@@ -1,31 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 May 2012 12:11:55 -0600
-Subject: [PATCH] ARM: move read_{boot,
- persistent}_clock to the architecture level
-In-Reply-To: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
-References: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4FA0276B.9090303@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 1 May 2012 19:19:23 +0100
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <4FA0258D.8020807@codeaurora.org>
+References: <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de>
+ <4F9EE84C.90106@codeaurora.org>
+ <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+ <4F9F1659.1010804@codeaurora.org>
+ <20120501081103.GC2194@S2101-09.ap.freescale.net>
+ <20120501091334.GG15541@lunn.ch>
+ <20120501170001.GB4089@opensource.wolfsonmicro.com>
+ <4FA0258D.8020807@codeaurora.org>
+Message-ID: <20120501181922.GD4089@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2012 06:45 AM, Marc Zyngier wrote:
-> At the moment, read_persistent_clock is implemented at the
-> platform level, which makes it impossible to compile these
-> platforms in a single kernel.
-> 
-> Implement these two functions at the architecture level, and
-> provide a thin registration interface for both read_boot_clock
-> and read_persistent_clock. The two affected platforms (OMAP and
-> Tegra) are converted at the same time.
-> 
-> Compile tested only.
-> 
-> Reported-by: Jeff Ohlstein <johlstei@codeaurora.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, May 01, 2012 at 11:03:57AM -0700, Saravana Kannan wrote:
 
-Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+> Sorry for the annoyance I seem to have caused. I too have been
+> trying to get this in for a while before the other platforms started
+> using the new framework. Not everyone was free at the same time and
+> it's taken longer that I would have wished for.
 
-I'm not sure exactly how to fully exercise this, but Tegra still boots
-without issue or obvious error messages with this patch applied.
+> I did my best to limit the changes that would be needed without
+> making my patch useless. Appreciate your understanding.
+
+To be honest it doesn't look like your patch is a particular issue here
+- there's wider process problems, for example we've managed to go
+through most of the release cycle and so far the only changes showing up
+in -next are:
+
+Viresh Kumar (6):
+      SPEAr: clk: Add VCO-PLL Synthesizer clock
+      SPEAr: clk: Add Auxiliary Synthesizer clock
+      SPEAr: clk: Add Fractional Synthesizer clock
+      SPEAr: clk: Add General Purpose Timer Synthesizer clock
+      SPEAr: Switch to common clock framework
+      SPEAr13xx: Add common clock framework support
+
+Mark Brown (1):
+      ARM: 7376/1: clkdev: Implement managed clk_get()
+
+Sascha Hauer (1):
+      clk: add a fixed factor clock
+
+viresh kumar (1):
+      ARM: 7392/1: CLKDEV: Optimize clk_find()
+
+and obviously there's quite a bit more work which has been going on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120501/612a36bc/attachment.sig>
