@@ -1,55 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 01 May 2012 10:16:01 +0200
-Subject: [PATCH 00/18][V3] ARM: OMAP3/4 : cpuidle34xx and cpuidle44xx
- cleanups
-In-Reply-To: <87vckgltdg.fsf@ti.com>
-References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
- <4F98740F.1020402@linaro.org> <87vckgltdg.fsf@ti.com>
-Message-ID: <4F9F9BC1.9020908@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 1 May 2012 08:34:14 +0000
+Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
+In-Reply-To: <4F9F5B3F.1030502@st.com>
+References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
+ <201204301746.45004.arnd@arndb.de> <4F9F5B3F.1030502@st.com>
+Message-ID: <201205010834.14724.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2012 12:58 AM, Kevin Hilman wrote:
-> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
->
->> On 04/24/2012 04:05 PM, Daniel Lezcano wrote:
->>> This patchset makes some cleanup on these cpuidle drivers
->>> and consolidate the code across both architecture.
->>>
->>> Tested on OMAP3 (igepV2).
->>> Partially tested on OMAP4 (pandaboard), without offlining the cpu1.
->
-> Without offlining CPU1, none of this code is executed.  Can you test
-> with CPU1 offlined?
+On Tuesday 01 May 2012, Viresh Kumar wrote:
+> 
+> On 4/30/2012 11:16 PM, Arnd Bergmann wrote:
+> > Ok, I missed the compilation dependencies you mentioned here.  So the branch
+> > you sent me doesn't actually build by itself, which is not good.
+> 
+> I thought, i must not add patches from Russell and Mike in my pull request, as they
+> haven't made to linux-next till now. i.e. even if this branch doesn't compile by
+> itself, it should get compiled when it is merged with your branch, where these
+> dependencies must be present already. Isn't this the right approach?
 
-Unfortunately my OMAP4 board burned :/ I am waiting for a new one.
-Rob tested the series but when he unplugged the cpu1, the kernel panics 
-for another reason. I guess the problem should have been fixed since the 
-last testing.
+It's more complicated than this. You are right that you cannot just add patches
+to one tree that should go through a different tree. However, another requirement
+is that all branches are bisectable and you have a working kernel at each
+intermediate step. It takes some experience to get it all working.
 
-Rob ? Do you mind the test the series again, the problem you were facing 
-when unplugging the cpu1 may have been fixed.
+> > We can work out something from here once I understand where the dependencies
+> > are.
+> 
+> These two only:
+> 
+> - Mike's clk-next branch
 
-Mike ? if you have time, is it possible you test it on your board ?
+The right solution for this would have been to take it as another base merged
+with the other two branches and put the new patches on top, and then let me
+pull in the clk-next branch as a dependency into linux-next that needs to
+get upstream first before I send out your patches.
 
->> Hi,>>
->> could be this patchset considered for inclusion ?
->>
->
-> Yes.   This is a good series, and a great cleanup.
->
-> Unfortunately, there is lots of OMAP PM code to review at the moment so
-> there's a bit of a lag in my ability to review and test.
+This is not as important for a new platform like spear13xx because there won't
+be any regressions, but you should absolutely make sure that you don't break
+existing platforms. I also noticed now that the pinctrl patches in the spear3xx
+series don't work by themselves and have another dependency on the stuff that
+I presume is in Linus' pinctrl tree.
 
-Ok, sure. I understand, no pressure :)
+> - Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ... 
 
-Thanks a lot.
+I could not find out the status of that patch. Which branch is it going to get
+merged through?
 
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
