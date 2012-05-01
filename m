@@ -1,51 +1,64 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 1 May 2012 15:48:32 -0700
-Subject: [PATCH] clk: Fix error handling paths of all basic clock
- register() routines
-In-Reply-To: <c65c7006185c193706b401b874b59e3769f593b0.1334029502.git.viresh.kumar@st.com>
-References: <c65c7006185c193706b401b874b59e3769f593b0.1334029502.git.viresh.kumar@st.com>
-Message-ID: <20120501224832.GB17311@gmail.com>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Tue, 1 May 2012 23:55:38 +0100
+Subject: [patch v2 3/3] kirkwood: Add iconnect support
+In-Reply-To: <878vhdbtk1.fsf@lebrac.rtp-net.org>
+References: <20120418211638.691400727@rtp-net.org>
+ <201204300011.17388.linux@baker-net.org.uk>
+ <878vhdbtk1.fsf@lebrac.rtp-net.org>
+Message-ID: <201205012355.38598.linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120410-09:24, Viresh Kumar wrote:
-> This fixes following in error handling paths of register() routines of all basic
-> clock types:
-> - Free memory for clock type, allocated with kmalloc or kzalloc if
->   clk_register() fails.
-> - No, need to free memory for clock type, if allocation fails for it.
+On Monday 30 April 2012, Arnaud Patard wrote:
+> Adam Baker <linux@baker-net.org.uk> writes:
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/clk/clk-divider.c      |    2 +-
->  drivers/clk/clk-fixed-factor.c |    2 +-
->  drivers/clk/clk-fixed-rate.c   |   25 ++++++++++++++++++++-----
->  drivers/clk/clk-gate.c         |    2 +-
->  drivers/clk/clk-mux.c          |    8 +++++++-
->  5 files changed, 30 insertions(+), 9 deletions(-)
+> Hi,
 > 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index d5ac6a7..68158ce 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -192,8 +192,8 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
->  	if (clk)
->  		return clk;
->  
-> -out:
->  	kfree(div->parent[0]);
-> +out:
->  	kfree(div);
->  
->  	return NULL;
+> > On Thursday 26 April 2012, Arnaud Patard wrote:
+> >> Adam Baker <linux@baker-net.org.uk> writes:
+> >> 
+> >> Hi,
+> >> 
+> >> > On Wednesday 18 April 2012, Arnaud Patard wrote:
+> >> >> Add support for Iomega Iconnect system.
+> >> >> 
+> >> >> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> >> > 
+> >> > Arnaud,
+> >> > 
+> >> > I have so far been unable to get a kernel to boot with your patches. I
+> >> > just get
+> >> > 
+> >> > Uncompressing Linux... done, booting the kernel.
+> >> 
+> >> hm. sounds weird. Are you sure that you have the DTB appended to your
+> >> kernel image ?
+> > 
+> > Yes, if I don't append the DTB and I set ArcNumber to 1682 then it boots
+> > using the ref board setup, if the DTB is appended then it doesn't boot
+> > (I configured the kernel to support iconnect, dreamplug and RD-88F6281)
+> 
+> hm. ok. Can you provide your uImage/kernel config/modules/ and which
+> sources you've used... so that I can try to reproduce / boot your kernel?
+> 
 
-Hi Viresh,
+Arnaud has spotted that my kernel config was missing CONFIG_SERIAL_OF_PLATFORM 
+which is why I was getting no output from it. After fixing that I've got a 
+working system, therefore
 
-My apologies for taking so long to get back to you on this.  This patch
-completely fell through the cracks.
+Tested-By: Adam Baker <linux@baker-net.org.uk>
 
-Anyways my clk-next branch refactored this code and does The Right Thing
-now, so I won't be taking this patch.
+I have verified that all of the LED options work, that the reset and OTB 
+buttons generate the expected codes (I think the reason Iomega chose odd SW_ 
+values is simply those are the first 2 defined values in linux/input.h) and that 
+the mtd partitions start at the correct offsets for what they claim to contain 
+(although the last one might make more sense called root rather than boot). 
+I've verified that the WLAN interface works but not tested wired ethernet.
 
-Thanks,
-Mike
+Unfortunately CONFIG_SERIAL_OF_PLATFORM has dependencies so it wouldn't be a 
+good idea for CONFIG_MACH_ICONNECT_DT to select it. There could be some value 
+in it making the default value for CONFIG_SERIAL_OF_PLATFORM=y.
+
+Regards
+
+Adam
