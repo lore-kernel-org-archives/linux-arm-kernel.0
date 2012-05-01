@@ -1,61 +1,59 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Tue, 01 May 2012 12:45:33 +0200
-Subject: [PATCH 1/9] cpu: Introduce clear_tasks_mm_cpumask() helper
-In-Reply-To: <20120426165911.00cebd31.akpm@linux-foundation.org>
-References: <20120423070641.GA27702@lizard> <20120423070736.GA30752@lizard>
- <20120426165911.00cebd31.akpm@linux-foundation.org>
-Message-ID: <1335869133.13683.125.camel@twins>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 1 May 2012 12:48:02 +0200
+Subject: [PATCH] arm: omap: add minimal support for Nokia RM-696
+In-Reply-To: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20120501104801.GA23559@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-04-26 at 16:59 -0700, Andrew Morton wrote:
-> > +void clear_tasks_mm_cpumask(int cpu)
-> 
-> The operation of this function was presumably obvious to you at the
-> time you wrote it, but that isn't true of other people at later times.
-> 
-> Please document it?
-> 
-> 
-> > +{
-> > +     struct task_struct *p;
-> > +
-> > +     /*
-> > +      * This function is called after the cpu is taken down and marked
-> > +      * offline,
-> 
-> hm, well.  Who said that this function will only ever be called
-> after that CPU was taken down?  There is nothing in the function name
-> nor in the (absent) documentation which enforces this precondition.
-> 
-> If someone tries to use this function for a different purpose, or
-> copies-and-modifies it for a different purpose, we just shot them in
-> the foot.
-> 
-> They'd be pretty dumb to do that without reading the local comment,
-> but still...
+Hi!
 
-Methinks something simple like:
-
-	WARN_ON(cpu_online(cpu));
-
-Ought to cure that worry, no? :-)
-
+> Add minimal support for Nokia RM-696 board.
 > 
-> >        so its not like new tasks will ever get this cpu set in
-> > +      * their mm mask. -- Peter Zijlstra
-> > +      * Thus, we may use rcu_read_lock() here, instead of grabbing
-> > +      * full-fledged tasklist_lock.
-> > +      */
-> > +     rcu_read_lock();
-> > +     for_each_process(p) {
-> > +             struct task_struct *t;
-> > +
-> > +             t = find_lock_task_mm(p);
-> > +             if (!t)
-> > +                     continue;
-> > +             cpumask_clear_cpu(cpu, mm_cpumask(t->mm));
-> > +             task_unlock(t);
-> > +     }
-> > +     rcu_read_unlock();
-> > +} 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+> 
+> 	The patch is based & boot-tested with 3.3-rc6.
+> 
+> 
+>  arch/arm/mach-omap2/Kconfig                  |    3 ++-
+>  arch/arm/mach-omap2/board-rm680.c            |   14 +++++++++++++-
+>  arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+>  3 files changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index e20c8ab..b740c2e 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -245,10 +245,11 @@ config MACH_NOKIA_N8X0
+>  	select MACH_NOKIA_N810_WIMAX
+>  
+>  config MACH_NOKIA_RM680
+> -	bool "Nokia RM-680 board"
+> +	bool "Nokia RM-680/696 board"
+>  	depends on ARCH_OMAP3
+>  	default y
+>  	select OMAP_PACKAGE_CBB
+> +	select MACH_NOKIA_RM696
+>
+
+AFAICT, this is nokia N9. At least help text should state that...
+
+>  config MACH_NOKIA_RX51
+>  	bool "Nokia RX-51 board"
+> diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+> index 8678b38..094473e 100644
+> --- a/arch/arm/mach-omap2/board-rm680.c
+> +++ b/arch/arm/mach-omap2/board-rm680.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Board support file for Nokia RM-680.
+> + * Board support file for Nokia RM-680/696.
+>   *
+
+And a comment.
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
