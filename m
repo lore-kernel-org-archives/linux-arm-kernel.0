@@ -1,35 +1,35 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Wed, 2 May 2012 08:55:55 +1000
-Subject: mc13xxx: add I2C support, V5
-In-Reply-To: <20120501103949.GC20224@sortiz-mobl>
-References: <1333262499-25871-1-git-send-email-marc@cpdesign.com.au>
- <201204170921.42027.marc@cpdesign.com.au>
- <20120501103949.GC20224@sortiz-mobl>
-Message-ID: <201205020855.55953.marc@cpdesign.com.au>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 1 May 2012 15:59:00 -0700
+Subject: [PATCH 3/4] clk: add DT clock binding support
+In-Reply-To: <1334003101-17274-4-git-send-email-robherring2@gmail.com>
+References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
+ <1334003101-17274-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20120501225900.GC17311@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+On 20120409-15:25, Rob Herring wrote:
+> From: Grant Likely <grant.likely@secretlab.ca>
+snip
+> ---
+>  .../devicetree/bindings/clock/clock-bindings.txt   |  117 ++++++++++++++++
+>  .../devicetree/bindings/clock/fixed-clock.txt      |   22 +++
+>  drivers/clk/clk.c                                  |  140 ++++++++++++++++++++
+>  drivers/clk/clkdev.c                               |   77 +++++++++++
+>  include/linux/clk-provider.h                       |   14 ++
+>  include/linux/clk.h                                |   19 +++
+>  6 files changed, 389 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
 
-> > On Sunday, April 01, 2012 04:41:35 PM Marc Reilly wrote:
-> > > This series (against mfd-2.6/for-next) changes the mc13xxx driver to
-> > > use regmap and adds I2C support.
-> > > It has a compile dependency on regmap/for-next, as the spi driver uses
-> > > the recently added pad_bits config field.
-> > 
-> > (bump).
-> > 
-> > Are these changes OK to go in?
-> 
-> All 4 patches applied to my for-next branch.
-> I had to manually apply patch #1, please verify that it's all good.
+Hi Rob,
 
-Looks good. I think I can see where it didn't apply, thanks for that. 
+Patches 1 & 2 are trivial and certainly aimed at clk-next, so I've taken
+them in.  This patch is a bit more difficult as it touches the common
+clk code, clkdev/clk.h and some DT docs.
 
-> I added an Acked-by: Oskar Schirmer <oskar@scara.com> to patch #4. Please
-> make sure that you add the right tags to the corresponding patches in the
-> future.
-Apologies, will try.
+Are you looking for me to take this patch into clk-next?  I'm just
+trying to avoid any more clk dependency issues than we already have...
 
-Cheers,
-Marc
+Thanks,
+Mike
