@@ -1,201 +1,145 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 1 May 2012 10:47:35 +0200
-Subject: [PATCH] arm: omap: Use only valid power domain states
-In-Reply-To: <1335821126-12994-1-git-send-email-mgreer@animalcreek.com>
-References: <1335821126-12994-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <CAORVsuUJQOL-aTaGdo6VsOGm3ZHU=nWinQYrP70Lx0kG6G34TQ@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 1 May 2012 14:15:33 +0530
+Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
+ clkdevs for given struct clk *
+In-Reply-To: <20120428110635.GQ24211@n2100.arm.linux.org.uk>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
+ <20120426074746.GD24211@n2100.arm.linux.org.uk> <4F992369.2020308@st.com>
+ <20120428095222.GP24211@n2100.arm.linux.org.uk>
+ <20120428110108.GD20478@pengutronix.de>
+ <20120428110635.GQ24211@n2100.arm.linux.org.uk>
+Message-ID: <4F9FA2AD.4050904@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, Apr 30, 2012 at 11:25 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> Some parts of the OMAP code assume that all power
-> domains support certain states (e.g., RET & OFF).
-> This isn't always true (e.g., the am35x family of
-> SoC's) so those assumptions need to be removed.
->
-> Remove those assumptions by looking up the deepest
-> state that a power domain can be in whereever its
-> being blindly set. ?The 'max()' of the deepest
-> state and what the code formerly wanted to set it
-> to, is the correct state. ?If the code formerly
-> wanted to set it to PWRDM_POWER_OFF, then the
-> deepest possible state will be used (i.e., no
-> need to perform the 'max()').
->
-> The code still assumes that ON is a valid state.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->
-> These patches apply on top of Kevin's patch series,
-> ? ? ?"[PATCH/RFT 0/8] ARM: OMAP: remove IP checks from SoC family detection"
->
-> Tested on an am3517 evm and am37x evm.
->
-> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 19 +++++++++++++------
-> ?arch/arm/mach-omap2/pm34xx.c ? ? ?| ? 15 +++++++++------
-> ?arch/arm/mach-omap2/powerdomain.c | ? 25 +++++++++++++++++++++++++
-> ?arch/arm/mach-omap2/powerdomain.h | ? ?2 ++
-> ?4 files changed, 49 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 5358664..2c91711 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -175,19 +175,25 @@ static int next_valid_state(struct cpuidle_device *dev,
-> ? ? ? ?struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
-> ? ? ? ?struct cpuidle_state *curr = &drv->states[index];
-> ? ? ? ?struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
-> - ? ? ? u32 mpu_deepest_state = PWRDM_POWER_RET;
-> - ? ? ? u32 core_deepest_state = PWRDM_POWER_RET;
-> + ? ? ? u32 mpu_deepest_state, mpu_deepest_possible;
-> + ? ? ? u32 core_deepest_state, core_deepest_possible;
-> ? ? ? ?int next_index = -1;
->
-> + ? ? ? mpu_deepest_possible = pwrdm_get_deepest_state(mpu_pd);
-> + ? ? ? mpu_deepest_state = max_t(u32, mpu_deepest_possible, PWRDM_POWER_RET);
-I do not think you need to change the pwrdm API and the cpuidle code for that.
-
-Instead you should use the pwrst* fields in the power domains data
-files, which allow to specify the allowed states.
-After reading the rest of your patches it seems you are addressing the
-issue in a subsequent patch 'arm: omap3: am35x: Set proper powerdomain
-states'.
-
-> +
-> + ? ? ? core_deepest_possible = pwrdm_get_deepest_state(core_pd);
-> + ? ? ? core_deepest_state = max_t(u32, core_deepest_possible, PWRDM_POWER_RET);
-> +
-> ? ? ? ?if (enable_off_mode) {
-> - ? ? ? ? ? ? ? mpu_deepest_state = PWRDM_POWER_OFF;
-> + ? ? ? ? ? ? ? mpu_deepest_state = mpu_deepest_possible;
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? * Erratum i583: valable for ES rev < Es1.2 on 3630.
-> ? ? ? ? ? ? ? ? * CORE OFF mode is not supported in a stable form, restrict
-> ? ? ? ? ? ? ? ? * instead the CORE state to RET.
-> ? ? ? ? ? ? ? ? */
-> ? ? ? ? ? ? ? ?if (!IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
-> - ? ? ? ? ? ? ? ? ? ? ? core_deepest_state = PWRDM_POWER_OFF;
-> + ? ? ? ? ? ? ? ? ? ? ? core_deepest_state = core_deepest_possible;
-> ? ? ? ?}
->
-> ? ? ? ?/* Check if current state is valid */
-> @@ -422,8 +428,9 @@ int __init omap3_idle_init(void)
-> ? ? ? ? ? ? ? ?pr_warn("%s: core off state C7 disabled due to i583\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?__func__);
-> ? ? ? ?}
-> - ? ? ? cx->mpu_state = PWRDM_POWER_OFF;
-> - ? ? ? cx->core_state = PWRDM_POWER_OFF;
-> +
-> + ? ? ? cx->mpu_state = pwrdm_get_deepest_state(mpu_pd);
-> + ? ? ? cx->core_state = pwrdm_get_deepest_state(core_pd);
->
-> ? ? ? ?drv->state_count = OMAP3_NUM_STATES;
-> ? ? ? ?cpuidle_register_driver(&omap3_idle_driver);
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index ec92676..40d8d07 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -614,12 +614,11 @@ void omap3_pm_off_mode_enable(int enable)
-> ? ? ? ?struct power_state *pwrst;
-> ? ? ? ?u32 state;
->
-> - ? ? ? if (enable)
-> - ? ? ? ? ? ? ? state = PWRDM_POWER_OFF;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? state = PWRDM_POWER_RET;
+On 4/28/2012 4:36 PM, Russell King - ARM Linux wrote:
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 6db161f..2000c6b 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -116,8 +116,9 @@ struct clk_lookup_alloc {
+>  	char	con_id[MAX_CON_ID];
+>  };
+>  
+> -struct clk_lookup * __init_refok
+> -clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+> +static struct clk_lookup * __init_refok
+> +vclkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt,
+> +	va_list ap)
+>  {
+>  	struct clk_lookup_alloc *cla;
+>  
+> @@ -132,16 +133,25 @@ clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+>  	}
+>  
+>  	if (dev_fmt) {
+> -		va_list ap;
 > -
-> ? ? ? ?list_for_each_entry(pwrst, &pwrst_list, node) {
-> + ? ? ? ? ? ? ? state = pwrdm_get_deepest_state(pwrst->pwrdm);
-> + ? ? ? ? ? ? ? if (!enable)
-> + ? ? ? ? ? ? ? ? ? ? ? state = max_t(u32, state, PWRDM_POWER_RET);
+> -		va_start(ap, dev_fmt);
+>  		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
+>  		cla->cl.dev_id = cla->dev_id;
+> -		va_end(ap);
+>  	}
+>  
+>  	return &cla->cl;
+>  }
 > +
-> ? ? ? ? ? ? ? ?if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pwrst->pwrdm == core_pwrdm &&
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?state == PWRDM_POWER_OFF) {
-> @@ -660,6 +659,7 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
-> ?static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
-> ?{
-> ? ? ? ?struct power_state *pwrst;
-> + ? ? ? u32 state;
->
-> ? ? ? ?if (!pwrdm->pwrsts)
-> ? ? ? ? ? ? ? ?return 0;
-> @@ -668,7 +668,10 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
-> ? ? ? ?if (!pwrst)
-> ? ? ? ? ? ? ? ?return -ENOMEM;
-> ? ? ? ?pwrst->pwrdm = pwrdm;
-> - ? ? ? pwrst->next_state = PWRDM_POWER_RET;
+> +struct clk_lookup * __init_refok
+> +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+> +{
+> +	struct clk_lookup *cl;
+> +	va_list ap;
 > +
-> + ? ? ? state = pwrdm_get_deepest_state(pwrdm);
-> + ? ? ? pwrst->next_state = max_t(u32, state, PWRDM_POWER_RET);
+> +	va_start(ap, dev_fmt);
+> +	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
+> +	va_end(ap);
 > +
-> ? ? ? ?list_add(&pwrst->node, &pwrst_list);
->
-> ? ? ? ?if (pwrdm_has_hdwr_sar(pwrdm))
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 96ad3dbe..9c80c19 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -1078,3 +1078,28 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
->
-> ? ? ? ?return 0;
-> ?}
+> +	return cl;
+> +}
+>  EXPORT_SYMBOL(clkdev_alloc);
+>  
+>  int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+> @@ -173,3 +183,65 @@ void clkdev_drop(struct clk_lookup *cl)
+>  	kfree(cl);
+>  }
+>  EXPORT_SYMBOL(clkdev_drop);
 > +
 > +/**
-> + * pwrdm_get_deepest_state - Get deepest valid state domain can enter
-> + * @pwrdm: struct powerdomain *
+> + * clk_register_clkdev - register one clock lookup for a struct clk
+> + * @clk: struct clk to associate with all clk_lookups
+> + * @con_id: connection ID string on device
+> + * @dev_id: format string describing device name
 > + *
-> + * Find and return the deepest valid state a power domain can be in.
-> + * Returns the deepest state that @pwrdm can enter.
+> + * con_id or dev_id may be NULL as a wildcard, just as in the rest of
+> + * clkdev.
+> + *
+> + * To make things easier for mass registration, we detect error clks
+> + * from a previous clk_register() call, and return the error code for
+> + * those.  This is to permit this function to be called immediately after
+> + * clk_register().
 > + */
-> +u32 pwrdm_get_deepest_state(struct powerdomain *pwrdm)
+> +int clk_register_clkdev(struct clk *clk, const char *con_id,
+> +	const char *dev_fmt, ...)
 > +{
-> + ? ? ? u32 valid_states, deepest_state;
+> +	struct clk_lookup *cl;
+> +	va_list ap;
 > +
-> + ? ? ? valid_states = pwrdm->pwrsts;
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
 > +
-> + ? ? ? if (valid_states & PWRSTS_OFF)
-> + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_OFF;
-> + ? ? ? else if (valid_states & PWRSTS_RET)
-> + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_RET;
-> + ? ? ? else if (valid_states & PWRSTS_INACTIVE)
-> + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_INACTIVE;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_ON;
+> +	va_start(ap, dev_fmt);
+> +	cl = vclkdev_alloc(clk, con_id, dev_fmt, ap);
+> +	va_end(ap);
 > +
-> + ? ? ? return deepest_state;
+> +	if (!cl)
+> +		return -ENOMEM;
+> +
+> +	clkdev_add(cl);
+> +
+> +	return 0;
 > +}
-
-The pwrdm API already performs those checks on pwrst*, cf.
-pwrdm_set_next_pwrst for example.
-
-So to summarize I think the code duplication should be avoided.
-
-Regards,
-Jean
-
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index 0d72a8a..9688ff1 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -220,6 +220,8 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
-> ?int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
-> ?bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
->
-> +u32 pwrdm_get_deepest_state(struct powerdomain *pwrdm);
 > +
-> ?extern void omap242x_powerdomains_init(void);
-> ?extern void omap243x_powerdomains_init(void);
-> ?extern void omap3xxx_powerdomains_init(void);
-> --
-> 1.7.9.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> +/**
+> + * clk_register_clkdevs - register a set of clk_lookup for a struct clk
+> + * @clk: struct clk to associate with all clk_lookups
+> + * @cl: array of clk_lookup structures with con_id and dev_id pre-initialized
+> + * @num: number of clk_lookup structures to register
+> + *
+> + * To make things easier for mass registration, we detect error clks
+> + * from a previous clk_register() call, and return the error code for
+> + * those.  This is to permit this function to be called immediately after
+> + * clk_register().
+> + */
+> +int clk_register_clkdevs(struct clk *clk, struct clk_lookup *cl, size_t num)
+> +{
+> +	unsigned i;
+> +
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	for (i = 0; i < num; i++) {
+> +		cl->clk = clk;
+> +		clkdev_add(cl);
+> +	}
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(clk_register_clkdevs);
+> diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+> index d9a4fd0..a6a6f60 100644
+> --- a/include/linux/clkdev.h
+> +++ b/include/linux/clkdev.h
+> @@ -40,4 +40,7 @@ void clkdev_drop(struct clk_lookup *cl);
+>  void clkdev_add_table(struct clk_lookup *, size_t);
+>  int clk_add_alias(const char *, const char *, char *, struct device *);
+>  
+> +int clk_register_clkdev(struct clk *, const char *, const char *, ...);
+> +int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
+> +
+>  #endif
+
+Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+
+-- 
+viresh
