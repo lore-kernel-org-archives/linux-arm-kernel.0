@@ -1,59 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 1 May 2012 12:48:02 +0200
-Subject: [PATCH] arm: omap: add minimal support for Nokia RM-696
-In-Reply-To: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20120501104801.GA23559@elf.ucw.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 May 2012 12:07:45 +0100
+Subject: [PATCH] ARM: Fix restoration of IP scratch register when
+ auditing syscalls
+In-Reply-To: <4F9EE024.8000906@redhat.com>
+References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
+ <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
+ <20120430100746.GA11080@mudshark.cambridge.arm.com>
+ <4F9EE024.8000906@redhat.com>
+Message-ID: <20120501110744.GD2305@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Apr 30, 2012 at 07:55:32PM +0100, Jon Masters wrote:
+> But I'll look over your patch and do some poking. Now that we know where
+> this problem is, I think the priority is for me to test this patch from
+> you (took the day off, but I'll give it a test tonight) to make sure
+> nothing blows up, then schedule some time for audit to make sure it's
+> actually doing anything useful. I'll email you later today. Still
+> leaning toward recommending nobody actually turn on audit on ARM systems
+> until we know that it doesn't do anything else that's terrible.
 
-> Add minimal support for Nokia RM-696 board.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
-> 
-> 	The patch is based & boot-tested with 3.3-rc6.
-> 
-> 
->  arch/arm/mach-omap2/Kconfig                  |    3 ++-
->  arch/arm/mach-omap2/board-rm680.c            |   14 +++++++++++++-
->  arch/arm/plat-omap/include/plat/uncompress.h |    1 +
->  3 files changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index e20c8ab..b740c2e 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -245,10 +245,11 @@ config MACH_NOKIA_N8X0
->  	select MACH_NOKIA_N810_WIMAX
->  
->  config MACH_NOKIA_RM680
-> -	bool "Nokia RM-680 board"
-> +	bool "Nokia RM-680/696 board"
->  	depends on ARCH_OMAP3
->  	default y
->  	select OMAP_PACKAGE_CBB
-> +	select MACH_NOKIA_RM696
->
+Well this might make you smile.
 
-AFAICT, this is nokia N9. At least help text should state that...
+The original audit code blew up the ARM kernel because it assumed a big-endian
+target, which we since fixed. However, it looks like the userspace audit tools
+only support ARMEB, so I've not been able to get them working on my board.
+Linaro even had the heart to package them up nicely in their v7l filesystem!
 
->  config MACH_NOKIA_RX51
->  	bool "Nokia RX-51 board"
-> diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-> index 8678b38..094473e 100644
-> --- a/arch/arm/mach-omap2/board-rm680.c
-> +++ b/arch/arm/mach-omap2/board-rm680.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Board support file for Nokia RM-680.
-> + * Board support file for Nokia RM-680/696.
->   *
+I doubt it's much effort to fix the tools, but it implies nobody is using
+them on armv7l today and turning it off is probably your safest bet for the time
+being.
 
-And a comment.
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Will
