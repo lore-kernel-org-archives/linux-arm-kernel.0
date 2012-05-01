@@ -1,40 +1,34 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 1 May 2012 03:36:37 +0000
-Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201205010521.14052.marex@denx.de>
-References: <1335837363-12376-1-git-send-email-marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B7C3E3@039-SN2MPN1-023.039d.mgd.msft.net>
- <201205010521.14052.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7C439@039-SN2MPN1-023.039d.mgd.msft.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 1 May 2012 09:10:47 +0530
+Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
+In-Reply-To: <201204301746.45004.arnd@arndb.de>
+References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
+ <201204301746.45004.arnd@arndb.de>
+Message-ID: <4F9F5B3F.1030502@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> > If the host and device interrupt handler are called by otg interrupt
-> > handler, then, the interrupt handlers are registered by host/device
-> will
-> > be called twice as they are also registered by host/device themselves.
-> 
-> No they won't, I don't register them in ehci-mxs or ci13xxx-mxs anymore.
-> 
-Have you changed any hcd code? The host interrupt is registered by hcd
-core code: usb_add_hcd.
+On 4/30/2012 11:16 PM, Arnd Bergmann wrote:
+> Ok, I missed the compilation dependencies you mentioned here.  So the branch
+> you sent me doesn't actually build by itself, which is not good.
 
-> >
-> > Besides, what kinds of function do you want to add at this patchset?
-> 
-> Device and Host mode, separate so far, configurable by platform data. I'm
-> also
-> looking into the OTG, but let's get this basic stuff right and mainline
-> first.
-> 
-Then, the aim for this patchset is only enable OTG port, 
-and device/host function is selected by platform data, 
-no otg function(id switch) will be supported, correct?
+I thought, i must not add patches from Russell and Mike in my pull request, as they
+haven't made to linux-next till now. i.e. even if this branch doesn't compile by
+itself, it should get compiled when it is merged with your branch, where these
+dependencies must be present already. Isn't this the right approach?
 
-Understanding your scope may help me review your patches.
+> I have now merged both as staging branches, which means it will be in linux-next
+> from now on but can still get rebased in order to work out the dependencies.
 
- 
-> 
-> Best regards,
-> Marek Vasut
+Ok.
+
+> We can work out something from here once I understand where the dependencies
+> are.
+
+These two only:
+
+- Mike's clk-next branch
+- Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ...
+
+-- 
+viresh
