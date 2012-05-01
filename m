@@ -1,79 +1,46 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 1 May 2012 16:16:02 -0500
-Subject: [PATCH v4 04/39] ARM: OMAP2+: gpmc: Acquire NAND CS value
-In-Reply-To: <10220de398d22fad5de783d8f58fc55ebac85338.1335874494.git.afzal@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <10220de398d22fad5de783d8f58fc55ebac85338.1335874494.git.afzal@ti.com>
-Message-ID: <4FA05292.7030902@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue,  1 May 2012 17:36:54 -0400
+Subject: [PATCH] usb: [ARM] fix unresolved err() reference in
+ host/ohci-pxa27x.c
+Message-ID: <1335908214-4803-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+Commit af4e1ee04026908086d7ed252db2619a8ceaa333 (usb-next)
 
-On 05/01/2012 07:20 AM, Afzal Mohammed wrote:
-> Some boards depend on bootloader to update chip select value for NAND.
-> It is felt that Kernel should not depend on bootloader to get CS, as
-> for a particular board CS is hardwired and is fixed, hence this can
-> directly be updated in Kernel. But as CS value for boards that depend
-> on this behaviour is not available, educate gpmc driver to acquire
-> chip select value for NAND. this ideally should be removed once CS
-> for those boards are available.
+    "USB: remove err() macro"
 
-Do you know how many boards require this? If so which are those boards?
+was preceeded by a tree-wide cleanup of users, however this
+one squeaked through the cracks because it had whitespace
+between the function name and the bracket for the args.
 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 657ce95..ecd3384 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -892,6 +892,30 @@ static int __init gpmc_init(void)
->  }
->  postcore_initcall(gpmc_init);
->  
-> +static __devinit int gpmc_acquire_nand_cs(struct gpmc *gpmc,
-> +					struct gpmc_device_pdata *gdp)
-> +{
-> +	int cs = 0;
-> +	struct omap_nand_platform_data *nand = gdp->pdata;
-> +
-> +	if ((nand->cs >= 0) && (nand->cs < GPMC_CS_NUM))
-> +		return 0;
-> +
-> +	while (cs < GPMC_CS_NUM) {
-> +		u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
-> +
-> +		if ((l & GPMC_CONFIG1_DEVICETYPE(~0)) ==
-> +				GPMC_CONFIG1_DEVICETYPE_NAND) {
-> +			dev_info(gpmc->dev, "found NAND on CS: %d\n", cs);
-> +			nand->cs = cs;
-> +			gdp->cs_data->cs = cs;
-> +			return 0;
-> +		}
-> +		cs++;
-> +	}
-> +	return -ENODEV;
-> +}
-> +
->  static __devinit void gpmc_update_nand_reg(struct gpmc *gpmc,
->  				struct omap_nand_platform_data *nand)
->  {
-> @@ -1450,8 +1474,14 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
->  
->  	for (i = 0, gdq = gp->device_pdata, gd = gpmc->device;
->  			(i < gp->num_device) && (*gdq); i++, gdq++) {
-> -		if ((*gdq)->is_nand)
-> +		if ((*gdq)->is_nand) {
-> +			ret = gpmc_acquire_nand_cs(gpmc, *gdq);
-> +			if (IS_ERR_VALUE(ret)) {
-> +				dev_err(gpmc->dev, "CS error: %d\n", ret);
-> +				continue;
-> +			}
+Map it onto dev_err, just like all the "pre-commits" made
+in advance of af4e1ee04026, such as the example seen in
+the commit d57b177208b6ec20cacd7321ee32ef02f9f9e7fa:
 
-Should this code be marked with a FIXME?
+    "USB: ohci-xls.c: remove err() usage"
 
-Cheers
-Jon
+Build tested with the ARM magician_defconfig settings.
+
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index c31b281..e1a3cc6 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -419,7 +419,8 @@ ohci_pxa27x_start (struct usb_hcd *hcd)
+ 		return ret;
+ 
+ 	if ((ret = ohci_run (ohci)) < 0) {
+-		err ("can't start %s", hcd->self.bus_name);
++		dev_err(hcd->self.controller, "can't start %s",
++			hcd->self.bus_name);
+ 		ohci_stop (hcd);
+ 		return ret;
+ 	}
+-- 
+1.7.9.1
