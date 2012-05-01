@@ -1,51 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 1 May 2012 21:56:03 +0200
-Subject: [PATCH 1/1] ARM: kirkwood: Add support for RaidSonic
-In-Reply-To: <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
-References: <20120501172042.GA13233@lunn.ch>
- <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
-Message-ID: <20120501195603.GW25584@lunn.ch>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Tue, 1 May 2012 12:54:58 -0700
+Subject: [PATCH] ARM: BCMRING: Add debug macro
+Message-ID: <4FA03F92.5090104@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 07:34:29PM +0100, Jamie Lentin wrote:
-> On Tue, 1 May 2012, Andrew Lunn wrote:
-> 
-> >Hi Simon
-> >
-> >The patch looks good.
-> >
-> >+static void ib62x0_power_off(void)
-> >+{
-> >+       gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
-> >+}
-> >
-> >Seeing this set of a train of thought. I have a feature creep
-> >request. Nice to have, i.e. not required to acceptance. This patterns
-> >of using a GPIO line to turn the hardware off is seen quite a few
-> >times. e.g.
-> >
-> >mach-kirkwood/netspace_v2-setup.c
-> >mach-orion5x/mv2120-setup.c
-> >mach-kirkwood/d2net_v2-setup.c
-> >mach-kirkwood/netspace_v2-setup.c
-> >
-> >and a few more.
-> >
-> >How about writing a gpio-poweroff platform driver? It would take a
-> >platform_data structure which lists which GPIO line to use, and if it
-> >should be active high/low. The probe function would take control of
-> >the GPIO line, set it to inactive state, and output. It would also
-> >register a function for pm_power_off(). When that function is called,
-> >it toggles the GPIO to turn the power off.
-> >
-> >Then wrap all this up in a DT binding.
-> 
-> I've been thinking about this too, would make a lot of sense. Most
-> of the gpio-poweroff driver would be easy, although registering the
-> power_off function wasn't immediately obvious.
+Add debug macro for bcmring.
 
-pm_power_off is a global variable. You should be able to assign it
-from anywhere.
+It is to support low-level debugging and earlyprintk.
 
-     Andrew
+Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+---
+  arch/arm/mach-bcmring/include/mach/debug-macro.S |   19 
++++++++++++++++++++
+  1 file changed, 19 insertions(+)
+  create mode 100644 arch/arm/mach-bcmring/include/mach/debug-macro.S
+
+diff --git a/arch/arm/mach-bcmring/include/mach/debug-macro.S 
+b/arch/arm/mach-bcmring/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..fae01fd
+--- /dev/null
++++ b/arch/arm/mach-bcmring/include/mach/debug-macro.S
+@@ -0,0 +1,19 @@
++/* arch/arm/mach-bcmring/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Based on arch/arm/mach-versatile/include/mach/debug-macro.S
++ *  by Jiandong Zheng
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
++        .macro    addruart, rp, rv, tmp
++        mov    \rp,      #0x00012000
++        orr    \rv, \rp, #0xf8000000    @ virtual base
++        orr    \rp, \rp, #0x80000000    @ physical base
++        .endm
++
++#include <asm/hardware/debug-pl01x.S>
+-- 
+1.7.9.5
