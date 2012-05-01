@@ -1,111 +1,118 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 1 May 2012 17:36:15 +0530
-Subject: [PATCH 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
+Date: Tue, 1 May 2012 17:36:22 +0530
+Subject: [PATCH 03/39] ARM: OMAP2+: gpmc: register details for nand driver
 In-Reply-To: <cover.1335873032.git.afzal@ti.com>
 References: <cover.1335873032.git.afzal@ti.com>
-Message-ID: <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335873032.git.afzal@ti.com>
+Message-ID: <93464215b662bfdafc75eb689fbc03fce16d1796.1335873032.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create API for platforms to adapt gpmc to HWMOD
+If peripheral connected is NAND, update NAND drivers platform data
+with NAND related register addresses so that NAND driver can handle
+GPMC NAND operations by itself
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c             |   52 +++++++++++++++++++++++---------
- arch/arm/plat-omap/include/plat/gpmc.h |    1 +
- 2 files changed, 38 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/gpmc.c             |   25 +++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/gpmc.h |   16 ++++++++++++++++
+ arch/arm/plat-omap/include/plat/nand.h |    1 +
+ 3 files changed, 42 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 12916f3..c8d07bb 100644
+index c8d07bb..657ce95 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -33,6 +33,8 @@
+@@ -30,6 +30,7 @@
+ 
+ #include <asm/mach-types.h>
+ #include <plat/gpmc.h>
++#include <plat/nand.h>
  
  #include <plat/sdrc.h>
  
-+#include <plat/omap_device.h>
-+
- /* GPMC register offsets */
- #define GPMC_REVISION		0x00
- #define GPMC_SYSCONFIG		0x10
-@@ -276,6 +278,31 @@ unsigned int gpmc_round_ns_to_ticks(unsigned int time_ns)
- 	return ticks * gpmc_get_fclk_period() / 1000;
+@@ -891,6 +892,28 @@ static int __init gpmc_init(void)
  }
+ postcore_initcall(gpmc_init);
  
-+int __init omap_init_gpmc(struct gpmc_pdata *pdata)
++static __devinit void gpmc_update_nand_reg(struct gpmc *gpmc,
++				struct omap_nand_platform_data *nand)
 +{
-+	struct omap_hwmod *oh;
-+	struct platform_device *pdev;
-+	char *name = "omap-gpmc";
-+	char *oh_name = "gpmc";
++	int cs = nand->cs;
 +
-+	pdata->clk_prd = gpmc_get_fclk_period();
-+
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh) {
-+		pr_err("Could not look up %s\n", oh_name);
-+		return -ENODEV;
-+	}
-+
-+	pdev = omap_device_build(name, -1, oh, pdata,
-+					sizeof(*pdata), NULL, 0, 0);
-+	if (IS_ERR(pdev)) {
-+		WARN(1, "Can't build omap_device for %s:%s.\n",
-+						name, oh->name);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
++	nand->reg.gpmc_status = gpmc->io_base + GPMC_STATUS;
++	nand->reg.gpmc_nand_command = gpmc->io_base + GPMC_CS0_OFFSET +
++				GPMC_CS_NAND_COMMAND + GPMC_CS_SIZE * cs;
++	nand->reg.gpmc_nand_address = gpmc->io_base + GPMC_CS0_OFFSET +
++				GPMC_CS_NAND_ADDRESS + GPMC_CS_SIZE * cs;
++	nand->reg.gpmc_nand_data = gpmc->io_base + GPMC_CS0_OFFSET +
++				GPMC_CS_NAND_DATA + GPMC_CS_SIZE * cs;
++	nand->reg.gpmc_prefetch_config1 = gpmc->io_base + GPMC_PREFETCH_CONFIG1;
++	nand->reg.gpmc_prefetch_config2 = gpmc->io_base + GPMC_PREFETCH_CONFIG2;
++	nand->reg.gpmc_prefetch_control = gpmc->io_base + GPMC_PREFETCH_CONTROL;
++	nand->reg.gpmc_prefetch_status = gpmc->io_base + GPMC_PREFETCH_STATUS;
++	nand->reg.gpmc_ecc_config = gpmc->io_base + GPMC_ECC_CONFIG;
++	nand->reg.gpmc_ecc_control = gpmc->io_base + GPMC_ECC_CONTROL;
++	nand->reg.gpmc_ecc_size_config = gpmc->io_base + GPMC_ECC_SIZE_CONFIG;
++	nand->reg.gpmc_ecc1_result = gpmc->io_base + GPMC_ECC1_RESULT;
 +}
- #ifdef DEBUG
- static int set_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit,
- 			       int time, const char *name)
-@@ -843,24 +870,19 @@ static __devinit void gpmc_mem_init(void)
- 
- static int __init gpmc_init(void)
++
+ static inline int gpmc_waitpin_is_reserved(struct gpmc *gpmc, unsigned waitpin)
  {
--	int ret = -EINVAL;
--	char *ck = NULL;
--
--	if (cpu_is_omap24xx()) {
--		ck = "core_l3_ck";
--	} else if (cpu_is_omap34xx()) {
--		ck = "gpmc_fck";
--	} else if (cpu_is_omap44xx()) {
--		ck = "gpmc_ck";
--	}
-+	char *oh_name = "gpmc";
-+	struct omap_hwmod *oh;
+ 	return gpmc->waitpin_map & (0x1 << waitpin);
+@@ -1427,6 +1450,8 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
  
--	if (WARN_ON(!ck))
--		return ret;
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh) {
-+		pr_err("Could not look up %s\n", oh_name);
-+		return -ENODEV;
-+	}
- 
--	gpmc_l3_clk = clk_get(NULL, ck);
-+	gpmc_l3_clk = clk_get(NULL, oh->main_clk);
- 	if (IS_ERR(gpmc_l3_clk)) {
--		printk(KERN_ERR "Could not get GPMC clock %s\n", ck);
--		BUG();
-+		pr_err("error: clk_get on %s\n", oh->main_clk);
-+		return -EINVAL;
- 	}
- 
- 	clk_enable(gpmc_l3_clk);
+ 	for (i = 0, gdq = gp->device_pdata, gd = gpmc->device;
+ 			(i < gp->num_device) && (*gdq); i++, gdq++) {
++		if ((*gdq)->is_nand)
++			gpmc_update_nand_reg(gpmc, (*gdq)->pdata);
+ 		ret = gpmc_setup_device(gpmc, gd, *gdq);
+ 		if (IS_ERR_VALUE(ret))
+ 			dev_err(gpmc->dev, "gpmc setup on %s failed\n",
 diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index 2eedd99..c5cf020 100644
+index c5cf020..976a8f0 100644
 --- a/arch/arm/plat-omap/include/plat/gpmc.h
 +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -217,6 +217,7 @@ struct gpmc_pdata {
+@@ -207,6 +207,7 @@ struct gpmc_device_pdata {
+ 	unsigned		per_res_cnt;
+ 	struct gpmc_cs_data	*cs_data;
+ 	unsigned		num_cs;
++	bool			is_nand;
  };
  
- extern int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *cs);
-+extern int omap_init_gpmc(struct gpmc_pdata *pdata);
+ struct gpmc_pdata {
+@@ -216,6 +217,21 @@ struct gpmc_pdata {
+ 	struct gpmc_device_pdata	**device_pdata;
+ };
  
- extern unsigned int gpmc_ns_to_ticks(unsigned int time_ns);
- extern unsigned int gpmc_ps_to_ticks(unsigned int time_ps);
++struct gpmc_nand_regs {
++	void __iomem	*gpmc_status;
++	void __iomem	*gpmc_nand_command;
++	void __iomem	*gpmc_nand_address;
++	void __iomem	*gpmc_nand_data;
++	void __iomem	*gpmc_prefetch_config1;
++	void __iomem	*gpmc_prefetch_config2;
++	void __iomem	*gpmc_prefetch_control;
++	void __iomem	*gpmc_prefetch_status;
++	void __iomem	*gpmc_ecc_config;
++	void __iomem	*gpmc_ecc_control;
++	void __iomem	*gpmc_ecc_size_config;
++	void __iomem	*gpmc_ecc1_result;
++};
++
+ extern int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *cs);
+ extern int omap_init_gpmc(struct gpmc_pdata *pdata);
+ 
+diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
+index 67fc506..86e4d9c 100644
+--- a/arch/arm/plat-omap/include/plat/nand.h
++++ b/arch/arm/plat-omap/include/plat/nand.h
+@@ -29,6 +29,7 @@ struct omap_nand_platform_data {
+ 	unsigned long		phys_base;
+ 	int			devsize;
+ 	enum omap_ecc           ecc_opt;
++	struct gpmc_nand_regs	reg;
+ };
+ 
+ /* minimum size for IO mapping */
 -- 
 1.7.10
