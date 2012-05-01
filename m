@@ -1,24 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 09:56:52 +0800
-Subject: [PATCH 15/17] ARM: shmobile: use machine specific hook for late
- init
-In-Reply-To: <201204302358.40328.rjw@sisk.pl>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <201204292335.30761.rjw@sisk.pl>
- <CAAQ0ZWRKh+uS+mo-O0MLTO7eXvwR7v1o9ii8Tck+8R4U_Ja3zA@mail.gmail.com>
- <201204302358.40328.rjw@sisk.pl>
-Message-ID: <CAAQ0ZWQGNh20mrJC-u_H4T4kOW2qfwj2jSdRqgTFEXm372wjSA@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue,  1 May 2012 04:00:17 +0200
+Subject: =?UTF-8?q?=5BPATCH=200/4=5D=20MXS=3A=20I2C=20improvements?=
+Message-ID: <1335837621-14816-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2012 05:58, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> However, my question was to the other maintainers in the CC list whether
-> any of them was going to take the patch directly or I was supposed to push
-> it to them.
->
-With acks collected from platform maintainers, I will eventually send
-a pull-request to arm-soc maintainers (Arnd, Olof) to include the
-whole series into arm-soc tree.
+This patchset implements support for adjustment of I2C bus speed via platform
+data. Further, it implements support for DMA transfers into the mxs-i2c driver.
+Lastly, there is a fix for GCC4.7 warning included.
 
-Regards,
-Shawn
+Marek Vasut (4):
+  MXS: Allow passing i2c bus speed via platform data
+  MXS: Set I2C timing registers for mxs-i2c
+  MXS: Implement DMA support into mxs-i2c
+  MXS: Fix GCC4.7 complaint in mxs-i2c
+
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +-
+ arch/arm/mach-mxs/devices/platform-mxs-i2c.c    |   14 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h |    5 +-
+ arch/arm/mach-mxs/mach-apx4devkit.c             |    7 +-
+ arch/arm/mach-mxs/mach-m28evk.c                 |    8 +-
+ arch/arm/mach-mxs/mach-mx28evk.c                |    7 +-
+ arch/arm/mach-mxs/mach-tx28.c                   |    7 +-
+ drivers/i2c/busses/i2c-mxs.c                    |  304 +++++++++++++++++++++--
+ include/linux/i2c/mxs-i2c.h                     |   22 ++
+ 9 files changed, 343 insertions(+), 34 deletions(-)
+ create mode 100644 include/linux/i2c/mxs-i2c.h
+
+Cc: Detlev Zundel <dzu@denx.de>
+CC: Dong Aisheng <b29396@freescale.com>
+CC: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-i2c at vger.kernel.org
+CC: Sascha Hauer <s.hauer@pengutronix.de>
+CC: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Wolfgang Denk <wd@denx.de>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+
+-- 
+1.7.10
