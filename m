@@ -1,35 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 1 May 2012 18:00:01 +0100
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <20120501091334.GG15541@lunn.ch>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
- <4F98EB10.2000505@codeaurora.org>
- <20120426084201.GF17184@pengutronix.de>
- <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
- <20120426095135.GG17184@pengutronix.de>
- <4F9EE84C.90106@codeaurora.org>
- <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
- <4F9F1659.1010804@codeaurora.org>
- <20120501081103.GC2194@S2101-09.ap.freescale.net>
- <20120501091334.GG15541@lunn.ch>
-Message-ID: <20120501170001.GB4089@opensource.wolfsonmicro.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 01 May 2012 10:03:49 -0700
+Subject: [PATCH-V5 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA000B5@DBDE01.ent.ti.com>
+ (Vaibhav Hiremath's message of "Fri, 27 Apr 2012 05:31:07 +0000")
+References: <1335362340-14960-1-git-send-email-hvaibhav@ti.com>
+ <1335362340-14960-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204260904580.10308@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF819@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204261330010.10308@utopia.booyaka.com>
+ <alpine.DEB.2.00.1204261636340.10308@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA000B5@DBDE01.ent.ti.com>
+Message-ID: <8762cfj0ju.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 11:13:34AM +0200, Andrew Lunn wrote:
+"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-> I agree with you as well, it is frustrating. Could we agree, that once
-> this patch is in, we freeze the core until the start of the next
-> cycle. We use the remainder of this cycle for porting platforms to the
-> generic clock framework.
+> On Fri, Apr 27, 2012 at 04:08:07, Paul Walmsley wrote:
+>> On Thu, 26 Apr 2012, Paul Walmsley wrote:
+>> 
+>> > Okay, thanks for testing.  Please do update this patch to use 
+>> > omap_hwmod_enable(), etc.; see for example omap_dm_timer_init_one().
+>> 
+>> And, just to be explicit, the ioremap(), clk_get(), and clk_enable() 
+>> should no longer be needed for OMAP2+, once you add the 
+>> omap_hwmod_enable().
+>> 
+>
+> What about OMAP1 architecture? Will it work? 
 
-Or merge the platforms then do framework changes incrementally, updating
-the platforms as we go (which is the normal pattern for maintaining a
-framework...).  I see we've already got SPEAr merged.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120501/f67b54b6/attachment.sig>
+You'll need to move the ioremap/clk* usage into OMAP1 code
+(mach-omap1/timer32k.c), and move the omap_hwmod_enable() into OMAP2+
+code (mach-omap2/timer.c).
+
+Then make the omap_init_clocksource_32k() just take the base address.
+
+If counter_32k were a real driver (and it should be) this is how things
+would work.  For example, the GPIO driver is shared between OMAP1 and
+OMAP2+ and any SoC specific init is done in the SoC specific device init
+code instead of the driver.
+
+Hope this helps,
+
+Kevin
