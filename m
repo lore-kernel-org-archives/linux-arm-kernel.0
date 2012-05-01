@@ -1,33 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 16:11:05 +0800
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <4F9F1659.1010804@codeaurora.org>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
- <4F98EB10.2000505@codeaurora.org>
- <20120426084201.GF17184@pengutronix.de>
- <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
- <20120426095135.GG17184@pengutronix.de>
- <4F9EE84C.90106@codeaurora.org>
- <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
- <4F9F1659.1010804@codeaurora.org>
-Message-ID: <20120501081103.GC2194@S2101-09.ap.freescale.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 01 May 2012 10:16:01 +0200
+Subject: [PATCH 00/18][V3] ARM: OMAP3/4 : cpuidle34xx and cpuidle44xx
+ cleanups
+In-Reply-To: <87vckgltdg.fsf@ti.com>
+References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F98740F.1020402@linaro.org> <87vckgltdg.fsf@ti.com>
+Message-ID: <4F9F9BC1.9020908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 03:46:49PM -0700, Saravana Kannan wrote:
-> I'm still hoping a Ack/Nack for the general idea from the others.
-> 
-I believe that I have Acked the idea when you proposed it at the first
-time.  What I really hoped is you can post the patch at least 1 week
-earlier.  Basically I share the same frustration that Sascha has, the
-platform porting have been delayed by flowing changes on the core code.
-It's been -rc5, but we have not got a stable core base to have platform
-porting expose on linux-next.
+On 05/01/2012 12:58 AM, Kevin Hilman wrote:
+> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
+>
+>> On 04/24/2012 04:05 PM, Daniel Lezcano wrote:
+>>> This patchset makes some cleanup on these cpuidle drivers
+>>> and consolidate the code across both architecture.
+>>>
+>>> Tested on OMAP3 (igepV2).
+>>> Partially tested on OMAP4 (pandaboard), without offlining the cpu1.
+>
+> Without offlining CPU1, none of this code is executed.  Can you test
+> with CPU1 offlined?
 
-Anyway, since I agree this is the right direction for the long run, I
-will revisit my platform porting one more time once Mike applies the
-patch.
+Unfortunately my OMAP4 board burned :/ I am waiting for a new one.
+Rob tested the series but when he unplugged the cpu1, the kernel panics 
+for another reason. I guess the problem should have been fixed since the 
+last testing.
+
+Rob ? Do you mind the test the series again, the problem you were facing 
+when unplugging the cpu1 may have been fixed.
+
+Mike ? if you have time, is it possible you test it on your board ?
+
+>> Hi,>>
+>> could be this patchset considered for inclusion ?
+>>
+>
+> Yes.   This is a good series, and a great cleanup.
+>
+> Unfortunately, there is lots of OMAP PM code to review at the moment so
+> there's a bit of a lag in my ability to review and test.
+
+Ok, sure. I understand, no pressure :)
+
+Thanks a lot.
+
+   -- Daniel
 
 -- 
-Regards,
-Shawn
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
