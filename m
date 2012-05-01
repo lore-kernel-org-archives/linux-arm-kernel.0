@@ -1,49 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 01 May 2012 20:49:37 +0400
-Subject: [PATCH v4 06/39] ARM: OMAP2+: onenand: return value in init
- function
-In-Reply-To: <91c09cb6a6cb5e87acdcc3f6100a87b4c2a3dd41.1335874494.git.afzal@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <91c09cb6a6cb5e87acdcc3f6100a87b4c2a3dd41.1335874494.git.afzal@ti.com>
-Message-ID: <4FA01421.9080808@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 1 May 2012 18:00:01 +0100
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <20120501091334.GG15541@lunn.ch>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org>
+ <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de>
+ <4F9EE84C.90106@codeaurora.org>
+ <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+ <4F9F1659.1010804@codeaurora.org>
+ <20120501081103.GC2194@S2101-09.ap.freescale.net>
+ <20120501091334.GG15541@lunn.ch>
+Message-ID: <20120501170001.GB4089@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, May 01, 2012 at 11:13:34AM +0200, Andrew Lunn wrote:
 
-On 01-05-2012 16:20, Afzal Mohammed wrote:
+> I agree with you as well, it is frustrating. Could we agree, that once
+> this patch is in, we freeze the core until the start of the next
+> cycle. We use the remainder of this cycle for porting platforms to the
+> generic clock framework.
 
-> Modify board_onenand_init to return platform data. This
-> would be required for boards to be able to pass it to
-> gpmc driver so that it finally reaches onenand driver.
-
-> Also un-static the function so that boards can use it.
-
-> Signed-off-by: Afzal Mohammed<afzal@ti.com>
-[...]
-
-> diff --git a/arch/arm/mach-omap2/board-flash.h b/arch/arm/mach-omap2/board-flash.h
-> index 052964c..75ba49f 100644
-> --- a/arch/arm/mach-omap2/board-flash.h
-> +++ b/arch/arm/mach-omap2/board-flash.h
-> @@ -52,3 +52,15 @@ board_nand_init(struct mtd_partition *nand_parts,
->   	return NULL;
->   }
->   #endif
-> +
-> +#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
-> +		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
-
-    You can use IS_ENABLED(CONFIG_MTD_ONENAND_OMAP2) instead these two.
-
-> +extern struct omap_onenand_platform_data * __init
-> +board_onenand_init(struct mtd_partition *onenand_parts, u8 nr_parts, u8 cs);
-> +#else
-> +static inline struct omap_onenand_platform_data *
-> +__init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
-> +{
-> +	return NULL;
-> +}
-> +#endif
-
-WBR, Sergei
+Or merge the platforms then do framework changes incrementally, updating
+the platforms as we go (which is the normal pattern for maintaining a
+framework...).  I see we've already got SPEAr merged.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120501/f67b54b6/attachment.sig>
