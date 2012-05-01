@@ -1,32 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 1 May 2012 08:54:54 +0000
-Subject: [GIT PULL] ARM: SPEAr13xx support for 3.5
-In-Reply-To: <20120501084236.GX24211@n2100.arm.linux.org.uk>
-References: <CAOh2x==Dh5thHoQaQ+eN34oeWsmZ32kMOOQ6nU5kO7Tfcr=PUA@mail.gmail.com>
- <20120501083813.GW24211@n2100.arm.linux.org.uk>
- <20120501084236.GX24211@n2100.arm.linux.org.uk>
-Message-ID: <201205010854.54911.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 1 May 2012 11:13:34 +0200
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <20120501081103.GC2194@S2101-09.ap.freescale.net>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org>
+ <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de>
+ <4F9EE84C.90106@codeaurora.org>
+ <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+ <4F9F1659.1010804@codeaurora.org>
+ <20120501081103.GC2194@S2101-09.ap.freescale.net>
+Message-ID: <20120501091334.GG15541@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 May 2012, Russell King - ARM Linux wrote:
-> On Tue, May 01, 2012 at 09:38:13AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, May 01, 2012 at 08:34:14AM +0000, Arnd Bergmann wrote:
-> > > On Tuesday 01 May 2012, Viresh Kumar wrote:
-> > > > - Russell's: CLKDEV: Add helper routines to allocate and add clkdevs for ... 
-> > > 
-> > > I could not find out the status of that patch. Which branch is it going to get
-> > > merged through?
+On Tue, May 01, 2012 at 04:11:05PM +0800, Shawn Guo wrote:
+> On Mon, Apr 30, 2012 at 03:46:49PM -0700, Saravana Kannan wrote:
+> > I'm still hoping a Ack/Nack for the general idea from the others.
 > > 
-> > That's because I've not committed it yet.
-> 
-> Note also that the latest version of it, posted just last Saturday, has
-> yet to attract any replies what so ever.
+> I believe that I have Acked the idea when you proposed it at the first
+> time.  What I really hoped is you can post the patch at least 1 week
+> earlier.  Basically I share the same frustration that Sascha has, the
+> platform porting have been delayed by flowing changes on the core code.
+> It's been -rc5, but we have not got a stable core base to have platform
+> porting expose on linux-next.
 
-Ok. In that case, we need to wait until that is settled and applied to a
-stable branch. Viresh, please tell me when all the dependencies are merged
-somewhere, then we can do a refresh of your patches on top of those. You can
-either send me a new version then, or I can rebased the patches from the
-staging branch and apply them into a proper next/* branch.
+Hi folks
 
-	Arnd
+I agree with you as well, it is frustrating. Could we agree, that once
+this patch is in, we freeze the core until the start of the next
+cycle. We use the remainder of this cycle for porting platforms to the
+generic clock framework.
+
+	  Andrew
