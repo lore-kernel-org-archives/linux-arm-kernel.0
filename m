@@ -1,52 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 1 May 2012 04:05:23 +0200
-Subject: [PATCH 0/4] MXS: I2C improvements
-In-Reply-To: <1335837621-14816-1-git-send-email-marex@denx.de>
-References: <1335837621-14816-1-git-send-email-marex@denx.de>
-Message-ID: <201205010405.23362.marex@denx.de>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Tue, 1 May 2012 03:13:21 +0000
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <1335837363-12376-1-git-send-email-marex@denx.de>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7C3E3@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patchset implements support for adjustment of I2C bus speed via
-> platform data. Further, it implements support for DMA transfers into the
-> mxs-i2c driver. Lastly, there is a fix for GCC4.7 warning included.
-
-btw. this patchset is also available here:
-
-http://git.kernel.org/?p=linux/kernel/git/marex/linux-2.6.git;a=shortlog;h=refs/heads/mxs-
-i2c
-
+ 
+ 
+> V7: * Pass only necessary data to the drivers registered by imx-otg
+>       (memory, irq, pointer to imx-otg device). This should fix issue
+> pointed
+>       out by Lothar Wassmann.
+>     * Have single IRQ handler in imx-otg, which then calls host/gadget
+> IRQ
+>       handlers only if they're registered via imx_otg_set_irq_handler()
+> call,
+>       depending on the current state of the OTG.
 > 
-> Marek Vasut (4):
->   MXS: Allow passing i2c bus speed via platform data
->   MXS: Set I2C timing registers for mxs-i2c
->   MXS: Implement DMA support into mxs-i2c
->   MXS: Fix GCC4.7 complaint in mxs-i2c
-> 
->  arch/arm/mach-mxs/devices-mx28.h                |    3 +-
->  arch/arm/mach-mxs/devices/platform-mxs-i2c.c    |   14 +-
->  arch/arm/mach-mxs/include/mach/devices-common.h |    5 +-
->  arch/arm/mach-mxs/mach-apx4devkit.c             |    7 +-
->  arch/arm/mach-mxs/mach-m28evk.c                 |    8 +-
->  arch/arm/mach-mxs/mach-mx28evk.c                |    7 +-
->  arch/arm/mach-mxs/mach-tx28.c                   |    7 +-
->  drivers/i2c/busses/i2c-mxs.c                    |  304
-> +++++++++++++++++++++-- include/linux/i2c/mxs-i2c.h                     | 
->  22 ++
->  9 files changed, 343 insertions(+), 34 deletions(-)
->  create mode 100644 include/linux/i2c/mxs-i2c.h
-> 
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> Cc: linux-i2c at vger.kernel.org
-> CC: Sascha Hauer <s.hauer@pengutronix.de>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
+ 
+Hi Marek,
 
-Best regards,
-Marek Vasut
+If the host and device interrupt handler are called by otg interrupt handler,
+then, the interrupt handlers are registered by host/device will be called twice
+as they are also registered by host/device themselves.
+
+Besides, what kinds of function do you want to add at this patchset?
+device-only?host-only? basic otg (id switch)? power management (As I have seen you add
+wakeup interrupt handler)?
+ 
