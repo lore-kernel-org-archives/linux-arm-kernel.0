@@ -1,62 +1,88 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 May 2012 07:15:19 -0700
-Subject: [PATCH v2] arm: omap3: am35x: Don't mark missing features as
- present
-In-Reply-To: <1335830229-4700-1-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Mon, 30 Apr 2012 16:57:09 -0700")
-References: <1334861927-1741-1-git-send-email-mgreer@animalcreek.com>
- <1335830229-4700-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <87pqaohts8.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 May 2012 15:37:13 +0100
+Subject: [PATCH 2/2] I2C: Implement DMA support into mxs-i2c
+In-Reply-To: <20120501135800.GL2194@S2101-09.ap.freescale.net>
+References: <1335738969-27445-1-git-send-email-marex@denx.de>
+ <201204302207.39112.marex@denx.de> <20120430203016.GD28226@pengutronix.de>
+ <201204302245.57958.marex@denx.de> <20120430210108.GE28226@pengutronix.de>
+ <20120501135800.GL2194@S2101-09.ap.freescale.net>
+Message-ID: <20120501143712.GB3548@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+On Tue, May 01, 2012 at 09:58:03PM +0800, Shawn Guo wrote:
+> On Mon, Apr 30, 2012 at 11:01:08PM +0200, Wolfram Sang wrote:
+> > 
+> > > > > It complains that data might be undefined, do you want it in a separate
+> > > > > patch then ?
+> > > > 
+> > > > Yes, but only if you can prove that the compiler is right.
+> > > 
+> > > It's not right, because that variable is always initialized, but this at least 
+> > > squashes the compile warning.
+> > 
+> > The compiler needs to be fixed, not the kernel.
+> > 
+> Heh, this is coming up again.  I'm not convincing you to take the
+> change, but just curious what if this is not a compile warning but
+> an error for the same cause that compiler is not right.
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> The Chip Identification register on the am35x family of SoCs
-> has bits 12, 7:5, and 3:2 marked as reserved and are read as
-> zeroes.  Unfortunately, on other omap SoCs, a 0 bit means a
-> feature is "Full Use" so the OMAP3_CHECK_FEATURE() macro
-> called by omap3_check_features() will incorrectly interpret
-> those zeroes to mean that a feature is present even though it
-> isn't.  To fix that, the feature bits that are incorrectly
-> set (namely, OMAP3_HAS_IVA and OMAP3_HAS_ISP) need to be
-> cleared after all of the calls to OMAP3_CHECK_FEATURE() in
-> omap3_check_features() are made.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+It's a compiler warning.
 
-Looks good, thanks.
+Please look at the wording of the warning.  The compiler uses "may" not
+"is".  That means it can't come to a conclusion about it.
 
-I'll queue this one up on top of my AM35x cpu_is cleanups (branch:
-for_3.5/cleanup/am35x-cpu-is)
+But we, as humans with our biological inference engines, can see that
+the code is correct, and we _can_ choose to ignore the warning -
+just like I do with:
 
-Kevin
+drivers/video/omap2/displays/panel-taal.c: In function 'taal_num_errors_show':
+drivers/video/omap2/displays/panel-taal.c:605: warning: 'errors' may be used uninitialized in this function
 
-> ---
->  arch/arm/mach-omap2/id.c |   11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index d2913e2..20c95b4 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -247,6 +247,17 @@ void __init omap3xxx_check_features(void)
->  	omap_features |= OMAP3_HAS_SDRC;
->  
->  	/*
-> +	 * am35x fixups:
-> +	 * - The am35x Chip ID register has bits 12, 7:5, and 3:2 marked as
-> +	 *   reserved and therefore return 0 when read.  Unfortunately,
-> +	 *   OMAP3_CHECK_FEATURE() will interpret some of those zeroes to
-> +	 *   mean that a feature is present even though it isn't so clear
-> +	 *   the incorrectly set feature bits.
-> +	 */
-> +	if (cpu_is_am35xx())
-> +		omap_features &= ~(OMAP3_HAS_IVA | OMAP3_HAS_ISP);
-> +
-> +	/*
->  	 * TODO: Get additional info (where applicable)
->  	 *       e.g. Size of L2 cache.
->  	 */
+static int taal_dcs_read_1(struct taal_data *td, u8 dcs_cmd, u8 *data)
+{
+        int r;
+        u8 buf[1];
+        r = dsi_vc_dcs_read(td->dssdev, td->channel, dcs_cmd, buf, 1);
+        if (r < 0)
+                return r;
+        *data = buf[0];  
+        return 0;
+}
+
+        u8 errors;
+
+        mutex_lock(&td->lock);
+        if (td->enabled) {
+                dsi_bus_lock(dssdev);
+                r = taal_wake_up(dssdev);
+                if (!r) 
+                        r = taal_dcs_read_1(td, DCS_READ_NUM_ERRORS, &errors);
+                dsi_bus_unlock(dssdev);
+        } else {
+                r = -ENODEV;
+        }
+        mutex_unlock(&td->lock);
+
+        if (r)
+                return r;
+
+        return snprintf(buf, PAGE_SIZE, "%d\n", errors);
+
+See?  We can infer from the above that that 'errors' will always be set
+if r is zero - but the compiler is saying it's not clever enough to do
+that automatically.
+
+This doesn't mean the code _has_ to be changed - we can see that the
+above warning is false.  Though, if there is a way to rewrite it to make
+it easier for us humans to read and that makes the warning go away, it
+_might_ be a good idea to make the change - but only for a maintainability
+reason.
+
+The reverse is also true - if trying to fix a warning like this makes
+the code more difficult to understand, then the warning _should_ stay.
+
+That's actually the point of programming languages - the ability to
+express our instructions to a computer in a way that both we and the
+compiler can readily understand.  The most important part of that is
+that _we_ understand what's been written.
