@@ -1,42 +1,33 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 1 May 2012 07:52:38 +0000
-Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201205010549.34309.marex@denx.de>
-References: <1335837363-12376-1-git-send-email-marex@denx.de>
- <201205010521.14052.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B7C439@039-SN2MPN1-023.039d.mgd.msft.net>
- <201205010549.34309.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B7C53C@039-SN2MPN1-023.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 1 May 2012 16:11:05 +0800
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <4F9F1659.1010804@codeaurora.org>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+ <4F98EB10.2000505@codeaurora.org>
+ <20120426084201.GF17184@pengutronix.de>
+ <4d67387a86d99cbb4e2acf68d3588b1c.squirrel@www.codeaurora.org>
+ <20120426095135.GG17184@pengutronix.de>
+ <4F9EE84C.90106@codeaurora.org>
+ <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
+ <4F9F1659.1010804@codeaurora.org>
+Message-ID: <20120501081103.GC2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Mon, Apr 30, 2012 at 03:46:49PM -0700, Saravana Kannan wrote:
+> I'm still hoping a Ack/Nack for the general idea from the others.
 > 
-> Well, let's fix it in V8. I suggest we do a stub handler in the ehci-mxs
-> for
-> usb_add_hcd() and call ehci_irq() from the imx-otg's IRQ handler like
-> it's
-> already done in this patchset.
-> 
-I have not understood how you would like to do?
+I believe that I have Acked the idea when you proposed it at the first
+time.  What I really hoped is you can post the patch at least 1 week
+earlier.  Basically I share the same frustration that Sascha has, the
+platform porting have been delayed by flowing changes on the core code.
+It's been -rc5, but we have not got a stable core base to have platform
+porting expose on linux-next.
 
- 
-> 
-> But this patchset also works with the host-only port #1 on mx28
-> (obviously, you
-> can't enable gadget(device) mode for that port).
-> 
+Anyway, since I agree this is the right direction for the long run, I
+will revisit my platform porting one more time once Mike applies the
+patch.
 
-Currently, there is not generic PHY driver, so only one PHY can be supported
-at runtime, and only one controller can be enabled if you have used
-PHY driver.
-
-How can you let otg and host 1 work together with your patchset?
-
-> > Understanding your scope may help me review your patches.
-> >
-> > > Best regards,
-> > > Marek Vasut
-> 
-> Best regards,
-> Marek Vasut
+-- 
+Regards,
+Shawn
