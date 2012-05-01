@@ -1,88 +1,276 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 May 2012 15:37:13 +0100
-Subject: [PATCH 2/2] I2C: Implement DMA support into mxs-i2c
-In-Reply-To: <20120501135800.GL2194@S2101-09.ap.freescale.net>
-References: <1335738969-27445-1-git-send-email-marex@denx.de>
- <201204302207.39112.marex@denx.de> <20120430203016.GD28226@pengutronix.de>
- <201204302245.57958.marex@denx.de> <20120430210108.GE28226@pengutronix.de>
- <20120501135800.GL2194@S2101-09.ap.freescale.net>
-Message-ID: <20120501143712.GB3548@n2100.arm.linux.org.uk>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue,  1 May 2012 23:01:27 +0800
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+Message-ID: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 09:58:03PM +0800, Shawn Guo wrote:
-> On Mon, Apr 30, 2012 at 11:01:08PM +0200, Wolfram Sang wrote:
-> > 
-> > > > > It complains that data might be undefined, do you want it in a separate
-> > > > > patch then ?
-> > > > 
-> > > > Yes, but only if you can prove that the compiler is right.
-> > > 
-> > > It's not right, because that variable is always initialized, but this at least 
-> > > squashes the compile warning.
-> > 
-> > The compiler needs to be fixed, not the kernel.
-> > 
-> Heh, this is coming up again.  I'm not convincing you to take the
-> change, but just curious what if this is not a compile warning but
-> an error for the same cause that compiler is not right.
+Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
+new generic led trigger for CPU not only for ARM but also for others.
 
-It's a compiler warning.
+For enabling CPU idle event, CPU arch code should call ledtrig_cpu() stub to
+trigger idle start or idle end event.
 
-Please look at the wording of the warning.  The compiler uses "may" not
-"is".  That means it can't come to a conclusion about it.
+These patches convert old style LED driver in arch/arm to gpio_led or new led
+driver interface. Against linux-next 20120501 and build successfully for all the machines.
 
-But we, as humans with our biological inference engines, can see that
-the code is correct, and we _can_ choose to ignore the warning -
-just like I do with:
+Test ledtrig-cpu driver on OMAP4 Panda board.
+--
+root at PandaBoard:~# uname -a
+Linux PandaBoard 3.4.0-rc5-next-20120501-00019-gccaf932 #2 SMP Tue May 1 22:43:58 CST 2012 armv7l armv7l armv7l GNU/Linux
+root at PandaBoard:~# dmesg | grep ledtrig-cpu
+[    2.033203] ledtrig-cpu: registered to indicate activity on CPUs
+root at PandaBoard:~# cat /sys/class/leds/pandaboard\:\:status1/trigger
+none nand-disk mmc0 mmc1 [heartbeat] cpu0 cpu1 
+root at PandaBoard:~# cat /sys/class/leds/pandaboard\:\:status2/trigger
+none nand-disk [mmc0] mmc1 heartbeat cpu0 cpu1 
+root at PandaBoard:~# echo cpu0 > /sys/class/leds/pandaboard\:\:status1/trigger
+root at PandaBoard:~# cat /sys/class/leds/pandaboard\:\:status1/trigger
+none nand-disk mmc0 mmc1 heartbeat [cpu0] cpu1 
+root at PandaBoard:~# echo cpu1 > /sys/class/leds/pandaboard\:\:status2/trigger
+root at PandaBoard:~# cat /sys/class/leds/pandaboard\:\:status2/trigger
+none nand-disk mmc0 mmc1 heartbeat cpu0 [cpu1] 
 
-drivers/video/omap2/displays/panel-taal.c: In function 'taal_num_errors_show':
-drivers/video/omap2/displays/panel-taal.c:605: warning: 'errors' may be used uninitialized in this function
+Then try some heavy task like dd and use taskset to assign the task to a specific CPU,
+LED will turn on or off as expect
 
-static int taal_dcs_read_1(struct taal_data *td, u8 dcs_cmd, u8 *data)
-{
-        int r;
-        u8 buf[1];
-        r = dsi_vc_dcs_read(td->dssdev, td->channel, dcs_cmd, buf, 1);
-        if (r < 0)
-                return r;
-        *data = buf[0];  
-        return 0;
-}
+root at PandaBoard:~# dd if=/dev/zero of=/dev/null &
+[1] 1202
+root at PandaBoard:~# taskset -pc 0 1202
+pid 1202's current affinity list: 0,1
+pid 1202's new affinity list: 0
+root at PandaBoard:~# taskset -pc 1 1202
+pid 1202's current affinity list: 0
+pid 1202's new affinity list: 1
 
-        u8 errors;
+Try to hotplug on CPU 1
 
-        mutex_lock(&td->lock);
-        if (td->enabled) {
-                dsi_bus_lock(dssdev);
-                r = taal_wake_up(dssdev);
-                if (!r) 
-                        r = taal_dcs_read_1(td, DCS_READ_NUM_ERRORS, &errors);
-                dsi_bus_unlock(dssdev);
-        } else {
-                r = -ENODEV;
-        }
-        mutex_unlock(&td->lock);
+root at PandaBoard:~# echo 0 > /sys/devices/system/cpu/cpu1/online
+root at PandaBoard:~# dmesg | tail
+[    4.740173] EXT4-fs (mmcblk0p2): recovery complete
+[    5.242736] EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
+[    6.020446] init: ureadahead main process (764) terminated with status 5
+[    6.685058] udevd[817]: starting version 175
+[    7.090179] EXT4-fs (mmcblk0p2): re-mounted. Opts: errors=remount-ro
+[    8.548797] init: udev-fallback-graphics main process (970) terminated with status 1
+[   10.964263] Adding 524232k swap on /SWAP.swap.  Priority:-1 extents:13 across:593912k SS
+[  128.872192] init: failsafe main process (1014) killed by TERM signal
+[  275.078094] [sched_delayed] process 1202 (dd) no longer affine to cpu1
+[  275.078369] CPU1: shutdown
+root at PandaBoard:~# echo 1 > /sys/devices/system/cpu/cpu1/online
+[  293.458679] CPU1: Unknown IPI message 0x1
+root at PandaBoard:~# taskset -pc 1 1202
+pid 1202's current affinity list: 0,1
+pid 1202's new affinity list: 1
+--
 
-        if (r)
-                return r;
+Please find these patches here:
+       git://kernel.ubuntu.com/roc/linux-2.6/.git leds
 
-        return snprintf(buf, PAGE_SIZE, "%d\n", errors);
+v8 --> v9:
+ * use mutex to replace rw_sema pointed out by Tim Gardner
+ * add a new struct led_trigger_cpu
+ * add lock_is_inited to record mutex lock initialization
 
-See?  We can infer from the above that that 'errors' will always be set
-if r is zero - but the compiler is saying it's not clever enough to do
-that automatically.
+v7 --> v8:
+ * add a patch to unify the led-trigger name
+ * fix some typo pointed
 
-This doesn't mean the code _has_ to be changed - we can see that the
-above warning is false.  Though, if there is a way to rewrite it to make
-it easier for us humans to read and that makes the warning go away, it
-_might_ be a good idea to make the change - but only for a maintainability
-reason.
+v6 --> v7:
+ * add BUILD_BUG_ON() to detect NR_CPUS > 9999
+ * move out pr_info from the loop as one line message
+ * add percpu rw_semaphore to protect critical region in ledtrig_cpu_init()
+ * fix error in English comments
 
-The reverse is also true - if trying to fix a warning like this makes
-the code more difficult to understand, then the warning _should_ stay.
+v5 --> v6:
+ * replace  __get_cpu_var() to per_cpu()
+ * remove smp_processor_id() which is wrong with for_each_possible_cpu()
+ * test on real OMAP4 Panda board
+ * add comments about CPU hotplug in the CPU LED trigger driver 
 
-That's actually the point of programming languages - the ability to
-express our instructions to a computer in a way that both we and the
-compiler can readily understand.  The most important part of that is
-that _we_ understand what's been written.
+v4 --> v5:
+ * rebase all the patches on top of latest linux-next
+ * replace on_each_cpu() with for_each_possible_cpu()
+ * add some description of ledtrig_cpu() API
+ * remove old leds code from driver nwflash.c, which should use a new led trigger then
+ * this trigger driver can be built as module now
+
+v3 --> v4:
+ * fix a typo pointed by Jochen Friedrich
+ * fix some building errors
+ * add Reviewed-by and Tested-by into patch log
+
+v2 --> v3:
+ * almost rewrote the whole ledtrig-cpu driver, which is more simple
+ * every CPU will have a per-CPU trigger
+ * cpu trigger can be assigned to any leds
+ * fix a lockdep issue in led-trigger common code
+ * other fix according to review
+
+v1 --> v2:
+ * remove select operations in Kconfig of every machines
+ * add back supporting of led in core module of mach-integrator
+ * solidate name scheme in ledtrig-cpu.c
+ * add comments of CPU_LED_* cpu led events
+ * fold patches of RealView and Versatile together
+ * add machine_is_ check during assabet led driver init
+ * add some Acked-by in patch logs
+ * remove code for simpad machine in machine-sa11000, since Jochen Friedrich
+ introduced gpiolib and gpio-led driver for simpad
+ * on Assabet and Netwinder machine, LED operations is reversed like:
+ setting bit means turn off leds
+ clearing bit means turn on leds
+ * add a new function to read CM_CTRL register for led driver
+
+Bryan Wu (19):
+  led-triggers: rename *trigger to *trig for unified naming scheme
+  led-triggers: create a trigger for CPU activity
+  ARM: at91: convert old leds drivers to gpio_led and led_trigger
+    drivers
+  ARM: mach-realview and mach-versatile: retire custom LED code
+  ARM: mach-ks8695: remove leds driver, since nobody use it
+  ARM: mach-shark: retire custom LED code
+  ARM: mach-orion5x: convert custom LED code to gpio_led and LED CPU
+    trigger
+  ARM: mach-integrator: move CM_CTRL to header file for accessing by
+    other functions
+  ARM: mach-integrator: retire custom LED code
+  ARM: mach-clps711x: retire custom LED code of P720T machine
+  ARM: mach-ebsa110: retire custom LED code
+  ARM: mach-footbridge: retire custom LED code
+  char: nwflash: remove old led event code
+  ARM: mach-pxa: retire custom LED code
+  ARM: plat-samsung: remove including old leds event API header file
+  ARM: mach-pnx4008: remove including old leds event API header file
+  ARM: mach-omap1: retire custom LED code
+  ARM: mach-sa1100: retire custom LED code
+  ARM: use new LEDS CPU trigger stub to replace old one
+
+ arch/arm/Kconfig                             |   53 -----
+ arch/arm/include/asm/leds.h                  |   50 -----
+ arch/arm/kernel/Makefile                     |    1 -
+ arch/arm/kernel/leds.c                       |  121 -----------
+ arch/arm/kernel/process.c                    |    6 +-
+ arch/arm/kernel/time.c                       |   17 --
+ arch/arm/mach-at91/board-csb337.c            |    2 -
+ arch/arm/mach-at91/board-ecbat91.c           |   18 +-
+ arch/arm/mach-at91/board-eco920.c            |   22 +-
+ arch/arm/mach-at91/board-kafa.c              |   17 +-
+ arch/arm/mach-at91/board-kb9202.c            |   23 +-
+ arch/arm/mach-at91/board-rm9200dk.c          |    3 -
+ arch/arm/mach-at91/board-rm9200ek.c          |    3 -
+ arch/arm/mach-at91/board-rsi-ews.c           |    3 -
+ arch/arm/mach-at91/board-sam9-l9260.c        |   23 +-
+ arch/arm/mach-at91/board-sam9261ek.c         |    3 -
+ arch/arm/mach-at91/board-yl-9200.c           |    3 -
+ arch/arm/mach-at91/include/mach/board.h      |    1 -
+ arch/arm/mach-at91/leds.c                    |  105 ---------
+ arch/arm/mach-clps711x/Makefile              |    2 -
+ arch/arm/mach-clps711x/common.c              |    1 -
+ arch/arm/mach-clps711x/include/mach/time.h   |    2 -
+ arch/arm/mach-clps711x/p720t-leds.c          |   66 ------
+ arch/arm/mach-clps711x/p720t.c               |   59 ++++++
+ arch/arm/mach-ebsa110/Makefile               |    4 +-
+ arch/arm/mach-ebsa110/leds.c                 |   79 ++++---
+ arch/arm/mach-footbridge/Makefile            |    4 -
+ arch/arm/mach-footbridge/ebsa285-leds.c      |  138 ------------
+ arch/arm/mach-footbridge/ebsa285.c           |   79 +++++++
+ arch/arm/mach-footbridge/netwinder-hw.c      |  110 ++++++++--
+ arch/arm/mach-footbridge/netwinder-leds.c    |  138 ------------
+ arch/arm/mach-integrator/Makefile            |    3 +-
+ arch/arm/mach-integrator/core.c              |    3 -
+ arch/arm/mach-integrator/include/mach/cm.h   |    2 +
+ arch/arm/mach-integrator/leds.c              |  158 ++++++++------
+ arch/arm/mach-ks8695/Makefile                |    3 -
+ arch/arm/mach-ks8695/devices.c               |   21 --
+ arch/arm/mach-ks8695/include/mach/devices.h  |    5 -
+ arch/arm/mach-ks8695/leds.c                  |   92 --------
+ arch/arm/mach-omap1/Makefile                 |    8 -
+ arch/arm/mach-omap1/board-h2.c               |   32 +++
+ arch/arm/mach-omap1/board-h3.c               |   32 +++
+ arch/arm/mach-omap1/board-osk.c              |   33 +++
+ arch/arm/mach-omap1/leds-h2p2-debug.c        |  166 ---------------
+ arch/arm/mach-omap1/leds-innovator.c         |   98 ---------
+ arch/arm/mach-omap1/leds-osk.c               |  113 ----------
+ arch/arm/mach-omap1/leds.c                   |   69 ------
+ arch/arm/mach-omap1/leds.h                   |    3 -
+ arch/arm/mach-omap1/time.c                   |    1 -
+ arch/arm/mach-omap1/timer32k.c               |    1 -
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c |    1 -
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c  |    1 -
+ arch/arm/mach-orion5x/rd88f5182-setup.c      |   72 ++-----
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c |    1 -
+ arch/arm/mach-pnx4008/time.c                 |    1 -
+ arch/arm/mach-pxa/Makefile                   |    8 -
+ arch/arm/mach-pxa/idp.c                      |   79 +++++++
+ arch/arm/mach-pxa/leds-idp.c                 |  115 ----------
+ arch/arm/mach-pxa/leds-lubbock.c             |  124 -----------
+ arch/arm/mach-pxa/leds-mainstone.c           |  119 -----------
+ arch/arm/mach-pxa/leds.c                     |   32 ---
+ arch/arm/mach-pxa/leds.h                     |   13 --
+ arch/arm/mach-pxa/lubbock.c                  |   93 ++++++++
+ arch/arm/mach-pxa/mainstone.c                |   92 ++++++++
+ arch/arm/mach-realview/core.c                |   39 ----
+ arch/arm/mach-realview/core.h                |    2 -
+ arch/arm/mach-realview/realview_eb.c         |    5 -
+ arch/arm/mach-realview/realview_pb1176.c     |    5 -
+ arch/arm/mach-realview/realview_pb11mp.c     |    5 -
+ arch/arm/mach-realview/realview_pba8.c       |    5 -
+ arch/arm/mach-realview/realview_pbx.c        |    5 -
+ arch/arm/mach-sa1100/Makefile                |    9 -
+ arch/arm/mach-sa1100/assabet.c               |   83 ++++++++
+ arch/arm/mach-sa1100/badge4.c                |   30 +++
+ arch/arm/mach-sa1100/cerf.c                  |   42 ++++
+ arch/arm/mach-sa1100/hackkit.c               |   32 +++
+ arch/arm/mach-sa1100/lart.c                  |   26 +++
+ arch/arm/mach-sa1100/leds-assabet.c          |  113 ----------
+ arch/arm/mach-sa1100/leds-badge4.c           |  110 ----------
+ arch/arm/mach-sa1100/leds-cerf.c             |  109 ----------
+ arch/arm/mach-sa1100/leds-hackkit.c          |  111 ----------
+ arch/arm/mach-sa1100/leds-lart.c             |  100 ---------
+ arch/arm/mach-sa1100/leds.c                  |   50 -----
+ arch/arm/mach-sa1100/leds.h                  |   13 --
+ arch/arm/mach-shark/Makefile                 |    4 +-
+ arch/arm/mach-shark/core.c                   |    1 -
+ arch/arm/mach-shark/leds.c                   |  226 ++++++++------------
+ arch/arm/mach-versatile/core.c               |    5 -
+ arch/arm/plat-omap/Kconfig                   |    3 +-
+ arch/arm/plat-omap/debug-leds.c              |  293 ++++++--------------------
+ arch/arm/plat-samsung/time.c                 |    1 -
+ arch/arm/plat-versatile/Kconfig              |    4 +-
+ arch/arm/plat-versatile/leds.c               |   13 +-
+ drivers/char/nwflash.c                       |   34 ---
+ drivers/leds/Kconfig                         |   10 +
+ drivers/leds/Makefile                        |    1 +
+ drivers/leds/led-triggers.c                  |   84 ++++----
+ drivers/leds/ledtrig-cpu.c                   |  163 ++++++++++++++
+ include/linux/leds.h                         |   16 ++
+ 99 files changed, 1470 insertions(+), 3032 deletions(-)
+ delete mode 100644 arch/arm/include/asm/leds.h
+ delete mode 100644 arch/arm/kernel/leds.c
+ delete mode 100644 arch/arm/mach-clps711x/p720t-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/ebsa285-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-leds.c
+ delete mode 100644 arch/arm/mach-ks8695/leds.c
+ delete mode 100644 arch/arm/mach-omap1/leds-h2p2-debug.c
+ delete mode 100644 arch/arm/mach-omap1/leds-innovator.c
+ delete mode 100644 arch/arm/mach-omap1/leds-osk.c
+ delete mode 100644 arch/arm/mach-omap1/leds.c
+ delete mode 100644 arch/arm/mach-omap1/leds.h
+ delete mode 100644 arch/arm/mach-pxa/leds-idp.c
+ delete mode 100644 arch/arm/mach-pxa/leds-lubbock.c
+ delete mode 100644 arch/arm/mach-pxa/leds-mainstone.c
+ delete mode 100644 arch/arm/mach-pxa/leds.c
+ delete mode 100644 arch/arm/mach-pxa/leds.h
+ delete mode 100644 arch/arm/mach-sa1100/leds-assabet.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-badge4.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-cerf.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-hackkit.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-lart.c
+ delete mode 100644 arch/arm/mach-sa1100/leds.c
+ delete mode 100644 arch/arm/mach-sa1100/leds.h
+ create mode 100644 drivers/leds/ledtrig-cpu.c
+
+-- 
+1.7.9.5
