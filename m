@@ -1,35 +1,32 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 1 May 2012 15:59:00 -0700
-Subject: [PATCH 3/4] clk: add DT clock binding support
-In-Reply-To: <1334003101-17274-4-git-send-email-robherring2@gmail.com>
-References: <1334003101-17274-1-git-send-email-robherring2@gmail.com>
- <1334003101-17274-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20120501225900.GC17311@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 May 2012 01:05:16 +0200
+Subject: [PATCH v5 1/1] dt: add of_get_child_count helper function
+In-Reply-To: <1335497780-1164-1-git-send-email-b29396@freescale.com>
+References: <20120427032831.GE26070@shlinux2.ap.freescale.net>
+ <1335497780-1164-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdbgZA5p0YWZDjDxGfX-TQS+NHa1WcwCL0jnjDp-QW_hdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120409-15:25, Rob Herring wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-snip
+On Fri, Apr 27, 2012 at 5:36 AM, Dong Aisheng <b29396@freescale.com> wrote:
+
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> Currently most code to get child count in kernel are almost same,
+> add a helper to implement this function for dt to use.
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>
 > ---
->  .../devicetree/bindings/clock/clock-bindings.txt   |  117 ++++++++++++++++
->  .../devicetree/bindings/clock/fixed-clock.txt      |   22 +++
->  drivers/clk/clk.c                                  |  140 ++++++++++++++++++++
->  drivers/clk/clkdev.c                               |   77 +++++++++++
->  include/linux/clk-provider.h                       |   14 ++
->  include/linux/clk.h                                |   19 +++
->  6 files changed, 389 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
+> Rob missed this patch for 3.4 kernel.
+> Based on Rob's suggestion, we can get it go in with pinctrl driver.
+> Since Rob once had applied it, i added Rob's ack.
+> See:
+> https://lkml.org/lkml/2012/4/14/239
 
-Hi Rob,
+OK I've applied this to the pinctrl tree with Stephens ACK.
 
-Patches 1 & 2 are trivial and certainly aimed at clk-next, so I've taken
-them in.  This patch is a bit more difficult as it touches the common
-clk code, clkdev/clk.h and some DT docs.
-
-Are you looking for me to take this patch into clk-next?  I'm just
-trying to avoid any more clk dependency issues than we already have...
-
-Thanks,
-Mike
+Yours,
+Linus Walleij
