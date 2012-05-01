@@ -1,53 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 1 May 2012 20:55:14 +0800
-Subject: [PATCH 11/11] ARM: dts: imx6q-sabrelite: add sound device
- imx6q-sabrelite-sgtl5000
-In-Reply-To: <1335510185-7906-12-git-send-email-richard.zhao@freescale.com>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-12-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120501125512.GG2194@S2101-09.ap.freescale.net>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Tue,  1 May 2012 15:07:38 +0200
+Subject: [PATCH 0/5] ARM: OMAP2+: PM: implement a caching mechanism on the
+ power domains state registers
+Message-ID: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 03:03:05PM +0800, Richard Zhao wrote:
-> From: Richard Zhao <richard.zhao@linaro.org>
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index cdae2dd..20aa767 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -97,4 +97,17 @@
->  			regulator-always-on;
->  		};
->  	};
-> +
-> +	sound {
-> +		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-> +			     "fsl,imx-audio-sgtl5000";
-> +		model = "imx6q-sabrelite-sgtl5000";
-> +		ssi-controller = <&ssi1>;
-> +		audio-codec = <&codec>;
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
+From: Jean Pihet <j-pihet@ti.com>
 
-Just curious if you have capture working without enabling Mic Bias
-power supplier.
+The OMAP3 PRCM registers accesses are known to be slow, with a PRCM register
+read taking up to 12-14us depending on the OPP.
 
-Regards,
-Shawn
+This patch adds a caching mechanism on the power domains state registers.
+When the cache is cold or has been invalidated a register access is
+performed, otherwise the register value is retrieved from the registers
+cache.
+The API is made of read and write functions for fields in the cache, as well
+as an invalidate and helper functions to invalidate parts of the cache
+contents (i.e. previous, current power states and all fields in the cache).
+The power domain code is converted to use the API to read and write the
+previous, current and next states for the power domains states, logical
+and memory states.
+The PM debug code also uses the caching API instead of the internal
+pwrdm->state variable.
 
-> +			"Headphone Jack", "HP_OUT";
-> +		mux-int-port = <1>;
-> +		mux-ext-port = <4>;
-> +	};
->  };
-> -- 
-> 1.7.5.4
-> 
-> 
+Using the caching mechanism optimizes the performance of the system in the
+transitions to and from the low power states.
+
+Tested on Beagleboard using cpuidle in RET and OFF modes.
+
+Based on the linux-omap git tree (3.4.0-rc2) [1] with the changes for the
+functional power states [2] and the per-device PM QoS support for OMAP [3].
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+[2] http://marc.info/?l=linux-omap&m=133475291911194&w=2
+[3] http://marc.info/?l=linux-omap&m=133475685213067&w=2
+
+
+Jean Pihet (5):
+  ARM: OMAP2+: PM: implement a caching mechanism on the power domains
+    state registers
+  ARM: OMAP2+: PM: use the power domains registers cache for the power
+    states
+  ARM: OMAP2+: PM: use the power domains registers cache for the logic
+    and mem states
+  ARM: OMAP2+: PM: use the power domains registers cache invalidate API
+  ARM: OMAP2+: PM debug: use the power domains registers caching API
+
+ arch/arm/mach-omap2/pm-debug.c    |   16 ++-
+ arch/arm/mach-omap2/pm34xx.c      |    6 +
+ arch/arm/mach-omap2/powerdomain.c |  272 ++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-omap2/powerdomain.h |   45 ++++++-
+ 4 files changed, 297 insertions(+), 42 deletions(-)
+
+-- 
+1.7.7.6
