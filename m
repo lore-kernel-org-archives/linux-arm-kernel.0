@@ -1,95 +1,52 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue,  1 May 2012 14:57:36 -0700
-Subject: [PATCH] mmc: dw_mmc: make multiple instances of dw_mci_card_workqueue
-Message-ID: <1335909456-14020-1-git-send-email-thomas.abraham@linaro.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 1 May 2012 15:18:43 -0700
+Subject: [PATCH] clk: constify parent name arrays in macros
+In-Reply-To: <20120427181833.GA24587@arwen.pp.htv.fi>
+References: <1335529693-14280-1-git-send-email-rnayak@ti.com>
+ <CAJOA=zNzkOvzdFSuSzC015ELZWE+Jtj=H5P9fbQSHW3HZdsZow@mail.gmail.com>
+ <20120427181833.GA24587@arwen.pp.htv.fi>
+Message-ID: <CAJOA=zM0pwHrMM5j7c_v4Vy=r5=ChTigHDsFxTr8H_v1jNippw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable 'dw_mci_card_workqueue' is a global variable shared between
-multiple instances of the dw_mmc host controller. Due to this, data
-corruption has been noticed when multiple instances of dw_mmc controllers
-are actively reading/writing the media. Fix this by adding a instance
-of 'struct workqueue_struct' for each host instance and removing the
-global 'dw_mci_card_workqueue' instance.
+On Fri, Apr 27, 2012 at 11:18 AM, Felipe Balbi <balbi@ti.com> wrote:
+> On Fri, Apr 27, 2012 at 10:55:50AM -0700, Turquette, Mike wrote:
+>> On Fri, Apr 27, 2012 at 5:28 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+>> > parent name array is now expected to be const char *, make
+>> > the relevent changes in the clk macros which define
+>> > default clock types.
+>> >
+>> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>
+>> Good catch Rajendra. ?I'll pull it into clk-next.
+>>
+>> Regards,
+>> Mike
+>>
+>> > ---
+>> > ?include/linux/clk-private.h | ? ?6 +++---
+>> > ?1 files changed, 3 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+>> > index eeae7a3..6ebec83 100644
+>> > --- a/include/linux/clk-private.h
+>> > +++ b/include/linux/clk-private.h
+>> > @@ -70,7 +70,7 @@ struct clk {
+>> > ?#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ? ?\
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_fixed_rate_flags) ? ? ? ? ? ? ?\
+>> > ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> > - ? ? ? static char *_name##_parent_names[] = {}; ? ? ? ? ? ? ? \
+>> > + ? ? ? static const char *_name##_parent_names[] = {}; ? ? ? ? \
+>
+> does it make sense to have this as:
+>
+> static const char * const _name##_parent_names[] = { }; ??
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/mmc/host/dw_mmc.c  |   14 ++++++--------
- include/linux/mmc/dw_mmc.h |    1 +
- 2 files changed, 7 insertions(+), 8 deletions(-)
+Hi Felipe,
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index ab3fc46..1532357 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -100,8 +100,6 @@ struct dw_mci_slot {
- 	int			last_detect_state;
- };
- 
--static struct workqueue_struct *dw_mci_card_workqueue;
--
- #if defined(CONFIG_DEBUG_FS)
- static int dw_mci_req_show(struct seq_file *s, void *v)
- {
-@@ -1605,7 +1603,7 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
- 
- 		if (pending & SDMMC_INT_CD) {
- 			mci_writel(host, RINTSTS, SDMMC_INT_CD);
--			queue_work(dw_mci_card_workqueue, &host->card_work);
-+			queue_work(host->card_workqueue, &host->card_work);
- 		}
- 
- 		/* Handle SDIO Interrupts */
-@@ -1844,7 +1842,7 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	 * Card may have been plugged in prior to boot so we
- 	 * need to run the detect tasklet
- 	 */
--	queue_work(dw_mci_card_workqueue, &host->card_work);
-+	queue_work(host->card_workqueue, &host->card_work);
- 
- 	return 0;
- }
-@@ -2021,9 +2019,9 @@ int dw_mci_probe(struct dw_mci *host)
- 	mci_writel(host, CLKSRC, 0);
- 
- 	tasklet_init(&host->tasklet, dw_mci_tasklet_func, (unsigned long)host);
--	dw_mci_card_workqueue = alloc_workqueue("dw-mci-card",
-+	host->card_workqueue = alloc_workqueue("dw-mci-card",
- 			WQ_MEM_RECLAIM | WQ_NON_REENTRANT, 1);
--	if (!dw_mci_card_workqueue)
-+	if (!host->card_workqueue)
- 		goto err_dmaunmap;
- 	INIT_WORK(&host->card_work, dw_mci_work_routine_card);
- 	ret = request_irq(host->irq, dw_mci_interrupt, host->irq_flags, "dw-mci", host);
-@@ -2085,7 +2083,7 @@ err_init_slot:
- 	free_irq(host->irq, host);
- 
- err_workqueue:
--	destroy_workqueue(dw_mci_card_workqueue);
-+	destroy_workqueue(host->card_workqueue);
- 
- err_dmaunmap:
- 	if (host->use_dma && host->dma_ops->exit)
-@@ -2119,7 +2117,7 @@ void dw_mci_remove(struct dw_mci *host)
- 	mci_writel(host, CLKSRC, 0);
- 
- 	free_irq(host->irq, host);
--	destroy_workqueue(dw_mci_card_workqueue);
-+	destroy_workqueue(host->card_workqueue);
- 	dma_free_coherent(&host->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
- 
- 	if (host->use_dma && host->dma_ops->exit)
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 8f66e28..7a7ebd3 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -125,6 +125,7 @@ struct dw_mci {
- 	struct mmc_request	*mrq;
- 	struct mmc_command	*cmd;
- 	struct mmc_data		*data;
-+	struct workqueue_struct	*card_workqueue;
- 
- 	/* DMA interface members*/
- 	int			use_dma;
--- 
-1.7.5.4
+I don't think so.  We're never going to reference the member of the
+array anyways, so I think the current approach is fine for just
+satisfying type qualifier-sameness.
+
+Thanks,
+Mike
