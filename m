@@ -1,38 +1,84 @@
 From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 1 May 2012 12:44:05 -0700
-Subject: [PATCH] ARM: BCMRING: Fix UART declaration and clk dev name mismatch
-Message-ID: <4FA03D05.9060303@broadcom.com>
+Date: Tue, 1 May 2012 12:51:55 -0700
+Subject: [PATCH] ARM: BCMRING: fix IO mem static mapping
+Message-ID: <4FA03EDB.9060008@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bcmring UART declaration and clk dev name mismatch
+Fix bcmring IO mem static mapping.
 
-In 888073d41680e8244232f3d850e0424a4e9de60f, bcmring UART declaration
-was fixed but introduced clk dev name mismatch which leads to UART 
-initialization
-failure during boot.
+This causes bcmring booting issue since v3.2
 
 Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
 ---
-  arch/arm/mach-bcmring/core.c |    4 ++--
-  1 file changed, 2 insertions(+), 2 deletions(-)
+  arch/arm/mach-bcmring/mm.c |   27 +++++++++++----------------
+  1 file changed, 11 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index adbfb19..5559857 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -110,10 +110,10 @@ static struct clk_lookup lookups[] = {
-          .con_id = "apb_pclk",
-          .clk = &dummy_apb_pclk,
-      }, {            /* UART0 */
--        .dev_id = "uarta",
-+        .dev_id = "uartA",
-          .clk = &uart_clk,
-      }, {            /* UART1 */
--        .dev_id = "uartb",
-+        .dev_id = "uartB",
-          .clk = &uart_clk,
-      }, {            /* SP804 timer 0 */
-          .dev_id = "sp804",
+diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
+index 1adec78..b46ea07 100644
+--- a/arch/arm/mach-bcmring/mm.c
++++ b/arch/arm/mach-bcmring/mm.c
+@@ -31,24 +31,19 @@
+      .type = MT_MEMORY }
+
+  static struct map_desc bcmring_io_desc[] __initdata = {
+-    IO_DESC(MM_IO_BASE_NAND, SZ_64K),    /* phys:0x28000000-0x28000FFF  
+virt:0xE8000000-0xE8000FFF  size:0x00010000 */
+-    IO_DESC(MM_IO_BASE_UMI, SZ_64K),    /* phys:0x2C000000-0x2C000FFF  
+virt:0xEC000000-0xEC000FFF  size:0x00010000 */
+-
+      IO_DESC(MM_IO_BASE_BROM, SZ_64K),    /* 
+phys:0x30000000-0x3000FFFF  virt:0xF3000000-0xF300FFFF  size:0x00010000 */
+-    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF  
+virt:0xF3100000-0xF31FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF  
+virt:0xF3200000-0xF32FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF  
+virt:0xF3300000-0xF33FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_ESW, SZ_1M),    /* phys:0x34000000-0x34FFFFFF  
+virt:0xF3400000-0xF34FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF  
+virt:0xF3500000-0xF35FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_APM, SZ_1M),    /* phys:0x36000000-0x36FFFFFF  
+virt:0xF3600000-0xF36FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF  
+virt:0xF3700000-0xF37FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /* 
+phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /* 
+phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x01000000 */
+-
++    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF  
+virt:0xF3100000-0xF31FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF  
+virt:0xF3200000-0xF32FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF  
+virt:0xF3300000-0xF33FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_ESW, SZ_1M),            /* 
+phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF  
+virt:0xF3500000-0xF35FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_APM, SZ_1M),            /* 
+phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF  
+virt:0xF3700000-0xF37FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /* 
+phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x00100000 */
++    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /* 
+phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x00100000 */
+      IO_DESC(MM_IO_BASE_VRAM, SZ_64K),    /* 
+phys:0x40000000-0x4000FFFF  virt:0xF4000000-0xF400FFFF  size:0x00010000 */
+-    IO_DESC(MM_IO_BASE_CHIPC, SZ_16M),    /* 
+phys:0x80000000-0x80FFFFFF  virt:0xF8000000-0xF8FFFFFF  size:0x01000000 */
+-    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD,
+-        SZ_16M),    /* phys:0x0F000000-0x0FFFFFFF  
+virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
++    IO_DESC(MM_IO_BASE_CHIPC, SZ_8M),    /* phys:0x80000000-0x807FFFFF  
+virt:0xF8000000-0xF87FFFFF  size:0x00800000 */
++    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD, SZ_16M), /* 
+phys:0x0F000000-0x0FFFFFFF virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
+  };
+
+  void __init bcmring_map_io(void)
 -- 
 1.7.9.5
