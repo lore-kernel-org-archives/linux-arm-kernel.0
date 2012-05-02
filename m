@@ -1,108 +1,85 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 2 May 2012 18:50:24 +0800
-Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for
- imx-sgtl5000
-In-Reply-To: <20120501134446.GK2194@S2101-09.ap.freescale.net>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
- <20120501134446.GK2194@S2101-09.ap.freescale.net>
-Message-ID: <20120502105024.GC2982@b20223-02.ap.freescale.net>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 2 May 2012 10:55:24 +0000
+Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-2-git-send-email-t-kristo@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
+ <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6C848@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 09:44:48PM +0800, Shawn Guo wrote:
-> On Fri, Apr 27, 2012 at 03:02:57PM +0800, Richard Zhao wrote:
-> > From: Richard Zhao <richard.zhao@linaro.org>
-> > 
-> > It tries to clk_get the clock. And if it failed, it assumes the clock
-> > by default enabled.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  sound/soc/fsl/imx-sgtl5000.c |   40 ++++++++++++++++++++++++++++++++--------
-> >  1 files changed, 32 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-> > index 73b935e..3a729ca 100644
-> > --- a/sound/soc/fsl/imx-sgtl5000.c
-> > +++ b/sound/soc/fsl/imx-sgtl5000.c
-> > @@ -13,6 +13,8 @@
-> >  #include <linux/module.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_platform.h>
-> > +#include <linux/of_i2c.h>
-> > +#include <linux/clk.h>
-> >  #include <sound/soc.h>
-> >  
-> >  #include "../codecs/sgtl5000.h"
-> > @@ -25,6 +27,7 @@ struct imx_sgtl5000_data {
-> >  	struct snd_soc_card card;
-> >  	char codec_dai_name[DAI_NAME_SIZE];
-> >  	char platform_name[DAI_NAME_SIZE];
-> > +	struct clk *codec_clk;
-> >  	unsigned int clk_frequency;
-> >  };
-> >  
-> > @@ -58,6 +61,7 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
-> >  	struct device_node *np = pdev->dev.of_node;
-> >  	struct device_node *ssi_np, *codec_np;
-> >  	struct platform_device *ssi_pdev;
-> > +	struct i2c_client *codec_dev;
-> >  	struct imx_sgtl5000_data *data;
-> >  	int int_port, ext_port;
-> >  	int ret;
-> > @@ -113,6 +117,11 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
-> >  		ret = -EINVAL;
-> >  		goto fail;
-> >  	}
-> > +	codec_dev = of_find_i2c_device_by_node(codec_np);
-> > +	if (!codec_dev) {
-> > +		dev_err(&pdev->dev, "failed to find codec platform device\n");
-> > +		return -EINVAL;
-> > +	}
-> 
-> What if the codec is accessed via SPI bus on some machines?
-> 
-> >  
-> >  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> >  	if (!data) {
-> > @@ -120,11 +129,20 @@ static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
-> >  		goto fail;
-> >  	}
-> >  
-> > -	ret = of_property_read_u32(codec_np, "clock-frequency",
-> > -				   &data->clk_frequency);
-> > -	if (ret) {
-> > -		dev_err(&pdev->dev, "clock-frequency missing or invalid\n");
-> > -		goto fail;
-> > +	data->codec_clk = clk_get(&codec_dev->dev, NULL);
-> 
-> It's a clock of sgtl5000 codec.  I feel it makes more sense to have
-> sgtl5000 device driver than machine driver to manage this clock.
-The ASoC machine driver handled the clock settings, I just followed the
-same way, using snd_soc_dai_set_sysclk to set codec clk. But what you
-said  is reasonable. I also find it's impossible to use devm_get_clk.
+On Wed, May 02, 2012 at 15:48:01, Shilimkar, Santosh wrote:
+> On Wed, May 2, 2012 at 3:40 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> > Hi Tero,
+> >
+> > On Fri, Apr 20, 2012 at 15:03:34, Kristo, Tero wrote:
+> >> From: Rajendra Nayak <rnayak@ti.com>
+> >>
+> >> SAR/ROM code restores only CORE DPLL to its original state
+> >> post wakeup from OFF mode.
+> >> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
+> >> are saved and restored here during an OFF transition.
+> >>
+> >
+> > Most of the registers being saved and restored in the various
+> > patches look to be contiguous. So, instead of a long list of these
+> > contiguous registers how about having a generic API for backup and
+> > restore of the registers contents based on the memory address range?
+> >
+> > Most of the registers which require save and restore are either part
+> > of PRM, CM or Control. The PRM or CM instance could be passed as the
+> > base and the save/restore API could work around that.
+> >
+> > One downside is that there are some read-only registers in between but
+> > I don't see any simple way of avoiding save and restore of those. BTW,
+> > as per the TRM that I have, this patch is also doing save and restore
+> > of some read-only registers.
+> >
+> You should never write to read-only registers since the behavior is
+> undefined.
 
-Mark, do you suggest get clk in ASoC machine driver or in codec driver?
+I was afraid of that. If all the read-only registers were clubbed together
+a lot of code could have been removed. Looking more closely at the TRM
+I guess we can't really ask design folks to club those read-only registers
+in the future. So scratch this.
 
-Thanks
-Richard
 > 
-> Regards,
-> Shawn
+> [...]
+> >> +void omap4_dpll_resume_off(void)
+> >> +{
+> >> + ? ? u32 i;
+> >> + ? ? struct omap4_dpll_regs *dpll_reg = dpll_regs;
+> >> +
+> >> + ? ? for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clksel);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m2);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m3);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m4);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m5);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m6);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m7);
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkdcoldo);
+> >> +
+> >> + ? ? ? ? ? ? /* Restore clkmode after the above registers are restored */
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkmode);
+> >> +
+> >> + ? ? ? ? ? ? omap4_wait_dpll_lock(dpll_reg);
+> >> +
+> >> + ? ? ? ? ? ? /* Restore autoidle settings after the dpll is locked */
+> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->autoidle);
+> >> + ? ? }
+> >> +}
+> >
+> > If this function is placed in SRAM and PER PLL restored just after MPU
+> > won't the exit latency be further optimized?
+> >
+> How ?
+> SRAM is sower memory than DDR so I don't see how it
+> will reduce latency.
 > 
-> > +	if (IS_ERR(data->codec_clk)) {
-> > +		/* assuming clock enabled by default */
-> > +		data->codec_clk = NULL;
-> > +		ret = of_property_read_u32(codec_np, "clock-frequency",
-> > +					&data->clk_frequency);
-> > +		if (ret) {
-> > +			dev_err(&codec_dev->dev,
-> > +				"clock-frequency missing or invalid\n");
-> > +			goto fail;
-> > +		}
-> > +	} else {
-> > +		data->clk_frequency = clk_get_rate(data->codec_clk);
-> > +		clk_prepare_enable(data->codec_clk);
-> >  	}
-> 
+
+I am just guessing if that's indeed the case ;) 
+Haven't done any measurements to really check if that's indeed the case though.
