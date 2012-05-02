@@ -1,46 +1,30 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 1 May 2012 18:42:58 -0700
-Subject: [PATCH] clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is
- set and clk is enabled
-In-Reply-To: <b9cb6ed1e4bf0f777873b142d88cedfc520023b2.1334140283.git.viresh.kumar@st.com>
-References: <b9cb6ed1e4bf0f777873b142d88cedfc520023b2.1334140283.git.viresh.kumar@st.com>
-Message-ID: <20120502014258.GD17311@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 2 May 2012 09:51:26 +0800
+Subject: [PATCH v4 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
+ subsystem
+In-Reply-To: <CACRpkdbE=fFhTr=MyD-2dgV=W07Kb-T+ax4dgdjZ8ONzoz3K7A@mail.gmail.com>
+References: <1335529578-14507-1-git-send-email-b29396@freescale.com>
+ <1335529578-14507-4-git-send-email-b29396@freescale.com>
+ <CACRpkdbE=fFhTr=MyD-2dgV=W07Kb-T+ax4dgdjZ8ONzoz3K7A@mail.gmail.com>
+Message-ID: <20120502015124.GP2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120411-16:03, Viresh Kumar wrote:
-> This is well documented but isn't implemented. clk_set_rate() must check if
-> flags have CLK_SET_RATE_GATE bit set and is enabled too.
+On Wed, May 02, 2012 at 01:12:58AM +0200, Linus Walleij wrote:
+> If I cannot apply it there are two ways to proceed:
+> 1. Wait for next merge window
+> 2. Pull pinctrl into i.MX tree
 > 
-> Untested patch.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Yes, if we would not wait for next merge window, I prefer to ask Arnd,
+Olof to pull pinctrl into arm-soc as a dependency and we convert imx
+drivers to the subsystem in there.
 
-Tested and pulled into clk-next.
+BTW, this patch should be split into two.  Adding dummy pinctrl for
+imx should be one patch, and sdhci-imx-esdhc should be separate one.
+And we may want to come up a series to convert all outstanding imx
+driver to use pinctrl API, one patch for one driver with subsystem
+maintainer Cc on the corresponding driver patch.
 
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 9d11c19..65dc35d 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -905,6 +905,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->  	if (rate == clk->rate)
->  		goto out;
->  
-> +	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
->  	/* calculate new rates and get the topmost changed clock */
->  	top = clk_calc_new_rates(clk, rate);
->  	if (!top) {
-> -- 
-> 1.7.9
-> 
+-- 
+Regards,
+Shawn
