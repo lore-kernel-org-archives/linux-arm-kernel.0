@@ -1,44 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 2 May 2012 10:14:45 +0800
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <20120502015650.GE17311@gmail.com>
-References: <20120426095135.GG17184@pengutronix.de>
- <4F9EE84C.90106@codeaurora.org>
- <CAJOA=zNCagT6GaeHi_jq7-LU9P-SfJZ8PA9bo-oeswjC0tHyYA@mail.gmail.com>
- <4F9F1659.1010804@codeaurora.org>
- <20120501081103.GC2194@S2101-09.ap.freescale.net>
- <20120501091334.GG15541@lunn.ch>
- <20120501170001.GB4089@opensource.wolfsonmicro.com>
- <4FA0258D.8020807@codeaurora.org>
- <20120501181922.GD4089@opensource.wolfsonmicro.com>
- <20120502015650.GE17311@gmail.com>
-Message-ID: <20120502021443.GQ2194@S2101-09.ap.freescale.net>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 1 May 2012 21:16:48 -0500
+Subject: [PATCH 01/17] ARM: provide a late_initcall hook for platform
+ initialization
+In-Reply-To: <1335454725-13089-2-git-send-email-shawn.guo@linaro.org>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <1335454725-13089-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAMXH7KEzQUpFFVrdyVsUaBZdNCTuotrTWhYABxQYBcaFRE8yqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 06:56:50PM -0700, Mike Turquette wrote:
-> I could use some suggestions on the best way to resolve the merge issues
-> we have currently.  It appears that we have three bases that platforms
-> need to port over the common clk framework:
-> 
-> Russell's clkdev
-> Arnd's arm-soc
-> My clk-next branch
-> 
-> I was happy to push my changes to Linus directly (as discussed in
-> previous mails) but I'm starting to think that maybe having Arnd absorb
-> the clk-next branch as part of arm-soc would be the fastest way to
-> assist platforms that are porting over.
-> 
-> Do the platform folks agree?  Is this suggestion sane?
-> 
-As one of the people who are working on platform porting, I'm not
-concerned about the path that clk core goes to Linus, but the time
-when we have a stable clk core branch appears on arm-soc either as
-a dependency or a downstream tree.  Once we have stable branches for
-both rmk's clkdev and clk core appear on arm-soc, we can start asking
-Arnd to pull platform porting.
+On Thu, Apr 26, 2012 at 10:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> This allows platforms to set up things that need to be done at
+> late_initcall time.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> ?arch/arm/include/asm/mach/arch.h | ? ?1 +
+> ?arch/arm/kernel/setup.c ? ? ? ? ?| ? ?8 ++++++++
+> ?2 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index d7692ca..0b1c94b 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -43,6 +43,7 @@ struct machine_desc {
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
+> ? ? ? ?struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
+> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
+> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
+> ?#endif
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index ebfac78..549f036 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
+> ?}
+> ?arch_initcall(customize_machine);
+>
+> +static int __init init_machine_late(void)
+> +{
+> + ? ? ? if (machine_desc->init_late)
+> + ? ? ? ? ? ? ? machine_desc->init_late();
+> + ? ? ? return 0;
+> +}
+> +late_initcall(init_machine_late);
+> +
+> ?#ifdef CONFIG_KEXEC
+> ?static inline unsigned long long get_total_mem(void)
+> ?{
+> --
+> 1.7.5.4
+>
 
--- 
-Regards,
-Shawn
+Tested-by: Robert Lee <rob.lee@linaro.org>
