@@ -1,50 +1,47 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Wed, 2 May 2012 13:53:11 -0700
-Subject: Fwd: [PATCH] arm: Add extra clobber registers for assembly in
- kernel_execve
-In-Reply-To: <4F7F2DA2.4040805@am.sony.com>
-References: <4F7F2DA2.4040805@am.sony.com>
-Message-ID: <4FA19EB7.7080000@am.sony.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 02 May 2012 23:31:31 +0200
+Subject: [PATCH 1/1] ARM: kirkwood: Add support for RaidSonic
+In-Reply-To: <op.wdonrhzb4cuzmg@gonzo.lentin.co.uk>
+References: <20120501172042.GA13233@lunn.ch>
+ <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
+ <20120501195603.GW25584@lunn.ch> <op.wdonrhzb4cuzmg@gonzo.lentin.co.uk>
+Message-ID: <4FA1A7B3.8070106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anyone interested in this?
+Hi Jamie, Andrew,
 
--------- Original Message --------
-Subject: [PATCH] arm: Add extra clobber registers for assembly in kernel_execve
-Date: Fri, 6 Apr 2012 10:53:38 -0700
-From: Tim Bird <tim.bird@am.sony.com>
-To: linux-arm-kernel at lists.infradead.org <linux-arm-kernel@lists.infradead.org>, Russell King <rmk@arm.linux.org.uk>, Arnd Bergmann <arnd@arndb.de>
+Am 02.05.2012 15:29, schrieb Jamie Lentin:
+>>> >How about writing a gpio-poweroff platform driver? It would take a
+>>> >platform_data structure which lists which GPIO line to use, and if it
+>>> >should be active high/low. The probe function would take control of
+>>> >the GPIO line, set it to inactive state, and output. It would also
+>>> >register a function for pm_power_off(). When that function is called,
+>>> >it toggles the GPIO to turn the power off.
+>>> >
+>>> >Then wrap all this up in a DT binding.
+>>>
+>>> I've been thinking about this too, would make a lot of sense. Most
+>>> of the gpio-poweroff driver would be easy, although registering the
+>>> power_off function wasn't immediately obvious.
+>>
+>> pm_power_off is a global variable. You should be able to assign it
+>> from anywhere.
+> >
+>
+> It seemed a bit worrying setting the global within a driver when it
+> might be overridden elsewhere, but I guess it's fairly unlikely a
+> board would invoke several means of turning off. A grep shows several
+> drivers that already do this (setting pm_power_off) anyway. I'll have
+> a go at writing one later.
 
+This saves me a long-winded explanation why I would prefer someone more
+experienced to do this before I give it a try...
+Of course I am happy to support e.g. by testing. Just let me know.
 
-The inline assembly in kernel_execve() uses r8 and r9.  Since this
-code sequence does not return, it usually doesn't matter if the
-register clobber list is accurate.  However, I saw a case where a
-particular version of gcc used r8 as an intermediate for the value
-eventually passed to r9.  Because r8 is used in the inline
-assembly, and not mentioned in the clobber list, r9 was set
-to an incorrect value.
+Andrew, thanks for the review of the ib62x0 patch. Once there is a
+gpio-poweroff driver, should I integrate the adaptations to use it into
+the existing patch or would you like to have a dedicated patch for that?
+(I prefer the latter.)
 
-This resulted in a kernel panic on execution of the first user-space
-program in the system.  r9 is used in ret_to_user as the thread_info
-pointer, and if it's wrong, bad things happen.
-
-Signed off by: Tim Bird <tim.bird@am.sony.com>
----
- arch/arm/kernel/sys_arm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
-index 62e7c61..0264ab4 100644
---- a/arch/arm/kernel/sys_arm.c
-+++ b/arch/arm/kernel/sys_arm.c
-@@ -115,7 +115,7 @@ int kernel_execve(const char *filename,
- 		  "Ir" (THREAD_START_SP - sizeof(regs)),
- 		  "r" (&regs),
- 		  "Ir" (sizeof(regs))
--		: "r0", "r1", "r2", "r3", "ip", "lr", "memory");
-+		: "r0", "r1", "r2", "r3", "r8", "r9", "ip", "lr", "memory");
-
-  out:
- 	return ret;
--- 
+- Simon
