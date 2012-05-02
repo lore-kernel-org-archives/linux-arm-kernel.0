@@ -1,172 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 2 May 2012 11:13:13 +0800
-Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
- functionality.
-In-Reply-To: <1335924760-796-2-git-send-email-rob.lee@linaro.org>
-References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-2-git-send-email-rob.lee@linaro.org>
-Message-ID: <20120502031311.GT2194@S2101-09.ap.freescale.net>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 2 May 2012 11:27:08 +0800
+Subject: [PATCH v4 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
+ subsystem
+In-Reply-To: <20120502015124.GP2194@S2101-09.ap.freescale.net>
+References: <1335529578-14507-1-git-send-email-b29396@freescale.com>
+ <1335529578-14507-4-git-send-email-b29396@freescale.com>
+ <CACRpkdbE=fFhTr=MyD-2dgV=W07Kb-T+ax4dgdjZ8ONzoz3K7A@mail.gmail.com>
+ <20120502015124.GP2194@S2101-09.ap.freescale.net>
+Message-ID: <20120502032707.GA1708@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 09:12:38PM -0500, Robert Lee wrote:
-> Add common cpuidle init functionality that can be used by various
-> imx platforms.
+On Wed, May 02, 2012 at 09:51:26AM +0800, Shawn Guo wrote:
+> On Wed, May 02, 2012 at 01:12:58AM +0200, Linus Walleij wrote:
+> > If I cannot apply it there are two ways to proceed:
+> > 1. Wait for next merge window
+> > 2. Pull pinctrl into i.MX tree
+> > 
+> Yes, if we would not wait for next merge window, I prefer to ask Arnd,
+> Olof to pull pinctrl into arm-soc as a dependency and we convert imx
+> drivers to the subsystem in there.
 > 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
->  arch/arm/plat-mxc/Makefile               |    1 +
->  arch/arm/plat-mxc/cpuidle.c              |   80 ++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/cpuidle.h |   22 ++++++++
->  3 files changed, 103 insertions(+)
->  create mode 100644 arch/arm/plat-mxc/cpuidle.c
->  create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+> BTW, this patch should be split into two.  Adding dummy pinctrl for
+> imx should be one patch, and sdhci-imx-esdhc should be separate one.
+> And we may want to come up a series to convert all outstanding imx
+> driver to use pinctrl API, one patch for one driver with subsystem
+> maintainer Cc on the corresponding driver patch.
 > 
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index e81290c..63b064b 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
->  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
->  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-> +obj-$(CONFIG_CPU_IDLE) += cpuidle.o
->  ifdef CONFIG_SND_IMX_SOC
->  obj-y += ssi-fiq.o
->  obj-y += ssi-fiq-ksym.o
-> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
-> new file mode 100644
-> index 0000000..b7a5e1c
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/cpuidle.c
-> @@ -0,0 +1,80 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/err.h>
-> +#include <linux/slab.h>
-> +
-> +static struct cpuidle_device __percpu * imx_cpuidle_devices;
-> +
-> +void imx_cpuidle_devices_uninit(void)
-> +{
-> +	int cpu_id;
-> +	struct cpuidle_device *dev;
-> +
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-> +		cpuidle_unregister_device(dev);
-> +	}
-> +
-> +	free_percpu(imx_cpuidle_devices);
-> +}
+I can split it.
+One question is that will driver convert patch go via subsystem tree
+or soc tree?
+If adding dummy pinctrl for imx goes via soc tree but sdhci-imx-esdhc
+goes via mmc driver, the next one may break.
 
-Does this function need to be exported?  I haven't seen it being
-used anywhere outside this file.  Also, can it be __init?
-
-> +
-> +int __init imx_cpuidle_init(struct cpuidle_driver *drv)
-> +{
-> +	struct cpuidle_device *dev;
-> +	int cpu_id, ret;
-> +
-> +	if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
-> +		pr_err("%s: Invalid Input\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
-> +			 __func__, ret);
-> +		return ret;
-> +	}
-> +
-> +	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-> +	if (imx_cpuidle_devices == NULL) {
-> +		ret = -ENOMEM;
-> +		goto unregister_drv;
-> +	}
-> +
-> +	/* initialize state data for each cpuidle_device */
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-> +		dev->cpu = cpu_id;
-> +		dev->state_count = drv->state_count;
-> +
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("%s: Failed to register cpu %u\n",
-> +				__func__, cpu_id);
-
-Nit: print ret (error code) too?
-
-> +			goto uninit;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +uninit:
-> +	imx_cpuidle_devices_uninit();
-> +
-> +unregister_drv:
-> +	cpuidle_unregister_driver(drv);
-> +	return ret;
-> +}
-> diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> new file mode 100644
-> index 0000000..8612510
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +
-> +#ifdef CONFIG_CPU_IDLE
-> +extern void imx_cpuidle_devices_uninit(void);
-> +extern int imx_cpuidle_init(struct cpuidle_driver *drv);
-> +#else
-> +static inline void imx_cpuidle_devices_uninit(void) {}
-> +static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
-> +{ return -ENODEV; }
-
-Nit: if it can not be in the same line with function name, we usually
-have it be:
-
-{
-	return -ENODEV;
-}
-
-> +#endif
-> -- 
-> 1.7.10
-> 
-
--- 
-Regards,
-Shawn
+Regards
+Dong Aisheng
