@@ -1,33 +1,44 @@
 From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 02 May 2012 16:49:16 +0100
-Subject: [PATCH RESEND] ARM: pxa: hx4700: Initialize DS1WM clock_rate
-Message-ID: <mailman.1.1335973764.1417.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 02 May 2012 16:49:24 +0100
+Subject: [PATCH RESEND] ARM: pxa: hx4700: Enable ASIC3 GPIO as a wakeup source
+Message-ID: <mailman.2.1335973768.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asic3 driver now sets the DS1WM clock_rate from the newly added
-asic3_platform_data clock_rate field.
+This patch enables the ASIC3 GPIO (12) as a wakeup source:
+1. Set the WAKEUP_ON_EDGE_RISE MFP config bits for GPIO12 in
+hx4700_pin_config[].
+2. Call gpio_set_wake() for GPIO12.
 
-This patch initializes the asic3_platform_data clock_rate field on the
-hx4700 platform.
+With GPIO12 thus enabled, the mfd/asic3 driver can enable its own GPIOs
+as wakeup sources by implementing a irq_set_wake() handler.
 
 Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 Cc: Philipp Zabel <philipp.zabel@gmail.com>
 ---
- arch/arm/mach-pxa/hx4700.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/hx4700.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 00a00a9..6bd692d 100644
+index de01277..00a00a9 100644
 --- a/arch/arm/mach-pxa/hx4700.c
 +++ b/arch/arm/mach-pxa/hx4700.c
-@@ -295,6 +295,7 @@ static struct asic3_platform_data asic3_platform_data = {
- 	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
- 	.irq_base        = IRQ_BOARD_START,
- 	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
-+	.clock_rate      = 4000000,
- 	.leds            = asic3_leds,
- };
+@@ -129,7 +129,7 @@ static unsigned long hx4700_pin_config[] __initdata = {
+ 	GPIO88_GPIO,
  
+ 	/* HX4700 specific input GPIOs */
+-	GPIO12_GPIO,	/* ASIC3_IRQ */
++	GPIO12_GPIO | WAKEUP_ON_EDGE_RISE,	/* ASIC3_IRQ */
+ 	GPIO13_GPIO,	/* W3220_IRQ */
+ 	GPIO14_GPIO,	/* nWLAN_IRQ */
+ 
+@@ -863,6 +863,7 @@ static void __init hx4700_init(void)
+ 	int ret;
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
++	gpio_set_wake(GPIO12_HX4700_ASIC3_IRQ, 1);
+ 	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+ 	if (ret)
+ 		pr_err ("hx4700: Failed to request GPIOs.\n");
 -- 
 1.7.3.4
