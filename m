@@ -1,81 +1,47 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Wed, 2 May 2012 10:34:29 +0530
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <87wr4wriq3.fsf@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
- <20120427175657.GP18260@opensource.wolfsonmicro.com>
- <87397o3n4y.fsf@ti.com>
- <20120430095429.GB3170@opensource.wolfsonmicro.com>
- <87wr4wriq3.fsf@ti.com>
-Message-ID: <CAJ6a13ZBwZn20ObD2hy=xna8oFoKtdczYNxyWACJZoJkhKhsUQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue,  1 May 2012 22:07:39 -0700
+Subject: [PATCH 0/7] mmc: dw_mmc: add support for device tree based
+ instantiation
+Message-ID: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 1, 2012 at 3:21 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
->
->> On Fri, Apr 27, 2012 at 02:01:17PM -0700, Kevin Hilman wrote:
->>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
->>
->>> > But presumably these things should integrate somehow - for example,
->>> > should devfreq and cpufreq be providing inputs into what AVS is doing,
->>> > and if so how?
->>
->>> The way it is currently designed, cpufreq/devfreq/regulator layers don't
->>> need to know about AVS.
->>
->> Yes, and that was a part of my concern, but see below.
->>
->>> The higher-level layers only know about the "nominal" voltage. ?AVS
->>> hardware does automatic, adaptive, micro-adjustments around that nominal
->>> voltage, and these micro-adjustments are managed by the AVS hardware
->>> sending commands to the PMIC. ?(specifically, on OMAP, the AVS sensors
->>> provide inputs to the voltage processor (VP) which provide inputs to the
->>> voltage controller (VC) which sends commands to the PMIC[1].)
->>
->> Right, that's what I'd understood it to be.
->>
->>> The driver proposed here is primarily for initializing the various
->>> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
->>> adjustments are done in hardware by VC/VP.
->>
->> It's not just a driver, though - it's also creating this power/avs
->> thing, though now I look at the code rather than just its shape there's
->> not actually an abstraction being added here, it's mostly just straight
->> code motion of the arch/arm code that's there already. ?The changelog
->> and the shape of the code make it sound like this is intended to be
->> somewhat generic when really it's providing some OMAP specific tuning
->> for the device which is much less of a concern.
->>
->> I guess for now it's probably OK to just clarify in the documentation
->> and say that whoever adds the second driver has to work on making this
->> generic :)
->
-> Agreed.
->
-> In a different thread (which I can't seem to find now) we discussed this
-> as well, so it just sounds like the changelog should clarify this a bit
-> better.
+This patch series adds device tree support for Synopsis Designware Mobile
+Storage Host Controller.
 
-Kevin/Mark,
+The first patch adds clock lookup in the driver and this is optional. Platforms
+that do not need any clock gating and control for the dw_mmc controllers will
+not be affected with this change. The second patch adds a quirk to notify the
+controller about the absence of the write protect line.
 
-Thanks for the feedback. I will add more documentation
-to clarify this aspect. Please let me know if there are any more
-things to be taken care of in this patch set.
+The third patch adds device tree support and fourth patch adds Samsung
+Exynos5250 specific controlller extentions to the driver. The rest of the
+patches in the series enable support for dw_mmc support on the Samsing
+Exynos5250 based platforms.
 
->
-> Kevin
->
->> This does also sound rather like it's in a similar area to the current
->> management work which Durgadoss R (CCed) was working on, though with a
->> slightly different application and in the OMAP case it's pretty much all
->> hidden in the external processor.
->
+This patchset has been derived from Samsung internal patches prepared by
+Abhilash Kesavan <a.kesavan@samsung.com>.
 
+Thomas Abraham (7):
+  mmc: dw_mmc: lookup for optional biu and ciu clocks
+  mmc: dw_mmc: add quirk to indicate missing write protect line
+  mmc: dw_mmc: add device tree support
+  mmc: dw_mmc: add samsung exynos5250 specific extentions
+  ARM: Samsung: Add support for MSHC controller clocks
+  ARM: Exynos5: Add AUXDATA support for MSHC controllers
+  ARM: dts: Add nodes for dw_mmc controllers for Samsung Exynos5250 platforms
 
+ .../devicetree/bindings/mmc/synposis-dw-mshc.txt   |  116 +++++++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   50 ++++-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   24 ++
+ arch/arm/mach-exynos/clock-exynos5.c               |   45 ++---
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    8 +
+ drivers/mmc/host/dw_mmc-pltfm.c                    |   32 +++
+ drivers/mmc/host/dw_mmc.c                          |  252 +++++++++++++++++++-
+ drivers/mmc/host/dw_mmc.h                          |   23 ++
+ include/linux/mmc/dw_mmc.h                         |   15 +-
+ 9 files changed, 521 insertions(+), 44 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
 
 -- 
-Regards and Thanks,
-Keerthy
+1.7.5.4
