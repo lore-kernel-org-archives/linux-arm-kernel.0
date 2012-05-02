@@ -1,42 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 2 May 2012 11:28:12 +0800
-Subject: [PATCH v4 4/4] mmc: sdhci-imx-esdhc: convert to use pinctrl
- subsystem
-In-Reply-To: <20120502032707.GA1708@shlinux2.ap.freescale.net>
-References: <1335529578-14507-1-git-send-email-b29396@freescale.com>
- <1335529578-14507-4-git-send-email-b29396@freescale.com>
- <CACRpkdbE=fFhTr=MyD-2dgV=W07Kb-T+ax4dgdjZ8ONzoz3K7A@mail.gmail.com>
- <20120502015124.GP2194@S2101-09.ap.freescale.net>
- <20120502032707.GA1708@shlinux2.ap.freescale.net>
-Message-ID: <20120502032810.GV2194@S2101-09.ap.freescale.net>
+Date: Wed, 2 May 2012 11:37:13 +0800
+Subject: [alsa-devel] [PATCH 10/11] ARM: imx6q_sabrelite: clkdev_add cko1
+ for sgtl5000
+In-Reply-To: <CAOMZO5Ab5pYuOY4oLbkOc+SeeT6itKOMJu+zzodFOJaW5h+RuQ@mail.gmail.com>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-11-git-send-email-richard.zhao@freescale.com>
+ <20120501124706.GF2194@S2101-09.ap.freescale.net>
+ <20120501233939.GO2194@S2101-09.ap.freescale.net>
+ <CAOMZO5Ab5pYuOY4oLbkOc+SeeT6itKOMJu+zzodFOJaW5h+RuQ@mail.gmail.com>
+Message-ID: <20120502033711.GW2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 11:27:08AM +0800, Dong Aisheng wrote:
-> On Wed, May 02, 2012 at 09:51:26AM +0800, Shawn Guo wrote:
-> > On Wed, May 02, 2012 at 01:12:58AM +0200, Linus Walleij wrote:
-> > > If I cannot apply it there are two ways to proceed:
-> > > 1. Wait for next merge window
-> > > 2. Pull pinctrl into i.MX tree
-> > > 
-> > Yes, if we would not wait for next merge window, I prefer to ask Arnd,
-> > Olof to pull pinctrl into arm-soc as a dependency and we convert imx
-> > drivers to the subsystem in there.
-> > 
-> > BTW, this patch should be split into two.  Adding dummy pinctrl for
-> > imx should be one patch, and sdhci-imx-esdhc should be separate one.
-> > And we may want to come up a series to convert all outstanding imx
-> > driver to use pinctrl API, one patch for one driver with subsystem
-> > maintainer Cc on the corresponding driver patch.
-> > 
-> I can split it.
-> One question is that will driver convert patch go via subsystem tree
-> or soc tree?
-> If adding dummy pinctrl for imx goes via soc tree but sdhci-imx-esdhc
-> goes via mmc driver, the next one may break.
+On Tue, May 01, 2012 at 11:47:55PM -0300, Fabio Estevam wrote:
+> On Tue, May 1, 2012 at 8:39 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Tue, May 01, 2012 at 08:47:10PM +0800, Shawn Guo wrote:
+> >> > + ? clk_register_clkdev(cko1, NULL, "0-000a");
+> >>
+> >> This dev_id looks a little strange to me. ?I understand that's the
+> >> consequence of having sgtl5000 clock managed in ASoC machine driver
+> >> imx-sgtl5000.
+> >>
+> > Just realised it's not the case. ?But shouldn't the name look like
+> > "sgtl5000.0-000a"?
 > 
-I meant we have the whole series go through arm-soc tree with ack from
-subsystem maintainers collected.
+> Since this is common code, we should not hardcode the I2C bus as the
+> codec can be connected in a I2C bus different of 0.
+
+No, it's not.  It's a sabrelite specific lookup which is done in
+imx6q_sabrelite_init, while imx6q_cko1_setup needs a better naming,
+as what I already commented.
+
+In the end, this type of board specific clock lookup should really
+go into device tree.
 
 -- 
 Regards,
