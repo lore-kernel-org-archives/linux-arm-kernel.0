@@ -1,44 +1,47 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 May 2012 15:52:23 +0400
-Subject: [PATCH 1/1] Add missing include <plat/cpu.h> in
- drivers/mfd/omap-usb-host.c
-In-Reply-To: <4FA02CE9.3090106@free.fr>
-References: <4FA02CE9.3090106@free.fr>
-Message-ID: <4FA11FF7.8040600@mvista.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 2 May 2012 11:55:25 +0000
+Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <CAMQu2gxSKaLhd3qMYpE75_X8gLDrjBWbt3oAf52LE3NjfE=5qg@mail.gmail.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-2-git-send-email-t-kristo@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
+ <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6C848@DBDE01.ent.ti.com>
+ <CAMQu2gxcUw5A-p25xdYeXfy=tLbDNPsjV_5MJ6s5qGNfn4Zbfw@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6D93B@DBDE01.ent.ti.com>
+ <CAMQu2gxSKaLhd3qMYpE75_X8gLDrjBWbt3oAf52LE3NjfE=5qg@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6DABA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, May 02, 2012 at 17:16:19, Shilimkar, Santosh wrote:
+> On Wed, May 2, 2012 at 5:10 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> > On Wed, May 02, 2012 at 16:30:26, Shilimkar, Santosh wrote:
+> > [...]
+> >
+> >> >> How ?
+> >> >> SRAM is sower memory than DDR so I don't see how it
+> >> >> will reduce latency.
+> >> >>
+> >> >
+> >> > I am just guessing if that's indeed the case ;)
+> >> > Haven't done any measurements to really check if that's indeed the case though.
+> >> >
+> >> You don't have to do any real measurements at least on OMAP.
+> >> OCMC RAM is interfaced over L4 and MPU has to cross two interconnect
+> >> bridges to reach to SRAM. DDR is more of direct path and much faster.
+> >>
+> >
+> > Hmm, I was under the impression that OCMC RAM was on L3, at least for OMAP4.
+> Nope. It's on L4 and it is same for all OMAPs including OMAP5
+> 
+> > Maybe there's a extra low latency path for DDR that I am missing.
+> Even OMAP3 DDR is faster than OCMC RAM.
+> 
 
-On 01-05-2012 22:35, Guillaume Gardet wrote:
+Ok. I guess I need to come up with some data for AM33x then.
+Thanks for the clarification.
 
-> Fix compilation error for omap boards (beagleboard, etc.) due to missing
-> include <plat/cpu.h> in drivers/mfd/omap-usb-host.c leading to build error
-> (unknown cpu_is_omap3430, omap_rev and OMAP3430_REV_ES2_1).
-
-> KernelVersion: 3.4-rc5
-
-    This should have been specified under --- tear line.
-
-> Signed-off-by: Guillaume GARDET<guillaume.gardet@free.fr>
-
-> ---
-> drivers/mfd/omap-usb-host.c | 1 +
-> 1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index c8aae66..7e96bb2 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -25,6 +25,7 @@
->  #include<linux/clk.h>
->  #include<linux/dma-mapping.h>
->  #include<linux/spinlock.h>
-> +#include<plat/cpu.h>
->  #include<plat/usb.h>
->  #include<linux/pm_runtime.h>
-
-    Something ate spaces between #include and < in your patch (this time it's 
-not my Thunderbird).
-
-WBR, Sergei
+Regards,
+Vaibhav
