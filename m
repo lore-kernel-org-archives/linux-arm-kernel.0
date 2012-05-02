@@ -1,47 +1,190 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 2 May 2012 21:53:59 +0800
-Subject: [PATCH v2 3/3] ARM: imx: Add imx6q cpuidle driver
-In-Reply-To: <CAMXH7KHnN3YDwM6crgaFqwrgb4W=CErjgNiTPaZ8wrZ5dvKLuw@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Wed, 2 May 2012 08:59:11 -0500
+Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
+ functionality.
+In-Reply-To: <20120502031311.GT2194@S2101-09.ap.freescale.net>
 References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-4-git-send-email-rob.lee@linaro.org>
- <20120502032336.GU2194@S2101-09.ap.freescale.net>
- <CAMXH7KHnN3YDwM6crgaFqwrgb4W=CErjgNiTPaZ8wrZ5dvKLuw@mail.gmail.com>
-Message-ID: <20120502135357.GC2194@S2101-09.ap.freescale.net>
+ <1335924760-796-2-git-send-email-rob.lee@linaro.org>
+ <20120502031311.GT2194@S2101-09.ap.freescale.net>
+Message-ID: <CAMXH7KG9DNm4Yv4-YMHdB5-aZ14VKVhnHkwEZVUWpjO9q6Vp8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 08:50:20AM -0500, Rob Lee wrote:
-> >> --- a/arch/arm/mach-imx/mach-imx6q.c
-> >> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> >> @@ -21,6 +21,9 @@
-> >> ?#include <linux/of_platform.h>
-> >> ?#include <linux/phy.h>
-> >> ?#include <linux/micrel_phy.h>
-> >> +#include <linux/export.h>
-> >> +#include <linux/cpuidle.h>
-> >> +#include <asm/cpuidle.h>
-> >> ?#include <asm/smp_twd.h>
-> >> ?#include <asm/hardware/cache-l2x0.h>
-> >> ?#include <asm/hardware/gic.h>
-> >> @@ -29,6 +32,7 @@
-> >> ?#include <asm/system_misc.h>
-> >> ?#include <mach/common.h>
-> >> ?#include <mach/hardware.h>
-> >> +#include <mach/cpuidle.h>
-> >
-> > The headers here are mostly sorted in names, so please ...
-> >
-> 
-> Do you mean sorted alphabetically per group?  So the last three
-> includes should look like this instead?
-> ...
-> #include <mach/common.h>
-> #include <mach/cpuidle.h>
-> #include <mach/hardware.h>
-> ...
+Shawn,
 
-Yes.  And do not forget <linux/export.h> and <linux/cpuidle.h>.
+On Tue, May 1, 2012 at 10:13 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, May 01, 2012 at 09:12:38PM -0500, Robert Lee wrote:
+>> Add common cpuidle init functionality that can be used by various
+>> imx platforms.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/plat-mxc/Makefile ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/plat-mxc/cpuidle.c ? ? ? ? ? ? ?| ? 80 ++++++++++++++++++++++++++++++
+>> ?arch/arm/plat-mxc/include/mach/cpuidle.h | ? 22 ++++++++
+>> ?3 files changed, 103 insertions(+)
+>> ?create mode 100644 arch/arm/plat-mxc/cpuidle.c
+>> ?create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+>>
+>> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+>> index e81290c..63b064b 100644
+>> --- a/arch/arm/plat-mxc/Makefile
+>> +++ b/arch/arm/plat-mxc/Makefile
+>> @@ -16,6 +16,7 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+>> ?obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+>> ?obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+>> ?obj-$(CONFIG_CPU_FREQ_IMX) ? ?+= cpufreq.o
+>> +obj-$(CONFIG_CPU_IDLE) += cpuidle.o
+>> ?ifdef CONFIG_SND_IMX_SOC
+>> ?obj-y += ssi-fiq.o
+>> ?obj-y += ssi-fiq-ksym.o
+>> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+>> new file mode 100644
+>> index 0000000..b7a5e1c
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/cpuidle.c
+>> @@ -0,0 +1,80 @@
+>> +/*
+>> + * Copyright 2012 Freescale Semiconductor, Inc.
+>> + * Copyright 2012 Linaro Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/hrtimer.h>
+>> +#include <linux/err.h>
+>> +#include <linux/slab.h>
+>> +
+>> +static struct cpuidle_device __percpu * imx_cpuidle_devices;
+>> +
+>> +void imx_cpuidle_devices_uninit(void)
+>> +{
+>> + ? ? int cpu_id;
+>> + ? ? struct cpuidle_device *dev;
+>> +
+>> + ? ? for_each_possible_cpu(cpu_id) {
+>> + ? ? ? ? ? ? dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
+>> + ? ? ? ? ? ? cpuidle_unregister_device(dev);
+>> + ? ? }
+>> +
+>> + ? ? free_percpu(imx_cpuidle_devices);
+>> +}
+>
+> Does this function need to be exported? ?I haven't seen it being
+> used anywhere outside this file. ?Also, can it be __init?
+>
 
--- 
-Regards,
-Shawn
+Yes to both for now and can be changed back if necessary in the future.
+
+>> +
+>> +int __init imx_cpuidle_init(struct cpuidle_driver *drv)
+>> +{
+>> + ? ? struct cpuidle_device *dev;
+>> + ? ? int cpu_id, ret;
+>> +
+>> + ? ? if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
+>> + ? ? ? ? ? ? pr_err("%s: Invalid Input\n", __func__);
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? ret = cpuidle_register_driver(drv);
+>> + ? ? if (ret) {
+>> + ? ? ? ? ? ? pr_err("%s: Failed to register cpuidle driver with error: %d\n",
+>> + ? ? ? ? ? ? ? ? ? ? ?__func__, ret);
+>> + ? ? ? ? ? ? return ret;
+>> + ? ? }
+>> +
+>> + ? ? imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+>> + ? ? if (imx_cpuidle_devices == NULL) {
+>> + ? ? ? ? ? ? ret = -ENOMEM;
+>> + ? ? ? ? ? ? goto unregister_drv;
+>> + ? ? }
+>> +
+>> + ? ? /* initialize state data for each cpuidle_device */
+>> + ? ? for_each_possible_cpu(cpu_id) {
+>> + ? ? ? ? ? ? dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
+>> + ? ? ? ? ? ? dev->cpu = cpu_id;
+>> + ? ? ? ? ? ? dev->state_count = drv->state_count;
+>> +
+>> + ? ? ? ? ? ? ret = cpuidle_register_device(dev);
+>> + ? ? ? ? ? ? if (ret) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to register cpu %u\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, cpu_id);
+>
+> Nit: print ret (error code) too?
+>
+
+I added the printing of the error code based on Sascha's suggestion in
+v1 of this submission.
+
+>> + ? ? ? ? ? ? ? ? ? ? goto uninit;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? return 0;
+>> +
+>> +uninit:
+>> + ? ? imx_cpuidle_devices_uninit();
+>> +
+>> +unregister_drv:
+>> + ? ? cpuidle_unregister_driver(drv);
+>> + ? ? return ret;
+>> +}
+>> diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
+>> new file mode 100644
+>> index 0000000..8612510
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
+>> @@ -0,0 +1,22 @@
+>> +/*
+>> + * Copyright 2012 Freescale Semiconductor, Inc.
+>> + * Copyright 2012 Linaro Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +#include <linux/cpuidle.h>
+>> +
+>> +#ifdef CONFIG_CPU_IDLE
+>> +extern void imx_cpuidle_devices_uninit(void);
+>> +extern int imx_cpuidle_init(struct cpuidle_driver *drv);
+>> +#else
+>> +static inline void imx_cpuidle_devices_uninit(void) {}
+>> +static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
+>> +{ return -ENODEV; }
+>
+> Nit: if it can not be in the same line with function name, we usually
+> have it be:
+>
+> {
+> ? ? ? ?return -ENODEV;
+> }
+
+Understood.  I was just going by what I have seen used in other places
+(like include/linux/cpuidle.h).
+
+Thanks,
+Rob
+
+>
+>> +#endif
+>> --
+>> 1.7.10
+>>
+>
+> --
+> Regards,
+> Shawn
