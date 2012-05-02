@@ -1,58 +1,60 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 2 May 2012 10:03:20 +0800
-Subject: [PATCH RESEND] ARM: pxa: hx4700: Initialize DS1WM clock_rate
-In-Reply-To: <20120428173604.GC27792@n2100.arm.linux.org.uk>
-References: <1335610789.79238.YahooMailClassic@web29018.mail.ird.yahoo.com>
- <20120428173604.GC27792@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZyonR=0ZswWkKNX4B7rXmqzJDkPcdNX6kJ7Y5_xNO2=WQ@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 1 May 2012 19:04:18 -0700
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <20120502020418.GF17311@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2012 at 1:36 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I don't know who's intending to take this, but I'd have thought Haojian
-> would have...
->
-> On Sat, Apr 28, 2012 at 11:59:49AM +0100, Paul Parsons wrote:
->> The asic3 driver now sets the DS1WM clock_rate from the newly added
->> asic3_platform_data clock_rate field.
->>
->> This patch initializes the asic3_platform_data clock_rate field on the
->> hx4700 platform.
->>
->> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
->> Cc: Philipp Zabel <philipp.zabel@gmail.com>
->> ---
->> ?arch/arm/mach-pxa/hx4700.c | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
->> index 00a00a9..6bd692d 100644
->> --- a/arch/arm/mach-pxa/hx4700.c
->> +++ b/arch/arm/mach-pxa/hx4700.c
->> @@ -295,6 +295,7 @@ static struct asic3_platform_data asic3_platform_data = {
->> ? ? ? .gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
->> ? ? ? .irq_base ? ? ? ?= IRQ_BOARD_START,
->> ? ? ? .gpio_base ? ? ? = HX4700_ASIC3_GPIO_BASE,
->> + ? ? .clock_rate ? ? ?= 4000000,
->> ? ? ? .leds ? ? ? ? ? ?= asic3_leds,
->> ?};
->>
->> --
->> 1.7.3.4
->>
+On 20120425-22:58, Saravana Kannan wrote:
+> Create a struct clk_init_data to hold all data that needs to be passed from
+> the platfrom specific driver to the common clock framework during clock
+> registration. Add a pointer to this struct inside clk_hw.
+> 
+> This has several advantages:
+> * Completely hides struct clk from many clock platform drivers and static
+>   clock initialization code that don't care for static initialization of
+>   the struct clks.
+> * For platforms that want to do complete static initialization, it removed
+>   the need to directly mess with the struct clk's fields while still
+>   allowing to statically allocate struct clk. This keeps the code more
+>   future proof even if they include clk-private.h.
+> * Simplifies the generic clk_register() function and allows adding optional
+>   fields in the future without modifying the function signature.
+> * Simplifies the static initialization of clocks on all platforms by
+>   removing the need for forward delcarations or convoluted macros.
+> 
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 
-Yes, I'll handle it. I required Paul to resend the patches since the
-format of content is corrupted.
+Hi Saravana,
 
-Paul,
-Are you using copy & paste with html format to send patch? '=0A' is
-CR, '=' is connecting character
-between two lines. There's two much special characters, and I don't
-want to handle them all.
+Thanks for the patch.  I've taken it into my clk-next but I have two
+points:
 
-I prefer you can use git-send-email to send patches. Or you can send
-them as attachment.
+1) I'm surprised that you abandoned the approach of exposing the
+less-private members of struct clk via struct clk_hw.  Your original
+patch did just that, but did not account for static initialization.
+This patch seems to have gone in the opposite direction and only
+accounts for static initialization.
 
-Thanks
-Haojian
+I'm happy to take the patch as-is, but I did think that there were
+merits to your original approach.
+
+2) I did make a modification to your patch where I kept the
+DEFINE_CLK_* macros and continued to declare __clk_init in
+clk-private.h.  I do want to get rid of both of these in the future but
+currently my platform relies on static initialization before the
+allocator is available.  Please let me know if this causes a problem for
+you.
+
+Platform folks should rebase on top of this if needed.  This should be
+the last change to the driver/platform-facing API before 3.5.
+
+Sascha,
+
+Can you resubmit your fixed-factor clock?  I think the registration
+function collides with these changes.
+
+Thanks,
+Mike
