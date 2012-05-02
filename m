@@ -1,43 +1,53 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 2 May 2012 20:02:14 +0530
-Subject: [PATCHv9 09/10] I2C: OMAP: Do not set the XUDF(Transmit underflow) if
- the underflow is not reached
-In-Reply-To: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
-References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1335969135-20858-10-git-send-email-shubhrajyoti@ti.com>
+Date: Wed, 2 May 2012 20:02:05 +0530
+Subject: [PATCHv9 00/10] I2C fixes
+Message-ID: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the 1.153 errata handling while waiting for transmitter
-underflow if NACK is got the XUDF(Transmit underflow) flag is also set.
-The flag is set after wait for the condition is over.
 
-Cc: Alexander Shishkin <virtuoso@slind.org>
-Acked-by: Moiz Sonasath <m-sonasath@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The patch series does the following
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 43b0efb..c0aa16b 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -730,7 +730,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
- 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
--			*err |= OMAP_I2C_STAT_XUDF;
- 			return -ETIMEDOUT;
- 		}
- 
-@@ -743,6 +742,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		return 0;
- 	}
- 
-+	*err |= OMAP_I2C_STAT_XUDF;
- 	return 0;
- }
- 
+- Warn fixes if CONFIG_PM_RUNTIME is not selected.
+- In case of i2c remove register access was done without any
+ get_sync fix the same.
+- Folds a patch from Tasslehoff to prevent any merge conflicts.
+- Prevents the XDUF flag to be set if the underflow condition is not met.
+- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
+ use the unique id instead as the section number in the recent errata
+ docs has changed.
+
+v9:
+Fix the comments from Wolfram Sang
+
+[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
+
+Tested on omap4sdp and omap3sdp.
+
+The following changes since commit b821861b905a79f71746945237968c3382d99adc:
+
+  Merge tag 'ktest-for-v3.4-rc5' of git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-ktest (2012-05-01 19:43:34 -0700)
+
+are available in the git repository at:
+
+  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
+
+Shubhrajyoti D (9):
+      I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
+      I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
+      I2C: OMAP: Fix the interrupt clearing in OMAP4
+      I2C: OMAP: Prevent the register access after pm_runtime_put in probe
+      I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
+      I2C: OMAP: Fix the crash in i2c remove
+      I2C: OMAP: Handle error check for pm runtime
+      I2C: OMAP: Do not set the XUDF(Transmit underflow) if the underflow is not reached
+      I2C: OMAP: Rename the 1p153 to the erratum id i462
+
+Tasslehoff Kjappfot (1):
+      I2C: OMAP: prevent the overwrite of the errata flags
+
+ drivers/i2c/busses/i2c-omap.c |  127 ++++++++++++++++++++---------------------
+ 1 files changed, 62 insertions(+), 65 deletions(-)
+
 -- 
 1.7.5.4
