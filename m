@@ -1,42 +1,57 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 2 May 2012 12:45:06 -0500
-Subject: [PATCH 03/15] ARM: ep93xx: use machine specific hook for late init
-In-Reply-To: <1335958420-5193-4-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 2 May 2012 12:47:34 -0500
+Subject: [PATCH 01/15] ARM: provide a late_initcall hook for platform
+ initialization
+In-Reply-To: <1335958420-5193-2-git-send-email-shawn.guo@linaro.org>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
- <1335958420-5193-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698952162@AUSP01VMBX24.collaborationhost.net>
+ <1335958420-5193-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698952166@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday, May 02, 2012 4:33 AM, Shawn Guo wrote:
 >
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
+> This allows platforms to set up things that need to be done at
+> late_initcall time.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Tested-by: Robert Lee <rob.lee@linaro.org>
 > ---
->  arch/arm/mach-ep93xx/adssphere.c             |    1 +
->  arch/arm/mach-ep93xx/core.c                  |    5 +++++
->  arch/arm/mach-ep93xx/crunch.c                |    4 +---
->  arch/arm/mach-ep93xx/edb93xx.c               |    8 ++++++++
->  arch/arm/mach-ep93xx/gesbc9312.c             |    1 +
->  arch/arm/mach-ep93xx/include/mach/platform.h |    7 +++++++
->  arch/arm/mach-ep93xx/micro9.c                |    4 ++++
->  arch/arm/mach-ep93xx/simone.c                |    1 +
->  arch/arm/mach-ep93xx/snappercl15.c           |    1 +
->  arch/arm/mach-ep93xx/ts72xx.c                |    1 +
->  arch/arm/mach-ep93xx/vision_ep9307.c         |    1 +
->  11 files changed, 31 insertions(+), 3 deletions(-)
+>  arch/arm/include/asm/mach/arch.h |    1 +
+>  arch/arm/kernel/setup.c          |    8 ++++++++
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index d7692ca..0b1c94b 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -43,6 +43,7 @@ struct machine_desc {
+>  	void			(*init_irq)(void);
+>  	struct sys_timer	*timer;		/* system tick timer	*/
+>  	void			(*init_machine)(void);
+> +	void			(*init_late)(void);
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+>  	void			(*handle_irq)(struct pt_regs *);
+>  #endif
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index ebfac78..549f036 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
+>  }
+>  arch_initcall(customize_machine);
+>  
+> +static int __init init_machine_late(void)
+> +{
+> +	if (machine_desc->init_late)
+> +		machine_desc->init_late();
+> +	return 0;
+> +}
+> +late_initcall(init_machine_late);
+> +
+>  #ifdef CONFIG_KEXEC
+>  static inline unsigned long long get_total_mem(void)
+>  {
 
-Shawn,
-
-I'm ok with these changes for ep93xx.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-I'm not sure what tree this patch was based on but you will have
-some fuzz issues with linux-next due to some other changes to
-core.c, snappercl15.c, and ts72xx.c. Just wanted to make sure
-you were aware of this.
-
-Regards,
-Hartley
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
