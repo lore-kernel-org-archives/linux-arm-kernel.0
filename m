@@ -1,72 +1,50 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 May 2012 13:39:59 -0700
-Subject: [PATCH-V6 3/3] ARM: OMAP: Make OMAP clocksource source selection
- using kernel param
-In-Reply-To: <1335967014-11937-4-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Wed, 2 May 2012 19:26:54 +0530")
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <1335967014-11937-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <87mx5qfhb4.fsf@ti.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Wed, 2 May 2012 13:53:11 -0700
+Subject: Fwd: [PATCH] arm: Add extra clobber registers for assembly in
+ kernel_execve
+In-Reply-To: <4F7F2DA2.4040805@am.sony.com>
+References: <4F7F2DA2.4040805@am.sony.com>
+Message-ID: <4FA19EB7.7080000@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+Anyone interested in this?
 
-> Current OMAP code supports couple of clocksource options based
-> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
-> So there can be 3 options -
->
-> 1. 32KHz sync-timer
-> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
-> 3. 32KHz based gptimer.
->
-> The optional gptimer based clocksource was added so that it can
-> give the high precision than sync-timer, so expected usage was 2
-> and not 3.
-> Unfortunately option 2, clocksource doesn't meet the requirement of
-> free-running clock as per clocksource need. It stops in low power states
-> when sys_clock is cut. That makes gptimer based clocksource option
-> useless for OMAP2/3/4 devices with sys_clock as a clock input.
-> So, in order to use option 2, deeper idle state MUST be disabled.
->
-> Option 3 will still work but it is no better than 32K sync-timer
-> based clocksource.
->
-> We must support both sync timer and gptimer based clocksource as
-> some OMAP based derivative SoCs like AM33XX does not have the
-> sync timer.
->
-> Considering above, make sync-timer and gptimer clocksource runtime
-> selectable so that both OMAP and AMXXXX continue to use the same code.
->
-> And, in order to precisely configure/setup sched_clock for given
-> clocksource, decision has to be made early enough in boot sequence.
->
-> So, the solution is,
->
-> Use standard kernel parameter ("clocksource=") to override
-> default 32k_sync-timer, in addition to this, we also use hwmod database
-> lookup mechanism, through which at run-time we can identify availability
-> of 32k-sync timer on the device, else fall back to gptimer.
->
-> Also, moved low-level SoC specific init code to respective files,
-> (mach-omap1/timer32k.c and mach-omap2/timer.c)
->
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Cc: Ming Lei <tom.leiming@gmail.com>
+-------- Original Message --------
+Subject: [PATCH] arm: Add extra clobber registers for assembly in kernel_execve
+Date: Fri, 6 Apr 2012 10:53:38 -0700
+From: Tim Bird <tim.bird@am.sony.com>
+To: linux-arm-kernel at lists.infradead.org <linux-arm-kernel@lists.infradead.org>, Russell King <rmk@arm.linux.org.uk>, Arnd Bergmann <arnd@arndb.de>
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
 
-tested on OMAP3530/Overo with default 32k timer and cmdline override for
-GPtimer.
+The inline assembly in kernel_execve() uses r8 and r9.  Since this
+code sequence does not return, it usually doesn't matter if the
+register clobber list is accurate.  However, I saw a case where a
+particular version of gcc used r8 as an intermediate for the value
+eventually passed to r9.  Because r8 is used in the inline
+assembly, and not mentioned in the clobber list, r9 was set
+to an incorrect value.
 
-Kevin
+This resulted in a kernel panic on execution of the first user-space
+program in the system.  r9 is used in ret_to_user as the thread_info
+pointer, and if it's wrong, bad things happen.
+
+Signed off by: Tim Bird <tim.bird@am.sony.com>
+---
+ arch/arm/kernel/sys_arm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
+index 62e7c61..0264ab4 100644
+--- a/arch/arm/kernel/sys_arm.c
++++ b/arch/arm/kernel/sys_arm.c
+@@ -115,7 +115,7 @@ int kernel_execve(const char *filename,
+ 		  "Ir" (THREAD_START_SP - sizeof(regs)),
+ 		  "r" (&regs),
+ 		  "Ir" (sizeof(regs))
+-		: "r0", "r1", "r2", "r3", "ip", "lr", "memory");
++		: "r0", "r1", "r2", "r3", "r8", "r9", "ip", "lr", "memory");
+
+  out:
+ 	return ret;
+-- 
