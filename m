@@ -1,85 +1,113 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 2 May 2012 10:55:24 +0000
-Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-2-git-send-email-t-kristo@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
- <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6C848@DBDE01.ent.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 2 May 2012 19:00:11 +0800
+Subject: [PATCH 10/11] ARM: imx6q_sabrelite: clkdev_add cko1 for sgtl5000
+In-Reply-To: <20120501124706.GF2194@S2101-09.ap.freescale.net>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-11-git-send-email-richard.zhao@freescale.com>
+ <20120501124706.GF2194@S2101-09.ap.freescale.net>
+Message-ID: <20120502110011.GD2982@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 15:48:01, Shilimkar, Santosh wrote:
-> On Wed, May 2, 2012 at 3:40 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> > Hi Tero,
-> >
-> > On Fri, Apr 20, 2012 at 15:03:34, Kristo, Tero wrote:
-> >> From: Rajendra Nayak <rnayak@ti.com>
-> >>
-> >> SAR/ROM code restores only CORE DPLL to its original state
-> >> post wakeup from OFF mode.
-> >> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
-> >> are saved and restored here during an OFF transition.
-> >>
-> >
-> > Most of the registers being saved and restored in the various
-> > patches look to be contiguous. So, instead of a long list of these
-> > contiguous registers how about having a generic API for backup and
-> > restore of the registers contents based on the memory address range?
-> >
-> > Most of the registers which require save and restore are either part
-> > of PRM, CM or Control. The PRM or CM instance could be passed as the
-> > base and the save/restore API could work around that.
-> >
-> > One downside is that there are some read-only registers in between but
-> > I don't see any simple way of avoiding save and restore of those. BTW,
-> > as per the TRM that I have, this patch is also doing save and restore
-> > of some read-only registers.
-> >
-> You should never write to read-only registers since the behavior is
-> undefined.
-
-I was afraid of that. If all the read-only registers were clubbed together
-a lot of code could have been removed. Looking more closely at the TRM
-I guess we can't really ask design folks to club those read-only registers
-in the future. So scratch this.
-
+On Tue, May 01, 2012 at 08:47:10PM +0800, Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 03:03:04PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c  |    3 +++
+> >  arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
+> >  2 files changed, 31 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 9a03dcc..4ea0de0 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -419,6 +419,9 @@ int __init mx6q_clocks_init(void)
+> >  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
+> >  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
+> >  	clk_register_clkdev(clk[ssi1], NULL, "2028000.ssi");
+> > +	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+> > +	clk_register_clkdev(clk[ahb], "ahb", NULL);
+> > +	clk_register_clkdev(clk[cko1], "cko1", NULL);
+> >  
+> >  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++) {
+> >  		c = clk_get_sys(clks_init_on[i], NULL);
+> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> > index d25c5d8..e9b2522 100644
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -10,6 +10,8 @@
+> >   * http://www.gnu.org/copyleft/gpl.html
+> >   */
+> >  
+> > +#include <linux/clkdev.h>
+> > +#include <linux/clk.h>
 > 
-> [...]
-> >> +void omap4_dpll_resume_off(void)
-> >> +{
-> >> + ? ? u32 i;
-> >> + ? ? struct omap4_dpll_regs *dpll_reg = dpll_regs;
-> >> +
-> >> + ? ? for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clksel);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m2);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m3);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m4);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m5);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m6);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m7);
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkdcoldo);
-> >> +
-> >> + ? ? ? ? ? ? /* Restore clkmode after the above registers are restored */
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkmode);
-> >> +
-> >> + ? ? ? ? ? ? omap4_wait_dpll_lock(dpll_reg);
-> >> +
-> >> + ? ? ? ? ? ? /* Restore autoidle settings after the dpll is locked */
-> >> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->autoidle);
-> >> + ? ? }
-> >> +}
-> >
-> > If this function is placed in SRAM and PER PLL restored just after MPU
-> > won't the exit latency be further optimized?
-> >
-> How ?
-> SRAM is sower memory than DDR so I don't see how it
-> will reduce latency.
+> Nit: I would have <linux/clk.h> put before <linux/clkdev.h>.
+ok
 > 
+> >  #include <linux/delay.h>
+> >  #include <linux/init.h>
+> >  #include <linux/io.h>
+> > @@ -75,10 +77,36 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+> >  	return 0;
+> >  }
+> >  
+> > +static void __init imx6q_cko1_setup(void)
+> 
+> I would say this is a sabrelite specific setup so far.
+ok
+> 
+> > +{
+> > +	struct clk *cko1_sel, *ahb, *cko1;
+> > +	unsigned long rate;
+> > +
+> > +	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+> > +	ahb = clk_get_sys(NULL, "ahb");
+> > +	cko1 = clk_get_sys(NULL, "cko1");
+> > +	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
+> > +		printk(KERN_ERR "cko1 setup failed!\n");
+> 
+> pr_err
+ok
 
-I am just guessing if that's indeed the case ;) 
-Haven't done any measurements to really check if that's indeed the case though.
+Thanks
+Richard
+> 
+> > +		goto put_clk;
+> > +	}
+> > +	clk_set_parent(cko1_sel, ahb);
+> > +	rate = clk_round_rate(cko1, 16000000);
+> > +	clk_set_rate(cko1, rate);
+> > +	clk_register_clkdev(cko1, NULL, "0-000a");
+> 
+> This dev_id looks a little strange to me.  I understand that's the
+> consequence of having sgtl5000 clock managed in ASoC machine driver
+> imx-sgtl5000.  IMO, having sgtl5000 driver manages its clock and
+> looking up the clock with dev_id simply as "sgtl5000" makes more
+> sense to me.  Will put more comment on your imx-sgtl5000 clock patch.
+> 
+> Regards,
+> Shawn
+> 
+> > +put_clk:
+> > +	if (!IS_ERR(cko1_sel))
+> > +		clk_put(cko1_sel);
+> > +	if (!IS_ERR(ahb))
+> > +		clk_put(ahb);
+> > +	if (!IS_ERR(cko1))
+> > +		clk_put(cko1);
+> > +}
+> > +
+> >  static void __init imx6q_sabrelite_init(void)
+> >  {
+> >  	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+> >  				ksz9021rn_phy_fixup);
+> > +	imx6q_cko1_setup();
+> >  }
+> >  
+> >  static void __init imx6q_init_machine(void)
+> > -- 
+> > 1.7.5.4
+> > 
+> > 
+> 
