@@ -1,27 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 May 2012 13:41:42 +0000
-Subject: [PATCH 00/15] arch/arm/mach-* late_initcall cleanup
-In-Reply-To: <20120502133757.GB2194@S2101-09.ap.freescale.net>
-References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
- <201205021245.02831.arnd@arndb.de>
- <20120502133757.GB2194@S2101-09.ap.freescale.net>
-Message-ID: <201205021341.43041.arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed,  2 May 2012 16:44:35 +0300
+Subject: [PATCH 2/3] OMAP: 4430SDP: Use common configuration for V1V8,
+ V2V1 supplies
+In-Reply-To: <1335966276-19775-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1335966276-19775-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1335966276-19775-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 May 2012, Shawn Guo wrote:
-> > On a related note, do you plan to do the same thing for subsys_initcall?
-> > 
-> I was asked by Russell to clean up late_initcall when I was trying to
-> propose some something to help imx cpuidle drivers, so I did not really
-> plan to do the same thing for subsys_initcall.  However, since you are
-> asking, I think I can do it.  But I would defer it a little bit until
-> we have device tree kill some amount of board files.
+These supplies going to be needed for the twl6040 driver.
 
-Ok, fair enough. I don't see a reason to rush the subsys_initcall conversion,
-it just felt odd to do it for late_initcall first when there are so many more
-instances of subsys_initcall in arch/arm. We can also ask the next person
-who wants to add a subsys_initcall to do that work, so you don't have to
-do it all by yourself ;-)
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/board-4430sdp.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 130ab00..c8d38bd 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -615,7 +615,9 @@ static int __init omap4_i2c_init(void)
+ 			TWL_COMMON_REGULATOR_VANA |
+ 			TWL_COMMON_REGULATOR_VCXIO |
+ 			TWL_COMMON_REGULATOR_VUSB |
+-			TWL_COMMON_REGULATOR_CLK32KG);
++			TWL_COMMON_REGULATOR_CLK32KG |
++			TWL_COMMON_REGULATOR_V1V8 |
++			TWL_COMMON_REGULATOR_V2V1);
+ 	omap4_pmic_init("twl6030", &sdp4430_twldata,
+ 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+-- 
+1.7.8.6
