@@ -1,46 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 May 2012 11:02:25 +0100
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <20120502095816.GG20478@pengutronix.de>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
- <20120502095816.GG20478@pengutronix.de>
-Message-ID: <20120502100225.GB24211@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 May 2012 11:05:37 +0100
+Subject: [PATCH v4] ARM: cache-l2x0.c: save aux ctrl for resume in case
+ l2x0 is enabled before init
+In-Reply-To: <4FA08B39.60300@marvell.com>
+References: <1335791786-32377-1-git-send-email-ylmao@marvell.com>
+ <CAHkRjk51pATYdhKhmBb9sWywN+0BgeQLpW9bMfTkRgf_09wydg@mail.gmail.com>
+ <4FA08B39.60300@marvell.com>
+Message-ID: <20120502100537.GB8492@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 11:58:16AM +0200, Sascha Hauer wrote:
-> > diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> > index 6e58f11..8e97491 100644
-> > --- a/drivers/clk/clk-mux.c
-> > +++ b/drivers/clk/clk-mux.c
-> > @@ -95,6 +95,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> >  {
-> >  	struct clk_mux *mux;
-> >  	struct clk *clk;
-> > +	struct clk_init_data init;
-> >  
-> >  	/* allocate the mux */
-> >  	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-> > @@ -103,6 +104,12 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> >  		return ERR_PTR(-ENOMEM);
-> >  	}
-> >  
-> > +	init.name = name;
-> > +	init.ops = &clk_mux_ops;
-> > +	init.flags = flags;
-> > +	init.parent_names = parent_names;
-> > +	init.num_parents = num_parents;
-> > +
-> >  	/* struct clk_mux assignments */
-> >  	mux->reg = reg;
-> >  	mux->shift = shift;
-> > @@ -110,8 +117,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> >  	mux->flags = clk_mux_flags;
-> >  	mux->lock = lock;
+On Wed, May 02, 2012 at 02:17:45AM +0100, Yilu Mao wrote:
+> On 04/30/2012 09:34 PM, Catalin Marinas wrote:
+> > On 30 April 2012 14:16, Yilu Mao<ylmao@marvell.com>  wrote:
+> >> If l2x0 controller has been enabled when calling l2x0_init, the aux ctrl
+> >> register will not be saved in l2x0_saved_regs. Therefore we can not use
+> >> l2x0_saved_regs.aux_ctrl for resume later. This patch fixed the problem
+> >> by saving aux ctrl in l2x0_saved_regs just after it's being read from
+> >> the register.
+> >> And in case some bits of aux ctrl register are reserved, re-read and
+> >> save it properly after set it if l2x0 is disabled before init.
+> >>
+> >> Change-Id: I54f3002274ffe9cdc667dba81e36e08f2e121467
+> >> Signed-off-by: Yilu Mao<ylmao@marvell.com>
+> >> ---
+> >>   arch/arm/mm/cache-l2x0.c |    9 +++++++++
+> >>   1 files changed, 9 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> >> index a53fd2a..9893e58 100644
+> >> --- a/arch/arm/mm/cache-l2x0.c
+> >> +++ b/arch/arm/mm/cache-l2x0.c
+> >> @@ -320,6 +320,13 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+> >>         cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+> >>         aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+> >>
+> >> +       /*
+> >> +        * In case l2x controller is enabled, the aux ctrl register
+> >> +        * can't be set. So the original value should be stored in
+> >> +        * the l2x0_saved_regs for restoring when resume.
+> >> +        */
+> >> +       l2x0_saved_regs.aux_ctrl = aux;
+> >
+> > Why not move this
+> >
+> >> +
+> >>         aux&= aux_mask;
+> >>         aux |= aux_val;
+> >>
+> >> @@ -364,6 +371,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+> >>                 /* l2x0 controller is disabled */
+> >>                 writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+> >>
+> >> +               /* Re-read it in case some bits are reserved. */
+> >> +               aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+> >
+> > and this
+> >
+> >>                 l2x0_saved_regs.aux_ctrl = aux;
+> >>
+> >>                 l2x0_inv_all();
+> >
+> > somewhere after the if block and we only read the aux once. The
+> > comment may no longer make sense though.
 > 
-> There is a mux->hw.init = &init missing here.
+> I want to make it clear before I provide a new patch. :)
+> We can't only read once because we must read it before handle the 
+> aux_val and aux_mask arguments.
 
-What happens to mux->hw.init long term?  Because once this function
-returns, that pointer will no longer be valid.  It would be a good
-idea to NULL it out in clk_register() once its done with, to ensure
-that no one comes up with the idea of using it later.
+I was thinking about something like this:
+
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 361a628..fbd8903 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -371,14 +371,15 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		/* l2x0 controller is disabled */
+ 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+ 
+-		l2x0_saved_regs.aux_ctrl = aux;
+-
+ 		l2x0_inv_all();
+ 
+ 		/* enable L2X0 */
+ 		writel_relaxed(1, l2x0_base + L2X0_CTRL);
+ 	}
+ 
++	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
++	l2x0_saved_regs.aux_ctrl = aux;
++
+ 	outer_cache.inv_range = l2x0_inv_range;
+ 	outer_cache.clean_range = l2x0_clean_range;
+ 	outer_cache.flush_range = l2x0_flush_range;
+
+
+-- 
+Catalin
