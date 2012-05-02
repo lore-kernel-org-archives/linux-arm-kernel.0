@@ -1,99 +1,110 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue,  1 May 2012 21:12:39 -0500
-Subject: [PATCH v2 2/3] ARM: imx: Add imx5 cpuidle driver
+Date: Tue,  1 May 2012 21:12:40 -0500
+Subject: [PATCH v2 3/3] ARM: imx: Add imx6q cpuidle driver
 In-Reply-To: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
 References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1335924760-796-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <1335924760-796-4-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx5 cpuidle driver.
+Add basic imx6q cpuidle driver.  For now, only basic WFI state is
+supported.  Deeper idle states will be added in the future.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-imx/mm-imx5.c |   42 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 39 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/cpuidle-imx6q.c |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mach-imx6q.c    |   18 ++++++++++++++++++
+ 2 files changed, 51 insertions(+)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
 
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index d6b7e9f..cbd9bad 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -22,24 +22,59 @@
- #include <mach/common.h>
- #include <mach/devices-common.h>
- #include <mach/iomux-v3.h>
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+new file mode 100644
+index 0000000..b74557f
+--- /dev/null
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -0,0 +1,33 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/cpuidle.h>
++#include <linux/export.h>
++#include <asm/cpuidle.h>
 +#include <mach/cpuidle.h>
- 
- static struct clk *gpc_dvfs_clk;
- 
--static void imx5_idle(void)
-+static int imx5_idle(void)
- {
-+	int ret = 0;
 +
- 	/* gpc clock is needed for SRPG */
- 	if (gpc_dvfs_clk == NULL) {
- 		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
- 		if (IS_ERR(gpc_dvfs_clk))
--			return;
-+			return -ENODEV;
- 	}
- 	clk_enable(gpc_dvfs_clk);
- 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
- 	if (!tzic_enable_wake())
- 		cpu_do_idle();
-+	else
-+		ret = -EBUSY;
- 	clk_disable(gpc_dvfs_clk);
-+
-+	return ret;
-+}
-+
-+static int imx5_cpuidle_enter(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int idx)
-+{
-+	int ret;
-+
-+	ret = imx5_idle();
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	return idx;
- }
- 
-+static struct cpuidle_driver imx5_cpuidle_driver = {
-+	.name			= "imx5_cpuidle",
++static struct cpuidle_driver imx6q_cpuidle_driver = {
++	.name			= "imx6q_cpuidle",
 +	.owner			= THIS_MODULE,
 +	.en_core_tk_irqen	= 1,
-+	.states[0]	= {
-+		.enter			= imx5_cpuidle_enter,
-+		.exit_latency		= 20, /* max latency@160MHz */
-+		.target_residency	= 1,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "IMX5 SRPG",
-+		.desc			= "CPU state retained,powered off",
-+	},
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
 +	.state_count		= 1,
 +};
 +
- /*
-  * Define the MX50 memory map.
-  */
-@@ -103,7 +138,7 @@ void __init imx51_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
--	arm_pm_idle = imx5_idle;
-+	arm_pm_idle = (void *)imx5_idle;
++int __init imx6q_cpuidle_init(void)
++{
++	imx_cpuidle_set_driver(&imx6q_cpuidle_driver);
++
++	return 0;
++}
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index da6c1d9..21e2051 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -21,6 +21,9 @@
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/micrel_phy.h>
++#include <linux/export.h>
++#include <linux/cpuidle.h>
++#include <asm/cpuidle.h>
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+@@ -29,6 +32,7 @@
+ #include <asm/system_misc.h>
+ #include <mach/common.h>
+ #include <mach/hardware.h>
++#include <mach/cpuidle.h>
+ 
+ void imx6q_restart(char mode, const char *cmd)
+ {
+@@ -86,6 +90,19 @@ static void __init imx6q_init_machine(void)
+ 	imx6q_pm_init();
  }
  
- void __init imx53_init_early(void)
-@@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
- void __init imx51_init_late(void)
++static struct cpuidle_driver imx6q_cpuidle_driver = {
++	.name			= "imx6q_cpuidle",
++	.owner			= THIS_MODULE,
++	.en_core_tk_irqen	= 1,
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
++	.state_count		= 1,
++};
++
++static void __init imx6q_init_late(void)
++{
++	imx_cpuidle_init(&imx6q_cpuidle_driver);
++}
++
+ static void __init imx6q_map_io(void)
  {
- 	mx51_neon_fixup();
-+	imx_cpuidle_init(&imx5_cpuidle_driver);
- }
+ 	imx_lluart_map_io();
+@@ -142,6 +159,7 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
+ 	.handle_irq	= imx6q_handle_irq,
+ 	.timer		= &imx6q_timer,
+ 	.init_machine	= imx6q_init_machine,
++	.init_late      = imx6q_init_late,
+ 	.dt_compat	= imx6q_dt_compat,
+ 	.restart	= imx6q_restart,
+ MACHINE_END
 -- 
 1.7.10
