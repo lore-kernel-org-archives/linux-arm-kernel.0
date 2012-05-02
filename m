@@ -1,53 +1,62 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 2 May 2012 18:34:41 +0800
-Subject: [PATCH 09/11] ARM: imx6q: add ssi1 clk_lookup
-In-Reply-To: <20120430121857.GL4141@pengutronix.de>
+Date: Wed, 2 May 2012 18:37:48 +0800
+Subject: [PATCH 11/11] ARM: dts: imx6q-sabrelite: add sound device
+ imx6q-sabrelite-sgtl5000
+In-Reply-To: <20120501125512.GG2194@S2101-09.ap.freescale.net>
 References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-10-git-send-email-richard.zhao@freescale.com>
- <20120427080412.GW17184@pengutronix.de>
- <20120427091055.GP28063@b20223-02.ap.freescale.net>
- <20120427092529.GA20478@pengutronix.de>
- <20120430020143.GA1857@richard-laptop>
- <20120430121857.GL4141@pengutronix.de>
-Message-ID: <20120502103440.GA2982@b20223-02.ap.freescale.net>
+ <1335510185-7906-12-git-send-email-richard.zhao@freescale.com>
+ <20120501125512.GG2194@S2101-09.ap.freescale.net>
+Message-ID: <20120502103747.GB2982@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 02:18:57PM +0200, Sascha Hauer wrote:
-> On Mon, Apr 30, 2012 at 10:01:46AM +0800, Richard Zhao wrote:
-> > > > > 
-> > > > > 	clk_register_clkdev(clk[ipg], "ipg", "2028000.ssi");
-> > > > ssi don't have ipg gate. We can let it always on for imx6q.
-> > > 
-> > > Can you please ask your IC guys for clarification?
-> > > 
-> > > For example on i.MX5 we have a ssi ipg clock and a ssi serial clock.
-> > > Both can be gated with two individual gate bits.
-> > > 
-> > > The i.MX6 datasheet (and also several other i.MX datasheets) is quite
-> > > nebulous. The i.MX6 has only one gate bit for each SSI unit, but
-> > > it's not clear if this bit actually gates both the ipg and serial
-> > > clock or only one of them.
-> > You're right. ipg and serial clocks share the same gate. How do we
-> > handle it? I think it's not the only one and won't be last one.
+On Tue, May 01, 2012 at 08:55:14PM +0800, Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 03:03:05PM +0800, Richard Zhao wrote:
+> > From: Richard Zhao <richard.zhao@linaro.org>
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6q-sabrelite.dts |   13 +++++++++++++
+> >  1 files changed, 13 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > index cdae2dd..20aa767 100644
+> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > @@ -97,4 +97,17 @@
+> >  			regulator-always-on;
+> >  		};
+> >  	};
+> > +
+> > +	sound {
+> > +		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+> > +			     "fsl,imx-audio-sgtl5000";
+> > +		model = "imx6q-sabrelite-sgtl5000";
+> > +		ssi-controller = <&ssi1>;
+> > +		audio-codec = <&codec>;
+> > +		audio-routing =
+> > +			"MIC_IN", "Mic Jack",
 > 
-> We don't have support for a single gate gating two clocks right now and
-> I don't know how this fits into the clock framework.
-> We could pretend that only the ipg clock is gateable because this is
-> needed anyway when the SSI unit is used.
-Shawn, will you add clk ssi_ipg?
+> Just curious if you have capture working without enabling Mic Bias
+> power supplier.
+I should add a "Mic Jack", "Mic Bias". When arecord, mic_bias_event
+is called.
+It's strange that it can not record any voice. debugging ...
 
 Thanks
 Richard
 > 
-> It seems we need a proper solution for this later.
+> Regards,
+> Shawn
 > 
-> Sascha
-> 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > +			"Headphone Jack", "HP_OUT";
+> > +		mux-int-port = <1>;
+> > +		mux-ext-port = <4>;
+> > +	};
+> >  };
+> > -- 
+> > 1.7.5.4
+> > 
+> > 
 > 
