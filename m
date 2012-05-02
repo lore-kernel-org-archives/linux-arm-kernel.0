@@ -1,63 +1,36 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 2 May 2012 09:55:23 +0000
-Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
-In-Reply-To: <1335950421.2149.189.camel@sokoban>
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
- <1334913591-26312-7-git-send-email-t-kristo@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6A33C@DBDE01.ent.ti.com>
- <1335950421.2149.189.camel@sokoban>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6B593@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 May 2012 10:56:12 +0100
+Subject: [PATCH 2/7] ARM: OMAP2+: Clean up wrapping multiple objects in
+ Makefile
+In-Reply-To: <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
+ <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120502095612.GG25053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 14:50:21, Kristo, Tero wrote:
-> On Wed, 2012-05-02 at 10:45 +0200, Bedia, Vaibhav wrote:
-> > Hi Tero,
-> > 
-> > On Fri, Apr 20, 2012 at 14:49:49, Kristo, Tero wrote:
-> > > From: Axel Haslam <axelhaslam@gmail.com>
-> > > 
-> > > On OMAP4, there is no support to read previous logic state
-> > > or previous memory state achieved when a power domain transitions
-> > > to RET. Instead there are module level context registers.
-> > > 
-> > > In order to support the powerdomain level logic/mem_off_counters
-> > > on OMAP4, instead use the previous power state achieved (RET) and
-> > > the *programmed* logic/mem RET state to derive if a powerdomain lost
-> > > logic or did not.
-> > > 
-> > > If the powerdomain is programmed to enter RET state and lose logic
-> > > in RET state, knowing that the powerdomain entered RET is good enough
-> > > to derive that the logic was lost as well, in such cases.
-> > > 
-> > 
-> > Unfortunately this won't scale for AM33xx devices :(
-> > It neither has module level context registers nor previous logic/memory state
-> > registers in PRCM. 
-> > 
-> > At a top level, there's a Cortex-M3 (CM3) to assist the low power state transitions
-> > and the indication of successful transition to a low power states is handled as part
-> > of the IPC mechanism between the MPU (A8) and CM3 which is s/w defined.
-> > 
-> > Since the various APIs like omap_hwmod_get_context_loss_context() and friends are
-> > necessary to have correct context saves and restores in drivers we'll need
-> > to add another API for AM33xx which basically builds on the IPC mechanism
-> > and updates the counters.
-> > 
-> > So, instead of the fallback mechanism that is currently in place, can the
-> > implementation for updating the logic/mem counters be converted to make use of
-> > function pointers. When AM33xx PM support comes in, we can just define
-> > a custom function and not pollute the code with cpu_is_* checks.
+On Wed, May 02, 2012 at 03:18:08PM +0530, Santosh Shilimkar wrote:
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/Makefile |  160 ++++++++++++++++++++---------------------
+>  1 files changed, 78 insertions(+), 82 deletions(-)
 > 
-> I think that should be fine. We can add arch_hwmod struct or such
-> (similar to arch_clkdm / arch_pwrdm) if need be. However, I think we
-> should just expand the support towards that way once we can implement
-> the am33xx support properly with a separate patch. I guess this doesn't
-> break anything on am33xx currently, right?
-> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 56ed62e..669e2b1 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -24,10 +24,11 @@ endif
+>  obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+>  
+>  # SMP support ONLY available for OMAP4
+> +
+>  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+> -obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
+> -					   sleep44xx.o
+> +obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o
+> +obj-$(CONFIG_ARCH_OMAP4)		+= sleep44xx.o
 
-It doesn't break anything right now but since we know this doesn't scale
-that would be save some additional round of validation on OMAP3/4
-later on.
-
--Vaibhav
+Using \ in makefiles really isn't a problem.  I don't think this is something
+which we need to do, and it just creates additional changes where none is
+required.
