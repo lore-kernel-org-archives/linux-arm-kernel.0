@@ -1,115 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2012 11:48:07 +0200
-Subject: [PATCH V3 2/8] clk: add a fixed factor clock
-In-Reply-To: <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
-Message-ID: <20120502094807.GE20478@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 2 May 2012 15:18:06 +0530
+Subject: [PATCH 0/7] ARM: OMAP2+: Misc cleanup
+Message-ID: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2012 at 12:20:30PM +0530, Viresh Kumar wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Having fixed factors/dividers in hardware is a common pattern, so
-> add a basic clock type doing this. It basically describes a fixed
-> factor clock using a nominator and a denominator.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> Sascha,
-> 
-> I have this patch in my set, because i need this to get SPEAr stuff pushed by
-> Mike. I have updated your original patch, with all the review comments you got
-> on it. Please check see if i have corrupted something.
-> 
->  drivers/clk/Makefile           |    2 +-
->  drivers/clk/clk-fixed-factor.c |   94 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk-private.h    |   20 ++++++++
->  include/linux/clk-provider.h   |   23 ++++++++++
->  4 files changed, 138 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/clk/clk-fixed-factor.c
-> 
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 1f736bc..24aa714 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -1,4 +1,4 @@
->  
->  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
-> -				   clk-mux.o clk-divider.o
-> +				   clk-mux.o clk-divider.o clk-fixed-factor.o
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> new file mode 100644
-> index 0000000..7453efe
-> --- /dev/null
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -0,0 +1,94 @@
-> +/*
-> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Standard functionality for the common clock API.
-> + */
-> +#include <linux/module.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/slab.h>
-> +#include <linux/err.h>
-> +
-> +/*
-> + * DOC: basic fixed multiplier and divider clock that cannot gate
-> + *
-> + * Traits of this clock:
-> + * prepare - clk_prepare only ensures that parents are prepared
-> + * enable - clk_enable only ensures that parents are enabled
-> + * rate - rate is fixed.  clk->rate = parent->rate / div * mult
-> + * parent - fixed parent.  No clk_set_parent support
-> + */
-> +
-> +#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
-> +
-> +static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
-> +		unsigned long parent_rate)
-> +{
-> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> +
-> +	return (parent_rate / fix->div) * fix->mult;
-> +}
-> +
-> +static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long *prate)
-> +{
-> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> +
-> +	if (prate) {
-> +		unsigned long best_parent;
-> +		best_parent = (rate / fix->mult) * fix->div;
-> +		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
-> +				best_parent);
-> +		return (*prate / fix->div) * fix->mult;
-> +	} else {
-> +		return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
-> +			fix->mult;
-> +	}
-> +}
+This series has some miscellianeous clean up patches which help to add future
+OMAP2+ device support with bit less changes. It is a preparatory series for
+adding minimal OMAP5 support.
 
-This needs a fixup. The clock framework used to pass in a NULL pointer
-as prate when a clk is not allowed to change a parents clock. This
-is no longer true, so we have to check for
+Boot tested on below platforms:
+- OMAP2430 SDP
+- OMAP3430 SDP
+- OMAP4430 SDP
 
-__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT
+Thanks for Tony and Benoit for these suggestions.
 
-instead.
+The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
 
-Sascha
+  Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
 
+are available in the git repository at:
+  git://gitorious.org/omap-sw-develoment/linux-omap-dev.git for_3.5/omap_misc_cleanup
+
+R Sricharan (1):
+  ARM: OMAP4+: Add prm and cm base init function.
+
+Santosh Shilimkar (6):
+  ARM: OMAP4: Don't compile cm2xxx_3xxx.c for OMAP4 only builds.
+  ARM: OMAP2+: Clean up wrapping multiple objects in Makefile
+  ARM: OMAP4: Remove un-used WakeupGen register defines.
+  ARM: OMAP: dma: Make use of cpu_class_is_omap2() to avoid future
+    patching.
+  ARM: All OMAP2PLUS machines use omap2 directory so just add one entry
+  ARM: OMAP4: Reduce the static IO mapping
+
+ arch/arm/Makefile                                 |    4 +-
+ arch/arm/mach-omap2/Makefile                      |  163 ++++++++++-----------
+ arch/arm/mach-omap2/cminst44xx.c                  |   28 +++--
+ arch/arm/mach-omap2/common.c                      |    1 +
+ arch/arm/mach-omap2/common.h                      |    1 +
+ arch/arm/mach-omap2/dma.c                         |    2 +-
+ arch/arm/mach-omap2/include/mach/omap-wakeupgen.h |    8 -
+ arch/arm/mach-omap2/io.c                          |   30 ----
+ arch/arm/mach-omap2/iomap.h                       |   28 ----
+ arch/arm/mach-omap2/prcm-common.h                 |   13 ++
+ arch/arm/mach-omap2/prcm.c                        |    8 +
+ arch/arm/mach-omap2/prminst44xx.c                 |   27 ++--
+ arch/arm/plat-omap/dma.c                          |    4 +-
+ 13 files changed, 139 insertions(+), 178 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.5.4
