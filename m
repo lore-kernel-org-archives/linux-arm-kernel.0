@@ -1,133 +1,56 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Wed, 2 May 2012 10:17:26 +0100
-Subject: [PATCH 1/7] mmc: dw_mmc: lookup for optional biu and ciu clocks
-In-Reply-To: <1335935266-25289-2-git-send-email-thomas.abraham@linaro.org>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAFbHwiTZOOP1HwZQPPKBei3aGhbBjFyJ4QLJ+Ea465L6r6vEYg@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 2 May 2012 12:20:21 +0300
+Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA6A33C@DBDE01.ent.ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-7-git-send-email-t-kristo@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6A33C@DBDE01.ent.ti.com>
+Message-ID: <1335950421.2149.189.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 6:07 AM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> Some platforms allow for clock gating and control of bus interface unit clock
-> and card interface unit clock. Add support for clock lookup of optional biu
-> and ciu clocks for clock gating and clock speed determination.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> ?drivers/mmc/host/dw_mmc.c ?| ? 35 +++++++++++++++++++++++++++++++----
-> ?include/linux/mmc/dw_mmc.h | ? ?4 ++++
-> ?2 files changed, 35 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 1532357..036846f 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1938,19 +1938,35 @@ int dw_mci_probe(struct dw_mci *host)
-> ? ? ? ? ? ? ? ?return -ENODEV;
-> ? ? ? ?}
->
-> - ? ? ? if (!host->pdata->bus_hz) {
-> + ? ? ? host->biu_clk = clk_get(&host->dev, "biu");
-> + ? ? ? if (IS_ERR(host->biu_clk))
-> + ? ? ? ? ? ? ? dev_info(&host->dev, "biu clock not available\n");
-> + ? ? ? else
-> + ? ? ? ? ? ? ? clk_enable(host->biu_clk);
-> +
-> + ? ? ? host->ciu_clk = clk_get(&host->dev, "ciu");
-> + ? ? ? if (IS_ERR(host->ciu_clk))
-> + ? ? ? ? ? ? ? dev_info(&host->dev, "ciu clock not available\n");
+On Wed, 2012-05-02 at 10:45 +0200, Bedia, Vaibhav wrote:
+> Hi Tero,
+> 
+> On Fri, Apr 20, 2012 at 14:49:49, Kristo, Tero wrote:
+> > From: Axel Haslam <axelhaslam@gmail.com>
+> > 
+> > On OMAP4, there is no support to read previous logic state
+> > or previous memory state achieved when a power domain transitions
+> > to RET. Instead there are module level context registers.
+> > 
+> > In order to support the powerdomain level logic/mem_off_counters
+> > on OMAP4, instead use the previous power state achieved (RET) and
+> > the *programmed* logic/mem RET state to derive if a powerdomain lost
+> > logic or did not.
+> > 
+> > If the powerdomain is programmed to enter RET state and lose logic
+> > in RET state, knowing that the powerdomain entered RET is good enough
+> > to derive that the logic was lost as well, in such cases.
+> > 
+> 
+> Unfortunately this won't scale for AM33xx devices :(
+> It neither has module level context registers nor previous logic/memory state
+> registers in PRCM. 
+> 
+> At a top level, there's a Cortex-M3 (CM3) to assist the low power state transitions
+> and the indication of successful transition to a low power states is handled as part
+> of the IPC mechanism between the MPU (A8) and CM3 which is s/w defined.
+> 
+> Since the various APIs like omap_hwmod_get_context_loss_context() and friends are
+> necessary to have correct context saves and restores in drivers we'll need
+> to add another API for AM33xx which basically builds on the IPC mechanism
+> and updates the counters.
+> 
+> So, instead of the fallback mechanism that is currently in place, can the
+> implementation for updating the logic/mem counters be converted to make use of
+> function pointers. When AM33xx PM support comes in, we can just define
+> a custom function and not pollute the code with cpu_is_* checks.
 
-Should these printks be at debug level? I'm not 100% sure either way
-but it could be a little noisy on systems that do not use these
-clocks.
+I think that should be fine. We can add arch_hwmod struct or such
+(similar to arch_clkdm / arch_pwrdm) if need be. However, I think we
+should just expand the support towards that way once we can implement
+the am33xx support properly with a separate patch. I guess this doesn't
+break anything on am33xx currently, right?
 
-> + ? ? ? else
-> + ? ? ? ? ? ? ? clk_enable(host->ciu_clk);
-> +
-> + ? ? ? if (IS_ERR(host->ciu_clk))
-> + ? ? ? ? ? ? ? host->bus_hz = host->pdata->bus_hz;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? host->bus_hz = clk_get_rate(host->ciu_clk);
-> +
-> + ? ? ? if (!host->bus_hz) {
-> ? ? ? ? ? ? ? ?dev_err(&host->dev,
-> ? ? ? ? ? ? ? ? ? ? ? ?"Platform data must supply bus speed\n");
-> - ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? ? ? ? ? ret = -ENODEV;
-> + ? ? ? ? ? ? ? goto err_clk;
-> ? ? ? ?}
->
-> - ? ? ? host->bus_hz = host->pdata->bus_hz;
-> ? ? ? ?host->quirks = host->pdata->quirks;
->
-> ? ? ? ?spin_lock_init(&host->lock);
-> ? ? ? ?INIT_LIST_HEAD(&host->queue);
->
-> -
-> ? ? ? ?host->dma_ops = host->pdata->dma_ops;
-> ? ? ? ?dw_mci_init_dma(host);
->
-> @@ -2095,6 +2111,13 @@ err_dmaunmap:
-> ? ? ? ? ? ? ? ?regulator_disable(host->vmmc);
-> ? ? ? ? ? ? ? ?regulator_put(host->vmmc);
-> ? ? ? ?}
-> + ? ? ? kfree(host);
-> +
-> +err_clk:
-> + ? ? ? clk_disable(host->ciu_clk);
-> + ? ? ? clk_disable(host->biu_clk);
-> + ? ? ? clk_put(host->ciu_clk);
-> + ? ? ? clk_put(host->biu_clk);
-
-Are these calls safe, or do we need to check IS_ERR as above?
-
-> ? ? ? ?return ret;
-> ?}
-> ?EXPORT_SYMBOL(dw_mci_probe);
-> @@ -2128,6 +2151,10 @@ void dw_mci_remove(struct dw_mci *host)
-> ? ? ? ? ? ? ? ?regulator_put(host->vmmc);
-> ? ? ? ?}
->
-> + ? ? ? clk_disable(host->ciu_clk);
-> + ? ? ? clk_disable(host->biu_clk);
-> + ? ? ? clk_put(host->ciu_clk);
-> + ? ? ? clk_put(host->biu_clk);
-
-Likewise.
-
-> ?}
-> ?EXPORT_SYMBOL(dw_mci_remove);
->
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 7a7ebd3..fa9a139 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -78,6 +78,8 @@ struct mmc_data;
-> ?* @data_offset: Set the offset of DATA register according to VERID.
-> ?* @dev: Device associated with the MMC controller.
-> ?* @pdata: Platform data associated with the MMC controller.
-> + * @biu_clk: Pointer to bus interface unit clock instance.
-> + * @ciu_clk: Pointer to card interface unit clock instance.
-> ?* @slot: Slots sharing this MMC controller.
-> ?* @fifo_depth: depth of FIFO.
-> ?* @data_shift: log2 of FIFO item size.
-> @@ -158,6 +160,8 @@ struct dw_mci {
-> ? ? ? ?u16 ? ? ? ? ? ? ? ? ? ? data_offset;
-> ? ? ? ?struct device ? ? ? ? ? dev;
-> ? ? ? ?struct dw_mci_board ? ? *pdata;
-> + ? ? ? struct clk ? ? ? ? ? ? ?*biu_clk;
-> + ? ? ? struct clk ? ? ? ? ? ? ?*ciu_clk;
-> ? ? ? ?struct dw_mci_slot ? ? ?*slot[MAX_MCI_SLOTS];
->
-> ? ? ? ?/* FIFO push and pull */
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+-Tero
