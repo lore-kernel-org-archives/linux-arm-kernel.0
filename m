@@ -1,100 +1,94 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 02 May 2012 12:07:59 +0900
-Subject: [PATCH] mmc: dw_mmc: make multiple instances of
- dw_mci_card_workqueue
-In-Reply-To: <1335909456-14020-1-git-send-email-thomas.abraham@linaro.org>
-References: <1335909456-14020-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4FA0A50F.4020400@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 2 May 2012 04:51:44 +0200
+Subject: [PATCH 02/17] ARM: at91: use machine specific hook for late init
+In-Reply-To: <201204300846.41118.arnd@arndb.de>
+References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
+ <20120428053001.GY9142@game.jcrosoft.org>
+ <20120428065348.GC9924@S2101-09.ap.freescale.net>
+ <201204300846.41118.arnd@arndb.de>
+Message-ID: <20120502025144.GA19477@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-
-On 05/02/2012 06:57 AM, Thomas Abraham wrote:
-
-> The variable 'dw_mci_card_workqueue' is a global variable shared between
-> multiple instances of the dw_mmc host controller. Due to this, data
-> corruption has been noticed when multiple instances of dw_mmc controllers
-> are actively reading/writing the media. Fix this by adding a instance
-> of 'struct workqueue_struct' for each host instance and removing the
-> global 'dw_mci_card_workqueue' instance.
+On 08:46 Mon 30 Apr     , Arnd Bergmann wrote:
+> On Saturday 28 April 2012, Shawn Guo wrote:
+> > On Sat, Apr 28, 2012 at 07:30:01AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 10:30 Sat 28 Apr     , Shawn Guo wrote:
+> > > > On Fri, Apr 27, 2012 at 04:26:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > we discuss with Arnd we came back with 2 ideas one is to use a machine
+> > > > > specific initcall or compatible specifc initcall
+> > > > 
+> > > > Do you mean an initcall with machine/compatible detection inside?  The
+> > > > whole point of the hooks in struct machine_desc  is to save the
+> > > > machine/compatible detection.  You already use .init_machine as
+> > > > an arch_initcall time hook, and what .init_late provides you is just
+> > > > a late_initcall time hook.  If you want to detect machine/compatible
+> > > > in your late_initcall rather than using this hook, you should not
+> > > > use .init_machine for the same reason.
+> > > on DT we just do this
+> > > 
+> > I'm talking about non-DT case.  Sadly, there are still so many non-DT
+> > board files in arch/arm/mach-at91.
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/mmc/host/dw_mmc.c  |   14 ++++++--------
->  include/linux/mmc/dw_mmc.h |    1 +
->  2 files changed, 7 insertions(+), 8 deletions(-)
+> It depends on whether we want to allow non-DT board files for multiplatform
+> kernels. We clearly can allow them, but I think we can spare some trouble
+> and also make the configuration simpler if we just disallow it, and
+> make only those platforms that are converted to both allow multiplat
+> and DT boot as sub-options under the top-level multiplatform kernel
+> option. If we do that, we can keep a lot of initcalls in the platform
+> code and just add an "if (!of_have_populated_dt())" in them or a check
+> for the respective device.
+I agree with Arnd
+
+and in your patch you export sensitive SoC function that no board Maintainer
+will ever have to care about
+
+As example on at91 you ask the baord maintainer to call the clock shutdown
+to disable the non used clock
+
+if we use the soc_desc or the conditional initcall we will avoid a lot of
+trouble
+
+I'll send a patch for soc_desc and conditional initcall
+will see which Russell prefer.
+
+Best Regards,
+J.
 > 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index ab3fc46..1532357 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -100,8 +100,6 @@ struct dw_mci_slot {
->  	int			last_detect_state;
->  };
->  
-> -static struct workqueue_struct *dw_mci_card_workqueue;
-> -
->  #if defined(CONFIG_DEBUG_FS)
->  static int dw_mci_req_show(struct seq_file *s, void *v)
->  {
-> @@ -1605,7 +1603,7 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->  
->  		if (pending & SDMMC_INT_CD) {
->  			mci_writel(host, RINTSTS, SDMMC_INT_CD);
-> -			queue_work(dw_mci_card_workqueue, &host->card_work);
-> +			queue_work(host->card_workqueue, &host->card_work);
->  		}
->  
->  		/* Handle SDIO Interrupts */
-> @@ -1844,7 +1842,7 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	 * Card may have been plugged in prior to boot so we
->  	 * need to run the detect tasklet
->  	 */
-> -	queue_work(dw_mci_card_workqueue, &host->card_work);
-> +	queue_work(host->card_workqueue, &host->card_work);
->  
->  	return 0;
->  }
-> @@ -2021,9 +2019,9 @@ int dw_mci_probe(struct dw_mci *host)
->  	mci_writel(host, CLKSRC, 0);
->  
->  	tasklet_init(&host->tasklet, dw_mci_tasklet_func, (unsigned long)host);
-> -	dw_mci_card_workqueue = alloc_workqueue("dw-mci-card",
-> +	host->card_workqueue = alloc_workqueue("dw-mci-card",
->  			WQ_MEM_RECLAIM | WQ_NON_REENTRANT, 1);
-> -	if (!dw_mci_card_workqueue)
-> +	if (!host->card_workqueue)
->  		goto err_dmaunmap;
->  	INIT_WORK(&host->card_work, dw_mci_work_routine_card);
->  	ret = request_irq(host->irq, dw_mci_interrupt, host->irq_flags, "dw-mci", host);
-> @@ -2085,7 +2083,7 @@ err_init_slot:
->  	free_irq(host->irq, host);
->  
->  err_workqueue:
-> -	destroy_workqueue(dw_mci_card_workqueue);
-> +	destroy_workqueue(host->card_workqueue);
->  
->  err_dmaunmap:
->  	if (host->use_dma && host->dma_ops->exit)
-> @@ -2119,7 +2117,7 @@ void dw_mci_remove(struct dw_mci *host)
->  	mci_writel(host, CLKSRC, 0);
->  
->  	free_irq(host->irq, host);
-> -	destroy_workqueue(dw_mci_card_workqueue);
-> +	destroy_workqueue(host->card_workqueue);
->  	dma_free_coherent(&host->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
->  
->  	if (host->use_dma && host->dma_ops->exit)
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 8f66e28..7a7ebd3 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -125,6 +125,7 @@ struct dw_mci {
->  	struct mmc_request	*mrq;
->  	struct mmc_command	*cmd;
->  	struct mmc_data		*data;
-> +	struct workqueue_struct	*card_workqueue;
->  
->  	/* DMA interface members*/
->  	int			use_dma;
+> > > so the hook start to make not too much sense
+> > > at machine level
+> > > 
+> > > as this is for nearly all of them purely soc
+> > > 
+> > This reminds me an argument against soc_desc stuff.  With DT adopted,
+> > the struct machine_desc (hooks inside it) becomes purely soc specific,
+> > so why do we need soc_desc then?
+> 
+> Ah, good point. I was wondering what happened to that discussion.
+> 
+> On a related note, I have looked up what kinds of initcalls are in
+> the platform code:
+> 
+> $ git grep -h ^[a-z_]*_initcall arch/arm/ | cut -f 1 -d \( | sort | uniq -c | sort -n      1 subsys_initcall_sync
+>       2 postcore_initcall_sync
+>       5 console_initcall
+>       7 fs_initcall
+>       9 early_initcall
+>      14 __initcall
+>      34 device_initcall
+>      35 postcore_initcall
+>      43 core_initcall
+>      49 late_initcall
+>      87 subsys_initcall
+>     128 arch_initcall
+> 
+> I think that if we do the late_initcall mechanism that you proposed,
+> we will probaly need the same for subsyste_initcall, and although
+> we already have mach_desc->init_machine() at the arch_initcall
+> level, it seems that there are a lot of other users that don't
+> use it (for good or for not so good reasons, I have not checked)
+> and that would definitely benefit from the method that Jean-Christophe
+> posted. I think we will end up wanting both in any case.
+> 
+> 	Arnd
+> 
