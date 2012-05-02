@@ -1,129 +1,61 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 2 May 2012 15:11:35 -0500
-Subject: [PATCH v2 2/3] ARM: imx: Add imx5 cpuidle driver
-In-Reply-To: <20120502073331.GS4141@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 May 2012 22:21:01 +0200
+Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
+ functionality.
+In-Reply-To: <CAMXH7KGLHD8uimSnf8=0t15F7KcFiPuL=3bebY309MbaA75USA@mail.gmail.com>
 References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-3-git-send-email-rob.lee@linaro.org>
- <20120502073331.GS4141@pengutronix.de>
-Message-ID: <CAMXH7KE1jao1p5ZQ1aw8p7qzOQUftck22QTMKJ1oGwiPhY=FMA@mail.gmail.com>
+ <1335924760-796-2-git-send-email-rob.lee@linaro.org>
+ <20120502072701.GR4141@pengutronix.de>
+ <CAMXH7KGLHD8uimSnf8=0t15F7KcFiPuL=3bebY309MbaA75USA@mail.gmail.com>
+Message-ID: <20120502202101.GA16535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+On Wed, May 02, 2012 at 02:16:36PM -0500, Rob Lee wrote:
+> Sascha,
+> 
+> >> +int __init imx_cpuidle_init(struct cpuidle_driver *drv)
+> >> +{
+> >> + ? ? struct cpuidle_device *dev;
+> >> + ? ? int cpu_id, ret;
+> >> +
+> >> + ? ? if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
+> >
+> > Please don't check for !drv here. When someone calls this function with
+> > a NULL pointer he should get a nive stack trace allowing him to figure
+> > out what went wrong.
+> >
+> 
+> Ok, I will change this in v3.  Given your statement, my understanding
+> is that I should avoid adding checks to make sure a valid driver
+> object was given as the stack trace information is all the handling
+> that is needed.  If there is any further logic needed in that rule,
+> could you elaborate so that I don't make this mistake in the future,
+> or so that I don't add a check on a driver object in a case that I
+> should?
 
-On Wed, May 2, 2012 at 2:33 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, May 01, 2012 at 09:12:39PM -0500, Robert Lee wrote:
->> Add imx5 cpuidle driver.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?arch/arm/mach-imx/mm-imx5.c | ? 42 +++++++++++++++++++++++++++++++++++++++---
->> ?1 file changed, 39 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
->> index d6b7e9f..cbd9bad 100644
->> --- a/arch/arm/mach-imx/mm-imx5.c
->> +++ b/arch/arm/mach-imx/mm-imx5.c
->> @@ -22,24 +22,59 @@
->> ?#include <mach/common.h>
->> ?#include <mach/devices-common.h>
->> ?#include <mach/iomux-v3.h>
->> +#include <mach/cpuidle.h>
->>
->> ?static struct clk *gpc_dvfs_clk;
->>
->> -static void imx5_idle(void)
->> +static int imx5_idle(void)
->> ?{
->> + ? ? int ret = 0;
->> +
->> ? ? ? /* gpc clock is needed for SRPG */
->> ? ? ? if (gpc_dvfs_clk == NULL) {
->> ? ? ? ? ? ? ? gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
->> ? ? ? ? ? ? ? if (IS_ERR(gpc_dvfs_clk))
->> - ? ? ? ? ? ? ? ? ? ? return;
->> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
->> ? ? ? }
->> ? ? ? clk_enable(gpc_dvfs_clk);
->> ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
->> ? ? ? if (!tzic_enable_wake())
->> ? ? ? ? ? ? ? cpu_do_idle();
->> + ? ? else
->> + ? ? ? ? ? ? ret = -EBUSY;
->> ? ? ? clk_disable(gpc_dvfs_clk);
->> +
->> + ? ? return ret;
->> +}
->> +
->> +static int imx5_cpuidle_enter(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv, int idx)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? ret = imx5_idle();
->> +
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? return ret;
->> +
->> + ? ? return idx;
->> ?}
->>
->> +static struct cpuidle_driver imx5_cpuidle_driver = {
->> + ? ? .name ? ? ? ? ? ? ? ? ? = "imx5_cpuidle",
->> + ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
->> + ? ? .en_core_tk_irqen ? ? ? = 1,
->> + ? ? .states[0] ? ? ?= {
->> + ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= imx5_cpuidle_enter,
->> + ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 20, /* max latency at 160MHz */
->> + ? ? ? ? ? ? .target_residency ? ? ? = 1,
->> + ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> + ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IMX5 SRPG",
->> + ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "CPU state retained,powered off",
->> + ? ? },
->> + ? ? .state_count ? ? ? ? ? ?= 1,
->> +};
->> +
->> ?/*
->> ? * Define the MX50 memory map.
->> ? */
->> @@ -103,7 +138,7 @@ void __init imx51_init_early(void)
->> ? ? ? mxc_set_cpu_type(MXC_CPU_MX51);
->> ? ? ? mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
->> ? ? ? mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
->> - ? ? arm_pm_idle = imx5_idle;
->> + ? ? arm_pm_idle = (void *)imx5_idle;
->
-> I don't like this. It will cover all warnings when the prototype of
-> arm_pm_idle changes in future. Better add a static void imx5_idle
-> which calls a static int imx5_do_idle, then you have an idle function
-> which returns an int.
->
+Here we have the case that only a Kernel developer will add a call to
+this function. For a kernel developer a stack trace is more useful
+than a pr_err. Of course this is different when not testing for a NULL
+pointer causes subtle bugs in unrelated code.
 
-What about using the following:
+> >
+> > You should only unregister the cpuidle devices you successfully
+> > registered. Unregistering not yet registered cpuidle devices probably
+> > has unwanted side effects.
+> >
+> 
+> I did not add in this handling because the cpuidle_unregister_device()
+> call already has a "registered" check so extra handling seemed
+> unnecessary.  But if you still think it is needed just let me know.
+> 
 
-arm_pm_idle =  (void (*)(void))imx5_idle;
+It's ok then. I didn't check cpuidle_unregister_device.
 
-This will give warnings if arm_pm_idle prototype changes.
+Sascha
 
-Thanks,
-Rob
-
->> ?}
->>
->> ?void __init imx53_init_early(void)
->> @@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
->> ?void __init imx51_init_late(void)
->> ?{
->> ? ? ? mx51_neon_fixup();
->> + ? ? imx_cpuidle_init(&imx5_cpuidle_driver);
->> ?}
->> --
->> 1.7.10
->>
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
