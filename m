@@ -1,49 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 May 2012 12:55:53 -0700
-Subject: [PATCH 18/20] ARM: dts: Update device tree source files for
- EXYNOS5250
-In-Reply-To: <1335813270-13083-19-git-send-email-thomas.abraham@linaro.org>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-19-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAOesGMiSrNoOA5wTEZo4RiZkPvSAMi43CntN6GUepTzx6M++OA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 2 May 2012 14:56:18 -0500
+Subject: [PATCH-V6 0/3] ARM: OMAP: Make OMAP clocksource source selection
+ runtime
+In-Reply-To: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
+References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <4FA19162.5040102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vaibhav,
 
-On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> Updated EXYNOS5 device tree source files to reflect changes in rev1
-> of EXYNOS5 SoC. This includes new additions to the EXYNOS5 dtsi and
-> SMDK5250 dts files and few minor fixes.
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?arch/arm/boot/dts/exynos5250-smdk5250.dts | ? 52 +++++++++++++++++++++++++++++
-> ?arch/arm/boot/dts/exynos5250.dtsi ? ? ? ? | ? 44 +++++++-----------------
-> ?2 files changed, 65 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 399d17b..bcc4b89 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -23,4 +23,56 @@
-> ? ? ? ?chosen {
-> ? ? ? ? ? ? ? ?bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
-> ? ? ? ?};
-> +
-> + ? ? ? i2c at 12C60000 {
-> + ? ? ? ? ? ? ? #address-cells = <1>;
-> + ? ? ? ? ? ? ? #size-cells = <0>;
+On 05/02/2012 08:56 AM, Vaibhav Hiremath wrote:
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
+> 
+> This patch series cleans up the existing 32k-sync timer implementation,
+> movind SoC init code to respective files (mach-omap1/timer32k.c and
+> mach-omap2/timer.c) and uses kernel parameter to override the default
+> clocksource of "counter_32k", also in order to support some OMAP based
+> derivative SoCs like AM33XX which doesn't have 32K sync-timer hardware IP,
+> adds hwmod lookup for omap2+ devices, and if lookup fails then
+> fall back to gp-timer.
+> 
+> if(use_gptimer_clksrc == true)
+> 	gptimer clocksource init;
+> else if (counter_32 init == false)
+> 	/* Fallback to gptimer */
+> 	gptimer clocksource init(;
+> 
+> With this, we should be able to support multi-omap boot
+> including devices with/without 32k-sync timer.
+> 
+> This patch-series has been boot tested on AM37xEVM platform, it
+> would be helpful if somebody help me to validate it on OMAP1/2
+> platforms.
+> 
+> The patches are also available at (based on linux-omap/master) -
+> https://github.com/hvaibhav/am335x-linux   32ksync-timer-cleanup
 
-Two nits:
+I was testing on OMAP4 and I found that the gptimer was always being set by default. I noticed that currently the HWMOD for counter_32k on OMAP4 is commented and hence was not being found. Please can you include the following with your series?
 
-#a-c and #s-c is likely to always be 1/0, so you might as well move
-these to the dtsi file for the SoC.
+Cheers
+Jon
 
-Also, we tend to use non-caps here and in other locations (so it
-should be 12c60000 here).
+>From 2a213a6d5f5894bc1c5262f2724508eaef21c7a5 Mon Sep 17 00:00:00 2001
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Wed, 2 May 2012 14:45:03 -0500
+Subject: [PATCH] ARM: OMAP4: Enable counter_32k HWMOD for OMAP4 devices
 
+HWMOD is being used to determine if the 32k sync timer is present in order
+to use the timer as the clocksource for the kernel. Enable the counter_32k
+HWMOD for OMAP4 devices so that the 32k sync timer will be used by default.
 
--Olof
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 6abc757..f0455d0 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -5561,7 +5561,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	&omap44xx_bandgap_hwmod,
+ 
+ 	/* counter class */
+-/*	&omap44xx_counter_32k_hwmod, */
++	&omap44xx_counter_32k_hwmod,
+ 
+ 	/* dma class */
+ 	&omap44xx_dma_system_hwmod,
+-- 
+1.7.5.4
