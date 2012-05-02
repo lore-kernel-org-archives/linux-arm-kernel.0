@@ -1,36 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2012 14:36:02 +0200
-Subject: [PATCH 05/15] ARM: imx: use machine specific hook for late init
-In-Reply-To: <1335958420-5193-6-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 2 May 2012 12:45:02 +0000
+Subject: [PATCH 00/15] arch/arm/mach-* late_initcall cleanup
+In-Reply-To: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
- <1335958420-5193-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120502123602.GZ4141@pengutronix.de>
+Message-ID: <201205021245.02831.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 07:33:30PM +0800, Shawn Guo wrote:
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/cpu-imx5.c            |    6 +---
->  arch/arm/mach-imx/imx51-dt.c            |    1 +
->  arch/arm/mach-imx/mach-cpuimx51.c       |    1 +
->  arch/arm/mach-imx/mach-cpuimx51sd.c     |    1 +
->  arch/arm/mach-imx/mach-mx51_3ds.c       |    1 +
->  arch/arm/mach-imx/mach-mx51_babbage.c   |    1 +
->  arch/arm/mach-imx/mach-mx51_efikamx.c   |   42 +++++++++++++++++--------------
->  arch/arm/mach-imx/mach-mx51_efikasb.c   |   28 +++++++++++---------
->  arch/arm/mach-imx/mach-pcm037.c         |    6 ++++
->  arch/arm/mach-imx/mach-pcm037_eet.c     |    5 +--
->  arch/arm/mach-imx/mm-imx5.c             |    5 +++
->  arch/arm/mach-imx/pcm037.h              |    6 ++++
->  arch/arm/plat-mxc/include/mach/common.h |    7 +++++
->  13 files changed, 71 insertions(+), 39 deletions(-)
+On Wednesday 02 May 2012, Shawn Guo wrote:
+> This series tries to clean up those late_initcall in arch/arm/mach-*,
+> which will be a blocker for single kernel build for multiple platforms.
+> Even on single platform, for example imx, where we already have single
+> kernel image for imx3, imx5 and imx6 families, late_initcall does not
+> scale.  We have to detect soc type in the late_initcall to do soc
+> sepcific late initialization.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Shawn,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+If you're targetting this at v3.5, I think we should get it into arm-soc
+as a staging branch to give it some more testing in linux-next ASAP.
+
+If you send me a pull request, I can put it in and then we upgrade it
+to a proper branch for the next merge window when everyone is happy
+with it. Until then, you can send add-on patches or replacement
+pull requests. Most importantly, the first patch needs an Ack from
+Russell and we should see if there are any serious conflicts of the
+other patches with stuff in his tree. If so, we should put the
+branch into both the arm and the arm-soc tree before we send it off
+to Linus.
+
+On a related note, do you plan to do the same thing for subsys_initcall?
+
+	Arnd
