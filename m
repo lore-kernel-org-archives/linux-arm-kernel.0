@@ -1,57 +1,56 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 02 May 2012 16:49:29 +0100
-Subject: [PATCH RESEND 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
-Message-ID: <mailman.3.1335973776.1417.linux-arm-kernel@lists.infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 May 2012 08:49:49 -0700
+Subject: [PATCH 2/7] ARM: OMAP2+: Clean up wrapping multiple objects in
+ Makefile
+In-Reply-To: <CAMQu2gx3_tZnQg=+8xm4Bnnv31BTOgJki_y=aNDOAUG-xNNrvg@mail.gmail.com>
+References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
+ <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120502095612.GG25053@n2100.arm.linux.org.uk>
+ <CAMQu2gx3_tZnQg=+8xm4Bnnv31BTOgJki_y=aNDOAUG-xNNrvg@mail.gmail.com>
+Message-ID: <20120502154949.GF3739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is part of a set which adds PCMCIA/CF support for the hx4700.
-This patch modifies asic3_gpio_config[] as follows:
-1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
-2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120502 03:18]:
+> On Wed, May 2, 2012 at 3:26 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, May 02, 2012 at 03:18:08PM +0530, Santosh Shilimkar wrote:
+> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> ---
+> >> ?arch/arm/mach-omap2/Makefile | ?160 ++++++++++++++++++++---------------------
+> >> ?1 files changed, 78 insertions(+), 82 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> >> index 56ed62e..669e2b1 100644
+> >> --- a/arch/arm/mach-omap2/Makefile
+> >> +++ b/arch/arm/mach-omap2/Makefile
+> >> @@ -24,10 +24,11 @@ endif
+> >> ?obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+> >>
+> >> ?# SMP support ONLY available for OMAP4
+> >> +
+> >> ?obj-$(CONFIG_SMP) ? ? ? ? ? ? ? ? ? ?+= omap-smp.o omap-headsmp.o
+> >> ?obj-$(CONFIG_HOTPLUG_CPU) ? ? ? ? ? ?+= omap-hotplug.o
+> >> -obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += omap4-common.o omap-wakeupgen.o \
+> >> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sleep44xx.o
+> >> +obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += omap4-common.o omap-wakeupgen.o
+> >> +obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += sleep44xx.o
+> >
+> > Using \ in makefiles really isn't a problem. ?I don't think this is something
+> > which we need to do, and it just creates additional changes where none is
+> > required.
+> 
+> Tony might give better reasoning for this change since he suggested it.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: Philipp Zabel <philipp.zabel@gmail.com>
----
+Mostly for making it cleaner to build shared objects between omap4 and omap5
+without adding things like:
 
-V6:
-Rebased from linux-3.3-rc6 to linux-3.4-rc1.
++obj-$(CONFIG_ARCH_OMAP5)                += omap4-common.o omap-wakeupgen.o \
++                                          sleep44xx.o
 
- arch/arm/mach-pxa/hx4700.c |    2 +-
- include/linux/mfd/asic3.h  |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
+But of course more localized changes will do there too to prepare adding
+omap5.
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 75ce812..de01277 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC0_LED0,		/* red */
- 	ASIC3_GPIOC1_LED1,		/* green */
- 	ASIC3_GPIOC2_LED2,		/* blue */
--	ASIC3_GPIOC4_CF_nCD,
- 	ASIC3_GPIOC5_nCIOW,
- 	ASIC3_GPIOC6_nCIOR,
- 	ASIC3_GPIOC7_nPCE_1,
-@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
- 	ASIC3_GPIOC15_nPIOR,
- 
- 	/* GPIOD: input GPIOs, CF */
-+	ASIC3_GPIOD4_CF_nCD,
- 	ASIC3_GPIOD11_nCIOIS16,
- 	ASIC3_GPIOD12_nCWAIT,
- 	ASIC3_GPIOD15_nPIOW,
-diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
-index ed793b7..ef6faa5 100644
---- a/include/linux/mfd/asic3.h
-+++ b/include/linux/mfd/asic3.h
-@@ -138,6 +138,7 @@ struct asic3_platform_data {
- #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
- #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
- #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
-+#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
- #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
- #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
- #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
--- 
-1.7.3.4
+Regards,
+
+Tony
