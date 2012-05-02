@@ -1,53 +1,58 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Wed, 2 May 2012 20:02:05 +0530
-Subject: [PATCHv9 00/10] I2C fixes
-Message-ID: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+Date: Wed, 2 May 2012 20:02:10 +0530
+Subject: [PATCHv9 05/10] I2C: OMAP: Don't check if
+ wait_for_completion_timeout() returns less than zero
+In-Reply-To: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1335969135-20858-6-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+By definition, wait_for_completion_timeout() returns an unsigned value and
+therefore, it is not necessary to check if the return value is less than zero
+as this is not possible.
 
-The patch series does the following
+This is based on a patch from Jon Hunter <jon-hunter@ti.com>
+Changes from his patch
+- Declare a long as the wait_for_completion_timeout returns long.
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Folds a patch from Tasslehoff to prevent any merge conflicts.
-- Prevents the XDUF flag to be set if the underflow condition is not met.
-- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
- use the unique id instead as the section number in the recent errata
- docs has changed.
+Original patch is
+http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
 
-v9:
-Fix the comments from Wolfram Sang
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
-[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
-
-Tested on omap4sdp and omap3sdp.
-
-The following changes since commit b821861b905a79f71746945237968c3382d99adc:
-
-  Merge tag 'ktest-for-v3.4-rc5' of git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-ktest (2012-05-01 19:43:34 -0700)
-
-are available in the git repository at:
-
-  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
-
-Shubhrajyoti D (9):
-      I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
-      I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
-      I2C: OMAP: Fix the interrupt clearing in OMAP4
-      I2C: OMAP: Prevent the register access after pm_runtime_put in probe
-      I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
-      I2C: OMAP: Fix the crash in i2c remove
-      I2C: OMAP: Handle error check for pm runtime
-      I2C: OMAP: Do not set the XUDF(Transmit underflow) if the underflow is not reached
-      I2C: OMAP: Rename the 1p153 to the erratum id i462
-
-Tasslehoff Kjappfot (1):
-      I2C: OMAP: prevent the overwrite of the errata flags
-
- drivers/i2c/busses/i2c-omap.c |  127 ++++++++++++++++++++---------------------
- 1 files changed, 62 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 1777d79..fec8d5c 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -473,7 +473,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 			     struct i2c_msg *msg, int stop)
+ {
+ 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+-	int r;
++	unsigned long timeout;
+ 	u16 w;
+ 
+ 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+@@ -541,12 +541,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	 * REVISIT: We should abort the transfer on signals, but the bus goes
+ 	 * into arbitration and we're currently unable to recover from it.
+ 	 */
+-	r = wait_for_completion_timeout(&dev->cmd_complete,
+-					OMAP_I2C_TIMEOUT);
++	timeout = wait_for_completion_timeout(&dev->cmd_complete,
++						OMAP_I2C_TIMEOUT);
+ 	dev->buf_len = 0;
+-	if (r < 0)
+-		return r;
+-	if (r == 0) {
++	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
 -- 
 1.7.5.4
