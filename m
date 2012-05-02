@@ -1,58 +1,48 @@
-From: guillaume.gardet@free.fr (Guillaume Gardet)
-Date: Wed, 02 May 2012 14:58:15 +0200
-Subject: [PATCH 1/1] Add missing include <plat/cpu.h> in
- drivers/mfd/omap-usb-host.c
-In-Reply-To: <4FA11FF7.8040600@mvista.com>
-References: <4FA02CE9.3090106@free.fr> <4FA11FF7.8040600@mvista.com>
-Message-ID: <4FA12F67.1010901@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 2 May 2012 12:58:24 +0000
+Subject: [PATCH 2/9] ARM: mmp: distinguish mmp and mmp2 in Kconfig
+In-Reply-To: <CAN1soZy=OdS=GUc93mgJ0bXTLJSX3+=WuWT=0yLDxkgjjG=wgQ@mail.gmail.com>
+References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
+ <201204272014.49443.arnd@arndb.de>
+ <CAN1soZy=OdS=GUc93mgJ0bXTLJSX3+=WuWT=0yLDxkgjjG=wgQ@mail.gmail.com>
+Message-ID: <201205021258.24624.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 02 May 2012, Haojian Zhuang wrote:
+> On Sat, Apr 28, 2012 at 4:14 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 27 April 2012, Haojian Zhuang wrote:
+> >> Append four CONFIG_* MACRO to distinguish boards in arch-mmp.
+> >>
+> >> CONFIG_MMP_LEGACY and CONFIG_MMP2_LEGACY are used to support boards
+> >> without device tree.
+> >>
+> >> CONFIG_MMP_DT and CONFIG_MMP2_DT are used to support boards with
+> >> device tree.
+> >>
+> >> At the same time, only one of these four macro could be selected.
+> >> It's used to miss compiling all boards file together.
+> >
+> > Can you explain why this is done? It seems counterintuitive to
+> > have the DT and non-DT support be mutually exclusive.
+> >
+> If I selected DT support, I needn't select those machine support one
+> by one. I want to use
+> mmp-dt to support all PXA168/PXA910 boards, and use mmp2-dt to support
+> all mmp2 boards.
+> So I use exclusive statements in Kconfig for convenience.
 
-Le 02/05/2012 13:52, Sergei Shtylyov a ?crit :
-> Hello.
->
-> On 01-05-2012 22:35, Guillaume Gardet wrote:
->
->> Fix compilation error for omap boards (beagleboard, etc.) due to missing
->> include <plat/cpu.h> in drivers/mfd/omap-usb-host.c leading to build error
->> (unknown cpu_is_omap3430, omap_rev and OMAP3430_REV_ES2_1).
->
->> KernelVersion: 3.4-rc5
->
->    This should have been specified under --- tear line.
+Everyone else who is adding DT support does it so that one can boot
+the same kernel using ATAG or DT mode, to allow testing in direct
+comparison for the transitional period. Further, you can currently
+build a single kernel that supports all board files including DT
+support, with this patch you have to build two separate kernels,
+which I consider a regression.
 
-Ok.
+I guess this would be ok if you plan to remove the non-DT board files
+from mach-mmp soon (e.g. v3.6) and only support DT booting, providing
+the same feature set as today with the board files. If you think you
+need longer than that, I would prefer if you make the two options
+coexist in the kernel.
 
->
->> Signed-off-by: Guillaume GARDET<guillaume.gardet@free.fr>
->
->> ---
->> drivers/mfd/omap-usb-host.c | 1 +
->> 1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->> index c8aae66..7e96bb2 100644
->> --- a/drivers/mfd/omap-usb-host.c
->> +++ b/drivers/mfd/omap-usb-host.c
->> @@ -25,6 +25,7 @@
->>  #include<linux/clk.h>
->>  #include<linux/dma-mapping.h>
->>  #include<linux/spinlock.h>
->> +#include<plat/cpu.h>
->>  #include<plat/usb.h>
->>  #include<linux/pm_runtime.h>
->
->    Something ate spaces between #include and < in your patch (this time it's not my Thunderbird).
-
-Hmm, it is strange. I will resend it now.
-
-Regards,
-
-Guillaume
-
-
->
-> WBR, Sergei
->
+	Arnd
