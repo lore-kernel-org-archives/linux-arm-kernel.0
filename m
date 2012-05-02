@@ -1,61 +1,72 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2012 22:21:01 +0200
-Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
- functionality.
-In-Reply-To: <CAMXH7KGLHD8uimSnf8=0t15F7KcFiPuL=3bebY309MbaA75USA@mail.gmail.com>
-References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-2-git-send-email-rob.lee@linaro.org>
- <20120502072701.GR4141@pengutronix.de>
- <CAMXH7KGLHD8uimSnf8=0t15F7KcFiPuL=3bebY309MbaA75USA@mail.gmail.com>
-Message-ID: <20120502202101.GA16535@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 02 May 2012 13:39:59 -0700
+Subject: [PATCH-V6 3/3] ARM: OMAP: Make OMAP clocksource source selection
+ using kernel param
+In-Reply-To: <1335967014-11937-4-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Wed, 2 May 2012 19:26:54 +0530")
+References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
+ <1335967014-11937-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <87mx5qfhb4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 02:16:36PM -0500, Rob Lee wrote:
-> Sascha,
-> 
-> >> +int __init imx_cpuidle_init(struct cpuidle_driver *drv)
-> >> +{
-> >> + ? ? struct cpuidle_device *dev;
-> >> + ? ? int cpu_id, ret;
-> >> +
-> >> + ? ? if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
-> >
-> > Please don't check for !drv here. When someone calls this function with
-> > a NULL pointer he should get a nive stack trace allowing him to figure
-> > out what went wrong.
-> >
-> 
-> Ok, I will change this in v3.  Given your statement, my understanding
-> is that I should avoid adding checks to make sure a valid driver
-> object was given as the stack trace information is all the handling
-> that is needed.  If there is any further logic needed in that rule,
-> could you elaborate so that I don't make this mistake in the future,
-> or so that I don't add a check on a driver object in a case that I
-> should?
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-Here we have the case that only a Kernel developer will add a call to
-this function. For a kernel developer a stack trace is more useful
-than a pr_err. Of course this is different when not testing for a NULL
-pointer causes subtle bugs in unrelated code.
+> Current OMAP code supports couple of clocksource options based
+> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz).
+> So there can be 3 options -
+>
+> 1. 32KHz sync-timer
+> 2. Sys_clock based (e.g 13/19.2/26/38.4 MHz) gptimer
+> 3. 32KHz based gptimer.
+>
+> The optional gptimer based clocksource was added so that it can
+> give the high precision than sync-timer, so expected usage was 2
+> and not 3.
+> Unfortunately option 2, clocksource doesn't meet the requirement of
+> free-running clock as per clocksource need. It stops in low power states
+> when sys_clock is cut. That makes gptimer based clocksource option
+> useless for OMAP2/3/4 devices with sys_clock as a clock input.
+> So, in order to use option 2, deeper idle state MUST be disabled.
+>
+> Option 3 will still work but it is no better than 32K sync-timer
+> based clocksource.
+>
+> We must support both sync timer and gptimer based clocksource as
+> some OMAP based derivative SoCs like AM33XX does not have the
+> sync timer.
+>
+> Considering above, make sync-timer and gptimer clocksource runtime
+> selectable so that both OMAP and AMXXXX continue to use the same code.
+>
+> And, in order to precisely configure/setup sched_clock for given
+> clocksource, decision has to be made early enough in boot sequence.
+>
+> So, the solution is,
+>
+> Use standard kernel parameter ("clocksource=") to override
+> default 32k_sync-timer, in addition to this, we also use hwmod database
+> lookup mechanism, through which at run-time we can identify availability
+> of 32k-sync timer on the device, else fall back to gptimer.
+>
+> Also, moved low-level SoC specific init code to respective files,
+> (mach-omap1/timer32k.c and mach-omap2/timer.c)
+>
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Cc: Ming Lei <tom.leiming@gmail.com>
 
-> >
-> > You should only unregister the cpuidle devices you successfully
-> > registered. Unregistering not yet registered cpuidle devices probably
-> > has unwanted side effects.
-> >
-> 
-> I did not add in this handling because the cpuidle_unregister_device()
-> call already has a "registered" check so extra handling seemed
-> unnecessary.  But if you still think it is needed just let me know.
-> 
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-It's ok then. I didn't check cpuidle_unregister_device.
+tested on OMAP3530/Overo with default 32k timer and cmdline override for
+GPtimer.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Kevin
