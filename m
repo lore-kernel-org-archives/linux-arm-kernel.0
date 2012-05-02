@@ -1,75 +1,42 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 2 May 2012 14:56:18 -0500
-Subject: [PATCH-V6 0/3] ARM: OMAP: Make OMAP clocksource source selection
- runtime
-In-Reply-To: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <4FA19162.5040102@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  2 May 2012 22:08:07 +0200
+Subject: [PATCH] ARM: imx: only specify i2c device type once
+Message-ID: <1335989287-10094-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+The first argument of I2C_BOARD_INFO is used to assign .type, so drop
+second assignment.
 
-On 05/02/2012 08:56 AM, Vaibhav Hiremath wrote:
-> Current OMAP code supports couple of clocksource options based
-> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
-> 
-> This patch series cleans up the existing 32k-sync timer implementation,
-> movind SoC init code to respective files (mach-omap1/timer32k.c and
-> mach-omap2/timer.c) and uses kernel parameter to override the default
-> clocksource of "counter_32k", also in order to support some OMAP based
-> derivative SoCs like AM33XX which doesn't have 32K sync-timer hardware IP,
-> adds hwmod lookup for omap2+ devices, and if lookup fails then
-> fall back to gp-timer.
-> 
-> if(use_gptimer_clksrc == true)
-> 	gptimer clocksource init;
-> else if (counter_32 init == false)
-> 	/* Fallback to gptimer */
-> 	gptimer clocksource init(;
-> 
-> With this, we should be able to support multi-omap boot
-> including devices with/without 32k-sync timer.
-> 
-> This patch-series has been boot tested on AM37xEVM platform, it
-> would be helpful if somebody help me to validate it on OMAP1/2
-> platforms.
-> 
-> The patches are also available at (based on linux-omap/master) -
-> https://github.com/hvaibhav/am335x-linux   32ksync-timer-cleanup
-
-I was testing on OMAP4 and I found that the gptimer was always being set by default. I noticed that currently the HWMOD for counter_32k on OMAP4 is commented and hence was not being found. Please can you include the following with your series?
-
-Cheers
-Jon
-
->From 2a213a6d5f5894bc1c5262f2724508eaef21c7a5 Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Wed, 2 May 2012 14:45:03 -0500
-Subject: [PATCH] ARM: OMAP4: Enable counter_32k HWMOD for OMAP4 devices
-
-HWMOD is being used to determine if the 32k sync timer is present in order
-to use the timer as the clocksource for the kernel. Enable the counter_32k
-HWMOD for OMAP4 devices so that the 32k sync timer will be used by default.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/mach-cpuimx35.c   |    1 -
+ arch/arm/mach-imx/mach-cpuimx51sd.c |    1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 6abc757..f0455d0 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -5561,7 +5561,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_bandgap_hwmod,
- 
- 	/* counter class */
--/*	&omap44xx_counter_32k_hwmod, */
-+	&omap44xx_counter_32k_hwmod,
- 
- 	/* dma class */
- 	&omap44xx_dma_system_hwmod,
+diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
+index 8ecc872..b1a4796 100644
+--- a/arch/arm/mach-imx/mach-cpuimx35.c
++++ b/arch/arm/mach-imx/mach-cpuimx35.c
+@@ -70,7 +70,6 @@ static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
+ 		I2C_BOARD_INFO("pcf8563", 0x51),
+ 	}, {
+ 		I2C_BOARD_INFO("tsc2007", 0x48),
+-		.type		= "tsc2007",
+ 		.platform_data	= &tsc2007_info,
+ 		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
+ 	},
+diff --git a/arch/arm/mach-imx/mach-cpuimx51sd.c b/arch/arm/mach-imx/mach-cpuimx51sd.c
+index 9fbe923..89eb93c 100644
+--- a/arch/arm/mach-imx/mach-cpuimx51sd.c
++++ b/arch/arm/mach-imx/mach-cpuimx51sd.c
+@@ -124,7 +124,6 @@ static struct i2c_board_info eukrea_cpuimx51sd_i2c_devices[] = {
+ 		I2C_BOARD_INFO("pcf8563", 0x51),
+ 	}, {
+ 		I2C_BOARD_INFO("tsc2007", 0x49),
+-		.type		= "tsc2007",
+ 		.platform_data	= &tsc2007_info,
+ 		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
+ 	},
 -- 
-1.7.5.4
+1.7.10
