@@ -1,23 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 May 2012 12:51:16 +0000
-Subject: [PATCH 3/9] ARM: mmp: support DT in irq
-In-Reply-To: <CAN1soZz5b0bc10isc6syxM7WzKfvVqc-HzotW6Auqv1A1mnC9A@mail.gmail.com>
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
- <20120427190620.D3C313E0B4D@localhost>
- <CAN1soZz5b0bc10isc6syxM7WzKfvVqc-HzotW6Auqv1A1mnC9A@mail.gmail.com>
-Message-ID: <201205021251.16967.arnd@arndb.de>
+From: guillaume.gardet@free.fr (Guillaume Gardet)
+Date: Wed, 02 May 2012 14:58:15 +0200
+Subject: [PATCH 1/1] Add missing include <plat/cpu.h> in
+ drivers/mfd/omap-usb-host.c
+In-Reply-To: <4FA11FF7.8040600@mvista.com>
+References: <4FA02CE9.3090106@free.fr> <4FA11FF7.8040600@mvista.com>
+Message-ID: <4FA12F67.1010901@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 May 2012, Haojian Zhuang wrote:
-> I use two CONFIG_OF in this file. The first one is used to record
-> register base address
-> of interrupt controller. In legacy code, the register address is
-> hardcoding. Do you mean
-> that I should remove this CONFIG_OF?
+Hi,
 
-Unless it's a noticeable performance impact, I would recommend just
-always using the mmp_icu_base variable, even for when CONFIG_OF is
-disabled.
+Le 02/05/2012 13:52, Sergei Shtylyov a ?crit :
+> Hello.
+>
+> On 01-05-2012 22:35, Guillaume Gardet wrote:
+>
+>> Fix compilation error for omap boards (beagleboard, etc.) due to missing
+>> include <plat/cpu.h> in drivers/mfd/omap-usb-host.c leading to build error
+>> (unknown cpu_is_omap3430, omap_rev and OMAP3430_REV_ES2_1).
+>
+>> KernelVersion: 3.4-rc5
+>
+>    This should have been specified under --- tear line.
 
-	Arnd
+Ok.
+
+>
+>> Signed-off-by: Guillaume GARDET<guillaume.gardet@free.fr>
+>
+>> ---
+>> drivers/mfd/omap-usb-host.c | 1 +
+>> 1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>> index c8aae66..7e96bb2 100644
+>> --- a/drivers/mfd/omap-usb-host.c
+>> +++ b/drivers/mfd/omap-usb-host.c
+>> @@ -25,6 +25,7 @@
+>>  #include<linux/clk.h>
+>>  #include<linux/dma-mapping.h>
+>>  #include<linux/spinlock.h>
+>> +#include<plat/cpu.h>
+>>  #include<plat/usb.h>
+>>  #include<linux/pm_runtime.h>
+>
+>    Something ate spaces between #include and < in your patch (this time it's not my Thunderbird).
+
+Hmm, it is strange. I will resend it now.
+
+Regards,
+
+Guillaume
+
+
+>
+> WBR, Sergei
+>
