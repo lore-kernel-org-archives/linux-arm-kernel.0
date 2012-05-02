@@ -1,35 +1,129 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 May 2012 13:09:58 -0700
-Subject: [PATCH-V6 2/3] ARM: OMAP2+: Replace space=>underscore in the name
- field of system timers
-In-Reply-To: <1335967014-11937-3-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Wed, 2 May 2012 19:26:53 +0530")
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <1335967014-11937-3-git-send-email-hvaibhav@ti.com>
-Message-ID: <87r4v2fip5.fsf@ti.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Wed, 2 May 2012 15:11:35 -0500
+Subject: [PATCH v2 2/3] ARM: imx: Add imx5 cpuidle driver
+In-Reply-To: <20120502073331.GS4141@pengutronix.de>
+References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
+ <1335924760-796-3-git-send-email-rob.lee@linaro.org>
+ <20120502073331.GS4141@pengutronix.de>
+Message-ID: <CAMXH7KE1jao1p5ZQ1aw8p7qzOQUftck22QTMKJ1oGwiPhY=FMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+Sascha,
 
-> Depending on the bootloader, passing command-line arguments
-> with spaces may have issues. Some bootloaders doesn't seem
-> to pass along the quotes, passing only 'gp' part of the string,
-> which leads to wrong clocksource override configuration.
-
-For clarity, it would help to specify which command-line options this
-affects
-
-> So this patch changes "gp timer" => "gp_timer", for clockevent,
-> clocksource and timer irq_handler.
+On Wed, May 2, 2012 at 2:33 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, May 01, 2012 at 09:12:39PM -0500, Robert Lee wrote:
+>> Add imx5 cpuidle driver.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/mach-imx/mm-imx5.c | ? 42 +++++++++++++++++++++++++++++++++++++++---
+>> ?1 file changed, 39 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+>> index d6b7e9f..cbd9bad 100644
+>> --- a/arch/arm/mach-imx/mm-imx5.c
+>> +++ b/arch/arm/mach-imx/mm-imx5.c
+>> @@ -22,24 +22,59 @@
+>> ?#include <mach/common.h>
+>> ?#include <mach/devices-common.h>
+>> ?#include <mach/iomux-v3.h>
+>> +#include <mach/cpuidle.h>
+>>
+>> ?static struct clk *gpc_dvfs_clk;
+>>
+>> -static void imx5_idle(void)
+>> +static int imx5_idle(void)
+>> ?{
+>> + ? ? int ret = 0;
+>> +
+>> ? ? ? /* gpc clock is needed for SRPG */
+>> ? ? ? if (gpc_dvfs_clk == NULL) {
+>> ? ? ? ? ? ? ? gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+>> ? ? ? ? ? ? ? if (IS_ERR(gpc_dvfs_clk))
+>> - ? ? ? ? ? ? ? ? ? ? return;
+>> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
+>> ? ? ? }
+>> ? ? ? clk_enable(gpc_dvfs_clk);
+>> ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+>> ? ? ? if (!tzic_enable_wake())
+>> ? ? ? ? ? ? ? cpu_do_idle();
+>> + ? ? else
+>> + ? ? ? ? ? ? ret = -EBUSY;
+>> ? ? ? clk_disable(gpc_dvfs_clk);
+>> +
+>> + ? ? return ret;
+>> +}
+>> +
+>> +static int imx5_cpuidle_enter(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv, int idx)
+>> +{
+>> + ? ? int ret;
+>> +
+>> + ? ? ret = imx5_idle();
+>> +
+>> + ? ? if (ret < 0)
+>> + ? ? ? ? ? ? return ret;
+>> +
+>> + ? ? return idx;
+>> ?}
+>>
+>> +static struct cpuidle_driver imx5_cpuidle_driver = {
+>> + ? ? .name ? ? ? ? ? ? ? ? ? = "imx5_cpuidle",
+>> + ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
+>> + ? ? .en_core_tk_irqen ? ? ? = 1,
+>> + ? ? .states[0] ? ? ?= {
+>> + ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= imx5_cpuidle_enter,
+>> + ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 20, /* max latency at 160MHz */
+>> + ? ? ? ? ? ? .target_residency ? ? ? = 1,
+>> + ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+>> + ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IMX5 SRPG",
+>> + ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "CPU state retained,powered off",
+>> + ? ? },
+>> + ? ? .state_count ? ? ? ? ? ?= 1,
+>> +};
+>> +
+>> ?/*
+>> ? * Define the MX50 memory map.
+>> ? */
+>> @@ -103,7 +138,7 @@ void __init imx51_init_early(void)
+>> ? ? ? mxc_set_cpu_type(MXC_CPU_MX51);
+>> ? ? ? mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+>> ? ? ? mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+>> - ? ? arm_pm_idle = imx5_idle;
+>> + ? ? arm_pm_idle = (void *)imx5_idle;
 >
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> I don't like this. It will cover all warnings when the prototype of
+> arm_pm_idle changes in future. Better add a static void imx5_idle
+> which calls a static int imx5_do_idle, then you have an idle function
+> which returns an int.
+>
 
-With the change above,
+What about using the following:
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+arm_pm_idle =  (void (*)(void))imx5_idle;
+
+This will give warnings if arm_pm_idle prototype changes.
+
+Thanks,
+Rob
+
+>> ?}
+>>
+>> ?void __init imx53_init_early(void)
+>> @@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
+>> ?void __init imx51_init_late(void)
+>> ?{
+>> ? ? ? mx51_neon_fixup();
+>> + ? ? imx_cpuidle_init(&imx5_cpuidle_driver);
+>> ?}
+>> --
+>> 1.7.10
+>>
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
