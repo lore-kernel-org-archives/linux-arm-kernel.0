@@ -1,48 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 May 2012 11:10:45 -0700
-Subject: [PATCH 4/7] mmc: dw_mmc: add samsung exynos5250 specific
- extentions
-In-Reply-To: <1335935266-25289-5-git-send-email-thomas.abraham@linaro.org>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAOesGMiJrfCgLHmBix1WUrpF-0D9tG5r6xi-3zsiM7KQjkO=ug@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 2 May 2012 11:28:41 -0700
+Subject: [PATCH 06/15] ARM: msm: use machine specific hook for late init
+In-Reply-To: <1335958420-5193-7-git-send-email-shawn.guo@linaro.org>
+References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
+ <1335958420-5193-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120502182841.GA26165@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, May 1, 2012 at 10:07 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> The instantiation of the Synopsis Designware controller on Exynos5250
-> include extension for SDR and DDR specific tx/rx phase shift timing
-> and CIU internal divider. In addition to that, the option to skip the
-> command hold stage is also introduced. Add support for these Exynos5250
-> specfic extenstions.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+On Wed, May 02, 2012 at 07:33:31PM +0800, Shawn Guo wrote:
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> ?.../devicetree/bindings/mmc/synposis-dw-mshc.txt ? | ? 33 +++++++++++++++++++-
-> ?drivers/mmc/host/dw_mmc-pltfm.c ? ? ? ? ? ? ? ? ? ?| ? ?8 +++++
-> ?drivers/mmc/host/dw_mmc.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 32 ++++++++++++++++++-
-> ?drivers/mmc/host/dw_mmc.h ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 13 ++++++++
-> ?include/linux/mmc/dw_mmc.h ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +++
-> ?5 files changed, 89 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
-> index c1ed70e..465fc31 100644
-> --- a/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/synposis-dw-mshc.txt
-> @@ -7,6 +7,8 @@ Required Properties:
->
-> ?* compatible: should be one of the following
-> ? ? ? ?- synopsis,dw-mshc: for controllers compliant with synopsis dw-mshc.
-> + ? ? ? - synopsis,dw-mshc-exynos5250: for controllers with Samsung
-> + ? ? ? ? Exynos5250 specific extentions.
+>  arch/arm/mach-msm/board-halibut.c      |    6 ++++++
+>  arch/arm/mach-msm/board-mahimahi.c     |    6 ++++++
+>  arch/arm/mach-msm/board-msm7x27.c      |    9 +++++++++
+>  arch/arm/mach-msm/board-msm7x30.c      |    8 ++++++++
+>  arch/arm/mach-msm/board-msm8960.c      |    7 +++++++
+>  arch/arm/mach-msm/board-msm8x60.c      |   10 ++++++++++
+>  arch/arm/mach-msm/board-qsd8x50.c      |    7 +++++++
+>  arch/arm/mach-msm/board-sapphire.c     |    6 ++++++
+>  arch/arm/mach-msm/board-trout.c        |    6 ++++++
+>  arch/arm/mach-msm/include/mach/board.h |    6 ++++++
+>  arch/arm/mach-msm/smd_debug.c          |    3 +--
+>  11 files changed, 72 insertions(+), 2 deletions(-)
 
-It makes more sense to use your own manufacturer prefix here:
+Acked-by: David Brown <davidb@codeaurora.org>
 
-samsung,exynos5250-dw-mshc
-
-
--Olof
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
