@@ -1,53 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 May 2012 12:41:22 +0100
-Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for
- imx-sgtl5000
-In-Reply-To: <20120502105024.GC2982@b20223-02.ap.freescale.net>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
- <20120501134446.GK2194@S2101-09.ap.freescale.net>
- <20120502105024.GC2982@b20223-02.ap.freescale.net>
-Message-ID: <20120502114121.GB5722@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 2 May 2012 17:16:19 +0530
+Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA6D93B@DBDE01.ent.ti.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-2-git-send-email-t-kristo@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
+ <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6C848@DBDE01.ent.ti.com>
+ <CAMQu2gxcUw5A-p25xdYeXfy=tLbDNPsjV_5MJ6s5qGNfn4Zbfw@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6D93B@DBDE01.ent.ti.com>
+Message-ID: <CAMQu2gxSKaLhd3qMYpE75_X8gLDrjBWbt3oAf52LE3NjfE=5qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 06:50:24PM +0800, Richard Zhao wrote:
-> On Tue, May 01, 2012 at 09:44:48PM +0800, Shawn Guo wrote:
+On Wed, May 2, 2012 at 5:10 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> On Wed, May 02, 2012 at 16:30:26, Shilimkar, Santosh wrote:
+> [...]
+>
+>> >> How ?
+>> >> SRAM is sower memory than DDR so I don't see how it
+>> >> will reduce latency.
+>> >>
+>> >
+>> > I am just guessing if that's indeed the case ;)
+>> > Haven't done any measurements to really check if that's indeed the case though.
+>> >
+>> You don't have to do any real measurements at least on OMAP.
+>> OCMC RAM is interfaced over L4 and MPU has to cross two interconnect
+>> bridges to reach to SRAM. DDR is more of direct path and much faster.
+>>
+>
+> Hmm, I was under the impression that OCMC RAM was on L3, at least for OMAP4.
+Nope. It's on L4 and it is same for all OMAPs including OMAP5
 
-> > > +	data->codec_clk = clk_get(&codec_dev->dev, NULL);
+> Maybe there's a extra low latency path for DDR that I am missing.
+Even OMAP3 DDR is faster than OCMC RAM.
 
-> > It's a clock of sgtl5000 codec.  I feel it makes more sense to have
-> > sgtl5000 device driver than machine driver to manage this clock.
-
-> The ASoC machine driver handled the clock settings, I just followed the
-> same way, using snd_soc_dai_set_sysclk to set codec clk. But what you
-> said  is reasonable. I also find it's impossible to use devm_get_clk.
-
-> Mark, do you suggest get clk in ASoC machine driver or in codec driver?
-
-We generally try to keep the clock API out of CODEC drivers due to the
-issues with the clock API that the generic implementation is intended to
-help us solve.
-
-The major problem here is that we can't rely on having the clock API
-present at all on most platforms so as soon as we start adding clock
-support into things we have to do a performance with HAVE_CLK which is
-at best annoying.
-
-There's also the fact that even if the clock API is available we've no
-way to register a clock consistently and since the audio clock tree
-often needs management off-SoC for at least some components when the
-clock API is in use you end up having to handle clock trees that go into
-and out of the clock API.
-
-The upshot of this is that while we really should be using the clock API
-for clocks the API as it stands is somewhat difficult to deploy in cross
-platform code.  What I'd suggest is connecting the clock to the CODEC in
-the device tree but actually doing the clk_get() in the machine driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120502/82d6f6ac/attachment.sig>
+Regards
+Santosh
