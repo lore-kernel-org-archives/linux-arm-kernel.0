@@ -1,87 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 May 2012 10:57:11 -0700
-Subject: [PATCH 19/20] ARM: Exynos5: Add combiner, wakeup interrupt
- controller and ethernet nodes
-In-Reply-To: <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAOesGMhxn6L+Pcp-v2v6z7srGd=8kGwqff7Tt6ok8pHMVXp3ZQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 2 May 2012 11:03:22 -0700
+Subject: [PATCH v5 0/7] Add TI EMIF SDRAM controller driver
+In-Reply-To: <4FA0D930.3080806@ti.com>
+References: <y> <1335529449-28046-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120502051623.GA23705@kroah.com> <4FA0D930.3080806@ti.com>
+Message-ID: <20120502180322.GA28837@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 02, 2012 at 12:20:24PM +0530, Santosh Shilimkar wrote:
+> Greg,
+> 
+> On Wednesday 02 May 2012 10:46 AM, Greg KH wrote:
+> > On Fri, Apr 27, 2012 at 05:54:02PM +0530, Santosh Shilimkar wrote:
+> >> Add a driver for the EMIF SDRAM controller used in Texas Instrument SoCs
+> >>
+> >> EMIF is an SDRAM controller that supports, based on its revision,
+> >> one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
+> >> for LPDDR2.
+> >>
+> >> The driver supports the following features:
+> >> - Calculates the DDR AC timing parameters to be set in EMIF
+> >>   registers using data from the device data-sheets and based
+> >>   on the DDR frequency. If data from data-sheets is not available
+> >>   default timing values from the JEDEC spec are used. These
+> >>   will be safe, but not necessarily optimal
+> >> - API for changing timings during DVFS or at boot-up
+> >> - Temperature alert configuration and handling of temperature
+> >>   alerts, if any for LPDDR2 devices
+> >>   * temperature alert is based on periodic polling of MR4 mode
+> >>     register in DDR devices automatically performed by hardware
+> >>   * timings are de-rated and brought back to nominal when
+> >>     temperature raises and falls respectively
+> >> - Cache of calculated register values to avoid re-calculating
+> >>   them
+> >>
+> >> The driver will need some minor updates when it is eventually
+> >> integrated with Dynamic Voltage and Frequency Scaling (DVFS).
+> >> This can not be done now as DVFS support is not available in
+> >> the mainline yet.
+> >>
+> >> Discussions with Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> were immensely helpful in shaping up the interfaces. Vibhore Vardhan
+> >> <vvardhan@gmail.com> did the initial code snippet for thermal
+> >> handling.
+> >>
+> >> Testing: 
+> >> - The driver is tested on OMAP4430 SDP.
+> >> - The driver in a slightly adapted form is also tested on OMAP5.
+> >> - Since mainline kernel doesn't have DVFS support yet,
+> >>   testing was done using a test module.
+> >> - Temperature alert handling was tested with simulated interrupts
+> >>   and faked temperature values as testing all cases in real-life
+> >>   scenarios is difficult.
+> >> - Tested the driver as a module
+> >>
+> >> Cc: Greg KH <greg@kroah.com>
+> > 
+> > This all looks good to me now, thanks for reworking this.
+> > 
+> > So, do you want me to take this through my "driver" tree to get to Linus
+> > for 3.5, or do you want it to go through somewhere else?
+> > 
+> > If somewhere else, that's fine with me, consider this an:
+> > 	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > 
+> > If you want me to take it, just let me know, whichever you prefer is
+> > fine with me.
+> > 
+> Can you take this one through your 3.5 driver tree please ?
+> Thanks for help.
 
-[adding devicetree-discuss]
+Ok, all now applied.
 
-On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> And interrupt combiner, external interrupt wakeup interrupt controller
-> and smsc9215 lan controller nodes.
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> ?arch/arm/boot/dts/exynos5250-smdk5250.dts | ? 11 ++++++
-> ?arch/arm/boot/dts/exynos5250.dtsi ? ? ? ? | ? 55 +++++++++++++++++++++++++++++
-> ?2 files changed, 66 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index bcc4b89..dbc4bdb 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -24,6 +24,17 @@
-> ? ? ? ? ? ? ? ?bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
-> ? ? ? ?};
->
-> + ? ? ? lan9215 at 0x05000000 {
-> + ? ? ? ? ? ? ? compatible = "smsc,lan9215", "smsc,lan9115";
-> + ? ? ? ? ? ? ? reg = <0x05000000 0x20000>;
-> + ? ? ? ? ? ? ? interrupts = <5 0>;
-> + ? ? ? ? ? ? ? interrupt-parent = <&wakeup_eint>;
-> + ? ? ? ? ? ? ? phy-mode = "mii";
-> + ? ? ? ? ? ? ? smsc,irq-push-pull;
-> + ? ? ? ? ? ? ? smsc,force-internal-phy;
-> + ? ? ? ? ? ? ? local-mac-address = [00 80 00 23 45 67];
-> + ? ? ? };
-> +
-
-since the 911x sits on a chipselect bus, you should instead add that
-bus to the dtsi and define this on that bus.
-
-Something like this in the dtsi:
-
-       sromc-bus {
-               #address-cells = <2>;
-               #size-cells = <1>;
-               ranges = < 0 0 0x04000000 0x20000
-                          1 0 0x05000000 0x20000
-                          2 0 0x06000000 0x20000
-                          3 0 0x07000000 0x20000>;
-       };
-
-and in the dts:
-
-       sromc-bus {
-               lan9215 at 1,0 {
-                       compatible = "smsc,lan9215", "smsc,lan9115";
-                       reg = <1 0 0x20000>;
-                       interrupts = <5 0>;
-                       interrupt-parent = <&wakeup_eint>;
-                       phy-mode = "mii";
-                       smsc,irq-push-pull;
-                       smsc,force-internal-phy;
-                       local-mac-address = [00 80 00 23 45 67];
-               };
-        };
-
-
-(You might be able to do just fine with one address cell, I'm not 100%
-sure why Grant's example uses two, but I used the same above for
-consistency).
-
-Also, I don't think it's a good idea to hardcode the mac address in
-the dts like this; have u-boot fill it in from the environment
-variable there instead, if needed.
-
-
-
--Olof
+greg k-h
