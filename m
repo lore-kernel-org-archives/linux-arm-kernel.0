@@ -1,63 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 2 May 2012 03:09:12 -0600 (MDT)
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
- <20120426190524.GZ3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
+From: will.newton@gmail.com (Will Newton)
+Date: Wed, 2 May 2012 10:10:25 +0100
+Subject: [PATCH 2/7] mmc: dw_mmc: add quirk to indicate missing write
+ protect line
+In-Reply-To: <1335935266-25289-3-git-send-email-thomas.abraham@linaro.org>
+References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
+ <1335935266-25289-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAFbHwiTRzGJgxxMAkqDDM-fPxgGe1bC3yKWCM+bNp3-i7WWcZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
+On Wed, May 2, 2012 at 6:07 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> If the write protect pad of the controller is not connected to the write
+> protect pin of the slot, the driver should be notified of this condition
+> so that incorrect check for write protection by reading the WRTORT
+> register can avoided. The get_ro platform callback can be used for in
+> such cases, but with device tree support enabled, such platform callbacks
+> cannot be supported.
+>
+> Add a new quirk for notifying the driver about the missing write protect
+> line so the driver can assume that the card write protection is disabled.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> ?drivers/mmc/host/dw_mmc.c ?| ? ?4 +++-
+> ?include/linux/mmc/dw_mmc.h | ? ?3 ++-
+> ?2 files changed, 5 insertions(+), 2 deletions(-)
 
-> I will be waiting for your comment and conformation on, which family AM33xx 
-> device should fall in? Please refer to the mail-chain -
-> 
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67275.html
-
-This decision turns out to be pretty important; it certainly affects the 
-AM33xx PRM/CM/clockdomain/powerdomain patches that I've been looking at.
-
-Here is my suggestion, based on our previous practice.  I am not so 
-sure that it is the best way, but it seems pretty reasonable"
-
-Using CONFIG_ARCH_OMAP3 for CONFIG_ARCH_OMAPAM33XX doesn't make sense, as 
-far as I can tell.  The main area of similarity between the other 
-CONFIG_ARCH_OMAP3 and AM33xx is the Cortex-A8.  And even that MPU 
-subsystem is quite different between, say, the 3430/3630 and the AM33xx.  
-Most of the AM33xx is quite different from the 3430/3630: OMAP4-style PRCM 
-interface, OMAP4-style interconnect, etc.  Plus, most of the 
-CONFIG_ARCH_OMAP3 code in our codebase is very 3430/3630-specific, like 
-the PM code.
-
-This would seem to suggest that we should use CONFIG_ARCH_OMAP4.  But that 
-option currently assumes an OMAP4-style MPU subsystem: SMP Cortex-A9, 
-PL310, etc.  None of that is true for AM335x.
-
-So first we have to decide whether the CONFIG_ARCH_OMAP* options should 
-have a strong dependency on the MPU type, as they currently do; or whether 
-they should focus on the way the SoC is integrated.
-
-If we take the former option, then we should add a new 
-CONFIG_ARCH_OMAPAM33XX Kconfig option to arch/arm/Makefile, at the same 
-level as CONFIG_ARCH_OMAP1/2/3/4.  Similarly, we should add a 
-CONFIG_ARCH_OMAPTI81XX Kconfig option.
-
-However, if we take the second option, then we can probably shoehorn the 
-AM33XX and the TI81xx chips into CONFIG_ARCH_OMAP4.
-
-Either way, it would be good to get AM33xx and TI81xx out of 
-CONFIG_ARCH_OMAP3, since keeping them there will require lots of 
-changes across the codebase to stop using CONFIG_ARCH_OMAP3 and use the 
-CONFIG_SOC_* Kconfig options instead.
-
-
-- Paul
+Acked-by: Will Newton <will.newton@imgtec.com>
