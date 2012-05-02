@@ -1,38 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 May 2012 15:13:34 +0100
-Subject: [PATCH V3 1/8] CLKDEV: Add helper routines to allocate and add
- clkdevs for given struct clk *
-In-Reply-To: <20120502135945.GD2194@S2101-09.ap.freescale.net>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <0fb69ddb87f9a5e6a6afec2f833c6341e45763c7.1335249846.git.viresh.kumar@st.com>
- <20120426074746.GD24211@n2100.arm.linux.org.uk> <4F992369.2020308@st.com>
- <20120428095222.GP24211@n2100.arm.linux.org.uk>
- <20120428110108.GD20478@pengutronix.de>
- <20120428110635.GQ24211@n2100.arm.linux.org.uk>
- <20120501123149.GE2194@S2101-09.ap.freescale.net>
- <20120502095404.GA24211@n2100.arm.linux.org.uk>
- <20120502135945.GD2194@S2101-09.ap.freescale.net>
-Message-ID: <20120502141334.GD3548@n2100.arm.linux.org.uk>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Wed, 2 May 2012 20:02:14 +0530
+Subject: [PATCHv9 09/10] I2C: OMAP: Do not set the XUDF(Transmit underflow) if
+ the underflow is not reached
+In-Reply-To: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1335969135-20858-10-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 09:59:48PM +0800, Shawn Guo wrote:
-> On Wed, May 02, 2012 at 10:54:04AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, May 01, 2012 at 08:31:51PM +0800, Shawn Guo wrote:
-> > > > +	for (i = 0; i < num; i++) {
-> > > 
-> > > With above line changed to:
-> > > 
-> > > 	for (i = 0; i < num; i++, cl++) {
-> > > 
-> > > 
-> > > Tested-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Thanks, fixed that and committed.
-> 
-> Can you please publish a branch for clkdev patches, so that we can ask
-> Arnd to pull it into arm-soc as a dependency of platform clock porting?
+Currently in the 1.153 errata handling while waiting for transmitter
+underflow if NACK is got the XUDF(Transmit underflow) flag is also set.
+The flag is set after wait for the condition is over.
 
-Let's wait for it to be in linux-next - and having it go through one
-of my nightly build cycles first (which is where the problem with the
-last version from Viresh was noticed.)
+Cc: Alexander Shishkin <virtuoso@slind.org>
+Acked-by: Moiz Sonasath <m-sonasath@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 43b0efb..c0aa16b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -730,7 +730,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+ 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
+-			*err |= OMAP_I2C_STAT_XUDF;
+ 			return -ETIMEDOUT;
+ 		}
+ 
+@@ -743,6 +742,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 		return 0;
+ 	}
+ 
++	*err |= OMAP_I2C_STAT_XUDF;
+ 	return 0;
+ }
+ 
+-- 
+1.7.5.4
