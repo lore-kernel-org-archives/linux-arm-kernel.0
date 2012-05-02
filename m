@@ -1,34 +1,27 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  2 May 2012 16:44:36 +0300
-Subject: [PATCH 3/3] OMAP: omap4panda: Use common configuration for V1V8,
- V2V1 supplies
-In-Reply-To: <1335966276-19775-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1335966276-19775-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1335966276-19775-4-git-send-email-peter.ujfalusi@ti.com>
+From: 13556835687@139.com (=?GB2312?B?zeLDs87lsr23qM3iw7PO5bK9t6g=?=)
+Date: Wed, 02 May 2012 13:47:53 +0000
+Subject: =?GB2312?B?zeLDs87lsr23qM3iw7PO5bK9t6ggc2hhcmVkIHBob3RvcyB3aXRoIHlv?=
+ =?GB2312?B?dQ==?=
+Message-ID: <e89a8ff1c342177b4804bf0def85@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These supplies going to be needed for the twl6040 driver.
+?????????????
+???????????
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+LED????????????????.
+?????????????????????????????????????? 
+???.????????????????????????????????
+????????????
+?????????????????????1?????
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 1b782ba..c47feed 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -323,7 +323,9 @@ static int __init omap4_panda_i2c_init(void)
- 			TWL_COMMON_REGULATOR_VANA |
- 			TWL_COMMON_REGULATOR_VCXIO |
- 			TWL_COMMON_REGULATOR_VUSB |
--			TWL_COMMON_REGULATOR_CLK32KG);
-+			TWL_COMMON_REGULATOR_CLK32KG |
-+			TWL_COMMON_REGULATOR_V1V8 |
-+			TWL_COMMON_REGULATOR_V2V1);
- 	omap4_pmic_init("twl6030", &omap4_panda_twldata,
- 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
- 	omap_register_i2c_bus(2, 400, NULL, 0);
--- 
-1.7.8.6
+????????
+QQ:1193330842
+TEL?13556835687
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ????.jpg
+Type: image/jpeg
+Size: 44334 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120502/1c99204c/attachment-0001.jpg>
