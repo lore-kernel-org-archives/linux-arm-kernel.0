@@ -1,54 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 May 2012 09:58:28 +0100
-Subject: [PATCH] ARM: Fix restoration of IP scratch register when
- auditing syscalls
-In-Reply-To: <4FA0D3CA.8080704@jonmasters.org>
-References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
- <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
- <20120430100746.GA11080@mudshark.cambridge.arm.com>
- <4F9EE024.8000906@redhat.com>
- <20120501110744.GD2305@mudshark.cambridge.arm.com>
- <4FA0D3CA.8080704@jonmasters.org>
-Message-ID: <20120502085828.GB547@mudshark.cambridge.arm.com>
+From: will.newton@gmail.com (Will Newton)
+Date: Wed, 2 May 2012 10:07:45 +0100
+Subject: [PATCH] mmc: dw_mmc: make multiple instances of
+ dw_mci_card_workqueue
+In-Reply-To: <1335909456-14020-1-git-send-email-thomas.abraham@linaro.org>
+References: <1335909456-14020-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAFbHwiSG6Z0aWuZvrydSjY07rgJpAuPx=9tzQDKc7UbaRTnY6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 07:27:22AM +0100, Jon Masters wrote:
-> Right. So audit userspace has this:
-> 
-> static const struct int_transtab elftab[] = {
->     { MACH_X86,     AUDIT_ARCH_I386   },
->     { MACH_86_64,   AUDIT_ARCH_X86_64 },
->     { MACH_IA64,    AUDIT_ARCH_IA64   },
->     { MACH_PPC64,   AUDIT_ARCH_PPC64  },
->     { MACH_PPC,     AUDIT_ARCH_PPC    },
->     { MACH_S390X,   AUDIT_ARCH_S390X  },
->     { MACH_S390,    AUDIT_ARCH_S390   },
-> #ifdef WITH_ALPHA
->     { MACH_ALPHA,   AUDIT_ARCH_ALPHA  }
-> #endif
-> #ifdef WITH_ARMEB
->     { MACH_ARMEB,   AUDIT_ARCH_ARMEB  }
-> #endif
-> };
+On Tue, May 1, 2012 at 10:57 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> The variable 'dw_mci_card_workqueue' is a global variable shared between
+> multiple instances of the dw_mmc host controller. Due to this, data
+> corruption has been noticed when multiple instances of dw_mmc controllers
+> are actively reading/writing the media. Fix this by adding a instance
+> of 'struct workqueue_struct' for each host instance and removing the
+> global 'dw_mci_card_workqueue' instance.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> ?drivers/mmc/host/dw_mmc.c ?| ? 14 ++++++--------
+> ?include/linux/mmc/dw_mmc.h | ? ?1 +
+> ?2 files changed, 7 insertions(+), 8 deletions(-)
 
-Yes -- it seems that ARMEB was confused with ARM EABI, so it's probably
-worth dropping the -EB suffix in the tools and then updating the RHS of the
-above table to use the little-endian identifier. This raises some questions:
+Looks good.
 
-(1) Why does endianness come into this? Is there some structure parsing code
-    somewhere that I can't see or is there an assumption about syscall ABIs
-    being necessarily different if the endianness changes?
-
-(2) What do we do about OABI? I think the two choices are either (a) add
-    some new AUDIT_ARCH_ARM* entries (although then you have the messy
-    problem of determining the ABI of the current task during tracing) or
-    (b) support EABI only for the time being.
-
-I had to hack a random switch statement in the tools too, otherwise I got a
-cryptic message about `requested bit level not supported by machine'.
-
-Anyway, I threw the kernel changes into my audit branch and will re-post later
-on.
-
-Will
+Acked-by: Will Newton <will.newton@imgtec.com>
