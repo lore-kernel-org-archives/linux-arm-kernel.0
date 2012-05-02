@@ -1,34 +1,65 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 2 May 2012 09:09:12 -0500
-Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
- functionality.
-In-Reply-To: <CAAQ0ZWTsdNE7=c8CxPGbqdUKYp5wHa1yVriv2OApEFAqtm43Pg@mail.gmail.com>
-References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-2-git-send-email-rob.lee@linaro.org>
- <20120502031311.GT2194@S2101-09.ap.freescale.net>
- <CAMXH7KG9DNm4Yv4-YMHdB5-aZ14VKVhnHkwEZVUWpjO9q6Vp8w@mail.gmail.com>
- <CAAQ0ZWTsdNE7=c8CxPGbqdUKYp5wHa1yVriv2OApEFAqtm43Pg@mail.gmail.com>
-Message-ID: <CAMXH7KGcFjEXazVJeEmKA+7s2yPJv6tzsrPg0d=SwtgH3A62fQ@mail.gmail.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Wed, 2 May 2012 10:10:09 -0400
+Subject: [PATCH] ARM: Fix restoration of IP scratch register when auditing
+ syscalls
+In-Reply-To: <20120502085828.GB547@mudshark.cambridge.arm.com>
+References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
+ <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
+ <20120430100746.GA11080@mudshark.cambridge.arm.com>
+ <4F9EE024.8000906@redhat.com>
+ <20120501110744.GD2305@mudshark.cambridge.arm.com>
+ <4FA0D3CA.8080704@jonmasters.org>
+ <20120502085828.GB547@mudshark.cambridge.arm.com>
+Message-ID: <42BD0A3B-1820-4C51-8303-A73A6AB974B8@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 9:07 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 2 May 2012 21:59, Rob Lee <rob.lee@linaro.org> wrote:
->>>> + ? ? ? ? ? ? ret = cpuidle_register_device(dev);
->>>> + ? ? ? ? ? ? if (ret) {
->>>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to register cpu %u\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, cpu_id);
->>>
->>> Nit: print ret (error code) too?
->>>
->>
->> I added the printing of the error code based on Sascha's suggestion in
->> v1 of this submission.
->>
-> But you did not print "ret" in above pr_err.
->
 
-Argh, sorry, still trying to wake up I guess.  Thanks.
+On May 2, 2012, at 4:58 AM, Will Deacon wrote:
 
-> Regards,
-> Shawn
+> On Wed, May 02, 2012 at 07:27:22AM +0100, Jon Masters wrote:
+>> Right. So audit userspace has this:
+>> 
+>> static const struct int_transtab elftab[] = {
+>>    { MACH_X86,     AUDIT_ARCH_I386   },
+>>    { MACH_86_64,   AUDIT_ARCH_X86_64 },
+>>    { MACH_IA64,    AUDIT_ARCH_IA64   },
+>>    { MACH_PPC64,   AUDIT_ARCH_PPC64  },
+>>    { MACH_PPC,     AUDIT_ARCH_PPC    },
+>>    { MACH_S390X,   AUDIT_ARCH_S390X  },
+>>    { MACH_S390,    AUDIT_ARCH_S390   },
+>> #ifdef WITH_ALPHA
+>>    { MACH_ALPHA,   AUDIT_ARCH_ALPHA  }
+>> #endif
+>> #ifdef WITH_ARMEB
+>>    { MACH_ARMEB,   AUDIT_ARCH_ARMEB  }
+>> #endif
+>> };
+> 
+> Yes -- it seems that ARMEB was confused with ARM EABI, so it's probably
+> worth dropping the -EB suffix in the tools and then updating the RHS of the
+> above table to use the little-endian identifier. This raises some questions:
+> 
+> (1) Why does endianness come into this? Is there some structure parsing code
+>    somewhere that I can't see or is there an assumption about syscall ABIs
+>    being necessarily different if the endianness changes?
+
+Can Eric or someone else provide context here?
+
+> (2) What do we do about OABI? I think the two choices are either (a) add
+>    some new AUDIT_ARCH_ARM* entries (although then you have the messy
+>    problem of determining the ABI of the current task during tracing) or
+>    (b) support EABI only for the time being.
+
+I think the answer is?nobody cares about OABI :) Seriously though, for
+"new" stuff, let's just look to the future I say. But that's my opinion.
+
+> I had to hack a random switch statement in the tools too, otherwise I got a
+> cryptic message about `requested bit level not supported by machine'.
+> 
+> Anyway, I threw the kernel changes into my audit branch and will re-post later
+> on.
+
+Cool. And you'll make sure stable is CC'd on this specific patch too?
+
+Jon.
