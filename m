@@ -1,114 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2012 09:27:01 +0200
-Subject: [PATCH v2 1/3] ARM: imx: Add common imx cpuidle init
- functionality.
-In-Reply-To: <1335924760-796-2-git-send-email-rob.lee@linaro.org>
-References: <1335924760-796-1-git-send-email-rob.lee@linaro.org>
- <1335924760-796-2-git-send-email-rob.lee@linaro.org>
-Message-ID: <20120502072701.GR4141@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 02 May 2012 13:02:47 +0530
+Subject: About CPU hotplug stress test failed
+In-Reply-To: <CAB4PhKf06wNA_=QEe3uT9u25WaxVHAenWADCA49hUwJxcPGdwA@mail.gmail.com>
+References: <CAB4PhKf06wNA_=QEe3uT9u25WaxVHAenWADCA49hUwJxcPGdwA@mail.gmail.com>
+Message-ID: <4FA0E31F.8090304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2012 at 09:12:38PM -0500, Robert Lee wrote:
-> Add common cpuidle init functionality that can be used by various
-> imx platforms.
+On Wednesday 02 May 2012 12:46 PM, Jason Liu wrote:
+> Hi, kernel experts
 > 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
-> +
-> +int __init imx_cpuidle_init(struct cpuidle_driver *drv)
-> +{
-> +	struct cpuidle_device *dev;
-> +	int cpu_id, ret;
-> +
-> +	if (!drv || drv->state_count > CPUIDLE_STATE_MAX) {
-
-Please don't check for !drv here. When someone calls this function with
-a NULL pointer he should get a nive stack trace allowing him to figure
-out what went wrong.
-
-> +		pr_err("%s: Invalid Input\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
-> +			 __func__, ret);
-> +		return ret;
-> +	}
-> +
-> +	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-> +	if (imx_cpuidle_devices == NULL) {
-> +		ret = -ENOMEM;
-> +		goto unregister_drv;
-> +	}
-> +
-> +	/* initialize state data for each cpuidle_device */
-> +	for_each_possible_cpu(cpu_id) {
-> +		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-> +		dev->cpu = cpu_id;
-> +		dev->state_count = drv->state_count;
-> +
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("%s: Failed to register cpu %u\n",
-> +				__func__, cpu_id);
-> +			goto uninit;
-
-You should only unregister the cpuidle devices you successfully
-registered. Unregistering not yet registered cpuidle devices probably
-has unwanted side effects.
-
-Sascha
-
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +uninit:
-> +	imx_cpuidle_devices_uninit();
-> +
-> +unregister_drv:
-> +	cpuidle_unregister_driver(drv);
-> +	return ret;
-> +}
-> diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> new file mode 100644
-> index 0000000..8612510
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2012 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +
-> +#ifdef CONFIG_CPU_IDLE
-> +extern void imx_cpuidle_devices_uninit(void);
-> +extern int imx_cpuidle_init(struct cpuidle_driver *drv);
-> +#else
-> +static inline void imx_cpuidle_devices_uninit(void) {}
-> +static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
-> +{ return -ENODEV; }
-> +#endif
-> -- 
-> 1.7.10
+>  We met CPU hotplug issue on v3.0.15 and event the latest v3.4,
+> sometimes system hang when doing stress test of CPU hotplug which is
+> simply to remove all secondary cores(core1 ~ core3) and add them back,
+> the failure is in random. But we didn?t meet any issue on V2.6.38, so
+> I guess it is pure kernel issue, do you have any idea about it? Or did
+> you meet any similar issue on other platform(OMAP, SAMSUNG or Tegra)?
+> Thanks in advanced!
 > 
 > 
+I haven't observed yet such issue on OMAP with 3.4 but there were issues
+seen before the cpu_active fixes. You can look at commit "5fbd036b" for more
+information.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+In your report, you haven't mentioned much. What you mean by system
+hang. What is the state of CPU's at the time of hang ? Are you getting
+some CPU stalled kind of messages ? You can enable the debug support so
+that kernel will panic if CPUs are stalled.
+
+Regards
+Santosh
