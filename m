@@ -1,45 +1,115 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 2 May 2012 09:37:47 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <alpine.DEB.2.00.1205020325100.19695@utopia.booyaka.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1205020325100.19695@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA10A80@DBDE01.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 May 2012 11:48:07 +0200
+Subject: [PATCH V3 2/8] clk: add a fixed factor clock
+In-Reply-To: <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
+Message-ID: <20120502094807.GE20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 15:00:28, Paul Walmsley wrote:
+On Tue, Apr 24, 2012 at 12:20:30PM +0530, Viresh Kumar wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> Hello Vaibhav,
+> Having fixed factors/dividers in hardware is a common pattern, so
+> add a basic clock type doing this. It basically describes a fixed
+> factor clock using a nominator and a denominator.
 > 
-> I've reworked these patches somewhat to separate the PRM and CM changes 
-> into their own patches.  Also, the omap_hwmod changes have been separated 
-> and moved into a different series, as have the clock tree changes.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> Sascha,
 > 
-> So now, pending for 3.5, there are the SCM, voltagedomain, PRM, CM, 
-> powerdomain, and clockdomain changes.  Under the (probably incorrect) 
-> assumption that Tony will opt to create a CONFIG_ARCH_OMAPAM33XX, you 
-> might wish to take a look at the 'am33xx_prcm_devel_3.5' branch of 
-> git://git.pwsan.com/linux-2.6.  It is based on four patches, not yet 
-> upstream, which create the appropriate board file, Kconfig options, etc.
+> I have this patch in my set, because i need this to get SPEAr stuff pushed by
+> Mike. I have updated your original patch, with all the review comments you got
+> on it. Please check see if i have corrupted something.
 > 
-> Once we're able to reach a conclusion as to which of the CONFIG_ARCH_OMAP* 
-> options the AM33xx belongs under, this branch will be updated and 
-> reposted, and if everyone is happy with it, proposed for pulling. 
+>  drivers/clk/Makefile           |    2 +-
+>  drivers/clk/clk-fixed-factor.c |   94 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-private.h    |   20 ++++++++
+>  include/linux/clk-provider.h   |   23 ++++++++++
+>  4 files changed, 138 insertions(+), 1 deletions(-)
+>  create mode 100644 drivers/clk/clk-fixed-factor.c
 > 
-> 
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 1f736bc..24aa714 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -1,4 +1,4 @@
+>  
+>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>  obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
+> -				   clk-mux.o clk-divider.o
+> +				   clk-mux.o clk-divider.o clk-fixed-factor.o
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> new file mode 100644
+> index 0000000..7453efe
+> --- /dev/null
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Standard functionality for the common clock API.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +
+> +/*
+> + * DOC: basic fixed multiplier and divider clock that cannot gate
+> + *
+> + * Traits of this clock:
+> + * prepare - clk_prepare only ensures that parents are prepared
+> + * enable - clk_enable only ensures that parents are enabled
+> + * rate - rate is fixed.  clk->rate = parent->rate / div * mult
+> + * parent - fixed parent.  No clk_set_parent support
+> + */
+> +
+> +#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
+> +
+> +static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+> +		unsigned long parent_rate)
+> +{
+> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+> +
+> +	return (parent_rate / fix->div) * fix->mult;
+> +}
+> +
+> +static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				unsigned long *prate)
+> +{
+> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+> +
+> +	if (prate) {
+> +		unsigned long best_parent;
+> +		best_parent = (rate / fix->mult) * fix->div;
+> +		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
+> +				best_parent);
+> +		return (*prate / fix->div) * fix->mult;
+> +	} else {
+> +		return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
+> +			fix->mult;
+> +	}
+> +}
 
-Sounds Great and Thanks a lot Paul.
+This needs a fixup. The clock framework used to pass in a NULL pointer
+as prate when a clk is not allowed to change a parents clock. This
+is no longer true, so we have to check for
 
-I will look at the above branch and update you if I find something 
-wrong/missing.
+__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT
 
-Thanks,
-Vaibhav
+instead.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
