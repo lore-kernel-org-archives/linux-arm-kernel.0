@@ -1,58 +1,26 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Tue, 1 May 2012 21:16:48 -0500
-Subject: [PATCH 01/17] ARM: provide a late_initcall hook for platform
- initialization
-In-Reply-To: <1335454725-13089-2-git-send-email-shawn.guo@linaro.org>
-References: <1335454725-13089-1-git-send-email-shawn.guo@linaro.org>
- <1335454725-13089-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAMXH7KEzQUpFFVrdyVsUaBZdNCTuotrTWhYABxQYBcaFRE8yqQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 2 May 2012 10:38:13 +0800
+Subject: [PATCH 06/11] ARM: dts: imx6q-sabrelite: add ssi device
+In-Reply-To: <20120501132651.GJ2194@S2101-09.ap.freescale.net>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-7-git-send-email-richard.zhao@freescale.com>
+ <20120501132651.GJ2194@S2101-09.ap.freescale.net>
+Message-ID: <20120502023811.GR2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 10:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> This allows platforms to set up things that need to be done at
-> late_initcall time.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> ?arch/arm/include/asm/mach/arch.h | ? ?1 +
-> ?arch/arm/kernel/setup.c ? ? ? ? ?| ? ?8 ++++++++
-> ?2 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index d7692ca..0b1c94b 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -43,6 +43,7 @@ struct machine_desc {
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
-> ? ? ? ?struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_late)(void);
-> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*handle_irq)(struct pt_regs *);
-> ?#endif
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index ebfac78..549f036 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -800,6 +800,14 @@ static int __init customize_machine(void)
-> ?}
-> ?arch_initcall(customize_machine);
->
-> +static int __init init_machine_late(void)
-> +{
-> + ? ? ? if (machine_desc->init_late)
-> + ? ? ? ? ? ? ? machine_desc->init_late();
-> + ? ? ? return 0;
-> +}
-> +late_initcall(init_machine_late);
-> +
-> ?#ifdef CONFIG_KEXEC
-> ?static inline unsigned long long get_total_mem(void)
-> ?{
-> --
-> 1.7.5.4
->
+On Tue, May 01, 2012 at 09:26:53PM +0800, Shawn Guo wrote:
+> On Fri, Apr 27, 2012 at 03:03:00PM +0800, Richard Zhao wrote:
+> > From: Richard Zhao <richard.zhao@linaro.org>
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> 
+> I tried to apply patch #6 and #7, but they did not apply.
+> 
+Just manually applied these two patches on imx/dt branch, please check
+if they are applied correctly.
 
-Tested-by: Robert Lee <rob.lee@linaro.org>
+-- 
+Regards,
+Shawn
