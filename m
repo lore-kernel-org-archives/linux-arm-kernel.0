@@ -1,37 +1,42 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 02 May 2012 13:37:45 -0400
-Subject: [PATCH] ARM: Fix restoration of IP scratch register when auditing
- syscalls
-In-Reply-To: <20120502153933.GD547@mudshark.cambridge.arm.com>
-References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
- <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
- <20120430100746.GA11080@mudshark.cambridge.arm.com>
- <4F9EE024.8000906@redhat.com>
- <20120501110744.GD2305@mudshark.cambridge.arm.com>
- <4FA0D3CA.8080704@jonmasters.org>
- <20120502085828.GB547@mudshark.cambridge.arm.com>
- <42BD0A3B-1820-4C51-8303-A73A6AB974B8@jonmasters.org>
- <1335970090.30722.13.camel@localhost>
- <20120502153933.GD547@mudshark.cambridge.arm.com>
-Message-ID: <4FA170E9.6090908@redhat.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 2 May 2012 12:45:06 -0500
+Subject: [PATCH 03/15] ARM: ep93xx: use machine specific hook for late init
+In-Reply-To: <1335958420-5193-4-git-send-email-shawn.guo@linaro.org>
+References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
+ <1335958420-5193-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698952162@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2012 11:39 AM, Will Deacon wrote:
-> On Wed, May 02, 2012 at 03:48:10PM +0100, Eric Paris wrote:
+On Wednesday, May 02, 2012 4:33 AM, Shawn Guo wrote:
+>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-ep93xx/adssphere.c             |    1 +
+>  arch/arm/mach-ep93xx/core.c                  |    5 +++++
+>  arch/arm/mach-ep93xx/crunch.c                |    4 +---
+>  arch/arm/mach-ep93xx/edb93xx.c               |    8 ++++++++
+>  arch/arm/mach-ep93xx/gesbc9312.c             |    1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h |    7 +++++++
+>  arch/arm/mach-ep93xx/micro9.c                |    4 ++++
+>  arch/arm/mach-ep93xx/simone.c                |    1 +
+>  arch/arm/mach-ep93xx/snappercl15.c           |    1 +
+>  arch/arm/mach-ep93xx/ts72xx.c                |    1 +
+>  arch/arm/mach-ep93xx/vision_ep9307.c         |    1 +
+>  11 files changed, 31 insertions(+), 3 deletions(-)
 
->> I'm fine with not supporting things.  But I'm pretty stupid here.  Is
->> this just not supporting some old chip?  Or is this some ABI that a new
->> chip could have both and can switch at run time?  If the latter, we need
->> to support it.  If the former, and hints on how to make sure you can't
->> build audit with OABI?
-> 
-> My current hack in the kernel is to change the Kconfig entries for audit. As
-> for userspace, I guess you have to check the toolchain triplet somehow. v6
-> onwards makes use only of EABI and it's becoming increasingly more difficult
-> to find distributions supporting OABI (required for CPUs prior to v4t).
+Shawn,
 
-I'll followup with an email explaining ARM ABIs to help out - might take
-me a bit of time to get to it.
+I'm ok with these changes for ep93xx.
 
-Jon.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+I'm not sure what tree this patch was based on but you will have
+some fuzz issues with linux-next due to some other changes to
+core.c, snappercl15.c, and ts72xx.c. Just wanted to make sure
+you were aware of this.
+
+Regards,
+Hartley
