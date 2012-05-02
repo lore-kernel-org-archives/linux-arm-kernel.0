@@ -1,42 +1,58 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 2 May 2012 02:08:36 -0600 (MDT)
-Subject: [PATCH] W1: OMAP HDQ1W: allow driver to be built on all OMAP2+
-Message-ID: <alpine.DEB.2.00.1205020206020.19695@utopia.booyaka.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 2 May 2012 16:19:30 +0800
+Subject: [PATCH] serial/imx: enable the clock when we really use the uart port
+Message-ID: <1335946770-17120-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The current code keeps the clock enabled even when we do not really
+use the uart port. But keep the clock enabled will consume some power.
 
-Allow the OMAP HDQ1W driver to be built for all OMAP2+ SoCs by
-adjusting KConfig dependencies.  The previous dependency required
-either SOC_OMAP2430 or ARCH_OMAP3 to be set, but the HDQ IP block is
-present on OMAP2420 and OMAP44xx SoCs.  The driver was still
-selectable on multi-OMAP kernel configurations, however; so the
-previous prohibition was rather pointless.
+In order to save more power, disable the clock when we do not use
+the uart, and enable the clock when we really use the uart port.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Evgeniy Polyakov <zbr@ioremap.net>
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
-Hi Evgeniy,
+ drivers/tty/serial/imx.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-was wondering if you would be willing to ack this so it can be submitted 
-along with the other OMAP HDQ patches here that you've already acked?  
-Thanks - Paul
-
- drivers/w1/masters/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/w1/masters/Kconfig b/drivers/w1/masters/Kconfig
-index 979d6ee..5ceb1cd 100644
---- a/drivers/w1/masters/Kconfig
-+++ b/drivers/w1/masters/Kconfig
-@@ -60,7 +60,7 @@ config W1_MASTER_GPIO
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index e7fecee..f5dcdf6 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -694,6 +694,8 @@ static int imx_startup(struct uart_port *port)
+ 	int retval;
+ 	unsigned long flags, temp;
  
- config HDQ_MASTER_OMAP
- 	tristate "OMAP HDQ driver"
--	depends on SOC_OMAP2430 || ARCH_OMAP3
-+	depends on ARCH_OMAP2PLUS
- 	help
- 	  Say Y here if you want support for the 1-wire or HDQ Interface
- 	  on an OMAP processor.
++	clk_prepare_enable(sport->clk);
++
+ 	imx_setup_ufcr(sport, 0);
+ 
+ 	/* disable the DREN bit (Data Ready interrupt enable) before
+@@ -877,6 +879,8 @@ static void imx_shutdown(struct uart_port *port)
+ 		temp &= ~(UCR1_IREN);
+ 
+ 	writel(temp, sport->port.membase + UCR1);
++
++	clk_disable_unprepare(sport->clk);
+ }
+ 
+ static void
+@@ -1526,6 +1530,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		goto deinit;
+ 	platform_set_drvdata(pdev, &sport->port);
+ 
++	clk_disable_unprepare(sport->clk);
+ 	return 0;
+ deinit:
+ 	if (pdata && pdata->exit)
+@@ -1552,7 +1557,6 @@ static int serial_imx_remove(struct platform_device *pdev)
+ 
+ 	if (sport) {
+ 		uart_remove_one_port(&imx_reg, &sport->port);
+-		clk_disable_unprepare(sport->clk);
+ 		clk_put(sport->clk);
+ 	}
+ 
 -- 
-1.7.10
+1.7.3.2
