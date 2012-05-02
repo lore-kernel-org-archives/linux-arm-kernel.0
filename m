@@ -1,33 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 May 2012 15:15:43 +0000
-Subject: [GIT PULL] defconfig updates for 3.5
-In-Reply-To: <20120502083442.GV4141@pengutronix.de>
-References: <20120502083442.GV4141@pengutronix.de>
-Message-ID: <201205021515.43557.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 02 May 2012 09:27:35 -0600
+Subject: [PATCH] gpiolib: Add of_get_gpio_chip_by_phandle() helper
+In-Reply-To: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
+References: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
+Message-ID: <4FA15267.4090306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 May 2012, Sascha Hauer wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following i.MX defconfig updates for 3.5
-> 
-> 
-> The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-> 
->   Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
-> 
-> for you to fetch changes up to d86a3480543941344625d1c71aa70510d01f7b11:
-> 
->   ARM: imx_v6_v7_defconfig: Add SPI NOR support (2012-04-27 12:17:50 +0200)
+On 05/02/2012 03:04 AM, Viresh Kumar wrote:
+> There is a requirement in pinctrl subsystem, to bind pinctrl driver with
+> gpio_chip.
 
-Applied to a new next/defconfig branch. Let's see of this topic branch
-catches on with the other maintainers. If this ends up being the only
-pull request for defconfigs, we can just merge it into another branch
-before sending it upstream.
+Could you please explain more? I don't believe that's true.
 
-	Arnd
+It's certainly possible that the same driver can be both a pinctrl
+driver and a GPIO driver if this is how the HW works. However, in this
+case, the device tree would contain a single node to represent that HW
+module, and the driver for that node would then register itself as both
+a GPIO chip and a pinctrl driver. In other words, device tree content
+shouldn't be influenced by this (except of course that the single node
+would contain both GPIO provider and pinctrl provider properties)
+
+When GPIO and pinmux HW are separate but interact, the GPIO/pinctrl
+driver interaction is for the GPIO driver to call into pinctrl if
+required. However, this is through the generic functions such as
+pinctrl_request_gpio() which take global GPIO numbers, and hence have no
+need for a specific GPIO driver handle.
