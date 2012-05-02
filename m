@@ -1,274 +1,246 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed,  2 May 2012 19:33:27 +0800
-Subject: [PATCH 02/15] ARM: davinci: use machine specific hook for late init
+Date: Wed,  2 May 2012 19:33:28 +0800
+Subject: [PATCH 03/15] ARM: ep93xx: use machine specific hook for late init
 In-Reply-To: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335958420-5193-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335958420-5193-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     |    1 +
- arch/arm/mach-davinci/board-da850-evm.c     |    1 +
- arch/arm/mach-davinci/board-dm355-evm.c     |    1 +
- arch/arm/mach-davinci/board-dm355-leopard.c |    1 +
- arch/arm/mach-davinci/board-dm365-evm.c     |    1 +
- arch/arm/mach-davinci/board-dm644x-evm.c    |    1 +
- arch/arm/mach-davinci/board-dm646x-evm.c    |    1 +
- arch/arm/mach-davinci/board-mityomapl138.c  |    1 +
- arch/arm/mach-davinci/board-neuros-osd2.c   |    1 +
- arch/arm/mach-davinci/board-omapl138-hawk.c |    1 +
- arch/arm/mach-davinci/board-sffsdr.c        |    1 +
- arch/arm/mach-davinci/board-tnetv107x-evm.c |    1 +
- arch/arm/mach-davinci/clock.c               |    3 +--
- arch/arm/mach-davinci/common.c              |    7 +++++++
- arch/arm/mach-davinci/cpufreq.c             |    3 +--
- arch/arm/mach-davinci/include/mach/common.h |   19 +++++++++++++++++++
- arch/arm/mach-davinci/pm.c                  |    3 +--
- 17 files changed, 41 insertions(+), 6 deletions(-)
+ arch/arm/mach-ep93xx/adssphere.c             |    1 +
+ arch/arm/mach-ep93xx/core.c                  |    5 +++++
+ arch/arm/mach-ep93xx/crunch.c                |    4 +---
+ arch/arm/mach-ep93xx/edb93xx.c               |    8 ++++++++
+ arch/arm/mach-ep93xx/gesbc9312.c             |    1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h |    7 +++++++
+ arch/arm/mach-ep93xx/micro9.c                |    4 ++++
+ arch/arm/mach-ep93xx/simone.c                |    1 +
+ arch/arm/mach-ep93xx/snappercl15.c           |    1 +
+ arch/arm/mach-ep93xx/ts72xx.c                |    1 +
+ arch/arm/mach-ep93xx/vision_ep9307.c         |    1 +
+ 11 files changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index dc1afe5..0031864 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -681,6 +681,7 @@ MACHINE_START(DAVINCI_DA830_EVM, "DaVinci DA830/OMAP-L137/AM17x EVM")
- 	.init_irq	= cp_intc_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= da830_evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= da8xx_restart,
+diff --git a/arch/arm/mach-ep93xx/adssphere.c b/arch/arm/mach-ep93xx/adssphere.c
+index 2d45947..a472777 100644
+--- a/arch/arm/mach-ep93xx/adssphere.c
++++ b/arch/arm/mach-ep93xx/adssphere.c
+@@ -41,5 +41,6 @@ MACHINE_START(ADSSPHERE, "ADS Sphere board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= adssphere_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index a70de24..280cbed 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1411,6 +1411,7 @@ MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
- 	.init_irq	= cp_intc_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= da850_evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= da8xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index 82ed753..1c7b1f4 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -357,6 +357,7 @@ MACHINE_START(DAVINCI_DM355_EVM, "DaVinci DM355 EVM")
- 	.init_irq     = davinci_irq_init,
- 	.timer	      = &davinci_timer,
- 	.init_machine = dm355_evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index d74a8b3..8e77032 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -276,6 +276,7 @@ MACHINE_START(DM355_LEOPARD, "DaVinci DM355 leopard")
- 	.init_irq     = davinci_irq_init,
- 	.timer	      = &davinci_timer,
- 	.init_machine = dm355_leopard_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 5bce2b8..688a9c5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -618,6 +618,7 @@ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
- 	.init_irq	= davinci_irq_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= dm365_evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 3683306..d34ed55 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -825,6 +825,7 @@ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
- 	.init_irq     = davinci_irq_init,
- 	.timer	      = &davinci_timer,
- 	.init_machine = davinci_evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index d72ab94..f213359 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -798,6 +798,7 @@ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
- 	.init_irq     = davinci_irq_init,
- 	.timer        = &davinci_timer,
- 	.init_machine = evm_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 672d820..beecde3 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -572,6 +572,7 @@ MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
- 	.init_irq	= cp_intc_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= mityomapl138_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= da8xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index a772bb4..5de69f2 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -278,6 +278,7 @@ MACHINE_START(NEUROS_OSD2, "Neuros OSD2")
- 	.init_irq	= davinci_irq_init,
- 	.timer		= &davinci_timer,
- 	.init_machine = davinci_ntosd2_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 45e8157..dc1208e 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -343,6 +343,7 @@ MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
- 	.init_irq	= cp_intc_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= omapl138_hawk_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= da8xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 76e67509..9078acf 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -157,6 +157,7 @@ MACHINE_START(SFFSDR, "Lyrtech SFFSDR")
- 	.init_irq     = davinci_irq_init,
- 	.timer	      = &davinci_timer,
- 	.init_machine = davinci_sffsdr_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= davinci_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index 5f14e30..ac4e003 100644
---- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -282,6 +282,7 @@ MACHINE_START(TNETV107X, "TNETV107X EVM")
- 	.init_irq	= cp_intc_init,
- 	.timer		= &davinci_timer,
- 	.init_machine	= tnetv107x_evm_board_init,
-+	.init_late	= davinci_init_late,
- 	.dma_zone_size	= SZ_128M,
- 	.restart	= tnetv107x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index 008772e..34668ea 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -213,7 +213,7 @@ EXPORT_SYMBOL(clk_unregister);
- /*
-  * Disable any unused clocks left on by the bootloader
-  */
--static int __init clk_disable_unused(void)
-+int __init davinci_clk_disable_unused(void)
- {
- 	struct clk *ck;
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8d25895..365a90b 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -904,3 +904,8 @@ void ep93xx_restart(char mode, const char *cmd)
+ 	while (1)
+ 		;
+ }
++
++void __init ep93xx_init_late(void)
++{
++	crunch_init();
++}
+diff --git a/arch/arm/mach-ep93xx/crunch.c b/arch/arm/mach-ep93xx/crunch.c
+index 74753e2..a4a2ab9 100644
+--- a/arch/arm/mach-ep93xx/crunch.c
++++ b/arch/arm/mach-ep93xx/crunch.c
+@@ -79,12 +79,10 @@ static struct notifier_block crunch_notifier_block = {
+ 	.notifier_call	= crunch_do,
+ };
  
-@@ -237,7 +237,6 @@ static int __init clk_disable_unused(void)
+-static int __init crunch_init(void)
++int __init crunch_init(void)
+ {
+ 	thread_register_notifier(&crunch_notifier_block);
+ 	elf_hwcap |= HWCAP_CRUNCH;
  
  	return 0;
  }
--late_initcall(clk_disable_unused);
+-
+-late_initcall(crunch_init);
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index da9047d..d74c5cd 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -255,6 +255,7 @@ MACHINE_START(EDB9301, "Cirrus Logic EDB9301 Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
  #endif
+@@ -268,6 +269,7 @@ MACHINE_START(EDB9302, "Cirrus Logic EDB9302 Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -281,6 +283,7 @@ MACHINE_START(EDB9302A, "Cirrus Logic EDB9302A Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -294,6 +297,7 @@ MACHINE_START(EDB9307, "Cirrus Logic EDB9307 Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -307,6 +311,7 @@ MACHINE_START(EDB9307A, "Cirrus Logic EDB9307A Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -320,6 +325,7 @@ MACHINE_START(EDB9312, "Cirrus Logic EDB9312 Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -333,6 +339,7 @@ MACHINE_START(EDB9315, "Cirrus Logic EDB9315 Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -346,6 +353,7 @@ MACHINE_START(EDB9315A, "Cirrus Logic EDB9315A Evaluation Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= edb93xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+diff --git a/arch/arm/mach-ep93xx/gesbc9312.c b/arch/arm/mach-ep93xx/gesbc9312.c
+index fcdffbe..437c341 100644
+--- a/arch/arm/mach-ep93xx/gesbc9312.c
++++ b/arch/arm/mach-ep93xx/gesbc9312.c
+@@ -41,5 +41,6 @@ MACHINE_START(GESBC9312, "Glomation GESBC-9312-sx")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= gesbc9312_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+index 602bd87..1ecb040 100644
+--- a/arch/arm/mach-ep93xx/include/mach/platform.h
++++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+@@ -53,5 +53,12 @@ void ep93xx_init_devices(void);
+ extern struct sys_timer ep93xx_timer;
  
- static unsigned long clk_sysclk_recalc(struct clk *clk)
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index cb9b2e4..64b0f65 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -117,3 +117,10 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
- err:
- 	panic("davinci_common_init: SoC Initialization failed\n");
- }
+ void ep93xx_restart(char, const char *);
++void ep93xx_init_late(void);
 +
-+void __init davinci_init_late(void)
-+{
-+	davinci_cpufreq_init();
-+	davinci_pm_init();
-+	davinci_clk_disable_unused();
-+}
-diff --git a/arch/arm/mach-davinci/cpufreq.c b/arch/arm/mach-davinci/cpufreq.c
-index 031048f..4729eaa 100644
---- a/arch/arm/mach-davinci/cpufreq.c
-+++ b/arch/arm/mach-davinci/cpufreq.c
-@@ -240,10 +240,9 @@ static struct platform_driver davinci_cpufreq_driver = {
- 	.remove = __exit_p(davinci_cpufreq_remove),
- };
- 
--static int __init davinci_cpufreq_init(void)
-+int __init davinci_cpufreq_init(void)
- {
- 	return platform_driver_probe(&davinci_cpufreq_driver,
- 							davinci_cpufreq_probe);
- }
--late_initcall(davinci_cpufreq_init);
- 
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 5cd39a4..bdc4aa8 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -84,6 +84,25 @@ extern struct davinci_soc_info davinci_soc_info;
- extern void davinci_common_init(struct davinci_soc_info *soc_info);
- extern void davinci_init_ide(void);
- void davinci_restart(char mode, const char *cmd);
-+void davinci_init_late(void);
-+
-+#ifdef CONFIG_DAVINCI_RESET_CLOCKS
-+int davinci_clk_disable_unused(void);
++#ifdef CONFIG_CRUNCH
++int crunch_init(void);
 +#else
-+static inline int davinci_clk_disable_unused(void) { return 0; }
-+#endif
-+
-+#ifdef CONFIG_CPU_FREQ
-+int davinci_cpufreq_init(void);
-+#else
-+static inline int davinci_cpufreq_init(void) { return 0; }
-+#endif
-+
-+#ifdef CONFIG_SUSPEND
-+int davinci_pm_init(void);
-+#else
-+static inline int davinci_pm_init(void) { return 0; }
++static inline int crunch_init(void) { return 0; }
 +#endif
  
- /* standard place to map on-chip SRAMs; they *may* support DMA */
- #define SRAM_VIRT	0xfffe0000
-diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-index 04c49f7..eb8360b 100644
---- a/arch/arm/mach-davinci/pm.c
-+++ b/arch/arm/mach-davinci/pm.c
-@@ -152,8 +152,7 @@ static struct platform_driver davinci_pm_driver = {
- 	.remove = __exit_p(davinci_pm_remove),
- };
- 
--static int __init davinci_pm_init(void)
-+int __init davinci_pm_init(void)
- {
- 	return platform_driver_probe(&davinci_pm_driver, davinci_pm_probe);
- }
--late_initcall(davinci_pm_init);
+ #endif
+diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
+index dc431c5..3d7cdab 100644
+--- a/arch/arm/mach-ep93xx/micro9.c
++++ b/arch/arm/mach-ep93xx/micro9.c
+@@ -85,6 +85,7 @@ MACHINE_START(MICRO9, "Contec Micro9-High")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= micro9_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -98,6 +99,7 @@ MACHINE_START(MICRO9M, "Contec Micro9-Mid")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= micro9_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -111,6 +113,7 @@ MACHINE_START(MICRO9L, "Contec Micro9-Lite")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= micro9_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+@@ -124,6 +127,7 @@ MACHINE_START(MICRO9S, "Contec Micro9-Slim")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= micro9_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+ #endif
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index f40c298..33dc079 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -86,5 +86,6 @@ MACHINE_START(SIM_ONE, "Simplemachines Sim.One Board")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= simone_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
+index 0c00852..eb28237 100644
+--- a/arch/arm/mach-ep93xx/snappercl15.c
++++ b/arch/arm/mach-ep93xx/snappercl15.c
+@@ -183,5 +183,6 @@ MACHINE_START(SNAPPER_CL15, "Bluewater Systems Snapper CL15")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer 		= &ep93xx_timer,
+ 	.init_machine	= snappercl15_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 5ea7909..d4ef339 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -252,5 +252,6 @@ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= ts72xx_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index ba156eb..2905a49 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -367,5 +367,6 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= vision_init_machine,
++	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
 -- 
 1.7.5.4
