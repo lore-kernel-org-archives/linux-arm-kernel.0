@@ -1,26 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 1 May 2012 23:47:55 -0300
-Subject: [alsa-devel] [PATCH 10/11] ARM: imx6q_sabrelite: clkdev_add cko1
- for sgtl5000
-In-Reply-To: <20120501233939.GO2194@S2101-09.ap.freescale.net>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-11-git-send-email-richard.zhao@freescale.com>
- <20120501124706.GF2194@S2101-09.ap.freescale.net>
- <20120501233939.GO2194@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Ab5pYuOY4oLbkOc+SeeT6itKOMJu+zzodFOJaW5h+RuQ@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 2 May 2012 10:52:30 +0800
+Subject: [PATCH v2 1/3] mtd: gpmi: add device tree support for mx6q and
+ mx28
+In-Reply-To: <20120501074943.GB2194@S2101-09.ap.freescale.net>
+References: <1335323184-11233-1-git-send-email-b32955@freescale.com>
+ <1335323184-11233-2-git-send-email-b32955@freescale.com>
+ <20120501074943.GB2194@S2101-09.ap.freescale.net>
+Message-ID: <4FA0A16E.30601@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 1, 2012 at 8:39 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, May 01, 2012 at 08:47:10PM +0800, Shawn Guo wrote:
->> > + ? clk_register_clkdev(cko1, NULL, "0-000a");
->>
->> This dev_id looks a little strange to me. ?I understand that's the
->> consequence of having sgtl5000 clock managed in ASoC machine driver
->> imx-sgtl5000.
->>
-> Just realised it's not the case. ?But shouldn't the name look like
-> "sgtl5000.0-000a"?
+? 2012?05?01? 15:49, Shawn Guo ??:
+> BTW, it seems Documentation/CodingStyle suggest put brace like the
+> following.
+>
+> 	if (condition) {
+> 		do_this();
+> 	} else {
+> 		otherwise_do_this();
+> 		otherwise_do_that();
+> 	}
+sorry. you are right.
 
-Since this is common code, we should not hardcode the I2C bus as the
-codec can be connected in a I2C bus different of 0.
+Best Regards
+Huang Shijie
