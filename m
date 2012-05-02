@@ -1,44 +1,73 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 2 May 2012 15:44:27 +0530
-Subject: [PATCH 2/7] ARM: OMAP2+: Clean up wrapping multiple objects in
- Makefile
-In-Reply-To: <20120502095612.GG25053@n2100.arm.linux.org.uk>
-References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
- <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
- <20120502095612.GG25053@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gx3_tZnQg=+8xm4Bnnv31BTOgJki_y=aNDOAUG-xNNrvg@mail.gmail.com>
+Date: Wed, 2 May 2012 15:48:01 +0530
+Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-2-git-send-email-t-kristo@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
+Message-ID: <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 3:26 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, May 02, 2012 at 03:18:08PM +0530, Santosh Shilimkar wrote:
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->> ?arch/arm/mach-omap2/Makefile | ?160 ++++++++++++++++++++---------------------
->> ?1 files changed, 78 insertions(+), 82 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->> index 56ed62e..669e2b1 100644
->> --- a/arch/arm/mach-omap2/Makefile
->> +++ b/arch/arm/mach-omap2/Makefile
->> @@ -24,10 +24,11 @@ endif
->> ?obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
->>
->> ?# SMP support ONLY available for OMAP4
->> +
->> ?obj-$(CONFIG_SMP) ? ? ? ? ? ? ? ? ? ?+= omap-smp.o omap-headsmp.o
->> ?obj-$(CONFIG_HOTPLUG_CPU) ? ? ? ? ? ?+= omap-hotplug.o
->> -obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += omap4-common.o omap-wakeupgen.o \
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sleep44xx.o
->> +obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += omap4-common.o omap-wakeupgen.o
->> +obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += sleep44xx.o
+On Wed, May 2, 2012 at 3:40 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> Hi Tero,
 >
-> Using \ in makefiles really isn't a problem. ?I don't think this is something
-> which we need to do, and it just creates additional changes where none is
-> required.
+> On Fri, Apr 20, 2012 at 15:03:34, Kristo, Tero wrote:
+>> From: Rajendra Nayak <rnayak@ti.com>
+>>
+>> SAR/ROM code restores only CORE DPLL to its original state
+>> post wakeup from OFF mode.
+>> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
+>> are saved and restored here during an OFF transition.
+>>
+>
+> Most of the registers being saved and restored in the various
+> patches look to be contiguous. So, instead of a long list of these
+> contiguous registers how about having a generic API for backup and
+> restore of the registers contents based on the memory address range?
+>
+> Most of the registers which require save and restore are either part
+> of PRM, CM or Control. The PRM or CM instance could be passed as the
+> base and the save/restore API could work around that.
+>
+> One downside is that there are some read-only registers in between but
+> I don't see any simple way of avoiding save and restore of those. BTW,
+> as per the TRM that I have, this patch is also doing save and restore
+> of some read-only registers.
+>
+You should never write to read-only registers since the behavior is
+undefined.
 
-Tony might give better reasoning for this change since he suggested it.
-
-Regards
-Santosh
+[...]
+>> +void omap4_dpll_resume_off(void)
+>> +{
+>> + ? ? u32 i;
+>> + ? ? struct omap4_dpll_regs *dpll_reg = dpll_regs;
+>> +
+>> + ? ? for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clksel);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m2);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m3);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m4);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m5);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m6);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m7);
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkdcoldo);
+>> +
+>> + ? ? ? ? ? ? /* Restore clkmode after the above registers are restored */
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clkmode);
+>> +
+>> + ? ? ? ? ? ? omap4_wait_dpll_lock(dpll_reg);
+>> +
+>> + ? ? ? ? ? ? /* Restore autoidle settings after the dpll is locked */
+>> + ? ? ? ? ? ? omap4_dpll_restore_reg(dpll_reg, &dpll_reg->autoidle);
+>> + ? ? }
+>> +}
+>
+> If this function is placed in SRAM and PER PLL restored just after MPU
+> won't the exit latency be further optimized?
+>
+How ?
+SRAM is sower memory than DDR so I don't see how it
+will reduce latency.
