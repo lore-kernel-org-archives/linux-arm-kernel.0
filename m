@@ -1,44 +1,57 @@
 From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 02 May 2012 16:49:24 +0100
-Subject: [PATCH RESEND] ARM: pxa: hx4700: Enable ASIC3 GPIO as a wakeup source
-Message-ID: <mailman.2.1335973768.1417.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 02 May 2012 16:49:29 +0100
+Subject: [PATCH RESEND 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
+Message-ID: <mailman.3.1335973776.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the ASIC3 GPIO (12) as a wakeup source:
-1. Set the WAKEUP_ON_EDGE_RISE MFP config bits for GPIO12 in
-hx4700_pin_config[].
-2. Call gpio_set_wake() for GPIO12.
-
-With GPIO12 thus enabled, the mfd/asic3 driver can enable its own GPIOs
-as wakeup sources by implementing a irq_set_wake() handler.
+This patch is part of a set which adds PCMCIA/CF support for the hx4700.
+This patch modifies asic3_gpio_config[] as follows:
+1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
+2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
 
 Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 Cc: Philipp Zabel <philipp.zabel@gmail.com>
 ---
- arch/arm/mach-pxa/hx4700.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+
+V6:
+Rebased from linux-3.3-rc6 to linux-3.4-rc1.
+
+ arch/arm/mach-pxa/hx4700.c |    2 +-
+ include/linux/mfd/asic3.h  |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index de01277..00a00a9 100644
+index 75ce812..de01277 100644
 --- a/arch/arm/mach-pxa/hx4700.c
 +++ b/arch/arm/mach-pxa/hx4700.c
-@@ -129,7 +129,7 @@ static unsigned long hx4700_pin_config[] __initdata = {
- 	GPIO88_GPIO,
+@@ -231,7 +231,6 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC0_LED0,		/* red */
+ 	ASIC3_GPIOC1_LED1,		/* green */
+ 	ASIC3_GPIOC2_LED2,		/* blue */
+-	ASIC3_GPIOC4_CF_nCD,
+ 	ASIC3_GPIOC5_nCIOW,
+ 	ASIC3_GPIOC6_nCIOR,
+ 	ASIC3_GPIOC7_nPCE_1,
+@@ -245,6 +244,7 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOC15_nPIOR,
  
- 	/* HX4700 specific input GPIOs */
--	GPIO12_GPIO,	/* ASIC3_IRQ */
-+	GPIO12_GPIO | WAKEUP_ON_EDGE_RISE,	/* ASIC3_IRQ */
- 	GPIO13_GPIO,	/* W3220_IRQ */
- 	GPIO14_GPIO,	/* nWLAN_IRQ */
- 
-@@ -863,6 +863,7 @@ static void __init hx4700_init(void)
- 	int ret;
- 
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
-+	gpio_set_wake(GPIO12_HX4700_ASIC3_IRQ, 1);
- 	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
- 	if (ret)
- 		pr_err ("hx4700: Failed to request GPIOs.\n");
+ 	/* GPIOD: input GPIOs, CF */
++	ASIC3_GPIOD4_CF_nCD,
+ 	ASIC3_GPIOD11_nCIOIS16,
+ 	ASIC3_GPIOD12_nCWAIT,
+ 	ASIC3_GPIOD15_nPIOW,
+diff --git a/include/linux/mfd/asic3.h b/include/linux/mfd/asic3.h
+index ed793b7..ef6faa5 100644
+--- a/include/linux/mfd/asic3.h
++++ b/include/linux/mfd/asic3.h
+@@ -138,6 +138,7 @@ struct asic3_platform_data {
+ #define ASIC3_GPIOC13_nPWAIT		ASIC3_CONFIG_GPIO(45, 1, 1, 0)
+ #define ASIC3_GPIOC14_nPIOIS16		ASIC3_CONFIG_GPIO(46, 1, 1, 0)
+ #define ASIC3_GPIOC15_nPIOR		ASIC3_CONFIG_GPIO(47, 1, 0, 0)
++#define ASIC3_GPIOD4_CF_nCD		ASIC3_CONFIG_GPIO(52, 1, 0, 0)
+ #define ASIC3_GPIOD11_nCIOIS16		ASIC3_CONFIG_GPIO(59, 1, 0, 0)
+ #define ASIC3_GPIOD12_nCWAIT		ASIC3_CONFIG_GPIO(60, 1, 0, 0)
+ #define ASIC3_GPIOD15_nPIOW		ASIC3_CONFIG_GPIO(63, 1, 0, 0)
 -- 
 1.7.3.4
