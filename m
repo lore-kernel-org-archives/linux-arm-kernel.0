@@ -1,36 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 May 2012 10:56:12 +0100
-Subject: [PATCH 2/7] ARM: OMAP2+: Clean up wrapping multiple objects in
- Makefile
-In-Reply-To: <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
- <1335952093-12541-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20120502095612.GG25053@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 May 2012 11:58:16 +0200
+Subject: [PATCH] clk: Use a separate struct for holding init data.
+In-Reply-To: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <20120502095816.GG20478@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 03:18:08PM +0530, Santosh Shilimkar wrote:
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/Makefile |  160 ++++++++++++++++++++---------------------
->  1 files changed, 78 insertions(+), 82 deletions(-)
+On Wed, Apr 25, 2012 at 10:58:56PM -0700, Saravana Kannan wrote:
+> Create a struct clk_init_data to hold all data that needs to be passed from
+> the platfrom specific driver to the common clock framework during clock
+> registration. Add a pointer to this struct inside clk_hw.
 > 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 56ed62e..669e2b1 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -24,10 +24,11 @@ endif
->  obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+> This has several advantages:
+> * Completely hides struct clk from many clock platform drivers and static
+>   clock initialization code that don't care for static initialization of
+>   the struct clks.
+> * For platforms that want to do complete static initialization, it removed
+>   the need to directly mess with the struct clk's fields while still
+>   allowing to statically allocate struct clk. This keeps the code more
+>   future proof even if they include clk-private.h.
+> * Simplifies the generic clk_register() function and allows adding optional
+>   fields in the future without modifying the function signature.
+> * Simplifies the static initialization of clocks on all platforms by
+>   removing the need for forward delcarations or convoluted macros.
+> 
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: Richard Zhao <richard.zhao@linaro.org>
+> Cc: Saravana Kannan <skannan@codeaurora.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> Cc: Deepak Saxena <dsaxena@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  drivers/clk/clk-divider.c    |   14 +++--
+>  drivers/clk/clk-fixed-rate.c |   14 +++--
+>  drivers/clk/clk-gate.c       |   15 +++--
+>  drivers/clk/clk-mux.c        |   10 +++-
+>  drivers/clk/clk.c            |   91 +++++++++++++++++++------------
+>  include/linux/clk-private.h  |  121 +-----------------------------------------
+>  include/linux/clk-provider.h |   59 +++++++++++++-------
+>  7 files changed, 129 insertions(+), 195 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 6e58f11..8e97491 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -95,6 +95,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+>  {
+>  	struct clk_mux *mux;
+>  	struct clk *clk;
+> +	struct clk_init_data init;
 >  
->  # SMP support ONLY available for OMAP4
+>  	/* allocate the mux */
+>  	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
+> @@ -103,6 +104,12 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+>  		return ERR_PTR(-ENOMEM);
+>  	}
+>  
+> +	init.name = name;
+> +	init.ops = &clk_mux_ops;
+> +	init.flags = flags;
+> +	init.parent_names = parent_names;
+> +	init.num_parents = num_parents;
 > +
->  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
-> -obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o \
-> -					   sleep44xx.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= omap4-common.o omap-wakeupgen.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= sleep44xx.o
+>  	/* struct clk_mux assignments */
+>  	mux->reg = reg;
+>  	mux->shift = shift;
+> @@ -110,8 +117,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+>  	mux->flags = clk_mux_flags;
+>  	mux->lock = lock;
 
-Using \ in makefiles really isn't a problem.  I don't think this is something
-which we need to do, and it just creates additional changes where none is
-required.
+There is a mux->hw.init = &init missing here.
+
+Sascha
+
+>  
+> -	clk = clk_register(dev, name, &clk_mux_ops, &mux->hw,
+> -			parent_names, num_parents, flags);
+> +	clk = clk_register(dev, &mux->hw);
+>  
+>  	if (IS_ERR(clk))
+>  		kfree(mux);
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
