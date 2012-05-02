@@ -1,40 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2012 10:34:42 +0200
-Subject: [GIT PULL] defconfig updates for 3.5
-Message-ID: <20120502083442.GV4141@pengutronix.de>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 2 May 2012 08:45:32 +0000
+Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
+In-Reply-To: <1334913591-26312-7-git-send-email-t-kristo@ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-7-git-send-email-t-kristo@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6A33C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Tero,
 
-Please pull the following i.MX defconfig updates for 3.5
+On Fri, Apr 20, 2012 at 14:49:49, Kristo, Tero wrote:
+> From: Axel Haslam <axelhaslam@gmail.com>
+> 
+> On OMAP4, there is no support to read previous logic state
+> or previous memory state achieved when a power domain transitions
+> to RET. Instead there are module level context registers.
+> 
+> In order to support the powerdomain level logic/mem_off_counters
+> on OMAP4, instead use the previous power state achieved (RET) and
+> the *programmed* logic/mem RET state to derive if a powerdomain lost
+> logic or did not.
+> 
+> If the powerdomain is programmed to enter RET state and lose logic
+> in RET state, knowing that the powerdomain entered RET is good enough
+> to derive that the logic was lost as well, in such cases.
+> 
 
+Unfortunately this won't scale for AM33xx devices :(
+It neither has module level context registers nor previous logic/memory state
+registers in PRCM. 
 
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
+At a top level, there's a Cortex-M3 (CM3) to assist the low power state transitions
+and the indication of successful transition to a low power states is handled as part
+of the IPC mechanism between the MPU (A8) and CM3 which is s/w defined.
 
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+Since the various APIs like omap_hwmod_get_context_loss_context() and friends are
+necessary to have correct context saves and restores in drivers we'll need
+to add another API for AM33xx which basically builds on the IPC mechanism
+and updates the counters.
 
-are available in the git repository at:
+So, instead of the fallback mechanism that is currently in place, can the
+implementation for updating the logic/mem counters be converted to make use of
+function pointers. When AM33xx PM support comes in, we can just define
+a custom function and not pollute the code with cpu_is_* checks.
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
-
-for you to fetch changes up to d86a3480543941344625d1c71aa70510d01f7b11:
-
-  ARM: imx_v6_v7_defconfig: Add SPI NOR support (2012-04-27 12:17:50 +0200)
-
-----------------------------------------------------------------
-ARM i.MX defconfig updates for 3.5
-
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: imx_v4_v5_defconfig: Let CONFIG_MACH_IMX27_DT be built by default
-      ARM: imx_v6_v7_defconfig: Add SPI NOR support
-
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- arch/arm/configs/imx_v6_v7_defconfig |    6 ++++++
- 2 files changed, 7 insertions(+)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Vaibhav
