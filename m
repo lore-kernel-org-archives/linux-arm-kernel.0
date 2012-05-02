@@ -1,150 +1,19 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 2 May 2012 16:04:55 +0900
-Subject: [PATCH 5/7] ARM: Samsung: Add support for MSHC controller clocks
-In-Reply-To: <1335935266-25289-6-git-send-email-thomas.abraham@linaro.org>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAH9JG2UwFc+vo1chsH_1XsgCYypLFV2e3AVOrh0=F+bMRKHBZA@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Wed, 2 May 2012 15:16:49 +0800
+Subject: About CPU hotplug stress test failed
+Message-ID: <CAB4PhKf06wNA_=QEe3uT9u25WaxVHAenWADCA49hUwJxcPGdwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi, kernel experts
 
-I suggest to split the patches into mmc part and samsung specific
-part. As you know previous time there's mismatch between mmc and
-samsung. So split the patches and send it  separately to avoid merge
-conflict and mismatch.
+ We met CPU hotplug issue on v3.0.15 and event the latest v3.4,
+sometimes system hang when doing stress test of CPU hotplug which is
+simply to remove all secondary cores(core1 ~ core3) and add them back,
+the failure is in random. But we didn?t meet any issue on V2.6.38, so
+I guess it is pure kernel issue, do you have any idea about it? Or did
+you meet any similar issue on other platform(OMAP, SAMSUNG or Tegra)?
+Thanks in advanced!
 
-I think regardless mmc changes, it can be merged into samsung tree directly.
 
-Thank you,
-Kyungmin Park
-
-On 5/2/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> Add clock instances for bus interface unit clock and card interface unit
-> clock of the all four MSHC controller instances.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c |   45
-> ++++++++++++----------------------
->  1 files changed, 16 insertions(+), 29 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c
-> b/arch/arm/mach-exynos/clock-exynos5.c
-> index 7c0f810..4e17131 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -524,35 +524,30 @@ static struct clk exynos5_init_clocks_off[] = {
->  		.enable		= exynos5_clk_ip_peris_ctrl,
->  		.ctrlbit	= (1 << 19),
->  	}, {
-> -		.name		= "hsmmc",
-> -		.devname	= "exynos4-sdhci.0",
-> +		.name		= "biu",
-> +		.devname	= "dw_mmc.0",
->  		.parent		= &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 12),
->  	}, {
-> -		.name		= "hsmmc",
-> -		.devname	= "exynos4-sdhci.1",
-> +		.name		= "biu",
-> +		.devname	= "dw_mmc.1",
->  		.parent		= &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 13),
->  	}, {
-> -		.name		= "hsmmc",
-> -		.devname	= "exynos4-sdhci.2",
-> +		.name		= "biu",
-> +		.devname	= "dw_mmc.2",
->  		.parent		= &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 14),
->  	}, {
-> -		.name		= "hsmmc",
-> -		.devname	= "exynos4-sdhci.3",
-> +		.name		= "biu",
-> +		.devname	= "dw_mmc.3",
->  		.parent		= &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 15),
->  	}, {
-> -		.name		= "dwmci",
-> -		.parent		= &exynos5_clk_aclk_200.clk,
-> -		.enable		= exynos5_clk_ip_fsys_ctrl,
-> -		.ctrlbit	= (1 << 16),
-> -	}, {
->  		.name		= "sata",
->  		.devname	= "ahci",
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
-> @@ -882,8 +877,8 @@ static struct clksrc_clk exynos5_clk_sclk_uart3 = {
->
->  static struct clksrc_clk exynos5_clk_sclk_mmc0 = {
->  	.clk	= {
-> -		.name		= "sclk_mmc",
-> -		.devname	= "exynos4-sdhci.0",
-> +		.name		= "ciu",
-> +		.devname	= "dw_mmc.0",
->  		.parent		= &exynos5_clk_dout_mmc0.clk,
->  		.enable		= exynos5_clksrc_mask_fsys_ctrl,
->  		.ctrlbit	= (1 << 0),
-> @@ -893,8 +888,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc0 = {
->
->  static struct clksrc_clk exynos5_clk_sclk_mmc1 = {
->  	.clk	= {
-> -		.name		= "sclk_mmc",
-> -		.devname	= "exynos4-sdhci.1",
-> +		.name		= "ciu",
-> +		.devname	= "dw_mmc.1",
->  		.parent		= &exynos5_clk_dout_mmc1.clk,
->  		.enable		= exynos5_clksrc_mask_fsys_ctrl,
->  		.ctrlbit	= (1 << 4),
-> @@ -904,8 +899,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc1 = {
->
->  static struct clksrc_clk exynos5_clk_sclk_mmc2 = {
->  	.clk	= {
-> -		.name		= "sclk_mmc",
-> -		.devname	= "exynos4-sdhci.2",
-> +		.name		= "ciu",
-> +		.devname	= "dw_mmc.2",
->  		.parent		= &exynos5_clk_dout_mmc2.clk,
->  		.enable		= exynos5_clksrc_mask_fsys_ctrl,
->  		.ctrlbit	= (1 << 8),
-> @@ -915,8 +910,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc2 = {
->
->  static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
->  	.clk	= {
-> -		.name		= "sclk_mmc",
-> -		.devname	= "exynos4-sdhci.3",
-> +		.name		= "ciu",
-> +		.devname	= "dw_mmc.3",
->  		.parent		= &exynos5_clk_dout_mmc3.clk,
->  		.enable		= exynos5_clksrc_mask_fsys_ctrl,
->  		.ctrlbit	= (1 << 12),
-> @@ -927,14 +922,6 @@ static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
->  static struct clksrc_clk exynos5_clksrcs[] = {
->  	{
->  		.clk	= {
-> -			.name		= "sclk_dwmci",
-> -			.parent		= &exynos5_clk_dout_mmc4.clk,
-> -			.enable		= exynos5_clksrc_mask_fsys_ctrl,
-> -			.ctrlbit	= (1 << 16),
-> -		},
-> -		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
-> -	}, {
-> -		.clk	= {
->  			.name		= "sclk_fimd",
->  			.devname	= "s3cfb.1",
->  			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Jason Liu
