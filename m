@@ -1,219 +1,189 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed,  2 May 2012 19:33:38 +0800
-Subject: [PATCH 13/15] ARM: shmobile: use machine specific hook for late init
+Date: Wed,  2 May 2012 19:33:39 +0800
+Subject: [PATCH 14/15] ARM: tegra: use machine specific hook for late init
 In-Reply-To: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335958420-5193-14-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335958420-5193-15-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Colin Cross <ccross@android.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Magnus Damm <damm@opensource.se>
-Acked-by: "Rafael J. Wysocki" <rjw@sisk.pl>
 ---
- arch/arm/mach-shmobile/Makefile              |    2 +-
- arch/arm/mach-shmobile/board-ag5evm.c        |    1 +
- arch/arm/mach-shmobile/board-ap4evb.c        |    1 +
- arch/arm/mach-shmobile/board-bonito.c        |    1 +
- arch/arm/mach-shmobile/board-g3evm.c         |    1 +
- arch/arm/mach-shmobile/board-g4evm.c         |    1 +
- arch/arm/mach-shmobile/board-kota2.c         |    1 +
- arch/arm/mach-shmobile/board-mackerel.c      |    1 +
- arch/arm/mach-shmobile/board-marzen.c        |    1 +
- arch/arm/mach-shmobile/common.c              |   24 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/cpuidle.c             |    3 +--
- arch/arm/mach-shmobile/include/mach/common.h |   14 ++++++++++++++
- arch/arm/mach-shmobile/suspend.c             |    3 +--
- 13 files changed, 49 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/common.c
+ arch/arm/mach-tegra/board-dt-tegra20.c |    1 +
+ arch/arm/mach-tegra/board-dt-tegra30.c |    1 +
+ arch/arm/mach-tegra/board-harmony.c    |    1 +
+ arch/arm/mach-tegra/board-paz00.c      |    1 +
+ arch/arm/mach-tegra/board-seaboard.c   |    3 +++
+ arch/arm/mach-tegra/board-trimslice.c  |    1 +
+ arch/arm/mach-tegra/board.h            |   14 ++++++++++++++
+ arch/arm/mach-tegra/clock.c            |    3 +--
+ arch/arm/mach-tegra/common.c           |    6 ++++++
+ arch/arm/mach-tegra/powergate.c        |    4 +---
+ 10 files changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index e7c2590..93d62fb 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -3,7 +3,7 @@
- #
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 0952494..0f0da6c 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -142,6 +142,7 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer		= &tegra_timer,
+ 	.init_machine	= tegra_dt_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra20_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 5f7c03e..09d21b2 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -80,6 +80,7 @@ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer		= &tegra_timer,
+ 	.init_machine	= tegra30_dt_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra30_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index c00aadb..987115a 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -191,5 +191,6 @@ MACHINE_START(HARMONY, "harmony")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_harmony_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 330afdf..2e8a4c6 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -221,5 +221,6 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_paz00_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index d669847..273eaaa 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -289,6 +289,7 @@ MACHINE_START(SEABOARD, "seaboard")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_seaboard_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ MACHINE_END
  
- # Common objects
--obj-y				:= timer.o console.o clock.o
-+obj-y				:= timer.o console.o clock.o common.o
+@@ -300,6 +301,7 @@ MACHINE_START(KAEN, "kaen")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_kaen_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ MACHINE_END
  
- # CPU objects
- obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index cb224a3..a99e7e6 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -598,5 +598,6 @@ MACHINE_START(AG5EVM, "ag5evm")
- 	.init_irq	= sh73a0_init_irq,
+@@ -311,5 +313,6 @@ MACHINE_START(WARIO, "wario")
  	.handle_irq	= gic_handle_irq,
- 	.init_machine	= ag5evm_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_wario_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
  MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index b56dde2..522866d 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1440,5 +1440,6 @@ MACHINE_START(AP4EVB, "ap4evb")
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= ap4evb_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
-index 81fd95f..e6b1fd3 100644
---- a/arch/arm/mach-shmobile/board-bonito.c
-+++ b/arch/arm/mach-shmobile/board-bonito.c
-@@ -500,5 +500,6 @@ MACHINE_START(BONITO, "bonito")
- 	.init_irq	= r8a7740_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= bonito_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
-index 39b6cf8..796fa00 100644
---- a/arch/arm/mach-shmobile/board-g3evm.c
-+++ b/arch/arm/mach-shmobile/board-g3evm.c
-@@ -338,5 +338,6 @@ MACHINE_START(G3EVM, "g3evm")
- 	.init_irq	= sh7367_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= g3evm_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
-index 0e5a39c..f125732 100644
---- a/arch/arm/mach-shmobile/board-g4evm.c
-+++ b/arch/arm/mach-shmobile/board-g4evm.c
-@@ -381,5 +381,6 @@ MACHINE_START(G4EVM, "g4evm")
- 	.init_irq	= sh7377_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= g4evm_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
-index 200dcd4..f60f1b2 100644
---- a/arch/arm/mach-shmobile/board-kota2.c
-+++ b/arch/arm/mach-shmobile/board-kota2.c
-@@ -521,5 +521,6 @@ MACHINE_START(KOTA2, "kota2")
- 	.init_irq	= sh73a0_init_irq,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index cd52820..0a2a0e5 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -180,5 +180,6 @@ MACHINE_START(TRIMSLICE, "trimslice")
  	.handle_irq	= gic_handle_irq,
- 	.init_machine	= kota2_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_trimslice_init,
++	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
  MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index f49e28a..4cd438f 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1623,5 +1623,6 @@ MACHINE_START(MACKEREL, "mackerel")
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= mackerel_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index ef0e13b..14de378 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -98,5 +98,6 @@ MACHINE_START(MARZEN, "marzen")
- 	.init_irq	= r8a7779_init_irq,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= marzen_init,
-+	.init_late	= shmobile_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/common.c b/arch/arm/mach-shmobile/common.c
-new file mode 100644
-index 0000000..608aba9
---- /dev/null
-+++ b/arch/arm/mach-shmobile/common.c
-@@ -0,0 +1,24 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <mach/common.h>
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 75d1543..6501496 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -32,5 +32,19 @@ void __init tegra_init_irq(void);
+ void __init tegra_dt_init_irq(void);
+ int __init tegra_pcie_init(bool init_port0, bool init_port1);
+ 
++void tegra_init_late(void);
 +
-+void __init shmobile_init_late(void)
-+{
-+	shmobile_suspend_init();
-+	shmobile_cpuidle_init();
-+}
-diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-index 7e65591..7b541e9 100644
---- a/arch/arm/mach-shmobile/cpuidle.c
-+++ b/arch/arm/mach-shmobile/cpuidle.c
-@@ -46,7 +46,7 @@ static struct cpuidle_driver shmobile_cpuidle_driver = {
- 
- void (*shmobile_cpuidle_setup)(struct cpuidle_driver *drv);
- 
--static int shmobile_cpuidle_init(void)
-+int shmobile_cpuidle_init(void)
- {
- 	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
- 	struct cpuidle_driver *drv = &shmobile_cpuidle_driver;
-@@ -65,4 +65,3 @@ static int shmobile_cpuidle_init(void)
- 
++#ifdef CONFIG_DEBUG_FS
++int tegra_clk_debugfs_init(void);
++#else
++static inline int tegra_clk_debugfs_init(void) { return 0; }
++#endif
++
++#if defined(CONFIG_ARCH_TEGRA_2x_SOC) && defined(CONFIG_DEBUG_FS)
++int __init tegra_powergate_debugfs_init(void);
++#else
++static inline int tegra_powergate_debugfs_init(void) { return 0; }
++#endif
++
+ extern struct sys_timer tegra_timer;
+ #endif
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index 8dad8d1..58f981c 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -642,7 +642,7 @@ static int clk_debugfs_register(struct clk *c)
  	return 0;
  }
--late_initcall(shmobile_cpuidle_init);
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 83ad3fe..2a527c4 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -83,4 +83,18 @@ extern void r8a7779_secondary_init(unsigned int cpu);
- extern int r8a7779_boot_secondary(unsigned int cpu);
- extern void r8a7779_smp_prepare_cpus(void);
  
-+extern void shmobile_init_late(void);
+-static int __init clk_debugfs_init(void)
++int __init tegra_clk_debugfs_init(void)
+ {
+ 	struct clk *c;
+ 	struct dentry *d;
+@@ -669,5 +669,4 @@ err_out:
+ 	return err;
+ }
+ 
+-late_initcall(clk_debugfs_init);
+ #endif
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 22df10f..c90ec93 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -132,3 +132,9 @@ void __init tegra30_init_early(void)
+ 	tegra_powergate_init();
+ }
+ #endif
 +
-+#ifdef CONFIG_SUSPEND
-+int shmobile_suspend_init(void);
-+#else
-+static inline int shmobile_suspend_init(void) { return 0; }
-+#endif
-+
-+#ifdef CONFIG_CPU_IDLE
-+int shmobile_cpuidle_init(void);
-+#else
-+static inline int shmobile_cpuidle_init(void) { return 0; }
-+#endif
-+
- #endif /* __ARCH_MACH_COMMON_H */
-diff --git a/arch/arm/mach-shmobile/suspend.c b/arch/arm/mach-shmobile/suspend.c
-index 4d1b86a..47d83f7 100644
---- a/arch/arm/mach-shmobile/suspend.c
-+++ b/arch/arm/mach-shmobile/suspend.c
-@@ -39,9 +39,8 @@ struct platform_suspend_ops shmobile_suspend_ops = {
- 	.valid		= suspend_valid_only_mem,
++void __init tegra_init_late(void)
++{
++	tegra_clk_debugfs_init();
++	tegra_powergate_debugfs_init();
++}
+diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+index c238699..f5b12fb 100644
+--- a/arch/arm/mach-tegra/powergate.c
++++ b/arch/arm/mach-tegra/powergate.c
+@@ -234,7 +234,7 @@ static const struct file_operations powergate_fops = {
+ 	.release	= single_release,
  };
  
--static int __init shmobile_suspend_init(void)
-+int __init shmobile_suspend_init(void)
+-static int __init powergate_debugfs_init(void)
++int __init tegra_powergate_debugfs_init(void)
  {
- 	suspend_set_ops(&shmobile_suspend_ops);
- 	return 0;
+ 	struct dentry *d;
+ 	int err = -ENOMEM;
+@@ -247,6 +247,4 @@ static int __init powergate_debugfs_init(void)
+ 	return err;
  }
--late_initcall(shmobile_suspend_init);
+ 
+-late_initcall(powergate_debugfs_init);
+-
+ #endif
 -- 
 1.7.5.4
