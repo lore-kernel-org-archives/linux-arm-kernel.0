@@ -1,41 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 May 2012 15:40:47 +0000
-Subject: [GIT PULL] ux500-core for ARM SoC
-In-Reply-To: <CACRpkdY92StLhPv4kpopf8JpU1+PtjrgrdFWdvP4F3fwp1-_Gg@mail.gmail.com>
-References: <1335369056-5331-1-git-send-email-linus.walleij@linaro.org>
- <201204302141.08186.arnd@arndb.de>
- <CACRpkdY92StLhPv4kpopf8JpU1+PtjrgrdFWdvP4F3fwp1-_Gg@mail.gmail.com>
-Message-ID: <201205021540.48113.arnd@arndb.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 02 May 2012 16:49:16 +0100
+Subject: [PATCH RESEND] ARM: pxa: hx4700: Initialize DS1WM clock_rate
+Message-ID: <mailman.1.1335973764.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 May 2012, Linus Walleij wrote:
-> 
-> On Mon, Apr 30, 2012 at 11:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Please separate this into more logical branches, e.g.
-> >
-> > 1. delete u5500
-> > 2. add u9540 support
-> 
-> The U9540 stuff was used as a base so when deleting U5500 and
-> this code is in close hamming-proximity so you will get
-> a lot of conflicts.
+The asic3 driver now sets the DS1WM clock_rate from the newly added
+asic3_platform_data clock_rate field.
 
-Ok, I saw them. I think they are fine, but if they get too annoying,
-I will resolve the conflict myself before sending it upstream.
+This patch initializes the asic3_platform_data clock_rate field on the
+hx4700 platform.
 
-I was mostly worried about the order of stuff, because we are removing
-the ixp2xxx socs in the cleanup branch already, which I want to send
-early on, so I probably woundn't have complained if you had them in
-the opposite order in your branch (removal first, then new stuff) so
-I could just have put the last cleanup commit into a branch by itself
-and let the other one be based on that.
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/mach-pxa/hx4700.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Anyway, separate pulls are best, so I'm happy now and have applied
-pulled your four branches into next/cleanup, next/newsoc, next/dt and
-next/cpuidle respectively.
-
-Thanks a lot!
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 00a00a9..6bd692d 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -295,6 +295,7 @@ static struct asic3_platform_data asic3_platform_data = {
+ 	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+ 	.irq_base        = IRQ_BOARD_START,
+ 	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
++	.clock_rate      = 4000000,
+ 	.leds            = asic3_leds,
+ };
+ 
+-- 
+1.7.3.4
