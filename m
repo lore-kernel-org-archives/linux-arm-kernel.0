@@ -1,39 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 May 2012 13:22:29 +0100
-Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for
- imx-sgtl5000
-In-Reply-To: <20120502121222.GZ2194@S2101-09.ap.freescale.net>
-References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
- <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
- <20120501134446.GK2194@S2101-09.ap.freescale.net>
- <20120502105024.GC2982@b20223-02.ap.freescale.net>
- <20120502114121.GB5722@opensource.wolfsonmicro.com>
- <20120502121222.GZ2194@S2101-09.ap.freescale.net>
-Message-ID: <20120502122228.GC5722@opensource.wolfsonmicro.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 May 2012 14:36:02 +0200
+Subject: [PATCH 05/15] ARM: imx: use machine specific hook for late init
+In-Reply-To: <1335958420-5193-6-git-send-email-shawn.guo@linaro.org>
+References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
+ <1335958420-5193-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120502123602.GZ4141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 08:12:24PM +0800, Shawn Guo wrote:
-> On Wed, May 02, 2012 at 12:41:22PM +0100, Mark Brown wrote:
+On Wed, May 02, 2012 at 07:33:30PM +0800, Shawn Guo wrote:
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/cpu-imx5.c            |    6 +---
+>  arch/arm/mach-imx/imx51-dt.c            |    1 +
+>  arch/arm/mach-imx/mach-cpuimx51.c       |    1 +
+>  arch/arm/mach-imx/mach-cpuimx51sd.c     |    1 +
+>  arch/arm/mach-imx/mach-mx51_3ds.c       |    1 +
+>  arch/arm/mach-imx/mach-mx51_babbage.c   |    1 +
+>  arch/arm/mach-imx/mach-mx51_efikamx.c   |   42 +++++++++++++++++--------------
+>  arch/arm/mach-imx/mach-mx51_efikasb.c   |   28 +++++++++++---------
+>  arch/arm/mach-imx/mach-pcm037.c         |    6 ++++
+>  arch/arm/mach-imx/mach-pcm037_eet.c     |    5 +--
+>  arch/arm/mach-imx/mm-imx5.c             |    5 +++
+>  arch/arm/mach-imx/pcm037.h              |    6 ++++
+>  arch/arm/plat-mxc/include/mach/common.h |    7 +++++
+>  13 files changed, 71 insertions(+), 39 deletions(-)
 
-> > The major problem here is that we can't rely on having the clock API
-> > present at all on most platforms so as soon as we start adding clock
-> > support into things we have to do a performance with HAVE_CLK which is
-> > at best annoying.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> Is this something that the series below tries to solve?
-
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/163652
-
-Well, it helps building but that's only part of the issue - we've still
-got registration problems and if we were using the API in anger we would
-need things like clk_set_rate() to actually work.  It's not just a case
-of simply enabling and disabling clocks (which can be stubbed out pretty
-effectively), audio generally needs to manage the clock rates too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120502/2be059fb/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
