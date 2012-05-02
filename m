@@ -1,29 +1,35 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 2 May 2012 05:42:34 +0000
-Subject: [PATCH 0/2] OMAP: mailbox initial device tree support
-In-Reply-To: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
-References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA68F6D@DBDE01.ent.ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 2 May 2012 13:53:12 +0800
+Subject: [PATCH 2/9] ARM: mmp: distinguish mmp and mmp2 in Kconfig
+In-Reply-To: <201204272014.49443.arnd@arndb.de>
+References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
+ <1335515957-1798-3-git-send-email-haojian.zhuang@gmail.com>
+ <201204272014.49443.arnd@arndb.de>
+Message-ID: <CAN1soZy=OdS=GUc93mgJ0bXTLJSX3+=WuWT=0yLDxkgjjG=wgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
-
-On Tue, May 01, 2012 at 23:17:38, Omar Ramirez Luna wrote:
-> To allow mailbox driver to function with device tree.
-> 
-> Tested in OMAP4 and OMAP3. OMAP2 untested.
+On Sat, Apr 28, 2012 at 4:14 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 27 April 2012, Haojian Zhuang wrote:
+>> Append four CONFIG_* MACRO to distinguish boards in arch-mmp.
+>>
+>> CONFIG_MMP_LEGACY and CONFIG_MMP2_LEGACY are used to support boards
+>> without device tree.
+>>
+>> CONFIG_MMP_DT and CONFIG_MMP2_DT are used to support boards with
+>> device tree.
+>>
+>> At the same time, only one of these four macro could be selected.
+>> It's used to miss compiling all boards file together.
 >
+> Can you explain why this is done? It seems counterintuitive to
+> have the DT and non-DT support be mutually exclusive.
+>
+If I selected DT support, I needn't select those machine support one
+by one. I want to use
+mmp-dt to support all PXA168/PXA910 boards, and use mmp2-dt to support
+all mmp2 boards.
+So I use exclusive statements in Kconfig for convenience.
 
-I think the mailbox code needs a cleanup similar to what you
-had proposed earlier [1] before the device tree support is added.
-
-We probably need to decide whether the number of mailbox sub-modules
-should be part of hwmod attribute or come from device tree. IMO the
-static allocation of the mailboxes is better suited in the device-tree
-data.
-
-Regards,
-Vaibhav
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/054582.html
+Thanks
+Haojian
