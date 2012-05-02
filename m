@@ -1,66 +1,41 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 2 May 2012 12:10:24 +0000
-Subject: [PATCH 01/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <CAMQu2gy4wLw=a07dnP5GgKwqMOGA5s-GUZa2+nbTrp6Q-NOxwQ@mail.gmail.com>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-2-git-send-email-t-kristo@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6B68E@DBDE01.ent.ti.com>
- <CAMQu2gwCstL6eF92_QBDYZaA5xwxD9a+YWRVxdghA5WVkp4PEQ@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6C848@DBDE01.ent.ti.com>
- <CAMQu2gxcUw5A-p25xdYeXfy=tLbDNPsjV_5MJ6s5qGNfn4Zbfw@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6D93B@DBDE01.ent.ti.com>
- <CAOMWX4cjjhDYjsdjUPj+mVx_GCZ_sMEB6X0N3bN4zMJGBFxZRQ@mail.gmail.com>
- <B5906170F1614E41A8A28DE3B8D121433EA6DABF@DBDE01.ent.ti.com>
- <CAMQu2gy4wLw=a07dnP5GgKwqMOGA5s-GUZa2+nbTrp6Q-NOxwQ@mail.gmail.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA6DB56@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 2 May 2012 20:12:24 +0800
+Subject: [PATCH 03/11] ASoC: fsl: add sgtl5000 clock support for
+ imx-sgtl5000
+In-Reply-To: <20120502114121.GB5722@opensource.wolfsonmicro.com>
+References: <1335510185-7906-1-git-send-email-richard.zhao@freescale.com>
+ <1335510185-7906-4-git-send-email-richard.zhao@freescale.com>
+ <20120501134446.GK2194@S2101-09.ap.freescale.net>
+ <20120502105024.GC2982@b20223-02.ap.freescale.net>
+ <20120502114121.GB5722@opensource.wolfsonmicro.com>
+Message-ID: <20120502121222.GZ2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 17:28:17, Shilimkar, Santosh wrote:
-> On Wed, May 2, 2012 at 5:25 PM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> > On Wed, May 02, 2012 at 17:17:08, Menon, Nishanth wrote:
-> >> On Wed, May 2, 2012 at 6:40 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> >> >
-> >> > On Wed, May 02, 2012 at 16:30:26, Shilimkar, Santosh wrote:
-> >> > [...]
-> >> >
-> >> > > >> How ?
-> >> > > >> SRAM is sower memory than DDR so I don't see how it
-> >> > > >> will reduce latency.
-> >> > > >>
-> >> > > >
-> >> > > > I am just guessing if that's indeed the case ;)
-> >> > > > Haven't done any measurements to really check if that's indeed the
-> >> > > > case though.
-> >> > > >
-> >> > > You don't have to do any real measurements at least on OMAP.
-> >> > > OCMC RAM is interfaced over L4 and MPU has to cross two interconnect
-> >> > > bridges to reach to SRAM. DDR is more of direct path and much faster.
-> >> > >
-> >> >
-> >> > Hmm, I was under the impression that OCMC RAM was on L3, at least for
-> >> > OMAP4.
-> >> > Maybe there's a extra low latency path for DDR that I am missing.
-> >> have you folks considered the possibility that SRAM may be
-> >> reprogrammed by Security code to almost nothing if PA/PPA size needs
-> >> to be increased? it would be rather dumb not to support HS devices on
-> >> which real products are made, no? rule of thumb has been to avoid
-> >> usage of SRAM as it constraints security folks as well (yep, I know
-> >> they should share code with all of us etc.. but they have a different
-> >> sets of challenges that may deny them such luxury).
-> >>
-> >
-> > Even I would like to avoid the usage of MPUSS SRAM for this very reason.
-> > But AFAIK the whole PPA stuff isn't applicable for OCMC RAM (not SRAM inside MPUSS).
+On Wed, May 02, 2012 at 12:41:22PM +0100, Mark Brown wrote:
+> We generally try to keep the clock API out of CODEC drivers due to the
+> issues with the clock API that the generic implementation is intended to
+> help us solve.
 > 
-> On OMAP, even OCMC RAM can be used by security middle-ware apart from
-> reserved SRAM
-> for HS/EMU devices.
-> That's what Nishant meant.
+> The major problem here is that we can't rely on having the clock API
+> present at all on most platforms so as soon as we start adding clock
+> support into things we have to do a performance with HAVE_CLK which is
+> at best annoying.
 > 
+Is this something that the series below tries to solve?
 
-Oh ok. I wasn't aware of this aspect.
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/163652
 
-Thanks,
-Vaibhav
+Regards,
+Shawn
+
+> There's also the fact that even if the clock API is available we've no
+> way to register a clock consistently and since the audio clock tree
+> often needs management off-SoC for at least some components when the
+> clock API is in use you end up having to handle clock trees that go into
+> and out of the clock API.
+> 
+> The upshot of this is that while we really should be using the clock API
+> for clocks the API as it stands is somewhat difficult to deploy in cross
+> platform code.  What I'd suggest is connecting the clock to the CODEC in
+> the device tree but actually doing the clk_get() in the machine driver.
