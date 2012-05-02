@@ -1,202 +1,235 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed,  2 May 2012 19:33:36 +0800
-Subject: [PATCH 11/15] ARM: s3c64xx: use machine specific hook for late init
+Date: Wed,  2 May 2012 19:33:37 +0800
+Subject: [PATCH 12/15] ARM: sa1100: use machine specific hook for late init
 In-Reply-To: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1335958420-5193-12-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1335958420-5193-13-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-s3c64xx/common.c        |    5 +++++
- arch/arm/mach-s3c64xx/common.h        |    7 +++++++
- arch/arm/mach-s3c64xx/mach-anw6410.c  |    1 +
- arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
- arch/arm/mach-s3c64xx/mach-hmt.c      |    1 +
- arch/arm/mach-s3c64xx/mach-mini6410.c |    1 +
- arch/arm/mach-s3c64xx/mach-ncp.c      |    1 +
- arch/arm/mach-s3c64xx/mach-real6410.c |    1 +
- arch/arm/mach-s3c64xx/mach-smartq5.c  |    1 +
- arch/arm/mach-s3c64xx/mach-smartq7.c  |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6400.c |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 +
- arch/arm/mach-s3c64xx/pm.c            |    3 +--
- 13 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/assabet.c    |    1 +
+ arch/arm/mach-sa1100/badge4.c     |    1 +
+ arch/arm/mach-sa1100/cerf.c       |    1 +
+ arch/arm/mach-sa1100/collie.c     |    1 +
+ arch/arm/mach-sa1100/generic.c    |    4 ++++
+ arch/arm/mach-sa1100/generic.h    |    7 +++++++
+ arch/arm/mach-sa1100/h3100.c      |    1 +
+ arch/arm/mach-sa1100/h3600.c      |    1 +
+ arch/arm/mach-sa1100/hackkit.c    |    1 +
+ arch/arm/mach-sa1100/jornada720.c |    1 +
+ arch/arm/mach-sa1100/lart.c       |    1 +
+ arch/arm/mach-sa1100/nanoengine.c |    1 +
+ arch/arm/mach-sa1100/pleb.c       |    1 +
+ arch/arm/mach-sa1100/pm.c         |    4 +---
+ arch/arm/mach-sa1100/shannon.c    |    1 +
+ arch/arm/mach-sa1100/simpad.c     |    1 +
+ 16 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index b313380..be746e3 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -384,3 +384,8 @@ void s3c64xx_restart(char mode, const char *cmd)
- 	/* if all else fails, or mode was for soft, jump to 0 */
- 	soft_restart(0);
- }
-+
-+void __init s3c64xx_init_late(void)
-+{
-+	s3c64xx_pm_late_initcall();
-+}
-diff --git a/arch/arm/mach-s3c64xx/common.h b/arch/arm/mach-s3c64xx/common.h
-index 7a10be6..6cfc99b 100644
---- a/arch/arm/mach-s3c64xx/common.h
-+++ b/arch/arm/mach-s3c64xx/common.h
-@@ -24,6 +24,7 @@ void s3c64xx_register_clocks(unsigned long xtal, unsigned armclk_limit);
- void s3c64xx_setup_clocks(void);
- 
- void s3c64xx_restart(char mode, const char *cmd);
-+void s3c64xx_init_late(void);
- 
- #ifdef CONFIG_CPU_S3C6400
- 
-@@ -51,4 +52,10 @@ extern void s3c6410_init_clocks(int xtal);
- #define s3c6410_init NULL
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index 375d3f7..d1dc7f1 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -538,6 +538,7 @@ MACHINE_START(ASSABET, "Intel-Assabet")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= assabet_init,
++	.init_late	= sa11x0_init_late,
+ #ifdef CONFIG_SA1111
+ 	.dma_zone_size	= SZ_1M,
  #endif
+diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
+index e0f0c03..b30fb99 100644
+--- a/arch/arm/mach-sa1100/badge4.c
++++ b/arch/arm/mach-sa1100/badge4.c
+@@ -305,6 +305,7 @@ MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
+ 	.map_io		= badge4_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
+ 	.init_irq	= sa1100_init_irq,
++	.init_late	= sa11x0_init_late,
+ 	.timer		= &sa1100_timer,
+ #ifdef CONFIG_SA1111
+ 	.dma_zone_size	= SZ_1M,
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index 4a61f60..09d7f4b 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -134,5 +134,6 @@ MACHINE_START(CERF, "Intrinsyc CerfBoard/CerfCube")
+ 	.init_irq	= cerf_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= cerf_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index c7f418b..ea5cff3 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -401,5 +401,6 @@ MACHINE_START(COLLIE, "Sharp-Collie")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= collie_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 7c524b4..49468e6 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -359,6 +359,10 @@ static int __init sa1100_init(void)
  
-+#ifdef CONFIG_PM
-+int __init s3c64xx_pm_late_initcall(void);
-+#else
-+static inline int s3c64xx_pm_late_initcall(void) { return 0; }
-+#endif
+ arch_initcall(sa1100_init);
+ 
++void __init sa11x0_init_late(void)
++{
++	sa11x0_pm_init();
++}
+ 
+ /*
+  * Common I/O mapping:
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 9eb3b3c..a5b7c13 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -11,6 +11,7 @@ extern void __init sa1100_map_io(void);
+ extern void __init sa1100_init_irq(void);
+ extern void __init sa1100_init_gpio(void);
+ extern void sa11x0_restart(char, const char *);
++extern void sa11x0_init_late(void);
+ 
+ #define SET_BANK(__nr,__start,__size) \
+ 	mi->bank[__nr].start = (__start), \
+@@ -41,3 +42,9 @@ void sa11x0_register_mcp(struct mcp_plat_data *data);
+ 
+ struct sa1100fb_mach_info;
+ void sa11x0_register_lcd(struct sa1100fb_mach_info *inf);
 +
- #endif /* __ARCH_ARM_MACH_S3C64XX_COMMON_H */
-diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
-index b86f277..8808aa5 100644
---- a/arch/arm/mach-s3c64xx/mach-anw6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
-@@ -241,6 +241,7 @@ MACHINE_START(ANW6410, "A&W6410")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= anw6410_map_io,
- 	.init_machine	= anw6410_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
++#ifdef CONFIG_PM
++int sa11x0_pm_init(void);
++#else
++static inline int sa11x0_pm_init(void) { return 0; }
++#endif
+diff --git a/arch/arm/mach-sa1100/h3100.c b/arch/arm/mach-sa1100/h3100.c
+index b2e8d0f..e1571ea 100644
+--- a/arch/arm/mach-sa1100/h3100.c
++++ b/arch/arm/mach-sa1100/h3100.c
+@@ -110,6 +110,7 @@ MACHINE_START(H3100, "Compaq iPAQ H3100")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= h3100_mach_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index e20bf58..607d3f1 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -811,6 +811,7 @@ MACHINE_START(WLF_CRAGG_6410, "Wolfson Cragganmore 6410")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= crag6410_map_io,
- 	.init_machine	= crag6410_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index 521e07b..1bf6b9d 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -272,6 +272,7 @@ MACHINE_START(HMT, "Airgoo-HMT")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= hmt_map_io,
- 	.init_machine	= hmt_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index c34c2ab..5aef599 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -350,6 +350,7 @@ MACHINE_START(MINI6410, "MINI6410")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= mini6410_map_io,
- 	.init_machine	= mini6410_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-ncp.c b/arch/arm/mach-s3c64xx/mach-ncp.c
-index 0efa2ba..cad2e05 100644
---- a/arch/arm/mach-s3c64xx/mach-ncp.c
-+++ b/arch/arm/mach-s3c64xx/mach-ncp.c
-@@ -104,6 +104,7 @@ MACHINE_START(NCP, "NCP")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= ncp_map_io,
- 	.init_machine	= ncp_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index be2a9a2..a88b60f 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -331,6 +331,7 @@ MACHINE_START(REAL6410, "REAL6410")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= real6410_map_io,
- 	.init_machine	= real6410_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
-index 3f42431d..c5021d0 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq5.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
-@@ -152,6 +152,7 @@ MACHINE_START(SMARTQ5, "SmartQ 5")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= smartq_map_io,
- 	.init_machine	= smartq5_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
-index e5c09b6..aa9072a 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq7.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
-@@ -168,6 +168,7 @@ MACHINE_START(SMARTQ7, "SmartQ 7")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= smartq_map_io,
- 	.init_machine	= smartq7_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6400.c b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-index 5f09653..b0f4525 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6400.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-@@ -93,6 +93,7 @@ MACHINE_START(SMDK6400, "SMDK6400")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= smdk6400_map_io,
- 	.init_machine	= smdk6400_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index d55bc96..315a8b4 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -709,6 +709,7 @@ MACHINE_START(SMDK6410, "SMDK6410")
- 	.handle_irq	= vic_handle_irq,
- 	.map_io		= smdk6410_map_io,
- 	.init_machine	= smdk6410_machine_init,
-+	.init_late	= s3c64xx_init_late,
- 	.timer		= &s3c24xx_timer,
- 	.restart	= s3c64xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index 7d3e81b..7feb426 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -365,10 +365,9 @@ static __init int s3c64xx_pm_initcall(void)
- }
- arch_initcall(s3c64xx_pm_initcall);
  
--static __init int s3c64xx_pm_late_initcall(void)
-+int __init s3c64xx_pm_late_initcall(void)
+diff --git a/arch/arm/mach-sa1100/h3600.c b/arch/arm/mach-sa1100/h3600.c
+index cb6659f..ba7a290 100644
+--- a/arch/arm/mach-sa1100/h3600.c
++++ b/arch/arm/mach-sa1100/h3600.c
+@@ -160,6 +160,7 @@ MACHINE_START(H3600, "Compaq iPAQ H3600")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= h3600_mach_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
+index 5535475..7f86bd9 100644
+--- a/arch/arm/mach-sa1100/hackkit.c
++++ b/arch/arm/mach-sa1100/hackkit.c
+@@ -199,5 +199,6 @@ MACHINE_START(HACKKIT, "HackKit Cpu Board")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= hackkit_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index ca7a7e8..e3084f4 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -348,6 +348,7 @@ MACHINE_START(JORNADA720, "HP Jornada 720")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= jornada720_mach_init,
++	.init_late	= sa11x0_init_late,
+ #ifdef CONFIG_SA1111
+ 	.dma_zone_size	= SZ_1M,
+ #endif
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index eb6534e..b775a0a 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -147,6 +147,7 @@ MACHINE_START(LART, "LART")
+ 	.nr_irqs	= SA1100_NR_IRQS,
+ 	.init_irq	= sa1100_init_irq,
+ 	.init_machine	= lart_init,
++	.init_late	= sa11x0_init_late,
+ 	.timer		= &sa1100_timer,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
+index 8f6446b..41f69d9 100644
+--- a/arch/arm/mach-sa1100/nanoengine.c
++++ b/arch/arm/mach-sa1100/nanoengine.c
+@@ -112,5 +112,6 @@ MACHINE_START(NANOENGINE, "BSE nanoEngine")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= nanoengine_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/pleb.c b/arch/arm/mach-sa1100/pleb.c
+index 1602575..37fe0a0 100644
+--- a/arch/arm/mach-sa1100/pleb.c
++++ b/arch/arm/mach-sa1100/pleb.c
+@@ -135,5 +135,6 @@ MACHINE_START(PLEB, "PLEB")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine   = pleb_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/pm.c b/arch/arm/mach-sa1100/pm.c
+index 2fa499e..690cf0c 100644
+--- a/arch/arm/mach-sa1100/pm.c
++++ b/arch/arm/mach-sa1100/pm.c
+@@ -117,10 +117,8 @@ static const struct platform_suspend_ops sa11x0_pm_ops = {
+ 	.valid		= suspend_valid_only_mem,
+ };
+ 
+-static int __init sa11x0_pm_init(void)
++int __init sa11x0_pm_init(void)
  {
- 	pm_genpd_poweroff_unused();
- 
+ 	suspend_set_ops(&sa11x0_pm_ops);
  	return 0;
  }
--late_initcall(s3c64xx_pm_late_initcall);
+-
+-late_initcall(sa11x0_pm_init);
+diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
+index ca8bf59..5d33fc3 100644
+--- a/arch/arm/mach-sa1100/shannon.c
++++ b/arch/arm/mach-sa1100/shannon.c
+@@ -104,5 +104,6 @@ MACHINE_START(SHANNON, "Shannon (AKA: Tuxscreen)")
+ 	.init_irq	= sa1100_init_irq,
+ 	.timer		= &sa1100_timer,
+ 	.init_machine	= shannon_init,
++	.init_late	= sa11x0_init_late,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index 3efae03..fbd5359 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -395,6 +395,7 @@ MACHINE_START(SIMPAD, "Simpad")
+ 	.map_io		= simpad_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
+ 	.init_irq	= sa1100_init_irq,
++	.init_late	= sa11x0_init_late,
+ 	.timer		= &sa1100_timer,
+ 	.restart	= sa11x0_restart,
+ MACHINE_END
 -- 
 1.7.5.4
