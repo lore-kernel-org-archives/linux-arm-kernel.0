@@ -1,47 +1,78 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 2 May 2012 15:44:03 -0700
-Subject: [PATCH V3 2/8] clk: add a fixed factor clock
-In-Reply-To: <20120502224108.GC18402@gmail.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
- <20120502094807.GE20478@pengutronix.de> <4FA120E8.5030707@st.com>
- <20120502224108.GC18402@gmail.com>
-Message-ID: <20120502224403.GD18402@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  2 May 2012 17:00:13 -0600
+Subject: [PATCH 1/3] ARM: tegra: trimslice: enable PCIe when booting from
+ device tree
+Message-ID: <1335999615-6119-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120502-15:41, Mike Turquette wrote:
-> On 20120502-17:26, Viresh Kumar wrote:
-> > On 5/2/2012 3:18 PM, Sascha Hauer wrote:
-> > > This needs a fixup. The clock framework used to pass in a NULL pointer
-> > > as prate when a clk is not allowed to change a parents clock. This
-> > > is no longer true, so we have to check for
-> > > 
-> > > __clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT
-> > 
-> > Sure. Will send fixup.
-> > 
-> > @Mike: When will you send your clk patches to Arnd?
-> > I am asking this, because SPEAr patches are dependent on
-> > them. Also, please include this patch too, in your patchset.
-> > 
-> > I will send a fixup.
-> 
-> I will take this patch in before sending my request to Arnd.  In your
-> patch 0/8 you ask me to take in the series, but it looks like not all of
-> the patches are going through me.  For instance patch 2/8 certainly
-> looks destined for Russell.
+From: Stephen Warren <swarren@nvidia.com>
 
-Typo above.
+There currently aren't bindings for the Tegra PCIe controller. Work on
+this is in progress, but not yet complete. Manually initialize PCIe when
+booting from device tree, in order to bring DT support to the same
+feature level as board files, which will in turn allow board files to be
+deprecated.
 
-s/patch 2/patch 1/
+PCIe hosts the wired Ethernet controller on TrimSlice.
 
-Regards,
-Mike
+To support this, add infra-structure to board-dt-tegra20.c for board-
+specific initialization code. Once device tree support for the relevant
+features is in place, this code will be removed.
 
-> 
-> After fixing up this patch can you resend a clean series which is only
-> headed for clk-next?
-> 
-> Thanks,
-> Mike
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Note that this patch should be re-written to depend on Shawn Guo's late
+init hook series, since it adds a new late_initcall.
+---
+ arch/arm/mach-tegra/board-dt-tegra20.c |   35 ++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index fac3eb1..8fd6f31 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -98,6 +98,41 @@ static void __init tegra_dt_init(void)
+ 				tegra20_auxdata_lookup, NULL);
+ }
+ 
++#ifdef CONFIG_MACH_TRIMSLICE
++static void __init trimslice_init(void)
++{
++	int ret;
++
++	ret = tegra_pcie_init(true, true);
++	if (ret)
++		pr_err("tegra_pci_init() failed: %d\n", ret);
++}
++#endif
++
++static struct {
++	char *machine;
++	void (*init)(void);
++} board_init_funcs[] = {
++#ifdef CONFIG_MACH_TRIMSLICE
++	{ "compulab,trimslice", trimslice_init },
++#endif
++};
++
++static int __init tegra_dt_init_board_specific(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
++		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
++			board_init_funcs[i].init();
++			break;
++		}
++	}
++
++	return 0;
++}
++late_initcall(tegra_dt_init_board_specific);
++
+ static const char *tegra20_dt_board_compat[] = {
+ 	"nvidia,tegra20",
+ 	NULL
+-- 
+1.7.0.4
