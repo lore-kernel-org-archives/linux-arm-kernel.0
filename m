@@ -1,47 +1,106 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 02 May 2012 23:31:31 +0200
-Subject: [PATCH 1/1] ARM: kirkwood: Add support for RaidSonic
-In-Reply-To: <op.wdonrhzb4cuzmg@gonzo.lentin.co.uk>
-References: <20120501172042.GA13233@lunn.ch>
- <alpine.DEB.2.00.1205011902150.23719@marmot.wormnet.eu>
- <20120501195603.GW25584@lunn.ch> <op.wdonrhzb4cuzmg@gonzo.lentin.co.uk>
-Message-ID: <4FA1A7B3.8070106@gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Wed, 2 May 2012 15:04:20 -0700
+Subject: [PATCH] arm: omap: Use only valid power domain states
+In-Reply-To: <CAORVsuUJQOL-aTaGdo6VsOGm3ZHU=nWinQYrP70Lx0kG6G34TQ@mail.gmail.com>
+References: <1335821126-12994-1-git-send-email-mgreer@animalcreek.com>
+ <CAORVsuUJQOL-aTaGdo6VsOGm3ZHU=nWinQYrP70Lx0kG6G34TQ@mail.gmail.com>
+Message-ID: <20120502220420.GA19579@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie, Andrew,
+On Tue, May 01, 2012 at 10:47:35AM +0200, Jean Pihet wrote:
+> Hi Mark,
 
-Am 02.05.2012 15:29, schrieb Jamie Lentin:
->>> >How about writing a gpio-poweroff platform driver? It would take a
->>> >platform_data structure which lists which GPIO line to use, and if it
->>> >should be active high/low. The probe function would take control of
->>> >the GPIO line, set it to inactive state, and output. It would also
->>> >register a function for pm_power_off(). When that function is called,
->>> >it toggles the GPIO to turn the power off.
->>> >
->>> >Then wrap all this up in a DT binding.
->>>
->>> I've been thinking about this too, would make a lot of sense. Most
->>> of the gpio-poweroff driver would be easy, although registering the
->>> power_off function wasn't immediately obvious.
->>
->> pm_power_off is a global variable. You should be able to assign it
->> from anywhere.
+Hi Jean.  Thanks for the review.
+
+> On Mon, Apr 30, 2012 at 11:25 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+
+> > diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+> > index 5358664..2c91711 100644
+> > --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> > +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> > @@ -175,19 +175,25 @@ static int next_valid_state(struct cpuidle_device *dev,
+> > ? ? ? ?struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
+> > ? ? ? ?struct cpuidle_state *curr = &drv->states[index];
+> > ? ? ? ?struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
+> > - ? ? ? u32 mpu_deepest_state = PWRDM_POWER_RET;
+> > - ? ? ? u32 core_deepest_state = PWRDM_POWER_RET;
+> > + ? ? ? u32 mpu_deepest_state, mpu_deepest_possible;
+> > + ? ? ? u32 core_deepest_state, core_deepest_possible;
+> > ? ? ? ?int next_index = -1;
 > >
->
-> It seemed a bit worrying setting the global within a driver when it
-> might be overridden elsewhere, but I guess it's fairly unlikely a
-> board would invoke several means of turning off. A grep shows several
-> drivers that already do this (setting pm_power_off) anyway. I'll have
-> a go at writing one later.
+> > + ? ? ? mpu_deepest_possible = pwrdm_get_deepest_state(mpu_pd);
+> > + ? ? ? mpu_deepest_state = max_t(u32, mpu_deepest_possible, PWRDM_POWER_RET);
+> I do not think you need to change the pwrdm API and the cpuidle code for that.
+> Instead you should use the pwrst* fields in the power domains data
+> files, which allow to specify the allowed states.
+> After reading the rest of your patches it seems you are addressing the
+> issue in a subsequent patch 'arm: omap3: am35x: Set proper powerdomain
+> states'.
 
-This saves me a long-winded explanation why I would prefer someone more
-experienced to do this before I give it a try...
-Of course I am happy to support e.g. by testing. Just let me know.
+That patch sets the allowable power domain states for the am35x; the intent
+of this patch was to make the code respect what is set in the pwrst* fields.
 
-Andrew, thanks for the review of the ib62x0 patch. Once there is a
-gpio-poweroff driver, should I integrate the adaptations to use it into
-the existing patch or would you like to have a dedicated patch for that?
-(I prefer the latter.)
+> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> > index 96ad3dbe..9c80c19 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.c
+> > +++ b/arch/arm/mach-omap2/powerdomain.c
+> > @@ -1078,3 +1078,28 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
+> >
+> > ? ? ? ?return 0;
+> > ?}
+> > +
+> > +/**
+> > + * pwrdm_get_deepest_state - Get deepest valid state domain can enter
+> > + * @pwrdm: struct powerdomain *
+> > + *
+> > + * Find and return the deepest valid state a power domain can be in.
+> > + * Returns the deepest state that @pwrdm can enter.
+> > + */
+> > +u32 pwrdm_get_deepest_state(struct powerdomain *pwrdm)
+> > +{
+> > + ? ? ? u32 valid_states, deepest_state;
+> > +
+> > + ? ? ? valid_states = pwrdm->pwrsts;
+> > +
+> > + ? ? ? if (valid_states & PWRSTS_OFF)
+> > + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_OFF;
+> > + ? ? ? else if (valid_states & PWRSTS_RET)
+> > + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_RET;
+> > + ? ? ? else if (valid_states & PWRSTS_INACTIVE)
+> > + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_INACTIVE;
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? deepest_state = PWRDM_POWER_ON;
+> > +
+> > + ? ? ? return deepest_state;
+> > +}
+> 
+> The pwrdm API already performs those checks on pwrst*, cf.
+> pwrdm_set_next_pwrst for example.
 
-- Simon
+Well, sort of.  pwrdm_set_next_pwrst() fails if its an invalid state
+returning -EINVAL.  Very few of the callers actually check to see if
+it failed so they don't try the "next-one-up" power state.  The net
+result is that the next state doesn't change even though it could
+move to a lower state (just not the one that was asked for).
+
+Is that acceptable?
+
+Another sort of strange one is omap3_pm_off_mode_enable().  If its
+called with 'enable' set and PWRDM_POWER_OFF isn't a valid state,
+omap_set_pwrdm_state() will return 0 and leave the next state alone.
+When omap3_pm_off_mode_enable() is called again with 'enable' set,
+omap_set_pwrdm_state() will find the lowest valid state >= RET.
+So, if you had a device where OFF wasn't valid but RET was and
+its currently ON, when the user enables OFF mode, it stays ON
+and when they disable OFF mode, it moves to RET.
+
+Is that acceptable?
+
+If the things above are acceptable, then I think you're right, we can
+forget this patch.  FYI, the am35x appears to work okay and no invalid
+states are entered (according to /sys/kernel/debug/pm_debug/count)
+without this patch.
+
+Mark
