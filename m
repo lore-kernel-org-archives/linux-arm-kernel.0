@@ -1,45 +1,42 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Thu, 3 May 2012 21:22:22 +0100
-Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
- callbacks
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
-References: <20120502234718.GA5432@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
- <20120503160917.GA11310@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
- <20120503184632.GA28089@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
-Message-ID: <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 03 May 2012 22:29:00 +0200
+Subject: [PATCH 11/18][V3] ARM: OMAP3: cpuidle - remove the 'valid' field
+In-Reply-To: <87r4v1kofi.fsf@ti.com>
+References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
+ <1335276339-11135-12-git-send-email-daniel.lezcano@linaro.org>
+ <87r4v1kofi.fsf@ti.com>
+Message-ID: <4FA2EA8C.90207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-03 at 19:25 +0000, Bedia, Vaibhav wrote:
-> On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
-> [...]
-> > > 
-> > > So, if I understood this correctly, it's effectively like blocking a low power
-> > > state transition (here wfi execution) when EMAC is active?
-> > 
-> > Assuming "it" is my patch, correct.
-> > 
-> 
-> Recently I was thinking about how to get certain drivers to disallow some or all
-> low power states and to me this also seems to fall in a similar category.
-> 
-> One of the suggestions that I got was to check if the 'wakeup' entry associated with
-> the device under sysfs could be leveraged for this. The PM code could maintain
-> a whitelist (or blacklist) of devices and it decides the low power state to enter
-> based on the 'wakeup' entries associated with these devices. In this particular case,
-> maybe the driver could simply set this entry to non-wakeup capable when necessary and
-> then let the PM code take care of skipping the wfi execution.
-> 
-> Thoughts/brickbats welcome :)
+On 05/03/2012 10:19 PM, Kevin Hilman wrote:
+> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
+>
+>> With the previous changes all the states are valid, except
+>> the last state which can be handled by decreasing the number
+>> of states.
+> I don't think this changelog is valid anymore as you're not doing
+> anything to decrease the number of states.
+>
+> I updated the changelog locally to this:
+>
+> ARM: OMAP3: cpuidle - remove the 'valid' field
+>
+> With the previous changes all the states are valid, except the last
+> state which is now handled at runtime by next_valid_state() based on
+> the errata flags.
+>
+> Any problems with that?
 
-You can maybe (ab)use the pm_qos mechanism for this.
+No problem :)
 
-Ben.
+Thanks for fixing the Changelog.
+
+-- Daniel
 
 -- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+  <http://www.linaro.org/>  Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:<http://www.facebook.com/pages/Linaro>  Facebook |
+<http://twitter.com/#!/linaroorg>  Twitter |
+<http://www.linaro.org/linaro-blog/>  Blog
