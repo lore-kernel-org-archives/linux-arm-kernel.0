@@ -1,43 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 May 2012 14:47:53 -0700
-Subject: [PATCH 4/7] ARM: OMAP: dma: Make use of cpu_class_is_omap2() to
- avoid future patching.
-In-Reply-To: <1335952093-12541-5-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Wed, 2 May 2012 15:18:10 +0530")
-References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
- <1335952093-12541-5-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <8762cdgcmu.fsf@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu,  3 May 2012 17:59:24 -0400
+Subject: [PATCH] ARM: fix swizzle build failure in integrator platform
+Message-ID: <1336082364-27611-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Commit 466b8cb9ef7d64efb7aeadc802239e7af754b053 (linux-next)
 
-> cpu_class_is_omap2() contains all OMAP2+ devices. So update the DMA code
-> cpu checks accordingly so that there is no need to patch
-> the file for any future OMAP2+ devices.
->
-> In long run, all these attributes should come from hwmod dev_attr based
-> on DMA IP version.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/dma.c |    2 +-
->  arch/arm/plat-omap/dma.c  |    4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> index b19d849..2750bb9 100644
-> --- a/arch/arm/mach-omap2/dma.c
-> +++ b/arch/arm/mach-omap2/dma.c
-> @@ -227,7 +227,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->  
->  	dma_stride		= OMAP2_DMA_STRIDE;
->  	dma_common_ch_start	= CSDP;
-> -	if (cpu_is_omap3630() || cpu_is_omap44xx())
-> +	if (omap_rev() >= OMAP3630_REV_ES1_0)
+    "ARM: PCI: get rid of pci_std_swizzle()"
 
-It's not obvious (at least to me) that this is equivalent.
+deleted this line:
 
-For example, this will now be true on the TI81xx devices.
+    #define pci_std_swizzle pci_common_swizzle
 
-Kevin
+but the integrator was still using the std variant,
+causing the build failure:
+
+arch/arm/mach-integrator/pci.c:76:2: error: implicit declaration of function 'pci_std_swizzle'
+
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+
+diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
+index 40f4b4f..6c1667e 100644
+--- a/arch/arm/mach-integrator/pci.c
++++ b/arch/arm/mach-integrator/pci.c
+@@ -73,7 +73,7 @@ static u8 __init integrator_swizzle(struct pci_dev *dev, u8 *pinp)
+ 	if (*pinp == 0)
+ 		*pinp = 1;
+ 
+-	return pci_std_swizzle(dev, pinp);
++	return pci_common_swizzle(dev, pinp);
+ }
+ 
+ static int irq_tab[4] __initdata = {
+-- 
+1.7.9.1
