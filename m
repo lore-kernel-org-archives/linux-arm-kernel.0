@@ -1,29 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 May 2012 20:38:33 +0800
-Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
-In-Reply-To: <1336042485.13013.41.camel@sauron.fi.intel.com>
-References: <1335939209-15625-1-git-send-email-b32955@freescale.com>
- <20120502144008.GF2194@S2101-09.ap.freescale.net>
- <1336042485.13013.41.camel@sauron.fi.intel.com>
-Message-ID: <CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 May 2012 12:57:51 +0000
+Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code
+ registration when DT is enabled
+In-Reply-To: <4F967986.6090808@linaro.org>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZzAQNJ9ejKJJQJhEPjO9VO+fPHmPeCErg8XOj-dLc3gA@mail.gmail.com>
+ <4F967986.6090808@linaro.org>
+Message-ID: <201205031257.52100.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2012 18:54, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Wed, 2012-05-02 at 22:40 +0800, Shawn Guo wrote:
->> Hi Artem,
->>
->> As the patch heavily depends on mxs device tree branch, I think it will
->> be easier to have it go through arm-soc tree. ?If you agree, can you
->> please give your ack if the patch looks fine to you?
->
-> I do not mind if it goes via the arm-soc tree. I cannot really review
-> this patch - it is too big, I think it should be split on smaller
-> chunks.
->
-Right.  I also think that the patch should at least be split into two,
-one converts the driver to device tree and the other adds imx6q
-support.  Shijie, can you do that?
+On Tuesday 24 April 2012, Lee Jones wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 24 Apr 2012 10:54:25 +0100
+> Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
+> 
+> Now the SCMC911x is correctly enabled in Device Tree, there is no need
+> to continue registering it from platform code. In fact, if we continue
+> doing so, the system will throw an error on boot.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index 50809af..9dbd34b 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -612,7 +612,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>  static struct platform_device *snowball_of_platform_devs[] __initdata = {
+>         &snowball_led_dev,
+>         &snowball_key_dev,
+> -       &snowball_sbnet_dev,
+>         &ab8500_device,
+>  };
+>  
 
-Regards,
-Shawn
+This version of the patch looks good, the version that was applied does not.
+The same is true for "ARM: ux500: Fork cpu-db8500 platform_devs for
+sequential DT enablement". I only noticed because I get new build warnings
+for the bogus code now. It appears that some of the prerequisites for these
+patches, in particular "ARM: ux500: New DT:ed snowball_platform_devs for
+one-by-one device enablement" and "ARM: ux500: New DT:ed u8500_init_devices
+for one-by-one device enablement" are missing now and the two patches on
+top were mismerged.
+
+Linus and Lee, what's going on here?
+
+	Arnd
