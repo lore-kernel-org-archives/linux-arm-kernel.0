@@ -1,60 +1,43 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 May 2012 14:17:34 -0700
-Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Thu, 3 May 2012 16:41:44 +0000")
-References: <hvaibhav@ti.com>
- <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
- <20120503155717.GE5140@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
-Message-ID: <871un1j769.fsf@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 03 May 2012 22:21:36 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <20120503171316.GD14296@sirena.org.uk>
+References: <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <4FA2B98A.6060800@linaro.org> <20120503171316.GD14296@sirena.org.uk>
+Message-ID: <4FA2F6E0.1080202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-
-> On Thu, May 03, 2012 at 21:27:18, Tony Lindgren wrote:
->> Hi,
->> 
->> * Hiremath, Vaibhav <hvaibhav@ti.com> [120502 02:37]:
->> > On Wed, May 02, 2012 at 14:53:24, Paul Walmsley wrote:
->> > > Hi
->> > > 
->> > > On Fri, 2 Dec 2011, hvaibhav at ti.com wrote:
->> > > 
->> > > > From: Afzal Mohammed <afzal@ti.com>
->> > > > 
->> > > > This patch adds minimal support for AM335X EVM.
->> > > > The approach taken here is to add AM335X EVM support
->> > > > to AM3517EVM, considering the fact that with device tree
->> > > > developement we will get rid of board-*.c.
->> > > > 
->> > > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> > > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> > > > Reviewed-by: Kevin Hilman <khilman@ti.com>
->> > > 
->> > > I realize people may not necessarily like this, but I think that the 
->> > > AM33xx EVM needs its own board file.  This is because it really has 
->> > > nothing to do with the AM3517EVM.  Also, the AM3517EVM depends on 
->> > > CONFIG_ARCH_OMAP3, but the AM33xx EVM should not: it should depend on 
->> > > either CONFIG_ARCH_OMAPAM33XX, or CONFIG_ARCH_OMAP4.
->> 
->> I guess adding CONFIG_SOC_AM33XX makes sense if it does not share anything
->> except core with omap3. And the SOC is independent of the core selected,
->> there is no dependency between SoC and the core.
->> 
->> Note that we have CONFIG_ARCH_OMAP2PLUS, all the other ones should be just
->> CONFIG_SOC_XXX. As all omap3 omap4 and am33xx are v7, there's no need to
->> compile with different flags either.
->>  
+On 03/05/12 18:13, Mark Brown wrote:
+> On Thu, May 03, 2012 at 05:59:54PM +0100, Lee Jones wrote:
+>> On 03/05/12 17:45, Russell King - ARM Linux wrote:
 >
-> What about cpu_is_omap34xx() true for am33xx? Should we follow it?
+>>> One thing that might help is if the format of these descriptions were
+>>> changed so that there was one file per subsystem documenting the common
+>>> options, rather than (eg) every MMC driver documentating the same base
+>>> options time and time again.
+>
+>> I'm afraid that's not really for me to decide, however Grant is on
+>> CC. Perhaps that's a point he'd like to drive. If he's stopped
+>> reading this thread and fails to reply, I will endeavor to poke him
+>> about it while we're in Hong Kong.
+>
+> It's what we're already doing for other things where there's a lot of
+> commonality like regulators, I don't think there's any conroversy, it's
+> just reminding people to not cut'n'paste.
 
-Please, no.
+Okay. I'm happy to do a little documentation clean-up once the 
+enablement is complete. There is one more patch-set from me and another 
+from another engineer due, then we can work on tying up some of the 
+loose ends, such as documentation consolidation etc.
 
-I've already demonstrated that that is not necessary and only leads to
-confusion and maintenance headaches.
-
-Kevin
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
