@@ -1,68 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 May 2012 08:37:21 +0200
-Subject: [PATCH V3 2/8] clk: add a fixed factor clock
-In-Reply-To: <4FA21879.9060508@st.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
- <20120502094807.GE20478@pengutronix.de> <4FA120E8.5030707@st.com>
- <20120502224108.GC18402@gmail.com> <4FA21879.9060508@st.com>
-Message-ID: <20120503063721.GD4141@pengutronix.de>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 3 May 2012 06:38:34 +0000
+Subject: [PATCH 2/5] ARM: OMAP2+: PM: use the power domains registers
+ cache for the power states
+In-Reply-To: <4FA00343.3020704@ti.com>
+References: <1335877663-32649-1-git-send-email-j-pihet@ti.com>
+ <1335877663-32649-3-git-send-email-j-pihet@ti.com> <4FA00343.3020704@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA71233@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 11:02:41AM +0530, Viresh Kumar wrote:
-> On 5/3/2012 4:11 AM, Mike Turquette wrote:
-> > I will take this patch in before sending my request to Arnd.  In your
-> > patch 0/8 you ask me to take in the series, but it looks like not all of
-> > the patches are going through me.  For instance patch 2/8 certainly
-> > looks destined for Russell.
+On Tue, May 01, 2012 at 21:07:39, Hunter, Jon wrote:
+[...]
+> >  int pwrdm_read_pwrst(struct powerdomain *pwrdm)
+> >  {
+> > -	int ret = -EINVAL;
+> > +	int pwrst, ret = -EINVAL;
+> >  
+> >  	if (!pwrdm)
+> >  		return -EINVAL;
+> >  
+> > -	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
+> > +	if (!pwrdm_cache_read(pwrdm, PWRDM_CACHE_PWRST, &pwrst))
+> > +		return pwrst;
+> > +
+> > +	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst) {
+> >  		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
+> > +		if (ret >= 0)
+> > +			pwrdm_cache_write(pwrdm, PWRDM_CACHE_PWRST, ret);
+> > +	}
 > 
-> I think you only need to take this patch, i.e. 2/8.
-> Others will go through Arnd directly, keeping your branch as an dependency
-> branch for it.
+> Do we really want to use the cache for the current state? This is
+> updated by hardware. In the above it appears that once we have read it
+> once we will just return this value until the cache is invalidated.
+> Makes me a little nervous.
 > 
-> > After fixing up this patch can you resend a clean series which is only
-> > headed for clk-next?
-> 
-> So, i would be sending this patch only after applying the last fixup
-> (hopefully :) ).
-> 
-> @Sascha: Please see if this patch is sufficient.
-> 
-> ---
->  drivers/clk/clk-fixed-factor.c |    9 ++++-----
->  1 files changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index 9afbdc4..8d25c2e 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -37,16 +37,15 @@ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
->  {
->         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
->  
-> -       if (prate) {
-> +       if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
->                 unsigned long best_parent;
-> +
->                 best_parent = (rate / fix->mult) * fix->div;
->                 *prate = __clk_round_rate(__clk_get_parent(hw->clk),
->                                 best_parent);
-> -               return (*prate / fix->div) * fix->mult;
-> -       } else {
-> -               return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
-> -                       fix->mult;
->         }
-> +
-> +       return (*prate / fix->div) * fix->mult;
->  }
 
-Yes, looks good.
+I echo the concern here. If a powerdomain transition occurs when h/w conditions
+are met, the cached values will go out of sync and this may lead to unexpected
+behavior wherever this API is being used.
 
-Sascha
+As Jon pointed out in another patch, the registers which can be updated by h/w should
+be handled differently.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Just a wild thought, can PRCM_MPU_IRQ ([4]TRANSITION_EN) be used as a trigger to update
+the cache if the transition happened under s/w control?
+
+Regards,
+Vaibhav
