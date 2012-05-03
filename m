@@ -1,77 +1,44 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed,  2 May 2012 21:11:53 -0500
-Subject: [PATCH 3/3] staging: tidspbridge: use scm functions to set boot
- address and mode
-In-Reply-To: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-References: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1336011113-31502-4-git-send-email-omar.luna@linaro.org>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Wed, 02 May 2012 22:59:37 -0400
+Subject: [PATCH] ARM: Fix restoration of IP scratch register when auditing
+ syscalls
+In-Reply-To: <20120430190015.GV24211@n2100.arm.linux.org.uk>
+References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
+ <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
+ <20120430100746.GA11080@mudshark.cambridge.arm.com>
+ <20120430190015.GV24211@n2100.arm.linux.org.uk>
+Message-ID: <4FA1F499.8000408@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of ioremapping SCM registers, use the correspondent layer
-to write into them.
+On 04/30/2012 03:00 PM, Russell King - ARM Linux wrote:
+> On Mon, Apr 30, 2012 at 11:07:46AM +0100, Will Deacon wrote:
+>> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+>> index 80abafb..bfcadc0 100644
+>> --- a/arch/arm/kernel/ptrace.c
+>> +++ b/arch/arm/kernel/ptrace.c
+>> @@ -916,14 +916,7 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>>  {
+>>         unsigned long ip;
+>>  
+>> -       /*
+>> -        * Save IP.  IP is used to denote syscall entry/exit:
+>> -        *  IP = 0 -> entry, = 1 -> exit
+>> -        */
+>> -       ip = regs->ARM_ip;
+>> -       regs->ARM_ip = why;
+>> -
+>> -       if (!ip)
+>> +       if (why)
+> 
+> Umm yes, that original code is complete crap, because the old IP value
+> has no meaning what so ever.  The replacement looks much better here.
 
-This allows us to get rid of a layer violation, since the registers
-are no longer touched by driver code.
+Hey Russell,
 
-Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
----
- drivers/staging/tidspbridge/core/tiomap3430.c |   32 +++++-------------------
- 1 files changed, 7 insertions(+), 25 deletions(-)
+So given that Will's replacement works in my investigation, etc. Can you
+pull that please with my reported/tested-by ACK? I think it's a stable
+candidate too. I mean, ok, it won't crash your system unless you have
+audit capability, but it's still a good idea to fix I think.
 
-diff --git a/drivers/staging/tidspbridge/core/tiomap3430.c b/drivers/staging/tidspbridge/core/tiomap3430.c
-index 9cf29fc..40b35ca 100644
---- a/drivers/staging/tidspbridge/core/tiomap3430.c
-+++ b/drivers/staging/tidspbridge/core/tiomap3430.c
-@@ -70,14 +70,9 @@
- #define PAGES_II_LVL_TABLE   512
- #define PHYS_TO_PAGE(phys)      pfn_to_page((phys) >> PAGE_SHIFT)
- 
--/*
-- * This is a totally ugly layer violation, but needed until
-- * omap_ctrl_set_dsp_boot*() are provided.
-- */
--#define OMAP3_IVA2_BOOTMOD_IDLE 1
--#define OMAP2_CONTROL_GENERAL 0x270
--#define OMAP343X_CONTROL_IVA2_BOOTADDR (OMAP2_CONTROL_GENERAL + 0x0190)
--#define OMAP343X_CONTROL_IVA2_BOOTMOD (OMAP2_CONTROL_GENERAL + 0x0194)
-+/* IVA Boot modes */
-+#define DIRECT		0
-+#define IDLE		1
- 
- /* Forward Declarations: */
- static int bridge_brd_monitor(struct bridge_dev_context *dev_ctxt);
-@@ -414,27 +409,14 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
- 
- 		/* Assert RST1 i.e only the RST only for DSP megacell */
- 		if (!status) {
--			/*
--			 * XXX: ioremapping  MUST be removed once ctrl
--			 * function is made available.
--			 */
--			void __iomem *ctrl = ioremap(OMAP343X_CTRL_BASE, SZ_4K);
--			if (!ctrl)
--				return -ENOMEM;
--
- 			(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST1_IVA2_MASK,
- 					OMAP3430_RST1_IVA2_MASK, OMAP3430_IVA2_MOD,
- 					OMAP2_RM_RSTCTRL);
--			/* Mask address with 1K for compatibility */
--			__raw_writel(dsp_addr & OMAP3_IVA2_BOOTADDR_MASK,
--					ctrl + OMAP343X_CONTROL_IVA2_BOOTADDR);
--			/*
--			 * Set bootmode to self loop if dsp_debug flag is true
--			 */
--			__raw_writel((dsp_debug) ? OMAP3_IVA2_BOOTMOD_IDLE : 0,
--					ctrl + OMAP343X_CONTROL_IVA2_BOOTMOD);
- 
--			iounmap(ctrl);
-+			/* Mask address with 1K for compatibility */
-+			pdata->set_bootaddr(dsp_addr &
-+						OMAP3_IVA2_BOOTADDR_MASK);
-+			pdata->set_bootmode(dsp_debug ? IDLE : DIRECT);
- 		}
- 	}
- 	if (!status) {
--- 
-1.7.4.1
+Jon.
