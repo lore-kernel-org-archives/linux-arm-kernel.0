@@ -1,54 +1,28 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 3 May 2012 09:09:18 -0700
-Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
- callbacks
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
-References: <20120502234718.GA5432@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
-Message-ID: <20120503160917.GA11310@animalcreek.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 3 May 2012 19:13:11 +0300
+Subject: moving Tegra30 to the common clock framework
+Message-ID: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 10:44:44AM +0000, Bedia, Vaibhav wrote:
-> On Thu, May 03, 2012 at 05:17:18, Mark A. Greer wrote:
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > 
-> > The davinci EMAC driver has been incorporated into the am35x
-> > family of SoC's which is OMAP-based.  The incorporation is
-> > incomplete in that the EMAC cannot unblock the [ARM] core if
-> > its blocked on a 'wfi' instruction.  This is an issue with
-> > the cpu_idle code because it has the core execute a 'wfi'
-> > instruction.
-> > 
-> > To work around this issue, add platform data callbacks which
-> > are called at the beginning of the open routine and at the
-> > end of the stop routine of the davinci_emac driver.  The
-> > callbacks allow the platform code to issue disable_hlt() and
-> > enable_hlt() calls appropriately.  Calling disable_hlt()
-> > prevents cpu_idle from issuing the 'wfi' instruction.
-> > 
-> > It is not sufficient to simply call disable_hlt() when
-> > there is an EMAC present because it could be present but
-> > not actually used in which case, we do want the 'wfi' to
-> > be executed.
-> > 
-> 
-> Are you trying to say that if ARM executes _just_ wfi and _absolutely
-> nothing else_ is done in the OMAP PM code, EMAC stops working?
+Hi,
 
-No, I'm saying the EMAC can't wake the core from the wfi so if nothing
-else happens in the system, its effectively hung.  If something else
-does happen in the system (e.g., a timer expires), the the system is
-extremely slow because because its only waking up when a timer (or
-something else wakes it up--but not net traffic).  This is very apparent
-when using an nfs-mounted rootfs. It doesn't hang but its extremely
-slow because occasionally something else wakes up the core but it
-spends most of its time stuck in the wfi when it should be handling
-net/nfs traffic.
+I started looking into what would be needed to move our tegra30 clock code
+to the common clock framework. The tegra30 clocktree is rather flat. Basically
+there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
+and peripheral clocks which have a mux (with 4 or more inputs), a divider and
+a gate. So almost every peripheral clock can have multiple parents.
 
-> However, if this is indeed the case, then probably a better solution would be
-> to invoke disable_hlt() from the board file when EMAC support is compiled in.
+Some questions:
 
-Kevin addressed this one.  Thanks Kevin.
+1) should these peripheral clocks be modelled as 3 different clocks
+   (mux -> divider -> gate) or would it be better to make a new clock type for
+   this?
 
-Mark
+2) how to define the default parent? in many cases the hw reset value isn't
+   a very sensible choice, so the kernel probably needs to set a parent of
+   many of them if we don't want to rely on bootloader configuration.
+
+Cheers,
+
+Peter.
