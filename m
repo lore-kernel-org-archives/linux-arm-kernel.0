@@ -1,28 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 May 2012 12:26:55 +0200
-Subject: [PATCH] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <alpine.DEB.2.00.1205031101390.23719@marmot.wormnet.eu>
-References: <20120501195603.GW25584@lunn.ch>
- <1336033446-18949-1-git-send-email-jm@lentin.co.uk>
- <20120503084825.GD13023@lunn.ch>
- <alpine.DEB.2.00.1205031101390.23719@marmot.wormnet.eu>
-Message-ID: <20120503102655.GB14012@lunn.ch>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 3 May 2012 15:42:02 +0530
+Subject: [PATCH V2 0/5] pinctrl: SPEAr Updates
+Message-ID: <cover.1336039716.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >If you look at the Kirkwood/Orion5x, most systems that could use this
-> >are currently not DT enabled. So i think it needs old style
-> >platform_data as well as OF.
-> 
-> I wondered about this, but if you have board support code instead of
-> devicetree, would you have any reasons to use this driver over just
-> implementing the pm_power_off as most of them currently do? Seemed
-> to me that it was better to not complicate the code with
-> platform_data when it's practical use wasn't that high.
+Hi Linus,
 
-I just see that we have the same board support code repeated X
-times. We can replace it with a platform device structures. We can
-also add a function to create these structures, so in the end, we have
-a one-liner in the board support code.
+This patchset mainly focuses on providing support to configure SPEAr pads as
+gpios. For this i have added a gpiolib based driver and few changes in other
+SPEAr pinctrl drivers.
 
-	  Andrew
+It also contains minor fixes.
+
+V1->V2:
+- Passing gpio node via DT. Patch for this support in gpiolib is
+  gpiolib: Add of_get_gpio_chip_by_phandle() helper
+- Other minor fixes
+
+Viresh Kumar (5):
+  pinctrl: SPEAr: Don't set all non muxreg bits on pinctrl_disable
+  pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
+  pinctrl: SPEAr: Add plgpio driver
+  pinctrl: SPEAr: Add gpio ranges support
+  SPEAr: Add plgpio node in device tree dtsi files
+
+ arch/arm/boot/dts/spear1310-evb.dts       |    4 +
+ arch/arm/boot/dts/spear1310.dtsi          |   22 +
+ arch/arm/boot/dts/spear1340-evb.dts       |    4 +
+ arch/arm/boot/dts/spear1340.dtsi          |   21 +
+ arch/arm/boot/dts/spear310-evb.dts        |    4 +
+ arch/arm/boot/dts/spear310.dtsi           |   15 +
+ arch/arm/boot/dts/spear320-evb.dts        |    4 +
+ arch/arm/boot/dts/spear320.dtsi           |   16 +
+ drivers/pinctrl/spear/Kconfig             |   11 +
+ drivers/pinctrl/spear/Makefile            |    1 +
+ drivers/pinctrl/spear/pinctrl-plgpio.c    |  738 ++++++++++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear.c     |  110 ++++-
+ drivers/pinctrl/spear/pinctrl-spear.h     |   15 +
+ drivers/pinctrl/spear/pinctrl-spear1310.c |  812 ++++++++++++++++++++++++++++-
+ drivers/pinctrl/spear/pinctrl-spear1340.c |    8 +
+ drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +
+ drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +
+ drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +
+ drivers/pinctrl/spear/pinctrl-spear3xx.c  |  120 +++++
+ 19 files changed, 1898 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/pinctrl/spear/pinctrl-plgpio.c
+
+-- 
+1.7.9
