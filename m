@@ -1,40 +1,199 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 3 May 2012 08:06:42 +0000
-Subject: [PATCH-V6 3/3] ARM: OMAP: Make OMAP clocksource source
- selection using kernel param
-In-Reply-To: <87mx5qfhb4.fsf@ti.com>
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <1335967014-11937-4-git-send-email-hvaibhav@ti.com> <87mx5qfhb4.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA12328@DBDE01.ent.ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 3 May 2012 08:23:51 +0000
+Subject: [PATCH v4 01/39] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <4FA022FC.5040703@ti.com>
+References: <cover.1335874494.git.afzal@ti.com>
+ <363273a9ef82d6836197929157aa9a8eb8f5171a.1335874494.git.afzal@ti.com>
+ <4FA022FC.5040703@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E982967@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 02:09:59, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> >
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> > Cc: Ming Lei <tom.leiming@gmail.com>
-> 
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> Tested-by: Kevin Hilman <khilman@ti.com>
-> 
-> tested on OMAP3530/Overo with default 32k timer and cmdline override for
-> GPtimer.
-> 
+Hi Jon,
 
-Thanks Kevin, I have submitted V7 version of this series with your ack and 
-tested-by.
+On Tue, May 01, 2012 at 23:23:00, Hunter, Jon wrote:
+> Hi Afzal,
+> 
+> Looks good! Some minor comments ...
 
-Tony,
-Can you queue it for v3.5?
+Thanks
 
-Thanks,
-Vaibhav
+> > +#define	GPMC_WAITPIN_IDX0			0x0
+> > +#define	GPMC_WAITPIN_IDX1			0x1
+> > +#define	GPMC_WAITPIN_IDX2			0x2
+> > +#define	GPMC_WAITPIN_IDX3			0x3
+> > +#define	GPMC_NR_WAITPIN				0x4
+> 
+> How about an enum here? Also OMAP4 only have 3 wait pins and so the
+> number is device dependent.
+
+Ok
+
+> 
+> >  #define GPMC_MEM_START		0x00000000
+> >  #define GPMC_MEM_END		0x3FFFFFFF
+> >  #define BOOT_ROM_SPACE		0x100000	/* 1MB */
+> > @@ -64,6 +106,55 @@
+> >  #define ENABLE_PREFETCH		(0x1 << 7)
+> >  #define DMA_MPU_MODE		2
+> >  
+> > +#define	DRIVER_NAME	"omap-gpmc"
+> > +
+> > +#define	GPMC_NR_IRQ		2
+> 
+> Why has this been changed to 2? It was 6 in the previous version. As we
+> discussed before the number of IRQs should be detected based upon GPMC
+> IP version.
+
+As mentioned in the cover letter,
+
+"Additional features that currently boards in mainline does not make
+use of like, waitpin interrupt handling, changes to leverage revision
+6 IP differences has not been incorporated."
+
+Priority in this series is to convert into a driver, get all boards working
+on mainline. Once all boards are working with gpmc driver, these features
+which are not required for currently supported boards can be added later.
+
+> > +struct gpmc_device {
+> > +	char			*name;
+> > +	int			id;
+> > +	void			*pdata;
+> > +	unsigned		pdata_size;
+> > +	struct resource		*per_res;
+> > +	unsigned		per_res_cnt;
+> > +	struct resource		*gpmc_res;
+> > +	unsigned		gpmc_res_cnt;
+> > +	bool			have_waitpin;
+> > +	unsigned		waitpin;
+> > +	int			waitpin_polarity;
+> 
+> I think that it make more sense to have the wait-pin information part of
+> the gpmc_cs_data structure for the following reasons ...
+
+Waitpin information is indeed a part of cs as far as boards are concerned,
+it is only that it gets propogated to device
+
+> 
+> 1. If a device can use multiple CS, then it could use multiple wait signals.
+> 2. Eventually, all board information needs to move to device tree. By
+> having it in the pdata it will be easier to migrate to device tree.
+> 
+> It may be nice to have "have_waitpin" be an integer too, that indicates
+> if wait is used for both read and write or just one or the other.
+> 
+> Also, any reason why waitpin_polarity is an int? I see you define LOW as
+> -1, but I not sure why LOW cannot be 0 as 0 is programmed into the
+> register for an active low wait signal.
+
+Only intention is not to alter default waitpin polarity value, i.e. if
+any board does make use of it w/o knowledge of Kernel, I don't want to
+break it, there may be an argument saying that the board code is buggy,
+while if some board does so, it is, but don't want to break working one.
+
+Here unless user explicitly set the flag, it does nothing on polarity
+
+> > +	if (idx != ~0x0) {
+> > +		if (gd->have_waitpin) {
+> > +			if (gd->waitpin != idx ||
+> > +					gd->waitpin_polarity != polarity) {
+> > +				dev_err(gpmc->dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
+> > +					gd->waitpin, gd->waitpin_polarity,
+> > +					gd->name, gd->id);
+> > +				return -EBUSY;
+> > +			}
+> > +		} else {
+> > +			gd->have_waitpin = true;
+> > +			gd->waitpin = idx;
+> > +			gd->waitpin_polarity = polarity;
+> > +		}
+> 
+> I am not sure about the above code. What happens if a device has
+> multiple CS signals and uses multiple wait signals?
+> 
+> I am also not sure why gpmc_setup_cs_waitpin and gpmc_setup_waitpin
+> cannot be combined. I think that it would be a fair assumption to make
+> that anyone using the waitpin does so inconjunction with the CS (I think
+> that they would have too).
+> 
+> However, if there is a reason for splitting it up this way please
+> explain why.
+
+Initially it was done per CS, the problem happened while trying to
+convert tusb6010. It had multiple CS, but using same waitpin. Problem
+with incorporating this onto CS is we have to sacrifice on wait pin
+conflict prevention capability. The code now handles case of wait pin
+conflict per device, the code can be extended to have multiple
+wait pin per device also. But I prefer to defer it to later, not as
+part of this series, as this feature what you asking for is not required
+for any of the existing boards. I can add it in this series if there is
+a strong opinion in the community for the same in this series.
+
+Policy that is being followed here is first sit, then straighten legs, ;)
+
+> > +static int gpmc_setup_cs_nonres(struct gpmc *gpmc,
+> > +			struct gpmc_device *gd, struct gpmc_cs_data *cs)
+> 
+> The name of this function is not 100% clear to me. What do you mean by
+> "nonres"?
+
+It means anything other than resources like memory & irq, happened for
+want of better name, if you have one, name it, will put it.
+
+> > +int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *cs)
+> 
+> What scenario is this function used in? May be worth adding a comment
+> about the function.
+
+Ok, it was required for OneNAND, as it needs to reconfigure
+
+> > +	for (i = 0, n = gdp->num_cs, cs = gdp->cs_data;
+> > +				i < gdp->num_cs; i++, cs++)
+> > +		n += hweight32(cs->irq_config);
+> 
+> As you know I am not a fan of these overloaded for-loops as I find them
+> hard to read ;-)
+> 
+> Why not ...
+> 
+> n = gdp->num_cs;
+> cs = gdp->cs_data;
+
+
+Well, you also know that I am big fan of it; difference of opinion,
+my preference is to keep loop control statements together with "for",
+unless there is a cry from community that it should not be this way.
+I believe that it is not that much unreadable.
+
+> > +	for (i = 0, gdq = gp->device_pdata, gd = gpmc->device;
+> > +			(i < gp->num_device) && (*gdq); i++, gdq++) {
+> 
+> You have num_devices now and so do you really need the "&& (*gdq)"?
+> Seems redundant.
+
+num_device is something that I never wanted to add, was happy with,
+NULL entry termination, only because of your repeated comments,
+I added this. And this additional check now prevents NULL dereference.
+
+> > +	gpmc_setup_writeprotect(gpmc);
+> 
+> Write protect is a pin and there is only one. Like the waitpins and CS
+> signals this needs to be associated with a device. It would make sense
+> that this is associated with the cs data.
+
+As far as platform are concerned, it is associated with cs, it is only
+that while configuring CS, it is propagated such that it is done once.
+
+
+> > +#define	GPMC_READTYPE_ASYNC		BIT(30)
+> > +#define	GPMC_WRITETYPE_ASYNC		BIT(31)
+> > +
+> 
+> Please keep in mind that eventually this has to all be moved into device
+> tree and so at that point these configuration flags will have to be
+> re-worked. However, just a FYI.
+
+On device tree matters, my mind is next to blank, thanks for mentioning it.
+
+Regards
+Afzal
