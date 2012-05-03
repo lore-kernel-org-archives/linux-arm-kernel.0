@@ -1,44 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  3 May 2012 18:42:58 +0100
-Subject: [PATCH 4/6] ARM: entry: don't bother with syscall tracing on
- ret_from_fork path
+Date: Thu,  3 May 2012 18:42:59 +0100
+Subject: [PATCH 5/6] ARM: audit: move syscall auditing until after ptrace
+ SIGTRAP handling
 In-Reply-To: <1336066980-24000-1-git-send-email-will.deacon@arm.com>
 References: <1336066980-24000-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1336066980-24000-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1336066980-24000-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ret_from_fork is setup for a freshly spawned child task via copy_thread,
-called from copy_process. The latter function clears TIF_SYSCALL_TRACE
-and also resets the child task's audit_context to NULL, meaning that
-there is little point invoking the system call tracing routines.
-Furthermore, getting hold of the syscall number is a complete pain and
-it looks like the current code doesn't even bother.
+When auditing system calls on ARM, the audit code is called before
+notifying the parent process in the case that the current task is being
+ptraced. At this point, the parent (debugger) may choose to change the
+system call being issued via the SET_SYSCALL ptrace request, causing
+the wrong system call to be reported to the audit tools.
 
-This patch removes the syscall tracing checks from ret_from_fork.
+This patch moves the audit calls after the ptrace SIGTRAP handling code
+in the syscall tracing implementation.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/entry-common.S |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/kernel/ptrace.c |   20 +++++++++++---------
+ 1 files changed, 11 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 54ee265..93962cc 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -91,13 +91,7 @@ ENDPROC(ret_to_user)
- ENTRY(ret_from_fork)
- 	bl	schedule_tail
- 	get_thread_info tsk
--	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
- 	mov	why, #1
--	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
--	beq	ret_slow_syscall
--	mov	r1, sp
--	mov	r0, #1				@ trace exit [IP = 1]
--	bl	syscall_trace
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 9650c14..e7d687e 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -910,16 +910,10 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ {
+ 	unsigned long ip;
  
+-	if (why)
+-		audit_syscall_exit(regs);
+-	else
+-		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
+-				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+-
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-		return scno;
++		goto out_no_trace;
+ 	if (!(current->ptrace & PT_PTRACED))
+-		return scno;
++		goto out_no_trace;
+ 
+ 	current_thread_info()->syscall = scno;
+ 
+@@ -943,7 +937,15 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 		send_sig(current->exit_code, current, 1);
+ 		current->exit_code = 0;
+ 	}
++
+ 	regs->ARM_ip = ip;
++	scno = current_thread_info()->syscall;
+ 
+-	return current_thread_info()->syscall;
++out_no_trace:
++	if (why)
++		audit_syscall_exit(regs);
++	else
++		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
++				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
++	return scno;
+ }
 -- 
 1.7.4.1
