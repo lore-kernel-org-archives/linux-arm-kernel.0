@@ -1,31 +1,19 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 3 May 2012 13:11:03 +0200
-Subject: [PATCH 1/2] SPEAr: Add SMI NOR partition info in dts files
-In-Reply-To: <201205031102.48116.arnd@arndb.de>
-References: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
- <201205031102.48116.arnd@arndb.de>
-Message-ID: <201205031311.03475.sr@denx.de>
+From: jemmajones81@yahoo.co.uk (Jemma Jones)
+Date: Thu, 3 May 2012 12:56:39 +0100 (BST)
+Subject: Development tree for Cortex-A15?
+Message-ID: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 May 2012 13:02:47 Arnd Bergmann wrote:
-> On Thursday 03 May 2012, Viresh Kumar wrote:
-> > This patch adds NOR partitions in all SPEAr boards dts files.
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> > ---
-> > Arnd,
-> > 
-> > I will have it in my pull request for SPEAr13xx. These mails are only for
-> > review.
-> 
-> Both patches look good to me.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Looks good to me too:
 
-Acked-by: Stefan Roese <sr@denx.de>
+Hi, I'm looking for the latest KVM-enabled developer version of the Linux kernel for ARM on the Versatile Express board with the Cortex-A15 CPU.?
 
-Thanks,
-Stefan
+I have pulled from these two trees
+
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+http://git.kernel.org/?p=linux/kernel/git/maz/arm-platforms.git;a=summary
+
+But it seems the 2nd one is more up-to-date with KVM enablement while it doesn't have any support for the A15 VE board? And the 1st one doesn't support KVM on ARM with the ARMv7 virtualization extensions?
+
+Any help would be appreciated.
