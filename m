@@ -1,23 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 May 2012 22:23:30 +0800
-Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
-In-Reply-To: <CAMiH66EBO-MHXBb1eB4NMAJo6nPN47_42jYNGUGc=GC7oejPWQ@mail.gmail.com>
-References: <1335939209-15625-1-git-send-email-b32955@freescale.com>
- <20120502144008.GF2194@S2101-09.ap.freescale.net>
- <1336042485.13013.41.camel@sauron.fi.intel.com>
- <CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>
- <CAMiH66EBO-MHXBb1eB4NMAJo6nPN47_42jYNGUGc=GC7oejPWQ@mail.gmail.com>
-Message-ID: <CAAQ0ZWSqF9x7PSqS_14CscdU+RvcYg8pCFZUqLtDAq8uS_k=yw@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 3 May 2012 23:23:51 +0900
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120503141853.GC897@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503141853.GC897@n2100.arm.linux.org.uk>
+Message-ID: <CANqRtoRLmqLWfUYZRy8yuPWXybj0=RGxmYDEfuH+kqjT_009Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2012 22:14, Huang Shijie <shijie8@gmail.com> wrote:
-> It's better that this patch is merged by l2-mtd, because this patch
-> depends on another patch which is
-> on the l2-mtd now.
+On Thu, May 3, 2012 at 11:18 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+>> My feeling is that we should just mandate DT booting for multiplatform
+>> kernels, because it significantly reduces the combinatorial space
+>> at compile time, avoids a lot of legacy board files that we cannot
+>> test anyway, reduces the total kernel size and gives an incentive
+>> for people to move forward to DT with their existing boards.
 >
-But you patch has to be based on mxs-dma DT support to function.
-Maybe we should wait for the next merge window?
+> On this point, I strongly object, especially as I'm one who uses the
+> existing non-DT multiplatform support extensively. ?It's really not
+> a problem for what you're trying to achieve.
 
-Regards,
-Shawn
+Perhaps not so surprisingly, but I'm with Russell on this one.
+
+I'd like our work-in-progress DT support to coexist with all non-DT platforms.
+
+Thanks,
+
+/ magnus
