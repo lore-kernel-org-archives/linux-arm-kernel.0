@@ -1,34 +1,45 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 3 May 2012 08:42:11 +0000
-Subject: [PATCH v4 04/39] ARM: OMAP2+: gpmc: Acquire NAND CS value
-In-Reply-To: <4FA05292.7030902@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <10220de398d22fad5de783d8f58fc55ebac85338.1335874494.git.afzal@ti.com>
- <4FA05292.7030902@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9829B0@DBDE01.ent.ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 3 May 2012 10:48:25 +0200
+Subject: [PATCH] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <1336033446-18949-1-git-send-email-jm@lentin.co.uk>
+References: <20120501195603.GW25584@lunn.ch>
+ <1336033446-18949-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120503084825.GD13023@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, May 02, 2012 at 02:46:02, Hunter, Jon wrote:
-> > Some boards depend on bootloader to update chip select value for NAND.
-> > It is felt that Kernel should not depend on bootloader to get CS, as
-> > for a particular board CS is hardwired and is fixed, hence this can
-> > directly be updated in Kernel. But as CS value for boards that depend
-> > on this behaviour is not available, educate gpmc driver to acquire
-> > chip select value for NAND. this ideally should be removed once CS
-> > for those boards are available.
+> The main issue is where to put it. I'm not convinced that drivers/gpio
+> is an appropriate home, however drivers/power and drivers/hwmon (where
+> drivers with similar purpose live) contain frameworks this is not part
+> of. drivers/mfd has some modules that can power off, but this is hardly
+> multifunction :) Could also give in and use drivers/misc.
 > 
-> Do you know how many boards require this? If so which are those boards?
+> Feedback appreciated.
 
-devkit8000, beagle board, omap3touchbook, overo.
+Humm, sorry, no idea...
 
-Beagle board, found out to be zero.
+> +static int __devinit gpio_poweroff_probe(struct platform_device *pdev)
+> +{
+> +	enum of_gpio_flags flags;
+> +
+> +	gpio_num = of_get_gpio_flags(pdev->dev.of_node, 0, &flags);
+> +	if (gpio_num < 0) {
+> +		pr_err("%s: Could not get GPIO configuration: %d",
+> +		       __func__, gpio_num);
+> +		return -ENODEV;
+> +	}
+> +	gpio_active_low = flags & OF_GPIO_ACTIVE_LOW;
 
-> Should this code be marked with a FIXME?
+If you look at the Kirkwood/Orion5x, most systems that could use this
+are currently not DT enabled. So i think it needs old style
+platform_data as well as OF.
 
-Will let Tony decide it.
+> +static int __devexit gpio_poweroff_remove(struct platform_device *pdev)
+> +{
+> +	if (gpio_num)
+> +		gpio_free(gpio_num);
 
-Regards
-Afzal
+GPIO 0 is a valid GPIO number. You should not need this check, since
+if the probe function succeeded, you have a valid GPIO.
+
+    Andrew
