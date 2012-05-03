@@ -1,123 +1,181 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 03 May 2012 16:18:48 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <20120503151253.GE897@n2100.arm.linux.org.uk>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
- <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
-Message-ID: <4FA2A1D8.3070901@linaro.org>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Thu, 3 May 2012 17:25:31 +0200
+Subject: [PATCH v5] MTD: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <1336048655-29486-1-git-send-email-josh.wu@atmel.com>
+References: <1336048655-29486-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20120503152531.GA2261@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/12 16:12, Russell King - ARM Linux wrote:
-> On Thu, May 03, 2012 at 04:03:34PM +0100, Lee Jones wrote:
->> +#ifdef CONFIG_OF
->> +static void mmci_dt_populate_generic_pdata(struct device_node *np,
->> +					struct mmci_platform_data *pdata)
->> +{
->> +	int bus_width = 0;
->> +
->> +	of_property_read_u32(np, "wp-gpios",&pdata->gpio_wp);
->> +	if (!pdata->gpio_wp)
->> +		pdata->gpio_wp = -1;
->> +
->> +	of_property_read_u32(np, "cd-gpios",&pdata->gpio_cd);
->> +	if (!pdata->gpio_cd)
->> +		pdata->gpio_cd = -1;
->> +
->> +	if (of_get_property(np, "cd-inverted", NULL))
->> +		pdata->cd_invert = true;
->> +	else
->> +		pdata->cd_invert = false;
->> +
->> +	of_property_read_u32(np, "max-frequency",&pdata->f_max);
->> +	if (!pdata->f_max)
->> +		pr_warn("%s has no 'max-frequency' property\n", np->full_name);
->> +
->> +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
->> +		pdata->capabilities |= MMC_CAP_MMC_HIGHSPEED;
->> +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
->> +		pdata->capabilities |= MMC_CAP_SD_HIGHSPEED;
->> +
->> +	of_property_read_u32(np, "bus-width",&bus_width);
->> +	switch (bus_width) {
->> +	case 0 :
->> +		/* No bus-width supplied. */
->> +		break;
->> +	case 4 :
->> +		pdata->capabilities |= MMC_CAP_4_BIT_DATA;
->> +		break;
->> +	case 8 :
->> +		pdata->capabilities |= MMC_CAP_8_BIT_DATA;
->> +		break;
->> +	default :
->> +		pr_warn("%s: Unsupported bus width\n", np->full_name);
->> +	}
->> +}
->> +#endif
->> +
->>   static int __devinit mmci_probe(struct amba_device *dev,
->>   	const struct amba_id *id)
->>   {
->>   	struct mmci_platform_data *plat = dev->dev.platform_data;
->> +	struct device_node *np = dev->dev.of_node;
->>   	struct variant_data *variant = id->data;
->>   	struct mmci_host *host;
->>   	struct mmc_host *mmc;
->> -	int ret;
->> +	int ret, freeplat = 0;
->> +
->> +	/* Must have platform data or Device Tree. */
->> +	if (!plat&&  !np) {
->> +		dev_err(&dev->dev, "No plat data or DT found\n");
->> +		return -EINVAL;
->> +	}
->>
->> -	/* must have platform data */
->>   	if (!plat) {
->> -		ret = -EINVAL;
->> -		goto out;
->> +		plat = kzalloc(sizeof(*plat), GFP_KERNEL);
->
-> I think this will leak memory - consider what happens if the driver gets
-> bound and unbound from the same device a number of times.
->
-> How about using devm_kzalloc() instead, so that when probe fails or the
-> driver is unbound, the memory is automatically freed?  No need for that
-> freeplat variable either...
+On Thu, May 03, 2012 at 01:37:35PM +0100, Josh Wu wrote:
+> The Programmable Multibit ECC (PMECC) controller is a programmable binary
+> BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This controller
+> can be used to support both SLC and MLC NAND Flash devices. It supports to
+> generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector of data.
+> 
+> To use this driver, the user needs to pass in the correction capability and
+> the sector size.
+> 
+> This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with JFFS2,
+> YAFFS2, UBIFS and mtd-utils.
+> 
+(...)
 
-Makes sense. Give me a few moments.
+Hello Josh,
+Few comments below,
 
->> +		if (!plat)
->> +			return -ENOMEM;
->> +		freeplat = 1;
->>   	}
->>
->> +	if (np)
->> +		mmci_dt_populate_generic_pdata(np, plat);
->> +
->>   	ret = amba_request_regions(dev, DRIVER_NAME);
->>   	if (ret)
->>   		goto out;
->> @@ -1448,6 +1505,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
->>    rel_regions:
->>   	amba_release_regions(dev);
->>    out:
->> +	if (freeplat)
->> +		kfree(plat);
->> +
->>   	return ret;
->>   }
->>
->> --
->> 1.7.9.5
+> + * =====================       ================        =================
+> + *                2-bits                 4-bytes                  4-bytes
+> + *                4-bits                 7-bytes                  7-bytes
+> + *                8-bits                13-bytes                 14-bytes
+> + *               12-bits                20-bytes                 21-bytes
+> + *               24-bits                39-bytes                 42-bytes
+> + *
+> + */
+> +static const int ecc_bytes_table[5][2] = {
+> +       {4, 4}, {7, 7}, {13, 14}, {20, 21}, {39, 42}
+>  };
+> 
+>  static int cpu_has_dma(void)
+> @@ -288,6 +333,699 @@ static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
+>  }
+> 
+>  /*
+> + * Return number of ecc bytes per sector according to sector size and
+> + * correction capability
+> + */
+> +static int pmecc_get_ecc_bytes(int cap, int sector_size)
+> +{
+> +       int i, j;
+> +
+> +       switch (cap) {
+> +       case 2:
+> +               i = 0;
+> +               break;
+> +       case 4:
+> +               i = 1;
+> +               break;
+> +       case 8:
+> +               i = 2;
+> +               break;
+> +       case 12:
+> +               i = 3;
+> +               break;
+> +       case 24:
+> +               i = 4;
+> +               break;
+> +       default:
+> +               BUG();
+> +       }
+> +
+> +       switch (sector_size) {
+> +       case 512:
+> +               j = 0;
+> +               break;
+> +       case 1024:
+> +               j = 1;
+> +               break;
+> +       default:
+> +               BUG();
+> +       }
+> +
+> +       return ecc_bytes_table[i][j];
 
+You could get rid of your table and simplify your function:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+      int m;
+
+      m = 12+sector_size/512;
+      return (m*cap+7)/8;
+
+> +static void __iomem *pmecc_get_alpha_to(struct atmel_nand_host *host)
+> +{
+> +       void __iomem *p;
+> +
+> +       switch (host->sector_size) {
+> +       case 512:
+> +               p = host->rom_base + AT_PMECC_LOOKUP_TABLE_OFFSET_512 +
+> +                       AT_PMECC_LOOKUP_TABLE_SIZE_512 * sizeof(int16_t);
+> +               break;
+> +       case 1024:
+> +               p = host->rom_base + AT_PMECC_LOOKUP_TABLE_OFFSET_1024 +
+> +                       AT_PMECC_LOOKUP_TABLE_SIZE_1024 * sizeof(int16_t);
+> +               break;
+
+Just being curious here: it looks like your hardware provides hardcoded Galois field lookup tables.
+Do you access these through a cached mapping ? If not, maybe your code would be faster with ram-based tables ?
+
+> +static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
+> +       u8 *ecc)
+> +{
+> +       int                     i, err_nbr;
+> +       uint8_t                 *buf_pos;
+> +       int                     eccbytes;
+> +       struct nand_chip        *nand_chip = mtd->priv;
+> +       struct atmel_nand_host  *host = nand_chip->priv;
+> +
+> +       eccbytes = nand_chip->ecc.bytes;
+> +       for (i = 0; i < eccbytes; i++)
+> +               if (ecc[i] != 0xff)
+> +                       goto normal_check;
+> +       /* Erased page, return OK */
+> +       return 0;
+
+Here, you work around the fact that an erased page does not have a valid ecc.
+If an erased page has a bitflip in the ecc bytes region, then your code will jump
+to 'normal_check' and fail (because the page is erased).
+On 4-bit and 8-bit NAND devices, bitflips are very common and the risk of such a failure
+is quite high, especially with a large number of ecc bytes.
+
+There is a cleaner (and faster) workaround: just pretend your HW generates an extra ecc
+byte, always equal to 0. Assume you put this extra byte at the beginning of your ecc layout.
+Now, upon reading, you just need to do something like:
+
+       eccbytes = nand_chip->ecc.bytes;
+       /*
+        * first ecc byte should be zero if page has been programmed,
+        * but tolerate up to 4 bitflips in the same byte (very unlikely)
+        */
+       if (hweight_long(ecc[0]) <= 4)
+       	  goto normal_check;
+
+       /* Erased page, return OK */
+       return 0;
+
+On an erased page, even with bitflips, it is _very_ unlikely that ecc[0] would have
+less than 4 bits set out of 8.
+
+Regardless of the workaround, skipping ecc check on an erased page still has a drawback: UBIFS
+does not like to find uncorrected bitflips in erased pages.
+
++static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
++               struct nand_chip *chip, uint8_t *buf, int32_t page)
++{
++       uint32_t                stat;
++       int                     eccsize = chip->ecc.size;
++       uint8_t                 *oob = chip->oob_poi;
++       struct atmel_nand_host  *host = chip->priv;
++       uint32_t                *eccpos = chip->ecc.layout->eccpos;
++
++       pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
++       pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
++       pmecc_writel(host->ecc, CFG, (pmecc_readl(host->ecc, CFG)
++               & ~PMECC_CFG_WRITE_OP) | PMECC_CFG_AUTO_ENABLE);
++
++       pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
++       pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
++
++       chip->read_buf(mtd, buf, eccsize);
++       chip->read_buf(mtd, oob, mtd->oobsize);
++
++       while ((pmecc_readl(host->ecc, SR) & PMECC_SR_BUSY))
++               cpu_relax();
+
+Here it seems to me you feed the hardware ecc engine with the entire page (data+oob).
+Is it possible to feed it with data+oob-eccbytes, i.e. leave out the ecc bytes from the computation ?
+I'm asking this because it probably would allow correcting bitflips in erased pages (if you ever care about this :).
+
+BR,
+--
+Ivan
