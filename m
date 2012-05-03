@@ -1,33 +1,40 @@
 From: r.sricharan@ti.com (R Sricharan)
-Date: Thu, 3 May 2012 12:56:15 +0530
-Subject: [PATCH 06/13] ARM: OMAP5: gpmc: Update gpmc_init()
+Date: Thu, 3 May 2012 12:56:14 +0530
+Subject: [PATCH 05/13] TEMP: ARM: OMAP5: Update the base address of the
+ 32k-counter.
 In-Reply-To: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1336029982-31898-7-git-send-email-r.sricharan@ti.com>
+Message-ID: <1336029982-31898-6-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC module is the same as in OMAP4.
-Just update the base address and irq number.
+Not for merge.
+
+Just update the base address of the counter for
+OMAP5 soc.
+
+This patch will no longer be needed after rebasing on top of below
+series from Vaibhav Hiremath <hvaibhav@ti.com>.
+
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67166.html
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/counter_32k.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 00d5108..2f8f915 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -713,7 +713,8 @@ static int __init gpmc_init(void)
- 		ck = "gpmc_fck";
- 		l = OMAP34XX_GPMC_BASE;
- 		gpmc_irq = INT_34XX_GPMC_IRQ;
--	} else if (cpu_is_omap44xx()) {
-+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
-+		/* Base address and irq number are same for OMAP4/5 */
- 		ck = "gpmc_ck";
- 		l = OMAP44XX_GPMC_BASE;
- 		gpmc_irq = OMAP44XX_IRQ_GPMC;
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 5068fe5..5a48ec9 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -90,6 +90,8 @@ int __init omap_init_clocksource_32k(void)
+ 			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+ 		else if (cpu_is_omap44xx())
+ 			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
++		else if (cpu_is_omap54xx())
++			pbase = OMAP54XX_32KSYNCT_BASE + 0x30;
+ 		else
+ 			return -ENODEV;
+ 
 -- 
 1.7.1
