@@ -1,30 +1,60 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu,  3 May 2012 11:37:12 +0200
-Subject: [PATCH] Add missing call to uart_update_timeout()
-Message-ID: <1336037832-16060-1-git-send-email-LW@KARO-electronics.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 3 May 2012 15:20:31 +0530
+Subject: [PATCH V3 4/8] SPEAr: clk: Add Auxiliary Synthesizer clock
+In-Reply-To: <73afd5e86c8311a04c5d2d21419e3eaa45eafec4.1335249846.git.viresh.kumar@st.com>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <73afd5e86c8311a04c5d2d21419e3eaa45eafec4.1335249846.git.viresh.kumar@st.com>
+Message-ID: <4FA254E7.2050806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a problem reported here:
-http://article.gmane.org/gmane.linux.ports.arm.kernel/155242/match=auart
+On 4/24/2012 12:20 PM, Viresh KUMAR wrote:
+> All SPEAr SoC's contain Auxiliary Synthesizers. Their Fout is derived based on
+> values of eq, x and y.
+> 
+> Fout from synthesizer can be given from two equations:
+> Fout1 = (Fin * X/Y)/2		EQ1
+> Fout2 = Fin * X/Y		EQ2
+> 
+> This patch adds in support for this type of clock.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+Sorry for another fixup. Required due to Saravana's patch:
+
 ---
- drivers/tty/serial/mxs-auart.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/clk/spear/clk-aux-synth.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 55fd362..039c054 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -369,6 +369,8 @@ static void mxs_auart_settermios(struct uart_port *u,
+diff --git a/drivers/clk/spear/clk-aux-synth.c b/drivers/clk/spear/clk-aux-synth.c
+index abb1747..af34074 100644
+--- a/drivers/clk/spear/clk-aux-synth.c
++++ b/drivers/clk/spear/clk-aux-synth.c
+@@ -140,6 +140,7 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
+                u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk)
+ {
+        struct clk_aux *aux;
++       struct clk_init_data init;
+        struct clk *clk;
  
- 	writel(ctrl, u->membase + AUART_LINECTRL);
- 	writel(ctrl2, u->membase + AUART_CTRL2);
+        if (!aux_name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
+@@ -163,9 +164,15 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
+        aux->rtbl = rtbl;
+        aux->rtbl_cnt = rtbl_cnt;
+        aux->lock = lock;
++       aux->hw.init = &init;
+ 
+-       clk = clk_register(NULL, aux_name, &clk_aux_ops, &aux->hw, &parent_name,
+-                       1, flags);
++       init.name = aux_name;
++       init.ops = &clk_aux_ops;
++       init.flags = flags;
++       init.parent_names = &parent_name;
++       init.num_parents = 1;
 +
-+	uart_update_timeout(u, termios->c_cflag, baud);
- }
++       clk = clk_register(NULL, &aux->hw);
+        if (IS_ERR_OR_NULL(clk))
+                goto free_aux;
  
- static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
 -- 
-1.7.2.5
+viresh
