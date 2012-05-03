@@ -1,80 +1,47 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 4 May 2012 01:03:08 +0200
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20120503230308.GA13016@glitch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 04 May 2012 01:03:32 +0200
+Subject: [PATCH 17/18][V3] ARM: OMAP3/4: consolidate cpuidle Makefile
+In-Reply-To: <87wr4tj96h.fsf@ti.com>
+References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
+ <1335276339-11135-18-git-send-email-daniel.lezcano@linaro.org>
+ <87wr4tj96h.fsf@ti.com>
+Message-ID: <4FA30EC4.6090405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2012 at 10:58:56PM -0700, Saravana Kannan wrote:
+On 05/03/2012 10:34 PM, Kevin Hilman wrote:
+> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
 >
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 90627e4..8ea11b4 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -167,6 +167,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
->  {
->  	struct clk_divider *div;
->  	struct clk *clk;
-> +	struct clk_init_data init;
->  
->  	/* allocate the divider */
->  	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
-> @@ -175,19 +176,22 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
->  		return ERR_PTR(-ENOMEM);
->  	}
->  
-> +	init.name = name;
-> +	init.ops = &clk_divider_ops;
-> +	init.flags = flags;
-> +	init.parent_names = (parent_name ? &parent_name: NULL);
-> +	init.num_parents = (parent_name ? 1 : 0);
-> +
->  	/* struct clk_divider assignments */
->  	div->reg = reg;
->  	div->shift = shift;
->  	div->width = width;
->  	div->flags = clk_divider_flags;
->  	div->lock = lock;
-> +	div->hw.init = &init;
->  
->  	/* register the clock */
-> -	clk = clk_register(dev, name,
-> -			&clk_divider_ops, &div->hw,
-> -			(parent_name ? &parent_name: NULL),
-> -			(parent_name ? 1 : 0),
-> -			flags);
-> +	clk = clk_register(dev, &div->hw);
->  
->  	if (IS_ERR(clk))
->  		kfree(div);
+>> Define a CPU_IDLE section in the makefile, declare the functions in
+>> the header files conforming to the kernel coding rules and remove the
+>> 'define's in the C files.
+>>
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
+>
+> This patch breaks compilation for the !CONFIG_PM case:
+>
+>     arch/arm/mach-omap2/built-in.o: In function `__omap3_enter_idle':
+>     /work/kernel/omap/pm/arch/arm/mach-omap2/cpuidle34xx.c:121: undefined reference to `omap_sram_idle'
+>
+> Since you moved this stuff out of a CONFIG_PM conditional part of the
+> Makefile, it broke because pm34xx.c is still compiled conditionally on
+> CONFIG_PM.
+>
+> When changing Makefile/Kconfig dependencies like this, please
+> be sure to at least compile test with the various options
+> enabled/disabled.
+>
+> For now, I've dropped this patch from the series.  Feel free to
+> update/retest/resend since the idea is fine.
 
-I would prefer to rip the parent _settings_ configuration out of
-clk_register(). It's optional right? And passing a single parent is a
-common case.
+Ok, I will update it with the various options.
 
-Three cases:
+   -- Daniel
 
-  1) one parent:
-     __clk_register_parent(clk, parent_name);
-     clk_register(dev, name, &ops, flags);
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-  2) many parents:
-     __clk_register_parents(clk, parent_names, num_parents);
-     clk_register(dev, name, &ops, flags);
-
-  3) no parents:
-     clk_register(dev, name, &ops, flags);
-
-You may also want to move the whole parent initialization into
-__clk_register_parents() and call it after clk_register(), it would
-simplify some error paths.
-
-This pattern could be used also with other common clocks registration
-functions (fixed rate, divider, mux, etc) that may have complex
-initializations and/or optional parameters that cannot go all on the
-same function call.
-
-cheers,
-Domenico
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
