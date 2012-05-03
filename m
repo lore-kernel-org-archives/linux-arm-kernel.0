@@ -1,56 +1,64 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 3 May 2012 05:07:42 +0000
-Subject: [PATCH-V6 0/3] ARM: OMAP: Make OMAP clocksource source
- selection runtime
-In-Reply-To: <4FA19162.5040102@ti.com>
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <4FA19162.5040102@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA11F12@DBDE01.ent.ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 3 May 2012 11:02:41 +0530
+Subject: [PATCH V3 2/8] clk: add a fixed factor clock
+In-Reply-To: <20120502224108.GC18402@gmail.com>
+References: <cover.1335249846.git.viresh.kumar@st.com>
+ <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
+ <20120502094807.GE20478@pengutronix.de> <4FA120E8.5030707@st.com>
+ <20120502224108.GC18402@gmail.com>
+Message-ID: <4FA21879.9060508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 01:26:18, Hunter, Jon wrote:
-> Hi Vaibhav,
-> 
-> On 05/02/2012 08:56 AM, Vaibhav Hiremath wrote:
-> > Current OMAP code supports couple of clocksource options based
-> > on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
-> > and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
-> > 
-> > This patch series cleans up the existing 32k-sync timer implementation,
-> > movind SoC init code to respective files (mach-omap1/timer32k.c and
-> > mach-omap2/timer.c) and uses kernel parameter to override the default
-> > clocksource of "counter_32k", also in order to support some OMAP based
-> > derivative SoCs like AM33XX which doesn't have 32K sync-timer hardware IP,
-> > adds hwmod lookup for omap2+ devices, and if lookup fails then
-> > fall back to gp-timer.
-> > 
-> > if(use_gptimer_clksrc == true)
-> > 	gptimer clocksource init;
-> > else if (counter_32 init == false)
-> > 	/* Fallback to gptimer */
-> > 	gptimer clocksource init(;
-> > 
-> > With this, we should be able to support multi-omap boot
-> > including devices with/without 32k-sync timer.
-> > 
-> > This patch-series has been boot tested on AM37xEVM platform, it
-> > would be helpful if somebody help me to validate it on OMAP1/2
-> > platforms.
-> > 
-> > The patches are also available at (based on linux-omap/master) -
-> > https://github.com/hvaibhav/am335x-linux   32ksync-timer-cleanup
-> 
-> I was testing on OMAP4 and I found that the gptimer was always being set by default. I noticed that currently the HWMOD for counter_32k on OMAP4 is commented and hence was not being found. Please can you include the following with your series?
-> 
+On 5/3/2012 4:11 AM, Mike Turquette wrote:
+> I will take this patch in before sending my request to Arnd.  In your
+> patch 0/8 you ask me to take in the series, but it looks like not all of
+> the patches are going through me.  For instance patch 2/8 certainly
+> looks destined for Russell.
 
-The 32kcounter hwmod entry is already enabled in linux-omap/master branch.
+I think you only need to take this patch, i.e. 2/8.
+Others will go through Arnd directly, keeping your branch as an dependency
+branch for it.
 
-Your baseline looks pretty old to me, are you not using linux-omap/master?
-The hwmod data registration has now changed to ocp_if, and your patch still 
-use hwmod data entry.
+> After fixing up this patch can you resend a clean series which is only
+> headed for clk-next?
 
-Can you please use linux-omap/master and test it?
+So, i would be sending this patch only after applying the last fixup
+(hopefully :) ).
 
-Thanks,
-Vaibhav
+@Sascha: Please see if this patch is sufficient.
+
+---
+ drivers/clk/clk-fixed-factor.c |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 9afbdc4..8d25c2e 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -37,16 +37,15 @@ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+ {
+        struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+ 
+-       if (prate) {
++       if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
+                unsigned long best_parent;
++
+                best_parent = (rate / fix->mult) * fix->div;
+                *prate = __clk_round_rate(__clk_get_parent(hw->clk),
+                                best_parent);
+-               return (*prate / fix->div) * fix->mult;
+-       } else {
+-               return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
+-                       fix->mult;
+        }
++
++       return (*prate / fix->div) * fix->mult;
+ }
+ 
+ static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate,
+
+
+
+-- 
+viresh
