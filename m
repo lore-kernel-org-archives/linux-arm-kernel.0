@@ -1,44 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 3 May 2012 13:13:23 -0700
-Subject: [PATCH 1/1] ARM: tegra: Add Tegra Memory Controller(MC) driver
-In-Reply-To: <4FA2D0C4.4020608@wwwdotorg.org>
-References: <1336063897-12083-1-git-send-email-hdoyu@nvidia.com>
- <4FA2D0C4.4020608@wwwdotorg.org>
-Message-ID: <CAOesGMivxdDhkEoZh=LuvtKRPfgXi=8X4chEL-cJazjgeo_ONA@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 3 May 2012 13:18:58 -0700
+Subject: [PATCHv3 0/5] coupled cpuidle state support
+In-Reply-To: <201205032200.01823.rjw@sisk.pl>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+ <201204302354.41969.rjw@sisk.pl>
+ <CAMbhsRQcDDW5vWbqb1FRtvOmq6UjOjXj9MCfSt2KF9fHrcY59Q@mail.gmail.com>
+ <201205032200.01823.rjw@sisk.pl>
+Message-ID: <CAMbhsRS8D=d9aAbikosOis+Q+jMU04Oj9xaRg0jMVxtQ7nijTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 3, 2012 at 11:39 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/03/2012 10:51 AM, Hiroshi DOYU wrote:
->> Tegra Memory Controller(MC) driver for Tegra20/30.
->> Added to support MC General interrupts, mainly for IOMMU.
+On Thu, May 3, 2012 at 1:00 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+<snip>
+> There are two distinct cases to consider here, (1) when the last I/O
+> device in the domain becomes idle and the question is whether or not to
+> power off the entire domain and (2) when a CPU core in a power domain
+> becomes idle while all of the devices in the domain are idle already.
 >
->> The location of a file may not be suitable because of xxx_driver under arch/arm/mach-*.
->> ---
->> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+> Case (2) is quite straightforward, the .enter() routine for the
+> "domain" C-state has to check whether the domain can be turned off and
+> do it eventually.
 >
-> Russell, Olof, Arnd,
+> Case (1) is more difficult and (assuming that all CPU cores in the domain
+> are already idle at this point) i see two possible ways to handle it:
+> (a) Wake up all of the (idle) CPU cores in the domain and let the
+> ?"domain" C-state's .enter() do the job (ie. turn it into case (2)),
+> ?similarly to your patchset.
+> (b) If cpuidle has prepared the cores for going into deeper idle,
+> ?turn the domain off directly without waking up the cores.
+
+Multiple clusters is a design that has been considered in this
+patchset (all the data structures are in the right place to support
+it), and can be supported in the future, but does not exist in any
+current systems that would be using this.  In all of today's SoCs,
+there is a single cluster, so (1) can't happen - no code can be
+executing while all cpus are idle.
+
+(b) is an optimization that would not be possible on any future SoC
+that is similar to the current SoCs, where "turn the domain off" is
+very tightly integrated with TrustZone secure code running on the
+primary cpu of the cluster.
+
+<snip>
+
+> Having considered this for a while I think that it may be more straightforward
+> to avoid waking up the already idled cores.
 >
-> Where should this driver be placed? It's a completely Tegra-specific
-> module, and I don't believe there's any drivers/ directory or other
-> subsystem that's appropriate to house it right now. Should we go ahead
-> and create a drivers/arm/ for this? Perhaps drivers/misc/?
+> For instance, say we have 4 CPU cores in a cluster (package) such that each
+> core has its own idle state (call it C1) and there is a multicore idle state
+> entered by turning off the entire cluster (call this state C-multi). ?One of
+> the possible ways to handle this seems to be to use an identical table of
+> C-states for each core containing the C1 entry and a kind of fake entry called
+> (for example) C4 with the time characteristics of C-multi and a special
+> .enter() callback. ?That callback will prepare the core it is called for to
+> enter C-multi, but instead of simply turning off the whole package it will
+> decrement a counter. ?If the counte happens to be 0 at this point, the
+> package will be turned off. ?Otherwise, the core will be put into the idle
+> state corresponding to C1, but it will be ready for entering C-multi at
+> any time. The counter will be incremented on exiting the C4 "state".
 
-TI just added their memory driver in drivers/memory, and it was merged
-through Greg K-H's driver tree. That would be a good location for this
-one as well.
+I implemented something very similar to this on Tegra2 (having each
+cpu go to C1, but with enough state saved for C-multi), but it turns
+out not to work in hardware.  On every existing ARM SMP system where I
+have worked with cpuidle (Tegra2, OMAP4, Exynos5, and some Tegra3),
+only cpu 0 can trigger the transition to C-multi.  The cause of this
+restriction is different on every platform - sometimes it's by design,
+sometimes it's a bug in the SoC ROM code, but the restriction exists.
+The primary cpu of the cluster always needs to be awake.
 
-> Honestly, to me it seems best to keep purely platform-specific drivers
-> like this in arch/arm/mach-tegra, since that's the most closely
-> Tegra-related directory.
+In addition, it may not be possible to transition secondary cpus from
+C1 to C-multi without waking them.  That would generally involve
+cutting power to a CPU that is in clock gating, which is not a
+supported power transition in any SoC that I have a datasheet for.  I
+made it work for cpu1 on Tegra2, but I can't guarantee that there are
+not unsolvable HW race conditions.
 
-Since tegra has a custom memory controller it's not as obvious that it
-needs to go in a shared location, indeed. But it's easier to use the
-same practices across platforms, and if there are other vendors that
-end up sharing IP blocks for memory down the road, having them in a
-common location makes sense.
+The only generic way to make this work is to wake up all cpus.  Waking
+up a subset of cpus is certainly worth investigating as an
+optimization, but it would not be used on Tegra2, OMAP4, or Exynos5.
+Tegra3 may benefit from it.
 
+> It looks like this should work without modifying the cpuidle core, but
+> the drawback here is that the cpuidle core doesn't know how much time
+> spend in C4 is really in C1 and how much of it is in C-multi, so the
+> statistics reported by it won't reflect the real energy usage.
 
--Olof
+Idle statistics are extremely important when determining why a
+particular use case is drawing too much power, and it is worth
+modifying the cpuidle core if only to keep them accurate.  Especially
+when justifying the move from the cpufreq hotplug governor based code
+that every SoC vendor uses in their BSP to a proper multi-CPU cpuidle
+implementation.
