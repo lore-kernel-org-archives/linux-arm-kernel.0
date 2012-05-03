@@ -1,13 +1,13 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 May 2012 15:04:28 +0100
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 3 May 2012 15:45:46 +0200
 Subject: Making ARM multiplatform kernels DT-only?
 In-Reply-To: <201205031350.35476.arnd@arndb.de>
 References: <201205031350.35476.arnd@arndb.de>
-Message-ID: <20120503140428.GB897@n2100.arm.linux.org.uk>
+Message-ID: <20120503134546.GB7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+On 13:50 Thu 03 May     , Arnd Bergmann wrote:
 > Hi everyone,
 > 
 > I've been discussing multiplatform kernels with a few people recently,
@@ -26,6 +26,7 @@ On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
 > at compile time, avoids a lot of legacy board files that we cannot
 > test anyway, reduces the total kernel size and gives an incentive
 > for people to move forward to DT with their existing boards.
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
 > The counterargument is that we won't be able to support all the
 > boards we currently do when the user switches on multiplatform,
@@ -34,28 +35,10 @@ On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
 > separately in order to enable the ATAG style board files, even
 > for platforms that are not multiplatform capable.
 
-I'm basing my comments off mach-zynq.
+> 
+> Other opinions?
+it will also avoid us alot of trouble and work to fix old platform that we can
+not even test
 
-How about we take the following steps towards it?
-
-1. create arch/arm/include/mach/ which contains standardized headers
-   for DT based implementations.  This must include all headers included
-   by asm/ or linux/ includes.  This will also be the only mach/ header
-   directory included for code outside of arch/arm/mach-*.  This also
-   acts as the 'default' set of mach/* includes for stuff like timex.h
-   and the empty hardware.h
-
-2. DT based mach-* directories do not have an include directory; their
-   include files must be located in the main include/ heirarchy if shared
-   with other parts of the kernel, otherwise they must be in the mach-*
-   directory.
-
-3. Allow build multiple mach-* directories (which we already do... see
-   the samsung stuff.)
-
-We still have irqs.h being SoC dependent, and we still haven't taken
-debug-macros.S far enough along to get rid of that.  Then there's also
-the problem of uncompress.h.  The last piece of the puzzle is the common
-clock stuff.
-
-So, I think we're still a way off it yet - maybe six months or so.
+Best Regards,
+J.
