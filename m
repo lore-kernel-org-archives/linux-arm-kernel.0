@@ -1,94 +1,37 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 May 2012 16:07:10 +0530
-Subject: [PATCH 2/2] SPEAr: Update defconfigs
-In-Reply-To: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
-References: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
-Message-ID: <b4431690340af8d9892b2caa76b4921cdff5f1aa.1336041348.git.viresh.kumar@st.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 03 May 2012 13:54:45 +0300
+Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
+In-Reply-To: <20120502144008.GF2194@S2101-09.ap.freescale.net>
+References: <1335939209-15625-1-git-send-email-b32955@freescale.com>
+ <20120502144008.GF2194@S2101-09.ap.freescale.net>
+Message-ID: <1336042485.13013.41.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates following configuration:
-- Update MTD specific configurations
-- Enables JFFS2 FS support
-- Updates 6xx defconfig, with recent changes done by Arnd in 6xx Kconfig
+On Wed, 2012-05-02 at 22:40 +0800, Shawn Guo wrote:
+> On Wed, May 02, 2012 at 02:13:28PM +0800, Huang Shijie wrote:
+> > add gpmi support for mx6q.
+> > add DT support to mx6q and mx28.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> 
+> Hi Artem,
+> 
+> As the patch heavily depends on mxs device tree branch, I think it will
+> be easier to have it go through arm-soc tree.  If you agree, can you
+> please give your ack if the patch looks fine to you?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/configs/spear13xx_defconfig |    4 ++++
- arch/arm/configs/spear3xx_defconfig  |    4 ++++
- arch/arm/configs/spear6xx_defconfig  |    5 ++++-
- 3 files changed, 12 insertions(+), 1 deletions(-)
+I do not mind if it goes via the arm-soc tree. I cannot really review
+this patch - it is too big, I think it should be split on smaller
+chunks.
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index 587d1f3..1fdb826 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -20,6 +20,9 @@ CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
-@@ -81,6 +84,7 @@ CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
-diff --git a/arch/arm/configs/spear3xx_defconfig b/arch/arm/configs/spear3xx_defconfig
-index 7ed4291..865980c 100644
---- a/arch/arm/configs/spear3xx_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -14,6 +14,9 @@ CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
-@@ -73,6 +76,7 @@ CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
-diff --git a/arch/arm/configs/spear6xx_defconfig b/arch/arm/configs/spear6xx_defconfig
-index cf94bc7..a2a1265 100644
---- a/arch/arm/configs/spear6xx_defconfig
-+++ b/arch/arm/configs/spear6xx_defconfig
-@@ -8,11 +8,13 @@ CONFIG_MODVERSIONS=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_PLAT_SPEAR=y
- CONFIG_ARCH_SPEAR6XX=y
--CONFIG_BOARD_SPEAR600_DT=y
- CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
-@@ -64,6 +66,7 @@ CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
 -- 
-1.7.9
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120503/11b13754/attachment.sig>
