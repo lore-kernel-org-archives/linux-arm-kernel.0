@@ -1,79 +1,67 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 May 2012 15:19:47 +0530
-Subject: [PATCH V3 3/8] SPEAr: clk: Add VCO-PLL Synthesizer clock
-In-Reply-To: <bc76d68ff5c11be5750c6e65ce5c4b94bb9f7382.1335249846.git.viresh.kumar@st.com>
+Date: Thu, 3 May 2012 15:18:25 +0530
+Subject: [PATCH V3 2/8] clk: add a fixed factor clock
+In-Reply-To: <20120503063721.GD4141@pengutronix.de>
 References: <cover.1335249846.git.viresh.kumar@st.com>
- <bc76d68ff5c11be5750c6e65ce5c4b94bb9f7382.1335249846.git.viresh.kumar@st.com>
-Message-ID: <4FA254BB.5050308@st.com>
+ <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
+ <20120502094807.GE20478@pengutronix.de> <4FA120E8.5030707@st.com>
+ <20120502224108.GC18402@gmail.com> <4FA21879.9060508@st.com>
+ <20120503063721.GD4141@pengutronix.de>
+Message-ID: <4FA25469.6030701@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 12:20 PM, Viresh KUMAR wrote:
-> All SPEAr SoC's contain PLLs. Their Fout is derived based on following equations
-> 
-> - In normal mode
->   vco = (2 * M[15:8] * Fin)/N
-> 
-> - In Dithered mode
->   vco = (2 * M[15:0] * Fin)/(256 * N)
-> 
-> pll_rate = vco/2^p
-> 
-> vco and pll are very closely bound to each other,
-> "vco needs to program: mode, m & n" and "pll needs to program p",
-> both share common enable/disable logic and registers.
-> 
-> This patch adds in support for this type of clock.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
+On 5/3/2012 12:07 PM, Sascha Hauer wrote:
+> Yes, looks good.
 
-Sorry for another fixup. Required due to Saravana's patch:
+Thanks. Here is one more to review, found after rebasing on latest
+clk-next from Mike. I will send this a complete patch for fixed factor
+clock separately, following is just for review.
+
+This happened due to Saravana's patch:
 
 ---
- drivers/clk/spear/clk-vco-pll.c |   22 ++++++++++++++++++----
- 1 files changed, 18 insertions(+), 4 deletions(-)
+ drivers/clk/clk-fixed-factor.c |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/spear/clk-vco-pll.c b/drivers/clk/spear/clk-vco-pll.c
-index 318b04e..dcd4bdf 100644
---- a/drivers/clk/spear/clk-vco-pll.c
-+++ b/drivers/clk/spear/clk-vco-pll.c
-@@ -282,6 +282,7 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
-        struct clk_vco *vco;
-        struct clk_pll *pll;
-        struct clk *vco_clk, *tpll_clk, *tvco_gate_clk;
-+       struct clk_init_data vco_init, pll_init;
-        const char **vco_parent_name;
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 8d25c2e..0e8782b 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -66,10 +66,10 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+                unsigned int mult, unsigned int div)
+ {
+        struct clk_fixed_factor *fix;
++       struct clk_init_data init;
+        struct clk *clk;
  
-        if (!vco_name || !pll_name || !parent_name || !mode_reg || !cfg_reg ||
-@@ -308,7 +309,10 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
-        vco->rtbl = rtbl;
-        vco->rtbl_cnt = rtbl_cnt;
-        vco->lock = lock;
-+       vco->hw.init = &vco_init;
+        fix = kmalloc(sizeof(*fix), GFP_KERNEL);
+-
+        if (!fix) {
+                pr_err("%s: could not allocate fixed factor clk\n", __func__);
+                return ERR_PTR(-ENOMEM);
+@@ -78,12 +78,15 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+        /* struct clk_fixed_factor assignments */
+        fix->mult = mult;
+        fix->div = div;
++       fix->hw.init = &init;
 +
-        pll->vco = vco;
-+       pll->hw.init = &pll_init;
++       init.name = name;
++       init.ops = &clk_fixed_factor_ops;
++       init.flags = flags;
++       init.parent_names = &parent_name;
++       init.num_parents = 1;
  
-        if (vco_gate_name) {
-                tvco_gate_clk = clk_register_gate(NULL, vco_gate_name,
-@@ -323,13 +327,23 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
-                vco_parent_name = &parent_name;
-        }
+-       clk = clk_register(dev, name,
+-                       &clk_fixed_factor_ops, &fix->hw,
+-                       &parent_name,
+-                       (parent_name ? 1 : 0),
+-                       flags);
++       clk = clk_register(dev, &fix->hw);
  
--       vco_clk = clk_register(NULL, vco_name, &clk_vco_ops, &vco->hw,
--                       vco_parent_name, 1, flags);
-+       vco_init.name = vco_name;
-+       vco_init.ops = &clk_vco_ops;
-+       vco_init.flags = flags;
-+       vco_init.parent_names = vco_parent_name;
-+       vco_init.num_parents = 1;
-+
-+       pll_init.name = pll_name;
-+       pll_init.ops = &clk_pll_ops;
-+       pll_init.flags = CLK_SET_RATE_PARENT;
-+       pll_init.parent_names = &vco_name;
-+       pll_init.num_parents = 1;
+        if (clk)
+                return clk;
+
 
 -- 
 viresh
