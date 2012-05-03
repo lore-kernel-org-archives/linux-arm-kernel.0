@@ -1,199 +1,195 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 3 May 2012 08:23:51 +0000
-Subject: [PATCH v4 01/39] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4FA022FC.5040703@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <363273a9ef82d6836197929157aa9a8eb8f5171a.1335874494.git.afzal@ti.com>
- <4FA022FC.5040703@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E982967@DBDE01.ent.ti.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Thu,  3 May 2012 09:24:06 +0100
+Subject: [PATCH] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <20120501195603.GW25584@lunn.ch>
+References: <20120501195603.GW25584@lunn.ch>
+Message-ID: <1336033446-18949-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Given appropriate devicetree bindings, this driver registers a
+pm_power_off function to set a GPIO line high/low and power down
+your board.
 
-On Tue, May 01, 2012 at 23:23:00, Hunter, Jon wrote:
-> Hi Afzal,
-> 
-> Looks good! Some minor comments ...
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+Here's an attempt at doing this. All works fine, I've not submitted a
+patch to use it since GPIO patches for kirkwood aren't finalised, but
+you can see it being used here:-
 
-Thanks
+https://github.com/lentinj/linux.git v3.4-rc4-clk-next-orion-dnskw-gpio
 
-> > +#define	GPMC_WAITPIN_IDX0			0x0
-> > +#define	GPMC_WAITPIN_IDX1			0x1
-> > +#define	GPMC_WAITPIN_IDX2			0x2
-> > +#define	GPMC_WAITPIN_IDX3			0x3
-> > +#define	GPMC_NR_WAITPIN				0x4
-> 
-> How about an enum here? Also OMAP4 only have 3 wait pins and so the
-> number is device dependent.
+The main issue is where to put it. I'm not convinced that drivers/gpio
+is an appropriate home, however drivers/power and drivers/hwmon (where
+drivers with similar purpose live) contain frameworks this is not part
+of. drivers/mfd has some modules that can power off, but this is hardly
+multifunction :) Could also give in and use drivers/misc.
 
-Ok
+Feedback appreciated.
 
-> 
-> >  #define GPMC_MEM_START		0x00000000
-> >  #define GPMC_MEM_END		0x3FFFFFFF
-> >  #define BOOT_ROM_SPACE		0x100000	/* 1MB */
-> > @@ -64,6 +106,55 @@
-> >  #define ENABLE_PREFETCH		(0x1 << 7)
-> >  #define DMA_MPU_MODE		2
-> >  
-> > +#define	DRIVER_NAME	"omap-gpmc"
-> > +
-> > +#define	GPMC_NR_IRQ		2
-> 
-> Why has this been changed to 2? It was 6 in the previous version. As we
-> discussed before the number of IRQs should be detected based upon GPMC
-> IP version.
+ .../devicetree/bindings/gpio/poweroff-gpio.txt     |   15 ++++
+ drivers/gpio/Kconfig                               |   10 +++
+ drivers/gpio/Makefile                              |    2 +
+ drivers/gpio/poweroff-gpio.c                       |   95 ++++++++++++++++++++
+ 4 files changed, 122 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/poweroff-gpio.txt
+ create mode 100644 drivers/gpio/poweroff-gpio.c
 
-As mentioned in the cover letter,
-
-"Additional features that currently boards in mainline does not make
-use of like, waitpin interrupt handling, changes to leverage revision
-6 IP differences has not been incorporated."
-
-Priority in this series is to convert into a driver, get all boards working
-on mainline. Once all boards are working with gpmc driver, these features
-which are not required for currently supported boards can be added later.
-
-> > +struct gpmc_device {
-> > +	char			*name;
-> > +	int			id;
-> > +	void			*pdata;
-> > +	unsigned		pdata_size;
-> > +	struct resource		*per_res;
-> > +	unsigned		per_res_cnt;
-> > +	struct resource		*gpmc_res;
-> > +	unsigned		gpmc_res_cnt;
-> > +	bool			have_waitpin;
-> > +	unsigned		waitpin;
-> > +	int			waitpin_polarity;
-> 
-> I think that it make more sense to have the wait-pin information part of
-> the gpmc_cs_data structure for the following reasons ...
-
-Waitpin information is indeed a part of cs as far as boards are concerned,
-it is only that it gets propogated to device
-
-> 
-> 1. If a device can use multiple CS, then it could use multiple wait signals.
-> 2. Eventually, all board information needs to move to device tree. By
-> having it in the pdata it will be easier to migrate to device tree.
-> 
-> It may be nice to have "have_waitpin" be an integer too, that indicates
-> if wait is used for both read and write or just one or the other.
-> 
-> Also, any reason why waitpin_polarity is an int? I see you define LOW as
-> -1, but I not sure why LOW cannot be 0 as 0 is programmed into the
-> register for an active low wait signal.
-
-Only intention is not to alter default waitpin polarity value, i.e. if
-any board does make use of it w/o knowledge of Kernel, I don't want to
-break it, there may be an argument saying that the board code is buggy,
-while if some board does so, it is, but don't want to break working one.
-
-Here unless user explicitly set the flag, it does nothing on polarity
-
-> > +	if (idx != ~0x0) {
-> > +		if (gd->have_waitpin) {
-> > +			if (gd->waitpin != idx ||
-> > +					gd->waitpin_polarity != polarity) {
-> > +				dev_err(gpmc->dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
-> > +					gd->waitpin, gd->waitpin_polarity,
-> > +					gd->name, gd->id);
-> > +				return -EBUSY;
-> > +			}
-> > +		} else {
-> > +			gd->have_waitpin = true;
-> > +			gd->waitpin = idx;
-> > +			gd->waitpin_polarity = polarity;
-> > +		}
-> 
-> I am not sure about the above code. What happens if a device has
-> multiple CS signals and uses multiple wait signals?
-> 
-> I am also not sure why gpmc_setup_cs_waitpin and gpmc_setup_waitpin
-> cannot be combined. I think that it would be a fair assumption to make
-> that anyone using the waitpin does so inconjunction with the CS (I think
-> that they would have too).
-> 
-> However, if there is a reason for splitting it up this way please
-> explain why.
-
-Initially it was done per CS, the problem happened while trying to
-convert tusb6010. It had multiple CS, but using same waitpin. Problem
-with incorporating this onto CS is we have to sacrifice on wait pin
-conflict prevention capability. The code now handles case of wait pin
-conflict per device, the code can be extended to have multiple
-wait pin per device also. But I prefer to defer it to later, not as
-part of this series, as this feature what you asking for is not required
-for any of the existing boards. I can add it in this series if there is
-a strong opinion in the community for the same in this series.
-
-Policy that is being followed here is first sit, then straighten legs, ;)
-
-> > +static int gpmc_setup_cs_nonres(struct gpmc *gpmc,
-> > +			struct gpmc_device *gd, struct gpmc_cs_data *cs)
-> 
-> The name of this function is not 100% clear to me. What do you mean by
-> "nonres"?
-
-It means anything other than resources like memory & irq, happened for
-want of better name, if you have one, name it, will put it.
-
-> > +int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *cs)
-> 
-> What scenario is this function used in? May be worth adding a comment
-> about the function.
-
-Ok, it was required for OneNAND, as it needs to reconfigure
-
-> > +	for (i = 0, n = gdp->num_cs, cs = gdp->cs_data;
-> > +				i < gdp->num_cs; i++, cs++)
-> > +		n += hweight32(cs->irq_config);
-> 
-> As you know I am not a fan of these overloaded for-loops as I find them
-> hard to read ;-)
-> 
-> Why not ...
-> 
-> n = gdp->num_cs;
-> cs = gdp->cs_data;
-
-
-Well, you also know that I am big fan of it; difference of opinion,
-my preference is to keep loop control statements together with "for",
-unless there is a cry from community that it should not be this way.
-I believe that it is not that much unreadable.
-
-> > +	for (i = 0, gdq = gp->device_pdata, gd = gpmc->device;
-> > +			(i < gp->num_device) && (*gdq); i++, gdq++) {
-> 
-> You have num_devices now and so do you really need the "&& (*gdq)"?
-> Seems redundant.
-
-num_device is something that I never wanted to add, was happy with,
-NULL entry termination, only because of your repeated comments,
-I added this. And this additional check now prevents NULL dereference.
-
-> > +	gpmc_setup_writeprotect(gpmc);
-> 
-> Write protect is a pin and there is only one. Like the waitpins and CS
-> signals this needs to be associated with a device. It would make sense
-> that this is associated with the cs data.
-
-As far as platform are concerned, it is associated with cs, it is only
-that while configuring CS, it is propagated such that it is done once.
-
-
-> > +#define	GPMC_READTYPE_ASYNC		BIT(30)
-> > +#define	GPMC_WRITETYPE_ASYNC		BIT(31)
-> > +
-> 
-> Please keep in mind that eventually this has to all be moved into device
-> tree and so at that point these configuration flags will have to be
-> re-worked. However, just a FYI.
-
-On device tree matters, my mind is next to blank, thanks for mentioning it.
-
-Regards
-Afzal
+diff --git a/Documentation/devicetree/bindings/gpio/poweroff-gpio.txt b/Documentation/devicetree/bindings/gpio/poweroff-gpio.txt
+new file mode 100644
+index 0000000..be52486
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/poweroff-gpio.txt
+@@ -0,0 +1,15 @@
++GPIO line that should be set high/low to power off a device
++
++Required properties:
++- compatible : should be "gpio-poweroff".
++- gpios : The GPIO to set high/low, see "gpios property" in
++  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
++  low to power down the board set it to "Active Low", otherwise set
++  gpio to "Active High".
++
++Examples:
++
++gpio-poweroff {
++	compatible = "gpio-poweroff";
++	gpios = <&gpio 4 0>; /* GPIO 4 Active High */
++};
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index e03653d..48a531b 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -63,6 +63,16 @@ config GPIO_SYSFS
+ 	  Kernel drivers may also request that a particular GPIO be
+ 	  exported to userspace; this can be useful when debugging.
+ 
++config GPIO_POWEROFF
++	tristate "GPIO power-off driver"
++	depends on OF_GPIO
++	help
++	  This driver supports turning off your device via. a GPIO call.
++	  If your device needs a GPIO high/low to power down, say Y and
++	  create a binding in your devicetree.
++
++	  If unsure, say N
++
+ config GPIO_GENERIC
+ 	tristate
+ 
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 007f54b..54adeb8 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -4,6 +4,8 @@ ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
+ 
+ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
+ 
++obj-$(CONFIG_GPIO_POWEROFF)	+= poweroff-gpio.o
++
+ # Device drivers. Generally keep list sorted alphabetically
+ obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
+ 
+diff --git a/drivers/gpio/poweroff-gpio.c b/drivers/gpio/poweroff-gpio.c
+new file mode 100644
+index 0000000..3d216aa
+--- /dev/null
++++ b/drivers/gpio/poweroff-gpio.c
+@@ -0,0 +1,95 @@
++/*
++ * Toggles a GPIO pin to power down a device
++ *
++ * Jamie Lentin <jm@lentin.co.uk>
++ * Copyright (C) 2012 Jamie Lentin
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/of_platform.h>
++#include <linux/of_gpio.h>
++#include <linux/module.h>
++
++/*
++ * Hold configuration here, cannot be more than one instance of the driver
++ * since pm_power_off itself is global.
++ */
++static int gpio_num;
++static int gpio_active_low;
++
++static void gpio_poweroff_do_poweroff(void)
++{
++	gpio_set_value(gpio_num, !gpio_active_low);
++}
++
++static int __devinit gpio_poweroff_probe(struct platform_device *pdev)
++{
++	enum of_gpio_flags flags;
++
++	gpio_num = of_get_gpio_flags(pdev->dev.of_node, 0, &flags);
++	if (gpio_num < 0) {
++		pr_err("%s: Could not get GPIO configuration: %d",
++		       __func__, gpio_num);
++		return -ENODEV;
++	}
++	gpio_active_low = flags & OF_GPIO_ACTIVE_LOW;
++
++	/* If a pm_power_off function has already been added, leave it alone */
++	if (pm_power_off != NULL) {
++		pr_err("%s: pm_power_off function already registered",
++		       __func__);
++		return -EBUSY;
++	}
++
++	if (gpio_request(gpio_num, "poweroff-gpio")) {
++		pr_err("%s: Could not get GPIO %d", __func__, gpio_num);
++		return -ENODEV;
++	}
++	if (gpio_direction_output(gpio_num, gpio_active_low)) {
++		pr_err("%s: Could not set direction of GPIO %d",
++		       __func__, gpio_num);
++		return -ENODEV;
++	}
++
++	pm_power_off = &gpio_poweroff_do_poweroff;
++	return 0;
++}
++
++static int __devexit gpio_poweroff_remove(struct platform_device *pdev)
++{
++	if (gpio_num)
++		gpio_free(gpio_num);
++	if (pm_power_off == &gpio_poweroff_do_poweroff)
++		pm_power_off = NULL;
++
++	return 0;
++}
++
++static const struct of_device_id of_gpio_poweroff_match[] = {
++	{ .compatible = "gpio-poweroff", },
++	{},
++};
++
++static struct platform_driver gpio_poweroff_driver = {
++	.probe = gpio_poweroff_probe,
++	.remove = __devexit_p(gpio_poweroff_remove),
++	.driver = {
++		   .name = "poweroff-gpio",
++		   .owner = THIS_MODULE,
++		   .of_match_table = of_gpio_poweroff_match,
++		   },
++};
++
++module_platform_driver(gpio_poweroff_driver);
++
++MODULE_AUTHOR("Jamie Lentin <jm@lentin.co.uk>");
++MODULE_DESCRIPTION("GPIO poweroff driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:poweroff-gpio");
+-- 
+1.7.10
