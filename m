@@ -1,37 +1,74 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Thu, 3 May 2012 19:25:36 +0000
-Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
- callbacks
-In-Reply-To: <20120503184632.GA28089@animalcreek.com>
-References: <20120502234718.GA5432@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
- <20120503160917.GA11310@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
- <20120503184632.GA28089@animalcreek.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu,  3 May 2012 21:33:01 +0200
+Subject: [PATCH RESEND v5] rtc: Add device tree support for LPC32xx
+Message-ID: <1336073581-25667-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
-[...]
-> > 
-> > So, if I understood this correctly, it's effectively like blocking a low power
-> > state transition (here wfi execution) when EMAC is active?
-> 
-> Assuming "it" is my patch, correct.
-> 
+This patch adds device tree support for rtc-lpc32xx.c
 
-Recently I was thinking about how to get certain drivers to disallow some or all
-low power states and to me this also seems to fall in a similar category.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-One of the suggestions that I got was to check if the 'wakeup' entry associated with
-the device under sysfs could be leveraged for this. The PM code could maintain
-a whitelist (or blacklist) of devices and it decides the low power state to enter
-based on the 'wakeup' entries associated with these devices. In this particular case,
-maybe the driver could simply set this entry to non-wakeup capable when necessary and
-then let the PM code take care of skipping the wfi execution.
+---
 
-Thoughts/brickbats welcome :)
+Applies to v3.4-rc5
 
-Regards,
-Vaibhav
+Changes since v4:
+* Reduced "compatible" strings to just the first one
+
+ Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt |   15 +++++++++++++++
+ drivers/rtc/rtc-lpc32xx.c                             |   12 +++++++++++-
+ 2 files changed, 26 insertions(+), 1 deletion(-)
+
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/rtc/lpc32xx-rtc.txt
+@@ -0,0 +1,15 @@
++* NXP LPC32xx SoC Real Time Clock controller
++
++Required properties:
++- compatible: must be "nxp,lpc3220-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: The RTC interrupt
++
++Example:
++
++	rtc at 40024000 {
++		compatible = "nxp,lpc3220-rtc";
++		reg = <0x40024000 0x1000>;
++		interrupts = <52 0>;
++	};
+--- linux-2.6.orig/drivers/rtc/rtc-lpc32xx.c
++++ linux-2.6/drivers/rtc/rtc-lpc32xx.c
+@@ -19,6 +19,7 @@
+ #include <linux/rtc.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ 
+ /*
+  * Clock and Power control register offsets
+@@ -386,13 +387,22 @@ static const struct dev_pm_ops lpc32xx_r
+ #define LPC32XX_RTC_PM_OPS NULL
+ #endif
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id lpc32xx_rtc_match[] = {
++	{ .compatible = "nxp,lpc3220-rtc" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, lpc32xx_rtc_match);
++#endif
++
+ static struct platform_driver lpc32xx_rtc_driver = {
+ 	.probe		= lpc32xx_rtc_probe,
+ 	.remove		= __devexit_p(lpc32xx_rtc_remove),
+ 	.driver = {
+ 		.name	= RTC_NAME,
+ 		.owner	= THIS_MODULE,
+-		.pm	= LPC32XX_RTC_PM_OPS
++		.pm	= LPC32XX_RTC_PM_OPS,
++		.of_match_table = of_match_ptr(lpc32xx_rtc_match),
+ 	},
+ };
+ 
