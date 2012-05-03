@@ -1,40 +1,34 @@
 From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 3 May 2012 08:37:05 +0000
-Subject: [PATCH v4 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FA04A8C.4050703@ti.com>
+Date: Thu, 3 May 2012 08:42:11 +0000
+Subject: [PATCH v4 04/39] ARM: OMAP2+: gpmc: Acquire NAND CS value
+In-Reply-To: <4FA05292.7030902@ti.com>
 References: <cover.1335874494.git.afzal@ti.com>
- <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335874494.git.afzal@ti.com>
- <4FA04A8C.4050703@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E98299B@DBDE01.ent.ti.com>
+ <10220de398d22fad5de783d8f58fc55ebac85338.1335874494.git.afzal@ti.com>
+ <4FA05292.7030902@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9829B0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jon,
 
-On Wed, May 02, 2012 at 02:11:48, Hunter, Jon wrote:
-> > +
-> > +	pdata->clk_prd = gpmc_get_fclk_period();
+On Wed, May 02, 2012 at 02:46:02, Hunter, Jon wrote:
+> > Some boards depend on bootloader to update chip select value for NAND.
+> > It is felt that Kernel should not depend on bootloader to get CS, as
+> > for a particular board CS is hardwired and is fixed, hence this can
+> > directly be updated in Kernel. But as CS value for boards that depend
+> > on this behaviour is not available, educate gpmc driver to acquire
+> > chip select value for NAND. this ideally should be removed once CS
+> > for those boards are available.
 > 
-> Does this need to be done here? May be this should be done in the probe
-> function. You could store the handle to the main clk in the pdata.
+> Do you know how many boards require this? If so which are those boards?
 
-This is done so that migration of gpmc driver to the drivers folder
-would be smooth, remember that this function will still live here.
- 
-> > +		pr_err("error: clk_get on %s\n", oh->main_clk);
-> > +		return -EINVAL;
-> >  	}
-> >  
-> >  	clk_enable(gpmc_l3_clk);
-> 
-> I would have thought we should be able to remove the gpmc_init function
-> completely by now. Most of the code should be moved to the probe function.
-> 
-> Also now with hwmod in place, we should be able to remove the
-> clk_enable/disable functions and use the pm_runtime APIs instead.
+devkit8000, beagle board, omap3touchbook, overo.
 
-There was no plan to add rpm in this series, but now that you have
-brought it up, I will adapt the driver to rpm.
+Beagle board, found out to be zero.
+
+> Should this code be marked with a FIXME?
+
+Will let Tony decide it.
 
 Regards
 Afzal
