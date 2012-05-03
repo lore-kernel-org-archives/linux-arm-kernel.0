@@ -1,37 +1,24 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 03 May 2012 13:54:45 +0300
-Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
-In-Reply-To: <20120502144008.GF2194@S2101-09.ap.freescale.net>
-References: <1335939209-15625-1-git-send-email-b32955@freescale.com>
- <20120502144008.GF2194@S2101-09.ap.freescale.net>
-Message-ID: <1336042485.13013.41.camel@sauron.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 May 2012 11:02:47 +0000
+Subject: [PATCH 1/2] SPEAr: Add SMI NOR partition info in dts files
+In-Reply-To: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
+References: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
+Message-ID: <201205031102.48116.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-02 at 22:40 +0800, Shawn Guo wrote:
-> On Wed, May 02, 2012 at 02:13:28PM +0800, Huang Shijie wrote:
-> > add gpmi support for mx6q.
-> > add DT support to mx6q and mx28.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Thursday 03 May 2012, Viresh Kumar wrote:
 > 
-> Hi Artem,
+> This patch adds NOR partitions in all SPEAr boards dts files.
 > 
-> As the patch heavily depends on mxs device tree branch, I think it will
-> be easier to have it go through arm-soc tree.  If you agree, can you
-> please give your ack if the patch looks fine to you?
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+> Arnd,
+> 
+> I will have it in my pull request for SPEAr13xx. These mails are only for
+> review.
+> 
 
-I do not mind if it goes via the arm-soc tree. I cannot really review
-this patch - it is too big, I think it should be split on smaller
-chunks.
+Both patches look good to me.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120503/11b13754/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
