@@ -1,51 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 May 2012 12:57:51 +0000
-Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code
- registration when DT is enabled
-In-Reply-To: <4F967986.6090808@linaro.org>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdZzAQNJ9ejKJJQJhEPjO9VO+fPHmPeCErg8XOj-dLc3gA@mail.gmail.com>
- <4F967986.6090808@linaro.org>
-Message-ID: <201205031257.52100.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 May 2012 13:59:55 +0100
+Subject: [PATCH v5] ARM: cache-l2x0.c: save the final aux ctrl value
+ for resuming
+In-Reply-To: <1336046857-24133-1-git-send-email-ylmao@marvell.com>
+References: <1336046857-24133-1-git-send-email-ylmao@marvell.com>
+Message-ID: <20120503125955.GE27872@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 April 2012, Lee Jones wrote:
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Tue, 24 Apr 2012 10:54:25 +0100
-> Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
+On Thu, May 03, 2012 at 01:07:37PM +0100, Yilu Mao wrote:
+> There is a bug if l2x0 controller has been enabled when calling
+> l2x0_init, the aux ctrl register will not be saved in l2x0_saved_regs.
+> Therefore we will use uninitialized l2x0_saved_regs.aux_ctrl for
+> resuming later.
 > 
-> Now the SCMC911x is correctly enabled in Device Tree, there is no need
-> to continue registering it from platform code. In fact, if we continue
-> doing so, the system will throw an error on boot.
+> In this patch, the aux ctrl value is read and saved after it is
+> initialized. So we have the real value being set for resuming.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index 50809af..9dbd34b 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -612,7 +612,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
->  static struct platform_device *snowball_of_platform_devs[] __initdata = {
->         &snowball_led_dev,
->         &snowball_key_dev,
-> -       &snowball_sbnet_dev,
->         &ab8500_device,
->  };
->  
+> Signed-off-by: Yilu Mao <ylmao@marvell.com>
 
-This version of the patch looks good, the version that was applied does not.
-The same is true for "ARM: ux500: Fork cpu-db8500 platform_devs for
-sequential DT enablement". I only noticed because I get new build warnings
-for the bogus code now. It appears that some of the prerequisites for these
-patches, in particular "ARM: ux500: New DT:ed snowball_platform_devs for
-one-by-one device enablement" and "ARM: ux500: New DT:ed u8500_init_devices
-for one-by-one device enablement" are missing now and the two patches on
-top were mismerged.
-
-Linus and Lee, what's going on here?
-
-	Arnd
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
