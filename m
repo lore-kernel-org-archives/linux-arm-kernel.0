@@ -1,43 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 03 May 2012 22:21:36 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <20120503171316.GD14296@sirena.org.uk>
-References: <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
- <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
- <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
- <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
- <4FA2B98A.6060800@linaro.org> <20120503171316.GD14296@sirena.org.uk>
-Message-ID: <4FA2F6E0.1080202@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 03 May 2012 14:32:16 -0700
+Subject: [PATCH] net: davinci_emac: Add pre_open,
+ post_stop platform callbacks
+In-Reply-To: <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com> (Ben
+ Hutchings's message of "Thu, 3 May 2012 21:22:22 +0100")
+References: <20120502234718.GA5432@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
+ <20120503160917.GA11310@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
+ <20120503184632.GA28089@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
+ <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
+Message-ID: <87ehr1gdcv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/12 18:13, Mark Brown wrote:
-> On Thu, May 03, 2012 at 05:59:54PM +0100, Lee Jones wrote:
->> On 03/05/12 17:45, Russell King - ARM Linux wrote:
->
->>> One thing that might help is if the format of these descriptions were
->>> changed so that there was one file per subsystem documenting the common
->>> options, rather than (eg) every MMC driver documentating the same base
->>> options time and time again.
->
->> I'm afraid that's not really for me to decide, however Grant is on
->> CC. Perhaps that's a point he'd like to drive. If he's stopped
->> reading this thread and fails to reply, I will endeavor to poke him
->> about it while we're in Hong Kong.
->
-> It's what we're already doing for other things where there's a lot of
-> commonality like regulators, I don't think there's any conroversy, it's
-> just reminding people to not cut'n'paste.
+Ben Hutchings <bhutchings@solarflare.com> writes:
 
-Okay. I'm happy to do a little documentation clean-up once the 
-enablement is complete. There is one more patch-set from me and another 
-from another engineer due, then we can work on tying up some of the 
-loose ends, such as documentation consolidation etc.
+> On Thu, 2012-05-03 at 19:25 +0000, Bedia, Vaibhav wrote:
+>> On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
+>> [...]
+>> > > 
+>> > > So, if I understood this correctly, it's effectively like blocking a low power
+>> > > state transition (here wfi execution) when EMAC is active?
+>> > 
+>> > Assuming "it" is my patch, correct.
+>> > 
+>> 
+>> Recently I was thinking about how to get certain drivers to disallow some or all
+>> low power states and to me this also seems to fall in a similar category.
+>> 
+>> One of the suggestions that I got was to check if the 'wakeup' entry associated with
+>> the device under sysfs could be leveraged for this. The PM code could maintain
+>> a whitelist (or blacklist) of devices and it decides the low power state to enter
+>> based on the 'wakeup' entries associated with these devices. In this particular case,
+>> maybe the driver could simply set this entry to non-wakeup capable when necessary and
+>> then let the PM code take care of skipping the wfi execution.
+>> 
+>> Thoughts/brickbats welcome :)
+>
+> You can maybe (ab)use the pm_qos mechanism for this.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I thought of using this too, but it doesn't actually solve the problem:
+
+Using PM QoS, you can avoid hitting the deeper idle states by setting a
+very low wakeup latency.  However, on ARM platforms, even the shallowest
+idle states use the WFI instruction, and the EMAC would still not be
+able to wake the system from WFI.  A possibility would be define the
+shallowest idle state to be one that doesn't call WFI and just does
+cpu_relax().  However, that would only work for CPUidle since PM QoS
+constraints are only checked by CPUidle.  So, a non-CPUidle kernel would
+still have this bug. :(
+
+Ultimately, this is just broken HW.  This network HW was bolted onto an
+existing SoC without consideration for wakeup capabilities.  The result
+is that any use of this device with networking has to completely disable
+SoC power management.
+
+Kevin
