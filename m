@@ -1,23 +1,77 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 3 May 2012 09:55:08 +0800
-Subject: [PATCH RESEND 2/3 v6] ARM: pxa: hx4700: Add PCMCIA/CF support
-In-Reply-To: <E1SPboE-0004O5-4i@merlin.infradead.org>
-References: <E1SPboE-0004O5-4i@merlin.infradead.org>
-Message-ID: <CAN1soZyKMkhJBB_AxTt6=zuWK5_VuPGE=vRgfO4EM8-djASERA@mail.gmail.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Thu,  3 May 2012 10:04:28 +0800
+Subject: [PATCH 1/4] ARM: mm: proc-mohawk: add suspend resume for mohawk
+Message-ID: <1336010671-12792-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 11:49 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> This patch is part of a set which adds PCMCIA/CF support for the hx4700.
-> This patch modifies asic3_gpio_config[] as follows:
-> 1. Remove ASIC3_GPIOC4_CF_nCD, whose purpose is unknown.
-> 2. Add ASIC3_GPIOD4_CF_nCD, the actual CF card detect GPIO.
->
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> Cc: Philipp Zabel <philipp.zabel@gmail.com>
-> ---
->
-Applied
+When enable ARCH_SUSPEND_POSSIBLE, it need defintion of
+cpu_mohawk_do_suspend and cpu_mohawk_do_resume
 
-Regards
-Haojian
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ arch/arm/Kconfig          |    2 +-
+ arch/arm/mm/proc-mohawk.S |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cf006d4..974e6ab 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2274,7 +2274,7 @@ source "kernel/power/Kconfig"
+ config ARCH_SUSPEND_POSSIBLE
+ 	depends on !ARCH_S5PC100
+ 	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+-		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
++		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
+ 	def_bool y
+ 
+ config ARM_CPU_SUSPEND
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index cdfedc5..6a050b1 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -344,6 +344,41 @@ ENTRY(cpu_mohawk_set_pte_ext)
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+ 	mov	pc, lr
+ 
++.globl	cpu_mohawk_suspend_size
++.equ	cpu_mohawk_suspend_size, 4 * 6
++#ifdef CONFIG_PM_SLEEP
++ENTRY(cpu_mohawk_do_suspend)
++	stmfd	sp!, {r4 - r9, lr}
++	mrc	p14, 0, r4, c6, c0, 0	@ clock configuration, for turbo mode
++	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
++	mrc	p15, 0, r6, c13, c0, 0	@ PID
++	mrc 	p15, 0, r7, c3, c0, 0	@ domain ID
++	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
++	mrc 	p15, 0, r9, c1, c0, 0	@ control reg
++	bic	r4, r4, #2		@ clear frequency change bit
++	stmia	r0, {r4 - r9}		@ store cp regs
++	ldmia	sp!, {r4 - r9, pc}
++ENDPROC(cpu_mohawk_do_suspend)
++
++ENTRY(cpu_mohawk_do_resume)
++	ldmia	r0, {r4 - r9}		@ load cp regs
++	mov	ip, #0
++	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I & D caches, BTB
++	mcr	p15, 0, ip, c7, c10, 4	@ drain write (&fill) buffer
++	mcr	p15, 0, ip, c7, c5, 4	@ flush prefetch buffer
++	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I & D TLBs
++	mcr	p14, 0, r4, c6, c0, 0	@ clock configuration, turbo mode.
++	mcr	p15, 0, r5, c15, c1, 0	@ CP access reg
++	mcr	p15, 0, r6, c13, c0, 0	@ PID
++	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
++	orr	r1, r1, #0x18		@ cache the page table in L2
++	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
++	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
++	mov	r0, r9			@ control register
++	b	cpu_resume_mmu
++ENDPROC(cpu_mohawk_do_resume)
++#endif
++
+ 	__CPUINIT
+ 
+ 	.type	__mohawk_setup, #function
+-- 
+1.7.0.4
