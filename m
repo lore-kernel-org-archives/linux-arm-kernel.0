@@ -1,41 +1,274 @@
-From: bryan.buckley@ti.com (Bryan Buckley)
-Date: Thu, 3 May 2012 16:00:25 -0500
-Subject: [PATCH] ARM: Enable I$/D$/BrPredict based on config
-Message-ID: <1336078825-9810-1-git-send-email-bryan.buckley@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 3 May 2012 14:13:27 -0700
+Subject: [PATCHv3 5/5] cpuidle: coupled: add trace events
+In-Reply-To: <1336078827.14207.109.camel@gandalf.stny.rr.com>
+References: <1335816551-27756-1-git-send-email-ccross@android.com>
+ <1335816551-27756-6-git-send-email-ccross@android.com>
+ <1336078827.14207.109.camel@gandalf.stny.rr.com>
+Message-ID: <CAMbhsRQWwp6TLVbHefV5c0fsb0W5=B_EVEdWtHcwc799dWEHGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only disable these bits based on config. Now we will
-use this config option to explicitly enable these features at this
-point regardless of what bootloader, other SW, or HW did before.
+On Thu, May 3, 2012 at 2:00 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Mon, 2012-04-30 at 13:09 -0700, Colin Cross wrote:
+>
+>> diff --git a/include/trace/events/cpuidle.h b/include/trace/events/cpuidle.h
+>> new file mode 100644
+>> index 0000000..9b2cbbb
+>> --- /dev/null
+>> +++ b/include/trace/events/cpuidle.h
+>> @@ -0,0 +1,243 @@
+>> +#undef TRACE_SYSTEM
+>> +#define TRACE_SYSTEM cpuidle
+>> +
+>> +#if !defined(_TRACE_CPUIDLE_H) || defined(TRACE_HEADER_MULTI_READ)
+>> +#define _TRACE_CPUIDLE_H
+>> +
+>> +#include <linux/atomic.h>
+>> +#include <linux/tracepoint.h>
+>> +
+>> +extern atomic_t cpuidle_trace_seq;
+>> +
+>> +TRACE_EVENT(coupled_enter,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_exit,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_spin,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_unspin,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_safe_enter,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_safe_exit,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_idle_enter,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_idle_exit,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_abort,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_detected_abort,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_poke,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>> +
+>> +TRACE_EVENT(coupled_poked,
+>> +
+>> + ? ? TP_PROTO(unsigned int cpu),
+>> +
+>> + ? ? TP_ARGS(cpu),
+>> +
+>> + ? ? TP_STRUCT__entry(
+>> + ? ? ? ? ? ? __field(unsigned int, cpu)
+>> + ? ? ? ? ? ? __field(unsigned int, seq)
+>> + ? ? ),
+>> +
+>> + ? ? TP_fast_assign(
+>> + ? ? ? ? ? ? __entry->cpu = cpu;
+>> + ? ? ? ? ? ? __entry->seq = atomic_inc_return(&cpuidle_trace_seq);
+>> + ? ? ),
+>> +
+>> + ? ? TP_printk("%u %u", __entry->seq, __entry->cpu)
+>> +);
+>
+> Egad! Please use DECLARE_EVENT_CLASS() and DEFINE_EVENT() when adding
+> events that are basically the same. Every TRACE_EVENT() can bloat the
+> kernel by 5k, using the DEFINE_EVENT()s keeps each event around just a
+> few hundred bytes.
+>
+> See include/trace/events/ext4.h for examples.
 
-Signed-off-by: Bryan Buckley <bryan.buckley@ti.com>
----
- arch/arm/kernel/head.S |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Thanks, I'll take a look.  There is no mention in Documentation/ or
+samples/ of DECLARE_EVENT_CLASS() or DEFINE_EVENT(), nor any mention
+of the cost of TRACE_EVENT().
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 3bf0c7f..cec0de5 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -411,12 +411,18 @@ __enable_mmu:
- #endif
- #ifdef CONFIG_CPU_DCACHE_DISABLE
- 	bic	r0, r0, #CR_C
-+#else
-+	orr	r0, r0, #CR_C
- #endif
- #ifdef CONFIG_CPU_BPREDICT_DISABLE
- 	bic	r0, r0, #CR_Z
-+#else
-+	orr	r0, r0, #CR_Z
- #endif
- #ifdef CONFIG_CPU_ICACHE_DISABLE
- 	bic	r0, r0, #CR_I
-+#else
-+	orr	r0, r0, #CR_I
- #endif
- #ifdef CONFIG_ARM_LPAE
- 	mov	r5, #0
--- 
-1.7.4.1
+Looking at the new power tracing code, I will also rework these events
+to be more similar to the existing ones.
+
+I suggest skipping this patch for 3.5, and I'll post an updated one for 3.6.
