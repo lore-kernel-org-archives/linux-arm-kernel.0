@@ -1,61 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 May 2012 23:52:09 +0100
-Subject: [PATCH] ARM: Enable I$/D$/BrPredict based on config
-In-Reply-To: <CAG_NtY_sf6Et2F7kFdUT8=M7W51T5-qQxziG-iKCjY7R890enw@mail.gmail.com>
-References: <1336078825-9810-1-git-send-email-bryan.buckley@ti.com>
- <yw1xfwbgc3ab.fsf@unicorn.mansr.com>
- <CAG_NtY_sf6Et2F7kFdUT8=M7W51T5-qQxziG-iKCjY7R890enw@mail.gmail.com>
-Message-ID: <20120503225209.GI897@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 3 May 2012 16:52:32 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: watchdog: fix !PM boot crash, disarm timer
+ after hwmod reset
+In-Reply-To: <4FA2CC48.8020302@deeprootsystems.com>
+References: <1334353873-15972-1-git-send-email-khilman@ti.com>
+ <alpine.DEB.2.00.1204201451510.11306@utopia.booyaka.com>
+ <4FA2CC48.8020302@deeprootsystems.com>
+Message-ID: <alpine.DEB.2.00.1205031652070.20926@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 05:48:33PM -0500, Buckley, Bryan wrote:
-> On Thu, May 3, 2012 at 5:23 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
-> >
-> > Bryan Buckley <bryan.buckley@ti.com> writes:
-> >
-> > > Currently we only disable these bits based on config. Now we will
-> > > use this config option to explicitly enable these features at this
-> > > point regardless of what bootloader, other SW, or HW did before.
-> > >
-> > > Signed-off-by: Bryan Buckley <bryan.buckley@ti.com>
-> > > ---
-> > > ?arch/arm/kernel/head.S | ? ?6 ++++++
-> > > ?1 files changed, 6 insertions(+), 0 deletions(-)
-> > >
-> > > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> > > index 3bf0c7f..cec0de5 100644
-> > > --- a/arch/arm/kernel/head.S
-> > > +++ b/arch/arm/kernel/head.S
-> > > @@ -411,12 +411,18 @@ __enable_mmu:
-> > > ?#endif
-> > > ?#ifdef CONFIG_CPU_DCACHE_DISABLE
-> > > ? ? ? bic ? ? r0, r0, #CR_C
-> > > +#else
-> > > + ? ? orr ? ? r0, r0, #CR_C
-> > > ?#endif
-> > > ?#ifdef CONFIG_CPU_BPREDICT_DISABLE
-> > > ? ? ? bic ? ? r0, r0, #CR_Z
-> > > +#else
-> > > + ? ? orr ? ? r0, r0, #CR_Z
-> > > ?#endif
-> > > ?#ifdef CONFIG_CPU_ICACHE_DISABLE
-> > > ? ? ? bic ? ? r0, r0, #CR_I
-> > > +#else
-> > > + ? ? orr ? ? r0, r0, #CR_I
-> > > ?#endif
-> > > ?#ifdef CONFIG_ARM_LPAE
-> > > ? ? ? mov ? ? r5, #0
-> > > --
-> >
-> > Caches and branch predictors may require implementation defined
-> > invalidation before being enabled.
+Hi Kevin,
+
+On Thu, 3 May 2012, Kevin Hilman wrote:
+
+> On 04/20/2012 01:59 PM, Paul Walmsley wrote:
 > 
-> True.. I was relying on going through arch/arm/boot/compressed/head.S
-> to do that for me. Was that unreasonable?
+> [...]
+> 
+> > This looks great, looks like it will finally fix this longstanding bug.  I
+> > think Santosh hit it too a long time ago, so I suspect he will be happy
+> > too.
+> > 
+> > One comment: I think that omap2_wd_timer_reset() needs to be updated in
+> > light of commit 3c55c1baffa5f719eb2ae9729088bc867f972f53 ("ARM: OMAP2+:
+> > hwmod: Revert "ARM: OMAP2+: hwmod: Make omap_hwmod_softreset wait for
+> > reset status"").  I did this here.  It's passed basic build testing but
+> > haven't tried booting it yet.  Care to take a look and see if you have any
+> > comments?  It's also available in the 'hwmod_devel_a_3.5' branch of
+> > git://git.pwsan.com/linux-2.6
+> 
+> I just noticed a compile warning with your updated version:
+> 
+> /work/kernel/omap/pm/arch/arm/mach-omap2/wd_timer.c: In function
+> 'omap2_wd_timer_reset':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/wd_timer.c:78:6: warning: unused
+> variable 'v' [-Wunused-variable]
+> 
+> The diff below on top of your patch fixes it.
 
-Yes, because that may not always be used.
+Thanks, just rolled this into the patch and added some credit.
 
-Where that _is_ dealt with is in the CPU specific setup assembly code,
-just as providing the CPU specific default value for the CPU control
-register in r0 is done.
+
+- Paul
