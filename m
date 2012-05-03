@@ -1,48 +1,79 @@
 From: r.sricharan@ti.com (R Sricharan)
-Date: Thu, 3 May 2012 12:56:13 +0530
-Subject: [PATCH 04/13] ARM: OMAP5: timer: Add clocksource, clockevent support
+Date: Thu, 3 May 2012 12:56:12 +0530
+Subject: [PATCH 03/13] TEMP: ARM: OMAP5: Add cpu_is_omap54xx() checks.
 In-Reply-To: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1336029982-31898-5-git-send-email-r.sricharan@ti.com>
+Message-ID: <1336029982-31898-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the Initialisaton for clocksource and clockevent device
-on OMAP5 Socs.
+Not for merge.
+
+Adding the cpu_is_omap54xx checks at relevant places
+for that part of code to execute on OMAP5 socs as well.
+
+This patch will no longer be needed once rebased on
+top of below series from Kevin Hilman <khilman@ti.com>
+
+http://www.spinics.net/lists/linux-omap/msg69013.html
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 ---
- arch/arm/mach-omap2/common.h |    1 +
- arch/arm/mach-omap2/timer.c  |    5 +++++
- 2 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   15 +++++++++------
+ 1 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 797dda7..88fb577 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -92,6 +92,7 @@ extern struct sys_timer omap2_timer;
- extern struct sys_timer omap3_timer;
- extern struct sys_timer omap3_secure_timer;
- extern struct sys_timer omap4_timer;
-+extern struct sys_timer omap5_timer;
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 7144ae6..4063a8c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1221,7 +1221,7 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ 		ret = omap2_cm_wait_module_ready(oh->prcm.omap2.module_offs,
+ 						 oh->prcm.omap2.idlest_reg_id,
+ 						 oh->prcm.omap2.idlest_idle_bit);
+-	} else if (cpu_is_omap44xx()) {
++	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+ 		if (!oh->clkdm)
+ 			return -EINVAL;
  
- void omap2420_init_early(void);
- void omap2430_init_early(void);
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index c512bac..3262ad6 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -348,6 +348,11 @@ static void __init omap4_timer_init(void)
- OMAP_SYS_TIMER(4)
- #endif
- 
-+#ifdef CONFIG_ARCH_OMAP5
-+OMAP_SYS_TIMER_INIT(5, 1, OMAP4_CLKEV_SOURCE, 2, OMAP4_MPU_SOURCE)
-+OMAP_SYS_TIMER(5)
-+#endif
+@@ -1291,13 +1291,16 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
+ 						  ohri.rst_shift);
+-	else if (cpu_is_omap44xx())
++	else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+ 		return omap4_prminst_assert_hardreset(ohri.rst_shift,
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+ 				  oh->clkdm->pwrdm.ptr->prcm_offs,
+ 				  oh->prcm.omap4.rstctrl_offs);
+-	else
++	} else {
+ 		return -EINVAL;
++	}
 +
++	return ret;
+ }
+ 
  /**
-  * omap2_dm_timer_set_src - change the timer input clock source
-  * @pdev:	timer platform device pointer
+@@ -1326,9 +1329,9 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+ 						   ohri.rst_shift,
+ 						   ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
++	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+ 		if (ohri.st_shift)
+-			pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
++			pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4+ does not support st_shift\n",
+ 			       oh->name, name);
+ 		ret = omap4_prminst_deassert_hardreset(ohri.rst_shift,
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+@@ -1367,7 +1370,7 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
+ 						       ohri.st_shift);
+-	} else if (cpu_is_omap44xx()) {
++	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+ 		return omap4_prminst_is_hardreset_asserted(ohri.rst_shift,
+ 				  oh->clkdm->pwrdm.ptr->prcm_partition,
+ 				  oh->clkdm->pwrdm.ptr->prcm_offs,
 -- 
 1.7.1
