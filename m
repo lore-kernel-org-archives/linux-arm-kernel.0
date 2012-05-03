@@ -1,25 +1,31 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 3 May 2012 08:54:08 +0000
-Subject: [PATCH v4 06/39] ARM: OMAP2+: onenand: return value in init
- function
-In-Reply-To: <4FA01421.9080808@mvista.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <91c09cb6a6cb5e87acdcc3f6100a87b4c2a3dd41.1335874494.git.afzal@ti.com>
- <4FA01421.9080808@mvista.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E982A0E@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 May 2012 09:55:29 +0100
+Subject: [PATCH] ARM: Fix restoration of IP scratch register when
+ auditing syscalls
+In-Reply-To: <20120503030312.GM6871@ZenIV.linux.org.uk>
+References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
+ <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
+ <20120430100746.GA11080@mudshark.cambridge.arm.com>
+ <20120430190015.GV24211@n2100.arm.linux.org.uk>
+ <4FA1F499.8000408@jonmasters.org>
+ <20120503030312.GM6871@ZenIV.linux.org.uk>
+Message-ID: <20120503085528.GA30175@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Al,
 
-On Tue, May 01, 2012 at 22:19:37, Sergei Shtylyov wrote:
-> > +
-> > +#if defined(CONFIG_MTD_ONENAND_OMAP2) || \
-> > +		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
-> 
->     You can use IS_ENABLED(CONFIG_MTD_ONENAND_OMAP2) instead these two.
+On Thu, May 03, 2012 at 04:03:12AM +0100, Al Viro wrote:
+> How about splitting the damn thing into syscall_trace_enter() and
+> syscall_trace_exit(), losing the "why" argument along with all possible
+> confusion as to which audit hook to call?
 
-Thanks for educating me.
+That could certainly pan out to be slightly cleaner but I'd rather approach
+it separately given that this stuff should go into the -stable trees and the
+current fix is nicely self-contained.
 
-Regards
-Afzal
+I'll post some follow up patches.
+
+Cheers,
+
+Will
