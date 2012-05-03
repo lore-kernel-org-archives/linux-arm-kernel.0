@@ -1,31 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 May 2012 09:55:29 +0100
-Subject: [PATCH] ARM: Fix restoration of IP scratch register when
- auditing syscalls
-In-Reply-To: <20120503030312.GM6871@ZenIV.linux.org.uk>
-References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
- <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
- <20120430100746.GA11080@mudshark.cambridge.arm.com>
- <20120430190015.GV24211@n2100.arm.linux.org.uk>
- <4FA1F499.8000408@jonmasters.org>
- <20120503030312.GM6871@ZenIV.linux.org.uk>
-Message-ID: <20120503085528.GA30175@mudshark.cambridge.arm.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu,  3 May 2012 11:37:12 +0200
+Subject: [PATCH] Add missing call to uart_update_timeout()
+Message-ID: <1336037832-16060-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+This patch fixes a problem reported here:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/155242/match=auart
 
-On Thu, May 03, 2012 at 04:03:12AM +0100, Al Viro wrote:
-> How about splitting the damn thing into syscall_trace_enter() and
-> syscall_trace_exit(), losing the "why" argument along with all possible
-> confusion as to which audit hook to call?
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/tty/serial/mxs-auart.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-That could certainly pan out to be slightly cleaner but I'd rather approach
-it separately given that this stuff should go into the -stable trees and the
-current fix is nicely self-contained.
-
-I'll post some follow up patches.
-
-Cheers,
-
-Will
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index 55fd362..039c054 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -369,6 +369,8 @@ static void mxs_auart_settermios(struct uart_port *u,
+ 
+ 	writel(ctrl, u->membase + AUART_LINECTRL);
+ 	writel(ctrl2, u->membase + AUART_CTRL2);
++
++	uart_update_timeout(u, termios->c_cflag, baud);
+ }
+ 
+ static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
+-- 
+1.7.2.5
