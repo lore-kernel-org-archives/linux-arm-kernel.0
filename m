@@ -1,25 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 03 May 2012 11:59:33 -0600
-Subject: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com>
-References: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <4FA2C785.2080703@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 3 May 2012 13:19:41 -0500
+Subject: [PATCH-V6 0/3] ARM: OMAP: Make OMAP clocksource source selection
+ runtime
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA11F12@DBDE01.ent.ti.com>
+References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
+ <4FA19162.5040102@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA11F12@DBDE01.ent.ti.com>
+Message-ID: <4FA2CC3D.8000804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2012 10:05 AM, Hiroshi DOYU wrote:
-> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> High-performance Bus (AHB) architecture.
-> 
-> The AHB Arbiter controls AHB bus master arbitration. This effectively
-> forms a second level of arbitration for access to the memory
-> controller through the AHB Slave Memory device. The AHB pre-fetch
-> logic can be configured to enhance performance for devices doing
-> sequential access. Each AHB master is assigned to either the high or
-> low priority bin. Both Tegra20/30 have this AHB bus.
-> 
-> Some of configuration param could be passed from DT too.
+Hi Vaibhav,
 
-This patch should add
-Documentation/devicetree/bindings/arm/tegra/tegra20-ahb.txt to describe
-the DT binding.
+On 05/03/2012 12:07 AM, Hiremath, Vaibhav wrote:
+> On Thu, May 03, 2012 at 01:26:18, Hunter, Jon wrote:
+>> Hi Vaibhav,
+>>
+>> On 05/02/2012 08:56 AM, Vaibhav Hiremath wrote:
+>>> Current OMAP code supports couple of clocksource options based
+>>> on compilation flag (CONFIG_OMAP_32K_TIMER). The 32KHz sync-timer
+>>> and a gptimer which can run on 32KHz or system clock (e.g 38.4 MHz)
+>>>
+>>> This patch series cleans up the existing 32k-sync timer implementation,
+>>> movind SoC init code to respective files (mach-omap1/timer32k.c and
+>>> mach-omap2/timer.c) and uses kernel parameter to override the default
+>>> clocksource of "counter_32k", also in order to support some OMAP based
+>>> derivative SoCs like AM33XX which doesn't have 32K sync-timer hardware IP,
+>>> adds hwmod lookup for omap2+ devices, and if lookup fails then
+>>> fall back to gp-timer.
+>>>
+>>> if(use_gptimer_clksrc == true)
+>>> 	gptimer clocksource init;
+>>> else if (counter_32 init == false)
+>>> 	/* Fallback to gptimer */
+>>> 	gptimer clocksource init(;
+>>>
+>>> With this, we should be able to support multi-omap boot
+>>> including devices with/without 32k-sync timer.
+>>>
+>>> This patch-series has been boot tested on AM37xEVM platform, it
+>>> would be helpful if somebody help me to validate it on OMAP1/2
+>>> platforms.
+>>>
+>>> The patches are also available at (based on linux-omap/master) -
+>>> https://github.com/hvaibhav/am335x-linux   32ksync-timer-cleanup
+>>
+>> I was testing on OMAP4 and I found that the gptimer was always being set by default. I noticed that currently the HWMOD for counter_32k on OMAP4 is commented and hence was not being found. Please can you include the following with your series?
+>>
+> 
+> The 32kcounter hwmod entry is already enabled in linux-omap/master branch.
+> 
+> Your baseline looks pretty old to me, are you not using linux-omap/master?
+
+Ha! My "old" baseline is the latest mainline kernel ;-)
+
+I guess this is a bit out-dated in terms of omap now. Sorry I missed
+that fact your patches were on top of the omap kernel in the changelog.
+
+Cheers
+Jon
