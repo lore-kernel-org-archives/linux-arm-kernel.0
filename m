@@ -1,64 +1,24 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 May 2012 11:02:41 +0530
-Subject: [PATCH V3 2/8] clk: add a fixed factor clock
-In-Reply-To: <20120502224108.GC18402@gmail.com>
-References: <cover.1335249846.git.viresh.kumar@st.com>
- <a8f9558e0709b63673e88912d25f2173b6b410e5.1335249846.git.viresh.kumar@st.com>
- <20120502094807.GE20478@pengutronix.de> <4FA120E8.5030707@st.com>
- <20120502224108.GC18402@gmail.com>
-Message-ID: <4FA21879.9060508@st.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 3 May 2012 15:35:10 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120503153510.ce4453a236d89250fb8dacde@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/3/2012 4:11 AM, Mike Turquette wrote:
-> I will take this patch in before sending my request to Arnd.  In your
-> patch 0/8 you ask me to take in the series, but it looks like not all of
-> the patches are going through me.  For instance patch 2/8 certainly
-> looks destined for Russell.
+Hi all,
 
-I think you only need to take this patch, i.e. 2/8.
-Others will go through Arnd directly, keeping your branch as an dependency
-branch for it.
+Today's linux-next merge of the arm-soc tree got conflicts in
+arch/arm/mach-ixp2000 and arch/arm/mach-ixp23xx between commits from the
+arm tree and commits from the arm-soc tree.
 
-> After fixing up this patch can you resend a clean series which is only
-> headed for clk-next?
-
-So, i would be sending this patch only after applying the last fixup
-(hopefully :) ).
-
-@Sascha: Please see if this patch is sufficient.
-
----
- drivers/clk/clk-fixed-factor.c |    9 ++++-----
- 1 files changed, 4 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 9afbdc4..8d25c2e 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -37,16 +37,15 @@ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
- {
-        struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
- 
--       if (prate) {
-+       if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
-                unsigned long best_parent;
-+
-                best_parent = (rate / fix->mult) * fix->div;
-                *prate = __clk_round_rate(__clk_get_parent(hw->clk),
-                                best_parent);
--               return (*prate / fix->div) * fix->mult;
--       } else {
--               return (__clk_get_rate(__clk_get_parent(hw->clk)) / fix->div) *
--                       fix->mult;
-        }
-+
-+       return (*prate / fix->div) * fix->mult;
- }
- 
- static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate,
-
-
-
+On Russell's advise, I just removed those two directories completely.
 -- 
-viresh
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120503/fb625be6/attachment.sig>
