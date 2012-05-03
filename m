@@ -1,116 +1,68 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 3 May 2012 13:28:59 +0530
-Subject: [PATCH-V7 1/3] ARM: OMAP1: FIX: check possible error condition in
- timer_init
+Date: Thu, 3 May 2012 13:29:00 +0530
+Subject: [PATCH-V7 2/3] ARM: OMAP2+: Replace space=>underscore in the name
+ field of system timers
 In-Reply-To: <1336031941-23651-1-git-send-email-hvaibhav@ti.com>
 References: <1336031941-23651-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1336031941-23651-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <1336031941-23651-3-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP1, omap_32k_timer_init() function always returns "true",
-irrespective of whether error occurred while initializing 32k sync
-counter as a kernel clocksource or not and execution will never
-fallback to mpu_timer clocksource init code.
+Depending on the bootloader, passing command-line arguments
+with spaces may have issues. Some bootloaders doesn't seem
+to pass along the quotes, passing only 'gp' part of the string,
+which leads to wrong override configuration.
 
-This patch adds check for return value from function
-omap_init_clocksource_32k(), and fallback to omap_mpu_timer_init()
-in case of failure/error from omap_init_clocksource_32k().
+The only affected kernel parameter configuration for OMAP family
+is "clocksource=", used to override kernel clocksource.
+
+So this patch changes "gp timer" => "gp_timer", for clockevent,
+clocksource and timer irq_handler.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Acked-by: Kevin Hilman <khilman@ti.com>
 Tested-by: Kevin Hilman <khilman@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
 ---
-No Functional code change compared to V6 version, only 'inline'
-prefix added to the function omap_32k_timer_init(), required to
-fix warning (Thanks to Kevin).
+No code change compared to V6 patch series, only
+commit description has been updated as per Kevin's comment.
 
- arch/arm/mach-omap1/common.h   |   10 +++++++++-
- arch/arm/mach-omap1/time.c     |   16 +---------------
- arch/arm/mach-omap1/timer32k.c |   13 +++++++++----
- 3 files changed, 19 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/timer.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index 8cc616e..cc83251 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -63,7 +63,15 @@ extern void omap1_nand_cmd_ctl(struct mtd_info *mtd, int cmd,
- 			       unsigned int ctrl);
-
- extern struct sys_timer omap1_timer;
--extern bool omap_32k_timer_init(void);
-+
-+#ifdef CONFIG_OMAP_32K_TIMER
-+extern int omap_32k_timer_init(void);
-+#else
-+static inline int __init omap_32k_timer_init(void)
-+{
-+	return -ENODEV;
-+}
-+#endif
-
- extern u32 omap_irq_flags;
-
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index 4d8dd9a..4062480 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -232,20 +232,6 @@ static inline void omap_mpu_timer_init(void)
- }
- #endif	/* CONFIG_OMAP_MPU_TIMER */
-
--static inline int omap_32k_timer_usable(void)
--{
--	int res = false;
--
--	if (cpu_is_omap730() || cpu_is_omap15xx())
--		return res;
--
--#ifdef CONFIG_OMAP_32K_TIMER
--	res = omap_32k_timer_init();
--#endif
--
--	return res;
--}
--
- /*
-  * ---------------------------------------------------------------------------
-  * Timer initialization
-@@ -253,7 +239,7 @@ static inline int omap_32k_timer_usable(void)
-  */
- static void __init omap1_timer_init(void)
- {
--	if (!omap_32k_timer_usable())
-+	if (omap_32k_timer_init() != 0)
- 		omap_mpu_timer_init();
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index ecec873..777f84b 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -90,7 +90,7 @@ static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
  }
 
-diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
-index 325b9a0..e3613a8 100644
---- a/arch/arm/mach-omap1/timer32k.c
-+++ b/arch/arm/mach-omap1/timer32k.c
-@@ -182,10 +182,15 @@ static __init void omap_init_32k_timer(void)
-  * Timer initialization
-  * ---------------------------------------------------------------------------
-  */
--bool __init omap_32k_timer_init(void)
-+int __init omap_32k_timer_init(void)
- {
--	omap_init_clocksource_32k();
--	omap_init_32k_timer();
-+	int ret = -ENODEV;
-
--	return true;
-+	if (cpu_is_omap16xx())
-+		ret = omap_init_clocksource_32k();
-+
-+	if (!ret)
-+		omap_init_32k_timer();
-+
-+	return ret;
+ static struct irqaction omap2_gp_timer_irq = {
+-	.name		= "gp timer",
++	.name		= "gp_timer",
+ 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= omap2_gp_timer_interrupt,
+ };
+@@ -132,7 +132,7 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
  }
+
+ static struct clock_event_device clockevent_gpt = {
+-	.name		= "gp timer",
++	.name		= "gp_timer",
+ 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+ 	.shift		= 32,
+ 	.set_next_event	= omap2_gp_timer_set_next_event,
+@@ -269,7 +269,7 @@ static cycle_t clocksource_read_cycles(struct clocksource *cs)
+ }
+
+ static struct clocksource clocksource_gpt = {
+-	.name		= "gp timer",
++	.name		= "gp_timer",
+ 	.rating		= 300,
+ 	.read		= clocksource_read_cycles,
+ 	.mask		= CLOCKSOURCE_MASK(32),
 --
 1.7.0.4
