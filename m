@@ -1,28 +1,31 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 3 May 2012 19:13:11 +0300
-Subject: moving Tegra30 to the common clock framework
-Message-ID: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 3 May 2012 19:14:03 +0300
+Subject: [PATCHv4 8/8] ARM: OMAP4: PM: Added option for enabling OSWR
+In-Reply-To: <CAORVsuWVMa-_T4JuXTwT6sePhp0mPoE9U_xhwA28AULveeiM+w@mail.gmail.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-9-git-send-email-t-kristo@ti.com>
+ <CAORVsuWVMa-_T4JuXTwT6sePhp0mPoE9U_xhwA28AULveeiM+w@mail.gmail.com>
+Message-ID: <1336061643.2149.213.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-I started looking into what would be needed to move our tegra30 clock code
-to the common clock framework. The tegra30 clocktree is rather flat. Basically
-there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
-and peripheral clocks which have a mux (with 4 or more inputs), a divider and
-a gate. So almost every peripheral clock can have multiple parents.
+<clip>
 
-Some questions:
+> > @@ -274,8 +278,16 @@ static int __init pm_dbg_init(void)
+> >
+> >        pwrdm_for_each(pwrdms_setup, (void *)d);
+> >
+> > -       (void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
+> > -                                  &enable_off_mode, &pm_dbg_option_fops);
+> > +       if (cpu_is_omap34xx())
+> > +               (void) debugfs_create_file("enable_off_mode",
+> > +                       S_IRUGO | S_IWUSR, d, &enable_off_mode,
+> > +                       &pm_dbg_option_fops);
+> Is the enable_off_mode entry needed on other OMAP platorms (OMAP<3)?
 
-1) should these peripheral clocks be modelled as 3 different clocks
-   (mux -> divider -> gate) or would it be better to make a new clock type for
-   this?
+Actually I am not sure, I've never used OMAP2. It looks like@least
+the kernel does not support off-mode for OMAP2, but according to TRM it
+might be possible to support it on HW.
 
-2) how to define the default parent? in many cases the hw reset value isn't
-   a very sensible choice, so the kernel probably needs to set a parent of
-   many of them if we don't want to rely on bootloader configuration.
-
-Cheers,
-
-Peter.
+-Tero
