@@ -1,34 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 3 May 2012 15:27:15 +0200
-Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B874F8@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <1335837363-12376-1-git-send-email-marex@denx.de>
- <201205011555.48430.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B874F8@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <201205031527.16149.marex@denx.de>
+From: jemmajones81@yahoo.co.uk (Jemma Jones)
+Date: Thu, 3 May 2012 14:35:55 +0100 (BST)
+Subject: Development tree for Cortex-A15?
+In-Reply-To: <bc6e93f98278125c354282f23751b1aa@localhost>
+References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+ <bc6e93f98278125c354282f23751b1aa@localhost>
+Message-ID: <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chen Peter-B29397,
+> Subject: Re: Development tree for Cortex-A15?
 
-> > Still use IRQF_SHARED for the usb interrupt, but:
-> > * The IRQ handler in ehci-mxs, that's set in hc_driver.irq would be
-> > always
-> > returning IRQ_NONE.
-> > * The IRQ handler in imx-otg would call the callback registered via
-> > imx_otg_set_irq_handler() only if the port was actually in host mode
 > 
-> The interrupt which is registered by hcd core is usb_hcd_irq, it will call
-> ehci_irq. The hc_driver.irq is included in usb_hcd_irq.
+> On Thu, 3 May 2012 12:56:39 +0100 (BST), Jemma Jones
+> <jemmajones81@yahoo.co.uk> wrote:
+> 
+> Hi Jemma,
+> 
+>>  Hi, I'm looking for the latest KVM-enabled developer version of the
+> Linux
+>>  kernel for ARM on the Versatile Express board with the Cortex-A15 CPU.?
+> 
+> It really depends on what you call "developer version". As far as I 
+> know,
+> there is nothing but dev trees around ;-).
+> 
+>>  I have pulled from these two trees
+>> 
+>> 
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+>> 
+> http://git.kernel.org/?p=linux/kernel/git/maz/arm-platforms.git;a=summary
+>> 
+>>  But it seems the 2nd one is more up-to-date with KVM enablement while it
+>>  doesn't have any support for the A15 VE board? And the 1st one 
+> doesn't
+>>  support KVM on ARM with the ARMv7 virtualization extensions?
+> 
+> First, my tree (the second one) does support the A15. Otherwise I'd have a
+> hard time testing my own code... Which branch are you looking at? Please
+> note that the KVM branches in this tree are under heavy development, and
+> are only suitable if you don't mind frequent rebases and regular breakage
+> due to bleeding edge code.
 
-Hm, that's correct. I'll dive in and see if there's any other way around. I 
-think I saw IRQF_DISABLED somewhere there, but that might be just some phantom. 
-Either way, is this direction I'm taking the correct one (have irq handler in 
-imx-otg and send IRQs to gadget/host drivers from there)?
+I'm currently on kvm-arm-v7-ael, because it looked like the most up-to-date one. Which one should I be using for Cortex-A15 support?
 
-Also, any other comments about this patchset before I roll out another version?
-
-Thanks!
-
-Best regards,
-Marek Vasut
+Thanks.
