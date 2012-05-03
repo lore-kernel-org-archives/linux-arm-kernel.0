@@ -1,37 +1,55 @@
-From: ylmao@marvell.com (Yilu Mao)
-Date: Thu, 3 May 2012 21:02:56 +0800
-Subject: [PATCH v5] ARM: cache-l2x0.c: save the final aux ctrl value for
- resuming
-In-Reply-To: <20120503125955.GE27872@arm.com>
-References: <1336046857-24133-1-git-send-email-ylmao@marvell.com>
- <20120503125955.GE27872@arm.com>
-Message-ID: <4FA28200.7020508@marvell.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 May 2012 15:24:36 +0200
+Subject: Development tree for =?UTF-8?Q?Cortex-A=31=35=3F?=
+In-Reply-To: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+Message-ID: <bc6e93f98278125c354282f23751b1aa@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2012 08:59 PM, Catalin Marinas wrote:
-> On Thu, May 03, 2012 at 01:07:37PM +0100, Yilu Mao wrote:
->> There is a bug if l2x0 controller has been enabled when calling
->> l2x0_init, the aux ctrl register will not be saved in l2x0_saved_regs.
->> Therefore we will use uninitialized l2x0_saved_regs.aux_ctrl for
->> resuming later.
->>
->> In this patch, the aux ctrl value is read and saved after it is
->> initialized. So we have the real value being set for resuming.
->>
->> Signed-off-by: Yilu Mao<ylmao@marvell.com>
+On Thu, 3 May 2012 12:56:39 +0100 (BST), Jemma Jones
+<jemmajones81@yahoo.co.uk> wrote:
+
+Hi Jemma,
+
+> Hi, I'm looking for the latest KVM-enabled developer version of the
+Linux
+> kernel for ARM on the Versatile Express board with the Cortex-A15 CPU.?
+
+It really depends on what you call "developer version". As far as I know,
+there is nothing but dev trees around ;-).
+ 
+> I have pulled from these two trees
+> 
 >
-> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
-Hi Catalin,
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+>
+http://git.kernel.org/?p=linux/kernel/git/maz/arm-platforms.git;a=summary
+> 
+> But it seems the 2nd one is more up-to-date with KVM enablement while it
+> doesn't have any support for the A15 VE board? And the 1st one doesn't
+> support KVM on ARM with the ARMv7 virtualization extensions?
 
-Thanks for reviewing.
-I have another question:
-There are a lot of registers in l2x0 controller.
-Why we only save so small amount of registers?
-Base on l2x0 spec, they suggest to save/restore all of them.
+First, my tree (the second one) does support the A15. Otherwise I'd have a
+hard time testing my own code... Which branch are you looking at? Please
+note that the KVM branches in this tree are under heavy development, and
+are only suitable if you don't mind frequent rebases and regular breakage
+due to bleeding edge code.
 
+If you want something more stable, you probably want to have a look at
+Christoffer Dall's tree:
+https://github.com/virtualopensystems/linux-kvm-arm
+
+You also may need to join the KVM-ARM mailing list (named android-virt for
+historical reasons):
+https://lists.cs.columbia.edu/cucslists/listinfo/android-virt
+
+One last thing though: all our developments are done on the Cortex-A15
+FastModel. In your email, you keep mentioning the VE board. For the time
+being, we have nothing running on the real hardware, only on the model.
+
+Good luck! ;-)
+
+        M.
 -- 
-Thanks.
-
-Best Wishes,
-Yilu Mao
+Fast, cheap, reliable. Pick two.
