@@ -1,55 +1,37 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 3 May 2012 21:23:55 +0200
-Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <20120503144645.6390.62303.sendpatchset@w520>
-References: <20120503144645.6390.62303.sendpatchset@w520>
-Message-ID: <201205032123.55535.rjw@sisk.pl>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 3 May 2012 19:25:36 +0000
+Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
+ callbacks
+In-Reply-To: <20120503184632.GA28089@animalcreek.com>
+References: <20120502234718.GA5432@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
+ <20120503160917.GA11310@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
+ <20120503184632.GA28089@animalcreek.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 03, 2012, Magnus Damm wrote:
-> mach-shmobile: Emma Mobile EV2 - first shot
+On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
+[...]
+> > 
+> > So, if I understood this correctly, it's effectively like blocking a low power
+> > state transition (here wfi execution) when EMAC is active?
 > 
-> [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
-> [PATCH 02/02] mach-shmobile: KZM9D board prototype support
+> Assuming "it" is my patch, correct.
 > 
-> This series adds experimental Emma Mobile EV2 support to
-> mach-shmobile. Yet another dual core Cortex-A9 SoC.
-> 
-> At this point only serial and timer is supported. Future work
-> includes GPIO, network device, SMP and DT support. If possible
-> it would be nice to use the common clocks on this platform.
-> 
-> To boot this on actual hardware you also need the following:
-> "[PATCH] serial8250-em: Emma Mobile UART driver V2"
-> "[PATCH] clocksource: em_sti: Emma Mobile STI driver"
-> 
-> Any reason to not put this in mach-shmobile?
-> 
-> Partially-signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Does unfortunately not apply cleanly to the renesas
->  git repository,
 
-Well, this sounds like a reason.
+Recently I was thinking about how to get certain drivers to disallow some or all
+low power states and to me this also seems to fall in a similar category.
 
->  so we need to figure out how to let
->  this coexist with the new boards...
+One of the suggestions that I got was to check if the 'wakeup' entry associated with
+the device under sysfs could be leveraged for this. The PM code could maintain
+a whitelist (or blacklist) of devices and it decides the low power state to enter
+based on the 'wakeup' entries associated with these devices. In this particular case,
+maybe the driver could simply set this entry to non-wakeup capable when necessary and
+then let the PM code take care of skipping the wfi execution.
 
-Surely.
+Thoughts/brickbats welcome :)
 
-Thanks,
-Rafael
-
-
->  arch/arm/mach-shmobile/Kconfig               |    9 +
->  arch/arm/mach-shmobile/Makefile              |    2 
->  arch/arm/mach-shmobile/board-kzm9d.c         |   44 +++++
->  arch/arm/mach-shmobile/clock-emev2.c         |  206 ++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/common.h |    6 
->  arch/arm/mach-shmobile/intc-emev2.c          |   36 ++++
->  arch/arm/mach-shmobile/setup-emev2.c         |  187 +++++++++++++++++++++++
->  7 files changed, 490 insertions(+)
-> 
-> 
+Regards,
+Vaibhav
