@@ -1,70 +1,70 @@
-From: bryan.buckley@ti.com (Buckley, Bryan)
-Date: Thu, 3 May 2012 17:58:58 -0500
-Subject: [PATCH] ARM: Enable I$/D$/BrPredict based on config
-In-Reply-To: <yw1xbom4c1ot.fsf@unicorn.mansr.com>
-References: <1336078825-9810-1-git-send-email-bryan.buckley@ti.com>
- <yw1xfwbgc3ab.fsf@unicorn.mansr.com>
- <CAG_NtY_sf6Et2F7kFdUT8=M7W51T5-qQxziG-iKCjY7R890enw@mail.gmail.com>
- <yw1xbom4c1ot.fsf@unicorn.mansr.com>
-Message-ID: <CAG_NtY8+W67_tbT0GGRB6eFBQGa5ht8kXU6ws7nS74g2ymtPuA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 04 May 2012 01:02:20 +0200
+Subject: [PATCH 18/18][V3] ARM: OMAP3: cpuidle - set global variables
+ static
+In-Reply-To: <878vh9ko3j.fsf@ti.com>
+References: <1335276339-11135-1-git-send-email-daniel.lezcano@linaro.org>
+ <1335276339-11135-19-git-send-email-daniel.lezcano@linaro.org>
+ <878vh9ko3j.fsf@ti.com>
+Message-ID: <4FA30E7C.8090900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2012 at 5:57 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
-> "Buckley, Bryan" <bryan.buckley@ti.com> writes:
+On 05/03/2012 10:26 PM, Kevin Hilman wrote:
+> Daniel Lezcano<daniel.lezcano@linaro.org>  writes:
 >
->> On Thu, May 3, 2012 at 5:23 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
->>>
->>> Bryan Buckley <bryan.buckley@ti.com> writes:
->>>
->>> > Currently we only disable these bits based on config. Now we will
->>> > use this config option to explicitly enable these features at this
->>> > point regardless of what bootloader, other SW, or HW did before.
->>> >
->>> > Signed-off-by: Bryan Buckley <bryan.buckley@ti.com>
->>> > ---
->>> > ?arch/arm/kernel/head.S | ? ?6 ++++++
->>> > ?1 files changed, 6 insertions(+), 0 deletions(-)
->>> >
->>> > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->>> > index 3bf0c7f..cec0de5 100644
->>> > --- a/arch/arm/kernel/head.S
->>> > +++ b/arch/arm/kernel/head.S
->>> > @@ -411,12 +411,18 @@ __enable_mmu:
->>> > ?#endif
->>> > ?#ifdef CONFIG_CPU_DCACHE_DISABLE
->>> > ? ? ? bic ? ? r0, r0, #CR_C
->>> > +#else
->>> > + ? ? orr ? ? r0, r0, #CR_C
->>> > ?#endif
->>> > ?#ifdef CONFIG_CPU_BPREDICT_DISABLE
->>> > ? ? ? bic ? ? r0, r0, #CR_Z
->>> > +#else
->>> > + ? ? orr ? ? r0, r0, #CR_Z
->>> > ?#endif
->>> > ?#ifdef CONFIG_CPU_ICACHE_DISABLE
->>> > ? ? ? bic ? ? r0, r0, #CR_I
->>> > +#else
->>> > + ? ? orr ? ? r0, r0, #CR_I
->>> > ?#endif
->>> > ?#ifdef CONFIG_ARM_LPAE
->>> > ? ? ? mov ? ? r5, #0
->>> > --
->>>
->>> Caches and branch predictors may require implementation defined
->>> invalidation before being enabled.
+>> and check the powerdomain lookup is successful.
 >>
->> True.. I was relying on going through arch/arm/boot/compressed/head.S
->> to do that for me. Was that unreasonable?
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cpuidle34xx.c |    5 ++++-
+>>   1 files changed, 4 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>> index 0d28596..116a0d8 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> @@ -73,7 +73,7 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+>>   	},
+>>   };
+>>
+>> -struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
+>> +static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
+>>
+>>   static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
+>>   				struct clockdomain *clkdm)
+>> @@ -252,6 +252,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>>   	 *        its own code.
+>>   	 */
+>>
+>> +	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
+>> +		return -ENODEV;
+>> +
 >
-> I'd be inclined to qualify that as "other SW." ?It is possible to start
-> the kernel without using that code, even if it is not typically done.
+> Why check here?  cam_pd is actually used just above this code.
 >
+> Also, this is in the fast path.  This should just be checked once at
+> init time instead of every idle path.
+>
+> For those reasons, I've dropped this part of the patch (updated patch
+> below.)
 
-haha, yeah me too.
+Hmm, weird this part should have been in the init function, I likely 
+missed a big fuzz I think when porting the patchset to the latest kernel 
+version. Thanks for fixing it.
 
-Thanks M?ns and Russel.
+> If desired, you can send an additional patch that adds this error
+> checking at init time and then refuses to register the driver if any of
+> the pwrdms don't exist.
 
-> --
-> M?ns Rullg?rd
-> mans at mansr.com
+Yes, I will do it.
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
