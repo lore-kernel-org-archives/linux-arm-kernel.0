@@ -1,36 +1,71 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 3 May 2012 22:14:55 +0800
-Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
-In-Reply-To: <CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>
-References: <1335939209-15625-1-git-send-email-b32955@freescale.com>
- <20120502144008.GF2194@S2101-09.ap.freescale.net>
- <1336042485.13013.41.camel@sauron.fi.intel.com>
- <CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>
-Message-ID: <CAMiH66EBO-MHXBb1eB4NMAJo6nPN47_42jYNGUGc=GC7oejPWQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 3 May 2012 15:52:48 +0200
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120503140428.GB897@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+Message-ID: <20120503135248.GC7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2012 at 8:38 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 3 May 2012 18:54, Artem Bityutskiy <dedekind1@gmail.com> wrote:
->> On Wed, 2012-05-02 at 22:40 +0800, Shawn Guo wrote:
->>> Hi Artem,
->>>
->>> As the patch heavily depends on mxs device tree branch, I think it will
->>> be easier to have it go through arm-soc tree. ?If you agree, can you
->>> please give your ack if the patch looks fine to you?
->>
->> I do not mind if it goes via the arm-soc tree. I cannot really review
->> this patch - it is too big, I think it should be split on smaller
->> chunks.
->>
-> Right. ?I also think that the patch should at least be split into two,
-> one converts the driver to device tree and the other adds imx6q
-> support. ?Shijie, can you do that?
-ok, I will  do it tomorrow.
+On 15:04 Thu 03 May     , Russell King - ARM Linux wrote:
+> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+> > Hi everyone,
+> > 
+> > I've been discussing multiplatform kernels with a few people recently,
+> > and we will have a lot of discussion sessions about this at Linaro
+> > Connect in Hong Kong.
+> > 
+> > One question that came up repeatedly is whether we should support all
+> > possible board files for each platform in a multiplatform kernel,
+> > or just the ones that are already using DT probing. I would like
+> > to get a quick poll of opinions on that and I've tried to put those
+> > people on Cc that would be most impacted by this, i.e. the maintainers
+> > for platforms that have both DT and non-DT board files at the moment.
+> > 
+> > My feeling is that we should just mandate DT booting for multiplatform
+> > kernels, because it significantly reduces the combinatorial space
+> > at compile time, avoids a lot of legacy board files that we cannot
+> > test anyway, reduces the total kernel size and gives an incentive
+> > for people to move forward to DT with their existing boards.
+> > 
+> > The counterargument is that we won't be able to support all the
+> > boards we currently do when the user switches on multiplatform,
+> > but I think that is acceptable.
+> > Note that I would still want to allow users to build platforms
+> > separately in order to enable the ATAG style board files, even
+> > for platforms that are not multiplatform capable.
+> 
+> I'm basing my comments off mach-zynq.
+> 
+> How about we take the following steps towards it?
+> 
+> 1. create arch/arm/include/mach/ which contains standardized headers
+>    for DT based implementations.  This must include all headers included
+>    by asm/ or linux/ includes.  This will also be the only mach/ header
+>    directory included for code outside of arch/arm/mach-*.  This also
+>    acts as the 'default' set of mach/* includes for stuff like timex.h
+>    and the empty hardware.h
+> 
+> 2. DT based mach-* directories do not have an include directory; their
+>    include files must be located in the main include/ heirarchy if shared
+>    with other parts of the kernel, otherwise they must be in the mach-*
+>    directory.
+on at91 I'm working to drop it
 
-It's better that this patch is merged by l2-mtd, because this patch
-depends on another patch which is
-on the l2-mtd now.
+but will have to keep for old non DT board
+> 
+> 3. Allow build multiple mach-* directories (which we already do... see
+>    the samsung stuff.)
+> 
+> We still have irqs.h being SoC dependent, and we still haven't taken
+> debug-macros.S far enough along to get rid of that.  Then there's also
+> the problem of uncompress.h.  The last piece of the puzzle is the common
+> clock stuff.
+on the decompressor I was thinking to use the DT to select it
+by using a compatible string
 
-Best Regards
-Huang Shijie
+if it's ok with you
+
+Best Regards,
+J.
