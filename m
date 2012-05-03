@@ -1,70 +1,58 @@
-From: jemmajones81@yahoo.co.uk (Jemma Jones)
-Date: Fri, 4 May 2012 13:20:08 +0100 (BST)
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
-Message-ID: <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 May 2012 16:27:44 +0000
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120503141853.GC897@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503141853.GC897@n2100.arm.linux.org.uk>
+Message-ID: <201205031627.44889.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> Subject: Re: Development tree for Cortex-A15?
+On Thursday 03 May 2012, Russell King - ARM Linux wrote:
+> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+> > My feeling is that we should just mandate DT booting for multiplatform
+> > kernels, because it significantly reduces the combinatorial space
+> > at compile time, avoids a lot of legacy board files that we cannot
+> > test anyway, reduces the total kernel size and gives an incentive
+> > for people to move forward to DT with their existing boards.
 > 
-> On Fri, 4 May 2012 09:44:07 +0100 (BST), Jemma Jones
-> <jemmajones81@yahoo.co.uk> wrote:
->>>  Subject: Re: Development tree for Cortex-A15?
->> 
->>> 
->>>  On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
->>>  <jemmajones81@yahoo.co.uk> wrote:
->>>>> ? Subject: Re: Development tree for Cortex-A15?
->>>> 
->>>> ? I'm currently on kvm-arm-v7-ael, because it looked like the 
-> most
->>>> ? up-to-date one. Which one should I be using for Cortex-A15 
-> support?
->>> 
->>>  That branch is good enough, if you have a bleeding edge QEMU. Note that
->>>  the VE A15 support in that tree is DT only. I'm working on a v3.4 
-> based
->>>  one
->>>  at the moment, but that's not completely ready yet.
->> 
->>  I'm just a little confused because under arch/arm/mach-vexpress/ there
-> is
->>  no A15 tile? On the virtualopensystems.com git (which you quote above)
-> you
->>  had to explicitly enable the board and it would show up in the .config
-> as
->>  CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your kernel
->>  tree?
-> 
-> No. The ARM tree in general is moving to the device tree, and
-> CONFIG_ARCH_VEXPRESS_CA15X4 was always meant as a temporary hack until the
-> VE-DT port was mature enough to be used.
-> 
-> As Pawe?'s DT work has been merged into 3.4, there is strictly no reason
-> to keep this hack around, and my recent trees do reflect that fact
-> (kvm-arm-v7-ael and kvm-arm-3.4). Christoffer may decide to keep this in
-> his tree during a transition period, but CONFIG_ARCH_VEXPRESS_CA15X4 is
-> dead as far as I am concerned.
-> 
-> If you're just starting to play with KVM-ARM now, please don't rely on 
-> the
-> A15 board file, it is a dead end.
+> On this point, I strongly object, especially as I'm one who uses the
+> existing non-DT multiplatform support extensively.  It's really not
+> a problem for what you're trying to achieve.
 
-Any chance you can send me a .config file that works on the kernel in this branch which runs on your A15x1 FastModel?
+Just to clarify the terminology, when I said "multiplatform", I did
+not mean enabling more than one board file inside a given mach-*
+directory but instead enabling multiple mach-* directories that
+are currently mutually exclusive, i.e. the future stuff you replied
+to in the other mail, not what everyone is doing today, and this
+would not stop anything from working that works today.
 
-I'm using the boot-wrapper from http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in semi hosting mode.
+> I think what you're proposing is a totally artificial restriction.
+> There's no problem with a kernel supporting DT and non-DT together.
+> We've proven that many many times.  I prove it every night that my
+> build and boot system runs - the OMAP LDP boots a multiplatform kernel
+> just fine without DT.
 
-I managed to boot Android from that but I don't seem to be able to boot your kernel. It just stops after the boot-wrapper says loading uImage.
+Of course it's an artificial restriction, if it was a technical necessity,
+I would not have needed to ask ;-) IMHO however it's a helpful restriction.
+My current count of board files is 393 and if you consider that we won't
+build v6+ and v4/v5 together and that some of them will probably not
+be multiplatform capable for a long time, we probably end up with about
+half of them in a given kernel, which is still a lot and I would not
+expect distributors to make a good decision about which ones of these
+are important to enable and which ones are not. If we restrict the
+Kconfig space to just the ones that are DT-enabled, we can be reasonably
+sure that these have been recently tested on actual hardware by someone
+who cares about them, and we get only a fraction of the user visible
+options, roughly one per soc generation.
 
-I'll need some more time to debug it properly and give some more information but it would be useful if I had a working .config to compare mine to.
+One counterargument that just occurred to me is build coverage, and it
+would be nice to have "make allyesconfig" actually build everything
+together as far as possible. We could get a bit closer to that if
+we allow those platforms that have no DT support to just provide a
+Kconfig option for multiplatform kernels that enables everything, e.g.
+when you build an ARMv4/ARMv5 kernel, you can enable all sa1100
+based boards together using one option, but when you build an sa1100
+kernel, you keep picking them individually.
 
-Cheers.
+	Arnd
