@@ -1,114 +1,181 @@
 From: r.sricharan@ti.com (R Sricharan)
-Date: Thu, 3 May 2012 12:56:16 +0530
-Subject: [PATCH 07/13] ARM: OMAP5: l3: Add l3 error handler support for omap5.
+Date: Thu, 3 May 2012 12:56:19 +0530
+Subject: [PATCH 10/13] ARM: OMAP5: board-generic: Add device tree support.
 In-Reply-To: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1336029982-31898-8-git-send-email-r.sricharan@ti.com>
+Message-ID: <1336029982-31898-11-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The l3 interconnect ip is same for OMAP4 and OMAP5.
-So reuse the l3 error handler error code for OMAP5
-as well. Also a few targets has been newly added for
-OMAP5. So updating the driver for that here.
+Adding the minimal support for OMAP5 soc with device tree.
 
 Signed-off-by: R Sricharan <r.sricharan@ti.com>
 ---
- arch/arm/mach-omap2/Makefile      |    1 +
- arch/arm/mach-omap2/devices.c     |    2 +-
- arch/arm/mach-omap2/omap_l3_noc.h |   22 ++++++++++++++++++----
- 3 files changed, 20 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/board-generic.c |   39 +++++++++++++++++++++-------------
+ arch/arm/mach-omap2/common.h        |    2 +
+ arch/arm/mach-omap2/irq.c           |   11 +++++++++
+ arch/arm/mach-omap2/omap4-common.c  |   14 ++++++++++++
+ 4 files changed, 51 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fbb6b3d..9f554e3 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -183,6 +183,7 @@ obj-$(CONFIG_OMAP3_EMU)			+= emu.o
- # L3 interconnect
- obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
- obj-$(CONFIG_ARCH_OMAP4)		+= omap_l3_noc.o
-+obj-$(CONFIG_ARCH_OMAP5)                += omap_l3_noc.o
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 098d183..0dd9e3f 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -20,6 +20,7 @@
+ #include <mach/hardware.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
++#include <mach/omap-wakeupgen.h>
  
- obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
- mailbox_mach-objs			:= mailbox.o
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index e433603..a1b539a 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -85,7 +85,7 @@ static int __init omap4_l3_init(void)
- 	 * To avoid code running on other OMAPs in
- 	 * multi-omap builds
- 	 */
--	if (!(cpu_is_omap44xx()))
-+	if ((!(cpu_is_omap44xx())) && (!cpu_is_omap54xx()))
- 		return -ENODEV;
+ #include <plat/board.h>
+ #include "common.h"
+@@ -32,17 +33,6 @@
+ #define gic_of_init		NULL
+ #endif
  
- 	for (i = 0; i < L3_MODULES; i++) {
-diff --git a/arch/arm/mach-omap2/omap_l3_noc.h b/arch/arm/mach-omap2/omap_l3_noc.h
-index 90b5098..a6ce34d 100644
---- a/arch/arm/mach-omap2/omap_l3_noc.h
-+++ b/arch/arm/mach-omap2/omap_l3_noc.h
-@@ -51,7 +51,9 @@ static u32 l3_targ_inst_clk1[] = {
- 	0x200, /* DMM2 */
- 	0x300, /* ABE */
- 	0x400, /* L4CFG */
--	0x600  /* CLK2 PWR DISC */
-+	0x600,  /* CLK2 PWR DISC */
-+	0x0,	/* Host CLK1 */
-+	0x900	/* L4 Wakeup */
- };
+-static struct of_device_id irq_match[] __initdata = {
+-	{ .compatible = "ti,omap2-intc", .data = omap_intc_of_init, },
+-	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+-	{ }
+-};
+-
+-static void __init omap_init_irq(void)
+-{
+-	of_irq_init(irq_match);
+-}
+-
+ static struct of_device_id omap_dt_match_table[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+ 	{ .compatible = "ti,omap-infra", },
+@@ -66,7 +56,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap242x_map_io,
+ 	.init_early	= omap2420_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_of_init_irq,
+ 	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+@@ -85,7 +75,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap243x_map_io,
+ 	.init_early	= omap2430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_of_init_irq,
+ 	.handle_irq	= omap2_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+@@ -120,7 +110,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_of_init_irq,
+ 	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap3_init,
+ 	.timer		= &omap3_timer,
+@@ -155,7 +145,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap4_map_io,
+ 	.init_early	= omap4430_init_early,
+-	.init_irq	= omap_init_irq,
++	.init_irq	= omap_gic_of_init,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= omap4_init,
+ 	.timer		= &omap4_timer,
+@@ -163,3 +153,22 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.restart	= omap_prcm_restart,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_ARCH_OMAP5
++static const char *omap5_boards_compat[] __initdata = {
++	"ti,omap5",
++	NULL,
++};
++
++DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= omap5_map_io,
++	.init_early	= omap5_init_early,
++	.init_irq	= omap_gic_of_init,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= omap_generic_init,
++	.timer		= &omap5_timer,
++	.dt_compat	= omap5_boards_compat,
++	.restart	= omap_prcm_restart,
++MACHINE_END
++#endif
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 0771d22..e66859d 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -185,6 +185,8 @@ void omap3_intc_prepare_idle(void);
+ void omap3_intc_resume_idle(void);
+ void omap2_intc_handle_irq(struct pt_regs *regs);
+ void omap3_intc_handle_irq(struct pt_regs *regs);
++void omap_of_init_irq(void);
++void omap_gic_of_init(void);
  
- static u32 l3_targ_inst_clk2[] = {
-@@ -72,11 +74,16 @@ static u32 l3_targ_inst_clk2[] = {
- 	0xE00, /* missing in TRM corresponds to AES2*/
- 	0xC00, /* L4 PER3 */
- 	0xA00, /* L4 PER1*/
--	0xB00 /* L4 PER2*/
-+	0xB00, /* L4 PER2*/
-+	0x0, /* HOST CLK2 */
-+	0x1800, /* CAL */
-+	0x1700 /* LLI */
- };
+ #ifdef CONFIG_CACHE_L2X0
+ extern void __iomem *omap4_get_l2cache_base(void);
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 65f0d25..d316c68 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -21,6 +21,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
  
- static u32 l3_targ_inst_clk3[] = {
--	0x0100	/* EMUSS */
-+	0x0100	/* EMUSS */,
-+	0x0300, /* DEBUGSS_CT_TBR */
-+	0x0 /* HOST CLK3 */
- };
+ #include <mach/hardware.h>
  
- static struct l3_masters_data {
-@@ -110,13 +117,15 @@ static struct l3_masters_data {
- 	{ 0xC8, "USBHOSTFS"}
- };
+@@ -279,6 +280,16 @@ int __init omap_intc_of_init(struct device_node *node,
+ 	return 0;
+ }
  
--static char *l3_targ_inst_name[L3_MODULES][18] = {
-+static char *l3_targ_inst_name[L3_MODULES][21] = {
- 	{
- 		"DMM1",
- 		"DMM2",
- 		"ABE",
- 		"L4CFG",
- 		"CLK2 PWR DISC",
-+		"HOST CLK1",
-+		"L4 WAKEUP"
- 	},
- 	{
- 		"CORTEX M3" ,
-@@ -137,9 +146,14 @@ static char *l3_targ_inst_name[L3_MODULES][18] = {
- 		"L4 PER3",
- 		"L4 PER1",
- 		"L4 PER2",
-+		"HOST CLK2",
-+		"CAL",
-+		"LLI"
- 	},
- 	{
- 		"EMUSS",
-+		"DEBUG SOURCE",
-+		"HOST CLK3"
- 	},
- };
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "ti,omap2-intc", .data = omap_intc_of_init, },
++	{ }
++};
++
++void __init omap_of_init_irq(void)
++{
++	of_irq_init(irq_match);
++}
++
+ #ifdef CONFIG_ARCH_OMAP3
+ static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
  
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 70de277..5d7c083 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -16,6 +16,8 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/memblock.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ 
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -207,3 +209,15 @@ static int __init omap4_sar_ram_init(void)
+ 	return 0;
+ }
+ early_initcall(omap4_sar_ram_init);
++
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
++	{ }
++};
++
++void __init omap_gic_of_init(void)
++{
++	omap_wakeupgen_init();
++	of_irq_init(irq_match);
++}
 -- 
 1.7.1
