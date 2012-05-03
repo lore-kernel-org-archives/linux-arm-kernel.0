@@ -1,45 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 03 May 2012 11:41:35 -0600
-Subject: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com>
-References: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <4FA2C34F.5060406@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  3 May 2012 18:42:55 +0100
+Subject: [PATCH 1/6] ARM: audit: fix treatment of saved ip register during
+ syscall tracing
+In-Reply-To: <1336066980-24000-1-git-send-email-will.deacon@arm.com>
+References: <1336066980-24000-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1336066980-24000-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2012 10:05 AM, Hiroshi DOYU wrote:
-> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> High-performance Bus (AHB) architecture.
-> 
-> The AHB Arbiter controls AHB bus master arbitration. This effectively
-> forms a second level of arbitration for access to the memory
-> controller through the AHB Slave Memory device. The AHB pre-fetch
-> logic can be configured to enhance performance for devices doing
-> sequential access. Each AHB master is assigned to either the high or
-> low priority bin. Both Tegra20/30 have this AHB bus.
-> 
-> Some of configuration param could be passed from DT too.
+The ARM audit code incorrectly uses the saved application ip register
+value to infer syscall entry or exit. Additionally, the saved value will
+be clobbered if the current task is not being traced, which can lead to
+libc corruption if ip is live (apparently glibc uses it for the TLS
+pointer).
 
-> diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-> +static u32 tegra_ahb_gizmo[] = {
+This patch fixes the syscall tracing code so that the why parameter is
+used to infer the syscall direction and the saved ip is only updated if
+we know that we will be signalling a ptrace trap.
 
-const?
+Cc: Eric Paris <eparis@redhat.com>
+Reported-and-tested-by: Jon Masters <jcm@jonmasters.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/ptrace.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-> +static int __init tegra_ahb_module_init(void)
-> +{
-> +	return platform_driver_register(&tegra_ahb_driver);
-> +}
-> +postcore_initcall(tegra_ahb_module_init);
-
-Can this be a module_init() instead of postcore_initcall()?
-
-> +
-> +static void __exit tegra_ahb_module_exit(void)
-> +{
-> +	platform_driver_unregister(&tegra_ahb_driver);
-> +}
-> +module_exit(tegra_ahb_module_exit);
-
-If so, all of the previous two quoted chunks can be replaced with just:
-
-module_platform_driver(tegra_ahb_module_init);
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 80abafb..d8dbe9c 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -916,14 +916,7 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ {
+ 	unsigned long ip;
+ 
+-	/*
+-	 * Save IP.  IP is used to denote syscall entry/exit:
+-	 *  IP = 0 -> entry, = 1 -> exit
+-	 */
+-	ip = regs->ARM_ip;
+-	regs->ARM_ip = why;
+-
+-	if (!ip)
++	if (why)
+ 		audit_syscall_exit(regs);
+ 	else
+ 		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
+@@ -936,6 +929,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 
+ 	current_thread_info()->syscall = scno;
+ 
++	/*
++	 * IP is used to denote syscall entry/exit:
++	 * IP = 0 -> entry, =1 -> exit
++	 */
++	ip = regs->ARM_ip;
++	regs->ARM_ip = why;
++
+ 	/* the 0x80 provides a way for the tracing parent to distinguish
+ 	   between a syscall stop and SIGTRAP delivery */
+ 	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+-- 
+1.7.4.1
