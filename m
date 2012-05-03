@@ -1,48 +1,32 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Thu, 3 May 2012 04:03:12 +0100
-Subject: [PATCH] ARM: Fix restoration of IP scratch register when
- auditing syscalls
-In-Reply-To: <4FA1F499.8000408@jonmasters.org>
-References: <1335681504-4609-1-git-send-email-jcm@jonmasters.org>
- <1335681504-4609-2-git-send-email-jcm@jonmasters.org>
- <20120430100746.GA11080@mudshark.cambridge.arm.com>
- <20120430190015.GV24211@n2100.arm.linux.org.uk>
- <4FA1F499.8000408@jonmasters.org>
-Message-ID: <20120503030312.GM6871@ZenIV.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 3 May 2012 11:21:05 +0800
+Subject: [PATCH 31/33] ARM i.MX5: implement clocks using common clock
+ framework
+In-Reply-To: <1335367703-19929-32-git-send-email-s.hauer@pengutronix.de>
+References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
+ <1335367703-19929-32-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20120503032102.GG2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 10:59:37PM -0400, Jon Masters wrote:
-> On 04/30/2012 03:00 PM, Russell King - ARM Linux wrote:
-> > On Mon, Apr 30, 2012 at 11:07:46AM +0100, Will Deacon wrote:
-> >> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> >> index 80abafb..bfcadc0 100644
-> >> --- a/arch/arm/kernel/ptrace.c
-> >> +++ b/arch/arm/kernel/ptrace.c
-> >> @@ -916,14 +916,7 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
-> >>  {
-> >>         unsigned long ip;
-> >>  
-> >> -       /*
-> >> -        * Save IP.  IP is used to denote syscall entry/exit:
-> >> -        *  IP = 0 -> entry, = 1 -> exit
-> >> -        */
-> >> -       ip = regs->ARM_ip;
-> >> -       regs->ARM_ip = why;
-> >> -
-> >> -       if (!ip)
-> >> +       if (why)
-> > 
-> > Umm yes, that original code is complete crap, because the old IP value
-> > has no meaning what so ever.  The replacement looks much better here.
-> 
-> Hey Russell,
-> 
-> So given that Will's replacement works in my investigation, etc. Can you
-> pull that please with my reported/tested-by ACK? I think it's a stable
-> candidate too. I mean, ok, it won't crash your system unless you have
-> audit capability, but it's still a good idea to fix I think.
+Hi Sascha,
 
-How about splitting the damn thing into syscall_trace_enter() and
-syscall_trace_exit(), losing the "why" argument along with all possible
-confusion as to which audit hook to call?
+Can you fix the ssi clocks below before you send it to Arnd?  Or I will
+send a fix to patch it later.
+
+On Wed, Apr 25, 2012 at 05:28:21PM +0200, Sascha Hauer wrote:
+> +	clk[ssi1_ipg_gate] = imx_clk_gate2("ssi1_ipg_gate", "ipg", MXC_CCM_CCGR3, 16);
+> +	clk[ssi2_ipg_gate] = imx_clk_gate2("ssi2_ipg_gate", "ipg", MXC_CCM_CCGR3, 18);
+s/18/20
+> +	clk[ssi3_ipg_gate] = imx_clk_gate2("ssi3_ipg_gate", "ipg", MXC_CCM_CCGR3, 20);
+s/20/24
+
+> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
+> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.1");
+ssi2_ipg_gate
+> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.2");
+ssi3_ipg_gate
+
+-- 
+Regards,
+Shawn
