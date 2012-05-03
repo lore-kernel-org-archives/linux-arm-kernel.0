@@ -1,32 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 3 May 2012 11:21:05 +0800
-Subject: [PATCH 31/33] ARM i.MX5: implement clocks using common clock
- framework
-In-Reply-To: <1335367703-19929-32-git-send-email-s.hauer@pengutronix.de>
-References: <1335367703-19929-1-git-send-email-s.hauer@pengutronix.de>
- <1335367703-19929-32-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120503032102.GG2194@S2101-09.ap.freescale.net>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Thu, 3 May 2012 03:24:50 +0000
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <201205011555.48430.marex@denx.de>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+ <201205010549.34309.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B7C53C@039-SN2MPN1-023.039d.mgd.msft.net>
+ <201205011555.48430.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B874F8@039-SN2MPN1-022.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
-Can you fix the ssi clocks below before you send it to Arnd?  Or I will
-send a fix to patch it later.
-
-On Wed, Apr 25, 2012 at 05:28:21PM +0200, Sascha Hauer wrote:
-> +	clk[ssi1_ipg_gate] = imx_clk_gate2("ssi1_ipg_gate", "ipg", MXC_CCM_CCGR3, 16);
-> +	clk[ssi2_ipg_gate] = imx_clk_gate2("ssi2_ipg_gate", "ipg", MXC_CCM_CCGR3, 18);
-s/18/20
-> +	clk[ssi3_ipg_gate] = imx_clk_gate2("ssi3_ipg_gate", "ipg", MXC_CCM_CCGR3, 20);
-s/20/24
-
-> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
-> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.1");
-ssi2_ipg_gate
-> +	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.2");
-ssi3_ipg_gate
-
--- 
-Regards,
-Shawn
+ 
+> 
+> Still use IRQF_SHARED for the usb interrupt, but:
+> * The IRQ handler in ehci-mxs, that's set in hc_driver.irq would be
+> always
+> returning IRQ_NONE.
+> * The IRQ handler in imx-otg would call the callback registered via
+> imx_otg_set_irq_handler() only if the port was actually in host mode
+> 
+The interrupt which is registered by hcd core is usb_hcd_irq, it will call
+ehci_irq. The hc_driver.irq is included in usb_hcd_irq. 
