@@ -1,63 +1,61 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 4 May 2012 15:00:35 +0200
-Subject: [PATCH 1/1] ARM: tegra: Add Tegra Memory Controller(MC) driver
-In-Reply-To: <4FA2D0C4.4020608@wwwdotorg.org>
-References: <1336063897-12083-1-git-send-email-hdoyu@nvidia.com><4FA2D0C4.4020608@wwwdotorg.org>
-Message-ID: <20120504.160035.1828735037330038337.hdoyu@nvidia.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 4 May 2012 13:04:42 +0000
+Subject: [GIT PULL] DaVinci fixes for v3.5
+Message-ID: <DF0F476B391FA8409C78302C7BA518B63E9FF67D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@wwwdotorg.org>
-Subject: Re: [PATCH 1/1] ARM: tegra: Add Tegra Memory Controller(MC) driver
-Date: Thu, 3 May 2012 20:39:00 +0200
-Message-ID: <4FA2D0C4.4020608@wwwdotorg.org>
+Hi Arnd, Olof,
 
-> On 05/03/2012 10:51 AM, Hiroshi DOYU wrote:
-> > Tegra Memory Controller(MC) driver for Tegra20/30.
-> > Added to support MC General interrupts, mainly for IOMMU.
-> 
-> > The location of a file may not be suitable because of xxx_driver under arch/arm/mach-*.
-> > ---
-> > diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> 
-> Russell, Olof, Arnd,
-> 
-> Where should this driver be placed? It's a completely Tegra-specific
-> module, and I don't believe there's any drivers/ directory or other
-> subsystem that's appropriate to house it right now. Should we go ahead
-> and create a drivers/arm/ for this? Perhaps drivers/misc/?
-> 
-> Honestly, to me it seems best to keep purely platform-specific drivers
-> like this in arch/arm/mach-tegra, since that's the most closely
-> Tegra-related directory.
-> 
-> Hiroshi,
-> 
-> This driver attempts to cover both Tegra20 and Tegra30. However, there's
-> almost no common code. I think it'd be best as separate tegra20-mc.c and
-> tegra30-mc.c.
-> 
-> This patch should include DT binding documentation.
-> 
-> That all said, I'd hold off on reposting this until we work out how the
-> MC/GART/SMMU parent-child relationship stuff is worked out; see my
-> immediately previous email.
+Please pull these DaVinci fixes for v3.5 kernel. The definition of "fix" is 
+admittedly broad here, but I did not want to create too many separate pull 
+requests either. This itself is a pretty small one as such.
 
-Ok.
+This is also a first signed-tag pull request from me, so let me know it is not 
+correct for some reason.
 
-What about the following AHB patches? AHB patches are independent of
-MC/GART/SMMU DT issue basically. If you think that they are ready to
-merge, I'll post the update version, I fixed some of your latest
-comments.
+Thanks,
+Sekhar
 
- [PATCH 1/3] ARM: tegra: Add Tegra AHB driver
- [PATCH 2/3] ARM: tegra: Add SMMU enabler in AHB
- [PATCH 3/3] ARM: dt: tegra: Add device tree support for AHB
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 
+  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
 
-I'll hold off on the following until we get some direction for
-MC/GART/SMMU. They are related to how dt info is passed via MC.
+are available in the git repository at:
 
- [PATCH 1/3] ARM: tegra: Add Tegra Memory Controller(MC) driver
- [PATCH 2/3] ARM: dt: tegra: Add device tree support for Memory Controller(MC)
- [PATCH 3/3] iommu/tegra: smmu: Refrain from accessing to AHB
+  git://gitorious.org/linux-davinci/linux-davinci.git tags/v3.5-fixes
+
+for you to fetch changes up to b1cb237602563db2d69d010a708a90149850e832:
+
+  ARM: davinci: optimize the DMA ISR (2012-05-01 00:54:57 +0530)
+
+----------------------------------------------------------------
+DaVinci fixes for v3.5
+
+This patch set has fixes for
+
+1) incorrect bit position being used in power domain switching code
+2) not marking some variables as const when they could be const
+3) section mismatch warning in da850 evm code
+4) remove excessive register access in DMA ISR to speed up execution.
+
+----------------------------------------------------------------
+Murali Karicheri (1):
+      ARM: davinci: fix incorrect pdctl next bit position
+
+Sebastian Andrzej Siewior (1):
+      ARM: davinci: optimize the DMA ISR
+
+Uwe Kleine-K?nig (2):
+      ARM: davinci: mark spi_board_info arguments as const
+      ARM: davinci: da850-evm: fix section mismatch
+
+ arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
+ arch/arm/mach-davinci/davinci.h            |    4 +-
+ arch/arm/mach-davinci/devices-da8xx.c      |    2 +-
+ arch/arm/mach-davinci/dm355.c              |    2 +-
+ arch/arm/mach-davinci/dm365.c              |    2 +-
+ arch/arm/mach-davinci/dma.c                |   69 ++++++++++++++--------------
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 +-
+ arch/arm/mach-davinci/include/mach/psc.h   |    2 +-
+ 8 files changed, 43 insertions(+), 43 deletions(-)
