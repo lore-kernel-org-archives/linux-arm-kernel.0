@@ -1,79 +1,72 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 4 May 2012 08:30:12 +0000
-Subject: [PATCH V3 04/10] ARM: OMAP3: hwmod: rename the smartreflex entries
-In-Reply-To: <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B1AA2@DBDE01.ent.ti.com>
+From: jemmajones81@yahoo.co.uk (Jemma Jones)
+Date: Fri, 4 May 2012 09:44:07 +0100 (BST)
+Subject: Development tree for Cortex-A15?
+In-Reply-To: <6e4ad6defa33bf693ec45cae819469f0@localhost>
+References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+ <bc6e93f98278125c354282f23751b1aa@localhost>
+ <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
+ <6e4ad6defa33bf693ec45cae819469f0@localhost>
+Message-ID: <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 23:10:35, J, KEERTHY wrote:
-> From: Jean Pihet <j-pihet@ti.com>
-> 
-> Change the name field value to better reflect the smartreflex
-> integration in the system.
-> 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Signed-off-by: J Keerthy <j-keerthy@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
->  arch/arm/mach-omap2/smartreflex.c          |    2 +-
->  2 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index 144d118..15907b0 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -1324,7 +1324,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
->  };
->  
->  static struct omap_hwmod omap34xx_sr1_hwmod = {
-> -	.name		= "sr1",
-> +	.name		= "smartreflex_mpu_iva",
->  	.class		= &omap34xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr1_fck",
->  	.prcm		= {
-> @@ -1342,7 +1342,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
->  };
->  
->  static struct omap_hwmod omap36xx_sr1_hwmod = {
-> -	.name		= "sr1",
-> +	.name		= "smartreflex_mpu_iva",
->  	.class		= &omap36xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr1_fck",
->  	.prcm		= {
-> @@ -1369,7 +1369,7 @@ static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
->  };
->  
->  static struct omap_hwmod omap34xx_sr2_hwmod = {
-> -	.name		= "sr2",
-> +	.name		= "smartreflex_core",
->  	.class		= &omap34xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr2_fck",
->  	.prcm		= {
-> @@ -1387,7 +1387,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
->  };
->  
->  static struct omap_hwmod omap36xx_sr2_hwmod = {
-> -	.name		= "sr2",
-> +	.name		= "smartreflex_core",
->  	.class		= &omap36xx_smartreflex_hwmod_class,
->  	.main_clk	= "sr2_fck",
->  	.prcm		= {
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 2edd1e2..d859277 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -183,7 +183,7 @@ static void sr_set_regfields(struct omap_sr *sr)
->  		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
->  		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
->  		sr->accum_data = OMAP3430_SR_ACCUMDATA;
-> -		if (!(strcmp(sr->name, "sr1"))) {
-> +		if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
+> Subject: Re: Development tree for Cortex-A15?
 
-What if voltage rail is different for mpu and iva? I have seen some devices
-supports SmartReflex have different voltage rails for mpu and iva.
+> 
+> On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
+> <jemmajones81@yahoo.co.uk> wrote:
+>>>  Subject: Re: Development tree for Cortex-A15?
+>> 
+>>> 
+>>>  On Thu, 3 May 2012 12:56:39 +0100 (BST), Jemma Jones
+>>>  <jemmajones81@yahoo.co.uk> wrote:
+>>> 
+>>>  Hi Jemma,
+>>> 
+>>>> ? Hi, I'm looking for the latest KVM-enabled developer version 
+> of the
+>>>  Linux
+>>>> ? kernel for ARM on the Versatile Express board with the Cortex-A15
+>>>> ? CPU.?
+>>> 
+>>>  It really depends on what you call "developer version". As 
+> far as I 
+>>>  know,
+>>>  there is nothing but dev trees around ;-).
+>>> 
+>>>> ? I have pulled from these two trees
+>>>> 
+>>>> 
+>>> 
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
+>>>> 
+>>> 
+> http://git.kernel.org/?p=linux/kernel/git/maz/arm-platforms.git;a=summary
+>>>> 
+>>>> ? But it seems the 2nd one is more up-to-date with KVM enablement 
+> while
+>>>> ? it
+>>>> ? doesn't have any support for the A15 VE board? And the 1st one 
+> 
+>>>  doesn't
+>>>> ? support KVM on ARM with the ARMv7 virtualization extensions?
+>>> 
+>>>  First, my tree (the second one) does support the A15. Otherwise I'd
+> have
+>>>  a
+>>>  hard time testing my own code... Which branch are you looking at?
+> Please
+>>>  note that the KVM branches in this tree are under heavy development,
+> and
+>>>  are only suitable if you don't mind frequent rebases and regular
+> breakage
+>>>  due to bleeding edge code.
+>> 
+>>  I'm currently on kvm-arm-v7-ael, because it looked like the most
+>>  up-to-date one. Which one should I be using for Cortex-A15 support?
+> 
+> That branch is good enough, if you have a bleeding edge QEMU. Note that
+> the VE A15 support in that tree is DT only. I'm working on a v3.4 based one
+> at the moment, but that's not completely ready yet.
 
-Regards
-AnilKumar
+I'm just a little confused because under arch/arm/mach-vexpress/ there is no A15 tile? On the virtualopensystems.com git (which you quote above) you had to explicitly enable the board and it would show up in the .config as CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your kernel tree?
