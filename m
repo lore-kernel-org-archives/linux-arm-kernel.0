@@ -1,38 +1,93 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 May 2012 19:58:51 +0100
-Subject: Handling of modular boards
-Message-ID: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 5 May 2012 00:31:49 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FA3F308.6030900@ti.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+ <4FA3F308.6030900@ti.com>
+Message-ID: <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quite a few reference platforms (including Wolfson ones, which is why
-I'm particularly interested) use replaceable modules to allow
-configuration changes.  Since we can often identify the configuration at
-runtime we should ideally do that but currently there's no infrastructure 
-to help with that, generally this seems to be done in arch code for the
-machine but this doesn't scale when even the CPU might change and isn't
-terribly device tree compatible either.
+On 4 May 2012 20:47, Jon Hunter <jon-hunter@ti.com> wrote:
+> Hi Jassi,
+>
+> On 05/04/2012 01:56 AM, Jassi Brar wrote:
+>> On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
+>>> From: Jon Hunter <jon-hunter@ti.com>
+>>>
+>>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+>>> to add some basic helpers to retrieve a DMA controller device_node and the
+>>> DMA request/channel information.
+>>>
+>>> Aim of DMA helpers
+>>> - The purpose of device-tree (as far as I understand), is to describe the
+>>> ?capabilites of the hardware. Thinking about DMA controllers purely from the
+>>> ?context of the hardware to begin with, we can describe a device in terms of
+>>> ?a DMA controller as follows ...
+>>> ? ? ? ?1. Number of DMA controllers
+>>> ? ? ? ?2. Number of channels (maybe physical or logical)
+>>> ? ? ? ?3. Mapping of DMA requests signals to DMA controller
+>>> ? ? ? ?4. Number of DMA interrupts
+>>> ? ? ? ?5. Mapping of DMA interrupts to channels
+>>> - With the above in mind the aim of the DT DMA helper functions is to extract
+>>> ?the above information from the DT and provide to the appropriate driver.
+>>> ?However, due to the vast number of DMA controllers and not all are using a
+>>> ?common driver (such as DMA Engine) it has been seen that this is not a
+>>> ?trivial task.
+>>>
+>> Sorry for being slow, but so far I thought DT is only to provide _h/w_
+>> specific info
+>> to the _controller_ drivers. It was not supposed to provide any info
+>> pertaining to
+>> some API (dmaengine in this case).
+>>
+>> And I believe this is one of few situations where we are better off
+>> not generalizing
+>> the interface - pass controller specific info in the controller
+>> driver's specified format.
+>> Generalizing only seems to complicate things here, when we anyway have machine
+>> specific dtb, which could always have clients requesting and the
+>> controllers given
+>> dma's info in controller driver's specific format.
+>>
+>> Perhaps I am overlooking the need to generalize. If you think so, please help me
+>> understand by pointing out some use case for it.
+>
+> No not really, your points are valid. From reading the previous
+> discussions one of the items that was clearly lacking was the ability to
+> represent and identify a device having more than one DMA controller. In
+> other words, when you request the DMA resource, how do you identify
+> which DMA controller in the system that resource belongs too. With DMA
+> engine there are ways we can do this.
+>
+Well, if we really can't have dmac drivers make 'intelligent' runtime decision
+of request mapping on more than one capable controllers, we still can
+make it simpler than the proposed scheme.
 
-For reference the code for current Wolfson plugin modules is in
-arch/arm/mach-s3c64xx/mach-crag6410-module.c.
++       i2c1: i2c at 1 {
++               ...
++               dma = <&sdma 2 1 &sdma 3 2>;
++               ...
++       };
+>
+I see this requires a client driver to specify a particular req_line on a
+particular dma controller. I am not sure if this is most optimal.
 
-The most obvious current fit here is the MFD subsystem but it feels like
-we need some slightly different infastructure to what MFD currently
-provides.  MFD is really set up to handle platform devices with a core
-and linear ranges of resources fanning out from that core since they're
-really oriented around chips.  In contrast these boards are more about
-remapping random collections of potentially unrelated resources and
-instantiating devices on all sorts of buses and share more with board
-files.
+I think such client->req_line map should be provided to the dmac controller
+driver via its dt node in some format. The dmac driver could then populate
+a dma_chan, or similar, only for that req_line and not for the unused one
+which otherwise could also have served the same client.
 
-I'm just starting to put some stuff together for this so I was wondering
-if anyone had been thinking about this and had any bright ideas for how
-to handle it, and also if people think that MFD is a good fit for this
-or if we should split the silicon MFDs from these PCBs.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/63fe30a3/attachment.sig>
+Ideally the I2C driver should simply ask, say, a channel for TX and another
+for RX, everything else should already be setup via dmac's dt nodes.
+
+Channel properties like duplex, priority etc specified in client's dt node
+doesn't seem really necessary - the client's driver is able to adjust
+according to the capability of the channel the dmaengine api is able
+to provide and the client driver can't really do anything if it saw "txrx"
+specified in it's dt node while it doesn't yet support full-duplex (say).
+
+Having spilled my guts and realizing the fact that the Maradonas and Peles
+of the game seem to have already bought the scheme, I am afraid it only
+points to my not yet diagnosed adhd  :o
