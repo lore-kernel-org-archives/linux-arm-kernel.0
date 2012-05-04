@@ -1,122 +1,47 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 4 May 2012 18:38:07 +0200
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <20120504163420.GA5613@atomide.com>
-References: <20120502172401.GG3739@atomide.com>
- <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com>
- <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org>
- <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org>
- <20120504163420.GA5613@atomide.com>
-Message-ID: <20120504163807.GG7788@game.jcrosoft.org>
+Date: Fri, 4 May 2012 18:40:45 +0200
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120504165603.GK897@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+ <201205041220.24747.arnd@arndb.de> <4FA40642.5040203@gmail.com>
+ <20120504165603.GK897@n2100.arm.linux.org.uk>
+Message-ID: <20120504164045.GH7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:34 Fri 04 May     , Tony Lindgren wrote:
-> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
-> > On 08:03 Fri 04 May     , Tony Lindgren wrote:
-> > > > 
-> > > > so I was thinking to do like on gpio
-> > > > 
-> > > > uart {
-> > > > 	pin = < &pioA 12 {pararms} >
-> > > > 
-> > > > }
-> > > 
-> > > Hmm I assume the "12" above the gpio number?
-> > no pin number in the bank because it could not be gpio
+On 17:56 Fri 04 May     , Russell King - ARM Linux wrote:
+> On Fri, May 04, 2012 at 11:39:30AM -0500, Rob Herring wrote:
+> > Many of the headers are simply platform_data structs which may still be
+> > needed on DT platforms, but could be moved elsewhere.
 > 
-> Yes OK, but pin number 12 in the gpio bank, not in the mux register.
-> Got it.
->  
-> > 	pioD: gpio at fffff800 {
-> > 		compatible = "atmel,at91rm9200-gpio";
-> > 		reg = <0xfffff800 0x100>;
-> > 		interrupts = <5 4>;
-> > 		#gpio-cells = <2>;
-> > 		gpio-controller;
-> > 		interrupt-controller;
-> > 	};
+> Those should be in include/linux/platform.
+> 
+> > >> Then there's also the problem of uncompress.h.  The last piece of the
+> > >> puzzle is the common clock stuff.
 > > 
-> > 	pioE: gpio at fffffa00 {
-> > 		compatible = "atmel,at91rm9200-gpio";
-> > 		reg = <0xfffffa00 0x100>;
-> > 		interrupts = <5 4>;
-> > 		#gpio-cells = <2>;
-> > 		gpio-controller;
-> > 		interrupt-controller;
-> > 	};
+> > The smp/hotplug/localtimer related functions are still global. Marc Z
+> > has posted patches for this, but I haven't seen recent activity. This
+> > and clocks were the 2 main issues I saw trying to build 2 platforms
+> > together. highbank and picoxcell could be built together since only
+> > highbank has clocks and smp.
 > > 
-> > 	dbgu {
-> > 		pins = < &pioB 12 0 0
-> > 			 &pioB 13 0 2 >;
-> > 	/* with macro */
-> > 		pins = < &pioB 12 MUX_A NO_PULL_UP
-> > 			 &pioB 13 MUX_A PULL_UP >;
-> > 	};
+> > gpio.h is still required, but empty for most platforms.
 > 
-> I could change to use this too no problem. The only concern I have is
-> that is "&pioB 12" immutable for all gpio controllers?
+> Those empty gpio.h files are definitely a candidate for going into
+> arch/arm/include/mach/gpio.h, and then all those 12-byte mach/gpio.h can
+> be deleted (13 files).
 > 
-> Grepping the *.dts* files, at least exynos is using the following
-> for gpios:
+> We've not had any progress on the gpio.h issue since I did the last round
+> of cleanup; the next stage was to persuade SoC maintainers to get rid of
+> their optimized versions which aren't compatible with multi-platform
+> kernels.
 > 
-> gpios = <&gpx2 0 0 0 2>;
+> I don't know if folk are expecting me to push that forwards or whether
+> there's someone else working on that aspect of it...
 > 
-> If we can conclude that phandle to the gpio controller instance and
-> the register offset is always enough here, then I'm OK changing to
-> that format. It would actually save some parsing in most cases.
-I would said yes but we could use the same notion to create pin-bank
+> So this issue really does need to be progressed too.
+on at91 as we clean it for DT we will be able to drop it soon too
 
-the idea is to refer to the bank and then the pin inside
-
-after if a driver need more argumement as on exynos they will have to
-implement their own xlate
-
-as we did on at91 for the irq xlate
->  
-> > 	/* and also the notion of linked group
-> > 	 * as on uart of network you have often the same subset of pin use.
-> > 	 *
-> > 	 * As example on uart rxd/txd is use for the group without rts/cts
-> > 	 * and the one with it
-> > 	 * on ethernet the RMII pin are use also on MII
-> > 	 */
-> > 
-> > 	uart0_rxd_txd {
-> > 		pins = < &pioB 19 MUX_A PULL_UP		/* rxd */
-> > 			 &pioB 18 MUX_A NO_PULL_UP >;	/* txd */
-> > 	};
-> > 
-> > 	uart0_rts_cts {
-> > 		groups = < &uart0_rxd_txd >;
-> > 		pins = < &pioB 17 MUX_B NO_PULL_UP	/* rts */
-> > 			 &pioB 15 MUX_B NO_PULL_UP >;	/* cts */
-> > 	};
-> > 
-> > 	uart0_rts_cts_external_pull_up {
-> > 		groups = < &uart0_rts_cts >;
-> > 		gpios = <&pioC 1 0>;
-> > 	};
-> > };
-> > 
-> > The idea is to avoid duplication the xlate for pins will be driver specific
-> > with maybe a common implementation
-> > 
-> > the 3 or 4 first fix as done on gpio
-> 
-> Yeah sounds doable to me, but can probably be added later?
-for the sub-group stuff yes agreed
-> 
-> Regarding grouping, basically for most cases it makes sense to have
-> three states: default, active, idle instead of just active and idle.
-> The reason is that for most cases the default pins only need to be
-> set once for each devices. Only few pins need to toggle between
-> active and idle states.
-yeah agreed
-
-Best Regards,
+Best Regards
 J.
