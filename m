@@ -1,76 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 13:05:47 -0700
-Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
- <20120503155717.GE5140@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
- <871un1j769.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
-Message-ID: <20120504200547.GU5613@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 May 2012 21:07:00 +0100
+Subject: Handling of modular boards
+In-Reply-To: <201205041934.08830.arnd@arndb.de>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <201205041934.08830.arnd@arndb.de>
+Message-ID: <20120504200659.GQ14230@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120503 23:04]:
-> 
-> Tony, seems to be against adding new ARCH_OMAPAM33XX, but which _ARCH_ we need to follow for AM33XX?
-> I have to choose between ARCH_OMAP3 or ARCH_OMAP4 and what should I choose 
-> here?
+On Fri, May 04, 2012 at 07:34:08PM +0000, Arnd Bergmann wrote:
 
-I think you're getting confused now :) I'm against ARCH_XXX but I'm OK with
-adding SOC_XXX.
+> One idea that I've heard before is to put device tree fragments into the
+> kernel and dynamically add them to the device tree that was passed by the
+> boot loader whenever we detect the presence of a specific device.
+> This obviously means it works only for boards using DT for booting, but
+> it allows us to use some infrastructure that we already have.
 
-We should only need ARCH_OMAP2PLUS + SOC_XXX, there should not be any need
-to add new ARCH_XXX under mach-omap2. Whatever we have left for ARCH_OMAP
-in mach-omap2 will be eventually converted to SOC_OMAP.
- 
-> Does it make sense to follow ARCH_OMAPx but not follow cpu_is_omapxxx()?
-> OR
+I think anything that relies on bootloaders (or DT for that matter) is a
+bit of a non-starter for my personal use cases.  Even where we're using
+DT relying on a sane bootloader seems a bit scary - my personal use
+cases would rely on updating this stuff in the field for non-technical
+users who would have trouble recovering from issues.
 
-No
+> An intermediate solution that I really like is the ability to
+> stuff device tree fragments on extension board themselves, but that
+> can only work for new designs and causes problems when that information
+> is not actually correct.
 
-> Should we create ARCH_AMXXXX, assuming that all AM devices have similar 
-
-No
-
-> memory map layout, interrupt mapping, etc...
-> OR
-> Should I just add SOC_OMAPAM33XX, wherever required?
-
-Yes, but how about just use SOC_AM33XX? 
- 
-> Also, there are lot of thing wrapped under ARCH_OMAP3 || ARCH_OMAP4 option, which is required for AM33XX, how should we handle this?
-> 
-> For example,
-> 
-> "arch/arm/plat-omap/include/plat/clock.h"
-> struct dpll_data {
-> #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> 	<dpll related variables>
-> #endif
-> };
-> 
-> "arch/arm/mach-omap2/clock.c"
-> 
-> #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> 
-> const struct clkops clkops_omap3_noncore_dpll_ops = {
-> };
-> const struct clkops clkops_omap3_core_dpll_ops = {
-> }
-
-I suggest doing some clean-up patches before adding SOC_AM33XX where
-you just convert those to be
-
-#if defined(CONFIG_ARCH_OMAP2PLUS) && !defined(CONFIG_ARCH_OMAP2)
-
-or something similar depending if they already are inside mach-omap2
-directory. This will make them future proof for adding new SoCs
-without having to patch all over the place.
-
-Regards,
-
-Tony
+I can see the theory, but I can also see some practical concerns.  And
+with the boards I'm working with we currently have 8 bits of data so...
