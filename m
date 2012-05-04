@@ -1,34 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  4 May 2012 19:23:14 +0100
-Subject: [PATCH 04/15] ARM: ux500: CONFIG: Compile in support for leds-gpio
+Date: Fri,  4 May 2012 19:23:15 +0100
+Subject: [PATCH 05/15] ARM: ux500: Enable the user LED on Snowball via Device
+ Tree
 In-Reply-To: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
 References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1336155805-18554-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1336155805-18554-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code exists in the mop500 board file (used for HREF and
-Snowball) to initialise Snowball's user LED via the
-leds-gpio driver. However, the driver isn't currently
-built when using the default configuration file. This
-patch aims to change that behavior.
+This patch enables and illuminates the user_led on the
+Snowball low-cost development board using DT. It also
+removes initialisation carried out from platform code.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/u8500_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/snowball.dts     |    1 +
+ arch/arm/mach-ux500/board-mop500.c |    3 +--
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 7e84f45..00571b7 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -85,6 +85,7 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_LM3530=y
- CONFIG_LEDS_LP5521=y
-+CONFIG_LEDS_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AB8500=y
- CONFIG_RTC_DRV_PL031=y
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 56f8a76..579c304 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -67,6 +67,7 @@
+ 		used-led {
+ 			label = "user_led";
+ 			gpios = <&gpio4 14 0x4>;
++			default-state = "on";
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 4b847cb..7810334 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -579,7 +579,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ };
+ 
+ static struct platform_device *snowball_of_platform_devs[] __initdata = {
+-	&snowball_led_dev,
+ 	&snowball_key_dev,
+ 	&ab8500_device,
+ };
+@@ -783,7 +782,7 @@ static void __init u8500_init_machine(void)
+ 
+ 		/*
+ 		 * Devices to be DT:ed:
+-		 *   snowball_led_dev   = todo
++		 *   snowball_led_dev   = done
+ 		 *   snowball_key_dev   = todo
+ 		 *   snowball_sbnet_dev = done
+ 		 *   ab8500_device      = todo
 -- 
 1.7.9.5
