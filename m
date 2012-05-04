@@ -1,47 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 4 May 2012 18:01:22 +0200 (CEST)
-Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice level-triggered
- interrupts.
-In-Reply-To: <20120504151221.6998d4e5@notabene.brown>
-References: <20120425025637.7832.14013.stgit@notabene.brown>
- <20120425030524.7832.85239.stgit@notabene.brown>
- <alpine.LFD.2.02.1204251018530.2542@ionos>
- <20120425193916.0db1b4b1@notabene.brown>
- <alpine.LFD.2.02.1204251402360.2542@ionos>
- <20120504151221.6998d4e5@notabene.brown>
-Message-ID: <alpine.LFD.2.02.1205041759540.6271@ionos>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 4 May 2012 18:02:07 +0200
+Subject: [PATCH v2 1/5] dma: mxs-dma: use global stmp_device functionality
+In-Reply-To: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120504160207.GA5789@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil,
-
-On Fri, 4 May 2012, NeilBrown wrote:
-
-> On Wed, 25 Apr 2012 14:54:54 +0200 (CEST) Thomas Gleixner
-> <tglx@linutronix.de> wrote:
+On Fri, May 04, 2012 at 08:12:15PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> > Why not simply managing the pending bit for level irqs ?
-> > 
+> This can get rid of the mach-dependency.
 > 
-> Hi Thomas,
->  thanks again for the patch.  I finally made time to test it and it works as
-> expected.  I've included it below with a change-log entry and tested-by:
-> in case that helps.
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Huang Shijie <b32955@freescale.com>
+> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-thanks for testing. The changelog is great. You know how to make the
-live of lazy buggers easier :)
-  
->  	for_each_irq_desc(irq, desc) {
-> -		if (irqd_is_wakeup_set(&desc->irq_data)) {
-> +		if (desc->depth == 1 &&
-> +		    irqd_is_wakeup_set(&desc->irq_data)) {
->  			if (desc->istate & IRQS_PENDING)
->  				return -EBUSY;
->  			continue;
+Looks good to me, thanks!
 
-I split that part into a separate patch, as it's really a different
-issue.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Thanks,
-
-	tglx
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/f0910967/attachment.sig>
