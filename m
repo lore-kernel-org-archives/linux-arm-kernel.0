@@ -1,70 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 19:47:38 +0000
-Subject: [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
-In-Reply-To: <201205041307.46080.arnd@arndb.de>
-References: <20120503144645.6390.62303.sendpatchset@w520>
- <20120503144654.6390.56399.sendpatchset@w520>
- <201205041307.46080.arnd@arndb.de>
-Message-ID: <201205041947.38375.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 12:49:10 -0700
+Subject: [PATCH 4/7] ARM: OMAP2: Add MMC hwmod data for 2420
+In-Reply-To: <alpine.DEB.2.00.1205021844280.19695@utopia.booyaka.com>
+References: <20120424000607.17783.81686.stgit@muffinssi.local>
+ <20120424000832.17783.21327.stgit@muffinssi.local>
+ <alpine.DEB.2.00.1205021840160.19695@utopia.booyaka.com>
+ <alpine.DEB.2.00.1205021844280.19695@utopia.booyaka.com>
+Message-ID: <20120504194910.GS5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 May 2012, Arnd Bergmann wrote:
+* Paul Walmsley <paul@pwsan.com> [120502 18:05]:
+> On Wed, 2 May 2012, Paul Walmsley wrote:
 > 
-> On Thursday 03 May 2012, Magnus Damm wrote:
+> > Hi Tony,
+> > 
+> > On Mon, 23 Apr 2012, Tony Lindgren wrote:
+> > 
+> > > Add MMC for 2420 so we can pass the DMA request lines the same
+> > > way as we already do on omap2430 and later.
+> > > 
+> > > Cc: Benoit Cousson <b-cousson@ti.com>
+> > > Cc: Paul Walmsley <paul@pwsan.com>
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > Made a few changes here so that it applies on the omap-devel-a-for-3.5 tag 
+> > that you pulled in.  Also changed the 2420 MMC class name to "msdi" and 
+> > the hwmod name to "msdi1" -- this is the IP block name that is listed in 
+> > the 2420 TRM Rev. X Table 26-9 "Instance Summary".  It also is convenient 
+> > for us, because the 2420 MMC driver is different than the 2430+ HSMMC 
+> > driver, so we can just probe all of the hwmods of class "msdi" to register 
+> > the 2420 MMC :-)
 > 
-> > +
-> > +/* EMEV2 SMU registers */
-> > +#define USIAU0_RSTCTRL 0xe0110094
-> > +#define USIBU1_RSTCTRL 0xe01100ac
-> > +#define USIBU2_RSTCTRL 0xe01100b0
-> > +#define USIBU3_RSTCTRL 0xe01100b4
-> > +#define STI_RSTCTRL 0xe0110124
-> > +#define USIAU0GCLKCTRL 0xe01104a0
-> > +#define USIBU1GCLKCTRL 0xe01104b8
-> > +#define USIBU2GCLKCTRL 0xe01104bc
-> > +#define USIBU3GCLKCTRL 0xe01104c0
-> > +#define STIGCLKCTRL 0xe0110528
-> > +#define USIAU0SCLKDIV 0xe011061c
-> > +#define USIB2SCLKDIV 0xe011065c
-> > +#define USIB3SCLKDIV 0xe0110660
-> > +#define STI_CLKSEL 0xe0110688
+> Also, forgot to mention that a struct omap_hwmod_class_sysconfig record 
+> was added here too, based on the info in the 2420 TRM.
 > 
-> Please cast to __iomem* here, e.g. using the IOMEM() macro, as these are
-> virtual addresses.
+> The updated patch is below.  Have queued it in a hwmod data update branch 
+> here along with some other hwmod data updates.  Will send a pull request 
+> after testing is finished here...
 
-I should revise that: there is no excuse to hardcode these virtual address
-here at all. Just use call ioremap() on the physical address for the
-clock registers (0xe0110000) and use the resulting pointer with an
-offset that you define locally in this file.
+OK
 
-It is safe to call ioremap when you get to emev2_clock_init()
-and you will still get a large page mapping with the recent
-code reworks for map_desc.
-
-Regarding the iotable that is currently defined as
-
-+static struct map_desc emev2_io_desc[] __initdata = {
-+       /* 128K entity map for 0xe0020000 (GIC) */
-+       {
-+               .virtual        = 0xe0020000,
-+               .pfn            = __phys_to_pfn(0xe0020000),
-+               .length         = SZ_128K,
-+               .type           = MT_UNCACHED
-+       },
-+       /* 128K entity map for 0xe0100000 (SMU) */
-+       {
-+               .virtual        = 0xe0100000,
-+               .pfn            = __phys_to_pfn(0xe0100000),
-+               .length         = SZ_128K,
-+               .type           = MT_DEVICE
-+       },
-+};
-
-I would recommend just mapping the entire 16MB page around this, or at least
-2 MB, so you can benefit from the larger mappings. If you don't do that,
-better remove the entire iotable registration and rely on ioremap, the
-result will be the same and you can be prevent any hacks from creeping in
-that rely on the virtual address being the same as the physical address.
-
-	Arnd
+Tony 
