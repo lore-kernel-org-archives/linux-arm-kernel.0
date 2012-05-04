@@ -1,106 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 13:07:45 +0000
-Subject: [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
-In-Reply-To: <20120503144654.6390.56399.sendpatchset@w520>
+Date: Fri, 4 May 2012 13:14:08 +0000
+Subject: [PATCH 02/02] mach-shmobile: KZM9D board prototype support
+In-Reply-To: <20120503144703.6390.20689.sendpatchset@w520>
 References: <20120503144645.6390.62303.sendpatchset@w520>
- <20120503144654.6390.56399.sendpatchset@w520>
-Message-ID: <201205041307.46080.arnd@arndb.de>
+ <20120503144703.6390.20689.sendpatchset@w520>
+Message-ID: <201205041314.08701.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 03 May 2012, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Add experimental KZM9D board support that makes
+> use of the Emma Mobile EV2 SoC code.
+> 
+> Nothing except serial ports and timer are supported
+> at this point. On-board ethernet support can be
+> added after proper GPIO bindings are implemented.
+> Without GPIO we cannot make use of external IRQs.
+> 
+> Not-yet-signed-off-by: Magnus Damm <damm@opensource.se>
 
-> +
-> +/* EMEV2 SMU registers */
-> +#define USIAU0_RSTCTRL 0xe0110094
-> +#define USIBU1_RSTCTRL 0xe01100ac
-> +#define USIBU2_RSTCTRL 0xe01100b0
-> +#define USIBU3_RSTCTRL 0xe01100b4
-> +#define STI_RSTCTRL 0xe0110124
-> +#define USIAU0GCLKCTRL 0xe01104a0
-> +#define USIBU1GCLKCTRL 0xe01104b8
-> +#define USIBU2GCLKCTRL 0xe01104bc
-> +#define USIBU3GCLKCTRL 0xe01104c0
-> +#define STIGCLKCTRL 0xe0110528
-> +#define USIAU0SCLKDIV 0xe011061c
-> +#define USIB2SCLKDIV 0xe011065c
-> +#define USIB3SCLKDIV 0xe0110660
-> +#define STI_CLKSEL 0xe0110688
+Given that this doesn't do anything, I see no reason to leave this
+machine based on ATAG rather than DT probing:
 
-Please cast to __iomem* here, e.g. using the IOMEM() macro, as these are
-virtual addresses.
++MACHINE_START(KZM9D, "kzm9d")
++       .map_io         = emev2_map_io,
++       .init_early     = emev2_add_early_devices,
++       .nr_irqs        = NR_IRQS_LEGACY,
++       .init_irq       = emev2_init_irq,
++       .handle_irq     = gic_handle_irq,
++       .init_machine   = emev2_add_standard_devices,
++       .timer          = &shmobile_timer,
++MACHINE_END
 
-> +void __init emev2_clock_init(void)
-> +{
-> +	int k, ret = 0;
-> +
-> +	/* setup STI timer to run on 37.768 kHz and deassert reset */
-> +	__raw_writel(0, STI_CLKSEL);
-> +	__raw_writel(1, STI_RSTCTRL);
-> +
-> +	/* deassert reset for UART0->UART3 */
-> +	__raw_writel(2, USIAU0_RSTCTRL);
-> +	__raw_writel(2, USIBU1_RSTCTRL);
-> +	__raw_writel(2, USIBU2_RSTCTRL);
-> +	__raw_writel(2, USIBU3_RSTCTRL);
+Just make this DT_MACHINE_START and add a minimal .dts file for
+it that has the right compatible value. That will already enable
+people to add devices in their .dts files without touching
+the platform code.
 
-Better use iowrite32 or writel or writel_relaxed here, but not __raw_*.
-
-> --- 0003/arch/arm/mach-shmobile/include/mach/common.h
-> +++ work/arch/arm/mach-shmobile/include/mach/common.h	2012-05-03 20:45:56.000000000 +0900
-> @@ -85,4 +85,10 @@ extern void r8a7779_secondary_init(unsig
->  extern int r8a7779_boot_secondary(unsigned int cpu);
->  extern void r8a7779_smp_prepare_cpus(void);
->  
-> +extern void emev2_init_irq(void);
-> +extern void emev2_map_io(void);
-> +extern void emev2_add_early_devices(void);
-> +extern void emev2_add_standard_devices(void);
-> +extern void emev2_clock_init(void);
-> +
->  #endif /* __ARCH_MACH_COMMON_H */
-
-I would feel more comfortable with a separate header for this than putting
-it into the same file as everything else, but it's not important to me.
-
-> --- /dev/null
-> +++ work/arch/arm/mach-shmobile/intc-emev2.c	2012-05-03 20:45:57.000000000 +0900
-
-> +
-> +void __init emev2_init_irq(void)
-> +{
-> +	void __iomem *gic_dist_base = IOMEM(0xe0028000);
-> +	void __iomem *gic_cpu_base = IOMEM(0xe0020000);
-> +
-> +	/* use GIC to handle interrupts */
-> +	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-> +}
-
-This could just go into teh setup-emev2.c file, it doesn't actually do much,
-and the other file is where the constants are coming from anyway. Then you
-can put it right next to this code:
-
-> +static struct map_desc emev2_io_desc[] __initdata = {
-> +	/* 128K entity map for 0xe0020000 (GIC) */
-> +	{
-> +		.virtual	= 0xe0020000,
-> +		.pfn		= __phys_to_pfn(0xe0020000),
-> +		.length		= SZ_128K,
-> +		.type		= MT_UNCACHED
-> +	},
-> +	/* 128K entity map for 0xe0100000 (SMU) */
-> +	{
-> +		.virtual	= 0xe0100000,
-> +		.pfn		= __phys_to_pfn(0xe0100000),
-> +		.length		= SZ_128K,
-> +		.type		= MT_DEVICE
-> +	},
-> +};
-> +
-> +void __init emev2_map_io(void)
-> +{
-> +	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
-> +}
-
+It would also be really easy to just add DT support for the three
+devices you actually support (GIC, STI, uart), because two of
+them already have bindings and the third one is a new driver.
+When we discussed this new soc earlier, you said that using DT
+based booting would be extra work, but given the set of devices
+that you are putting into this, I don't think that argument holds
+any more.
 
 	Arnd
