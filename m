@@ -1,17 +1,29 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Thu, 3 May 2012 19:02:07 -0700
-Subject: common clock framework
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 4 May 2012 10:14:18 +0800
+Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
+In-Reply-To: <CAAQ0ZWSqF9x7PSqS_14CscdU+RvcYg8pCFZUqLtDAq8uS_k=yw@mail.gmail.com>
+References: <1335939209-15625-1-git-send-email-b32955@freescale.com>	<20120502144008.GF2194@S2101-09.ap.freescale.net>	<1336042485.13013.41.camel@sauron.fi.intel.com>	<CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>	<CAMiH66EBO-MHXBb1eB4NMAJo6nPN47_42jYNGUGc=GC7oejPWQ@mail.gmail.com>
+ <CAAQ0ZWSqF9x7PSqS_14CscdU+RvcYg8pCFZUqLtDAq8uS_k=yw@mail.gmail.com>
+Message-ID: <4FA33B7A.3040504@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-The common clock driver in drivers/clk/ has been integrated into mainline. In fact, I still have some questions to the driver.
-1. Why need big lock: enable_lock and prepare_lock?
-   Using these locks means that the clock enable and prepare operation cannot re-entered.
-2. How to handle the depended clocks?
-   For example clock1 and clock2 both have multiple inputs, and they both depend on clock3. It means that before enable clock1 or clock2, clock3 should be enabled, and if clock1 and clock2 are both off, clock2 need to be off too to save power. Clock3 is not the parent of clock1 and clock2, because the clock3 is not one of inputs of clock1 and clock2.
-   If we do not handle it in clock framework, we have to let device driver to know it. It means that the device driver need to handle clock dependency. It will make the device driver to be complicated especially it is shared by different SOCs.
-3. how to handle voltage changes in clock framework?
-   When some clock's rate is changed, the voltage for the component that using the clock may need changed too. So where to add the voltage change sequence?
-   
+? 2012?05?03? 22:23, Shawn Guo ??:
+> On 3 May 2012 22:14, Huang Shijie<shijie8@gmail.com>  wrote:
+>> It's better that this patch is merged by l2-mtd, because this patch
+>> depends on another patch which is
+>> on the l2-mtd now.
+>>
+> But you patch has to be based on mxs-dma DT support to function.
+The mxs-dma is another driver (just as the pinctrl driver). I think it's 
+better to do the job in parallel.
+
+Best Regards
+Huang Shijie
+
+
+> Maybe we should wait for the next merge window?
+>
+> Regards,
+> Shawn
+>
