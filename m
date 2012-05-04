@@ -1,99 +1,99 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Fri, 04 May 2012 12:10:47 +0200
-Subject: usb, davinci: usb 2.0 problem on an am1808 based board
-In-Reply-To: <4EC0F87B.4010104@denx.de>
-References: <4EBC9DF1.90604@denx.de>
- <20111111091912.GB19090@legolas.emea.dhcp.ti.com> <4EBEB29E.50705@mvista.com>
- <4EC0F87B.4010104@denx.de>
-Message-ID: <4FA3AB27.7060205@denx.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 4 May 2012 09:12:13 +0000
+Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy
+ loop condition test macro
+In-Reply-To: <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-a while ago (see discussion here:
-http://comments.gmane.org/gmane.linux.usb.general/54505), I found this
-"USB timing Bug" on an am1808 based board:
-
-Heiko Schocher wrote:
-> Hello Sergei,
-[...]
-> Sergei Shtylyov wrote:
->> Hello.
->>
->> On 11.11.2011 11:19, Felipe Balbi wrote:
->>
->>>> I try to bring up usb 2.0 support on an am1808 based
->>>> board and Linux version 3.1.0-rc10 and I am facing
->>>> some issues:
-[...]
->>>>   But if I add in drivers/usb/musb/da8xx.c
->>>>    da8xx_musb_interrupt() a 10ms delay befor the
->>>>    "if (status&  (DA8XX_INTR_DRVVBUS<<  DA8XX_INTR_USB_SHIFT)) {"
->>>>    line usb works fine!
->>>>    It also works without this timeout if I change the
->>>>    "dev_dbg(musb->controller, "USB IRQ %08x\n", status);"
->>>>    to
->>>>    "printk(musb->controller, "USB IRQ %08x\n", status);"
->>>>
->>>>    ->  some timing issue, but I have no idea why!
->>>>       (Maybe you have an idea?)
->>> unfortunately I don't know any details about DaVinci.
->>    AM1808 is not exactly DaVinci, to be precise...
->>
->>> Sergei, are you able to help on this question ?
->>    Maybe. :-)
+On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
+> From: Jean Pihet <j-pihet@ti.com>
 > 
-> I hope it ;-)
+> Now that omap_test_timeout is only accessible from mach-omap2/,
+> introduce a similar function for SR.
+> 
+> This change makes the SmartReflex implementation ready for the move
+> to drivers/.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+> ---
+>  arch/arm/mach-omap2/smartreflex.c |   12 ++++++------
+>  include/linux/power/smartreflex.h |   23 ++++++++++++++++++++++-
+>  2 files changed, 28 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index d859277..acef08d 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
+>  	 * Wait for SR to be disabled.
+>  	 * wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
+>  	 */
+> -	omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+> -			ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+> -			timeout);
+> +	sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+> +			     ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+> +			     timeout);
+>  
+>  	if (timeout >= SR_DISABLE_TIMEOUT)
+>  		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
+>  	 * Wait for SR to be disabled.
+>  	 * wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
+>  	 */
+> -	omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
+> -			IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+> -			timeout);
+> +	sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
+> +			     IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+> +			     timeout);
+>  
+>  	if (timeout >= SR_DISABLE_TIMEOUT)
+>  		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+> index 884eaee..78b795e 100644
+> --- a/include/linux/power/smartreflex.h
+> +++ b/include/linux/power/smartreflex.h
+> @@ -22,7 +22,7 @@
+>  
+>  #include <linux/types.h>
+>  #include <linux/platform_device.h>
+> -
+> +#include <linux/delay.h>
+>  #include <plat/voltage.h>
+>  
+>  /*
+> @@ -168,6 +168,27 @@ struct omap_sr {
+>  };
+>  
+>  /**
+> + * test_cond_timeout - busy-loop, testing a condition
+> + * @cond: condition to test until it evaluates to true
+> + * @timeout: maximum number of microseconds in the timeout
+> + * @index: loop index (integer)
+> + *
+> + * Loop waiting for @cond to become true or until at least @timeout
+> + * microseconds have passed.  To use, define some integer @index in the
+> + * calling code.  After running, if @index == @timeout, then the loop has
+> + * timed out.
+> + *
+> + * Copied from omap_test_timeout */
+> +#define sr_test_cond_timeout(cond, timeout, index)		\
+> +({								\
+> +	for (index = 0; index < timeout; index++) {		\
+> +		if (cond)					\
+> +			break;					\
+> +		udelay(1);					\
+> +	}							\
+> +})
 
-now I digged deeper and found this patch, which solves the
-problem (without adding a 10 ms delay):
+I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
+tight loops instead of udelay().
 
------------------------------
-diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-index d32aa4d..6a6b17b 100644
---- a/drivers/usb/musb/da8xx.c
-+++ b/drivers/usb/musb/da8xx.c
-@@ -297,6 +297,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
-        unsigned long           flags;
-        irqreturn_t             ret = IRQ_NONE;
-        u32                     status;
-+       int                     flag = 1;
-
-        spin_lock_irqsave(&musb->lock, flags);
-
-@@ -368,6 +363,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
-                        musb->xceiv->default_a = 0;
-                        musb->xceiv->state = OTG_STATE_B_IDLE;
-                        portstate(musb->port1_status &= ~USB_PORT_STAT_POWER);
-+                       flag = 0;
-                }
-
-                dev_dbg(musb->controller, "VBUS %s (%s)%s, devctl %02x\n",
-@@ -378,7 +374,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
-                ret = IRQ_HANDLED;
-        }
-
--       if (musb->int_tx || musb->int_rx || musb->int_usb)
-+       if (flag && ((musb->int_tx || musb->int_rx || musb->int_usb)))
-                ret |= musb_interrupt(musb);
-
-  eoi:
------------------------------
-
-If we get an DA8XX_INTR_DRVVBUS IRQ, in the else case
-
-musb->xceiv->state = OTG_STATE_B_IDLE;
-
-is set, but overwritten in the musb_interrupt() call, which results
-in not starting the "Poll for ID change" timer ... as I am not an USB
-expert, posting this intermediate result here, maybe someone have an
-idea/explanation if this patch is the way to go, or what would be a
-better solution?
-
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Regards
+AnilKumar
