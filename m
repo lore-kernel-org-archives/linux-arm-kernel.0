@@ -1,53 +1,49 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 4 May 2012 11:29:38 -0700
-Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
- callbacks
-In-Reply-To: <87fwbgdnlp.fsf@ti.com>
-References: <20120502234718.GA5432@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
- <20120503160917.GA11310@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
- <20120503184632.GA28089@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
- <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
- <87ehr1gdcv.fsf@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
- <87fwbgdnlp.fsf@ti.com>
-Message-ID: <20120504182938.GB28910@animalcreek.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 May 2012 12:30:23 -0600
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201205041556.38918.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205041556.38918.arnd@arndb.de>
+Message-ID: <4FA4203F.3070000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 07:31:30AM -0700, Kevin Hilman wrote:
-> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
-
-Hi Kevin.
-
-> > If it does, perhaps there should some other mechanism for letting
-> > users control the system behavior.
+On 05/04/2012 09:56 AM, Arnd Bergmann wrote:
+> On Monday 30 April 2012, Jon Hunter wrote:
+>> From: Jon Hunter <jon-hunter@ti.com>
+>>
+>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+>> to add some basic helpers to retrieve a DMA controller device_node and the
+>> DMA request/channel information.
+...
+>>   Forgetting device tree for now, some drivers use strings to represent a
+>>   DMA channel instead of using an integer. I assume that these drivers then
+>>   employ some sort of look-up table to convert the string into a channel
+>>   number/index that the hardware understands. If this assumption is correct
+>>   then when moving to a device tree implementation having such look-up tables
+>>   in the driver should no longer be necessary as the device tree will provide
+>>   the mapping of channel index/number to the device. Furthermore, it makes
+>>   sense that device tree uses integers to represent channel as opposed to
+>>   strings to save the driver having to convert the string into a integer at
+>>   some later stage.
+...
+> I think you can actually use strings, too, as long as you use a fixed number
+> of cells.
 > 
-> Come to think of it, the right solution here is probably to use runtime
-> PM.  We could then to add some custom hooks for davinci_emac in the
-> device code to use enable_hlt/disable_hlt based on activity.
+> Wouldn't something like this work:?
+...
+> 	some-device {
+> 		compatible = "something";
+> 		dmas = <&dma-controller1>, "some-dma",
+> 			<&dma-controller2 1 2 3>;
+> 	}
 
-That was my first thought, actually, but that only works if its
-okay for the driver to call enable_hlt/disable_hlt directly (i.e.,
-have runtime_suspend() call enable_hlt() and runtime_resume() call
-disable_hlt()).  However, I assumed it would _not_ be acceptable for
-the driver to issue those calls directly.  Its a platform-specific
-issue that we shouldn't be polluting the driver with and there are
-currently no drivers that call them under the drivers directory.
-
-If its not okay to call enable_hlt/disable_hlt directly, then we still
-need callback hooks to the plaform code (i.e., some version of this
-patch).
-
-> In order to do that though, the davinci_emac driver needs to be runtime
-> PM converted.
-
-We probably should pm_runtime-ize the driver either way but we need
-to resolve the question of whether its okay for the driver to call
-enable_hlt/disable_hlt directly or not.  If it is okay, we call them
-in runtime_suspend/resume.  If it isn't okay, then we still need 
-platform callback hooks.
-
-Mark
+The idea of mixing integer cells and strings in the same property has
+come up before for other bindings, but been rejected. IIRC, there are
+issues such as alignment of the integers after the string (they are not
+aligned in the DTB) which can cause unaligned accesses, and perhaps
+other issues I fail to recall - perhaps because it's no longer possible
+to skip from the &dma-controller1 phandle to the &dma-controller2
+phandle using #dma-cells, but rather you need to use strlen() and hence
+involve the DMA controller driver itself (otherwise, how do you know
+it's a string?) rather than just the core DMA property parsing code.
