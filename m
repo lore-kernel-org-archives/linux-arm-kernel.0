@@ -1,105 +1,169 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  4 May 2012 19:23:11 +0100
-Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 5 May 2012 00:06:21 +0530
+Subject: [PATCH v3 0/7] ARM: davinci: add support for the am1808 based
+ enbw_cmc board
+In-Reply-To: <4FA3F6C2.9010602@denx.de>
+References: <1330945804-3379-1-git-send-email-hs@denx.de>
+ <4FA3F6C2.9010602@denx.de>
+Message-ID: <4FA421A5.4020109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we move the i2c-nomadik's default settings into the driver
-rather than specifying them from platform code. At the time of
-this writing we only have one user, the u8500. As new users are
-added, it is expected that they will be Device Tree compliant.
-If this is the case, we will look up their initialisation values
-by compatible entry, then apply them forthwith.
+Hi Heiko,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   50 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+On 5/4/2012 9:03 PM, Heiko Schocher wrote:
+> Hello,
+> 
+> this v3 patchset is now pending for more than 1 month without
+> seeing comments for it. Are there no more issues?
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 5267ab9..8803467 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -899,15 +899,57 @@ static const struct i2c_algorithm nmk_i2c_algo = {
- 	.functionality	= nmk_i2c_functionality
- };
- 
-+static const struct nmk_i2c_controller u8500_i2c = {
-+       /*
-+        * slave data setup time, which is
-+        * 250 ns,100ns,10ns which is 14,6,2
-+        * respectively for a 48 Mhz
-+        * i2c clock
-+        */
-+       .slsu           = 0xe,
-+       /* Tx FIFO threshold */
-+       .tft            = 1,
-+       /* Rx FIFO threshold */
-+       .rft            = 8,
-+       /* std. mode operation */
-+       .clk_freq       = 100000,
-+       /* Slave response timeout(ms) */
-+       .timeout        = 200,
-+       .sm             = I2C_FREQ_MODE_FAST,
-+};
-+
-+static const struct nmk_i2c_controller *
-+nmk_i2c_find_pdata_from_compatible(struct device_node *np)
-+{
-+	/*
-+	 * The u8500 is currently our only user. As more SoCs are added,
-+	 * search for the correct value set using of_machine_is_compatible
-+	 * and return a 'struct nmk_i2c_controller *' which contains the
-+	 * correct information for the given SoC, whilst leaving u8500_i2c
-+	 * as the default/fall-back value set.
-+	 */
-+	return &u8500_i2c;
-+}
-+
- static int __devinit nmk_i2c_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
--	struct nmk_i2c_controller *pdata =
-+	const struct nmk_i2c_controller *pdata =
- 			pdev->dev.platform_data;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
-+	if (!pdata) {
-+		if (!np) {
-+			dev_err(&pdev->dev,
-+				"Neither platform_data nor Device Tree not found\n");
-+			return -EINVAL;
-+		}
-+		pdata = nmk_i2c_find_pdata_from_compatible(np);
-+	}
-+
- 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
- 		dev_err(&pdev->dev, "cannot allocate memory\n");
-@@ -1039,11 +1081,17 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id nmk_gpio_match[] = {
-+	{ .compatible = "st,nomadik-i2c", },
-+	{}
-+};
-+
- static struct platform_driver nmk_i2c_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = DRIVER_NAME,
- 		.pm = &nmk_i2c_pm,
-+		.of_match_table = nmk_gpio_match,
- 	},
- 	.probe = nmk_i2c_probe,
- 	.remove = __devexit_p(nmk_i2c_remove),
--- 
-1.7.9.5
+I am yet to get to them. I have mostly cleared my backlog and will be
+looking into these next. Sorry about the delay.
+
+> Should I rebase it (if no further comments occur), as it is
+> pending so long? (If so, against which tree?)
+
+The series touches multiple subsystems, so may be each patch will go
+through individual subsystem maintainer.
+
+Also copying Grant and Rob as device tree maintainers.
+
+Thanks,
+Sekhar
+
+> 
+> Thanks.
+> 
+> bye,
+> Heiko
+> 
+> Heiko Schocher wrote:
+>> This patchserie add support for the davinci am1808 based
+>> enbw_cmc board.
+>>
+>> Important: I rebased this patchserie against the irqdomain/next
+>> branch from grant likely, as he suggested to rework the OF
+>> intcontroller changes to the irqdomain work, branch found here:
+>>
+>> http://git.secretlab.ca/?p=linux-2.6.git;a=shortlog;h=refs/heads/irqdomain/next
+>>
+>>     git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+>>
+>>     commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
+>>     Author: Grant Likely <grant.likely@secretlab.ca>
+>>     Date:   Fri Feb 24 14:58:54 2012 -0700
+>>
+>>     mfd: twl-core: Add IRQ_DOMAIN dependency
+>>
+>> changes for v2:
+>> Post this patchserie now as v2, as reworked in the
+>> comments I got for the RFC serie.
+>>
+>> changes for v3:
+>> - Interrupt Controller:
+>>   - comment from Sergei Shtylyov:
+>>     - rename compatible" prop to "ti,cp_intc"
+>>     - cp_intc_init() is now also for the of case
+>>       the name of the init function (it calls the
+>>       "new" __cp_intc_init() function, which was
+>>       the "old" cp_intc_init()). Through this
+>>       rework the changes for OF is better visible.
+>>       As the OF case uses the irq_domain rework from
+>>       Grant Likely, maybe the none OF case can use
+>>       this also, but this should be tested on a hw ...
+>>  
+>> Got no comments to the following points, I noted in the
+>> RFC series, so posting this patchseries with them:
+>>
+>> - ARM: davinci: configure davinci aemif chipselects through OF
+>>   not moved to mfd, as mentioned in this discussion:
+>>   http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-td7059739.html
+>>   instead use a phandle in the DTS, so drivers which
+>>   uses the davinci aemif, can call davinci_aemif_setup_timing_of()
+>>
+>>   This is just thought as an RFC ... The enbw_cmc board
+>>   support not really need to setup this bus timings, as
+>>   they are setup in U-Boot ... but I want to post this,
+>>   as I think, it is a nice to have, and I am not really
+>>   sure, if this has to be a MFD device (If so, all bus
+>>   interfaces for other SoCs should be converted also to
+>>   MFD devices) ... as an example how this can be used
+>>   I add this to the davinci nand controller OF support
+>>   patch, in this patchserie.
+>>
+>> - ARM: davinci: mux: add OF support
+>>   I want to get rid of the pin setup code in board code ...
+>>   This patch introduces a davinci_cfg_reg_of() function,
+>>   which davinci drivers can call, if they found a
+>>   "pinmux-handle", so used in the following drivers in
+>>   this patchserie:
+>>
+>>   drivers/net/ethernet/ti/davinci_emac
+>>   drivers/i2c/busses/i2c-davinci.c
+>>   drivers/mtd/nand/davinci_nand.c
+>>
+>> - post this board support with USB support, even though
+>>   USB is only working with the 10 ms "workaround", posted here:
+>>   http://comments.gmane.org/gmane.linux.usb.general/54505
+>>   I see this issue also on the AM1808 TMDXEXP1808L evalboard.
+>>
+>> - MMC and USB are not using OF support yet, ideas how to port
+>>   this are welcome. I need for USB and MMC board specific
+>>   callbacks, how to solve this with OF support?
+>>
+>> Signed-off-by: Heiko Schocher <hs@denx.de>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-mtd at lists.infradead.org
+>> Cc: linux-i2c at vger.kernel.org
+>> Cc: netdev at vger.kernel.org
+>> Cc: David Woodhouse <dwmw2@infradead.org>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>> Cc: Wolfram Sang <w.sang@pengutronix.de>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Wolfgang Denk <wd@denx.de>
+>> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+>>
+>> Heiko Schocher (7):
+>>   ARM: davinci, intc: Add OF support for TI interrupt controller
+>>   ARM: davinci: configure davinci aemif chipselects through OF
+>>   ARM: davinci: mux: add OF support
+>>   ARM: davinci: net: davinci_emac: add OF support
+>>   ARM: davinci: i2c: add OF support
+>>   ARM: mtd: nand: davinci: add OF support for davinci nand controller
+>>   ARM: davinci: add support for the am1808 based enbw_cmc board
+>>
+>>  .../devicetree/bindings/arm/davinci/aemif.txt      |  119 ++++++
+>>  .../bindings/arm/davinci/davinci_emac.txt          |   43 +++
+>>  .../devicetree/bindings/arm/davinci/i2c.txt        |   33 ++
+>>  .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++
+>>  .../devicetree/bindings/arm/davinci/mux.txt        |   40 ++
+>>  .../devicetree/bindings/arm/davinci/nand.txt       |   74 ++++
+>>  arch/arm/boot/dts/enbw_cmc.dts                     |  268 ++++++++++++++
+>>  arch/arm/configs/enbw_cmc_defconfig                |  123 +++++++
+>>  arch/arm/mach-davinci/Kconfig                      |    9 +
+>>  arch/arm/mach-davinci/Makefile                     |    1 +
+>>  arch/arm/mach-davinci/aemif.c                      |   86 +++++-
+>>  arch/arm/mach-davinci/board-enbw-cmc.c             |  380 ++++++++++++++++++++
+>>  arch/arm/mach-davinci/cp_intc.c                    |   87 ++++-
+>>  arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
+>>  arch/arm/mach-davinci/include/mach/mux.h           |    2 +
+>>  arch/arm/mach-davinci/include/mach/uncompress.h    |    1 +
+>>  arch/arm/mach-davinci/mux.c                        |   73 ++++-
+>>  drivers/i2c/busses/i2c-davinci.c                   |   37 ++
+>>  drivers/mtd/nand/davinci_nand.c                    |   85 +++++-
+>>  drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++-
+>>  20 files changed, 1569 insertions(+), 14 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/mux.txt
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+>>  create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
+>>  create mode 100644 arch/arm/configs/enbw_cmc_defconfig
+>>  create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
+>>
+> 
