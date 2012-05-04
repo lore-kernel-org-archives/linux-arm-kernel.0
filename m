@@ -1,55 +1,70 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 04 May 2012 21:45:20 +0200
-Subject: [PATCH-V6 1/3] ARM: OMAP1: FIX: check possible error condition in
- timer_init
-In-Reply-To: <20120504174301.GH5613@atomide.com>
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <87y5pafis6.fsf@ti.com> <20120504174301.GH5613@atomide.com>
-Message-ID: <1353295.rIGgu9aSFg@acer>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 May 2012 19:47:38 +0000
+Subject: [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
+In-Reply-To: <201205041307.46080.arnd@arndb.de>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <20120503144654.6390.56399.sendpatchset@w520>
+ <201205041307.46080.arnd@arndb.de>
+Message-ID: <201205041947.38375.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia pi?tek, 4 maja 2012 10:43:02 Tony Lindgren pisze:
-> Hi,
+On Friday 04 May 2012, Arnd Bergmann wrote:
 > 
-> * Kevin Hilman <khilman@ti.com> [120502 13:11]:
-> > Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> > 
-> > > OMAP1, omap_32k_timer_init() function always returns "true",
-> > > irrespective of whether error occurred while initializing 32k sync
-> > > counter as a kernel clocksource or not and execution will never
-> > > fallback to mpu_timer clocksource init code.
-> > >
-> > > This patch adds check for return value from function
-> > > omap_init_clocksource_32k(), and fallback to omap_mpu_timer_init()
-> > > in case of failure/error from omap_init_clocksource_32k().
-> > >
-> > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > > Cc: Kevin Hilman <khilman@ti.com>
-> > > Cc: Paul Walmsley <paul@pwsan.com>
-> > > Cc: Benoit Cousson <b-cousson@ti.com>
-> > > ---
-> > > This is new patch addition compared to original series (<=V5).
-> > >
-> > > Also, note that, this patch is only compile tested, since
-> > > I do not have omap1 board with me to validate it.
-> > > Kevin, can you help me to validate it.
-> > 
-> > I boot tested on OMAP1 (5912/OSK) with 32k timer and MPU timer
-> > Kconfigs.  Works fine, but needs small change below for compile 
-warnings.
-> > 
-> > Otherwise, looks good.
+> On Thursday 03 May 2012, Magnus Damm wrote:
 > 
-> We need at least one tested-by on some 15xx platform for these 
-changes.
-> Janusz, can you please give this series a try on your board too?
+> > +
+> > +/* EMEV2 SMU registers */
+> > +#define USIAU0_RSTCTRL 0xe0110094
+> > +#define USIBU1_RSTCTRL 0xe01100ac
+> > +#define USIBU2_RSTCTRL 0xe01100b0
+> > +#define USIBU3_RSTCTRL 0xe01100b4
+> > +#define STI_RSTCTRL 0xe0110124
+> > +#define USIAU0GCLKCTRL 0xe01104a0
+> > +#define USIBU1GCLKCTRL 0xe01104b8
+> > +#define USIBU2GCLKCTRL 0xe01104bc
+> > +#define USIBU3GCLKCTRL 0xe01104c0
+> > +#define STIGCLKCTRL 0xe0110528
+> > +#define USIAU0SCLKDIV 0xe011061c
+> > +#define USIB2SCLKDIV 0xe011065c
+> > +#define USIB3SCLKDIV 0xe0110660
+> > +#define STI_CLKSEL 0xe0110688
+> 
+> Please cast to __iomem* here, e.g. using the IOMEM() macro, as these are
+> virtual addresses.
 
-Sure, but in a week or so.
+I should revise that: there is no excuse to hardcode these virtual address
+here at all. Just use call ioremap() on the physical address for the
+clock registers (0xe0110000) and use the resulting pointer with an
+offset that you define locally in this file.
 
-I'm still trying to follow the l-o list, but please always Cc: me for 
-testing any changes on Amstrad Delta whenever you see fit.
+It is safe to call ioremap when you get to emev2_clock_init()
+and you will still get a large page mapping with the recent
+code reworks for map_desc.
 
-Regards,
-Janusz
+Regarding the iotable that is currently defined as
+
++static struct map_desc emev2_io_desc[] __initdata = {
++       /* 128K entity map for 0xe0020000 (GIC) */
++       {
++               .virtual        = 0xe0020000,
++               .pfn            = __phys_to_pfn(0xe0020000),
++               .length         = SZ_128K,
++               .type           = MT_UNCACHED
++       },
++       /* 128K entity map for 0xe0100000 (SMU) */
++       {
++               .virtual        = 0xe0100000,
++               .pfn            = __phys_to_pfn(0xe0100000),
++               .length         = SZ_128K,
++               .type           = MT_DEVICE
++       },
++};
+
+I would recommend just mapping the entire 16MB page around this, or at least
+2 MB, so you can benefit from the larger mappings. If you don't do that,
+better remove the entire iotable registration and rely on ioremap, the
+result will be the same and you can be prevent any hacks from creeping in
+that rely on the virtual address being the same as the physical address.
+
+	Arnd
