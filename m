@@ -1,51 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 4 May 2012 00:39:12 -0600 (MDT)
-Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
- DSS L3 slave interfaces
-In-Reply-To: <4F87E924.5040601@ti.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
- <4F87E924.5040601@ti.com>
-Message-ID: <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 4 May 2012 08:40:30 +0200
+Subject: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
+In-Reply-To: <4FA2C785.2080703@wwwdotorg.org>
+References: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com><4FA2C785.2080703@wwwdotorg.org>
+Message-ID: <20120504.094030.1816474762821188264.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
+From: Stephen Warren <swarren@wwwdotorg.org>
+Subject: Re: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
+Date: Thu, 3 May 2012 19:59:33 +0200
+Message-ID: <4FA2C785.2080703@wwwdotorg.org>
 
-On Fri, 13 Apr 2012, Archit Taneja wrote:
-
-> On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
-> > On 4/13/2012 10:01 AM, Archit Taneja wrote:
-> > > The clock for all DSS L3 slave interfaces had been recently changed to
-> > > "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
-> > > clock domain
-> > > which can't autoidle when enabled.
-> > > 
-> > > Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
-> > > hwmods so
-> > > that clock is explicitly enabled and disabled by software. Without this,
-> > > "dss_fck" would be left as enabled and the OMAP4 device won't idle
-> > > even when
-> > > DSS is not in use.
+> On 05/03/2012 10:05 AM, Hiroshi DOYU wrote:
+> > Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+> > High-performance Bus (AHB) architecture.
 > > 
-> > Yeah, that was done on purpose with Tomi knowning well that limitation.
+> > The AHB Arbiter controls AHB bus master arbitration. This effectively
+> > forms a second level of arbitration for access to the memory
+> > controller through the AHB Slave Memory device. The AHB pre-fetch
+> > logic can be configured to enhance performance for devices doing
+> > sequential access. Each AHB master is assigned to either the high or
+> > low priority bin. Both Tegra20/30 have this AHB bus.
 > > 
-> > The issue was mainly due to the lack of proper parent / child
-> > relationship between the DSS (the whole subsystem) and the DSS children
-> > at that time.
-> > 
-> > I think that Tomi posted a series to fix that for 3.4. So if we ensure
-> > that every DSS IPs are children of the DSS, then pm_runtime will always
-> > ensure that the DSS will be enabled each time a submodule is used.
-> > 
-> > So the right fix is to put back the proper iclk (l3_div) to the DSS
-> > instead of the dss_fck.
+> > Some of configuration param could be passed from DT too.
 > 
-> Ok, I get it now. Tomi's patch series ensured the parent-child 
-> dependency, but they didn't switch the iclks back to l3_div, I guess 
-> that should be a part of the series too.
+> This patch should add
+> Documentation/devicetree/bindings/arm/tegra/tegra20-ahb.txt to describe
+> the DT binding.
 
-Just checking on this one.  Does this patch need to be updated ?
-
-
-- Paul
+>From 'dts' POV, there's no difference between tegra20 and
+tegra30. They just have a register range. Is
+"../bindings/arm/tegra/tegra-ahb.txt" ok, instead of having both
+tegra{20,30}-ahb.txt?
