@@ -1,32 +1,35 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 May 2012 19:18:39 +0200
-Subject: [PATCH 0/2] ARM: OMAP3/4: cpuidle - misc fixes
-Message-ID: <1336151921-9485-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri,  4 May 2012 19:18:40 +0200
+Subject: [PATCH 1/2] ARM: OMAP3: cpuidle - check the powerdomain lookup
+In-Reply-To: <1336151921-9485-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1336151921-9485-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1336151921-9485-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches are coming from the series I previously
-sent for the cpuidle OMAP3/4 cleanups.
+At init time, check the powerdomains lookup is successful otherwise
+exit the cpuidle driver init function with -ENODEV like what is done for the
+omap3 cpuidle driver.
 
-The first one, move the powerdomain lookup check in the init
-function, the second one fix the linkage error, when the
-CONFIG_PM is not set while CONFIG_CPU_IDLE is. Omap's Kconfig
-has been modified to select CONFIG_PM when CONFIG_CPU_IDLE is
-set.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Jean Pihet <j-pihet@ti.com>
+---
+ arch/arm/mach-omap2/cpuidle34xx.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-I compiled with different options but I was not able to boot
-my board because the kernel panics for another reason.
-
-Daniel Lezcano (2):
-  ARM: OMAP3: cpuidle - check the powerdomain lookup
-  ARM: OMAP3/4: consolidate cpuidle Makefile
-
- arch/arm/mach-omap2/Kconfig       |    2 ++
- arch/arm/mach-omap2/Makefile      |   11 +++++++----
- arch/arm/mach-omap2/cpuidle34xx.c |   11 +++--------
- arch/arm/mach-omap2/cpuidle44xx.c |    8 --------
- arch/arm/mach-omap2/pm.h          |   17 +++++++++++++++--
- 5 files changed, 27 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index f682e17..207bc1c 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -363,6 +363,9 @@ int __init omap3_idle_init(void)
+ 	per_pd = pwrdm_lookup("per_pwrdm");
+ 	cam_pd = pwrdm_lookup("cam_pwrdm");
+ 
++	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
++		return -ENODEV;
++
+ 	cpuidle_register_driver(&omap3_idle_driver);
+ 
+ 	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
 -- 
 1.7.5.4
