@@ -1,57 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  4 May 2012 21:50:44 +0800
-Subject: [PATCH 2/2] ARM: mxs: always build in device tree support
-In-Reply-To: <1336139444-24672-1-git-send-email-shawn.guo@linaro.org>
-References: <1336139444-24672-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336139444-24672-2-git-send-email-shawn.guo@linaro.org>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Fri, 4 May 2012 13:55:58 +0000
+Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
+ callbacks
+In-Reply-To: <87ehr1gdcv.fsf@ti.com>
+References: <20120502234718.GA5432@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
+ <20120503160917.GA11310@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
+ <20120503184632.GA28089@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
+ <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
+ <87ehr1gdcv.fsf@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ultimate for mxs platform is to convert over to device tree,
-let's start always building in device tree support for the platform.
+Hi Kevin,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/Kconfig               |    1 +
- arch/arm/configs/mxs_defconfig |    1 +
- arch/arm/mach-mxs/Kconfig      |    1 -
- 3 files changed, 2 insertions(+), 1 deletions(-)
+On Fri, May 04, 2012 at 03:02:16, Hilman, Kevin wrote:
+> Ben Hutchings <bhutchings@solarflare.com> writes:
+> 
+> > On Thu, 2012-05-03 at 19:25 +0000, Bedia, Vaibhav wrote:
+> >> On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
+> >> [...]
+> >> > > 
+> >> > > So, if I understood this correctly, it's effectively like blocking a low power
+> >> > > state transition (here wfi execution) when EMAC is active?
+> >> > 
+> >> > Assuming "it" is my patch, correct.
+> >> > 
+> >> 
+> >> Recently I was thinking about how to get certain drivers to disallow some or all
+> >> low power states and to me this also seems to fall in a similar category.
+> >> 
+> >> One of the suggestions that I got was to check if the 'wakeup' entry associated with
+> >> the device under sysfs could be leveraged for this. The PM code could maintain
+> >> a whitelist (or blacklist) of devices and it decides the low power state to enter
+> >> based on the 'wakeup' entries associated with these devices. In this particular case,
+> >> maybe the driver could simply set this entry to non-wakeup capable when necessary and
+> >> then let the PM code take care of skipping the wfi execution.
+> >> 
+> >> Thoughts/brickbats welcome :)
+> >
+> > You can maybe (ab)use the pm_qos mechanism for this.
+> 
+> I thought of using this too, but it doesn't actually solve the problem:
+> 
+> Using PM QoS, you can avoid hitting the deeper idle states by setting a
+> very low wakeup latency.  However, on ARM platforms, even the shallowest
+> idle states use the WFI instruction, and the EMAC would still not be
+> able to wake the system from WFI.  A possibility would be define the
+> shallowest idle state to be one that doesn't call WFI and just does
+> cpu_relax().  However, that would only work for CPUidle since PM QoS
+> constraints are only checked by CPUidle.  So, a non-CPUidle kernel would
+> still have this bug. :(
+> 
+> Ultimately, this is just broken HW.  This network HW was bolted onto an
+> existing SoC without consideration for wakeup capabilities.  The result
+> is that any use of this device with networking has to completely disable
+> SoC power management.
+> 
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf006d4..1a64f6b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -469,6 +469,7 @@ config ARCH_MXS
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select HAVE_CLK_PREPARE
-+	select USE_OF
- 	help
- 	  Support for Freescale MXS-based family of processors
- 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 1ebbf45..5406c23 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -22,6 +22,7 @@ CONFIG_BLK_DEV_INTEGRITY=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_MXS=y
-+CONFIG_MACH_MXS_DT=y
- CONFIG_MACH_MX23EVK=y
- CONFIG_MACH_MX28EVK=y
- CONFIG_MACH_STMP378X_DEVB=y
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index a37cfc3..a288762 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -23,7 +23,6 @@ config MACH_MXS_DT
- 	bool "Support MXS platforms from device tree"
- 	select SOC_IMX23
- 	select SOC_IMX28
--	select USE_OF
- 	help
- 	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
- 	  using the device tree for discovery
--- 
-1.7.5.4
+I was checking with internally with some folks on the issue being addressed
+in this patch and unfortunately no one seems to be aware of this :(
+Mark mentioned nfs mounted rootfs being slow but in my limited testing I
+didn't observe this on an AM3517 board. I am yet to go through the PSP code
+to be fully sure that wfi instruction is indeed being executed but I wanted
+to check if I need to do something specific to reproduce this at my end.
+
+Irrespective of the above problem being present in the h/w, I feel the approach
+of adding platform callbacks for blocking deeper idle states will create problems
+when this is required for multiple peripherals. I agree that the default behavior
+should be to support the deepest idle state based on the peripherals being used but
+IMO the user should have the flexibility to change this behavior if he wishes
+to do so. 
+
+I don't know whether the usage of the 'wakeup' entries for giving this
+control to users qualifies as an abuse of the infrastructure. If it does, perhaps
+there should some other mechanism for letting users control the system behavior.
+
+Regards,
+Vaibhav
