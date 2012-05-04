@@ -1,82 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 04 May 2012 09:46:17 -0700
-Subject: [PATCH 4/7] ARM: OMAP: dma: Make use of cpu_class_is_omap2() to
- avoid future patching.
-In-Reply-To: <CAMQu2gxjEFK3p9CZ0i3ACWTGTQSM6ywMCWUQJg7PMyh2avvL=w@mail.gmail.com>
- (Santosh Shilimkar's message of "Fri, 4 May 2012 12:34:23 +0530")
-References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
- <1335952093-12541-5-git-send-email-santosh.shilimkar@ti.com>
- <8762cdgcmu.fsf@ti.com>
- <CAMQu2gxjEFK3p9CZ0i3ACWTGTQSM6ywMCWUQJg7PMyh2avvL=w@mail.gmail.com>
-Message-ID: <87txzvc2sm.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 May 2012 10:48:56 -0600
+Subject: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
+In-Reply-To: <20120504.091736.839941449020176796.hdoyu@nvidia.com>
+References: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com><4FA2C34F.5060406@wwwdotorg.org>
+ <20120504.091736.839941449020176796.hdoyu@nvidia.com>
+Message-ID: <4FA40878.7070709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
-
-> On Fri, May 4, 2012 at 3:17 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On 05/04/2012 12:17 AM, Hiroshi Doyu wrote:
+> Stephen Warren wrote at Thu, 3 May 2012 19:41:35 +0200:
+>> On 05/03/2012 10:05 AM, Hiroshi DOYU wrote:
+>>> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+>>> High-performance Bus (AHB) architecture.
+...
+>>> +static int __init tegra_ahb_module_init(void)
+>>> +{
+>>> +	return platform_driver_register(&tegra_ahb_driver);
+>>> +}
+>>> +postcore_initcall(tegra_ahb_module_init);
 >>
->>> cpu_class_is_omap2() contains all OMAP2+ devices. So update the DMA code
->>> cpu checks accordingly so that there is no need to patch
->>> the file for any future OMAP2+ devices.
->>>
->>> In long run, all these attributes should come from hwmod dev_attr based
->>> on DMA IP version.
->>>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->>> ?arch/arm/mach-omap2/dma.c | ? ?2 +-
->>> ?arch/arm/plat-omap/dma.c ?| ? ?4 ++--
->>> ?2 files changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
->>> index b19d849..2750bb9 100644
->>> --- a/arch/arm/mach-omap2/dma.c
->>> +++ b/arch/arm/mach-omap2/dma.c
->>> @@ -227,7 +227,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
->>>
->>> ? ? ? dma_stride ? ? ? ? ? ? ?= OMAP2_DMA_STRIDE;
->>> ? ? ? dma_common_ch_start ? ? = CSDP;
->>> - ? ? if (cpu_is_omap3630() || cpu_is_omap44xx())
->>> + ? ? if (omap_rev() >= OMAP3630_REV_ES1_0)
->>
->> It's not obvious (at least to me) that this is equivalent.
->>
->> For example, this will now be true on the TI81xx devices.
->>
-> I see your point.
-> On second thought, i decided to drop this hunk from the patch since
-> the availability of the dma descriptor feature can be read from dma
-> capability register. Will post another patch for it and also add it to
-> the clean-up series.
->
-> Updated $subject patch in the end of email.
->
-> Regards
-> Santosh
->
-> From e42966bc56b1603e033b5b259564ae149b11a5d9 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Sat, 28 Apr 2012 20:19:10 +0530
-> Subject: [PATCH 4/7] ARM: OMAP: dma: Make use of cpu_class_is_omap2() to
->  avoid future patching.
->
-> cpu_class_is_omap2() contains all OMAP2+ devices. So update the DMA code
-> cpu checks accordingly so that there is no need to patch
-> the file for any future OMAP2+ devices.
->
-> In long run, all these attributes should come from hwmod dev_attr based
-> on DMA IP version.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Dropped the hunk for descriptor feature check based on OMAP cpu
-> version since it can be handled with DMA hardware capability
-> register read.
+>> Can this be a module_init() instead of postcore_initcall()?
+> 
+> Since this driver configures prefetch size from AHB client devices,
+> it's better to make this driver available before other AHB client
+> drivers get ready. So "postcore_initcall()" seems to make sense if
+> there's no other better initcall.
 
-Right, this looks better.
+I believe this only affects when the driver is registered and has no
+influence over when the device itself is probed.
 
-Thanks,
+When booting with board files rather than DT, it was possible to
+register drivers and platform devices early using various initcalls to
+control the order. However, with DT, I believe all the devices are
+instantiated from DT at the same time (well, one by one in whatever
+order as the DT is parsed), so the time when the driver is registered
+isn't relevant.
 
-Kevin
+So, if the other AHB devices really need this AHB driver to initialize
+first, you'd better move all the AHB devices inside the AHB node in DT,
+so that the AHB driver can influence when the children get probed.
+Still, I'd suggest leaving that to a later patch, since everything
+clearly works fine right now without this driver even existing.
+
+>>> +
+>>> +static void __exit tegra_ahb_module_exit(void)
+>>> +{
+>>> +	platform_driver_unregister(&tegra_ahb_driver);
+>>> +}
+>>> +module_exit(tegra_ahb_module_exit);
+>>
+>> If so, all of the previous two quoted chunks can be replaced with just:
+>>
+>> module_platform_driver(tegra_ahb_module_init);
