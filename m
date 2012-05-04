@@ -1,32 +1,94 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Fri, 04 May 2012 13:59:22 +0900
-Subject: [PATCH] video: EXYNOS: enable interrupt again after sw reset
-Message-ID: <4FA3622A.7060401@samsung.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Fri, 4 May 2012 10:35:45 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <CAJ6a13ZBwZn20ObD2hy=xna8oFoKtdczYNxyWACJZoJkhKhsUQ@mail.gmail.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>
+ <87397o3n4y.fsf@ti.com>
+ <20120430095429.GB3170@opensource.wolfsonmicro.com>
+ <87wr4wriq3.fsf@ti.com>
+ <CAJ6a13ZBwZn20ObD2hy=xna8oFoKtdczYNxyWACJZoJkhKhsUQ@mail.gmail.com>
+Message-ID: <CAJ6a13Z0omMwmuSDcZtJbUgTEoVu-ExiRVUw=dsitsjKfzi4Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When exynos_mipi_update_cfg() is called, mipi dsi registers were become
-sw reset. So, It needs to enable interrupt again.
+On Wed, May 2, 2012 at 10:34 AM, J, KEERTHY <j-keerthy@ti.com> wrote:
+> On Tue, May 1, 2012 at 3:21 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+>>
+>>> On Fri, Apr 27, 2012 at 02:01:17PM -0700, Kevin Hilman wrote:
+>>>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+>>>
+>>>> > But presumably these things should integrate somehow - for example,
+>>>> > should devfreq and cpufreq be providing inputs into what AVS is doing,
+>>>> > and if so how?
+>>>
+>>>> The way it is currently designed, cpufreq/devfreq/regulator layers don't
+>>>> need to know about AVS.
+>>>
+>>> Yes, and that was a part of my concern, but see below.
+>>>
+>>>> The higher-level layers only know about the "nominal" voltage. ?AVS
+>>>> hardware does automatic, adaptive, micro-adjustments around that nominal
+>>>> voltage, and these micro-adjustments are managed by the AVS hardware
+>>>> sending commands to the PMIC. ?(specifically, on OMAP, the AVS sensors
+>>>> provide inputs to the voltage processor (VP) which provide inputs to the
+>>>> voltage controller (VC) which sends commands to the PMIC[1].)
+>>>
+>>> Right, that's what I'd understood it to be.
+>>>
+>>>> The driver proposed here is primarily for initializing the various
+>>>> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+>>>> adjustments are done in hardware by VC/VP.
+>>>
+>>> It's not just a driver, though - it's also creating this power/avs
+>>> thing, though now I look at the code rather than just its shape there's
+>>> not actually an abstraction being added here, it's mostly just straight
+>>> code motion of the arch/arm code that's there already. ?The changelog
+>>> and the shape of the code make it sound like this is intended to be
+>>> somewhat generic when really it's providing some OMAP specific tuning
+>>> for the device which is much less of a concern.
+>>>
+>>> I guess for now it's probably OK to just clarify in the documentation
+>>> and say that whoever adds the second driver has to work on making this
+>>> generic :)
+>>
+>> Agreed.
+>>
+>> In a different thread (which I can't seem to find now) we discussed this
+>> as well, so it just sounds like the changelog should clarify this a bit
+>> better.
+>
+> Kevin/Mark,
+>
+> Thanks for the feedback. I will add more documentation
+> to clarify this aspect. Please let me know if there are any more
+> things to be taken care of in this patch set.
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/video/exynos/exynos_mipi_dsi.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Hello Kevin,
 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index 557091d..49c7351 100644
---- a/drivers/video/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -102,6 +102,8 @@ static void exynos_mipi_update_cfg(struct mipi_dsim_device *dsim)
- 	/* set display timing. */
- 	exynos_mipi_dsi_set_display_mode(dsim, dsim->dsim_config);
- 
-+	exynos_mipi_dsi_init_interrupt(dsim);
-+
- 	/*
- 	 * data from Display controller(FIMD) is transferred in video mode
- 	 * but in case of command mode, all settigs is updated to registers.
+A gentle ping on this series. Any comments on this?
+
+>
+>>
+>> Kevin
+>>
+>>> This does also sound rather like it's in a similar area to the current
+>>> management work which Durgadoss R (CCed) was working on, though with a
+>>> slightly different application and in the OMAP case it's pretty much all
+>>> hidden in the external processor.
+>>
+>
+>
+>
+> --
+> Regards and Thanks,
+> Keerthy
+
+
+
 -- 
-1.7.4.1
+Regards and Thanks,
+Keerthy
