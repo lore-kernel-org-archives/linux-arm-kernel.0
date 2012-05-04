@@ -1,60 +1,23 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 04 May 2012 09:14:19 +0530
-Subject: [PATCH] dma: pl330: assign a new cookie when restarting tx
- descriptors in cyclic mode
-In-Reply-To: <1336092630-20627-1-git-send-email-thomas.abraham@linaro.org>
-References: <1336092630-20627-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1336103059.1593.28.camel@vkoul-udesk3>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 4 May 2012 09:22:15 +0530
+Subject: [PATCH 1/2] SPEAr: Add SMI NOR partition info in dts files
+In-Reply-To: <20120504024123.GB26478@walimis-desktop>
+References: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
+ <20120504024123.GB26478@walimis-desktop>
+Message-ID: <4FA3526F.9040205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-03 at 17:50 -0700, Thomas Abraham wrote:
-> The cookie of completed transfer descriptors are marked as zero. In case of
-> cyclic transfers, a new cookie needs to be assigned to the transfer descriptors
-> which are picked up from the work_list list before they are re-enabled for
-> transfer. This prevents hitting BUG_ON in dma_cookie_complete function when
-> transfer descriptors are recycled from the work_list list.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/dma/pl330.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 2ee6e23..7f8f422 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2265,6 +2265,7 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
->  		dma_async_tx_callback callback;
->  
->  		/* Change status to reload it */
-> +		dma_cookie_assign(&desc->txd);
->  		desc->status = PREP;
->  		pch = desc->pchan;
->  		callback = desc->txd.callback;
-Nope, this doesn't seem correct to me for two reasons:
-1. client doesnt know this new descriptor, so how will it keep track
-2. What does marking cyclic descriptor complete mean... Nothing IMO
+On 5/4/2012 8:11 AM, walimis wrote:
+>> >+				partition at 310000 {
+>> >+					label = "rootfs";
+>> >+					reg = <0x310000 0x230000>;
 
-So it is better *NOT* to mark the descriptor complete.
-And below is a better fix this for you, Please test.
+> I have one question: we know smi nor flash has 8M Bytes, why we leave 
+> 0x2c0000 Bytes unused?
 
-----------
-
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 2ee6e23..fa3fb21 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2322,7 +2322,8 @@ static void pl330_tasklet(unsigned long data)
- 	/* Pick up ripe tomatoes */
- 	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
- 		if (desc->status == DONE) {
--			dma_cookie_complete(&desc->txd);
-+			if (pch->cyclic)
-+				dma_cookie_complete(&desc->txd);
- 			list_move_tail(&desc->node, &list);
- 		}
- 
+Correct. Either i make rootfs partition size 4f0000 or is there someway to say: 
+everything else belongs to rootfs? Will leaving size field blank for rootfs do this?
 
 -- 
-~Vinod
+viresh
