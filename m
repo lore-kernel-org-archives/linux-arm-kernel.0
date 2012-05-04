@@ -1,68 +1,54 @@
-From: wookey@wookware.org (Wookey)
-Date: Fri, 4 May 2012 17:05:45 +0100
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <201205041517.58830.arnd@arndb.de>
-References: <201205031350.35476.arnd@arndb.de>
- <20120504142057.GQ27023@stoneboat.aleph1.co.uk>
- <20120504143518.GF26481@n2100.arm.linux.org.uk>
- <201205041517.58830.arnd@arndb.de>
-Message-ID: <20120504160545.GT27023@stoneboat.aleph1.co.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 04 May 2012 18:17:40 +0200
+Subject: [PATCH] ARM: EXYNOS: Add platform resource definitions for FIMC-LITE
+Message-ID: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Arnd Bergmann [2012-05-04 15:17 +0000]:
-> On Friday 04 May 2012, Russell King - ARM Linux wrote:
-> > 
-> > On Fri, May 04, 2012 at 03:20:57PM +0100, Wookey wrote:
-> > > Debian tries very hard not to support anything in the kernel that
-> > > upstream don't support in the kernel because otherwise it's way too
-> > > much work. The current list of supplied arm kernels is:
-> > > 
-> > > iop32x (ThecusN2100, intel SS4000, GLAN tank)
-> > > ixp4xx (Linksys NSLU2)
-> > > kirkwood (*plugs, QNAP NAS, OPenRD)
-> > > orion5x (QNAP NAS, HP mv2120)
-> > > versatile
-> > > mx5
-> > > omap
-> > > 
-> > > because that's a good compromise between coverage and 'building 20-odd
-> > > images'. I have no idea how much of that lot is going to get DTified,
-> > > but I'm guessing the older stuff won't be?
-> 
-> Thanks for the list, Wookey!
-> 
-> This is very important because distros are obviously the primary consumer
-> of multiplatform builds (aside from build testing). The goal should very
-> much be to reduce the number of distinct kernels that folks like debian,
-> fedora or cyanogenmod have to build.
+Add the gate clocks and register region address definition for
+FIMC-LITE devices available in Exynos4x12 and Exynos5 SoCs.
 
-Just to be clear, we'd very much like to support more hardware, ideally
-'everything a significant number of people have', but the overhead to
-the whole distro for each new kernel added to the build (for every
-upload, slowing and potentially breaking releases on all arches) is
-sufficiently high that we have been strict about what is supported. As
-a result a lot of people use Debian with non-distro kernels.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/clock-exynos4212.c |   10 ++++++++++
+ arch/arm/mach-exynos/include/mach/map.h |    3 +++
+ 2 files changed, 13 insertions(+)
 
-Obviously missing things are tegra, dove/armada, omap4. Freerunner
-would have been nice a while back but probably a bit late now. 
-
-It's not clear to me how many omap platforms our 'omap' kernel
-actually serves in practice, and similarly for the other 'generic'
-kernels.
-
-Obviously any and all progress in the direction of making existing
-coverage or expanded coverage easier/faster/more-reliable/simpler is
-very welcome. 
-
-> > So, that means your list should reduce down to five kernels, or three if
-> > the Orion/Kirkwood stuff gets converted to DT.
-> 
-> I count four if we were to proceed with the initial proposal:
-> 
-> 1. ARMv6/v7 multiplatform: omap2plus, mx5/mx6, vexpress, ...
-> 2. ARMv4/v5 multiplatform: versatile, orion5x, kirkwood, , ...
-> 3. iop32x
-> 4. ixp4xx
-> 
-> 	Arnd
+diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
+index 9882312..da397d2 100644
+--- a/arch/arm/mach-exynos/clock-exynos4212.c
++++ b/arch/arm/mach-exynos/clock-exynos4212.c
+@@ -92,6 +92,16 @@ static struct clk init_clocks_off[] = {
+ 		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
+ 		.enable		= exynos4212_clk_ip_isp1_ctrl,
+ 		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= "flite",
++		.devname	= "exynos-fimc-lite.0",
++		.enable		= exynos4212_clk_ip_isp0_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= "flite",
++		.devname	= "exynos-fimc-lite.1",
++		.enable		= exynos4212_clk_ip_isp0_ctrl,
++		.ctrlbit	= (1 << 3),
+ 	}
+ };
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 0e2292d..d30643b 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -34,6 +34,9 @@
+ 
+ #define EXYNOS4_PA_JPEG			0x11840000
+ 
++/* x = 0...1 */
++#define EXYNOS4_PA_FIMC_LITE(x)		(0x12390000 + ((x) * 0x10000))
++
+ #define EXYNOS4_PA_G2D			0x12800000
+ 
+ #define EXYNOS4_PA_I2S0			0x03830000
+-- 
+1.7.10
