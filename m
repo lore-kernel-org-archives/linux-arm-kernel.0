@@ -1,173 +1,176 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  4 May 2012 23:45:29 +0800
-Subject: [PATCH 4/4] ARM: mxs: add gpio support for device tree boot
-In-Reply-To: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
-References: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336146329-3821-5-git-send-email-shawn.guo@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 4 May 2012 17:32:51 +0200
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
+ supports omap2+ padconf
+In-Reply-To: <20120504150342.GI5140@atomide.com>
+References: <20120502172401.GG3739@atomide.com>
+ <20120503065131.GA3738@game.jcrosoft.org>
+ <20120503152708.GC5140@atomide.com>
+ <4FA30805.5050804@wwwdotorg.org>
+ <20120504044305.GD7788@game.jcrosoft.org>
+ <20120504150342.GI5140@atomide.com>
+Message-ID: <20120504153251.GE7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds gpio support for device tree boot.
+On 08:03 Fri 04 May     , Tony Lindgren wrote:
+> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120503 22:08]:
+> > 
+> > In my mind in the driver we do not have to care how to list
+> > register/unregister the group. We just need to be able to do this
+> > 
+> > pinctrl_register_group(...)
+> > 
+> > or 
+> > 
+> > pinctrl_unregistewr_group(...)
+> > 
+> > On at91 we have this type of controller
+> 
+> Ah I see. Yeah makes sense. Also I think we should let the pinctrl
+> core eventually manage the pins more too. Right now the pins are
+> a static array in the driver, which makes things unnecessarily
+> complex for the DT case. It would be nice to also have something like
+> pinctrl_register/unregister_pin instead of requiring them all
+> be registered while registering with the framework initially.
+> 
+> But all that can be improved later on once we get the binding down..
+agreed at 100%
+>  
+> > one pin can have multiple function and each function can be on different pin
+> > and we need to program and represent each of them one by one
+> > 
+> > And each pin have different parameter
+> > 
+> > so I was thinking to do like on gpio
+> > 
+> > uart {
+> > 	pin = < &pioA 12 {pararms} >
+> > 
+> > }
+> 
+> Hmm I assume the "12" above the gpio number?
+no pin number in the bank because it could not be gpio
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx23.dtsi |   35 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx28.dtsi |   55 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-mxs/mach-mxs.c |   12 +++++++++
- 3 files changed, 100 insertions(+), 2 deletions(-)
+evenif on at91 and nearly on the controller I known it is the case
+>  
+> > and use macro as basicaly we are just this
+> > 
+> > and this can be applied to tegra too as you will just refer the pin in this hw
+> > pin block
+> 
+> I was thinking of adding gpio eventually as a separate attribute with
+> something like the following. Here cam_d10 pin is used as gpio109:
+> 
+> cam_d10.gpio_109 {
+> 	pinctrl-simple,cells = <0xfa 0x104>;	/* OMAP_PIN_INPUT | OMAP_MUX_MODE4 */
+> 	gpio = <&gpio4 13 0>;			/* gpio109 */
+> };
+> 
+> The reasoning for this is that as we may not care about the gpio number
+> for all pins, it should be optional. Would that work for you?
+yes
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 7761ed0..8c83bc4 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -14,6 +14,12 @@
- / {
- 	interrupt-parent = <&icoll>;
- 
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+	};
-+
- 	cpus {
- 		cpu at 0 {
- 			compatible = "arm,arm926ejs";
-@@ -72,8 +78,35 @@
- 			};
- 
- 			pinctrl at 80018000 {
-+				compatible = "fsl,imx23-pinctrl", "simple-bus";
- 				reg = <0x80018000 2000>;
--				status = "disabled";
-+
-+				gpio0: gpio at 0 {
-+					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
-+					interrupts = <16>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio1: gpio at 1 {
-+					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
-+					interrupts = <17>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio2: gpio at 2 {
-+					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
-+					interrupts = <18>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 			};
- 
- 			digctl at 8001c000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index e75c5b0..6e03e58 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -14,6 +14,14 @@
- / {
- 	interrupt-parent = <&icoll>;
- 
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+		gpio3 = &gpio3;
-+		gpio4 = &gpio4;
-+	};
-+
- 	cpus {
- 		cpu at 0 {
- 			compatible = "arm,arm926ejs";
-@@ -95,8 +103,53 @@
- 			};
- 
- 			pinctrl at 80018000 {
-+				compatible = "fsl,imx28-pinctrl", "simple-bus";
- 				reg = <0x80018000 2000>;
--				status = "disabled";
-+
-+				gpio0: gpio at 0 {
-+					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-+					interrupts = <127>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio1: gpio at 1 {
-+					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-+					interrupts = <126>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio2: gpio at 2 {
-+					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-+					interrupts = <125>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio3: gpio at 3 {
-+					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-+					interrupts = <124>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				gpio4: gpio at 4 {
-+					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-+					interrupts = <123>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
- 			};
- 
- 			digctl at 8001c000 {
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index ae07c9d..309f781 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -26,8 +26,20 @@ static int __init mxs_icoll_add_irq_domain(struct device_node *np,
- 	return 0;
- }
- 
-+static int __init mxs_gpio_add_irq_domain(struct device_node *np,
-+				struct device_node *interrupt_parent)
-+{
-+	static int gpio_irq_base = MXS_GPIO_IRQ_START;
-+
-+	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
-+	gpio_irq_base += 32;
-+
-+	return 0;
-+}
-+
- static const struct of_device_id mxs_irq_match[] __initconst = {
- 	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
-+	{ .compatible = "fsl,mxs-gpio", .data = mxs_gpio_add_irq_domain, },
- 	{ /* sentinel */ }
- };
- 
--- 
-1.7.5.4
+but I was thinking to put it as a param but why not
+
+my idea was this
+
+pinctrl at fffff200 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "atmel,at91rm9200-pinctrl";
+
+	atmel,mux-mask = <
+		/*    A	  B     */
+		 0xffffffff 0xffc003ff  /* pioA */
+		 0xffffffff 0x800f8f00  /* pioB */
+		 0xffffffff 0x00000e00  /* pioC */
+		 0xffffffff 0xff0c1381  /* pioD */
+		 0xffffffff 0x81ffff81  /* pioE */
+		>;
+
+	pioA: gpio at fffff200 {
+		compatible = "atmel,at91rm9200-gpio";
+		reg = <0xfffff200 0x100>;
+		interrupts = <2 4>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		interrupt-controller;
+	};
+
+	pioB: gpio at fffff400 {
+		compatible = "atmel,at91rm9200-gpio";
+		reg = <0xfffff400 0x100>;
+		interrupts = <3 4>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		interrupt-controller;
+	};
+
+	pioC: gpio at fffff600 {
+		compatible = "atmel,at91rm9200-gpio";
+		reg = <0xfffff600 0x100>;
+		interrupts = <4 4>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		interrupt-controller;
+	};
+
+	pioD: gpio at fffff800 {
+		compatible = "atmel,at91rm9200-gpio";
+		reg = <0xfffff800 0x100>;
+		interrupts = <5 4>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		interrupt-controller;
+	};
+
+	pioE: gpio at fffffa00 {
+		compatible = "atmel,at91rm9200-gpio";
+		reg = <0xfffffa00 0x100>;
+		interrupts = <5 4>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		interrupt-controller;
+	};
+
+	dbgu {
+		pins = < &pioB 12 0 0
+			 &pioB 13 0 2 >;
+	/* with macro */
+		pins = < &pioB 12 MUX_A NO_PULL_UP
+			 &pioB 13 MUX_A PULL_UP >;
+	};
+
+	/* and also the notion of linked group
+	 * as on uart of network you have often the same subset of pin use.
+	 *
+	 * As example on uart rxd/txd is use for the group without rts/cts
+	 * and the one with it
+	 * on ethernet the RMII pin are use also on MII
+	 */
+
+	uart0_rxd_txd {
+		pins = < &pioB 19 MUX_A PULL_UP		/* rxd */
+			 &pioB 18 MUX_A NO_PULL_UP >;	/* txd */
+	};
+
+	uart0_rts_cts {
+		groups = < &uart0_rxd_txd >;
+		pins = < &pioB 17 MUX_B NO_PULL_UP	/* rts */
+			 &pioB 15 MUX_B NO_PULL_UP >;	/* cts */
+	};
+
+	uart0_rts_cts_external_pull_up {
+		groups = < &uart0_rts_cts >;
+		gpios = <&pioC 1 0>;
+	};
+};
+
+The idea is to avoid duplication the xlate for pins will be driver specific
+with maybe a common implementation
+
+the 3 or 4 first fix as done on gpio
+
+Best Regards,
+J.
