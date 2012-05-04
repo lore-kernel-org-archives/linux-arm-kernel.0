@@ -1,115 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 04 May 2012 11:39:30 -0500
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <201205041220.24747.arnd@arndb.de>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503140428.GB897@n2100.arm.linux.org.uk>
- <201205041220.24747.arnd@arndb.de>
-Message-ID: <4FA40642.5040203@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 May 2012 09:44:45 -0700
+Subject: [PATCH] net: davinci_emac: Add pre_open,
+ post_stop platform callbacks
+In-Reply-To: <20120502234718.GA5432@animalcreek.com> (Mark A. Greer's message
+ of "Wed, 2 May 2012 16:47:18 -0700")
+References: <20120502234718.GA5432@animalcreek.com>
+Message-ID: <87y5p7c2v6.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 07:20 AM, Arnd Bergmann wrote:
-> On Thursday 03 May 2012, Russell King - ARM Linux wrote:
->> I'm basing my comments off mach-zynq.
-> 
-> It's a different question because mach-zynq is already DT-only, but we
-> can also discuss this for a bit.
-> 
->> How about we take the following steps towards it?
->>
->> 1. create arch/arm/include/mach/ which contains standardized headers
->>    for DT based implementations.  This must include all headers included
->>    by asm/ or linux/ includes.  This will also be the only mach/ header
->>    directory included for code outside of arch/arm/mach-*.  This also
->>    acts as the 'default' set of mach/* includes for stuff like timex.h
->>    and the empty hardware.h
->>
->> 2. DT based mach-* directories do not have an include directory; their
->>    include files must be located in the main include/ heirarchy if shared
->>    with other parts of the kernel, otherwise they must be in the mach-*
->>    directory.
-> 
-> My idea for the header files was slightly different, reorganizing only
-> the headers that actually conflict between the platforms renaming the
-> ones that conflict by name but not by content.
-> 
-> I know you are aware of my experiment with just renaming the header files
-> from mach/*.h to mach-*/*.h, and that has helped me a lot in understanding
-> the specific problems. I don't care about the specific names of the headers
-> but it has helped so far in identifying which drivers are already relying
-> on a specific platform's version of a header and which ones multiplex
-> between different platforms (e.g. sa1100/pxa/mmp or s3c*/s5p*/exynos)
-> and need more work. 
-> 
-> I also wouldn't change anything for the current configurations where
-> you only have one mach-* directory at a time (or the samsung speciality).
-> 
-> My plan is to have multiplatform kernels in parallel with what we have now,
-> so we can avoid breaking working machines but also play with multiplatform
-> configurations at the same time for a subset of the platforms and with
-> certain restrictions (not all board files, not all drivers, no generic
-> early printk, ...).
-> 
+Hi Mark,
 
-Many of the headers are simply platform_data structs which may still be
-needed on DT platforms, but could be moved elsewhere.
+"Mark A. Greer" <mgreer@animalcreek.com> writes:
 
->> 3. Allow build multiple mach-* directories (which we already do... see
->>    the samsung stuff.)
-> 
-> Incidentally, the samsung headers are what are currently causing the most
-> headaches regarding the header files, because they use a lot of files
-> with soc-specific definitions for the same symbols, which means significant
-> reorganization of the code using to to turn that into run-time selectable
-> values.
-> 
->> We still have irqs.h being SoC dependent, and we still haven't taken
->> debug-macros.S far enough along to get rid of that.
-> 
-> I believe the irqs.h conflict is only for the NR_IRQS constant, all other
-> defines in there should only be used inside of the mach-* directory,
-> or not at all for fully DT-based platforms.
+[...]
 
-A DT-enabled platform does not need irqs.h or NR_IRQS. SPARSE_IRQ should
-be selected for DT. However, some DT enabled platforms don't have all
-irq chips converted to domains and may still need to set the mach .nr_irqs.
+> To work around this issue, add platform data callbacks which
+> are called at the beginning of the open routine and at the
+> end of the stop routine of the davinci_emac driver.  The
+> callbacks allow the platform code to issue disable_hlt() and
+> enable_hlt() calls appropriately.  Calling disable_hlt()
+> prevents cpu_idle from issuing the 'wfi' instruction.
 
-> 
->> Then there's also the problem of uncompress.h.  The last piece of the
->> puzzle is the common clock stuff.
+OK, I'm feeling rather dumb for not thinking of this before and
+suggesting that you use pdata callbacks.  But there is a better
+solution: runtime PM.
 
-The smp/hotplug/localtimer related functions are still global. Marc Z
-has posted patches for this, but I haven't seen recent activity. This
-and clocks were the 2 main issues I saw trying to build 2 platforms
-together. highbank and picoxcell could be built together since only
-highbank has clocks and smp.
+I hadn't noticed before that since this driver comes from davinci, it
+uses the clock API and not runtime PM which all OMAP drivers have been
+(or are being) converted to.
 
-gpio.h is still required, but empty for most platforms.
+If we replace the clock API usage in this driver with proper runtime PM
+usage, we can make this work. Basically, clk_enable() turns into
+pm_runtime_get_sync() and clk_disable() turns into pm_runtime_put().
+With that, the OMAP PM core will get callbacks whenever the device is
+[not] needed and we can use device-specific hooks to call
+disable_hlt/enable_hlt.
 
-Rob
+The only catch though is that in order for this driver to be converted
+to runtime PM and still work on davinci devices, the davinci kernel
+needs to grow runtime PM support.   I belive Sekhar is already looking
+into this, and OMAP1 (mach-omap1/pm_bus.c) will be a good example of how
+to get a basic runtime PM implementation working for davinci which just
+does basic clock management.
 
-> Initially, I think we can live without debug-macros.S and uncompress.h
-> and change the code using those to just not output anything when
-> MULTIPLATFORM is enabled: you'd have to disable MULTIPLATFORM in order
-> to debug the early boot process and hope that any bugs are not
-> specific to multiplatform configurations. In the long run, we probably
-> want to have a better solution, but it's not on my hotlist.
-> 
-> The common clock support OTOH is definitely a requirement as soon as
-> we want to actually run multiplatform kernels rather than just building
-> them.
->  
->> So, I think we're still a way off it yet - maybe six months or so.
-> 
-> True, but in order to work on the points you raised and a few others,
-> I would like to know where we're heading because it does impact
-> some decisions like whether we need to make all initcalls in non-DT
-> board files aware of potentially being run on other platforms.
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Having worked on the guts of runtime PM for OMAP, I know it pretty well
+(which is all the more embarrasing that I didn't think of suggesting it
+sooner.)  So, let me know how I can help.
+
+As a quick hack to test my idea will help, you can try simply calling
+disable_hlt() after clk_enable() and enable_hlt() after clk_disable() in
+teh davinci_emac driver.  That will effectively be what happens after a
+runtime PM conversion with device-specific hooks.  The (not even compile
+tested) patch below does this.  For starters, can you tell me if this
+results in "normal" performance on the EMAC?
+
+Kevin
+
+
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 174a334..c92bc28 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -1909,6 +1909,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+ 	netif_napi_add(ndev, &priv->napi, emac_poll, EMAC_POLL_WEIGHT);
+ 
+ 	clk_enable(emac_clk);
++	disable_hlt();
+ 
+ 	/* register the network device */
+ 	SET_NETDEV_DEV(ndev, &pdev->dev);
+@@ -1929,6 +1930,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+ 
+ netdev_reg_err:
+ 	clk_disable(emac_clk);
++	enable_hlt();
+ no_irq_res:
+ 	if (priv->txchan)
+ 		cpdma_chan_destroy(priv->txchan);
+@@ -1979,6 +1981,7 @@ static int __devexit davinci_emac_remove(struct platform_device *pdev)
+ 
+ 	clk_disable(emac_clk);
+ 	clk_put(emac_clk);
++	enable_hlt();
+ 
+ 	return 0;
+ }
