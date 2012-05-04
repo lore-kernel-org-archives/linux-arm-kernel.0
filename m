@@ -1,41 +1,29 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Fri, 04 May 2012 22:54:41 +0200
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 May 2012 14:59:37 -0600
 Subject: Handling of modular boards
-In-Reply-To: <201205042039.25794.arnd@arndb.de>
+In-Reply-To: <20120504203857.49EAD206451@gemini.denx.de>
 References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
- <201205041934.08830.arnd@arndb.de>
- <20120504203357.6B79B206451@gemini.denx.de>
- <201205042039.25794.arnd@arndb.de>
-Message-ID: <20120504205441.D293120645E@gemini.denx.de>
+ <4FA432E9.9050606@wwwdotorg.org> <20120504203857.49EAD206451@gemini.denx.de>
+Message-ID: <4FA44339.2010808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
-
-In message <201205042039.25794.arnd@arndb.de> you wrote:
->
-> > On the other hand, some of the issues we're trying to solve here
-> > for the kernel are also present in the boot loader, so this needs to
-> > do this anyway - whether by inserting new or modifying (enabling or
-> > disabling) existing properties in the DT is not really relevant here.
+On 05/04/2012 02:38 PM, Wolfgang Denk wrote:
+> Dear Stephen,
 > 
-> I haven't seen a case where the add-on board is actually required
-> for booting. What examples are you thinking of?
+> In message <4FA432E9.9050606@wwwdotorg.org> you wrote:
+>>
+>> representation of how to identify the child boards, and then have the
+>> kernel only use/parse certain chunks of the DT based on the ID results.
+> 
+> I expect that this will quickly cause problems, for example in those
+> many cases where pins and peripheral functions are multiplexed, or
+> usable for different purposes. I would not want to maintain a DT that
+> has to describe all combinations used by some boards - in a way that
+> does not cause conflicts on either of them.
 
-There are systems (and I bet it will be a growing number) where U-Boot
-itself uses the DT for configuration.  Also, there are functions that
-are needed both by the boot loader and the kernel - for example to
-dislay a splash screen the boot loader needs to initialize the
-display, so it must be able to detect which type of LCD is attached
-(resolution, color-depth, orientation) - the device tree comes in very
-handy here.  Why should Linux re-do all such things?
-
-Best regards,
-
-Wolfgang Denk
-
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-I must follow the people.  Am I not their leader? - Benjamin Disraeli
+With the DT pinctrl bindings, you can define the pinctrl configuration
+required to interact with particular child boards in the DT chunk for
+that child board. So, I think this would work out fine; you wouldn't
+have to represent a huge maze/array of conditional pinctrl settings in
+the main board file.
