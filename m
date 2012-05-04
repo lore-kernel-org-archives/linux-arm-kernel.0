@@ -1,54 +1,69 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri,  4 May 2012 20:30:18 +0800
-Subject: [PATCH v2 1/9] ARM: mmp: fix build issue on mmp with device tree
+Date: Fri,  4 May 2012 20:30:19 +0800
+Subject: [PATCH v2 2/9] ARM: mmp: append CONFIG_MACH_MMP2_DT
 In-Reply-To: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1336134626-12262-2-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1336134626-12262-3-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since irq_domain_add_simple() is removed, remove it in mmp-dt.c also.
+Append CONFIG_MACH_MMP2_DT.
+
+CONFIG_MACH_MMP_DT is used to ARMv5 DT support. CONFIG_MACH_MMP2_DT
+is used to ARMv7 DT support. These two machine support can't be
+selected at the same time.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-mmp/mmp-dt.c |   22 ----------------------
- 1 files changed, 0 insertions(+), 22 deletions(-)
+ arch/arm/mach-mmp/Kconfig |   29 +++++++++++++++++++----------
+ 1 files changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
-index 6707539..ca22e3c0 100644
---- a/arch/arm/mach-mmp/mmp-dt.c
-+++ b/arch/arm/mach-mmp/mmp-dt.c
-@@ -32,31 +32,9 @@ static const struct of_dev_auxdata mmp_auxdata_lookup[] __initconst = {
- 	{}
- };
+diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+index 5a90b9a..ede7216 100644
+--- a/arch/arm/mach-mmp/Kconfig
++++ b/arch/arm/mach-mmp/Kconfig
+@@ -2,16 +2,6 @@ if ARCH_MMP
  
--static int __init mmp_intc_add_irq_domain(struct device_node *np,
--					   struct device_node *parent)
--{
--	irq_domain_add_simple(np, 0);
--	return 0;
--}
--
--static int __init mmp_gpio_add_irq_domain(struct device_node *np,
--					   struct device_node *parent)
--{
--	irq_domain_add_simple(np, IRQ_GPIO_START);
--	return 0;
--}
--
--static const struct of_device_id mmp_irq_match[] __initconst = {
--	{ .compatible = "mrvl,mmp-intc", .data = mmp_intc_add_irq_domain, },
--	{ .compatible = "mrvl,mmp-gpio", .data = mmp_gpio_add_irq_domain, },
--	{}
--};
--
- static void __init mmp_dt_init(void)
- {
+ menu "Marvell PXA168/910/MMP2 Implmentations"
  
--	of_irq_init(mmp_irq_match);
+-config MACH_MMP_DT
+-	bool "Support MMP2 platforms from device tree"
+-	select CPU_PXA168
+-	select CPU_PXA910
+-	select USE_OF
+-	help
+-	  Include support for Marvell MMP2 based platforms using
+-	  the device tree. Needn't select any other machine while
+-	  MACH_MMP_DT is enabled.
 -
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     mmp_auxdata_lookup, NULL);
- }
+ config MACH_ASPENITE
+ 	bool "Marvell's PXA168 Aspenite Development Board"
+ 	select CPU_PXA168
+@@ -94,6 +84,25 @@ config MACH_GPLUGD
+ 	  Say 'Y' here if you want to support the Marvell PXA168-based
+ 	  GuruPlug Display (gplugD) Board
+ 
++config MACH_MMP_DT
++	bool "Support MMP (ARMv5) platforms from device tree"
++	select CPU_PXA168
++	select CPU_PXA910
++	select USE_OF
++	help
++	  Include support for Marvell MMP2 based platforms using
++	  the device tree. Needn't select any other machine while
++	  MACH_MMP_DT is enabled.
++
++config MACH_MMP2_DT
++	bool "Support MMP2 (ARMv7) platforms from device tree"
++	depends on !CPU_MOHAWK
++	select CPU_MMP2
++	select USE_OF
++	help
++	  Include support for Marvell MMP2 based platforms using
++	  the device tree.
++
+ endmenu
+ 
+ config CPU_PXA168
 -- 
 1.7.5.4
