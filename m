@@ -1,78 +1,101 @@
-From: a0393947@ti.com (Archit Taneja)
-Date: Fri, 4 May 2012 12:33:29 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
- DSS L3 slave interfaces
-In-Reply-To: <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
- <4F87E924.5040601@ti.com>
- <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
-Message-ID: <4FA37F41.3070102@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 4 May 2012 12:34:23 +0530
+Subject: [PATCH 4/7] ARM: OMAP: dma: Make use of cpu_class_is_omap2() to
+ avoid future patching.
+In-Reply-To: <8762cdgcmu.fsf@ti.com>
+References: <1335952093-12541-1-git-send-email-santosh.shilimkar@ti.com>
+ <1335952093-12541-5-git-send-email-santosh.shilimkar@ti.com>
+ <8762cdgcmu.fsf@ti.com>
+Message-ID: <CAMQu2gxjEFK3p9CZ0i3ACWTGTQSM6ywMCWUQJg7PMyh2avvL=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Friday 04 May 2012 12:09 PM, Paul Walmsley wrote:
-> Hi Archit,
+On Fri, May 4, 2012 at 3:17 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 >
-> On Fri, 13 Apr 2012, Archit Taneja wrote:
->
->> On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
->>> On 4/13/2012 10:01 AM, Archit Taneja wrote:
->>>> The clock for all DSS L3 slave interfaces had been recently changed to
->>>> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
->>>> clock domain
->>>> which can't autoidle when enabled.
->>>>
->>>> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
->>>> hwmods so
->>>> that clock is explicitly enabled and disabled by software. Without this,
->>>> "dss_fck" would be left as enabled and the OMAP4 device won't idle
->>>> even when
->>>> DSS is not in use.
->>>
->>> Yeah, that was done on purpose with Tomi knowning well that limitation.
->>>
->>> The issue was mainly due to the lack of proper parent / child
->>> relationship between the DSS (the whole subsystem) and the DSS children
->>> at that time.
->>>
->>> I think that Tomi posted a series to fix that for 3.4. So if we ensure
->>> that every DSS IPs are children of the DSS, then pm_runtime will always
->>> ensure that the DSS will be enabled each time a submodule is used.
->>>
->>> So the right fix is to put back the proper iclk (l3_div) to the DSS
->>> instead of the dss_fck.
+>> cpu_class_is_omap2() contains all OMAP2+ devices. So update the DMA code
+>> cpu checks accordingly so that there is no need to patch
+>> the file for any future OMAP2+ devices.
 >>
->> Ok, I get it now. Tomi's patch series ensured the parent-child
->> dependency, but they didn't switch the iclks back to l3_div, I guess
->> that should be a part of the series too.
+>> In long run, all these attributes should come from hwmod dev_attr based
+>> on DMA IP version.
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/dma.c | ? ?2 +-
+>> ?arch/arm/plat-omap/dma.c ?| ? ?4 ++--
+>> ?2 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+>> index b19d849..2750bb9 100644
+>> --- a/arch/arm/mach-omap2/dma.c
+>> +++ b/arch/arm/mach-omap2/dma.c
+>> @@ -227,7 +227,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+>>
+>> ? ? ? dma_stride ? ? ? ? ? ? ?= OMAP2_DMA_STRIDE;
+>> ? ? ? dma_common_ch_start ? ? = CSDP;
+>> - ? ? if (cpu_is_omap3630() || cpu_is_omap44xx())
+>> + ? ? if (omap_rev() >= OMAP3630_REV_ES1_0)
 >
-> Just checking on this one.  Does this patch need to be updated ?
+> It's not obvious (at least to me) that this is equivalent.
 >
-
-We were working on this, but we realised that only having a parent-child 
-relation in dss platform devices won't be sufficient to remove "the use 
-of dss_fck(or MODULEMODE bits) as a slave clock" hack.
-
-The issue is that during bootup(when omap_hwmod_setup_all() is called), 
-all hwmods are enabled independently, so all dss hwmods need to enable 
-the MODULEMODE bits for them to be setup correctly.
-
-With the parent-child relation in platform devices in DSS, only the 
-parent platform device's hwmod("dss_core" in our case) should enable and 
-disable the MODULEMODE bits. If the children also become capable of 
-enabling/disabling it, then things wouldn't work.
-
-Hence, to go ahead with this approach, the hwmod's themselves need to 
-have some sort of parent child relationship, or atleast some sort of use 
-counting for MODULEMODE bits. Benoit and Tomi could comment more on this.
-
-Hence we are sort of stuck :)
-
-Archit
-
+> For example, this will now be true on the TI81xx devices.
 >
-> - Paul
->
+I see your point.
+On second thought, i decided to drop this hunk from the patch since
+the availability of the dma descriptor feature can be read from dma
+capability register. Will post another patch for it and also add it to
+the clean-up series.
+
+Updated $subject patch in the end of email.
+
+Regards
+Santosh
+
+>From e42966bc56b1603e033b5b259564ae149b11a5d9 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Sat, 28 Apr 2012 20:19:10 +0530
+Subject: [PATCH 4/7] ARM: OMAP: dma: Make use of cpu_class_is_omap2() to
+ avoid future patching.
+
+cpu_class_is_omap2() contains all OMAP2+ devices. So update the DMA code
+cpu checks accordingly so that there is no need to patch
+the file for any future OMAP2+ devices.
+
+In long run, all these attributes should come from hwmod dev_attr based
+on DMA IP version.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+Dropped the hunk for descriptor feature check based on OMAP cpu
+version since it can be handled with DMA hardware capability
+register read.
+
+ arch/arm/plat-omap/dma.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index ecdb3da..c046a19 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -843,7 +843,7 @@ omap_dma_set_prio_lch(int lch, unsigned char read_prio,
+ 	}
+ 	l = p->dma_read(CCR, lch);
+ 	l &= ~((1 << 6) | (1 << 26));
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() ||  cpu_is_omap44xx())
++	if (cpu_class_is_omap2() && !cpu_is_omap242x())
+ 		l |= ((read_prio & 0x1) << 6) | ((write_prio & 0x1) << 26);
+ 	else
+ 		l |= ((read_prio & 0x1) << 6);
+@@ -2057,7 +2057,7 @@ static int __devinit
+omap_system_dma_probe(struct platform_device *pdev)
+ 		}
+ 	}
+
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx())
++	if (cpu_class_is_omap2() && !cpu_is_omap242x())
+ 		omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE,
+ 				DMA_DEFAULT_FIFO_DEPTH, 0);
+
+-- 
+1.7.5.4
