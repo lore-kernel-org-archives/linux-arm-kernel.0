@@ -1,61 +1,106 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 4 May 2012 13:04:42 +0000
-Subject: [GIT PULL] DaVinci fixes for v3.5
-Message-ID: <DF0F476B391FA8409C78302C7BA518B63E9FF67D@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 May 2012 13:07:45 +0000
+Subject: [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
+In-Reply-To: <20120503144654.6390.56399.sendpatchset@w520>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <20120503144654.6390.56399.sendpatchset@w520>
+Message-ID: <201205041307.46080.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Thursday 03 May 2012, Magnus Damm wrote:
 
-Please pull these DaVinci fixes for v3.5 kernel. The definition of "fix" is 
-admittedly broad here, but I did not want to create too many separate pull 
-requests either. This itself is a pretty small one as such.
+> +
+> +/* EMEV2 SMU registers */
+> +#define USIAU0_RSTCTRL 0xe0110094
+> +#define USIBU1_RSTCTRL 0xe01100ac
+> +#define USIBU2_RSTCTRL 0xe01100b0
+> +#define USIBU3_RSTCTRL 0xe01100b4
+> +#define STI_RSTCTRL 0xe0110124
+> +#define USIAU0GCLKCTRL 0xe01104a0
+> +#define USIBU1GCLKCTRL 0xe01104b8
+> +#define USIBU2GCLKCTRL 0xe01104bc
+> +#define USIBU3GCLKCTRL 0xe01104c0
+> +#define STIGCLKCTRL 0xe0110528
+> +#define USIAU0SCLKDIV 0xe011061c
+> +#define USIB2SCLKDIV 0xe011065c
+> +#define USIB3SCLKDIV 0xe0110660
+> +#define STI_CLKSEL 0xe0110688
 
-This is also a first signed-tag pull request from me, so let me know it is not 
-correct for some reason.
+Please cast to __iomem* here, e.g. using the IOMEM() macro, as these are
+virtual addresses.
 
-Thanks,
-Sekhar
+> +void __init emev2_clock_init(void)
+> +{
+> +	int k, ret = 0;
+> +
+> +	/* setup STI timer to run on 37.768 kHz and deassert reset */
+> +	__raw_writel(0, STI_CLKSEL);
+> +	__raw_writel(1, STI_RSTCTRL);
+> +
+> +	/* deassert reset for UART0->UART3 */
+> +	__raw_writel(2, USIAU0_RSTCTRL);
+> +	__raw_writel(2, USIBU1_RSTCTRL);
+> +	__raw_writel(2, USIBU2_RSTCTRL);
+> +	__raw_writel(2, USIBU3_RSTCTRL);
 
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+Better use iowrite32 or writel or writel_relaxed here, but not __raw_*.
 
-  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+> --- 0003/arch/arm/mach-shmobile/include/mach/common.h
+> +++ work/arch/arm/mach-shmobile/include/mach/common.h	2012-05-03 20:45:56.000000000 +0900
+> @@ -85,4 +85,10 @@ extern void r8a7779_secondary_init(unsig
+>  extern int r8a7779_boot_secondary(unsigned int cpu);
+>  extern void r8a7779_smp_prepare_cpus(void);
+>  
+> +extern void emev2_init_irq(void);
+> +extern void emev2_map_io(void);
+> +extern void emev2_add_early_devices(void);
+> +extern void emev2_add_standard_devices(void);
+> +extern void emev2_clock_init(void);
+> +
+>  #endif /* __ARCH_MACH_COMMON_H */
 
-are available in the git repository at:
+I would feel more comfortable with a separate header for this than putting
+it into the same file as everything else, but it's not important to me.
 
-  git://gitorious.org/linux-davinci/linux-davinci.git tags/v3.5-fixes
+> --- /dev/null
+> +++ work/arch/arm/mach-shmobile/intc-emev2.c	2012-05-03 20:45:57.000000000 +0900
 
-for you to fetch changes up to b1cb237602563db2d69d010a708a90149850e832:
+> +
+> +void __init emev2_init_irq(void)
+> +{
+> +	void __iomem *gic_dist_base = IOMEM(0xe0028000);
+> +	void __iomem *gic_cpu_base = IOMEM(0xe0020000);
+> +
+> +	/* use GIC to handle interrupts */
+> +	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+> +}
 
-  ARM: davinci: optimize the DMA ISR (2012-05-01 00:54:57 +0530)
+This could just go into teh setup-emev2.c file, it doesn't actually do much,
+and the other file is where the constants are coming from anyway. Then you
+can put it right next to this code:
 
-----------------------------------------------------------------
-DaVinci fixes for v3.5
+> +static struct map_desc emev2_io_desc[] __initdata = {
+> +	/* 128K entity map for 0xe0020000 (GIC) */
+> +	{
+> +		.virtual	= 0xe0020000,
+> +		.pfn		= __phys_to_pfn(0xe0020000),
+> +		.length		= SZ_128K,
+> +		.type		= MT_UNCACHED
+> +	},
+> +	/* 128K entity map for 0xe0100000 (SMU) */
+> +	{
+> +		.virtual	= 0xe0100000,
+> +		.pfn		= __phys_to_pfn(0xe0100000),
+> +		.length		= SZ_128K,
+> +		.type		= MT_DEVICE
+> +	},
+> +};
+> +
+> +void __init emev2_map_io(void)
+> +{
+> +	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
+> +}
 
-This patch set has fixes for
 
-1) incorrect bit position being used in power domain switching code
-2) not marking some variables as const when they could be const
-3) section mismatch warning in da850 evm code
-4) remove excessive register access in DMA ISR to speed up execution.
-
-----------------------------------------------------------------
-Murali Karicheri (1):
-      ARM: davinci: fix incorrect pdctl next bit position
-
-Sebastian Andrzej Siewior (1):
-      ARM: davinci: optimize the DMA ISR
-
-Uwe Kleine-K?nig (2):
-      ARM: davinci: mark spi_board_info arguments as const
-      ARM: davinci: da850-evm: fix section mismatch
-
- arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
- arch/arm/mach-davinci/davinci.h            |    4 +-
- arch/arm/mach-davinci/devices-da8xx.c      |    2 +-
- arch/arm/mach-davinci/dm355.c              |    2 +-
- arch/arm/mach-davinci/dm365.c              |    2 +-
- arch/arm/mach-davinci/dma.c                |   69 ++++++++++++++--------------
- arch/arm/mach-davinci/include/mach/da8xx.h |    3 +-
- arch/arm/mach-davinci/include/mach/psc.h   |    2 +-
- 8 files changed, 43 insertions(+), 43 deletions(-)
+	Arnd
