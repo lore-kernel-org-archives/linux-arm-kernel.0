@@ -1,56 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 May 2012 23:55:14 +0100
-Subject: Handling of modular boards
-In-Reply-To: <20120504185850.GO14230@opensource.wolfsonmicro.com>
-References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
-Message-ID: <20120504225514.GM897@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 15:58:58 -0700
+Subject: [PATCH 12/13] ARM: OMAP5: Add the build support
+In-Reply-To: <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
+Message-ID: <20120504225857.GB5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 07:58:51PM +0100, Mark Brown wrote:
-> Quite a few reference platforms (including Wolfson ones, which is why
-> I'm particularly interested) use replaceable modules to allow
-> configuration changes.  Since we can often identify the configuration at
-> runtime we should ideally do that but currently there's no infrastructure 
-> to help with that, generally this seems to be done in arch code for the
-> machine but this doesn't scale when even the CPU might change and isn't
-> terribly device tree compatible either.
-> 
-> For reference the code for current Wolfson plugin modules is in
-> arch/arm/mach-s3c64xx/mach-crag6410-module.c.
-> 
-> The most obvious current fit here is the MFD subsystem but it feels like
-> we need some slightly different infastructure to what MFD currently
-> provides.  MFD is really set up to handle platform devices with a core
-> and linear ranges of resources fanning out from that core since they're
-> really oriented around chips.  In contrast these boards are more about
-> remapping random collections of potentially unrelated resources and
-> instantiating devices on all sorts of buses and share more with board
-> files.
-> 
-> I'm just starting to put some stuff together for this so I was wondering
-> if anyone had been thinking about this and had any bright ideas for how
-> to handle it, and also if people think that MFD is a good fit for this
-> or if we should split the silicon MFDs from these PCBs.
+* R Sricharan <r.sricharan@ti.com> [120503 00:30]:
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -9,7 +9,7 @@ config ARCH_OMAP2PLUS_TYPICAL
+>  	select REGULATOR
+>  	select PM_RUNTIME
+>  	select VFP
+> -	select NEON if ARCH_OMAP3 || ARCH_OMAP4
+> +	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5
+>  	select SERIAL_OMAP
+>  	select SERIAL_OMAP_CONSOLE
+>  	select I2C
 
-I don't think its true to say that there's no support for this kind of
-thing.
+If we add CONFIG_SOC_OMAP3PLUS and CONFIG_SOC_OMAP4PLUS, then
+this becomes more future proof with select NEON if SOC_OMAP3PLUS.
 
-If you're thinking about a motherboard with separate add-on cards, then
-you can view the cards as their own separate platform device.  Your
-platform device driver would be a "whole board driver" responsible
-for creating and registering the specific devices found on the board
-in its probe function, and unregistering them in the remove function.
+> @@ -55,6 +55,13 @@ config ARCH_OMAP4
+>  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  	select ARM_CPU_SUSPEND if PM
+>  
+> +config ARCH_OMAP5
+> +	bool "TI OMAP5"
+> +	depends on ARCH_OMAP2PLUS
+> +	select CPU_V7
+> +	select ARM_GIC
+> +	select HAVE_SMP
 
-This is exactly how I've now setup the Assabet with Neponset daughter
-board - all the Neponset devices sit behind the Neponset platform
-device, including things like the SA1111 multifunction chip and SMC91x
-network interface.  I can bind and unbind the Neponset device from its
-driver and have everything behind that driver appear and disappear
-appropriately - which is useful if your modules can be hotplugged.
+No need to have depends on ARCH_OMAP2PLUS, it's all inside
+if ARCH_OMAP2PLUS anyways. I removed those already once, but that
+had to be reverted because the patch was doing other things too
+that did not work out too well..
 
-It also helps to give the right model to the power management support,
-because you're automatically arranging the child devices below the
-board-level device, which means all the child devices should be
-suspended before the board level device, and the board level device
-should be resumed before the child devices.
+> @@ -343,6 +350,10 @@ config MACH_OMAP4_PANDA
+>  	select OMAP_PACKAGE_CBS
+>  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+>  
+> +config MACH_OMAP5_SEVM
+> +	bool "OMAP5 sevm Board"
+> +	depends on ARCH_OMAP5
+> +
+>  config OMAP3_EMU
+>  	bool "OMAP3 debugging peripherals"
+>  	depends on ARCH_OMAP3
+
+No need for it here either. Actually, I think this whole chunk
+can be now left out since it's DT based?
+
+Regards,
+
+Tony
