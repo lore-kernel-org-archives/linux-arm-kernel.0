@@ -1,72 +1,78 @@
-From: jemmajones81@yahoo.co.uk (Jemma Jones)
-Date: Fri, 4 May 2012 09:44:07 +0100 (BST)
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <6e4ad6defa33bf693ec45cae819469f0@localhost>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
-Message-ID: <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
+From: cxie4@marvell.com (Chao Xie)
+Date: Fri, 4 May 2012 01:45:15 -0700
+Subject: common clock framework
+In-Reply-To: <20120504082110.GB16535@pengutronix.de>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: Development tree for Cortex-A15?
+Hi
+For the clock dependency, what about bus clock. What do you mean about bus level.
+As I understand the device driver only need care about enabling a clock to make it work. For example a USB driver. To make a USB work, it may need turn on bus clock, function clock, and phy clock. For some SOCs, phy and function may share same clock. There is a problem, we leave this dependency to device driver or keep it in our clock framework.
+To keep it in clock framework, the device driver only need know that enable one clock. To leave the dependency to device driver, the device driver will need know about all the clocks and dependency. If the device driver is shared by many SOCs, it will add some #ifdef into it.
+So why not add a dependency list into clock structure, and it will do enable the dependency clock before enable its own clock.
 
-> 
-> On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
-> <jemmajones81@yahoo.co.uk> wrote:
->>>  Subject: Re: Development tree for Cortex-A15?
->> 
->>> 
->>>  On Thu, 3 May 2012 12:56:39 +0100 (BST), Jemma Jones
->>>  <jemmajones81@yahoo.co.uk> wrote:
->>> 
->>>  Hi Jemma,
->>> 
->>>> ? Hi, I'm looking for the latest KVM-enabled developer version 
-> of the
->>>  Linux
->>>> ? kernel for ARM on the Versatile Express board with the Cortex-A15
->>>> ? CPU.?
->>> 
->>>  It really depends on what you call "developer version". As 
-> far as I 
->>>  know,
->>>  there is nothing but dev trees around ;-).
->>> 
->>>> ? I have pulled from these two trees
->>>> 
->>>> 
->>> 
-> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
->>>> 
->>> 
-> http://git.kernel.org/?p=linux/kernel/git/maz/arm-platforms.git;a=summary
->>>> 
->>>> ? But it seems the 2nd one is more up-to-date with KVM enablement 
-> while
->>>> ? it
->>>> ? doesn't have any support for the A15 VE board? And the 1st one 
-> 
->>>  doesn't
->>>> ? support KVM on ARM with the ARMv7 virtualization extensions?
->>> 
->>>  First, my tree (the second one) does support the A15. Otherwise I'd
-> have
->>>  a
->>>  hard time testing my own code... Which branch are you looking at?
-> Please
->>>  note that the KVM branches in this tree are under heavy development,
-> and
->>>  are only suitable if you don't mind frequent rebases and regular
-> breakage
->>>  due to bleeding edge code.
->> 
->>  I'm currently on kvm-arm-v7-ael, because it looked like the most
->>  up-to-date one. Which one should I be using for Cortex-A15 support?
-> 
-> That branch is good enough, if you have a bleeding edge QEMU. Note that
-> the VE A15 support in that tree is DT only. I'm working on a v3.4 based one
-> at the moment, but that's not completely ready yet.
 
-I'm just a little confused because under arch/arm/mach-vexpress/ there is no A15 tile? On the virtualopensystems.com git (which you quote above) you had to explicitly enable the board and it would show up in the .config as CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your kernel tree?
+-----Original Message-----
+From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+Sent: Friday, May 04, 2012 4:21 PM
+To: Chao Xie
+Cc: Turquette, Mike; linux-arm-kernel at lists.infradead.org
+Subject: Re: common clock framework
+
+On Thu, May 03, 2012 at 07:02:07PM -0700, Chao Xie wrote:
+> Hi,
+> The common clock driver in drivers/clk/ has been integrated into mainline. In fact, I still have some questions to the driver.
+> 1. Why need big lock: enable_lock and prepare_lock?
+>    Using these locks means that the clock enable and prepare operation cannot re-entered.
+
+This has been discussed at length on the list. Short answer is that it's
+not trivial to properly lock the clock tree (or parts thereof) if we have
+individual clock locks. The possibility of having a lock per tree has
+been discussed if the single lock approach turns out to be unsufficient.
+This may be added later.
+
+> 2. How to handle the depended clocks?
+>    For example clock1 and clock2 both have multiple inputs, and they
+>    both depend on clock3. It means that before enable clock1 or
+>    clock2, clock3 should be enabled, and if clock1 and clock2 are both
+>    off, clock2 need to be off too to save power. Clock3 is not the
+>    parent of clock1 and clock2, because the clock3 is not one of
+>    inputs of clock1 and clock2.  If we do not handle it in clock
+>    framework, we have to let device driver to know it. It means that
+>    the device driver need to handle clock dependency. It will make the
+>    device driver to be complicated especially it is shared by
+>    different SOCs.
+
+If clock3 is not parent of clock2 and clock1 then the dependency does
+not come from your clock tree and thus can't be handled in the clock
+framework.
+If you have to enable clock3 to make your device work, then yes, your
+device must turn it on. It could also be that clock3 is not used by
+your device directly but by a bus which your device depends on. In this
+case you would have to describe the dependency on bus level.
+The clock framework can only describe a clock tree and that's all it
+*should* do.
+
+> 3. how to handle voltage changes in clock framework?  When some
+> clock's rate is changed, the voltage for the component that using the
+> clock may need changed too. So where to add the voltage change
+> sequence?
+
+Clocks have notifiers attached to them. You can hook yourself into a pre
+rate change (increasing the voltage here) and into a post rate change
+(decreasing the voltage here).
+That said, we are not there yet. Once the clock framework has settled
+and is actually used in SoCs I'm sure somebody will come up with some
+driver which can be passed a freq <-> voltage table for a given
+regulator clock pair.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
