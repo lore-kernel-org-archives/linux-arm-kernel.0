@@ -1,60 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 15:58:58 -0700
-Subject: [PATCH 12/13] ARM: OMAP5: Add the build support
-In-Reply-To: <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
-Message-ID: <20120504225857.GB5613@atomide.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 4 May 2012 16:08:20 -0700
+Subject: common clock framework
+In-Reply-To: <20120504082110.GB16535@pengutronix.de>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+Message-ID: <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* R Sricharan <r.sricharan@ti.com> [120503 00:30]:
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -9,7 +9,7 @@ config ARCH_OMAP2PLUS_TYPICAL
->  	select REGULATOR
->  	select PM_RUNTIME
->  	select VFP
-> -	select NEON if ARCH_OMAP3 || ARCH_OMAP4
-> +	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5
->  	select SERIAL_OMAP
->  	select SERIAL_OMAP_CONSOLE
->  	select I2C
+On Fri, May 4, 2012 at 1:21 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, May 03, 2012 at 07:02:07PM -0700, Chao Xie wrote:
+>> Hi,
+>> The common clock driver in drivers/clk/ has been integrated into mainline. In fact, I still have some questions to the driver.
+>> 1. Why need big lock: enable_lock and prepare_lock?
+>> ? ?Using these locks means that the clock enable and prepare operation cannot re-entered.
+>
+> This has been discussed at length on the list. Short answer is that it's
+> not trivial to properly lock the clock tree (or parts thereof) if we have
+> individual clock locks. The possibility of having a lock per tree has
+> been discussed if the single lock approach turns out to be unsufficient.
+> This may be added later.
 
-If we add CONFIG_SOC_OMAP3PLUS and CONFIG_SOC_OMAP4PLUS, then
-this becomes more future proof with select NEON if SOC_OMAP3PLUS.
+I think it is worth discussing improvements to the locking scheme.
+More on that below.
 
-> @@ -55,6 +55,13 @@ config ARCH_OMAP4
->  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
->  	select ARM_CPU_SUSPEND if PM
->  
-> +config ARCH_OMAP5
-> +	bool "TI OMAP5"
-> +	depends on ARCH_OMAP2PLUS
-> +	select CPU_V7
-> +	select ARM_GIC
-> +	select HAVE_SMP
+snip
 
-No need to have depends on ARCH_OMAP2PLUS, it's all inside
-if ARCH_OMAP2PLUS anyways. I removed those already once, but that
-had to be reverted because the patch was doing other things too
-that did not work out too well..
+>> 3. how to handle voltage changes in clock framework? ?When some
+>> clock's rate is changed, the voltage for the component that using the
+>> clock may need changed too. So where to add the voltage change
+>> sequence?
+>
+> Clocks have notifiers attached to them. You can hook yourself into a pre
+> rate change (increasing the voltage here) and into a post rate change
+> (decreasing the voltage here).
+> That said, we are not there yet. Once the clock framework has settled
+> and is actually used in SoCs I'm sure somebody will come up with some
+> driver which can be passed a freq <-> voltage table for a given
+> regulator clock pair.
 
-> @@ -343,6 +350,10 @@ config MACH_OMAP4_PANDA
->  	select OMAP_PACKAGE_CBS
->  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
->  
-> +config MACH_OMAP5_SEVM
-> +	bool "OMAP5 sevm Board"
-> +	depends on ARCH_OMAP5
-> +
->  config OMAP3_EMU
->  	bool "OMAP3 debugging peripherals"
->  	depends on ARCH_OMAP3
+We are very close.  I have been hacking on this in a private branch
+and have converted OMAP's CPUfreq driver over to using *only* the the
+clock framework for DVFS.
 
-No need for it here either. Actually, I think this whole chunk
-can be now left out since it's DT based?
+Good news: it works!  The CPUfreq driver's .target callback does the
+normal rate validation and table lookup to get a good rate for the
+CPU, then it simply calls clk_set_rate.  The pre- and post-rate-change
+notifiers are then fired off.  I have added notifier handlers to the
+OMAP regulator drivers which use a look-up-table (soon to be converted
+to the OPP library) to determine voltage and they simply call
+regulator_set_voltage either before or after the clock rate changes,
+depending on scaling direction.
+
+Bad news: lockdep gets cranky about possible deadlocks due to holding
+prepare_lock and then trying to hold it again in a rate-change
+notifier handler (from OMAP's regulator code).  Specifically
+clk_set_rate holds prepare_lock, and then the i2c message sent to the
+PMIC to raise voltage calls clk_prepare as part of the standard
+messaging sequence.  This is clearly a candidate for a deadlock.
+
+Having clk_set_rate and clk_prepare both hold the same prepare_lock
+mutex seems suboptimal, but it is easy.  Having reentrant accesses to
+the clock tree is going to be hard...  I've spent some time thinking
+of ways to solve this, but I would appreciate suggestions.  I suspect
+the exact same case I'm describing above will affect many SoCs.
 
 Regards,
-
-Tony
+Mike
