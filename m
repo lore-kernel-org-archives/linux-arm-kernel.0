@@ -1,94 +1,109 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Fri, 4 May 2012 10:35:45 +0530
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <CAJ6a13ZBwZn20ObD2hy=xna8oFoKtdczYNxyWACJZoJkhKhsUQ@mail.gmail.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
- <20120427175657.GP18260@opensource.wolfsonmicro.com>
- <87397o3n4y.fsf@ti.com>
- <20120430095429.GB3170@opensource.wolfsonmicro.com>
- <87wr4wriq3.fsf@ti.com>
- <CAJ6a13ZBwZn20ObD2hy=xna8oFoKtdczYNxyWACJZoJkhKhsUQ@mail.gmail.com>
-Message-ID: <CAJ6a13Z0omMwmuSDcZtJbUgTEoVu-ExiRVUw=dsitsjKfzi4Kg@mail.gmail.com>
+From: neilb@suse.de (NeilBrown)
+Date: Fri, 4 May 2012 15:12:21 +1000
+Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice
+ level-triggered interrupts.
+In-Reply-To: <alpine.LFD.2.02.1204251402360.2542@ionos>
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.85239.stgit@notabene.brown>
+ <alpine.LFD.2.02.1204251018530.2542@ionos>
+ <20120425193916.0db1b4b1@notabene.brown>
+ <alpine.LFD.2.02.1204251402360.2542@ionos>
+Message-ID: <20120504151221.6998d4e5@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 10:34 AM, J, KEERTHY <j-keerthy@ti.com> wrote:
-> On Tue, May 1, 2012 at 3:21 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
->>
->>> On Fri, Apr 27, 2012 at 02:01:17PM -0700, Kevin Hilman wrote:
->>>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
->>>
->>>> > But presumably these things should integrate somehow - for example,
->>>> > should devfreq and cpufreq be providing inputs into what AVS is doing,
->>>> > and if so how?
->>>
->>>> The way it is currently designed, cpufreq/devfreq/regulator layers don't
->>>> need to know about AVS.
->>>
->>> Yes, and that was a part of my concern, but see below.
->>>
->>>> The higher-level layers only know about the "nominal" voltage. ?AVS
->>>> hardware does automatic, adaptive, micro-adjustments around that nominal
->>>> voltage, and these micro-adjustments are managed by the AVS hardware
->>>> sending commands to the PMIC. ?(specifically, on OMAP, the AVS sensors
->>>> provide inputs to the voltage processor (VP) which provide inputs to the
->>>> voltage controller (VC) which sends commands to the PMIC[1].)
->>>
->>> Right, that's what I'd understood it to be.
->>>
->>>> The driver proposed here is primarily for initializing the various
->>>> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
->>>> adjustments are done in hardware by VC/VP.
->>>
->>> It's not just a driver, though - it's also creating this power/avs
->>> thing, though now I look at the code rather than just its shape there's
->>> not actually an abstraction being added here, it's mostly just straight
->>> code motion of the arch/arm code that's there already. ?The changelog
->>> and the shape of the code make it sound like this is intended to be
->>> somewhat generic when really it's providing some OMAP specific tuning
->>> for the device which is much less of a concern.
->>>
->>> I guess for now it's probably OK to just clarify in the documentation
->>> and say that whoever adds the second driver has to work on making this
->>> generic :)
->>
->> Agreed.
->>
->> In a different thread (which I can't seem to find now) we discussed this
->> as well, so it just sounds like the changelog should clarify this a bit
->> better.
->
-> Kevin/Mark,
->
-> Thanks for the feedback. I will add more documentation
-> to clarify this aspect. Please let me know if there are any more
-> things to be taken care of in this patch set.
+On Wed, 25 Apr 2012 14:54:54 +0200 (CEST) Thomas Gleixner
+<tglx@linutronix.de> wrote:
 
-Hello Kevin,
+> Why not simply managing the pending bit for level irqs ?
+> 
 
-A gentle ping on this series. Any comments on this?
+Hi Thomas,
+ thanks again for the patch.  I finally made time to test it and it works as
+expected.  I've included it below with a change-log entry and tested-by:
+in case that helps.
 
->
->>
->> Kevin
->>
->>> This does also sound rather like it's in a similar area to the current
->>> management work which Durgadoss R (CCed) was working on, though with a
->>> slightly different application and in the OMAP case it's pretty much all
->>> hidden in the external processor.
->>
->
->
->
-> --
-> Regards and Thanks,
-> Keerthy
+Thanks,
+NeilBrown
 
 
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Wed, 25 Apr 2012 12:54:54 +0200
+Subject: [PATCH] IRQ: allow check_wakeup_irqs to notice level-triggered interrupts.
 
--- 
-Regards and Thanks,
-Keerthy
+Level triggered interrupts do not cause IRQS_PENDING to be set when
+they fire-while-disabled as the 'pending' state is always present in
+the level - they automatically refire where re-enabled.
+
+However the IRQS_PENDING flag is also used to abort a suspend cycle -
+if any 'is_wakeup_set' interrupt is PENDING, check_wakeup_irqs() will
+cause suspend to abort. Without IRQS_PENDING, suspend won't abort.
+
+Consequently, level-triggered interrupts that fire during the 'noirq'
+phase of suspend do not currently abort suspend.
+
+So set IRQS_PENDING even for level triggered interrupts, and make sure
+to clear the flag in check_irq_resend.
+
+Also: in check_wakeup_irqs, ignore 'is_wakeup' interrupts that were
+already disabled before suspend_device_irqs() disabled them further.
+
+Tested-by: NeilBrown <neilb@suse.de>
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 6080f6b..741f836 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -379,8 +379,10 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
+ 	 * If its disabled or no action available
+ 	 * keep it masked and get out of here
+ 	 */
+-	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data)))
++	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
++		desc->istate |= IRQS_PENDING;
+ 		goto out_unlock;
++	}
+ 
+ 	handle_irq_event(desc);
+ 
+diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+index 15e53b1..b858ce3 100644
+--- a/kernel/irq/pm.c
++++ b/kernel/irq/pm.c
+@@ -103,7 +103,8 @@ int check_wakeup_irqs(void)
+ 	int irq;
+ 
+ 	for_each_irq_desc(irq, desc) {
+-		if (irqd_is_wakeup_set(&desc->irq_data)) {
++		if (desc->depth == 1 &&
++		    irqd_is_wakeup_set(&desc->irq_data)) {
+ 			if (desc->istate & IRQS_PENDING)
+ 				return -EBUSY;
+ 			continue;
+diff --git a/kernel/irq/resend.c b/kernel/irq/resend.c
+index 14dd576..6454db7 100644
+--- a/kernel/irq/resend.c
++++ b/kernel/irq/resend.c
+@@ -58,10 +58,13 @@ void check_irq_resend(struct irq_desc *desc, unsigned int irq)
+ 	/*
+ 	 * We do not resend level type interrupts. Level type
+ 	 * interrupts are resent by hardware when they are still
+-	 * active.
++	 * active. Clear the pending bit so suspend/resume does not
++	 * get confused.
+ 	 */
+-	if (irq_settings_is_level(desc))
++	if (irq_settings_is_level(desc)) {
++		desc->istate &= ~IRQS_PENDING;
+ 		return;
++	}
+ 	if (desc->istate & IRQS_REPLAY)
+ 		return;
+ 	if (desc->istate & IRQS_PENDING) {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/f8e80438/attachment.sig>
