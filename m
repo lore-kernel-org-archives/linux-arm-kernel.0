@@ -1,171 +1,42 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Fri,  4 May 2012 21:42:06 -0400
-Subject: [PATCH v2 2/2] mtd: gpmi: add gpmi support for mx6q
-In-Reply-To: <1336182126-3230-1-git-send-email-shijie8@gmail.com>
-References: <1336182126-3230-1-git-send-email-shijie8@gmail.com>
-Message-ID: <1336182126-3230-2-git-send-email-shijie8@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 04 May 2012 14:39:51 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <87mx5ot6vp.fsf@laptop.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org>
+Message-ID: <4FA3DC27.6030204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huang Shijie <b32955@freescale.com>
+On 04/05/12 14:26, Chris Ball wrote:
+> Hi,
+>
+> On Fri, May 04 2012, Lee Jones wrote:
+>> I can either do that, or push it through Arnd's tree if you like (and
+>> it's okay with him), as I will be supplying him with another pull
+>> request after my next patch-set has been scrutinised. Would that suit
+>> you better?
+>
+> If the MMC patches are self-contained and it doesn't break anything to
+> merge them separately, my preference is to merge them via the MMC tree
+> (to avoid creating conflicts against other MMC patches in there).
+>
+> If there are dependencies, going via Arnd instead is fine.
 
-add gpmi support for mx6q.
+Okay, I'll knock up a small patch-set and send it to you.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
----
- drivers/mtd/nand/Kconfig               |    2 +-
- drivers/mtd/nand/gpmi-nand/bch-regs.h  |   42 ++++++++++++++++++++++++-------
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   11 ++++----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    4 +++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 +
- 5 files changed, 45 insertions(+), 16 deletions(-)
+I think it's 3 patches.
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index fd4d064..3b29b55 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -440,7 +440,7 @@ config MTD_NAND_NANDSIM
- 
- config MTD_NAND_GPMI_NAND
-         bool "GPMI NAND Flash Controller driver"
--        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
-+        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-         help
- 	 Enables NAND Flash support for IMX23 or IMX28.
- 	 The GPMI controller is very powerful, with the help of BCH
-diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-index 4effb8c..a092451 100644
---- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-@@ -51,15 +51,26 @@
- 
- #define BP_BCH_FLASH0LAYOUT0_ECC0		12
- #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
--#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
-+#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
-+			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
- #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
--#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
--					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
-+	)
- 
- #define HW_BCH_FLASH0LAYOUT1			0x00000090
- 
-@@ -72,13 +83,24 @@
- 
- #define BP_BCH_FLASH0LAYOUT1_ECCN		12
- #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
--#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
-+#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
-+			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
- #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
--#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
--					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
-+	)
- #endif
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 5c55c71..a1f4332 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -224,13 +224,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	/* Configure layout 0. */
- 	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
- 			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
--			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
- 
- 	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
--			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
- 
- 	/* Set *all* chip selects to use layout 0. */
-@@ -805,7 +805,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
- 	if (GPMI_IS_MX23(this)) {
- 		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
- 		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
--	} else if (GPMI_IS_MX28(this)) {
-+	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
-+		/* MX28 shares the same R/B register as MX6Q. */
- 		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
- 		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
- 	} else
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 8011123..655fc5b 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1514,6 +1514,7 @@ err_out:
- static const struct platform_device_id gpmi_ids[] = {
- 	{ .name = "imx23-gpmi-nand", .driver_data = IS_MX23, },
- 	{ .name = "imx28-gpmi-nand", .driver_data = IS_MX28, },
-+	{ .name = "imx6q-gpmi-nand", .driver_data = IS_MX6Q, },
- 	{},
- };
- 
-@@ -1524,6 +1525,9 @@ static const struct of_device_id gpmi_nand_id_table[] = {
- 	}, {
- 		.compatible = "fsl,imx28-gpmi-nand",
- 		.data = (void *)&gpmi_ids[IS_MX28]
-+	}, {
-+		.compatible = "fsl,imx6q-gpmi-nand",
-+		.data = (void *)&gpmi_ids[IS_MX6Q]
- 	}, {}
- };
- MODULE_DEVICE_TABLE(of, gpmi_nand_id_table);
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 12fdd77..ce5daa1 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -268,6 +268,8 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
- /* Use the platform_id to distinguish different Archs. */
- #define IS_MX23			0x0
- #define IS_MX28			0x1
-+#define IS_MX6Q			0x2
- #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
- #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
-+#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
- #endif
 -- 
-1.7.4.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
