@@ -1,169 +1,87 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 5 May 2012 00:06:21 +0530
-Subject: [PATCH v3 0/7] ARM: davinci: add support for the am1808 based
- enbw_cmc board
-In-Reply-To: <4FA3F6C2.9010602@denx.de>
-References: <1330945804-3379-1-git-send-email-hs@denx.de>
- <4FA3F6C2.9010602@denx.de>
-Message-ID: <4FA421A5.4020109@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 11:43:13 -0700
+Subject: [PATCH-V4 4/4] ARM: OMAP3+: am33xx: Add powerdomain & PRM support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA00381@DBDE01.ent.ti.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <1333123435-27186-5-git-send-email-hvaibhav@ti.com>
+ <87bome579d.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA00381@DBDE01.ent.ti.com>
+Message-ID: <20120504184313.GN5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 5/4/2012 9:03 PM, Heiko Schocher wrote:
-> Hello,
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120426 23:40]:
+> On Fri, Apr 27, 2012 at 06:19:02, Hilman, Kevin wrote:
+> > Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> > 
+> > > As far as PRM/CM/PRCM modules are concerned, AM33XX device is
+> > > different than OMAP3 and OMAP4 architectures; so we need to
+> > > handle it separately.
+> > > This patch adds support for, Powerdomain, Powerdomain data,
+> > > PRM api's required for AM33XX device.
+> > >
+> > > And also, hooks up AM33XX powerdomain to existing OMAP framework.
+> > 
+> > [...]
+> > 
+> > > @@ -1288,7 +1289,15 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+> > >  	if (IS_ERR_VALUE(ret))
+> > >  		return ret;
+> > >
+> > > -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> > > +	/*
+> > > +	 * cpu_is_omap34xx() is true for am33xx device as well, so
+> > > +	 * fist check for cpu_is_am33xx().
+> > > +	 */
+> > > +	if (cpu_is_am33xx())
+> > > +		return am33xx_prm_assert_hardreset(ohri.rst_shift,
+> > > +				oh->clkdm->pwrdm.ptr->prcm_offs,
+> > > +				oh->prcm.omap4.rstctrl_offs);
+> > 
+> > This still troubles me.  I *really* don't like that we have a dependence
+> > on cpu_is* call ordering.  This is very fragile and error prone.
+> > 
+> > I also don't like all the cpu_is* checking currently in omap_hwmod.c
+> > (which is here before you added this) and have an idea on how to clean
+> > it up, I should have a patch by tomorrow for this.  That should help
+> > adding am33xx support here without needing all the cpu_is* checking.
+> > 
+> > That being said, I just did a simple experiment[1] to see why
+> > cpu_is_omap34xx() needs to be true for AM33xx in the first place.  Based
+> > on my quick experiment, it does not appear to be needed.  I think our
+> > lives will be much simpler if cpu_is_omap34xx() is not true for the
+> > AM335x family. 
+> > 
+> > Can you have a look at my test branch[1] and see what you think?  I
+> > changed the omap_revision for AM335x so that cpu_is_omap34xx() is no
+> > longer true on this platform.  Then, I only needed to fixup the SRAM
+> > init, and it boots just fine on my BeagleBone.
+> > 
+> > I really think we need to go this route, because having
+> > cpu_is_omap34xx() true on AM335x is causing more headaches than it is
+> > solving problems.  This will require you to rework a little bit these
+> > clock/power/voltage domain patches, but I belive it will greatly
+> > simplify the maintainability of the end result.
+> > 
 > 
-> this v3 patchset is now pending for more than 1 month without
-> seeing comments for it. Are there no more issues?
-
-I am yet to get to them. I have mostly cleared my backlog and will be
-looking into these next. Sorry about the delay.
-
-> Should I rebase it (if no further comments occur), as it is
-> pending so long? (If so, against which tree?)
-
-The series touches multiple subsystems, so may be each patch will go
-through individual subsystem maintainer.
-
-Also copying Grant and Rob as device tree maintainers.
-
-Thanks,
-Sekhar
-
+> Let me spend some time, and explore your changes; I think getting system to boot should not be only criteria here.
+> But honestly, I fully agree with you that, we are creating more issue, 
+> adding more cpu_is_xxx() checks, with cpu_is_34xx() true for AM33xx. 
 > 
-> Thanks.
+> As I have done in the past initially, I recommend and vote for,
 > 
-> bye,
-> Heiko
+>  1. Creating separate family cpu_is_am33xx() for AM33xx device.
+> OR
+>  2. Bring it to omap44xx family, since prcm block is closer to omap4
+>     and not with omap3. Also, 
 > 
-> Heiko Schocher wrote:
->> This patchserie add support for the davinci am1808 based
->> enbw_cmc board.
->>
->> Important: I rebased this patchserie against the irqdomain/next
->> branch from grant likely, as he suggested to rework the OF
->> intcontroller changes to the irqdomain work, branch found here:
->>
->> http://git.secretlab.ca/?p=linux-2.6.git;a=shortlog;h=refs/heads/irqdomain/next
->>
->>     git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
->>
->>     commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
->>     Author: Grant Likely <grant.likely@secretlab.ca>
->>     Date:   Fri Feb 24 14:58:54 2012 -0700
->>
->>     mfd: twl-core: Add IRQ_DOMAIN dependency
->>
->> changes for v2:
->> Post this patchserie now as v2, as reworked in the
->> comments I got for the RFC serie.
->>
->> changes for v3:
->> - Interrupt Controller:
->>   - comment from Sergei Shtylyov:
->>     - rename compatible" prop to "ti,cp_intc"
->>     - cp_intc_init() is now also for the of case
->>       the name of the init function (it calls the
->>       "new" __cp_intc_init() function, which was
->>       the "old" cp_intc_init()). Through this
->>       rework the changes for OF is better visible.
->>       As the OF case uses the irq_domain rework from
->>       Grant Likely, maybe the none OF case can use
->>       this also, but this should be tested on a hw ...
->>  
->> Got no comments to the following points, I noted in the
->> RFC series, so posting this patchseries with them:
->>
->> - ARM: davinci: configure davinci aemif chipselects through OF
->>   not moved to mfd, as mentioned in this discussion:
->>   http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-td7059739.html
->>   instead use a phandle in the DTS, so drivers which
->>   uses the davinci aemif, can call davinci_aemif_setup_timing_of()
->>
->>   This is just thought as an RFC ... The enbw_cmc board
->>   support not really need to setup this bus timings, as
->>   they are setup in U-Boot ... but I want to post this,
->>   as I think, it is a nice to have, and I am not really
->>   sure, if this has to be a MFD device (If so, all bus
->>   interfaces for other SoCs should be converted also to
->>   MFD devices) ... as an example how this can be used
->>   I add this to the davinci nand controller OF support
->>   patch, in this patchserie.
->>
->> - ARM: davinci: mux: add OF support
->>   I want to get rid of the pin setup code in board code ...
->>   This patch introduces a davinci_cfg_reg_of() function,
->>   which davinci drivers can call, if they found a
->>   "pinmux-handle", so used in the following drivers in
->>   this patchserie:
->>
->>   drivers/net/ethernet/ti/davinci_emac
->>   drivers/i2c/busses/i2c-davinci.c
->>   drivers/mtd/nand/davinci_nand.c
->>
->> - post this board support with USB support, even though
->>   USB is only working with the 10 ms "workaround", posted here:
->>   http://comments.gmane.org/gmane.linux.usb.general/54505
->>   I see this issue also on the AM1808 TMDXEXP1808L evalboard.
->>
->> - MMC and USB are not using OF support yet, ideas how to port
->>   this are welcome. I need for USB and MMC board specific
->>   callbacks, how to solve this with OF support?
->>
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-mtd at lists.infradead.org
->> Cc: linux-i2c at vger.kernel.org
->> Cc: netdev at vger.kernel.org
->> Cc: David Woodhouse <dwmw2@infradead.org>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Cc: Wolfram Sang <w.sang@pengutronix.de>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Wolfgang Denk <wd@denx.de>
->> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
->>
->> Heiko Schocher (7):
->>   ARM: davinci, intc: Add OF support for TI interrupt controller
->>   ARM: davinci: configure davinci aemif chipselects through OF
->>   ARM: davinci: mux: add OF support
->>   ARM: davinci: net: davinci_emac: add OF support
->>   ARM: davinci: i2c: add OF support
->>   ARM: mtd: nand: davinci: add OF support for davinci nand controller
->>   ARM: davinci: add support for the am1808 based enbw_cmc board
->>
->>  .../devicetree/bindings/arm/davinci/aemif.txt      |  119 ++++++
->>  .../bindings/arm/davinci/davinci_emac.txt          |   43 +++
->>  .../devicetree/bindings/arm/davinci/i2c.txt        |   33 ++
->>  .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++
->>  .../devicetree/bindings/arm/davinci/mux.txt        |   40 ++
->>  .../devicetree/bindings/arm/davinci/nand.txt       |   74 ++++
->>  arch/arm/boot/dts/enbw_cmc.dts                     |  268 ++++++++++++++
->>  arch/arm/configs/enbw_cmc_defconfig                |  123 +++++++
->>  arch/arm/mach-davinci/Kconfig                      |    9 +
->>  arch/arm/mach-davinci/Makefile                     |    1 +
->>  arch/arm/mach-davinci/aemif.c                      |   86 +++++-
->>  arch/arm/mach-davinci/board-enbw-cmc.c             |  380 ++++++++++++++++++++
->>  arch/arm/mach-davinci/cp_intc.c                    |   87 ++++-
->>  arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
->>  arch/arm/mach-davinci/include/mach/mux.h           |    2 +
->>  arch/arm/mach-davinci/include/mach/uncompress.h    |    1 +
->>  arch/arm/mach-davinci/mux.c                        |   73 ++++-
->>  drivers/i2c/busses/i2c-davinci.c                   |   37 ++
->>  drivers/mtd/nand/davinci_nand.c                    |   85 +++++-
->>  drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++-
->>  20 files changed, 1569 insertions(+), 14 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/mux.txt
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
->>  create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
->>  create mode 100644 arch/arm/configs/enbw_cmc_defconfig
->>  create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
->>
 > 
+> Tony,
+> I will let tony make a decision on this. By the time, Tony makes his 
+> decision, I will spend time to explore your (Kevin's below) branch.
+
+Just to summarize, I guess it's pretty obvious that we need cpu_is_am33xx
+here. In general work on getting rid of the cpu_is_xxxx checks as they
+are not safe to use with single zImage in initcalls.
+
+Tony
