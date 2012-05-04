@@ -1,47 +1,129 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 4 May 2012 18:18:04 +0000
-Subject: [GIT PULL] DaVinci clean-up for v3.5
-Message-ID: <DF0F476B391FA8409C78302C7BA518B63E9FFED3@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 11:18:08 -0700
+Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
+In-Reply-To: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
+References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <20120504181808.GM5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi,
 
-Can you please pull the following two DaVinci clean-up patches?
+Looking at this again..
 
-Thanks,
-Sekhar
+* Govindraj.R <govindraj.raja@ti.com> [120306 00:34]:
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+> 
+> All beagle boards rev > AX/BX have external usb hubs connected to ehci
+> interface, external hub/peripheral uses a nreset sequence for which
+> uart2_rx.gpio_147 pin in mux mode4(USB2HS_nRST) is used on all beagle
+> boards expect rev Ax/BX.
+> (Reference to all beagle boards rev schematics:
+> http://beagleboard.org/hardware/design)
+> 
+> Initialising uart2 will lead to serial init taking over uart2_rx pin
+> so init uart2_rx pin mux only for Beagle AX/BX rev boards.
+> Dont init uart2 for all other boards allowing usb_ehci functionality.
 
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+OK so the above got fixed for the muxing part with commit
+bce492c04ba8fc66a4ea0a52b181ba255daaaf54.
+ 
+> To initialise individual uart port by id utilise and modify the existing
+> available func. omap_serial_board_init.
 
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+This makes sense as board specific fixes.
+ 
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -126,6 +126,7 @@ static void __init omap3_beagle_init_rev(void)
+>  		beagle_config.mmc1_gpio_wp = 29;
+>  		beagle_config.reset_gpio = 170;
+>  		beagle_config.usr_button_gpio = 7;
+> +		omap_serial_board_init(NULL, 1);
+>  		break;
+>  	case 6:
+>  		printk(KERN_INFO "OMAP3 Beagle Rev: C1/C2/C3\n");
+> @@ -528,7 +529,10 @@ static void __init omap3_beagle_init(void)
+>  	platform_add_devices(omap3_beagle_devices,
+>  			ARRAY_SIZE(omap3_beagle_devices));
+>  	omap_display_init(&beagle_dss_data);
+> -	omap_serial_init();
+> +	omap_serial_board_init(NULL, 0);
+> +	omap_serial_board_init(NULL, 2);
+> +	omap_serial_board_init(NULL, 3);
+> +
+>  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
+>  				  mt46h32m32lf6_sdrc_params);
+>  
 
-are available in the git repository at:
+So this still looks valid, except now you also add the muxing for the
+uart pins instead of NULL? Note that you could define OMAP3_UART1_DEFAULT_PINS
+etc in some header.
 
-  git://gitorious.org/linux-davinci/linux-davinci.git tags/v3.5-cleanup
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -393,30 +393,32 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>  /**
+>   * omap_serial_board_init() - initialize all supported serial ports
+>   * @info: platform specific data pointer
+> + * @port_id: uart port number to be initialised
+>   *
+> - * Initializes all available UARTs as serial ports. Platforms
+> + * Initializes individual UARTs as serial ports. Platforms
+>   * can call this function when they want to have default behaviour
+> - * for serial ports (e.g initialize them all as serial ports).
+> + * for serial ports (e.g initialize individual serial ports based on port id).
+>   */
+> -void __init omap_serial_board_init(struct omap_uart_port_info *info)
+> +void __init omap_serial_board_init(struct omap_uart_port_info *info, u8 port_id)
+>  {
+>  	struct omap_uart_state *uart;
+>  	struct omap_board_data bdata;
+>  
+> -	list_for_each_entry(uart, &uart_list, node) {
+> -		bdata.id = uart->num;
+> -		bdata.flags = 0;
+> -		bdata.pads = NULL;
+> -		bdata.pads_cnt = 0;
+> -
+> -		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+> -			omap_serial_fill_default_pads(&bdata);
+> -
+> -		if (!info)
+> -			omap_serial_init_port(&bdata, NULL);
+> -		else
+> -			omap_serial_init_port(&bdata, &info[uart->num]);
+> -	}
+> +	list_for_each_entry(uart, &uart_list, node)
+> +		if (uart->num == port_id) {
+> +			bdata.id = uart->num;
+> +			bdata.flags = 0;
+> +			bdata.pads = NULL;
+> +			bdata.pads_cnt = 0;
+> +
+> +			if (!cpu_is_omap24xx())
+> +				omap_serial_fill_default_pads(&bdata);
+> +
+> +			if (!info)
+> +				omap_serial_init_port(&bdata, NULL);
+> +			else
+> +				omap_serial_init_port(&bdata, info);
+> +		}
+>  }
+> @@ -428,5 +430,8 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
+>   */
+>  void __init omap_serial_init(void)
+>  {
+> -	omap_serial_board_init(NULL);
+> +	struct omap_uart_state *uart;
+> +
+> +	list_for_each_entry(uart, &uart_list, node)
+> +		omap_serial_board_init(NULL, uart->num);
+>  }
 
-for you to fetch changes up to 04fd232beac094a8ba89fe310d5cdcf6cecb97e2:
+Is this fix still needed? If so, it should probably be a separate fix
+with it's own description.  
 
-  ARM: davinci: implement DEBUG_LL port choice (2012-04-27 23:22:08 +0530)
+Regards,
 
-----------------------------------------------------------------
-DaVinci clean-up for v3.5
-
-This pull request implements DEBUG_LL port choice for DaVinci and
-improves code readability by using for_each_set_bit_from in DMA
-driver.
-
-----------------------------------------------------------------
-Akinobu Mita (1):
-      arm: davinci: use for_each_set_bit_from
-
-Uwe Kleine-K?nig (1):
-      ARM: davinci: implement DEBUG_LL port choice
-
- arch/arm/Kconfig.debug                           |   29 +++++++++++
- arch/arm/mach-davinci/dma.c                      |    6 +--
- arch/arm/mach-davinci/include/mach/debug-macro.S |   58 ++++++++--------------
- arch/arm/mach-davinci/include/mach/hardware.h    |    2 +-
- arch/arm/mach-davinci/include/mach/serial.h      |   10 ----
- arch/arm/mach-davinci/include/mach/uncompress.h  |   30 ++++-------
- 6 files changed, 63 insertions(+), 72 deletions(-)
+Tony
