@@ -1,31 +1,33 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 3 May 2012 17:03:12 -0700
-Subject: [PATCH v5 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <CAP=VYLrCTOb9Qtz_HU5976cew_FR=qN6=x=_nD48ZprTcCjoUg@mail.gmail.com>
-References: <1335529449-28046-1-git-send-email-santosh.shilimkar@ti.com>
- <CAP=VYLrCTOb9Qtz_HU5976cew_FR=qN6=x=_nD48ZprTcCjoUg@mail.gmail.com>
-Message-ID: <20120504000312.GB32225@kroah.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu,  3 May 2012 17:50:30 -0700
+Subject: [PATCH] dma: pl330: assign a new cookie when restarting tx
+ descriptors in cyclic mode
+Message-ID: <1336092630-20627-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 06:38:23PM -0400, Paul Gortmaker wrote:
-> On Fri, Apr 27, 2012 at 8:24 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
-> > Add a driver for the EMIF SDRAM controller used in Texas Instrument SoCs
-> 
-> Hi Santosh,
-> 
-> Can you send Greg a patch that adds proper dependencies to the Kconfig?
-> I was going to simply add an ARM dependency, but perhaps you want to
-> restrict it further to a subset of OMAP platforms?
-> 
-> At the moment it is causing build failures in other architectures.
-> 
-> http://kisskb.ellerman.id.au/kisskb/buildresult/6243036/
+The cookie of completed transfer descriptors are marked as zero. In case of
+cyclic transfers, a new cookie needs to be assigned to the transfer descriptors
+which are picked up from the work_list list before they are re-enabled for
+transfer. This prevents hitting BUG_ON in dma_cookie_complete function when
+transfer descriptors are recycled from the work_list list.
 
-I think there's a config option for readl/writel, but yes, ARM would
-probably be fine as well.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/dma/pl330.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 2ee6e23..7f8f422 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2265,6 +2265,7 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
+ 		dma_async_tx_callback callback;
+ 
+ 		/* Change status to reload it */
++		dma_cookie_assign(&desc->txd);
+ 		desc->status = PREP;
+ 		pch = desc->pchan;
+ 		callback = desc->txd.callback;
+-- 
+1.7.5.4
