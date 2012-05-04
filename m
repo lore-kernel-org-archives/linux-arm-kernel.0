@@ -1,36 +1,60 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 4 May 2012 11:41:15 +0800
-Subject: [PATCH 3/9] ARM: mmp: support DT in irq
-In-Reply-To: <201205021251.16967.arnd@arndb.de>
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
- <20120427190620.D3C313E0B4D@localhost>
- <CAN1soZz5b0bc10isc6syxM7WzKfvVqc-HzotW6Auqv1A1mnC9A@mail.gmail.com>
- <201205021251.16967.arnd@arndb.de>
-Message-ID: <CAN1soZwE7MoifmxtPS8f_x6CrK-dF97=vPMTMStg=VW1wsoLrA@mail.gmail.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 04 May 2012 09:14:19 +0530
+Subject: [PATCH] dma: pl330: assign a new cookie when restarting tx
+ descriptors in cyclic mode
+In-Reply-To: <1336092630-20627-1-git-send-email-thomas.abraham@linaro.org>
+References: <1336092630-20627-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1336103059.1593.28.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 8:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 02 May 2012, Haojian Zhuang wrote:
->> I use two CONFIG_OF in this file. The first one is used to record
->> register base address
->> of interrupt controller. In legacy code, the register address is
->> hardcoding. Do you mean
->> that I should remove this CONFIG_OF?
->
-> Unless it's a noticeable performance impact, I would recommend just
-> always using the mmp_icu_base variable, even for when CONFIG_OF is
-> disabled.
->
-> ? ? ? ?Arnd
+On Thu, 2012-05-03 at 17:50 -0700, Thomas Abraham wrote:
+> The cookie of completed transfer descriptors are marked as zero. In case of
+> cyclic transfers, a new cookie needs to be assigned to the transfer descriptors
+> which are picked up from the work_list list before they are re-enabled for
+> transfer. This prevents hitting BUG_ON in dma_cookie_complete function when
+> transfer descriptors are recycled from the work_list list.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  drivers/dma/pl330.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 2ee6e23..7f8f422 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2265,6 +2265,7 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
+>  		dma_async_tx_callback callback;
+>  
+>  		/* Change status to reload it */
+> +		dma_cookie_assign(&desc->txd);
+>  		desc->status = PREP;
+>  		pch = desc->pchan;
+>  		callback = desc->txd.callback;
+Nope, this doesn't seem correct to me for two reasons:
+1. client doesnt know this new descriptor, so how will it keep track
+2. What does marking cyclic descriptor complete mean... Nothing IMO
 
-But I appended new irq handler for DT support. I still need to reserve
-this CONFIG_OF
-since I need to keep compatible with legacy code. While everything in
-arch-mmp is moved
-into DT, I can remove this CONFIG_OF.
+So it is better *NOT* to mark the descriptor complete.
+And below is a better fix this for you, Please test.
 
-For the second CONFIG_OF, I can try to remove it.
+----------
 
-Best Regards
-Haojian
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 2ee6e23..fa3fb21 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2322,7 +2322,8 @@ static void pl330_tasklet(unsigned long data)
+ 	/* Pick up ripe tomatoes */
+ 	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
+ 		if (desc->status == DONE) {
+-			dma_cookie_complete(&desc->txd);
++			if (pch->cyclic)
++				dma_cookie_complete(&desc->txd);
+ 			list_move_tail(&desc->node, &list);
+ 		}
+ 
+
+-- 
+~Vinod
