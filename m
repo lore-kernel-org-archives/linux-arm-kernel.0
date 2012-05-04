@@ -1,57 +1,53 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 4 May 2012 08:17:36 +0200
-Subject: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <4FA2C34F.5060406@wwwdotorg.org>
-References: <1336061147-10245-1-git-send-email-hdoyu@nvidia.com><4FA2C34F.5060406@wwwdotorg.org>
-Message-ID: <20120504.091736.839941449020176796.hdoyu@nvidia.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 4 May 2012 06:28:19 +0000
+Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
+In-Reply-To: <20120503155717.GE5140@atomide.com>
+References: <hvaibhav@ti.com>
+ <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
+ <20120503155717.GE5140@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA14183@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@wwwdotorg.org>
-Subject: Re: [PATCHv3 1/4] ARM: tegra: Add Tegra AHB driver
-Date: Thu, 3 May 2012 19:41:35 +0200
-Message-ID: <4FA2C34F.5060406@wwwdotorg.org>
-
-> On 05/03/2012 10:05 AM, Hiroshi DOYU wrote:
-> > Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> > High-performance Bus (AHB) architecture.
-> > 
-> > The AHB Arbiter controls AHB bus master arbitration. This effectively
-> > forms a second level of arbitration for access to the memory
-> > controller through the AHB Slave Memory device. The AHB pre-fetch
-> > logic can be configured to enhance performance for devices doing
-> > sequential access. Each AHB master is assigned to either the high or
-> > low priority bin. Both Tegra20/30 have this AHB bus.
-> > 
-> > Some of configuration param could be passed from DT too.
+On Thu, May 03, 2012 at 21:27:18, Tony Lindgren wrote:
+> Hi,
 > 
-> > diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-> > +static u32 tegra_ahb_gizmo[] = {
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120502 02:37]:
+> > On Wed, May 02, 2012 at 14:53:24, Paul Walmsley wrote:
+> > > Hi
+> > > 
+> > > On Fri, 2 Dec 2011, hvaibhav at ti.com wrote:
+> > > 
+> > > > From: Afzal Mohammed <afzal@ti.com>
+> > > > 
+> > > > This patch adds minimal support for AM335X EVM.
+> > > > The approach taken here is to add AM335X EVM support
+> > > > to AM3517EVM, considering the fact that with device tree
+> > > > developement we will get rid of board-*.c.
+> > > > 
+> > > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > > > Reviewed-by: Kevin Hilman <khilman@ti.com>
+> > > 
+> > > I realize people may not necessarily like this, but I think that the 
+> > > AM33xx EVM needs its own board file.  This is because it really has 
+> > > nothing to do with the AM3517EVM.  Also, the AM3517EVM depends on 
+> > > CONFIG_ARCH_OMAP3, but the AM33xx EVM should not: it should depend on 
+> > > either CONFIG_ARCH_OMAPAM33XX, or CONFIG_ARCH_OMAP4.
 > 
-> const?
-
-Yes.
-
-> > +static int __init tegra_ahb_module_init(void)
-> > +{
-> > +	return platform_driver_register(&tegra_ahb_driver);
-> > +}
-> > +postcore_initcall(tegra_ahb_module_init);
+> I guess adding CONFIG_SOC_AM33XX makes sense if it does not share anything
+> except core with omap3. And the SOC is independent of the core selected,
+> there is no dependency between SoC and the core.
 > 
-> Can this be a module_init() instead of postcore_initcall()?
+> Note that we have CONFIG_ARCH_OMAP2PLUS, all the other ones should be just
+> CONFIG_SOC_XXX. As all omap3 omap4 and am33xx are v7, there's no need to
+> compile with different flags either.
+>  
 
-Since this driver configures prefetch size from AHB client devices,
-it's better to make this driver available before other AHB client
-drivers get ready. So "postcore_initcall()" seems to make sense if
-there's no other better initcall.
+But still we do have ARCH_OMAP2, ARCH_OMAP3 and ARCH_OMAP4? And that's where, 
+we have issues for adding new devices like AM33xx and TI81xx.
 
-> > +
-> > +static void __exit tegra_ahb_module_exit(void)
-> > +{
-> > +	platform_driver_unregister(&tegra_ahb_driver);
-> > +}
-> > +module_exit(tegra_ahb_module_exit);
-> 
-> If so, all of the previous two quoted chunks can be replaced with just:
-> 
-> module_platform_driver(tegra_ahb_module_init);
+Thanks,
+Vaibhav
