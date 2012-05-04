@@ -1,32 +1,259 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 4 May 2012 10:39:07 +0800
-Subject: [PATCH v3] mtd: gpmi: add device tree support for mx6q and mx28
-In-Reply-To: <CAAQ0ZWTPhXNaMyFHyDnB4ez+VYpP=O1z8w-sYQiVspZSDBHuUw@mail.gmail.com>
-References: <1335939209-15625-1-git-send-email-b32955@freescale.com>	<20120502144008.GF2194@S2101-09.ap.freescale.net>	<1336042485.13013.41.camel@sauron.fi.intel.com>	<CAAQ0ZWSxNxtF6_1+5NDqR_ry++gKbbNLZHRSTXREG18P+kQL3w@mail.gmail.com>	<CAMiH66EBO-MHXBb1eB4NMAJo6nPN47_42jYNGUGc=GC7oejPWQ@mail.gmail.com>	<CAAQ0ZWSqF9x7PSqS_14CscdU+RvcYg8pCFZUqLtDAq8uS_k=yw@mail.gmail.com>	<4FA33B7A.3040504@freescale.com>
- <CAAQ0ZWTPhXNaMyFHyDnB4ez+VYpP=O1z8w-sYQiVspZSDBHuUw@mail.gmail.com>
-Message-ID: <4FA3414B.3050302@freescale.com>
+From: walimisdev@gmail.com (walimis)
+Date: Fri, 4 May 2012 10:41:23 +0800
+Subject: [PATCH 1/2] SPEAr: Add SMI NOR partition info in dts files
+In-Reply-To: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
+References: <bd96eb0df2e50de1293a8df60d30ceea920fe2b0.1336041348.git.viresh.kumar@st.com>
+Message-ID: <20120504024123.GB26478@walimis-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?05?04? 10:28, Shawn Guo ??:
-> On 4 May 2012 10:14, Huang Shijie<b32955@freescale.com>  wrote:
->> The mxs-dma is another driver (just as the pinctrl driver). I think it's
->> better to do the job in parallel.
->>
-> The problem is if the patch gets applied on mtd tree as it is, the
-> gpmi-nand will stop functioning on mtd tree.  Or you are fine with
-even this patch is get applied. the gpmi-nand still can not work. I still
-have to add the pinctl patch to it. So it have no difference on whether 
-the mxs-dma driver is ready or not. :)
-So let it go in parallel.
-
-Best Regards
-Huang Shijie
-
-
-> that, since no in-tree board support is using the driver so far?  If
-> you are fine with that, I'm fine too.
+On Thu, May 03, 2012 at 04:07:09PM +0530, Viresh Kumar wrote:
+>This patch adds NOR partitions in all SPEAr boards dts files.
 >
-> Regards,
-> Shawn
+>Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+>---
+>Arnd,
 >
+>I will have it in my pull request for SPEAr13xx. These mails are only for
+>review.
+>
+> arch/arm/boot/dts/spear1310-evb.dts |   25 +++++++++++++++++++++++++
+> arch/arm/boot/dts/spear1340-evb.dts |   25 +++++++++++++++++++++++++
+> arch/arm/boot/dts/spear300-evb.dts  |   25 +++++++++++++++++++++++++
+> arch/arm/boot/dts/spear310-evb.dts  |   20 ++++++++++++++++++--
+> arch/arm/boot/dts/spear320-evb.dts  |   25 +++++++++++++++++++++++++
+> arch/arm/boot/dts/spear600-evb.dts  |   29 +++++++++++++++++++++++++++++
+> 6 files changed, 147 insertions(+), 2 deletions(-)
+>
+>diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+>index 12cce81..c090833 100644
+>--- a/arch/arm/boot/dts/spear1310-evb.dts
+>+++ b/arch/arm/boot/dts/spear1310-evb.dts
+>@@ -121,6 +121,31 @@
+> 
+> 		smi: flash at ea000000 {
+> 			status = "okay";
+>+			clock-rate=<50000000>;
+>+
+>+			flash at e6000000 {
+>+				#address-cells = <1>;
+>+				#size-cells = <1>;
+>+				reg = <0xe6000000 0x800000>;
+>+				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+hi,
+
+I have one question: we know smi nor flash has 8M Bytes, why we leave 
+0x2c0000 Bytes unused?
+
+Liming Wang
+>+				};
+>+			};
+> 		};
+> 
+> 		spi0: spi at e0100000 {
+>diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+>index e52b23f..0bf9d8f 100644
+>--- a/arch/arm/boot/dts/spear1340-evb.dts
+>+++ b/arch/arm/boot/dts/spear1340-evb.dts
+>@@ -133,6 +133,31 @@
+> 
+> 		smi: flash at ea000000 {
+> 			status = "okay";
+>+			clock-rate=<50000000>;
+>+
+>+			flash at e6000000 {
+>+				#address-cells = <1>;
+>+				#size-cells = <1>;
+>+				reg = <0xe6000000 0x800000>;
+>+				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+>+				};
+>+			};
+> 		};
+> 
+> 		spi0: spi at e0100000 {
+>diff --git a/arch/arm/boot/dts/spear300-evb.dts b/arch/arm/boot/dts/spear300-evb.dts
+>index 910e264..cb66ba2 100644
+>--- a/arch/arm/boot/dts/spear300-evb.dts
+>+++ b/arch/arm/boot/dts/spear300-evb.dts
+>@@ -87,6 +87,31 @@
+> 
+> 		smi: flash at fc000000 {
+> 			status = "okay";
+>+			clock-rate=<50000000>;
+>+
+>+			flash at f8000000 {
+>+				#address-cells = <1>;
+>+				#size-cells = <1>;
+>+				reg = <0xf8000000 0x800000>;
+>+				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+>+				};
+>+			};
+> 		};
+> 
+> 		spi0: spi at d0100000 {
+>diff --git a/arch/arm/boot/dts/spear310-evb.dts b/arch/arm/boot/dts/spear310-evb.dts
+>index eb9f19e..12ac5ed 100644
+>--- a/arch/arm/boot/dts/spear310-evb.dts
+>+++ b/arch/arm/boot/dts/spear310-evb.dts
+>@@ -103,11 +103,27 @@
+> 			clock-rate=<50000000>;
+> 
+> 			flash at f8000000 {
+>-				label = "m25p64";
+>-				reg = <0xf8000000 0x800000>;
+> 				#address-cells = <1>;
+> 				#size-cells = <1>;
+>+				reg = <0xf8000000 0x800000>;
+> 				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+>+				};
+> 			};
+> 		};
+> 
+>diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+>index 96280fe..a2115aa 100644
+>--- a/arch/arm/boot/dts/spear320-evb.dts
+>+++ b/arch/arm/boot/dts/spear320-evb.dts
+>@@ -110,6 +110,31 @@
+> 
+> 		smi: flash at fc000000 {
+> 			status = "okay";
+>+			clock-rate=<50000000>;
+>+
+>+			flash at f8000000 {
+>+				#address-cells = <1>;
+>+				#size-cells = <1>;
+>+				reg = <0xf8000000 0x800000>;
+>+				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+>+				};
+>+			};
+> 		};
+> 
+> 		spi0: spi at d0100000 {
+>diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+>index 790a7a8..1872cb0 100644
+>--- a/arch/arm/boot/dts/spear600-evb.dts
+>+++ b/arch/arm/boot/dts/spear600-evb.dts
+>@@ -33,6 +33,35 @@
+> 			status = "okay";
+> 		};
+> 
+>+		smi: flash at fc000000 {
+>+			status = "okay";
+>+			clock-rate=<50000000>;
+>+
+>+			flash at f8000000 {
+>+				#address-cells = <1>;
+>+				#size-cells = <1>;
+>+				reg = <0xf8000000 0x800000>;
+>+				st,smi-fast-mode;
+>+
+>+				partition at 0 {
+>+					label = "xloader";
+>+					reg = <0x0 0x10000>;
+>+				};
+>+				partition at 10000 {
+>+					label = "u-boot";
+>+					reg = <0x10000 0x40000>;
+>+				};
+>+				partition at 50000 {
+>+					label = "linux";
+>+					reg = <0x50000 0x2c0000>;
+>+				};
+>+				partition at 310000 {
+>+					label = "rootfs";
+>+					reg = <0x310000 0x230000>;
+>+				};
+>+			};
+>+		};
+>+
+> 		apb {
+> 			serial at d0000000 {
+> 				status = "okay";
+>-- 
+>1.7.9
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
