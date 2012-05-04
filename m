@@ -1,89 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 12:20:24 +0000
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <20120503140428.GB897@n2100.arm.linux.org.uk>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503140428.GB897@n2100.arm.linux.org.uk>
-Message-ID: <201205041220.24747.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 May 2012 13:26:11 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120502162702.GE3548@n2100.arm.linux.org.uk>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+Message-ID: <20120504122611.GE26481@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 May 2012, Russell King - ARM Linux wrote:
-> I'm basing my comments off mach-zynq.
-
-It's a different question because mach-zynq is already DT-only, but we
-can also discuss this for a bit.
-
-> How about we take the following steps towards it?
+On Wed, May 02, 2012 at 05:27:02PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 02, 2012 at 09:31:15PM +0530, Vinod Koul wrote:
+> > From what I understand (Dan please correct me as you may know this much
+> > better than me), the tx_status tells you wrt passed cookie what is the
+> > status. Further, (as you pointed), it also tells you which is last
+> > completed cookie and what is the current "running". And wrt the
+> > currently "running" cookie it tells you how may bytes are left.
 > 
-> 1. create arch/arm/include/mach/ which contains standardized headers
->    for DT based implementations.  This must include all headers included
->    by asm/ or linux/ includes.  This will also be the only mach/ header
->    directory included for code outside of arch/arm/mach-*.  This also
->    acts as the 'default' set of mach/* includes for stuff like timex.h
->    and the empty hardware.h
->
-> 2. DT based mach-* directories do not have an include directory; their
->    include files must be located in the main include/ heirarchy if shared
->    with other parts of the kernel, otherwise they must be in the mach-*
->    directory.
+> That means we have a number of buggy drivers on both sides of the API...
+> PL08x for example always total up all the pending bytes from the position
+> in the current descriptor to the last issued descriptor.  Many other
+> implementations simply always return zero.
 
-My idea for the header files was slightly different, reorganizing only
-the headers that actually conflict between the platforms renaming the
-ones that conflict by name but not by content.
+Right, as there's been no reply on this, I'll see about changing PL08x
+and SA11x0 to do exactly this.  I'll also see about implementing it in
+the new OMAP DMA engine driver.
 
-I know you are aware of my experiment with just renaming the header files
-from mach/*.h to mach-*/*.h, and that has helped me a lot in understanding
-the specific problems. I don't care about the specific names of the headers
-but it has helped so far in identifying which drivers are already relying
-on a specific platform's version of a header and which ones multiplex
-between different platforms (e.g. sa1100/pxa/mmp or s3c*/s5p*/exynos)
-and need more work. 
+The semantics I intend to implement are:
 
-I also wouldn't change anything for the current configurations where
-you only have one mach-* directory at a time (or the samsung speciality).
+If the cookie has completed successfully, the residue will be zero.  If
+it is queued, it will be the number of bytes in the descriptor identified
+by the cookie.  If it is in progress, it will be the number of bytes yet
+to be transferred.
 
-My plan is to have multiplatform kernels in parallel with what we have now,
-so we can avoid breaking working machines but also play with multiplatform
-configurations at the same time for a subset of the platforms and with
-certain restrictions (not all board files, not all drivers, no generic
-early printk, ...).
+Now, there is a bit of ambiguity over "number of bytes yet to be transferred"
+with DMA hardware which reads from memory into a FIFO, and then transfers
+to the peripheral when the peripheral requests DMA service.  Do we define
+it as the number of bytes read from memory, or the number of bytes to be
+transferred to the peripheral.
 
-> 3. Allow build multiple mach-* directories (which we already do... see
->    the samsung stuff.)
-
-Incidentally, the samsung headers are what are currently causing the most
-headaches regarding the header files, because they use a lot of files
-with soc-specific definitions for the same symbols, which means significant
-reorganization of the code using to to turn that into run-time selectable
-values.
-
-> We still have irqs.h being SoC dependent, and we still haven't taken
-> debug-macros.S far enough along to get rid of that.
-
-I believe the irqs.h conflict is only for the NR_IRQS constant, all other
-defines in there should only be used inside of the mach-* directory,
-or not at all for fully DT-based platforms.
-
-> Then there's also the problem of uncompress.h.  The last piece of the
-> puzzle is the common clock stuff.
-
-Initially, I think we can live without debug-macros.S and uncompress.h
-and change the code using those to just not output anything when
-MULTIPLATFORM is enabled: you'd have to disable MULTIPLATFORM in order
-to debug the early boot process and hope that any bugs are not
-specific to multiplatform configurations. In the long run, we probably
-want to have a better solution, but it's not on my hotlist.
-
-The common clock support OTOH is definitely a requirement as soon as
-we want to actually run multiplatform kernels rather than just building
-them.
- 
-> So, I think we're still a way off it yet - maybe six months or so.
-
-True, but in order to work on the points you raised and a few others,
-I would like to know where we're heading because it does impact
-some decisions like whether we need to make all initcalls in non-DT
-board files aware of potentially being run on other platforms.
-
-	Arnd
+The latter may not be easy for DMA hardware to report to us... so my
+initial implementation will be number of bytes remaining calculated using
+the DMA address pointer into memory.
