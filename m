@@ -1,43 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 May 2012 12:20:42 +0200
-Subject: common clock framework
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
-Message-ID: <20120504102042.GL4141@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 4 May 2012 18:26:39 +0800
+Subject: [PATCH 1/2] mtd: gpmi: add device tree support to gpmi-nand
+In-Reply-To: <1336124510.4275.7.camel@sauron.fi.intel.com>
+References: <1336101182-5200-1-git-send-email-b32955@freescale.com>
+ <1336124510.4275.7.camel@sauron.fi.intel.com>
+Message-ID: <4FA3AEDF.8010009@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please do not top post.
+? 2012?05?04? 17:41, Artem Bityutskiy ??:
+> On Fri, 2012-05-04 at 11:13 +0800, Huang Shijie wrote:
+>> This patch just adds the DT support to gpmi-nand.
+>>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>> Please select the CONFIG_USE_OF before you do the compiler-test.
+>> thanks.
+> It should compile without CONFIG_USE_OF also just fine. Currently it
+> does not.
+>
+why not select CONFIG_USE_OF as the gpmi-nand is converted to a DT driver.
 
-On Fri, May 04, 2012 at 01:45:15AM -0700, Chao Xie wrote:
-> Hi
-> For the clock dependency, what about bus clock. What do you mean about
-> bus level.  As I understand the device driver only need care about
-> enabling a clock to make it work. For example a USB driver. To make a
-> USB work, it may need turn on bus clock, function clock, and phy
-> clock. For some SOCs, phy and function may share same clock. There is
-> a problem, we leave this dependency to device driver or keep it in our
-> clock framework.  To keep it in clock framework, the device driver
-> only need know that enable one clock. To leave the dependency to
-> device driver, the device driver will need know about all the clocks
-> and dependency. If the device driver is shared by many SOCs, it will
-> add some #ifdef into it.  So why not add a dependency list into clock
-> structure, and it will do enable the dependency clock before enable
-> its own clock.
+If you insist that it should compile without CONFIG_USE_OF, i have to 
+add back the header file ,
+such as of_irq.h.
 
-Additional to what Russell already said:
-If a clock is not needed by the device directly but for example by the
-bus which connects the device, then you need an instance which controls
-the bus. Then it's the bus that knows which clocks to activate when a
-device on this bus is activated. That said, there currently is hardly
-any infrastructure for this.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BR
+Huang Shijie
