@@ -1,68 +1,76 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 4 May 2012 10:17:28 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
-Message-ID: <4FA3F308.6030900@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 May 2012 15:17:58 +0000
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120504143518.GF26481@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120504142057.GQ27023@stoneboat.aleph1.co.uk>
+ <20120504143518.GF26481@n2100.arm.linux.org.uk>
+Message-ID: <201205041517.58830.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-On 05/04/2012 01:56 AM, Jassi Brar wrote:
-> On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
->> From: Jon Hunter <jon-hunter@ti.com>
->>
->> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
->> to add some basic helpers to retrieve a DMA controller device_node and the
->> DMA request/channel information.
->>
->> Aim of DMA helpers
->> - The purpose of device-tree (as far as I understand), is to describe the
->>  capabilites of the hardware. Thinking about DMA controllers purely from the
->>  context of the hardware to begin with, we can describe a device in terms of
->>  a DMA controller as follows ...
->>        1. Number of DMA controllers
->>        2. Number of channels (maybe physical or logical)
->>        3. Mapping of DMA requests signals to DMA controller
->>        4. Number of DMA interrupts
->>        5. Mapping of DMA interrupts to channels
->> - With the above in mind the aim of the DT DMA helper functions is to extract
->>  the above information from the DT and provide to the appropriate driver.
->>  However, due to the vast number of DMA controllers and not all are using a
->>  common driver (such as DMA Engine) it has been seen that this is not a
->>  trivial task.
->>
-> Sorry for being slow, but so far I thought DT is only to provide _h/w_
-> specific info
-> to the _controller_ drivers. It was not supposed to provide any info
-> pertaining to
-> some API (dmaengine in this case).
+On Friday 04 May 2012, Russell King - ARM Linux wrote:
 > 
-> And I believe this is one of few situations where we are better off
-> not generalizing
-> the interface - pass controller specific info in the controller
-> driver's specified format.
-> Generalizing only seems to complicate things here, when we anyway have machine
-> specific dtb, which could always have clients requesting and the
-> controllers given
-> dma's info in controller driver's specific format.
-> 
-> Perhaps I am overlooking the need to generalize. If you think so, please help me
-> understand by pointing out some use case for it.
+> On Fri, May 04, 2012 at 03:20:57PM +0100, Wookey wrote:
+> > Debian tries very hard not to support anything in the kernel that
+> > upstream don't support in the kernel because otherwise it's way too
+> > much work. The current list of supplied arm kernels is:
+> > 
+> > iop32x (ThecusN2100, intel SS4000, GLAN tank)
+> > ixp4xx (Linksys NSLU2)
+> > kirkwood (*plugs, QNAP NAS, OPenRD)
+> > orion5x (QNAP NAS, HP mv2120)
+> > versatile
+> > mx5
+> > omap
+> > 
+> > because that's a good compromise between coverage and 'building 20-odd
+> > images'. I have no idea how much of that lot is going to get DTified,
+> > but I'm guessing the older stuff won't be?
 
-No not really, your points are valid. From reading the previous
-discussions one of the items that was clearly lacking was the ability to
-represent and identify a device having more than one DMA controller. In
-other words, when you request the DMA resource, how do you identify
-which DMA controller in the system that resource belongs too. With DMA
-engine there are ways we can do this.
+Thanks for the list, Wookey!
 
-However, thinking about this now. Instead of passing specific DMA engine
-parameters to the register function may be we can pass a generic void *
-pointer with the information and completely abstract the binding from
-DMA engine. This is probably a better approach.
+This is very important because distros are obviously the primary consumer
+of multiplatform builds (aside from build testing). The goal should very
+much be to reduce the number of distinct kernels that folks like debian,
+fedora or cyanogenmod have to build.
 
-Cheers
-Jon
+> Well, my understanding is that there's DT patches around for Versatile.
+> OMAP and MX5 are both heading for DT.  I'm less certain about the Orion
+> and Kirkwood stuff, but as they're only about 4 years old, I would hope
+> that there was some active movement for these.
+
+FWIW, there is a lot of new activity on orion5x and kirkwood (less on
+mv78xxx and dove) and new board support for those platforms is being done
+using DT already, at least for the drivers that have been converted.
+
+As soon as the support is complete, I would hope that we can add dts files
+for the older boards that people are using as well, and a few releases
+later remove the respective board files.
+ 
+> The iop32x and ixp4xx stuff hasn't seen much in the way of maintenance
+> so its highly likely that these won't be converted to DT unless someone
+> with the hardware decides to step up and do it.
+
+Right. For those, I agree that it makes sense to support them without DT
+even in a multiplatform kernel. So I'll revise my initial proposal to
+
+* For mach-* directories that we expect to support using DT in the
+  near future, support the ATAG based board files only in the current
+  (single-platform, multi-board) way but not for multiplatform (i.e.
+  multiple mach-*/ combined) builds.
+* For mach-* directories that look like they will not support DT anytime
+  soon, support them as is in the multiplatform build, possibly enabling
+  all their boards (or a well-defined subset) unconditionally.
+
+> So, that means your list should reduce down to five kernels, or three if
+> the Orion/Kirkwood stuff gets converted to DT.
+
+I count four if we were to proceed with the initial proposal:
+
+1. ARMv6/v7 multiplatform: omap2plus, mx5/mx6, vexpress, ...
+2. ARMv4/v5 multiplatform: versatile, orion5x, kirkwood, , ...
+3. iop32x
+4. ixp4xx
+
+	Arnd
