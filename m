@@ -1,48 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 09:51:46 -0700
-Subject: [PATCH] omap: dma: Clear status registers on enable/disable irq.
-In-Reply-To: <1334954578-10478-1-git-send-email-oleg.matcovschi@ti.com>
-References: <1334954578-10478-1-git-send-email-oleg.matcovschi@ti.com>
-Message-ID: <20120504165146.GB5613@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 04 May 2012 10:53:58 -0600
+Subject: [PATCH 1/1] ARM: tegra: Add Tegra Memory Controller(MC) driver
+In-Reply-To: <20120504.160035.1828735037330038337.hdoyu@nvidia.com>
+References: <1336063897-12083-1-git-send-email-hdoyu@nvidia.com><4FA2D0C4.4020608@wwwdotorg.org>
+ <20120504.160035.1828735037330038337.hdoyu@nvidia.com>
+Message-ID: <4FA409A6.3020700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/04/2012 07:00 AM, Hiroshi Doyu wrote:
+...
+> What about the following AHB patches? AHB patches are independent of
+> MC/GART/SMMU DT issue basically. If you think that they are ready to
+> merge, I'll post the update version, I fixed some of your latest
+> comments.
+> 
+>  [PATCH 1/3] ARM: tegra: Add Tegra AHB driver
+>  [PATCH 2/3] ARM: tegra: Add SMMU enabler in AHB
+>  [PATCH 3/3] ARM: dt: tegra: Add device tree support for AHB
 
-* Oleg Matcovschi <oleg.matcovschi@ti.com> [120420 13:49]:
-> Use omap_disable_channel_irq() function instead of directly accessing CICR.
-> The omap_disable_chanel_irq() function clears pending interrupts
-> and disables interrupt on channel.
-> Functions omap2_enable_irq_lch()/omap2_disable_irq_lch() clear interrupt
-> status register.
+Yes, I think they be reposted and go in now.
 
-This seems like a nice fix to me. As it affects all omaps, I'd like to
-see some tested-by from Janusz/Jarkko/Peter. Can you guys give it a try
-with some audio tests?
-
-Also one comment below.
- 
-> @@ -575,10 +573,15 @@ static inline void omap_enable_channel_irq(int lch)
->  	p->dma_write(dma_chan[lch].enabled_irqs, CICR, lch);
->  }
->  
-> -static void omap_disable_channel_irq(int lch)
-> +static inline void omap_disable_channel_irq(int lch)
->  {
-> -	if (cpu_class_is_omap2())
-> -		p->dma_write(0, CICR, lch);
-> +	/* disable channel interrupts */
-> +	p->dma_write(0, CICR, lch);
-> +	/* Clear CSR */
-> +	if (cpu_class_is_omap1())
-> +		p->dma_read(CSR, lch);
-> +	else if (cpu_class_is_omap2())
-> +		p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, lch);
->  }
-
-You can leave out the else if cpu_class_is_omap2 and replace it
-with just else above.
-
-Regards,
-
-Tony 
+> I'll hold off on the following until we get some direction for
+> MC/GART/SMMU. They are related to how dt info is passed via MC.
+> 
+>  [PATCH 1/3] ARM: tegra: Add Tegra Memory Controller(MC) driver
+>  [PATCH 2/3] ARM: dt: tegra: Add device tree support for Memory Controller(MC)
+>  [PATCH 3/3] iommu/tegra: smmu: Refrain from accessing to AHB
