@@ -1,88 +1,123 @@
-From: jemmajones81@yahoo.co.uk (Jemma Jones)
-Date: Fri, 4 May 2012 15:30:27 +0100 (BST)
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
-Message-ID: <1336141827.34227.YahooMailNeo@web132503.mail.ird.yahoo.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 May 2012 07:31:30 -0700
+Subject: [PATCH] net: davinci_emac: Add pre_open,
+ post_stop platform callbacks
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
+ (Vaibhav Bedia's message of "Fri, 4 May 2012 13:55:58 +0000")
+References: <20120502234718.GA5432@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
+ <20120503160917.GA11310@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
+ <20120503184632.GA28089@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
+ <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
+ <87ehr1gdcv.fsf@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
+Message-ID: <87fwbgdnlp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: Development tree for Cortex-A15?
++Sekhar
 
-> 
-> On Fri, 4 May 2012 09:44:07 +0100 (BST), Jemma Jones
-> <jemmajones81@yahoo.co.uk> wrote:
->>>  Subject: Re: Development tree for Cortex-A15?
+"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+
+> Hi Kevin,
+>
+> On Fri, May 04, 2012 at 03:02:16, Hilman, Kevin wrote:
+>> Ben Hutchings <bhutchings@solarflare.com> writes:
 >> 
->>> 
->>>  On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
->>>  <jemmajones81@yahoo.co.uk> wrote:
->>>>> ? Subject: Re: Development tree for Cortex-A15?
->>>> 
->>>> ? I'm currently on kvm-arm-v7-ael, because it looked like the 
-> most
->>>> ? up-to-date one. Which one should I be using for Cortex-A15 
-> support?
->>> 
->>>  That branch is good enough, if you have a bleeding edge QEMU. Note that
->>>  the VE A15 support in that tree is DT only. I'm working on a v3.4 
-> based
->>>  one
->>>  at the moment, but that's not completely ready yet.
+>> > On Thu, 2012-05-03 at 19:25 +0000, Bedia, Vaibhav wrote:
+>> >> On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
+>> >> [...]
+>> >> > > 
+>> >> > > So, if I understood this correctly, it's effectively like blocking a low power
+>> >> > > state transition (here wfi execution) when EMAC is active?
+>> >> > 
+>> >> > Assuming "it" is my patch, correct.
+>> >> > 
+>> >> 
+>> >> Recently I was thinking about how to get certain drivers to disallow some or all
+>> >> low power states and to me this also seems to fall in a similar category.
+>> >> 
+>> >> One of the suggestions that I got was to check if the 'wakeup' entry associated with
+>> >> the device under sysfs could be leveraged for this. The PM code could maintain
+>> >> a whitelist (or blacklist) of devices and it decides the low power state to enter
+>> >> based on the 'wakeup' entries associated with these devices. In this particular case,
+>> >> maybe the driver could simply set this entry to non-wakeup capable when necessary and
+>> >> then let the PM code take care of skipping the wfi execution.
+>> >> 
+>> >> Thoughts/brickbats welcome :)
+>> >
+>> > You can maybe (ab)use the pm_qos mechanism for this.
 >> 
->>  I'm just a little confused because under arch/arm/mach-vexpress/ there
-> is
->>  no A15 tile? On the virtualopensystems.com git (which you quote above)
-> you
->>  had to explicitly enable the board and it would show up in the .config
-> as
->>  CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your kernel
->>  tree?
-> 
-> No. The ARM tree in general is moving to the device tree, and
-> CONFIG_ARCH_VEXPRESS_CA15X4 was always meant as a temporary hack until the
-> VE-DT port was mature enough to be used.
-> 
-> As Pawe?'s DT work has been merged into 3.4, there is strictly no reason
-> to keep this hack around, and my recent trees do reflect that fact
-> (kvm-arm-v7-ael and kvm-arm-3.4). Christoffer may decide to keep this in
-> his tree during a transition period, but CONFIG_ARCH_VEXPRESS_CA15X4 is
-> dead as far as I am concerned.
-> 
-> If you're just starting to play with KVM-ARM now, please don't rely on 
-> the
-> A15 board file, it is a dead end.
+>> I thought of using this too, but it doesn't actually solve the problem:
+>> 
+>> Using PM QoS, you can avoid hitting the deeper idle states by setting a
+>> very low wakeup latency.  However, on ARM platforms, even the shallowest
+>> idle states use the WFI instruction, and the EMAC would still not be
+>> able to wake the system from WFI.  A possibility would be define the
+>> shallowest idle state to be one that doesn't call WFI and just does
+>> cpu_relax().  However, that would only work for CPUidle since PM QoS
+>> constraints are only checked by CPUidle.  So, a non-CPUidle kernel would
+>> still have this bug. :(
+>> 
+>> Ultimately, this is just broken HW.  This network HW was bolted onto an
+>> existing SoC without consideration for wakeup capabilities.  The result
+>> is that any use of this device with networking has to completely disable
+>> SoC power management.
+>> 
+>
+> I was checking with internally with some folks on the issue being addressed
+> in this patch and unfortunately no one seems to be aware of this :(
 
-What would be the correct configuration of low-level kernel debugging for the A15 board? I'd like to have earlyprintk etc working.
+Do you mean they are not aware that the EMAC cannot wakeup th SoC, or
+they are not aware that having a device that cannot wakup the SoC has
+such an impact on Linux.
 
-When I set it to 
-Kernel low-level debugging port (No low-level debugging UART)
+> Mark mentioned nfs mounted rootfs being slow but in my limited testing I
+> didn't observe this on an AM3517 board. I am yet to go through the PSP code
+> to be fully sure that wfi instruction is indeed being executed but I wanted
+> to check if I need to do something specific to reproduce this at my end.
 
-then I get the following error:
+Based on my discussion with Mark, I suspect that the kernel you're using
+is simply not going idle.
 
-$ ARCH=arm make uImage
-scripts/kconfig/conf --silentoldconfig Kconfig
-#
-# configuration written to .config
-#
-? CHK???? include/linux/version.h
-? CHK???? include/generated/utsrelease.h
-make[1]: `include/generated/mach-types.h' is up to date.
-? CALL??? scripts/checksyscalls.sh
-? CHK???? include/generated/compile.h
-? AS????? arch/arm/kernel/debug.o
-In file included from arch/arm/kernel/debug.S:104:0:
-arch/arm/mach-vexpress/include/mach/debug-macro.S:26:2: error: #error "Unknown vexpress UART offset"
-make[1]: *** [arch/arm/kernel/debug.o] Error 1
-make: *** [arch/arm/kernel] Error 2
+> Irrespective of the above problem being present in the h/w, I feel the approach
+> of adding platform callbacks for blocking deeper idle states will create problems
+> when this is required for multiple peripherals. 
 
-If I just disable
-[*] Kernel low-level debugging functions
-then I don't seem to get any output at all.
+I agree.  If we have to do this for multiple peripherals, the curren
+approach it will become unwieldy.
 
-What is the correct configuration?
+> I agree that the default behavior should be to support the deepest
+> idle state based on the peripherals being used but IMO the user should
+> have the flexibility to change this behavior if he wishes to do so.
+
+Well, we always have the option of booting with 'nohlt' on the
+commandline.
+
+Since nobody seems to have thought about idle power management in the HW
+design, maybe we shouldn't break our backs to hack around the
+HW brokenness.
+
+Personally, I'm perfectly OK leaving the default behavior of
+sluggish/unresponsive devices that are not wakeup capable.  The only fix
+is to not sleep, and that can be accomplished on the cmdline using
+nohlt (at the expense of some energy savings.)
+
+> I don't know whether the usage of the 'wakeup' entries for giving this
+> control to users qualifies as an abuse of the infrastructure. 
+
+It does.
+
+> If it does, perhaps there should some other mechanism for letting
+> users control the system behavior.
+
+Come to think of it, the right solution here is probably to use runtime
+PM.  We could then to add some custom hooks for davinci_emac in the
+device code to use enable_hlt/disable_hlt based on activity.
+
+In order to do that though, the davinci_emac driver needs to be runtime
+PM converted.
+
+Kevin
