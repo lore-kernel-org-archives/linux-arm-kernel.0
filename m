@@ -1,99 +1,85 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 4 May 2012 09:12:13 +0000
-Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy
- loop condition test macro
-In-Reply-To: <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 4 May 2012 11:12:05 +0200
+Subject: [PATCH] ARM: imx: rename uart and fec device tree nodes
+In-Reply-To: <1333350084-5993-1-git-send-email-shawn.guo@linaro.org>
+References: <1333350084-5993-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FA39D65.3020007@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
-> From: Jean Pihet <j-pihet@ti.com>
+Hi Shawn,
+
+On 02.04.2012 09:01, Shawn Guo wrote:
+> It has been pointed out by device tree maintainer for several times
+> that the generic names 'serial' and 'ethernet' should be used for
+> those devices per ePAPR.  Renames imx uart and fec device tree nodes
+> to stop them being bad examples.
 > 
-> Now that omap_test_timeout is only accessible from mach-omap2/,
-> introduce a similar function for SR.
-> 
-> This change makes the SmartReflex implementation ready for the move
-> to drivers/.
-> 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/mach-omap2/smartreflex.c |   12 ++++++------
->  include/linux/power/smartreflex.h |   23 ++++++++++++++++++++++-
->  2 files changed, 28 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/net/fsl-fec.txt  |    2 +-
+>  .../bindings/tty/serial/fsl-imx-uart.txt           |    2 +-
+>  arch/arm/boot/dts/imx27-phytec-phycore.dts         |    8 ++++----
+>  arch/arm/boot/dts/imx27.dtsi                       |   14 +++++++-------
+>  arch/arm/boot/dts/imx51-babbage.dts                |    8 ++++----
+>  arch/arm/boot/dts/imx51.dtsi                       |    8 ++++----
+>  arch/arm/boot/dts/imx53-ard.dts                    |    2 +-
+>  arch/arm/boot/dts/imx53-evk.dts                    |    4 ++--
+>  arch/arm/boot/dts/imx53-qsb.dts                    |    4 ++--
+>  arch/arm/boot/dts/imx53-smd.dts                    |    8 ++++----
+>  arch/arm/boot/dts/imx53.dtsi                       |   12 ++++++------
+>  arch/arm/boot/dts/imx6q-arm2.dts                   |    4 ++--
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              |    4 ++--
+>  arch/arm/boot/dts/imx6q.dtsi                       |   12 ++++++------
+>  arch/arm/mach-imx/clock-imx6q.c                    |   12 ++++++------
+>  15 files changed, 52 insertions(+), 52 deletions(-)
+...
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index 4663a4e..a93c593 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+...
+> @@ -43,7 +43,7 @@
+>                                 status = "okay";
+>                         };
 > 
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index d859277..acef08d 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
->  	 * Wait for SR to be disabled.
->  	 * wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
->  	 */
-> -	omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
-> -			ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
-> -			timeout);
-> +	sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
-> +			     ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
-> +			     timeout);
->  
->  	if (timeout >= SR_DISABLE_TIMEOUT)
->  		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
->  	 * Wait for SR to be disabled.
->  	 * wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
->  	 */
-> -	omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
-> -			IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
-> -			timeout);
-> +	sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
-> +			     IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
-> +			     timeout);
->  
->  	if (timeout >= SR_DISABLE_TIMEOUT)
->  		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
-> index 884eaee..78b795e 100644
-> --- a/include/linux/power/smartreflex.h
-> +++ b/include/linux/power/smartreflex.h
-> @@ -22,7 +22,7 @@
->  
->  #include <linux/types.h>
->  #include <linux/platform_device.h>
-> -
-> +#include <linux/delay.h>
->  #include <plat/voltage.h>
->  
->  /*
-> @@ -168,6 +168,27 @@ struct omap_sr {
->  };
->  
->  /**
-> + * test_cond_timeout - busy-loop, testing a condition
-> + * @cond: condition to test until it evaluates to true
-> + * @timeout: maximum number of microseconds in the timeout
-> + * @index: loop index (integer)
-> + *
-> + * Loop waiting for @cond to become true or until at least @timeout
-> + * microseconds have passed.  To use, define some integer @index in the
-> + * calling code.  After running, if @index == @timeout, then the loop has
-> + * timed out.
-> + *
-> + * Copied from omap_test_timeout */
-> +#define sr_test_cond_timeout(cond, timeout, index)		\
-> +({								\
-> +	for (index = 0; index < timeout; index++) {		\
-> +		if (cond)					\
-> +			break;					\
-> +		udelay(1);					\
-> +	}							\
-> +})
+> -                       uart2: uart at 021e8000 {
+> +                       uart2: serial at 021e8000 {
+>                                 status = "okay";
+>                         };
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 68f2e42..56c5304 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+...
+> @@ -627,28 +627,28 @@
+>                                 interrupts = <0 18 0x04>;
+>                         };
+> 
+> -                       uart2: uart at 021e8000 {
+> +                       uart2: serial at 021e8000 {
+>                                 compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+>                                 reg = <0x021e8000 0x4000>;
+>                                 interrupts = <0 27 0x04>;
+>                                 status = "disabled";
+>                         };
 
-I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
-tight loops instead of udelay().
+Having this patch on a 3.4-rc5 based test branch and booting it on the 
+SabreLite I get (with earlyprintk enabled):
 
-Regards
-AnilKumar
+Serial: IMX driver
+imx-uart: probe of 21e8000.serial failed with error -2
+
+resulting in no console output. Reverting this patch I get
+
+Serial: IMX driver
+21e8000.uart: ttymxc1 at MMIO 0x21e8000 (irq = 59) is a IMX
+
+and console works fine again.
+
+Have I missed anything?
+
+Best regards
+
+Dirk
