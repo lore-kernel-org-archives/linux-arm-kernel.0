@@ -1,23 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  4 May 2012 19:23:10 +0100
-Subject: [PATCH 00/15] DT enablement for Snowball
-Message-ID: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 4 May 2012 11:29:38 -0700
+Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
+ callbacks
+In-Reply-To: <87fwbgdnlp.fsf@ti.com>
+References: <20120502234718.GA5432@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
+ <20120503160917.GA11310@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
+ <20120503184632.GA28089@animalcreek.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
+ <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
+ <87ehr1gdcv.fsf@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
+ <87fwbgdnlp.fsf@ti.com>
+Message-ID: <20120504182938.GB28910@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's your next back of DT related doings for the ux500,
-along with some bugs encountered fixed along the way.
+On Fri, May 04, 2012 at 07:31:30AM -0700, Kevin Hilman wrote:
+> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
 
- arch/arm/boot/dts/db8500.dtsi      |  103 +++++++++++++-
- arch/arm/boot/dts/snowball.dts     |    3 +
- arch/arm/configs/u8500_defconfig   |    1 +
- arch/arm/mach-ux500/board-mop500.c |   55 ++------
- drivers/i2c/busses/i2c-nomadik.c   |   53 ++++++-
- drivers/mfd/Makefile               |    5 +-
- drivers/mfd/ab8500-core.c          |  165 +++++++++++++++++++---
- drivers/mfd/ab8500-i2c.c           |  128 -----------------
- drivers/mfd/db8500-prcmu.c         |   30 ++--
- drivers/power/ab8500_btemp.c       |   12 +-
- drivers/power/ab8500_charger.c     |   12 +-
- drivers/power/ab8500_fg.c          |   12 +-
- drivers/regulator/ab8500.c         |  273 +++++++++++++++++++++++-------------
+Hi Kevin.
+
+> > If it does, perhaps there should some other mechanism for letting
+> > users control the system behavior.
+> 
+> Come to think of it, the right solution here is probably to use runtime
+> PM.  We could then to add some custom hooks for davinci_emac in the
+> device code to use enable_hlt/disable_hlt based on activity.
+
+That was my first thought, actually, but that only works if its
+okay for the driver to call enable_hlt/disable_hlt directly (i.e.,
+have runtime_suspend() call enable_hlt() and runtime_resume() call
+disable_hlt()).  However, I assumed it would _not_ be acceptable for
+the driver to issue those calls directly.  Its a platform-specific
+issue that we shouldn't be polluting the driver with and there are
+currently no drivers that call them under the drivers directory.
+
+If its not okay to call enable_hlt/disable_hlt directly, then we still
+need callback hooks to the plaform code (i.e., some version of this
+patch).
+
+> In order to do that though, the davinci_emac driver needs to be runtime
+> PM converted.
+
+We probably should pm_runtime-ize the driver either way but we need
+to resolve the question of whether its okay for the driver to call
+enable_hlt/disable_hlt directly or not.  If it is okay, we call them
+in runtime_suspend/resume.  If it isn't okay, then we still need 
+platform callback hooks.
+
+Mark
