@@ -1,49 +1,105 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 May 2012 12:30:23 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205041556.38918.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201205041556.38918.arnd@arndb.de>
-Message-ID: <4FA4203F.3070000@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri,  4 May 2012 19:23:11 +0100
+Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 09:56 AM, Arnd Bergmann wrote:
-> On Monday 30 April 2012, Jon Hunter wrote:
->> From: Jon Hunter <jon-hunter@ti.com>
->>
->> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
->> to add some basic helpers to retrieve a DMA controller device_node and the
->> DMA request/channel information.
-...
->>   Forgetting device tree for now, some drivers use strings to represent a
->>   DMA channel instead of using an integer. I assume that these drivers then
->>   employ some sort of look-up table to convert the string into a channel
->>   number/index that the hardware understands. If this assumption is correct
->>   then when moving to a device tree implementation having such look-up tables
->>   in the driver should no longer be necessary as the device tree will provide
->>   the mapping of channel index/number to the device. Furthermore, it makes
->>   sense that device tree uses integers to represent channel as opposed to
->>   strings to save the driver having to convert the string into a integer at
->>   some later stage.
-...
-> I think you can actually use strings, too, as long as you use a fixed number
-> of cells.
-> 
-> Wouldn't something like this work:?
-...
-> 	some-device {
-> 		compatible = "something";
-> 		dmas = <&dma-controller1>, "some-dma",
-> 			<&dma-controller2 1 2 3>;
-> 	}
+Here we move the i2c-nomadik's default settings into the driver
+rather than specifying them from platform code. At the time of
+this writing we only have one user, the u8500. As new users are
+added, it is expected that they will be Device Tree compliant.
+If this is the case, we will look up their initialisation values
+by compatible entry, then apply them forthwith.
 
-The idea of mixing integer cells and strings in the same property has
-come up before for other bindings, but been rejected. IIRC, there are
-issues such as alignment of the integers after the string (they are not
-aligned in the DTB) which can cause unaligned accesses, and perhaps
-other issues I fail to recall - perhaps because it's no longer possible
-to skip from the &dma-controller1 phandle to the &dma-controller2
-phandle using #dma-cells, but rather you need to use strlen() and hence
-involve the DMA controller driver itself (otherwise, how do you know
-it's a string?) rather than just the core DMA property parsing code.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/i2c/busses/i2c-nomadik.c |   50 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 5267ab9..8803467 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -899,15 +899,57 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+ 	.functionality	= nmk_i2c_functionality
+ };
+ 
++static const struct nmk_i2c_controller u8500_i2c = {
++       /*
++        * slave data setup time, which is
++        * 250 ns,100ns,10ns which is 14,6,2
++        * respectively for a 48 Mhz
++        * i2c clock
++        */
++       .slsu           = 0xe,
++       /* Tx FIFO threshold */
++       .tft            = 1,
++       /* Rx FIFO threshold */
++       .rft            = 8,
++       /* std. mode operation */
++       .clk_freq       = 100000,
++       /* Slave response timeout(ms) */
++       .timeout        = 200,
++       .sm             = I2C_FREQ_MODE_FAST,
++};
++
++static const struct nmk_i2c_controller *
++nmk_i2c_find_pdata_from_compatible(struct device_node *np)
++{
++	/*
++	 * The u8500 is currently our only user. As more SoCs are added,
++	 * search for the correct value set using of_machine_is_compatible
++	 * and return a 'struct nmk_i2c_controller *' which contains the
++	 * correct information for the given SoC, whilst leaving u8500_i2c
++	 * as the default/fall-back value set.
++	 */
++	return &u8500_i2c;
++}
++
+ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct resource *res;
+-	struct nmk_i2c_controller *pdata =
++	const struct nmk_i2c_controller *pdata =
+ 			pdev->dev.platform_data;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
+ 
++	if (!pdata) {
++		if (!np) {
++			dev_err(&pdev->dev,
++				"Neither platform_data nor Device Tree not found\n");
++			return -EINVAL;
++		}
++		pdata = nmk_i2c_find_pdata_from_compatible(np);
++	}
++
+ 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&pdev->dev, "cannot allocate memory\n");
+@@ -1039,11 +1081,17 @@ static int __devexit nmk_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id nmk_gpio_match[] = {
++	{ .compatible = "st,nomadik-i2c", },
++	{}
++};
++
+ static struct platform_driver nmk_i2c_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = DRIVER_NAME,
+ 		.pm = &nmk_i2c_pm,
++		.of_match_table = nmk_gpio_match,
+ 	},
+ 	.probe = nmk_i2c_probe,
+ 	.remove = __devexit_p(nmk_i2c_remove),
+-- 
+1.7.9.5
