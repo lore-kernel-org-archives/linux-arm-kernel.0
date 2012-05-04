@@ -1,49 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 10:43:02 -0700
-Subject: [PATCH-V6 1/3] ARM: OMAP1: FIX: check possible error condition
- in timer_init
-In-Reply-To: <87y5pafis6.fsf@ti.com>
-References: <1335967014-11937-1-git-send-email-hvaibhav@ti.com>
- <1335967014-11937-2-git-send-email-hvaibhav@ti.com>
- <87y5pafis6.fsf@ti.com>
-Message-ID: <20120504174301.GH5613@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 May 2012 18:45:58 +0100
+Subject: [GIT PULL] clk for next
+In-Reply-To: <20120504170533.GO4141@pengutronix.de>
+References: <20120504170533.GO4141@pengutronix.de>
+Message-ID: <20120504174558.GA6112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 04, 2012 at 07:05:33PM +0200, Sascha Hauer wrote:
 
-* Kevin Hilman <khilman@ti.com> [120502 13:11]:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > OMAP1, omap_32k_timer_init() function always returns "true",
-> > irrespective of whether error occurred while initializing 32k sync
-> > counter as a kernel clocksource or not and execution will never
-> > fallback to mpu_timer clocksource init code.
-> >
-> > This patch adds check for return value from function
-> > omap_init_clocksource_32k(), and fallback to omap_mpu_timer_init()
-> > in case of failure/error from omap_init_clocksource_32k().
-> >
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > ---
-> > This is new patch addition compared to original series (<=V5).
-> >
-> > Also, note that, this patch is only compile tested, since
-> > I do not have omap1 board with me to validate it.
-> > Kevin, can you help me to validate it.
-> 
-> I boot tested on OMAP1 (5912/OSK) with 32k timer and MPU timer
-> Kconfigs.  Works fine, but needs small change below for compile warnings.
-> 
-> Otherwise, looks good.
+> Currently we are still missing the clk patches for next in -next. It
+> should be fine to have these in arm-soc since probably no non-arm
+> architecture will convert to the clock framework in the next two weeks.
 
-We need at least one tested-by on some 15xx platform for these changes.
-Janusz, can you please give this series a try on your board too?
+Actually I've a patch which I keep pushing to the x86 maintainers to
+enable the clock API there (ideally we'd enable it on all architectures
+that don't currently have one of their own straight off).
 
-Regards,
+> So Mike, please consider sending the following pull request to Arnd:
 
-Tony
+Seconded!
+
+I'd also like to get the wm831x driver in there, I've not been looking
+at it since it doesn't seem sensible to put the effort in until we've
+got stuff flowing into -next.
