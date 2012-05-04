@@ -1,87 +1,99 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 04 May 2012 11:51:42 +0300
-Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
- DSS L3 slave interfaces
-In-Reply-To: <4FA37F41.3070102@ti.com>
-References: <1334304116-18872-1-git-send-email-archit@ti.com>
- <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
- <4F87E924.5040601@ti.com>
- <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
- <4FA37F41.3070102@ti.com>
-Message-ID: <1336121502.2701.12.camel@deskari>
+From: hs@denx.de (Heiko Schocher)
+Date: Fri, 04 May 2012 12:10:47 +0200
+Subject: usb, davinci: usb 2.0 problem on an am1808 based board
+In-Reply-To: <4EC0F87B.4010104@denx.de>
+References: <4EBC9DF1.90604@denx.de>
+ <20111111091912.GB19090@legolas.emea.dhcp.ti.com> <4EBEB29E.50705@mvista.com>
+ <4EC0F87B.4010104@denx.de>
+Message-ID: <4FA3AB27.7060205@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-04 at 12:33 +0530, Archit Taneja wrote:
-> Hi Paul,
-> 
-> On Friday 04 May 2012 12:09 PM, Paul Walmsley wrote:
-> > Hi Archit,
-> >
-> > On Fri, 13 Apr 2012, Archit Taneja wrote:
-> >
-> >> On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
-> >>> On 4/13/2012 10:01 AM, Archit Taneja wrote:
-> >>>> The clock for all DSS L3 slave interfaces had been recently changed to
-> >>>> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
-> >>>> clock domain
-> >>>> which can't autoidle when enabled.
-> >>>>
-> >>>> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
-> >>>> hwmods so
-> >>>> that clock is explicitly enabled and disabled by software. Without this,
-> >>>> "dss_fck" would be left as enabled and the OMAP4 device won't idle
-> >>>> even when
-> >>>> DSS is not in use.
-> >>>
-> >>> Yeah, that was done on purpose with Tomi knowning well that limitation.
-> >>>
-> >>> The issue was mainly due to the lack of proper parent / child
-> >>> relationship between the DSS (the whole subsystem) and the DSS children
-> >>> at that time.
-> >>>
-> >>> I think that Tomi posted a series to fix that for 3.4. So if we ensure
-> >>> that every DSS IPs are children of the DSS, then pm_runtime will always
-> >>> ensure that the DSS will be enabled each time a submodule is used.
-> >>>
-> >>> So the right fix is to put back the proper iclk (l3_div) to the DSS
-> >>> instead of the dss_fck.
-> >>
-> >> Ok, I get it now. Tomi's patch series ensured the parent-child
-> >> dependency, but they didn't switch the iclks back to l3_div, I guess
-> >> that should be a part of the series too.
-> >
-> > Just checking on this one.  Does this patch need to be updated ?
-> >
-> 
-> We were working on this, but we realised that only having a parent-child 
-> relation in dss platform devices won't be sufficient to remove "the use 
-> of dss_fck(or MODULEMODE bits) as a slave clock" hack.
-> 
-> The issue is that during bootup(when omap_hwmod_setup_all() is called), 
-> all hwmods are enabled independently, so all dss hwmods need to enable 
-> the MODULEMODE bits for them to be setup correctly.
-> 
-> With the parent-child relation in platform devices in DSS, only the 
-> parent platform device's hwmod("dss_core" in our case) should enable and 
-> disable the MODULEMODE bits. If the children also become capable of 
-> enabling/disabling it, then things wouldn't work.
-> 
-> Hence, to go ahead with this approach, the hwmod's themselves need to 
-> have some sort of parent child relationship, or atleast some sort of use 
-> counting for MODULEMODE bits. Benoit and Tomi could comment more on this.
-> 
-> Hence we are sort of stuck :)
+Hello,
 
-Yes, this is my understanding also. I got the impression from Benoit
-that adding such a parent-child relationship is not trivial.
+a while ago (see discussion here:
+http://comments.gmane.org/gmane.linux.usb.general/54505), I found this
+"USB timing Bug" on an am1808 based board:
 
- Tomi
+Heiko Schocher wrote:
+> Hello Sergei,
+[...]
+> Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> On 11.11.2011 11:19, Felipe Balbi wrote:
+>>
+>>>> I try to bring up usb 2.0 support on an am1808 based
+>>>> board and Linux version 3.1.0-rc10 and I am facing
+>>>> some issues:
+[...]
+>>>>   But if I add in drivers/usb/musb/da8xx.c
+>>>>    da8xx_musb_interrupt() a 10ms delay befor the
+>>>>    "if (status&  (DA8XX_INTR_DRVVBUS<<  DA8XX_INTR_USB_SHIFT)) {"
+>>>>    line usb works fine!
+>>>>    It also works without this timeout if I change the
+>>>>    "dev_dbg(musb->controller, "USB IRQ %08x\n", status);"
+>>>>    to
+>>>>    "printk(musb->controller, "USB IRQ %08x\n", status);"
+>>>>
+>>>>    ->  some timing issue, but I have no idea why!
+>>>>       (Maybe you have an idea?)
+>>> unfortunately I don't know any details about DaVinci.
+>>    AM1808 is not exactly DaVinci, to be precise...
+>>
+>>> Sergei, are you able to help on this question ?
+>>    Maybe. :-)
+> 
+> I hope it ;-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/c2262ca4/attachment-0001.sig>
+now I digged deeper and found this patch, which solves the
+problem (without adding a 10 ms delay):
+
+-----------------------------
+diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+index d32aa4d..6a6b17b 100644
+--- a/drivers/usb/musb/da8xx.c
++++ b/drivers/usb/musb/da8xx.c
+@@ -297,6 +297,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
+        unsigned long           flags;
+        irqreturn_t             ret = IRQ_NONE;
+        u32                     status;
++       int                     flag = 1;
+
+        spin_lock_irqsave(&musb->lock, flags);
+
+@@ -368,6 +363,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
+                        musb->xceiv->default_a = 0;
+                        musb->xceiv->state = OTG_STATE_B_IDLE;
+                        portstate(musb->port1_status &= ~USB_PORT_STAT_POWER);
++                       flag = 0;
+                }
+
+                dev_dbg(musb->controller, "VBUS %s (%s)%s, devctl %02x\n",
+@@ -378,7 +374,7 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
+                ret = IRQ_HANDLED;
+        }
+
+-       if (musb->int_tx || musb->int_rx || musb->int_usb)
++       if (flag && ((musb->int_tx || musb->int_rx || musb->int_usb)))
+                ret |= musb_interrupt(musb);
+
+  eoi:
+-----------------------------
+
+If we get an DA8XX_INTR_DRVVBUS IRQ, in the else case
+
+musb->xceiv->state = OTG_STATE_B_IDLE;
+
+is set, but overwritten in the musb_interrupt() call, which results
+in not starting the "Poll for ID change" timer ... as I am not an USB
+expert, posting this intermediate result here, maybe someone have an
+idea/explanation if this patch is the way to go, or what would be a
+better solution?
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
