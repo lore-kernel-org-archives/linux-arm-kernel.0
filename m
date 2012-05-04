@@ -1,34 +1,111 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  4 May 2012 23:45:25 +0800
-Subject: [PATCH 0/4] Add device tree support for gpio-mxs
-Message-ID: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri,  4 May 2012 23:45:26 +0800
+Subject: [PATCH 1/4] gpio/mxs: use devm_* helpers to make error handling simple
+In-Reply-To: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
+References: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336146329-3821-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series cleans up gpio-mxs a bit, and then adds device tree
-support for the driver.  Currently, the irqdomain for gpio is still
-added in platform code, and should be moved into driver later with the
-help from the generic-irq-chip irqdomain support.
+It uses devm_* helpers to make the error handling of probe clean
+and simple.
 
-It's based on mxs device tree branch, and might be easier to go
-via arm-soc tree.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/gpio/gpio-mxs.c |   52 +++++++++++-----------------------------------
+ 1 files changed, 13 insertions(+), 39 deletions(-)
 
-Shawn Guo (4):
-  gpio/mxs: use devm_* helpers to make error handling simple
-  gpio/mxs: get rid of the use of cpu_is_xxx
-  gpio/mxs: add device tree probe
-  ARM: mxs: add gpio support for device tree boot
-
- .../devicetree/bindings/gpio/gpio-mxs.txt          |   87 +++++++++++
- arch/arm/boot/dts/imx23.dtsi                       |   35 +++++-
- arch/arm/boot/dts/imx28.dtsi                       |   55 +++++++-
- arch/arm/mach-mxs/devices/platform-gpio-mxs.c      |   24 +---
- arch/arm/mach-mxs/include/mach/common.h            |    5 +-
- arch/arm/mach-mxs/mach-mxs.c                       |   12 ++
- arch/arm/mach-mxs/mm.c                             |   10 ++
- drivers/gpio/gpio-mxs.c                            |  156 ++++++++++++--------
- 8 files changed, 296 insertions(+), 88 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mxs.txt
-
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 385c58e..95a11db 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -186,44 +186,29 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+ 	struct resource *iores = NULL;
+ 	int err;
+ 
+-	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
++	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
+ 	if (!port)
+ 		return -ENOMEM;
+ 
+ 	port->id = pdev->id;
+ 	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
+ 
++	port->irq = platform_get_irq(pdev, 0);
++	if (port->irq < 0)
++		return port->irq;
++
+ 	/*
+ 	 * map memory region only once, as all the gpio ports
+ 	 * share the same one
+ 	 */
+ 	if (!base) {
+ 		iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-		if (!iores) {
+-			err = -ENODEV;
+-			goto out_kfree;
+-		}
+-
+-		if (!request_mem_region(iores->start, resource_size(iores),
+-					pdev->name)) {
+-			err = -EBUSY;
+-			goto out_kfree;
+-		}
+-
+-		base = ioremap(iores->start, resource_size(iores));
+-		if (!base) {
+-			err = -ENOMEM;
+-			goto out_release_mem;
+-		}
++		base = devm_request_and_ioremap(&pdev->dev, iores);
++		if (!base)
++			return -EADDRNOTAVAIL;
+ 	}
+ 	port->base = base;
+ 
+-	port->irq = platform_get_irq(pdev, 0);
+-	if (port->irq < 0) {
+-		err = -EINVAL;
+-		goto out_iounmap;
+-	}
+-
+ 	/*
+ 	 * select the pin interrupt functionality but initially
+ 	 * disable the interrupts
+@@ -246,29 +231,18 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+ 			 port->base + PINCTRL_DOUT(port->id), NULL,
+ 			 port->base + PINCTRL_DOE(port->id), NULL, false);
+ 	if (err)
+-		goto out_iounmap;
++		return err;
+ 
+ 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
+ 	port->bgc.gc.base = port->id * 32;
+ 
+ 	err = gpiochip_add(&port->bgc.gc);
+-	if (err)
+-		goto out_bgpio_remove;
++	if (err) {
++		bgpio_remove(&port->bgc);
++		return err;
++	}
+ 
+ 	return 0;
+-
+-out_bgpio_remove:
+-	bgpio_remove(&port->bgc);
+-out_iounmap:
+-	if (iores)
+-		iounmap(port->base);
+-out_release_mem:
+-	if (iores)
+-		release_mem_region(iores->start, resource_size(iores));
+-out_kfree:
+-	kfree(port);
+-	dev_info(&pdev->dev, "%s failed with errno %d\n", __func__, err);
+-	return err;
+ }
+ 
+ static struct platform_driver mxs_gpio_driver = {
 -- 
 1.7.5.4
