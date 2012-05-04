@@ -1,46 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 15:08:10 -0700
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <4FA42631.6060304@wwwdotorg.org>
-References: <20120502172401.GG3739@atomide.com>
- <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com>
- <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org>
- <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org>
- <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org>
-Message-ID: <20120504220809.GW5613@atomide.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 4 May 2012 15:08:37 -0700
+Subject: [PATCH V4] clk: add a fixed factor clock
+In-Reply-To: <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
+References: <85453b2bb4d448d0dcd291579bd76e70c1b48e5b.1336039424.git.viresh.kumar@st.com>
+ <20120503120821.GJ4141@pengutronix.de>
+ <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
+Message-ID: <CAJOA=zMQNMj2wup2sjXOce41DWmY=jdCC=Z-T9nHFjuGBG0yog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [120504 11:59]:
-> On 05/04/2012 10:34 AM, Tony Lindgren wrote:
-> > * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
-> >> On 08:03 Fri 04 May     , Tony Lindgren wrote:
-> >>>>
-> >>>> so I was thinking to do like on gpio
-> >>>>
-> >>>> uart {
-> >>>> 	pin = < &pioA 12 {pararms} >
-> >>>>
-> >>>> }
-> >>>
-> >>> Hmm I assume the "12" above the gpio number?
-> >> no pin number in the bank because it could not be gpio
-> > 
-> > Yes OK, but pin number 12 in the gpio bank, not in the mux register.
-> > Got it.
-> 
-> I'd prefer to avoid any references to GPIOs here; not all muxable pins
-> are GPIOs and not all GPIOs are muxable pins. Lets keep the two concepts
-> independent.
+On Thu, May 3, 2012 at 6:41 AM, viresh kumar <viresh.linux@gmail.com> wrote:
+>
+> On May 3, 2012 5:38 PM, "Sascha Hauer" <s.hauer@pengutronix.de> wrote:
+>>
+>
+>> > + ? ? if (clk)
+>> > + ? ? ? ? ? ? return clk;
+>>
+>> ? ? ? ?if (!IS_ERR(clk))
+>
+> Oops. @Mike: can you please fix it while applying?
 
-And it seems that &pioA 12 is not always enough information for the pinctrl
-driver to request a GPIO. So it's best to specify it separately.
+No problem.
 
 Regards,
-
-Tony
+Mike
