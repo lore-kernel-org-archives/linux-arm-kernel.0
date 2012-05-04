@@ -1,111 +1,115 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 4 May 2012 09:35:57 -0700
-Subject: [PATCH] net: davinci_emac: Add pre_open, post_stop platform
- callbacks
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
-References: <20120502234718.GA5432@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA72820@DBDE01.ent.ti.com>
- <20120503160917.GA11310@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA73591@DBDE01.ent.ti.com>
- <20120503184632.GA28089@animalcreek.com>
- <B5906170F1614E41A8A28DE3B8D121433EA7366B@DBDE01.ent.ti.com>
- <1336076542.2998.23.camel@bwh-desktop.uk.solarflarecom.com>
- <87ehr1gdcv.fsf@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EA81B04@DBDE01.ent.ti.com>
-Message-ID: <20120504163557.GA28910@animalcreek.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 04 May 2012 11:39:30 -0500
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <201205041220.24747.arnd@arndb.de>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+ <201205041220.24747.arnd@arndb.de>
+Message-ID: <4FA40642.5040203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 01:55:58PM +0000, Bedia, Vaibhav wrote:
-
-Hi Vaibhav.
-
-> Hi Kevin,
+On 05/04/2012 07:20 AM, Arnd Bergmann wrote:
+> On Thursday 03 May 2012, Russell King - ARM Linux wrote:
+>> I'm basing my comments off mach-zynq.
 > 
-> On Fri, May 04, 2012 at 03:02:16, Hilman, Kevin wrote:
-> > Ben Hutchings <bhutchings@solarflare.com> writes:
-> > 
-> > > On Thu, 2012-05-03 at 19:25 +0000, Bedia, Vaibhav wrote:
-> > >> On Fri, May 04, 2012 at 00:16:32, Mark A. Greer wrote:
-> > >> [...]
-> > >> > > 
-> > >> > > So, if I understood this correctly, it's effectively like blocking a low power
-> > >> > > state transition (here wfi execution) when EMAC is active?
-> > >> > 
-> > >> > Assuming "it" is my patch, correct.
-> > >> > 
-> > >> 
-> > >> Recently I was thinking about how to get certain drivers to disallow some or all
-> > >> low power states and to me this also seems to fall in a similar category.
-> > >> 
-> > >> One of the suggestions that I got was to check if the 'wakeup' entry associated with
-> > >> the device under sysfs could be leveraged for this. The PM code could maintain
-> > >> a whitelist (or blacklist) of devices and it decides the low power state to enter
-> > >> based on the 'wakeup' entries associated with these devices. In this particular case,
-> > >> maybe the driver could simply set this entry to non-wakeup capable when necessary and
-> > >> then let the PM code take care of skipping the wfi execution.
-> > >> 
-> > >> Thoughts/brickbats welcome :)
-> > >
-> > > You can maybe (ab)use the pm_qos mechanism for this.
-> > 
-> > I thought of using this too, but it doesn't actually solve the problem:
-> > 
-> > Using PM QoS, you can avoid hitting the deeper idle states by setting a
-> > very low wakeup latency.  However, on ARM platforms, even the shallowest
-> > idle states use the WFI instruction, and the EMAC would still not be
-> > able to wake the system from WFI.  A possibility would be define the
-> > shallowest idle state to be one that doesn't call WFI and just does
-> > cpu_relax().  However, that would only work for CPUidle since PM QoS
-> > constraints are only checked by CPUidle.  So, a non-CPUidle kernel would
-> > still have this bug. :(
-> > 
-> > Ultimately, this is just broken HW.  This network HW was bolted onto an
-> > existing SoC without consideration for wakeup capabilities.  The result
-> > is that any use of this device with networking has to completely disable
-> > SoC power management.
-> > 
+> It's a different question because mach-zynq is already DT-only, but we
+> can also discuss this for a bit.
 > 
-> I was checking with internally with some folks on the issue being addressed
-> in this patch and unfortunately no one seems to be aware of this :(
+>> How about we take the following steps towards it?
+>>
+>> 1. create arch/arm/include/mach/ which contains standardized headers
+>>    for DT based implementations.  This must include all headers included
+>>    by asm/ or linux/ includes.  This will also be the only mach/ header
+>>    directory included for code outside of arch/arm/mach-*.  This also
+>>    acts as the 'default' set of mach/* includes for stuff like timex.h
+>>    and the empty hardware.h
+>>
+>> 2. DT based mach-* directories do not have an include directory; their
+>>    include files must be located in the main include/ heirarchy if shared
+>>    with other parts of the kernel, otherwise they must be in the mach-*
+>>    directory.
+> 
+> My idea for the header files was slightly different, reorganizing only
+> the headers that actually conflict between the platforms renaming the
+> ones that conflict by name but not by content.
+> 
+> I know you are aware of my experiment with just renaming the header files
+> from mach/*.h to mach-*/*.h, and that has helped me a lot in understanding
+> the specific problems. I don't care about the specific names of the headers
+> but it has helped so far in identifying which drivers are already relying
+> on a specific platform's version of a header and which ones multiplex
+> between different platforms (e.g. sa1100/pxa/mmp or s3c*/s5p*/exynos)
+> and need more work. 
+> 
+> I also wouldn't change anything for the current configurations where
+> you only have one mach-* directory at a time (or the samsung speciality).
+> 
+> My plan is to have multiplatform kernels in parallel with what we have now,
+> so we can avoid breaking working machines but also play with multiplatform
+> configurations at the same time for a subset of the platforms and with
+> certain restrictions (not all board files, not all drivers, no generic
+> early printk, ...).
+> 
 
-This is from the TI hardware engineer that I talked to after spending many
-hours trying to get the EMAC to wake up the system.  It was a private
-conversation so I won't share his name/email here.  If you want to contact
-him, please reach me privately.
+Many of the headers are simply platform_data structs which may still be
+needed on DT platforms, but could be moved elsewhere.
 
-"No, AM35x can't be waken up from CPGMAC. If customer need to wake AM35x
- up from Ethernet, a wake up interrupt signal from Ethernet phy should be
- connected to one of wakeup capable GPIO pins."
+>> 3. Allow build multiple mach-* directories (which we already do... see
+>>    the samsung stuff.)
+> 
+> Incidentally, the samsung headers are what are currently causing the most
+> headaches regarding the header files, because they use a lot of files
+> with soc-specific definitions for the same symbols, which means significant
+> reorganization of the code using to to turn that into run-time selectable
+> values.
+> 
+>> We still have irqs.h being SoC dependent, and we still haven't taken
+>> debug-macros.S far enough along to get rid of that.
+> 
+> I believe the irqs.h conflict is only for the NR_IRQS constant, all other
+> defines in there should only be used inside of the mach-* directory,
+> or not at all for fully DT-based platforms.
 
-> Mark mentioned nfs mounted rootfs being slow but in my limited testing I
-> didn't observe this on an AM3517 board. I am yet to go through the PSP code
-> to be fully sure that wfi instruction is indeed being executed but I wanted
-> to check if I need to do something specific to reproduce this at my end.
+A DT-enabled platform does not need irqs.h or NR_IRQS. SPARSE_IRQ should
+be selected for DT. However, some DT enabled platforms don't have all
+irq chips converted to domains and may still need to set the mach .nr_irqs.
 
-When you go through the PSP code, look for the definition & use of
-omap3_can_sleep().  That routine returns '0' when either cpu_is_omap3505()
-or cpu_is_omap3517() ruturns true (among other conditions).  You will see
-that its used in omap3_pm_idle() to exit early so pm_idle never executes
-the wfi.
+> 
+>> Then there's also the problem of uncompress.h.  The last piece of the
+>> puzzle is the common clock stuff.
 
-I expect that you don't have CONFIG_CPU_IDLE enabled, so cpuidle has no
-opportunity to execute a wfi.  If it is enabled, omap3_can_sleep() is
-used in omap3_idle_bm_check() which is used in omap3_enter_idle_bm()
-so the wfi won't be executed when omap3_enter_idle_bm() is called.
-omap3_enter_idle() isn't called (in my testing--the code is very
-different from current k.o.) so it doesn't execute the wfi either.
+The smp/hotplug/localtimer related functions are still global. Marc Z
+has posted patches for this, but I haven't seen recent activity. This
+and clocks were the 2 main issues I saw trying to build 2 platforms
+together. highbank and picoxcell could be built together since only
+highbank has clocks and smp.
 
-Therefore, you don't see an issue when running PSP code.
+gpio.h is still required, but empty for most platforms.
 
-> Irrespective of the above problem being present in the h/w, I feel the approach
-> of adding platform callbacks for blocking deeper idle states will create problems
-> when this is required for multiple peripherals. I agree that the default behavior
-> should be to support the deepest idle state based on the peripherals being used but
-> IMO the user should have the flexibility to change this behavior if he wishes
-> to do so. 
+Rob
 
-I agree but hopefully this doesn't become common.  The real issue is a
-missing hardware feature that--again, hopefully--won't become common.
-
-Mark
+> Initially, I think we can live without debug-macros.S and uncompress.h
+> and change the code using those to just not output anything when
+> MULTIPLATFORM is enabled: you'd have to disable MULTIPLATFORM in order
+> to debug the early boot process and hope that any bugs are not
+> specific to multiplatform configurations. In the long run, we probably
+> want to have a better solution, but it's not on my hotlist.
+> 
+> The common clock support OTOH is definitely a requirement as soon as
+> we want to actually run multiplatform kernels rather than just building
+> them.
+>  
+>> So, I think we're still a way off it yet - maybe six months or so.
+> 
+> True, but in order to work on the points you raised and a few others,
+> I would like to know where we're heading because it does impact
+> some decisions like whether we need to make all initcalls in non-DT
+> board files aware of potentially being run on other platforms.
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
