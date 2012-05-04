@@ -1,42 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 04 May 2012 14:39:51 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <87mx5ot6vp.fsf@laptop.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
- <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
- <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
- <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
- <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
- <87mx5ot6vp.fsf@laptop.org>
-Message-ID: <4FA3DC27.6030204@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 4 May 2012 21:48:28 +0800
+Subject: [PATCH] ARM: imx: rename uart and fec device tree nodes
+In-Reply-To: <4FA3DB37.8080002@de.bosch.com>
+References: <1333350084-5993-1-git-send-email-shawn.guo@linaro.org>
+ <4FA39D65.3020007@de.bosch.com>
+ <20120504133301.GJ2194@S2101-09.ap.freescale.net>
+ <4FA3DB37.8080002@de.bosch.com>
+Message-ID: <20120504134825.GK2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/12 14:26, Chris Ball wrote:
-> Hi,
->
-> On Fri, May 04 2012, Lee Jones wrote:
->> I can either do that, or push it through Arnd's tree if you like (and
->> it's okay with him), as I will be supplying him with another pull
->> request after my next patch-set has been scrutinised. Would that suit
->> you better?
->
-> If the MMC patches are self-contained and it doesn't break anything to
-> merge them separately, my preference is to merge them via the MMC tree
-> (to avoid creating conflicts against other MMC patches in there).
->
-> If there are dependencies, going via Arnd instead is fine.
-
-Okay, I'll knock up a small patch-set and send it to you.
-
-I think it's 3 patches.
+On Fri, May 04, 2012 at 03:35:51PM +0200, Dirk Behme wrote:
+> Yes, I think so
+> 
+> https://github.com/dirkbehme/linux-imx6/commit/ebfac55f157425b5e063cdb2d9668b45a0a6515f#diff-14
+> 
+> >It reminds me that I should rebase my imx/dt branch on Sascha's clk
+> >series to save the conflict.
+> 
+> My test branch has Sascha's clk series, too. It's mainly based on
+> 
+> https://github.com/dirkbehme/linux-imx6/commits/linux-imx6-staging
+> 
+If you have Sascha's clk series merged, the changes on clock-imx6q.c
+made by this patch could probably get lost, since Sascha's clk series
+will remove clock-imx6q.c.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
