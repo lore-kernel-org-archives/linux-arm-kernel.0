@@ -1,78 +1,87 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Fri, 4 May 2012 01:45:15 -0700
-Subject: common clock framework
-In-Reply-To: <20120504082110.GB16535@pengutronix.de>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 04 May 2012 11:51:42 +0300
+Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
+ DSS L3 slave interfaces
+In-Reply-To: <4FA37F41.3070102@ti.com>
+References: <1334304116-18872-1-git-send-email-archit@ti.com>
+ <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
+ <4F87E924.5040601@ti.com>
+ <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
+ <4FA37F41.3070102@ti.com>
+Message-ID: <1336121502.2701.12.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-For the clock dependency, what about bus clock. What do you mean about bus level.
-As I understand the device driver only need care about enabling a clock to make it work. For example a USB driver. To make a USB work, it may need turn on bus clock, function clock, and phy clock. For some SOCs, phy and function may share same clock. There is a problem, we leave this dependency to device driver or keep it in our clock framework.
-To keep it in clock framework, the device driver only need know that enable one clock. To leave the dependency to device driver, the device driver will need know about all the clocks and dependency. If the device driver is shared by many SOCs, it will add some #ifdef into it.
-So why not add a dependency list into clock structure, and it will do enable the dependency clock before enable its own clock.
+On Fri, 2012-05-04 at 12:33 +0530, Archit Taneja wrote:
+> Hi Paul,
+> 
+> On Friday 04 May 2012 12:09 PM, Paul Walmsley wrote:
+> > Hi Archit,
+> >
+> > On Fri, 13 Apr 2012, Archit Taneja wrote:
+> >
+> >> On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
+> >>> On 4/13/2012 10:01 AM, Archit Taneja wrote:
+> >>>> The clock for all DSS L3 slave interfaces had been recently changed to
+> >>>> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
+> >>>> clock domain
+> >>>> which can't autoidle when enabled.
+> >>>>
+> >>>> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
+> >>>> hwmods so
+> >>>> that clock is explicitly enabled and disabled by software. Without this,
+> >>>> "dss_fck" would be left as enabled and the OMAP4 device won't idle
+> >>>> even when
+> >>>> DSS is not in use.
+> >>>
+> >>> Yeah, that was done on purpose with Tomi knowning well that limitation.
+> >>>
+> >>> The issue was mainly due to the lack of proper parent / child
+> >>> relationship between the DSS (the whole subsystem) and the DSS children
+> >>> at that time.
+> >>>
+> >>> I think that Tomi posted a series to fix that for 3.4. So if we ensure
+> >>> that every DSS IPs are children of the DSS, then pm_runtime will always
+> >>> ensure that the DSS will be enabled each time a submodule is used.
+> >>>
+> >>> So the right fix is to put back the proper iclk (l3_div) to the DSS
+> >>> instead of the dss_fck.
+> >>
+> >> Ok, I get it now. Tomi's patch series ensured the parent-child
+> >> dependency, but they didn't switch the iclks back to l3_div, I guess
+> >> that should be a part of the series too.
+> >
+> > Just checking on this one.  Does this patch need to be updated ?
+> >
+> 
+> We were working on this, but we realised that only having a parent-child 
+> relation in dss platform devices won't be sufficient to remove "the use 
+> of dss_fck(or MODULEMODE bits) as a slave clock" hack.
+> 
+> The issue is that during bootup(when omap_hwmod_setup_all() is called), 
+> all hwmods are enabled independently, so all dss hwmods need to enable 
+> the MODULEMODE bits for them to be setup correctly.
+> 
+> With the parent-child relation in platform devices in DSS, only the 
+> parent platform device's hwmod("dss_core" in our case) should enable and 
+> disable the MODULEMODE bits. If the children also become capable of 
+> enabling/disabling it, then things wouldn't work.
+> 
+> Hence, to go ahead with this approach, the hwmod's themselves need to 
+> have some sort of parent child relationship, or atleast some sort of use 
+> counting for MODULEMODE bits. Benoit and Tomi could comment more on this.
+> 
+> Hence we are sort of stuck :)
 
+Yes, this is my understanding also. I got the impression from Benoit
+that adding such a parent-child relationship is not trivial.
 
------Original Message-----
-From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
-Sent: Friday, May 04, 2012 4:21 PM
-To: Chao Xie
-Cc: Turquette, Mike; linux-arm-kernel at lists.infradead.org
-Subject: Re: common clock framework
+ Tomi
 
-On Thu, May 03, 2012 at 07:02:07PM -0700, Chao Xie wrote:
-> Hi,
-> The common clock driver in drivers/clk/ has been integrated into mainline. In fact, I still have some questions to the driver.
-> 1. Why need big lock: enable_lock and prepare_lock?
->    Using these locks means that the clock enable and prepare operation cannot re-entered.
-
-This has been discussed at length on the list. Short answer is that it's
-not trivial to properly lock the clock tree (or parts thereof) if we have
-individual clock locks. The possibility of having a lock per tree has
-been discussed if the single lock approach turns out to be unsufficient.
-This may be added later.
-
-> 2. How to handle the depended clocks?
->    For example clock1 and clock2 both have multiple inputs, and they
->    both depend on clock3. It means that before enable clock1 or
->    clock2, clock3 should be enabled, and if clock1 and clock2 are both
->    off, clock2 need to be off too to save power. Clock3 is not the
->    parent of clock1 and clock2, because the clock3 is not one of
->    inputs of clock1 and clock2.  If we do not handle it in clock
->    framework, we have to let device driver to know it. It means that
->    the device driver need to handle clock dependency. It will make the
->    device driver to be complicated especially it is shared by
->    different SOCs.
-
-If clock3 is not parent of clock2 and clock1 then the dependency does
-not come from your clock tree and thus can't be handled in the clock
-framework.
-If you have to enable clock3 to make your device work, then yes, your
-device must turn it on. It could also be that clock3 is not used by
-your device directly but by a bus which your device depends on. In this
-case you would have to describe the dependency on bus level.
-The clock framework can only describe a clock tree and that's all it
-*should* do.
-
-> 3. how to handle voltage changes in clock framework?  When some
-> clock's rate is changed, the voltage for the component that using the
-> clock may need changed too. So where to add the voltage change
-> sequence?
-
-Clocks have notifiers attached to them. You can hook yourself into a pre
-rate change (increasing the voltage here) and into a post rate change
-(decreasing the voltage here).
-That said, we are not there yet. Once the clock framework has settled
-and is actually used in SoCs I'm sure somebody will come up with some
-driver which can be passed a freq <-> voltage table for a given
-regulator clock pair.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/c2262ca4/attachment-0001.sig>
