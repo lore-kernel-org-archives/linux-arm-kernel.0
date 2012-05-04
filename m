@@ -1,41 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 20:02:20 +0000
-Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <201205042002.20943.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 May 2012 22:03:40 +0200
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120504143518.GF26481@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <CAK2p4sJj7FRVSStVkqmn16sUv8S3vHmUYCU_VzTWAWzqV5yVsg@mail.gmail.com>
+ <20120504142057.GQ27023@stoneboat.aleph1.co.uk>
+ <20120504143518.GF26481@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZ3m=PXg35==3wo2xHPL7TRn1W0AX_CeMKjPd1U+pTAGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 May 2012, Lee Jones wrote:
-> +static const struct nmk_i2c_controller *
-> +nmk_i2c_find_pdata_from_compatible(struct device_node *np)
-> +{
-> +       /*
-> +        * The u8500 is currently our only user. As more SoCs are added,
-> +        * search for the correct value set using of_machine_is_compatible
-> +        * and return a 'struct nmk_i2c_controller *' which contains the
-> +        * correct information for the given SoC, whilst leaving u8500_i2c
-> +        * as the default/fall-back value set.
-> +        */
-> +       return &u8500_i2c;
-> +}
+On Fri, May 4, 2012 at 4:35 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Why not just put this pointer ...
+> Well, my understanding is that there's DT patches around for Versatile.
 
-> +static const struct of_device_id nmk_gpio_match[] = {
-> +       { .compatible = "st,nomadik-i2c", },
-> +       {}
-> +};
+Is there? There is some in-tree stuff, but haven't seen any other
+sign of patches.
 
-into the .data field after the .compatible match, and make it more specific
-to the soc, i.e.
+Having looked a bit at that I get the impression that this DT code has
+been developed (by Grant I guess) in QEMU only as a proof of concept,
+and never really tested on a real Versatile hardware unit.
 
-static const struct of_device_id nmk_gpio_match[] = {
-	{ .compatible = "st-ericsson,u8500-i2c", .data = &u8500_i2c },
-	{ .compatible = "st,nomadik-i2c", .data = &default_i2c_controller },
-};
+These:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7390/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7391/1
 
-	Arnd
+make it clear that noone ever tested an MMC card on a Versatile
+booted on real hardware using DT. And I strongly suspect there
+are more instances like that, it seems AACI, GPIO and I2C and
+I guess whatever you cannot test on QEMU is just unsupported.
+
+But maybe the majority of Versatile users are on QEMU anyway,
+I sometimes get that impression :-/
+
+Yours,
+Linus Walleij
