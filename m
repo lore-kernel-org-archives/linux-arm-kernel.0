@@ -1,42 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 May 2012 16:02:53 +0100
-Subject: [RFC] Remove support for ARMv3 ARM610 and ARM710 CPUs
-In-Reply-To: <20120504144643.GG26481@n2100.arm.linux.org.uk>
-References: <20120504095645.GD26481@n2100.arm.linux.org.uk>
- <201205041441.24573.arnd@arndb.de>
- <20120504144643.GG26481@n2100.arm.linux.org.uk>
-Message-ID: <20120504150253.GH26481@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 08:03:42 -0700
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
+ supports omap2+ padconf
+In-Reply-To: <20120504044305.GD7788@game.jcrosoft.org>
+References: <20120502172401.GG3739@atomide.com>
+ <20120503065131.GA3738@game.jcrosoft.org>
+ <20120503152708.GC5140@atomide.com>
+ <4FA30805.5050804@wwwdotorg.org>
+ <20120504044305.GD7788@game.jcrosoft.org>
+Message-ID: <20120504150342.GI5140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 03:46:43PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 04, 2012 at 02:41:24PM +0000, Arnd Bergmann wrote:
-> > On Friday 04 May 2012, Russell King - ARM Linux wrote:
-> > > This patch removes support for ARMv3 CPUs, which haven't worked properly
-> > > for quite some time (see the FIXME comment in arch/arm/mm/fault.c).  The
-> > > only V3 parts left is the cache model for ARMv3, which is needed for some
-> > > odd reason by ARM740T CPUs, and being able to build with -march=armv3,
-> > > which is required for the RiscPC platform due to its bus structure.
-> > 
-> > No objections to the patch, but I wonder if this change obsoletes any
-> > hardware drivers in turn.  Are there any RiscPC peripherals that are
-> > only available on the older models?
+* Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120503 22:08]:
 > 
-> "older models" ?  It's not a machine where the CPU is soldered to the
-> motherboard.  I could describe it as being like an x86 motherboard where
-> you can plug either an ARM610, ARM710 or StrongARM CPU into it.  The
-> CPU type is merely incidental.
+> In my mind in the driver we do not have to care how to list
+> register/unregister the group. We just need to be able to do this
+> 
+> pinctrl_register_group(...)
+> 
+> or 
+> 
+> pinctrl_unregistewr_group(...)
+> 
+> On at91 we have this type of controller
 
-I'll point out that we can remove drivers if we kill off ARMv4 support,
-which would mean getting rid of all the StrongARM and FA526 CPU support.
-That would also mean removing all of ebsa110, footbridge, riscpc, gemini,
-sa1100, and shark mach- subdirectories.
+Ah I see. Yeah makes sense. Also I think we should let the pinctrl
+core eventually manage the pins more too. Right now the pins are
+a static array in the driver, which makes things unnecessarily
+complex for the DT case. It would be nice to also have something like
+pinctrl_register/unregister_pin instead of requiring them all
+be registered while registering with the framework initially.
 
-It also means I would no longer be able to test various chunks of code
-which I currently look after, such as ARM PCI stuff, PCMCIA soc-common,
-and some DMA engine stuff.
+But all that can be improved later on once we get the binding down..
+ 
+> one pin can have multiple function and each function can be on different pin
+> and we need to program and represent each of them one by one
+> 
+> And each pin have different parameter
+> 
+> so I was thinking to do like on gpio
+> 
+> uart {
+> 	pin = < &pioA 12 {pararms} >
+> 
+> }
 
-What I'm basically pointing out is that the majority of my infrastructure
-here runs on ARMv4 StrongARM based platforms, and I don't see this
-changing any time soon.  As long as that is the case, I have a vested
-and selfish interest in keeping the kernel buildable for ARMv4.
+Hmm I assume the "12" above the gpio number?
+ 
+> and use macro as basicaly we are just this
+> 
+> and this can be applied to tegra too as you will just refer the pin in this hw
+> pin block
+
+I was thinking of adding gpio eventually as a separate attribute with
+something like the following. Here cam_d10 pin is used as gpio109:
+
+cam_d10.gpio_109 {
+	pinctrl-simple,cells = <0xfa 0x104>;	/* OMAP_PIN_INPUT | OMAP_MUX_MODE4 */
+	gpio = <&gpio4 13 0>;			/* gpio109 */
+};
+
+The reasoning for this is that as we may not care about the gpio number
+for all pins, it should be optional. Would that work for you?
+
+Regards,
+
+Tony
