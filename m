@@ -1,27 +1,30 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 4 May 2012 15:08:37 -0700
-Subject: [PATCH V4] clk: add a fixed factor clock
-In-Reply-To: <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
-References: <85453b2bb4d448d0dcd291579bd76e70c1b48e5b.1336039424.git.viresh.kumar@st.com>
- <20120503120821.GJ4141@pengutronix.de>
- <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
-Message-ID: <CAJOA=zMQNMj2wup2sjXOce41DWmY=jdCC=Z-T9nHFjuGBG0yog@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 May 2012 23:09:45 +0100
+Subject: Handling of modular boards
+In-Reply-To: <20120504203357.6B79B206451@gemini.denx.de>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <201205041934.08830.arnd@arndb.de>
+ <20120504203357.6B79B206451@gemini.denx.de>
+Message-ID: <20120504220944.GT14230@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2012 at 6:41 AM, viresh kumar <viresh.linux@gmail.com> wrote:
->
-> On May 3, 2012 5:38 PM, "Sascha Hauer" <s.hauer@pengutronix.de> wrote:
->>
->
->> > + ? ? if (clk)
->> > + ? ? ? ? ? ? return clk;
->>
->> ? ? ? ?if (!IS_ERR(clk))
->
-> Oops. @Mike: can you please fix it while applying?
+On Fri, May 04, 2012 at 10:33:57PM +0200, Wolfgang Denk wrote:
 
-No problem.
+> On the other hand, some of the issues we're trying to solve here
+> for the kernel are also present in the boot loader, so this needs to
+> do this anyway - whether by inserting new or modifying (enabling or
+> disabling) existing properties in the DT is not really relevant here.
 
-Regards,
-Mike
+FWIW if the bootloader can usefully handle this stuff I think that's a
+good approach but there is substantial variation in quality of
+implementation between bootloaders and even when the bootloader is a
+good one it's not always practical to update it or the data it relies
+on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/61cb0296/attachment-0001.sig>
