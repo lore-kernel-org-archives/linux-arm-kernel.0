@@ -1,103 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 May 2012 08:27:57 +0100
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <CAK2p4sLagEw+ubrG-oAk_bjWeSkEnCQyS_mJFPLCkpbnMfOZ_A@mail.gmail.com>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503140428.GB897@n2100.arm.linux.org.uk>
- <CAK2p4sLagEw+ubrG-oAk_bjWeSkEnCQyS_mJFPLCkpbnMfOZ_A@mail.gmail.com>
-Message-ID: <20120504072756.GA26481@n2100.arm.linux.org.uk>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Fri, 4 May 2012 12:59:42 +0530
+Subject: [PATCH] ARM: OMAP2+: dma: Define dma capabilities register bitfields
+ and use them.
+Message-ID: <1336116582-11099-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 11:31:13PM -0700, Deepak Saxena wrote:
-> On 3 May 2012 07:04, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
-> >> Hi everyone,
-> >>
-> >> I've been discussing multiplatform kernels with a few people recently,
-> >> and we will have a lot of discussion sessions about this at Linaro
-> >> Connect in Hong Kong.
-> >>
-> >> One question that came up repeatedly is whether we should support all
-> >> possible board files for each platform in a multiplatform kernel,
-> >> or just the ones that are already using DT probing. I would like
-> >> to get a quick poll of opinions on that and I've tried to put those
-> >> people on Cc that would be most impacted by this, i.e. the maintainers
-> >> for platforms that have both DT and non-DT board files at the moment.
-> >>
-> >> My feeling is that we should just mandate DT booting for multiplatform
-> >> kernels, because it significantly reduces the combinatorial space
-> >> at compile time, avoids a lot of legacy board files that we cannot
-> >> test anyway, reduces the total kernel size and gives an incentive
-> >> for people to move forward to DT with their existing boards.
-> >>
-> >> The counterargument is that we won't be able to support all the
-> >> boards we currently do when the user switches on multiplatform,
-> >> but I think that is acceptable.
-> >> Note that I would still want to allow users to build platforms
-> >> separately in order to enable the ATAG style board files, even
-> >> for platforms that are not multiplatform capable.
-> >
-> > I'm basing my comments off mach-zynq.
-> >
-> > How about we take the following steps towards it?
-> >
-> > 1. create arch/arm/include/mach/ which contains standardized headers
-> > ? for DT based implementations. ?This must include all headers included
-> > ? by asm/ or linux/ includes. ?This will also be the only mach/ header
-> > ? directory included for code outside of arch/arm/mach-*. ?This also
-> > ? acts as the 'default' set of mach/* includes for stuff like timex.h
-> > ? and the empty hardware.h
-> >
-> > 2. DT based mach-* directories do not have an include directory; their
-> > ? include files must be located in the main include/ heirarchy if shared
-> > ? with other parts of the kernel, otherwise they must be in the mach-*
-> > ? directory.
-> 
-> What do we do about all the mach-specific driver related headers that are
-> currently littered all over arch/arm/mach*? Things like <mach/mx3fb.h> and
-> <mach/ohci.h>?
+The system dma module has capabiities register indicating
+the support for descriptor loading, constant fill, etc.
+Use this instead of OMAP revision check to identify the features
+supported runtime.
 
-Such platforms with that kind of stuff haven't fully converted to DT,
-because these sorts of things are platform dependent yet aren't represented
-in DT.
+This avoids patching the code for feature SOCs which has
+those capabilities.
 
-> Arnd (or maybe Nicolas?) suggested something along the lines
-> of scripting something to figure out the constants required for a
-> specific driver and pulling them out of <mach/*.h> and into that
-> driver as a starting point.
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+---
+ arch/arm/mach-omap2/dma.c             |   11 +++++++----
+ arch/arm/plat-omap/include/plat/dma.h |    5 +++++
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-But that doesn't solve the problem.  Take a USB driver where the register
-layouts are different.  To have it work on two different platforms, you'd
-need to build the driver twice.  Not only that, you'd also need to figure
-out some way to register only one copy of that.
-
-So really, the header file thing is just a sign of larger blocking issues
-to getting those kinds of drivers working on a multiplatform kernel, and
-no amount of header munging will sort it out.  The fact of that situation
-is the driver concerned is _not_ multiplatform and shouldn't be built in
-that situation until it is fixed.
-
-> > 3. Allow build multiple mach-* directories (which we already do... see
-> > ? the samsung stuff.)
-> >
-> > We still have irqs.h being SoC dependent, and we still haven't taken
-> > debug-macros.S far enough along to get rid of that. ?Then there's also
-> > the problem of uncompress.h. ?The last piece of the puzzle is the common
-> > clock stuff.
-> 
-> There's also some stuff outside of arch/arm that needs cleanup
-> including USB driver
-> refactoring and some other bits that I can't recall atm. Right now we
-> can build one and
-> only one host controller   inteface, even as modules. Not too
-> difficult of a problem to
-> solve and not critical to get the SOCs booting, but needed to be
-> usable on real devices.
-
-That's already a problem today, and has nothing to do with this current
-issue - what I'm saying is the problem can't be made to go away through
-header file stuff, so this issue is not relevant to this discussion.
-
-That's not to say it doesn't need to be resolved, because it does.  It's
-just no reason to argue against what I've said.
+diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+index b19d849..ff75abe 100644
+--- a/arch/arm/mach-omap2/dma.c
++++ b/arch/arm/mach-omap2/dma.c
+@@ -227,10 +227,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+ 
+ 	dma_stride		= OMAP2_DMA_STRIDE;
+ 	dma_common_ch_start	= CSDP;
+-	if (cpu_is_omap3630() || cpu_is_omap44xx())
+-		dma_common_ch_end = CCDN;
+-	else
+-		dma_common_ch_end = CCFN;
+ 
+ 	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
+ 	if (!p) {
+@@ -277,6 +273,13 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+ 		dev_err(&pdev->dev, "%s: kzalloc fail\n", __func__);
+ 		return -ENOMEM;
+ 	}
++
++	/* Check the capabilities register for descriptor loading feature */
++	if (dma_read(CAPS_0, 0) & DMA_HAS_DESCRIPTOR_CAPS)
++		dma_common_ch_end = CCDN;
++	else
++		dma_common_ch_end = CCFN;
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/plat-omap/include/plat/dma.h b/arch/arm/plat-omap/include/plat/dma.h
+index dc562a5..7742204 100644
+--- a/arch/arm/plat-omap/include/plat/dma.h
++++ b/arch/arm/plat-omap/include/plat/dma.h
+@@ -312,6 +312,11 @@
+ #define CLEAR_CSR_ON_READ		BIT(0xC)
+ #define IS_WORD_16			BIT(0xD)
+ 
++/* Defines for DMA Capabilities */
++#define DMA_HAS_TRANSPARENT_CAPS	(0x1 << 18)
++#define DMA_HAS_CONSTANT_FILL_CAPS	(0x1 << 19)
++#define DMA_HAS_DESCRIPTOR_CAPS		(0x3 << 20)
++
+ enum omap_reg_offsets {
+ 
+ GCR,		GSCR,		GRST1,		HW_ID,
+-- 
+1.7.1
