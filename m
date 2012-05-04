@@ -1,88 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 May 2012 19:05:33 +0200
-Subject: [GIT PULL] clk for next
-Message-ID: <20120504170533.GO4141@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 4 May 2012 18:51:28 +0200
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120504165603.GK897@n2100.arm.linux.org.uk>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+ <201205041220.24747.arnd@arndb.de> <4FA40642.5040203@gmail.com>
+ <20120504165603.GK897@n2100.arm.linux.org.uk>
+Message-ID: <20120504165128.GI7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erm, no, this is not a pull request, more a request for a pull request.
+On 17:56 Fri 04 May     , Russell King - ARM Linux wrote:
+> On Fri, May 04, 2012 at 11:39:30AM -0500, Rob Herring wrote:
+> > Many of the headers are simply platform_data structs which may still be
+> > needed on DT platforms, but could be moved elsewhere.
+> 
+> Those should be in include/linux/platform.
+> 
+> > >> Then there's also the problem of uncompress.h.  The last piece of the
+> > >> puzzle is the common clock stuff.
+> > 
+> > The smp/hotplug/localtimer related functions are still global. Marc Z
+> > has posted patches for this, but I haven't seen recent activity. This
+> > and clocks were the 2 main issues I saw trying to build 2 platforms
+> > together. highbank and picoxcell could be built together since only
+> > highbank has clocks and smp.
+> > 
+> > gpio.h is still required, but empty for most platforms.
+> 
+> Those empty gpio.h files are definitely a candidate for going into
+> arch/arm/include/mach/gpio.h, and then all those 12-byte mach/gpio.h can
+> be deleted (13 files).
+> 
+> We've not had any progress on the gpio.h issue since I did the last round
+> of cleanup; the next stage was to persuade SoC maintainers to get rid of
+> their optimized versions which aren't compatible with multi-platform
+> kernels.
+> 
+> I don't know if folk are expecting me to push that forwards or whether
+> there's someone else working on that aspect of it...
+> 
+> So this issue really does need to be progressed too.
+same with CLOCK_TICK_RATE
 
-Currently we are still missing the clk patches for next in -next. It
-should be fine to have these in arm-soc since probably no non-arm
-architecture will convert to the clock framework in the next two weeks.
+at91 (expect at91x40) and imx we drop it but nearly on the other platform
+did not
 
-Then finally we could merge SoC clk code in the arm-soc tree. BTW there
-are lready spear clk patches in the arm-soc tree which conflict with
-Mikes branch so Viresh might have to fix them (maybe he sent the fixes
-already to the list, can't remember)
-
-
-So Mike, please consider sending the following pull request to Arnd:
-
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/mturquette/linux.git clk-next
-
-for you to fetch changes up to 0e1c03017549a9df513622b3f15ff38eb8d35a62:
-
-  clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and clk is enabled (2012-05-01 18:13:38 -0700)
-
-----------------------------------------------------------------
-Mark Brown (2):
-      clk: Remove comment for end of CONFIG_COMMON_CLK section
-      clk: Constify parent name arrays
-
-Mike Turquette (6):
-      clk: core: correct clk_set_rate kerneldoc
-      clk: core: remove dead code paths
-      clk: core: clk_calc_new_rates handles NULL parents
-      clk: core: enforce clk_ops consistency
-      clk: core: copy parent_names & return error codes
-      clk: basic: improve parent_names & return errors
-
-Rajendra Nayak (2):
-      clk: Make clk_get_rate() return 0 on error
-      clk: constify parent name arrays in macros
-
-Rob Herring (2):
-      clk: select CLKDEV_LOOKUP for COMMON_CLK
-      clk: remove trailing whitespace from clk.h
-
-Saravana Kannan (1):
-      clk: Use a separate struct for holding init data.
-
-Shawn Guo (7):
-      clk: use kzalloc in clk_register_mux
-      clk: remove unnecessary EXPORT_SYMBOL_GPL
-      clk: add "const" for clk_ops of basic clks
-      clk: declare clk_ops of basic clks in clk-provider.h
-      clk: always pass parent_rate into .round_rate
-      clk: pass parent_rate into .set_rate
-      clk: propagate round_rate for CLK_SET_RATE_PARENT case
-
-Viresh Kumar (5):
-      clk: Fix typo in comment
-      clk: clk-gate: Create clk_gate_endisable()
-      clk: clk-private: Add DEFINE_CLK macro
-      clk: Don't set clk->new_rate twice
-      clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and clk is enabled
-
- drivers/clk/Kconfig          |    1 +
- drivers/clk/clk-divider.c    |   68 +++++------
- drivers/clk/clk-fixed-rate.c |   49 ++++----
- drivers/clk/clk-gate.c       |  104 ++++++++---------
- drivers/clk/clk-mux.c        |   26 +++--
- drivers/clk/clk.c            |  265 +++++++++++++++++++++++++++---------------
- include/linux/clk-private.h  |   79 +++++--------
- include/linux/clk-provider.h |   95 ++++++++-------
- include/linux/clk.h          |    6 +-
- 9 files changed, 383 insertions(+), 310 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best Regards,
+J.
