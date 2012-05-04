@@ -1,33 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 15:20:03 +0000
-Subject: [RFC] Remove support for ARMv3 ARM610 and ARM710 CPUs
-In-Reply-To: <20120504144643.GG26481@n2100.arm.linux.org.uk>
-References: <20120504095645.GD26481@n2100.arm.linux.org.uk>
- <201205041441.24573.arnd@arndb.de>
- <20120504144643.GG26481@n2100.arm.linux.org.uk>
-Message-ID: <201205041520.03423.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 4 May 2012 10:22:01 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+Message-ID: <4FA3F419.5050707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 May 2012, Russell King - ARM Linux wrote:
-> On Fri, May 04, 2012 at 02:41:24PM +0000, Arnd Bergmann wrote:
-> > On Friday 04 May 2012, Russell King - ARM Linux wrote:
-> > > This patch removes support for ARMv3 CPUs, which haven't worked properly
-> > > for quite some time (see the FIXME comment in arch/arm/mm/fault.c).  The
-> > > only V3 parts left is the cache model for ARMv3, which is needed for some
-> > > odd reason by ARM740T CPUs, and being able to build with -march=armv3,
-> > > which is required for the RiscPC platform due to its bus structure.
-> > 
-> > No objections to the patch, but I wonder if this change obsoletes any
-> > hardware drivers in turn.  Are there any RiscPC peripherals that are
-> > only available on the older models?
+Hi Jassi,
+
+On 05/04/2012 01:56 AM, Jassi Brar wrote:
+> On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
+>> From: Jon Hunter <jon-hunter@ti.com>
+>>
+>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+>> to add some basic helpers to retrieve a DMA controller device_node and the
+>> DMA request/channel information.
+>>
+>> Aim of DMA helpers
+>> - The purpose of device-tree (as far as I understand), is to describe the
+>>  capabilites of the hardware. Thinking about DMA controllers purely from the
+>>  context of the hardware to begin with, we can describe a device in terms of
+>>  a DMA controller as follows ...
+>>        1. Number of DMA controllers
+>>        2. Number of channels (maybe physical or logical)
+>>        3. Mapping of DMA requests signals to DMA controller
+>>        4. Number of DMA interrupts
+>>        5. Mapping of DMA interrupts to channels
+>> - With the above in mind the aim of the DT DMA helper functions is to extract
+>>  the above information from the DT and provide to the appropriate driver.
+>>  However, due to the vast number of DMA controllers and not all are using a
+>>  common driver (such as DMA Engine) it has been seen that this is not a
+>>  trivial task.
+>>
+> Sorry for being slow, but so far I thought DT is only to provide _h/w_
+> specific info
+> to the _controller_ drivers. It was not supposed to provide any info
+> pertaining to
+> some API (dmaengine in this case).
 > 
-> "older models" ?  It's not a machine where the CPU is soldered to the
-> motherboard.  I could describe it as being like an x86 motherboard where
-> you can plug either an ARM610, ARM710 or StrongARM CPU into it.  The
-> CPU type is merely incidental.
+> And I believe this is one of few situations where we are better off
+> not generalizing
+> the interface - pass controller specific info in the controller
+> driver's specified format.
+> Generalizing only seems to complicate things here, when we anyway have machine
+> specific dtb, which could always have clients requesting and the
+> controllers given
+> dma's info in controller driver's specific format.
+> 
+> Perhaps I am overlooking the need to generalize. If you think so, please help me
+> understand by pointing out some use case for it.
 
-Ok, I see. I've never actually seen one of those machines myself, they
-were always very rare in Germany.
+No not really, your points are valid. From reading the previous
+discussions one of the items that was clearly lacking was the ability to
+represent and identify a device having more than one DMA controller. In
+other words, when you request the DMA resource, how do you identify
+which DMA controller in the system that resource belongs too. With DMA
+engine there are ways we can do this.
 
-	Arnd
+However, thinking about this now. Instead of passing specific DMA engine
+parameters to the register function may be we can pass a generic void *
+pointer with the information and completely abstract the binding from
+DMA engine. This is probably a better approach.
+
+Cheers
+Jon
