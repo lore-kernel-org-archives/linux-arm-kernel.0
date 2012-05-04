@@ -1,51 +1,78 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 4 May 2012 12:26:13 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+From: a0393947@ti.com (Archit Taneja)
+Date: Fri, 4 May 2012 12:33:29 +0530
+Subject: [PATCH 2/2] ARM: OMAP4: DSS hwmods: Add OCPIF_SWSUP_IDLE to all
+ DSS L3 slave interfaces
+In-Reply-To: <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
+References: <1334304116-18872-1-git-send-email-archit@ti.com>
+ <1334304116-18872-3-git-send-email-archit@ti.com> <4F87E72A.2050104@ti.com>
+ <4F87E924.5040601@ti.com>
+ <alpine.DEB.2.00.1205040038510.20926@utopia.booyaka.com>
+Message-ID: <4FA37F41.3070102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
-> From: Jon Hunter <jon-hunter@ti.com>
->
-> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
-> to add some basic helpers to retrieve a DMA controller device_node and the
-> DMA request/channel information.
->
-> Aim of DMA helpers
-> - The purpose of device-tree (as far as I understand), is to describe the
-> ?capabilites of the hardware. Thinking about DMA controllers purely from the
-> ?context of the hardware to begin with, we can describe a device in terms of
-> ?a DMA controller as follows ...
-> ? ? ? ?1. Number of DMA controllers
-> ? ? ? ?2. Number of channels (maybe physical or logical)
-> ? ? ? ?3. Mapping of DMA requests signals to DMA controller
-> ? ? ? ?4. Number of DMA interrupts
-> ? ? ? ?5. Mapping of DMA interrupts to channels
-> - With the above in mind the aim of the DT DMA helper functions is to extract
-> ?the above information from the DT and provide to the appropriate driver.
-> ?However, due to the vast number of DMA controllers and not all are using a
-> ?common driver (such as DMA Engine) it has been seen that this is not a
-> ?trivial task.
->
-Sorry for being slow, but so far I thought DT is only to provide _h/w_
-specific info
-to the _controller_ drivers. It was not supposed to provide any info
-pertaining to
-some API (dmaengine in this case).
+Hi Paul,
 
-And I believe this is one of few situations where we are better off
-not generalizing
-the interface - pass controller specific info in the controller
-driver's specified format.
-Generalizing only seems to complicate things here, when we anyway have machine
-specific dtb, which could always have clients requesting and the
-controllers given
-dma's info in controller driver's specific format.
+On Friday 04 May 2012 12:09 PM, Paul Walmsley wrote:
+> Hi Archit,
+>
+> On Fri, 13 Apr 2012, Archit Taneja wrote:
+>
+>> On Friday 13 April 2012 02:13 PM, Cousson, Benoit wrote:
+>>> On 4/13/2012 10:01 AM, Archit Taneja wrote:
+>>>> The clock for all DSS L3 slave interfaces had been recently changed to
+>>>> "dss_fck" from "l3_div_ck". "dss_fck" is an optional clock in DSS
+>>>> clock domain
+>>>> which can't autoidle when enabled.
+>>>>
+>>>> Add OCPIF_SWSUP_IDLE flag to all the L3 slave interfaces used by DSS
+>>>> hwmods so
+>>>> that clock is explicitly enabled and disabled by software. Without this,
+>>>> "dss_fck" would be left as enabled and the OMAP4 device won't idle
+>>>> even when
+>>>> DSS is not in use.
+>>>
+>>> Yeah, that was done on purpose with Tomi knowning well that limitation.
+>>>
+>>> The issue was mainly due to the lack of proper parent / child
+>>> relationship between the DSS (the whole subsystem) and the DSS children
+>>> at that time.
+>>>
+>>> I think that Tomi posted a series to fix that for 3.4. So if we ensure
+>>> that every DSS IPs are children of the DSS, then pm_runtime will always
+>>> ensure that the DSS will be enabled each time a submodule is used.
+>>>
+>>> So the right fix is to put back the proper iclk (l3_div) to the DSS
+>>> instead of the dss_fck.
+>>
+>> Ok, I get it now. Tomi's patch series ensured the parent-child
+>> dependency, but they didn't switch the iclks back to l3_div, I guess
+>> that should be a part of the series too.
+>
+> Just checking on this one.  Does this patch need to be updated ?
+>
 
-Perhaps I am overlooking the need to generalize. If you think so, please help me
-understand by pointing out some use case for it.
+We were working on this, but we realised that only having a parent-child 
+relation in dss platform devices won't be sufficient to remove "the use 
+of dss_fck(or MODULEMODE bits) as a slave clock" hack.
 
-Thanks.
+The issue is that during bootup(when omap_hwmod_setup_all() is called), 
+all hwmods are enabled independently, so all dss hwmods need to enable 
+the MODULEMODE bits for them to be setup correctly.
+
+With the parent-child relation in platform devices in DSS, only the 
+parent platform device's hwmod("dss_core" in our case) should enable and 
+disable the MODULEMODE bits. If the children also become capable of 
+enabling/disabling it, then things wouldn't work.
+
+Hence, to go ahead with this approach, the hwmod's themselves need to 
+have some sort of parent child relationship, or atleast some sort of use 
+counting for MODULEMODE bits. Benoit and Tomi could comment more on this.
+
+Hence we are sort of stuck :)
+
+Archit
+
+>
+> - Paul
+>
