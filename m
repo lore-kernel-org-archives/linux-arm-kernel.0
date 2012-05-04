@@ -1,176 +1,141 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 4 May 2012 17:32:51 +0200
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <20120504150342.GI5140@atomide.com>
-References: <20120502172401.GG3739@atomide.com>
- <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com>
- <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org>
- <20120504150342.GI5140@atomide.com>
-Message-ID: <20120504153251.GE7788@game.jcrosoft.org>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Fri, 4 May 2012 23:55:38 +0800
+Subject: [PATCH] clk: give clock chance to change parent at setrate stage
+In-Reply-To: <CAG9bXvmAf-0fmVb8nzWkuAKaMoOJVzR=hThwXpN_izQzM26q-g@mail.gmail.com>
+References: <1336125068-32637-1-git-send-email-leiwen@marvell.com>
+ <CALZhoSRfF38oA9HrNs4J+BHZRUDAg0woWDe6e8RQdJDc3WQnPA@mail.gmail.com>
+ <CAG9bXvmAf-0fmVb8nzWkuAKaMoOJVzR=hThwXpN_izQzM26q-g@mail.gmail.com>
+Message-ID: <CALZhoSQhR1wVKZTjbS=YGThqs8Hfbt09dehv5YVeA2R9UXdkwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:03 Fri 04 May     , Tony Lindgren wrote:
-> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120503 22:08]:
-> > 
-> > In my mind in the driver we do not have to care how to list
-> > register/unregister the group. We just need to be able to do this
-> > 
-> > pinctrl_register_group(...)
-> > 
-> > or 
-> > 
-> > pinctrl_unregistewr_group(...)
-> > 
-> > On at91 we have this type of controller
-> 
-> Ah I see. Yeah makes sense. Also I think we should let the pinctrl
-> core eventually manage the pins more too. Right now the pins are
-> a static array in the driver, which makes things unnecessarily
-> complex for the DT case. It would be nice to also have something like
-> pinctrl_register/unregister_pin instead of requiring them all
-> be registered while registering with the framework initially.
-> 
-> But all that can be improved later on once we get the binding down..
-agreed at 100%
->  
-> > one pin can have multiple function and each function can be on different pin
-> > and we need to program and represent each of them one by one
-> > 
-> > And each pin have different parameter
-> > 
-> > so I was thinking to do like on gpio
-> > 
-> > uart {
-> > 	pin = < &pioA 12 {pararms} >
-> > 
-> > }
-> 
-> Hmm I assume the "12" above the gpio number?
-no pin number in the bank because it could not be gpio
+Hi Raul,
 
-evenif on at91 and nearly on the controller I known it is the case
->  
-> > and use macro as basicaly we are just this
-> > 
-> > and this can be applied to tegra too as you will just refer the pin in this hw
-> > pin block
-> 
-> I was thinking of adding gpio eventually as a separate attribute with
-> something like the following. Here cam_d10 pin is used as gpio109:
-> 
-> cam_d10.gpio_109 {
-> 	pinctrl-simple,cells = <0xfa 0x104>;	/* OMAP_PIN_INPUT | OMAP_MUX_MODE4 */
-> 	gpio = <&gpio4 13 0>;			/* gpio109 */
-> };
-> 
-> The reasoning for this is that as we may not care about the gpio number
-> for all pins, it should be optional. Would that work for you?
-yes
+On Fri, May 4, 2012 at 6:34 PM, Raul Xiong <raulxiong@gmail.com> wrote:
+>
+>
+> 2012/5/4 Lei Wen <adrian.wenl@gmail.com>
+>>
+>> There is one clock rate changing requirement like those:
+>> 1. clock may need specify specific rate binded with specific parent
+>> 2. driver care only set_rate, don't care for which parent it is linked
+>> 3. It need registering notification to changing voltage
+>> 4. It want keep parent and rate changing in an atomic operation, which
+>> ? means for chaning parent, it only caching the mux chaning, and
+>> ? maintent the relationship in this tree, while do the real parent
+>> ? and rate chaning in the set_rate callback. And it requires
+>> ? recalculated rate reflect the true rate changing state to make the
+>> ? decision to whether sending notification (for voltage change).
+>>
+>> Base on those assumption, the logic in set_rate is changed a little, the
+>> round_rate should return not only best parent_rate, but also best
+>> parent. If best parent is changed, we would switch parent first, then do
+>> the sub rate chaning.
+>>
+>> Signed-off-by: Lei Wen <leiwen@marvell.com>
+>> ---
+>> ?drivers/clk/clk.c ? ? ? ? ? ?| ? 22 +++++++++++++++++++++-
+>> ?include/linux/clk-provider.h | ? ?2 ++
+>> ?2 files changed, 23 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 9cf6f59..d207617 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -23,6 +23,7 @@ static DEFINE_MUTEX(prepare_lock);
+>> ?static HLIST_HEAD(clk_root_list);
+>> ?static HLIST_HEAD(clk_orphan_list);
+>> ?static LIST_HEAD(clk_notifier_list);
+>> +static int __clk_set_parent(struct clk *clk, struct clk *parent);
+>>
+>> ?/*** ? ? ? ?debugfs support ? ? ? ?***/
+>>
+>> @@ -767,6 +768,7 @@ static struct clk *clk_calc_new_rates(struct clk
+>> *clk, unsigned long rate)
+>> ? ? ? ?struct clk *top = clk;
+>> ? ? ? ?unsigned long best_parent_rate = clk->parent->rate;
+>> ? ? ? ?unsigned long new_rate;
+>> + ? ? ? int ret;
+>>
+>> ? ? ? ?if (!clk->ops->round_rate && !(clk->flags & CLK_SET_RATE_PARENT)) {
+>> ? ? ? ? ? ? ? ?clk->new_rate = clk->rate;
+>> @@ -785,6 +787,21 @@ static struct clk *clk_calc_new_rates(struct clk
+>> *clk, unsigned long rate)
+>> ? ? ? ?else
+>> ? ? ? ? ? ? ? ?new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
+>>
+>> + ? ? ? if (clk->hw->new_parent != clk->parent) {
+>
+>
+> Acked-by: Raul Xiong <raulxiong@gmail.com>
+>
+> Suggest to change it as
+> + ? ? ??if (clk->hw->new_parent != NULL &&?clk->hw->new_parent !=
+> clk->parent) {
+> to allow round_rate callback leave it as NULL.
 
-but I was thinking to put it as a param but why not
+Thanks for pointing out! I would post V2 patch to fix it.
 
-my idea was this
+>
+>>
+>> + ? ? ? ? ? ? ? if ((clk->flags & CLK_SET_PARENT_GATE) &&
+>> clk->prepare_count)
+>>
+>> + ? ? ? ? ? ? ? ? ? ? ? ret = -EBUSY;
+>> + ? ? ? ? ? ? ? else
+>> + ? ? ? ? ? ? ? ? ? ? ? ret = __clk_set_parent(clk, clk->hw->new_parent);
+>> +
+>> + ? ? ? ? ? ? ? if (ret) {
+>> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%s: %s set parent to %s failed\n",
+>> __func__,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clk->name,
+>> clk->hw->new_parent->name);
+>> + ? ? ? ? ? ? ? ? ? ? ? return NULL;
+>> + ? ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? ? __clk_reparent(clk, clk->hw->new_parent);
+>> + ? ? ? }
+>> +
+>> ? ? ? ?if (best_parent_rate != clk->parent->rate) {
+>> ? ? ? ? ? ? ? ?top = clk_calc_new_rates(clk->parent, best_parent_rate);
+>>
+>> @@ -1050,7 +1067,10 @@ out:
+>>
+>> ? ? ? ?clk->parent = new_parent;
+>>
+>> - ? ? ? __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>> + ? ? ? if (!clk->hw->new_parent)
+>> + ? ? ? ? ? ? ? __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>> + ? ? ? else
+>> + ? ? ? ? ? ? ? clk->hw->new_parent = NULL;
+>> ?}
+>>
+>> ?static int __clk_set_parent(struct clk *clk, struct clk *parent)
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 5508897..54dad8a 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -23,9 +23,11 @@
+>> ?*
+>> ?* clk: pointer to the struct clk instance that points back to this struct
+>> ?* clk_hw instance
+>> + * new_parent: pointer for caching new parent position
+>> ?*/
+>> ?struct clk_hw {
+>> ? ? ? ?struct clk *clk;
+>> + ? ? ? struct clk *new_parent;
+>> ?};
+>>
+>> ?/*
+>> --
+>> 1.7.5.4
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
 
-pinctrl at fffff200 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	compatible = "atmel,at91rm9200-pinctrl";
-
-	atmel,mux-mask = <
-		/*    A	  B     */
-		 0xffffffff 0xffc003ff  /* pioA */
-		 0xffffffff 0x800f8f00  /* pioB */
-		 0xffffffff 0x00000e00  /* pioC */
-		 0xffffffff 0xff0c1381  /* pioD */
-		 0xffffffff 0x81ffff81  /* pioE */
-		>;
-
-	pioA: gpio at fffff200 {
-		compatible = "atmel,at91rm9200-gpio";
-		reg = <0xfffff200 0x100>;
-		interrupts = <2 4>;
-		#gpio-cells = <2>;
-		gpio-controller;
-		interrupt-controller;
-	};
-
-	pioB: gpio at fffff400 {
-		compatible = "atmel,at91rm9200-gpio";
-		reg = <0xfffff400 0x100>;
-		interrupts = <3 4>;
-		#gpio-cells = <2>;
-		gpio-controller;
-		interrupt-controller;
-	};
-
-	pioC: gpio at fffff600 {
-		compatible = "atmel,at91rm9200-gpio";
-		reg = <0xfffff600 0x100>;
-		interrupts = <4 4>;
-		#gpio-cells = <2>;
-		gpio-controller;
-		interrupt-controller;
-	};
-
-	pioD: gpio at fffff800 {
-		compatible = "atmel,at91rm9200-gpio";
-		reg = <0xfffff800 0x100>;
-		interrupts = <5 4>;
-		#gpio-cells = <2>;
-		gpio-controller;
-		interrupt-controller;
-	};
-
-	pioE: gpio at fffffa00 {
-		compatible = "atmel,at91rm9200-gpio";
-		reg = <0xfffffa00 0x100>;
-		interrupts = <5 4>;
-		#gpio-cells = <2>;
-		gpio-controller;
-		interrupt-controller;
-	};
-
-	dbgu {
-		pins = < &pioB 12 0 0
-			 &pioB 13 0 2 >;
-	/* with macro */
-		pins = < &pioB 12 MUX_A NO_PULL_UP
-			 &pioB 13 MUX_A PULL_UP >;
-	};
-
-	/* and also the notion of linked group
-	 * as on uart of network you have often the same subset of pin use.
-	 *
-	 * As example on uart rxd/txd is use for the group without rts/cts
-	 * and the one with it
-	 * on ethernet the RMII pin are use also on MII
-	 */
-
-	uart0_rxd_txd {
-		pins = < &pioB 19 MUX_A PULL_UP		/* rxd */
-			 &pioB 18 MUX_A NO_PULL_UP >;	/* txd */
-	};
-
-	uart0_rts_cts {
-		groups = < &uart0_rxd_txd >;
-		pins = < &pioB 17 MUX_B NO_PULL_UP	/* rts */
-			 &pioB 15 MUX_B NO_PULL_UP >;	/* cts */
-	};
-
-	uart0_rts_cts_external_pull_up {
-		groups = < &uart0_rts_cts >;
-		gpios = <&pioC 1 0>;
-	};
-};
-
-The idea is to avoid duplication the xlate for pins will be driver specific
-with maybe a common implementation
-
-the 3 or 4 first fix as done on gpio
-
-Best Regards,
-J.
+Thanks,
+Lei
