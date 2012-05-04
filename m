@@ -1,85 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 May 2012 12:21:50 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FA3F08D.7030603@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA30604.1030401@wwwdotorg.org> <4FA3F08D.7030603@ti.com>
-Message-ID: <4FA41E3E.3020303@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 May 2012 20:22:10 +0200
+Subject: [PATCH 04/15] drivers/net: Do not free an IRQ if its request
+ failed
+In-Reply-To: <4FA3E35B.3000604@linaro.org>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <1334867804-31942-5-git-send-email-lee.jones@linaro.org>
+ <4FA3E35B.3000604@linaro.org>
+Message-ID: <CACRpkdaB+mAmo50uSDvVcq=V9_BF01-zu2WHUU+cc2WPU1NEXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 09:06 AM, Jon Hunter wrote:
-> Hi Stephen,
-> 
-> On 05/03/2012 05:26 PM, Stephen Warren wrote:
->> On 04/30/2012 03:17 PM, Jon Hunter wrote:
->>> From: Jon Hunter <jon-hunter@ti.com>
->>>
->>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
->>> to add some basic helpers to retrieve a DMA controller device_node and the
->>> DMA request/channel information.
-...
->>> +
->>> +	sdma: dmaengine at 48000000 {
->>> +		compatible = "ti,omap4-sdma"
->>> +		reg = <0x48000000 0x1000>;
->>> +		interrupts = <4>;
->>> +		#dma-cells = <2>;
->>> +		#dma-channels = <32>;
->>> +		#dma-requests = <127>;
->>> +	};
->>> +
->>> +
->>> +* DMA client
->>> +
->>> +Client drivers should specify the DMA property using a phandle to the controller
->>> +followed by the number of DMA request/channel and the transfer type of the
+On Fri, May 4, 2012 at 4:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 19/04/12 21:36, Lee Jones wrote:
+
+>> - ? ? ? ? ? ? ? goto out_free_irq;
+>> + ? ? ? ? ? ? ? goto out_disable_resources;
+>> ? ? ? ?}
 >>
->> What exactly is "request/channel"? Is it a request ID, a channel ID,
->> both packed into a single integer (which bits are used for each field),
->> etc.?
-> 
-> The thought here was that some DMAs may distinguish between devices by a
-> request ID or a channel ID or both. In the case of say an OMAP4, we have
-> 32 channels and 127 request IDs. From a h/w perspective we need to know
-> both. Each of the 32 channels can be programmed to use any one of the
-> 127 h/w request signals.
-
->From a HW perspective, do you actually need to know both? I think the HW
-description must specify the request ID, but because any channel can be
-programmed to any request ID, you don't actually care about the channel
-ID; it can be dynamically allocated by the DMA driver when the client
-driver calls dma_request_channel().
-
-Actually, you say the following below, so I guess you already agree here:
-
-> Yes this is the same as OMAPs SDMA. In the case of such DMA controllers
-> you only really care about the request ID and total number of channels
-> that are available to you.
-
-...
->> This is why I think DMA controller should specify the format of their
->> own DMA specifier in DT, and why they should provide an xlate function
->> to parse that.
-> 
-> Ok fair enough. However, it seems that at a minimum we could provide one
-> or two xlate functions in the generic binding for people to use. One
-> could be the DMA engine xlate binding and another could be the simple
-> xlate binding Nicolas proposed for a DMA controller that returns a
-> single channel/request ID.
+>> ? ? ? ?retval = register_netdev(dev);
 >
-> However, at the same time, may be people would prefer that devices such
-> as tegra, omap, at91, etc, offer their own xlate function for DMA
-> engine. I am not sure, but we could go either way.
+>
+> Anything on this from the Net guys?
 
-I'd expect the bindings to be written to allow the individual DMA
-controllers to have complete control over the meaning of the DMA specifier.
+This was merged for 3.4-rc5, check:
+https://lkml.org/lkml/2012/4/29/2
 
-That said, I would certainly expect some common patterns to emerge, such
-as a single cell to specify the DMA channel ID, or a single cell to
-specify the DMA request/selector ID. We should certainly make sure that
-where different controllers need the same information, they use the same
-way to represent it, and use common utility code to implement the xlate
-functionality. We could perhaps even write these common cases into the
-core DMA bindings as examples to help ensure uniformity. However, we
-just need to do this in a way that allows other cases too.
+Linus Walleij
