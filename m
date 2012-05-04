@@ -1,72 +1,55 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 04 May 2012 13:37:39 +0300
-Subject: [PATCH 1/2] mtd: gpmi: add device tree support to gpmi-nand
-In-Reply-To: <4FA3AEDF.8010009@freescale.com>
-References: <1336101182-5200-1-git-send-email-b32955@freescale.com>
- <1336124510.4275.7.camel@sauron.fi.intel.com>
- <4FA3AEDF.8010009@freescale.com>
-Message-ID: <1336127859.4275.14.camel@sauron.fi.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 04 May 2012 12:54:01 +0200
+Subject: Development tree for =?UTF-8?Q?Cortex-A=31=35=3F?=
+In-Reply-To: <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
+References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+ <bc6e93f98278125c354282f23751b1aa@localhost>
+ <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
+ <6e4ad6defa33bf693ec45cae819469f0@localhost>
+ <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
+Message-ID: <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-04 at 18:26 +0800, Huang Shijie wrote:
-> ? 2012?05?04? 17:41, Artem Bityutskiy ??:
-> > On Fri, 2012-05-04 at 11:13 +0800, Huang Shijie wrote:
-> >> This patch just adds the DT support to gpmi-nand.
-> >>
-> >> Signed-off-by: Huang Shijie<b32955@freescale.com>
-> >> ---
-> >> Please select the CONFIG_USE_OF before you do the compiler-test.
-> >> thanks.
-> > It should compile without CONFIG_USE_OF also just fine. Currently it
-> > does not.
-> >
-> why not select CONFIG_USE_OF as the gpmi-nand is converted to a DT driver.
+On Fri, 4 May 2012 09:44:07 +0100 (BST), Jemma Jones
+<jemmajones81@yahoo.co.uk> wrote:
+>> Subject: Re: Development tree for Cortex-A15?
+> 
+>> 
+>> On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
+>> <jemmajones81@yahoo.co.uk> wrote:
+>>>>  Subject: Re: Development tree for Cortex-A15?
+>>> 
+>>>  I'm currently on kvm-arm-v7-ael, because it looked like the most
+>>>  up-to-date one. Which one should I be using for Cortex-A15 support?
+>> 
+>> That branch is good enough, if you have a bleeding edge QEMU. Note that
+>> the VE A15 support in that tree is DT only. I'm working on a v3.4 based
+>> one
+>> at the moment, but that's not completely ready yet.
+> 
+> I'm just a little confused because under arch/arm/mach-vexpress/ there
+is
+> no A15 tile? On the virtualopensystems.com git (which you quote above)
+you
+> had to explicitly enable the board and it would show up in the .config
+as
+> CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your kernel
+> tree?
 
-Yes, it can be done as well. My point is that you should not break
-compilation. These 2 patches do not compile with for me - aiaiai
-reports:
+No. The ARM tree in general is moving to the device tree, and
+CONFIG_ARCH_VEXPRESS_CA15X4 was always meant as a temporary hack until the
+VE-DT port was mature enough to be used.
 
---------------------------------------------------------------------------------
-Failed to build the following commit for configuration "l2_mxs_defconfig" (architecture arm)":
+As Pawe?'s DT work has been merged into 3.4, there is strictly no reason
+to keep this hack around, and my recent trees do reflect that fact
+(kvm-arm-v7-ael and kvm-arm-3.4). Christoffer may decide to keep this in
+his tree during a transition period, but CONFIG_ARCH_VEXPRESS_CA15X4 is
+dead as far as I am concerned.
 
-d791f1c mtd: gpmi: add gpmi support for mx6q
+If you're just starting to play with KVM-ARM now, please don't rely on the
+A15 board file, it is a dead end.
 
-drivers/mtd/nand/gpmi-nand/gpmi-lib.c:437:36: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-drivers/mtd/nand/gpmi-nand/gpmi-lib.c:579:35: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-In file included from include/linux/kernel.h:19:0,
-                 from include/linux/clk.h:15,
-                 from drivers/mtd/nand/gpmi-nand/gpmi-nand.c:21:
-include/linux/bitops.h: In function 'hweight_long':
-include/linux/bitops.h:66:26: warning: signed and unsigned type in conditional expression [-Wsign-compare]
-In file included from include/linux/dma-mapping.h:73:0,
-                 from drivers/mtd/nand/gpmi-nand/gpmi-nand.h:22,
-                 from drivers/mtd/nand/gpmi-nand/gpmi-nand.c:28:
-arch/arm/include/asm/dma-mapping.h: In function 'dma_mapping_error':
-arch/arm/include/asm/dma-mapping.h:126:18: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'release_bch_irq':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:382:11: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'acquire_dma_channels':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:430:2: error: implicit declaration of function 'of_property_read_u32' [-Werror=implicit-function-declaration]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'mx23_check_transcription_stamp':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1186:9: warning: variable 'byte' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'mx23_write_transcription_stamp':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1247:15: warning: variable 'byte' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: At top level:
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1448:6: warning: no previous prototype for 'gpmi_nfc_exit' [-Wmissing-prototypes]
-cc1: some warnings being treated as errors
-make[5]: *** [drivers/mtd/nand/gpmi-nand/gpmi-nand.o] Error 1
-
---------------------------------------------------------------------------------
-
-
+        M.
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/3fb0c6f3/attachment-0001.sig>
+Fast, cheap, reliable. Pick two.
