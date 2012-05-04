@@ -1,109 +1,115 @@
-From: neilb@suse.de (NeilBrown)
-Date: Fri, 4 May 2012 15:12:21 +1000
-Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice
- level-triggered interrupts.
-In-Reply-To: <alpine.LFD.2.02.1204251402360.2542@ionos>
-References: <20120425025637.7832.14013.stgit@notabene.brown>
- <20120425030524.7832.85239.stgit@notabene.brown>
- <alpine.LFD.2.02.1204251018530.2542@ionos>
- <20120425193916.0db1b4b1@notabene.brown>
- <alpine.LFD.2.02.1204251402360.2542@ionos>
-Message-ID: <20120504151221.6998d4e5@notabene.brown>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 4 May 2012 06:43:05 +0200
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
+ supports omap2+ padconf
+In-Reply-To: <4FA30805.5050804@wwwdotorg.org>
+References: <20120502172401.GG3739@atomide.com>
+ <20120503065131.GA3738@game.jcrosoft.org>
+ <20120503152708.GC5140@atomide.com>
+ <4FA30805.5050804@wwwdotorg.org>
+Message-ID: <20120504044305.GD7788@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2012 14:54:54 +0200 (CEST) Thomas Gleixner
-<tglx@linutronix.de> wrote:
-
-> Why not simply managing the pending bit for level irqs ?
+On 16:34 Thu 03 May     , Stephen Warren wrote:
+> On 05/03/2012 09:27 AM, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120503 00:16]:
+> >>
+> >> 	I really like it
+> >>
+> >> 	I was working on something simillar
+> >>
+> >> 	but can we split the group management so we can use it on other
+> >> 	bindings
+> > 
+> > Hmm I'm not sure I follow on the group management splitting, can you specify
+> > what you have in mind here?
+> > 
+> > If you mean moving more things into pinctrl fwk, then yeah I'd assume that
+> > will happen eventually and drivers like this will end up becoming more minimal.
 > 
+> Jean-Christophe, forgive me if I'm putting words in your mouth, but I
+> assume the following is what you mean:
+> 
+> There are two pieces of data required by the pinctrl subsystem:
+> 
+> a) The set of pins, functions, and groups that exist.
+> 
+> b) The specific function to select for each pin/group on a given board.
+> 
+> Item (a) can be represented in the pinctrl driver (e.g. as in the Tegra
+> driver), or can be represented in device tree in order to avoid large
+> tables in the driver.
+> 
+> Item (b) has to be represented in device tree, since the whole point is
+> that it's board-specific.
+> 
+> For all DT bindings I've seen that choose to represent (a) in the DT
+> rather than in the driver, the DT represents (b) directly, and (a) is
+> implicitly extracted/created based on (a).
+> 
+> When I was first thinking about DT bindings for pinctrl, I had hoped
+> that even if (a) was represented in DT, the DT nodes/properties for (a)
+> and (b) would be entirely separate, so that the binding for (b) could be
+> completely common across all SoCs, even though the binding for (a) would
+> perhaps be different across SoCs (if it existed at all).
+> 
+> So, perhaps Jean-Christophe is talking about splitting up (a) and (b) in
+> device tree?
+> 
+> Or perhaps Jean-Christophe only refers to the code that creates the
+> group and function definitions from (b), and not the actual DT binding
+> itself?
+yes you are right Stephen
+I was thinking of both but the second could be a first step
 
-Hi Thomas,
- thanks again for the patch.  I finally made time to test it and it works as
-expected.  I've included it below with a change-log entry and tested-by:
-in case that helps.
+today we tend all to represent the group of pin in DT
 
-Thanks,
-NeilBrown
+for TI, IM, MXC, at91, ST and others
 
+the way to represend the groups are exactly the same
 
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Wed, 25 Apr 2012 12:54:54 +0200
-Subject: [PATCH] IRQ: allow check_wakeup_irqs to notice level-triggered interrupts.
+a group is a node with a set on pin
 
-Level triggered interrupts do not cause IRQS_PENDING to be set when
-they fire-while-disabled as the 'pending' state is always present in
-the level - they automatically refire where re-enabled.
+uart {
+ pincfg......
+}
 
-However the IRQS_PENDING flag is also used to abort a suspend cycle -
-if any 'is_wakeup_set' interrupt is PENDING, check_wakeup_irqs() will
-cause suspend to abort. Without IRQS_PENDING, suspend won't abort.
+and the group is uart
 
-Consequently, level-triggered interrupts that fire during the 'noirq'
-phase of suspend do not currently abort suspend.
+so we do need to have a common way to handle it in c
 
-So set IRQS_PENDING even for level triggered interrupts, and make sure
-to clear the flag in check_irq_resend.
+the code propose by Tony is really what I'm working on to acheive this
 
-Also: in check_wakeup_irqs, ignore 'is_wakeup' interrupts that were
-already disabled before suspend_device_irqs() disabled them further.
+In my mind in the driver we do not have to care how to list
+register/unregister the group. We just need to be able to do this
 
-Tested-by: NeilBrown <neilb@suse.de>
+pinctrl_register_group(...)
 
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 6080f6b..741f836 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -379,8 +379,10 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
- 	 * If its disabled or no action available
- 	 * keep it masked and get out of here
- 	 */
--	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data)))
-+	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
-+		desc->istate |= IRQS_PENDING;
- 		goto out_unlock;
-+	}
- 
- 	handle_irq_event(desc);
- 
-diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
-index 15e53b1..b858ce3 100644
---- a/kernel/irq/pm.c
-+++ b/kernel/irq/pm.c
-@@ -103,7 +103,8 @@ int check_wakeup_irqs(void)
- 	int irq;
- 
- 	for_each_irq_desc(irq, desc) {
--		if (irqd_is_wakeup_set(&desc->irq_data)) {
-+		if (desc->depth == 1 &&
-+		    irqd_is_wakeup_set(&desc->irq_data)) {
- 			if (desc->istate & IRQS_PENDING)
- 				return -EBUSY;
- 			continue;
-diff --git a/kernel/irq/resend.c b/kernel/irq/resend.c
-index 14dd576..6454db7 100644
---- a/kernel/irq/resend.c
-+++ b/kernel/irq/resend.c
-@@ -58,10 +58,13 @@ void check_irq_resend(struct irq_desc *desc, unsigned int irq)
- 	/*
- 	 * We do not resend level type interrupts. Level type
- 	 * interrupts are resent by hardware when they are still
--	 * active.
-+	 * active. Clear the pending bit so suspend/resume does not
-+	 * get confused.
- 	 */
--	if (irq_settings_is_level(desc))
-+	if (irq_settings_is_level(desc)) {
-+		desc->istate &= ~IRQS_PENDING;
- 		return;
-+	}
- 	if (desc->istate & IRQS_REPLAY)
- 		return;
- 	if (desc->istate & IRQS_PENDING) {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/f8e80438/attachment.sig>
+or 
+
+pinctrl_unregistewr_group(...)
+
+On at91 we have this type of controller
+
+one pin can have multiple function and each function can be on different pin
+and we need to program and represent each of them one by one
+
+And each pin have different parameter
+
+so I was thinking to do like on gpio
+
+uart {
+	pin = < &pioA 12 {pararms} >
+
+}
+
+and use macro as basicaly we are just this
+
+and this can be applied to tegra too as you will just refer the pin in this hw
+pin block
+
+Best Regards,
+J.
