@@ -1,109 +1,57 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  4 May 2012 21:50:43 +0800
-Subject: [PATCH 1/2] ARM: mxs: add initial device tree support for imx23-evk
- board
-Message-ID: <1336139444-24672-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri,  4 May 2012 21:50:44 +0800
+Subject: [PATCH 2/2] ARM: mxs: always build in device tree support
+In-Reply-To: <1336139444-24672-1-git-send-email-shawn.guo@linaro.org>
+References: <1336139444-24672-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336139444-24672-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds initial device tree support for imx23-evk board, and only
-serial console is enabled.
+As the ultimate for mxs platform is to convert over to device tree,
+let's start always building in device tree support for the platform.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt |    4 ++++
- arch/arm/mach-mxs/Kconfig                     |    1 +
- arch/arm/mach-mxs/clock-mx23.c                |    2 ++
- arch/arm/mach-mxs/mach-mxs.c                  |   24 ++++++++++++++++++++++++
- 4 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig               |    1 +
+ arch/arm/configs/mxs_defconfig |    1 +
+ arch/arm/mach-mxs/Kconfig      |    1 -
+ 3 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index fecb580..1708df5 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -1,6 +1,10 @@
- Freescale i.MX Platforms Device Tree Bindings
- -----------------------------------------------
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cf006d4..1a64f6b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -469,6 +469,7 @@ config ARCH_MXS
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select HAVE_CLK_PREPARE
++	select USE_OF
+ 	help
+ 	  Support for Freescale MXS-based family of processors
  
-+i.MX23 Evaluation Kit
-+Required root node properties:
-+    - compatible = "fsl,imx23-evk", "fsl,imx23";
-+
- i.MX28 Evaluation Kit
- Required root node properties:
-     - compatible = "fsl,imx28-evk", "fsl,imx28";
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 1ebbf45..5406c23 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -22,6 +22,7 @@ CONFIG_BLK_DEV_INTEGRITY=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_MXS=y
++CONFIG_MACH_MXS_DT=y
+ CONFIG_MACH_MX23EVK=y
+ CONFIG_MACH_MX28EVK=y
+ CONFIG_MACH_STMP378X_DEVB=y
 diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 09fe0fb..a37cfc3 100644
+index a37cfc3..a288762 100644
 --- a/arch/arm/mach-mxs/Kconfig
 +++ b/arch/arm/mach-mxs/Kconfig
-@@ -21,6 +21,7 @@ comment "MXS platforms:"
- 
- config MACH_MXS_DT
+@@ -23,7 +23,6 @@ config MACH_MXS_DT
  	bool "Support MXS platforms from device tree"
-+	select SOC_IMX23
+ 	select SOC_IMX23
  	select SOC_IMX28
- 	select USE_OF
+-	select USE_OF
  	help
-diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-index e3ac52c..23652df 100644
---- a/arch/arm/mach-mxs/clock-mx23.c
-+++ b/arch/arm/mach-mxs/clock-mx23.c
-@@ -440,6 +440,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-pwm.4", NULL, pwm_clk)
- 	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
- 	_REGISTER_CLOCK("imx23-gpmi-nand", NULL, gpmi_clk)
-+	/* for DT */
-+	_REGISTER_CLOCK("80070000.serial", NULL, uart_clk)
- };
- 
- static int clk_misc_init(void)
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 5c5cba2..ae07c9d 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -37,6 +37,15 @@ static void __init mxs_dt_init_irq(void)
- 	of_irq_init(mxs_irq_match);
- }
- 
-+static void __init imx23_timer_init(void)
-+{
-+	mx23_clocks_init();
-+}
-+
-+static struct sys_timer imx23_timer = {
-+	.init = imx23_timer_init,
-+};
-+
- static void __init imx28_timer_init(void)
- {
- 	mx28_clocks_init();
-@@ -52,12 +61,27 @@ static void __init mxs_machine_init(void)
- 				NULL, NULL);
- }
- 
-+static const char *imx23_dt_compat[] __initdata = {
-+	"fsl,imx23-evk",
-+	"fsl,imx23",
-+	NULL,
-+};
-+
- static const char *imx28_dt_compat[] __initdata = {
- 	"fsl,imx28-evk",
- 	"fsl,imx28",
- 	NULL,
- };
- 
-+DT_MACHINE_START(IMX23, "Freescale i.MX23 (Device Tree)")
-+	.map_io		= mx23_map_io,
-+	.init_irq	= mxs_dt_init_irq,
-+	.timer		= &imx23_timer,
-+	.init_machine	= mxs_machine_init,
-+	.dt_compat	= imx23_dt_compat,
-+	.restart	= mxs_restart,
-+MACHINE_END
-+
- DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
- 	.map_io		= mx28_map_io,
- 	.init_irq	= mxs_dt_init_irq,
+ 	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
+ 	  using the device tree for discovery
 -- 
 1.7.5.4
