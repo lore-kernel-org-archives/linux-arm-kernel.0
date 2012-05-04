@@ -1,21 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 14:41:24 +0000
-Subject: [RFC] Remove support for ARMv3 ARM610 and ARM710 CPUs
-In-Reply-To: <20120504095645.GD26481@n2100.arm.linux.org.uk>
-References: <20120504095645.GD26481@n2100.arm.linux.org.uk>
-Message-ID: <201205041441.24573.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 4 May 2012 22:44:56 +0800
+Subject: [PATCH v2 1/5] dma: mxs-dma: use global stmp_device functionality
+In-Reply-To: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120504144453.GM2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 May 2012, Russell King - ARM Linux wrote:
-> This patch removes support for ARMv3 CPUs, which haven't worked properly
-> for quite some time (see the FIXME comment in arch/arm/mm/fault.c).  The
-> only V3 parts left is the cache model for ARMv3, which is needed for some
-> odd reason by ARM740T CPUs, and being able to build with -march=armv3,
-> which is required for the RiscPC platform due to its bus structure.
+On Fri, May 04, 2012 at 08:12:15PM +0800, Dong Aisheng wrote:
+>  #include <asm/irq.h>
+> -#include <mach/mxs.h>
 
-No objections to the patch, but I wonder if this change obsoletes any
-hardware drivers in turn.  Are there any RiscPC peripherals that are
-only available on the older models?
+I do not think you can remove this inclusion in this patch, since the
+use of cpu_is_mx23() does not get removed from mxs-dma driver until
+patch #2.
 
-	Arnd
+You do not have to resend the series, if there are no other outstanding
+comments coming up.  I expect the series will go through arm-soc tree
+to ease the merging.  I can fix it when applying the series.
+
+Hi Vinod,
+
+Please let me know if you have problem with the series going through
+arm-soc than dma tree.  Thanks.
+
+> -#include <mach/common.h>
+
+-- 
+Regards,
+Shawn
