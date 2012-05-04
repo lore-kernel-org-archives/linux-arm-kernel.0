@@ -1,33 +1,67 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 10:53:54 -0700
-Subject: [PATCH] ARM: OMAP2+: dma: Define dma capabilities register
- bitfields and use them.
-In-Reply-To: <CAMQu2gzDgPQwrv4oRCeUKEeYq4Tpu=X=SBSFjKzeTb7TzDsb9A@mail.gmail.com>
-References: <1336116582-11099-1-git-send-email-r.sricharan@ti.com>
- <CAMQu2gzDgPQwrv4oRCeUKEeYq4Tpu=X=SBSFjKzeTb7TzDsb9A@mail.gmail.com>
-Message-ID: <20120504175353.GJ5613@atomide.com>
+Date: Fri, 4 May 2012 11:11:05 -0700
+Subject: [PATCH] arm: omap: add minimal support for Nokia RM-696
+In-Reply-To: <20120501104801.GA23559@elf.ucw.cz>
+References: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
+ <20120501104801.GA23559@elf.ucw.cz>
+Message-ID: <20120504181105.GL5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120504 00:37]:
-> On Fri, May 4, 2012 at 12:59 PM, R Sricharan <r.sricharan@ti.com> wrote:
-> > The system dma module has capabiities register indicating
-> > the support for descriptor loading, constant fill, etc.
-> > Use this instead of OMAP revision check to identify the features
-> > supported runtime.
-> >
-> > This avoids patching the code for feature SOCs which has
-> > those capabilities.
-> >
-> > Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> > ---
-> > ?arch/arm/mach-omap2/dma.c ? ? ? ? ? ? | ? 11 +++++++----
-> > ?arch/arm/plat-omap/include/plat/dma.h | ? ?5 +++++
-> > ?2 files changed, 12 insertions(+), 4 deletions(-)
-> >
-> Looks fine. Will add it to my clean-up series if no has
-> any objection on the patch.
+Hi Pavel,
 
-Yes this is nice.
+* Pavel Machek <pavel@ucw.cz> [120501 03:51]:
+> Hi!
+> 
+> > Add minimal support for Nokia RM-696 board.
+> > 
+> > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> > ---
+> > 
+> > 	The patch is based & boot-tested with 3.3-rc6.
+> > 
+> > 
+> >  arch/arm/mach-omap2/Kconfig                  |    3 ++-
+> >  arch/arm/mach-omap2/board-rm680.c            |   14 +++++++++++++-
+> >  arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+> >  3 files changed, 16 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index e20c8ab..b740c2e 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -245,10 +245,11 @@ config MACH_NOKIA_N8X0
+> >  	select MACH_NOKIA_N810_WIMAX
+> >  
+> >  config MACH_NOKIA_RM680
+> > -	bool "Nokia RM-680 board"
+> > +	bool "Nokia RM-680/696 board"
+> >  	depends on ARCH_OMAP3
+> >  	default y
+> >  	select OMAP_PACKAGE_CBB
+> > +	select MACH_NOKIA_RM696
+> >
+> 
+> AFAICT, this is nokia N9. At least help text should state that...
+> 
+> >  config MACH_NOKIA_RX51
+> >  	bool "Nokia RX-51 board"
+> > diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+> > index 8678b38..094473e 100644
+> > --- a/arch/arm/mach-omap2/board-rm680.c
+> > +++ b/arch/arm/mach-omap2/board-rm680.c
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * Board support file for Nokia RM-680.
+> > + * Board support file for Nokia RM-680/696.
+> >   *
+> 
+> And a comment.
+
+Sorry this is already in mainline tree as commit
+63fc5f3bb3d0ca9ab4767a801b518aa6335f87ad.
+
+Care to do a follow-up patch to add some N9 comments to Kconfig and
+board-rm680.c?
 
 Tony
