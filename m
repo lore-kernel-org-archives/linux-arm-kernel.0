@@ -1,63 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 May 2012 10:21:10 +0200
-Subject: common clock framework
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
-Message-ID: <20120504082110.GB16535@pengutronix.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 4 May 2012 08:21:28 +0000
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <87397o3n4y.fsf@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com> <87397o3n4y.fsf@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 07:02:07PM -0700, Chao Xie wrote:
-> Hi,
-> The common clock driver in drivers/clk/ has been integrated into mainline. In fact, I still have some questions to the driver.
-> 1. Why need big lock: enable_lock and prepare_lock?
->    Using these locks means that the clock enable and prepare operation cannot re-entered.
+On Sat, Apr 28, 2012 at 02:31:17, Hilman, Kevin wrote:
+> Hi Mark,
+> 
+> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+> 
+> > On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+> >
+> >> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
+> >> pre defined Operating Performance Points or the OPPs. Every OPP being
+> >> a voltage/frequency pair. Smartreflex is a different
+> >> power management technique.
+> >
+> > But presumably these things should integrate somehow - for example,
+> > should devfreq and cpufreq be providing inputs into what AVS is doing,
+> > and if so how?
+> 
+> The way it is currently designed, cpufreq/devfreq/regulator layers don't
+> need to know about AVS.
+> 
+> The higher-level layers only know about the "nominal" voltage.  AVS
+> hardware does automatic, adaptive, micro-adjustments around that nominal
+> voltage, and these micro-adjustments are managed by the AVS hardware
+> sending commands to the PMIC.  (specifically, on OMAP, the AVS sensors
+> provide inputs to the voltage processor (VP) which provide inputs to the
+> voltage controller (VC) which sends commands to the PMIC[1].)
+> 
+> The driver proposed here is primarily for initializing the various
+> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+> adjustments are done in hardware by VC/VP.
+> 
+> The only thing the higher-level layers might potentially need to do to
+> enable/disable AVS around transitions (e.g. when changing OPP, AVS is
+> disabled before changing OPP and only re-enabled when the new nominal
+> voltage has been acheived.)
+> 
+> On OMAP, we handle this inside the OMAP-specific voltage layer which is
+> called by the regulator framework, so even the regulators do not need
+> any knowledge of AVS.
 
-This has been discussed at length on the list. Short answer is that it's
-not trivial to properly lock the clock tree (or parts thereof) if we have
-individual clock locks. The possibility of having a lock per tree has
-been discussed if the single lock approach turns out to be unsufficient.
-This may be added later.
+Kevin,
 
-> 2. How to handle the depended clocks?
->    For example clock1 and clock2 both have multiple inputs, and they
->    both depend on clock3. It means that before enable clock1 or
->    clock2, clock3 should be enabled, and if clock1 and clock2 are both
->    off, clock2 need to be off too to save power. Clock3 is not the
->    parent of clock1 and clock2, because the clock3 is not one of
->    inputs of clock1 and clock2.  If we do not handle it in clock
->    framework, we have to let device driver to know it. It means that
->    the device driver need to handle clock dependency. It will make the
->    device driver to be complicated especially it is shared by
->    different SOCs.
+I want to point out some cases of SR implementation where this may not
+be true.
 
-If clock3 is not parent of clock2 and clock1 then the dependency does
-not come from your clock tree and thus can't be handled in the clock
-framework.
-If you have to enable clock3 to make your device work, then yes, your
-device must turn it on. It could also be that clock3 is not used by
-your device directly but by a bus which your device depends on. In this
-case you would have to describe the dependency on bus level.
-The clock framework can only describe a clock tree and that's all it
-*should* do.
+Devices like DM8168, DM8148 and AM335X use Class 2B implementation of SR.
 
-> 3. how to handle voltage changes in clock framework?  When some
-> clock's rate is changed, the voltage for the component that using the
-> clock may need changed too. So where to add the voltage change
-> sequence?
+Under this, SR module issues an interrupt to ARM when there is a need to
+change the voltage based on temperature changes, ageing etc.
 
-Clocks have notifiers attached to them. You can hook yourself into a pre
-rate change (increasing the voltage here) and into a post rate change
-(decreasing the voltage here).
-That said, we are not there yet. Once the clock framework has settled
-and is actually used in SoCs I'm sure somebody will come up with some
-driver which can be passed a freq <-> voltage table for a given
-regulator clock pair.
+Once the interrupt arrives, kernel needs to adjust voltage using regulator API.
+The voltage change is a micro adjustment as in other SR classes.
 
-Sascha
+The SR class 2B implementation on these devices does not exist in mainline.
+I can point to some public repositories if you are interested in taking a look at
+the current code.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Implementation of this SR method is must on at least the DM8168 device and
+I know some customers who are using it on their production systems.
+
+Regards
+AnilKumar
