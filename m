@@ -1,108 +1,51 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 4 May 2012 08:50:59 +0200
-Subject: [PATCH] clk: Use a separate struct for holding init data.
-In-Reply-To: <4FA32CDC.3070005@codeaurora.org>
-References: <1335419936-10881-1-git-send-email-skannan@codeaurora.org>
- <20120503230308.GA13016@glitch> <4FA32CDC.3070005@codeaurora.org>
-Message-ID: <20120504065059.GA16265@glitch>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 4 May 2012 12:26:13 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 06:11:56PM -0700, Saravana Kannan wrote:
-> On 05/03/2012 04:03 PM, Domenico Andreoli wrote:
-> >On Wed, Apr 25, 2012 at 10:58:56PM -0700, Saravana Kannan wrote:
-> >>
-> >>diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> >>index 90627e4..8ea11b4 100644
-> >>--- a/drivers/clk/clk-divider.c
-> >>+++ b/drivers/clk/clk-divider.c
-> >>@@ -167,6 +167,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
-> >>  {
-> >>  	struct clk_divider *div;
-> >>  	struct clk *clk;
-> >>+	struct clk_init_data init;
-> >>
-> >>  	/* allocate the divider */
-> >>  	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
-> >>@@ -175,19 +176,22 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
-> >>  		return ERR_PTR(-ENOMEM);
-> >>  	}
-> >>
-> >>+	init.name = name;
-> >>+	init.ops =&clk_divider_ops;
-> >>+	init.flags = flags;
-> >>+	init.parent_names = (parent_name ?&parent_name: NULL);
-> >>+	init.num_parents = (parent_name ? 1 : 0);
-> >>+
-> >>  	/* struct clk_divider assignments */
-> >>  	div->reg = reg;
-> >>  	div->shift = shift;
-> >>  	div->width = width;
-> >>  	div->flags = clk_divider_flags;
-> >>  	div->lock = lock;
-> >>+	div->hw.init =&init;
-> >>
-> >>  	/* register the clock */
-> >>-	clk = clk_register(dev, name,
-> >>-			&clk_divider_ops,&div->hw,
-> >>-			(parent_name ?&parent_name: NULL),
-> >>-			(parent_name ? 1 : 0),
-> >>-			flags);
-> >>+	clk = clk_register(dev,&div->hw);
-> >>
-> >>  	if (IS_ERR(clk))
-> >>  		kfree(div);
-> >
-> >I would prefer to rip the parent _settings_ configuration out of
-> >clk_register(). It's optional right? And passing a single parent is a
-> >common case.
-> >
-> >Three cases:
-> >
-> >   1) one parent:
-> >      __clk_register_parent(clk, parent_name);
-> >      clk_register(dev, name,&ops, flags);
-> >
-> >   2) many parents:
-> >      __clk_register_parents(clk, parent_names, num_parents);
-> >      clk_register(dev, name,&ops, flags);
-> >
-> >   3) no parents:
-> >      clk_register(dev, name,&ops, flags);
-> >
-> >You may also want to move the whole parent initialization into
-> >__clk_register_parents() and call it after clk_register(), it would
-> >simplify some error paths.
-> >
-> >This pattern could be used also with other common clocks registration
-> >functions (fixed rate, divider, mux, etc) that may have complex
-> >initializations and/or optional parameters that cannot go all on the
-> >same function call.
-> 
-> Please no. If anything, make those other register functions go in
-> the direction of clk_register(). Have a long list of params to a
-> function and then having it fill up a structure just makes the code
-> less readable. Why would that be any better than having the whole
-> structure statically declared or the whole structure dynamically
-> populated (by device tree) and then calling clk_register()?
-> 
-> Take about 50 clocks with 3 parents each and try to register them in
-> the way you suggested and in a way how clk_register() in this patch
-> will need you to declare them statically. Compare the two and see
-> which would be more readable.
+On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
+> From: Jon Hunter <jon-hunter@ti.com>
+>
+> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+> to add some basic helpers to retrieve a DMA controller device_node and the
+> DMA request/channel information.
+>
+> Aim of DMA helpers
+> - The purpose of device-tree (as far as I understand), is to describe the
+> ?capabilites of the hardware. Thinking about DMA controllers purely from the
+> ?context of the hardware to begin with, we can describe a device in terms of
+> ?a DMA controller as follows ...
+> ? ? ? ?1. Number of DMA controllers
+> ? ? ? ?2. Number of channels (maybe physical or logical)
+> ? ? ? ?3. Mapping of DMA requests signals to DMA controller
+> ? ? ? ?4. Number of DMA interrupts
+> ? ? ? ?5. Mapping of DMA interrupts to channels
+> - With the above in mind the aim of the DT DMA helper functions is to extract
+> ?the above information from the DT and provide to the appropriate driver.
+> ?However, due to the vast number of DMA controllers and not all are using a
+> ?common driver (such as DMA Engine) it has been seen that this is not a
+> ?trivial task.
+>
+Sorry for being slow, but so far I thought DT is only to provide _h/w_
+specific info
+to the _controller_ drivers. It was not supposed to provide any info
+pertaining to
+some API (dmaengine in this case).
 
-I was not thinking at the static initialization at all (but I was
-forgetting that clk does not yet exist before the invocation of
-clk_register).
+And I believe this is one of few situations where we are better off
+not generalizing
+the interface - pass controller specific info in the controller
+driver's specified format.
+Generalizing only seems to complicate things here, when we anyway have machine
+specific dtb, which could always have clients requesting and the
+controllers given
+dma's info in controller driver's specific format.
 
-For a few hours I was convinced that moving the parent initialization
-stuff in a separate function would have allowed also to ditch the (IMHO)
-horrible whole name caching (whose purpose is... allowing to register
-clock with a parent not yet known to the clock subsystem?)
+Perhaps I am overlooking the need to generalize. If you think so, please help me
+understand by pointing out some use case for it.
 
-Unfortunately the whole idea is quite invasive and the benefits
-debatable, it's simply too late to speak.
-
-Thanks anyway.
-
-Domenico
+Thanks.
