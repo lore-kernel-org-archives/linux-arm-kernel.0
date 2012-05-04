@@ -1,36 +1,68 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 4 May 2012 18:02:07 +0200
-Subject: [PATCH v2 1/5] dma: mxs-dma: use global stmp_device functionality
-In-Reply-To: <1336133539-13465-1-git-send-email-b29396@freescale.com>
-References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120504160207.GA5789@pengutronix.de>
+From: wookey@wookware.org (Wookey)
+Date: Fri, 4 May 2012 17:05:45 +0100
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <201205041517.58830.arnd@arndb.de>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120504142057.GQ27023@stoneboat.aleph1.co.uk>
+ <20120504143518.GF26481@n2100.arm.linux.org.uk>
+ <201205041517.58830.arnd@arndb.de>
+Message-ID: <20120504160545.GT27023@stoneboat.aleph1.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 08:12:15PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
++++ Arnd Bergmann [2012-05-04 15:17 +0000]:
+> On Friday 04 May 2012, Russell King - ARM Linux wrote:
+> > 
+> > On Fri, May 04, 2012 at 03:20:57PM +0100, Wookey wrote:
+> > > Debian tries very hard not to support anything in the kernel that
+> > > upstream don't support in the kernel because otherwise it's way too
+> > > much work. The current list of supplied arm kernels is:
+> > > 
+> > > iop32x (ThecusN2100, intel SS4000, GLAN tank)
+> > > ixp4xx (Linksys NSLU2)
+> > > kirkwood (*plugs, QNAP NAS, OPenRD)
+> > > orion5x (QNAP NAS, HP mv2120)
+> > > versatile
+> > > mx5
+> > > omap
+> > > 
+> > > because that's a good compromise between coverage and 'building 20-odd
+> > > images'. I have no idea how much of that lot is going to get DTified,
+> > > but I'm guessing the older stuff won't be?
 > 
-> This can get rid of the mach-dependency.
+> Thanks for the list, Wookey!
 > 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Huang Shijie <b32955@freescale.com>
-> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> This is very important because distros are obviously the primary consumer
+> of multiplatform builds (aside from build testing). The goal should very
+> much be to reduce the number of distinct kernels that folks like debian,
+> fedora or cyanogenmod have to build.
 
-Looks good to me, thanks!
+Just to be clear, we'd very much like to support more hardware, ideally
+'everything a significant number of people have', but the overhead to
+the whole distro for each new kernel added to the build (for every
+upload, slowing and potentially breaking releases on all arches) is
+sufficiently high that we have been strict about what is supported. As
+a result a lot of people use Debian with non-distro kernels.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Obviously missing things are tegra, dove/armada, omap4. Freerunner
+would have been nice a while back but probably a bit late now. 
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/f0910967/attachment.sig>
+It's not clear to me how many omap platforms our 'omap' kernel
+actually serves in practice, and similarly for the other 'generic'
+kernels.
+
+Obviously any and all progress in the direction of making existing
+coverage or expanded coverage easier/faster/more-reliable/simpler is
+very welcome. 
+
+> > So, that means your list should reduce down to five kernels, or three if
+> > the Orion/Kirkwood stuff gets converted to DT.
+> 
+> I count four if we were to proceed with the initial proposal:
+> 
+> 1. ARMv6/v7 multiplatform: omap2plus, mx5/mx6, vexpress, ...
+> 2. ARMv4/v5 multiplatform: versatile, orion5x, kirkwood, , ...
+> 3. iop32x
+> 4. ixp4xx
+> 
+> 	Arnd
