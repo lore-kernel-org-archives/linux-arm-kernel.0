@@ -1,54 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 04 May 2012 22:27:45 +0100
-Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <201205042002.20943.arnd@arndb.de>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
- <201205042002.20943.arnd@arndb.de>
-Message-ID: <4FA449D1.1040106@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 May 2012 22:52:30 +0100
+Subject: Handling of modular boards
+In-Reply-To: <4FA4457F.1010900@wwwdotorg.org>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <201205042039.25794.arnd@arndb.de>
+ <20120504205441.D293120645E@gemini.denx.de>
+ <201205042103.34285.arnd@arndb.de> <4FA4457F.1010900@wwwdotorg.org>
+Message-ID: <20120504215230.GS14230@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/12 21:02, Arnd Bergmann wrote:
-> On Friday 04 May 2012, Lee Jones wrote:
->> +static const struct nmk_i2c_controller *
->> +nmk_i2c_find_pdata_from_compatible(struct device_node *np)
->> +{
->> +       /*
->> +        * The u8500 is currently our only user. As more SoCs are added,
->> +        * search for the correct value set using of_machine_is_compatible
->> +        * and return a 'struct nmk_i2c_controller *' which contains the
->> +        * correct information for the given SoC, whilst leaving u8500_i2c
->> +        * as the default/fall-back value set.
->> +        */
->> +       return&u8500_i2c;
->> +}
->
-> Why not just put this pointer ...
->
->> +static const struct of_device_id nmk_gpio_match[] = {
->> +       { .compatible = "st,nomadik-i2c", },
->> +       {}
->> +};
->
-> into the .data field after the .compatible match, and make it more specific
-> to the soc, i.e.
->
-> static const struct of_device_id nmk_gpio_match[] = {
-> 	{ .compatible = "st-ericsson,u8500-i2c", .data =&u8500_i2c },
-> 	{ .compatible = "st,nomadik-i2c", .data =&default_i2c_controller },
-> };
+On Fri, May 04, 2012 at 03:09:19PM -0600, Stephen Warren wrote:
+> On 05/04/2012 03:03 PM, Arnd Bergmann wrote:
 
-Because;
-a) I only learned about .data way after this patch was written
-and
-b) _You_ told me to do it like this. ;)
+> > Sure, there are a lot of things that the boot loader can use from the
+> > device tree, but I'm not sure if the LCD panel connection fits into
+> > the same category as the devices that Mark was thinking of.
 
+> A board I have sitting on my desk right now has separate boards for (and
+> multiple options for each of):
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> * Motherboard
+> * CPU+DRAM
+> * PMU/PMIC
+> * Display (LCD)
+> ... and many more.
+
+> Interaction with the PMU/PMIC is required for at least some of the boot
+> media options.
+
+Yeah, similar setup for our boards except the PMICs are soldered down
+onto other boards.  We've got a mainboard, three audio boards of various
+kinds, a random non-audio components board and a CPU/DRAM board.
+
+There's good solid engineering reasons for doing this.  CPUs and RAMs
+tend to be very high density devices with lots of pins and be difficult
+enough to route to require large numbers of layers (and ideally you want
+the PMIC to be physically close to them since long traces tend to become
+electrically interesting for CPU style loads, especially when routed
+through connectors) all of which leads to an expensive board which you
+pay for by area.  With reference boards with large form factors it's
+worth the effort to have a separate, smaller, board manufactured to meet
+these requirements - even in very low volumes the cost wins are
+noticable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/c7b0362a/attachment.sig>
