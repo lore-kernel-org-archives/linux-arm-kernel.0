@@ -1,190 +1,173 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  4 May 2012 23:45:28 +0800
-Subject: [PATCH 3/4] gpio/mxs: add device tree probe
+Date: Fri,  4 May 2012 23:45:29 +0800
+Subject: [PATCH 4/4] ARM: mxs: add gpio support for device tree boot
 In-Reply-To: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
 References: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336146329-3821-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336146329-3821-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe for gpio-mxs driver.
+It adds gpio support for device tree boot.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/gpio/gpio-mxs.txt          |   87 ++++++++++++++++++++
- drivers/gpio/gpio-mxs.c                            |   36 +++++++-
- 2 files changed, 119 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mxs.txt
+ arch/arm/boot/dts/imx23.dtsi |   35 ++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx28.dtsi |   55 +++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-mxs/mach-mxs.c |   12 +++++++++
+ 3 files changed, 100 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mxs.txt b/Documentation/devicetree/bindings/gpio/gpio-mxs.txt
-new file mode 100644
-index 0000000..0c35673
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mxs.txt
-@@ -0,0 +1,87 @@
-+* Freescale MXS GPIO controller
-+
-+The Freescale MXS GPIO controller is part of MXS PIN controller.  The
-+GPIOs are organized in port/bank.  Each port consists of 32 GPIOs.
-+
-+As the GPIO controller is embedded in the PIN controller and all the
-+GPIO ports share the same IO space with PIN controller, the GPIO node
-+will be represented as sub-nodes of MXS pinctrl node.
-+
-+Required properties for GPIO node:
-+- compatible : Should be "fsl,<soc>-gpio".  The supported SoCs include
-+  imx23 and imx28.
-+- interrupts : Should be the port interrupt shared by all 32 pins.
-+- gpio-controller : Marks the device node as a gpio controller.
-+- #gpio-cells : Should be two.  The first cell is the pin number and
-+  the second cell is used to specify optional parameters (currently
-+  unused).
-+- interrupt-controller: Marks the device node as an interrupt controller.
-+- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
-+  The second cell bits[3:0] is used to specify trigger type and level flags:
-+      1 = low-to-high edge triggered.
-+      2 = high-to-low edge triggered.
-+      4 = active high level-sensitive.
-+      8 = active low level-sensitive.
-+
-+Note: Each GPIO port should have an alias correctly numbered in "aliases"
-+node.
-+
-+Examples:
-+
-+aliases {
-+	gpio0 = &gpio0;
-+	gpio1 = &gpio1;
-+	gpio2 = &gpio2;
-+	gpio3 = &gpio3;
-+	gpio4 = &gpio4;
-+};
-+
-+pinctrl at 80018000 {
-+	compatible = "fsl,imx28-pinctrl", "simple-bus";
-+	reg = <0x80018000 2000>;
-+
-+	gpio0: gpio at 0 {
-+		compatible = "fsl,imx28-gpio";
-+		interrupts = <127>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 7761ed0..8c83bc4 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -14,6 +14,12 @@
+ / {
+ 	interrupt-parent = <&icoll>;
+ 
++	aliases {
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++		gpio2 = &gpio2;
 +	};
 +
-+	gpio1: gpio at 1 {
-+		compatible = "fsl,imx28-gpio";
-+		interrupts = <126>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "arm,arm926ejs";
+@@ -72,8 +78,35 @@
+ 			};
+ 
+ 			pinctrl at 80018000 {
++				compatible = "fsl,imx23-pinctrl", "simple-bus";
+ 				reg = <0x80018000 2000>;
+-				status = "disabled";
++
++				gpio0: gpio at 0 {
++					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
++					interrupts = <16>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio1: gpio at 1 {
++					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
++					interrupts = <17>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio2: gpio at 2 {
++					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
++					interrupts = <18>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
+ 			};
+ 
+ 			digctl at 8001c000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index e75c5b0..6e03e58 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -14,6 +14,14 @@
+ / {
+ 	interrupt-parent = <&icoll>;
+ 
++	aliases {
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++		gpio2 = &gpio2;
++		gpio3 = &gpio3;
++		gpio4 = &gpio4;
 +	};
 +
-+	gpio2: gpio at 2 {
-+		compatible = "fsl,imx28-gpio";
-+		interrupts = <125>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "arm,arm926ejs";
+@@ -95,8 +103,53 @@
+ 			};
+ 
+ 			pinctrl at 80018000 {
++				compatible = "fsl,imx28-pinctrl", "simple-bus";
+ 				reg = <0x80018000 2000>;
+-				status = "disabled";
 +
-+	gpio3: gpio at 3 {
-+		compatible = "fsl,imx28-gpio";
-+		interrupts = <124>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
++				gpio0: gpio at 0 {
++					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
++					interrupts = <127>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
 +
-+	gpio4: gpio at 4 {
-+		compatible = "fsl,imx28-gpio";
-+		interrupts = <123>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+};
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 38ae56f..429228b 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -25,6 +25,9 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/basic_mmio_gpio.h>
-@@ -207,8 +210,19 @@ static struct platform_device_id mxs_gpio_ids[] = {
++				gpio1: gpio at 1 {
++					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
++					interrupts = <126>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio2: gpio at 2 {
++					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
++					interrupts = <125>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio3: gpio at 3 {
++					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
++					interrupts = <124>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				gpio4: gpio at 4 {
++					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
++					interrupts = <123>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
+ 			};
+ 
+ 			digctl at 8001c000 {
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index ae07c9d..309f781 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -26,8 +26,20 @@ static int __init mxs_icoll_add_irq_domain(struct device_node *np,
+ 	return 0;
+ }
+ 
++static int __init mxs_gpio_add_irq_domain(struct device_node *np,
++				struct device_node *interrupt_parent)
++{
++	static int gpio_irq_base = MXS_GPIO_IRQ_START;
++
++	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
++	gpio_irq_base += 32;
++
++	return 0;
++}
++
+ static const struct of_device_id mxs_irq_match[] __initconst = {
+ 	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
++	{ .compatible = "fsl,mxs-gpio", .data = mxs_gpio_add_irq_domain, },
+ 	{ /* sentinel */ }
  };
- MODULE_DEVICE_TABLE(platform, mxs_gpio_ids);
  
-+static const struct of_device_id mxs_gpio_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-gpio", .data = (void *) IMX23_GPIO, },
-+	{ .compatible = "fsl,imx28-gpio", .data = (void *) IMX28_GPIO, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_gpio_dt_ids);
-+
- static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(mxs_gpio_dt_ids, &pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *parent;
- 	static void __iomem *base;
- 	struct mxs_gpio_port *port;
- 	struct resource *iores = NULL;
-@@ -218,8 +232,15 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	if (!port)
- 		return -ENOMEM;
- 
--	port->id = pdev->id;
--	port->devid = pdev->id_entry->driver_data;
-+	if (np) {
-+		port->id = of_alias_get_id(np, "gpio");
-+		if (port->id < 0)
-+			return port->id;
-+		port->devid = (enum mxs_gpio_id) of_id->data;
-+	} else {
-+		port->id = pdev->id;
-+		port->devid = pdev->id_entry->driver_data;
-+	}
- 	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
- 
- 	port->irq = platform_get_irq(pdev, 0);
-@@ -231,8 +252,14 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	 * share the same one
- 	 */
- 	if (!base) {
--		iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--		base = devm_request_and_ioremap(&pdev->dev, iores);
-+		if (np) {
-+			parent = of_get_parent(np);
-+			base = of_iomap(parent, 0);
-+			of_node_put(parent);
-+		} else {
-+			iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+			base = devm_request_and_ioremap(&pdev->dev, iores);
-+		}
- 		if (!base)
- 			return -EADDRNOTAVAIL;
- 	}
-@@ -278,6 +305,7 @@ static struct platform_driver mxs_gpio_driver = {
- 	.driver		= {
- 		.name	= "gpio-mxs",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = mxs_gpio_dt_ids,
- 	},
- 	.probe		= mxs_gpio_probe,
- 	.id_table	= mxs_gpio_ids,
 -- 
 1.7.5.4
