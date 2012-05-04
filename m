@@ -1,29 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 May 2012 10:53:58 -0600
-Subject: [PATCH 1/1] ARM: tegra: Add Tegra Memory Controller(MC) driver
-In-Reply-To: <20120504.160035.1828735037330038337.hdoyu@nvidia.com>
-References: <1336063897-12083-1-git-send-email-hdoyu@nvidia.com><4FA2D0C4.4020608@wwwdotorg.org>
- <20120504.160035.1828735037330038337.hdoyu@nvidia.com>
-Message-ID: <4FA409A6.3020700@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 May 2012 17:56:03 +0100
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <4FA40642.5040203@gmail.com>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+ <201205041220.24747.arnd@arndb.de> <4FA40642.5040203@gmail.com>
+Message-ID: <20120504165603.GK897@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 07:00 AM, Hiroshi Doyu wrote:
-...
-> What about the following AHB patches? AHB patches are independent of
-> MC/GART/SMMU DT issue basically. If you think that they are ready to
-> merge, I'll post the update version, I fixed some of your latest
-> comments.
-> 
->  [PATCH 1/3] ARM: tegra: Add Tegra AHB driver
->  [PATCH 2/3] ARM: tegra: Add SMMU enabler in AHB
->  [PATCH 3/3] ARM: dt: tegra: Add device tree support for AHB
+On Fri, May 04, 2012 at 11:39:30AM -0500, Rob Herring wrote:
+> Many of the headers are simply platform_data structs which may still be
+> needed on DT platforms, but could be moved elsewhere.
 
-Yes, I think they be reposted and go in now.
+Those should be in include/linux/platform.
 
-> I'll hold off on the following until we get some direction for
-> MC/GART/SMMU. They are related to how dt info is passed via MC.
+> >> Then there's also the problem of uncompress.h.  The last piece of the
+> >> puzzle is the common clock stuff.
 > 
->  [PATCH 1/3] ARM: tegra: Add Tegra Memory Controller(MC) driver
->  [PATCH 2/3] ARM: dt: tegra: Add device tree support for Memory Controller(MC)
->  [PATCH 3/3] iommu/tegra: smmu: Refrain from accessing to AHB
+> The smp/hotplug/localtimer related functions are still global. Marc Z
+> has posted patches for this, but I haven't seen recent activity. This
+> and clocks were the 2 main issues I saw trying to build 2 platforms
+> together. highbank and picoxcell could be built together since only
+> highbank has clocks and smp.
+> 
+> gpio.h is still required, but empty for most platforms.
+
+Those empty gpio.h files are definitely a candidate for going into
+arch/arm/include/mach/gpio.h, and then all those 12-byte mach/gpio.h can
+be deleted (13 files).
+
+We've not had any progress on the gpio.h issue since I did the last round
+of cleanup; the next stage was to persuade SoC maintainers to get rid of
+their optimized versions which aren't compatible with multi-platform
+kernels.
+
+I don't know if folk are expecting me to push that forwards or whether
+there's someone else working on that aspect of it...
+
+So this issue really does need to be progressed too.
