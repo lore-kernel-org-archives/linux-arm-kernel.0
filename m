@@ -1,34 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 May 2012 16:14:23 +0100
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 4 May 2012 10:17:28 -0500
 Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FA3F08D.7030603@ti.com>
+In-Reply-To: <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
 References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA30604.1030401@wwwdotorg.org> <4FA3F08D.7030603@ti.com>
-Message-ID: <20120504151423.GA26585@n2100.arm.linux.org.uk>
+ <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+Message-ID: <4FA3F308.6030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 10:06:53AM -0500, Jon Hunter wrote:
-> The thought here was that some DMAs may distinguish between devices by a
-> request ID or a channel ID or both. In the case of say an OMAP4, we have
-> 32 channels and 127 request IDs. From a h/w perspective we need to know
-> both. Each of the 32 channels can be programmed to use any one of the
-> 127 h/w request signals.
+Hi Jassi,
+
+On 05/04/2012 01:56 AM, Jassi Brar wrote:
+> On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
+>> From: Jon Hunter <jon-hunter@ti.com>
+>>
+>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
+>> to add some basic helpers to retrieve a DMA controller device_node and the
+>> DMA request/channel information.
+>>
+>> Aim of DMA helpers
+>> - The purpose of device-tree (as far as I understand), is to describe the
+>>  capabilites of the hardware. Thinking about DMA controllers purely from the
+>>  context of the hardware to begin with, we can describe a device in terms of
+>>  a DMA controller as follows ...
+>>        1. Number of DMA controllers
+>>        2. Number of channels (maybe physical or logical)
+>>        3. Mapping of DMA requests signals to DMA controller
+>>        4. Number of DMA interrupts
+>>        5. Mapping of DMA interrupts to channels
+>> - With the above in mind the aim of the DT DMA helper functions is to extract
+>>  the above information from the DT and provide to the appropriate driver.
+>>  However, due to the vast number of DMA controllers and not all are using a
+>>  common driver (such as DMA Engine) it has been seen that this is not a
+>>  trivial task.
+>>
+> Sorry for being slow, but so far I thought DT is only to provide _h/w_
+> specific info
+> to the _controller_ drivers. It was not supposed to provide any info
+> pertaining to
+> some API (dmaengine in this case).
 > 
-> Other DMAs may only need to specify requests or channels. However, the
-> thought was you could specific either or both depending on your needs.
-> Again these should have been optional parameters.
+> And I believe this is one of few situations where we are better off
+> not generalizing
+> the interface - pass controller specific info in the controller
+> driver's specified format.
+> Generalizing only seems to complicate things here, when we anyway have machine
+> specific dtb, which could always have clients requesting and the
+> controllers given
+> dma's info in controller driver's specific format.
+> 
+> Perhaps I am overlooking the need to generalize. If you think so, please help me
+> understand by pointing out some use case for it.
 
-As being the one who is converting you over to DMA engine, I can't agree
-with what you've just said.  I don't see that there's anything specific
-to any particular DMA channel.  I don't see that a driver would need to
-obtain a reference to any particular channel.
+No not really, your points are valid. From reading the previous
+discussions one of the items that was clearly lacking was the ability to
+represent and identify a device having more than one DMA controller. In
+other words, when you request the DMA resource, how do you identify
+which DMA controller in the system that resource belongs too. With DMA
+engine there are ways we can do this.
 
-This seems to be supported by the current OMAP DMA API which merely
-returns any one of the 32 channels that it can find whenever
-omap_request_dma() is called.
+However, thinking about this now. Instead of passing specific DMA engine
+parameters to the register function may be we can pass a generic void *
+pointer with the information and completely abstract the binding from
+DMA engine. This is probably a better approach.
 
-At the moment, the DMA engine support I'm working on totally hides the
-physical DMA channels behind a set of virtual DMA channels, one for each
-DMA request signal.  This appears to work well, and is compatible with
-how existing drivers use the current OMAP DMA API.
+Cheers
+Jon
