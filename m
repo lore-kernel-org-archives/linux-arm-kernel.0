@@ -1,61 +1,103 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 4 May 2012 07:15:45 +0000
-Subject: [RFC / PATCH] arm/davinci: optimize the DMA ISR
-In-Reply-To: <1328790506-18507-1-git-send-email-bigeasy@linutronix.de>
-References: <1328790506-18507-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B63E9FED37@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 May 2012 08:27:57 +0100
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <CAK2p4sLagEw+ubrG-oAk_bjWeSkEnCQyS_mJFPLCkpbnMfOZ_A@mail.gmail.com>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503140428.GB897@n2100.arm.linux.org.uk>
+ <CAK2p4sLagEw+ubrG-oAk_bjWeSkEnCQyS_mJFPLCkpbnMfOZ_A@mail.gmail.com>
+Message-ID: <20120504072756.GA26481@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Thu, Feb 09, 2012 at 17:58:26, Sebastian Andrzej Siewior wrote:
-> The ISR does quiete a lot of hw access which could be avoided. First it
-> checks for a pending interrupt by reading alteast one register. Then it
-> checks for the "activated" slots by reading another register. This is
-> more or a less a must.
-> Now, once it found an active slot it does the same two reads again.
-> After that it "knows" that there must be a pending transfer however it
-> cross checks with the other register. There are 32 bit in an interger
-> which are polled instead of considering only the set bits and ignoring
-> those which are zero. This performs atleast 32 reads which could be
-> avoided. In case of a first match it does another read.
-> This patch reorganizes the access by re-using the register which have
-> been read and then uses ffs() to find the matching slot instead looping
-> over it. By doing this we get rid of the last (32 + 2 + hits) reads.
-
-> It is possible however that by really busy bank0 we never get to handle
-> bank1. If this is a problem, we could try to handle bank1 after we are
-> done with bank0 to check if there are any outstanding transfers.
-
-AFAICT, even the current code does not take care of this so
-I guess this is never really hit in practice.
-
-> To put some numbers on this, this is from spi transfer via spidev. The
-> first column is the number of total transfers, the time stamp is taken
-> before and after the ioctl():
+On Thu, May 03, 2012 at 11:31:13PM -0700, Deepak Saxena wrote:
+> On 3 May 2012 07:04, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+> >> Hi everyone,
+> >>
+> >> I've been discussing multiplatform kernels with a few people recently,
+> >> and we will have a lot of discussion sessions about this at Linaro
+> >> Connect in Hong Kong.
+> >>
+> >> One question that came up repeatedly is whether we should support all
+> >> possible board files for each platform in a multiplatform kernel,
+> >> or just the ones that are already using DT probing. I would like
+> >> to get a quick poll of opinions on that and I've tried to put those
+> >> people on Cc that would be most impacted by this, i.e. the maintainers
+> >> for platforms that have both DT and non-DT board files at the moment.
+> >>
+> >> My feeling is that we should just mandate DT booting for multiplatform
+> >> kernels, because it significantly reduces the combinatorial space
+> >> at compile time, avoids a lot of legacy board files that we cannot
+> >> test anyway, reduces the total kernel size and gives an incentive
+> >> for people to move forward to DT with their existing boards.
+> >>
+> >> The counterargument is that we won't be able to support all the
+> >> boards we currently do when the user switches on multiplatform,
+> >> but I think that is acceptable.
+> >> Note that I would still want to allow users to build platforms
+> >> separately in order to enable the ATAG style board files, even
+> >> for platforms that are not multiplatform capable.
+> >
+> > I'm basing my comments off mach-zynq.
+> >
+> > How about we take the following steps towards it?
+> >
+> > 1. create arch/arm/include/mach/ which contains standardized headers
+> > ? for DT based implementations. ?This must include all headers included
+> > ? by asm/ or linux/ includes. ?This will also be the only mach/ header
+> > ? directory included for code outside of arch/arm/mach-*. ?This also
+> > ? acts as the 'default' set of mach/* includes for stuff like timex.h
+> > ? and the empty hardware.h
+> >
+> > 2. DT based mach-* directories do not have an include directory; their
+> > ? include files must be located in the main include/ heirarchy if shared
+> > ? with other parts of the kernel, otherwise they must be in the mach-*
+> > ? directory.
 > 
-> |10000, min: 542us      avg: 591us
-> |20000, min: 542us      avg: 592us
-> |30000, min: 542us      avg: 592us
-> |40000, min: 542us      avg: 585us
-> |50000, min: 542us      avg: 593us
-> 
-> The same test case with the patch applied
-> |10000, min: 444us      avg: 493us
-> |20000, min: 444us      avg: 491us
-> |30000, min: 444us      avg: 489us
-> |40000, min: 444us      avg: 491us
-> |50000, min: 444us      avg: 492us
-> 
-> that is almost 100us that just went away.
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> What do we do about all the mach-specific driver related headers that are
+> currently littered all over arch/arm/mach*? Things like <mach/mx3fb.h> and
+> <mach/ohci.h>?
 
-Thanks for the patch. I also sanity tested it using audio
-on DA850 EVM.
+Such platforms with that kind of stuff haven't fully converted to DT,
+because these sorts of things are platform dependent yet aren't represented
+in DT.
 
-Applying it for v3.5
+> Arnd (or maybe Nicolas?) suggested something along the lines
+> of scripting something to figure out the constants required for a
+> specific driver and pulling them out of <mach/*.h> and into that
+> driver as a starting point.
 
-Thanks,
-Sekhar
+But that doesn't solve the problem.  Take a USB driver where the register
+layouts are different.  To have it work on two different platforms, you'd
+need to build the driver twice.  Not only that, you'd also need to figure
+out some way to register only one copy of that.
+
+So really, the header file thing is just a sign of larger blocking issues
+to getting those kinds of drivers working on a multiplatform kernel, and
+no amount of header munging will sort it out.  The fact of that situation
+is the driver concerned is _not_ multiplatform and shouldn't be built in
+that situation until it is fixed.
+
+> > 3. Allow build multiple mach-* directories (which we already do... see
+> > ? the samsung stuff.)
+> >
+> > We still have irqs.h being SoC dependent, and we still haven't taken
+> > debug-macros.S far enough along to get rid of that. ?Then there's also
+> > the problem of uncompress.h. ?The last piece of the puzzle is the common
+> > clock stuff.
+> 
+> There's also some stuff outside of arch/arm that needs cleanup
+> including USB driver
+> refactoring and some other bits that I can't recall atm. Right now we
+> can build one and
+> only one host controller   inteface, even as modules. Not too
+> difficult of a problem to
+> solve and not critical to get the SOCs booting, but needed to be
+> usable on real devices.
+
+That's already a problem today, and has nothing to do with this current
+issue - what I'm saying is the problem can't be made to go away through
+header file stuff, so this issue is not relevant to this discussion.
+
+That's not to say it doesn't need to be resolved, because it does.  It's
+just no reason to argue against what I've said.
