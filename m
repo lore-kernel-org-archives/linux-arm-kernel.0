@@ -1,37 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 May 2012 10:15:51 +0100
-Subject: common clock framework
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <AAD1C6EB06EE3649B35B7E026785068D1A74A942DB@SC-VEXCH2.marvell.com>
-Message-ID: <20120504091551.GC26481@n2100.arm.linux.org.uk>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 04 May 2012 11:22:55 +0200
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120503141853.GC897@n2100.arm.linux.org.uk> (Russell King's
+ message of "Thu, 3 May 2012 15:18:53 +0100")
+References: <201205031350.35476.arnd@arndb.de>
+ <20120503141853.GC897@n2100.arm.linux.org.uk>
+Message-ID: <87fwbg8fm8.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 01:45:15AM -0700, Chao Xie wrote:
-> For the clock dependency, what about bus clock. What do you mean about
-> bus level.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+
+Hi,
+
+> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
+>> My feeling is that we should just mandate DT booting for multiplatform
+>> kernels, because it significantly reduces the combinatorial space
+>> at compile time, avoids a lot of legacy board files that we cannot
+>> test anyway, reduces the total kernel size and gives an incentive
+>> for people to move forward to DT with their existing boards.
 >
-> As I understand the device driver only need care about enabling a clock
-> to make it work. For example a USB driver. To make a USB work, it may
-> need turn on bus clock, function clock, and phy clock. For some SOCs,
-> phy and function may share same clock. There is a problem, we leave this
-> dependency to device driver or keep it in our clock framework.
+> On this point, I strongly object, especially as I'm one who uses the
+> existing non-DT multiplatform support extensively.  It's really not
+> a problem for what you're trying to achieve.
+>
 
-If the hardware block takes three clocks, then the driver should be asking
-for three clocks and turning them on as if they were three separate clocks.
-Note I'm talking here about the USB module itself _before_ it is integrated
-onto the SoC.
+Please, don't do this. afaik, the idea was to reduce the numbers of
+kernel to deal with. Unfortunately, this kind of restriction would
+increase it. Consider orion platforms. This would mean having to deal
+with 4 kernels (1 for DT, 1 for orion5x, 1 for kirkwood, 1 for mv78xx0).
 
-Where SoCs don't provide explicit control of three clocks, but instead
-combine it as one clock, then you need to provide all three clock lookups
-from the _very_ _same_ struct clk for the device driver.  That means when
-any one of the clocks is requested to be enabled, they all will be.
+Dropping HW support because one wants to encourage people to convert
+their board file into DT seems weird. Doing this, imho, should even be
+called a regression. The DT conversion won't happen in an eye blink so
+non-DT kernels are still something we should take care of.
 
-This eliminates this kind of horrible dependency at the clock layer as well
-as the driver layer.  This is also how the clk API is intended to be used
-by drivers.
+> I think what you're proposing is a totally artificial restriction.
+> There's no problem with a kernel supporting DT and non-DT together.
+> We've proven that many many times.  I prove it _every_ night that my
+> build and boot system runs - the OMAP LDP boots a multiplatform kernel
+> just fine without DT.
 
-We don't ifdef clocks in drivers.  We provide what the driver (and
-ultimately hardware) requires.
+I think it's true for imx too. iirc, one can build a single image for
+armv4/armv5 and one other for armv6/armv7 without having to use DT.
+
+Regards,
+Arnaud
