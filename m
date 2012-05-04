@@ -1,194 +1,116 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 May 2012 13:23:43 -0600
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
- omap2+ padconf
-In-Reply-To: <20120502172401.GG3739@atomide.com>
-References: <20120502172401.GG3739@atomide.com>
-Message-ID: <4FA42CBF.8010906@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 4 May 2012 14:26:38 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201205041906.13959.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205041556.38918.arnd@arndb.de> <4FA40F8E.5010204@ti.com>
+ <201205041906.13959.arnd@arndb.de>
+Message-ID: <4FA42D6E.5040106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2012 11:24 AM, Tony Lindgren wrote:
-> Add simple pinctrl driver using device tree data.
+Hi Arnd,
+
+On 05/04/2012 02:06 PM, Arnd Bergmann wrote:
+> On Friday 04 May 2012, Jon Hunter wrote:
 > 
-> Currently this driver only works on omap2+ series of
-> processors, where there is either an 8 or 16-bit padconf
-> register for each pin. Support for other similar pinmux
-> controllers could be added.
+>>>
+>>> I believe this is not entirely correct: sometimes the filter_fn is provided
+>>> by the slave driver, sometimes by the master driver.
+>>
+>> Ok, but in the master case I assume they still use the same API?
 > 
-> Note that this patch does not yet support pinconf_ops
-> or GPIO. Further.
+> The all use dma_request_channel, but the format of the data that gets
+> passed depends only on whoever provides the filter function, which
+> is not necessarily the slave or the master, but could be either one.
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
-> Here's this one finally updated to use the common pinctrl bindings.
-> That sure cleaned up a bunch of the nasty things in this driver :)
-> Nice job Stephen!
+> FWIW, I believe that for each dma engine implementation we only do
+> one or the other, i.e. if the dmaengine driver provides a filter function,
+> it is always used with these devices.
 
-Thanks.
+Ok, I think I am with you now. That should be fine.
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-simple.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-simple.txt
+>>>>
+>>>>   Next we need to think about how the DMA controller and channels are described
+>>>>   in the device tree itself. The following device tree node example describes
+>>>>   the properties of the DMA controller that includes, the register address
+>>>>   range, number of interrupt supported, number of channels and number of request
+>>>>   signals. This has been enhanced from the previous versions by adding number of
+>>>>   channels and number of request signals.
+>>>
+>>> I think you can actually use strings, too, as long as you use a fixed number
+>>> of cells.
+>>>
+>>> Wouldn't something like this work:?
+>>>
+>>> 	dma-controller1: dma1 {
+>>> 		compatible = "something-using-strings";
+>>> 		#dma-cells = <1>;
+>>> 	};
+>>>
+>>> 	dma-controller2: dma2 {
+>>> 		compatible = "something-using-integers";
+>>> 		#dma-cells = <3>
+>>> 	};
+>>>
+>>> 	some-device {
+>>> 		compatible = "something";
+>>> 		dmas = <&dma-controller1>, "some-dma",
+>>> 			<&dma-controller2 1 2 3>;
+>>> 	}
+>>>
+>>> The only hard requirement is that the format of the attributes is
+>>> what the binding specific to that controller understands.
+>>
+>> Yes it could. My point was why do this, if at the end of the day you
+>> need to resolve the string into a number at some point in the driver?
+>> However, this may make the migration easier for those using strings.
+> 
+> Well, actually Stephen just clarified that we should not use strings
+> here :(
+> We will always have to use numbers then.
 
-> +Required properties:
-> +- compatible :  one of:
-> +	- "pinctrl-simple"
-> +	- "ti,omap2420-padconf"
-> +	- "ti,omap2430-padconf"
-> +	- "ti,omap3-padconf"
-> +	- "ti,omap4-padconf"
+Ok. I think it makes life easier in the long run too.
 
-I'm in two minds about this.
+>>> I think a better interface for the device driver would be something that combines
+>>> your of_get_dma_channel_info() function with the dma_request_channel() function,
+>>> like
+>>>
+>>> 	struct dma_chan *of_dma_request_channel(struct device_node *dn, int index);
+>>>
+>>> When we have the device tree, the driver using that channel doesn't actually have
+>>> to care about the specific of how the channel is defined any more, it just needs
+>>> to say which one it's interested in, out of the list of channels defined for that
+>>> device node.
+>>
+>> Yes true. I was trying to avoid any changes to DMA engine itself. Plus
+>> in the feedback from Stephen his preference was to isolate the binding
+>> from DMA engine.
+>>
+>> So in your example, is index passed via dma_request_channel()? I assume
+>> that of_dma_request_channel() get called in the context of
+>> dma_request_channel somewhere???
+> 
+> What I meant what that you should still provide the existing
+> dma_request_channel interface without changes, and also provide
+> of_dma_request_channel as a wrapper around it that does a lookup
+> in the way that your of_get_dma_channel_info does, passing the
+> data it gets back from the device tree into the filter function
+> that was provided by the dma engine driver.
 
-If this is truly intended to be generic, I would not document any of the
-ti compatible values here. Instead, I'd create a binding document for
-the TI controllers that basically just says "this uses the bindings in
-pinctrl-simple.txt, with the following additions", and list the
-compatible values as an addition.
+Ok, gotcha.
 
-On the other hand, I worry about whether using "pinctrl-simple" here as
-the compatible value is going to cause issues:
+>> By the way, have you looked at the pl330_filter() function
+>> (drivers/dma/pl330.c)? They parse the device-tree in the filter function
+>> itself. The index could be passed as the filter_param. In this type of
+>> implementation there would be no need for a generic dma binding.
+>> However, would only work for devices supporting DMA engine.
+> 
+> IMHO this will have to change, we should not have allowed a nonstandard
+> binding for pl330 to be used for the samsung platforms and should migrate
+> to the new binding as soon as possible.
 
-Certainly, this is a pretty simple driver, and most likely reasonably
-generic an applicable to many SoCs. However, it doesn't cover a bunch of
-cases that I'd still consider "simple". For example, what if each pin
-has a separate mux and pinconf register? There are probably many such
-small cases that would add up to something more complex. to cover those
-cases, will we be able to extend pinctrl-simple to cover them, and
-continue to be backwards compatible, or will we need to create a
-binding/driver for pinctrl-simple-1, pinctrl-simple-2, pinctrl-simple-3
-each of which covers some different, yet still simple, configuration?
+Ok, that's fine with me.
 
-To resolve this, perhaps it would be best to rework this binding and
-driver as a set of utility code that other bindings and drivers can
-build upon, rather than making it a standalone directly usable driver
-and binding.
-
-Honestly, I'm not really sure which way to go here.
-
-> +- reg : offset and length of the register set for the mux registers
-> +- #pinctrl-cells : width of the pinctrl array, currently only 2 is supported
-> +- pinctrl-simple,register-width : pinmux register access width
-> +- pinctrl-simple,function-mask : mask of allowed pinmux function bits
-> +- pinctrl-simple,function-off : function off mode for disabled state
-> +- pinctrl-simple,pinconf-mask : mask of allowed pinconf bits
-> +
-> +This driver uses the common pinctrl bindings as specified in
-> +pinctrl-bindings.txt document in this directory. The common bindings are used
-> +to specify the client device states using pinctrl-0 and pinctrl-names entries.
-
-I think just remove the second sentence there; it's implicit given the
-first.
-
-> +/* board specific .dts file, such as omap4-sdp.dts */
-> +&omap4_pmx_core {
-> +
-> +	/*
-> +	 * map all board specific static pins enabled by the pinctrl driver
-> +	 * itself during the boot (or just set them up in the bootloader)
-> +	 */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&board_pins>;
-> +
-> +	board_pins: pinmux_board_pins {
-> +		board_static_pins {
-
-I'd like to see a little more explanation of the node structure here.
-I.e. what does each node represent, why are there two levels of nodes, etc.
-
-Given that the "pinctrl-simple,cells" can specify both mux function and
-pin configuration for each pin, i.e. everything you need to, I don't see
-why you'd ever need two levels of nodes here. I'd expect each "pin
-configuration node" (in pinctrl core bindings terminology) to be a
-single level:
-
-node {
-    pinctrl-simple,cells = <...>;
-};
-
-where node is what's references in the pinctrl-0 property by pinctrl
-client drivers.
-
-> +			pinctrl-simple,cells = <
-
-"cells" here doesn't seem like the right word. Perhaps "pins" or
-"configuration"? "Cell"s to me seems semi-reserved for binding cell
-count description, like #gpio-cells, #address-cells, etc.
-
-Also, there's nothing in the free-form text part of this binding
-document that says describes the set of properties that need to exist in
-these "pin configuration nodes", nor what their content is.
-
-> +				0x6c 0xf	/* CSI21_DX3 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +				0x6e 0xf	/* CSI21_DY3 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +				0x70 0xf	/* CSI21_DX4 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +				0x72 0xf	/* CSI21_DY4 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
-> +			>;
-> +		};
-> +	};
-> +
-> +
-> +	/* map all uart2 pins as a single function */
-> +	uart2_pins: pinmux_uart2_pins {
-> +		uart2_pins {
-> +			pinctrl-simple,cells = <
-> +				0xd8 0x118	/* UART2_CTS OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0 */
-> +				0xda 0		/* UART2_RTS OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
-> +				0xdc 0x118	/* UART2_RX OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0 */
-> +				0xde 0		/* UART2_TX OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
-> +			>;
-> +		};
-> +	};
-> +
-> +	/* map all uart3 pins as separate functions */
-> +	uart3_pins: pinmux_uart3_pins {
-
->From a binding perspective, I don't see why you'd want to allow two cases:
-
-1) One node with multiple entries in pinctrl-simple,cells
-2) Multiple nodes each with a single entry in pinctrl-simple,cells
-
-Why not only allow (1)?
-
-> +		uart3_cts_rctx.uart3_cts_rctx {
-> +			pinctrl-simple,cells = <0x100 0x118>;	/* OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0 */
-> +             };
-> +
-> +		uart3_rts_sd.uart3_rts_sd {
-> +			pinctrl-simple,cells = <0x102 0>;	/* OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
-> +		};
-> +
-> +		uart3_rx_irrx.uart3_rx_irrx {
-> +			pinctrl-simple,cells = <0x104 0x100>;	/* OMAP_PIN_INPUT | OMAP_MUX_MODE0 */
-> +		};
-> +
-> +		uart3_tx_irtx.uart3_tx_irtx {
-> +			pinctrl-simple,cells = <0x106 0>;	/* OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
-> +		};
-> +	};
-> +};
-
-> diff --git a/drivers/pinctrl/pinctrl-simple.c b/drivers/pinctrl/pinctrl-simple.c
-
-> +struct pcs_device {
-...
-> +	unsigned (*read)(void __iomem *reg);
-> +	void (*write)(unsigned val, void __iomem *reg);
-> +};
-
-Why not use regmap instead of writing your own:
-
-> +static unsigned __maybe_unused pcs_readb(void __iomem *reg)
-> +static unsigned __maybe_unused pcs_readw(void __iomem *reg)
-...
-
-regmap recently gained support for memory-mapped IO, so should work for
-this. Also, using regmap might allow this binding/driver to be easily
-extended to support e.g. I2C-/SPI-based pin controller hardware, since
-regmap would handle all the IO details for you.
-
-Supporting these different IO modes might require a little more thought
-though. For example, an I2C device's reg refers to its location on the
-parent bus, rather than the address of the registers within the device.
-We'd probably need to augment parent busses with some method for child
-devices to acquire a regmap object for their own IO in order to hide
-this from drivers.
+Cheers
+Jon
