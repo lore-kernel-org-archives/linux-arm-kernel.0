@@ -1,116 +1,61 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 4 May 2012 14:26:38 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205041906.13959.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201205041556.38918.arnd@arndb.de> <4FA40F8E.5010204@ti.com>
- <201205041906.13959.arnd@arndb.de>
-Message-ID: <4FA42D6E.5040106@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 May 2012 19:34:08 +0000
+Subject: Handling of modular boards
+In-Reply-To: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+Message-ID: <201205041934.08830.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 05/04/2012 02:06 PM, Arnd Bergmann wrote:
-> On Friday 04 May 2012, Jon Hunter wrote:
+On Friday 04 May 2012, Mark Brown wrote:
+> Quite a few reference platforms (including Wolfson ones, which is why
+> I'm particularly interested) use replaceable modules to allow
+> configuration changes.  Since we can often identify the configuration at
+> runtime we should ideally do that but currently there's no infrastructure 
+> to help with that, generally this seems to be done in arch code for the
+> machine but this doesn't scale when even the CPU might change and isn't
+> terribly device tree compatible either.
 > 
->>>
->>> I believe this is not entirely correct: sometimes the filter_fn is provided
->>> by the slave driver, sometimes by the master driver.
->>
->> Ok, but in the master case I assume they still use the same API?
+> For reference the code for current Wolfson plugin modules is in
+> arch/arm/mach-s3c64xx/mach-crag6410-module.c.
+
+Hi Mark,
+
+Thanks for getting the discussion started. I've seen the same issue come
+up for arch/arm/mach-ux500/board-mop500*uib.c and for the beaglebone.
+I'm sure there are many more, but we should make sure that everyone
+of these can live with whatever we come up with.
+
+> The most obvious current fit here is the MFD subsystem but it feels like
+> we need some slightly different infastructure to what MFD currently
+> provides.  MFD is really set up to handle platform devices with a core
+> and linear ranges of resources fanning out from that core since they're
+> really oriented around chips.  In contrast these boards are more about
+> remapping random collections of potentially unrelated resources and
+> instantiating devices on all sorts of buses and share more with board
+> files.
 > 
-> The all use dma_request_channel, but the format of the data that gets
-> passed depends only on whoever provides the filter function, which
-> is not necessarily the slave or the master, but could be either one.
-> 
-> FWIW, I believe that for each dma engine implementation we only do
-> one or the other, i.e. if the dmaengine driver provides a filter function,
-> it is always used with these devices.
+> I'm just starting to put some stuff together for this so I was wondering
+> if anyone had been thinking about this and had any bright ideas for how
+> to handle it, and also if people think that MFD is a good fit for this
+> or if we should split the silicon MFDs from these PCBs.
 
-Ok, I think I am with you now. That should be fine.
+One idea that I've heard before is to put device tree fragments into the
+kernel and dynamically add them to the device tree that was passed by the
+boot loader whenever we detect the presence of a specific device.
+This obviously means it works only for boards using DT for booting, but
+it allows us to use some infrastructure that we already have.
 
->>>>
->>>>   Next we need to think about how the DMA controller and channels are described
->>>>   in the device tree itself. The following device tree node example describes
->>>>   the properties of the DMA controller that includes, the register address
->>>>   range, number of interrupt supported, number of channels and number of request
->>>>   signals. This has been enhanced from the previous versions by adding number of
->>>>   channels and number of request signals.
->>>
->>> I think you can actually use strings, too, as long as you use a fixed number
->>> of cells.
->>>
->>> Wouldn't something like this work:?
->>>
->>> 	dma-controller1: dma1 {
->>> 		compatible = "something-using-strings";
->>> 		#dma-cells = <1>;
->>> 	};
->>>
->>> 	dma-controller2: dma2 {
->>> 		compatible = "something-using-integers";
->>> 		#dma-cells = <3>
->>> 	};
->>>
->>> 	some-device {
->>> 		compatible = "something";
->>> 		dmas = <&dma-controller1>, "some-dma",
->>> 			<&dma-controller2 1 2 3>;
->>> 	}
->>>
->>> The only hard requirement is that the format of the attributes is
->>> what the binding specific to that controller understands.
->>
->> Yes it could. My point was why do this, if at the end of the day you
->> need to resolve the string into a number at some point in the driver?
->> However, this may make the migration easier for those using strings.
-> 
-> Well, actually Stephen just clarified that we should not use strings
-> here :(
-> We will always have to use numbers then.
+Another idea was to put all the possible extensions into the device tree
+for a given board and disable them by default, putting it into the
+responsibility of the boot loader to enable the one that is actually
+being used. This has serious scalibility problems when there are many
+possible extensions and also relies more on the boot loader than I would
+like.
 
-Ok. I think it makes life easier in the long run too.
+An intermediate solution that I really like is the ability to
+stuff device tree fragments on extension board themselves, but that
+can only work for new designs and causes problems when that information
+is not actually correct.
 
->>> I think a better interface for the device driver would be something that combines
->>> your of_get_dma_channel_info() function with the dma_request_channel() function,
->>> like
->>>
->>> 	struct dma_chan *of_dma_request_channel(struct device_node *dn, int index);
->>>
->>> When we have the device tree, the driver using that channel doesn't actually have
->>> to care about the specific of how the channel is defined any more, it just needs
->>> to say which one it's interested in, out of the list of channels defined for that
->>> device node.
->>
->> Yes true. I was trying to avoid any changes to DMA engine itself. Plus
->> in the feedback from Stephen his preference was to isolate the binding
->> from DMA engine.
->>
->> So in your example, is index passed via dma_request_channel()? I assume
->> that of_dma_request_channel() get called in the context of
->> dma_request_channel somewhere???
-> 
-> What I meant what that you should still provide the existing
-> dma_request_channel interface without changes, and also provide
-> of_dma_request_channel as a wrapper around it that does a lookup
-> in the way that your of_get_dma_channel_info does, passing the
-> data it gets back from the device tree into the filter function
-> that was provided by the dma engine driver.
-
-Ok, gotcha.
-
->> By the way, have you looked at the pl330_filter() function
->> (drivers/dma/pl330.c)? They parse the device-tree in the filter function
->> itself. The index could be passed as the filter_param. In this type of
->> implementation there would be no need for a generic dma binding.
->> However, would only work for devices supporting DMA engine.
-> 
-> IMHO this will have to change, we should not have allowed a nonstandard
-> binding for pl330 to be used for the samsung platforms and should migrate
-> to the new binding as soon as possible.
-
-Ok, that's fine with me.
-
-Cheers
-Jon
+	Arnd
