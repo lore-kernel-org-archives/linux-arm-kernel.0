@@ -1,51 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 May 2012 19:57:14 +0000
-Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <20120503144645.6390.62303.sendpatchset@w520>
-References: <20120503144645.6390.62303.sendpatchset@w520>
-Message-ID: <201205041957.14205.arnd@arndb.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 5 May 2012 01:28:57 +0530
+Subject: [PATCH 02/15] ARM: davinci: use machine specific hook for late
+ init
+In-Reply-To: <1335958420-5193-3-git-send-email-shawn.guo@linaro.org>
+References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
+ <1335958420-5193-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4FA43501.6020605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 May 2012, Magnus Damm wrote:
-> mach-shmobile: Emma Mobile EV2 - first shot
-> 
-> [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
-> [PATCH 02/02] mach-shmobile: KZM9D board prototype support
-> 
-> This series adds experimental Emma Mobile EV2 support to
-> mach-shmobile. Yet another dual core Cortex-A9 SoC.
-> 
-> At this point only serial and timer is supported. Future work
-> includes GPIO, network device, SMP and DT support. If possible
-> it would be nice to use the common clocks on this platform.
-> 
-> To boot this on actual hardware you also need the following:
-> "[PATCH] serial8250-em: Emma Mobile UART driver V2"
-> "[PATCH] clocksource: em_sti: Emma Mobile STI driver"
-> 
-> Any reason to not put this in mach-shmobile?
+Hi Shawn,
 
-Well, from all I can tell it shares basically zero code with the
-rest of mach-shmobile, so I would be more comfortable with creating
-a new mach-emma directory for this.
+On 5/2/2012 5:03 PM, Shawn Guo wrote:
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Clearly you have an interest in building it into the same kernel
-as the shmobile/rmobile platforms, but there seems to be little
-technical reason to keep them together. Since we are still missing
-a bit of infrastructure to actually build multiple platform
-directories together, how about doing this similar to some of
-the mach-s3c24* directories:?
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index d72ab94..f213359 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -798,6 +798,7 @@ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
+>  	.init_irq     = davinci_irq_init,
+>  	.timer        = &davinci_timer,
+>  	.init_machine = evm_init,
+> +	.init_late	= davinci_init_late,
+>  	.dma_zone_size	= SZ_128M,
+>  	.restart	= davinci_restart,
+>  MACHINE_END
 
-You can have a single Kconfig entry for shmobile and emma, but
-leave the code in separate directories, and just refer to the
-arch/arm/mach-shmobile/include/mach/ directory for the global
-headers (they are obviously identical right now). The additions
-to mach/common.h can easily become a local header file instead
-of getting listed in mach/*.h. I believe you don't actually need
-the other headers you currently include (mach/hardware.h, mach/irqs.h),
-so it would be completely standalone aside from the header files
-that are required for building, and it can still be built
-together with shmobile.
+There is another machine defined in the board-dm646x-evm.c file which
+needs to be updated too. You can apply the following diff.
 
-	Arnd
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c
+b/arch/arm/mach-davinci/board-dm646x-index f213359..958679a 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -788,6 +788,7 @@ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+        .init_irq     = davinci_irq_init,
+        .timer        = &davinci_timer,
+        .init_machine = evm_init,
++       .init_late      = davinci_init_late,
+        .dma_zone_size  = SZ_128M,
+        .restart        = davinci_restart,
+ MACHINE_END
+
+With this fixed, please also add my:
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
