@@ -1,48 +1,30 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 04 May 2012 11:22:55 +0200
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <20120503141853.GC897@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 3 May 2012 15:18:53 +0100")
-References: <201205031350.35476.arnd@arndb.de>
- <20120503141853.GC897@n2100.arm.linux.org.uk>
-Message-ID: <87fwbg8fm8.fsf@lebrac.rtp-net.org>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 04 May 2012 12:41:50 +0300
+Subject: [PATCH 1/2] mtd: gpmi: add device tree support to gpmi-nand
+In-Reply-To: <1336101182-5200-1-git-send-email-b32955@freescale.com>
+References: <1336101182-5200-1-git-send-email-b32955@freescale.com>
+Message-ID: <1336124510.4275.7.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Fri, 2012-05-04 at 11:13 +0800, Huang Shijie wrote:
+> This patch just adds the DT support to gpmi-nand.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+> Please select the CONFIG_USE_OF before you do the compiler-test.
+> thanks.
 
-Hi,
+It should compile without CONFIG_USE_OF also just fine. Currently it
+does not.
 
-> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
->> My feeling is that we should just mandate DT booting for multiplatform
->> kernels, because it significantly reduces the combinatorial space
->> at compile time, avoids a lot of legacy board files that we cannot
->> test anyway, reduces the total kernel size and gives an incentive
->> for people to move forward to DT with their existing boards.
->
-> On this point, I strongly object, especially as I'm one who uses the
-> existing non-DT multiplatform support extensively.  It's really not
-> a problem for what you're trying to achieve.
->
-
-Please, don't do this. afaik, the idea was to reduce the numbers of
-kernel to deal with. Unfortunately, this kind of restriction would
-increase it. Consider orion platforms. This would mean having to deal
-with 4 kernels (1 for DT, 1 for orion5x, 1 for kirkwood, 1 for mv78xx0).
-
-Dropping HW support because one wants to encourage people to convert
-their board file into DT seems weird. Doing this, imho, should even be
-called a regression. The DT conversion won't happen in an eye blink so
-non-DT kernels are still something we should take care of.
-
-> I think what you're proposing is a totally artificial restriction.
-> There's no problem with a kernel supporting DT and non-DT together.
-> We've proven that many many times.  I prove it _every_ night that my
-> build and boot system runs - the OMAP LDP boots a multiplatform kernel
-> just fine without DT.
-
-I think it's true for imx too. iirc, one can build a single image for
-armv4/armv5 and one other for armv6/armv7 without having to use DT.
-
-Regards,
-Arnaud
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120504/07f4d455/attachment-0001.sig>
