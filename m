@@ -1,38 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 May 2012 16:56:55 -0700
-Subject: [PATCH 00/15] arch/arm/mach-* late_initcall cleanup
-In-Reply-To: <20120502133757.GB2194@S2101-09.ap.freescale.net>
-References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
- <201205021245.02831.arnd@arndb.de>
- <20120502133757.GB2194@S2101-09.ap.freescale.net>
-Message-ID: <20120504235655.GC5613@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 5 May 2012 01:03:09 +0100
+Subject: Handling of modular boards
+In-Reply-To: <20120504235225.GN897@n2100.arm.linux.org.uk>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <20120504225514.GM897@n2100.arm.linux.org.uk>
+ <20120504234056.GV14230@opensource.wolfsonmicro.com>
+ <20120504235225.GN897@n2100.arm.linux.org.uk>
+Message-ID: <20120505000308.GX14230@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shawn Guo <shawn.guo@linaro.org> [120502 06:41]:
-> On Wed, May 02, 2012 at 12:45:02PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 02 May 2012, Shawn Guo wrote:
-> > > This series tries to clean up those late_initcall in arch/arm/mach-*,
-> > > which will be a blocker for single kernel build for multiple platforms.
-> > > Even on single platform, for example imx, where we already have single
-> > > kernel image for imx3, imx5 and imx6 families, late_initcall does not
-> > > scale.  We have to detect soc type in the late_initcall to do soc
-> > > sepcific late initialization.
-> > 
-> > Hi Shawn,
-> > 
-> > If you're targetting this at v3.5, I think we should get it into arm-soc
-> > as a staging branch to give it some more testing in linux-next ASAP.
-> > 
-> Thanks for the reminding, Arnd.  Yes, I'm targeting this at v3.5,
-> since the imx cpuidle drivers from Rob Lee which targets at v3.5
-> depends on it.
+On Sat, May 05, 2012 at 12:52:25AM +0100, Russell King - ARM Linux wrote:
 
-Sorro for being late in responding, these look good to me. For the
-omap parts:
+> How about this - we have struct platform_device_info, which is used to
+> create platform devices.  We can use this as an array to describe what
+> platform devices to create in the sub-driver, including what the resources
+> should be etc.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+We (well, I at least) need to handle devices on other buses like I2C and
+SPI too but yes, that's the sort of thing I was looking for.
 
-Also ack to merge without my ack added for being late ;)
+> However, there's a problem with this - what if you need to do some board
+> level init before hand?  That needs to be handled somehow before these
+> devices are instantiated.  That could be done via a callback through
+> platform data.
 
-Tony
+> But... this all seems wrong, because rather than having a driver which
+> knows about the details of the board, we now have all the details of the
+> board in question back in platform code which originally declared the
+> board device.  That's wrong, because a daughter board may be shared
+> between different platforms, and we don't want multiple copies of that
+> data all around the place.
+
+> I don't think there's an easy or generic solution to this.
+
+I think that's OK - if there's any init stuff that needs to be done on a
+prior to identification of the board then presumably it's a generic
+thing for the motherboard which will apply to any plugin module on that
+board and can be done as part of the normal board init.  If the init
+needs to be done after identification of the board then probably it
+applies to any motherboard the board might be plugged in to so we can
+just define callbacks for the plugin module that can be part of the
+plugin module description.
+
+Cases that depend on a specific combination will doubtless exist and do
+have the problems you describe but are probably less frequent but I
+think we can go a long way on the first two.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120505/b9172675/attachment.sig>
