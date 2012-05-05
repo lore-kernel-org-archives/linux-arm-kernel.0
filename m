@@ -1,55 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 5 May 2012 01:03:09 +0100
-Subject: Handling of modular boards
-In-Reply-To: <20120504235225.GN897@n2100.arm.linux.org.uk>
-References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
- <20120504225514.GM897@n2100.arm.linux.org.uk>
- <20120504234056.GV14230@opensource.wolfsonmicro.com>
- <20120504235225.GN897@n2100.arm.linux.org.uk>
-Message-ID: <20120505000308.GX14230@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2012 17:13:23 -0700
+Subject: [PATCH] ARM: move read_{boot,persistent}_clock to the
+ architecture level
+In-Reply-To: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
+References: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120505001323.GD5613@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2012 at 12:52:25AM +0100, Russell King - ARM Linux wrote:
+* Marc Zyngier <marc.zyngier@arm.com> [120428 05:49]:
+> At the moment, read_persistent_clock is implemented at the
+> platform level, which makes it impossible to compile these
+> platforms in a single kernel.
+> 
+> Implement these two functions at the architecture level, and
+> provide a thin registration interface for both read_boot_clock
+> and read_persistent_clock. The two affected platforms (OMAP and
+> Tegra) are converted at the same time.
+> 
+> Compile tested only.
 
-> How about this - we have struct platform_device_info, which is used to
-> create platform devices.  We can use this as an array to describe what
-> platform devices to create in the sub-driver, including what the resources
-> should be etc.
+Sorry I'm a bit behind with emails again..
 
-We (well, I at least) need to handle devices on other buses like I2C and
-SPI too but yes, that's the sort of thing I was looking for.
+Boot tested on omap1 and omap2/3/4:
 
-> However, there's a problem with this - what if you need to do some board
-> level init before hand?  That needs to be handled somehow before these
-> devices are instantiated.  That could be done via a callback through
-> platform data.
-
-> But... this all seems wrong, because rather than having a driver which
-> knows about the details of the board, we now have all the details of the
-> board in question back in platform code which originally declared the
-> board device.  That's wrong, because a daughter board may be shared
-> between different platforms, and we don't want multiple copies of that
-> data all around the place.
-
-> I don't think there's an easy or generic solution to this.
-
-I think that's OK - if there's any init stuff that needs to be done on a
-prior to identification of the board then presumably it's a generic
-thing for the motherboard which will apply to any plugin module on that
-board and can be done as part of the normal board init.  If the init
-needs to be done after identification of the board then probably it
-applies to any motherboard the board might be plugged in to so we can
-just define callbacks for the plugin module that can be part of the
-plugin module description.
-
-Cases that depend on a specific combination will doubtless exist and do
-have the problems you describe but are probably less frequent but I
-think we can go a long way on the first two.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120505/b9172675/attachment.sig>
+Tested-by: Tony Lindgren <tony@atomide.com>
