@@ -1,36 +1,24 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 5 May 2012 16:32:14 +0200
-Subject: [PATCH v2 2/5] dma: mxs-dma: make platform_device_id more generic
-In-Reply-To: <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
-References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
- <201205051512.17972.marex@denx.de>
- <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
-Message-ID: <201205051632.14882.marex@denx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 May 2012 17:47:53 +0100
+Subject: [PATCH] ARM: move read_{boot, persistent}_clock to the
+ architecture level
+In-Reply-To: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
+References: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120505164753.GP897@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On 5 May 2012 21:12, Marek Vasut <marex@denx.de> wrote:
-> > Can't the patches be reordered then to avoid adding this altogether?
+On Sat, Apr 28, 2012 at 01:45:45PM +0100, Marc Zyngier wrote:
+> At the moment, read_persistent_clock is implemented at the
+> platform level, which makes it impossible to compile these
+> platforms in a single kernel.
 > 
-> Maybe.  But I do not think it's really worth the effort.
+> Implement these two functions at the architecture level, and
+> provide a thin registration interface for both read_boot_clock
+> and read_persistent_clock. The two affected platforms (OMAP and
+> Tegra) are converted at the same time.
 > 
-> > You don't have to add dead code in this patch and re-add it when needed.
-> > Or fix the macro to take the parameter then, though I don't understand
-> > why you'd want to take it and then hide it.
-> 
-> I do not completely understand the comment.  My point is the problem
-> is in the existing code.  It's not introduced by Dong's patch.  The
-> problem should be fixed in another patch, and we do not want to do
-> several things in one patch.
+> Compile tested only.
 
-Then order such a patch before Dong's series then? It'd all be clear, without 
-compromises.
-
-> 
-> Regards,
-> Shawn
-
-Best regards,
-Marek Vasut
+As this now has tested-bys for OMAP and Tegra, I guess it's ready.  Who's
+planning to take this?
