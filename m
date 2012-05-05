@@ -1,21 +1,22 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 05 May 2012 13:04:33 +0200
+Date: Sat, 05 May 2012 13:08:17 +0200
 Subject: Development tree for =?UTF-8?Q?Cortex-A=31=35=3F?=
-In-Reply-To: <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
+In-Reply-To: <1336141827.34227.YahooMailNeo@web132503.mail.ird.yahoo.com>
 References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
  <bc6e93f98278125c354282f23751b1aa@localhost>
  <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
  <6e4ad6defa33bf693ec45cae819469f0@localhost>
  <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
  <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
- <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
-Message-ID: <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
+ <1336141827.34227.YahooMailNeo@web132503.mail.ird.yahoo.com>
+Message-ID: <d68fc1f05bb0a3a7d0e3bbe8c20b8b1e@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 May 2012 13:20:08 +0100 (BST), Jemma Jones
+On Fri, 4 May 2012 15:30:27 +0100 (BST), Jemma Jones
 <jemmajones81@yahoo.co.uk> wrote:
 >> Subject: Re: Development tree for Cortex-A15?
+> 
 >> 
 >> On Fri, 4 May 2012 09:44:07 +0100 (BST), Jemma Jones
 >> <jemmajones81@yahoo.co.uk> wrote:
@@ -68,20 +69,45 @@ in
 >> the
 >> A15 board file, it is a dead end.
 > 
-> Any chance you can send me a .config file that works on the kernel in
-this
-> branch which runs on your A15x1 FastModel?
-
-Coming in a private email.
-
-> I'm using the boot-wrapper from
-> http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
-> semi hosting mode.
+> What would be the correct configuration of low-level kernel debugging
+for
+> the A15 board? I'd like to have earlyprintk etc working.
 > 
-> I managed to boot Android from that but I don't seem to be able to boot
-> your kernel. It just stops after the boot-wrapper says loading uImage.
+> When I set it to 
+> Kernel low-level debugging port (No low-level debugging UART)
+> 
+> then I get the following error:
+> 
+> $ ARCH=arm make uImage
+> scripts/kconfig/conf --silentoldconfig Kconfig
+> #
+> # configuration written to .config
+> #
+> ? CHK???? include/linux/version.h
+> ? CHK???? include/generated/utsrelease.h
+> make[1]: `include/generated/mach-types.h' is up to date.
+> ? CALL??? scripts/checksyscalls.sh
+> ? CHK???? include/generated/compile.h
+> ? AS????? arch/arm/kernel/debug.o
+> In file included from arch/arm/kernel/debug.S:104:0:
+> arch/arm/mach-vexpress/include/mach/debug-macro.S:26:2: error: #error
+> "Unknown vexpress UART offset"
+> make[1]: *** [arch/arm/kernel/debug.o] Error 1
+> make: *** [arch/arm/kernel] Error 2
 
-Which dts file are you using?
+Known problem with this kernel tree, fixed in kvm-arm-3.4.
+
+> If I just disable
+> [*] Kernel low-level debugging functions
+> then I don't seem to get any output at all.
+
+Because your kernel is probably crashing before the console is enabled.
+
+> What is the correct configuration?
+
+First, we have to understand why your kernel is crashing, and I have the
+strong feeling it is DT related. I'm really curious of what dts file you're
+using when building your uImage...
 
         M.
 -- 
