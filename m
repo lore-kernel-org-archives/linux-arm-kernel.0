@@ -1,29 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 May 2012 17:49:33 +0100
-Subject: [PATCH] ARM: SMP: prevent use of the console when using idmap_pgd
-In-Reply-To: <1336180444-26563-1-git-send-email-ccross@android.com>
-References: <1336180444-26563-1-git-send-email-ccross@android.com>
-Message-ID: <20120505164933.GQ897@n2100.arm.linux.org.uk>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 5 May 2012 22:40:58 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201205041923.07620.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+Message-ID: <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 06:14:02PM -0700, Colin Cross wrote:
-> Commit 4e8ee7de227e3ab9a72040b448ad728c5428a042 (ARM: SMP: use
-> idmap_pgd for mapping MMU enable during secondary booting)
-> switched secondary boot to use idmap_pgd, which is initialized
-> during early_initcall, instead of a page table initialized during
-> __cpu_up.  This causes idmap_pgd to contain the static mappings
-> but be missing all dynamic mappings.
-> 
-> If a console is registered that creates a dynamic mapping, the
-> printk in secondary_start_kernel will trigger a data abort on
-> the missing mapping before the exception handlers have been
-> initialized, leading to a hang.  Initial boot is not affected
-> because no consoles have been registered, and resume is usually
-> not affected because the offending console is suspended.
-> Onlining a cpu with hotplug triggers the problem.
-> 
-> A workaround is to the printk in secondary_start_kernel until
-> after the page tables have been switched back to init_mm.
+On 5 May 2012 00:53, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 04 May 2012, Jassi Brar wrote:
+>> I see this requires a client driver to specify a particular req_line on a
+>> particular dma controller. I am not sure if this is most optimal.
+>>
+>> I think such client->req_line map should be provided to the dmac controller
+>> driver via its dt node in some format. The dmac driver could then populate
+>> a dma_chan, or similar, only for that req_line and not for the unused one
+>> which otherwise could also have served the same client.
+>>
+>> Ideally the I2C driver should simply ask, say, a channel for TX and another
+>> for RX, everything else should already be setup via dmac's dt nodes.
+>
+> If I understand you correctly, you think we can generalize the dma-request
+> data in a way that we don't need to pass a specific dma engine phandle.
+> I very much doubt this is possible, given how different the requirements
+> are for each of the engines we support. You really need to pass a specific
+> phandle so that we can find the code that can interpret the data in a
+> meaningful way.
+>
+Hmm... there ought to be a way by which a client is handed a random 'token'
+via its dt node and similarly the dmac informed which channel (and with what
+capabilities) to allocate should it see a request coming with that token.
 
-I think this is fine.  Please put it in the patch system, thanks.
+That way dmac and client drivers using DT could do away with the filter_fn.
+
+Roughly speaking (I am not very well versed with DT syntax)
+
+Client Node:-
+
+mmc1: mmc at 13002000 {
+        ...
+        dma_tx = <891>   //some platform-wide unique value
+        dma_rx = <927>   //some platform-wide unique value
+        ...
+ };
+
+
+Say the PL330 chapter of SoC's trm specifies that "channel_id" for
+MMC1_TX is 7 and MMC1_RX is 8 on second instance of PL330.
+
+DMAC's Node:-
+
+pdma2: pdma at 10800000 {
+         .......
+        dma_map = <891, 7>,       //Map mmc1_tx onto i/f 7
+                              <927, 8>,      //Map mmc1_rx onto i/f 8
+                              <487, 9>,      // Map other dma clients
+                                    .......
+};
+
+The dma_map could also encode features like duplex, priority etc
+depending on the needs of the client and capability of the dmac.
+(The "channel_id" could very well be an composite value specifying
+more than one parameter.... basically a value private to the dmac driver)
+
+As a positive side effect, the dmac controller could populate channels only
+for which some client exists on the machine.
+
+Also the decision to map a client onto one of two or more supporting dmacs
+is made here - token 927 wouldn't appear in dma_map of pdma1 even
+if it also could do RX for MMC1.
+
+The solution seems so simple that I am already cringing at the thought
+of having overlooked something fundamental. Please clarify :)
