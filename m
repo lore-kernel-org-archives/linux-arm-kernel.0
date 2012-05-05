@@ -1,8 +1,10 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sat,  5 May 2012 14:00:19 +0200
+Date: Sat,  5 May 2012 14:00:20 +0200
 Subject: [PATCH RESEND v3 1/2] input: keyboard: Add keys driver for the
  LPC32xx SoC
-Message-ID: <1336219221-27791-1-git-send-email-stigge@antcom.de>
+In-Reply-To: <1336219221-27791-1-git-send-email-stigge@antcom.de>
+References: <1336219221-27791-1-git-send-email-stigge@antcom.de>
+Message-ID: <1336219221-27791-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
