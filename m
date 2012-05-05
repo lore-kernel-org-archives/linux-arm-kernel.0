@@ -1,52 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 5 May 2012 10:28:40 +0200
-Subject: common clock framework
-In-Reply-To: <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
-Message-ID: <20120505082840.GQ4141@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 5 May 2012 16:44:57 +0800
+Subject: [GIT PULL] [for 3.5] request pull of dt on arch-mmp
+Message-ID: <CAN1soZxt6c6pTgOeZCBQ4+37hJfOwfxmCC=MAwCpOZZ1dMZ_sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 04:08:20PM -0700, Turquette, Mike wrote:
-> 
-> We are very close.  I have been hacking on this in a private branch
-> and have converted OMAP's CPUfreq driver over to using *only* the the
-> clock framework for DVFS.
-> 
-> Good news: it works!  The CPUfreq driver's .target callback does the
-> normal rate validation and table lookup to get a good rate for the
-> CPU, then it simply calls clk_set_rate.  The pre- and post-rate-change
-> notifiers are then fired off.  I have added notifier handlers to the
-> OMAP regulator drivers which use a look-up-table (soon to be converted
-> to the OPP library) to determine voltage and they simply call
-> regulator_set_voltage either before or after the clock rate changes,
-> depending on scaling direction.
-> 
-> Bad news: lockdep gets cranky about possible deadlocks due to holding
-> prepare_lock and then trying to hold it again in a rate-change
-> notifier handler (from OMAP's regulator code).  Specifically
-> clk_set_rate holds prepare_lock, and then the i2c message sent to the
-> PMIC to raise voltage calls clk_prepare as part of the standard
-> messaging sequence.  This is clearly a candidate for a deadlock.
-> 
-> Having clk_set_rate and clk_prepare both hold the same prepare_lock
-> mutex seems suboptimal, but it is easy.  Having reentrant accesses to
-> the clock tree is going to be hard...  I've spent some time thinking
-> of ways to solve this, but I would appreciate suggestions.  I suspect
-> the exact same case I'm describing above will affect many SoCs.
+Hi Arnd & Olof,
 
-That's interesting. Here's another one: What will happen when Mark
-attaches one of his i2c wolfson chips to a omap core and wants to test
-his new clock driver? a clk_prepare on some clock on the wolfson chip
-will trigger another clk_prepare inside the i2c driver.
-So the reentrancy problem is not limited to prepare vs. set_rate.
+Please help to pull dt branch on arch-mmp git tree.
 
-Sascha
+The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git dt
+
+Haojian Zhuang (9):
+      ARM: mmp: fix build issue on mmp with device tree
+      ARM: mmp: append CONFIG_MACH_MMP2_DT
+      ARM: mmp: support DT in irq
+      ARM: mmp: support DT in timer
+      gpio: pxa: parse gpio from DTS file
+      ARM: mmp: support mmp2 with device tree
+      ARM: mmp: support pxa910 with device tree
+      ARM: dts: refresh dts file for arch mmp
+      Documentation: update docs for mmp dt
+
+ .../devicetree/bindings/arm/mrvl/intc.txt          |   40 ++
+ .../devicetree/bindings/arm/{ => mrvl}/mrvl.txt    |    8 +
+ .../devicetree/bindings/arm/mrvl/timer.txt         |   13 +
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   18 +-
+ Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   15 +-
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/mmp2-brownstone.dts              |   38 ++
+ arch/arm/boot/dts/mmp2.dtsi                        |  220 ++++++++++
+ arch/arm/boot/dts/pxa168.dtsi                      |   67 +++-
+ arch/arm/boot/dts/pxa910-dkb.dts                   |   38 ++
+ arch/arm/boot/dts/pxa910.dtsi                      |  140 ++++++
+ arch/arm/mach-mmp/Kconfig                          |   29 +-
+ arch/arm/mach-mmp/Makefile                         |    9 +-
+ arch/arm/mach-mmp/include/mach/entry-macro.S       |    4 +-
+ arch/arm/mach-mmp/include/mach/irqs.h              |   27 +-
+ arch/arm/mach-mmp/irq-mmp2.c                       |  158 -------
+ arch/arm/mach-mmp/irq-pxa168.c                     |   54 ---
+ arch/arm/mach-mmp/irq.c                            |  445 ++++++++++++++++++++
+ arch/arm/mach-mmp/mmp-dt.c                         |   66 ++--
+ arch/arm/mach-mmp/mmp2-dt.c                        |   60 +++
+ arch/arm/mach-mmp/time.c                           |   81 +++-
+ drivers/gpio/gpio-pxa.c                            |  116 +++++-
+ 22 files changed, 1313 insertions(+), 334 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl/intc.txt
+ rename Documentation/devicetree/bindings/arm/{ => mrvl}/mrvl.txt (53%)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl/timer.txt
+ create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
+ create mode 100644 arch/arm/boot/dts/mmp2.dtsi
+ create mode 100644 arch/arm/boot/dts/pxa910-dkb.dts
+ create mode 100644 arch/arm/boot/dts/pxa910.dtsi
+ delete mode 100644 arch/arm/mach-mmp/irq-mmp2.c
+ delete mode 100644 arch/arm/mach-mmp/irq-pxa168.c
+ create mode 100644 arch/arm/mach-mmp/irq.c
+ create mode 100644 arch/arm/mach-mmp/mmp2-dt.c
