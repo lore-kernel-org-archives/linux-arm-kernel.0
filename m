@@ -1,48 +1,46 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 5 May 2012 10:44:17 -0700
-Subject: common clock framework
-In-Reply-To: <20120505082840.GQ4141@pengutronix.de>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
- <20120505082840.GQ4141@pengutronix.de>
-Message-ID: <CAJOA=zPozuanQFWt10PU4mySQ1kV+YV6iO5+BOfDWGPS2Y0aYg@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 5 May 2012 21:08:02 +0200
+Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
+In-Reply-To: <201205050722.45500.arnd@arndb.de>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <201205042316.55593.rjw@sisk.pl> <201205050722.45500.arnd@arndb.de>
+Message-ID: <201205052108.03001.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Mark & Graeme (for audio/pmic perspective)
+On Saturday, May 05, 2012, Arnd Bergmann wrote:
+> On Friday 04 May 2012, Rafael J. Wysocki wrote:
+> > I'm not sure if I understand your point correctly, so please let me clarify.
+> > 
+> > Do you think it's better to have a separate mach-emma directory for the
+> > new hardware because technically it is a different platform and the fact
+> > that it was developed by the same manufacturer as the mach-shmobile hardware
+> > is less important?
+> 
+> Yes, that was my point. Compare this to how we have omap and davinci for TI,
+> orion and pxa for Marvell, or mxs and imx for Freescale. These are all
+> for the most part independent developments that happened to end up being
+> owned by the same company.
+> 
+> We try to group code based on technical similarities, not on who makes them.
+> If you are able to share code between multiple completely independent socs
+> you work on, the result shouldn't be to put them into a directory you "own",
+> but to generalize the common parts so they can be shared with everyone else,
+> too.
 
-On Sat, May 5, 2012 at 1:28 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, May 04, 2012 at 04:08:20PM -0700, Turquette, Mike wrote:
->>
->> We are very close. ?I have been hacking on this in a private branch
->> and have converted OMAP's CPUfreq driver over to using *only* the the
->> clock framework for DVFS.
->>
->> Good news: it works! ?The CPUfreq driver's .target callback does the
->> normal rate validation and table lookup to get a good rate for the
->> CPU, then it simply calls clk_set_rate. ?The pre- and post-rate-change
->> notifiers are then fired off. ?I have added notifier handlers to the
->> OMAP regulator drivers which use a look-up-table (soon to be converted
->> to the OPP library) to determine voltage and they simply call
->> regulator_set_voltage either before or after the clock rate changes,
->> depending on scaling direction.
->>
->> Bad news: lockdep gets cranky about possible deadlocks due to holding
->> prepare_lock and then trying to hold it again in a rate-change
->> notifier handler (from OMAP's regulator code). ?Specifically
->> clk_set_rate holds prepare_lock, and then the i2c message sent to the
->> PMIC to raise voltage calls clk_prepare as part of the standard
->> messaging sequence. ?This is clearly a candidate for a deadlock.
->>
->> Having clk_set_rate and clk_prepare both hold the same prepare_lock
->> mutex seems suboptimal, but it is easy. ?Having reentrant accesses to
->> the clock tree is going to be hard... ?I've spent some time thinking
->> of ways to solve this, but I would appreciate suggestions. ?I suspect
->> the exact same case I'm describing above will affect many SoCs.
->
-> That's interesting. Here's another one: What will happen when Mark
-> attaches one of his i2c wolfson chips to a omap core and wants to test
-> his new clock driver? a clk_prepare on some clock on the wolfson chip
-> will trigger another clk_prepare inside the i2c driver.
-> So the reentrancy problem is not limited to prepare vs. set_rate.
+This works a slightly different way for the Renesas SoCs, though.  The
+mach-shmobile code is (almost) entirely specific to the SoCs and boards and
+everything else is already under drivers/ and elsewhere.  That's because
+much of that code is shared between the ARM and SH architectures (since there
+are SH CPU core in many of those systems along with the ARM CPU cores).
+So we generalize the common parts by putting them out of arch/arm rather
+than by putting them into a common place in there.
+
+Now, if you insist on us having a separate mach- directory for every platform
+(SoC), we can do that I think, but then we should start with splitting up the
+existing mach-shmobile into a number of SoC-specific directories rather than
+adding new mach- directories for random new parts, because that goes against
+our development history to date, which is important too IMHO.
+
+Thanks,
+Rafael
