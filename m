@@ -1,28 +1,31 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 5 May 2012 21:30:20 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 5 May 2012 19:50:01 +0000
 Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <201205051921.13209.arnd@arndb.de>
+In-Reply-To: <201205052130.21081.rjw@sisk.pl>
 References: <20120503144645.6390.62303.sendpatchset@w520>
- <201205052108.03001.rjw@sisk.pl> <201205051921.13209.arnd@arndb.de>
-Message-ID: <201205052130.21081.rjw@sisk.pl>
+ <201205051921.13209.arnd@arndb.de> <201205052130.21081.rjw@sisk.pl>
+Message-ID: <201205051950.01887.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 05, 2012, Arnd Bergmann wrote:
-> On Saturday 05 May 2012, Rafael J. Wysocki wrote:
-> > Now, if you insist on us having a separate mach- directory for every platform
-> > (SoC), we can do that I think, but then we should start with splitting up the
-> > existing mach-shmobile into a number of SoC-specific directories rather than
-> > adding new mach- directories for random new parts, because that goes against
-> > our development history to date, which is important too IMHO.
+On Saturday 05 May 2012, Rafael J. Wysocki wrote:
+> > All the chips in there so far share a common ancestry and they all use a
+> > significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
+> > sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
+> > uses none of those and apparently was developed by NEC before the merger with
+> > Renesas.
 > 
-> All the chips in there so far share a common ancestry and they all use a
-> significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
-> sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
-> uses none of those and apparently was developed by NEC before the merger with
-> Renesas.
+> I see.  So your opinion is that it may have more in common with the other
+> ARM-based platforms?
 
-I see.  So your opinion is that it may have more in common with the other
-ARM-based platforms?
+Not with any one in particular, although there are a lot of similarities between
+recent Cortex-A9 based designs. I just think it would be more logical to put the
+files into a new mach-emma directory in the same way that every other family has
+its own directory.
 
-Rafael
+As I said, I don't mind if you share infrastructure with mach-shmobile, like
+using the same mach/*.h header files, but if you end up sharing actual code,
+it would be nicer to put it into some location where it can also be shared by
+other platforms.
+
+	Arnd
