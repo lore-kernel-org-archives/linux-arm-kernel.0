@@ -1,30 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 5 May 2012 07:22:45 +0000
-Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <201205042316.55593.rjw@sisk.pl>
-References: <20120503144645.6390.62303.sendpatchset@w520>
- <201205041957.14205.arnd@arndb.de> <201205042316.55593.rjw@sisk.pl>
-Message-ID: <201205050722.45500.arnd@arndb.de>
+Date: Sat, 5 May 2012 13:17:40 +0000
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <20120505080936.GP4141@pengutronix.de>
+References: <201205031350.35476.arnd@arndb.de>
+ <201205041624.17850.arnd@arndb.de> <20120505080936.GP4141@pengutronix.de>
+Message-ID: <201205051317.40357.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 May 2012, Rafael J. Wysocki wrote:
-> I'm not sure if I understand your point correctly, so please let me clarify.
+On Saturday 05 May 2012, Sascha Hauer wrote:
+> They should not if they are not interested in these boards, but why
+> shouldn't I be able to enable these 25 boards plus a few atmel or pxa
+> boards?
 > 
-> Do you think it's better to have a separate mach-emma directory for the
-> new hardware because technically it is a different platform and the fact
-> that it was developed by the same manufacturer as the mach-shmobile hardware
-> is less important?
+> When there are technical reasons to limit a multiplatform Kernel to DT
+> only, then fine, lets do it that way. If there are no technical reasons
+> and this limitation shall only be used to put some political pressure on
+> platform board maintainers, then I am against it. Look around, people
+> actually are porting their boards over to device tree, I don't think
+> that such pressure is necessary.
 
-Yes, that was my point. Compare this to how we have omap and davinci for TI,
-orion and pxa for Marvell, or mxs and imx for Freescale. These are all
-for the most part independent developments that happened to end up being
-owned by the same company.
+It's definitely not a hard technical reason, just me trying to find
+ways to simplify the problem space an any possible way. Basically all
+code that can get built into the kernel has the ability to break other
+stuff and causes bloat, see the recent discussion about putting
+late_initcall into the machine_desc.
 
-We try to group code based on technical similarities, not on who makes them.
-If you are able to share code between multiple completely independent socs
-you work on, the result shouldn't be to put them into a directory you "own",
-but to generalize the common parts so they can be shared with everyone else,
-too.
+> Only my two cents, it's not that important to me since I want to port my
+> (relevant) boards over to DT anyway, so I won't argue about this.
+
+Ok, thanks for your input!
+
+>From the statements made so far, I can see no clear policy that we can
+apply to everyone. My take on this is that for any work I spend on
+multiplatform kernel, I concentrate on the DT-based board files and
+get them to work together first, but leave it up to the individual
+subarch maintainers whether they want to add other board files into
+the mix.
 
 	Arnd
