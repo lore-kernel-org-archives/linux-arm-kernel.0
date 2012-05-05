@@ -1,53 +1,49 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 5 May 2012 10:09:36 +0200
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <201205041624.17850.arnd@arndb.de>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503144609.GK4141@pengutronix.de>
- <201205041624.17850.arnd@arndb.de>
-Message-ID: <20120505080936.GP4141@pengutronix.de>
+Date: Sat, 5 May 2012 10:28:40 +0200
+Subject: common clock framework
+In-Reply-To: <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+ <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
+Message-ID: <20120505082840.GQ4141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 04:24:17PM +0000, Arnd Bergmann wrote:
-> On Thursday 03 May 2012, Sascha Hauer wrote:
-> > I don't think that enforcing DT only in multiplatform kernels will speed
-> > up porting to DT. As a platform maintainer I am interested in building
-> > multiplatform Kernels, but our customers are mostly uninterested in
-> > this. They probably disable other platforms anyway to save the binary space.
+On Fri, May 04, 2012 at 04:08:20PM -0700, Turquette, Mike wrote:
 > 
-> I was not asking about enabling multiple board files but multiple mach-*
-> directories, 
-
-Yes, I understood that.
-
-> which is something that I'm probably more interested in than
-> you are, and the customers you refer to would certainly not do that if
-> they only want to run on one board.
+> We are very close.  I have been hacking on this in a private branch
+> and have converted OMAP's CPUfreq driver over to using *only* the the
+> clock framework for DVFS.
 > 
-> This is really about people who distribute kernels that run on a wide
-> variety of machines across soc vendor boundaries, people like
-> ubuntu or cyanogenmod. The question is really whether you see a reason
-> why they should enable the 25 non-DT board files on your platform, rather
-> than helping out getting DT support for the machines they are
-> interested in?
+> Good news: it works!  The CPUfreq driver's .target callback does the
+> normal rate validation and table lookup to get a good rate for the
+> CPU, then it simply calls clk_set_rate.  The pre- and post-rate-change
+> notifiers are then fired off.  I have added notifier handlers to the
+> OMAP regulator drivers which use a look-up-table (soon to be converted
+> to the OPP library) to determine voltage and they simply call
+> regulator_set_voltage either before or after the clock rate changes,
+> depending on scaling direction.
+> 
+> Bad news: lockdep gets cranky about possible deadlocks due to holding
+> prepare_lock and then trying to hold it again in a rate-change
+> notifier handler (from OMAP's regulator code).  Specifically
+> clk_set_rate holds prepare_lock, and then the i2c message sent to the
+> PMIC to raise voltage calls clk_prepare as part of the standard
+> messaging sequence.  This is clearly a candidate for a deadlock.
+> 
+> Having clk_set_rate and clk_prepare both hold the same prepare_lock
+> mutex seems suboptimal, but it is easy.  Having reentrant accesses to
+> the clock tree is going to be hard...  I've spent some time thinking
+> of ways to solve this, but I would appreciate suggestions.  I suspect
+> the exact same case I'm describing above will affect many SoCs.
 
-They should not if they are not interested in these boards, but why
-shouldn't I be able to enable these 25 boards plus a few atmel or pxa
-boards?
-
-When there are technical reasons to limit a multiplatform Kernel to DT
-only, then fine, lets do it that way. If there are no technical reasons
-and this limitation shall only be used to put some political pressure on
-platform board maintainers, then I am against it. Look around, people
-actually *are* porting their boards over to device tree, I don't think
-that such pressure is necessary.
-
-Only my two cents, it's not that important to me since I want to port my
-(relevant) boards over to DT anyway, so I won't argue about this.
+That's interesting. Here's another one: What will happen when Mark
+attaches one of his i2c wolfson chips to a omap core and wants to test
+his new clock driver? a clk_prepare on some clock on the wolfson chip
+will trigger another clk_prepare inside the i2c driver.
+So the reentrancy problem is not limited to prepare vs. set_rate.
 
 Sascha
-
 
 -- 
 Pengutronix e.K.                           |                             |
