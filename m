@@ -1,62 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sat, 05 May 2012 07:30:19 +0100
-Subject: [PATCH 06/15] mfd/ab8500: Remove confusing ab8500-i2c file and
- merge into ab8500-core
-In-Reply-To: <4FA448FA.8000404@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-7-git-send-email-lee.jones@linaro.org>
- <201205042025.15421.arnd@arndb.de> <4FA448FA.8000404@linaro.org>
-Message-ID: <4FA4C8FB.4090202@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 5 May 2012 14:31:03 +0800
+Subject: [GIT PULL] arch/arm/mach-* late_initcall cleanup
+In-Reply-To: <CAAQ0ZWQ75tYxbnCHXW-WtDVLyFcf9WdvX=5MBiAOXD+ONrU8-g@mail.gmail.com>
+References: <CAAQ0ZWQ75tYxbnCHXW-WtDVLyFcf9WdvX=5MBiAOXD+ONrU8-g@mail.gmail.com>
+Message-ID: <20120505063101.GQ2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whoops, I put that comment in the wrong place. Let me amend:
-
-On 04/05/12 22:24, Lee Jones wrote:
-> On 04/05/12 21:25, Arnd Bergmann wrote:
->> On Friday 04 May 2012, Lee Jones wrote:
->>>
->>> ab8500-i2c is used as core code to register the ab8500 device.
->>> After allocating ab8500 memory, it immediately calls into
->>> ab8500-core where the real initialisation takes place. This
->>> patch moves all core registration and memory allocation into
->>> the true ab8500-core file and removes ab8500-i2c completely.
->>>
->>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->>
->> These changes all look good, but I think I would go further here.
->> I believe we discussed this and I agreed that we could leave that
->> for later, but upon reading this code, I think now that it's getting
->> rather silly.
-
-It's something I'm happy to do, but wasn't the point of the patch. I
-don't know much about this code, as I didn't write it. I can spend more 
-time on clean-ups such as these after my DT task has been completed.
-
-<snip>
-
->> If you apply this patch below, then there is no reason to add any of
->> those.
- >>
->> There is room for additional simplification even, but this is the most
->> important one. Note that the ab8500 mutex was only needed to support the
->> case where write_masked is not present, and that the debug output
->> on error is pointless because the prcmu driver already writes the same
->> output. The next step would be to remove all the {get,set}_register
->> functions
->> from ab8500 and just call the prcmu directly.
->>
->> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
-
-Patch looks good. I'll test it when I have my board. If it doesn't cause 
-any issues I'll apply it to the patch-set ready for pull-request.
-
-Kind regards,
-Lee
+On Thu, May 03, 2012 at 11:27:48PM +0800, Shawn Guo wrote:
+> Hi Arnd, Olof,
+> 
+> Please pull the arch/arm/mach-* late_initcall cleanup series below.  I
+> have collected acks from most of platform maintainers, and it may be
+> the time to have them expose on linux-next to ensure they do not
+> introduce any regression.
+> 
+> Regards,
+> Shawn
+> 
+> ---
+> 
+> The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
+> 
+>   Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git clean/late_initcall_v2
+> 
+I just updated the branch with one fixup from Sekhar applied, and the
+Acked-by from Sekhar and Tony collected.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
