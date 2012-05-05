@@ -1,29 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat,  5 May 2012 16:02:48 -0700
-Subject: [PATCH] mfd: da9052: fix of_match_node() arguments
-Message-ID: <1336258968-6423-1-git-send-email-olof@lixom.net>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Sun,  6 May 2012 02:56:52 +0300
+Subject: [PATCH] ARM: OMAP2+: remove incorrect irq_chip ack field
+Message-ID: <1336262212-4455-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver calls of_match_node() with the arguments swapped.
+Each irq_chip for the main interrupt controller has offsets set for irq
+masking registers, which added to respective base results in a pointer
+to appropriate hardware register. However this is not correct for
+INTC_CONTROL as there is only one INTC_CONTROL register. This does not
+cause problems because generic ack code is never called, but remove
+this assignment to avoid confusion.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 ---
- drivers/mfd/da9052-i2c.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/irq.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
-index d8abdb3..8410065 100644
---- a/drivers/mfd/da9052-i2c.c
-+++ b/drivers/mfd/da9052-i2c.c
-@@ -104,7 +104,7 @@ static int __devinit da9052_i2c_probe(struct i2c_client *client,
- 		struct device_node *np = client->dev.of_node;
- 		const struct of_device_id *deviceid;
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 65f0d25..c11e8a8 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -149,7 +149,6 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
+ 	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
  
--		deviceid = of_match_node(np, dialog_dt_ids);
-+		deviceid = of_match_node(dialog_dt_ids, np);
- 		id = (const struct i2c_device_id *)deviceid->data;
- 	}
- #endif
+-	ct->regs.ack = INTC_CONTROL;
+ 	ct->regs.enable = INTC_MIR_CLEAR0;
+ 	ct->regs.disable = INTC_MIR_SET0;
+ 	irq_setup_generic_chip(gc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
 -- 
-1.7.9.5
+1.7.0.4
