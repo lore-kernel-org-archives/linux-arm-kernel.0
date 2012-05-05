@@ -1,28 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 5 May 2012 14:25:34 +0800
-Subject: [PATCH 00/15] arch/arm/mach-* late_initcall cleanup
-In-Reply-To: <20120504235655.GC5613@atomide.com>
+Date: Sat, 5 May 2012 14:27:27 +0800
+Subject: [PATCH 02/15] ARM: davinci: use machine specific hook for late
+ init
+In-Reply-To: <4FA43501.6020605@ti.com>
 References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
- <201205021245.02831.arnd@arndb.de>
- <20120502133757.GB2194@S2101-09.ap.freescale.net>
- <20120504235655.GC5613@atomide.com>
-Message-ID: <20120505062532.GO2194@S2101-09.ap.freescale.net>
+ <1335958420-5193-3-git-send-email-shawn.guo@linaro.org>
+ <4FA43501.6020605@ti.com>
+Message-ID: <20120505062724.GP2194@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 04:56:55PM -0700, Tony Lindgren wrote:
-> Sorro for being late in responding, these look good to me. For the
-> omap parts:
+On Sat, May 05, 2012 at 01:28:57AM +0530, Sekhar Nori wrote:
+> With this fixed, please also add my:
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 > 
-Thanks, Tony.
-
-> Also ack to merge without my ack added for being late ;)
-> 
-It has not been merged yet.  We are just trying to get it into
-linux-next for testing.  Your ack has never been late, and I just
-added it.
+Problem fixed, ack added.  Thanks, Sekhar.
 
 -- 
 Regards,
