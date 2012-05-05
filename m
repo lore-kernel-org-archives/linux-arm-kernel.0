@@ -1,41 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 5 May 2012 13:17:40 +0000
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <20120505080936.GP4141@pengutronix.de>
-References: <201205031350.35476.arnd@arndb.de>
- <201205041624.17850.arnd@arndb.de> <20120505080936.GP4141@pengutronix.de>
-Message-ID: <201205051317.40357.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 5 May 2012 16:32:14 +0200
+Subject: [PATCH v2 2/5] dma: mxs-dma: make platform_device_id more generic
+In-Reply-To: <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
+References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+ <201205051512.17972.marex@denx.de>
+ <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
+Message-ID: <201205051632.14882.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 May 2012, Sascha Hauer wrote:
-> They should not if they are not interested in these boards, but why
-> shouldn't I be able to enable these 25 boards plus a few atmel or pxa
-> boards?
+Dear Shawn Guo,
+
+> On 5 May 2012 21:12, Marek Vasut <marex@denx.de> wrote:
+> > Can't the patches be reordered then to avoid adding this altogether?
 > 
-> When there are technical reasons to limit a multiplatform Kernel to DT
-> only, then fine, lets do it that way. If there are no technical reasons
-> and this limitation shall only be used to put some political pressure on
-> platform board maintainers, then I am against it. Look around, people
-> actually are porting their boards over to device tree, I don't think
-> that such pressure is necessary.
+> Maybe.  But I do not think it's really worth the effort.
+> 
+> > You don't have to add dead code in this patch and re-add it when needed.
+> > Or fix the macro to take the parameter then, though I don't understand
+> > why you'd want to take it and then hide it.
+> 
+> I do not completely understand the comment.  My point is the problem
+> is in the existing code.  It's not introduced by Dong's patch.  The
+> problem should be fixed in another patch, and we do not want to do
+> several things in one patch.
 
-It's definitely not a hard technical reason, just me trying to find
-ways to simplify the problem space an any possible way. Basically all
-code that can get built into the kernel has the ability to break other
-stuff and causes bloat, see the recent discussion about putting
-late_initcall into the machine_desc.
+Then order such a patch before Dong's series then? It'd all be clear, without 
+compromises.
 
-> Only my two cents, it's not that important to me since I want to port my
-> (relevant) boards over to DT anyway, so I won't argue about this.
+> 
+> Regards,
+> Shawn
 
-Ok, thanks for your input!
-
->From the statements made so far, I can see no clear policy that we can
-apply to everyone. My take on this is that for any work I spend on
-multiplatform kernel, I concentrate on the DT-based board files and
-get them to work together first, but leave it up to the individual
-subarch maintainers whether they want to add other board files into
-the mix.
-
-	Arnd
+Best regards,
+Marek Vasut
