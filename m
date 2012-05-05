@@ -1,28 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 5 May 2012 21:25:20 +0800
-Subject: [PATCH v2 2/5] dma: mxs-dma: make platform_device_id more generic
-In-Reply-To: <201205051512.17972.marex@denx.de>
-References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
- <201205041415.04095.marek.vasut@gmail.com>
- <20120504143442.GL2194@S2101-09.ap.freescale.net>
- <201205051512.17972.marex@denx.de>
-Message-ID: <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 5 May 2012 07:22:45 +0000
+Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
+In-Reply-To: <201205042316.55593.rjw@sisk.pl>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <201205041957.14205.arnd@arndb.de> <201205042316.55593.rjw@sisk.pl>
+Message-ID: <201205050722.45500.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 May 2012 21:12, Marek Vasut <marex@denx.de> wrote:
-> Can't the patches be reordered then to avoid adding this altogether?
->
-Maybe.  But I do not think it's really worth the effort.
+On Friday 04 May 2012, Rafael J. Wysocki wrote:
+> I'm not sure if I understand your point correctly, so please let me clarify.
+> 
+> Do you think it's better to have a separate mach-emma directory for the
+> new hardware because technically it is a different platform and the fact
+> that it was developed by the same manufacturer as the mach-shmobile hardware
+> is less important?
 
-> You don't have to add dead code in this patch and re-add it when needed. Or fix
-> the macro to take the parameter then, though I don't understand why you'd want
-> to take it and then hide it.
->
-I do not completely understand the comment.  My point is the problem
-is in the existing code.  It's not introduced by Dong's patch.  The
-problem should be fixed in another patch, and we do not want to do
-several things in one patch.
+Yes, that was my point. Compare this to how we have omap and davinci for TI,
+orion and pxa for Marvell, or mxs and imx for Freescale. These are all
+for the most part independent developments that happened to end up being
+owned by the same company.
 
-Regards,
-Shawn
+We try to group code based on technical similarities, not on who makes them.
+If you are able to share code between multiple completely independent socs
+you work on, the result shouldn't be to put them into a directory you "own",
+but to generalize the common parts so they can be shared with everyone else,
+too.
+
+	Arnd
