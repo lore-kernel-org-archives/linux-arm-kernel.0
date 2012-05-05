@@ -1,77 +1,38 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 5 May 2012 22:40:58 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205041923.07620.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <201205041923.07620.arnd@arndb.de>
-Message-ID: <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 05 May 2012 19:16:50 +0200
+Subject: [PATCH] ARM: move
+ =?UTF-8?Q?read=5F=7Bboot=2C=20persistent=7D=5Fclock?=
+ =?UTF-8?Q?=20to=20the=20architecture=20level?=
+In-Reply-To: <20120505164753.GP897@n2100.arm.linux.org.uk>
+References: <1335617145-24649-1-git-send-email-marc.zyngier@arm.com>
+ <20120505164753.GP897@n2100.arm.linux.org.uk>
+Message-ID: <f91fc31ded5595a14101dffb4cab937f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 May 2012 00:53, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 04 May 2012, Jassi Brar wrote:
->> I see this requires a client driver to specify a particular req_line on a
->> particular dma controller. I am not sure if this is most optimal.
->>
->> I think such client->req_line map should be provided to the dmac controller
->> driver via its dt node in some format. The dmac driver could then populate
->> a dma_chan, or similar, only for that req_line and not for the unused one
->> which otherwise could also have served the same client.
->>
->> Ideally the I2C driver should simply ask, say, a channel for TX and another
->> for RX, everything else should already be setup via dmac's dt nodes.
->
-> If I understand you correctly, you think we can generalize the dma-request
-> data in a way that we don't need to pass a specific dma engine phandle.
-> I very much doubt this is possible, given how different the requirements
-> are for each of the engines we support. You really need to pass a specific
-> phandle so that we can find the code that can interpret the data in a
-> meaningful way.
->
-Hmm... there ought to be a way by which a client is handed a random 'token'
-via its dt node and similarly the dmac informed which channel (and with what
-capabilities) to allocate should it see a request coming with that token.
+On Sat, 5 May 2012 17:47:53 +0100, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Apr 28, 2012 at 01:45:45PM +0100, Marc Zyngier wrote:
+>> At the moment, read_persistent_clock is implemented at the
+>> platform level, which makes it impossible to compile these
+>> platforms in a single kernel.
+>> 
+>> Implement these two functions at the architecture level, and
+>> provide a thin registration interface for both read_boot_clock
+>> and read_persistent_clock. The two affected platforms (OMAP and
+>> Tegra) are converted at the same time.
+>> 
+>> Compile tested only.
+> 
+> As this now has tested-bys for OMAP and Tegra, I guess it's ready. 
+Who's
+> planning to take this?
 
-That way dmac and client drivers using DT could do away with the filter_fn.
+If you're happy to take it, and unless someone objects to it, I'll put it
+in the patch system.
 
-Roughly speaking (I am not very well versed with DT syntax)
+Thanks Stephen and Tony for testing it.
 
-Client Node:-
-
-mmc1: mmc at 13002000 {
-        ...
-        dma_tx = <891>   //some platform-wide unique value
-        dma_rx = <927>   //some platform-wide unique value
-        ...
- };
-
-
-Say the PL330 chapter of SoC's trm specifies that "channel_id" for
-MMC1_TX is 7 and MMC1_RX is 8 on second instance of PL330.
-
-DMAC's Node:-
-
-pdma2: pdma at 10800000 {
-         .......
-        dma_map = <891, 7>,       //Map mmc1_tx onto i/f 7
-                              <927, 8>,      //Map mmc1_rx onto i/f 8
-                              <487, 9>,      // Map other dma clients
-                                    .......
-};
-
-The dma_map could also encode features like duplex, priority etc
-depending on the needs of the client and capability of the dmac.
-(The "channel_id" could very well be an composite value specifying
-more than one parameter.... basically a value private to the dmac driver)
-
-As a positive side effect, the dmac controller could populate channels only
-for which some client exists on the machine.
-
-Also the decision to map a client onto one of two or more supporting dmacs
-is made here - token 927 wouldn't appear in dma_map of pdma1 even
-if it also could do RX for MMC1.
-
-The solution seems so simple that I am already cringing at the thought
-of having overlooked something fundamental. Please clarify :)
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
