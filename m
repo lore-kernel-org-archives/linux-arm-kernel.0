@@ -1,50 +1,58 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun,  6 May 2012 23:35:00 +0800
-Subject: [PATCH 4/9] mmc: mxs-mmc: adopt pinctrl support
+Date: Sun,  6 May 2012 23:35:01 +0800
+Subject: [PATCH 5/9] mtd: nand: gpmi: adopt pinctrl support
 In-Reply-To: <1336318505-27043-1-git-send-email-shawn.guo@linaro.org>
 References: <1336318505-27043-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336318505-27043-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336318505-27043-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Chris Ball <cjb@laptop.org>
+Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/mmc/host/mxs-mmc.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index e3f5af9..bb03ddd 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -39,6 +39,7 @@
- #include <linux/regulator/consumer.h>
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 9ec51ce..8478fd9 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -24,6 +24,7 @@
  #include <linux/module.h>
- #include <linux/fsl/mxs-dma.h>
+ #include <linux/mtd/gpmi-nand.h>
+ #include <linux/mtd/partitions.h>
 +#include <linux/pinctrl/consumer.h>
+ #include "gpmi-nand.h"
  
- #include <mach/mxs.h>
- #include <mach/common.h>
-@@ -682,6 +683,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	struct mmc_host *mmc;
- 	struct resource *iores, *dmares, *r;
- 	struct mxs_mmc_platform_data *pdata;
+ /* add our owner bbt descriptor */
+@@ -476,6 +477,7 @@ acquire_err:
+ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+ {
+ 	struct resources *res = &this->resources;
 +	struct pinctrl *pinctrl;
- 	int ret = 0, irq_err, irq_dma;
- 	dma_cap_mask_t mask;
+ 	int ret;
  
-@@ -719,6 +721,12 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	host->irq = irq_err;
- 	host->sdio_irq_en = 0;
+ 	ret = acquire_register_block(this, GPMI_NAND_GPMI_REGS_ADDR_RES_NAME);
+@@ -494,6 +496,12 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto exit_dma_channels;
  
 +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 +	if (IS_ERR(pinctrl)) {
 +		ret = PTR_ERR(pinctrl);
-+		goto out_iounmap;
++		goto exit_pin;
 +	}
 +
- 	host->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(host->clk)) {
- 		ret = PTR_ERR(host->clk);
+ 	res->clock = clk_get(&this->pdev->dev, NULL);
+ 	if (IS_ERR(res->clock)) {
+ 		pr_err("can not get the clock\n");
+@@ -503,6 +511,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+ 	return 0;
+ 
+ exit_clock:
++exit_pin:
+ 	release_dma_channels(this);
+ exit_dma_channels:
+ 	release_bch_irq(this);
 -- 
 1.7.5.4
