@@ -1,24 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 6 May 2012 21:51:40 +0800
-Subject: [PATCH 1/3] ARM: imx: enable pinctrl dummy states
-In-Reply-To: <1335958282-3068-1-git-send-email-b29396@freescale.com>
-References: <1335958282-3068-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120506135138.GC19389@S2101-09.ap.freescale.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Sun, 6 May 2012 23:23:31 +0900
+Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
+In-Reply-To: <201205051921.13209.arnd@arndb.de>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <201205050722.45500.arnd@arndb.de> <201205052108.03001.rjw@sisk.pl>
+ <201205051921.13209.arnd@arndb.de>
+Message-ID: <CANqRtoRHekxkbpW9diJy27d1a1EofeyotLFfgN4tcabmJxZmsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 07:31:20PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Enable pinctrl dummy states for imx platforms without pinctrl
-> support.
-> 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+On Sun, May 6, 2012 at 4:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 05 May 2012, Rafael J. Wysocki wrote:
+>> Now, if you insist on us having a separate mach- directory for every platform
+>> (SoC), we can do that I think, but then we should start with splitting up the
+>> existing mach-shmobile into a number of SoC-specific directories rather than
+>> adding new mach- directories for random new parts, because that goes against
+>> our development history to date, which is important too IMHO.
+>
+> All the chips in there so far share a common ancestry and they all use a
+> significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
+> sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
+> uses none of those and apparently was developed by NEC before the merger with
+> Renesas.
 
-I queued the series and will have it send together with other imx
-and mxs driver patches that adopt pinctrl API.
+Please allow me to jump in here for a second.
 
--- 
-Regards,
-Shawn
+You are right that none of the current in-tree SoCs were developed by
+NEC, but exactly which bits that end up inside the SoC varies quite a
+bit. The r8a7779 is for instance in the R-Car line which I believe for
+some reason has more similarities with ex-NEC chips. The pinmux is not
+that different from Emma mobile. Some timers and serial ports are
+shared with other SoCs but many other IP blocks have nothing in common
+with other mach-shmobile SoCs. But I sort of fail to see why this
+matters since it's stuff kept outside of arch/arm anyways. As you
+probably know the r8a7779 SoC is already merged in mach-shmobile but
+we can of course move it out if that helps.
+
+Also, the more the merrier. Apart from NEC the current set of SoCs
+contain IP from Renesas which historically is a mix of Hitachi and
+Mitsubishi. Plus the regular set of ARM and SGX IP of course, like
+most vendors these days.
+
+So if all these things are moved out of arch/arm (which I believe is
+the right way forward) then what is the point of having mach
+directories at all? In the end it's some random ARM IP with I/O
+devices hanging off it. With that in mind i'd rather work on putting
+the Emma Mobile stuff in a common arch/arm location than create yet
+another separate directory for something that isn't really special at
+all.
+
+Cheers,
+
+/ magnus
