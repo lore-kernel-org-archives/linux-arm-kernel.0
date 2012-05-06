@@ -1,54 +1,53 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sun, 6 May 2012 23:23:31 +0900
-Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <201205051921.13209.arnd@arndb.de>
-References: <20120503144645.6390.62303.sendpatchset@w520>
- <201205050722.45500.arnd@arndb.de> <201205052108.03001.rjw@sisk.pl>
- <201205051921.13209.arnd@arndb.de>
-Message-ID: <CANqRtoRHekxkbpW9diJy27d1a1EofeyotLFfgN4tcabmJxZmsA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun,  6 May 2012 23:34:56 +0800
+Subject: [PATCH 0/9] Enable pinctrl support for mach-mxs
+Message-ID: <1336318505-27043-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 6, 2012 at 4:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 05 May 2012, Rafael J. Wysocki wrote:
->> Now, if you insist on us having a separate mach- directory for every platform
->> (SoC), we can do that I think, but then we should start with splitting up the
->> existing mach-shmobile into a number of SoC-specific directories rather than
->> adding new mach- directories for random new parts, because that goes against
->> our development history to date, which is important too IMHO.
->
-> All the chips in there so far share a common ancestry and they all use a
-> significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
-> sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
-> uses none of those and apparently was developed by NEC before the merger with
-> Renesas.
+With pinctrl-mxs driver (DT only) applied on pinctrl tree, the mxs
+device tree conversion can start basing on that support.  This series
+adopts pinctrl support for mxs device drivers with a dummy pinctrl
+state provided for non-DT boot, so that the pinctrl call in the device
+drivers will be bypassed for non-DT probe while it starts working for
+DT probe.
 
-Please allow me to jump in here for a second.
+To ease the merge process, I would like to ask Arnd and Olof to pull
+pinctrl tree as a dependency in arm-soc and have this series go through
+arm-soc.
 
-You are right that none of the current in-tree SoCs were developed by
-NEC, but exactly which bits that end up inside the SoC varies quite a
-bit. The r8a7779 is for instance in the R-Car line which I believe for
-some reason has more similarities with ex-NEC chips. The pinmux is not
-that different from Emma mobile. Some timers and serial ports are
-shared with other SoCs but many other IP blocks have nothing in common
-with other mach-shmobile SoCs. But I sort of fail to see why this
-matters since it's stuff kept outside of arch/arm anyways. As you
-probably know the r8a7779 SoC is already merged in mach-shmobile but
-we can of course move it out if that helps.
+Regards,
+Shawn
 
-Also, the more the merrier. Apart from NEC the current set of SoCs
-contain IP from Renesas which historically is a mix of Hitachi and
-Mitsubishi. Plus the regular set of ARM and SGX IP of course, like
-most vendors these days.
+Shawn Guo (9):
+  ARM: mxs: enable pinctrl dummy states
+  serial: amba-pl011: adopt pinctrl support
+  serial: mxs-auart: adopt pinctrl support
+  mmc: mxs-mmc: adopt pinctrl support
+  mtd: nand: gpmi: adopt pinctrl support
+  i2c: mxs: adopt pinctrl support
+  ASoC: mxs-saif: adopt pinctrl support
+  video: mxsfb: adopt pinctrl support
+  ARM: mxs: enable pinctrl support
 
-So if all these things are moved out of arch/arm (which I believe is
-the right way forward) then what is the point of having mach
-directories at all? In the end it's some random ARM IP with I/O
-devices hanging off it. With that in mind i'd rather work on putting
-the Emma Mobile stuff in a common arch/arm location than create yet
-another separate directory for something that isn't really special at
-all.
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mxs/Kconfig               |    2 ++
+ arch/arm/mach-mxs/include/mach/common.h |    2 ++
+ arch/arm/mach-mxs/mach-apx4devkit.c     |    2 ++
+ arch/arm/mach-mxs/mach-m28evk.c         |    2 ++
+ arch/arm/mach-mxs/mach-mx23evk.c        |    2 ++
+ arch/arm/mach-mxs/mach-mx28evk.c        |    2 ++
+ arch/arm/mach-mxs/mach-stmp378x_devb.c  |    2 ++
+ arch/arm/mach-mxs/mach-tx28.c           |    2 ++
+ arch/arm/mach-mxs/mm.c                  |   11 +++++++++++
+ drivers/i2c/busses/i2c-mxs.c            |    6 ++++++
+ drivers/mmc/host/mxs-mmc.c              |    8 ++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c  |    9 +++++++++
+ drivers/tty/serial/amba-pl011.c         |    8 ++++++++
+ drivers/tty/serial/mxs-auart.c          |    8 ++++++++
+ drivers/video/mxsfb.c                   |    9 +++++++++
+ sound/soc/mxs/mxs-saif.c                |    8 ++++++++
+ 17 files changed, 84 insertions(+), 0 deletions(-)
 
-Cheers,
-
-/ magnus
+-- 
+1.7.5.4
