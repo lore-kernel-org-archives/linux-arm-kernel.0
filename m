@@ -1,28 +1,20 @@
-From: sfking@fdwdc.com (Steven King)
-Date: Sun, 6 May 2012 10:26:28 -0700
-Subject: [PATCH 2/5] net: fec: adopt pinctrl API
-In-Reply-To: <1336309094-18517-3-git-send-email-shawn.guo@linaro.org>
-References: <1336309094-18517-1-git-send-email-shawn.guo@linaro.org>
- <1336309094-18517-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205061026.29238.sfking@fdwdc.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 6 May 2012 12:21:13 -0700
+Subject: [PATCH] ARM: SMP: prevent use of the console when using idmap_pgd
+In-Reply-To: <20120506101141.GI26481@n2100.arm.linux.org.uk>
+References: <1336180444-26563-1-git-send-email-ccross@android.com>
+ <20120505164933.GQ897@n2100.arm.linux.org.uk>
+ <20120506101141.GI26481@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRTpOhBvaucV0CWNHTMbWLW4iKMrF16kL5BoTFnudtxs9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 May 2012 5:58:11 am Shawn Guo wrote:
-> Cc: David S. Miller <davem@davemloft.net>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/net/ethernet/freescale/fec.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-
-As the fec driver is also used by m68k/coldfire, perhaps a CC to the 
-uclinux-dev at uclinux.org would be apropos.
+On Sun, May 6, 2012 at 3:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, May 05, 2012 at 05:49:33PM +0100, Russell King - ARM Linux wrote:
+>> I think this is fine. ?Please put it in the patch system, thanks.
 >
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl)) {
-> +		ret = PTR_ERR(pinctrl);
-> +		goto failed_pin;
-> +	}
+> It looks like this bug affects v3.2 kernels as well - should it be marked
+> for the attention of the stable kernel team?
 
-What happens here if pinmux support isnt implemented yet as is the case for 
-m68k/coldfire?
+I think it was introduced in v3.3, it should probably go to stable.
