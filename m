@@ -1,26 +1,37 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 6 May 2012 15:33:41 +0300
-Subject: [PATCH v2 2/3] OMAP4: iommu: fix irq and clock name for dsp-iommu
-In-Reply-To: <1334360392-1494-3-git-send-email-jgutierrez@ti.com>
-References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
- <1334360392-1494-3-git-send-email-jgutierrez@ti.com>
-Message-ID: <CAK=Wgbb8irgoyt21_tgqg+gFvKxSqs3Ud9KnTUkw-zMuE1X-wQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun,  6 May 2012 20:58:09 +0800
+Subject: [PATCH 0/5] Adopt pinctrl API for a few outstanding imx drivers
+Message-ID: <1336309094-18517-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juan,
+With patch 5b3aa5f (pinctrl: add pinctrl_provide_dummies interface for
+platforms to use) applied on pinctrl tree, and patch "ARM: imx: enable
+pinctrl dummy states" [1] being there, we are ready to adopt pinctrl
+API for imx drivers.  So let's start from a few outstanding ones.
 
-On Sat, Apr 14, 2012 at 2:39 AM, Juan Gutierrez <jgutierrez@ti.com> wrote:
-> Irq and clock names were wrong for dsp iommu configuration
-> for omap4.
+I would expect to ask Arnd and Olof to pull pinctrl tree into arm-soc
+as a dependency and then have series [1] and this patch set go through
+arm-soc tree to ease the merge process.
 
-Looks good.
+Regards,
+Shawn
 
-> Renamed tesla_ick to dsp_fck.
+[1] http://thread.gmane.org/gmane.linux.kernel.mmc/14180
 
-If you're resubmitting the series, please indicate here why this
-change is needed (specifically let's mention commit 0e43327 "OMAP4:
-clock: Fix clock names and align with hwmod names").
+Shawn Guo (5):
+  tty: serial: imx: adopt pinctrl API
+  net: fec: adopt pinctrl API
+  can: flexcan: adopt pinctrl API
+  i2c: imx: adopt pinctrl API
+  spi/imx: adopt pinctrl API
 
-Thanks,
-Ohad.
+ drivers/i2c/busses/i2c-imx.c         |    8 ++++++++
+ drivers/net/can/flexcan.c            |    6 ++++++
+ drivers/net/ethernet/freescale/fec.c |    9 +++++++++
+ drivers/spi/spi-imx.c                |    8 ++++++++
+ drivers/tty/serial/imx.c             |    8 ++++++++
+ 5 files changed, 39 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
