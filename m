@@ -1,27 +1,39 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Sun, 6 May 2012 13:08:41 +0530
-Subject: [PATCH 07/13] ARM: OMAP5: l3: Add l3 error handler support for
- omap5.
-In-Reply-To: <20120504225153.GZ5613@atomide.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-8-git-send-email-r.sricharan@ti.com>
- <20120504225153.GZ5613@atomide.com>
-Message-ID: <CAJ7qFSek4h78wHdwdb-h6UZNqUofT03PTm8LN66WQgdKyp5Y+A@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 06 May 2012 10:02:06 +0200
+Subject: [PATCH RESEND] Documentation: devicetree: Fix value format
+ description
+In-Reply-To: <4FA57504.2070308@landley.net>
+References: <1336217886-27224-1-git-send-email-stigge@antcom.de>
+ <4FA57504.2070308@landley.net>
+Message-ID: <4FA62FFE.6090301@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
->> - ? ? if (!(cpu_is_omap44xx()))
->> + ? ? if ((!(cpu_is_omap44xx())) && (!cpu_is_omap54xx()))
->> ? ? ? ? ? ? ? return -ENODEV;
->>
->> ? ? ? for (i = 0; i < L3_MODULES; i++) {
->
-> Isn't there some unnecessary parens here?
+On 05/05/12 20:44, Rob Landley wrote:
+> On 05/05/2012 06:38 AM, Roland Stigge wrote:
+>> Numeric values in dts files can be specified in decimal and hex (the latter
+>> prefixed 0x). The current documentation is updated with this patch to prevent
+>> confusion about what is meant with values without "0x" (previously hex, now
+>> dec).
+> 
+> This updates the documentation to consistently say 0x in front of hex
+> values, but doesn't change the device tree _parser_. What did the parser
+> previously do with this input?
 
- You mean in this above for loop?.
- There are multiple statements .
+I can add the following para to the patch description if you ack:
 
-Thanks,
- Sricharan
+===========================================================================
+Background:
+
+Since 2011's update to scripts/dtc/dtc-lexer.l, we only support the
+/dts-v1/ format which mandates "0x" for hex values. Practically,
+literals (<V1>[0-9]+|0[xX][0-9a-fA-F]+ -> DT_LITERAL) are handled via
+strtoull() with base==0 ("auto"), while we previously also had a
+DT_LEGACYLITERAL (<INITIAL>[0-9a-fA-F]+), forcing base==16. Not anymore.
+===========================================================================
+
+Thanks in advance,
+
+Roland
