@@ -1,76 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 May 2012 13:25:06 +0100
-Subject: mv_cesa dcache problem since 2.6.37 was: Re: mv_cesa hash
- functions
-In-Reply-To: <4FA5AE7A.3000201@gmail.com>
-References: <20120223183439.GA18545@orbit.nwl.cc> <4FA5AE7A.3000201@gmail.com>
-Message-ID: <20120506122506.GJ26481@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 6 May 2012 15:33:41 +0300
+Subject: [PATCH v2 2/3] OMAP4: iommu: fix irq and clock name for dsp-iommu
+In-Reply-To: <1334360392-1494-3-git-send-email-jgutierrez@ti.com>
+References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
+ <1334360392-1494-3-git-send-email-jgutierrez@ti.com>
+Message-ID: <CAK=Wgbb8irgoyt21_tgqg+gFvKxSqs3Ud9KnTUkw-zMuE1X-wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2012 at 12:49:30AM +0200, Simon Baatz wrote:
-> Am 23.02.2012 19:34, schrieb Phil Sutter:
-> > But you might suffer from another problem, which is only present on
-> > ARM machines with VIVT cache and linux >= 2.6.37: due to commit
-> > f8b63c1, "ARM: 6382/1: Remove superfluous flush_kernel_dcache_page()"
-> > which prevents pages being flushed from inside the scatterlist
-> > iterator API. This patch seems to introduce problems in other places
-> > (namely NFS), too but I sadly did not have time to investigate this
-> > further. I will post a possible (cryptodev-internal) solution to
-> > cryptodev-linux-devel at gna.org, maybe this fixes the problem with
-> > openssl. Greetings, Phil 
+Hi Juan,
 
-Well, the reason it has been removed is as follows:
+On Sat, Apr 14, 2012 at 2:39 AM, Juan Gutierrez <jgutierrez@ti.com> wrote:
+> Irq and clock names were wrong for dsp iommu configuration
+> for omap4.
 
-When pages are allocated, they have a special flag bit called PG_arch_1
-cleared by the page allocator.
+Looks good.
 
-We used to use PG_arch_1 to indicate that the page contained dirty cache
-lines - so by default, the page was marked clean.
+> Renamed tesla_ick to dsp_fck.
 
-Normal kernel behaviour upon allocating a page into the page cache is to
-read data off the disk into the new page cache page, calling
-flush_kernel_dcache_page() in the process.  This would ensure that data
-would be pushed out of the cache lines associated with the kernel mapping
-of the page into RAM.
+If you're resubmitting the series, please indicate here why this
+change is needed (specifically let's mention commit 0e43327 "OMAP4:
+clock: Fix clock names and align with hwmod names").
 
-This means when we map the page into userspace, we can be sure that the new
-mapping will see the data written there.  Moreover, when we place a page
-into a user process, we check this PG_arch_1 bit, and if it's set, we
-flush the kernel mapping cache lines at this point as well.
-
-Patch 6379/1 changed this behaviour: PG_arch_1 being _clear_ now indicates
-that the page contains dirty data.
-
-What this means is that when a page is placed into userspace, we check the
-PG_arch_1 bit.  If it is clear, we flush the kernel mapping for the page
-to push dirty data out to RAM.  This makes the flush in
-flush_kernel_dcache_page() entirely redundant.
-
-> since there has been no reaction on this, I would like to bring this
-> issue up again (I sadly don't have the expertise to investigate this
-> further...). The issue is not limited to cryptodev, but seems to be
-> either a problem with commit f8b63c1 or a problem in mv_cesa that was
-> uncovered by this commit.
-
-Can you reproduce it with anything else?
-
-It could be a problem with the way crypto stuff works - I've never had
-any dealings with that subsystem, so I really can't comment.  If crypto
-uses scatterlists, and walks them with the standard API, and uses
-scatterlists with pages which are already mapped into userspace, then
-I can see how the above commit would make things go wrong.
-
-So, without knowledge of the crypto subsystem, I'm not sure I can help
-sort this out.
-
-If it's possible to reproduce with NFS, and it seems sorted in the latest
-kernel, that's probably because something changed with NFS - NFS did for
-a time have issues on ARM for various reasons (because of remapping kernel
-memory into vmalloc space and expecting it to be DMA coherent...) and that
-got fixed.  Whether that's why you're not seeing problems with v3.4-rc5,
-I couldn't be sure unless you did a bisection between the bad and good
-kernel versions.  That would at least allow us to confirm that that issue
-has been properly resolved.
-
-Thanks.
+Thanks,
+Ohad.
