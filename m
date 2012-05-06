@@ -1,72 +1,65 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 6 May 2012 19:00:00 +0300
-Subject: [PATCH v2 1/3] omap: mailbox: enable mailbox irq per instance
-In-Reply-To: <1334360392-1494-2-git-send-email-jgutierrez@ti.com>
-References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
- <1334360392-1494-2-git-send-email-jgutierrez@ti.com>
-Message-ID: <CAK=WgbY3OaDH9ziavrXG4oM1ztO3mTmL_eoLPOzCHHKQpHn20w@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 06 May 2012 12:09:40 -0400
+Subject: [PATCH 4/9] mmc: mxs-mmc: adopt pinctrl support
+In-Reply-To: <1336318505-27043-5-git-send-email-shawn.guo@linaro.org> (Shawn
+ Guo's message of "Sun, 6 May 2012 23:35:00 +0800")
+References: <1336318505-27043-1-git-send-email-shawn.guo@linaro.org>
+ <1336318505-27043-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <87zk9lqojf.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juan,
+Hi,
 
-On Sat, Apr 14, 2012 at 2:39 AM, Juan Gutierrez <jgutierrez@ti.com> wrote:
-> The machine-specific omap2_mbox_startup is called only once
-> to initialize the whole mbox module. Enabling mbox irq at
-> startup is only enabling the irq of the very first mailbox
-> instance created.
+Patch looks fine -- perhaps you could copy the explanation about the
+dummy pinctrl state for non-DT boards from your series introduction
+into this commit message, since the commit messages go into git and
+the series description doesn't?  Thanks.
+
+On Sun, May 06 2012, Shawn Guo wrote:
+> Cc: Chris Ball <cjb@laptop.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/mmc/host/mxs-mmc.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
 >
-> The enable_irq function should be called every time a
-> new mbox instance is created,
-
-s/created/opened/
-
-> in the generic platform mailbox layer.
-
-This patch removes an omap2-specific code and then adds it to the
-"generic" layer, which also deals with omap1.
-
-Are we sure it's ok ?
-
-OMAP1 doesn't seem to enable its irq at this point: it doesn't even
-have a ->startup() handler (which actually somewhat implies it's been
-anyway broken for a long time now: omap_mbox_startup() seem to
-unhappily bail out if it doesn't find a machine-specific ->startup()
-handler).
-
-> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index ad32621..ebc1ba5 100644
-> --- a/arch/arm/plat-omap/mailbox.c
-> +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -282,6 +282,8 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?mbox->rxq = mq;
-> ? ? ? ? ? ? ? ?mq->mbox = mbox;
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index e3f5af9..bb03ddd 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/module.h>
+>  #include <linux/fsl/mxs-dma.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <mach/mxs.h>
+>  #include <mach/common.h>
+> @@ -682,6 +683,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	struct mmc_host *mmc;
+>  	struct resource *iores, *dmares, *r;
+>  	struct mxs_mmc_platform_data *pdata;
+> +	struct pinctrl *pinctrl;
+>  	int ret = 0, irq_err, irq_dma;
+>  	dma_cap_mask_t mask;
+>  
+> @@ -719,6 +721,12 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	host->irq = irq_err;
+>  	host->sdio_irq_en = 0;
+>  
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl)) {
+> +		ret = PTR_ERR(pinctrl);
+> +		goto out_iounmap;
+> +	}
 > +
-> + ? ? ? ? ? ? ? mbox->ops->enable_irq(mbox, IRQ_RX);
+>  	host->clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(host->clk)) {
+>  		ret = PTR_ERR(host->clk);
 
-Might be nicer to use omap_mbox_enable_irq() here instead of reaching
-out for the internal ops.
+Acked-by: Chris Ball <cjb@laptop.org>
 
-It also looks like there's a race here: omap_mbox_get() registers the
-notifier_block only after omap_mbox_startup() returns, which probably
-means there's a small window where an interrupt can be received
-without us invoking the user's notifier callback.
-
-This isn't related to your patch of course, but since you're touching
-this area, it might be nice if you can fix it (i.e. simply by
-registering the notifier_block before enabling the mbox's irq).
-
-> ? ? ? ?}
-> ? ? ? ?mutex_unlock(&mbox_configured_lock);
-> ? ? ? ?return 0;
-> @@ -305,6 +307,7 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
-> ? ? ? ?mutex_lock(&mbox_configured_lock);
->
-> ? ? ? ?if (!--mbox->use_count) {
-> + ? ? ? ? ? ? ? mbox->ops->disable_irq(mbox, IRQ_RX);
-
-omap_mbox_disable_irq() ?
-
-Thanks,
-Ohad.
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
