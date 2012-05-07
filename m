@@ -1,49 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2012 10:32:29 -0700
-Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1778E@DBDE01.ent.ti.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
- <20120503155717.GE5140@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
- <871un1j769.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
- <20120504200547.GU5613@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1778E@DBDE01.ent.ti.com>
-Message-ID: <20120507173229.GA5088@atomide.com>
+Date: Mon, 7 May 2012 10:50:18 -0700
+Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
+In-Reply-To: <CAMrsUdLE5CY_39p6g4gR7bi5B_gyD6ASitaWPA=D+WFvp4Rb=g@mail.gmail.com>
+References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
+ <20120504181808.GM5613@atomide.com>
+ <CAMrsUdLE5CY_39p6g4gR7bi5B_gyD6ASitaWPA=D+WFvp4Rb=g@mail.gmail.com>
+Message-ID: <20120507175017.GG5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120507 07:41]:
-> On Sat, May 05, 2012 at 01:35:47, Tony Lindgren wrote:
-> > 
-> > I suggest doing some clean-up patches before adding SOC_AM33XX where
-> > you just convert those to be
-> > 
-> > #if defined(CONFIG_ARCH_OMAP2PLUS) && !defined(CONFIG_ARCH_OMAP2)
-> > 
-> > or something similar depending if they already are inside mach-omap2
-> > directory. This will make them future proof for adding new SoCs
-> > without having to patch all over the place.
+* Raja, Govindraj <govindraj.raja@ti.com> [120507 05:26]:
+> On Fri, May 4, 2012 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+> > Is this fix still needed? If so, it should probably be a separate fix
+> > with it's own description.
+> 
+> No this one is not needed anymore
+> since its fixed part of commit
+> bce492c04ba8fc66a4ea0a52b181ba255daaaf54
 
-BTW, just noticied that the above won't work the right way in the
-multi-omap case when all of them are compiled in..
-
-> Cool, I also thought exactly same solution on this, but next thought came to 
-> my mind was, it won't scale up, since we still have dependency on ARCH_OMAP2 
-> option. However, it will be a good temporary solution for our problem, lets 
-> review them first (I will submit shortly).
-
-..so probably the best way to deal with that is with the additional
-CONFIG_SOC_OMAP3PLUS and CONFIG_SOC_OMAP4PLUS options that I posted
-at:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
-
-Can you please take a look and see how that works for am33xx?
-
-Regards,
+OK thanks for the update.
 
 Tony
