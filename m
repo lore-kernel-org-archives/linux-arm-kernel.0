@@ -1,37 +1,113 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 6 May 2012 22:08:26 -0700
-Subject: [PATCH 1/5] MAINTAINERS: add entry for common clk framework
-In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1336367310-5140-2-git-send-email-mturquette@linaro.org>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Mon, 7 May 2012 10:51:53 +0530
+Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy loop
+ condition test macro
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
+Message-ID: <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- MAINTAINERS |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+On Fri, May 4, 2012 at 2:42 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
+> On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
+>> From: Jean Pihet <j-pihet@ti.com>
+>>
+>> Now that omap_test_timeout is only accessible from mach-omap2/,
+>> introduce a similar function for SR.
+>>
+>> This change makes the SmartReflex implementation ready for the move
+>> to drivers/.
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/smartreflex.c | ? 12 ++++++------
+>> ?include/linux/power/smartreflex.h | ? 23 ++++++++++++++++++++++-
+>> ?2 files changed, 28 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+>> index d859277..acef08d 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
+>> ? ? ? ?* Wait for SR to be disabled.
+>> ? ? ? ?* wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
+>> ? ? ? ?*/
+>> - ? ? omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+>> - ? ? ? ? ? ? ? ? ? ? ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+>> - ? ? ? ? ? ? ? ? ? ? timeout);
+>> + ? ? sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+>>
+>> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
+>> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+>> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
+>> ? ? ? ?* Wait for SR to be disabled.
+>> ? ? ? ?* wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
+>> ? ? ? ?*/
+>> - ? ? omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
+>> - ? ? ? ? ? ? ? ? ? ? IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+>> - ? ? ? ? ? ? ? ? ? ? timeout);
+>> + ? ? sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+>>
+>> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
+>> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+>> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+>> index 884eaee..78b795e 100644
+>> --- a/include/linux/power/smartreflex.h
+>> +++ b/include/linux/power/smartreflex.h
+>> @@ -22,7 +22,7 @@
+>>
+>> ?#include <linux/types.h>
+>> ?#include <linux/platform_device.h>
+>> -
+>> +#include <linux/delay.h>
+>> ?#include <plat/voltage.h>
+>>
+>> ?/*
+>> @@ -168,6 +168,27 @@ struct omap_sr {
+>> ?};
+>>
+>> ?/**
+>> + * test_cond_timeout - busy-loop, testing a condition
+>> + * @cond: condition to test until it evaluates to true
+>> + * @timeout: maximum number of microseconds in the timeout
+>> + * @index: loop index (integer)
+>> + *
+>> + * Loop waiting for @cond to become true or until at least @timeout
+>> + * microseconds have passed. ?To use, define some integer @index in the
+>> + * calling code. ?After running, if @index == @timeout, then the loop has
+>> + * timed out.
+>> + *
+>> + * Copied from omap_test_timeout */
+>> +#define sr_test_cond_timeout(cond, timeout, index) ? ? ? ? ? \
+>> +({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? for (index = 0; index < timeout; index++) { ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? if (cond) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? break; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? udelay(1); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> +})
+>
+> I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
+> tight loops instead of udelay().
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1a2f8f5..164e9a1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1882,6 +1882,16 @@ F:	Documentation/filesystems/coda.txt
- F:	fs/coda/
- F:	include/linux/coda*.h
- 
-+COMMON CLK FRAMEWORK
-+M:	Mike Turquette <mturquette@ti.com>
-+M:	Mike Turquette <mturquette@linaro.org>
-+L:	linux-arm-kernel at lists.infradead.org (same as CLK API & CLKDEV)
-+T:	git git://git.linaro.org/people/mturquette/linux.git
-+S:	Maintained
-+F:	drivers/clk/clk.c
-+F:	drivers/clk/clk-*
-+F:	include/linux/clk-pr*
-+
- COMMON INTERNET FILE SYSTEM (CIFS)
- M:	Steve French <sfrench@samba.org>
- L:	linux-cifs at vger.kernel.org
+cpu_relax() changes the priority everytime to low and will yield to
+another thread.
+Considering that we are checking the condition every microsecond does it make
+some saving using cpu_relax().
+
+>
+> Regards
+> AnilKumar
+
+
+
 -- 
-1.7.5.4
+Regards and Thanks,
+Keerthy
