@@ -1,36 +1,74 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 07 May 2012 23:16:25 +0200
-Subject: [PATCH 3.4-rc4] ARM: OMAP1: Amstrad Delta: Fix wrong IRQ base in
- FIQ handler
-In-Reply-To: <20120504165948.GC5613@atomide.com>
-References: <1335806769-23711-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20120504165948.GC5613@atomide.com>
-Message-ID: <1470735.vzc89Ry7Ka@acer>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 7 May 2012 17:39:43 -0400
+Subject: [PATCH] ARM: BCMRING: Fix UART declaration and clk dev name
+ mismatch
+In-Reply-To: <4FA823C4.1070109@broadcom.com>
+References: <4FA823C4.1070109@broadcom.com>
+Message-ID: <CAP=VYLofEt_+CZmv2H90CTJ2F5gDfu5o8qfJN-a2bALC5LN=Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dnia pi?tek, 4 maja 2012 09:59:49 Tony Lindgren pisze:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120430 10:30]:
-> > Commit 384ebe1c2849160d040df3e68634ec506f13d9ff, "gpio/omap: Add DT
-> > support to GPIO driver", introduced dynamic IRQ numbering of OMAP 
-GPIO
-> > interrupts, breaking all IH_GPIO_BASE based IRQ number calculations.
-> > This issue was corrected in the OMAP GPIO driver and the related 
-header
-> > file with commit 25db711df3258d125dc1209800317e5c0ef3c870, 
-"gpio/omap:
-> > Fix IRQ handling for SPARSE_IRQ".
-> > 
-> > However, the Amstrad Delta FIQ handler, which replaces the gpio-omap
-> > driver in serving GPIO interrupts on this board, still uses that
-> > outdated method. Fix it.
-> 
-> Thanks applying into fixes.
+On Mon, May 7, 2012 at 3:34 PM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
+> Fix bcmring UART declaration and clk dev name mismatch
+>
+> With 888073d41680e8244232f3d850e0424a4e9de60f (ARM:
+> bcmring: fix UART declarations), it introduced clk dev name
+> mismatch and leads to UART initialization failure during boot.
 
-Hi Tony,
-Thanks for taking this patch, but I ca't see it applied into your fixes 
-branch (the last one sitting there is "Linux 3.4-rc4" by Linus). Am I 
-missing something?
+Do things work if you simply do a partial revert of 888073d41 ?
 
-Regards,
-Janusz
+Meaning:
+
+-static AMBA_APB_DEVICE(uartA, "uartA", 0, MM_ADDR_IO_UARTA, {IRQ_UARTA}, NULL);
+-static AMBA_APB_DEVICE(uartB, "uartB", 0, MM_ADDR_IO_UARTB, {IRQ_UARTB}, NULL);
++static AMBA_APB_DEVICE(uartA, "uarta", 0, MM_ADDR_IO_UARTA, {IRQ_UARTA}, NULL);
++static AMBA_APB_DEVICE(uartB, "uartb", 0, MM_ADDR_IO_UARTB, {IRQ_UARTB}, NULL);
+
+The original error messages led me to believe it was two errors;
+i.e. (1) the wrong # of args error, and (2) the "a" vs. "A" error.  But
+I think Olof was right on his 1st instinct, that it was just the
+single error, and the a <---> A thing was a side effect.
+
+In which case the above should just work, and it will also keep
+the naming consistent with what it was before any of these
+commits.
+
+Paul.
+--
+
+>
+> Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com
+> ?<http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>>
+> ---
+> ?arch/arm/mach-bcmring/core.c | ? ?4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+> index adbfb19..5559857 100644
+> --- a/arch/arm/mach-bcmring/core.c
+> +++ b/arch/arm/mach-bcmring/core.c
+> @@ -110,10 +110,10 @@ static struct clk_lookup lookups[] = {
+> ? ? ? ? ?.con_id = "apb_pclk",
+> ? ? ? ? ?.clk =&dummy_apb_pclk,
+> ? ? ?}, { ? ? ? ? ? ?/* UART0 */
+> - ? ? ? ?.dev_id = "uarta",
+> + ? ? ? ?.dev_id = "uartA",
+> ? ? ? ? ?.clk =&uart_clk,
+> ? ? ?}, { ? ? ? ? ? ?/* UART1 */
+> - ? ? ? ?.dev_id = "uartb",
+> + ? ? ? ?.dev_id = "uartB",
+> ? ? ? ? ?.clk =&uart_clk,
+> ? ? ?}, { ? ? ? ? ? ?/* SP804 timer 0 */
+> ? ? ? ? ?.dev_id = "sp804",
+> --
+> 1.7.9.5
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
