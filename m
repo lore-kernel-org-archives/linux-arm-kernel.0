@@ -1,109 +1,70 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 10:15:41 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FA45580.8070802@ti.com> (Jon Hunter's message of "Fri, 4 May
- 2012 17:17:36 -0500")
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
- <4FA45580.8070802@ti.com>
-Message-ID: <87ipg76hfm.fsf@ti.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Mon, 7 May 2012 22:49:36 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FA7F009.5010003@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+Message-ID: <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
-
-> Hi Will,
+On 7 May 2012 21:23, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/05/2012 11:10 AM, Jassi Brar wrote:
 >
-> On 04/26/2012 01:07 PM, Will Deacon wrote:
->> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
->>> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
->>>>
->>>> Part of the problem is that the clockdomain data for the emu_sys 
->>>> clockdomain is wrong.  Here's something to try to fix it.  It might just 
->>>> be enough to get it to work.
->>>
->>> Hmm, doesn't seem to work but I do see the following in dmesg when I try to
->>> use perf:
->>>
->>>  powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
->>>
->>> which is new with your patch.
->> 
->> Sorry to nag, but does anybody have a clue where to go from here? I can
->> start digging in the OMAP PM code, but it's all new territory for me.
+>> Hmm... there ought to be a way by which a client is handed a random 'token'
+>> via its dt node and similarly the dmac informed which channel (and with what
+>> capabilities) to allocate should it see a request coming with that token.
 >
-> I did a little playing around with this today and I think that I have figured out why this was not working (see below). Please can you try the following patch? I tried this on top of your series for perf/omap4. 
+> I think that's the whole point of the patch.
 >
-> Paul, FYI. If this works for Will then I can re-base on top of the latest linux-omap and submit to the mailing list.
+> However, the token needs to be some driver-specific struct, since the
+> required information may be more than just a single channel or request
+> ID in general.
 >
-> Also, the above error about the emu_pwrdm is odd too. I noticed that the emu_pwrdm is always in the transitioning state. And when I say always, I mean that even if I check the power domain state while u-boot is running it is in the transitioning state. So even before the kernel starts. 
+Well, what I call 'token' could just as well be some numerical hash of
+what you call 'driver-specific struct'.
+And I never thought we could do without h/w specific information,
+just that peculiarities lie with the dmac controllers and that's where
+the discerning should happen.
+
+Our opinions differ in that, I believe client side shouldn't need to
+parse/decode the h/w specific parameters from data gotten via DT
+(what I call 'token' and you 'driver-specific struct') - because that is
+the key to having common client drivers working with different dma
+controllers. And yes, I don't think we could find a future proof generic
+and simple enough representation of dma resource specification in a
+DT node :)
+
+Instead, I suggest we encode the finer details of each channel-request
+in node of the dma controller matched against the 'token' assigned
+to the respective clients. That encoding("channel_id") would be dma
+controller specific and if we also manage to contain it within fixed number
+of bytes we could also have common helpers for fetching it, though
+it still would need to be decoded by dmac controller driver - which I think
+we can't do without, considering the variety of dma floating around.
+
+
+>> That way dmac and client drivers using DT could do away with the filter_fn.
+>>
+>> Roughly speaking (I am not very well versed with DT syntax)
+>>
+>> Client Node:-
+>>
+>> mmc1: mmc at 13002000 {
+>> ? ? ? ? ...
+>> ? ? ? ? dma_tx = <891> ? //some platform-wide unique value
+>> ? ? ? ? dma_rx = <927> ? //some platform-wide unique value
+>> ? ? ? ? ...
+>> ?};
 >
-> Cheers
-> Jon 
+> I believe we specifically don't want to introduce any global concept of
+> DMA channel ID, either within the kernel, or at the device tree level.
 >
-> From 9137ff9c1b382232de7443db0b51b7555846fb62 Mon Sep 17 00:00:00 2001
-> From: Jon Hunter <jon-hunter@ti.com>
-> Date: Fri, 4 May 2012 16:48:45 -0500
-> Subject: [PATCH] ARM: OMAP4: Disable auto enable for EMU CLKDM
->
-> The flag CLKDM_CAN_HWSUP allows the clock-domain to automatically transition
-> to the enabled and disabled state. This means that as soon as we force a
-> software wake-up on the clock domain, the clock domain will be allowed to idle
-> and put back into the hardware auto state. For the EMU clock domain this is not
-> what we want. We want to keep the clock domain in the software wakeup state
-> while the clock domain is being used and put it back in to the hardware auto
-> state when we have finished using the clock domain.
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-
-With this patch, how is the clkdm ever idled?
-
-IIUC, your patch will get PMU interrupts working, but similarily to
-previous patches in this thread, it works because it *never* allows the
-EMU clkdm to idle.  This is not a mergeable solution because it will not
-allow CORE retention (and thus full-chip retention.)
-
-What we need is a solution that allows the clkdm to idle, and then to be
-reinitialzed when it wakes up.  Due to the way (I understand) resets in
-the debugss, allowing the clkdm to idle will cause a reset, so the
-PMU/CTI interrupts need to be reinitialzied after wakeup.
-
-Kevin
-
-P.S. Please note there is also already a different fix in mainline for
-the EMU clkdm data from Paul which adds the force wakeup flag and
-removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
-because the hardware is capable.)
-
-
-[1]
-Author: Paul Walmsley <paul@pwsan.com>  2012-04-04 07:25:25
-Committer: Paul Walmsley <paul@pwsan.com>  2012-04-04 07:25:25
-Parent: c16fa4f2ad19908a47c63d8fa436a1178438c7e7 (Linux 3.3)
-Branches: many (164)
-Follows: v3.4-rc1
-Precedes: omap-fixes-a-for-3.4rc, omap-fixes-a2-for-3.4rc
-
-    ARM: OMAP44xx: clockdomain data: correct the emu_sys_clkdm CLKTRCTRL data
-    
-    According to the 4430 ES2.0 TRM vX Table 3-744 "CM_EMU_CLKSTCTRL",
-    the emu_sys clockdomain data in mainline is incorrect.
-    
-    The emu_sys clockdomain does not support the DISABLE_AUTO state, and
-    instead it supports the FORCE_WAKEUP state.
-    
-    Signed-off-by: Paul Walmsley <paul@pwsan.com>
-    Cc: Beno?t Cousson <b-cousson@ti.com>
-    Cc: Kevin Hilman <khilman@ti.com>
-    Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Cc: Ming Lei <ming.lei@canonical.com>
-    Cc: Will Deacon <will.deacon@arm.com>
+I don't think these tokens have to be global.
+They just need to be common for .dts that define client and dmac nodes
+- which would usually be the same file. They just have to be unique across
+all dma clients on a given machine.
