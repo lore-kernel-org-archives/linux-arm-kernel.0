@@ -1,135 +1,87 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Mon, 7 May 2012 17:52:20 +0530
-Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
-In-Reply-To: <20120504181808.GM5613@atomide.com>
-References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
- <20120504181808.GM5613@atomide.com>
-Message-ID: <CAMrsUdLE5CY_39p6g4gR7bi5B_gyD6ASitaWPA=D+WFvp4Rb=g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 May 2012 14:38:23 +0200
+Subject: [RFC 4/5] pinctrl: SPEAr: Add gpio ranges support
+In-Reply-To: <4f7690c68b1fa5ef14b29b88fed50237e068fe4d.1335526926.git.viresh.kumar@st.com>
+References: <cover.1335526926.git.viresh.kumar@st.com>
+ <4f7690c68b1fa5ef14b29b88fed50237e068fe4d.1335526926.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdbhbESbQWX=5RC86X9Z+R767oijDB4myw=bSRay9ud-qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> Looking at this again..
->
-> * Govindraj.R <govindraj.raja@ti.com> [120306 00:34]:
->> From: "Govindraj.R" <govindraj.raja@ti.com>
->>
->> All beagle boards rev > AX/BX have external usb hubs connected to ehci
->> interface, external hub/peripheral uses a nreset sequence for which
->> uart2_rx.gpio_147 pin in mux mode4(USB2HS_nRST) is used on all beagle
->> boards expect rev Ax/BX.
->> (Reference to all beagle boards rev schematics:
->> http://beagleboard.org/hardware/design)
->>
->> Initialising uart2 will lead to serial init taking over uart2_rx pin
->> so init uart2_rx pin mux only for Beagle AX/BX rev boards.
->> Dont init uart2 for all other boards allowing usb_ehci functionality.
->
-> OK so the above got fixed for the muxing part with commit
-> bce492c04ba8fc66a4ea0a52b181ba255daaaf54.
->
->> To initialise individual uart port by id utilise and modify the existing
->> available func. omap_serial_board_init.
->
-> This makes sense as board specific fixes.
->
->> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->> @@ -126,6 +126,7 @@ static void __init omap3_beagle_init_rev(void)
->> ? ? ? ? ? ? ? beagle_config.mmc1_gpio_wp = 29;
->> ? ? ? ? ? ? ? beagle_config.reset_gpio = 170;
->> ? ? ? ? ? ? ? beagle_config.usr_button_gpio = 7;
->> + ? ? ? ? ? ? omap_serial_board_init(NULL, 1);
->> ? ? ? ? ? ? ? break;
->> ? ? ? case 6:
->> ? ? ? ? ? ? ? printk(KERN_INFO "OMAP3 Beagle Rev: C1/C2/C3\n");
->> @@ -528,7 +529,10 @@ static void __init omap3_beagle_init(void)
->> ? ? ? platform_add_devices(omap3_beagle_devices,
->> ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(omap3_beagle_devices));
->> ? ? ? omap_display_init(&beagle_dss_data);
->> - ? ? omap_serial_init();
->> + ? ? omap_serial_board_init(NULL, 0);
->> + ? ? omap_serial_board_init(NULL, 2);
->> + ? ? omap_serial_board_init(NULL, 3);
->> +
->> ? ? ? omap_sdrc_init(mt46h32m32lf6_sdrc_params,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mt46h32m32lf6_sdrc_params);
->>
->
-> So this still looks valid, except now you also add the muxing for the
-> uart pins instead of NULL? Note that you could define OMAP3_UART1_DEFAULT_PINS
-> etc in some header.
->
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -393,30 +393,32 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->> ?/**
->> ? * omap_serial_board_init() - initialize all supported serial ports
->> ? * @info: platform specific data pointer
->> + * @port_id: uart port number to be initialised
->> ? *
->> - * Initializes all available UARTs as serial ports. Platforms
->> + * Initializes individual UARTs as serial ports. Platforms
->> ? * can call this function when they want to have default behaviour
->> - * for serial ports (e.g initialize them all as serial ports).
->> + * for serial ports (e.g initialize individual serial ports based on port id).
->> ? */
->> -void __init omap_serial_board_init(struct omap_uart_port_info *info)
->> +void __init omap_serial_board_init(struct omap_uart_port_info *info, u8 port_id)
->> ?{
->> ? ? ? struct omap_uart_state *uart;
->> ? ? ? struct omap_board_data bdata;
->>
->> - ? ? list_for_each_entry(uart, &uart_list, node) {
->> - ? ? ? ? ? ? bdata.id = uart->num;
->> - ? ? ? ? ? ? bdata.flags = 0;
->> - ? ? ? ? ? ? bdata.pads = NULL;
->> - ? ? ? ? ? ? bdata.pads_cnt = 0;
->> -
->> - ? ? ? ? ? ? if (cpu_is_omap44xx() || cpu_is_omap34xx())
->> - ? ? ? ? ? ? ? ? ? ? omap_serial_fill_default_pads(&bdata);
->> -
->> - ? ? ? ? ? ? if (!info)
->> - ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, NULL);
->> - ? ? ? ? ? ? else
->> - ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, &info[uart->num]);
->> - ? ? }
->> + ? ? list_for_each_entry(uart, &uart_list, node)
->> + ? ? ? ? ? ? if (uart->num == port_id) {
->> + ? ? ? ? ? ? ? ? ? ? bdata.id = uart->num;
->> + ? ? ? ? ? ? ? ? ? ? bdata.flags = 0;
->> + ? ? ? ? ? ? ? ? ? ? bdata.pads = NULL;
->> + ? ? ? ? ? ? ? ? ? ? bdata.pads_cnt = 0;
->> +
->> + ? ? ? ? ? ? ? ? ? ? if (!cpu_is_omap24xx())
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_serial_fill_default_pads(&bdata);
->> +
->> + ? ? ? ? ? ? ? ? ? ? if (!info)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, NULL);
->> + ? ? ? ? ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_serial_init_port(&bdata, info);
->> + ? ? ? ? ? ? }
->> ?}
->> @@ -428,5 +430,8 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
->> ? */
->> ?void __init omap_serial_init(void)
->> ?{
->> - ? ? omap_serial_board_init(NULL);
->> + ? ? struct omap_uart_state *uart;
->> +
->> + ? ? list_for_each_entry(uart, &uart_list, node)
->> + ? ? ? ? ? ? omap_serial_board_init(NULL, uart->num);
->> ?}
->
-> Is this fix still needed? If so, it should probably be a separate fix
-> with it's own description.
+On Fri, Apr 27, 2012 at 1:43 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-No this one is not needed anymore
-since its fixed part of commit
-bce492c04ba8fc66a4ea0a52b181ba255daaaf54
+> Most of SPEAr SoCs, which support pinctrl, can configure & use pads as gpio.
+> This patch gpio enable support for SPEAr pinctrl drivers.
 
---
-Thanks,
-Govindraj.R
+OK...
+
+> +static struct spear_gpio_pingroup spear1310_gpio_pingroup[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .pins = i2c0_pins,
+> + ? ? ? ? ? ? ? .npins = ARRAY_SIZE(i2c0_pins),
+> + ? ? ? ? ? ? ? .muxreg = {
+> + ? ? ? ? ? ? ? ? ? ? ? .reg = PAD_FUNCTION_EN_0,
+> + ? ? ? ? ? ? ? ? ? ? ? .mask = PMX_I2C0_MASK,
+> + ? ? ? ? ? ? ? ? ? ? ? .val = 0,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .pins = ssp0_pins,
+> + ? ? ? ? ? ? ? .npins = ARRAY_SIZE(ssp0_pins),
+> + ? ? ? ? ? ? ? .muxreg = {
+> + ? ? ? ? ? ? ? ? ? ? ? .reg = PAD_FUNCTION_EN_0,
+> + ? ? ? ? ? ? ? ? ? ? ? .mask = PMX_SSP0_MASK,
+> + ? ? ? ? ? ? ? ? ? ? ? .val = 0,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+
+(...)
+
+Hm first I wonder what i2c0 and ssp0 have to do with GPIO...
+Well whatever, maybe split out a special patch just adding the
+groups?
+
+Please cut down this code by using a clever macro:
+
+#define SPEAR_PCTL_GRP(a,b) \
+{ \
+    .pins =  a##_pins, \
+    .npins = ARRAY_SIZE(a##_pins), \
+    .muxreg = { \
+        .reg = PAD_FUNCTION_EN_2, \
+        .mask PMX_##b##_MASK, \
+        .val = 0, \
+    }, \
+}
+
+Then:
+
+static struct spear_gpio_pingroup spear1310_gpio_pingroup[] = {
+    SPEAR_PCTL_GRP(i2c0, I2C0),
+    SPEAR_PCTL_GRP(ssp0, SSP0),
+    SPEAR_PCTL_GRP(ssp0_cs0, SSP0_CS0),
+    (...)
+};
+
+(You get the picture.)
+
+> +static struct spear_gpio_pingroup spear3xx_gpio_pingroup[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .pins = firda_pins,
+> + ? ? ? ? ? ? ? .npins = ARRAY_SIZE(firda_pins),
+> + ? ? ? ? ? ? ? .muxreg = {
+> + ? ? ? ? ? ? ? ? ? ? ? .mask = PMX_FIRDA_MASK,
+> + ? ? ? ? ? ? ? ? ? ? ? .val = PMX_FIRDA_MASK,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .pins = i2c_pins,
+> + ? ? ? ? ? ? ? .npins = ARRAY_SIZE(i2c_pins),
+> + ? ? ? ? ? ? ? .muxreg = {
+> + ? ? ? ? ? ? ? ? ? ? ? .mask = PMX_I2C_MASK,
+> + ? ? ? ? ? ? ? ? ? ? ? .val = PMX_I2C_MASK,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? }, {
+
+And do the same thing here.
+
+Yours,
+Linus Walleij
