@@ -1,80 +1,83 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:40:54 +0200
-Subject: [PATCH 6/6] ARM: mxs: add mxs-dma dt support
-In-Reply-To: <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
-References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
- <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080140.54370.marex@denx.de>
+Date: Tue, 8 May 2012 01:41:22 +0200
+Subject: [PATCH 01/10] mmc: mxs-mmc: use global stmp_device functionality
+In-Reply-To: <1336401793-13753-2-git-send-email-shawn.guo@linaro.org>
+References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
+ <1336401793-13753-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080141.22913.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+> Use global stmp_device functionality to reduce mach-dependency.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Huang Shijie <b32955@freescale.com>
-> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
 Acked-by: Marek Vasut <marex@denx.de>
 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/boot/dts/imx23.dtsi |    4 ++--
->  arch/arm/boot/dts/imx28.dtsi |    4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
+>  drivers/mmc/host/mxs-mmc.c |   14 +++++++-------
+>  1 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-> index fb09ccd..a85ef55 100644
-> --- a/arch/arm/boot/dts/imx23.dtsi
-> +++ b/arch/arm/boot/dts/imx23.dtsi
-> @@ -42,8 +42,8 @@
->  			};
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index bb03ddd..2ea5361 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -40,9 +40,9 @@
+>  #include <linux/module.h>
+>  #include <linux/fsl/mxs-dma.h>
+>  #include <linux/pinctrl/consumer.h>
+> +#include <linux/stmp_device.h>
 > 
->  			dma-apbh at 80004000 {
-> +				compatible = "fsl,imx23-dma-apbh";
->  				reg = <0x80004000 2000>;
-> -				status = "disabled";
->  			};
+>  #include <mach/mxs.h>
+> -#include <mach/common.h>
+>  #include <mach/mmc.h>
 > 
->  			ecc at 80008000 {
-> @@ -97,8 +97,8 @@
->  			};
+>  #define DRIVER_NAME	"mxs-mmc"
+> @@ -191,7 +191,7 @@ static void mxs_mmc_reset(struct mxs_mmc_host *host)
+>  {
+>  	u32 ctrl0, ctrl1;
 > 
->  			dma-apbx at 80024000 {
-> +				compatible = "fsl,imx23-dma-apbx";
->  				reg = <0x80024000 2000>;
-> -				status = "disabled";
->  			};
+> -	mxs_reset_block(host->base);
+> +	stmp_reset_block(host->base);
 > 
->  			dcp at 80028000 {
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 5daf757..a17fbfc 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -48,8 +48,8 @@
->  			};
+>  	ctrl0 = BM_SSP_CTRL0_IGNORE_CRC;
+>  	ctrl1 = BF_SSP(0x3, CTRL1_SSP_MODE) |
+> @@ -279,7 +279,7 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void
+> *dev_id)
 > 
->  			dma-apbh at 80004000 {
-> +				compatible = "fsl,imx28-dma-apbh";
->  				reg = <0x80004000 2000>;
-> -				status = "disabled";
->  			};
+>  	stat = readl(host->base + HW_SSP_CTRL1);
+>  	writel(stat & MXS_MMC_IRQ_BITS,
+> -	       host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
+> +	       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
 > 
->  			perfmon at 80006000 {
-> @@ -140,8 +140,8 @@
->  			};
+>  	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+>  		mmc_signal_sdio_irq(host->mmc);
+> @@ -637,18 +637,18 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
+> *mmc, int enable)
 > 
->  			dma-apbx at 80024000 {
-> +				compatible = "fsl,imx28-dma-apbx";
->  				reg = <0x80024000 2000>;
-> -				status = "disabled";
->  			};
+>  	if (enable) {
+>  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+> -		       host->base + HW_SSP_CTRL0 + MXS_SET_ADDR);
+> +		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+>  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
+> -		       host->base + HW_SSP_CTRL1 + MXS_SET_ADDR);
+> +		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_SET);
 > 
->  			dcp at 80028000 {
+>  		if (readl(host->base + HW_SSP_STATUS) & BM_SSP_STATUS_SDIO_IRQ)
+>  			mmc_signal_sdio_irq(host->mmc);
+> 
+>  	} else {
+>  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
+> -		       host->base + HW_SSP_CTRL0 + MXS_CLR_ADDR);
+> +		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+>  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
+> -		       host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
+> +		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
+>  	}
+> 
+>  	spin_unlock_irqrestore(&host->lock, flags);
 
 Best regards,
 Marek Vasut
