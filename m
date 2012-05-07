@@ -1,10 +1,10 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:34:26 +0200
-Subject: [PATCH 1/6] dma: mxs-dma: use global stmp_device functionality
-In-Reply-To: <1336400595-12964-2-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 8 May 2012 01:38:13 +0200
+Subject: [PATCH 3/6] dma: mxs-dma: make platform_device_id more generic
+In-Reply-To: <1336400595-12964-4-git-send-email-shawn.guo@linaro.org>
 References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
- <1336400595-12964-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080134.26651.marex@denx.de>
+ <1336400595-12964-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080138.13235.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,136 +12,40 @@ Dear Shawn Guo,
 
 > From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> This can get rid of the mach-dependency.
+> Rewrite mxs_dma_is_apbh and mxs_dma_is_apbx in order to support
+> other SoCs like imx6q and reform the platform_device_id for the
+> better further dt support.
 > 
 > Cc: Vinod Koul <vinod.koul@intel.com>
 > Cc: Dan Williams <dan.j.williams@intel.com>
 > Cc: Sascha Hauer <s.hauer@pengutronix.de>
 > Cc: Huang Shijie <b32955@freescale.com>
 > Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-
-Acked-by: Marek Vasut <marex@denx.de>
-
 > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 > ---
->  drivers/dma/Kconfig   |    1 +
->  drivers/dma/mxs-dma.c |   26 +++++++++++++-------------
->  2 files changed, 14 insertions(+), 13 deletions(-)
+>  arch/arm/mach-mxs/devices/platform-dma.c |   14 ++--
+>  drivers/clk/mxs/clk-imx23.c              |    4 +-
+>  drivers/clk/mxs/clk-imx28.c              |    4 +-
+>  drivers/dma/mxs-dma.c                    |  115
+> ++++++++++++++++++++--------- include/linux/fsl/mxs-dma.h              |  
+> 12 +---
+>  5 files changed, 93 insertions(+), 56 deletions(-)
 > 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index ef378b5..aadeb5b 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -238,6 +238,7 @@ config IMX_DMA
->  config MXS_DMA
->  	bool "MXS DMA support"
->  	depends on SOC_IMX23 || SOC_IMX28
-> +	select STMP_DEVICE
->  	select DMA_ENGINE
->  	help
->  	  Support the MXS DMA engine. This engine including APBH-DMA
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 655d4ce..bd27818 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -23,10 +23,10 @@
->  #include <linux/dmaengine.h>
->  #include <linux/delay.h>
->  #include <linux/fsl/mxs-dma.h>
-> +#include <linux/stmp_device.h>
+> diff --git a/arch/arm/mach-mxs/devices/platform-dma.c
+> b/arch/arm/mach-mxs/devices/platform-dma.c index 6a0202b..aff4813 100644
+> --- a/arch/arm/mach-mxs/devices/platform-dma.c
+> +++ b/arch/arm/mach-mxs/devices/platform-dma.c
+> @@ -32,17 +32,19 @@ static struct platform_device *__init mxs_add_dma(const
+> char *devid,
 > 
->  #include <asm/irq.h>
->  #include <mach/mxs.h>
-> -#include <mach/common.h>
-> 
->  #include "dmaengine.h"
-> 
-> @@ -138,10 +138,10 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan
-> *mxs_chan)
-> 
->  	if (dma_is_apbh() && apbh_is_old())
->  		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
-> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
->  	else
->  		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
-> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
-STMP_OFFSET_REG_SET);
->  }
-> 
->  static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-> @@ -170,10 +170,10 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan
-> *mxs_chan) /* freeze the channel */
->  	if (dma_is_apbh() && apbh_is_old())
->  		writel(1 << chan_id,
-> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
->  	else
->  		writel(1 << chan_id,
-> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
-STMP_OFFSET_REG_SET);
-> 
->  	mxs_chan->status = DMA_PAUSED;
->  }
-> @@ -186,10 +186,10 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan
-> *mxs_chan) /* unfreeze the channel */
->  	if (dma_is_apbh() && apbh_is_old())
->  		writel(1 << chan_id,
-> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_CLR_ADDR);
-> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
->  	else
->  		writel(1 << chan_id,
-> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_CLR_ADDR);
-> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
-STMP_OFFSET_REG_CLR);
-> 
->  	mxs_chan->status = DMA_IN_PROGRESS;
->  }
-> @@ -220,11 +220,11 @@ static irqreturn_t mxs_dma_int_handler(int irq, void
-> *dev_id) /* completion status */
->  	stat1 = readl(mxs_dma->base + HW_APBHX_CTRL1);
->  	stat1 &= MXS_DMA_CHANNELS_MASK;
-> -	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + MXS_CLR_ADDR);
-> +	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
-> 
->  	/* error status */
->  	stat2 = readl(mxs_dma->base + HW_APBHX_CTRL2);
-> -	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + MXS_CLR_ADDR);
-> +	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
-> 
->  	/*
->  	 * When both completion and error of termination bits set at the
-> @@ -567,7 +567,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine
-> *mxs_dma) if (ret)
->  		return ret;
-> 
-> -	ret = mxs_reset_block(mxs_dma->base);
-> +	ret = stmp_reset_block(mxs_dma->base);
->  	if (ret)
->  		goto err_out;
-> 
-> @@ -580,14 +580,14 @@ static int __init mxs_dma_init(struct mxs_dma_engine
-> *mxs_dma) /* enable apbh burst */
->  	if (dma_is_apbh()) {
->  		writel(BM_APBH_CTRL0_APB_BURST_EN,
-> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
->  		writel(BM_APBH_CTRL0_APB_BURST8_EN,
-> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
->  	}
-> 
->  	/* enable irq for all the channels */
->  	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
-> -		mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
-> +		mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_SET);
-> 
->  err_out:
->  	clk_disable_unprepare(mxs_dma->clk);
+>  static int __init mxs_add_mxs_dma(void)
+>  {
+> -	char *apbh = "mxs-dma-apbh";
+> -	char *apbx = "mxs-dma-apbx";
+> +	char *mx23_apbh = "imx23-dma-apbh";
+> +	char *mx23_apbx = "imx23-dma-apbx";
+> +	char *mx28_apbh = "imx28-dma-apbh";
+> +	char *mx28_apbx = "imx28-dma-apbx";
 
-Best regards,
-Marek Vasut
+Oh well ... :-)
