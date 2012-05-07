@@ -1,70 +1,52 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 7 May 2012 22:49:36 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FA7F009.5010003@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <201205041923.07620.arnd@arndb.de>
- <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
- <4FA7F009.5010003@wwwdotorg.org>
-Message-ID: <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 8 May 2012 01:27:48 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <871un4q2ku.fsf@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com>
+ <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com>
+ <871un4q2ku.fsf@ti.com>
+Message-ID: <CACVXFVODqzz+1gOc0PvzpnCAeF9UL=qJG5Zjg9KD9hkNTEy3AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2012 21:23, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/05/2012 11:10 AM, Jassi Brar wrote:
->
->> Hmm... there ought to be a way by which a client is handed a random 'token'
->> via its dt node and similarly the dmac informed which channel (and with what
->> capabilities) to allocate should it see a request coming with that token.
->
-> I think that's the whole point of the patch.
->
-> However, the token needs to be some driver-specific struct, since the
-> required information may be more than just a single channel or request
-> ID in general.
->
-Well, what I call 'token' could just as well be some numerical hash of
-what you call 'driver-specific struct'.
-And I never thought we could do without h/w specific information,
-just that peculiarities lie with the dmac controllers and that's where
-the discerning should happen.
+On Tue, May 1, 2012 at 6:25 AM, Kevin Hilman <khilman@ti.com> wrote:
 
-Our opinions differ in that, I believe client side shouldn't need to
-parse/decode the h/w specific parameters from data gotten via DT
-(what I call 'token' and you 'driver-specific struct') - because that is
-the key to having common client drivers working with different dma
-controllers. And yes, I don't think we could find a future proof generic
-and simple enough representation of dma resource specification in a
-DT node :)
+> Unfortunately, digging in the code isn't going to help much.
+>
+> We've been trying to get our heads around some undocumented reset
+> behavior for the various debug IPs in OMAP.
+>
+> After a little digging and clarification from HW designers, it appears
+> that if we allow the EMU clockdomain to idle, a full reset of the debug
+> IPs is done. ?That means there are two solutions to this problem:
+>
+> 1) don't ever alow EMU clockdomain to idle.
+> 2) modify CTI driver to re-init for every use.
+>
+> Obviously (1) is the easiet, and hacks for that have already been
+> posted, but that has pretty significant impacts on power savings. ?(2)
+> is the right solution to merge upstream, but needs writing.
+>
+> For (2), using runtime PM methods in the driver would be the simplest
+> here since the ->runtime_resume method will be called every time the
+> device is about to be used.
 
-Instead, I suggest we encode the finer details of each channel-request
-in node of the dma controller matched against the 'token' assigned
-to the respective clients. That encoding("channel_id") would be dma
-controller specific and if we also manage to contain it within fixed number
-of bytes we could also have common helpers for fetching it, though
-it still would need to be decoded by dmac controller driver - which I think
-we can't do without, considering the variety of dma floating around.
+The previous patch has supported runtime pm on omap4 pmu[1], but still
+didn't fix the problem. Could you comment on the patch and point out
+the proper way to support pmu runtime for fixing the problem?
 
 
->> That way dmac and client drivers using DT could do away with the filter_fn.
->>
->> Roughly speaking (I am not very well versed with DT syntax)
->>
->> Client Node:-
->>
->> mmc1: mmc at 13002000 {
->> ? ? ? ? ...
->> ? ? ? ? dma_tx = <891> ? //some platform-wide unique value
->> ? ? ? ? dma_rx = <927> ? //some platform-wide unique value
->> ? ? ? ? ...
->> ?};
->
-> I believe we specifically don't want to introduce any global concept of
-> DMA channel ID, either within the kernel, or at the device tree level.
->
-I don't think these tokens have to be global.
-They just need to be common for .dts that define client and dmac nodes
-- which would usually be the same file. They just have to be unique across
-all dma clients on a given machine.
+[1], http://marc.info/?l=linux-arm-kernel&m=131946777028358&w=2
+
+Thanks,
+--
+Ming Lei
