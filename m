@@ -1,56 +1,58 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Mon, 7 May 2012 11:36:11 -0700
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <20120507.143647.508182574757518311.hdoyu@nvidia.com>
-References: <201205070859.29174.arnd@arndb.de>
- <20120507.122333.2024326166703361049.hdoyu@nvidia.com>
- <201205071024.48958.arnd@arndb.de>
- <20120507.143647.508182574757518311.hdoyu@nvidia.com>
-Message-ID: <20120507183611.GA725@kroah.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 May 2012 19:44:54 +0100
+Subject: [PATCH 12/15] drivers/regulator: ab8500: Split up probe() into
+ manageable pieces
+In-Reply-To: <CAF2Aj3h7pgh=Kbt+M5Xd_RDRbJN7K+WbaH1+8nM2Eakb1QNpsg@mail.gmail.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-13-git-send-email-lee.jones@linaro.org>
+ <20120507165838.GN17002@opensource.wolfsonmicro.com>
+ <CAF2Aj3h7pgh=Kbt+M5Xd_RDRbJN7K+WbaH1+8nM2Eakb1QNpsg@mail.gmail.com>
+Message-ID: <20120507184453.GQ17002@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 01:36:47PM +0200, Hiroshi Doyu wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> Subject: Re: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-> Date: Mon, 7 May 2012 12:24:48 +0200
-> Message-ID: <201205071024.48958.arnd@arndb.de>
-> 
-> > On Monday 07 May 2012, Hiroshi Doyu wrote:
-> > > Tegra doesn't enable ARM_AMBA and Tegra doesn't use the following
-> > > "drivers/amba/bus.c" right now. I needed to make this directory
-> > > available to ones without ARM_AMBA enabled.
-> > 
-> > Ah, right. I looked at arch/arm/Kconfig earlier to see if
-> > tegra enabled ARM_AMBA but was accidentally looking
-> > at ARCH_INtegraTOR when grepping for TEGRA ;-)
-> > 
-> > Your proposed solution sounds good then.
-> 
-> Thank you for reviewing patches & ACK. Attached the update one here,
-> instead of sending a while series again.
-> 
-> >From 16cc2b0fab00c33cd24bb5c43c45a4cda646ad42 Mon Sep 17 00:00:00 2001
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
-> Date: Wed, 18 Apr 2012 11:41:56 +0300
-> Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-> 
-> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> High-performance Bus (AHB) architecture.
-> 
-> The AHB Arbiter controls AHB bus master arbitration. This effectively
-> forms a second level of arbitration for access to the memory
-> controller through the AHB Slave Memory device. The AHB pre-fetch
-> logic can be configured to enhance performance for devices doing
-> sequential access. Each AHB master is assigned to either the high or
-> low priority bin. Both Tegra20/30 have this AHB bus.
-> 
-> Some of configuration params could be passed from DT too if needed.
-> 
-> Change-Id: I184e0e1ce033e76881353a4bb99234e2850e99c2
+On Mon, May 07, 2012 at 07:04:59PM +0100, Lee Jones wrote:
+> On 7 May 2012 17:58, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-What nonsense is this?  Please never put that in a patch you want
-accepted upstream, as it makes no sense and we just have to edit it out
-by hand, making us grumpy...
+> > This doesn't apply against current regulator code.
 
-greg k-h
+> It doesn't? I rebased it onto -rc5 which was the latest at time of
+> submission.
+
+This isn't a bugfix that should be rushed into Linus' tree for 3.4!
+You're missing the best part of a release cycle of development here,
+including at least one incompatible API change.  
+
+If you're developing new code you should always submit against the tree
+it's supposed to be applied to; as a rule of thumb -next is a good
+approximation though subsystems do things slightly differently,
+especially in the creation of topic branches.  Even where the code will
+get applied to Linus' tree then merged as a new topic branch you should
+verify that there aren't any other changes in -next that affect it (eg,
+an API you rely on having changed or other changes to the same file
+which conflict with yours).
+
+> > Please also at least
+> > try to use changelogs that match the subsystem you're submitting
+> > against.
+
+> What do you mean? Isn't "drivers/regulator" in the subject line enough?
+
+As I said you should use changelogs that match the subsystem you are
+submitting against.  Essentially nothing in the regulator tree uses
+this, as you should be able to see from inspection of the changelogs:
+
+$ git shortlog next/master drivers/regulator | wc -l
+1059
+$ git shortlog drivers/regulator | grep drivers/regulator | wc -l
+6
+
+Generally everything uses "regulator: ".  You should always make an
+effort to do this for whatever subsystem you're working with.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/5d89fce0/attachment.sig>
