@@ -1,113 +1,106 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Mon, 7 May 2012 10:51:53 +0530
-Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy loop
- condition test macro
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
-Message-ID: <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 7 May 2012 10:52:28 +0530
+Subject: [PATCH v2] gpio/omap: fix incorrect initialization of
+ omap_gpio_mod_init
+In-Reply-To: <CANOLnOO3bSxoE-8TaXd_Tz=taPOZpfQY+z-=6c7Ovfpf+FCAuw@mail.gmail.com>
+References: <1335770412-1344-1-git-send-email-tarun.kanti@ti.com>
+ <CANOLnOO3bSxoE-8TaXd_Tz=taPOZpfQY+z-=6c7Ovfpf+FCAuw@mail.gmail.com>
+Message-ID: <CAC83ZvLYmPr3qTRUUTom1iOA-czef9EVcM229UMDePnw8sbA+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 2:42 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
->> From: Jean Pihet <j-pihet@ti.com>
+Hi,
+
+On Sun, May 6, 2012 at 3:25 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+> I've noticed that current mainline enables _all_ possible GPIO
+> interrupts, this patch fixes that problem.
+OK, thanks.
+
+> Also Grant doesn't seem to be on CC so might not be able to pick this up.
+I have added Cc: in the patch and was expecting that would take care.
+Looks like that has not happened. Anyways, I have explicitly added in the email.
+--
+Tarun
+>
+> On Mon, Apr 30, 2012 at 10:20 AM, Tarun Kanti DebBarma
+> <tarun.kanti@ti.com> wrote:
+>> Initialization of irqenable, irqstatus registers is the common
+>> operation done in this function for all OMAP platforms, viz. OMAP1,
+>> OMAP2+. The latter _gpio_rmw()'s which supposedly got introduced
+>> wrongly to take care of OMAP2+ platforms were overwriting initially
+>> programmed OMAP1 value breaking functionality on OMAP1.
+>> Somehow incorrect assumption was made that each _gpio_rmw()'s were
+>> mutually exclusive. On close observation it is found that the first
+>> _gpio_rmw() which is supposedly done to take care of OMAP1 platform
+>> is generic enough and takes care of OMAP2+ platform as well.
+>> Therefore remove the latter _gpio_rmw() to irqenable as they are
+>> redundant now.
 >>
->> Now that omap_test_timeout is only accessible from mach-omap2/,
->> introduce a similar function for SR.
+>> Writing to ctrl and debounce_en registers for OMAP2+ platforms are
+>> modified to match the original(pre-cleanup) code where the registers
+>> are initialized with 0. In the cleanup series since we are using
+>> _gpio_rmw(reg, 0, 1), instead of __raw_writel(), we are just reading
+>> and writing the same values to ctrl and debounce_en. This is not an
+>> issue for debounce_en register because it has 0x0 as the default value.
+>> But in the case of ctrl register the default value is 0x2 (GATINGRATIO
+>> ?= 0x1) so that we end up writing 0x2 instead of intended 0 value.
+>> Therefore changing back to __raw_writel() as this is sufficient for
+>> this case besides simpler to understand.
 >>
->> This change makes the SmartReflex implementation ready for the move
->> to drivers/.
+>> Also, change irqstatus initalization logic that avoids comparison
+>> with bool, besides making it fit in a single line.
 >>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+>> Cc: stable at vger.kernel.org
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Reported-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 >> ---
->> ?arch/arm/mach-omap2/smartreflex.c | ? 12 ++++++------
->> ?include/linux/power/smartreflex.h | ? 23 ++++++++++++++++++++++-
->> ?2 files changed, 28 insertions(+), 7 deletions(-)
+>> v2:
+>> Avoid irqstatus initialization sequence change.
+>> Use __raw_writel() to update debounce_en and ctrl registers.
+>> Update changelog to elaborate how redundant _gpio_rmw() got added.
 >>
->> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
->> index d859277..acef08d 100644
->> --- a/arch/arm/mach-omap2/smartreflex.c
->> +++ b/arch/arm/mach-omap2/smartreflex.c
->> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
->> ? ? ? ?* Wait for SR to be disabled.
->> ? ? ? ?* wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
->> ? ? ? ?*/
->> - ? ? omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
->> - ? ? ? ? ? ? ? ? ? ? ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
->> - ? ? ? ? ? ? ? ? ? ? timeout);
->> + ? ? sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+>> ?drivers/gpio/gpio-omap.c | ? ?9 +++------
+>> ?1 files changed, 3 insertions(+), 6 deletions(-)
 >>
->> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
->> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
->> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
->> ? ? ? ?* Wait for SR to be disabled.
->> ? ? ? ?* wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
->> ? ? ? ?*/
->> - ? ? omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
->> - ? ? ? ? ? ? ? ? ? ? IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
->> - ? ? ? ? ? ? ? ? ? ? timeout);
->> + ? ? sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 59a4af1..9b71f04 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -957,18 +957,15 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+>> ? ? ? ?}
 >>
->> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
->> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
->> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
->> index 884eaee..78b795e 100644
->> --- a/include/linux/power/smartreflex.h
->> +++ b/include/linux/power/smartreflex.h
->> @@ -22,7 +22,7 @@
+>> ? ? ? ?_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
+>> - ? ? ? _gpio_rmw(base, bank->regs->irqstatus, l,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->regs->irqenable_inv == false);
+>> - ? ? ? _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
+>> - ? ? ? _gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
+>> + ? ? ? _gpio_rmw(base, bank->regs->irqstatus, l, !bank->regs->irqenable_inv);
+>> ? ? ? ?if (bank->regs->debounce_en)
+>> - ? ? ? ? ? ? ? _gpio_rmw(base, bank->regs->debounce_en, 0, 1);
+>> + ? ? ? ? ? ? ? __raw_writel(0, base + bank->regs->debounce_en);
 >>
->> ?#include <linux/types.h>
->> ?#include <linux/platform_device.h>
->> -
->> +#include <linux/delay.h>
->> ?#include <plat/voltage.h>
+>> ? ? ? ?/* Save OE default value (0xffffffff) in the context */
+>> ? ? ? ?bank->context.oe = __raw_readl(bank->base + bank->regs->direction);
+>> ? ? ? ? /* Initialize interface clk ungated, module enabled */
+>> ? ? ? ?if (bank->regs->ctrl)
+>> - ? ? ? ? ? ? ? _gpio_rmw(base, bank->regs->ctrl, 0, 1);
+>> + ? ? ? ? ? ? ? __raw_writel(0, base + bank->regs->ctrl);
+>> ?}
 >>
->> ?/*
->> @@ -168,6 +168,27 @@ struct omap_sr {
->> ?};
+>> ?static __devinit void
+>> --
+>> 1.7.0.4
 >>
->> ?/**
->> + * test_cond_timeout - busy-loop, testing a condition
->> + * @cond: condition to test until it evaluates to true
->> + * @timeout: maximum number of microseconds in the timeout
->> + * @index: loop index (integer)
->> + *
->> + * Loop waiting for @cond to become true or until at least @timeout
->> + * microseconds have passed. ?To use, define some integer @index in the
->> + * calling code. ?After running, if @index == @timeout, then the loop has
->> + * timed out.
->> + *
->> + * Copied from omap_test_timeout */
->> +#define sr_test_cond_timeout(cond, timeout, index) ? ? ? ? ? \
->> +({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? for (index = 0; index < timeout; index++) { ? ? ? ? ? ? \
->> + ? ? ? ? ? ? if (cond) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? ? ? ? ? break; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? udelay(1); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> +})
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
-> I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
-> tight loops instead of udelay().
-
-cpu_relax() changes the priority everytime to low and will yield to
-another thread.
-Considering that we are checking the condition every microsecond does it make
-some saving using cpu_relax().
-
 >
-> Regards
-> AnilKumar
-
-
-
--- 
-Regards and Thanks,
-Keerthy
+>
+> --
+> Gra?vydas
