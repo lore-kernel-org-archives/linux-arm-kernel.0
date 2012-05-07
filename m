@@ -1,42 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 May 2012 10:08:58 +0100
-Subject: [PATCH 1/2] mfd: max8925: request resource region
-In-Reply-To: <20120507090127.GA2132@sirena.org.uk>
-References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
- <20120507075800.GL26481@n2100.arm.linux.org.uk>
- <20120507090127.GA2132@sirena.org.uk>
-Message-ID: <20120507090858.GN26481@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 May 2012 10:10:02 +0100
+Subject: [PATCH 1/3] regulator: add pre-regulator support for 88pm860x
+In-Reply-To: <20120506022954.GB29576@lizard>
+References: <1332825916-2183-1-git-send-email-jtzhou@marvell.com>
+ <20120506022954.GB29576@lizard>
+Message-ID: <20120507091001.GB4415@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 10:01:28AM +0100, Mark Brown wrote:
-> On Mon, May 07, 2012 at 08:58:00AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 07, 2012 at 11:10:48AM +0800, Haojian Zhuang wrote:
-> > > If resource region isn't requested, component devices will fail to request
-> > > their resources.
-> 
-> > > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> 
-> > This looks wrong.
-> 
-> > This driver looks broken.  IO regions are for PC IO stuff, not for I2C
-> > buses.  There is no resource reservation system in the kernel for
-> > registers on I2C devices.
-> 
-> They've commonly been used for this, it's a fairly sane way for an MFD
-> to communicate with its subdevices.  The fix in this series isn't good,
-> though - providing a parent resource with a suitable range for all the
-> device resources should do the job much more sensibly.  This isn't great
-> but the infrastructure seems to do the right thing with it for now and
-> it only requires a bit of reinterpretation of what IORESOURCE_IO means.
+On Sat, May 05, 2012 at 07:29:54PM -0700, Anton Vorontsov wrote:
 
-It's an abuse.  And it won't work unless PCMCIA, PCI or ISA is enabled.
-This abuse must stop, and it must stop right now.  And I really don't
-care about "it's commonly been used for XYZ" because it's a totally fucked
-idea.
+> OK to let me take this via battery tree?
 
-What if you have two devices both claiming IO regions at 0?  Hint: it
-fails.
-
-It's buggered beyond belief and it needs to die right now, no questions
-about it.  And anyone who supports this idea needs to be...
+No, there's now substantial conflicts with the regulator driver's
+ongoing development.  For example, the driver has been converted to use
+the core regmap support for enable and disable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/b4147d61/attachment.sig>
