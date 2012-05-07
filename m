@@ -1,232 +1,54 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 07 May 2012 12:54:29 -0700
-Subject: [PATCH 5/5] clk: add a fixed factor clock
-In-Reply-To: <1336367310-5140-6-git-send-email-mturquette@linaro.org>
-References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
- <1336367310-5140-6-git-send-email-mturquette@linaro.org>
-Message-ID: <4FA82875.604@codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 May 2012 20:58:03 +0100
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <201205071926.08810.arnd@arndb.de>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205071509.55166.arnd@arndb.de>
+ <20120507151744.GI17002@opensource.wolfsonmicro.com>
+ <201205071926.08810.arnd@arndb.de>
+Message-ID: <20120507195802.GB15893@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2012 10:08 PM, Mike Turquette wrote:
-> From: Sascha Hauer<s.hauer@pengutronix.de>
->
-> Having fixed factors/dividers in hardware is a common pattern, so
-> add a basic clock type doing this. It basically describes a fixed
-> factor clock using a nominator and a denominator.
->
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
-> Reviewed-by: Viresh Kumar<viresh.kumar@st.com>
-> [mturquette at linaro.org: constify parent_names in static init macro]
-> [mturquette at linaro.org: copy/paste bug from mux in static init macro]
-> [mturquette at linaro.org: fix error handling in clk_register_fixed_factor]
-> Signed-off-by: Mike Turquette<mturquette@linaro.org>
-> ---
->   drivers/clk/Makefile           |    2 +-
->   drivers/clk/clk-fixed-factor.c |   95 ++++++++++++++++++++++++++++++++++++++++
->   include/linux/clk-private.h    |   20 ++++++++
->   include/linux/clk-provider.h   |   23 ++++++++++
->   4 files changed, 139 insertions(+), 1 deletions(-)
->   create mode 100644 drivers/clk/clk-fixed-factor.c
->
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 1f736bc..24aa714 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -1,4 +1,4 @@
->
->   obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
->   obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
-> -				   clk-mux.o clk-divider.o
-> +				   clk-mux.o clk-divider.o clk-fixed-factor.o
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> new file mode 100644
-> index 0000000..1f2da01
-> --- /dev/null
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -0,0 +1,95 @@
-> +/*
-> + * Copyright (C) 2011 Sascha Hauer, Pengutronix<s.hauer@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Standard functionality for the common clock API.
-> + */
-> +#include<linux/module.h>
-> +#include<linux/clk-provider.h>
-> +#include<linux/slab.h>
-> +#include<linux/err.h>
-> +
-> +/*
-> + * DOC: basic fixed multiplier and divider clock that cannot gate
-> + *
-> + * Traits of this clock:
-> + * prepare - clk_prepare only ensures that parents are prepared
-> + * enable - clk_enable only ensures that parents are enabled
-> + * rate - rate is fixed.  clk->rate = parent->rate / div * mult
-> + * parent - fixed parent.  No clk_set_parent support
-> + */
-> +
-> +#define to_clk_fixed_factor(_hw) container_of(_hw, struct clk_fixed_factor, hw)
-> +
-> +static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
-> +		unsigned long parent_rate)
-> +{
-> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> +
-> +	return (parent_rate / fix->div) * fix->mult;
+On Mon, May 07, 2012 at 07:26:08PM +0000, Arnd Bergmann wrote:
+> On Monday 07 May 2012, Mark Brown wrote:
+> > On Mon, May 07, 2012 at 03:09:54PM +0000, Arnd Bergmann wrote:
+> > > On Monday 07 May 2012, Mark Brown wrote:
 
-Wouldn't multiplying and then dividing result in better accuracy? Is it 
-worth doing that (since we will have to account for overflow)?
+> > > > Given what I'm saying about platform devices above perhaps we should be
+> > > > factoring some of the platform device stuff up to struct device level.
 
-> +}
-> +
-> +static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long *prate)
-> +{
-> +	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> +
-> +	if (__clk_get_flags(hw->clk)&  CLK_SET_RATE_PARENT) {
-> +		unsigned long best_parent;
-> +
-> +		best_parent = (rate / fix->mult) * fix->div;
-> +		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
-> +				best_parent);
-> +	}
-> +
-> +	return (*prate / fix->div) * fix->mult;
-> +}
-> +
-> +static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long parent_rate)
-> +{
-> +	return 0;
-> +}
-> +
-> +struct clk_ops clk_fixed_factor_ops = {
-> +	.round_rate = clk_factor_round_rate,
-> +	.set_rate = clk_factor_set_rate,
-> +	.recalc_rate = clk_factor_recalc_rate,
-> +};
-> +EXPORT_SYMBOL_GPL(clk_fixed_factor_ops);
-> +
-> +struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
-> +		const char *parent_name, unsigned long flags,
-> +		unsigned int mult, unsigned int div)
-> +{
-> +	struct clk_fixed_factor *fix;
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +
-> +	fix = kmalloc(sizeof(*fix), GFP_KERNEL);
-> +	if (!fix) {
-> +		pr_err("%s: could not allocate fixed factor clk\n", __func__);
-> +		return ERR_PTR(-ENOMEM);
-> +	}
+> > > Isn't that what devres is for? We should be able to just attach arbitrary
+> > > data to a device with this, e.g. a struct regmap to use for doing I/O
+> > > that a driver can use. Maybe we should add some wrappers around that
+> > > to make it more obvious to use.
 
-Can we add a check for mult <= div? It doesn't look like this clock is 
-meant to capture clock multipliers (if there is even anything like that 
-other than PLLs).
+> > Not as far as I understand it, it's more about making error handling and
+> > unregistration code less error prone by automating the freeing of
+> > things when a device goes away or probe() fails.  The managed versions
 
-> +
-> +	/* struct clk_fixed_factor assignments */
-> +	fix->mult = mult;
-> +	fix->div = div;
-> +	fix->hw.init =&init;
-> +
-> +	init.name = name;
-> +	init.ops =&clk_fixed_factor_ops;
-> +	init.flags = flags;
-> +	init.parent_names =&parent_name;
-> +	init.num_parents = 1;
-> +
-> +	clk = clk_register(dev,&fix->hw);
-> +
-> +	if (IS_ERR(clk))
-> +		kfree(fix);
-> +
-> +	return clk;
-> +}
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index b258532..eb3f84b 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -143,6 +143,26 @@ struct clk {
->   	DEFINE_CLK(_name, clk_mux_ops, _flags, _parent_names,	\
->   			_parents);
->
-> +#define DEFINE_CLK_FIXED_FACTOR(_name, _parent_name,		\
-> +				_parent_ptr, _flags,		\
-> +				_mult, _div)			\
-> +	static struct clk _name;				\
-> +	static const char *_name##_parent_names[] = {		\
-> +		_parent_name,					\
-> +	};							\
-> +	static struct clk *_name##_parents[] = {		\
-> +		_parent_ptr,					\
-> +	};							\
-> +	static struct clk_fixed_factor _name##_hw = {		\
-> +		.hw = {						\
-> +			.clk =&_name,				\
-> +		},						\
-> +		.mult = _mult,					\
-> +		.div = _div,					\
-> +	};							\
-> +	DEFINE_CLK(_name, clk_fixed_factor_ops, _flags,		\
-> +			_name##_parent_names, _name##_parents);
-> +
+> Yes, it also does that, but have a look at how drivers/pci/pci.c uses
+> devres to attach auxiliary attributes to a device. We can do the same
+> thing for other devices to attach any data.
 
-I would prefer not defining a macro for this. But if we are going to do 
-it, can we please at least stop doing nested macros here? It would be 
-much easier for a new comer to read if we don't nest these clock macros.
+Right, but that's essentially just the bus doing the equivalent of
+devm_kzalloc() to allocate some private data which is a separate thing.
+It doesn't really address the problem of passing information from
+registration code to the device through the bus which is what the
+resource API is currently doing for these devices.
 
-Also, should we stop adding support for fully static allocation for new 
-clock types? Since it's supposed to be going away soon. Since Mike 
-didn't add this clock type, I'm guessing he doesn't need the clock type 
-now and hence doesn't need static allocation support for it.
+We probably should be making a bit more use of devres for this than we
+are (using it to bounce through a regmap isn't a bad idea, I might just
+do that though a lot of the time you need the parent internal data
+struct anyway) but it's a separate thing.
 
->   /**
->    * __clk_init - initialize the data structures in a struct clk
->    * @dev:	device initializing this clk, placeholder for now
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 5db3412..c1c23b9 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -277,6 +277,29 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
->   		u8 clk_mux_flags, spinlock_t *lock);
->
->   /**
-> + * struct clk_fixed_factor - fixed multiplier and divider clock
-> + *
-> + * @hw:		handle between common and hardware-specific interfaces
-> + * @mult:	multiplier
-> + * @div:	divider
-> + *
-> + * Clock with a fixed multiplier and divider. The output frequency is the
-> + * parent clock rate divided by div and multiplied by mult.
-> + * Implements .recalc_rate, .set_rate and .round_rate
-> + */
-> +
-> +struct clk_fixed_factor {
-> +	struct clk_hw	hw;
-> +	unsigned int	mult;
-> +	unsigned int	div;
-> +};
-> +
-> +extern struct clk_ops clk_fixed_factor_ops;
-> +struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
-> +		const char *parent_name, unsigned long flags,
-> +		unsigned int mult, unsigned int div);
-
-Should we have one header file for each common clock type? We seem to be 
-adding a lot of those (which is good), but it almost feels like 
-clock-provider get out of hand soon.
-
-Thanks,
-Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Something like pulling the type out of the flags in struct resource to
+give us a bit more space (or replace the bits with a pointer, though
+that's even more invasive) would address this more...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/564ed995/attachment.sig>
