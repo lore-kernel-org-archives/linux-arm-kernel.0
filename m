@@ -1,101 +1,312 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:23:11 +0800
-Subject: [PATCH 2/6] dma: mxs-dma: let dma_is_apbh and apbh_is_old take
- parameter
+Date: Mon,  7 May 2012 22:23:12 +0800
+Subject: [PATCH 3/6] dma: mxs-dma: make platform_device_id more generic
 In-Reply-To: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
 References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336400595-12964-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336400595-12964-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let macros dma_is_apbh and apbh_is_old take mxs_dma as parameter
-to make the code easy to read.
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
+Rewrite mxs_dma_is_apbh and mxs_dma_is_apbx in order to support
+other SoCs like imx6q and reform the platform_device_id for the
+better further dt support.
+
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Huang Shijie <b32955@freescale.com>
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/dma/mxs-dma.c |   24 ++++++++++++------------
- 1 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-mxs/devices/platform-dma.c |   14 ++--
+ drivers/clk/mxs/clk-imx23.c              |    4 +-
+ drivers/clk/mxs/clk-imx28.c              |    4 +-
+ drivers/dma/mxs-dma.c                    |  115 ++++++++++++++++++++---------
+ include/linux/fsl/mxs-dma.h              |   12 +---
+ 5 files changed, 93 insertions(+), 56 deletions(-)
 
+diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+index 6a0202b..aff4813 100644
+--- a/arch/arm/mach-mxs/devices/platform-dma.c
++++ b/arch/arm/mach-mxs/devices/platform-dma.c
+@@ -32,17 +32,19 @@ static struct platform_device *__init mxs_add_dma(const char *devid,
+ 
+ static int __init mxs_add_mxs_dma(void)
+ {
+-	char *apbh = "mxs-dma-apbh";
+-	char *apbx = "mxs-dma-apbx";
++	char *mx23_apbh = "imx23-dma-apbh";
++	char *mx23_apbx = "imx23-dma-apbx";
++	char *mx28_apbh = "imx28-dma-apbh";
++	char *mx28_apbx = "imx28-dma-apbx";
+ 
+ 	if (cpu_is_mx23()) {
+-		mxs_add_dma(apbh, MX23_APBH_DMA_BASE_ADDR);
+-		mxs_add_dma(apbx, MX23_APBX_DMA_BASE_ADDR);
++		mxs_add_dma(mx23_apbh, MX23_APBH_DMA_BASE_ADDR);
++		mxs_add_dma(mx23_apbx, MX23_APBX_DMA_BASE_ADDR);
+ 	}
+ 
+ 	if (cpu_is_mx28()) {
+-		mxs_add_dma(apbh, MX28_APBH_DMA_BASE_ADDR);
+-		mxs_add_dma(apbx, MX28_APBX_DMA_BASE_ADDR);
++		mxs_add_dma(mx28_apbh, MX28_APBH_DMA_BASE_ADDR);
++		mxs_add_dma(mx28_apbx, MX28_APBX_DMA_BASE_ADDR);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 07fe1f1..96562f5 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -81,14 +81,14 @@ static struct clk_lookup uart_lookups[] __initdata = {
+ };
+ 
+ static struct clk_lookup hbus_lookups[] __initdata = {
+-	{ .dev_id = "mxs-dma-apbh", },
++	{ .dev_id = "imx23-dma-apbh", },
+ 	{ .dev_id = "80004000.dma-apbh", },
+ };
+ 
+ static struct clk_lookup xbus_lookups[] __initdata = {
+ 	{ .dev_id = "duart", .con_id = "apb_pclk"},
+ 	{ .dev_id = "80070000.serial", .con_id = "apb_pclk"},
+-	{ .dev_id = "mxs-dma-apbx", },
++	{ .dev_id = "imx23-dma-apbx", },
+ 	{ .dev_id = "80024000.dma-apbx", },
+ };
+ 
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 92b6ce0..e18cac9 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -127,14 +127,14 @@ static struct clk_lookup uart_lookups[] __initdata = {
+ };
+ 
+ static struct clk_lookup hbus_lookups[] __initdata = {
+-	{ .dev_id = "mxs-dma-apbh", },
++	{ .dev_id = "imx28-dma-apbh", },
+ 	{ .dev_id = "80004000.dma-apbh", },
+ };
+ 
+ static struct clk_lookup xbus_lookups[] __initdata = {
+ 	{ .dev_id = "duart", .con_id = "apb_pclk"},
+ 	{ .dev_id = "80074000.serial", .con_id = "apb_pclk"},
+-	{ .dev_id = "mxs-dma-apbx", },
++	{ .dev_id = "imx28-dma-apbx", },
+ 	{ .dev_id = "80024000.dma-apbx", },
+ };
+ 
 diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index bd27818..e801fbf 100644
+index e801fbf..5d9813c 100644
 --- a/drivers/dma/mxs-dma.c
 +++ b/drivers/dma/mxs-dma.c
-@@ -38,10 +38,10 @@
+@@ -36,12 +36,8 @@
+  * dma can program the controller registers of peripheral devices.
+  */
  
- #define MXS_DMA_APBH		0
- #define MXS_DMA_APBX		1
--#define dma_is_apbh()		(mxs_dma->dev_id == MXS_DMA_APBH)
-+#define dma_is_apbh(mxs_dma)	(mxs_dma->dev_id == MXS_DMA_APBH)
- 
- #define APBH_VERSION_LATEST	3
--#define apbh_is_old()		(mxs_dma->version < APBH_VERSION_LATEST)
-+#define apbh_is_old(mxs_dma)	(mxs_dma->version < APBH_VERSION_LATEST)
+-#define MXS_DMA_APBH		0
+-#define MXS_DMA_APBX		1
+-#define dma_is_apbh(mxs_dma)	(mxs_dma->dev_id == MXS_DMA_APBH)
+-
+-#define APBH_VERSION_LATEST	3
+-#define apbh_is_old(mxs_dma)	(mxs_dma->version < APBH_VERSION_LATEST)
++#define dma_is_apbh(mxs_dma)		(mxs_dma->type == MXS_DMA_APBH)
++#define apbh_is_old(mxs_dma)		(mxs_dma->dev_id == IMX23_DMA)
  
  #define HW_APBHX_CTRL0				0x000
  #define BM_APBH_CTRL0_APB_BURST8_EN		(1 << 29)
-@@ -54,10 +54,10 @@
- #define HW_APBH_VERSION				(cpu_is_mx23() ? 0x3f0 : 0x800)
- #define HW_APBX_VERSION				0x800
- #define BP_APBHX_VERSION_MAJOR			24
--#define HW_APBHX_CHn_NXTCMDAR(n) \
--	(((dma_is_apbh() && apbh_is_old()) ? 0x050 : 0x110) + (n) * 0x70)
--#define HW_APBHX_CHn_SEMA(n) \
--	(((dma_is_apbh() && apbh_is_old()) ? 0x080 : 0x140) + (n) * 0x70)
-+#define HW_APBHX_CHn_NXTCMDAR(d, n) \
-+	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
-+#define HW_APBHX_CHn_SEMA(d, n) \
-+	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
+@@ -51,9 +47,6 @@
+ #define HW_APBHX_CTRL2				0x020
+ #define HW_APBHX_CHANNEL_CTRL			0x030
+ #define BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL	16
+-#define HW_APBH_VERSION				(cpu_is_mx23() ? 0x3f0 : 0x800)
+-#define HW_APBX_VERSION				0x800
+-#define BP_APBHX_VERSION_MAJOR			24
+ #define HW_APBHX_CHn_NXTCMDAR(d, n) \
+ 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
+ #define HW_APBHX_CHn_SEMA(d, n) \
+@@ -121,9 +114,19 @@ struct mxs_dma_chan {
+ #define MXS_DMA_CHANNELS		16
+ #define MXS_DMA_CHANNELS_MASK		0xffff
  
- /*
-  * ccw bits definitions
-@@ -136,7 +136,7 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
++enum mxs_dma_devtype {
++	MXS_DMA_APBH,
++	MXS_DMA_APBX,
++};
++
++enum mxs_dma_id {
++	IMX23_DMA,
++	IMX28_DMA,
++};
++
+ struct mxs_dma_engine {
+-	int				dev_id;
+-	unsigned int			version;
++	enum mxs_dma_id			dev_id;
++	enum mxs_dma_devtype		type;
+ 	void __iomem			*base;
+ 	struct clk			*clk;
+ 	struct dma_device		dma_device;
+@@ -131,6 +134,66 @@ struct mxs_dma_engine {
+ 	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+ };
+ 
++struct mxs_dma_type {
++	enum mxs_dma_id id;
++	enum mxs_dma_devtype type;
++};
++
++static struct mxs_dma_type mxs_dma_types[] = {
++	{
++		.id = IMX23_DMA,
++		.type = MXS_DMA_APBH,
++	}, {
++		.id = IMX23_DMA,
++		.type = MXS_DMA_APBX,
++	}, {
++		.id = IMX28_DMA,
++		.type = MXS_DMA_APBH,
++	}, {
++		.id = IMX28_DMA,
++		.type = MXS_DMA_APBX,
++	}
++};
++
++static struct platform_device_id mxs_dma_ids[] = {
++	{
++		.name = "imx23-dma-apbh",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[0],
++	}, {
++		.name = "imx23-dma-apbx",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[1],
++	}, {
++		.name = "imx28-dma-apbh",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[2],
++	}, {
++		.name = "imx28-dma-apbx",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[3],
++	}, {
++		/* end of list */
++	}
++};
++
++static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
++{
++	return container_of(chan, struct mxs_dma_chan, chan);
++}
++
++int mxs_dma_is_apbh(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++
++	return dma_is_apbh(mxs_dma);
++}
++
++int mxs_dma_is_apbx(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++
++	return !dma_is_apbh(mxs_dma);
++}
++
+ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ {
  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
--	if (dma_is_apbh() && apbh_is_old())
-+	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
- 		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
- 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
- 	else
-@@ -151,10 +151,10 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
- 
- 	/* set cmd_addr up */
- 	writel(mxs_chan->ccw_phys,
--		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
-+		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(mxs_dma, chan_id));
- 
- 	/* write 1 to SEMA to kick off the channel */
--	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
-+	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(mxs_dma, chan_id));
+@@ -194,11 +257,6 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->status = DMA_IN_PROGRESS;
  }
  
- static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
-@@ -168,7 +168,7 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
- 	int chan_id = mxs_chan->chan.chan_id;
+-static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+-{
+-	return container_of(chan, struct mxs_dma_chan, chan);
+-}
+-
+ static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+ 	return dma_cookie_assign(tx);
+@@ -571,12 +629,6 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+ 	if (ret)
+ 		goto err_out;
  
- 	/* freeze the channel */
--	if (dma_is_apbh() && apbh_is_old())
-+	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
- 		writel(1 << chan_id,
- 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
- 	else
-@@ -184,7 +184,7 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
- 	int chan_id = mxs_chan->chan.chan_id;
- 
- 	/* unfreeze the channel */
--	if (dma_is_apbh() && apbh_is_old())
-+	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
- 		writel(1 << chan_id,
- 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
- 	else
-@@ -578,7 +578,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
- 				BP_APBHX_VERSION_MAJOR;
- 
+-	/* only major version matters */
+-	mxs_dma->version = readl(mxs_dma->base +
+-				((mxs_dma->dev_id == MXS_DMA_APBX) ?
+-				HW_APBX_VERSION : HW_APBH_VERSION)) >>
+-				BP_APBHX_VERSION_MAJOR;
+-
  	/* enable apbh burst */
--	if (dma_is_apbh()) {
-+	if (dma_is_apbh(mxs_dma)) {
+ 	if (dma_is_apbh(mxs_dma)) {
  		writel(BM_APBH_CTRL0_APB_BURST_EN,
- 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
- 		writel(BM_APBH_CTRL0_APB_BURST8_EN,
+@@ -598,6 +650,8 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id_entry =
+ 				platform_get_device_id(pdev);
++	const struct mxs_dma_type *dma_type =
++			(struct mxs_dma_type *)id_entry->driver_data;
+ 	struct mxs_dma_engine *mxs_dma;
+ 	struct resource *iores;
+ 	int ret, i;
+@@ -606,7 +660,8 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 	if (!mxs_dma)
+ 		return -ENOMEM;
+ 
+-	mxs_dma->dev_id = id_entry->driver_data;
++	mxs_dma->dev_id = dma_type->id;
++	mxs_dma->type = dma_type->type;
+ 
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 
+@@ -689,23 +744,11 @@ err_request_region:
+ 	return ret;
+ }
+ 
+-static struct platform_device_id mxs_dma_type[] = {
+-	{
+-		.name = "mxs-dma-apbh",
+-		.driver_data = MXS_DMA_APBH,
+-	}, {
+-		.name = "mxs-dma-apbx",
+-		.driver_data = MXS_DMA_APBX,
+-	}, {
+-		/* end of list */
+-	}
+-};
+-
+ static struct platform_driver mxs_dma_driver = {
+ 	.driver		= {
+ 		.name	= "mxs-dma",
+ 	},
+-	.id_table	= mxs_dma_type,
++	.id_table	= mxs_dma_ids,
+ };
+ 
+ static int __init mxs_dma_module_init(void)
+diff --git a/include/linux/fsl/mxs-dma.h b/include/linux/fsl/mxs-dma.h
+index 203d7c4..55d8702 100644
+--- a/include/linux/fsl/mxs-dma.h
++++ b/include/linux/fsl/mxs-dma.h
+@@ -15,14 +15,6 @@ struct mxs_dma_data {
+ 	int chan_irq;
+ };
+ 
+-static inline int mxs_dma_is_apbh(struct dma_chan *chan)
+-{
+-	return !strcmp(dev_name(chan->device->dev), "mxs-dma-apbh");
+-}
+-
+-static inline int mxs_dma_is_apbx(struct dma_chan *chan)
+-{
+-	return !strcmp(dev_name(chan->device->dev), "mxs-dma-apbx");
+-}
+-
++extern int mxs_dma_is_apbh(struct dma_chan *chan);
++extern int mxs_dma_is_apbx(struct dma_chan *chan);
+ #endif /* __MACH_MXS_DMA_H__ */
 -- 
 1.7.5.4
