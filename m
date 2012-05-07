@@ -1,65 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 7 May 2012 13:59:16 +0000
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <CAMQu2gxmPAEWYmE+DLHNYii1-wtjkm68mxU89F8EXyGLQP1Tww@mail.gmail.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
- <20120426190524.GZ3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
- <4FA7A4D0.80006@ti.com>
- <CAMQu2gxmPAEWYmE+DLHNYii1-wtjkm68mxU89F8EXyGLQP1Tww@mail.gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA175CD@DBDE01.ent.ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 7 May 2012 16:02:52 +0200
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <201205071319.48768.arnd@arndb.de>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205071121.53302.arnd@arndb.de>
+ <20120507112956.GJ4415@opensource.wolfsonmicro.com>
+ <201205071319.48768.arnd@arndb.de>
+Message-ID: <20120507140252.GB25020@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 16:14:42, Shilimkar, Santosh wrote:
-> On Mon, May 7, 2012 at 4:02 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> > Hi Paul,
-> >
-> >
-> > On 5/2/2012 11:09 AM, Paul Walmsley wrote:
-> >>
-> >> On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
-> >>
-<snip>
-> >> So first we have to decide whether the CONFIG_ARCH_OMAP* options should
-> >> have a strong dependency on the MPU type, as they currently do; or whether
-> >> they should focus on the way the SoC is integrated.
-> >
-> >
-> > I think as well that these devices should be considered as part of the OMAP4
-> > family.
-> > The CPU type should not be the parameter that decide the OMAP family, it is
-> > just an IP, that can change on some variant, whereas the whole PRCM
-> > infrastructure / interconnect is mostly the same.
-> >
-> I agree. In fact more and more I think of this problem, looks like we
-> should get rid
-> off ARCH_OMAP* and just is SOC_* going forward.
+Hi Arnd,
+
+On Mon, May 07, 2012 at 01:19:48PM +0000, Arnd Bergmann wrote:
+> On Monday 07 May 2012, Mark Brown wrote:
+> > On Mon, May 07, 2012 at 11:21:53AM +0000, Arnd Bergmann wrote:
+> > 
+> > > Can you explain why you need this kind of arbitration to start with?
+> > > Can't you just ensure that each client of the max8925 only sees a fixed
+> > > set of nonconflicting registers, and provide a higher-level abstractions
+> > > for the registers that are indeed shared between clients?
+> > 
+> > This is nothing to do with arbitration or sharing.  It's for the case
+> > where you have a set of IP blocks on the chip (and possibly over a
+> > series of different chips) all with the same register map within the IP
+> > block - you need a way to tell the function driver for the IP block
+> > where it is in the chip register map.  A similar thing happens (without
+> > issue) for the interrupts within the chip.
+> > 
+> > You'd never expect any collisions to need arbitrating, it's purely about
+> > telling the function driver where to find the IP without having to open
+> > code this.  Anything which is actually shared would be handled in the
+> > MFD core for the device normally, or with some other API like genirq.
 > 
-> Common ARM code already takes care of different CPU version and as Benoit
-> mentioned it is just one of the IP in the entire SOC. I saw tony commenting
-> in similarly on of the patch set.
+> The patch that we are discussing adds a call to 'request_region' --
+> that is the arbitration interface and that is what is causing the
+> conflicts.
 > 
+> Using a 'struct resource' of type IORESOURCE_IO to pass information
+> about non-PIO registers to child devices is inconsistent, ugly and
+> confusing, but I agree it doesn't actually result in bugs. The problems
+> start when you use those resources in combination with request_region,
+> request_resource and ioport_map.
+I agree with the latter and decided to not push this patch forward.
 
-I am working on creating patch-sets for am33xx device on the same direction,
-that means, am33xx will not fallow, neither ARCH_OMAP3 nor ARCH_OMAP4.
-am33xx will be separate device under ARCH_OMAP2PLUS, with "SOC_OMAPAM33XX".
+Cheers,
+Samuel.
 
-This also means, neither cpu_is_omap34xx() not cpu_is_omap44xx() will be 
-true for am33xx. We will have separate cpu_is_am33xx() class for this.
-
-Shortly I will submit patch-series for this. 
-Just FYI, I have some cleanup patches,  which actually tries to cleanup some 
-of the existing ARCH_OMAPx dependency in code, making addition of devices 
-easier under ARCH_OMAP2PLUS.
-
-Thanks,
-Vaibhav
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
