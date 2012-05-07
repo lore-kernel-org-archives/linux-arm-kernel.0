@@ -1,58 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 May 2012 19:44:54 +0100
-Subject: [PATCH 12/15] drivers/regulator: ab8500: Split up probe() into
- manageable pieces
-In-Reply-To: <CAF2Aj3h7pgh=Kbt+M5Xd_RDRbJN7K+WbaH1+8nM2Eakb1QNpsg@mail.gmail.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-13-git-send-email-lee.jones@linaro.org>
- <20120507165838.GN17002@opensource.wolfsonmicro.com>
- <CAF2Aj3h7pgh=Kbt+M5Xd_RDRbJN7K+WbaH1+8nM2Eakb1QNpsg@mail.gmail.com>
-Message-ID: <20120507184453.GQ17002@opensource.wolfsonmicro.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 7 May 2012 18:55:39 +0000
+Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
+In-Reply-To: <20120507173229.GA5088@atomide.com>
+References: <hvaibhav@ti.com>
+ <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
+ <20120503155717.GE5140@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
+ <871un1j769.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
+ <20120504200547.GU5613@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA1778E@DBDE01.ent.ti.com>
+ <20120507173229.GA5088@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA17EEC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 07:04:59PM +0100, Lee Jones wrote:
-> On 7 May 2012 17:58, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On Mon, May 07, 2012 at 23:02:29, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120507 07:41]:
+> > On Sat, May 05, 2012 at 01:35:47, Tony Lindgren wrote:
+> > > 
+> > > I suggest doing some clean-up patches before adding SOC_AM33XX where
+> > > you just convert those to be
+> > > 
+> > > #if defined(CONFIG_ARCH_OMAP2PLUS) && !defined(CONFIG_ARCH_OMAP2)
+> > > 
+> > > or something similar depending if they already are inside mach-omap2
+> > > directory. This will make them future proof for adding new SoCs
+> > > without having to patch all over the place.
+> 
+> BTW, just noticied that the above won't work the right way in the
+> multi-omap case when all of them are compiled in..
+> 
+> > Cool, I also thought exactly same solution on this, but next thought came to 
+> > my mind was, it won't scale up, since we still have dependency on ARCH_OMAP2 
+> > option. However, it will be a good temporary solution for our problem, lets 
+> > review them first (I will submit shortly).
+> 
+> ..so probably the best way to deal with that is with the additional
+> CONFIG_SOC_OMAP3PLUS and CONFIG_SOC_OMAP4PLUS options that I posted
+> at:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
+> 
+> Can you please take a look and see how that works for am33xx?
+> 
 
-> > This doesn't apply against current regulator code.
+I still don't understand, how this will help am33xx, and for that matter any 
+new future devices based on cortex-a8 or a9 core, but not omap exactly 
+families? 
+As I said earlier, am33xx doesn't fall under either omap3 or omap4; we have 
+again same question in front of us, which to follow, either omap3 or omap4??
 
-> It doesn't? I rebased it onto -rc5 which was the latest at time of
-> submission.
+What is the thought process of creating these config options? Isn't it same 
+as just replacing ARCH_OMAP3/4 with SOC_OMAP3PLUS and SOC_OMAP4PLUS? What is 
+the criteria for the device to get into this umbrella?
 
-This isn't a bugfix that should be rushed into Linus' tree for 3.4!
-You're missing the best part of a release cycle of development here,
-including at least one incompatible API change.  
-
-If you're developing new code you should always submit against the tree
-it's supposed to be applied to; as a rule of thumb -next is a good
-approximation though subsystems do things slightly differently,
-especially in the creation of topic branches.  Even where the code will
-get applied to Linus' tree then merged as a new topic branch you should
-verify that there aren't any other changes in -next that affect it (eg,
-an API you rely on having changed or other changes to the same file
-which conflict with yours).
-
-> > Please also at least
-> > try to use changelogs that match the subsystem you're submitting
-> > against.
-
-> What do you mean? Isn't "drivers/regulator" in the subject line enough?
-
-As I said you should use changelogs that match the subsystem you are
-submitting against.  Essentially nothing in the regulator tree uses
-this, as you should be able to see from inspection of the changelogs:
-
-$ git shortlog next/master drivers/regulator | wc -l
-1059
-$ git shortlog drivers/regulator | grep drivers/regulator | wc -l
-6
-
-Generally everything uses "regulator: ".  You should always make an
-effort to do this for whatever subsystem you're working with.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/5d89fce0/attachment.sig>
+Thanks,
+Vaibhav
