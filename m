@@ -1,38 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 10:33:41 -0700
-Subject: [PATCH 0/2] ARM: OMAP3: cleanup AM35xx SoC detection
-In-Reply-To: <1335829030-19431-1-git-send-email-khilman@ti.com> (Kevin
- Hilman's message of "Mon, 30 Apr 2012 16:37:08 -0700")
-References: <1335829030-19431-1-git-send-email-khilman@ti.com>
-Message-ID: <87zk9j5216.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 May 2012 10:33:51 -0700
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <CAJ7qFSfkHGF7ehanZP=hyZ27HqSp1ONsT0tUV-wpLne9B4DEaQ@mail.gmail.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <CAJ7qFSfkHGF7ehanZP=hyZ27HqSp1ONsT0tUV-wpLne9B4DEaQ@mail.gmail.com>
+Message-ID: <20120507173351.GB5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-Kevin Hilman <khilman@ti.com> writes:
-
-> The detection of AM35xx SoCs is confusing and has redundancies.  Clean
-> this up so that SoC detection is only based on SoC family: AM35xx.
-
-Since these aren't PM related, can you queue these with other cleanups
-for v3.5.  This is now independent from the similar changes made to the
-clock fwk which Paul is queuing.
-
-Once both series are merged, I'll have one final patch that removes all
-users of cpu_is_omap35*.
-
-Kevin
-
-> Kevin Hilman (2):
->   ARM: OMAP: AM35xx: remove redunant cpu_is checks for AM3505
->   ARM: OMAP: AM35xx: convert 3517 detection/flags to AM35xx
+* R, Sricharan <r.sricharan@ti.com> [120506 00:40]:
 >
->  arch/arm/mach-omap2/hsmmc.c                   |    8 ++++----
->  arch/arm/mach-omap2/id.c                      |    7 +++----
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |    2 +-
->  arch/arm/mach-omap2/powerdomains3xxx_data.c   |    2 +-
->  arch/arm/mach-omap2/usb-musb.c                |    2 +-
->  arch/arm/mach-omap2/voltagedomains3xxx_data.c |    2 +-
->  arch/arm/plat-omap/include/plat/cpu.h         |    8 ++++++++
->  7 files changed, 19 insertions(+), 12 deletions(-)
+> > Also, please change the whole series to use CONFIG_SOC_OMAP5 instead
+> > of CONFIG_ARCH_OMAP5. CONFIG_ARCH_OMAPXXXX stuff will go away except
+> > for CONFIG_ARCH_OMAP2PLUS. Sorry forgot to mention that earlier.
+> >
+>  ok. sure. will change this.
+
+Thanks.
+ 
+> >> -#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) || ? ?\
+> >> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? defined(CONFIG_ARCH_OMAP3))
+> >> +#if (defined(CONFIG_ARCH_OMAP5) || defined(CONFIG_ARCH_OMAP4)) && \
+> >> + ? ? ? ? ? ? !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+> >> +
+> >> ?static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
+> >> ?{
+> >> ? ? ? WARN(1, "prm: omap2xxx/omap3xxx specific function and "
+> >
+> > Maybe these functions could be just set up as __weak to avoid the
+> > ifdeffery?
+> >
+>  sorry to understand,
+>  you mean make this weak and have a strong override for OMAP2 ?
+
+Yeah that should do the trick, right?
+ 
+Regards,
+
+Tony
