@@ -1,158 +1,161 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:49:58 +0200
-Subject: [PATCH 05/10] mmc: mxs-mmc: use devm_* helper to make cleanup
- simpler
-In-Reply-To: <1336401793-13753-6-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 8 May 2012 01:58:07 +0200
+Subject: [PATCH 08/10] mmc: mxs-mmc: add device tree support
+In-Reply-To: <1336401793-13753-9-git-send-email-shawn.guo@linaro.org>
 References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
- <1336401793-13753-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080149.59012.marex@denx.de>
+ <1336401793-13753-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080158.07259.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> Use devm_request_and_ioremap and devm_request_irq helpers to clean up
-> the code a little bit.
-
-Nice :)
-
-btw do we have i2c dt bindings ?
-
-Acked-by: Marek Vasut <marex@denx.de>
+> It adds device tree probe support for mxs-mmc driver.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  drivers/mmc/host/mxs-mmc.c |   40 +++++++++-------------------------------
->  1 files changed, 9 insertions(+), 31 deletions(-)
+>  Documentation/devicetree/bindings/mmc/mxs-mmc.txt |   26 +++++++++++
+>  drivers/mmc/host/mxs-mmc.c                        |   48
+> ++++++++++++++++++-- 2 files changed, 69 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/mxs-mmc.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+> b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt new file mode 100644
+> index 0000000..d7c2a40
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+> @@ -0,0 +1,26 @@
+> +* Freescale MXS MMC controller
+> +
+> +The Freescale MXS Synchronous Serial Ports (SSP) can act as a MMC
+> controller +to support MMC, SD, and SDIO types of memory cards.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,<chip>-mmc".  The supported chips include
+> +  imx23 and imx28.
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain ERROR and DMA interrupts
+> +- fsl,ssp-dma-channel: APBH DMA channel for the SSP
+> +- fsl,bus-width: Number of data lines, can be <1>, <4>, or <8>
+> +
+> +Optional properties:
+> +- wp-gpios: Specify GPIOs for write protection
+
+You can have multiple wp-gpio per port? :-)
+
+> +
+> +Examples:
+> +
+> +ssp0: ssp at 80010000 {
+> +	compatible = "fsl,imx28-mmc";
+> +	reg = <0x80010000 2000>;
+> +	interrupts = <96 82>;
+> +	fsl,ssp-dma-channel = <0>;
+> +	fsl,bus-width = <8>;
+> +	status = "okay";
+> +};
 > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index c70c7c7..1a8ba314 100644
+> index 66f792a..c6b56b4 100644
 > --- a/drivers/mmc/host/mxs-mmc.c
 > +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -146,8 +146,6 @@ struct mxs_mmc_host {
->  	struct mmc_data			*data;
+> @@ -23,6 +23,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/ioport.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> @@ -685,8 +688,18 @@ static struct platform_device_id mxs_mmc_ids[] = {
+>  };
+>  MODULE_DEVICE_TABLE(platform, mxs_mmc_ids);
 > 
->  	void __iomem			*base;
-> -	int				irq;
-> -	struct resource			*res;
->  	struct resource			*dma_res;
->  	struct clk			*clk;
->  	unsigned int			clk_rate;
-> @@ -695,7 +693,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+> +static const struct of_device_id mxs_mmc_dt_ids[] = {
+> +	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_MMC, },
+> +	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_MMC, },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
+> +
+>  static int mxs_mmc_probe(struct platform_device *pdev)
 >  {
+> +	const struct of_device_id *of_id =
+> +			of_match_device(mxs_mmc_dt_ids, &pdev->dev);
+> +	struct device_node *np = pdev->dev.of_node;
 >  	struct mxs_mmc_host *host;
 >  	struct mmc_host *mmc;
-> -	struct resource *iores, *dmares, *r;
-> +	struct resource *iores, *dmares;
->  	struct mxs_mmc_platform_data *pdata;
->  	struct pinctrl *pinctrl;
->  	int ret = 0, irq_err, irq_dma;
-> @@ -708,28 +706,20 @@ static int mxs_mmc_probe(struct platform_device
-> *pdev) if (!iores || !dmares || irq_err < 0 || irq_dma < 0)
+>  	struct resource *iores, *dmares;
+> @@ -699,7 +712,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+>  	irq_err = platform_get_irq(pdev, 0);
+>  	irq_dma = platform_get_irq(pdev, 1);
+> -	if (!iores || !dmares || irq_err < 0 || irq_dma < 0)
+> +	if (!iores || irq_err < 0 || irq_dma < 0)
 >  		return -EINVAL;
 > 
-> -	r = request_mem_region(iores->start, resource_size(iores), pdev->name);
-> -	if (!r)
-> -		return -EBUSY;
-> -
 >  	mmc = mmc_alloc_host(sizeof(struct mxs_mmc_host), &pdev->dev);
-> -	if (!mmc) {
-> -		ret = -ENOMEM;
-> -		goto out_release_mem;
-> -	}
-> +	if (!mmc)
-> +		return -ENOMEM;
-> 
->  	host = mmc_priv(mmc);
-> -	host->base = ioremap(r->start, resource_size(r));
-> +	host->base = devm_request_and_ioremap(&pdev->dev, iores);
->  	if (!host->base) {
-> -		ret = -ENOMEM;
-> +		ret = -EADDRNOTAVAIL;
->  		goto out_mmc_free;
+> @@ -713,15 +726,31 @@ static int mxs_mmc_probe(struct platform_device
+> *pdev) goto out_mmc_free;
 >  	}
 > 
->  	host->devid = pdev->id_entry->driver_data;
+> -	host->devid = pdev->id_entry->driver_data;
+> +	if (np) {
+> +		host->devid = (enum mxs_mmc_id) of_id->data;
+> +		/*
+> +		 * TODO: This is a temporary solution and should be changed
+> +		 * to use generic DMA binding later when the helplers get in.
+> +		 */
+> +		ret = of_property_read_u32(np, "fsl,ssp-dma-channel",
+> +					   &host->dma_channel);
+> +		if (ret) {
+> +			dev_err(mmc_dev(host->mmc),
+> +				"failed to get dma channel\n");
+> +			goto out_mmc_free;
+> +		}
+> +	} else {
+> +		host->devid = pdev->id_entry->driver_data;
+> +		host->dma_channel = dmares->start;
+> +	}
+> +
 >  	host->mmc = mmc;
-> -	host->res = r;
->  	host->dma_res = dmares;
-> -	host->irq = irq_err;
+> -	host->dma_channel = dmares->start;
 >  	host->sdio_irq_en = 0;
 > 
 >  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> @@ -741,7 +731,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->  	host->clk = clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(host->clk)) {
->  		ret = PTR_ERR(host->clk);
+>  	if (IS_ERR(pinctrl)) {
+>  		ret = PTR_ERR(pinctrl);
 > -		goto out_iounmap;
 > +		goto out_mmc_free;
 >  	}
->  	clk_prepare_enable(host->clk);
 > 
-> @@ -782,7 +772,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	host->clk = clk_get(&pdev->dev, NULL);
+> @@ -749,7 +778,15 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  		    MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL;
 > 
->  	platform_set_drvdata(pdev, mmc);
-> 
-> -	ret = request_irq(host->irq, mxs_mmc_irq_handler, 0, DRIVER_NAME, host);
-> +	ret = devm_request_irq(&pdev->dev, irq_err, mxs_mmc_irq_handler, 0,
-> +			       DRIVER_NAME, host);
->  	if (ret)
->  		goto out_free_dma;
-> 
-> @@ -790,26 +781,20 @@ static int mxs_mmc_probe(struct platform_device
-> *pdev)
-> 
->  	ret = mmc_add_host(mmc);
->  	if (ret)
-> -		goto out_free_irq;
-> +		goto out_free_dma;
-> 
->  	dev_info(mmc_dev(host->mmc), "initialized\n");
-> 
->  	return 0;
-> 
-> -out_free_irq:
-> -	free_irq(host->irq, host);
->  out_free_dma:
->  	if (host->dmach)
->  		dma_release_channel(host->dmach);
->  out_clk_put:
->  	clk_disable_unprepare(host->clk);
->  	clk_put(host->clk);
-> -out_iounmap:
-> -	iounmap(host->base);
->  out_mmc_free:
->  	mmc_free_host(mmc);
-> -out_release_mem:
-> -	release_mem_region(iores->start, resource_size(iores));
->  	return ret;
->  }
-> 
-> @@ -817,12 +802,9 @@ static int mxs_mmc_remove(struct platform_device
-> *pdev) {
->  	struct mmc_host *mmc = platform_get_drvdata(pdev);
->  	struct mxs_mmc_host *host = mmc_priv(mmc);
-> -	struct resource *res = host->res;
-> 
->  	mmc_remove_host(mmc);
-> 
-> -	free_irq(host->irq, host);
-> -
->  	platform_set_drvdata(pdev, NULL);
-> 
->  	if (host->dmach)
-> @@ -831,12 +813,8 @@ static int mxs_mmc_remove(struct platform_device
-> *pdev) clk_disable_unprepare(host->clk);
->  	clk_put(host->clk);
-> 
-> -	iounmap(host->base);
-> -
->  	mmc_free_host(mmc);
-> 
-> -	release_mem_region(res->start, resource_size(res));
-> -
->  	return 0;
->  }
+>  	pdata =	mmc_dev(host->mmc)->platform_data;
+> -	if (pdata) {
+> +	if (!pdata) {
+> +		u32 bus_width = 0;
+> +		of_property_read_u32(np, "fsl,bus-width", &bus_width);
+> +		if (bus_width == 4)
+> +			mmc->caps |= MMC_CAP_4_BIT_DATA;
+> +		else if (bus_width == 8)
+> +			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+> +		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
+> +	} else {
+>  		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+>  		if (pdata->flags & SLOTF_4_BIT_CAPABLE)
+> @@ -857,6 +894,7 @@ static struct platform_driver mxs_mmc_driver = {
+>  		.owner	= THIS_MODULE,
+>  #ifdef CONFIG_PM
+>  		.pm	= &mxs_mmc_pm_ops,
+> +		.of_match_table = mxs_mmc_dt_ids,
+>  #endif
+>  	},
+>  };
 
 Best regards,
 Marek Vasut
