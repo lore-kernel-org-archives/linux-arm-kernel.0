@@ -1,97 +1,73 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:23:14 +0800
-Subject: [PATCH 5/6] ARM: mxs: do not add dma device by default
+Date: Mon,  7 May 2012 22:23:15 +0800
+Subject: [PATCH 6/6] ARM: mxs: add mxs-dma dt support
 In-Reply-To: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
 References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336400595-12964-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-This will cause conflict when dt is enabled.
-So let each platform add dma devices respectively.
-
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Huang Shijie <b32955@freescale.com>
 Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-mxs/devices/platform-dma.c |   23 +----------------------
- arch/arm/mach-mxs/include/mach/common.h  |    3 +++
- arch/arm/mach-mxs/mm.c                   |    6 ++++++
- 3 files changed, 10 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/imx23.dtsi |    4 ++--
+ arch/arm/boot/dts/imx28.dtsi |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
-index aff4813..4682450 100644
---- a/arch/arm/mach-mxs/devices/platform-dma.c
-+++ b/arch/arm/mach-mxs/devices/platform-dma.c
-@@ -14,7 +14,7 @@
- #include <mach/mx28.h>
- #include <mach/devices-common.h>
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index fb09ccd..a85ef55 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -42,8 +42,8 @@
+ 			};
  
--static struct platform_device *__init mxs_add_dma(const char *devid,
-+struct platform_device *__init mxs_add_dma(const char *devid,
- 						resource_size_t base)
- {
- 	struct resource res[] = {
-@@ -29,24 +29,3 @@ static struct platform_device *__init mxs_add_dma(const char *devid,
- 				res, ARRAY_SIZE(res), NULL, 0,
- 				DMA_BIT_MASK(32));
- }
--
--static int __init mxs_add_mxs_dma(void)
--{
--	char *mx23_apbh = "imx23-dma-apbh";
--	char *mx23_apbx = "imx23-dma-apbx";
--	char *mx28_apbh = "imx28-dma-apbh";
--	char *mx28_apbx = "imx28-dma-apbx";
--
--	if (cpu_is_mx23()) {
--		mxs_add_dma(mx23_apbh, MX23_APBH_DMA_BASE_ADDR);
--		mxs_add_dma(mx23_apbx, MX23_APBX_DMA_BASE_ADDR);
--	}
--
--	if (cpu_is_mx28()) {
--		mxs_add_dma(mx28_apbh, MX28_APBH_DMA_BASE_ADDR);
--		mxs_add_dma(mx28_apbx, MX28_APBX_DMA_BASE_ADDR);
--	}
--
--	return 0;
--}
--arch_initcall(mxs_add_mxs_dma);
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-index 84af61c..5f9a358 100644
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -31,4 +31,7 @@ extern void mx28_init_irq(void);
+ 			dma-apbh at 80004000 {
++				compatible = "fsl,imx23-dma-apbh";
+ 				reg = <0x80004000 2000>;
+-				status = "disabled";
+ 			};
  
- extern void icoll_init_irq(void);
+ 			ecc at 80008000 {
+@@ -97,8 +97,8 @@
+ 			};
  
-+extern struct platform_device *mxs_add_dma(const char *devid,
-+						resource_size_t base);
-+
- #endif /* __MACH_MXS_COMMON_H__ */
-diff --git a/arch/arm/mach-mxs/mm.c b/arch/arm/mach-mxs/mm.c
-index 67a384e..6af4371 100644
---- a/arch/arm/mach-mxs/mm.c
-+++ b/arch/arm/mach-mxs/mm.c
-@@ -66,9 +66,15 @@ void __init mx28_init_irq(void)
- void __init mx23_soc_init(void)
- {
- 	pinctrl_provide_dummies();
-+
-+	mxs_add_dma("imx23-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
-+	mxs_add_dma("imx23-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
- }
+ 			dma-apbx at 80024000 {
++				compatible = "fsl,imx23-dma-apbx";
+ 				reg = <0x80024000 2000>;
+-				status = "disabled";
+ 			};
  
- void __init mx28_soc_init(void)
- {
- 	pinctrl_provide_dummies();
-+
-+	mxs_add_dma("imx28-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
-+	mxs_add_dma("imx28-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
- }
+ 			dcp at 80028000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 5daf757..a17fbfc 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -48,8 +48,8 @@
+ 			};
+ 
+ 			dma-apbh at 80004000 {
++				compatible = "fsl,imx28-dma-apbh";
+ 				reg = <0x80004000 2000>;
+-				status = "disabled";
+ 			};
+ 
+ 			perfmon at 80006000 {
+@@ -140,8 +140,8 @@
+ 			};
+ 
+ 			dma-apbx at 80024000 {
++				compatible = "fsl,imx28-dma-apbx";
+ 				reg = <0x80024000 2000>;
+-				status = "disabled";
+ 			};
+ 
+ 			dcp at 80028000 {
 -- 
 1.7.5.4
