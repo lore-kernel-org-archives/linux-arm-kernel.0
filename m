@@ -1,136 +1,101 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:23:10 +0800
-Subject: [PATCH 1/6] dma: mxs-dma: use global stmp_device functionality
+Date: Mon,  7 May 2012 22:23:11 +0800
+Subject: [PATCH 2/6] dma: mxs-dma: let dma_is_apbh and apbh_is_old take
+ parameter
 In-Reply-To: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
 References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336400595-12964-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336400595-12964-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Let macros dma_is_apbh and apbh_is_old take mxs_dma as parameter
+to make the code easy to read.
 
-This can get rid of the mach-dependency.
-
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Huang Shijie <b32955@freescale.com>
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- drivers/dma/Kconfig   |    1 +
- drivers/dma/mxs-dma.c |   26 +++++++++++++-------------
- 2 files changed, 14 insertions(+), 13 deletions(-)
+ drivers/dma/mxs-dma.c |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index ef378b5..aadeb5b 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -238,6 +238,7 @@ config IMX_DMA
- config MXS_DMA
- 	bool "MXS DMA support"
- 	depends on SOC_IMX23 || SOC_IMX28
-+	select STMP_DEVICE
- 	select DMA_ENGINE
- 	help
- 	  Support the MXS DMA engine. This engine including APBH-DMA
 diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 655d4ce..bd27818 100644
+index bd27818..e801fbf 100644
 --- a/drivers/dma/mxs-dma.c
 +++ b/drivers/dma/mxs-dma.c
-@@ -23,10 +23,10 @@
- #include <linux/dmaengine.h>
- #include <linux/delay.h>
- #include <linux/fsl/mxs-dma.h>
-+#include <linux/stmp_device.h>
+@@ -38,10 +38,10 @@
  
- #include <asm/irq.h>
- #include <mach/mxs.h>
--#include <mach/common.h>
+ #define MXS_DMA_APBH		0
+ #define MXS_DMA_APBX		1
+-#define dma_is_apbh()		(mxs_dma->dev_id == MXS_DMA_APBH)
++#define dma_is_apbh(mxs_dma)	(mxs_dma->dev_id == MXS_DMA_APBH)
  
- #include "dmaengine.h"
+ #define APBH_VERSION_LATEST	3
+-#define apbh_is_old()		(mxs_dma->version < APBH_VERSION_LATEST)
++#define apbh_is_old(mxs_dma)	(mxs_dma->version < APBH_VERSION_LATEST)
  
-@@ -138,10 +138,10 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ #define HW_APBHX_CTRL0				0x000
+ #define BM_APBH_CTRL0_APB_BURST8_EN		(1 << 29)
+@@ -54,10 +54,10 @@
+ #define HW_APBH_VERSION				(cpu_is_mx23() ? 0x3f0 : 0x800)
+ #define HW_APBX_VERSION				0x800
+ #define BP_APBHX_VERSION_MAJOR			24
+-#define HW_APBHX_CHn_NXTCMDAR(n) \
+-	(((dma_is_apbh() && apbh_is_old()) ? 0x050 : 0x110) + (n) * 0x70)
+-#define HW_APBHX_CHn_SEMA(n) \
+-	(((dma_is_apbh() && apbh_is_old()) ? 0x080 : 0x140) + (n) * 0x70)
++#define HW_APBHX_CHn_NXTCMDAR(d, n) \
++	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
++#define HW_APBHX_CHn_SEMA(d, n) \
++	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
  
- 	if (dma_is_apbh() && apbh_is_old())
+ /*
+  * ccw bits definitions
+@@ -136,7 +136,7 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+-	if (dma_is_apbh() && apbh_is_old())
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
  		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
--			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
  	else
- 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
--			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
+@@ -151,10 +151,10 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+ 
+ 	/* set cmd_addr up */
+ 	writel(mxs_chan->ccw_phys,
+-		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
++		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(mxs_dma, chan_id));
+ 
+ 	/* write 1 to SEMA to kick off the channel */
+-	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
++	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(mxs_dma, chan_id));
  }
  
- static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-@@ -170,10 +170,10 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+ static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
+@@ -168,7 +168,7 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
  	/* freeze the channel */
- 	if (dma_is_apbh() && apbh_is_old())
+-	if (dma_is_apbh() && apbh_is_old())
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
  		writel(1 << chan_id,
--			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
  	else
- 		writel(1 << chan_id,
--			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
+@@ -184,7 +184,7 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
+ 	int chan_id = mxs_chan->chan.chan_id;
  
- 	mxs_chan->status = DMA_PAUSED;
- }
-@@ -186,10 +186,10 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
  	/* unfreeze the channel */
- 	if (dma_is_apbh() && apbh_is_old())
+-	if (dma_is_apbh() && apbh_is_old())
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
  		writel(1 << chan_id,
--			mxs_dma->base + HW_APBHX_CTRL0 + MXS_CLR_ADDR);
-+			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
  	else
- 		writel(1 << chan_id,
--			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_CLR_ADDR);
-+			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_CLR);
+@@ -578,7 +578,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+ 				BP_APBHX_VERSION_MAJOR;
  
- 	mxs_chan->status = DMA_IN_PROGRESS;
- }
-@@ -220,11 +220,11 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 	/* completion status */
- 	stat1 = readl(mxs_dma->base + HW_APBHX_CTRL1);
- 	stat1 &= MXS_DMA_CHANNELS_MASK;
--	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + MXS_CLR_ADDR);
-+	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
- 
- 	/* error status */
- 	stat2 = readl(mxs_dma->base + HW_APBHX_CTRL2);
--	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + MXS_CLR_ADDR);
-+	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
- 
- 	/*
- 	 * When both completion and error of termination bits set at the
-@@ -567,7 +567,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
- 	if (ret)
- 		return ret;
- 
--	ret = mxs_reset_block(mxs_dma->base);
-+	ret = stmp_reset_block(mxs_dma->base);
- 	if (ret)
- 		goto err_out;
- 
-@@ -580,14 +580,14 @@ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
  	/* enable apbh burst */
- 	if (dma_is_apbh()) {
+-	if (dma_is_apbh()) {
++	if (dma_is_apbh(mxs_dma)) {
  		writel(BM_APBH_CTRL0_APB_BURST_EN,
--			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
  		writel(BM_APBH_CTRL0_APB_BURST8_EN,
--			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
-+			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
- 	}
- 
- 	/* enable irq for all the channels */
- 	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
--		mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
-+		mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_SET);
- 
- err_out:
- 	clk_disable_unprepare(mxs_dma->clk);
 -- 
 1.7.5.4
