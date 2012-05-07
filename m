@@ -1,69 +1,77 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon,  7 May 2012 11:22:22 +0800
-Subject: [PATCH V2 1/2] ARM: mmp: move XX_REG definition to addr-map.h
-Message-ID: <1336360943-16862-1-git-send-email-chao.xie@marvell.com>
+Date: Mon,  7 May 2012 11:23:58 +0800
+Subject: [PATCH V2 1/4] ARM: mm: proc-mohawk: add suspend resume for mohawk
+Message-ID: <1336361041-18145-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move APBC_REG, APMU_REG and CIU_REG definition to addr-map.h
-driver only need include addr-map.h to get access of the
-registers.
+When enable ARCH_SUSPEND_POSSIBLE, it need defintion of
+cpu_mohawk_do_suspend and cpu_mohawk_do_resume
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/addr-map.h  |   12 ++++++++++++
- arch/arm/mach-mmp/include/mach/regs-apbc.h |    3 ---
- arch/arm/mach-mmp/include/mach/regs-apmu.h |    3 ---
- 3 files changed, 12 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig          |    2 +-
+ arch/arm/mm/proc-mohawk.S |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/addr-map.h b/arch/arm/mach-mmp/include/mach/addr-map.h
-index b1ece08..f88a44c 100644
---- a/arch/arm/mach-mmp/include/mach/addr-map.h
-+++ b/arch/arm/mach-mmp/include/mach/addr-map.h
-@@ -31,4 +31,16 @@
- #define SMC_CS1_PHYS_BASE	0x90000000
- #define SMC_CS1_PHYS_SIZE	0x10000000
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4cf9d42..aaa22f8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2275,7 +2275,7 @@ source "kernel/power/Kconfig"
+ config ARCH_SUSPEND_POSSIBLE
+ 	depends on !ARCH_S5PC100
+ 	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+-		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
++		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
+ 	def_bool y
  
-+#define APMU_VIRT_BASE		(AXI_VIRT_BASE + 0x82800)
-+#define APMU_REG(x)		(APMU_VIRT_BASE + (x))
+ config ARM_CPU_SUSPEND
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index cdfedc5..6a050b1 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -344,6 +344,41 @@ ENTRY(cpu_mohawk_set_pte_ext)
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+ 	mov	pc, lr
+ 
++.globl	cpu_mohawk_suspend_size
++.equ	cpu_mohawk_suspend_size, 4 * 6
++#ifdef CONFIG_PM_SLEEP
++ENTRY(cpu_mohawk_do_suspend)
++	stmfd	sp!, {r4 - r9, lr}
++	mrc	p14, 0, r4, c6, c0, 0	@ clock configuration, for turbo mode
++	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
++	mrc	p15, 0, r6, c13, c0, 0	@ PID
++	mrc 	p15, 0, r7, c3, c0, 0	@ domain ID
++	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
++	mrc 	p15, 0, r9, c1, c0, 0	@ control reg
++	bic	r4, r4, #2		@ clear frequency change bit
++	stmia	r0, {r4 - r9}		@ store cp regs
++	ldmia	sp!, {r4 - r9, pc}
++ENDPROC(cpu_mohawk_do_suspend)
 +
-+#define APBC_VIRT_BASE		(APB_VIRT_BASE + 0x015000)
-+#define APBC_REG(x)		(APBC_VIRT_BASE + (x))
++ENTRY(cpu_mohawk_do_resume)
++	ldmia	r0, {r4 - r9}		@ load cp regs
++	mov	ip, #0
++	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I & D caches, BTB
++	mcr	p15, 0, ip, c7, c10, 4	@ drain write (&fill) buffer
++	mcr	p15, 0, ip, c7, c5, 4	@ flush prefetch buffer
++	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I & D TLBs
++	mcr	p14, 0, r4, c6, c0, 0	@ clock configuration, turbo mode.
++	mcr	p15, 0, r5, c15, c1, 0	@ CP access reg
++	mcr	p15, 0, r6, c13, c0, 0	@ PID
++	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
++	orr	r1, r1, #0x18		@ cache the page table in L2
++	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
++	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
++	mov	r0, r9			@ control register
++	b	cpu_resume_mmu
++ENDPROC(cpu_mohawk_do_resume)
++#endif
 +
-+#define MPMU_VIRT_BASE		(APB_VIRT_BASE + 0x50000)
-+#define MPMU_REG(x)		(MPMU_VIRT_BASE + (x))
-+
-+#define CIU_VIRT_BASE		(AXI_VIRT_BASE + 0x82c00)
-+#define CIU_REG(x)		(CIU_VIRT_BASE + (x))
-+
- #endif /* __ASM_MACH_ADDR_MAP_H */
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apbc.h b/arch/arm/mach-mmp/include/mach/regs-apbc.h
-index 8a37fb0..68b0c93 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apbc.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apbc.h
-@@ -13,9 +13,6 @@
+ 	__CPUINIT
  
- #include <mach/addr-map.h>
- 
--#define APBC_VIRT_BASE	(APB_VIRT_BASE + 0x015000)
--#define APBC_REG(x)	(APBC_VIRT_BASE + (x))
--
- /*
-  * APB clock register offsets for PXA168
-  */
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-index 8447ac6..7af8deb 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-@@ -13,9 +13,6 @@
- 
- #include <mach/addr-map.h>
- 
--#define APMU_VIRT_BASE	(AXI_VIRT_BASE + 0x82800)
--#define APMU_REG(x)	(APMU_VIRT_BASE + (x))
--
- /* Clock Reset Control */
- #define APMU_IRE	APMU_REG(0x048)
- #define APMU_LCD	APMU_REG(0x04c)
+ 	.type	__mohawk_setup, #function
 -- 
 1.7.0.4
