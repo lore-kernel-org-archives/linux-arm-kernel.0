@@ -1,31 +1,55 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 7 May 2012 09:08:39 +0800
-Subject: [PATCH 4/9] mmc: mxs-mmc: adopt pinctrl support
-In-Reply-To: <87zk9lqojf.fsf@laptop.org>
-References: <1336318505-27043-1-git-send-email-shawn.guo@linaro.org>
- <1336318505-27043-5-git-send-email-shawn.guo@linaro.org>
- <87zk9lqojf.fsf@laptop.org>
-Message-ID: <20120507010837.GF19389@S2101-09.ap.freescale.net>
+Date: Mon,  7 May 2012 09:16:05 +0800
+Subject: [PATCH RESEND 0/9] Enable pinctrl support for mach-mxs
+Message-ID: <1336353374-28939-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2012 at 12:09:40PM -0400, Chris Ball wrote:
-> Hi,
-> 
-> Patch looks fine -- perhaps you could copy the explanation about the
-> dummy pinctrl state for non-DT boards from your series introduction
-> into this commit message, since the commit messages go into git and
-> the series description doesn't?  Thanks.
-> 
-Yeah, I thought about doing that.  But after a second thought, I did
-not do because I think device drivers should not care about these
-underneath details.  Pinctrl subsystem and platform should just sort
-these out and make them invisible to device drivers.
+[Resend to have subsystem lists Cc-ed]
 
-> Acked-by: Chris Ball <cjb@laptop.org>
-> 
-Thanks, Chris.
+With pinctrl-mxs driver (DT only) applied on pinctrl tree, the mxs
+device tree conversion can start basing on that support.  This series
+adopts pinctrl support for mxs device drivers with a dummy pinctrl
+state provided for non-DT boot, so that the pinctrl call in the device
+drivers will be bypassed for non-DT probe while it starts working for
+DT probe.
 
--- 
+To ease the merge process, I would like to ask Arnd and Olof to pull
+pinctrl tree as a dependency in arm-soc and have this series go through
+arm-soc.
+
 Regards,
 Shawn
+
+Shawn Guo (9):
+  ARM: mxs: enable pinctrl dummy states
+  serial: amba-pl011: adopt pinctrl support
+  serial: mxs-auart: adopt pinctrl support
+  mmc: mxs-mmc: adopt pinctrl support
+  mtd: nand: gpmi: adopt pinctrl support
+  i2c: mxs: adopt pinctrl support
+  ASoC: mxs-saif: adopt pinctrl support
+  video: mxsfb: adopt pinctrl support
+  ARM: mxs: enable pinctrl support
+
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mxs/Kconfig               |    2 ++
+ arch/arm/mach-mxs/include/mach/common.h |    2 ++
+ arch/arm/mach-mxs/mach-apx4devkit.c     |    2 ++
+ arch/arm/mach-mxs/mach-m28evk.c         |    2 ++
+ arch/arm/mach-mxs/mach-mx23evk.c        |    2 ++
+ arch/arm/mach-mxs/mach-mx28evk.c        |    2 ++
+ arch/arm/mach-mxs/mach-stmp378x_devb.c  |    2 ++
+ arch/arm/mach-mxs/mach-tx28.c           |    2 ++
+ arch/arm/mach-mxs/mm.c                  |   11 +++++++++++
+ drivers/i2c/busses/i2c-mxs.c            |    6 ++++++
+ drivers/mmc/host/mxs-mmc.c              |    8 ++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c  |    9 +++++++++
+ drivers/tty/serial/amba-pl011.c         |    8 ++++++++
+ drivers/tty/serial/mxs-auart.c          |    8 ++++++++
+ drivers/video/mxsfb.c                   |    9 +++++++++
+ sound/soc/mxs/mxs-saif.c                |    8 ++++++++
+ 17 files changed, 84 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
