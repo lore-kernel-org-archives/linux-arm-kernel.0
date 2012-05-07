@@ -1,62 +1,37 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 6 May 2012 22:08:28 -0700
-Subject: [PATCH 3/5] clk: remove COMMON_CLK_DISABLE_UNUSED
+Date: Sun, 6 May 2012 22:08:26 -0700
+Subject: [PATCH 1/5] MAINTAINERS: add entry for common clk framework
 In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
 References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1336367310-5140-4-git-send-email-mturquette@linaro.org>
+Message-ID: <1336367310-5140-2-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exposing this option generates confusion and incorrect behavior for
-single-image builds across platforms.  Enable this behavior permanently.
-
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/Kconfig |   11 -----------
- drivers/clk/clk.c   |    2 --
- 2 files changed, 0 insertions(+), 13 deletions(-)
+ MAINTAINERS |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index f05a60d..4864407 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -23,17 +23,6 @@ config COMMON_CLK
- menu "Common Clock Framework"
- 	depends on COMMON_CLK
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1a2f8f5..164e9a1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1882,6 +1882,16 @@ F:	Documentation/filesystems/coda.txt
+ F:	fs/coda/
+ F:	include/linux/coda*.h
  
--config COMMON_CLK_DISABLE_UNUSED
--	bool "Disabled unused clocks at boot"
--	depends on COMMON_CLK
--	---help---
--	  Traverses the entire clock tree and disables any clocks that are
--	  enabled in hardware but have not been enabled by any device drivers.
--	  This saves power and keeps the software model of the clock in line
--	  with reality.
--
--	  If in doubt, say "N".
--
- config COMMON_CLK_DEBUG
- 	bool "DebugFS representation of clock tree"
- 	depends on COMMON_CLK
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 7ceca0e..e5d5dc1 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -196,7 +196,6 @@ late_initcall(clk_debug_init);
- static inline int clk_debug_register(struct clk *clk) { return 0; }
- #endif
- 
--#ifdef CONFIG_COMMON_CLK_DISABLE_UNUSED
- /* caller must hold prepare_lock */
- static void clk_disable_unused_subtree(struct clk *clk)
- {
-@@ -246,7 +245,6 @@ static int clk_disable_unused(void)
- 	return 0;
- }
- late_initcall(clk_disable_unused);
--#endif
- 
- /***    helper functions   ***/
- 
++COMMON CLK FRAMEWORK
++M:	Mike Turquette <mturquette@ti.com>
++M:	Mike Turquette <mturquette@linaro.org>
++L:	linux-arm-kernel at lists.infradead.org (same as CLK API & CLKDEV)
++T:	git git://git.linaro.org/people/mturquette/linux.git
++S:	Maintained
++F:	drivers/clk/clk.c
++F:	drivers/clk/clk-*
++F:	include/linux/clk-pr*
++
+ COMMON INTERNET FILE SYSTEM (CIFS)
+ M:	Steve French <sfrench@samba.org>
+ L:	linux-cifs at vger.kernel.org
 -- 
 1.7.5.4
