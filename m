@@ -1,43 +1,39 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 7 May 2012 09:11:53 +0530
-Subject: [PATCH V4] clk: add a fixed factor clock
-In-Reply-To: <20120507014241.GA15248@gmail.com>
-References: <85453b2bb4d448d0dcd291579bd76e70c1b48e5b.1336039424.git.viresh.kumar@st.com>
- <20120503120821.GJ4141@pengutronix.de>
- <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
- <20120507014241.GA15248@gmail.com>
-Message-ID: <4FA74481.7010401@st.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 7 May 2012 11:55:59 +0800
+Subject: [PATCH v2 2/5] dma: mxs-dma: make platform_device_id more generic
+In-Reply-To: <201205051632.14882.marex@denx.de>
+References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
+ <201205051512.17972.marex@denx.de>
+ <CAAQ0ZWTztNaqwjVA257N+42PByhH1k1Gswi18S9G=dHEaO5PhQ@mail.gmail.com>
+ <201205051632.14882.marex@denx.de>
+Message-ID: <20120507035558.GB31245@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/7/2012 7:12 AM, Mike Turquette wrote:
-> I've applied the below fix in my local branch.  Let me know if you have
-> issue with it before I send out my pull request to Arnd.
+On Sat, May 05, 2012 at 10:32:14PM +0800, Marek Vasut wrote:
+> Dear Shawn Guo,
 > 
-> Thanks,
-> Mike
+> > On 5 May 2012 21:12, Marek Vasut <marex@denx.de> wrote:
+> > > Can't the patches be reordered then to avoid adding this altogether?
+> > 
+> > Maybe.  But I do not think it's really worth the effort.
+> > 
+> > > You don't have to add dead code in this patch and re-add it when needed.
+> > > Or fix the macro to take the parameter then, though I don't understand
+> > > why you'd want to take it and then hide it.
+> > 
+> > I do not completely understand the comment.  My point is the problem
+> > is in the existing code.  It's not introduced by Dong's patch.  The
+> > problem should be fixed in another patch, and we do not want to do
+> > several things in one patch.
 > 
+> Then order such a patch before Dong's series then? It'd all be clear, without 
+> compromises.
 > 
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index 0e8782b..1f2da01 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -88,10 +88,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
->  
->  	clk = clk_register(dev, &fix->hw);
->  
-> -	if (clk)
-> -		return clk;
-> +	if (IS_ERR(clk))
-> +		kfree(fix);
->  
-> -	kfree(fix);
-> -
-> -	return NULL;
-> +	return clk;
->  }
+Hmm, although not a big issue, but i can re-oder it to make most people happy with
+the patch.
 
-No problems. Please send it to Arnd ASAP.
+Thanks
 
---
-viresh
+Regards
+Dong Aisheng
