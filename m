@@ -1,59 +1,68 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:51:44 +0200
-Subject: [PATCH 06/10] mmc: mxs-mmc: have dma_channel than dma_res in
- mxs_mmc_host
-In-Reply-To: <1336401793-13753-7-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 8 May 2012 01:53:44 +0200
+Subject: [PATCH 07/10] mmc: mxs-mmc: copy wp_gpio in struct mxs_mmc_host
+In-Reply-To: <1336401793-13753-8-git-send-email-shawn.guo@linaro.org>
 References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
- <1336401793-13753-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080151.44883.marex@denx.de>
+ <1336401793-13753-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080153.44313.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> It replaces dma_res with dma_channel in struct mxs_mmc_host, so that
-> the device tree support will be a little easier, since dma channel
-> can not be retrieved from "struct resource *dma_res".
+> It has wp_gpio copied in struct mxs_mmc_host from platform_data,
+
+Copy wp_gpio into struct ...
+
+> so that the use of platform_data can be limited in probe function,
+> which will ease the device tree probe.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
+Otherwise
 Acked-by: Marek Vasut <marex@denx.de>
 
 > ---
->  drivers/mmc/host/mxs-mmc.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/mmc/host/mxs-mmc.c |   11 ++++-------
+>  1 files changed, 4 insertions(+), 7 deletions(-)
 > 
 > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 1a8ba314..e905721 100644
+> index e905721..66f792a 100644
 > --- a/drivers/mmc/host/mxs-mmc.c
 > +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -146,7 +146,7 @@ struct mxs_mmc_host {
->  	struct mmc_data			*data;
+> @@ -160,21 +160,17 @@ struct mxs_mmc_host {
+>  	unsigned char			bus_width;
+>  	spinlock_t			lock;
+>  	int				sdio_irq_en;
+> +	int				wp_gpio;
+>  };
 > 
->  	void __iomem			*base;
-> -	struct resource			*dma_res;
-> +	int				dma_channel;
->  	struct clk			*clk;
->  	unsigned int			clk_rate;
+>  static int mxs_mmc_get_ro(struct mmc_host *mmc)
+>  {
+>  	struct mxs_mmc_host *host = mmc_priv(mmc);
+> -	struct mxs_mmc_platform_data *pdata =
+> -		mmc_dev(host->mmc)->platform_data;
 > 
-> @@ -668,7 +668,7 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan,
-> void *param) if (!mxs_dma_is_apbh(chan))
->  		return false;
+> -	if (!pdata)
+> -		return -EFAULT;
+> -
+> -	if (!gpio_is_valid(pdata->wp_gpio))
+> +	if (!gpio_is_valid(host->wp_gpio))
+>  		return -EINVAL;
 > 
-> -	if (chan->chan_id != host->dma_res->start)
-> +	if (chan->chan_id != host->dma_channel)
->  		return false;
+> -	return gpio_get_value(pdata->wp_gpio);
+> +	return gpio_get_value(host->wp_gpio);
+>  }
 > 
->  	chan->private = &host->dma_data;
-> @@ -719,7 +719,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  static int mxs_mmc_get_cd(struct mmc_host *mmc)
+> @@ -758,6 +754,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+>  		if (pdata->flags & SLOTF_4_BIT_CAPABLE)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA;
+> +		host->wp_gpio = pdata->wp_gpio;
+>  	}
 > 
->  	host->devid = pdev->id_entry->driver_data;
->  	host->mmc = mmc;
-> -	host->dma_res = dmares;
-> +	host->dma_channel = dmares->start;
->  	host->sdio_irq_en = 0;
-> 
->  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>  	mmc->f_min = 400000;
 
 Best regards,
 Marek Vasut
