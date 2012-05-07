@@ -1,41 +1,27 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Mon, 7 May 2012 11:20:52 +0800
-Subject: [PATCH v2 1/5] dma: mxs-dma: use global stmp_device functionality
-In-Reply-To: <20120504144453.GM2194@S2101-09.ap.freescale.net>
-References: <1336133539-13465-1-git-send-email-b29396@freescale.com>
- <20120504144453.GM2194@S2101-09.ap.freescale.net>
-Message-ID: <20120507032051.GA31245@shlinux2.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 7 May 2012 11:17:01 +0800
+Subject: [GIT PULL][for 3.4]pull request for fix branch in arch-pxa
+Message-ID: <CAN1soZwOhZBCaY8K_mj-uwxc1aA54JiOvRkxA9X7BMdViU3nVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 10:44:56PM +0800, Shawn Guo wrote:
-> On Fri, May 04, 2012 at 08:12:15PM +0800, Dong Aisheng wrote:
-> >  #include <asm/irq.h>
-> > -#include <mach/mxs.h>
-> 
-> I do not think you can remove this inclusion in this patch, since the
-> use of cpu_is_mx23() does not get removed from mxs-dma driver until
-> patch #2.
-> 
-Yes. I missed somehow.
+Hi Arnd & Olof,
 
-> You do not have to resend the series, if there are no other outstanding
-> comments coming up.  I expect the series will go through arm-soc tree
-> to ease the merging.  I can fix it when applying the series.
-> 
-Thanks.
+Please help to merge this fixes branch from arch-pxa git tree.
 
-Regards
-Dong Aisheng
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
 
-> Hi Vinod,
-> 
-> Please let me know if you have problem with the series going through
-> arm-soc than dma tree.  Thanks.
-> 
-> > -#include <mach/common.h>
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git fixes
+
+Haojian Zhuang (2):
+      mfd: max8925: request resource region
+      ARM: mmp: add io head file
+
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/mach-mmp/include/mach/io.h |   13 +++++++++++++
+ drivers/mfd/max8925-core.c          |    4 ++++
+ 3 files changed, 18 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/include/mach/io.h
