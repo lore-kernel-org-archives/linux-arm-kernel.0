@@ -1,108 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:43:12 +0800
-Subject: [PATCH 10/10] ARM: dts: enable mmc for imx28-evk
-In-Reply-To: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
-References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336401793-13753-11-git-send-email-shawn.guo@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 7 May 2012 18:05:17 +0300
+Subject: [PATCH v2 3/3] omap: remoteproc: add support for a boot register
+In-Reply-To: <CADVn9RFOBdw0_19ErT6qEpy7325TG7wWkDfJtdF-6jq74z3nFw@mail.gmail.com>
+References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
+ <1334360392-1494-4-git-send-email-jgutierrez@ti.com>
+ <CAK=Wgbb4bJ22BYh444Xndaody7Q7Eoox3K7zvGCFmf6ZMHAa0w@mail.gmail.com>
+ <CADVn9RFOBdw0_19ErT6qEpy7325TG7wWkDfJtdF-6jq74z3nFw@mail.gmail.com>
+Message-ID: <CAK=WgbYHxh7tJhzApEWrkjQmkJGMWpnXynTPH5QUDnJ-TnVaYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx28-evk.dts |   19 +++++++++++++++++++
- arch/arm/boot/dts/imx28.dtsi    |   25 +++++++++++++++++++++++++
- 2 files changed, 44 insertions(+), 0 deletions(-)
+Hi Juan,
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 5aee8ed..6ca10f2 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -21,6 +21,25 @@
- 	};
- 
- 	apb at 80000000 {
-+		apbh at 80000000 {
-+			ssp0: ssp at 80010000 {
-+				compatible = "fsl,imx28-mmc";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_8bit_pins_a
-+					&mmc0_cd_cfg &mmc0_sck_cfg>;
-+				fsl,bus-width = <8>;
-+				wp-gpios = <&gpio2 12 0>;
-+				status = "okay";
-+			};
-+
-+			ssp1: ssp at 80012000 {
-+				compatible = "fsl,imx28-mmc";
-+				fsl,bus-width = <8>;
-+				wp-gpios = <&gpio0 28 0>;
-+				status = "okay";
-+			};
-+		};
-+
- 		apbx at 80040000 {
- 			duart: serial at 80074000 {
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 1abd9b3..8596bdf 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -81,24 +81,28 @@
- 			ssp0: ssp at 80010000 {
- 				reg = <0x80010000 2000>;
- 				interrupts = <96 82>;
-+				fsl,ssp-dma-channel = <0>;
- 				status = "disabled";
- 			};
- 
- 			ssp1: ssp at 80012000 {
- 				reg = <0x80012000 2000>;
- 				interrupts = <97 83>;
-+				fsl,ssp-dma-channel = <1>;
- 				status = "disabled";
- 			};
- 
- 			ssp2: ssp at 80014000 {
- 				reg = <0x80014000 2000>;
- 				interrupts = <98 84>;
-+				fsl,ssp-dma-channel = <2>;
- 				status = "disabled";
- 			};
- 
- 			ssp3: ssp at 80016000 {
- 				reg = <0x80016000 2000>;
- 				interrupts = <99 85>;
-+				fsl,ssp-dma-channel = <3>;
- 				status = "disabled";
- 			};
- 
-@@ -179,6 +183,27 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <1>;
- 				};
-+
-+				mmc0_8bit_pins_a: mmc0-8bit at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <0x2000 0x2010 0x2020
-+						0x2030 0x2040 0x2050 0x2060
-+						0x2070 0x2080 0x2090 0x20a0>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				mmc0_cd_cfg: mmc0-cd-cfg {
-+					fsl,pinmux-ids = <0x2090>;
-+					fsl,pull-up = <0>;
-+				};
-+
-+				mmc0_sck_cfg: mmc0-sck-cfg {
-+					fsl,pinmux-ids = <0x20a0>;
-+					fsl,drive-strength = <2>;
-+					fsl,pull-up = <0>;
-+				};
- 			};
- 
- 			digctl at 8001c000 {
--- 
-1.7.5.4
+On Mon, May 7, 2012 at 5:38 PM, Gutierrez, Juan <jgutierrez@ti.com> wrote:
+>> > @@ -40,6 +41,7 @@ struct omap_rproc_pdata {
+>> > ? ? ? ?const struct rproc_ops *ops;
+>> > ? ? ? ?int (*device_enable) (struct platform_device *pdev);
+>> > ? ? ? ?int (*device_shutdown) (struct platform_device *pdev);
+>> > + ? ? ? u32 boot_reg;
+>>
+>> We might want to use an IORESOURCE_MEM resource instead, since we're
+>> dealing with a platform device anyway.
+>>
+>> The driver can then fetch the address using platform_get_resource.
+>
+> Ok, Do you mean using resource table to get the boot_reg address, right?
+
+Sorry for the confusion - I meant using a 'struct resource' as the
+standard way to pass this kind of information to platform drivers.
+
+For example take a look how omap2_mbox_probe uses
+platform_get_resource to retrieve the parameters which it then feeds
+to ioremap.
+
+Using this standard approach will probably make life easier when we
+migrate to DT, too.
+
+Thanks,
+Ohad.
