@@ -1,60 +1,49 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 7 May 2012 12:32:48 +0200
-Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
- PRM support for AM33XX device
-In-Reply-To: <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
-References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
- <20120418231837.GT21106@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
- <20120426184312.GY3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
- <20120426190524.GZ3739@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
-Message-ID: <4FA7A4D0.80006@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 7 May 2012 11:37:29 +0100
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <201205071014.03632.arnd@arndb.de>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <20120507090858.GN26481@n2100.arm.linux.org.uk>
+ <20120507094718.GD4415@opensource.wolfsonmicro.com>
+ <201205071014.03632.arnd@arndb.de>
+Message-ID: <20120507103724.GF4415@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Mon, May 07, 2012 at 10:14:03AM +0000, Arnd Bergmann wrote:
+> On Monday 07 May 2012, Mark Brown wrote:
 
-On 5/2/2012 11:09 AM, Paul Walmsley wrote:
-> On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
->
->> I will be waiting for your comment and conformation on, which family AM33xx
->> device should fall in? Please refer to the mail-chain -
->>
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67275.html
->
-> This decision turns out to be pretty important; it certainly affects the
-> AM33xx PRM/CM/clockdomain/powerdomain patches that I've been looking at.
->
-> Here is my suggestion, based on our previous practice.  I am not so
-> sure that it is the best way, but it seems pretty reasonable"
->
-> Using CONFIG_ARCH_OMAP3 for CONFIG_ARCH_OMAPAM33XX doesn't make sense, as
-> far as I can tell.  The main area of similarity between the other
-> CONFIG_ARCH_OMAP3 and AM33xx is the Cortex-A8.  And even that MPU
-> subsystem is quite different between, say, the 3430/3630 and the AM33xx.
-> Most of the AM33xx is quite different from the 3430/3630: OMAP4-style PRCM
-> interface, OMAP4-style interconnect, etc.  Plus, most of the
-> CONFIG_ARCH_OMAP3 code in our codebase is very 3430/3630-specific, like
-> the PM code.
->
-> This would seem to suggest that we should use CONFIG_ARCH_OMAP4.  But that
-> option currently assumes an OMAP4-style MPU subsystem: SMP Cortex-A9,
-> PL310, etc.  None of that is true for AM335x.
->
-> So first we have to decide whether the CONFIG_ARCH_OMAP* options should
-> have a strong dependency on the MPU type, as they currently do; or whether
-> they should focus on the way the SoC is integrated.
+> > Don't think I've got any examples with regions beginning at 0 but other
+> > regions seem to not run into any problems with overlap.  Note that all
+> > these drivers do with the regions is use them to look up the base
+> > register.
 
-I think as well that these devices should be considered as part of the 
-OMAP4 family.
-The CPU type should not be the parameter that decide the OMAP family, it 
-is just an IP, that can change on some variant, whereas the whole PRCM 
-infrastructure / interconnect is mostly the same.
+> ISA devices start at 0. Using a definition for IORESOURCE_IO of "PCI
+> port number for relatively large values, but either ISA or PCMCIA or
+> an arbitrary MFD for relatively small values" is absolutely crazy.
 
-Regards,
-Benoit
+So what you're saying is that it's nothing to do with zero and just
+about plain conflicts - there's nothing magic about zero (which is what
+Russell seemed to be suggesting)?  For whatever reason in the MFD usage
+the conflicts don't seem to be triggering - I suspect it's because the
+struct resource is simply inspected by the driver rather than doing
+whatever it is that PCI/ISA devices do with them, though I've not
+checked recently.
+
+> FWIW, there are resources you define in include/linux/mfd/wm831x/core.h
+> that have values between 0x4000 and 0x8000, which is exactly the
+> range occupied by PCI devices on my thinkpad. It's only a matter of
+> time until someone puts conflicting devices into one machine.
+
+Yes, I agree it will be a problem if they're part of the same resource
+tree and used via the same API but if we allow multiple trees of I/O
+resources then does that avoid the issue?  It seems like it ought to be
+something we can do, if not we'll have to define a new resource type and
+like I say it's a pretty full bitmask at the minute...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/72995196/attachment.sig>
