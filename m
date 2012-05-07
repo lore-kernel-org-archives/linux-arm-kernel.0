@@ -1,40 +1,116 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 7 May 2012 22:30:00 +0200
-Subject: [PATCH 2/5] ARM: S3C24XX: move plat-s3c24xx/irq.c into common.c
-In-Reply-To: <201205071959.22122.arnd@arndb.de>
-References: <201205071939.37433.heiko@sntech.de>
- <201205071941.33343.heiko@sntech.de> <201205071959.22122.arnd@arndb.de>
-Message-ID: <201205072230.00758.heiko@sntech.de>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon,  7 May 2012 22:51:37 +0200
+Subject: [PATCH v2 3.4-rc6] MTD: NAND: ams-delta: fix request_mem_region()
+ failure
+In-Reply-To: <20120504171125.GD5613@atomide.com>
+References: <20120504171125.GD5613@atomide.com>
+Message-ID: <1336423897-31729-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+A call to request_mem_region() has been introduced in the omap-gpio
+driver recently (commit 96751fcbe5438e95514b025e9cee7a6d38038f40,
+"gpio/omap: Use devm_ API and add request_mem_region"). This change
+prevented the Amstrad Delta NAND driver, which was doing the same in
+order to take control over OMAP MPU I/O lines that the NAND device hangs
+off, from loading successfully.
 
-Am Montag 07 Mai 2012, 21:59:21 schrieb Arnd Bergmann:
-> On Monday 07 May 2012, Heiko St?bner wrote:
-> > Again following the model set out by s3c64xx.
-> > 
-> > As checkpatch showed a lot of style errors and warning, these got fixed
-> > too.
-> > 
-> > Signed-off-by: Heiko Stueber <heiko@sntech.de>
-> 
-> I object on two grounds:
-> 
-> 1. there are plans to move irq chip drivers to drivers/irqchip eventually,
-> so I think it makes little sense to merge the current implementation into
-> another file. That just makes it harder to split it out again. Better leave
-> the file named irq.c and just move it to the mach-s3c24xx for now.
-> 
-> 2. You should *never* move code around and change it at the same time
-> if you have a choice. Instead if you discover coding style issues with
-> code you want to move, fix those first and then do a second patch to
-> move it without further changes. Otherwise it becomes very hard to
-> check that the coding style changes are actually correct.
+The I/O lines and corresponding registers used by the NAND driver are a
+subset of those used for the GPIO function. Then, to avoid run time
+collisions, all MPUIO GPIO lines should be marked as requested while
+initializing the NAND driver, and vice versa, a single MPUIO GPIO line
+already requested before the NAND driver initialization is attempted
+should prevent the NAND device from being started successfully.
 
-thanks for the two pointers, you are of course right with them.
-I will do another round of the patches.
+There is another driver, omap-keypad, which also manipulates MPUIO
+registers, but has never been calling request_mem_region() on startup,
+so it's not affected by the change in the gpio-omap and works correctly.
+It uses the depreciated omap_read/write functions for accessing MPUIO
+registers. Unlike the NAND driver, these I/O lines and registers are
+separate from those used by the GPIO driver. However, both register sets
+are non-contiguous and overlapping, so it would be impractical to
+request the two sets separately, one from the gpio-omap, the other form
+the omap-keypad driver.
 
+In order to solve all these issues correctly, a solution first suggested
+by Artem Bityutskiy, then closer specified by Tony Lindgren while they
+commented the initial version of this fix, should be implemented. The
+gpio-omap driver should export a few functions which would allow the
+other two drivers to access MPUIO registers in a safe manner instead of
+trying to manage them in parallel to the GPIO driver.  However, such a
+big change, affecting 3 drivers all together, is not suitable for the rc
+cycle, and should be prepared for the merge window.  Then, an
+alternative solution is proposed as a regression fix.
 
-Thanks
-Heiko
+For the ams-delta NAND driver to initialize correctly in coexistence
+with the changed GPIO driver, drop the request_mem_region() call from
+the former, especially as this call is going to be removed while the
+long-term solution is implemented.
+
+Tested on Amstrad Delta.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+Artem, Tony,
+I hope the changelog message is now good enough to make you satisfied,
+and render the Tony's Ack valid.
+
+Changes against initial version:
+* a comment replacing the removed function call added,
+* more details on the three drivers coexistance and possible interaction
+  provided,
+* a hopefuly decent long-term plan to properly fix all identified issues
+  proposed.
+
+ drivers/mtd/nand/ams-delta.c |   16 ++++++----------
+ 1 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
+index 7341695..358162a 100644
+--- a/drivers/mtd/nand/ams-delta.c
++++ b/drivers/mtd/nand/ams-delta.c
+@@ -212,18 +212,17 @@ static int __devinit ams_delta_init(struct platform_device *pdev)
+ 	/* Link the private data with the MTD structure */
+ 	ams_delta_mtd->priv = this;
+ 
+-	if (!request_mem_region(res->start, resource_size(res),
+-			dev_name(&pdev->dev))) {
+-		dev_err(&pdev->dev, "request_mem_region failed\n");
+-		err = -EBUSY;
+-		goto out_free;
+-	}
++	/*
++	 * Don't try to request the memory region from here,
++	 * it should have been already requested from the
++	 * gpio-omap driver and requesting it again would fail.
++	 */
+ 
+ 	io_base = ioremap(res->start, resource_size(res));
+ 	if (io_base == NULL) {
+ 		dev_err(&pdev->dev, "ioremap failed\n");
+ 		err = -EIO;
+-		goto out_release_io;
++		goto out_free;
+ 	}
+ 
+ 	this->priv = io_base;
+@@ -271,8 +270,6 @@ out_gpio:
+ 	platform_set_drvdata(pdev, NULL);
+ 	gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB);
+ 	iounmap(io_base);
+-out_release_io:
+-	release_mem_region(res->start, resource_size(res));
+ out_free:
+ 	kfree(ams_delta_mtd);
+  out:
+@@ -293,7 +290,6 @@ static int __devexit ams_delta_cleanup(struct platform_device *pdev)
+ 	gpio_free_array(_mandatory_gpio, ARRAY_SIZE(_mandatory_gpio));
+ 	gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB);
+ 	iounmap(io_base);
+-	release_mem_region(res->start, resource_size(res));
+ 
+ 	/* Free the MTD device structure */
+ 	kfree(ams_delta_mtd);
+-- 
+1.7.3.4
