@@ -1,24 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2012 10:50:18 -0700
-Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
-In-Reply-To: <CAMrsUdLE5CY_39p6g4gR7bi5B_gyD6ASitaWPA=D+WFvp4Rb=g@mail.gmail.com>
-References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
- <20120504181808.GM5613@atomide.com>
- <CAMrsUdLE5CY_39p6g4gR7bi5B_gyD6ASitaWPA=D+WFvp4Rb=g@mail.gmail.com>
-Message-ID: <20120507175017.GG5088@atomide.com>
+Date: Mon, 7 May 2012 10:54:15 -0700
+Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
+ uart pads
+In-Reply-To: <87r4uv51rz.fsf@ti.com>
+References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
+ <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
+ <87397uhv0q.fsf@ti.com>
+ <CAMrsUdKnDaO7qV2NpNvTb3QdO-XeM_PF645Mc43RozFVex71hQ@mail.gmail.com>
+ <20120504172417.GE5613@atomide.com> <87r4uv51rz.fsf@ti.com>
+Message-ID: <20120507175414.GH5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Raja, Govindraj <govindraj.raja@ti.com> [120507 05:26]:
-> On Fri, May 4, 2012 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
->
-> > Is this fix still needed? If so, it should probably be a separate fix
-> > with it's own description.
+* Kevin Hilman <khilman@ti.com> [120507 10:42]:
+> Tony Lindgren <tony@atomide.com> writes:
+> >  
+> > Just to follow up on this.. Let's first get things working reliably,
+> > and only then add more PM support.
+> >
+> > We absolutely can't revert $SUBJECT because it's known to mess up
+> > at least smsc911x and ehci on zoom3, hsi on n900 and probably
+> > many other things.
+> >
+> > For the -rc cycle, it seems that [2] is out of question at this point
+> > as too intrusive. If the PM & wakeups are broken in the default cases,
+> > then I suggest we just take few steps back and disable any deeper PM
+> > states in the -rc series.
 > 
-> No this one is not needed anymore
-> since its fixed part of commit
-> bce492c04ba8fc66a4ea0a52b181ba255daaaf54
+> Unfortunately, no need to do anything more to disable deeper PM states.
+> 
+> Because $SUBJECT disables runtime PM for UART, it keeps both PER and
+> CORE on all the time. :(
 
-OK thanks for the update.
+Oh well, it seems that that runtime PM can now be enabled on per-board
+basis as it gets tested.
+
+Regards,
 
 Tony
