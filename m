@@ -1,62 +1,62 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 6 May 2012 22:08:27 -0700
-Subject: [PATCH 2/5] clk: prevent spurious parent rate propagation
+Date: Sun, 6 May 2012 22:08:28 -0700
+Subject: [PATCH 3/5] clk: remove COMMON_CLK_DISABLE_UNUSED
 In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
 References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1336367310-5140-3-git-send-email-mturquette@linaro.org>
+Message-ID: <1336367310-5140-4-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 'clk: always pass parent_rate into .round_rate' made a subtle
-change to the semantics of .round_rate.  It is now expected for the
-parent's rate to always be passed in, simplifying the implemenation of
-various .round_rate callback definitions.
-
-However the patch also introduced a bug in clk_calc_new_rates whereby a
-clock without the CLK_SET_RATE_PARENT flag set could still propagate a
-rate change up to a parent clock if the the .round_rate callback
-modified the &best_parent_rate value in any way.
-
-This patch fixes the issue at the framework level (in
-clk_calc_new_rates) by specifically handling the case where the
-CLK_SET_RATE_PARENT flag is not set.
+Exposing this option generates confusion and incorrect behavior for
+single-image builds across platforms.  Enable this behavior permanently.
 
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
-Reported-by: Sascha Hauer<s.hauer@pengutronix.de>
 ---
- drivers/clk/clk.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ drivers/clk/Kconfig |   11 -----------
+ drivers/clk/clk.c   |    2 --
+ 2 files changed, 0 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index f05a60d..4864407 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -23,17 +23,6 @@ config COMMON_CLK
+ menu "Common Clock Framework"
+ 	depends on COMMON_CLK
+ 
+-config COMMON_CLK_DISABLE_UNUSED
+-	bool "Disabled unused clocks at boot"
+-	depends on COMMON_CLK
+-	---help---
+-	  Traverses the entire clock tree and disables any clocks that are
+-	  enabled in hardware but have not been enabled by any device drivers.
+-	  This saves power and keeps the software model of the clock in line
+-	  with reality.
+-
+-	  If in doubt, say "N".
+-
+ config COMMON_CLK_DEBUG
+ 	bool "DebugFS representation of clock tree"
+ 	depends on COMMON_CLK
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 8149764..7ceca0e 100644
+index 7ceca0e..e5d5dc1 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -774,12 +774,18 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
- 	if (IS_ERR_OR_NULL(clk))
- 		return NULL;
+@@ -196,7 +196,6 @@ late_initcall(clk_debug_init);
+ static inline int clk_debug_register(struct clk *clk) { return 0; }
+ #endif
  
-+	/* save parent rate, if it exists */
-+	if (clk->parent)
-+		best_parent_rate = clk->parent->rate;
-+
- 	/* never propagate up to the parent */
- 	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
- 		if (!clk->ops->round_rate) {
- 			clk->new_rate = clk->rate;
- 			return NULL;
- 		}
-+		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
-+		goto out;
- 	}
+-#ifdef CONFIG_COMMON_CLK_DISABLE_UNUSED
+ /* caller must hold prepare_lock */
+ static void clk_disable_unused_subtree(struct clk *clk)
+ {
+@@ -246,7 +245,6 @@ static int clk_disable_unused(void)
+ 	return 0;
+ }
+ late_initcall(clk_disable_unused);
+-#endif
  
- 	/* need clk->parent from here on out */
-@@ -795,7 +801,6 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
- 		goto out;
- 	}
+ /***    helper functions   ***/
  
--	best_parent_rate = clk->parent->rate;
- 	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
- 
- 	if (best_parent_rate != clk->parent->rate) {
 -- 
 1.7.5.4
