@@ -1,76 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 10:39:12 -0700
-Subject: [PATCH 1/2] OMAP2+: UART: Fix incorrect population of default
- uart pads
-In-Reply-To: <20120504172417.GE5613@atomide.com> (Tony Lindgren's message of
- "Fri, 4 May 2012 10:24:18 -0700")
-References: <1334065246-21294-1-git-send-email-govindraj.raja@ti.com>
- <1334065246-21294-2-git-send-email-govindraj.raja@ti.com>
- <87397uhv0q.fsf@ti.com>
- <CAMrsUdKnDaO7qV2NpNvTb3QdO-XeM_PF645Mc43RozFVex71hQ@mail.gmail.com>
- <20120504172417.GE5613@atomide.com>
-Message-ID: <87r4uv51rz.fsf@ti.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 7 May 2012 19:39:37 +0200
+Subject: [PATCH 0/5] ARM: S3C24XX: move the easy parts to mach-s3c24xx from
+ plat-s3c24xx
+Message-ID: <201205071939.37433.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+plat-s3c24xx still contains code that wasn't moved during the initial
+consolidation of the s3c24xx mach directories.
 
-> * Raja, Govindraj <govindraj.raja@ti.com> [120424 01:41]:
->> On Tue, Apr 24, 2012 at 5:15 AM, Kevin Hilman <khilman@ti.com> wrote:
->> > "Govindraj.R" <govindraj.raja@ti.com> writes:
->> >
->> >> From: "Govindraj.R" <govindraj.raja@ti.com>
->> >>
->> >> The following commit:
->> >> (7496ba3 ?ARM: OMAP2+: UART: Add default mux for all uarts)
->> >> added default pads for all uarts. But not all boards tend to
->> >> use all uarts and most of unused uart pins are muxed for
->> >> other purpose. This commit breaks the modules which where trying
->> >> to use unused uart pins on their boards.
->> >>
->> >> So remove the default pads adding.
->> >
->> > I just noticed that this patch breaks runtime PM & wakeups for UART
->> > console (at least on 3530/Overo with ttyO2 console.)
->> >
->> > By removing the pads, the initial device_init_wakeup() is not called on
->> > port init. ?Without this call serial_omap_pm() disables runtime PM
->> > because it checks device_may_wakeup().
->> >
->> > Since runtime PM was disabled, I manually re-enabled it and then enabled
->> > wakeups:
->> >
->> > ?echo auto > /sys/devices/platform/omap_uart.2/power/control
->> > ?echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
->> >
->> > Then, after enabling auto-suspend timeouts, it seems wakeups are still
->> > not working since the console hangs.
->> >
->> > Reverting $SUBJECT patch gets things working again.
->> 
->> This was decided as part of discussion [1]
->> 
->> If we are _reconsidering_ taking this patch [2]
->> to dynamically probe uart pins and enable rx wakeup.
->> 
->> I can re-work on the patch[2] as per tony's comments[1]
->> and re-post it.
->  
-> Just to follow up on this.. Let's first get things working reliably,
-> and only then add more PM support.
->
-> We absolutely can't revert $SUBJECT because it's known to mess up
-> at least smsc911x and ehci on zoom3, hsi on n900 and probably
-> many other things.
->
-> For the -rc cycle, it seems that [2] is out of question at this point
-> as too intrusive. If the PM & wakeups are broken in the default cases,
-> then I suggest we just take few steps back and disable any deeper PM
-> states in the -rc series.
+This series moves the easy parts, that shouldn't require changes, to
+mach-s3c24xx, following the layout example set out by s3c64xx.
 
-Unfortunately, no need to do anything more to disable deeper PM states.
+Heiko Stuebner (5):
+  ARM: S3C24XX: move plat-s3c24xx/cpu.c
+  ARM: S3C24XX: move plat-s3c24xx/irq.c into common.c
+  ARM: S3C24XX: move plat-s3c24xx/dev-uart.c into common.c
+  ARM: S3C24XX: move common power-management code to mach-s3c24xx
+  ARM: S3C24XX: move common clock init into common.c
 
-Because $SUBJECT disables runtime PM for UART, it keeps both PER and
-CORE on all the time. :(
+ arch/arm/mach-s3c24xx/Makefile                     |    6 +
+ .../{plat-s3c24xx/irq.c => mach-s3c24xx/common.c}  |  367 ++++++++++++++++++--
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c   |    0
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c       |    0
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S    |    0
+ arch/arm/plat-s3c24xx/Makefile                     |    7 -
+ arch/arm/plat-s3c24xx/clock.c                      |   59 ----
+ arch/arm/plat-s3c24xx/cpu.c                        |  236 -------------
+ arch/arm/plat-s3c24xx/dev-uart.c                   |  100 ------
+ 9 files changed, 336 insertions(+), 439 deletions(-)
+ rename arch/arm/{plat-s3c24xx/irq.c => mach-s3c24xx/common.c} (64%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c (100%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c (100%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S (100%)
+ delete mode 100644 arch/arm/plat-s3c24xx/clock.c
+ delete mode 100644 arch/arm/plat-s3c24xx/cpu.c
+ delete mode 100644 arch/arm/plat-s3c24xx/dev-uart.c
 
-Kevin
+-- 
+1.7.5.4
