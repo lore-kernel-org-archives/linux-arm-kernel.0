@@ -1,68 +1,89 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 07 May 2012 09:53:45 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <201205041923.07620.arnd@arndb.de>
- <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
-Message-ID: <4FA7F009.5010003@wwwdotorg.org>
+From: jgutierrez@ti.com (Gutierrez, Juan)
+Date: Mon, 7 May 2012 10:54:21 -0500
+Subject: [PATCH v2 3/3] omap: remoteproc: add support for a boot register
+In-Reply-To: <CAK=Wgbb4bJ22BYh444Xndaody7Q7Eoox3K7zvGCFmf6ZMHAa0w@mail.gmail.com>
+References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
+ <1334360392-1494-4-git-send-email-jgutierrez@ti.com>
+ <CAK=Wgbb4bJ22BYh444Xndaody7Q7Eoox3K7zvGCFmf6ZMHAa0w@mail.gmail.com>
+Message-ID: <CADVn9RG5xn0G40ug5_fRNqZtwP_OszXzmQCvchZH+WwgWxb6Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2012 11:10 AM, Jassi Brar wrote:
-> On 5 May 2012 00:53, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Friday 04 May 2012, Jassi Brar wrote:
->>> I see this requires a client driver to specify a particular req_line on a
->>> particular dma controller. I am not sure if this is most optimal.
->>>
->>> I think such client->req_line map should be provided to the dmac controller
->>> driver via its dt node in some format. The dmac driver could then populate
->>> a dma_chan, or similar, only for that req_line and not for the unused one
->>> which otherwise could also have served the same client.
->>>
->>> Ideally the I2C driver should simply ask, say, a channel for TX and another
->>> for RX, everything else should already be setup via dmac's dt nodes.
+Hi Ohad
+
+Thanks for reviewing.
+
+On Sun, May 6, 2012 at 6:21 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Juan,
+>
+> Thanks for the patches ! it's exciting to see that support for OMAP's
+> DSP is (relatively) easily achieved now. I hope your work can be a
+> good basis for an OMAP3 port, too.
+>
+> Overall the patches look good, I have only some minor comments inline.
+>
+> And - sorry for the late response. I've just left for a (somewhat
+> long) business trip when you posted this.
+>
+> On Sat, Apr 14, 2012 at 2:39 AM, Juan Gutierrez <jgutierrez@ti.com> wrote:
+>> Some remote processors (like Omap4's DSP) need to explicitly
+>> configure a boot address in a special register or memory
+>> location
+>
+> Let's just slightly rephrase this to prevent confusion: some remote
+> processors "need to have the boot address configured" in a special
+> register (as opposed to "need to configure").
+>
+Ok, I will do it.
+
+>> @@ -30,6 +30,7 @@ struct platform_device;
+>> ?* @ops: start/stop rproc handlers
+>> ?* @device_enable: omap-specific handler for enabling a device
+>> ?* @device_shutdown: omap-specific handler for shutting down a device
+>> + * @boot_reg: physical address of the control register for storing boot address
+>> ?*/
+>> ?struct omap_rproc_pdata {
+>> ? ? ? ?const char *name;
+>> @@ -40,6 +41,7 @@ struct omap_rproc_pdata {
+>> ? ? ? ?const struct rproc_ops *ops;
+>> ? ? ? ?int (*device_enable) (struct platform_device *pdev);
+>> ? ? ? ?int (*device_shutdown) (struct platform_device *pdev);
+>> + ? ? ? u32 boot_reg;
+>
+> We might want to use an IORESOURCE_MEM resource instead, since we're
+> dealing with a platform device anyway.
+>
+> The driver can then fetch the address using platform_get_resource.
+>
+Ok, I will investigate about this, and include it in next series
+
+>> @@ -203,6 +215,9 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
+>> ? ? ? ?return 0;
 >>
->> If I understand you correctly, you think we can generalize the dma-request
->> data in a way that we don't need to pass a specific dma engine phandle.
->> I very much doubt this is possible, given how different the requirements
->> are for each of the engines we support. You really need to pass a specific
->> phandle so that we can find the code that can interpret the data in a
->> meaningful way.
->>
-> Hmm... there ought to be a way by which a client is handed a random 'token'
-> via its dt node and similarly the dmac informed which channel (and with what
-> capabilities) to allocate should it see a request coming with that token.
+>> ?free_rproc:
+>> + ? ? ? if (oproc->boot_reg)
+>> + ? ? ? ? ? ? ? iounmap(oproc->boot_reg);
+>> +err_ioremap:
+>> ? ? ? ?rproc_free(rproc);
+>> ? ? ? ?return ret;
+>> ?}
+>
+> I tend to call those cleanup snippets with names that indicate what they do.
+>
+> In this case I'd slightly prefer to keep calling the lower snippet
+> with "free_rproc" and just name the new snippet with something like
+> "unmap_bootreg". It's then a bit easier to read the code that calls
+> into those snippets (the reader easily know which cleanup snippet is
+> invoked by each 'goto').
+>
+Agree. I will do the change.
 
-I think that's the whole point of the patch.
+> Thanks,
+> Ohad.
 
-However, the token needs to be some driver-specific struct, since the
-required information may be more than just a single channel or request
-ID in general.
 
-> That way dmac and client drivers using DT could do away with the filter_fn.
-> 
-> Roughly speaking (I am not very well versed with DT syntax)
-> 
-> Client Node:-
-> 
-> mmc1: mmc at 13002000 {
->         ...
->         dma_tx = <891>   //some platform-wide unique value
->         dma_rx = <927>   //some platform-wide unique value
->         ...
->  };
 
-I believe we specifically don't want to introduce any global concept of
-DMA channel ID, either within the kernel, or at the device tree level.
+-- 
+Thanks
 
-While we do have global interrupt and GPIO IDs within the kernel, this
-has caused problems, I think primarily due to the need to manage this
-unified namespace and allocate a single global ID for a bunch of
-different ranges of controller-specific IDs.
-
-Within device tree, everything is always represented as an ID
-relative-to or within a particular controller, so it's easy to namespace
-things separately.
+juan gutierrez
