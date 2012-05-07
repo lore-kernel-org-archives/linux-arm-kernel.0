@@ -1,32 +1,29 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 7 May 2012 11:02:09 +0000
-Subject: [PATCH v4 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FA4041D.9010000@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335874494.git.afzal@ti.com>
- <4FA04A8C.4050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E98299B@DBDE01.ent.ti.com>
- <4FA4041D.9010000@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E987159@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 7 May 2012 11:21:53 +0000
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <CAN1soZwwr21=JV=NE81aey-1nSMzg-37fXG7zjouALJaU345Fg@mail.gmail.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205071014.03632.arnd@arndb.de>
+ <CAN1soZwwr21=JV=NE81aey-1nSMzg-37fXG7zjouALJaU345Fg@mail.gmail.com>
+Message-ID: <201205071121.53302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Monday 07 May 2012, Haojian Zhuang wrote:
+> Even we append a new IORESOURCE type. We still meet similar issue. So
+> it means that we can't use any IORESOURCE for this kind of i2c usage. Is
+> it right?
 
-On Fri, May 04, 2012 at 22:00:21, Hunter, Jon wrote:
-> >>> +
-> >>> +	pdata->clk_prd = gpmc_get_fclk_period();
-> >>
-> >> Does this need to be done here? May be this should be done in the probe
-> >> function. You could store the handle to the main clk in the pdata.
-> > 
-> > This is done so that migration of gpmc driver to the drivers folder
-> > would be smooth, remember that this function will still live here.
-> 
-> Sure, but why call this here?
+Yes, basically the concept of IORESOURCE is incompatible here, unless you
+want to add a new IORESOURCE type for each one of these drivers, or you
+find a way to put all these devices into one global register space at
+unique addresses, which doesn't sound any better.
 
-Clk_prd is a platform data passed to the driver, so platform code
-updates it, where else can it be done ?
+Can you explain why you need this kind of arbitration to start with?
+Can't you just ensure that each client of the max8925 only sees a fixed
+set of nonconflicting registers, and provide a higher-level abstractions
+for the registers that are indeed shared between clients?
 
-Regards
-Afzal
+Wouldn't you always know which drivers potentially coexist here?
+
+	Arnd
