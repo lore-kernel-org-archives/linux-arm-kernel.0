@@ -1,47 +1,73 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 7 May 2012 14:58:28 -0700
-Subject: [GIT PULL] msm-core changes for v3.5.
-Message-ID: <20120507215828.GA21748@codeaurora.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 7 May 2012 18:00:15 -0400
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <4FA3DC27.6030204@linaro.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
+Message-ID: <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are some minor fixes, and Daniel's fixup of the sapphire target
-support.
+On Fri, May 4, 2012 at 9:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 04/05/12 14:26, Chris Ball wrote:
+>>
+>> Hi,
+>>
+>> On Fri, May 04 2012, Lee Jones wrote:
+>>>
+>>> I can either do that, or push it through Arnd's tree if you like (and
+>>> it's okay with him), as I will be supplying him with another pull
+>>> request after my next patch-set has been scrutinised. Would that suit
+>>> you better?
+>>
+>>
+>> If the MMC patches are self-contained and it doesn't break anything to
 
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+Hi All,
 
-  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+The version of these patches that just appeared in linux-next is causing
+build fails on about 5 different configs (versatile_defconfig etc).
 
-are available in the git repository at:
+It isn't hard to see (with hindsight) that the new function is declared in
+an #ifdef CONFIG_OF block, but it's callers are not similarly guarded.
+So you get things like this:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-core
+http://kisskb.ellerman.id.au/kisskb/buildresult/6272348/
 
-for you to fetch changes up to 2935b1facdfb77d5f03d9036cc0da8c889f59a02:
+If you can get a fixed up version into the linux-next queue ASAP, that
+would be great.
 
-  ARM: msm: fix compilation flags for MSM_SCM (part 2) (2012-05-01 16:44:11 -0700)
+Thanks,
+Paul.
+--
 
-----------------------------------------------------------------
-Daniel Walker (1):
-      arm: msm: fix up very basic HTC Sapphire support
 
-Danny Kukawka (1):
-      arch/arm/mach-msm: linux/gpio.h included twice
-
-Stephen Boyd (2):
-      ARM: msm: Drop useless teq from DEBUG_LL support
-      ARM: msm: fix compilation flags for MSM_SCM (part 2)
-
- arch/arm/mach-msm/Kconfig                    |   10 +-
- arch/arm/mach-msm/Makefile                   |    1 +
- arch/arm/mach-msm/board-msm7x30.c            |    1 -
- arch/arm/mach-msm/board-qsd8x50.c            |    1 -
- arch/arm/mach-msm/board-sapphire.c           |   18 +--
- arch/arm/mach-msm/board-sapphire.h           |  224 ++++++++++++++++++++++++++
- arch/arm/mach-msm/include/mach/debug-macro.S |    3 +-
- arch/arm/mach-msm/scm.c                      |    3 +
- 8 files changed, 239 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/mach-msm/board-sapphire.h
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>> merge them separately, my preference is to merge them via the MMC tree
+>> (to avoid creating conflicts against other MMC patches in there).
+>>
+>> If there are dependencies, going via Arnd instead is fine.
+>
+>
+> Okay, I'll knock up a small patch-set and send it to you.
+>
+> I think it's 3 patches.
+>
+>
+> --
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> M: +44 77 88 633 515
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
