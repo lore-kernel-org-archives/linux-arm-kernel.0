@@ -1,73 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:23:15 +0800
-Subject: [PATCH 6/6] ARM: mxs: add mxs-dma dt support
-In-Reply-To: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
+From: nm@ti.com (Menon, Nishanth)
+Date: Mon, 7 May 2012 09:32:19 -0500
+Subject: [PATCH 3/3] ARM: OMAP2+ PM: Add support for TPS62361
+In-Reply-To: <1336376299.2149.249.camel@sokoban>
+References: <1336139842-845-1-git-send-email-t-kristo@ti.com>
+ <1336139842-845-4-git-send-email-t-kristo@ti.com>
+ <20120504220046.GA20795@senorita.am.dhcp.ti.com>
+ <1336376299.2149.249.camel@sokoban>
+Message-ID: <CAOMWX4foaNJxRqeun-i0XmupmrNPz17DaB11MD4AKUvxu_6o_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Mon, May 7, 2012 at 2:38 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>
+>> One more point to consider is that with this - we *should* disable
+>> VCORE3 and VMEM else we can have weird behavior such as those seen
+>> by pandaboard-ES early adopters.
+>
+> In what case are we seeing such? If the regulators should be disabled,
+> maybe we should do it already in bootloader.
+We deal with tons of bootloaders - each platform tends to have their
+own custom bootloaders. kernel should always assume bootloader guys
+screw up and it is upto kernel to ensure that it keeps the platform
+stable at all points of time. TWL6030 does detect short if any
+LDO/SMPS is not connected but switched on. so it is necessary to
+ensure on 4460 that VCORE3 and VMEM are completely switched off in
+kernel no matter what the heck the bootloader decides to do.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Huang Shijie <b32955@freescale.com>
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx23.dtsi |    4 ++--
- arch/arm/boot/dts/imx28.dtsi |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index fb09ccd..a85ef55 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -42,8 +42,8 @@
- 			};
- 
- 			dma-apbh at 80004000 {
-+				compatible = "fsl,imx23-dma-apbh";
- 				reg = <0x80004000 2000>;
--				status = "disabled";
- 			};
- 
- 			ecc at 80008000 {
-@@ -97,8 +97,8 @@
- 			};
- 
- 			dma-apbx at 80024000 {
-+				compatible = "fsl,imx23-dma-apbx";
- 				reg = <0x80024000 2000>;
--				status = "disabled";
- 			};
- 
- 			dcp at 80028000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 5daf757..a17fbfc 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -48,8 +48,8 @@
- 			};
- 
- 			dma-apbh at 80004000 {
-+				compatible = "fsl,imx28-dma-apbh";
- 				reg = <0x80004000 2000>;
--				status = "disabled";
- 			};
- 
- 			perfmon at 80006000 {
-@@ -140,8 +140,8 @@
- 			};
- 
- 			dma-apbx at 80024000 {
-+				compatible = "fsl,imx28-dma-apbx";
- 				reg = <0x80024000 2000>;
--				status = "disabled";
- 			};
- 
- 			dcp at 80028000 {
--- 
-1.7.5.4
+Regards,
+Nishanth Menon
