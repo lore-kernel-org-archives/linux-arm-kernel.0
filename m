@@ -1,83 +1,59 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:41:22 +0200
-Subject: [PATCH 01/10] mmc: mxs-mmc: use global stmp_device functionality
-In-Reply-To: <1336401793-13753-2-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 8 May 2012 01:51:44 +0200
+Subject: [PATCH 06/10] mmc: mxs-mmc: have dma_channel than dma_res in
+ mxs_mmc_host
+In-Reply-To: <1336401793-13753-7-git-send-email-shawn.guo@linaro.org>
 References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
- <1336401793-13753-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080141.22913.marex@denx.de>
+ <1336401793-13753-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080151.44883.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> Use global stmp_device functionality to reduce mach-dependency.
+> It replaces dma_res with dma_channel in struct mxs_mmc_host, so that
+> the device tree support will be a little easier, since dma channel
+> can not be retrieved from "struct resource *dma_res".
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
 Acked-by: Marek Vasut <marex@denx.de>
 
 > ---
->  drivers/mmc/host/mxs-mmc.c |   14 +++++++-------
->  1 files changed, 7 insertions(+), 7 deletions(-)
+>  drivers/mmc/host/mxs-mmc.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index bb03ddd..2ea5361 100644
+> index 1a8ba314..e905721 100644
 > --- a/drivers/mmc/host/mxs-mmc.c
 > +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -40,9 +40,9 @@
->  #include <linux/module.h>
->  #include <linux/fsl/mxs-dma.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/stmp_device.h>
+> @@ -146,7 +146,7 @@ struct mxs_mmc_host {
+>  	struct mmc_data			*data;
 > 
->  #include <mach/mxs.h>
-> -#include <mach/common.h>
->  #include <mach/mmc.h>
+>  	void __iomem			*base;
+> -	struct resource			*dma_res;
+> +	int				dma_channel;
+>  	struct clk			*clk;
+>  	unsigned int			clk_rate;
 > 
->  #define DRIVER_NAME	"mxs-mmc"
-> @@ -191,7 +191,7 @@ static void mxs_mmc_reset(struct mxs_mmc_host *host)
->  {
->  	u32 ctrl0, ctrl1;
+> @@ -668,7 +668,7 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan,
+> void *param) if (!mxs_dma_is_apbh(chan))
+>  		return false;
 > 
-> -	mxs_reset_block(host->base);
-> +	stmp_reset_block(host->base);
+> -	if (chan->chan_id != host->dma_res->start)
+> +	if (chan->chan_id != host->dma_channel)
+>  		return false;
 > 
->  	ctrl0 = BM_SSP_CTRL0_IGNORE_CRC;
->  	ctrl1 = BF_SSP(0x3, CTRL1_SSP_MODE) |
-> @@ -279,7 +279,7 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void
-> *dev_id)
+>  	chan->private = &host->dma_data;
+> @@ -719,7 +719,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
 > 
->  	stat = readl(host->base + HW_SSP_CTRL1);
->  	writel(stat & MXS_MMC_IRQ_BITS,
-> -	       host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
-> +	       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
+>  	host->devid = pdev->id_entry->driver_data;
+>  	host->mmc = mmc;
+> -	host->dma_res = dmares;
+> +	host->dma_channel = dmares->start;
+>  	host->sdio_irq_en = 0;
 > 
->  	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
->  		mmc_signal_sdio_irq(host->mmc);
-> @@ -637,18 +637,18 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
-> *mmc, int enable)
-> 
->  	if (enable) {
->  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
-> -		       host->base + HW_SSP_CTRL0 + MXS_SET_ADDR);
-> +		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
->  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
-> -		       host->base + HW_SSP_CTRL1 + MXS_SET_ADDR);
-> +		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_SET);
-> 
->  		if (readl(host->base + HW_SSP_STATUS) & BM_SSP_STATUS_SDIO_IRQ)
->  			mmc_signal_sdio_irq(host->mmc);
-> 
->  	} else {
->  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
-> -		       host->base + HW_SSP_CTRL0 + MXS_CLR_ADDR);
-> +		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
->  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
-> -		       host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
-> +		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
->  	}
-> 
->  	spin_unlock_irqrestore(&host->lock, flags);
+>  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 
 Best regards,
 Marek Vasut
