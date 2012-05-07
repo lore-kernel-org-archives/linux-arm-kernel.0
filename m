@@ -1,60 +1,32 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Sun, 6 May 2012 17:03:29 -0700
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20120507000329.GB14559@gmail.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Mon, 07 May 2012 09:20:51 +0900
+Subject: [PATCH] video: EXYNOS: changes mipi dsi regulator name from vdd10 to
+ vdd11
+Message-ID: <4FA71563.5050401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120503-19:13, Peter De Schrijver wrote:
-> Hi,
-> 
-> I started looking into what would be needed to move our tegra30 clock code
-> to the common clock framework. The tegra30 clocktree is rather flat. Basically
-> there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
-> and peripheral clocks which have a mux (with 4 or more inputs), a divider and
-> a gate. So almost every peripheral clock can have multiple parents.
-> 
-> Some questions:
-> 
-> 1) should these peripheral clocks be modelled as 3 different clocks
->    (mux -> divider -> gate) or would it be better to make a new clock type for
->    this?
-> 
+MIPI DSI uses 1.1v regulator, so change its supply name.
 
-That is really for you to decide.  If the semantics of the existing mux,
-divider and gate in drivers/clk/clk-*.c work well for you then I think
-the answer is "yes".  There is infrastructure for register-access
-locking in those common types which might help your complex clocks.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/exynos/exynos_mipi_dsi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks to the parent rate propagation stuff in clk_set_rate it should be
-possible for your drivers to only be aware of the gate and call
-clk_set_rate on only that clock, which propagates up to the divider and,
-if necessary, again propagates up to the mux.
-
-I encourage you to try that first.  But if you find the semantics of
-those basic clock types aren't cutting it for you then you must create a
-type which is platform-specific.
-
-> 2) how to define the default parent? in many cases the hw reset value isn't
->    a very sensible choice, so the kernel probably needs to set a parent of
->    many of them if we don't want to rely on bootloader configuration.
-
-The only related thing handled at the framework level is _discovery_ of
-the parent during clock registration/initialization.  If you don't trust
-the bootloader and want to set things up as soon as possible (a wise
-move) then I suggest you do so from your platform clock code at the same
-time that you register your clocks with the framework.  Something like:
-
-	struct clk *c;
-	c = clk_register(...);
-	if (IS_ERR(c))
-		omg_fail();
-	clk_set_parent(c, b);
-
-Where 'b' is a parent of 'c'.  Register your clock tree top-down and you
-can re-parent as you go.
-
-Regards,
-Mike
+diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+index 95e33f0..2e779d3 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi.c
++++ b/drivers/video/exynos/exynos_mipi_dsi.c
+@@ -58,7 +58,7 @@ static struct mipi_dsim_platform_data *to_dsim_plat(struct platform_device
+ }
+ 
+ static struct regulator_bulk_data supplies[] = {
+-	{ .supply = "vdd10", },
++	{ .supply = "vdd11", },
+ 	{ .supply = "vdd18", },
+ };
+ 
+-- 
+1.7.4.1
