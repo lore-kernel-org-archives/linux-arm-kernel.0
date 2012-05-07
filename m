@@ -1,47 +1,62 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 6 May 2012 22:08:25 -0700
-Subject: [PATCH 0/5] more clk-next fixes
-Message-ID: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+Date: Sun, 6 May 2012 22:08:27 -0700
+Subject: [PATCH 2/5] clk: prevent spurious parent rate propagation
+In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1336367310-5140-3-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Patch 'clk: always pass parent_rate into .round_rate' made a subtle
+change to the semantics of .round_rate.  It is now expected for the
+parent's rate to always be passed in, simplifying the implemenation of
+various .round_rate callback definitions.
 
-These five patches are hopefully the final set of core framework changes
-for 3.5.  There is the obligatory MAINTAINERS file change, three new
-fixes and the fixed-factor clock patch.  That last patch is being
-reposted since three bugs were found in it (one on the list, two in my
-testing).
+However the patch also introduced a bug in clk_calc_new_rates whereby a
+clock without the CLK_SET_RATE_PARENT flag set could still propagate a
+rate change up to a parent clock if the the .round_rate callback
+modified the &best_parent_rate value in any way.
 
-If no one complains about these then I'll commit them to clk-next and
-(finally) send my pull request to Arnd.
+This patch fixes the issue at the framework level (in
+clk_calc_new_rates) by specifically handling the case where the
+CLK_SET_RATE_PARENT flag is not set.
 
-Note that the Orion patches aren't here, but I figure that Andrew L.
-probably wants to check those against the final clk-next before I pull
-them.
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Reported-by: Sascha Hauer<s.hauer@pengutronix.de>
+---
+ drivers/clk/clk.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-Regards,
-Mike
-
-Mike Turquette (4):
-  MAINTAINERS: add entry for common clk framework
-  clk: prevent spurious parent rate propagation
-  clk: remove COMMON_CLK_DISABLE_UNUSED
-  clk: mux: assign init data
-
-Sascha Hauer (1):
-  clk: add a fixed factor clock
-
- MAINTAINERS                    |   10 ++++
- drivers/clk/Kconfig            |   11 -----
- drivers/clk/Makefile           |    2 +-
- drivers/clk/clk-fixed-factor.c |   95 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-mux.c          |    1 +
- drivers/clk/clk.c              |    9 +++-
- include/linux/clk-private.h    |   20 ++++++++
- include/linux/clk-provider.h   |   23 ++++++++++
- 8 files changed, 156 insertions(+), 15 deletions(-)
- create mode 100644 drivers/clk/clk-fixed-factor.c
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8149764..7ceca0e 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -774,12 +774,18 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 	if (IS_ERR_OR_NULL(clk))
+ 		return NULL;
+ 
++	/* save parent rate, if it exists */
++	if (clk->parent)
++		best_parent_rate = clk->parent->rate;
++
+ 	/* never propagate up to the parent */
+ 	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
+ 		if (!clk->ops->round_rate) {
+ 			clk->new_rate = clk->rate;
+ 			return NULL;
+ 		}
++		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
++		goto out;
+ 	}
+ 
+ 	/* need clk->parent from here on out */
+@@ -795,7 +801,6 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 		goto out;
+ 	}
+ 
+-	best_parent_rate = clk->parent->rate;
+ 	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+ 
+ 	if (best_parent_rate != clk->parent->rate) {
 -- 
 1.7.5.4
