@@ -1,23 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 May 2012 13:04:20 +0100
-Subject: [PATCH RESEND 7/9] ASoC: mxs-saif: adopt pinctrl support
-In-Reply-To: <1336353374-28939-8-git-send-email-shawn.guo@linaro.org>
-References: <1336353374-28939-1-git-send-email-shawn.guo@linaro.org>
- <1336353374-28939-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120507120419.GC17002@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 May 2012 14:19:29 +0200
+Subject: [PATCH 15/15] ARM: ux500: use machine specific hook for late init
+In-Reply-To: <1335958420-5193-16-git-send-email-shawn.guo@linaro.org>
+References: <1335958420-5193-1-git-send-email-shawn.guo@linaro.org>
+ <1335958420-5193-16-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdYD12R2JzmB8i57wzssPpg5TkW+NvkNnzJA13Gk4nus+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 09:16:12AM +0800, Shawn Guo wrote:
-> Cc: alsa-devel at alsa-project.org
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Wed, May 2, 2012 at 1:33 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/8c1cd3b2/attachment-0001.sig>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks,
+Linus Walleij
