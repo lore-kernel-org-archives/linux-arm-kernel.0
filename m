@@ -1,23 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 7 May 2012 10:24:48 +0000
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <20120507.122333.2024326166703361049.hdoyu@nvidia.com>
-References: <20120507074228.GK26481@n2100.arm.linux.org.uk>
- <201205070859.29174.arnd@arndb.de>
- <20120507.122333.2024326166703361049.hdoyu@nvidia.com>
-Message-ID: <201205071024.48958.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 7 May 2012 12:32:48 +0200
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+ <20120418231837.GT21106@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
+ <20120426184312.GY3739@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
+ <20120426190524.GZ3739@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
+Message-ID: <4FA7A4D0.80006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 May 2012, Hiroshi Doyu wrote:
-> Tegra doesn't enable ARM_AMBA and Tegra doesn't use the following
-> "drivers/amba/bus.c" right now. I needed to make this directory
-> available to ones without ARM_AMBA enabled.
+Hi Paul,
 
-Ah, right. I looked at arch/arm/Kconfig earlier to see if
-tegra enabled ARM_AMBA but was accidentally looking
-at ARCH_INtegraTOR when grepping for TEGRA ;-)
+On 5/2/2012 11:09 AM, Paul Walmsley wrote:
+> On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
+>
+>> I will be waiting for your comment and conformation on, which family AM33xx
+>> device should fall in? Please refer to the mail-chain -
+>>
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67275.html
+>
+> This decision turns out to be pretty important; it certainly affects the
+> AM33xx PRM/CM/clockdomain/powerdomain patches that I've been looking at.
+>
+> Here is my suggestion, based on our previous practice.  I am not so
+> sure that it is the best way, but it seems pretty reasonable"
+>
+> Using CONFIG_ARCH_OMAP3 for CONFIG_ARCH_OMAPAM33XX doesn't make sense, as
+> far as I can tell.  The main area of similarity between the other
+> CONFIG_ARCH_OMAP3 and AM33xx is the Cortex-A8.  And even that MPU
+> subsystem is quite different between, say, the 3430/3630 and the AM33xx.
+> Most of the AM33xx is quite different from the 3430/3630: OMAP4-style PRCM
+> interface, OMAP4-style interconnect, etc.  Plus, most of the
+> CONFIG_ARCH_OMAP3 code in our codebase is very 3430/3630-specific, like
+> the PM code.
+>
+> This would seem to suggest that we should use CONFIG_ARCH_OMAP4.  But that
+> option currently assumes an OMAP4-style MPU subsystem: SMP Cortex-A9,
+> PL310, etc.  None of that is true for AM335x.
+>
+> So first we have to decide whether the CONFIG_ARCH_OMAP* options should
+> have a strong dependency on the MPU type, as they currently do; or whether
+> they should focus on the way the SoC is integrated.
 
-Your proposed solution sounds good then.
+I think as well that these devices should be considered as part of the 
+OMAP4 family.
+The CPU type should not be the parameter that decide the OMAP family, it 
+is just an IP, that can change on some variant, whereas the whole PRCM 
+infrastructure / interconnect is mostly the same.
 
-	Arnd
+Regards,
+Benoit
