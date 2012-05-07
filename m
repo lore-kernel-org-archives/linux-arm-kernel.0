@@ -1,384 +1,350 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 7 May 2012 13:36:47 +0200
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <201205071024.48958.arnd@arndb.de>
-References: <201205070859.29174.arnd@arndb.de><20120507.122333.2024326166703361049.hdoyu@nvidia.com><201205071024.48958.arnd@arndb.de>
-Message-ID: <20120507.143647.508182574757518311.hdoyu@nvidia.com>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Mon, 7 May 2012 17:30:45 +0530
+Subject: [PATCH 2/3] ARM: OMAP3+: PM: introduce a central pmic control
+In-Reply-To: <1336139842-845-3-git-send-email-t-kristo@ti.com>
+References: <1336139842-845-1-git-send-email-t-kristo@ti.com>
+ <1336139842-845-3-git-send-email-t-kristo@ti.com>
+Message-ID: <ca56d8bf68a45af7436d206c4d13bc7f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-Date: Mon, 7 May 2012 12:24:48 +0200
-Message-ID: <201205071024.48958.arnd@arndb.de>
+Hi Tero,
 
-> On Monday 07 May 2012, Hiroshi Doyu wrote:
-> > Tegra doesn't enable ARM_AMBA and Tegra doesn't use the following
-> > "drivers/amba/bus.c" right now. I needed to make this directory
-> > available to ones without ARM_AMBA enabled.
-> 
-> Ah, right. I looked at arch/arm/Kconfig earlier to see if
-> tegra enabled ARM_AMBA but was accidentally looking
-> at ARCH_INtegraTOR when grepping for TEGRA ;-)
-> 
-> Your proposed solution sounds good then.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tero Kristo
+> Sent: Friday, May 04, 2012 7:27 PM
+> To: linux-omap at vger.kernel.org; khilman at ti.com
+> Cc: linux-arm-kernel at lists.infradead.org; Nishanth Menon
+> Subject: [PATCH 2/3] ARM: OMAP3+: PM: introduce a central pmic
+> control
+>
+> From: Nishanth Menon <nm@ti.com>
+>
+> Since we are starting to use multiple PMICs in various combinations,
+> use the existing .omap_chip = OMAP_CHIP_INIT() to mark the
+> structures we are interested in using per OMAP device we
+> are currently running on. This mapping is based on the default
+> device recommendations from TI. Boards using custom PMICs now
+> have an opportunity to register their own custom mapping.
+>
+> With this we no longer need omap4_twl_init and omap3_twl_int
+> instead we introduce a registration mechanism which is PMIC
+> generic and move twl implementation to use the same. This allows
+> for future OMAP4460 support where there is a mixture of
+> PMIC combinations used.
+In this patch, you seem to be tying PMIC configuration with a OMAP version
+which I think is not quite appropriate. Rather it should be a board
+dependent parameter. We have many boards based on 4460 chip with different
+PMICs. This implementation will not be able to support all such
+configurations.
 
-Thank you for reviewing patches & ACK. Attached the update one here,
-instead of sending a while series again.
-
->From 16cc2b0fab00c33cd24bb5c43c45a4cda646ad42 Mon Sep 17 00:00:00 2001
-From: Hiroshi DOYU <hdoyu@nvidia.com>
-Date: Wed, 18 Apr 2012 11:41:56 +0300
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-
-Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-High-performance Bus (AHB) architecture.
-
-The AHB Arbiter controls AHB bus master arbitration. This effectively
-forms a second level of arbitration for access to the memory
-controller through the AHB Slave Memory device. The AHB pre-fetch
-logic can be configured to enhance performance for devices doing
-sequential access. Each AHB master is assigned to either the high or
-low priority bin. Both Tegra20/30 have this AHB bus.
-
-Some of configuration params could be passed from DT too if needed.
-
-Change-Id: I184e0e1ce033e76881353a4bb99234e2850e99c2
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Felipe Balbi <balbi@ti.com>
----
- .../bindings/arm/tegra/nvidia,tegra20-ahb.txt      |   11 +
- arch/arm/mach-tegra/Kconfig                        |    8 +
- drivers/Makefile                                   |    2 +-
- drivers/amba/Makefile                              |    4 +-
- drivers/amba/tegra-ahb.c                           |  261 ++++++++++++++++++++
- 5 files changed, 283 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
-new file mode 100644
-index 0000000..234406d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
-@@ -0,0 +1,11 @@
-+NVIDIA Tegra AHB
-+
-+Required properties:
-+- compatible : "nvidia,tegra20-ahb" or "nvidia,tegra30-ahb"
-+- reg : Should contain 1 register ranges(address and length)
-+
-+Example:
-+	ahb: ahb at 6000c004 {
-+		compatible = "nvidia,tegra20-ahb";
-+		reg = <0x6000c004 0x10c>; /* AHB Arbitration + Gizmo Controller */
-+	};
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 204d3d4..6a113a9 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -50,6 +50,14 @@ config TEGRA_PCI
- 	depends on ARCH_TEGRA_2x_SOC
- 	select PCI
- 
-+config TEGRA_AHB
-+	bool "Enable AHB driver for NVIDIA Tegra SoCs"
-+	default y
-+	help
-+	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
-+	  which controls AHB bus master arbitration and some
-+	  perfomance parameters(priority, prefech size).
-+
- comment "Tegra board type"
- 
- config MACH_HARMONY
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 5870322..8ba23a7 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_SFI)		+= sfi/
- # PnP must come after ACPI since it will eventually need to check if acpi
- # was used and do nothing if so
- obj-$(CONFIG_PNP)		+= pnp/
--obj-$(CONFIG_ARM_AMBA)		+= amba/
-+obj-y				+= amba/
- # Many drivers will want to use DMA so this has to be made available
- # really early.
- obj-$(CONFIG_DMA_ENGINE)	+= dma/
-diff --git a/drivers/amba/Makefile b/drivers/amba/Makefile
-index 40fe740..66e81c2 100644
---- a/drivers/amba/Makefile
-+++ b/drivers/amba/Makefile
-@@ -1,2 +1,2 @@
--obj-y		+= bus.o
--
-+obj-$(CONFIG_ARM_AMBA)		+= bus.o
-+obj-$(CONFIG_TEGRA_AHB)		+= tegra-ahb.o
-diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-new file mode 100644
-index 0000000..106a780
---- /dev/null
-+++ b/drivers/amba/tegra-ahb.c
-@@ -0,0 +1,261 @@
-+/*
-+ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-+ * Copyright (C) 2011 Google, Inc.
-+ *
-+ * Author:
-+ *	Jay Cheng <jacheng@nvidia.com>
-+ *	James Wylder <james.wylder@motorola.com>
-+ *	Benoit Goby <benoit@android.com>
-+ *	Colin Cross <ccross@android.com>
-+ *	Hiroshi DOYU <hdoyu@nvidia.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#define DRV_NAME "tegra-ahb"
-+
-+#define AHB_ARBITRATION_DISABLE		0x00
-+#define AHB_ARBITRATION_PRIORITY_CTRL	0x04
-+#define   AHB_PRIORITY_WEIGHT(x)	(((x) & 0x7) << 29)
-+#define   PRIORITY_SELECT_USB BIT(6)
-+#define   PRIORITY_SELECT_USB2 BIT(18)
-+#define   PRIORITY_SELECT_USB3 BIT(17)
-+
-+#define AHB_GIZMO_AHB_MEM		0x0c
-+#define   ENB_FAST_REARBITRATE BIT(2)
-+#define   DONT_SPLIT_AHB_WR     BIT(7)
-+
-+#define AHB_GIZMO_APB_DMA		0x10
-+#define AHB_GIZMO_IDE			0x18
-+#define AHB_GIZMO_USB			0x1c
-+#define AHB_GIZMO_AHB_XBAR_BRIDGE	0x20
-+#define AHB_GIZMO_CPU_AHB_BRIDGE	0x24
-+#define AHB_GIZMO_COP_AHB_BRIDGE	0x28
-+#define AHB_GIZMO_XBAR_APB_CTLR		0x2c
-+#define AHB_GIZMO_VCP_AHB_BRIDGE	0x30
-+#define AHB_GIZMO_NAND			0x3c
-+#define AHB_GIZMO_SDMMC4		0x44
-+#define AHB_GIZMO_XIO			0x48
-+#define AHB_GIZMO_BSEV			0x60
-+#define AHB_GIZMO_BSEA			0x70
-+#define AHB_GIZMO_NOR			0x74
-+#define AHB_GIZMO_USB2			0x78
-+#define AHB_GIZMO_USB3			0x7c
-+#define   IMMEDIATE	BIT(18)
-+
-+#define AHB_GIZMO_SDMMC1		0x80
-+#define AHB_GIZMO_SDMMC2		0x84
-+#define AHB_GIZMO_SDMMC3		0x88
-+#define AHB_MEM_PREFETCH_CFG_X		0xd8
-+#define AHB_ARBITRATION_XBAR_CTRL	0xdc
-+#define AHB_MEM_PREFETCH_CFG3		0xe0
-+#define AHB_MEM_PREFETCH_CFG4		0xe4
-+#define AHB_MEM_PREFETCH_CFG1		0xec
-+#define AHB_MEM_PREFETCH_CFG2		0xf0
-+#define   PREFETCH_ENB	BIT(31)
-+#define   MST_ID(x)	(((x) & 0x1f) << 26)
-+#define   AHBDMA_MST_ID	MST_ID(5)
-+#define   USB_MST_ID	MST_ID(6)
-+#define   USB2_MST_ID	MST_ID(18)
-+#define   USB3_MST_ID	MST_ID(17)
-+#define   ADDR_BNDRY(x)	(((x) & 0xf) << 21)
-+#define   INACTIVITY_TIMEOUT(x)	(((x) & 0xffff) << 0)
-+
-+#define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xf8
-+
-+static const u32 tegra_ahb_gizmo[] = {
-+	AHB_ARBITRATION_DISABLE,
-+	AHB_ARBITRATION_PRIORITY_CTRL,
-+	AHB_GIZMO_AHB_MEM,
-+	AHB_GIZMO_APB_DMA,
-+	AHB_GIZMO_IDE,
-+	AHB_GIZMO_USB,
-+	AHB_GIZMO_AHB_XBAR_BRIDGE,
-+	AHB_GIZMO_CPU_AHB_BRIDGE,
-+	AHB_GIZMO_COP_AHB_BRIDGE,
-+	AHB_GIZMO_XBAR_APB_CTLR,
-+	AHB_GIZMO_VCP_AHB_BRIDGE,
-+	AHB_GIZMO_NAND,
-+	AHB_GIZMO_SDMMC4,
-+	AHB_GIZMO_XIO,
-+	AHB_GIZMO_BSEV,
-+	AHB_GIZMO_BSEA,
-+	AHB_GIZMO_NOR,
-+	AHB_GIZMO_USB2,
-+	AHB_GIZMO_USB3,
-+	AHB_GIZMO_SDMMC1,
-+	AHB_GIZMO_SDMMC2,
-+	AHB_GIZMO_SDMMC3,
-+	AHB_MEM_PREFETCH_CFG_X,
-+	AHB_ARBITRATION_XBAR_CTRL,
-+	AHB_MEM_PREFETCH_CFG3,
-+	AHB_MEM_PREFETCH_CFG4,
-+	AHB_MEM_PREFETCH_CFG1,
-+	AHB_MEM_PREFETCH_CFG2,
-+	AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID,
-+};
-+
-+struct tegra_ahb {
-+	void __iomem	*regs;
-+	struct device	*dev;
-+	u32		ctx[0];
-+};
-+
-+static inline u32 gizmo_readl(struct tegra_ahb *ahb, u32 offset)
-+{
-+	return readl(ahb->regs + offset);
-+}
-+
-+static inline void gizmo_writel(struct tegra_ahb *ahb, u32 value, u32 offset)
-+{
-+	writel(value, ahb->regs + offset);
-+}
-+
-+static int tegra_ahb_suspend(struct device *dev)
-+{
-+	int i;
-+	struct tegra_ahb *ahb = dev_get_drvdata(dev);
-+
-+	for (i = 0; i < ARRAY_SIZE(tegra_ahb_gizmo); i++)
-+		ahb->ctx[i] = gizmo_readl(ahb, tegra_ahb_gizmo[i]);
-+	return 0;
-+}
-+
-+static int tegra_ahb_resume(struct device *dev)
-+{
-+	int i;
-+	struct tegra_ahb *ahb = dev_get_drvdata(dev);
-+
-+	for (i = 0; i < ARRAY_SIZE(tegra_ahb_gizmo); i++)
-+		gizmo_writel(ahb, ahb->ctx[i], tegra_ahb_gizmo[i]);
-+	return 0;
-+}
-+
-+static UNIVERSAL_DEV_PM_OPS(tegra_ahb_pm,
-+			    tegra_ahb_suspend,
-+			    tegra_ahb_resume, NULL);
-+
-+static void tegra_ahb_gizmo_init(struct tegra_ahb *ahb)
-+{
-+	u32 val;
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_AHB_MEM);
-+	val |= ENB_FAST_REARBITRATE | IMMEDIATE | DONT_SPLIT_AHB_WR;
-+	gizmo_writel(ahb, val, AHB_GIZMO_AHB_MEM);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB2);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB2);
-+
-+	val = gizmo_readl(ahb, AHB_GIZMO_USB3);
-+	val |= IMMEDIATE;
-+	gizmo_writel(ahb, val, AHB_GIZMO_USB3);
-+
-+	val = gizmo_readl(ahb, AHB_ARBITRATION_PRIORITY_CTRL);
-+	val |= PRIORITY_SELECT_USB |
-+		PRIORITY_SELECT_USB2 |
-+		PRIORITY_SELECT_USB3 |
-+		AHB_PRIORITY_WEIGHT(7);
-+	gizmo_writel(ahb, val, AHB_ARBITRATION_PRIORITY_CTRL);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG1);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		AHBDMA_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG1);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG2);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG2);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG3);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB3_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG3);
-+
-+	val = gizmo_readl(ahb, AHB_MEM_PREFETCH_CFG4);
-+	val &= ~MST_ID(~0);
-+	val |= PREFETCH_ENB |
-+		USB2_MST_ID |
-+		ADDR_BNDRY(0xc) |
-+		INACTIVITY_TIMEOUT(0x1000);
-+	gizmo_writel(ahb, val, AHB_MEM_PREFETCH_CFG4);
-+}
-+
-+static int __devinit tegra_ahb_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct tegra_ahb *ahb;
-+	size_t bytes;
-+
-+	bytes = sizeof(*ahb) + sizeof(u32) * ARRAY_SIZE(tegra_ahb_gizmo);
-+	ahb = devm_kzalloc(&pdev->dev, bytes, GFP_KERNEL);
-+	if (!ahb)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+	ahb->regs = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!ahb->regs)
-+		return -EBUSY;
-+
-+	ahb->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, ahb);
-+	tegra_ahb_gizmo_init(ahb);
-+	return 0;
-+}
-+
-+static int __devexit tegra_ahb_remove(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static const struct of_device_id tegra_ahb_of_match[] __devinitconst = {
-+	{ .compatible = "nvidia,tegra30-ahb", },
-+	{ .compatible = "nvidia,tegra20-ahb", },
-+	{},
-+};
-+
-+static struct platform_driver tegra_ahb_driver = {
-+	.probe = tegra_ahb_probe,
-+	.remove = __devexit_p(tegra_ahb_remove),
-+	.driver = {
-+		.name = DRV_NAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table = tegra_ahb_of_match,
-+		.pm = &tegra_ahb_pm,
-+	},
-+};
-+module_platform_driver(tegra_ahb_driver);
-+
-+MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
-+MODULE_DESCRIPTION("Tegra AHB driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:" DRV_NAME);
--- 
-1.7.5.4
+Vishwa
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> [t-kristo at ti.com: moved code under twl-common, other minor cleanups]
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_twl.c   |   81 ++++++++++++++++++++++-----
+> -----------
+>  arch/arm/mach-omap2/pm.h         |    9 +---
+>  arch/arm/mach-omap2/twl-common.c |   55 +++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/twl-common.h |   27 +++++++++++++
+>  4 files changed, 129 insertions(+), 43 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-
+> omap2/omap_twl.c
+> index 7830eae..c8e418e 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -19,8 +19,8 @@
+>  #include <linux/i2c/twl.h>
+>
+>  #include "voltage.h"
+> -
+>  #include "pm.h"
+> +#include "twl-common.h"
+>
+>  #define OMAP3_SRI2C_SLAVE_ADDR		0x12
+>  #define OMAP3_VDD_MPU_SR_CONTROL_REG	0x00
+> @@ -170,7 +170,7 @@ static struct omap_voltdm_pmic omap3_core_pmic =
+> {
+>  	.uv_to_vsel		= twl4030_uv_to_vsel,
+>  };
+>
+> -static struct omap_voltdm_pmic omap4_mpu_pmic = {
+> +static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
+>  	.slew_rate		= 4000,
+>  	.step_size		= 12660,
+>  	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+> @@ -187,7 +187,7 @@ static struct omap_voltdm_pmic omap4_mpu_pmic =
+> {
+>  	.uv_to_vsel		= twl6030_uv_to_vsel,
+>  };
+>
+> -static struct omap_voltdm_pmic omap4_iva_pmic = {
+> +static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
+>  	.slew_rate		= 4000,
+>  	.step_size		= 12660,
+>  	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+> @@ -204,7 +204,7 @@ static struct omap_voltdm_pmic omap4_iva_pmic =
+> {
+>  	.uv_to_vsel		= twl6030_uv_to_vsel,
+>  };
+>
+> -static struct omap_voltdm_pmic omap4_core_pmic = {
+> +static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
+>  	.slew_rate		= 4000,
+>  	.step_size		= 12660,
+>  	.startup_time		= 500,
+> @@ -222,31 +222,9 @@ static struct omap_voltdm_pmic omap4_core_pmic
+> = {
+>  	.uv_to_vsel		= twl6030_uv_to_vsel,
+>  };
+>
+> -int __init omap4_twl_init(void)
+> +static int __init twl_set_sr(struct voltagedomain *voltdm)
+>  {
+> -	struct voltagedomain *voltdm;
+> -
+> -	if (!cpu_is_omap44xx())
+> -		return -ENODEV;
+> -
+> -	voltdm = voltdm_lookup("mpu");
+> -	omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
+> -
+> -	voltdm = voltdm_lookup("iva");
+> -	omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
+> -
+> -	voltdm = voltdm_lookup("core");
+> -	omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
+> -
+> -	return 0;
+> -}
+> -
+> -int __init omap3_twl_init(void)
+> -{
+> -	struct voltagedomain *voltdm;
+> -
+> -	if (!cpu_is_omap34xx())
+> -		return -ENODEV;
+> +	int r = 0;
+>
+>  	/*
+>  	 * The smartreflex bit on twl4030 specifies if the setting of
+> voltage
+> @@ -258,15 +236,50 @@ int __init omap3_twl_init(void)
+>  	 * voltage scaling will not function on TWL over I2C_SR.
+>  	 */
+>  	if (!twl_sr_enable_autoinit)
+> -		omap3_twl_set_sr_bit(true);
+> +		r = omap3_twl_set_sr_bit(true);
+>
+> -	voltdm = voltdm_lookup("mpu_iva");
+> -	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
+> +	return r;
+> +}
+>
+> -	voltdm = voltdm_lookup("core");
+> -	omap_voltage_register_pmic(voltdm, &omap3_core_pmic);
+> +static __initdata struct omap_pmic_map omap_twl_map[] = {
+> +	{
+> +		.name = "mpu_iva",
+> +		.cpu = PMIC_CPU_OMAP3,
+> +		.pmic_data = &omap3_mpu_pmic,
+> +		.special_action = twl_set_sr,
+> +	},
+> +	{
+> +		.name = "core",
+> +		.cpu = PMIC_CPU_OMAP3,
+> +		.pmic_data = &omap3_core_pmic,
+> +	},
+> +	{
+> +		.name = "mpu",
+> +		.cpu = PMIC_CPU_OMAP4430,
+> +		.pmic_data = &twl6030_vcore1_pmic,
+> +	},
+> +	{
+> +		.name = "core",
+> +		.cpu = PMIC_CPU_OMAP4430,
+> +		.pmic_data = &twl6030_vcore3_pmic,
+> +	},
+> +	{
+> +		.name = "core",
+> +		.cpu = PMIC_CPU_OMAP4460,
+> +		.pmic_data = &twl6030_vcore1_pmic,
+> +	},
+> +	{
+> +		.name = "iva",
+> +		.cpu = PMIC_CPU_OMAP44XX,
+> +		.pmic_data = &twl6030_vcore2_pmic,
+> +	},
+> +	/* Terminator */
+> +	{ .name = NULL, .pmic_data = NULL},
+> +};
+>
+> -	return 0;
+> +int __init omap_twl_init(void)
+> +{
+> +	return omap_pmic_register_data(omap_twl_map);
+>  }
+>
+>  /**
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 3d55926..afea204 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -128,15 +128,10 @@ static inline void
+> omap_enable_smartreflex_on_init(void) {}
+>  #endif
+>
+>  #ifdef CONFIG_TWL4030_CORE
+> -extern int omap3_twl_init(void);
+> -extern int omap4_twl_init(void);
+> +extern int omap_twl_init(void);
+>  extern int omap3_twl_set_sr_bit(bool enable);
+>  #else
+> -static inline int omap3_twl_init(void)
+> -{
+> -	return -EINVAL;
+> -}
+> -static inline int omap4_twl_init(void)
+> +static inline int omap_twl_init(void)
+>  {
+>  	return -EINVAL;
+>  }
+> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-
+> omap2/twl-common.c
+> index 9120a4f..2588e04 100644
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -77,8 +77,7 @@ void __init omap_pmic_late_init(void)
+>  	if (!pmic_i2c_board_info.irq)
+>  		return;
+>
+> -	omap3_twl_init();
+> -	omap4_twl_init();
+> +	omap_twl_init();
+>  }
+>
+>  #if defined(CONFIG_ARCH_OMAP3)
+> @@ -481,3 +480,55 @@ void __init omap4_pmic_get_config(struct
+> twl4030_platform_data *pmic_data,
+>  		pmic_data->clk32kg = &omap4_clk32kg_idata;
+>  }
+>  #endif /* CONFIG_ARCH_OMAP4 */
+> +
+> +/**
+> + * omap_pmic_register_data() - Register the PMIC information to
+> OMAP mapping
+> + * @omap_pmic_maps:    array ending with a empty element
+> representing the maps
+> + */
+> +int __init omap_pmic_register_data(struct omap_pmic_map *map)
+> +{
+> +	struct voltagedomain *voltdm;
+> +	int r;
+> +
+> +	if (!map)
+> +		return 0;
+> +
+> +	while (map->name) {
+> +		if (cpu_is_omap34xx() && !(map->cpu & PMIC_CPU_OMAP3))
+> +			goto next;
+> +
+> +		if (cpu_is_omap443x() && !(map->cpu &
+> PMIC_CPU_OMAP4430))
+> +			goto next;
+> +
+> +		if (cpu_is_omap446x() && !(map->cpu &
+> PMIC_CPU_OMAP4460))
+> +			goto next;
+> +
+> +		voltdm = voltdm_lookup(map->name);
+> +		if (IS_ERR_OR_NULL(voltdm)) {
+> +			pr_err("%s: unable to find map %s\n", __func__,
+> +				map->name);
+> +			goto next;
+> +		}
+> +		if (IS_ERR_OR_NULL(map->pmic_data)) {
+> +			pr_warning("%s: domain[%s] has no pmic data\n",
+> +					__func__, map->name);
+> +			goto next;
+> +		}
+> +
+> +		r = omap_voltage_register_pmic(voltdm, map->pmic_data);
+> +		if (r) {
+> +			pr_warning("%s: domain[%s] register returned
+> %d\n",
+> +					__func__, map->name, r);
+> +			goto next;
+> +		}
+> +		if (map->special_action) {
+> +			r = map->special_action(voltdm);
+> +			WARN(r, "%s: domain[%s] action returned %d\n",
+> __func__,
+> +				map->name, r);
+> +		}
+> +next:
+> +		map++;
+> +	}
+> +
+> +	return 0;
+> +}
+> diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-
+> omap2/twl-common.h
+> index 275dde8..2f805a3 100644
+> --- a/arch/arm/mach-omap2/twl-common.h
+> +++ b/arch/arm/mach-omap2/twl-common.h
+> @@ -2,6 +2,7 @@
+>  #define __OMAP_PMIC_COMMON__
+>
+>  #include <plat/irqs.h>
+> +#include "voltage.h"
+>
+>  #define TWL_COMMON_PDATA_USB		(1 << 0)
+>  #define TWL_COMMON_PDATA_BCI		(1 << 1)
+> @@ -59,4 +60,30 @@ void omap3_pmic_get_config(struct
+> twl4030_platform_data *pmic_data,
+>  void omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+>  			   u32 pdata_flags, u32 regulators_flags);
+>
+> +/**
+> + * struct omap_pmic_map - Describe the OMAP PMIC data for OMAP
+> + * @name:		name of the voltage domain
+> + * @pmic_data:		pmic data associated with it
+> + * @cpu:		CPUs this PMIC data is valid for
+> + * @special_action:	callback for any specific action to take for
+> that map
+> + *
+> + * Since we support multiple PMICs each potentially functioning on
+> multiple
+> + * OMAP devices, we describe the parameters in a map allowing us to
+> reuse the
+> + * data as necessary.
+> + */
+> +struct omap_pmic_map {
+> +	char			*name;
+> +	struct omap_voltdm_pmic	*pmic_data;
+> +	u32			cpu;
+> +	int			(*special_action)(struct voltagedomain *);
+> +};
+> +
+> +#define PMIC_CPU_OMAP3		(1 << 0)
+> +#define PMIC_CPU_OMAP4430	(1 << 1)
+> +#define PMIC_CPU_OMAP4460	(1 << 2)
+> +#define PMIC_CPU_OMAP44XX	(PMIC_CPU_OMAP4430 |
+> PMIC_CPU_OMAP4460)
+> +
+> +extern int omap_pmic_register_data(struct omap_pmic_map *map);
+> +extern void omap_pmic_data_init(void);
+> +
+>  #endif /* __OMAP_PMIC_COMMON__ */
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
