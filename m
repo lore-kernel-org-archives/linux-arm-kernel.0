@@ -1,62 +1,59 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 May 2012 10:47:19 +0100
-Subject: [PATCH 1/2] mfd: max8925: request resource region
-In-Reply-To: <20120507090858.GN26481@n2100.arm.linux.org.uk>
-References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
- <20120507075800.GL26481@n2100.arm.linux.org.uk>
- <20120507090127.GA2132@sirena.org.uk>
- <20120507090858.GN26481@n2100.arm.linux.org.uk>
-Message-ID: <20120507094718.GD4415@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 07 May 2012 15:19:31 +0530
+Subject: [PATCH 00/13] ARM: OMAP5: Add minimal OMAP5 SOC support
+In-Reply-To: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <4FA79AAB.5050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 10:08:58AM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 07, 2012 at 10:01:28AM +0100, Mark Brown wrote:
+Tony,
 
-> > They've commonly been used for this, it's a fairly sane way for an MFD
-> > to communicate with its subdevices.  The fix in this series isn't good,
-> > though - providing a parent resource with a suitable range for all the
-> > device resources should do the job much more sensibly.  This isn't great
-> > but the infrastructure seems to do the right thing with it for now and
-> > it only requires a bit of reinterpretation of what IORESOURCE_IO means.
+On Thursday 03 May 2012 12:56 PM, R Sricharan wrote:
+> The series adds minimal OMAP5 support.
+> OMAP5430 has a dual core Cortex-A15 based MPU subsystem with 2MB
+> L2 cache. The SOC has many compatible blocks with OMAP4 SOCS and
+> hence large part of the peripherals are re-used.
+> 
+> OMAP5432 is another variant of OMAP5430, with a
+> memory controller supporting DDR3 and SATA.
+> 
+> Series is generated against the 3.4-rc5. This has been rebased on
+> top of the OMAP2+ cleanup series [1]
+> 
+> To get the boot working with omap2plus_defconfig,
+> OMAP5 hwmod/clock/prm/cm database needs to be added.
+> The data and the integrated tree are available in the
+> below git repository
+> 
+> OMAP5_DATA:
+> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+>  omap5_data
+> 
+> OMAP5_INTEGRATED:
+> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+>  omap5_dt_integrated
+> 
+> The series is boot tested on OMAP5430 ES1.0.
+> OMAP2/3/4 build and boot is tested as well to avoid any breakage
+> because of the series.
+> 
+> Patch "TEMP: ARM: OMAP5: Add cpu_is_omap54xx() checks" is temporary and
+> can be dropped once rebased against [2]
+> 
+> Patch "TEMP: ARM: OMAP5: Update the base address of the 32k-counter" is
+> temporary and can be dropped once rebased against [3]
+> 
+> 
+> [1] http://www.spinics.net/lists/linux-omap/msg69233.html
+> [2] http://www.spinics.net/lists/linux-omap/msg69013.html
+> [3] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67166.html
+> 
+Do you have a branch where above dependencies are merged ?
+How do you suggest to go about updating this series so
+that above dependencies plus DT support(3.3 based branch
+in arm-soc tree and needs to be updated against 3.4) is
+base tree for the patchset.
 
-> It's an abuse.  And it won't work unless PCMCIA, PCI or ISA is enabled.
-
-What causes it to fail if these are disabled?  I've got a bunch of
-systems here which don't appear to have any of those enabled as far as I
-can tell (though I don't know exactly what I'm looking for with ISA) but
-seem to be using this quite happily for some time now.
-
-> This abuse must stop, and it must stop right now.  And I really don't
-> care about "it's commonly been used for XYZ" because it's a totally fucked
-> idea.
-
-I'd agree we should do something a bit nicer (though just having a
-separate resource tree for the chip registers like I suggested does seem
-like a reasonable first approach there).
-
-> What if you have two devices both claiming IO regions at 0?  Hint: it
-> fails.
-
-Don't think I've got any examples with regions beginning at 0 but other
-regions seem to not run into any problems with overlap.  Note that all
-these drivers do with the regions is use them to look up the base
-register.
-
-> It's buggered beyond belief and it needs to die right now, no questions
-> about it.  And anyone who supports this idea needs to be...
-
-We have a bunch of drivers which have been in production for some time
-now.  Simply saying the above without offering a constructive
-alternative doesn't really help move anything forward here.  We could
-add a new resource type but it's not clear to me that there's any need
-to do so as it should be possible to arrange to avoid conflicts between
-the different address ranges, and obviously there's no little space in
-the bitmask used for resource types.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/dfc545ad/attachment.sig>
+Regards
+Santosh
