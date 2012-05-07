@@ -1,37 +1,41 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 7 May 2012 12:34:28 -0700
-Subject: [PATCH] ARM: BCMRING: Fix UART declaration and clk dev name mismatch
-Message-ID: <4FA823C4.1070109@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 May 2012 12:35:01 -0700
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120507191847.GJ5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
+ <20120507191847.GJ5088@atomide.com>
+Message-ID: <20120507193500.GK5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bcmring UART declaration and clk dev name mismatch
+* Tony Lindgren <tony@atomide.com> [120507 12:22]:
+> * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
+> > Hi,
+> > 
+> > On Fri, 4 May 2012, Tony Lindgren wrote:
+> > 
+> > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
+> > > Then this becomes just:
+> > > 
+> > > #ifdef CONFIG_SOC_OMAP3PLUS
+> > 
+> > We might want to consider having separate CONFIG_SOC_* values for each 
+> > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
+> > CONFIG_SOC_OMAP3630, etc.
+> 
+> Hmm but this would be in addition to the SOC specific options. The goal
+> is to cut down the ifdeffery needed all over the place to add new SoCs,
+> see the experimental patch I posted:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
 
-With 888073d41680e8244232f3d850e0424a4e9de60f (ARM:
-bcmring: fix UART declarations), it introduced clk dev name
-mismatch and leads to UART initialization failure during boot.
+Of course we could make this finer grained based on features
+like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
+grouping like that in mind.
 
-Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com  <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>>
----
-   arch/arm/mach-bcmring/core.c |    4 ++--
-   1 file changed, 2 insertions(+), 2 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index adbfb19..5559857 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -110,10 +110,10 @@ static struct clk_lookup lookups[] = {
-           .con_id = "apb_pclk",
-           .clk =&dummy_apb_pclk,
-       }, {            /* UART0 */
--        .dev_id = "uarta",
-+        .dev_id = "uartA",
-           .clk =&uart_clk,
-       }, {            /* UART1 */
--        .dev_id = "uartb",
-+        .dev_id = "uartB",
-           .clk =&uart_clk,
-       }, {            /* SP804 timer 0 */
-           .dev_id = "sp804",
--- 
-1.7.9.5
+Tony
