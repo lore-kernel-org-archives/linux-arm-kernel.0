@@ -1,24 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 May 2012 10:10:02 +0100
-Subject: [PATCH 1/3] regulator: add pre-regulator support for 88pm860x
-In-Reply-To: <20120506022954.GB29576@lizard>
-References: <1332825916-2183-1-git-send-email-jtzhou@marvell.com>
- <20120506022954.GB29576@lizard>
-Message-ID: <20120507091001.GB4415@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 7 May 2012 09:23:07 +0000
+Subject: [PATCH 2/2] ARM: mmp: add io head file
+In-Reply-To: <1336360249-29963-2-git-send-email-haojian.zhuang@gmail.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <1336360249-29963-2-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201205070923.07418.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2012 at 07:29:54PM -0700, Anton Vorontsov wrote:
+On Monday 07 May 2012, Haojian Zhuang wrote:
+> +#ifndef __ARCH_MMP_IO_H
+> +#define __ARCH_MMP_IO_H
+> +
+> +#define IO_SPACE_LIMIT 0xffffffff
+> +
+> +#define __io(a)                ((a) & IO_SPACE_LIMIT)
+> +
+> +#endif
 
-> OK to let me take this via battery tree?
+NAK
 
-No, there's now substantial conflicts with the regulator driver's
-ongoing development.  For example, the driver has been converted to use
-the core regmap support for enable and disable.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/b4147d61/attachment.sig>
+If you don't have ISA or PCI devices, don't define these.
+
+More importantly, never define them to an incorrect value. This
+definition will cause an oops by NULL pointer dereferences for any
+access to ISA devices such as writing to /dev/port, or loading a
+module that probes the ISA ports.
+
+	Arnd
