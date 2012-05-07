@@ -1,56 +1,40 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Mon, 7 May 2012 19:38:39 +0530
-Subject: [PATCH 10/13] ARM: OMAP5: board-generic: Add device tree support.
-In-Reply-To: <4FA7CDC1.9050301@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-11-git-send-email-r.sricharan@ti.com>
- <4FA7CDC1.9050301@ti.com>
-Message-ID: <CAJ7qFSdBz1ccp0Z-4pWvbq0J0zb6j3Kto4cDz3R0kHT7YfRo0w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  7 May 2012 22:11:27 +0800
+Subject: [PATCH 0/3] Initial device tree support for mxs
+Message-ID: <1336399890-12883-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-  Thanks for the reviews.
+This series is based on mxs common clk and pinctrl support to recreate
+the mxs/dt branch, which includes the initial device tree support, fec
+and serial console for imx28-evk and imx23-evk boards.
 
->
->> Adding the minimal support for OMAP5 soc with device tree.
->
->
-> You should probably split that patch since you are doing several things that
-> are not OMAP5 related.
->
-> Do a patch that move the omap_init_irq into the INTC and GIC code first.
->
-> Then, you can add a patch to add the OMAP5_DT machine entry.
->
-  ok, will split this then accordingly.
+Dong Aisheng (1):
+  ARM: mxs: add initial device tree support for imx28-evk board
 
-[snip]
+Shawn Guo (2):
+  ARM: mxs: add initial device tree support for imx23-evk board
+  ARM: mxs: always build in device tree support
 
->> @@ -185,6 +185,8 @@ void omap3_intc_prepare_idle(void);
->> ?void omap3_intc_resume_idle(void);
->> ?void omap2_intc_handle_irq(struct pt_regs *regs);
->> ?void omap3_intc_handle_irq(struct pt_regs *regs);
->> +void omap_of_init_irq(void);
->
->
-> In order to be consistent with the GIC function and even the previous ones,
-> you should name the exported one:
->
-> +void omap_intc_of_init(void);
->
- Ok, will take care of this rename.
+ Documentation/devicetree/bindings/arm/fsl.txt |    8 +
+ arch/arm/Kconfig                              |    1 +
+ arch/arm/boot/dts/imx23-evk.dts               |   32 ++
+ arch/arm/boot/dts/imx23.dtsi                  |  243 ++++++++++++++++
+ arch/arm/boot/dts/imx28-evk.dts               |   48 +++
+ arch/arm/boot/dts/imx28.dtsi                  |  382 +++++++++++++++++++++++++
+ arch/arm/configs/mxs_defconfig                |    1 +
+ arch/arm/mach-mxs/Kconfig                     |   10 +
+ arch/arm/mach-mxs/Makefile                    |    1 +
+ arch/arm/mach-mxs/devices/Kconfig             |    1 -
+ arch/arm/mach-mxs/mach-mxs.c                  |  109 +++++++
+ drivers/clk/mxs/clk-imx23.c                   |    1 +
+ drivers/clk/mxs/clk-imx28.c                   |    1 +
+ 13 files changed, 837 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx23-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx23.dtsi
+ create mode 100644 arch/arm/boot/dts/imx28-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx28.dtsi
+ create mode 100644 arch/arm/mach-mxs/mach-mxs.c
 
-
->>
->> @@ -279,6 +280,16 @@ int __init omap_intc_of_init(struct device_node
->> *node,
->
->
-> And thus rename that one that become a private function without the omap_
-> prefix.
->
- ok..
-
-Thanks,
- Sricharan
+-- 
+1.7.5.4
