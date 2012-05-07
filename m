@@ -1,54 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 7 May 2012 20:58:03 +0100
-Subject: [PATCH 1/2] mfd: max8925: request resource region
-In-Reply-To: <201205071926.08810.arnd@arndb.de>
-References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
- <201205071509.55166.arnd@arndb.de>
- <20120507151744.GI17002@opensource.wolfsonmicro.com>
- <201205071926.08810.arnd@arndb.de>
-Message-ID: <20120507195802.GB15893@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 7 May 2012 19:59:21 +0000
+Subject: [PATCH 2/5] ARM: S3C24XX: move plat-s3c24xx/irq.c into common.c
+In-Reply-To: <201205071941.33343.heiko@sntech.de>
+References: <201205071939.37433.heiko@sntech.de>
+ <201205071941.33343.heiko@sntech.de>
+Message-ID: <201205071959.22122.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 07:26:08PM +0000, Arnd Bergmann wrote:
-> On Monday 07 May 2012, Mark Brown wrote:
-> > On Mon, May 07, 2012 at 03:09:54PM +0000, Arnd Bergmann wrote:
-> > > On Monday 07 May 2012, Mark Brown wrote:
+On Monday 07 May 2012, Heiko St?bner wrote:
+> Again following the model set out by s3c64xx.
+> 
+> As checkpatch showed a lot of style errors and warning, these got fixed too.
+> 
+> Signed-off-by: Heiko Stueber <heiko@sntech.de>
 
-> > > > Given what I'm saying about platform devices above perhaps we should be
-> > > > factoring some of the platform device stuff up to struct device level.
+I object on two grounds:
 
-> > > Isn't that what devres is for? We should be able to just attach arbitrary
-> > > data to a device with this, e.g. a struct regmap to use for doing I/O
-> > > that a driver can use. Maybe we should add some wrappers around that
-> > > to make it more obvious to use.
+1. there are plans to move irq chip drivers to drivers/irqchip eventually,
+so I think it makes little sense to merge the current implementation into
+another file. That just makes it harder to split it out again. Better leave
+the file named irq.c and just move it to the mach-s3c24xx for now.
 
-> > Not as far as I understand it, it's more about making error handling and
-> > unregistration code less error prone by automating the freeing of
-> > things when a device goes away or probe() fails.  The managed versions
+2. You should *never* move code around and change it at the same time
+if you have a choice. Instead if you discover coding style issues with
+code you want to move, fix those first and then do a second patch to
+move it without further changes. Otherwise it becomes very hard to
+check that the coding style changes are actually correct.
 
-> Yes, it also does that, but have a look at how drivers/pci/pci.c uses
-> devres to attach auxiliary attributes to a device. We can do the same
-> thing for other devices to attach any data.
+The other four patches look fine to me.
 
-Right, but that's essentially just the bus doing the equivalent of
-devm_kzalloc() to allocate some private data which is a separate thing.
-It doesn't really address the problem of passing information from
-registration code to the device through the bus which is what the
-resource API is currently doing for these devices.
-
-We probably should be making a bit more use of devres for this than we
-are (using it to bounce through a regmap isn't a bad idea, I might just
-do that though a lot of the time you need the parent internal data
-struct anyway) but it's a separate thing.
-
-Something like pulling the type out of the flags in struct resource to
-give us a bit more space (or replace the bits with a pointer, though
-that's even more invasive) would address this more...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/564ed995/attachment.sig>
+	Arnd
