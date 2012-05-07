@@ -1,29 +1,56 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 11:12:23 -0700
-Subject: [PATCH 1/2 v4] ARM: OMAP2+: omap_hwmod: Add api to enable/disable
- module level wakeup events
-In-Reply-To: <1335338237-4095-1-git-send-email-govindraj.raja@ti.com>
- (Govindraj R.'s message of "Wed, 25 Apr 2012 12:47:17 +0530")
-References: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
- <1335338237-4095-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <874nrr508o.fsf@ti.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 7 May 2012 11:36:11 -0700
+Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
+In-Reply-To: <20120507.143647.508182574757518311.hdoyu@nvidia.com>
+References: <201205070859.29174.arnd@arndb.de>
+ <20120507.122333.2024326166703361049.hdoyu@nvidia.com>
+ <201205071024.48958.arnd@arndb.de>
+ <20120507.143647.508182574757518311.hdoyu@nvidia.com>
+Message-ID: <20120507183611.GA725@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+On Mon, May 07, 2012 at 01:36:47PM +0200, Hiroshi Doyu wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> Subject: Re: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
+> Date: Mon, 7 May 2012 12:24:48 +0200
+> Message-ID: <201205071024.48958.arnd@arndb.de>
+> 
+> > On Monday 07 May 2012, Hiroshi Doyu wrote:
+> > > Tegra doesn't enable ARM_AMBA and Tegra doesn't use the following
+> > > "drivers/amba/bus.c" right now. I needed to make this directory
+> > > available to ones without ARM_AMBA enabled.
+> > 
+> > Ah, right. I looked at arch/arm/Kconfig earlier to see if
+> > tegra enabled ARM_AMBA but was accidentally looking
+> > at ARCH_INtegraTOR when grepping for TEGRA ;-)
+> > 
+> > Your proposed solution sounds good then.
+> 
+> Thank you for reviewing patches & ACK. Attached the update one here,
+> instead of sending a while series again.
+> 
+> >From 16cc2b0fab00c33cd24bb5c43c45a4cda646ad42 Mon Sep 17 00:00:00 2001
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> Date: Wed, 18 Apr 2012 11:41:56 +0300
+> Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
+> 
+> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
+> High-performance Bus (AHB) architecture.
+> 
+> The AHB Arbiter controls AHB bus master arbitration. This effectively
+> forms a second level of arbitration for access to the memory
+> controller through the AHB Slave Memory device. The AHB pre-fetch
+> logic can be configured to enhance performance for devices doing
+> sequential access. Each AHB master is assigned to either the high or
+> low priority bin. Both Tegra20/30 have this AHB bus.
+> 
+> Some of configuration params could be passed from DT too if needed.
+> 
+> Change-Id: I184e0e1ce033e76881353a4bb99234e2850e99c2
 
-> From: "Govindraj.R" <govindraj.raja@ti.com>
->
-> On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
-> PM_WKEN1_CORE/PM_WKEN_PER regs.
->
-> Add api to control the module level wakeup mechanism from info provided from
-> hwmod data.
+What nonsense is this?  Please never put that in a patch you want
+accepted upstream, as it makes no sense and we just have to edit it out
+by hand, making us grumpy...
 
-Can you rework this slightly on top of the new SoC detection support
-recently added to hwmod[1].   That series adds support for init-time, SoC
-specific function pointers for this kind of SoC specific feature.
-
-Kevin
-
-[1] git://git.pwsan.com/linux-2.6 hwmod_soc_conditional_cleanup_3.5
+greg k-h
