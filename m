@@ -1,84 +1,113 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 7 May 2012 12:35:48 -0700
-Subject: [PATCH] ARM: BCMRING: fix IO mem static mapping
-Message-ID: <4FA82414.7070407@broadcom.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 7 May 2012 14:53:48 -0500
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <87ipg76hfm.fsf@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
+ <87ipg76hfm.fsf@ti.com>
+Message-ID: <4FA8284C.7080803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bcmring IO mem static mapping.
+Hi Kevin,
 
-This causes bcmring booting issue since v3.2
+On 05/07/2012 12:15 PM, Kevin Hilman wrote:
+> Jon Hunter <jon-hunter@ti.com> writes:
+> 
+>> Hi Will,
+>>
+>> On 04/26/2012 01:07 PM, Will Deacon wrote:
+>>> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
+>>>> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
+>>>>>
+>>>>> Part of the problem is that the clockdomain data for the emu_sys 
+>>>>> clockdomain is wrong.  Here's something to try to fix it.  It might just 
+>>>>> be enough to get it to work.
+>>>>
+>>>> Hmm, doesn't seem to work but I do see the following in dmesg when I try to
+>>>> use perf:
+>>>>
+>>>>  powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
+>>>>
+>>>> which is new with your patch.
+>>>
+>>> Sorry to nag, but does anybody have a clue where to go from here? I can
+>>> start digging in the OMAP PM code, but it's all new territory for me.
+>>
+>> I did a little playing around with this today and I think that I have figured out why this was not working (see below). Please can you try the following patch? I tried this on top of your series for perf/omap4. 
+>>
+>> Paul, FYI. If this works for Will then I can re-base on top of the latest linux-omap and submit to the mailing list.
+>>
+>> Also, the above error about the emu_pwrdm is odd too. I noticed that the emu_pwrdm is always in the transitioning state. And when I say always, I mean that even if I check the power domain state while u-boot is running it is in the transitioning state. So even before the kernel starts. 
+>>
+>> Cheers
+>> Jon 
+>>
+>> From 9137ff9c1b382232de7443db0b51b7555846fb62 Mon Sep 17 00:00:00 2001
+>> From: Jon Hunter <jon-hunter@ti.com>
+>> Date: Fri, 4 May 2012 16:48:45 -0500
+>> Subject: [PATCH] ARM: OMAP4: Disable auto enable for EMU CLKDM
+>>
+>> The flag CLKDM_CAN_HWSUP allows the clock-domain to automatically transition
+>> to the enabled and disabled state. This means that as soon as we force a
+>> software wake-up on the clock domain, the clock domain will be allowed to idle
+>> and put back into the hardware auto state. For the EMU clock domain this is not
+>> what we want. We want to keep the clock domain in the software wakeup state
+>> while the clock domain is being used and put it back in to the hardware auto
+>> state when we have finished using the clock domain.
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> 
+> With this patch, how is the clkdm ever idled?
 
-Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com  <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>>
----
-   arch/arm/mach-bcmring/mm.c |   27 +++++++++++----------------
-   1 file changed, 11 insertions(+), 16 deletions(-)
+It does not! Sorry, I was so engrossed with figuring out why the EMU
+clkdm was being idled as soon as it was enabled, I forgot to check if is
+ever disabled once we terminated perf :-(
 
-diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
-index 1adec78..b46ea07 100644
---- a/arch/arm/mach-bcmring/mm.c
-+++ b/arch/arm/mach-bcmring/mm.c
-@@ -31,24 +31,19 @@
-       .type = MT_MEMORY }
+> IIUC, your patch will get PMU interrupts working, but similarily to
+> previous patches in this thread, it works because it *never* allows the
+> EMU clkdm to idle.  This is not a mergeable solution because it will not
+> allow CORE retention (and thus full-chip retention.)
 
-   static struct map_desc bcmring_io_desc[] __initdata = {
--    IO_DESC(MM_IO_BASE_NAND, SZ_64K),    /* phys:0x28000000-0x28000FFF
-virt:0xE8000000-0xE8000FFF  size:0x00010000 */
--    IO_DESC(MM_IO_BASE_UMI, SZ_64K),    /* phys:0x2C000000-0x2C000FFF
-virt:0xEC000000-0xEC000FFF  size:0x00010000 */
--
-       IO_DESC(MM_IO_BASE_BROM, SZ_64K),    /*
-phys:0x30000000-0x3000FFFF  virt:0xF3000000-0xF300FFFF  size:0x00010000 */
--    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF
-virt:0xF3100000-0xF31FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF
-virt:0xF3200000-0xF32FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF
-virt:0xF3300000-0xF33FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_ESW, SZ_1M),    /* phys:0x34000000-0x34FFFFFF
-virt:0xF3400000-0xF34FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF
-virt:0xF3500000-0xF35FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_APM, SZ_1M),    /* phys:0x36000000-0x36FFFFFF
-virt:0xF3600000-0xF36FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF
-virt:0xF3700000-0xF37FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /*
-phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /*
-phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x01000000 */
--
-+    MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),    /* phys:0x31000000-0x31FFFFFF
-virt:0xF3100000-0xF31FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_DMA0, SZ_1M),    /* phys:0x32000000-0x32FFFFFF
-virt:0xF3200000-0xF32FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_DMA1, SZ_1M),    /* phys:0x33000000-0x33FFFFFF
-virt:0xF3300000-0xF33FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_ESW, SZ_1M),            /*
-phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_CLCD, SZ_1M),    /* phys:0x35000000-0x35FFFFFF
-virt:0xF3500000-0xF35FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_APM, SZ_1M),            /*
-phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_SPUM, SZ_1M),    /* phys:0x37000000-0x37FFFFFF
-virt:0xF3700000-0xF37FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),    /*
-phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x00100000 */
-+    IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),    /*
-phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x00100000 */
-       IO_DESC(MM_IO_BASE_VRAM, SZ_64K),    /*
-phys:0x40000000-0x4000FFFF  virt:0xF4000000-0xF400FFFF  size:0x00010000 */
--    IO_DESC(MM_IO_BASE_CHIPC, SZ_16M),    /*
-phys:0x80000000-0x80FFFFFF  virt:0xF8000000-0xF8FFFFFF  size:0x01000000 */
--    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD,
--        SZ_16M),    /* phys:0x0F000000-0x0FFFFFFF
-virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-+    IO_DESC(MM_IO_BASE_CHIPC, SZ_8M),    /* phys:0x80000000-0x807FFFFF
-virt:0xF8000000-0xF87FFFFF  size:0x00800000 */
-+    IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD, SZ_16M), /*
-phys:0x0F000000-0x0FFFFFFF virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-   };
+Right!
 
-   void __init bcmring_map_io(void)
--- 
-1.7.9.5
+> What we need is a solution that allows the clkdm to idle, and then to be
+> reinitialzed when it wakes up.  Due to the way (I understand) resets in
+> the debugss, allowing the clkdm to idle will cause a reset, so the
+> PMU/CTI interrupts need to be reinitialzied after wakeup.
+
+Yes exactly I see that now. I have prototyped the 3 patches and this is
+working AND the EMU clkdm does go back to idle. I can send out to the
+list for review.
+
+> Kevin
+> 
+> P.S. Please note there is also already a different fix in mainline for
+> the EMU clkdm data from Paul which adds the force wakeup flag and
+> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
+> because the hardware is capable.)
+
+Hmmm ... yes saw this, and you will have to excuse me as I don't fully
+follow the logic here. In fact, I am thinking we want the opposite ;-)
+
+>From looking, into this it seems to me that when PMU is running we want
+the EMU clock domain in software-wakeup state and when PMU is not
+running we want in the hardware auto state. By keeping the ENABLE_AUTO
+flag set, as soon as we enable the clock domain it is put right back
+into the HW_AUTO state and hence PMU is not working (see _enable()
+function in arch/arm/mach-omap2/omap_hwmod.c)
+
+So really what I think we want is to remove the ENABLE_AUTO flag to keep
+the clock domain in software wake-up and use the DISABLE_AUTO flag to
+put the clock domain back in HW_AUTO (note this requires a patch to
+perform this 2nd part).
+
+Cheers
+Jon
