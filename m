@@ -1,33 +1,60 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Sun, 6 May 2012 16:49:58 -0700
-Subject: common clock framework
-In-Reply-To: <CAG9bXv=T7v_MBUOmCsp4n0SNmYY_DOEkhQXAp0rTGpdi6KkXNA@mail.gmail.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
- <CAG9bXv=T7v_MBUOmCsp4n0SNmYY_DOEkhQXAp0rTGpdi6KkXNA@mail.gmail.com>
-Message-ID: <20120506234958.GA14559@gmail.com>
+Date: Sun, 6 May 2012 17:03:29 -0700
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20120507000329.GB14559@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120505-13:33, Raul Xiong wrote:
-> 2012/5/5 Turquette, Mike <mturquette@ti.com>
-> > Bad news: lockdep gets cranky about possible deadlocks due to holding
-> > prepare_lock and then trying to hold it again in a rate-change
-> > notifier handler (from OMAP's regulator code).  Specifically
-> >
+On 20120503-19:13, Peter De Schrijver wrote:
+> Hi,
 > 
-> Glad to see common clock framework will support DVFS. Can we use different
-> spinlock for different clocks with different lockdep lock classes to avoid
-> the dead lock and lockdep warnings?
+> I started looking into what would be needed to move our tegra30 clock code
+> to the common clock framework. The tegra30 clocktree is rather flat. Basically
+> there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
+> and peripheral clocks which have a mux (with 4 or more inputs), a divider and
+> a gate. So almost every peripheral clock can have multiple parents.
+> 
+> Some questions:
+> 
+> 1) should these peripheral clocks be modelled as 3 different clocks
+>    (mux -> divider -> gate) or would it be better to make a new clock type for
+>    this?
+> 
 
-I understand that different lockdep classes could allow for nested
-locking, but I don't have a good idea of how that would actually be
-implemented.  Could you elaborate a bit more?
+That is really for you to decide.  If the semantics of the existing mux,
+divider and gate in drivers/clk/clk-*.c work well for you then I think
+the answer is "yes".  There is infrastructure for register-access
+locking in those common types which might help your complex clocks.
 
-In the mean time I'm looking at some different locking semantics that
-don't involve lockdep class mangling, just a more fine-grained approach
-to locking exactly what we want.
+Thanks to the parent rate propagation stuff in clk_set_rate it should be
+possible for your drivers to only be aware of the gate and call
+clk_set_rate on only that clock, which propagates up to the divider and,
+if necessary, again propagates up to the mux.
+
+I encourage you to try that first.  But if you find the semantics of
+those basic clock types aren't cutting it for you then you must create a
+type which is platform-specific.
+
+> 2) how to define the default parent? in many cases the hw reset value isn't
+>    a very sensible choice, so the kernel probably needs to set a parent of
+>    many of them if we don't want to rely on bootloader configuration.
+
+The only related thing handled at the framework level is _discovery_ of
+the parent during clock registration/initialization.  If you don't trust
+the bootloader and want to set things up as soon as possible (a wise
+move) then I suggest you do so from your platform clock code at the same
+time that you register your clocks with the framework.  Something like:
+
+	struct clk *c;
+	c = clk_register(...);
+	if (IS_ERR(c))
+		omg_fail();
+	clk_set_parent(c, b);
+
+Where 'b' is a parent of 'c'.  Register your clock tree top-down and you
+can re-parent as you go.
 
 Regards,
 Mike
