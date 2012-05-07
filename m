@@ -1,36 +1,68 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 7 May 2012 21:21:31 +0530
-Subject: [PATCH] gpiolib: Add of_get_gpio_chip_by_phandle() helper
-In-Reply-To: <CACRpkda2jBmjPCgt=5rfqdCQH9Lipq4aejeQq-Qbw0_Nk6o-yg@mail.gmail.com>
-References: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
- <4FA15267.4090306@wwwdotorg.org>
- <CAOh2x=nrNDrtNjOroWOm6HkYkc3f2qfaWrtN97d1M3rWv1qmsQ@mail.gmail.com>
- <CACRpkda2jBmjPCgt=5rfqdCQH9Lipq4aejeQq-Qbw0_Nk6o-yg@mail.gmail.com>
-Message-ID: <CAOh2x=nizQYXWFu3deQPXr93Nqv77Pnj5DNhYZw_vYyY2go3vA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 07 May 2012 09:53:45 -0600
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+Message-ID: <4FA7F009.5010003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2012 at 6:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 2, 2012 at 6:51 PM, viresh kumar <viresh.linux@gmail.com> wrote:
->
->> So i need someway of accessing gpio chip
->> from pinctrl driver. How should i do it?
->
-> I once proposed a patch like this to gpiolib and Grant NACK:ed it.
-> It was one of the reasons I created pinctrl to begin with...
+On 05/05/2012 11:10 AM, Jassi Brar wrote:
+> On 5 May 2012 00:53, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 04 May 2012, Jassi Brar wrote:
+>>> I see this requires a client driver to specify a particular req_line on a
+>>> particular dma controller. I am not sure if this is most optimal.
+>>>
+>>> I think such client->req_line map should be provided to the dmac controller
+>>> driver via its dt node in some format. The dmac driver could then populate
+>>> a dma_chan, or similar, only for that req_line and not for the unused one
+>>> which otherwise could also have served the same client.
+>>>
+>>> Ideally the I2C driver should simply ask, say, a channel for TX and another
+>>> for RX, everything else should already be setup via dmac's dt nodes.
+>>
+>> If I understand you correctly, you think we can generalize the dma-request
+>> data in a way that we don't need to pass a specific dma engine phandle.
+>> I very much doubt this is possible, given how different the requirements
+>> are for each of the engines we support. You really need to pass a specific
+>> phandle so that we can find the code that can interpret the data in a
+>> meaningful way.
+>>
+> Hmm... there ought to be a way by which a client is handed a random 'token'
+> via its dt node and similarly the dmac informed which channel (and with what
+> capabilities) to allocate should it see a request coming with that token.
 
-@Grant/Linus: Any specific reason, why it got rejected?
+I think that's the whole point of the patch.
 
-I don't feel there is anything wrong in this approach and is a very
-clean solution to
-bind two drivers.
+However, the token needs to be some driver-specific struct, since the
+required information may be more than just a single channel or request
+ID in general.
 
-> The U300 solution isn't super-clean, and I have another
-> solution for Nomadik which is cleaner, but there GPIO and
-> pinctrl is in the same file. Expect to mail that out tomorrow.
+> That way dmac and client drivers using DT could do away with the filter_fn.
+> 
+> Roughly speaking (I am not very well versed with DT syntax)
+> 
+> Client Node:-
+> 
+> mmc1: mmc at 13002000 {
+>         ...
+>         dma_tx = <891>   //some platform-wide unique value
+>         dma_rx = <927>   //some platform-wide unique value
+>         ...
+>  };
 
-Even that is not so clean. You are creating another mess in order to fix one.
-Two drivers implementing separate functionality must be kept separate.
+I believe we specifically don't want to introduce any global concept of
+DMA channel ID, either within the kernel, or at the device tree level.
 
---
-viresh
+While we do have global interrupt and GPIO IDs within the kernel, this
+has caused problems, I think primarily due to the need to manage this
+unified namespace and allocate a single global ID for a bunch of
+different ranges of controller-specific IDs.
+
+Within device tree, everything is always represented as an ID
+relative-to or within a particular controller, so it's easy to namespace
+things separately.
