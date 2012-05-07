@@ -1,47 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 09:16:14 +0800
-Subject: [PATCH RESEND 9/9] ARM: mxs: enable pinctrl support
-In-Reply-To: <1336353374-28939-1-git-send-email-shawn.guo@linaro.org>
-References: <1336353374-28939-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336353374-28939-10-git-send-email-shawn.guo@linaro.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Sun, 6 May 2012 18:42:41 -0700
+Subject: [PATCH V4] clk: add a fixed factor clock
+In-Reply-To: <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
+References: <85453b2bb4d448d0dcd291579bd76e70c1b48e5b.1336039424.git.viresh.kumar@st.com>
+ <20120503120821.GJ4141@pengutronix.de>
+ <CAOh2x=mF5MjG_TM0S7W+r8=eVXf3v9SBsaxADZYFTjtPKoRm4w@mail.gmail.com>
+Message-ID: <20120507014241.GA15248@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/Kconfig          |    1 +
- arch/arm/mach-mxs/Kconfig |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+On 20120503-19:11, viresh kumar wrote:
+> On May 3, 2012 5:38 PM, "Sascha Hauer" <s.hauer@pengutronix.de> wrote:
+> >
+> 
+> > > +     if (clk)
+> > > +             return clk;
+> >
+> >        if (!IS_ERR(clk))
+> 
+> Oops. @Mike: can you please fix it while applying?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cf006d4..c67494f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -469,6 +469,7 @@ config ARCH_MXS
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select HAVE_CLK_PREPARE
-+	select PINCTRL
- 	help
- 	  Support for Freescale MXS-based family of processors
+I've applied the below fix in my local branch.  Let me know if you have
+issue with it before I send out my pull request to Arnd.
+
+Thanks,
+Mike
+
+
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 0e8782b..1f2da01 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -88,10 +88,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
  
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index c57f996..07d5383 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -9,11 +9,13 @@ config SOC_IMX23
- 	bool
- 	select CPU_ARM926T
- 	select HAVE_PWM
-+	select PINCTRL_IMX23
+ 	clk = clk_register(dev, &fix->hw);
  
- config SOC_IMX28
- 	bool
- 	select CPU_ARM926T
- 	select HAVE_PWM
-+	select PINCTRL_IMX28
+-	if (clk)
+-		return clk;
++	if (IS_ERR(clk))
++		kfree(fix);
  
- comment "MXS platforms:"
- 
--- 
-1.7.5.4
+-	kfree(fix);
+-
+-	return NULL;
++	return clk;
+ }
