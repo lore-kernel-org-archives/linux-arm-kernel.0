@@ -1,43 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 May 2012 13:07:39 -0600 (MDT)
-Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <20120504223933.GX5613@atomide.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
- <20120504223933.GX5613@atomide.com>
-Message-ID: <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 May 2012 20:07:51 +0100
+Subject: How to check if a patch is applied, ejected or ignored?
+In-Reply-To: <4FA81C16.8070204@broadcom.com>
+References: <4FA81C16.8070204@broadcom.com>
+Message-ID: <20120507190751.GA12133@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 07, 2012 at 12:01:42PM -0700, Jiandong Zheng wrote:
+> Hello,
+>
+> Sorry if it is not the first time about such question. But I still get  
+> confused about if my patches are applied or just ignored.
+>
+> For example, I didn't see much response about the following patches and  
+> I don't know how to check if they are already in a tree to be merged to  
+> Linus':
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097346.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097347.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097349.html
+> (BTW, a couple of them were sent multiple times before)
+>
+> Previously I was told to use patch system once and for a couple of other  
+> times the patches were just got applied, and ignored patches happened  
+> more. I hope a clear procedure can be clarified so that we can work more  
+> efficiently.
 
-On Fri, 4 May 2012, Tony Lindgren wrote:
+I only very rarely apply patches which aren't in the patch system.
 
-> How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
-> Then this becomes just:
-> 
-> #ifdef CONFIG_SOC_OMAP3PLUS
-
-We might want to consider having separate CONFIG_SOC_* values for each 
-SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
-CONFIG_SOC_OMAP3630, etc.
-
-This would be for two main reasons.  One is that Kconfig options like 
-CONFIG_SOC_OMAP3PLUS don't have much meaning.  It is really unclear to me 
-what SoCs would be included in CONFIG_SOC_OMAP3PLUS, since some of them 
-differ so radically -- different interconnects, different power and system 
-management IP blocks, different CPU subsystems, different RAM controllers, 
-etc.  The advantage of using SoC-specific Kconfig options, from this point 
-of view, is that it is easy to know what they mean.  Then those 
-SoC-specific Kconfig options can select the appropriate SoC-independent 
-interconnect driver, PRCM drivers, CPU options, etc.
-
-The other motivation would be to support device manufacturers who only 
-wish to build a kernel for the single device that they are shipping.  In 
-terms of kernels shipped, this is probably the most popular use-case. With 
-something like CONFIG_SOC_OMAPAM33XX, they can avoid building quite a bit 
-of code and data (and potentially bugs) that are not needed for their 
-specific device.
-
-
-- Paul
+Now that we have arm-soc, I leave most patches to SoCs to Arnd & Olof to
+deal with, so I guess you should be sending these patches there now.
