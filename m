@@ -1,39 +1,47 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 7 May 2012 14:50:14 -0700
-Subject: [PATCH] ARM: BCMRING: Fix UART declaration and clk dev name
- mismatch
-In-Reply-To: <CAP=VYLofEt_+CZmv2H90CTJ2F5gDfu5o8qfJN-a2bALC5LN=Xg@mail.gmail.com>
-References: <4FA823C4.1070109@broadcom.com>
- <CAP=VYLofEt_+CZmv2H90CTJ2F5gDfu5o8qfJN-a2bALC5LN=Xg@mail.gmail.com>
-Message-ID: <4FA84396.7090808@broadcom.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 7 May 2012 14:58:28 -0700
+Subject: [GIT PULL] msm-core changes for v3.5.
+Message-ID: <20120507215828.GA21748@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/7/2012 2:39 PM, Paul Gortmaker wrote:
->
-> Do things work if you simply do a partial revert of 888073d41 ?
->
-> Meaning:
->
-> -static AMBA_APB_DEVICE(uartA, "uartA", 0, MM_ADDR_IO_UARTA, {IRQ_UARTA}, NULL);
-> -static AMBA_APB_DEVICE(uartB, "uartB", 0, MM_ADDR_IO_UARTB, {IRQ_UARTB}, NULL);
-> +static AMBA_APB_DEVICE(uartA, "uarta", 0, MM_ADDR_IO_UARTA, {IRQ_UARTA}, NULL);
-> +static AMBA_APB_DEVICE(uartB, "uartb", 0, MM_ADDR_IO_UARTB, {IRQ_UARTB}, NULL);
->
-> The original error messages led me to believe it was two errors;
-> i.e. (1) the wrong # of args error, and (2) the "a" vs. "A" error.  But
-> I think Olof was right on his 1st instinct, that it was just the
-> single error, and the a<--->  A thing was a side effect.
->
-> In which case the above should just work, and it will also keep
-> the naming consistent with what it was before any of these
-> commits.
-Yes.  Either way works. Just in original code, the name uartA and the 
-name string "uarta" looks confusing and easy to get it wrong.
+These are some minor fixes, and Daniel's fixup of the sapphire target
+support.
 
-Thanks,
-JD
->
-> Paul.
-> --
->
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+
+  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git msm-core
+
+for you to fetch changes up to 2935b1facdfb77d5f03d9036cc0da8c889f59a02:
+
+  ARM: msm: fix compilation flags for MSM_SCM (part 2) (2012-05-01 16:44:11 -0700)
+
+----------------------------------------------------------------
+Daniel Walker (1):
+      arm: msm: fix up very basic HTC Sapphire support
+
+Danny Kukawka (1):
+      arch/arm/mach-msm: linux/gpio.h included twice
+
+Stephen Boyd (2):
+      ARM: msm: Drop useless teq from DEBUG_LL support
+      ARM: msm: fix compilation flags for MSM_SCM (part 2)
+
+ arch/arm/mach-msm/Kconfig                    |   10 +-
+ arch/arm/mach-msm/Makefile                   |    1 +
+ arch/arm/mach-msm/board-msm7x30.c            |    1 -
+ arch/arm/mach-msm/board-qsd8x50.c            |    1 -
+ arch/arm/mach-msm/board-sapphire.c           |   18 +--
+ arch/arm/mach-msm/board-sapphire.h           |  224 ++++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/debug-macro.S |    3 +-
+ arch/arm/mach-msm/scm.c                      |    3 +
+ 8 files changed, 239 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-sapphire.h
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
