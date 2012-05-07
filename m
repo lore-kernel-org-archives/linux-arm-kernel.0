@@ -1,42 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 7 May 2012 21:54:53 +0800
-Subject: [GIT PULL] mxs: device tree support for v3.5
-In-Reply-To: <CAOesGMjrJe++s-tmgzs2oY1T9GVntngV71-2iqZhfWx2EiZL_g@mail.gmail.com>
-References: <20120405013556.GI7264@S2101-09.ap.freescale.net>
- <CAOesGMjrJe++s-tmgzs2oY1T9GVntngV71-2iqZhfWx2EiZL_g@mail.gmail.com>
-Message-ID: <20120507135451.GI19389@S2101-09.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 7 May 2012 13:59:16 +0000
+Subject: [PATCH-V4 0/4] ARM: OMAP2+: Add voltagedomain, powerdomain &
+ PRM support for AM33XX device
+In-Reply-To: <CAMQu2gxmPAEWYmE+DLHNYii1-wtjkm68mxU89F8EXyGLQP1Tww@mail.gmail.com>
+References: <1333123435-27186-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204120207420.29473@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9EA07A@DBDE01.ent.ti.com>
+ <20120418231837.GT21106@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9F9C2D@DBDE01.ent.ti.com>
+ <20120426184312.GY3739@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83E9FF9EA@DBDE01.ent.ti.com>
+ <20120426190524.GZ3739@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA008E5@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1205020255150.19695@utopia.booyaka.com>
+ <4FA7A4D0.80006@ti.com>
+ <CAMQu2gxmPAEWYmE+DLHNYii1-wtjkm68mxU89F8EXyGLQP1Tww@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA175CD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2012 at 11:29:54AM -0700, Olof Johansson wrote:
-> On Wed, Apr 4, 2012 at 6:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > Hi Arnd, Olof,
+On Mon, May 07, 2012 at 16:14:42, Shilimkar, Santosh wrote:
+> On Mon, May 7, 2012 at 4:02 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > Hi Paul,
 > >
-> > Please pull the mxs basic device tree support for -next, so that people
-> > can start playing and contributing mxs device tree conversion. ?Thanks.
 > >
-> > Regards,
-> > Shawn
+> > On 5/2/2012 11:09 AM, Paul Walmsley wrote:
+> >>
+> >> On Fri, 27 Apr 2012, Hiremath, Vaibhav wrote:
+> >>
+<snip>
+> >> So first we have to decide whether the CONFIG_ARCH_OMAP* options should
+> >> have a strong dependency on the MPU type, as they currently do; or whether
+> >> they should focus on the way the SoC is integrated.
 > >
-> > ---
-> > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
 > >
-> > ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+> > I think as well that these devices should be considered as part of the OMAP4
+> > family.
+> > The CPU type should not be the parameter that decide the OMAP family, it is
+> > just an IP, that can change on some variant, whereas the whole PRCM
+> > infrastructure / interconnect is mostly the same.
 > >
-> > are available in the git repository at:
-> > ?git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt
+> I agree. In fact more and more I think of this problem, looks like we
+> should get rid
+> off ARCH_OMAP* and just is SOC_* going forward.
 > 
-> Thanks, pulled.
+> Common ARM code already takes care of different CPU version and as Benoit
+> mentioned it is just one of the IP in the entire SOC. I saw tony commenting
+> in similarly on of the patch set.
 > 
-> Sorry for the delay, we've been late at starting up the branches for 3.5.
-> 
-Hi Arnd, Olof,
 
-Please abandon this branch.  It will be broken due to the mxs common
-clk and pinctrl series.  I'm going to send an updated mxs device tree
-branch based on common-clk and pinctrl support after I send those two
-prerequisites to you.
+I am working on creating patch-sets for am33xx device on the same direction,
+that means, am33xx will not fallow, neither ARCH_OMAP3 nor ARCH_OMAP4.
+am33xx will be separate device under ARCH_OMAP2PLUS, with "SOC_OMAPAM33XX".
 
--- 
-Regards,
-Shawn
+This also means, neither cpu_is_omap34xx() not cpu_is_omap44xx() will be 
+true for am33xx. We will have separate cpu_is_am33xx() class for this.
+
+Shortly I will submit patch-series for this. 
+Just FYI, I have some cleanup patches,  which actually tries to cleanup some 
+of the existing ARCH_OMAPx dependency in code, making addition of devices 
+easier under ARCH_OMAP2PLUS.
+
+Thanks,
+Vaibhav
