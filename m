@@ -1,37 +1,54 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 16:51:14 -0700
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <1335462041-4949-1-git-send-email-j-keerthy@ti.com> (Keerthy's
- message of "Thu, 26 Apr 2012 23:10:31 +0530")
+Date: Mon, 07 May 2012 16:55:37 -0700
+Subject: [PATCH V3 04/10] ARM: OMAP3: hwmod: rename the smartreflex entries
+In-Reply-To: <87d36fzhkm.fsf@ti.com> (Kevin Hilman's message of "Mon, 07 May
+ 2012 16:39:53 -0700")
 References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <87397by2h9.fsf@ti.com>
+ <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1AA2@DBDE01.ent.ti.com>
+ <CAJ6a13ZSWSa_RpGB9NxtfyChUba9NGivGogpsfyk7oT9pNayjg@mail.gmail.com>
+ <87d36fzhkm.fsf@ti.com>
+Message-ID: <87r4uvwnpi.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael,
+Kevin Hilman <khilman@ti.com> writes:
 
-Keerthy <j-keerthy@ti.com> writes:
+> "J, KEERTHY" <j-keerthy@ti.com> writes:
 
-> From: J Keerthy <j-keerthy@ti.com>
+[...]
+
+>>>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+>>>> index 2edd1e2..d859277 100644
+>>>> --- a/arch/arm/mach-omap2/smartreflex.c
+>>>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>>>> @@ -183,7 +183,7 @@ static void sr_set_regfields(struct omap_sr *sr)
+>>>> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
+>>>> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+>>>> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
+>>>> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
+>>>> + ? ? ? ? ? ? if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
+>>>
+>>> What if voltage rail is different for mpu and iva? I have seen some devices
+>>> supports SmartReflex have different voltage rails for mpu and iva.
+>>>
+>>
+>> I get the point. OMAP3 iva and mpu have a common rail. OMAP4 onwards
+>> even we have different rails for mpu and iva. I will enhance the checks here.
 >
-> AVS(Adaptive Voltage Scaling) is a power management technique which
-> controls the operating voltage of a device in order to optimize (i.e. reduce)
-> its power consumption. The voltage is adapted depending on static factors
-> (chip manufacturing process) and dynamic factors (temperature
-> depending performance).
-> The TI AVS solution is named Smartreflex. 
->
-> To that end, create the AVS driver in drivers/power/avs and
-> move the OMAP SmartReflex code to the new directory. The
-> class driver is still retained in the mach-omap2 directory.
+> Rather than enhancing the checks, this SoC specific data should probably
+> just be made part of the SoC specific hwmod dev_attr.
 
-How should we handle this for upstream?
+That being said, this is an additional feature we can add after this
+driver is moved.
 
-It does a bunch of cleanup under arch/arm then does the move to
-drivers/power the end.  To avoid conflicts with other OMAP core changes,
-I would suggest we take this through the OMAP tree.
+I would like this series to concentrate on the cleanups necessary to
+move to drivers/*, then additional features to support other SoCs can be
+added on top.
 
-With your ack, I'd be glad to take it.
+Keerthy, please prepare a patch to generalize this to other SoCs by
+using dev_attr for this SoC specific data.   We can add it after this
+series is merged upstream.
 
 Thanks,
 
