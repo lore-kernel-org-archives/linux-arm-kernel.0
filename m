@@ -1,99 +1,39 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 7 May 2012 14:38:10 +0000
-Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
-In-Reply-To: <20120504200547.GU5613@atomide.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
- <20120503155717.GE5140@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
- <871un1j769.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
- <20120504200547.GU5613@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1778E@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  7 May 2012 22:43:02 +0800
+Subject: [PATCH 00/10] Add device tree support for mxs-mmc
+Message-ID: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2012 at 01:35:47, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120503 23:04]:
-> > 
-> > Tony, seems to be against adding new ARCH_OMAPAM33XX, but which _ARCH_ we need to follow for AM33XX?
-> > I have to choose between ARCH_OMAP3 or ARCH_OMAP4 and what should I choose 
-> > here?
-> 
-> I think you're getting confused now :) I'm against ARCH_XXX but I'm OK with
-> adding SOC_XXX.
-> 
-> We should only need ARCH_OMAP2PLUS + SOC_XXX, there should not be any need
-> to add new ARCH_XXX under mach-omap2. Whatever we have left for ARCH_OMAP
-> in mach-omap2 will be eventually converted to SOC_OMAP.
->  
-> > Does it make sense to follow ARCH_OMAPx but not follow cpu_is_omapxxx()?
-> > OR
-> 
-> No
-> 
-> > Should we create ARCH_AMXXXX, assuming that all AM devices have similar 
-> 
-> No
-> 
-> > memory map layout, interrupt mapping, etc...
-> > OR
-> > Should I just add SOC_OMAPAM33XX, wherever required?
-> 
-> Yes, but how about just use SOC_AM33XX? 
->  
+This series adds device tree support for mxs-mmc based on mxs
+common-clk, pinctrl, and DT support for mxs gpio and dma.
 
-I will submit patches shortly (in the last cleanup now), where for am33xx
+Shawn Guo (10):
+  mmc: mxs-mmc: use global stmp_device functionality
+  mmc: mxs-mmc: let ssp_is_old take host as parameter
+  mmc: mxs-mmc: get rid of the use of cpu_is_xxx
+  mmc: mxs-mmc: move header from mach into linux folder
+  mmc: mxs-mmc: use devm_* helper to make cleanup simpler
+  mmc: mxs-mmc: have dma_channel than dma_res in mxs_mmc_host
+  mmc: mxs-mmc: copy wp_gpio in struct mxs_mmc_host
+  mmc: mxs-mmc: add device tree support
+  ARM: dts: enable mmc for imx23-evk
+  ARM: dts: enable mmc for imx28-evk
 
- - cpu_is_omap34xx() will be false.
+ Documentation/devicetree/bindings/mmc/mxs-mmc.txt  |   26 +++
+ arch/arm/boot/dts/imx23-evk.dts                    |   11 +
+ arch/arm/boot/dts/imx23.dtsi                       |   19 ++
+ arch/arm/boot/dts/imx28-evk.dts                    |   19 ++
+ arch/arm/boot/dts/imx28.dtsi                       |   25 +++
+ arch/arm/mach-mxs/devices/platform-mxs-mmc.c       |   21 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h    |    3 +-
+ drivers/clk/mxs/clk-imx23.c                        |    4 +-
+ drivers/clk/mxs/clk-imx28.c                        |    8 +-
+ drivers/mmc/host/mxs-mmc.c                         |  199 +++++++++++---------
+ .../mach/mmc.h => include/linux/mmc/mxs-mmc.h      |    7 +-
+ 11 files changed, 235 insertions(+), 107 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+ rename arch/arm/mach-mxs/include/mach/mmc.h => include/linux/mmc/mxs-mmc.h (81%)
 
- - Only cpu_is_am33xx() will be true here.
-
- - Neither be under ARCH_OMAP3 nor ARCH_OMAP4, instead will be an 
-   independent device under SOC_OMAPAM33XX.
-
-This brings-in, some cleanup in existing code, which I will also submit 
-shortly.
-
-
-> > Also, there are lot of thing wrapped under ARCH_OMAP3 || ARCH_OMAP4 option, which is required for AM33XX, how should we handle this?
-> > 
-> > For example,
-> > 
-> > "arch/arm/plat-omap/include/plat/clock.h"
-> > struct dpll_data {
-> > #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> > 	<dpll related variables>
-> > #endif
-> > };
-> > 
-> > "arch/arm/mach-omap2/clock.c"
-> > 
-> > #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-> > 
-> > const struct clkops clkops_omap3_noncore_dpll_ops = {
-> > };
-> > const struct clkops clkops_omap3_core_dpll_ops = {
-> > }
-> 
-> I suggest doing some clean-up patches before adding SOC_AM33XX where
-> you just convert those to be
-> 
-> #if defined(CONFIG_ARCH_OMAP2PLUS) && !defined(CONFIG_ARCH_OMAP2)
-> 
-> or something similar depending if they already are inside mach-omap2
-> directory. This will make them future proof for adding new SoCs
-> without having to patch all over the place.
-> 
-
-Tony,
-
-Cool, I also thought exactly same solution on this, but next thought came to 
-my mind was, it won't scale up, since we still have dependency on ARCH_OMAP2 
-option. However, it will be a good temporary solution for our problem, lets 
-review them first (I will submit shortly).
-
-Thanks,
-Vaibhav
+-- 
+1.7.5.4
