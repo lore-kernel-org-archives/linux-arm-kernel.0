@@ -1,86 +1,80 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:47:19 +0200
-Subject: [PATCH 04/10] mmc: mxs-mmc: move header from mach into linux
- folder
-In-Reply-To: <1336401793-13753-5-git-send-email-shawn.guo@linaro.org>
-References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
- <1336401793-13753-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080147.20128.marex@denx.de>
+Date: Tue, 8 May 2012 01:40:54 +0200
+Subject: [PATCH 6/6] ARM: mxs: add mxs-dma dt support
+In-Reply-To: <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
+References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
+ <1336400595-12964-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080140.54370.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Shawn Guo,
 
-> Rename arch/arm/mach-mxs/include/mach/mmc.h to
-> include/linux/mmc/mxs-mmc.h, so that mxs-mmc driver becomes
-> <mach/*> inclusion free.
-
-Good :-)
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Huang Shijie <b32955@freescale.com>
+> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 
 Acked-by: Marek Vasut <marex@denx.de>
-> 
+
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/mach-mxs/include/mach/devices-common.h    |    2 +-
->  drivers/mmc/host/mxs-mmc.c                         |    3 +--
->  .../mach/mmc.h => include/linux/mmc/mxs-mmc.h      |    7 ++++---
->  3 files changed, 6 insertions(+), 6 deletions(-)
->  rename arch/arm/mach-mxs/include/mach/mmc.h => include/linux/mmc/mxs-mmc.h
-> (81%)
+>  arch/arm/boot/dts/imx23.dtsi |    4 ++--
+>  arch/arm/boot/dts/imx28.dtsi |    4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h
-> b/arch/arm/mach-mxs/include/mach/devices-common.h index 2b37689..6fc0601
-> 100644
-> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> @@ -87,7 +87,7 @@ struct platform_device * __init mxs_add_mxs_i2c(
->  		const struct mxs_mxs_i2c_data *data);
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index fb09ccd..a85ef55 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -42,8 +42,8 @@
+>  			};
 > 
->  /* mmc */
-> -#include <mach/mmc.h>
-> +#include <linux/mmc/mxs-mmc.h>
->  struct mxs_mxs_mmc_data {
->  	const char *devid;
->  	int id;
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 54bbb8b..c70c7c7 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -41,8 +41,7 @@
->  #include <linux/fsl/mxs-dma.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/stmp_device.h>
-> -
-> -#include <mach/mmc.h>
-> +#include <linux/mmc/mxs-mmc.h>
+>  			dma-apbh at 80004000 {
+> +				compatible = "fsl,imx23-dma-apbh";
+>  				reg = <0x80004000 2000>;
+> -				status = "disabled";
+>  			};
 > 
->  #define DRIVER_NAME	"mxs-mmc"
+>  			ecc at 80008000 {
+> @@ -97,8 +97,8 @@
+>  			};
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/mmc.h
-> b/include/linux/mmc/mxs-mmc.h similarity index 81%
-> rename from arch/arm/mach-mxs/include/mach/mmc.h
-> rename to include/linux/mmc/mxs-mmc.h
-> index 211547a..7c2ad3a 100644
-> --- a/arch/arm/mach-mxs/include/mach/mmc.h
-> +++ b/include/linux/mmc/mxs-mmc.h
-> @@ -6,8 +6,8 @@
->   * published by the Free Software Foundation.
->   */
+>  			dma-apbx at 80024000 {
+> +				compatible = "fsl,imx23-dma-apbx";
+>  				reg = <0x80024000 2000>;
+> -				status = "disabled";
+>  			};
 > 
-> -#ifndef __MACH_MXS_MMC_H__
-> -#define __MACH_MXS_MMC_H__
-> +#ifndef __LINUX_MMC_MXS_MMC_H__
-> +#define __LINUX_MMC_MXS_MMC_H__
+>  			dcp at 80028000 {
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 5daf757..a17fbfc 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -48,8 +48,8 @@
+>  			};
 > 
->  struct mxs_mmc_platform_data {
->  	int wp_gpio;	/* write protect pin */
-> @@ -15,4 +15,5 @@ struct mxs_mmc_platform_data {
->  #define SLOTF_4_BIT_CAPABLE	(1 << 0)
->  #define SLOTF_8_BIT_CAPABLE	(1 << 1)
->  };
-> -#endif /* __MACH_MXS_MMC_H__ */
-> +
-> +#endif /* __LINUX_MMC_MXS_MMC_H__ */
+>  			dma-apbh at 80004000 {
+> +				compatible = "fsl,imx28-dma-apbh";
+>  				reg = <0x80004000 2000>;
+> -				status = "disabled";
+>  			};
+> 
+>  			perfmon at 80006000 {
+> @@ -140,8 +140,8 @@
+>  			};
+> 
+>  			dma-apbx at 80024000 {
+> +				compatible = "fsl,imx28-dma-apbx";
+>  				reg = <0x80024000 2000>;
+> -				status = "disabled";
+>  			};
+> 
+>  			dcp at 80028000 {
 
 Best regards,
 Marek Vasut
