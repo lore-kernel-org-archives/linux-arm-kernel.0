@@ -1,116 +1,62 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon,  7 May 2012 22:51:37 +0200
-Subject: [PATCH v2 3.4-rc6] MTD: NAND: ams-delta: fix request_mem_region()
- failure
-In-Reply-To: <20120504171125.GD5613@atomide.com>
-References: <20120504171125.GD5613@atomide.com>
-Message-ID: <1336423897-31729-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Mon,  7 May 2012 16:16:44 -0500
+Subject: [PATCH v3 0/3] Add imx cpuidle
+Message-ID: <1336425407-20308-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A call to request_mem_region() has been introduced in the omap-gpio
-driver recently (commit 96751fcbe5438e95514b025e9cee7a6d38038f40,
-"gpio/omap: Use devm_ API and add request_mem_region"). This change
-prevented the Amstrad Delta NAND driver, which was doing the same in
-order to take control over OMAP MPU I/O lines that the NAND device hangs
-off, from loading successfully.
+Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6Q
+platform cpuidle implementation.
 
-The I/O lines and corresponding registers used by the NAND driver are a
-subset of those used for the GPIO function. Then, to avoid run time
-collisions, all MPUIO GPIO lines should be marked as requested while
-initializing the NAND driver, and vice versa, a single MPUIO GPIO line
-already requested before the NAND driver initialization is attempted
-should prevent the NAND device from being started successfully.
+Based on v3.4-rc6 plus recently submitted device tree late_initcall patch:
+ http://www.spinics.net/lists/arm-kernel/msg171620.html
 
-There is another driver, omap-keypad, which also manipulates MPUIO
-registers, but has never been calling request_mem_region() on startup,
-so it's not affected by the change in the gpio-omap and works correctly.
-It uses the depreciated omap_read/write functions for accessing MPUIO
-registers. Unlike the NAND driver, these I/O lines and registers are
-separate from those used by the GPIO driver. However, both register sets
-are non-contiguous and overlapping, so it would be impractical to
-request the two sets separately, one from the gpio-omap, the other form
-the omap-keypad driver.
+v3 changes:
+ * removed file introduced in v1 no longer needed after v2 [per Shawn Guo]
+ * re-ordered added #includes in alphabetical order [per Shawn Guo]
+ * Remove if(!drv) check to allow handling by stack trace [per Sascha Hauer]
+ * Added missing return value in error meesage [per Shawn Guo]
+ * fixed (void *) casting problem pointed out Sasha Hauer.  Used a different
+   type of casting to properly give warning on improper casting:
+   	arm_pm_idle = (void (*)(void))imx5_idle;
+   Used this casting instead of adding a dummy caller function because
+   adding the dummy function appears to unnecessarily introduce the following
+   additional operations:
+	static void imx5_pm_idle(void)
+	{
+	  a0:	e1a0c00d 	mov	ip, sp
+	  a4:	e92dd800 	push	{fp, ip, lr, pc}
+	  a8:	e24cb004 	sub	fp, ip, #4
+		imx5_idle();
+	  ac:	ebffffd3 	bl	0 <imx5_idle>
+	}
+	  b0:	e89da800 	ldm	sp, {fp, sp, pc}
 
-In order to solve all these issues correctly, a solution first suggested
-by Artem Bityutskiy, then closer specified by Tony Lindgren while they
-commented the initial version of this fix, should be implemented. The
-gpio-omap driver should export a few functions which would allow the
-other two drivers to access MPUIO registers in a safe manner instead of
-trying to manage them in parallel to the GPIO driver.  However, such a
-big change, affecting 3 drivers all together, is not suitable for the rc
-cycle, and should be prepared for the merge window.  Then, an
-alternative solution is proposed as a regression fix.
+v2 changes:
+ * Removed some unnecessary  spaces [per Jess Juhl]
+ * Added return value for an error message [per Sascha Hauer]
+ * Reworked init scheme to use device tree late_initcall [per Sascha and Shawn]
+ * Moved imx6q and imx5 cpuidle functionality to existing files.
 
-For the ams-delta NAND driver to initialize correctly in coexistence
-with the changed GPIO driver, drop the request_mem_region() call from
-the former, especially as this call is going to be removed while the
-long-term solution is implemented.
+https://lkml.org/lkml/2012/5/1/363
 
-Tested on Amstrad Delta.
+v1 initial submission:
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
-Artem, Tony,
-I hope the changelog message is now good enough to make you satisfied,
-and render the Tony's Ack valid.
+https://lkml.org/lkml/2012/4/16/644
 
-Changes against initial version:
-* a comment replacing the removed function call added,
-* more details on the three drivers coexistance and possible interaction
-  provided,
-* a hopefuly decent long-term plan to properly fix all identified issues
-  proposed.
+Robert Lee (3):
+  ARM: imx: Add common imx cpuidle init functionality.
+  ARM: imx: Add imx5 cpuidle driver
+  ARM: imx: Add imx6q cpuidle driver
 
- drivers/mtd/nand/ams-delta.c |   16 ++++++----------
- 1 files changed, 6 insertions(+), 10 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c           |   19 +++++++
+ arch/arm/mach-imx/mm-imx5.c              |   42 ++++++++++++++--
+ arch/arm/plat-mxc/Makefile               |    1 +
+ arch/arm/plat-mxc/cpuidle.c              |   80 ++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/cpuidle.h |   22 ++++++++
+ 5 files changed, 161 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
 
-diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
-index 7341695..358162a 100644
---- a/drivers/mtd/nand/ams-delta.c
-+++ b/drivers/mtd/nand/ams-delta.c
-@@ -212,18 +212,17 @@ static int __devinit ams_delta_init(struct platform_device *pdev)
- 	/* Link the private data with the MTD structure */
- 	ams_delta_mtd->priv = this;
- 
--	if (!request_mem_region(res->start, resource_size(res),
--			dev_name(&pdev->dev))) {
--		dev_err(&pdev->dev, "request_mem_region failed\n");
--		err = -EBUSY;
--		goto out_free;
--	}
-+	/*
-+	 * Don't try to request the memory region from here,
-+	 * it should have been already requested from the
-+	 * gpio-omap driver and requesting it again would fail.
-+	 */
- 
- 	io_base = ioremap(res->start, resource_size(res));
- 	if (io_base == NULL) {
- 		dev_err(&pdev->dev, "ioremap failed\n");
- 		err = -EIO;
--		goto out_release_io;
-+		goto out_free;
- 	}
- 
- 	this->priv = io_base;
-@@ -271,8 +270,6 @@ out_gpio:
- 	platform_set_drvdata(pdev, NULL);
- 	gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB);
- 	iounmap(io_base);
--out_release_io:
--	release_mem_region(res->start, resource_size(res));
- out_free:
- 	kfree(ams_delta_mtd);
-  out:
-@@ -293,7 +290,6 @@ static int __devexit ams_delta_cleanup(struct platform_device *pdev)
- 	gpio_free_array(_mandatory_gpio, ARRAY_SIZE(_mandatory_gpio));
- 	gpio_free(AMS_DELTA_GPIO_PIN_NAND_RB);
- 	iounmap(io_base);
--	release_mem_region(res->start, resource_size(res));
- 
- 	/* Free the MTD device structure */
- 	kfree(ams_delta_mtd);
 -- 
-1.7.3.4
+1.7.10
