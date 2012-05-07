@@ -1,77 +1,68 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon,  7 May 2012 11:23:58 +0800
-Subject: [PATCH V2 1/4] ARM: mm: proc-mohawk: add suspend resume for mohawk
-Message-ID: <1336361041-18145-1-git-send-email-chao.xie@marvell.com>
+Date: Mon,  7 May 2012 11:23:59 +0800
+Subject: [PATCH V2 2/4] ARM: cache: tauros2: add disable and resume callback
+In-Reply-To: <1336361041-18145-1-git-send-email-chao.xie@marvell.com>
+References: <1336361041-18145-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1336361041-18145-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enable ARCH_SUSPEND_POSSIBLE, it need defintion of
-cpu_mohawk_do_suspend and cpu_mohawk_do_resume
+For the SOC chips using tauros2 cache, will need disable
+and resume tauros2 cache for SOC suspend/resume.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/Kconfig          |    2 +-
- arch/arm/mm/proc-mohawk.S |   35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 1 deletions(-)
+ arch/arm/mm/cache-tauros2.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4cf9d42..aaa22f8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2275,7 +2275,7 @@ source "kernel/power/Kconfig"
- config ARCH_SUSPEND_POSSIBLE
- 	depends on !ARCH_S5PC100
- 	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
--		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
-+		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
- 	def_bool y
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 1fbca05..23a7643 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -108,6 +108,26 @@ static void tauros2_flush_range(unsigned long start, unsigned long end)
  
- config ARM_CPU_SUSPEND
-diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-index cdfedc5..6a050b1 100644
---- a/arch/arm/mm/proc-mohawk.S
-+++ b/arch/arm/mm/proc-mohawk.S
-@@ -344,6 +344,41 @@ ENTRY(cpu_mohawk_set_pte_ext)
- 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
-+.globl	cpu_mohawk_suspend_size
-+.equ	cpu_mohawk_suspend_size, 4 * 6
-+#ifdef CONFIG_PM_SLEEP
-+ENTRY(cpu_mohawk_do_suspend)
-+	stmfd	sp!, {r4 - r9, lr}
-+	mrc	p14, 0, r4, c6, c0, 0	@ clock configuration, for turbo mode
-+	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
-+	mrc	p15, 0, r6, c13, c0, 0	@ PID
-+	mrc 	p15, 0, r7, c3, c0, 0	@ domain ID
-+	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
-+	mrc 	p15, 0, r9, c1, c0, 0	@ control reg
-+	bic	r4, r4, #2		@ clear frequency change bit
-+	stmia	r0, {r4 - r9}		@ store cp regs
-+	ldmia	sp!, {r4 - r9, pc}
-+ENDPROC(cpu_mohawk_do_suspend)
+ 	dsb();
+ }
 +
-+ENTRY(cpu_mohawk_do_resume)
-+	ldmia	r0, {r4 - r9}		@ load cp regs
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I & D caches, BTB
-+	mcr	p15, 0, ip, c7, c10, 4	@ drain write (&fill) buffer
-+	mcr	p15, 0, ip, c7, c5, 4	@ flush prefetch buffer
-+	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I & D TLBs
-+	mcr	p14, 0, r4, c6, c0, 0	@ clock configuration, turbo mode.
-+	mcr	p15, 0, r5, c15, c1, 0	@ CP access reg
-+	mcr	p15, 0, r6, c13, c0, 0	@ PID
-+	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
-+	orr	r1, r1, #0x18		@ cache the page table in L2
-+	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
-+	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
-+	mov	r0, r9			@ control register
-+	b	cpu_resume_mmu
-+ENDPROC(cpu_mohawk_do_resume)
-+#endif
++static void tauros2_disable(void)
++{
++	__asm__ __volatile__ (
++	"mcr	p15, 1, %0, c7, c11, 0 @L2 Cache Clean All\n\t"
++	"mrc	p15, 0, %0, c1, c0, 0\n\t"
++	"bic	%0, %0, #(1 << 26)\n\t"
++	"mcr	p15, 0, %0, c1, c0, 0  @Disable L2 Cache\n\t"
++	: : "r" (0x0));
++}
 +
- 	__CPUINIT
++static void tauros2_resume(void)
++{
++	__asm__ __volatile__ (
++	"mcr	p15, 1, %0, c7, c7, 0 @L2 Cache Invalidate All\n\t"
++	"mrc	p15, 0, %0, c1, c0, 0\n\t"
++	"orr	%0, %0, #(1 << 26)\n\t"
++	"mcr	p15, 0, %0, c1, c0, 0 @Enable L2 Cache\n\t"
++	: : "r" (0x0));
++}
+ #endif
  
- 	.type	__mohawk_setup, #function
+ static inline u32 __init read_extra_features(void)
+@@ -194,6 +214,8 @@ void __init tauros2_init(void)
+ 		outer_cache.inv_range = tauros2_inv_range;
+ 		outer_cache.clean_range = tauros2_clean_range;
+ 		outer_cache.flush_range = tauros2_flush_range;
++		outer_cache.disable = tauros2_disable;
++		outer_cache.resume = tauros2_resume;
+ 	}
+ #endif
+ 
+@@ -219,6 +241,8 @@ void __init tauros2_init(void)
+ 		outer_cache.inv_range = tauros2_inv_range;
+ 		outer_cache.clean_range = tauros2_clean_range;
+ 		outer_cache.flush_range = tauros2_flush_range;
++		outer_cache.disable = tauros2_disable;
++		outer_cache.resume = tauros2_resume;
+ 	}
+ #endif
+ 
 -- 
 1.7.0.4
