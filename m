@@ -1,32 +1,48 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 7 May 2012 09:52:54 +0200
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <20120507074228.GK26481@n2100.arm.linux.org.uk>
-References: <1336373032-16881-1-git-send-email-hdoyu@nvidia.com><20120507074228.GK26481@n2100.arm.linux.org.uk>
-Message-ID: <20120507.105254.1899925115243585929.hdoyu@nvidia.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 7 May 2012 16:01:32 +0800
+Subject: [alsa-devel] [PATCH RESEND 0/9] Enable pinctrl support for
+ mach-mxs
+In-Reply-To: <20120507074658.GH19389@S2101-09.ap.freescale.net>
+References: <1336353374-28939-1-git-send-email-shawn.guo@linaro.org>
+ <20120507071400.GB23607@shlinux2.ap.freescale.net>
+ <20120507074658.GH19389@S2101-09.ap.freescale.net>
+Message-ID: <20120507080131.GD23607@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Subject: Re: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-Date: Mon, 7 May 2012 09:42:28 +0200
-Message-ID: <20120507074228.GK26481@n2100.arm.linux.org.uk>
-
-> On Mon, May 07, 2012 at 09:43:45AM +0300, Hiroshi DOYU wrote:
-> > diff --git a/drivers/Makefile b/drivers/Makefile
-> > index 5870322..d97e2e2 100644
-> > --- a/drivers/Makefile
-> > +++ b/drivers/Makefile
-> > @@ -18,7 +18,7 @@ obj-$(CONFIG_SFI)		+= sfi/
-> >  # PnP must come after ACPI since it will eventually need to check if acpi
-> >  # was used and do nothing if so
-> >  obj-$(CONFIG_PNP)		+= pnp/
-> > -obj-$(CONFIG_ARM_AMBA)		+= amba/
-> > +obj-$(CONFIG_ARM)		+= amba/
+On Mon, May 07, 2012 at 03:47:00PM +0800, Shawn Guo wrote:
+> On Mon, May 07, 2012 at 03:14:00PM +0800, Dong Aisheng wrote:
+> > As IMX, basically i'd prefer to add pinctrl states in dts file at the
+> > same time within the patch or using a separate patch to add them before
+> > this series to avoid breaking the exist platforms.
+> > 
+> > However i noted that for mxs, most drivers here are still not dt capable,
+> > so it may be ok to not add their pinctrl state at this time.
+> > 
+> There no mxs driver on mainline that has been DT aware of.  What I'm
+> going to do is to ask Arnd abandon the mxs/dt branch I sent him before
+> and send him an updated one with the whole mxs DT support based on
+> mxs common clk and pinctrl series.
 > 
-> NAK.  This makes amba only buildable for ARM which is not the intention.
-> Other architectures do have Primecells.
+> > But for the patch "serial: amba-pl011: adopt pinctrl support" since it is
+> > dt capable, so with this patch applied, the mx28 dt boot will fail.
+> > Maybe we should at least add pinctrl states for amba-pl011 first.
+> > 
+> The updated mxs/dt will have pinctrl defined in dts for each device
+> that is converted to DT.
+> 
+Well, i did not see amba-pl011 pinctrl states defined in this patch.
+But it would be ok if you can get it done and applied before this patch.
 
-What about the following?
+> > > Shawn Guo (9):
+> > >   ARM: mxs: enable pinctrl dummy states
+> > >   serial: amba-pl011: adopt pinctrl support
+> > BTW, will this one break other platforms using this driver?
+> > 
+> If the platforms do not turn on CONFIG_PINCTRL, they are fine.  If they
+> turn on the support, they should provide pinctrl state either dummy or
+> real one.
+> 
 
- +obj-y		+= amba/
+Regards
+Dong Aisheng
