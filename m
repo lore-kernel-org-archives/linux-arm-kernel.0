@@ -1,46 +1,27 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 07 May 2012 10:06:48 +0200
-Subject: [PATCH RESEND 3/5] can: flexcan: adopt pinctrl support
-In-Reply-To: <1336352040-28447-4-git-send-email-shawn.guo@linaro.org>
-References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
- <1336352040-28447-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4FA78298.4080401@pengutronix.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 7 May 2012 10:12:11 +0200
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20120507081211.GC3229@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Haojian,
 
-On 05/07/2012 02:53 AM, Shawn Guo wrote:
-> Cc: linux-can at vger.kernel.org
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Mon, May 07, 2012 at 11:10:48AM +0800, Haojian Zhuang wrote:
+> If resource region isn't requested, component devices will fail to request
+> their resources.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 > ---
+>  drivers/mfd/max8925-core.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+Applied to my for-next branch, thanks.
 
-It doesn't compile yet against net-next/master, which is based on v3.4-rc4:
-
-/home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c: In
-function 'flexcan_probe':
-/home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c:937:
-error: implicit declaration of function 'devm_pinctrl_get_select_default'
-/home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c:937:
-warning: assignment makes pointer from integer without a cast
-
-Which tree does this series depend on? If this should go over the
-linux-can tree, I have to ask David first to merge this.
-
-regards,
-Marc
+Cheers,
+Samuel.
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120507/0a7929ce/attachment-0001.sig>
+Intel Open Source Technology Centre
+http://oss.intel.com/
