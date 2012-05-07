@@ -1,30 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 7 May 2012 16:17:49 +0800
-Subject: [PATCH RESEND 3/5] can: flexcan: adopt pinctrl support
-In-Reply-To: <4FA78298.4080401@pengutronix.de>
-References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
- <1336352040-28447-4-git-send-email-shawn.guo@linaro.org>
- <4FA78298.4080401@pengutronix.de>
-Message-ID: <CAAQ0ZWSzrfFm+=m+s8S3FDG5k_OrULN58VUVCBE=fwU0r=ZD+g@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 7 May 2012 16:18:40 +0800
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <20120507075800.GL26481@n2100.arm.linux.org.uk>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <20120507075800.GL26481@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZzj1FKhFPHOUjbARpzuA1_vB4TO0O8ThCiG49nPqYqCwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2012 16:06, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
-> It doesn't compile yet against net-next/master, which is based on v3.4-rc4:
+On Mon, May 7, 2012 at 3:58 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 07, 2012 at 11:10:48AM +0800, Haojian Zhuang wrote:
+>> If resource region isn't requested, component devices will fail to request
+>> their resources.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 >
-> /home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c: In
-> function 'flexcan_probe':
-> /home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c:937:
-> error: implicit declaration of function 'devm_pinctrl_get_select_default'
-> /home/frogger/pengutronix/socketcan/linux/drivers/net/can/flexcan.c:937:
-> warning: assignment makes pointer from integer without a cast
+> This looks wrong.
 >
-> Which tree does this series depend on? If this should go over the
-> linux-can tree, I have to ask David first to merge this.
->
-Thanks for the response, Marc.  The patch depends on pinctrl tree and
-a couple of other patches that will go through arm-soc tree, so I
-would like to ask for your ack to have the patch go over arm-soc tree.
+> This driver looks broken. ?IO regions are for PC IO stuff, not for I2C
+> buses. ?There is no resource reservation system in the kernel for
+> registers on I2C devices.
 
-Regards,
-Shawn
+There's some components in PMIC devices. I used IO resources to
+identify these components,
+and these IO resources are register offset in PMIC. But if I choose
+MEM resources, it may
+conflict with real memory resources. So I choose IO resources. Do you
+have any other implementation
+instead?
+
+Thanks
+Haojian
