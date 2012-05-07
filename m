@@ -1,77 +1,53 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2012 15:38:42 -0700
-Subject: [GIT PULL 2/5] omap hwmod cleanup for v3.5 merge window
+Date: Mon, 7 May 2012 15:38:43 -0700
+Subject: [GIT PULL 3/5] omap cpuidle cleanup for v3.5 merge window
 In-Reply-To: <pull-1336430323-742388>
-Message-ID: <mailman.5.1336430334.1417.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.6.1336430340.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
 
-  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-hwmod-for-v3.5
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-cpuidle-for-v3.5
 
-for you to fetch changes up to 9c3a3009f1c66f4a758b1e5d31b6977185d70a56:
+for you to fetch changes up to 274994c49c0ae7c42ce96dcd33b9555a697e7391:
 
-  Merge tag 'omap-cleanup-b-for-3.5' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into cleanup-hwmod (2012-04-19 17:43:42 -0700)
-
-----------------------------------------------------------------
-
-Clean up of hwmod to shrink down the IP block interconnections
+  Merge branch 'for_3.5/cleanup/omap-cpuidle' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into cleanup-cpuidle (2012-05-07 13:51:31 -0700)
 
 ----------------------------------------------------------------
-Archit Taneja (1):
-      ARM: OMAP2/3: VENC hwmods: Remove OCPIF_SWSUP_IDLE flag from VENC slave interface
 
-Fernando Guzman Lugo (1):
-      ARM: OMAP2+: hwmod: add softreset delay field and OMAP4 data
+CPUidle cleanup
 
-Paul Walmsley (30):
-      ARM: OMAP2+: hwmod: Revert "ARM: OMAP2+: hwmod: Make omap_hwmod_softreset wait for reset status"
-      ARM: OMAP2+: hwmod: control all hardreset lines attached to a hwmod
-      ARM: OMAP4: hwmod data: remove pseudo-hwmods associated with hardreset lines
-      ARM: OMAP2+: hwmod: revise the IP block reset process
-      ARM: OMAP2+: hwmod: reorganize and document the initialization process
-      ARM: OMAP2+: hwmod: reorganize and document the reset and configuration process
-      ARM: OMAP2+: hwmod: revise hardreset behavior
-      ARM: OMAP2+: hwmod: provide a function to return the address space of the MPU RT
-      ARM: OMAP2+: hwmod: add omap_hwmod_get_resource_byname()
-      ARM: OMAP2+: timer: use a proper interface to get hwmod data
-      ARM: OMAP2/3: hwmod data: update old names
-      ARM: OMAP3: hwmod data: fix interfaces for the MMC hwmods
-      ARM: OMAP3: hwmod data: add DSS->L3 interconnect for 3430ES1
-      ARM: OMAP3: hwmod data: GPTIMER12 is attached to a separate interconnect
-      ARM: OMAP4: hwmod data: remove bandgap hwmod
-      ARM: OMAP4: hwmod data: add OCP_USER_DSP; mark omap44xx_dsp__iva appropriately
-      ARM: OMAP4: hwmod data: uncomment some "excluded" hwmods
-      ARM: OMAP2+: hwmod: extend OCP_* register offsets from 16 to 32 bits
-      ARM: OMAP2+: hwmod: add _find_mpu_rt_port()
-      ARM: OMAP2+: hwmod: add function to iterate over struct omap_hwmod_ocp_if
-      ARM: OMAP2+: hwmod: consolidate finding the MPU port index and storing it
-      ARM: OMAP2+: hwmod: add support for link registration
-      ARM: OMAP2+: hwmod data: convert to link registration
-      ARM: OMAP: hwmod: remove code support for direct hwmod registration
-      ARM: OMAP2+: hwmod data: remove forward declarations, reorganize
-      ARM: OMAP2xxx: hwmod data: share common hwmods between OMAP2420 and OMAP2430
-      ARM: OMAP2xxx: hwmod data: share common interface data
-      ARM: OMAP3: hwmod data: fix IVA interface clock
-      ARM: OMAP3: hwmod data: add IVA hard reset lines, main clock, clockdomain
-      ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP
+----------------------------------------------------------------
+Daniel Lezcano (18):
+      ARM: OMAP4: cpuidle - Remove unused valid field
+      ARM: OMAP4: cpuidle - Declare the states with the driver declaration
+      ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
+      ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
+      ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
+      ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
+      ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot time
+      ARM: OMAP3: cpuidle - remove rx51 cpuidle parameters table
+      ARM: OMAP3: define cpuidle statically
+      ARM: OMAP3: cpuidle - remove errata check in the init function
+      ARM: OMAP3: cpuidle - remove the 'valid' field
+      ARM: OMAP3: cpuidle - remove cpuidle_params_table
+      ARM: OMAP3: define statically the omap3_idle_data
+      ARM: OMAP3: cpuidle - use omap3_idle_data directly
+      ARM: OMAP3: cpuidle - simplify next_valid_state
+      ARM: OMAP3: set omap3_idle_data as static
+      ARM: OMAP3: cpuidle - set global variables static
+      ARM: OMAP3: cpuidle - check the powerdomain lookup
 
 Tony Lindgren (1):
-      Merge tag 'omap-cleanup-b-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into cleanup-hwmod
+      Merge branch 'for_3.5/cleanup/omap-cpuidle' of git://git.kernel.org/.../khilman/linux-omap-pm into cleanup-cpuidle
 
- arch/arm/mach-omap2/omap_hwmod.c                   | 1160 +++--
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         | 1563 +-----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         | 2316 +++------
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  266 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  562 +++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 5022 +++++++++----------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 5066 ++++++++------------
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   71 +-
- arch/arm/mach-omap2/timer.c                        |   15 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h       |   44 +-
- 10 files changed, 6976 insertions(+), 9109 deletions(-)
+ arch/arm/mach-omap2/board-rx51.c  |   38 +++--
+ arch/arm/mach-omap2/cpuidle34xx.c |  298 +++++++++++++++----------------------
+ arch/arm/mach-omap2/cpuidle44xx.c |  126 +++++++---------
+ arch/arm/mach-omap2/pm.h          |   21 ---
+ 4 files changed, 190 insertions(+), 293 deletions(-)
