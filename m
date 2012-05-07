@@ -1,67 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 7 May 2012 15:28:48 +0000
-Subject: [RFC 4/5] pinctrl: SPEAr: Add gpio ranges support
-In-Reply-To: <CACRpkdbhbESbQWX=5RC86X9Z+R767oijDB4myw=bSRay9ud-qQ@mail.gmail.com>
-References: <cover.1335526926.git.viresh.kumar@st.com>
- <4f7690c68b1fa5ef14b29b88fed50237e068fe4d.1335526926.git.viresh.kumar@st.com>
- <CACRpkdbhbESbQWX=5RC86X9Z+R767oijDB4myw=bSRay9ud-qQ@mail.gmail.com>
-Message-ID: <201205071528.48460.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 07 May 2012 09:39:22 -0600
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <20120507000329.GB14559@gmail.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com>
+Message-ID: <4FA7ECAA.1040104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 May 2012, Linus Walleij wrote:
-> Hm first I wonder what i2c0 and ssp0 have to do with GPIO...
-> Well whatever, maybe split out a special patch just adding the
-> groups?
+On 05/06/2012 06:03 PM, Mike Turquette wrote:
+> On 20120503-19:13, Peter De Schrijver wrote:
+>> Hi,
+>>
+>> I started looking into what would be needed to move our tegra30 clock code
+>> to the common clock framework. The tegra30 clocktree is rather flat. Basically
+>> there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
+>> and peripheral clocks which have a mux (with 4 or more inputs), a divider and
+>> a gate. So almost every peripheral clock can have multiple parents.
+>>
+>> Some questions:
+>>
+>> 1) should these peripheral clocks be modelled as 3 different clocks
+>>    (mux -> divider -> gate) or would it be better to make a new clock type for
+>>    this?
+>>
 > 
-> Please cut down this code by using a clever macro:
+> That is really for you to decide.  If the semantics of the existing mux,
+> divider and gate in drivers/clk/clk-*.c work well for you then I think
+> the answer is "yes".  There is infrastructure for register-access
+> locking in those common types which might help your complex clocks.
 > 
-> #define SPEAR_PCTL_GRP(a,b) \
-> { \
->     .pins =  a##_pins, \
->     .npins = ARRAY_SIZE(a##_pins), \
->     .muxreg = { \
->         .reg = PAD_FUNCTION_EN_2, \
->         .mask PMX_##b##_MASK, \
->         .val = 0, \
->     }, \
-> }
+> Thanks to the parent rate propagation stuff in clk_set_rate it should be
+> possible for your drivers to only be aware of the gate and call
+> clk_set_rate on only that clock, which propagates up to the divider and,
+> if necessary, again propagates up to the mux.
 > 
-> Then:
+> I encourage you to try that first.  But if you find the semantics of
+> those basic clock types aren't cutting it for you then you must create a
+> type which is platform-specific.
+
+A lot of these mux/divider/gate clocks go out to peripherals, whose
+drivers want to call both clk_set_rate() and clk_en/disable() on the clock.
+
+There's only 1 clock reaching the peripheral in HW, so the driver should
+only call clk_get() once, and similarly the DT should only provide a
+single clock to the driver.
+
+Given the mux->divider->gate clock construction, that clock would
+presumably be the gate object. clk_en/disable() clearly work there, but
+is clk_set_rate() intended to propagate up the chain until it can be
+satisfied, i.e. does the gate clock object's set_rate() op simply call
+the parent's set_rate() op?
+
+If the order were instead mux->gate->divider, would it be correct for
+enable/disable to propagate from the divider to the gate?
+
+>> 2) how to define the default parent? in many cases the hw reset value isn't
+>>    a very sensible choice, so the kernel probably needs to set a parent of
+>>    many of them if we don't want to rely on bootloader configuration.
 > 
-> static struct spear_gpio_pingroup spear1310_gpio_pingroup[] = {
->     SPEAR_PCTL_GRP(i2c0, I2C0),
->     SPEAR_PCTL_GRP(ssp0, SSP0),
->     SPEAR_PCTL_GRP(ssp0_cs0, SSP0_CS0),
->     (...)
-> };
+> The only related thing handled at the framework level is _discovery_ of
+> the parent during clock registration/initialization.  If you don't trust
+> the bootloader and want to set things up as soon as possible (a wise
+> move) then I suggest you do so from your platform clock code at the same
+> time that you register your clocks with the framework.  Something like:
 > 
-> (You get the picture.)
+> 	struct clk *c;
+> 	c = clk_register(...);
+> 	if (IS_ERR(c))
+> 		omg_fail();
+> 	clk_set_parent(c, b);
+> 
+> Where 'b' is a parent of 'c'.  Register your clock tree top-down and you
+> can re-parent as you go.
 
-If you allow me to give my 2 cents, I would recommend the exact opposite
-in general: resist the urge to use complex macros for everything!
+I'm hoping we can represent this in device tree somehow, so that
+individual boards can set the clock tree up differently depending on
+their needs (e.g. Tegra20 doesn't have quite enough PLLs, so sometimes a
+particular PLL will be used to generate the 2nd display's pixel clock,
+whereas on other boards it may be used for some peripherals). So, we'd
+like to describe this in DT.
 
-When that gets too hard, please at least use macros that do not concatenate
-C identifies because that makes it really hard to grep for where a constant
-gets used. 
-
-A more acceptable macro would be 
-
-#define SPEAR_PCTL_GRP(_pins, _mask) \
-{ \
-	.pins =  _pins, \
-	.npins = ARRAY_SIZE(_pins), \
-	.muxreg = { \
-	        .reg = PAD_FUNCTION_EN_2, \
-	        .mask _val, \
-	        .val = 0, \
-	}, \
-}
-
-but open-coding is generally ok too. Note that you can sometimes save a lot
-of lines if you don't first define all those constants as macros but
-treat a table like this as the place where you put the raw numbers
-from the data sheet, if that the only code location in which they are
-used.
-
-	Arnd
+It seems like it'd be pretty common to want the kernel to fully
+initialize the clock tree, and to do this from device tree, so perhaps
+this might evolve into a common (part of) a cross-SoC clock binding, or
+some kind of utility function that parsed a clock-tree-init-table from DT?
