@@ -1,55 +1,147 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 16:55:37 -0700
-Subject: [PATCH V3 04/10] ARM: OMAP3: hwmod: rename the smartreflex entries
-In-Reply-To: <87d36fzhkm.fsf@ti.com> (Kevin Hilman's message of "Mon, 07 May
- 2012 16:39:53 -0700")
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1AA2@DBDE01.ent.ti.com>
- <CAJ6a13ZSWSa_RpGB9NxtfyChUba9NGivGogpsfyk7oT9pNayjg@mail.gmail.com>
- <87d36fzhkm.fsf@ti.com>
-Message-ID: <87r4uvwnpi.fsf@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 8 May 2012 01:34:26 +0200
+Subject: [PATCH 1/6] dma: mxs-dma: use global stmp_device functionality
+In-Reply-To: <1336400595-12964-2-git-send-email-shawn.guo@linaro.org>
+References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
+ <1336400595-12964-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201205080134.26651.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+Dear Shawn Guo,
 
-> "J, KEERTHY" <j-keerthy@ti.com> writes:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> This can get rid of the mach-dependency.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Huang Shijie <b32955@freescale.com>
+> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 
-[...]
+Acked-by: Marek Vasut <marex@denx.de>
 
->>>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
->>>> index 2edd1e2..d859277 100644
->>>> --- a/arch/arm/mach-omap2/smartreflex.c
->>>> +++ b/arch/arm/mach-omap2/smartreflex.c
->>>> @@ -183,7 +183,7 @@ static void sr_set_regfields(struct omap_sr *sr)
->>>> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
->>>> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
->>>> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
->>>> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
->>>> + ? ? ? ? ? ? if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
->>>
->>> What if voltage rail is different for mpu and iva? I have seen some devices
->>> supports SmartReflex have different voltage rails for mpu and iva.
->>>
->>
->> I get the point. OMAP3 iva and mpu have a common rail. OMAP4 onwards
->> even we have different rails for mpu and iva. I will enhance the checks here.
->
-> Rather than enhancing the checks, this SoC specific data should probably
-> just be made part of the SoC specific hwmod dev_attr.
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  drivers/dma/Kconfig   |    1 +
+>  drivers/dma/mxs-dma.c |   26 +++++++++++++-------------
+>  2 files changed, 14 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index ef378b5..aadeb5b 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -238,6 +238,7 @@ config IMX_DMA
+>  config MXS_DMA
+>  	bool "MXS DMA support"
+>  	depends on SOC_IMX23 || SOC_IMX28
+> +	select STMP_DEVICE
+>  	select DMA_ENGINE
+>  	help
+>  	  Support the MXS DMA engine. This engine including APBH-DMA
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 655d4ce..bd27818 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -23,10 +23,10 @@
+>  #include <linux/dmaengine.h>
+>  #include <linux/delay.h>
+>  #include <linux/fsl/mxs-dma.h>
+> +#include <linux/stmp_device.h>
+> 
+>  #include <asm/irq.h>
+>  #include <mach/mxs.h>
+> -#include <mach/common.h>
+> 
+>  #include "dmaengine.h"
+> 
+> @@ -138,10 +138,10 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan
+> *mxs_chan)
+> 
+>  	if (dma_is_apbh() && apbh_is_old())
+>  		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
+> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+>  	else
+>  		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
+> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
+STMP_OFFSET_REG_SET);
+>  }
+> 
+>  static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+> @@ -170,10 +170,10 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan
+> *mxs_chan) /* freeze the channel */
+>  	if (dma_is_apbh() && apbh_is_old())
+>  		writel(1 << chan_id,
+> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+>  	else
+>  		writel(1 << chan_id,
+> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
+STMP_OFFSET_REG_SET);
+> 
+>  	mxs_chan->status = DMA_PAUSED;
+>  }
+> @@ -186,10 +186,10 @@ static void mxs_dma_resume_chan(struct mxs_dma_chan
+> *mxs_chan) /* unfreeze the channel */
+>  	if (dma_is_apbh() && apbh_is_old())
+>  		writel(1 << chan_id,
+> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_CLR_ADDR);
+> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
+>  	else
+>  		writel(1 << chan_id,
+> -			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + MXS_CLR_ADDR);
+> +			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + 
+STMP_OFFSET_REG_CLR);
+> 
+>  	mxs_chan->status = DMA_IN_PROGRESS;
+>  }
+> @@ -220,11 +220,11 @@ static irqreturn_t mxs_dma_int_handler(int irq, void
+> *dev_id) /* completion status */
+>  	stat1 = readl(mxs_dma->base + HW_APBHX_CTRL1);
+>  	stat1 &= MXS_DMA_CHANNELS_MASK;
+> -	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + MXS_CLR_ADDR);
+> +	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
+> 
+>  	/* error status */
+>  	stat2 = readl(mxs_dma->base + HW_APBHX_CTRL2);
+> -	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + MXS_CLR_ADDR);
+> +	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
+> 
+>  	/*
+>  	 * When both completion and error of termination bits set at the
+> @@ -567,7 +567,7 @@ static int __init mxs_dma_init(struct mxs_dma_engine
+> *mxs_dma) if (ret)
+>  		return ret;
+> 
+> -	ret = mxs_reset_block(mxs_dma->base);
+> +	ret = stmp_reset_block(mxs_dma->base);
+>  	if (ret)
+>  		goto err_out;
+> 
+> @@ -580,14 +580,14 @@ static int __init mxs_dma_init(struct mxs_dma_engine
+> *mxs_dma) /* enable apbh burst */
+>  	if (dma_is_apbh()) {
+>  		writel(BM_APBH_CTRL0_APB_BURST_EN,
+> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+>  		writel(BM_APBH_CTRL0_APB_BURST8_EN,
+> -			mxs_dma->base + HW_APBHX_CTRL0 + MXS_SET_ADDR);
+> +			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+>  	}
+> 
+>  	/* enable irq for all the channels */
+>  	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
+> -		mxs_dma->base + HW_APBHX_CTRL1 + MXS_SET_ADDR);
+> +		mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_SET);
+> 
+>  err_out:
+>  	clk_disable_unprepare(mxs_dma->clk);
 
-That being said, this is an additional feature we can add after this
-driver is moved.
-
-I would like this series to concentrate on the cleanups necessary to
-move to drivers/*, then additional features to support other SoCs can be
-added on top.
-
-Keerthy, please prepare a patch to generalize this to other SoCs by
-using dev_attr for this SoC specific data.   We can add it after this
-series is merged upstream.
-
-Thanks,
-
-Kevin
+Best regards,
+Marek Vasut
