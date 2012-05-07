@@ -1,33 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2012 10:35:55 -0700
-Subject: [PATCH 10/13] ARM: OMAP5: board-generic: Add device tree support.
-In-Reply-To: <CAJ7qFSdBz1ccp0Z-4pWvbq0J0zb6j3Kto4cDz3R0kHT7YfRo0w@mail.gmail.com>
+Date: Mon, 7 May 2012 10:37:50 -0700
+Subject: [PATCH 12/13] ARM: OMAP5: Add the build support
+In-Reply-To: <CAJ7qFSeJc+F5xnW+P5r89yZEZXi8k-LqqnD8R1KEUONqravNBw@mail.gmail.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-11-git-send-email-r.sricharan@ti.com>
- <4FA7CDC1.9050301@ti.com>
- <CAJ7qFSdBz1ccp0Z-4pWvbq0J0zb6j3Kto4cDz3R0kHT7YfRo0w@mail.gmail.com>
-Message-ID: <20120507173555.GD5088@atomide.com>
+ <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
+ <20120504225857.GB5613@atomide.com>
+ <CAJ7qFSeJc+F5xnW+P5r89yZEZXi8k-LqqnD8R1KEUONqravNBw@mail.gmail.com>
+Message-ID: <20120507173749.GE5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* R, Sricharan <r.sricharan@ti.com> [120507 07:12]:
-> Hi Benoit,
->   Thanks for the reviews.
+* R, Sricharan <r.sricharan@ti.com> [120506 20:39]:
+> >> +config MACH_OMAP5_SEVM
+> >> + ? ? bool "OMAP5 sevm Board"
+> >> + ? ? depends on ARCH_OMAP5
+> >> +
+> >> ?config OMAP3_EMU
+> >> ? ? ? bool "OMAP3 debugging peripherals"
+> >> ? ? ? depends on ARCH_OMAP3
+> >
+> > No need for it here either. Actually, I think this whole chunk
+> > can be now left out since it's DT based?
+> >he
+>  ok, but the concern here was that without this macro
+>  the print from compress and subsequently early
+> prints appear broken.
 > 
-> >
-> >> Adding the minimal support for OMAP5 soc with device tree.
-> >
-> >
-> > You should probably split that patch since you are doing several things that
-> > are not OMAP5 related.
-> >
-> > Do a patch that move the omap_init_irq into the INTC and GIC code first.
-> >
-> > Then, you can add a patch to add the OMAP5_DT machine entry.
-> >
->   ok, will split this then accordingly.
+> machine_is_omap5_sevm becomes zero without this config and
+> machine_is_xxxx is used by the macro _DEBUG_LL_ENTRY
+> uncompress.h.
 
-Thanks, that allows us to remove the dependencies that will easily
-cause merge errors adding let's say am33xx here.
+Ah I see.
 
 Tony
