@@ -1,125 +1,97 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  7 May 2012 22:23:13 +0800
-Subject: [PATCH 4/6] dma: mxs-dma: add device tree probe support
+Date: Mon,  7 May 2012 22:23:14 +0800
+Subject: [PATCH 5/6] ARM: mxs: do not add dma device by default
 In-Reply-To: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
 References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336400595-12964-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336400595-12964-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Rob Landley <rob@landley.net>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
+This will cause conflict when dt is enabled.
+So let each platform add dma devices respectively.
+
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Huang Shijie <b32955@freescale.com>
 Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   19 +++++++++++++
- drivers/dma/mxs-dma.c                              |   29 ++++++++++++++++---
- 2 files changed, 43 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+ arch/arm/mach-mxs/devices/platform-dma.c |   23 +----------------------
+ arch/arm/mach-mxs/include/mach/common.h  |    3 +++
+ arch/arm/mach-mxs/mm.c                   |    6 ++++++
+ 3 files changed, 10 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-new file mode 100644
-index 0000000..ded0398
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-@@ -0,0 +1,19 @@
-+* Freescale MXS DMA
-+
-+Required properties:
-+- compatible : Should be "fsl,<chip>-dma-apbh" or "fsl,<chip>-dma-apbx"
-+- reg : Should contain registers location and length
-+
-+Supported chips:
-+imx23, imx28.
-+
-+Examples:
-+dma-apbh at 80004000 {
-+	compatible = "fsl,imx28-dma-apbh";
-+	reg = <0x80004000 2000>;
-+};
-+
-+dma-apbx at 80024000 {
-+	compatible = "fsl,imx28-dma-apbx";
-+	reg = <0x80024000 2000>;
-+};
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 5d9813c..fe8c498 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -22,8 +22,11 @@
- #include <linux/platform_device.h>
- #include <linux/dmaengine.h>
- #include <linux/delay.h>
-+#include <linux/module.h>
- #include <linux/fsl/mxs-dma.h>
- #include <linux/stmp_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
+diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+index aff4813..4682450 100644
+--- a/arch/arm/mach-mxs/devices/platform-dma.c
++++ b/arch/arm/mach-mxs/devices/platform-dma.c
+@@ -14,7 +14,7 @@
+ #include <mach/mx28.h>
+ #include <mach/devices-common.h>
  
- #include <asm/irq.h>
- #include <mach/mxs.h>
-@@ -173,6 +176,15 @@ static struct platform_device_id mxs_dma_ids[] = {
- 	}
- };
- 
-+static const struct of_device_id mxs_dma_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-dma-apbh", .data = &mxs_dma_ids[0], },
-+	{ .compatible = "fsl,imx23-dma-apbx", .data = &mxs_dma_ids[1], },
-+	{ .compatible = "fsl,imx28-dma-apbh", .data = &mxs_dma_ids[2], },
-+	{ .compatible = "fsl,imx28-dma-apbx", .data = &mxs_dma_ids[3], },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_dma_dt_ids);
-+
- static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+-static struct platform_device *__init mxs_add_dma(const char *devid,
++struct platform_device *__init mxs_add_dma(const char *devid,
+ 						resource_size_t base)
  {
- 	return container_of(chan, struct mxs_dma_chan, chan);
-@@ -648,10 +660,9 @@ err_out:
+ 	struct resource res[] = {
+@@ -29,24 +29,3 @@ static struct platform_device *__init mxs_add_dma(const char *devid,
+ 				res, ARRAY_SIZE(res), NULL, 0,
+ 				DMA_BIT_MASK(32));
+ }
+-
+-static int __init mxs_add_mxs_dma(void)
+-{
+-	char *mx23_apbh = "imx23-dma-apbh";
+-	char *mx23_apbx = "imx23-dma-apbx";
+-	char *mx28_apbh = "imx28-dma-apbh";
+-	char *mx28_apbx = "imx28-dma-apbx";
+-
+-	if (cpu_is_mx23()) {
+-		mxs_add_dma(mx23_apbh, MX23_APBH_DMA_BASE_ADDR);
+-		mxs_add_dma(mx23_apbx, MX23_APBX_DMA_BASE_ADDR);
+-	}
+-
+-	if (cpu_is_mx28()) {
+-		mxs_add_dma(mx28_apbh, MX28_APBH_DMA_BASE_ADDR);
+-		mxs_add_dma(mx28_apbx, MX28_APBX_DMA_BASE_ADDR);
+-	}
+-
+-	return 0;
+-}
+-arch_initcall(mxs_add_mxs_dma);
+diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+index 84af61c..5f9a358 100644
+--- a/arch/arm/mach-mxs/include/mach/common.h
++++ b/arch/arm/mach-mxs/include/mach/common.h
+@@ -31,4 +31,7 @@ extern void mx28_init_irq(void);
  
- static int __init mxs_dma_probe(struct platform_device *pdev)
- {
--	const struct platform_device_id *id_entry =
--				platform_get_device_id(pdev);
--	const struct mxs_dma_type *dma_type =
--			(struct mxs_dma_type *)id_entry->driver_data;
-+	const struct platform_device_id *id_entry;
-+	const struct of_device_id *of_id;
-+	const struct mxs_dma_type *dma_type;
- 	struct mxs_dma_engine *mxs_dma;
- 	struct resource *iores;
- 	int ret, i;
-@@ -660,8 +671,15 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
- 	if (!mxs_dma)
- 		return -ENOMEM;
+ extern void icoll_init_irq(void);
  
--	mxs_dma->dev_id = dma_type->id;
-+	of_id = of_match_device(mxs_dma_dt_ids, &pdev->dev);
-+	if (of_id)
-+		id_entry = of_id->data;
-+	else
-+		id_entry = platform_get_device_id(pdev);
++extern struct platform_device *mxs_add_dma(const char *devid,
++						resource_size_t base);
 +
-+	dma_type = (struct mxs_dma_type *)id_entry->driver_data;
- 	mxs_dma->type = dma_type->type;
-+	mxs_dma->dev_id = dma_type->id;
+ #endif /* __MACH_MXS_COMMON_H__ */
+diff --git a/arch/arm/mach-mxs/mm.c b/arch/arm/mach-mxs/mm.c
+index 67a384e..6af4371 100644
+--- a/arch/arm/mach-mxs/mm.c
++++ b/arch/arm/mach-mxs/mm.c
+@@ -66,9 +66,15 @@ void __init mx28_init_irq(void)
+ void __init mx23_soc_init(void)
+ {
+ 	pinctrl_provide_dummies();
++
++	mxs_add_dma("imx23-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
++	mxs_add_dma("imx23-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
+ }
  
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 
-@@ -747,6 +765,7 @@ err_request_region:
- static struct platform_driver mxs_dma_driver = {
- 	.driver		= {
- 		.name	= "mxs-dma",
-+		.of_match_table = mxs_dma_dt_ids,
- 	},
- 	.id_table	= mxs_dma_ids,
- };
+ void __init mx28_soc_init(void)
+ {
+ 	pinctrl_provide_dummies();
++
++	mxs_add_dma("imx28-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
++	mxs_add_dma("imx28-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
+ }
 -- 
 1.7.5.4
