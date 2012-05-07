@@ -1,34 +1,23 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 7 May 2012 16:18:40 +0800
-Subject: [PATCH 1/2] mfd: max8925: request resource region
-In-Reply-To: <20120507075800.GL26481@n2100.arm.linux.org.uk>
-References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
- <20120507075800.GL26481@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZzj1FKhFPHOUjbARpzuA1_vB4TO0O8ThCiG49nPqYqCwg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 7 May 2012 16:21:04 +0800
+Subject: [PATCH] ARM: imx: rename uart and fec device tree nodes
+In-Reply-To: <4FA7843E.8050302@de.bosch.com>
+References: <1333350084-5993-1-git-send-email-shawn.guo@linaro.org>
+ <4FA39D65.3020007@de.bosch.com>
+ <20120504133301.GJ2194@S2101-09.ap.freescale.net>
+ <4FA3DB37.8080002@de.bosch.com>
+ <20120504134825.GK2194@S2101-09.ap.freescale.net>
+ <4FA7843E.8050302@de.bosch.com>
+Message-ID: <CAAQ0ZWScwMy1JCd=fw_a14h0VVS1vYf_OGgtgymQqhm0kk9v8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2012 at 3:58 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, May 07, 2012 at 11:10:48AM +0800, Haojian Zhuang wrote:
->> If resource region isn't requested, component devices will fail to request
->> their resources.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On 7 May 2012 16:13, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> Ok. Using this patch on top of Sascha's clk series [1], the following
+> changes [2] are needed.
 >
-> This looks wrong.
->
-> This driver looks broken. ?IO regions are for PC IO stuff, not for I2C
-> buses. ?There is no resource reservation system in the kernel for
-> registers on I2C devices.
+Thanks for the patch, Dirk.  I will rebase my patch on top of Sascha's
+clk series before I ask Arnd to pull.
 
-There's some components in PMIC devices. I used IO resources to
-identify these components,
-and these IO resources are register offset in PMIC. But if I choose
-MEM resources, it may
-conflict with real memory resources. So I choose IO resources. Do you
-have any other implementation
-instead?
-
-Thanks
-Haojian
+Regards,
+Shawn
