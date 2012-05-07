@@ -1,69 +1,37 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 07 May 2012 12:31:43 -0700
-Subject: [PATCH 3/5] clk: remove COMMON_CLK_DISABLE_UNUSED
-In-Reply-To: <1336367310-5140-4-git-send-email-mturquette@linaro.org>
-References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
- <1336367310-5140-4-git-send-email-mturquette@linaro.org>
-Message-ID: <4FA8231F.4010902@codeaurora.org>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Mon, 7 May 2012 12:34:28 -0700
+Subject: [PATCH] ARM: BCMRING: Fix UART declaration and clk dev name mismatch
+Message-ID: <4FA823C4.1070109@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2012 10:08 PM, Mike Turquette wrote:
-> Exposing this option generates confusion and incorrect behavior for
-> single-image builds across platforms.  Enable this behavior permanently.
->
-> Signed-off-by: Mike Turquette<mturquette@linaro.org>
-> ---
->   drivers/clk/Kconfig |   11 -----------
->   drivers/clk/clk.c   |    2 --
->   2 files changed, 0 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index f05a60d..4864407 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -23,17 +23,6 @@ config COMMON_CLK
->   menu "Common Clock Framework"
->   	depends on COMMON_CLK
->
-> -config COMMON_CLK_DISABLE_UNUSED
-> -	bool "Disabled unused clocks at boot"
-> -	depends on COMMON_CLK
-> -	---help---
-> -	  Traverses the entire clock tree and disables any clocks that are
-> -	  enabled in hardware but have not been enabled by any device drivers.
-> -	  This saves power and keeps the software model of the clock in line
-> -	  with reality.
-> -
-> -	  If in doubt, say "N".
-> -
->   config COMMON_CLK_DEBUG
->   	bool "DebugFS representation of clock tree"
->   	depends on COMMON_CLK
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 7ceca0e..e5d5dc1 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -196,7 +196,6 @@ late_initcall(clk_debug_init);
->   static inline int clk_debug_register(struct clk *clk) { return 0; }
->   #endif
->
-> -#ifdef CONFIG_COMMON_CLK_DISABLE_UNUSED
->   /* caller must hold prepare_lock */
->   static void clk_disable_unused_subtree(struct clk *clk)
->   {
-> @@ -246,7 +245,6 @@ static int clk_disable_unused(void)
->   	return 0;
->   }
->   late_initcall(clk_disable_unused);
-> -#endif
->
->   /***    helper functions   ***/
->
+Fix bcmring UART declaration and clk dev name mismatch
 
-Good decision! Acked.
+With 888073d41680e8244232f3d850e0424a4e9de60f (ARM:
+bcmring: fix UART declarations), it introduced clk dev name
+mismatch and leads to UART initialization failure during boot.
 
--Saravana
+Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com  <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>>
+---
+   arch/arm/mach-bcmring/core.c |    4 ++--
+   1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index adbfb19..5559857 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -110,10 +110,10 @@ static struct clk_lookup lookups[] = {
+           .con_id = "apb_pclk",
+           .clk =&dummy_apb_pclk,
+       }, {            /* UART0 */
+-        .dev_id = "uarta",
++        .dev_id = "uartA",
+           .clk =&uart_clk,
+       }, {            /* UART1 */
+-        .dev_id = "uartb",
++        .dev_id = "uartB",
+           .clk =&uart_clk,
+       }, {            /* SP804 timer 0 */
+           .dev_id = "sp804",
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.9.5
