@@ -1,106 +1,68 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 May 2012 00:41:33 -0600 (MDT)
-Subject: [PATCH 1/6] ARM: OMAP2+: PM: protect the power domain state
- change by a mutex
-In-Reply-To: <1334752782-28804-2-git-send-email-j-pihet@ti.com>
-References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
- <1334752782-28804-2-git-send-email-j-pihet@ti.com>
-Message-ID: <alpine.DEB.2.00.1205070033490.9984@utopia.booyaka.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 7 May 2012 14:50:02 +0800
+Subject: [PATCH RESEND 0/5] Adopt pinctrl support for a few outstanding
+ imx drivers
+In-Reply-To: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
+References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120507065001.GA23607@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 18 Apr 2012, jean.pihet at newoldbits.com wrote:
-
-> From: Jean Pihet <j-pihet@ti.com>
+On Mon, May 07, 2012 at 08:53:55AM +0800, Shawn Guo wrote:
+> With patch 5b3aa5f (pinctrl: add pinctrl_provide_dummies interface for
+> platforms to use) applied on pinctrl tree, and patch "ARM: imx: enable
+> pinctrl dummy states" [1] being there, we are ready to adopt pinctrl
+> API for imx drivers.  So let's start from a few outstanding ones.
 > 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-
-This patch is missing a description, which would describe why this lock is 
-needed and what it protects against.  Please add this.
-
-> ---
->  arch/arm/mach-omap2/pm.c          |    8 ++++++--
->  arch/arm/mach-omap2/powerdomain.c |    1 +
->  arch/arm/mach-omap2/powerdomain.h |    3 ++-
->  3 files changed, 9 insertions(+), 3 deletions(-)
+> I would expect to ask Arnd and Olof to pull pinctrl tree into arm-soc
+> as a dependency and then have series [1] and this patch set go through
+> arm-soc tree to ease the merge process.
 > 
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index d0c1c96..6918a13 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -100,15 +100,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
->  	if (!pwrdm || IS_ERR(pwrdm))
->  		return -EINVAL;
->  
-> +	mutex_lock(&pwrdm->lock);
-> +
->  	while (!(pwrdm->pwrsts & (1 << pwrst))) {
->  		if (pwrst == PWRDM_POWER_OFF)
-> -			return ret;
-> +			goto out;
->  		pwrst--;
->  	}
->  
->  	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
->  	if (next_pwrst == pwrst)
-> -		return ret;
-> +		goto out;
->  
->  	curr_pwrst = pwrdm_read_pwrst(pwrdm);
->  	if (curr_pwrst < PWRDM_POWER_ON) {
-> @@ -141,6 +143,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
->  		break;
->  	}
->  
-> +out:
-> +	mutex_unlock(&pwrdm->lock);
->  	return ret;
->  }
->  
+Shouldn't we add the pinctrl states in dts file at the same time
+with this patch series or using another separate patch to add them
+before this series to avoid breaking the exist mx6q platforms?
 
-So this mutex would protect against simultaneous calls to 
-omap_set_pwrdm_state(), but shouldn't this protection be extended to 
-anything that would change the powerdomain's state?  For example, couldn't 
-other calls to pwrdm_set_next_pwrst() race against this function?
+> Resend to have subsystem lists Cc-ed.
+> 
+> Regards,
+> Shawn
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel.mmc/14180
+> 
+> Shawn Guo (5):
+>   tty: serial: imx: adopt pinctrl support
+...
 
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 96ad3dbe..319b277 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -102,6 +102,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
->  	INIT_LIST_HEAD(&pwrdm->voltdm_node);
->  	voltdm_add_pwrdm(voltdm, pwrdm);
->  
-> +	mutex_init(&pwrdm->lock);
->  	list_add(&pwrdm->node, &pwrdm_list);
->  
->  	/* Initialize the powerdomain's state counter */
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index 0d72a8a..6c6567d 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -19,7 +19,7 @@
->  
->  #include <linux/types.h>
->  #include <linux/list.h>
-> -
-> +#include <linux/mutex.h>
->  #include <linux/atomic.h>
->  
->  #include <plat/cpu.h>
-> @@ -116,6 +116,7 @@ struct powerdomain {
->  	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
->  	struct list_head node;
->  	struct list_head voltdm_node;
-> +	struct mutex lock;
->  	int state;
->  	unsigned state_counter[PWRDM_MAX_PWRSTS];
->  	unsigned ret_logic_off_counter;
+>   net: fec: adopt pinctrl support
+>   can: flexcan: adopt pinctrl support
+This two also depends on another patch you sent.
+[PATCH RESEND 1/9] ARM: mxs: enable pinctrl dummy states
+http://www.spinics.net/lists/arm-kernel/msg173341.html
 
-Please add a kerneldoc entry in the struct powerdomain documentation for 
-this field.
+Maybe you can put this two in the mxs convert series to avoid breaking
+mxs platforms.
+[PATCH 0/9] Enable pinctrl support for mach-mxs
+http://www.spinics.net/lists/arm-kernel/msg173312.html
 
+Regards
+Dong Aisheng
 
-- Paul
+>   i2c: imx: adopt pinctrl support
+>   spi/imx: adopt pinctrl support
+> 
+>  drivers/i2c/busses/i2c-imx.c         |    8 ++++++++
+>  drivers/net/can/flexcan.c            |    6 ++++++
+>  drivers/net/ethernet/freescale/fec.c |    9 +++++++++
+>  drivers/spi/spi-imx.c                |    8 ++++++++
+>  drivers/tty/serial/imx.c             |    8 ++++++++
+>  5 files changed, 39 insertions(+), 0 deletions(-)
+> 
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
