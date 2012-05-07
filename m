@@ -1,57 +1,29 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 11:03:47 -0700
-Subject: [GIT PULL] ARM: OMAP: PM: CPUidle cleanup for v3.5
-Message-ID: <87d36f50n0.fsf@ti.com>
+Date: Mon, 07 May 2012 11:12:23 -0700
+Subject: [PATCH 1/2 v4] ARM: OMAP2+: omap_hwmod: Add api to enable/disable
+ module level wakeup events
+In-Reply-To: <1335338237-4095-1-git-send-email-govindraj.raja@ti.com>
+ (Govindraj R.'s message of "Wed, 25 Apr 2012 12:47:17 +0530")
+References: <1335276552-24340-1-git-send-email-govindraj.raja@ti.com>
+ <1335338237-4095-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <874nrr508o.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-Please pull the following cleanup/consolidation of the OMAP CPUidle
-code.  It's been reviewed and tested by Jean, Santosh and myself on
-OMAP3/4.
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> On 24xx/34xx/36xx Module level wakeup events are enabled/disabled using
+> PM_WKEN1_CORE/PM_WKEN_PER regs.
+>
+> Add api to control the module level wakeup mechanism from info provided from
+> hwmod data.
 
-Special thanks to Daniel Lezcano for this nice cleanup and
-consolidation.
+Can you rework this slightly on top of the new SoC detection support
+recently added to hwmod[1].   That series adds support for init-time, SoC
+specific function pointers for this kind of SoC specific feature.
 
 Kevin
 
-
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/cleanup/omap-cpuidle
-
-for you to fetch changes up to daa37cee791722711bf15b9635d007014e73ad3d:
-
-  ARM: OMAP3: cpuidle - check the powerdomain lookup (2012-05-04 14:07:10 -0700)
-
-----------------------------------------------------------------
-Daniel Lezcano (18):
-      ARM: OMAP4: cpuidle - Remove unused valid field
-      ARM: OMAP4: cpuidle - Declare the states with the driver declaration
-      ARM: OMAP4: cpuidle - Remove the cpuidle_params_table table
-      ARM: OMAP4: cpuidle - fix static omap4_idle_data declaration
-      ARM: OMAP4: cpuidle - Initialize omap4_idle_data at compile time
-      ARM: OMAP4: cpuidle - use the omap4_idle_data variable directly
-      ARM: OMAP4: cpuidle - remove omap4_idle_data initialization at boot time
-      ARM: OMAP3: cpuidle - remove rx51 cpuidle parameters table
-      ARM: OMAP3: define cpuidle statically
-      ARM: OMAP3: cpuidle - remove errata check in the init function
-      ARM: OMAP3: cpuidle - remove the 'valid' field
-      ARM: OMAP3: cpuidle - remove cpuidle_params_table
-      ARM: OMAP3: define statically the omap3_idle_data
-      ARM: OMAP3: cpuidle - use omap3_idle_data directly
-      ARM: OMAP3: cpuidle - simplify next_valid_state
-      ARM: OMAP3: set omap3_idle_data as static
-      ARM: OMAP3: cpuidle - set global variables static
-      ARM: OMAP3: cpuidle - check the powerdomain lookup
-
- arch/arm/mach-omap2/board-rx51.c  |   38 +++--
- arch/arm/mach-omap2/cpuidle34xx.c |  298 +++++++++++++++----------------------
- arch/arm/mach-omap2/cpuidle44xx.c |  126 +++++++---------
- arch/arm/mach-omap2/pm.h          |   21 ---
- 4 files changed, 190 insertions(+), 293 deletions(-)
+[1] git://git.pwsan.com/linux-2.6 hwmod_soc_conditional_cleanup_3.5
