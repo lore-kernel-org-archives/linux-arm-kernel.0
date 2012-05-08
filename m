@@ -1,125 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 May 2012 12:13:32 +0100
-Subject: [PATCH] Prevent process migration during vfp_init()
-In-Reply-To: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
-References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
-Message-ID: <20120508111332.GG2263@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 08 May 2012 12:19:03 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
+ <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
+Message-ID: <4FA90127.1050107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2012 at 09:28:15PM +0100, Hyungwoo Yang wrote:
-> Hello,
+On 07/05/12 23:00, Paul Gortmaker wrote:
+> On Fri, May 4, 2012 at 9:39 AM, Lee Jones<lee.jones@linaro.org>  wrote:
+>> On 04/05/12 14:26, Chris Ball wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Fri, May 04 2012, Lee Jones wrote:
+>>>>
+>>>> I can either do that, or push it through Arnd's tree if you like (and
+>>>> it's okay with him), as I will be supplying him with another pull
+>>>> request after my next patch-set has been scrutinised. Would that suit
+>>>> you better?
+>>>
+>>>
+>>> If the MMC patches are self-contained and it doesn't break anything to
+>
+> Hi All,
+>
+> The version of these patches that just appeared in linux-next is causing
+> build fails on about 5 different configs (versatile_defconfig etc).
+>
+> It isn't hard to see (with hindsight) that the new function is declared in
+> an #ifdef CONFIG_OF block, but it's callers are not similarly guarded.
+> So you get things like this:
+>
+> http://kisskb.ellerman.id.au/kisskb/buildresult/6272348/
+>
+> If you can get a fixed up version into the linux-next queue ASAP, that
+> would be great.
 
-Hi,
+I've fixed the issue. How would you like the fix?
 
-Some comments inline and a proposed v2.
+As a fix patch, or a replacement for the broken one?
 
-> From f96fc79d508235706462336239eb30d66e2e6c0b Mon Sep 17 00:00:00 2001
-> From: Hyungwoo Yang <hyungwooy@nvidia.com>
-> Date: Fri, 4 May 2012 11:22:59 -0700
-> Subject: [PATCH] System crashes if there is process migration during
-> vfp_init() call.
-> 
-> During vfp_init(), if a process which called vfp_enable() is migrated just
-> after the call, then the process executing the rest of code will access
-> a VFP unit which is not ENABLED and also smp_call_function() will not work
-> as it is expected.
-> 
-> This patch prevents accessing VFP unit disabled by preventing migration
-> and also replaces smp_call_function() with on_each_cpu() to make sure that
-> no VFP remains disabled.
-> 
-> Signed-off-by: Hyungwoo Yang <hyungwooy@nvidia.com>
-> 
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index bc683b8..6f33e4d 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -655,7 +655,9 @@ static int __init vfp_init(void)
->  {
->  	unsigned int vfpsid;
->  	unsigned int cpu_arch = cpu_architecture();
-> -
-> +#ifdef CONFIG_SMP
-> +	preempt_disable();
-> +#endif
+Kind regards,
+Lee
 
-I don't think it's worth having the SMP guards for this.
-
->  	if (cpu_arch >= CPU_ARCH_ARMv6)
->  		vfp_enable(NULL);
-
-I think we can avoid this redundant enable if we move some code around (see
-below).
-
-> @@ -667,7 +669,9 @@ static int __init vfp_init(void)
->  	vfp_vector = vfp_testing_entry;
->  	barrier();
->  	vfpsid = fmrx(FPSID);
-> -	barrier();
-> +#ifdef CONFIG_SMP
-> +	preempt_enable();
-> +#endif
-
-If we're not running a PREEMPT kernel, you just removed a compiler barrier.
-
-How about something like the following instead? I've also added a BUG_ON to
-vfp_enable to stop this catching us out in future:
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index bc683b8..8e08983 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -11,6 +11,7 @@
- #include <linux/types.h>
- #include <linux/cpu.h>
- #include <linux/cpu_pm.h>
-+#include <linux/hardirq.h>
- #include <linux/kernel.h>
- #include <linux/notifier.h>
- #include <linux/signal.h>
-@@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
- 
- static void vfp_enable(void *unused)
- {
--       u32 access = get_copro_access();
-+       u32 access;
-+
-+       BUG_ON(preemptible());
-+       access = get_copro_access();
- 
-        /*
-         * Enable full access to VFP (cp10 and cp11)
-@@ -657,18 +661,20 @@ static int __init vfp_init(void)
-        unsigned int cpu_arch = cpu_architecture();
- 
-        if (cpu_arch >= CPU_ARCH_ARMv6)
--               vfp_enable(NULL);
-+               on_each_cpu(vfp_enable, NULL, 1);
- 
-        /*
-         * First check that there is a VFP that we can use.
-         * The handler is already setup to just log calls, so
-         * we just need to read the VFPSID register.
-         */
-+       preempt_disable();
-        vfp_vector = vfp_testing_entry;
-        barrier();
-        vfpsid = fmrx(FPSID);
-        barrier();
-        vfp_vector = vfp_null_entry;
-+       preempt_enable();
- 
-        printk(KERN_INFO "VFP support v0.3: ");
-        if (VFP_arch)
-@@ -678,8 +684,6 @@ static int __init vfp_init(void)
-        } else {
-                hotcpu_notifier(vfp_hotplug, 0);
- 
--               smp_call_function(vfp_enable, NULL, 1);
--
-                VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
-                printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
-                        (vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
-
-Will
+>>> merge them separately, my preference is to merge them via the MMC tree
+>>> (to avoid creating conflicts against other MMC patches in there).
+>>>
+>>> If there are dependencies, going via Arnd instead is fine.
+>>
+>>
+>> Okay, I'll knock up a small patch-set and send it to you.
+>>
+>> I think it's 3 patches.
