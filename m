@@ -1,34 +1,86 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 13:45:23 -0700
-Subject: [PATCH 2/2] ARM: OMAP3/4: consolidate cpuidle Makefile
-In-Reply-To: <4FA98153.4050405@linaro.org> (Daniel Lezcano's message of "Tue,
- 08 May 2012 22:25:55 +0200")
-References: <1336151921-9485-1-git-send-email-daniel.lezcano@linaro.org>
- <1336151921-9485-3-git-send-email-daniel.lezcano@linaro.org>
- <4FA98153.4050405@linaro.org>
-Message-ID: <87sjfammfw.fsf@ti.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Tue, 8 May 2012 22:50:27 +0200
+Subject: mv_cesa dcache problem since 2.6.37 was: Re: mv_cesa hash
+ functions
+In-Reply-To: <20120506122506.GJ26481@n2100.arm.linux.org.uk>
+References: <20120223183439.GA18545@orbit.nwl.cc> <4FA5AE7A.3000201@gmail.com>
+ <20120506122506.GJ26481@n2100.arm.linux.org.uk>
+Message-ID: <20120508205027.GA31974@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Sun, May 06, 2012 at 01:25:06PM +0100, Russell King - ARM Linux wrote:
+> On Sun, May 06, 2012 at 12:49:30AM +0200, Simon Baatz wrote:
+> > Am 23.02.2012 19:34, schrieb Phil Sutter:
+> > > But you might suffer from another problem, which is only present on
+> > > ARM machines with VIVT cache and linux >= 2.6.37: due to commit
+> > > f8b63c1, "ARM: 6382/1: Remove superfluous flush_kernel_dcache_page()"
+> > > which prevents pages being flushed from inside the scatterlist
+> > > iterator API. This patch seems to introduce problems in other places
+> > > (namely NFS), too but I sadly did not have time to investigate this
+> > > further. I will post a possible (cryptodev-internal) solution to
+> > > cryptodev-linux-devel at gna.org, maybe this fixes the problem with
+> > > openssl. Greetings, Phil 
+> 
+> Well, the reason it has been removed is as follows:
+> 
 
-> On 05/04/2012 07:18 PM, Daniel Lezcano wrote:
->> Define a CPU_IDLE section in the makefile, declare the functions in
->> the header files conforming to the kernel coding rules and remove the
->> 'define's in the C files.
->>
->> CONFIG_PM is enabled when CPU_IDLE is enabled because the cpuidle drivers
->> use some functions from the pm subsystem.
->>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> Reviewed-by: Jean Pihet<j-pihet@ti.com>
->> ---
->
-> Hi Kevin,
->
-> you did not apply this patch. Is it something wrong with it ?
->
+Thanks for the explanation. This helped a lot.
 
-oops, the reply was still in my drafts folder... just sent.
+> > since there has been no reaction on this, I would like to bring this
+> > issue up again (I sadly don't have the expertise to investigate this
+> > further...). The issue is not limited to cryptodev, but seems to be
+> > either a problem with commit f8b63c1 or a problem in mv_cesa that was
+> > uncovered by this commit.
+> 
+> Can you reproduce it with anything else?
 
-Kevin
+No, I only have issues with mv_cesa (and NFS in the past, see below).
+ 
+> It could be a problem with the way crypto stuff works - I've never had
+> any dealings with that subsystem, so I really can't comment.  If crypto
+> uses scatterlists, and walks them with the standard API, and uses
+> scatterlists with pages which are already mapped into userspace, then
+> I can see how the above commit would make things go wrong.
+
+As Phil explained in his mail, this seems to be what happens. I have
+another question on top of his.  mv_cesa uses SG_MITER_TO_SG, whose
+function was described in the respective commit as:
+
+commit 6de7e356faf54aa75de5b624bbce28a5b776dfa8
+Author: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+Date:   Thu Jun 18 10:19:12 2009 +0200
+
+    lib/scatterlist: add a flags to signalize mapping direction
+    sg_miter_start() is currently unaware of the direction of the copy
+    process (to or from the scatter list). It is important to know the
+    direction because the page has to be flushed in case the data written
+    is seen on a different mapping in user land on cache incoherent
+    architectures.
+
+Thus, I would have expected that the scatterlist iterators do the
+necessary "magic" in the userspace mapped case.  Apparently, this is
+not the case with the changes you describe above.  
+
+Is each driver supposed to handle this case or can/should this be handled
+in a generic fashion by scatterlists?
+
+> If it's possible to reproduce with NFS, and it seems sorted in the latest
+> kernel, that's probably because something changed with NFS - NFS did for
+> a time have issues on ARM for various reasons (because of remapping kernel
+> memory into vmalloc space and expecting it to be DMA coherent...) and that
+> got fixed.  Whether that's why you're not seeing problems with v3.4-rc5,
+> I couldn't be sure unless you did a bisection between the bad and good
+> kernel versions.  That would at least allow us to confirm that that issue
+> has been properly resolved.
+
+I had no idea that I reverted f8b63c1 for so long, but you are right
+again.  The merge b9d919a4ac6cf031b8e065f82ad8f1b0c9ed74b1 (in
+2.6.38) containing:
+
+NFS: Don't use vm_map_ram() in readdir
+
+fixes my test case.
+
+
+- Simon
