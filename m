@@ -1,68 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  8 May 2012 21:46:25 +0800
-Subject: [PATCH] ARM: imx6q: register phy fixup only when CONFIG_PHYLIB is
- enabled
-In-Reply-To: <1336478520.23308.36.camel@sauron.fi.intel.com>
-References: <1336478520.23308.36.camel@sauron.fi.intel.com>
-Message-ID: <1336484785-8881-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 May 2012 13:48:14 +0000
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <4FA913BA.30908@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <20120508121940.GL15893@opensource.wolfsonmicro.com>
+ <4FA913BA.30908@linaro.org>
+Message-ID: <201205081348.14269.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It fixes the following compile error with network disabled in
-imx_v6_v7_defconfig.
+On Tuesday 08 May 2012, Lee Jones wrote:
+> This piece of code plucks pre-defined initialisation values and from the 
+> Device Tree and uses them to set-up regulator related registers on the 
+> u8500. See 'struct ab8500_regulator_reg_init ab8500_regulator_reg_init' 
+> in arch/arm/mach-ux500/board-mop500-regulators.c for reference.
+> 
+> I did run this past Arnd before writing the code and he agreed that this 
+> would be suitable; however, if you know of a better way in which I can 
+> do this, I'd be pleased to hear of it.
 
-arch/arm/mach-imx/built-in.o: In function `ksz9021rn_phy_fixup':
-imx53-dt.c:(.text+0x5f70): undefined reference to `mdiobus_write'
-imx53-dt.c:(.text+0x5f84): undefined reference to `mdiobus_write'
-imx53-dt.c:(.text+0x5f98): undefined reference to `mdiobus_write'
-imx53-dt.c:(.text+0x5fac): undefined reference to `mdiobus_write'
-imx53-dt.c:(.text+0x5fc0): undefined reference to `mdiobus_write'
-arch/arm/mach-imx/built-in.o: In function `imx6q_init_machine':
-imx53-dt.c:(.init.text+0x387c): undefined reference to `phy_register_fixup_for_uid'
-make: *** [.tmp_vmlinux1] Error 1
+It was the best approach that I could think of for this, but I'm also
+a total newbie on regulators.
 
-Reported-by: Artem Bityutskiy <dedekind1@gmail.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mach-imx6q.c |   19 +++++++++++--------
- 1 files changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index d25c5d8..2047d7d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -63,21 +63,24 @@ soft:
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
--	/* min rx data delay */
--	phy_write(phydev, 0x0b, 0x8105);
--	phy_write(phydev, 0x0c, 0x0000);
-+	if (IS_ENABLED(CONFIG_PHYLIB)) {
-+		/* min rx data delay */
-+		phy_write(phydev, 0x0b, 0x8105);
-+		phy_write(phydev, 0x0c, 0x0000);
- 
--	/* max rx/tx clock delay, min rx/tx control delay */
--	phy_write(phydev, 0x0b, 0x8104);
--	phy_write(phydev, 0x0c, 0xf0f0);
--	phy_write(phydev, 0x0b, 0x104);
-+		/* max rx/tx clock delay, min rx/tx control delay */
-+		phy_write(phydev, 0x0b, 0x8104);
-+		phy_write(phydev, 0x0c, 0xf0f0);
-+		phy_write(phydev, 0x0b, 0x104);
-+	}
- 
- 	return 0;
- }
- 
- static void __init imx6q_sabrelite_init(void)
- {
--	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-+	if (IS_ENABLED(CONFIG_PHYLIB))
-+		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
- }
- 
--- 
-1.7.5.4
+	Arnd
