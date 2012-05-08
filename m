@@ -1,65 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 12:07:40 -0700
-Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1AEC8@DBDE01.ent.ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
- <20120504223933.GX5613@atomide.com>
- <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
- <20120507191847.GJ5088@atomide.com>
- <20120507193500.GK5088@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
- <20120508154829.GS5088@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA1AEC8@DBDE01.ent.ti.com>
-Message-ID: <20120508190739.GC5088@atomide.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 9 May 2012 00:39:12 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FA94B49.5050500@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+ <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+ <4FA94B49.5050500@wwwdotorg.org>
+Message-ID: <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120508 10:04]:
-> On Tue, May 08, 2012 at 21:18:29, Tony Lindgren wrote:
-> > * Hiremath, Vaibhav <hvaibhav@ti.com> [120507 22:52]:
-> > > On Tue, May 08, 2012 at 01:05:01, Tony Lindgren wrote:
-> > > > * Tony Lindgren <tony@atomide.com> [120507 12:22]:
-> > > > > * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
-> > > > > > Hi,
-> > > > > > 
-> > > > > > On Fri, 4 May 2012, Tony Lindgren wrote:
-> > > > > > 
-> > > > > > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
-> > > > > > > Then this becomes just:
-> > > > > > > 
-> > > > > > > #ifdef CONFIG_SOC_OMAP3PLUS
-> > > > > > 
-> > > > > > We might want to consider having separate CONFIG_SOC_* values for each 
-> > > > > > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
-> > > > > > CONFIG_SOC_OMAP3630, etc.
-> > > > > 
-> > > > > Hmm but this would be in addition to the SOC specific options. The goal
-> > > > > is to cut down the ifdeffery needed all over the place to add new SoCs,
-> > > > > see the experimental patch I posted:
-> > > > > 
-> > > > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
-> > > > 
-> > > > Of course we could make this finer grained based on features
-> > > > like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
-> > > > grouping like that in mind.
-> > > > 
-> > > 
-> > > This is much better approach than both ARCH_OMAPx and SOC_OMAPxxxx.
-> > 
-> > OK good, so now the question is just what groupings we need.. Got any
-> > suggestions?
-> > 
-> 
-> Tony
-> 
-> I have submitted first round of cleanup patches in the same direction, can 
-> you please take a look at them? Most of them are trivial and should be 
-> considered for upstream.
-> 
-> I am trying to take cleanup thing one-by-one, and keep submitting them. 
-> Please let me know if you have any suggestions or pointers for me.
+On 8 May 2012 22:05, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>
+> The data doesn't need to be part of the DMA controller node in order for
+> the DMA controller driver to be the entity interpreting it.
+>
+I rather say, if the dma controller driver is the entity going to interpret the
+data, why not provide the data directly through its node at one go?
 
-Yes looking good thanks, made few comments there as you noticed.
+There is important difference between providing data via clients
+during runtime vs providing info about every client to the dmac driver
+at one go during its probe.
 
-Tony
+>
+> The advantage here is that:
+>
+> * The specifier is stored in the client, not the IRQ/GPIO/DMA
+> controller's node, so it's located right at the usage site, which
+> typically makes working out what resources a client uses easier.
+>
+A client doesn't really need some n'th channel of some m'th dma controller.
+A client simply needs one channel for transmitting data whichever
+platform it be.
+So {n,m}_channel isn't really a required resource, dma_tx is, which I  still
+specify in the client's node.
+  The fact that this information is simply fwd by the client as such to the dmac
+(via utility code), makes the ritual even more pointless.
+
+
+> This also keeps client-specific information out of the provider node,
+> allowing it to be fully generic.
+>
+A typical Samsung SoC has 2 peripheral DMA controllers and
+about 40 possible clients. Of which ~20 clients could be served by either of
+the two dmacs. Of course hardly ever a machine has 10 clients. It would be
+desirable if the dma driver doesn't populate the unused 54(32+32-10) channels,
+ presumably also reserving limited resources for each, on the machine.
+
+Consider this example ...
+A PL330 instance has 8 physical channels and 32 client i/f.
+So only 8 client reqs could be active at any time.
+PL330 doesn't provide a way to program a true LLI transfer(very useful for
+audio) using a single physical channel. However, we could emulate
+true LLI if we employ 2 physical channels for one audio channel request.
+
+Obviously, if a machine had 7 or lesser clients, one would freely employ
+2 physical channels for audio and yet not worry about starving other clients.
+How would we achieve this if the dmac driver was initialized as "fully
+generic" ?
+
+>
+>> That encoding("channel_id") would be dma
+>> controller specific and if we also manage to contain it within fixed number
+>> of bytes we could also have common helpers for fetching it,
+>
+> I don't think there's any need for it to fit into a fixed number of  bytes
+>
+Yeah, I realized that soon after posting.
+
+I think I have run out of ways to explain myself better. FWIW, I won't
+object to whatever mechanism folks decide after knowing my concerns.
+
+Best Regards,
+-Jassi
