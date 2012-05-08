@@ -1,37 +1,31 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 08 May 2012 22:25:55 +0200
-Subject: [PATCH 2/2] ARM: OMAP3/4: consolidate cpuidle Makefile
-In-Reply-To: <1336151921-9485-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1336151921-9485-1-git-send-email-daniel.lezcano@linaro.org>
- <1336151921-9485-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4FA98153.4050405@linaro.org>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Tue, 8 May 2012 20:38:35 +0000
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>	<87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 07:18 PM, Daniel Lezcano wrote:
-> Define a CPU_IDLE section in the makefile, declare the functions in
-> the header files conforming to the kernel coding rules and remove the
-> 'define's in the C files.
->
-> CONFIG_PM is enabled when CPU_IDLE is enabled because the cpuidle drivers
-> use some functions from the pm subsystem.
->
-> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
-> Reviewed-by: Jean Pihet<j-pihet@ti.com>
-> ---
 
-Hi Kevin,
+> > >> The only thing the higher-level layers might potentially need to do
+> > >> is to enable/disable AVS around transitions (e.g. when changing OPP, > > >> AVS is disabled before changing OPP and only re-enabled when the new > >> >> nominal voltage has been acheived.)
 
-you did not apply this patch. Is it something wrong with it ?
+Getting clean baseline in place is huge step but actual production interfaces will need to comprehend some OPP to AVS dependencies beyond on/off.
 
-Thanks
--- Daniel
+AVS as used in many OMAP designs (mostly > OMAP4430) do have some per OPP dependent details:
 
+- Multiple PMICs are in use. In some current designs the AVS step size is different per voltage range. At OPP change time you have to reconfigure several AVS parameters before enable.
 
+- ABB-ldo sequencing and parameters in tightly coupled with OPP and AVS enables.
 
--- 
-  <http://www.linaro.org/>  Linaro.org ? Open source software for ARM SoCs
+- Good power savings can be had in future 1.5/3.5 by adjusting nominal to calibrated-plus-margin voltage.
 
-Follow Linaro:<http://www.facebook.com/pages/Linaro>  Facebook |
-<http://twitter.com/#!/linaroorg>  Twitter |
-<http://www.linaro.org/linaro-blog/>  Blog
+Regards,
+Richard W.
