@@ -1,99 +1,115 @@
-From: jemmajones81@yahoo.co.uk (Jemma Jones)
-Date: Tue, 8 May 2012 12:47:00 +0100 (BST)
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <4FA8FADF.2070701@arm.com>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
- <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
- <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
- <4FA8FADF.2070701@arm.com>
-Message-ID: <1336477620.23126.YahooMailNeo@web132503.mail.ird.yahoo.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 8 May 2012 13:57:09 +0200
+Subject: [PATCH 4/8] mmc: mmci: Use ios_handler to save power
+In-Reply-To: <20120418134520.GA24211@n2100.arm.linux.org.uk>
+References: <1326810867-5346-1-git-send-email-ulf.hansson@stericsson.com>
+ <1326810867-5346-5-git-send-email-ulf.hansson@stericsson.com>
+ <CAMJBoFOBVXQHpjNyy7LDpXuNUbEyRosOVvuVt_MYeOrWbQutnw@mail.gmail.com>
+ <20120418134520.GA24211@n2100.arm.linux.org.uk>
+Message-ID: <4FA90A15.8020807@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
+Sorry for a late reply.
 
-> Subject: Re: Development tree for Cortex-A15?
-> 
-> On 08/05/12 11:13, Jemma Jones wrote:
->>>  Subject: Re: Development tree for Cortex-A15?
->>>> ? Any chance you can send me a .config file that works on the kernel 
-> in
->>>  this
->>>> ? branch which runs on your A15x1 FastModel?
->>> 
->>>  Coming in a private email.
->> 
->>  I didn't seem to get anything?
-> 
-> As far as I'm concerned, it was delivered:
-> 
-> 2012-05-05 13:09:33 1SQcrl-0006uI-OX <= maz@misterjones.org U=www-data 
-> P=local S=59827 id=7da4dd4bd4f768d907094ce4919bfffe at localhost
-> 2012-05-05 13:09:34 1SQcrl-0006uI-OX => jemmajones81 at yahoo.co.uk R=dnslookup 
-> T=remote_smtp H=mx-eu.mail.am0.yahoodns.net [77.238.184.241]
-> 2012-05-05 13:09:34 1SQcrl-0006uI-OX Completed
-> 
-> I'll resend it again, but you may want to check your spam folder.
+On 04/18/2012 03:45 PM, Russell King - ARM Linux wrote:
+> On Wed, Apr 18, 2012 at 01:57:27PM +0200, Vitaly Wool wrote:
+>> Hi Ulf,
+>>
+>> On Tue, Jan 17, 2012 at 3:34 PM, Ulf Hansson<ulf.hansson@stericsson.com>  wrote:
+>>> To disable a levelshifter when we are in an idle state will
+>>> decrease current consumption. We make use of the ios_handler
+>>> at runtime suspend and at regular suspend to accomplish this.
+>>>
+>>> Of course depending on the used levelshifter the decrease of
+>>> current differs. For ST6G3244ME the value is up to ~200 uA.
+>>>
+>>> Tested-by: Linus Walleij<linus.walleij@linaro.org>
+>>> Signed-off-by: Ulf Hansson<ulf.hansson@stericsson.com>
+>>> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
+>>> ---
+>>>   drivers/mmc/host/mmci.c |   19 ++++++++++++++++++-
+>>>   1 files changed, 18 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>>> index a7c8f8f..76ce2cd 100644
+>>> --- a/drivers/mmc/host/mmci.c
+>>> +++ b/drivers/mmc/host/mmci.c
+>>> @@ -1505,10 +1505,22 @@ static int mmci_save(struct amba_device *dev)
+>>>   {
+>>>         struct mmc_host *mmc = amba_get_drvdata(dev);
+>>>         unsigned long flags;
+>>> +       struct mmc_ios ios;
+>>> +       int ret = 0;
+>>>
+>>>         if (mmc) {
+>>>                 struct mmci_host *host = mmc_priv(mmc);
+>>>
+>>> +               /* Let the ios_handler act on a POWER_OFF to save power. */
+>>> +               if (host->plat->ios_handler) {
+>>> +                       memcpy(&ios,&mmc->ios, sizeof(struct mmc_ios));
+>>> +                       ios.power_mode = MMC_POWER_OFF;
+>>> +                       ret = host->plat->ios_handler(mmc_dev(mmc),
+>>> +&ios);
+>>> +                       if (ret)
+>>> +                               return ret;
+>>> +               }
+>>> +
+>>>                 spin_lock_irqsave(&host->lock, flags);
+>>>
+>>>                 /*
+>>> @@ -1527,7 +1539,7 @@ static int mmci_save(struct amba_device *dev)
+>>>                 amba_vcore_disable(dev);
+>>>         }
+>>>
+>>> -       return 0;
+>>> +       return ret;
+>>>   }
+>>>
+>>>   static int mmci_restore(struct amba_device *dev)
+>>> @@ -1550,6 +1562,11 @@ static int mmci_restore(struct amba_device *dev)
+>>>                 writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+>>>
+>>>                 spin_unlock_irqrestore(&host->lock, flags);
+>>> +
+>>> +               /* Restore settings done by the ios_handler. */
+>>> +               if (host->plat->ios_handler)
+>>> +                       host->plat->ios_handler(mmc_dev(mmc),
+>>> +&mmc->ios);
+>>>         }
+>>>
+>>>         return 0;
+>>
+>> this patch is a disaster because it cuts off the chip's power on
+>> suspend regardless of whether MMC_PM_KEEP_POWER flag has been set or
+>> not. Simply put: it breaks everything This patch therefore gets a
+>> strongest *NACK* from me.
 
-Got it, thanks!
+Agree, the ios_handler should not be called like this. In our internal 
+code base the ios_handler were only handling the levelshifter, which is 
+safe to disable in the runtim_suspend sequence. But of course, and 
+ios_handler may control power to the card as well and thus shall not be 
+called like this patch does.
 
-?
->>>> ? I'm using the boot-wrapper from
->>>> ? 
-> http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
->>>> ? semi hosting mode.
->>>> 
->>>> ? I managed to boot Android from that but I don't seem to be 
-> able to boot
->>>> ? your kernel. It just stops after the boot-wrapper says loading 
-> uImage.
->>> 
->>>  Which dts file are you using?
->> 
->>  I don't quite understand yet how the DT stuff is used. When I build the 
-> DTB files then I get vexpress-v2p-ca15-tc1.dtb in my arch/arm/boot directory. I 
-> assume that one is used then for my kernel image?
->> 
->>  My .config has all the DT stuff enabled I think:
->>  CONFIG_ARCH_VEXPRESS_DT=y
->>  CONFIG_ARM_APPENDED_DTB=y
->>  CONFIG_ARM_ATAG_DTB_COMPAT=y
->> 
->>  Or is that not correct?
-> 
-> First, you want to forget about anything TC1 related, it isn't what you need 
-> for the Fast Model.
-> 
-> Step by step instructions:
-> - Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
-> - Build your zImage
-> - From your kernel tree, run:
-> ? ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x2.dtb 
-> wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x2.dts
-> - cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
-> - Build your uImage if that's what you're using.
-> - Build your boot-wrapper as usual.
-> 
-> That should get you going.
-> 
->>  I have now updated to you latest kvm-arm-3.4 branch.
-> 
-> That's very brave of you... ;-)
-> 
->>  But the kernel still does not boot up properly, or at least I don't 
-> seem to get any output. It just goes "Uncompressing Linux... done." 
-> and then does nothing.
->>  I'm using the FastModel Cortex-A15x2 simulation.
-> 
-> Let me know if it gets better with the above. Or not.
+>
+> Thank you for backing up what I've already said about this patch (which
+> is why I stopped applying Ulf's MMC patches at this patch.)
+>
+> I've also been concerned with the mere saving and restoring of the
+> clock and power registers in this patch - something which the ARM version
+> of the primecell does not actually support.
 
+The ios_handler is not used for the ARM version so it should not be 
+causing any issue I think. But, still, according to input from Vitaly 
+above, this patch is not OK.
 
-Yep, thanks, now the kernel boots!
+I will rework this patch. Thanks for your input.
 
-Jemma
+>
+> I've said that before...
+>
+
+Kind regards
+Ulf Hansson
