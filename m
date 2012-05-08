@@ -1,69 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 09:56:51 -0700
-Subject: CPUFREQ maintainence.
-In-Reply-To: <20120430140645.GB12583@redhat.com> (Dave Jones's message of
- "Mon, 30 Apr 2012 10:06:45 -0400")
-References: <20120430140645.GB12583@redhat.com>
-Message-ID: <877gwmr4q4.fsf@ti.com>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Wed, 09 May 2012 01:00:12 +0800
+Subject: [PATCH] mfd: da9052: fix of_match_node() arguments
+In-Reply-To: <1336258968-6423-1-git-send-email-olof@lixom.net>
+References: <1336258968-6423-1-git-send-email-olof@lixom.net>
+Message-ID: <4FA9511C.5060007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Jones <davej@redhat.com> writes:
+(2012?05?06? 07:02), Olof Johansson wrote:
+> The driver calls of_match_node() with the arguments swapped.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  drivers/mfd/da9052-i2c.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
+> index d8abdb3..8410065 100644
+> --- a/drivers/mfd/da9052-i2c.c
+> +++ b/drivers/mfd/da9052-i2c.c
+> @@ -104,7 +104,7 @@ static int __devinit da9052_i2c_probe(struct i2c_client *client,
+>  		struct device_node *np = client->dev.of_node;
+>  		const struct of_device_id *deviceid;
+>  
+> -		deviceid = of_match_node(np, dialog_dt_ids);
+> +		deviceid = of_match_node(dialog_dt_ids, np);
+>  		id = (const struct i2c_device_id *)deviceid->data;
+>  	}
+>  #endif
 
-> This last few releases I've been more of a hindrance than help to getting
-> some of the patches merged upstream, so due to my lack of time, I'm considering
-> removing myself as maintainer, and having patches routed as such instead...
+Tested-by: Ying-Chun Liu <paul.liu@linaro.org>
 
-Thanks Dave for your work in maintaining the core all this time!
 
-> ARM -> Russell/relevant ARM subtree maintainers
-> x86 driver patches -> x86 at vger.kernel.org
-> (All the other archs currently supported already go through the arch trees mips/sparc etc)
-
-I will continue to handle the OMAP driver.
-
-> The core doesn't see a huge amount of change these days, I figure patches for
-> that can just go to lkml & Linus/Andrew like any other subsystem.
->
-> comments?
-
-I suppose we should we create separate MAINTAINERS entries for each of
-the drivers?
-
-If so, here's one to add the OMAP CPUfreq driver to the rest of the OMAP
-PM stuff I maintain.  I Cc'd the linux-omap list in case there are any
-objections to me adding myself.
-
-Kevin
-
->From 307f4150416c34936d7f0011d7f1b2146c13f9a0 Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@ti.com>
-Date: Tue, 8 May 2012 09:51:22 -0700
-Subject: [PATCH] MAINTAINERS: add OMAP CPUfreq driver to OMAP Power
- Management section
-
-Add the OMAP CPUFreq driver to the list of files in the OMAP Power
-Management section.
-
-I've already been maintaining this driver, this just makes it
-official.
-
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7071633..3f5212b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4788,6 +4788,7 @@ M:	Kevin Hilman <khilman@ti.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	arch/arm/*omap*/*pm*
-+F:	drivers/cpufreq/omap-cpufreq.c
- 
- OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
- M:	Rajendra Nayak <rnayak@ti.com>
--- 
-1.7.9.2
+Sorry. I don't know how my code works and tested previously.
+But your patch is definited correct.
