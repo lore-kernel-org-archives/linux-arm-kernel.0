@@ -1,68 +1,46 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 8 May 2012 09:22:27 +0530
-Subject: [PATCH V3 Resend 00/12] clk: Add non CONFIG_HAVE_CLK routines
-Message-ID: <cover.1336448639.git.viresh.kumar@st.com>
+Date: Tue, 8 May 2012 09:22:30 +0530
+Subject: [PATCH V3 Resend 03/12] i2c/i2c-pxa: Remove conditional compilation
+ of clk code
+In-Reply-To: <cover.1336448639.git.viresh.kumar@st.com>
+References: <cover.1336448639.git.viresh.kumar@st.com>
+Message-ID: <28655b8c590cefc2d6481dafd7bec6ec010b66d3.1336448639.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Viresh Kumar <viresh.linux@gmail.com>
 
-I am resending this patchset as Andrew didn't get few patches of this set. Also
-i have updated patches with Acked-by or Reviewed by of people who replied with
-these strings.
+With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+macros.
 
-Last time there were few discussion over this patchset which can be found at
+pxa i2c also has these dummy macros defined locally. Remove them as they aren't
+required anymore.
 
-http://lkml.org/lkml/2012/4/24/154
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: linux-i2c at vger.kernel.org
+---
+ drivers/i2c/busses/i2c-pxa.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-Many drivers are shared between architectures that may or may not have HAVE_CLK
-selected for them. To remove compilation errors for them we enclose clk_*()
-calls in these drivers within #ifdef CONFIG_HAVE_CLK, #endif.
-
-This patchset removes the need of these CONFIG_HAVE_CLK statements, by
-introducing dummy routines when HAVE_CLK is not selected by platforms. So,
-definition of these routines will always be available. These calls will return
-error for platforms that don't select HAVE_CLK.
-
-V2->V3:
-- Dummy routines now return NULL or 0.
-- All user drivers must fail if clk_get returned error other than NULL.
-- All user drivers don't need to validate their clk pointer before every call to
-  clk_*() routines.
-- Patches dropped earlier are again taken back, as they were following similar
-  approach to what is implemented now.
-
-Viresh Kumar (12):
-  clk: Add non CONFIG_HAVE_CLK routines
-  clk: Remove redundant depends on from drivers/Kconfig
-  i2c/i2c-pxa: Remove conditional compilation of clk code
-  usb/marvell: Remove conditional compilation of clk code
-  usb/musb: Remove conditional compilation of clk code
-  ata/pata_arasan: Remove conditional compilation of clk code
-  ata/sata_mv: Remove conditional compilation of clk code
-  net/c_can: Remove conditional compilation of clk code
-  net/stmmac: Remove conditional compilation of clk code
-  gadget/m66592: Remove conditional compilation of clk code
-  gadget/r8a66597: Remove conditional compilation of clk code
-  usb/host/r8a66597: Remove conditional compilation of clk code
-
- drivers/ata/pata_arasan_cf.c                      |   14 +--
- drivers/ata/sata_mv.c                             |   10 --
- drivers/clk/Kconfig                               |    2 -
- drivers/i2c/busses/i2c-pxa.c                      |    7 -
- drivers/net/can/c_can/c_can_platform.c            |    8 -
- drivers/net/ethernet/stmicro/stmmac/stmmac.h      |   41 -----
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c |   33 ++--
- drivers/usb/gadget/m66592-udc.c                   |    9 +-
- drivers/usb/gadget/m66592-udc.h                   |    5 -
- drivers/usb/gadget/r8a66597-udc.c                 |   11 +-
- drivers/usb/gadget/r8a66597-udc.h                 |    5 -
- drivers/usb/host/r8a66597-hcd.c                   |   12 --
- drivers/usb/host/r8a66597.h                       |    5 -
- drivers/usb/musb/musb_core.h                      |    8 -
- include/linux/clk.h                               |  168 +++++++++++++-------
- include/linux/platform_data/mv_usb.h              |    9 -
- 16 files changed, 131 insertions(+), 216 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index a997c7d..1034d93 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -41,13 +41,6 @@
+ 
+ #include <asm/irq.h>
+ 
+-#ifndef CONFIG_HAVE_CLK
+-#define clk_get(dev, id)	NULL
+-#define clk_put(clk)		do { } while (0)
+-#define clk_disable(clk)	do { } while (0)
+-#define clk_enable(clk)		do { } while (0)
+-#endif
+-
+ struct pxa_reg_layout {
+ 	u32 ibmr;
+ 	u32 idbr;
 -- 
 1.7.9
