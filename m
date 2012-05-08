@@ -1,71 +1,125 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 08 May 2012 12:08:36 +0100
-Subject: [PATCH 12/15] drivers/regulator: ab8500: Split up probe() into
- manageable pieces
-In-Reply-To: <20120507184453.GQ17002@opensource.wolfsonmicro.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-13-git-send-email-lee.jones@linaro.org>
- <20120507165838.GN17002@opensource.wolfsonmicro.com>
- <CAF2Aj3h7pgh=Kbt+M5Xd_RDRbJN7K+WbaH1+8nM2Eakb1QNpsg@mail.gmail.com>
- <20120507184453.GQ17002@opensource.wolfsonmicro.com>
-Message-ID: <4FA8FEB4.2030201@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 May 2012 12:13:32 +0100
+Subject: [PATCH] Prevent process migration during vfp_init()
+In-Reply-To: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
+References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
+Message-ID: <20120508111332.GG2263@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/12 19:44, Mark Brown wrote:
-> On Mon, May 07, 2012 at 07:04:59PM +0100, Lee Jones wrote:
->> On 7 May 2012 17:58, Mark Brown<broonie@opensource.wolfsonmicro.com>  wrote:
->
->>> This doesn't apply against current regulator code.
->
->> It doesn't? I rebased it onto -rc5 which was the latest at time of
->> submission.
->
-> This isn't a bugfix that should be rushed into Linus' tree for 3.4!
-> You're missing the best part of a release cycle of development here,
-> including at least one incompatible API change.
->
-> If you're developing new code you should always submit against the tree
-> it's supposed to be applied to; as a rule of thumb -next is a good
-> approximation though subsystems do things slightly differently,
-> especially in the creation of topic branches.  Even where the code will
-> get applied to Linus' tree then merged as a new topic branch you should
-> verify that there aren't any other changes in -next that affect it (eg,
-> an API you rely on having changed or other changes to the same file
-> which conflict with yours).
+On Fri, May 04, 2012 at 09:28:15PM +0100, Hyungwoo Yang wrote:
+> Hello,
 
-Okay, I will pull these patches out of the patch-set and rebase them 
-against -next before re-sending.
+Hi,
 
->>> Please also at least
->>> try to use changelogs that match the subsystem you're submitting
->>> against.
->
->> What do you mean? Isn't "drivers/regulator" in the subject line enough?
->
-> As I said you should use changelogs that match the subsystem you are
-> submitting against.  Essentially nothing in the regulator tree uses
-> this, as you should be able to see from inspection of the changelogs:
->
-> $ git shortlog next/master drivers/regulator | wc -l
-> 1059
-> $ git shortlog drivers/regulator | grep drivers/regulator | wc -l
-> 6
->
-> Generally everything uses "regulator: ".  You should always make an
-> effort to do this for whatever subsystem you're working with.
+Some comments inline and a proposed v2.
 
-I am happy to change the subject line to make you happy. :)
+> From f96fc79d508235706462336239eb30d66e2e6c0b Mon Sep 17 00:00:00 2001
+> From: Hyungwoo Yang <hyungwooy@nvidia.com>
+> Date: Fri, 4 May 2012 11:22:59 -0700
+> Subject: [PATCH] System crashes if there is process migration during
+> vfp_init() call.
+> 
+> During vfp_init(), if a process which called vfp_enable() is migrated just
+> after the call, then the process executing the rest of code will access
+> a VFP unit which is not ENABLED and also smp_call_function() will not work
+> as it is expected.
+> 
+> This patch prevents accessing VFP unit disabled by preventing migration
+> and also replaces smp_call_function() with on_each_cpu() to make sure that
+> no VFP remains disabled.
+> 
+> Signed-off-by: Hyungwoo Yang <hyungwooy@nvidia.com>
+> 
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index bc683b8..6f33e4d 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -655,7 +655,9 @@ static int __init vfp_init(void)
+>  {
+>  	unsigned int vfpsid;
+>  	unsigned int cpu_arch = cpu_architecture();
+> -
+> +#ifdef CONFIG_SMP
+> +	preempt_disable();
+> +#endif
 
-I'll make the requested changes and re-send early next week - as I'm off 
-this week.
+I don't think it's worth having the SMP guards for this.
 
-Kind regards,
-Lee
+>  	if (cpu_arch >= CPU_ARCH_ARMv6)
+>  		vfp_enable(NULL);
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I think we can avoid this redundant enable if we move some code around (see
+below).
+
+> @@ -667,7 +669,9 @@ static int __init vfp_init(void)
+>  	vfp_vector = vfp_testing_entry;
+>  	barrier();
+>  	vfpsid = fmrx(FPSID);
+> -	barrier();
+> +#ifdef CONFIG_SMP
+> +	preempt_enable();
+> +#endif
+
+If we're not running a PREEMPT kernel, you just removed a compiler barrier.
+
+How about something like the following instead? I've also added a BUG_ON to
+vfp_enable to stop this catching us out in future:
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index bc683b8..8e08983 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -11,6 +11,7 @@
+ #include <linux/types.h>
+ #include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
++#include <linux/hardirq.h>
+ #include <linux/kernel.h>
+ #include <linux/notifier.h>
+ #include <linux/signal.h>
+@@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
+ 
+ static void vfp_enable(void *unused)
+ {
+-       u32 access = get_copro_access();
++       u32 access;
++
++       BUG_ON(preemptible());
++       access = get_copro_access();
+ 
+        /*
+         * Enable full access to VFP (cp10 and cp11)
+@@ -657,18 +661,20 @@ static int __init vfp_init(void)
+        unsigned int cpu_arch = cpu_architecture();
+ 
+        if (cpu_arch >= CPU_ARCH_ARMv6)
+-               vfp_enable(NULL);
++               on_each_cpu(vfp_enable, NULL, 1);
+ 
+        /*
+         * First check that there is a VFP that we can use.
+         * The handler is already setup to just log calls, so
+         * we just need to read the VFPSID register.
+         */
++       preempt_disable();
+        vfp_vector = vfp_testing_entry;
+        barrier();
+        vfpsid = fmrx(FPSID);
+        barrier();
+        vfp_vector = vfp_null_entry;
++       preempt_enable();
+ 
+        printk(KERN_INFO "VFP support v0.3: ");
+        if (VFP_arch)
+@@ -678,8 +684,6 @@ static int __init vfp_init(void)
+        } else {
+                hotcpu_notifier(vfp_hotplug, 0);
+ 
+-               smp_call_function(vfp_enable, NULL, 1);
+-
+                VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
+                printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
+                        (vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
+
+Will
