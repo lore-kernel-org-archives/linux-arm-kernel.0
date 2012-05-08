@@ -1,50 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 8 May 2012 11:19:33 +0200
-Subject: [PATCH 12/13] ARM: OMAP5: Add the build support
-In-Reply-To: <20120507173749.GE5088@atomide.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
- <20120504225857.GB5613@atomide.com>
- <CAJ7qFSeJc+F5xnW+P5r89yZEZXi8k-LqqnD8R1KEUONqravNBw@mail.gmail.com>
- <20120507173749.GE5088@atomide.com>
-Message-ID: <4FA8E525.50506@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 May 2012 10:21:09 +0100
+Subject: [PATCH] ARM: SMP: prevent use of the console when using idmap_pgd
+In-Reply-To: <1336180444-26563-1-git-send-email-ccross@android.com>
+References: <1336180444-26563-1-git-send-email-ccross@android.com>
+Message-ID: <20120508092109.GB2263@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Colin,
 
-On 5/7/2012 7:37 PM, Tony Lindgren wrote:
-> * R, Sricharan<r.sricharan@ti.com>  [120506 20:39]:
->>>> +config MACH_OMAP5_SEVM
->>>> +     bool "OMAP5 sevm Board"
->>>> +     depends on ARCH_OMAP5
->>>> +
->>>>   config OMAP3_EMU
->>>>        bool "OMAP3 debugging peripherals"
->>>>        depends on ARCH_OMAP3
->>>
->>> No need for it here either. Actually, I think this whole chunk
->>> can be now left out since it's DT based?
->>> he
->>   ok, but the concern here was that without this macro
->>   the print from compress and subsequently early
->> prints appear broken.
->>
->> machine_is_omap5_sevm becomes zero without this config and
->> machine_is_xxxx is used by the macro _DEBUG_LL_ENTRY
->> uncompress.h.
->
-> Ah I see.
+Sorry for the delayed response.
 
-Mmm, still, I guess this mechanism should be deprecated with DT?
-We cannot keep creating fake board entry since we are not supposed to 
-have MACHINE_ID anymore.
-That will break DEBUG_LL for sure, but we knew about that current 
-limitation with DT.
+On Sat, May 05, 2012 at 02:14:02AM +0100, Colin Cross wrote:
+> Commit 4e8ee7de227e3ab9a72040b448ad728c5428a042 (ARM: SMP: use
+> idmap_pgd for mapping MMU enable during secondary booting)
+> switched secondary boot to use idmap_pgd, which is initialized
+> during early_initcall, instead of a page table initialized during
+> __cpu_up.  This causes idmap_pgd to contain the static mappings
+> but be missing all dynamic mappings.
+> 
+> If a console is registered that creates a dynamic mapping, the
+> printk in secondary_start_kernel will trigger a data abort on
+> the missing mapping before the exception handlers have been
+> initialized, leading to a hang.  Initial boot is not affected
+> because no consoles have been registered, and resume is usually
+> not affected because the offending console is suspended.
+> Onlining a cpu with hotplug triggers the problem.
+> 
+> A workaround is to the printk in secondary_start_kernel until
+> after the page tables have been switched back to init_mm.
 
-The point is that we should fix the code to stop relying on a machine id 
-going forward.
-And maybe we can parse the FDT at that time?
+You missed a word out here (`delay'?) but it looks like Russell has taken
+this now so I'm sure we'll cope.
 
-Regards,
-Benoit
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
