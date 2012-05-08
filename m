@@ -1,64 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 15:50:06 -0700
-Subject: [PATCH-V2 4/4] ARM: OMAP2+: CLEANUP: Add new config option for
- different DPLL features
-In-Reply-To: <1336506724-5494-5-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Wed, 9 May 2012 01:22:04 +0530")
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-5-git-send-email-hvaibhav@ti.com>
-Message-ID: <87ehqui8yp.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2012 16:16:54 -0700
+Subject: [RESEND PATCH 1/2] ARM: OMAP2+: nand: Make
+ board_onenand_init() visible to board code
+In-Reply-To: <CABxcv=kXukrVYOzjrMGoWzi=GTefh8EsXnTwzcahsfLa1a6Kaw@mail.gmail.com>
+References: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
+ <CAFqH_52aiDvR_xHY6TUN7igMiq6EqB-Nx9D=sPMCUeUaKLiuQg@mail.gmail.com>
+ <CABxcv=kXukrVYOzjrMGoWzi=GTefh8EsXnTwzcahsfLa1a6Kaw@mail.gmail.com>
+Message-ID: <20120508231653.GP5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+* Javier Martinez Canillas <javier@dowhile0.org> [120427 02:33]:
+> On Wed, Apr 25, 2012 at 9:59 AM, Enric Balletb? i Serra
+> <eballetbo@gmail.com> wrote:
+> >
+> > Tony, as this is a fix ,may be included ?
+> >
+> > Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> > Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> >
+> > Cheers,
+> > ? ?Enric
+> 
+> Hi Tony, Russel:
+> 
+> This patch is a requirement for patch:
+> 
+> [RESEND PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND Flash
+> storage memory
+> 
+> which is really important since newer IGEPv2 boards have changed their
+> flash memory from OneNAND to NAND.
+> 
+> This patch-set is necessary to make the board work, otherwise it
+> doesn't even boot.
+> 
+> Could we please include these patches?
 
-> This patch cleans up dpll_data structure, making structure
-> fields definition based on feature availability for given SoC,
-> managed using Kconfig rules.
->
-> SOC_HAS_OMAP3_DPLL_IDLE: idle state
-> SOC_HAS_OMAP3_DPLL_RECAL: recalibration capability
-> SOC_HAS_OMAP3_DPLL_DCO_SEL: dco selection
-> SOC_HAS_OMAP3_DPLL_SDDIV: sigma-delta div factor
-> SOC_HAS_OMAP3_DPLL_FREQSEL: frequency selection
->
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+Thanks for the patience, applying now into board branch finally.
 
-Paul is the one to make the call here, but personally I'd much prefer to
-just see the existing ifdefs go away[1] instead of adding a bunch of new
-ones.  
+Regards,
 
-Yes, doing so would add a few fields to a struct that may be unused, but
-IMO, the improvement in readabilitly and maintainability is improved.
-
-Note that the users of these fields are not changed and are still based
-on Kconfig/Makefile values as before (e.g. CONFIG_ARCH_OMAP3), so to me
-this creates another layer of obfuscation.
-
-Kevin
-
-
-[1]
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index d0ef57c..656b986 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -156,7 +156,6 @@ struct dpll_data {
- 	u8			min_divider;
- 	u16			max_divider;
- 	u8			modes;
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
- 	void __iomem		*autoidle_reg;
- 	void __iomem		*idlest_reg;
- 	u32			autoidle_mask;
-@@ -167,7 +166,6 @@ struct dpll_data {
- 	u8			auto_recal_bit;
- 	u8			recal_en_bit;
- 	u8			recal_st_bit;
--#  endif
- 	u8			flags;
- };
- 
+Tony
