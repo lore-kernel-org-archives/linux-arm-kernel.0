@@ -1,20 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 16:54:29 -0700
-Subject: [PATCH 2/2] OMAP4: devices: Do not create mcpdm device if the
- dtb has been provided
-In-Reply-To: <1335961399-18345-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1335961399-18345-1-git-send-email-peter.ujfalusi@ti.com>
- <1335961399-18345-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120508235428.GW5088@atomide.com>
+Date: Tue, 8 May 2012 16:57:49 -0700
+Subject: [PATCH 1/3] OMAP4: twl-common: Add twl6030 V1V8, V2V1 SMPS
+ common configuration
+In-Reply-To: <1335966276-19775-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1335966276-19775-1-git-send-email-peter.ujfalusi@ti.com>
+ <1335966276-19775-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120508235748.GX5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* nb6g3dENgvI <peter.ujfalusi@ti.com> [120502 05:26]:
-> From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> If dtb is provided the needed device will be created dynamically.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120502 06:48]:
+> V1V8 supply from twl6030 commonly used as VIO for the machine.
+> V2V1 is adviced to supply the twl6040, and also to feed the twl6030's
+> VCXIO_IN, and VDAC_IN inputs.
+> Create the common regulator configurations for these regulators:
+> Make the V2V1 as supply_regulator for VCXIO, VDAC.
+> Add twl6040 (1-004b) as consumer for V1V8, and V2V1.
 
-Thanks applying both into dt branch.
+Looks like this needs to be refreshed, it does not seem to apply.
+Can you update against v3.4-rc6 and check the others too?
 
 Regards,
 
