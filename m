@@ -1,162 +1,101 @@
-From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
-Date: Tue,  8 May 2012 21:48:18 +0530
-Subject: [PATCH v3 6/6] ARM: exynos: Add thermal sensor driver platform data
- support
-In-Reply-To: <1336493898-7039-6-git-send-email-amit.kachhap@linaro.org>
-References: <1336493898-7039-1-git-send-email-amit.kachhap@linaro.org>
- <1336493898-7039-2-git-send-email-amit.kachhap@linaro.org>
- <1336493898-7039-3-git-send-email-amit.kachhap@linaro.org>
- <1336493898-7039-4-git-send-email-amit.kachhap@linaro.org>
- <1336493898-7039-5-git-send-email-amit.kachhap@linaro.org>
- <1336493898-7039-6-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <1336493898-7039-7-git-send-email-amit.kachhap@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 08 May 2012 10:35:21 -0600
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+ <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+Message-ID: <4FA94B49.5050500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds necessary default platform data support needed for TMU driver.
-This dt/non-dt values are tested for origen exynos4210 and smdk exynos5250 platforms.
+On 05/07/2012 11:19 AM, Jassi Brar wrote:
+> On 7 May 2012 21:23, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 05/05/2012 11:10 AM, Jassi Brar wrote:
+>>
+>>> Hmm... there ought to be a way by which a client is handed a random 'token'
+>>> via its dt node and similarly the dmac informed which channel (and with what
+>>> capabilities) to allocate should it see a request coming with that token.
+>>
+>> I think that's the whole point of the patch.
+>>
+>> However, the token needs to be some driver-specific struct, since the
+>> required information may be more than just a single channel or request
+>> ID in general.
+>>
+> Well, what I call 'token' could just as well be some numerical hash of
+> what you call 'driver-specific struct'.
+> And I never thought we could do without h/w specific information,
+> just that peculiarities lie with the dmac controllers and that's where
+> the discerning should happen.
+> 
+> Our opinions differ in that, I believe client side shouldn't need to
+> parse/decode the h/w specific parameters from data gotten via DT
+> (what I call 'token' and you 'driver-specific struct') - because that is
+> the key to having common client drivers working with different dma
+> controllers. And yes, I don't think we could find a future proof generic
+> and simple enough representation of dma resource specification in a
+> DT node :)
 
-Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
----
- drivers/thermal/exynos_thermal.c |  107 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 106 insertions(+), 1 deletions(-)
+Yes, I don't believe that follows.
 
-diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
-index f818432..3471d9d 100644
---- a/drivers/thermal/exynos_thermal.c
-+++ b/drivers/thermal/exynos_thermal.c
-@@ -646,14 +646,117 @@ static irqreturn_t exynos_tmu_irq(int irq, void *id)
- static struct thermal_sensor_conf exynos_sensor_conf = {
- 	.name			= "exynos-therm",
- 	.read_temperature	= (int (*)(void *))exynos_tmu_read,
-+};
-+
-+#if defined(CONFIG_CPU_EXYNOS4210)
-+static struct exynos_tmu_platform_data exynos4_default_tmu_data = {
-+	.threshold = 80,
-+	.trigger_levels[0] = 5,
-+	.trigger_levels[1] = 20,
-+	.trigger_levels[2] = 30,
-+	.trigger_level0_en = 1,
-+	.trigger_level1_en = 1,
-+	.trigger_level2_en = 1,
-+	.trigger_level3_en = 0,
-+	.gain = 15,
-+	.reference_voltage = 7,
-+	.cal_type = TYPE_ONE_POINT_TRIMMING,
-+	.freq_tab[0] = {
-+		.freq_clip_max = 800 * 1000,
-+	},
-+	.freq_tab[1] = {
-+		.freq_clip_max = 200 * 1000,
-+	},
-+	.freq_tab_count = 2,
-+	.type = SOC_ARCH_EXYNOS4,
-+};
-+#define EXYNOS4_TMU_DRV_DATA ((kernel_ulong_t)&exynos4_default_tmu_data)
-+#else
-+#define EXYNOS4_TMU_DRV_DATA ((kernel_ulong_t)NULL)
-+#endif
-+
-+#if defined(CONFIG_SOC_EXYNOS5250)
-+static struct exynos_tmu_platform_data exynos5_default_tmu_data = {
-+	.trigger_levels[0] = 85,
-+	.trigger_levels[1] = 103,
-+	.trigger_levels[2] = 110,
-+	.trigger_level0_en = 1,
-+	.trigger_level1_en = 1,
-+	.trigger_level2_en = 1,
-+	.trigger_level3_en = 0,
-+	.gain = 8,
-+	.reference_voltage = 16,
-+	.noise_cancel_mode = 4,
-+	.cal_type = TYPE_ONE_POINT_TRIMMING,
-+	.efuse_value = 55,
-+	.freq_tab[0] = {
-+		.freq_clip_max = 800 * 1000,
-+	},
-+	.freq_tab[1] = {
-+		.freq_clip_max = 200 * 1000,
-+	},
-+	.freq_tab_count = 2,
-+	.type = SOC_ARCH_EXYNOS5,
-+};
-+#define EXYNOS5_TMU_DRV_DATA ((kernel_ulong_t)&exynos5_default_tmu_data)
-+#else
-+#define EXYNOS5_TMU_DRV_DATA ((kernel_ulong_t)NULL)
-+#endif
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id exynos_tmu_match[] = {
-+	{
-+		.compatible = "samsung,exynos4-tmu",
-+		.data = (void *)EXYNOS4_TMU_DRV_DATA,
-+	},
-+	{
-+		.compatible = "samsung,exynos5-tmu",
-+		.data = (void *)EXYNOS5_TMU_DRV_DATA,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, exynos_tmu_match);
-+#else
-+#define  exynos_tmu_match NULL
-+#endif
-+
-+static struct platform_device_id exynos_tmu_driver_ids[] = {
-+	{
-+		.name		= "exynos4-tmu",
-+		.driver_data    = EXYNOS4_TMU_DRV_DATA,
-+	},
-+	{
-+		.name		= "exynos5-tmu",
-+		.driver_data    = EXYNOS5_TMU_DRV_DATA,
-+	},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(platform, exynos4_tmu_driver_ids);
-+
-+static inline struct  exynos_tmu_platform_data *exynos_get_driver_data(
-+			struct platform_device *pdev)
-+{
-+#ifdef CONFIG_OF
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(exynos_tmu_match, pdev->dev.of_node);
-+		if (!match)
-+			return NULL;
-+		return (struct exynos_tmu_platform_data *) match->data;
-+	}
-+#endif
-+	return (struct exynos_tmu_platform_data *)
-+			platform_get_device_id(pdev)->driver_data;
- }
--;
- static int __devinit exynos_tmu_probe(struct platform_device *pdev)
- {
- 	struct exynos_tmu_data *data;
- 	struct exynos_tmu_platform_data *pdata = pdev->dev.platform_data;
- 	int ret, i;
- 
-+	if (!pdata)
-+		pdata = exynos_get_driver_data(pdev);
-+
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "No platform init data supplied.\n");
- 		return -ENODEV;
-@@ -813,11 +916,13 @@ static struct platform_driver exynos_tmu_driver = {
- 	.driver = {
- 		.name   = "exynos-tmu",
- 		.owner  = THIS_MODULE,
-+		.of_match_table = exynos_tmu_match,
- 	},
- 	.probe = exynos_tmu_probe,
- 	.remove	= __devexit_p(exynos_tmu_remove),
- 	.suspend = exynos_tmu_suspend,
- 	.resume = exynos_tmu_resume,
-+	.id_table = exynos_tmu_driver_ids,
- };
- 
- module_platform_driver(exynos_tmu_driver);
--- 
-1.7.1
+The data doesn't need to be part of the DMA controller node in order for
+the DMA controller driver to be the entity interpreting it.
+
+In many existing DT bindings, the structure of the client's property is:
+
+phandle specifier
+
+... all possibly repeated n times if you need to represent n resources,
+like n interrupts, n GPIOs, n DMA channels/...)
+
+... where specifier is some arbitrary sequence of cells, whose size and
+format are entirely determined by the driver for the node referred to by
+phandle.
+
+The parsing of this whole construct is hidden inside some utility code,
+so clients simply call e.g. of_get_gpio(), which internally calls a
+function in the relevant GPIO driver (as specified by the phandle) to
+parse the specifier, and return whatever representation of that
+specifier is required for the client to either use directly (e.g. GPIO
+ID to pass to gpio_request()) or pass back to the relevant APIs for the
+driver's subsystem (e.g. complete possibly driver-specific DMA
+filter/data representation for dmaengine).
+
+The advantage here is that:
+
+* The specifier is stored in the client, not the IRQ/GPIO/DMA
+controller's node, so it's located right at the usage site, which
+typically makes working out what resources a client uses easier. This
+also keeps client-specific information out of the provider node,
+allowing it to be fully generic.
+
+* The client doesn't know anything about the format of "specifier",
+since the provider driver parses it, so clients can still work with
+arbitrary providers of resources.
+
+> Instead, I suggest we encode the finer details of each channel-request
+> in node of the dma controller matched against the 'token' assigned
+> to the respective clients.
+
+Well, I guess I addressed that above - there's no need for the data to
+be in the DMA controller node for the DMA controller driver to parse it.
+
+> That encoding("channel_id") would be dma
+> controller specific and if we also manage to contain it within fixed number
+> of bytes we could also have common helpers for fetching it,
+
+I don't think there's any need for it to fit into a fixed number of
+bytes; the parsing routine can simply return a pointer to a
+driver-specific structure (or perhaps a dmaengine-defined structure,
+which in turn might contain a pointer to a driver-specific structure).
+That would allow complete flexibility in the representation of the
+driver-specific data.
+
+> though
+> it still would need to be decoded by dmac controller driver - which I think
+> we can't do without, considering the variety of dma floating around.
