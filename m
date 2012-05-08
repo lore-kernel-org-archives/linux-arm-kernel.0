@@ -1,55 +1,30 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 8 May 2012 09:10:24 +0530
-Subject: [PATCH V3 0/5] pinctrl: SPEAr Updates
-Message-ID: <cover.1336448307.git.viresh.kumar@st.com>
+Date: Tue, 8 May 2012 09:10:26 +0530
+Subject: [PATCH V3 2/5] pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
+In-Reply-To: <cover.1336448307.git.viresh.kumar@st.com>
+References: <cover.1336448307.git.viresh.kumar@st.com>
+Message-ID: <3c578d3031b2b5ec6ecd05db65a925cb13e66ed0.1336448307.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/spear/pinctrl-spear1310.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-This patchset mainly focuses on providing support to configure SPEAr pads as
-gpios. For this i have added a gpiolib based driver and few changes in other
-SPEAr pinctrl drivers.
-
-It also contains minor fixes.
-
-V2->V3:
-- Created Macros for spear_gpio_pingroups as suggested by Linus and Arnd.
-- Included Acked-by from Linus
-
-V1->V2:
-- Passing gpio node via DT. Patch for this support in gpiolib is
-  gpiolib: Add of_get_gpio_chip_by_phandle() helper
-- Other minor fixes
-
-Viresh Kumar (5):
-  pinctrl: SPEAr: Don't set all non muxreg bits on pinctrl_disable
-  pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
-  pinctrl: SPEAr: Add plgpio driver
-  pinctrl: SPEAr: Add gpio ranges support
-  SPEAr: Add plgpio node in device tree dtsi files
-
- arch/arm/boot/dts/spear1310-evb.dts       |    4 +
- arch/arm/boot/dts/spear1310.dtsi          |   22 +
- arch/arm/boot/dts/spear1340-evb.dts       |    4 +
- arch/arm/boot/dts/spear1340.dtsi          |   21 +
- arch/arm/boot/dts/spear310-evb.dts        |    4 +
- arch/arm/boot/dts/spear310.dtsi           |   15 +
- arch/arm/boot/dts/spear320-evb.dts        |    4 +
- arch/arm/boot/dts/spear320.dtsi           |   16 +
- drivers/pinctrl/spear/Kconfig             |   11 +
- drivers/pinctrl/spear/Makefile            |    1 +
- drivers/pinctrl/spear/pinctrl-plgpio.c    |  738 +++++++++++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear.c     |  110 ++++-
- drivers/pinctrl/spear/pinctrl-spear.h     |   26 +
- drivers/pinctrl/spear/pinctrl-spear1310.c |  182 +++++++-
- drivers/pinctrl/spear/pinctrl-spear1340.c |    8 +
- drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear3xx.c  |   29 ++
- 19 files changed, 1188 insertions(+), 13 deletions(-)
- create mode 100644 drivers/pinctrl/spear/pinctrl-plgpio.c
-
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
+index 12b094d..fff168b 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
+@@ -437,7 +437,7 @@ static struct spear_pingroup clcd_pingroup = {
+ };
+ 
+ static const unsigned clcd_high_res_pins[] = { 30, 31, 32, 33, 34, 35, 36, 37,
+-	38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52 };
++	38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53 };
+ static struct spear_muxreg clcd_high_res_muxreg[] = {
+ 	{
+ 		.reg = PAD_FUNCTION_EN_1,
 -- 
 1.7.9
