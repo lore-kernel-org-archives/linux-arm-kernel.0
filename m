@@ -1,71 +1,58 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 May 2012 14:17:49 +0200
-Subject: [PATCH 1/2] clockevents: add an optional frequency update function
-Message-ID: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 8 May 2012 14:18:01 +0200
+Subject: [PATCH 2/2] ARM: smp_twd: use the .update_freq() for periodic mode
+Message-ID: <1336479481-9281-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-For some clockevents, especially for periodic ones, we get a
-problem when the frequency of the clock driving the event
-changes. We previously have a solution for one-shot events
-that will simply reprogram the next event. This introduces
-an optional callback so that drivers can update constant
-timer latch values derived from HZ.
+When the SMP TWD timer is in periodic mode, the frequency update
+function will need to call into the driver to update the periodic
+latch value.
 
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- include/linux/clockchips.h |    3 +++
- kernel/time/clockevents.c  |    8 ++++++--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/kernel/smp_twd.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 81e803e..c83d008 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -70,6 +70,7 @@ enum clock_event_nofitiers {
-  * @features:		features
-  * @retries:		number of forced programming retries
-  * @set_mode:		set mode function
-+ * @update_freq:	function called to update timer clock frequency
-  * @broadcast:		function to broadcast events
-  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
-  * @max_delta_ticks:	maximum delta value in ticks stored for reconfiguration
-@@ -97,6 +98,8 @@ struct clock_event_device {
- 	void			(*broadcast)(const struct cpumask *mask);
- 	void			(*set_mode)(enum clock_event_mode mode,
- 					    struct clock_event_device *);
-+	void			(*update_freq)(enum clock_event_mode mode,
-+					    struct clock_event_device *);
- 	unsigned long		min_delta_ticks;
- 	unsigned long		max_delta_ticks;
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index fef42b2..7bb2e31 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -74,6 +74,23 @@ static int twd_set_next_event(unsigned long evt,
+ 	return 0;
+ }
  
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 9cd928f..0444bad 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -346,13 +346,17 @@ void clockevents_config_and_register(struct clock_event_device *dev,
-  * @dev:	device to modify
-  * @freq:	new device frequency
-  *
-- * Reconfigure and reprogram a clock event device in oneshot
-- * mode. Must be called on the cpu for which the device delivers per
-+ * Reconfigure and reprogram a clock event device.
-+ * Must be called on the cpu for which the device delivers per
-  * cpu timer events with interrupts disabled!  Returns 0 on success,
-  * -ETIME when the event is in the past.
-  */
- int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
- {
-+	/* Call down to the driver to reconfigure for new frequency */
-+	if (dev->update_freq)
-+		dev->update_freq(dev->mode, dev);
++static void twd_update_freq(enum clock_event_mode mode,
++			    struct clock_event_device *clk)
++{
++	/*
++	 * The only thing we need to handle here is for the periodic mode,
++	 * where the loaded value needs to be reprogrammed so the new
++	 * frequency is used for the next event.
++	 */
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
++		break;
++	default:
++		break;
++	}
++}
 +
- 	clockevents_config(dev, freq);
+ /*
+  * local_timer_ack: checks for a local timer interrupt.
+  *
+@@ -245,6 +262,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
++	clk->update_freq = twd_update_freq;
+ 	clk->irq = twd_ppi;
  
- 	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
+ 	this_cpu_clk = __this_cpu_ptr(twd_evt);
 -- 
 1.7.9.2
