@@ -1,44 +1,37 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 8 May 2012 05:49:13 +0000
-Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <20120507193500.GK5088@atomide.com>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Tue, 8 May 2012 11:34:05 +0530
+Subject: [PATCH 07/13] ARM: OMAP5: l3: Add l3 error handler support for
+ omap5.
+In-Reply-To: <20120507173430.GC5088@atomide.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
- <20120504223933.GX5613@atomide.com>
- <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
- <20120507191847.GJ5088@atomide.com> <20120507193500.GK5088@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
+ <1336029982-31898-8-git-send-email-r.sricharan@ti.com>
+ <20120504225153.GZ5613@atomide.com>
+ <CAJ7qFSek4h78wHdwdb-h6UZNqUofT03PTm8LN66WQgdKyp5Y+A@mail.gmail.com>
+ <20120507173430.GC5088@atomide.com>
+Message-ID: <CAJ7qFSdE50KH0YdyiiDccPZ9oduM4ktwXDm+h2OvgXRvmm-LAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2012 at 01:05:01, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [120507 12:22]:
-> > * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
-> > > Hi,
-> > > 
-> > > On Fri, 4 May 2012, Tony Lindgren wrote:
-> > > 
-> > > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
-> > > > Then this becomes just:
-> > > > 
-> > > > #ifdef CONFIG_SOC_OMAP3PLUS
-> > > 
-> > > We might want to consider having separate CONFIG_SOC_* values for each 
-> > > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
-> > > CONFIG_SOC_OMAP3630, etc.
-> > 
-> > Hmm but this would be in addition to the SOC specific options. The goal
-> > is to cut down the ifdeffery needed all over the place to add new SoCs,
-> > see the experimental patch I posted:
-> > 
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
-> 
-> Of course we could make this finer grained based on features
-> like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
-> grouping like that in mind.
-> 
+Tony,
 
-This is much better approach than both ARCH_OMAPx and SOC_OMAPxxxx.
+On Mon, May 7, 2012 at 11:04 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * R, Sricharan <r.sricharan@ti.com> [120506 00:42]:
+>> Hi Tony,
+>>
+>> >> - ? ? if (!(cpu_is_omap44xx()))
+>> >> + ? ? if ((!(cpu_is_omap44xx())) && (!cpu_is_omap54xx()))
+>> >> ? ? ? ? ? ? ? return -ENODEV;
+>> >>
+>> >> ? ? ? for (i = 0; i < L3_MODULES; i++) {
+>> >
+>> > Isn't there some unnecessary parens here?
+>>
+>> ?You mean in this above for loop?.
+>> ?There are multiple statements .
+>
+> No, both the old (!(cpu_is_omap44xx())) and the added one.
+>
+  oh ok, will remove those extra ones. Thanks.
 
 Thanks,
-Vaibhav
+ Sricharan
