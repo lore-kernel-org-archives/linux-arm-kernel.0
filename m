@@ -1,107 +1,40 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 8 May 2012 09:22:37 +0530
-Subject: [PATCH V3 Resend 10/12] gadget/m66592: Remove conditional compilation
- of clk code
+Date: Tue, 8 May 2012 09:22:29 +0530
+Subject: [PATCH V3 Resend 02/12] clk: Remove redundant depends on from
+ drivers/Kconfig
 In-Reply-To: <cover.1336448639.git.viresh.kumar@st.com>
 References: <cover.1336448639.git.viresh.kumar@st.com>
-Message-ID: <60e6ca8b7d1458bf28181bad71c6fd006fbc9e6d.1336448639.git.viresh.kumar@st.com>
+Message-ID: <c0b4b679ea0b0fd7c46ff1fddf4eebc91850a536.1336448639.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
-there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
-macros.
+menu "Common Clock Framework" has "depends on COMMON_CLK" and so configs defined
+within menu don't require these "depends on COMMON_CLK again".
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/gadget/m66592-udc.c |    9 +--------
- drivers/usb/gadget/m66592-udc.h |    5 -----
- 2 files changed, 1 insertions(+), 13 deletions(-)
+ drivers/clk/Kconfig |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/m66592-udc.c b/drivers/usb/gadget/m66592-udc.c
-index 3608b3b..51c24d2 100644
---- a/drivers/usb/gadget/m66592-udc.c
-+++ b/drivers/usb/gadget/m66592-udc.c
-@@ -1583,12 +1583,10 @@ static int __exit m66592_remove(struct platform_device *pdev)
- 	iounmap(m66592->reg);
- 	free_irq(platform_get_irq(pdev, 0), m66592);
- 	m66592_free_request(&m66592->ep[0].ep, m66592->ep0_req);
--#ifdef CONFIG_HAVE_CLK
- 	if (m66592->pdata->on_chip) {
- 		clk_disable(m66592->clk);
- 		clk_put(m66592->clk);
- 	}
--#endif
- 	kfree(m66592);
- 	return 0;
- }
-@@ -1602,9 +1600,7 @@ static int __init m66592_probe(struct platform_device *pdev)
- 	struct resource *res, *ires;
- 	void __iomem *reg = NULL;
- 	struct m66592 *m66592 = NULL;
--#ifdef CONFIG_HAVE_CLK
- 	char clk_name[8];
--#endif
- 	int ret = 0;
- 	int i;
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 165e1fe..4f10a21 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -24,7 +24,6 @@ menu "Common Clock Framework"
  
-@@ -1671,7 +1667,6 @@ static int __init m66592_probe(struct platform_device *pdev)
- 		goto clean_up;
- 	}
+ config COMMON_CLK_DISABLE_UNUSED
+ 	bool "Disabled unused clocks at boot"
+-	depends on COMMON_CLK
+ 	---help---
+ 	  Traverses the entire clock tree and disables any clocks that are
+ 	  enabled in hardware but have not been enabled by any device drivers.
+@@ -35,7 +34,6 @@ config COMMON_CLK_DISABLE_UNUSED
  
--#ifdef CONFIG_HAVE_CLK
- 	if (m66592->pdata->on_chip) {
- 		snprintf(clk_name, sizeof(clk_name), "usbf%d", pdev->id);
- 		m66592->clk = clk_get(&pdev->dev, clk_name);
-@@ -1683,7 +1678,7 @@ static int __init m66592_probe(struct platform_device *pdev)
- 		}
- 		clk_enable(m66592->clk);
- 	}
--#endif
-+
- 	INIT_LIST_HEAD(&m66592->gadget.ep_list);
- 	m66592->gadget.ep0 = &m66592->ep[0].ep;
- 	INIT_LIST_HEAD(&m66592->gadget.ep0->ep_list);
-@@ -1731,13 +1726,11 @@ err_add_udc:
- 	m66592_free_request(&m66592->ep[0].ep, m66592->ep0_req);
- 
- clean_up3:
--#ifdef CONFIG_HAVE_CLK
- 	if (m66592->pdata->on_chip) {
- 		clk_disable(m66592->clk);
- 		clk_put(m66592->clk);
- 	}
- clean_up2:
--#endif
- 	free_irq(ires->start, m66592);
- clean_up:
- 	if (m66592) {
-diff --git a/drivers/usb/gadget/m66592-udc.h b/drivers/usb/gadget/m66592-udc.h
-index 9d9f7e3..a044ad3 100644
---- a/drivers/usb/gadget/m66592-udc.h
-+++ b/drivers/usb/gadget/m66592-udc.h
-@@ -13,10 +13,7 @@
- #ifndef __M66592_UDC_H__
- #define __M66592_UDC_H__
- 
--#ifdef CONFIG_HAVE_CLK
- #include <linux/clk.h>
--#endif
--
- #include <linux/usb/m66592.h>
- 
- #define M66592_SYSCFG		0x00
-@@ -468,9 +465,7 @@ struct m66592_ep {
- struct m66592 {
- 	spinlock_t		lock;
- 	void __iomem		*reg;
--#ifdef CONFIG_HAVE_CLK
- 	struct clk *clk;
--#endif
- 	struct m66592_platdata	*pdata;
- 	unsigned long		irq_trigger;
- 
+ config COMMON_CLK_DEBUG
+ 	bool "DebugFS representation of clock tree"
+-	depends on COMMON_CLK
+ 	select DEBUG_FS
+ 	---help---
+ 	  Creates a directory hierchy in debugfs for visualizing the clk
 -- 
 1.7.9
