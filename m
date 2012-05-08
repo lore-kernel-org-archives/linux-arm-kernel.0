@@ -1,49 +1,44 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 8 May 2012 06:27:18 +0000
-Subject: [PATCH v4 01/39] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4FA7F706.1020706@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <363273a9ef82d6836197929157aa9a8eb8f5171a.1335874494.git.afzal@ti.com>
- <4FA022FC.5040703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E982967@DBDE01.ent.ti.com>
- <4FA401C0.7070503@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E98712C@DBDE01.ent.ti.com>
- <4FA7F706.1020706@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E98792A@DBDE01.ent.ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 08 May 2012 10:03:25 +0300
+Subject: [PATCH v2 3.4-rc6] MTD: NAND: ams-delta: fix
+ request_mem_region() failure
+In-Reply-To: <1336423897-31729-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <20120504171125.GD5613@atomide.com>
+ <1336423897-31729-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <1336460605.23308.8.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Mon, 2012-05-07 at 22:51 +0200, Janusz Krzysztofik wrote:
+> A call to request_mem_region() has been introduced in the omap-gpio
+> driver recently (commit 96751fcbe5438e95514b025e9cee7a6d38038f40,
+> "gpio/omap: Use devm_ API and add request_mem_region"). This change
+> prevented the Amstrad Delta NAND driver, which was doing the same in
+> order to take control over OMAP MPU I/O lines that the NAND device hangs
+> off, from loading successfully.
 
-On Mon, May 07, 2012 at 21:53:34, Hunter, Jon wrote:
+Aiaiai found out that your patch adds this gcc warning:
 
-> >>>> Write protect is a pin and there is only one. Like the waitpins and CS
-> >>>> signals this needs to be associated with a device. It would make sense
-> >>>> that this is associated with the cs data.
-> >>>
-> >>> As far as platform are concerned, it is associated with cs, it is only
-> >>> that while configuring CS, it is propagated such that it is done once.
-> >>
-> >> Hmmm ... but here it looks like if write-protect is used you are going
-> >> to turn it on. A feature like this seems that it does need to be handled
-> >> by the device's driver. Enabling and disabling write-protect are
-> >> functions that I would expect are exported to the device's driver and
-> >> not directly enabled in the gpmc driver during probe. However, maybe is
-> >> could be valid for the write protect to be enabled by default which
-> >> could make sense. However, I don't see anywhere else in the driver to
-> >> control it.
-> >>
-> >> Shouldn't we warn on multiple devices trying to use write-protect when
-> >> parsing their configuration?
-> > 
-> > Even if a single device sets write protect, kernel will log it.
-> 
-> That does not seem sufficient. It should be flagged as an error.
-> 
-> Write protect is a resource like the CS and waitpins and so I would have
-> thought that it should be reserved in the same way.
+--------------------------------------------------------------------------------
 
-Isn't it valid for multiple devices to make use of write protect pin ?
+Successfully built configuration "l2_omap1_defconfig,arm,arm-unknown-linux-gnueabi-", results:
 
-Regards
-Afzal
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/nand/ams-delta.c: In function 'ams_delta_cleanup':
++drivers/mtd/nand/ams-delta.c:285:19: warning: unused variable 'res' [-Wunused-variable]
+
+--------------------------------------------------------------------------------
+
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120508/12743195/attachment.sig>
