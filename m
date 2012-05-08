@@ -1,78 +1,149 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 May 2012 11:52:15 +0100
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
- <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
- <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
-Message-ID: <4FA8FADF.2070701@arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 8 May 2012 13:01:19 +0200
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <87k40nzi3i.fsf@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
+ <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+Message-ID: <4FA8FCFF.40105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/12 11:13, Jemma Jones wrote:
->> Subject: Re: Development tree for Cortex-A15?
->>>  Any chance you can send me a .config file that works on the kernel in
->> this
->>>  branch which runs on your A15x1 FastModel?
+Hi Kevin & Jon,
+
+On 5/8/2012 1:28 AM, Kevin Hilman wrote:
+> Jon Hunter<jon-hunter@ti.com>  writes:
+>
+>> Hi Kevin,
 >>
->> Coming in a private email.
-> 
-> I didn't seem to get anything?
-
-As far as I'm concerned, it was delivered:
-
-2012-05-05 13:09:33 1SQcrl-0006uI-OX <= maz at misterjones.org U=www-data P=local S=59827 id=7da4dd4bd4f768d907094ce4919bfffe@localhost
-2012-05-05 13:09:34 1SQcrl-0006uI-OX => jemmajones81 at yahoo.co.uk R=dnslookup T=remote_smtp H=mx-eu.mail.am0.yahoodns.net [77.238.184.241]
-2012-05-05 13:09:34 1SQcrl-0006uI-OX Completed
-
-I'll resend it again, but you may want to check your spam folder.
-
->>>  I'm using the boot-wrapper from
->>>  http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
->>>  semi hosting mode.
+>> On 05/07/2012 12:15 PM, Kevin Hilman wrote:
+>>> Jon Hunter<jon-hunter@ti.com>  writes:
 >>>
->>>  I managed to boot Android from that but I don't seem to be able to boot
->>>  your kernel. It just stops after the boot-wrapper says loading uImage.
+>>>> Hi Will,
+>>>>
+>>>> On 04/26/2012 01:07 PM, Will Deacon wrote:
+>>>>> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
+>>>>>> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
+>>>>>>>
+>>>>>>> Part of the problem is that the clockdomain data for the emu_sys
+>>>>>>> clockdomain is wrong.  Here's something to try to fix it.  It might just
+>>>>>>> be enough to get it to work.
+>>>>>>
+>>>>>> Hmm, doesn't seem to work but I do see the following in dmesg when I try to
+>>>>>> use perf:
+>>>>>>
+>>>>>>   powerdomain: waited too long for powerdomain emu_pwrdm to complete transition
+>>>>>>
+>>>>>> which is new with your patch.
+>>>>>
+>>>>> Sorry to nag, but does anybody have a clue where to go from here? I can
+>>>>> start digging in the OMAP PM code, but it's all new territory for me.
+>>>>
+>>>> I did a little playing around with this today and I think that I have figured out why this was not working (see below). Please can you try the following patch? I tried this on top of your series for perf/omap4.
+>>>>
+>>>> Paul, FYI. If this works for Will then I can re-base on top of the latest linux-omap and submit to the mailing list.
+>>>>
+>>>> Also, the above error about the emu_pwrdm is odd too. I noticed that the emu_pwrdm is always in the transitioning state. And when I say always, I mean that even if I check the power domain state while u-boot is running it is in the transitioning state. So even before the kernel starts.
+>>>>
+>>>> Cheers
+>>>> Jon
+>>>>
+>>>>  From 9137ff9c1b382232de7443db0b51b7555846fb62 Mon Sep 17 00:00:00 2001
+>>>> From: Jon Hunter<jon-hunter@ti.com>
+>>>> Date: Fri, 4 May 2012 16:48:45 -0500
+>>>> Subject: [PATCH] ARM: OMAP4: Disable auto enable for EMU CLKDM
+>>>>
+>>>> The flag CLKDM_CAN_HWSUP allows the clock-domain to automatically transition
+>>>> to the enabled and disabled state. This means that as soon as we force a
+>>>> software wake-up on the clock domain, the clock domain will be allowed to idle
+>>>> and put back into the hardware auto state. For the EMU clock domain this is not
+>>>> what we want. We want to keep the clock domain in the software wakeup state
+>>>> while the clock domain is being used and put it back in to the hardware auto
+>>>> state when we have finished using the clock domain.
+>>>>
+>>>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
+>>>
+>>> With this patch, how is the clkdm ever idled?
 >>
->> Which dts file are you using?
-> 
-> I don't quite understand yet how the DT stuff is used. When I build the DTB files then I get vexpress-v2p-ca15-tc1.dtb in my arch/arm/boot directory. I assume that one is used then for my kernel image?
-> 
-> My .config has all the DT stuff enabled I think:
-> CONFIG_ARCH_VEXPRESS_DT=y
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> 
-> Or is that not correct?
+>> It does not! Sorry, I was so engrossed with figuring out why the EMU
+>> clkdm was being idled as soon as it was enabled, I forgot to check if is
+>> ever disabled once we terminated perf :-(
+>>
+>>> IIUC, your patch will get PMU interrupts working, but similarily to
+>>> previous patches in this thread, it works because it *never* allows the
+>>> EMU clkdm to idle.  This is not a mergeable solution because it will not
+>>> allow CORE retention (and thus full-chip retention.)
+>>
+>> Right!
+>>
+>>> What we need is a solution that allows the clkdm to idle, and then to be
+>>> reinitialzed when it wakes up.  Due to the way (I understand) resets in
+>>> the debugss, allowing the clkdm to idle will cause a reset, so the
+>>> PMU/CTI interrupts need to be reinitialzied after wakeup.
+>>
+>> Yes exactly I see that now. I have prototyped the 3 patches and this is
+>> working AND the EMU clkdm does go back to idle. I can send out to the
+>> list for review.
+>
+> Perfect, thanks.
+>
+>>> Kevin
+>>>
+>>> P.S. Please note there is also already a different fix in mainline for
+>>> the EMU clkdm data from Paul which adds the force wakeup flag and
+>>> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
+>>> because the hardware is capable.)
+>>
+>> Hmmm ... yes saw this, and you will have to excuse me as I don't fully
+>> follow the logic here. In fact, I am thinking we want the opposite ;-)
+>>
+>>  From looking, into this it seems to me that when PMU is running we want
+>> the EMU clock domain in software-wakeup state and when PMU is not
+>> running we want in the hardware auto state.
+>
+> So far, I'm with you.
+>
+>> By keeping the ENABLE_AUTO flag set, as soon as we enable the clock
+>> domain it is put right back into the HW_AUTO state
+>
+> This is only because it was in the HWSUP state when _enable was called.
+> If clkdm_deny_idle() is used, that behavior will change.
+>
+>> and hence PMU is
+>> not working (see _enable() function in
+>> arch/arm/mach-omap2/omap_hwmod.c)
+>>
+>> So really what I think we want is to remove the ENABLE_AUTO flag to keep
+>> the clock domain in software wake-up and use the DISABLE_AUTO flag to
+>> put the clock domain back in HW_AUTO (note this requires a patch to
+>> perform this 2nd part).
+>
+> Well, Paul will have to comment here for the final word, but IIUC, the
+> hwmod flags are supposed to indicate only what the HW is capable of.  If
+> we want to change the runtime behavior, we nee to use (or add) APIs to
+> change the beahvior.  In this case, clkdm_allow_idle(),
+> clkdm_deny_idle() are probably what is needed here.
 
-First, you want to forget about anything TC1 related, it isn't what you need for the Fast Model.
+Yes, indeed, we should not hack the flags to fix that kind of issue. The 
+flags describe what the HW is capable of, and the EMU CD can support 
+HW_AUTO and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the 
+only valid next power state is OFF, meaning that no retention mode is 
+supported. So any transition to idle will go to OFF and lead to a reset 
+upon wakeup.
 
-Step by step instructions:
-- Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
-- Build your zImage
-- From your kernel tree, run:
-  ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x2.dtb wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x2.dts
-- cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
-- Build your uImage if that's what you're using.
-- Build your boot-wrapper as usual.
+That being said, being able to transition to OFF during idle is a 
+perfectly valid state for most powerdomain in OMAP anyway, so we should 
+be able to restore from OFF mode smoothly.
 
-That should get you going.
+It looks to me that what is missing here is *just* a restore path in the 
+PMU/CTI code. But I'm probably missing some nasty details in this issue :-)
 
-> I have now updated to you latest kvm-arm-3.4 branch.
-
-That's very brave of you... ;-)
-
-> But the kernel still does not boot up properly, or at least I don't seem to get any output. It just goes "Uncompressing Linux... done." and then does nothing.
-> I'm using the FastModel Cortex-A15x2 simulation.
-
-Let me know if it gets better with the above. Or not.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards,
+Benoit
