@@ -1,26 +1,88 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 May 2012 13:45:59 -0600
-Subject: [PATCHv5 1/3] ARM: tegra: Add Tegra AHB driver
-In-Reply-To: <20120507.143647.508182574757518311.hdoyu@nvidia.com>
-References: <201205070859.29174.arnd@arndb.de><20120507.122333.2024326166703361049.hdoyu@nvidia.com><201205071024.48958.arnd@arndb.de>
- <20120507.143647.508182574757518311.hdoyu@nvidia.com>
-Message-ID: <4FA977F7.9080806@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 8 May 2012 14:51:38 -0500
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <87wr4mr6io.fsf@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
+ <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+ <4FA8FCFF.40105@ti.com>
+ <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
+ <4FA9138D.8010604@ti.com>
+ <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
+ <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com> <87wr4mr6io.fsf@ti.com>
+Message-ID: <4FA9794A.7030607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2012 05:36 AM, Hiroshi Doyu wrote:
-...
-> Tegra AHB Bus conforms to the AMBA Specification (Rev 2.0) Advanced
-> High-performance Bus (AHB) architecture.
-> 
-> The AHB Arbiter controls AHB bus master arbitration. This effectively
-> forms a second level of arbitration for access to the memory
-> controller through the AHB Slave Memory device. The AHB pre-fetch
-> logic can be configured to enhance performance for devices doing
-> sequential access. Each AHB master is assigned to either the high or
-> low priority bin. Both Tegra20/30 have this AHB bus.
 
-I've applied this (minus the Change-Id line) and the other two patches
-to Tegra's for-next branch. I'll let it sit there for a day or two
-before sending a pull request into arm-soc for 3.5; hopefully it's not
-too late for that.
+On 05/08/2012 11:18 AM, Kevin Hilman wrote:
+> "Cousson, Benoit" <b-cousson@ti.com> writes:
+> 
+>> On 5/8/2012 4:00 PM, Kevin Hilman wrote:
+>>> Jean Pihet<jean.pihet@newoldbits.com>  writes:
+>>>
+>>> [...]
+>>>
+>>>>>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
+>>>>>>> flags describe what the HW is capable of, and the EMU CD can support
+>>>>>>> HW_AUTO
+>>>>>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
+>>>>>>> next
+>>>>>>> power state is OFF, meaning that no retention mode is supported. So any
+>>>>>>> transition to idle will go to OFF and lead to a reset upon wakeup.
+>>>>>>>
+>>>>>>> That being said, being able to transition to OFF during idle is a
+>>>>>>> perfectly
+>>>>>>> valid state for most powerdomain in OMAP anyway, so we should be able to
+>>>>>>> restore from OFF mode smoothly.
+>>>>>>>
+>>>>>>> It looks to me that what is missing here is *just* a restore path in the
+>>>>>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
+>>>>>>> :-)
+>>>>>>
+>>>>>> Although it is perfectly feasible to have a seamless transition of the
+>>>>>> EMU power domain, I think the PMU counters will not be accurate
+>>>>>> anymore since they stop counting events when going to OFF and re-start
+>>>>>> after the state restore.
+>>>>>
+>>>>>
+>>>>> Good point, but I think the PMU might still works fine because located
+>>>>> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
+>>>>> going to OFF and thus will be reset.
+>>>>
+>>>> Ever better point ;p Thanks for the precision.
+>>>> In any case my point was: can we allow the EMU CD to go OFF or prevent
+>>>> it from doing so? We need to answer that question first.
+>>>>
+>>>
+>>> The idea I've suggested is to use runtime PM for this.  As long as the
+>>> PMU is in use, it will be runtime PM enabled (and not allowed to go into
+>>> HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
+>>> then be reset.  The next time it is needed, the runtime resume will need
+>>> to do a full re-init.
+>>
+>> Oh, but does that mean that this driver is not pm_runtime adapted yet?
+>>
+> 
+> Actually, it is.  Ming Lei has done it.
+> 
+> Currently, Will has collected this[1] and is waiting (patiently) for us
+> to produce a real fix that doesn't kill PM in the process.
+
+I had to make a couple mods to Ming's patches but I do have something
+working now that _should_ not break PM. However, per my previous email
+(in response to Benoit's) I am struggling with the definition of the
+CLKDM_CAN_XXXXXX_AUTO flags to know the correct way to fix this.
+
+I was going to send out my patches, but I wanted to get some more
+feedback on this first.
+
+Cheers
+Jon
