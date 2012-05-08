@@ -1,96 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 08:58:58 -0700
-Subject: [PATCH 00/13] ARM: OMAP5: Add minimal OMAP5 SOC support
-In-Reply-To: <4FA8CA1D.6060105@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <4FA79AAB.5050503@ti.com> <20120507222635.GO5088@atomide.com>
- <4FA8CA1D.6060105@ti.com>
-Message-ID: <20120508155858.GU5088@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 May 2012 10:10:18 -0600 (MDT)
+Subject: Broken UART I/O wakeups on v3.4-rc4+
+In-Reply-To: <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
+References: <alpine.DEB.2.00.1205072249090.9984@utopia.booyaka.com>
+ <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1205081006480.9984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [120508 00:27]:
-> On Tuesday 08 May 2012 03:56 AM, Tony Lindgren wrote:
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120507 02:53]:
-> >> Tony,
-> >>
-> >> On Thursday 03 May 2012 12:56 PM, R Sricharan wrote:
-> >>> The series adds minimal OMAP5 support.
-> >>> OMAP5430 has a dual core Cortex-A15 based MPU subsystem with 2MB
-> >>> L2 cache. The SOC has many compatible blocks with OMAP4 SOCS and
-> >>> hence large part of the peripherals are re-used.
-> >>>
-> >>> OMAP5432 is another variant of OMAP5430, with a
-> >>> memory controller supporting DDR3 and SATA.
-> >>>
-> >>> Series is generated against the 3.4-rc5. This has been rebased on
-> >>> top of the OMAP2+ cleanup series [1]
-> >>>
-> >>> To get the boot working with omap2plus_defconfig,
-> >>> OMAP5 hwmod/clock/prm/cm database needs to be added.
-> >>> The data and the integrated tree are available in the
-> >>> below git repository
-> >>>
-> >>> OMAP5_DATA:
-> >>> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-> >>>  omap5_data
-> >>>
-> >>> OMAP5_INTEGRATED:
-> >>> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-> >>>  omap5_dt_integrated
-> >>>
-> >>> The series is boot tested on OMAP5430 ES1.0.
-> >>> OMAP2/3/4 build and boot is tested as well to avoid any breakage
-> >>> because of the series.
-> >>>
-> >>> Patch "TEMP: ARM: OMAP5: Add cpu_is_omap54xx() checks" is temporary and
-> >>> can be dropped once rebased against [2]
-> >>>
-> >>> Patch "TEMP: ARM: OMAP5: Update the base address of the 32k-counter" is
-> >>> temporary and can be dropped once rebased against [3]
-> >>>
-> >>>
-> >>> [1] http://www.spinics.net/lists/linux-omap/msg69233.html
-> >>> [2] http://www.spinics.net/lists/linux-omap/msg69013.html
-> >>> [3] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67166.html
-> >>>
-> >> Do you have a branch where above dependencies are merged ?
-> > 
-> > Seems like those should go into the cleanup branch, and then
-> > that can be used as a base.
+On Tue, 8 May 2012, Raja, Govindraj wrote:
+
+> On Tue, May 8, 2012 at 10:35 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
 > >
-> Yep. That will be a good base.
+>
+> The same is discussed in this thread as in here: 
+> http://www.spinics.net/lists/linux-omap/msg68659.html
+
+OK.
+
+> > Could you please fix this? ?We probably aren't too far from the v3.5 merge
+> > window opening, so there isn't much time to fix it.
 > 
-> >> How do you suggest to go about updating this series so
-> >> that above dependencies plus DT support(3.3 based branch
-> >> in arm-soc tree and needs to be updated against 3.4) is
-> >> base tree for the patchset.
-> > 
-> > Probably the DT patch should be separate, we can make dt branch
-> > depend on the cleanup branch.
-> > 
-> Sounds good. Btw, who is re-basing the omap-dt branch against 3.4 ?
+> okay, one possible solution is to probe pins dynamically
+> and make rx wakeup capable which myself and Tony
+> discussed and came up with this patch [1]
+> 
+> or to add rx wakeup pad support for each board,
+> based on uart used as console.
 
-That's already queued up, I can merge in some trivial v3.4 based patches
-Benoit has and it gets updated automatically.
- 
-> > Then the data files should be first posted for reviews (and potentially
-> > updated for what we have queued in hwmod-cleanup).  Does this series
-> > compile on it's own without the data now?
-> > 
-> This series does compile on it's own without data patches. Data
-> patches needs to re-based against Paul's clean-up and also we
-> need to sort out ES1/ES2 diff so they can wait till then.
-> Probably 3.6+
+Oh well, sounds like UART I/O wakeups are going to be broken in v3.4 :-(
 
-OK good.
- 
-> This series was intentionally made in such a way that it can
-> be merged without data patches. Just for getting boot working
-> on OMAP5 data patches needs to be merged.
+Do you have a patch ready for Tony to queue for v3.5 to fix this?  From 
+the above thread, it looks like Tony had some remaining comments to be 
+addressed on your patch.
 
-Great, excellent.
 
-Regards,
-
-Tony
+- Paul
