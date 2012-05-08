@@ -1,62 +1,50 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 8 May 2012 06:18:37 +0000
-Subject: [PATCH v4 01/39] ARM: OMAP2+: gpmc: driver conversion
-In-Reply-To: <4FA7F232.7050802@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <363273a9ef82d6836197929157aa9a8eb8f5171a.1335874494.git.afzal@ti.com>
- <4FA4035E.6020308@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E987147@DBDE01.ent.ti.com>
- <4FA7F232.7050802@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9878EC@DBDE01.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 08 May 2012 15:20:00 +0900
+Subject: [GIT PULL] arch/arm/mach-* late_initcall cleanup
+In-Reply-To: <20120505063101.GQ2194@S2101-09.ap.freescale.net>
+References: <CAAQ0ZWQ75tYxbnCHXW-WtDVLyFcf9WdvX=5MBiAOXD+ONrU8-g@mail.gmail.com>
+ <20120505063101.GQ2194@S2101-09.ap.freescale.net>
+Message-ID: <018701cd2ce2$999bad80$ccd30880$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Mon, May 07, 2012 at 21:32:58, Hunter, Jon wrote:
-
-> >>> +	/* no waitpin */
-> >>> +	case 0:
-> >>> +		break;
-> >>> +	default:
-> >>> +		dev_err(gpmc->dev, "multiple waitpins selected on CS:%u\n", cs);
-> >>> +		return -EINVAL;
-> >>> +		break;
-> >>> +	}
-> >>
-> >> Why not combined case 0 and default? Both are invalid configurations so
-> >> just report invalid selection.
-> > 
-> > Case 0 is not invalid, a case where waitpin is not used, default refers
-> > to when a user selects multiple waitpins wrongly.
+Shawn Guo wrote:
 > 
-> Ok. Then for case 0, just return here. If the polarity is set, you could
-> print an error here.
-
-Different ways of doing things, this looks cleaner to me as already it is
-checked, and time of execution in both cases would not differ much.
-
-> >>> +		if (gd->have_waitpin) {
-> >>> +			if (gd->waitpin != idx ||
-> >>> +					gd->waitpin_polarity != polarity) {
-> >>> +				dev_err(gpmc->dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
-> >>> +					gd->waitpin, gd->waitpin_polarity,
-> >>> +					gd->name, gd->id);
-> >>> +				return -EBUSY;
-> >>> +			}
-> >>> +		} else {
-> >>
-> >> Don't need the else as you are going to return in the above.
-> > 
-> > Not always, only in case of error
+> On Thu, May 03, 2012 at 11:27:48PM +0800, Shawn Guo wrote:
+> > Hi Arnd, Olof,
+> >
+> > Please pull the arch/arm/mach-* late_initcall cleanup series below.  I
+> > have collected acks from most of platform maintainers, and it may be
+> > the time to have them expose on linux-next to ensure they do not
+> > introduce any regression.
+> >
+> > Regards,
+> > Shawn
+> >
+> > ---
+> >
+> > The following changes since commit
+> 66f75a5d028beaf67c931435fdc3e7823125730c:
+> >
+> >   Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+> >
+> > are available in the git repository at:
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git
+> clean/late_initcall_v2
+> >
+> I just updated the branch with one fixup from Sekhar applied, and the
+> Acked-by from Sekhar and Tony collected.
 > 
-> Ok, but seems that it can be simplified a little.
-> 
-> What happens if a device uses more than one wait-pin? In other words a
-> device with two chip-selects that uses two wait-pins?
+Sorry for late. If you need my ack on Samsung stuff, feel free to add:
 
-Please re-read http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67702.html
-and your reply
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Regards
-Afzal
+(It is available on 4th and 11th patches?)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
