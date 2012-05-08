@@ -1,73 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 May 2012 19:04:30 +0100
-Subject: [PATCH] Prevent process migration during vfp_init()
-In-Reply-To: <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
-References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
- <20120508111332.GG2263@mudshark.cambridge.arm.com>
- <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
-Message-ID: <20120508180430.GL2263@mudshark.cambridge.arm.com>
+From: paulliu@debian.org (Ying-Chun Liu (PaulLiu))
+Date: Wed,  9 May 2012 02:06:27 +0800
+Subject: [PATCH] arm: imx53-qsb: Add Dialog DA9053 PMIC support
+Message-ID: <1336500387-25546-1-git-send-email-paulliu@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2012 at 06:24:27PM +0100, Hyungwoo Yang wrote:
-> I think we don't need preempt_disable()/preempt_enable() call in your proposal.
-> I mean, since we have enabled on every VFPs in cores online(
-> on_each_cpu() ), we don't need to worry about accessing a VFP which is
-> disabled. So we don't need to worry about migration after
-> "on_each_cpu()", right?
+From: "Ying-Chun Liu (PaulLiu)" <paulliu@debian.org>
 
-Yes, that sounds reasonable to me since any thread migration will imply the
-barriers we need for the VFP exception vector to be correct. In which case the
-patch can be further reduced to what I've got below.
+Add Dialog DA9053 regulators support for imx53-qsb (Loco board)
 
-It seems happy enough on my quad A9 running a bunch of paranoia FP tests --
-do you have a particular testcase which was exhibiting this failure when you
-reported the issue?
+Signed-off-by: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Amit Kucheria <amit.kucheria@canonical.com>
+Cc: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/imx53-qsb.dts |   74 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 73 insertions(+), 1 deletion(-)
 
-Cheers,
-
-Will
-
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index bc683b8..c5767b5 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -11,6 +11,7 @@
- #include <linux/types.h>
- #include <linux/cpu.h>
- #include <linux/cpu_pm.h>
-+#include <linux/hardirq.h>
- #include <linux/kernel.h>
- #include <linux/notifier.h>
- #include <linux/signal.h>
-@@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index b08b587..393e90d 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -73,8 +73,80 @@
+ 				};
  
- static void vfp_enable(void *unused)
- {
--       u32 access = get_copro_access();
-+       u32 access;
+ 				pmic: dialog at 48 {
+-					compatible = "dialog,da9053", "dialog,da9052";
++					compatible = "dlg,da9053-aa", "dlg,da9052";
+ 					reg = <0x48>;
 +
-+       BUG_ON(preemptible());
-+       access = get_copro_access();
++					regulators {
++						buck0 {
++							regulator-min-microvolt = <500000>;
++							regulator-max-microvolt = <2075000>;
++						};
++
++						buck1 {
++							regulator-min-microvolt = <500000>;
++							regulator-max-microvolt = <2075000>;
++						};
++
++						buck2 {
++							regulator-min-microvolt = <925000>;
++					                regulator-max-microvolt = <2500000>;
++						};
++
++						buck3 {
++							regulator-min-microvolt = <925000>;
++					                regulator-max-microvolt = <2500000>;
++						};
++
++						ldo4 {
++							regulator-min-microvolt = <600000>;
++							regulator-max-microvolt = <1800000>;
++						};
++
++						ldo5 {
++							regulator-min-microvolt = <600000>;
++					                regulator-max-microvolt = <1800000>;
++						};
++
++						ldo6 {
++							regulator-min-microvolt = <1725000>;
++					                regulator-max-microvolt = <3300000>;
++						};
++
++						ldo7 {
++							regulator-min-microvolt = <1725000>;
++					                regulator-max-microvolt = <3300000>;
++						};
++
++						ldo8 {
++							regulator-min-microvolt = <1200000>;
++					                regulator-max-microvolt = <3600000>;
++						};
++
++						ldo9 {
++							regulator-min-microvolt = <1200000>;
++					                regulator-max-microvolt = <3600000>;
++						};
++
++						ldo10 {
++							regulator-min-microvolt = <1200000>;
++					                regulator-max-microvolt = <3600000>;
++						};
++
++						ldo11 {
++							regulator-min-microvolt = <1200000>;
++					                regulator-max-microvolt = <3600000>;
++						};
++
++						ldo12 {
++							regulator-min-microvolt = <1250000>;
++					                regulator-max-microvolt = <3650000>;
++						};
++
++						ldo13 {
++							regulator-min-microvolt = <1200000>;
++					                regulator-max-microvolt = <3600000>;
++						};
++					};
+ 				};
+ 			};
  
-        /*
-         * Enable full access to VFP (cp10 and cp11)
-@@ -657,7 +661,7 @@ static int __init vfp_init(void)
-        unsigned int cpu_arch = cpu_architecture();
- 
-        if (cpu_arch >= CPU_ARCH_ARMv6)
--               vfp_enable(NULL);
-+               on_each_cpu(vfp_enable, NULL, 1);
- 
-        /*
-         * First check that there is a VFP that we can use.
-@@ -678,8 +682,6 @@ static int __init vfp_init(void)
-        } else {
-                hotcpu_notifier(vfp_hotplug, 0);
- 
--               smp_call_function(vfp_enable, NULL, 1);
--
-                VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
-                printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
-                        (vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
+-- 
+1.7.10
