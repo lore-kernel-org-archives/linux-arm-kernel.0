@@ -1,38 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 8 May 2012 10:01:46 +0100
-Subject: common clock framework
-In-Reply-To: <CAJOA=zPozuanQFWt10PU4mySQ1kV+YV6iO5+BOfDWGPS2Y0aYg@mail.gmail.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
- <20120505082840.GQ4141@pengutronix.de>
- <CAJOA=zPozuanQFWt10PU4mySQ1kV+YV6iO5+BOfDWGPS2Y0aYg@mail.gmail.com>
-Message-ID: <20120508090145.GG15893@opensource.wolfsonmicro.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Tue, 8 May 2012 14:34:15 +0530
+Subject: [PATCH v4 0/2] ARM: omap_hwmod: add api to enable/disable module
+ level wakeup
+Message-ID: <1336467857-12521-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2012 at 10:44:17AM -0700, Turquette, Mike wrote:
-> + Mark & Graeme (for audio/pmic perspective)
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-> >> Having clk_set_rate and clk_prepare both hold the same prepare_lock
-> >> mutex seems suboptimal, but it is easy. ?Having reentrant accesses to
-> >> the clock tree is going to be hard... ?I've spent some time thinking
-> >> of ways to solve this, but I would appreciate suggestions. ?I suspect
-> >> the exact same case I'm describing above will affect many SoCs.
+On omap2/3 module level wakeup is handled using PM_WKEN registers.
+Expand the hwmod framework to handle the module level wakeup enable 
+registers.
 
-> > That's interesting. Here's another one: What will happen when Mark
-> > attaches one of his i2c wolfson chips to a omap core and wants to test
-> > his new clock driver? a clk_prepare on some clock on the wolfson chip
-> > will trigger another clk_prepare inside the i2c driver.
-> > So the reentrancy problem is not limited to prepare vs. set_rate.
+Patch series based on:
+git://git.pwsan.com/linux-2.6 hwmod_soc_conditional_cleanup_3.5
 
-This sounds pretty much expected - you'll also see similar things on
-some SoCs where IPs for clocks might get clock gated when not in use and
-reentrancy could crop up while exiting low power modes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120508/d985f537/attachment.sig>
+Tested on Beagle-xm by enabling and disabling uart wakeups from sysfs
+Series depends on following patches for testing.
+http://marc.info/?l=linux-omap&m=133527588923598&w=2
+http://marc.info/?l=linux-omap&m=133518614022144&w=2
+
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Changes from v3:
+---------------
+Using hwmod soc init support to populate soc specific
+funcs.
+http://www.spinics.net/lists/linux-omap/msg69676.html
+
+
+Govindraj.R (2):
+  ARM: OMAP2/3: omap_hwmod: Add api to enable/disable module level
+    wakeup events
+  ARM: omap3: pm: Remove uart module level wakeup configurations
+
+ arch/arm/mach-omap2/omap_hwmod.c   |   29 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm34xx.c       |   14 +++++---------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   16 ++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    9 +++++++++
+ 4 files changed, 59 insertions(+), 9 deletions(-)
+
+-- 
+1.7.9
