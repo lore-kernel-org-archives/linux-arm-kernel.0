@@ -1,62 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 May 2012 13:47:59 +0100
-Subject: [PATCH 09/13] ARM: OMAP5: Add SMP support.
-In-Reply-To: <1336029982-31898-10-git-send-email-r.sricharan@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-10-git-send-email-r.sricharan@ti.com>
-Message-ID: <20120508124759.GI2263@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 08 May 2012 13:59:38 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <878vh2rhlh.fsf@laptop.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
+ <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
+ <4FA90127.1050107@linaro.org> <878vh2rhlh.fsf@laptop.org>
+Message-ID: <4FA918BA.3080303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Here you go Chris.
 
-On Thu, May 03, 2012 at 08:26:18AM +0100, R Sricharan wrote:
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Add OMAP5 SMP boot support using OMAP4 SMP code. The relevant code paths
-> are runtime checked using cpu id
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> ---
->  arch/arm/mach-omap2/common.h       |    1 +
->  arch/arm/mach-omap2/omap-headsmp.S |   21 ++++++++++++++++++
->  arch/arm/mach-omap2/omap-smp.c     |   41 +++++++++++++++++++++++++----------
->  3 files changed, 51 insertions(+), 12 deletions(-)
+From: Lee Jones <lee.jones@linaro.org>
+Date: Tue, 8 May 2012 13:40:02 +0100
+Subject: [PATCH] MMC: mmci: Fix compiler error when CONFIG_OF is not set
 
-[...]
+error: implicit declaration of function 'mmci_dt_populate_generic_pdata'
 
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> index 151fd5b..9424bb6 100644
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -33,6 +33,10 @@
->  #include "common.h"
->  #include "clockdomain.h"
->  
-> +#define CPU_MASK		0xff0ffff0
-> +#define CPU_CORTEX_A9		0x410FC090
-> +#define CPU_CORTEX_A15		0x410FC0F0
-> +
->  /* SCU base address */
->  static void __iomem *scu_base;
->  
-> @@ -43,6 +47,14 @@ void __iomem *omap4_get_scu_base(void)
->  	return scu_base;
->  }
->  
-> +static inline unsigned int get_a15_core_count(void)
-> +{
-> +	unsigned int ncores;
-> +
-> +	asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (ncores));
-> +	return ((ncores >> 24) & 3) + 1;
-> +}
+This is due to the '#if CONFIG_OF' guards placed around
+mmci_dt_populate_generic_pdata(), but not around the call to it. We
+repair this by inserting a stub which elegantly returns when CONFIG_OF
+is not set.
 
-This register (L2 control) only tells you how many cores you have hanging
-off the L2 cache, which isn't really viable for future multi-cluster
-configurations. You're probably better off either reading the number of CPU
-nodes out of the DT (ppc, vexpress) or returning a constant for now
-(exynos5).
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Will
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 2303a16..efc822d 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1241,6 +1241,12 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ 		pr_warn("%s: Unsupported bus width\n", np->full_name);
+ 	}
+ }
++#else
++static void mmci_dt_populate_generic_pdata(struct device_node *np,
++					struct mmci_platform_data *pdata)
++{
++	return;
++}
+ #endif
+ 
+ static int __devinit mmci_probe(struct amba_device *dev,
+-- 
+1.7.9.5
