@@ -1,79 +1,52 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 13:08:34 -0700
-Subject: [PATCH] ARM: OMAP2+: am33xx: Make am33xx as a separate class
-In-Reply-To: <1336490630-7272-1-git-send-email-hvaibhav@ti.com>
-References: <1336490630-7272-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120508200833.GD5088@atomide.com>
+Date: Tue, 8 May 2012 13:12:03 -0700
+Subject: Broken UART I/O wakeups on v3.4-rc4+
+In-Reply-To: <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
+References: <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
+Message-ID: <20120508201203.GE5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120508 08:32]:
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -123,8 +123,11 @@ config SOC_OMAPTI81XX
->  
->  config SOC_OMAPAM33XX
->  	bool "AM33XX support"
-> -	depends on ARCH_OMAP3
-> +	depends on ARCH_OMAP2PLUS
+* Raja, Govindraj <govindraj.raja@ti.com> [120508 02:17]:
+> On Tue, May 8, 2012 at 10:35 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> >
+> > Govindraj,
+> >
+> > After your commit bce492c04ba8fc66a4ea0a52b181ba255daaaf54 ("ARM: OMAP2+:
+> > UART: Fix incorrect population of default uart pads"), the kernel does not
+> > return from static suspend when off-mode is enabled upon an incoming
+> > serial character.
+> >
+> > The following steps reproduce the problem:
+> >
+> > echo 1 > /debug/pm_debug/enable_off_mode
+> > echo mem > /sys/power/state
+> > (send a serial character after suspend is entered)
+> >
+> > (N.B., on the BeagleBoard, the GPIO-connected "USER" button can be used to
+> > wake the system at this point.)
+> >
+> 
+> The same is discussed in this thread as in here:
+> http://www.spinics.net/lists/linux-omap/msg68659.html
+> 
+> > Could you please fix this? ?We probably aren't too far from the v3.5 merge
+> > window opening, so there isn't much time to fix it.
+> 
+> okay, one possible solution is to probe pins dynamically
+> and make rx wakeup capable which myself and Tony
+> discussed and came up with this patch [1]
 
-This is not needed, it's inside if ARCH_OMAP2PLUS block.
+This would be good for the v3.5 merge window.
+ 
+> or to add rx wakeup pad support for each board,
+> based on uart used as console.
 
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -16,6 +16,7 @@ secure-common				= omap-smc.o omap-secure.o
->  obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
->  obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
->  obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
-> +obj-$(CONFIG_SOC_OMAPAM33XX) += irq.o $(hwmod-common)
->  
->  ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
->  obj-y += mcbsp.o
-> @@ -93,6 +94,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
->  					   cm44xx.o prcm_mpu44xx.o \
->  					   prminst44xx.o vc44xx_data.o \
->  					   vp44xx_data.o prm44xx.o
-> +obj-$(CONFIG_SOC_OMAPAM33XX)		+= prcm.o
->  
->  # OMAP voltage domains
->  voltagedomain-common			:= voltage.o vc.o vp.o
-> @@ -102,6 +104,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
->  					   voltagedomains3xxx_data.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
->  					   voltagedomains44xx_data.o
-> +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(voltagedomain-common)
->  
->  # OMAP powerdomain framework
->  powerdomain-common			+= powerdomain.o powerdomain-common.o
-> @@ -116,6 +119,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
->  					   powerdomain44xx.o \
->  					   powerdomains44xx_data.o
-> +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(powerdomain-common)
->  
->  # PRCM clockdomain control
->  clockdomain-common			+= clockdomain.o \
-> @@ -132,6 +136,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clockdomain-common) \
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(clockdomain-common) \
->  					   clockdomain44xx.o \
->  					   clockdomains44xx_data.o
-> +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(clockdomain-common)
->  
->  # Clock framework
->  obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o \
-> @@ -149,6 +154,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o \
->  					   clkt_iclk.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common) clock44xx_data.o \
->  					   dpll3xxx.o dpll44xx.o
-> +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(clock-common) dpll3xxx.o
->  
->  # OMAP2 clock rate set data (old "OPP" data)
->  obj-$(CONFIG_SOC_OMAP2420)		+= opp2420_data.o
+This should be still done too to avoid bootloader dependency
+for setting up the serial ports.
 
-Can you please rebase this on what's now in the cleanup branch at commit
-382ae00105d9989a821f458084e0428bce10b969? That should simplify the Makefile
-changes a bit.
-
-Other than that looks good to me.
+Regards,
 
 Tony
+ 
+> [1]: http://www.spinics.net/lists/linux-omap/msg67822.html
