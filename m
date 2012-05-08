@@ -1,62 +1,119 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Tue, 8 May 2012 14:34:17 +0530
-Subject: [PATCH v4 2/2] ARM: omap3: pm: Remove uart module level wakeup
- configurations
-In-Reply-To: <1336467857-12521-1-git-send-email-govindraj.raja@ti.com>
-References: <1336467857-12521-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1336467857-12521-3-git-send-email-govindraj.raja@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 8 May 2012 12:09:10 +0300
+Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
+In-Reply-To: <4FA8DFFC.6050608@ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-7-git-send-email-t-kristo@ti.com> <87pqafv810.fsf@ti.com>
+ <1336466198.2149.269.camel@sokoban> <4FA8DFFC.6050608@ti.com>
+Message-ID: <1336468150.2149.271.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On Tue, 2012-05-08 at 14:27 +0530, Rajendra Nayak wrote:
+> On Tuesday 08 May 2012 02:06 PM, Tero Kristo wrote:
+> > On Mon, 2012-05-07 at 17:19 -0700, Kevin Hilman wrote:
+> >> Tero Kristo<t-kristo@ti.com>  writes:
+> >>
+> >>> From: Axel Haslam<axelhaslam@gmail.com>
+> >>>
+> >>> On OMAP4, there is no support to read previous logic state
+> >>> or previous memory state achieved when a power domain transitions
+> >>> to RET. Instead there are module level context registers.
+> >>>
+> >>> In order to support the powerdomain level logic/mem_off_counters
+> >>> on OMAP4, instead use the previous power state achieved (RET) and
+> >>> the *programmed* logic/mem RET state to derive if a powerdomain lost
+> >>> logic or did not.
+> >>
+> >> OK, but this also changes the behavior for OMAP3 as well, right?  I
+> >> don't see in the changelog how this affects OMAP3 and whether it is
+> >> still expected to work on OMAP3.  When changing common code like this,
+> >> the changelog should describe the impacts on to all affected SoCs.
+> >>
+> >> As suggested by Vaibhav Bedia, now might be the right time to add this
+> >> function to the SoC specific function pointers (struct pwrdm_ops.)
+> >>
+> >> Doing that, the existing function could be used for OMAP3 (and OMAP4 if
+> >> the changelog describes that it can/should be used for both.)
+> >>
+> >> Then, when AM33xx support is added, it will be obvious where they will
+> >> need to plugin support for that SoC.
+> >
+> > How about the following patch? It will add a couple of redundant
+> > read_prev_pwrst calls, but works in the same way as the original patch,
+> > without touching the generic code. Also, as there have been talks about
+> > adding caching for some of the pwrdm registers (especially the
+> > prev_pwrst), this might not be that big of an issue.
+> >
+> > If this looks good to you, I'll re-post the set with this patch.
+> >
+> > -Tero
+> >
+> >
+> > diff --git a/arch/arm/mach-omap2/powerdomain44xx.c
+> > b/arch/arm/mach-omap2/powerdomain44xx.c
+> > index 9bfb8a0..3d5e8d4 100644
+> > --- a/arch/arm/mach-omap2/powerdomain44xx.c
+> > +++ b/arch/arm/mach-omap2/powerdomain44xx.c
+> > @@ -155,6 +155,14 @@ static int omap4_pwrdm_read_logic_retst(struct
+> > powerdomain *pwrdm)
+> >   	return v;
+> >   }
+> >
+> > +static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+> > +{
+> > +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
+> > +		return PWRDM_POWER_ON;
+> > +
+> > +	return omap4_pwrdm_read_logic_retst(pwrdm);
+> 
+> Looks good to me. Do these ever get called with target state programmed
+> to OFF?
 
-The uart module level wakeups enabling and disabling
-are now handled from uart driver itself remove the uart module
-level configurations from pm code.
+At least with current kernel code, no. But you are right, it might be
+better to change these to check against > PWRDM_POWER_RET.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c |   14 +++++---------
- 1 files changed, 5 insertions(+), 9 deletions(-)
+-Tero
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 703bd10..7a19498 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -529,8 +529,6 @@ static void __init omap3_d2d_idle(void)
- 
- static void __init prcm_setup_regs(void)
- {
--	u32 omap3630_en_uart4_mask = cpu_is_omap3630() ?
--					OMAP3630_EN_UART4_MASK : 0;
- 	u32 omap3630_grpsel_uart4_mask = cpu_is_omap3630() ?
- 					OMAP3630_GRPSEL_UART4_MASK : 0;
- 
-@@ -562,13 +560,11 @@ static void __init prcm_setup_regs(void)
- 				OMAP3430_DSS_MOD, PM_WKEN);
- 
- 	/* Enable wakeups in PER */
--	omap2_prm_write_mod_reg(omap3630_en_uart4_mask |
--			  OMAP3430_EN_GPIO2_MASK | OMAP3430_EN_GPIO3_MASK |
--			  OMAP3430_EN_GPIO4_MASK | OMAP3430_EN_GPIO5_MASK |
--			  OMAP3430_EN_GPIO6_MASK | OMAP3430_EN_UART3_MASK |
--			  OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
--			  OMAP3430_EN_MCBSP4_MASK,
--			  OMAP3430_PER_MOD, PM_WKEN);
-+	omap2_prm_write_mod_reg(OMAP3430_EN_GPIO2_MASK |
-+			OMAP3430_EN_GPIO3_MASK | OMAP3430_EN_GPIO4_MASK |
-+			OMAP3430_EN_GPIO5_MASK | OMAP3430_EN_GPIO6_MASK |
-+			OMAP3430_EN_MCBSP2_MASK | OMAP3430_EN_MCBSP3_MASK |
-+			OMAP3430_EN_MCBSP4_MASK, OMAP3430_PER_MOD, PM_WKEN);
- 	/* and allow them to wake up MPU */
- 	omap2_prm_write_mod_reg(omap3630_grpsel_uart4_mask |
- 			  OMAP3430_GRPSEL_GPIO2_MASK |
--- 
-1.7.9
+> 
+> regards,
+> Rajendra
+> 
+> > +}
+> > +
+> >   static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8
+> > bank)
+> >   {
+> >   	u32 m, v;
+> > @@ -183,6 +191,14 @@ static int omap4_pwrdm_read_mem_retst(struct
+> > powerdomain *pwrdm, u8 bank)
+> >   	return v;
+> >   }
+> >
+> > +static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm,
+> > u8 bank)
+> > +{
+> > +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
+> > +		return PWRDM_POWER_ON;
+> > +
+> > +	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
+> > +}
+> > +
+> >   static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+> >   {
+> >   	u32 c = 0;
+> > @@ -256,9 +272,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+> >   	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+> >   	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+> >   	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
+> > +	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
+> >   	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+> >   	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+> >   	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
+> > +	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
+> >   	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+> >   	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+> >   	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
+> >
+> >
+> 
