@@ -1,213 +1,85 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 May 2012 01:43:49 +0200
-Subject: [PATCH 02/10] mmc: mxs-mmc: let ssp_is_old take host as parameter
-In-Reply-To: <1336401793-13753-3-git-send-email-shawn.guo@linaro.org>
-References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
- <1336401793-13753-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201205080143.49806.marex@denx.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 07 May 2012 17:19:39 -0700
+Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
+In-Reply-To: <1334913591-26312-7-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Fri, 20 Apr 2012 12:19:49 +0300")
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-7-git-send-email-t-kristo@ti.com>
+Message-ID: <87pqafv810.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Tero Kristo <t-kristo@ti.com> writes:
 
-> Let macro ssp_is_old take host as parameter to make the code easy
-> to read.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> From: Axel Haslam <axelhaslam@gmail.com>
+>
+> On OMAP4, there is no support to read previous logic state
+> or previous memory state achieved when a power domain transitions
+> to RET. Instead there are module level context registers.
+>
+> In order to support the powerdomain level logic/mem_off_counters
+> on OMAP4, instead use the previous power state achieved (RET) and
+> the *programmed* logic/mem RET state to derive if a powerdomain lost
+> logic or did not.
+
+OK, but this also changes the behavior for OMAP3 as well, right?  I
+don't see in the changelog how this affects OMAP3 and whether it is
+still expected to work on OMAP3.  When changing common code like this,
+the changelog should describe the impacts on to all affected SoCs.
+
+As suggested by Vaibhav Bedia, now might be the right time to add this
+function to the SoC specific function pointers (struct pwrdm_ops.)
+
+Doing that, the existing function could be used for OMAP3 (and OMAP4 if
+the changelog describes that it can/should be used for both.)
+
+Then, when AM33xx support is added, it will be obvious where they will
+need to plugin support for that SoC.
+
+Kevin
+
+> If the powerdomain is programmed to enter RET state and lose logic
+> in RET state, knowing that the powerdomain entered RET is good enough
+> to derive that the logic was lost as well, in such cases.
+>
+> Signed-off-by: Axel Haslam <axelhaslam@gmail.com>
+> [rnayak at ti.com: Updated changelog, updated patch to support mem counters]
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  drivers/mmc/host/mxs-mmc.c |   59
-> ++++++++++++++++++++++--------------------- 1 files changed, 30
-> insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 2ea5361..13907e4 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -51,7 +51,7 @@
->  #define MXS_MMC_DETECT_TIMEOUT			(HZ/2)
-> 
->  #define SSP_VERSION_LATEST	4
-> -#define ssp_is_old()		(host->version < SSP_VERSION_LATEST)
-> +#define ssp_is_old(host)	(host->version < SSP_VERSION_LATEST)
-
-(host)->version ... to make the macro safer.
-
-> 
->  /* SSP registers */
->  #define HW_SSP_CTRL0				0x000
-> @@ -86,14 +86,14 @@
->  #define  BM_SSP_BLOCK_SIZE_BLOCK_COUNT		(0xffffff << 4)
->  #define  BP_SSP_BLOCK_SIZE_BLOCK_SIZE		(0)
->  #define  BM_SSP_BLOCK_SIZE_BLOCK_SIZE		(0xf)
-> -#define HW_SSP_TIMING				(ssp_is_old() ? 0x050 : 
-0x070)
-> +#define HW_SSP_TIMING(h)			(ssp_is_old(h) ? 0x050 : 0x070)
->  #define  BP_SSP_TIMING_TIMEOUT			(16)
->  #define  BM_SSP_TIMING_TIMEOUT			(0xffff << 16)
->  #define  BP_SSP_TIMING_CLOCK_DIVIDE		(8)
->  #define  BM_SSP_TIMING_CLOCK_DIVIDE		(0xff << 8)
->  #define  BP_SSP_TIMING_CLOCK_RATE		(0)
->  #define  BM_SSP_TIMING_CLOCK_RATE		(0xff)
-> -#define HW_SSP_CTRL1				(ssp_is_old() ? 0x060 : 0x080)
-> +#define HW_SSP_CTRL1(h)				(ssp_is_old(h) ? 0x060 : 
-0x080)
->  #define  BM_SSP_CTRL1_SDIO_IRQ			(1 << 31)
->  #define  BM_SSP_CTRL1_SDIO_IRQ_EN		(1 << 30)
->  #define  BM_SSP_CTRL1_RESP_ERR_IRQ		(1 << 29)
-> @@ -116,11 +116,11 @@
->  #define  BM_SSP_CTRL1_WORD_LENGTH		(0xf << 4)
->  #define  BP_SSP_CTRL1_SSP_MODE			(0)
->  #define  BM_SSP_CTRL1_SSP_MODE			(0xf)
-> -#define HW_SSP_SDRESP0				(ssp_is_old() ? 0x080 : 
-0x0a0)
-> -#define HW_SSP_SDRESP1				(ssp_is_old() ? 0x090 : 
-0x0b0)
-> -#define HW_SSP_SDRESP2				(ssp_is_old() ? 0x0a0 : 
-0x0c0)
-> -#define HW_SSP_SDRESP3				(ssp_is_old() ? 0x0b0 : 
-0x0d0)
-> -#define HW_SSP_STATUS				(ssp_is_old() ? 0x0c0 : 
-0x100)
-> +#define HW_SSP_SDRESP0(h)			(ssp_is_old(h) ? 0x080 : 0x0a0)
-> +#define HW_SSP_SDRESP1(h)			(ssp_is_old(h) ? 0x090 : 0x0b0)
-> +#define HW_SSP_SDRESP2(h)			(ssp_is_old(h) ? 0x0a0 : 0x0c0)
-> +#define HW_SSP_SDRESP3(h)			(ssp_is_old(h) ? 0x0b0 : 0x0d0)
-> +#define HW_SSP_STATUS(h)			(ssp_is_old(h) ? 0x0c0 : 0x100)
->  #define  BM_SSP_STATUS_CARD_DETECT		(1 << 28)
->  #define  BM_SSP_STATUS_SDIO_IRQ			(1 << 17)
->  #define HW_SSP_VERSION				(cpu_is_mx23() ? 0x110 : 
-0x130)
-> @@ -183,7 +183,7 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+>  arch/arm/mach-omap2/powerdomain.c |   16 ++++++++++------
+>  1 files changed, 10 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 96ad3dbe..068f06b 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -124,18 +124,22 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+>  static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 >  {
->  	struct mxs_mmc_host *host = mmc_priv(mmc);
-> 
-> -	return !(readl(host->base + HW_SSP_STATUS) &
-> +	return !(readl(host->base + HW_SSP_STATUS(host)) &
->  		 BM_SSP_STATUS_CARD_DETECT);
+>  	int i;
+> -	u8 prev_logic_pwrst, prev_mem_pwrst;
+> +	int logic_pwrst, mem_pwrst;
+> +
+> +	logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
+> +	if (logic_pwrst == -EINVAL)
+> +		logic_pwrst = pwrdm_read_logic_retst(pwrdm);
+>  
+> -	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
+>  	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
+> -	    (prev_logic_pwrst == PWRDM_POWER_OFF))
+> +	    (logic_pwrst == PWRDM_POWER_OFF))
+>  		pwrdm->ret_logic_off_counter++;
+>  
+>  	for (i = 0; i < pwrdm->banks; i++) {
+> -		prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
+> -
+> +		mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
+> +		if (mem_pwrst == -EINVAL)
+> +			mem_pwrst = pwrdm_read_mem_retst(pwrdm, i);
+>  		if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
+> -		    (prev_mem_pwrst == PWRDM_POWER_OFF))
+> +		    (mem_pwrst == PWRDM_POWER_OFF))
+>  			pwrdm->ret_mem_off_counter[i]++;
+>  	}
 >  }
-> 
-> @@ -207,7 +207,7 @@ static void mxs_mmc_reset(struct mxs_mmc_host *host)
->  	writel(BF_SSP(0xffff, TIMING_TIMEOUT) |
->  	       BF_SSP(2, TIMING_CLOCK_DIVIDE) |
->  	       BF_SSP(0, TIMING_CLOCK_RATE),
-> -	       host->base + HW_SSP_TIMING);
-> +	       host->base + HW_SSP_TIMING(host));
-> 
->  	if (host->sdio_irq_en) {
->  		ctrl0 |= BM_SSP_CTRL0_SDIO_IRQ_CHECK;
-> @@ -215,7 +215,7 @@ static void mxs_mmc_reset(struct mxs_mmc_host *host)
->  	}
-> 
->  	writel(ctrl0, host->base + HW_SSP_CTRL0);
-> -	writel(ctrl1, host->base + HW_SSP_CTRL1);
-> +	writel(ctrl1, host->base + HW_SSP_CTRL1(host));
->  }
-> 
->  static void mxs_mmc_start_cmd(struct mxs_mmc_host *host,
-> @@ -229,12 +229,12 @@ static void mxs_mmc_request_done(struct mxs_mmc_host
-> *host)
-> 
->  	if (mmc_resp_type(cmd) & MMC_RSP_PRESENT) {
->  		if (mmc_resp_type(cmd) & MMC_RSP_136) {
-> -			cmd->resp[3] = readl(host->base + HW_SSP_SDRESP0);
-> -			cmd->resp[2] = readl(host->base + HW_SSP_SDRESP1);
-> -			cmd->resp[1] = readl(host->base + HW_SSP_SDRESP2);
-> -			cmd->resp[0] = readl(host->base + HW_SSP_SDRESP3);
-> +			cmd->resp[3] = readl(host->base + HW_SSP_SDRESP0(host));
-> +			cmd->resp[2] = readl(host->base + HW_SSP_SDRESP1(host));
-> +			cmd->resp[1] = readl(host->base + HW_SSP_SDRESP2(host));
-> +			cmd->resp[0] = readl(host->base + HW_SSP_SDRESP3(host));
->  		} else {
-> -			cmd->resp[0] = readl(host->base + HW_SSP_SDRESP0);
-> +			cmd->resp[0] = readl(host->base + HW_SSP_SDRESP0(host));
->  		}
->  	}
-> 
-> @@ -277,11 +277,11 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void
-> *dev_id)
-> 
->  	spin_lock(&host->lock);
-> 
-> -	stat = readl(host->base + HW_SSP_CTRL1);
-> +	stat = readl(host->base + HW_SSP_CTRL1(host));
->  	writel(stat & MXS_MMC_IRQ_BITS,
-> -	       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
-> +	       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_CLR);
-> 
-> -	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
-> +	if ((sta & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
-
-^ s/sta/stat/ ... did you try compiling this at all ? :-)
-
->  		mmc_signal_sdio_irq(host->mmc);
-> 
->  	spin_unlock(&host->lock);
-> @@ -485,7 +485,7 @@ static void mxs_mmc_adtc(struct mxs_mmc_host *host)
->  		blocks = 1;
-> 
->  	/* xfer count, block size and count need to be set differently */
-> -	if (ssp_is_old()) {
-> +	if (ssp_is_old(host)) {
->  		ctrl0 |= BF_SSP(data_size, CTRL0_XFER_COUNT);
->  		cmd0 |= BF_SSP(log2_blksz, CMD0_BLOCK_SIZE) |
->  			BF_SSP(blocks - 1, CMD0_BLOCK_COUNT);
-> @@ -509,10 +509,10 @@ static void mxs_mmc_adtc(struct mxs_mmc_host *host)
-> 
->  	/* set the timeout count */
->  	timeout = mxs_ns_to_ssp_ticks(host->clk_rate, data->timeout_ns);
-> -	val = readl(host->base + HW_SSP_TIMING);
-> +	val = readl(host->base + HW_SSP_TIMING(host));
->  	val &= ~(BM_SSP_TIMING_TIMEOUT);
->  	val |= BF_SSP(timeout, TIMING_TIMEOUT);
-> -	writel(val, host->base + HW_SSP_TIMING);
-> +	writel(val, host->base + HW_SSP_TIMING(host));
-> 
->  	/* pio */
->  	host->ssp_pio_words[0] = ctrl0;
-> @@ -598,11 +598,11 @@ static void mxs_mmc_set_clk_rate(struct mxs_mmc_host
-> *host, unsigned int rate)
-> 
->  	ssp_sck = ssp_clk / clock_divide / (1 + clock_rate);
-> 
-> -	val = readl(host->base + HW_SSP_TIMING);
-> +	val = readl(host->base + HW_SSP_TIMING(host));
->  	val &= ~(BM_SSP_TIMING_CLOCK_DIVIDE | BM_SSP_TIMING_CLOCK_RATE);
->  	val |= BF_SSP(clock_divide, TIMING_CLOCK_DIVIDE);
->  	val |= BF_SSP(clock_rate, TIMING_CLOCK_RATE);
-> -	writel(val, host->base + HW_SSP_TIMING);
-> +	writel(val, host->base + HW_SSP_TIMING(host));
-> 
->  	host->clk_rate = ssp_sck;
-> 
-> @@ -639,16 +639,17 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host
-> *mmc, int enable) writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->  		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
->  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
-> -		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_SET);
-> +		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
-> 
-> -		if (readl(host->base + HW_SSP_STATUS) & BM_SSP_STATUS_SDIO_IRQ)
-> +		if (readl(host->base + HW_SSP_STATUS(host)) &
-> +				BM_SSP_STATUS_SDIO_IRQ)
->  			mmc_signal_sdio_irq(host->mmc);
-> 
->  	} else {
->  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->  		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
->  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
-> -		       host->base + HW_SSP_CTRL1 + STMP_OFFSET_REG_CLR);
-> +		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_CLR);
->  	}
-> 
->  	spin_unlock_irqrestore(&host->lock, flags);
-> @@ -765,8 +766,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
-> 
->  	mmc->max_segs = 52;
->  	mmc->max_blk_size = 1 << 0xf;
-> -	mmc->max_blk_count = (ssp_is_old()) ? 0xff : 0xffffff;
-> -	mmc->max_req_size = (ssp_is_old()) ? 0xffff : 0xffffffff;
-> +	mmc->max_blk_count = (ssp_is_old(host)) ? 0xff : 0xffffff;
-> +	mmc->max_req_size = (ssp_is_old(host)) ? 0xffff : 0xffffffff;
->  	mmc->max_seg_size = dma_get_max_seg_size(host->dmach->device->dev);
-> 
->  	platform_set_drvdata(pdev, mmc);
