@@ -1,33 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 May 2012 14:20:26 -0400
-Subject: [PATCH] ARM: kirkwood: add missing kexec.h include
-In-Reply-To: <201204301421.45446.arnd@arndb.de>
-References: <1335706842-11725-1-git-send-email-ijc@hellion.org.uk>
- <201204301421.45446.arnd@arndb.de>
-Message-ID: <20120508182026.GF15711@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 08 May 2012 12:43:52 -0600
+Subject: [GIT PULL] ARM: tegra defconfig branch
+Message-ID: <4FA96968.1040007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2012 at 02:21:45PM +0000, Arnd Bergmann wrote:
-> On Sunday 29 April 2012, Ian Campbell wrote:
-> > 
-> > Fixes the following build error when CONFIG_KEXEC is enabled:
-> >   CC      arch/arm/mach-kirkwood/board-dt.o
-> > arch/arm/mach-kirkwood/board-dt.c: In function 'kirkwood_dt_init':
-> > arch/arm/mach-kirkwood/board-dt.c:52:2: error: 'kexec_reinit' undeclared (first use in this function)
-> > arch/arm/mach-kirkwood/board-dt.c:52:2: note: each undeclared identifier is reported only once for each function it appears in
-> > 
-> > Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> > [v4, rebase onto recent Linus for repost]
-> > [v3, speak actual English in the commit message, thanks Sergei Shtylyov]
-> > [v2, using linux/kexec.h not asm/kexec.h]
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Jason, can you apply this patch on your tree?
+This is independent from the other pull requests. It mainly enables a
+bunch of options for devices on Tegra boards.
 
-Got it, putting together a branch for v3.4 fixes now.
+P.S. Sorry if this git URL/branch are getting wrapped; they show up
+unwrapped in my email client, and it's rewrapping it during the send
+operation; I'm not sure how to fix that yet.
 
-thx,
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+  Linus Torvalds (1):
+        Linux 3.4-rc3
 
-Jason.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+for-3.5/defconfig
+
+Stephen Warren (1):
+      ARM: tegra: update defconfig
+
+ arch/arm/configs/tegra_defconfig |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
