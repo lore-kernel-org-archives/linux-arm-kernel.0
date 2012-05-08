@@ -1,50 +1,70 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 08:48:29 -0700
-Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
+Date: Tue, 8 May 2012 08:57:07 -0700
+Subject: [PATCH 12/13] ARM: OMAP5: Add the build support
+In-Reply-To: <4FA8E525.50506@ti.com>
 References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
- <20120504223933.GX5613@atomide.com>
- <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
- <20120507191847.GJ5088@atomide.com>
- <20120507193500.GK5088@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
-Message-ID: <20120508154829.GS5088@atomide.com>
+ <1336029982-31898-13-git-send-email-r.sricharan@ti.com>
+ <20120504225857.GB5613@atomide.com>
+ <CAJ7qFSeJc+F5xnW+P5r89yZEZXi8k-LqqnD8R1KEUONqravNBw@mail.gmail.com>
+ <20120507173749.GE5088@atomide.com> <4FA8E525.50506@ti.com>
+Message-ID: <20120508155706.GT5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120507 22:52]:
-> On Tue, May 08, 2012 at 01:05:01, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [120507 12:22]:
-> > > * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
-> > > > Hi,
-> > > > 
-> > > > On Fri, 4 May 2012, Tony Lindgren wrote:
-> > > > 
-> > > > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
-> > > > > Then this becomes just:
-> > > > > 
-> > > > > #ifdef CONFIG_SOC_OMAP3PLUS
-> > > > 
-> > > > We might want to consider having separate CONFIG_SOC_* values for each 
-> > > > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
-> > > > CONFIG_SOC_OMAP3630, etc.
-> > > 
-> > > Hmm but this would be in addition to the SOC specific options. The goal
-> > > is to cut down the ifdeffery needed all over the place to add new SoCs,
-> > > see the experimental patch I posted:
-> > > 
-> > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
-> > 
-> > Of course we could make this finer grained based on features
-> > like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
-> > grouping like that in mind.
-> > 
+* Cousson, Benoit <b-cousson@ti.com> [120508 02:23]:
+> Hi Tony,
 > 
-> This is much better approach than both ARCH_OMAPx and SOC_OMAPxxxx.
+> On 5/7/2012 7:37 PM, Tony Lindgren wrote:
+> >* R, Sricharan<r.sricharan@ti.com>  [120506 20:39]:
+> >>>>+config MACH_OMAP5_SEVM
+> >>>>+     bool "OMAP5 sevm Board"
+> >>>>+     depends on ARCH_OMAP5
+> >>>>+
+> >>>>  config OMAP3_EMU
+> >>>>       bool "OMAP3 debugging peripherals"
+> >>>>       depends on ARCH_OMAP3
+> >>>
+> >>>No need for it here either. Actually, I think this whole chunk
+> >>>can be now left out since it's DT based?
+> >>>he
+> >>  ok, but the concern here was that without this macro
+> >>  the print from compress and subsequently early
+> >>prints appear broken.
+> >>
+> >>machine_is_omap5_sevm becomes zero without this config and
+> >>machine_is_xxxx is used by the macro _DEBUG_LL_ENTRY
+> >>uncompress.h.
+> >
+> >Ah I see.
+> 
+> Mmm, still, I guess this mechanism should be deprecated with DT?
+> We cannot keep creating fake board entry since we are not supposed
+> to have MACHINE_ID anymore.
+> That will break DEBUG_LL for sure, but we knew about that current
+> limitation with DT.
 
-OK good, so now the question is just what groupings we need.. Got any
-suggestions?
+For most usecases for DEBUG_LL we can get away in two steps:
+
+1. Debug output for uncompress code based on DT parsing (I think
+   this is already there)
+
+2. Early console/earlyprintk parsed from DT that gets set up in
+   init_early
+
+This should be enough for most users, then the people who need
+to debug early kernel code until init_early is done can patch
+it in manually.
+ 
+> The point is that we should fix the code to stop relying on a
+> machine id going forward.
+> And maybe we can parse the FDT at that time?
+
+Yes that should be trivial for most use cases, we just need
+to initialize the earlycon/earlyprintk based on the DT.
+
+See kernel/early_printk.c for more info. We just need to
+set up the hardware specific function for early_write instead
+of printch.
 
 Regards,
 
