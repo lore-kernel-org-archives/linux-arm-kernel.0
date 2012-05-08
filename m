@@ -1,260 +1,45 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 8 May 2012 15:18:44 +0200
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FA9138D.8010604@ti.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
- <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
- <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
- <4FA9138D.8010604@ti.com>
-Message-ID: <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 8 May 2012 21:21:15 +0800
+Subject: [PATCH] ARM: imx6q: make ksz9021rn_phy_fixup depends on config of FEC
+In-Reply-To: <1336478520.23308.36.camel@sauron.fi.intel.com>
+References: <1336478520.23308.36.camel@sauron.fi.intel.com>
+Message-ID: <1336483275-8610-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 2:37 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Salut Jean,
->
->
-> On 5/8/2012 1:23 PM, Jean Pihet wrote:
->>
->> Hi Benoit,
->>
->> On Tue, May 8, 2012 at 1:01 PM, Cousson, Benoit<b-cousson@ti.com> ?wrote:
->>>
->>> Hi Kevin& ?Jon,
->>>
->>>
->>>
->>> On 5/8/2012 1:28 AM, Kevin Hilman wrote:
->>>>
->>>>
->>>> Jon Hunter<jon-hunter@ti.com> ? ?writes:
->>>>
->>>>> Hi Kevin,
->>>>>
->>>>> On 05/07/2012 12:15 PM, Kevin Hilman wrote:
->>>>>>
->>>>>>
->>>>>> Jon Hunter<jon-hunter@ti.com> ? ?writes:
->>>>>>
->>>>>>> Hi Will,
->>>>>>>
->>>>>>> On 04/26/2012 01:07 PM, Will Deacon wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Part of the problem is that the clockdomain data for the emu_sys
->>>>>>>>>> clockdomain is wrong. ?Here's something to try to fix it. ?It
->>>>>>>>>> might
->>>>>>>>>> just
->>>>>>>>>> be enough to get it to work.
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Hmm, doesn't seem to work but I do see the following in dmesg when
->>>>>>>>> I
->>>>>>>>> try to
->>>>>>>>> use perf:
->>>>>>>>>
->>>>>>>>> ?powerdomain: waited too long for powerdomain emu_pwrdm to complete
->>>>>>>>> transition
->>>>>>>>>
->>>>>>>>> which is new with your patch.
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> Sorry to nag, but does anybody have a clue where to go from here? I
->>>>>>>> can
->>>>>>>> start digging in the OMAP PM code, but it's all new territory for
->>>>>>>> me.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> I did a little playing around with this today and I think that I have
->>>>>>> figured out why this was not working (see below). Please can you try
->>>>>>> the
->>>>>>> following patch? I tried this on top of your series for perf/omap4.
->>>>>>>
->>>>>>> Paul, FYI. If this works for Will then I can re-base on top of the
->>>>>>> latest linux-omap and submit to the mailing list.
->>>>>>>
->>>>>>> Also, the above error about the emu_pwrdm is odd too. I noticed that
->>>>>>> the emu_pwrdm is always in the transitioning state. And when I say
->>>>>>> always, I
->>>>>>> mean that even if I check the power domain state while u-boot is
->>>>>>> running it
->>>>>>> is in the transitioning state. So even before the kernel starts.
->>>>>>>
->>>>>>> Cheers
->>>>>>> Jon
->>>>>>>
->>>>>>> ?From 9137ff9c1b382232de7443db0b51b7555846fb62 Mon Sep 17 00:00:00
->>>>>>> 2001
->>>>>>> From: Jon Hunter<jon-hunter@ti.com>
->>>>>>> Date: Fri, 4 May 2012 16:48:45 -0500
->>>>>>> Subject: [PATCH] ARM: OMAP4: Disable auto enable for EMU CLKDM
->>>>>>>
->>>>>>> The flag CLKDM_CAN_HWSUP allows the clock-domain to automatically
->>>>>>> transition
->>>>>>> to the enabled and disabled state. This means that as soon as we
->>>>>>> force
->>>>>>> a
->>>>>>> software wake-up on the clock domain, the clock domain will be
->>>>>>> allowed
->>>>>>> to idle
->>>>>>> and put back into the hardware auto state. For the EMU clock domain
->>>>>>> this is not
->>>>>>> what we want. We want to keep the clock domain in the software wakeup
->>>>>>> state
->>>>>>> while the clock domain is being used and put it back in to the
->>>>>>> hardware
->>>>>>> auto
->>>>>>> state when we have finished using the clock domain.
->>>>>>>
->>>>>>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
->>>>>>
->>>>>>
->>>>>>
->>>>>> With this patch, how is the clkdm ever idled?
->>>>>
->>>>>
->>>>>
->>>>> It does not! Sorry, I was so engrossed with figuring out why the EMU
->>>>> clkdm was being idled as soon as it was enabled, I forgot to check if
->>>>> is
->>>>> ever disabled once we terminated perf :-(
->>>>>
->>>>>> IIUC, your patch will get PMU interrupts working, but similarily to
->>>>>> previous patches in this thread, it works because it *never* allows
->>>>>> the
->>>>>> EMU clkdm to idle. ?This is not a mergeable solution because it will
->>>>>> not
->>>>>> allow CORE retention (and thus full-chip retention.)
->>>>>
->>>>>
->>>>>
->>>>> Right!
->>>>>
->>>>>> What we need is a solution that allows the clkdm to idle, and then to
->>>>>> be
->>>>>> reinitialzed when it wakes up. ?Due to the way (I understand) resets
->>>>>> in
->>>>>> the debugss, allowing the clkdm to idle will cause a reset, so the
->>>>>> PMU/CTI interrupts need to be reinitialzied after wakeup.
->>>>>
->>>>>
->>>>>
->>>>> Yes exactly I see that now. I have prototyped the 3 patches and this is
->>>>> working AND the EMU clkdm does go back to idle. I can send out to the
->>>>> list for review.
->>>>
->>>>
->>>>
->>>> Perfect, thanks.
->>>>
->>>>>> Kevin
->>>>>>
->>>>>> P.S. Please note there is also already a different fix in mainline for
->>>>>> the EMU clkdm data from Paul which adds the force wakeup flag and
->>>>>> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
->>>>>> because the hardware is capable.)
->>>>>
->>>>>
->>>>>
->>>>> Hmmm ... yes saw this, and you will have to excuse me as I don't fully
->>>>> follow the logic here. In fact, I am thinking we want the opposite ;-)
->>>>>
->>>>> ?From looking, into this it seems to me that when PMU is running we
->>>>> want
->>>>> the EMU clock domain in software-wakeup state and when PMU is not
->>>>> running we want in the hardware auto state.
->>>>
->>>>
->>>>
->>>> So far, I'm with you.
->>>>
->>>>> By keeping the ENABLE_AUTO flag set, as soon as we enable the clock
->>>>> domain it is put right back into the HW_AUTO state
->>>>
->>>>
->>>>
->>>> This is only because it was in the HWSUP state when _enable was called.
->>>> If clkdm_deny_idle() is used, that behavior will change.
->>>>
->>>>> and hence PMU is
->>>>> not working (see _enable() function in
->>>>> arch/arm/mach-omap2/omap_hwmod.c)
->>>>>
->>>>> So really what I think we want is to remove the ENABLE_AUTO flag to
->>>>> keep
->>>>> the clock domain in software wake-up and use the DISABLE_AUTO flag to
->>>>> put the clock domain back in HW_AUTO (note this requires a patch to
->>>>> perform this 2nd part).
->>>>
->>>>
->>>>
->>>> Well, Paul will have to comment here for the final word, but IIUC, the
->>>> hwmod flags are supposed to indicate only what the HW is capable of. ?If
->>>> we want to change the runtime behavior, we nee to use (or add) APIs to
->>>> change the beahvior. ?In this case, clkdm_allow_idle(),
->>>> clkdm_deny_idle() are probably what is needed here.
->>>
->>>
->>>
->>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->>> flags describe what the HW is capable of, and the EMU CD can support
->>> HW_AUTO
->>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
->>> next
->>> power state is OFF, meaning that no retention mode is supported. So any
->>> transition to idle will go to OFF and lead to a reset upon wakeup.
->>>
->>> That being said, being able to transition to OFF during idle is a
->>> perfectly
->>> valid state for most powerdomain in OMAP anyway, so we should be able to
->>> restore from OFF mode smoothly.
->>>
->>> It looks to me that what is missing here is *just* a restore path in the
->>> PMU/CTI code. But I'm probably missing some nasty details in this issue
->>> :-)
->>
->> Although it is perfectly feasible to have a seamless transition of the
->> EMU power domain, I think the PMU counters will not be accurate
->> anymore since they stop counting events when going to OFF and re-start
->> after the state restore.
->
->
-> Good point, but I think the PMU might still works fine because located
-> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
-> going to OFF and thus will be reset.
-Ever better point ;p Thanks for the precision.
-In any case my point was: can we allow the EMU CD to go OFF or prevent
-it from doing so? We need to answer that question first.
+Fix build error without choose fec driver.
 
-> But that whole DEBUGSS is such a nightmare, that I'm not 100% sure about
-> that :-)
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6q.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-
->
-> Regards,
-> Benoit
->
-
-Jean
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index d25c5d8..999de69 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -60,6 +60,7 @@ soft:
+ 	soft_restart(0);
+ }
+ 
++#if defined(CONFIG_FEC) || defined(CONFIG_FEC_MODULE)
+ /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
+ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ {
+@@ -74,11 +75,14 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ 
+ 	return 0;
+ }
++#endif
+ 
+ static void __init imx6q_sabrelite_init(void)
+ {
++#if defined(CONFIG_FEC) || defined(CONFIG_FEC_MODULE)
+ 	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+ 				ksz9021rn_phy_fixup);
++#endif
+ }
+ 
+ static void __init imx6q_init_machine(void)
+-- 
+1.7.5.4
