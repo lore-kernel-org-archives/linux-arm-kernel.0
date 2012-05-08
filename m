@@ -1,40 +1,43 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 08 May 2012 08:18:50 -0400
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <4FA90127.1050107@linaro.org> (Lee Jones's message of "Tue, 08
- May 2012 12:19:03 +0100")
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org>
- <20120425185747.GC24211@n2100.arm.linux.org.uk>
- <4FA29E46.6040204@linaro.org>
- <20120503151253.GE897@n2100.arm.linux.org.uk>
- <4FA2A4A8.9010208@linaro.org>
- <20120503163008.GF897@n2100.arm.linux.org.uk>
- <4FA2B4A3.2040402@linaro.org>
- <20120503164501.GG897@n2100.arm.linux.org.uk>
- <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
- <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
- <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
- <4FA90127.1050107@linaro.org>
-Message-ID: <878vh2rhlh.fsf@laptop.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 May 2012 13:19:41 +0100
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <4FA90BE1.3050304@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FA90BE1.3050304@linaro.org>
+Message-ID: <20120508121940.GL15893@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Tue, May 08, 2012 at 01:04:49PM +0100, Lee Jones wrote:
+> On 07/05/12 18:08, Mark Brown wrote:
 
-On Tue, May 08 2012, Lee Jones wrote:
-> I've fixed the issue. How would you like the fix?
->
-> As a fix patch, or a replacement for the broken one?
+> >You should be using of_regulator_match() for this (I think it's supposed
+> >to do an equivalent job...) rather than open coding.
 
-Let's go with a fix patch.  (I may squash it into the original later,
-before sending it to Linus.)
+> of_regulator_match() didn't exist when I wrote this. In fact, it
+> only made it into -next a couple of days ago. Besides, it doesn't
 
-Thanks,
+It's been kicking around for review for a little while longer than that
+(it was waiting for review while Rhyland was on holiday), and in any
+case half the reason for adding infrastructure is to avoid adding
+repeated code.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> satisfy the needs of this code segment. of_regulator_match() is
+> a(nother) wrapper around of_get_regulation_constraints(), which is
+> only used to populate 'struct regulation_constraints constraints'
+> after being provided with a selection of .compatible strings.
+
+I suspect that what you're trying to achieve isn't a good regulator
+binding but I'm not entirely sure what you're trying to do so perhaps
+not.  You haven't documented the binding at all which might make things
+clearer...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120508/5436d4b0/attachment-0001.sig>
