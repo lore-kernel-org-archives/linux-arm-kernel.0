@@ -1,114 +1,114 @@
-From: jemmajones81@yahoo.co.uk (Jemma Jones)
-Date: Tue, 8 May 2012 11:13:36 +0100 (BST)
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
- <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
-Message-ID: <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 8 May 2012 10:17:41 +0000
+Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy
+ loop condition test macro
+In-Reply-To: <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
+ <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B667C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: Development tree for Cortex-A15?
-
+On Mon, May 07, 2012 at 10:51:53, J, KEERTHY wrote:
+> On Fri, May 4, 2012 at 2:42 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
+> > On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
+> >> From: Jean Pihet <j-pihet@ti.com>
+> >>
+> >> Now that omap_test_timeout is only accessible from mach-omap2/,
+> >> introduce a similar function for SR.
+> >>
+> >> This change makes the SmartReflex implementation ready for the move
+> >> to drivers/.
+> >>
+> >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> >> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+> >> ---
+> >> ?arch/arm/mach-omap2/smartreflex.c | ? 12 ++++++------
+> >> ?include/linux/power/smartreflex.h | ? 23 ++++++++++++++++++++++-
+> >> ?2 files changed, 28 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> >> index d859277..acef08d 100644
+> >> --- a/arch/arm/mach-omap2/smartreflex.c
+> >> +++ b/arch/arm/mach-omap2/smartreflex.c
+> >> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
+> >> ? ? ? ?* Wait for SR to be disabled.
+> >> ? ? ? ?* wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
+> >> ? ? ? ?*/
+> >> - ? ? omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+> >> - ? ? ? ? ? ? ? ? ? ? ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+> >> - ? ? ? ? ? ? ? ? ? ? timeout);
+> >> + ? ? sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+> >>
+> >> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
+> >> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+> >> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
+> >> ? ? ? ?* Wait for SR to be disabled.
+> >> ? ? ? ?* wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
+> >> ? ? ? ?*/
+> >> - ? ? omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
+> >> - ? ? ? ? ? ? ? ? ? ? IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+> >> - ? ? ? ? ? ? ? ? ? ? timeout);
+> >> + ? ? sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
+> >>
+> >> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
+> >> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
+> >> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+> >> index 884eaee..78b795e 100644
+> >> --- a/include/linux/power/smartreflex.h
+> >> +++ b/include/linux/power/smartreflex.h
+> >> @@ -22,7 +22,7 @@
+> >>
+> >> ?#include <linux/types.h>
+> >> ?#include <linux/platform_device.h>
+> >> -
+> >> +#include <linux/delay.h>
+> >> ?#include <plat/voltage.h>
+> >>
+> >> ?/*
+> >> @@ -168,6 +168,27 @@ struct omap_sr {
+> >> ?};
+> >>
+> >> ?/**
+> >> + * test_cond_timeout - busy-loop, testing a condition
+> >> + * @cond: condition to test until it evaluates to true
+> >> + * @timeout: maximum number of microseconds in the timeout
+> >> + * @index: loop index (integer)
+> >> + *
+> >> + * Loop waiting for @cond to become true or until at least @timeout
+> >> + * microseconds have passed. ?To use, define some integer @index in the
+> >> + * calling code. ?After running, if @index == @timeout, then the loop has
+> >> + * timed out.
+> >> + *
+> >> + * Copied from omap_test_timeout */
+> >> +#define sr_test_cond_timeout(cond, timeout, index) ? ? ? ? ? \
+> >> +({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> >> + ? ? for (index = 0; index < timeout; index++) { ? ? ? ? ? ? \
+> >> + ? ? ? ? ? ? if (cond) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> >> + ? ? ? ? ? ? ? ? ? ? break; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> >> + ? ? ? ? ? ? udelay(1); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> >> + ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> >> +})
+> >
+> > I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
+> > tight loops instead of udelay().
 > 
-> On Fri, 4 May 2012 13:20:08 +0100 (BST), Jemma Jones
-> <jemmajones81@yahoo.co.uk> wrote:
->>>  Subject: Re: Development tree for Cortex-A15?
->>> 
->>>  On Fri, 4 May 2012 09:44:07 +0100 (BST), Jemma Jones
->>>  <jemmajones81@yahoo.co.uk> wrote:
->>>>> ? Subject: Re: Development tree for Cortex-A15?
->>>> 
->>>>> 
->>>>> ? On Thu, 3 May 2012 14:35:55 +0100 (BST), Jemma Jones
->>>>> ? <jemmajones81@yahoo.co.uk> wrote:
->>>>>>>  ? Subject: Re: Development tree for Cortex-A15?
->>>>>> 
->>>>>>  ? I'm currently on kvm-arm-v7-ael, because it looked 
-> like the 
->>>  most
->>>>>>  ? up-to-date one. Which one should I be using for 
-> Cortex-A15 
->>>  support?
->>>>> 
->>>>> ? That branch is good enough, if you have a bleeding edge QEMU. 
-> Note
->>>>> ? that
->>>>> ? the VE A15 support in that tree is DT only. I'm working on 
-> a v3.4 
->>>  based
->>>>> ? one
->>>>> ? at the moment, but that's not completely ready yet.
->>>> 
->>>> ? I'm just a little confused because under 
-> arch/arm/mach-vexpress/
-> there
->>>  is
->>>> ? no A15 tile? On the virtualopensystems.com git (which you quote
-> above)
->>>  you
->>>> ? had to explicitly enable the board and it would show up in the
-> .config
->>>  as
->>>> ? CONFIG_ARCH_VEXPRESS_CA15X4. Is that not the case anymore in your
->>>> ? kernel
->>>> ? tree?
->>> 
->>>  No. The ARM tree in general is moving to the device tree, and
->>>  CONFIG_ARCH_VEXPRESS_CA15X4 was always meant as a temporary hack until
->>>  the
->>>  VE-DT port was mature enough to be used.
->>> 
->>>  As Pawe?'s DT work has been merged into 3.4, there is strictly no
-> reason
->>>  to keep this hack around, and my recent trees do reflect that fact
->>>  (kvm-arm-v7-ael and kvm-arm-3.4). Christoffer may decide to keep this
-> in
->>>  his tree during a transition period, but CONFIG_ARCH_VEXPRESS_CA15X4 is
->>>  dead as far as I am concerned.
->>> 
->>>  If you're just starting to play with KVM-ARM now, please don't 
-> rely on 
->>>  the
->>>  A15 board file, it is a dead end.
->> 
->>  Any chance you can send me a .config file that works on the kernel in
-> this
->>  branch which runs on your A15x1 FastModel?
+> cpu_relax() changes the priority everytime to low and will yield to
+> another thread.
+> Considering that we are checking the condition every microsecond does it make
+> some saving using cpu_relax().
 > 
-> Coming in a private email.
 
-I didn't seem to get anything?
+cpu_relax() does not involve any priority changes or scheduling AFAICS.
+Have a look at this thread:
 
-?
->>  I'm using the boot-wrapper from
->>  http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
->>  semi hosting mode.
->> 
->>  I managed to boot Android from that but I don't seem to be able to boot
->>  your kernel. It just stops after the boot-wrapper says loading uImage.
-> 
-> Which dts file are you using?
+http://www.spinics.net/lists/netdev/msg151699.html
 
-I don't quite understand yet how the DT stuff is used. When I build the DTB files then I get vexpress-v2p-ca15-tc1.dtb in my arch/arm/boot directory. I assume that one is used then for my kernel image?
-
-My .config has all the DT stuff enabled I think:
-CONFIG_ARCH_VEXPRESS_DT=y
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-
-Or is that not correct?
-
-I have now updated to you latest kvm-arm-3.4 branch.
-
-But the kernel still does not boot up properly, or at least I don't seem to get any output. It just goes "Uncompressing Linux... done." and then does nothing.
-I'm using the FastModel Cortex-A15x2 simulation.
-
-Cheers
-Jemma
+Regards
+AnilKumar
