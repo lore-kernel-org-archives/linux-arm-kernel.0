@@ -1,114 +1,83 @@
 From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 8 May 2012 10:17:41 +0000
-Subject: [PATCH V3 05/10] ARM: OMAP2+: SmartReflex: introduce a busy
- loop condition test macro
-In-Reply-To: <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
+Date: Tue, 8 May 2012 10:17:44 +0000
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <87mx5jy2li.fsf@ti.com>
 References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-6-git-send-email-j-keerthy@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1B40@DBDE01.ent.ti.com>
- <CAJ6a13aA9nutZvRkcj8GHok9cEe8A=J2bwzSXt=Sd0Hu_WPaPw@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B667C@DBDE01.ent.ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>	<87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 10:51:53, J, KEERTHY wrote:
-> On Fri, May 4, 2012 at 2:42 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> > On Thu, Apr 26, 2012 at 23:10:36, J, KEERTHY wrote:
-> >> From: Jean Pihet <j-pihet@ti.com>
-> >>
-> >> Now that omap_test_timeout is only accessible from mach-omap2/,
-> >> introduce a similar function for SR.
-> >>
-> >> This change makes the SmartReflex implementation ready for the move
-> >> to drivers/.
-> >>
-> >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> >> Signed-off-by: J Keerthy <j-keerthy@ti.com>
-> >> ---
-> >> ?arch/arm/mach-omap2/smartreflex.c | ? 12 ++++++------
-> >> ?include/linux/power/smartreflex.h | ? 23 ++++++++++++++++++++++-
-> >> ?2 files changed, 28 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> >> index d859277..acef08d 100644
-> >> --- a/arch/arm/mach-omap2/smartreflex.c
-> >> +++ b/arch/arm/mach-omap2/smartreflex.c
-> >> @@ -289,9 +289,9 @@ static void sr_v1_disable(struct omap_sr *sr)
-> >> ? ? ? ?* Wait for SR to be disabled.
-> >> ? ? ? ?* wait until ERRCONFIG.MCUDISACKINTST = 1. Typical latency is 1us.
-> >> ? ? ? ?*/
-> >> - ? ? omap_test_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
-> >> - ? ? ? ? ? ? ? ? ? ? ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
-> >> - ? ? ? ? ? ? ? ? ? ? timeout);
-> >> + ? ? sr_test_cond_timeout((sr_read_reg(sr, ERRCONFIG_V1) &
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?ERRCONFIG_MCUDISACKINTST), SR_DISABLE_TIMEOUT,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
-> >>
-> >> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
-> >> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-> >> @@ -334,9 +334,9 @@ static void sr_v2_disable(struct omap_sr *sr)
-> >> ? ? ? ?* Wait for SR to be disabled.
-> >> ? ? ? ?* wait until IRQSTATUS.MCUDISACKINTST = 1. Typical latency is 1us.
-> >> ? ? ? ?*/
-> >> - ? ? omap_test_timeout((sr_read_reg(sr, IRQSTATUS) &
-> >> - ? ? ? ? ? ? ? ? ? ? IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
-> >> - ? ? ? ? ? ? ? ? ? ? timeout);
-> >> + ? ? sr_test_cond_timeout((sr_read_reg(sr, IRQSTATUS) &
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?IRQSTATUS_MCUDISABLEACKINT), SR_DISABLE_TIMEOUT,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?timeout);
-> >>
-> >> ? ? ? if (timeout >= SR_DISABLE_TIMEOUT)
-> >> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-> >> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
-> >> index 884eaee..78b795e 100644
-> >> --- a/include/linux/power/smartreflex.h
-> >> +++ b/include/linux/power/smartreflex.h
-> >> @@ -22,7 +22,7 @@
-> >>
-> >> ?#include <linux/types.h>
-> >> ?#include <linux/platform_device.h>
-> >> -
-> >> +#include <linux/delay.h>
-> >> ?#include <plat/voltage.h>
-> >>
-> >> ?/*
-> >> @@ -168,6 +168,27 @@ struct omap_sr {
-> >> ?};
-> >>
-> >> ?/**
-> >> + * test_cond_timeout - busy-loop, testing a condition
-> >> + * @cond: condition to test until it evaluates to true
-> >> + * @timeout: maximum number of microseconds in the timeout
-> >> + * @index: loop index (integer)
-> >> + *
-> >> + * Loop waiting for @cond to become true or until at least @timeout
-> >> + * microseconds have passed. ?To use, define some integer @index in the
-> >> + * calling code. ?After running, if @index == @timeout, then the loop has
-> >> + * timed out.
-> >> + *
-> >> + * Copied from omap_test_timeout */
-> >> +#define sr_test_cond_timeout(cond, timeout, index) ? ? ? ? ? \
-> >> +({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> >> + ? ? for (index = 0; index < timeout; index++) { ? ? ? ? ? ? \
-> >> + ? ? ? ? ? ? if (cond) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> >> + ? ? ? ? ? ? ? ? ? ? break; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> >> + ? ? ? ? ? ? udelay(1); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> >> + ? ? } ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> >> +})
+On Tue, May 08, 2012 at 05:18:41, Hilman, Kevin wrote:
+> "AnilKumar, Chimata" <anilkumar@ti.com> writes:
+> 
+> > On Sat, Apr 28, 2012 at 02:31:17, Hilman, Kevin wrote:
+> >> Hi Mark,
+> >> 
+> >> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+> >> 
+> >> > On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+> >> >
+> >> >> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
+> >> >> pre defined Operating Performance Points or the OPPs. Every OPP being
+> >> >> a voltage/frequency pair. Smartreflex is a different
+> >> >> power management technique.
+> >> >
+> >> > But presumably these things should integrate somehow - for example,
+> >> > should devfreq and cpufreq be providing inputs into what AVS is doing,
+> >> > and if so how?
+> >> 
+> >> The way it is currently designed, cpufreq/devfreq/regulator layers don't
+> >> need to know about AVS.
+> >> 
+> >> The higher-level layers only know about the "nominal" voltage.  AVS
+> >> hardware does automatic, adaptive, micro-adjustments around that nominal
+> >> voltage, and these micro-adjustments are managed by the AVS hardware
+> >> sending commands to the PMIC.  (specifically, on OMAP, the AVS sensors
+> >> provide inputs to the voltage processor (VP) which provide inputs to the
+> >> voltage controller (VC) which sends commands to the PMIC[1].)
+> >> 
+> >> The driver proposed here is primarily for initializing the various
+> >> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+> >> adjustments are done in hardware by VC/VP.
+> >> 
+> >> The only thing the higher-level layers might potentially need to do to
+> >> enable/disable AVS around transitions (e.g. when changing OPP, AVS is
+> >> disabled before changing OPP and only re-enabled when the new nominal
+> >> voltage has been acheived.)
+> >> 
+> >> On OMAP, we handle this inside the OMAP-specific voltage layer which is
+> >> called by the regulator framework, so even the regulators do not need
+> >> any knowledge of AVS.
 > >
-> > I think we can use time_after()/time_before() APIs for timeout and cpu_relax() for
-> > tight loops instead of udelay().
+> > Kevin,
+> >
+> > I want to point out some cases of SR implementation where this may not
+> > be true.
+> >
+> > Devices like DM8168, DM8148 and AM335X use Class 2B implementation of SR.
+> >
+> > Under this, SR module issues an interrupt to ARM when there is a need to
+> > change the voltage based on temperature changes, ageing etc.
+> >
+> > Once the interrupt arrives, kernel needs to adjust voltage using regulator API.
+> > The voltage change is a micro adjustment as in other SR classes.
 > 
-> cpu_relax() changes the priority everytime to low and will yield to
-> another thread.
-> Considering that we are checking the condition every microsecond does it make
-> some saving using cpu_relax().
+> That can easily be handled writing a plugin specific to class 2B.  This
+> driver was designed so plugins for other classes can be supported.  
+> 
+> Sure, we might need some enhancements for other classes (we already know
+> that we will for class 1 support.)  However, the purpose of this series
+> is to do the cleanups necessary for the driver to move to drivers/*.
 > 
 
-cpu_relax() does not involve any priority changes or scheduling AFAICS.
-Have a look at this thread:
+It's perfectly fine with me. My intention was just to highlight that
+class 2B SR will have to interact with regulator layer for voltage
+changes, so I guess it is little different from other SR classes.
 
-http://www.spinics.net/lists/netdev/msg151699.html
-
-Regards
+Thanks,
 AnilKumar
