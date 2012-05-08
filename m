@@ -1,28 +1,34 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 09 May 2012 04:04:54 +0530
-Subject: [PATCH] mtd: m25p80: Add support for Winbond W25Q80BW
-Message-ID: <1336516494-22791-1-git-send-email-thomas.abraham@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 08 May 2012 15:38:09 -0700
+Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
+ around __omap2_set_globals
+In-Reply-To: <1336506724-5494-4-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Wed, 9 May 2012 01:22:03 +0530")
+References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
+ <1336506724-5494-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <87397ajo32.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Winbond W25Q80BW is a 8Mbit serial flash memory device.
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/mtd/devices/m25p80.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> The function __omap2_set_globals() can be common across all
+> platforms/architectures, even in case of omap4, internally it
+> calls same set of functions as in __omap2_set_globals() function
+> (except for sdrc).
 
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index 1924d24..dbd44b1 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -728,6 +728,7 @@ static const struct spi_device_id m25p_ids[] = {
- 	{ "w25q32", INFO(0xef4016, 0, 64 * 1024,  64, SECT_4K) },
- 	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
- 	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
-+	{ "w25q80", INFO(0xef5014, 0, 64 * 1024,  16, SECT_4K) },
- 
- 	/* Catalyst / On Semiconductor -- non-JEDEC */
- 	{ "cat25c11", CAT25_INFO(  16, 8, 16, 1) },
--- 
-1.6.6.rc2
+OK so far.
+
+> This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
+> so that we can reuse same function across omap2/3/4...
+
+But what happens when a single kernel is built that has support for an
+SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
+
+In that case this new SOC_HAS_OMAP2_SDRC will be set, and
+set_globals_sdrc() will be called even for the SoCs without SDRC.
+
+So, rather than add a new Kconfig option for this, I would rather see 
+you using the existing runtime feature check for the SDRC: omap_has_sdrc()
+
+Kevin
