@@ -1,249 +1,111 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 8 May 2012 10:40:27 +0200
-Subject: [PATCH 2/6] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <alpine.DEB.2.00.1205070043230.9984@utopia.booyaka.com>
-References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
- <1334752782-28804-3-git-send-email-j-pihet@ti.com>
- <alpine.DEB.2.00.1205070043230.9984@utopia.booyaka.com>
-Message-ID: <CAORVsuXUbz_f54x=hoFLEQpfAGTDcZGnTQ-fBgY_j415LC0TiQ@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 08 May 2012 14:27:32 +0530
+Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
+In-Reply-To: <1336466198.2149.269.camel@sokoban>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>	
+ <1334913591-26312-7-git-send-email-t-kristo@ti.com> <87pqafv810.fsf@ti.com>
+ <1336466198.2149.269.camel@sokoban>
+Message-ID: <4FA8DFFC.6050608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-
-On Mon, May 7, 2012 at 11:28 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> On Wed, 18 Apr 2012, jean.pihet at newoldbits.com wrote:
->
->> From: Jean Pihet <j-pihet@ti.com>
+On Tuesday 08 May 2012 02:06 PM, Tero Kristo wrote:
+> On Mon, 2012-05-07 at 17:19 -0700, Kevin Hilman wrote:
+>> Tero Kristo<t-kristo@ti.com>  writes:
 >>
->> Introduce functional (or logical) states for power domains and the
->> API functions to read the power domains settings and to convert
->> between the functional (i.e. logical) and the internal (or registers)
->> values.
+>>> From: Axel Haslam<axelhaslam@gmail.com>
+>>>
+>>> On OMAP4, there is no support to read previous logic state
+>>> or previous memory state achieved when a power domain transitions
+>>> to RET. Instead there are module level context registers.
+>>>
+>>> In order to support the powerdomain level logic/mem_off_counters
+>>> on OMAP4, instead use the previous power state achieved (RET) and
+>>> the *programmed* logic/mem RET state to derive if a powerdomain lost
+>>> logic or did not.
 >>
->> OMAP2, OMAP3 and OMAP4 platforms are defining a conversion routine.
+>> OK, but this also changes the behavior for OMAP3 as well, right?  I
+>> don't see in the changelog how this affects OMAP3 and whether it is
+>> still expected to work on OMAP3.  When changing common code like this,
+>> the changelog should describe the impacts on to all affected SoCs.
 >>
->> In the new API the function omap_set_pwrdm_state takes the functional
->> states as parameter; while at it the function is moved to the power
->> domains code.
+>> As suggested by Vaibhav Bedia, now might be the right time to add this
+>> function to the SoC specific function pointers (struct pwrdm_ops.)
 >>
->> The memory and logic states are not using the functional states, this
->> comes as a subsequent patch.
+>> Doing that, the existing function could be used for OMAP3 (and OMAP4 if
+>> the changelog describes that it can/should be used for both.)
 >>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> Then, when AM33xx support is added, it will be obvious where they will
+>> need to plugin support for that SoC.
 >
-> This patch results in several checkpatch warnings; please resolve them.
-Oops. Will check and update.
+> How about the following patch? It will add a couple of redundant
+> read_prev_pwrst calls, but works in the same way as the original patch,
+> without touching the generic code. Also, as there have been talks about
+> adding caching for some of the pwrdm registers (especially the
+> prev_pwrst), this might not be that big of an issue.
+>
+> If this looks good to you, I'll re-post the set with this patch.
+>
+> -Tero
+>
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain44xx.c
+> b/arch/arm/mach-omap2/powerdomain44xx.c
+> index 9bfb8a0..3d5e8d4 100644
+> --- a/arch/arm/mach-omap2/powerdomain44xx.c
+> +++ b/arch/arm/mach-omap2/powerdomain44xx.c
+> @@ -155,6 +155,14 @@ static int omap4_pwrdm_read_logic_retst(struct
+> powerdomain *pwrdm)
+>   	return v;
+>   }
+>
+> +static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+> +{
+> +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
+> +		return PWRDM_POWER_ON;
+> +
+> +	return omap4_pwrdm_read_logic_retst(pwrdm);
 
->
->> ---
->> ?arch/arm/mach-omap2/pm.c ? ? ? ? ? ? ? ? ? | ? 66 -----------
->> ?arch/arm/mach-omap2/powerdomain-common.c ? | ? 61 ++++++++++
->> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ?| ?175 ++++++++++++++++++++++++++++
->> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ?| ? 21 ++++
->> ?arch/arm/mach-omap2/powerdomain2xxx_3xxx.c | ? ?5 +
->> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ?| ? ?2 +
->> ?6 files changed, 264 insertions(+), 66 deletions(-)
->>
-...
+Looks good to me. Do these ever get called with target state programmed
+to OFF?
 
->> +/*
->> + * Functional (i.e. logical) to internal (i.e. registers)
->> + * values for the power domains states
->> + */
->
-> Please use kerneldoc-style function comments.
-Ok
+regards,
+Rajendra
 
+> +}
+> +
+>   static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8
+> bank)
+>   {
+>   	u32 m, v;
+> @@ -183,6 +191,14 @@ static int omap4_pwrdm_read_mem_retst(struct
+> powerdomain *pwrdm, u8 bank)
+>   	return v;
+>   }
 >
->> +int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? switch (func_pwrst) {
->> + ? ? case PWRDM_FUNC_PWRST_ON:
->> + ? ? ? ? ? ? ret = PWRDM_POWER_ON;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_FUNC_PWRST_INACTIVE:
->> + ? ? ? ? ? ? ret = PWRDM_POWER_INACTIVE;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_FUNC_PWRST_CSWR:
->> + ? ? case PWRDM_FUNC_PWRST_OSWR:
->> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_FUNC_PWRST_OFF:
->> + ? ? ? ? ? ? ret = PWRDM_POWER_OFF;
->> + ? ? ? ? ? ? break;
->> + ? ? default:
->> + ? ? ? ? ? ? ret = -1;
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->
-> At a quick glance, I don't think that this function is appropriate for all
-> OMAP2+ chips. ?For example, off-mode is not supported in our OMAP2xxx
-> kernels. ?And OMAP2xxx/3xxx do not support the INACTIVE powerstate. ?So
-> probably this function should differ by chip, and be located in the
-> powerdomain[2-4]*xx*.c files.
-I hope to make this function as generic as possible, hence the
-location (powerdomain-common.c). Some states are not programmed by the
-pwrdm_* functions since there forbidden by the contents of the
-pwrdm->pwrst field.
-Now if the need arises some platform specific function can be defined
-for conversion functions since the pwrdm->ops function pointers are
-used. I do not think it is needed now but it can easily be changed.
-
-> Also, what about the logic and memory bank power states? ?Shouldn't this
-> function pass those back as well?
-Cf. in the description "The memory and logic states are not using the
-functional states, this comes as a subsequent patch."
-
->
->> +
->> +/*
->> + * Internal (i.e. registers) to functional (i.e. logical) values
->> + * for the power domains states
->> + */
->
-> Please use kerneldoc-style function documentation.
-Ok
-
->
->> +int omap2_pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst)
->
-> Probably best to use "func_pwrst" or "fpwrst" rather than simply "func"
-> here.
-Ok. I am for 'omap2_pwrdm_pwrst_to_fpwrst(...)'.
-
->
->> +{
->> + ? ? int ret;
->> +
->> + ? ? switch (pwrst) {
->> + ? ? case PWRDM_POWER_ON:
->> + ? ? ? ? ? ? ret = PWRDM_FUNC_PWRST_ON;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_POWER_INACTIVE:
->> + ? ? ? ? ? ? ret = PWRDM_FUNC_PWRST_INACTIVE;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_POWER_RET:
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* XXX warning: return OSWR in case of pd in RET and
->> + ? ? ? ? ? ? ?* logic in OFF
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? ret = PWRDM_FUNC_PWRST_CSWR;
->> + ? ? ? ? ? ? break;
->> + ? ? case PWRDM_POWER_OFF:
->> + ? ? ? ? ? ? ret = PWRDM_FUNC_PWRST_OFF;
->> + ? ? ? ? ? ? break;
->> + ? ? default:
->> + ? ? ? ? ? ? ret = -1;
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->
-> This function also needs to check the bank power states and logic power
-> states to determine what the actual functional powerstate is.
-Same remark as above + there is a comment about it in the code ("XXX warning").
-
->> +
->> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
->> index 319b277..718fa43 100644
->> --- a/arch/arm/mach-omap2/powerdomain.c
->> +++ b/arch/arm/mach-omap2/powerdomain.c
->> @@ -466,6 +466,136 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
->> ?}
->>
->> ?/**
->> + * pwrdm_func_to_pwrst - get the internal (i.e. registers) value mapped
->> + * to the functional state
->
-> Probably best to use "func_pwrst" or "fpwrst" rather than simply "func"
-> here.
-Ok
-
->
->> + * @pwrdm: struct powerdomain * to query
->> + * @func_pwrst: functional power state
->> + *
->> + * Convert the functional power state to the platform specific power
->> + * domain state value.
->> + * Returns the internal power domain state value or -EINVAL in case
->> + * of invalid parameters passed in.
->> + */
->> +int pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
->> +{
->> + ? ? int ret = func_pwrst;
->> +
->> + ? ? if ((!pwrdm)|| (func_pwrst >= PWRDM_MAX_FUNC_PWRSTS))
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? pr_debug("powerdomain: convert %0x func to pwrst for %s\n",
->> + ? ? ? ? ? ? ?func_pwrst, pwrdm->name);
->> +
->> + ? ? if (arch_pwrdm && arch_pwrdm->pwrdm_func_to_pwrst) {
->> + ? ? ? ? ? ? ret = arch_pwrdm->pwrdm_func_to_pwrst(pwrdm, func_pwrst);
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->> +
->> +/**
->> + * pwrdm_pwrst_to_func - get the functional (i.e. logical) value mapped
->> + * to the internal state
->> + * @pwrdm: struct powerdomain * to query
->> + * @pwrst: internal power state
->> + *
->> + * Convert the internal power state to the power domain functional value.
->> + * Returns the functional power domain state value or -EINVAL in case
->> + * of invalid parameters passed in.
->> + */
->> +int pwrdm_pwrst_to_func(struct powerdomain *pwrdm, u8 pwrst)
->> +{
->> + ? ? int ret = pwrst;
->> +
->> + ? ? if ((!pwrdm)|| (pwrst >= PWRDM_MAX_PWRSTS))
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? pr_debug("powerdomain: convert %0x pwrst to func for %s\n",
->> + ? ? ? ? ? ? ?pwrst, pwrdm->name);
->> +
->> + ? ? if (arch_pwrdm && arch_pwrdm->pwrdm_pwrst_to_func) {
->> + ? ? ? ? ? ? ret = arch_pwrdm->pwrdm_pwrst_to_func(pwrdm, pwrst);
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->> +
->> +/* Types of sleep_switch used in omap_set_pwrdm_state */
->> +#define FORCEWAKEUP_SWITCH ? 0
->> +#define LOWPOWERSTATE_SWITCH 1
->> +
->> +/**
->> + * omap_set_pwrdm_state - program next powerdomain power state
->> + * @pwrdm: struct powerdomain * to set
->> + * @func_pwrst: power domain functional state, one of the PWRDM_FUNC_* macros
->> + *
->> + * This programs the pwrdm next functional state, sets the dependencies
->> + * and waits for the state to be applied.
->> + */
->> +int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
->
-> This should presumably get renamed to match the other function names in
-> this file, to be something like pwrdm_set_func_pwrst() or something
-> similar.
-Ok that makes sense.
-
-...
-
+> +static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm,
+> u8 bank)
+> +{
+> +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
+> +		return PWRDM_POWER_ON;
+> +
+> +	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
+> +}
+> +
+>   static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+>   {
+>   	u32 c = 0;
+> @@ -256,9 +272,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+>   	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+>   	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+>   	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
+> +	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
+>   	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+>   	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+>   	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
+> +	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
+>   	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+>   	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+>   	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
 >
 >
-> - Paul
-
-Thanks,
-Jean
