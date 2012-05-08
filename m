@@ -1,26 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 May 2012 14:26:54 +0200
+Date: Tue, 8 May 2012 14:33:38 +0200
 Subject: Handling of modular boards
-In-Reply-To: <201205041934.08830.arnd@arndb.de>
+In-Reply-To: <20120504204455.GR14230@opensource.wolfsonmicro.com>
 References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
- <201205041934.08830.arnd@arndb.de>
-Message-ID: <CACRpkdb4LGXfJ72uODr841O7M4FGTYKa1X7y6ekeLUw9vaL=mw@mail.gmail.com>
+ <4FA432E9.9050606@wwwdotorg.org>
+ <20120504204455.GR14230@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdbyp=BNGn8Eub6vcAgB9CS5PhYcGt2foi8kNxA3oU5Fzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 9:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, May 4, 2012 at 10:44 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, May 04, 2012 at 01:50:01PM -0600, Stephen Warren wrote:
+>
+>> b) Doesn't integrate well with hotplug; the DT for the board
+>> configuration is static at boot. What if a board can be unplugged and
+>> another plugged in; a reboot or similar would be needed to adjust the
+>> kernel to this.
+>
+> This is another issue - a similar set of problems does apply to some PCI
+> type cards where the PCI device is essentially a bridge to a typical
+> embedded system - though practically speaking it's much less severe.
 
-> Thanks for getting the discussion started. I've seen the same issue come
-> up for arch/arm/mach-ux500/board-mop500*uib.c and for the beaglebone.
-> I'm sure there are many more, but we should make sure that everyone
-> of these can live with whatever we come up with.
+I think Alessandro is working on a board like that right now, so looping
+in Ale to this discussion to get his attention...
 
-The same issue sort of comes up with any system that uses the idiom
-to have a few GPIO lines indicate in a binary code what version of the
-board we're dealing with and what devices are thus on it, right?
-
-We have this issue for the U9540 reference design and potentially
-on the Snowball as well.
-
-Yours,
 Linus Walleij
