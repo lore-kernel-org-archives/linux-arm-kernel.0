@@ -1,86 +1,71 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 8 May 2012 22:50:27 +0200
-Subject: mv_cesa dcache problem since 2.6.37 was: Re: mv_cesa hash
- functions
-In-Reply-To: <20120506122506.GJ26481@n2100.arm.linux.org.uk>
-References: <20120223183439.GA18545@orbit.nwl.cc> <4FA5AE7A.3000201@gmail.com>
- <20120506122506.GJ26481@n2100.arm.linux.org.uk>
-Message-ID: <20120508205027.GA31974@schnuecks.de>
+From: neilb@suse.de (NeilBrown)
+Date: Wed, 9 May 2012 06:52:02 +1000
+Subject: [PATCH 2/3] IRQ: allow check_wakeup_irqs to notice
+ level-triggered interrupts.
+In-Reply-To: <alpine.LFD.2.02.1205041759540.6271@ionos>
+References: <20120425025637.7832.14013.stgit@notabene.brown>
+ <20120425030524.7832.85239.stgit@notabene.brown>
+ <alpine.LFD.2.02.1204251018530.2542@ionos>
+ <20120425193916.0db1b4b1@notabene.brown>
+ <alpine.LFD.2.02.1204251402360.2542@ionos>
+ <20120504151221.6998d4e5@notabene.brown>
+ <alpine.LFD.2.02.1205041759540.6271@ionos>
+Message-ID: <20120509065202.3b3b0436@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2012 at 01:25:06PM +0100, Russell King - ARM Linux wrote:
-> On Sun, May 06, 2012 at 12:49:30AM +0200, Simon Baatz wrote:
-> > Am 23.02.2012 19:34, schrieb Phil Sutter:
-> > > But you might suffer from another problem, which is only present on
-> > > ARM machines with VIVT cache and linux >= 2.6.37: due to commit
-> > > f8b63c1, "ARM: 6382/1: Remove superfluous flush_kernel_dcache_page()"
-> > > which prevents pages being flushed from inside the scatterlist
-> > > iterator API. This patch seems to introduce problems in other places
-> > > (namely NFS), too but I sadly did not have time to investigate this
-> > > further. I will post a possible (cryptodev-internal) solution to
-> > > cryptodev-linux-devel at gna.org, maybe this fixes the problem with
-> > > openssl. Greetings, Phil 
+On Fri, 4 May 2012 18:01:22 +0200 (CEST) Thomas Gleixner <tglx@linutronix.de>
+wrote:
+
+> Neil,
 > 
-> Well, the reason it has been removed is as follows:
+> On Fri, 4 May 2012, NeilBrown wrote:
 > 
-
-Thanks for the explanation. This helped a lot.
-
-> > since there has been no reaction on this, I would like to bring this
-> > issue up again (I sadly don't have the expertise to investigate this
-> > further...). The issue is not limited to cryptodev, but seems to be
-> > either a problem with commit f8b63c1 or a problem in mv_cesa that was
-> > uncovered by this commit.
+> > On Wed, 25 Apr 2012 14:54:54 +0200 (CEST) Thomas Gleixner
+> > <tglx@linutronix.de> wrote:
+> > 
+> > > Why not simply managing the pending bit for level irqs ?
+> > > 
+> > 
+> > Hi Thomas,
+> >  thanks again for the patch.  I finally made time to test it and it works as
+> > expected.  I've included it below with a change-log entry and tested-by:
+> > in case that helps.
 > 
-> Can you reproduce it with anything else?
+> thanks for testing. The changelog is great. You know how to make the
+> live of lazy buggers easier :)
 
-No, I only have issues with mv_cesa (and NFS in the past, see below).
- 
-> It could be a problem with the way crypto stuff works - I've never had
-> any dealings with that subsystem, so I really can't comment.  If crypto
-> uses scatterlists, and walks them with the standard API, and uses
-> scatterlists with pages which are already mapped into userspace, then
-> I can see how the above commit would make things go wrong.
+Just buttering you up so any future patches slip past easily :-)
 
-As Phil explained in his mail, this seems to be what happens. I have
-another question on top of his.  mv_cesa uses SG_MITER_TO_SG, whose
-function was described in the respective commit as:
+I think I'll need to ask for IRQS_PENDING to be set for nested interrupts too
+but I'll be a little while before  I an look at that issue properly and
+propose a patch.
 
-commit 6de7e356faf54aa75de5b624bbce28a5b776dfa8
-Author: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
-Date:   Thu Jun 18 10:19:12 2009 +0200
-
-    lib/scatterlist: add a flags to signalize mapping direction
-    sg_miter_start() is currently unaware of the direction of the copy
-    process (to or from the scatter list). It is important to know the
-    direction because the page has to be flushed in case the data written
-    is seen on a different mapping in user land on cache incoherent
-    architectures.
-
-Thus, I would have expected that the scatterlist iterators do the
-necessary "magic" in the userspace mapped case.  Apparently, this is
-not the case with the changes you describe above.  
-
-Is each driver supposed to handle this case or can/should this be handled
-in a generic fashion by scatterlists?
-
-> If it's possible to reproduce with NFS, and it seems sorted in the latest
-> kernel, that's probably because something changed with NFS - NFS did for
-> a time have issues on ARM for various reasons (because of remapping kernel
-> memory into vmalloc space and expecting it to be DMA coherent...) and that
-> got fixed.  Whether that's why you're not seeing problems with v3.4-rc5,
-> I couldn't be sure unless you did a bisection between the bad and good
-> kernel versions.  That would at least allow us to confirm that that issue
-> has been properly resolved.
-
-I had no idea that I reverted f8b63c1 for so long, but you are right
-again.  The merge b9d919a4ac6cf031b8e065f82ad8f1b0c9ed74b1 (in
-2.6.38) containing:
-
-NFS: Don't use vm_map_ram() in readdir
-
-fixes my test case.
+Thanks for your help,
+NeilBrown
 
 
-- Simon
+
+>   
+> >  	for_each_irq_desc(irq, desc) {
+> > -		if (irqd_is_wakeup_set(&desc->irq_data)) {
+> > +		if (desc->depth == 1 &&
+> > +		    irqd_is_wakeup_set(&desc->irq_data)) {
+> >  			if (desc->istate & IRQS_PENDING)
+> >  				return -EBUSY;
+> >  			continue;
+> 
+> I split that part into a separate patch, as it's really a different
+> issue.
+> 
+> Thanks,
+> 
+> 	tglx
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120509/4bb23696/attachment.sig>
