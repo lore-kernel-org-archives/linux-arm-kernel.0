@@ -1,30 +1,61 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 8 May 2012 12:43:41 +0300
-Subject: [PATCH v2 1/3] omap: mailbox: enable mailbox irq per instance
-In-Reply-To: <CADVn9RHc4b+hLth5j-1Jr+dv2ePB8W1pGAgQiBSgFKuDycG8pA@mail.gmail.com>
-References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
- <1334360392-1494-2-git-send-email-jgutierrez@ti.com>
- <CAK=WgbY3OaDH9ziavrXG4oM1ztO3mTmL_eoLPOzCHHKQpHn20w@mail.gmail.com>
- <CADVn9RHc4b+hLth5j-1Jr+dv2ePB8W1pGAgQiBSgFKuDycG8pA@mail.gmail.com>
-Message-ID: <CAK=WgbZBMtn57uHn33OAK_EQizCfiXe2nVHx-4g22vJ7t7DC5Q@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 8 May 2012 11:43:34 +0200
+Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
+Message-ID: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juan,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On Tue, May 8, 2012 at 1:09 AM, Gutierrez, Juan <jgutierrez@ti.com> wrote:
-> Startup it is now only used to enable pm runtime of the whole mbox module.
+This moves the Nomadik "GPIO" driver to the pinctrl subsystem
+and adds the interfaces needed to provide a pinctrl driver for
+the DB8500 ASIC.
 
-Btw I really doubt we need to do that in a machine-specific handler,
-or whether we really need this startup/shutdown abstraction at all.
-But that's not related to your patch of course...
+It further switches Ux500 over to using it with a combination
+of hogs and runtime controls.
 
-> I think, if request_irq is called from the generic layer, it is kind
-> of logical to enable_irq next to it.
+The ux500 portions were developed on top of the gpio and pins
+branch earlier sent for integration in the ARM SoC tree.
 
-I somewhat agree, though I was wondering about the implications for
-OMAP1, which didn't seem to enable_irq at startup at all. Not sure
-there's much to do here (unless you have some OMAP1 hardware ? :).
+Linus Walleij (12):
+  gpio: move the Nomadik GPIO driver to pinctrl
+  pinctrl: basic Nomadik pinctrl interface
+  pinctrl/nomadik: break out single GPIO debug function
+  pinctrl/nomadik: reuse GPIO debug function for pins
+  pinctrl/nomadik: implement pin multiplexing
+  pinctrl/nomadik: implement pin configuration
+  pinctrl: add sleep state definition
+  ARM: ux500: switch over to Nomadik pinctrl driver
+  ARM: ux500: delete custom pin control system
+  ARM: ux500: switch to using pinctrl for uart0
+  ARM: ux500: alter MSP registration to return a device pointer
+  ARM: ux500: switch MSP to using pinctrl for pins
 
-Thanks,
-Ohad.
+ arch/arm/mach-ux500/Kconfig                 |    3 +
+ arch/arm/mach-ux500/board-mop500-msp.c      |   85 +-
+ arch/arm/mach-ux500/board-mop500-pins.c     |  855 ++++++-------
+ arch/arm/mach-ux500/board-mop500.c          |   83 +-
+ arch/arm/mach-ux500/board-mop500.h          |    6 +-
+ arch/arm/mach-ux500/cpu-db8500.c            |    1 +
+ arch/arm/mach-ux500/devices-common.h        |   12 +
+ arch/arm/mach-ux500/pins.c                  |   88 --
+ arch/arm/mach-ux500/pins.h                  |   46 -
+ arch/arm/plat-nomadik/include/plat/pincfg.h |   13 +
+ drivers/gpio/Makefile                       |    1 -
+ drivers/gpio/gpio-nomadik.c                 | 1306 -------------------
+ drivers/pinctrl/Kconfig                     |   10 +
+ drivers/pinctrl/Makefile                    |    2 +
+ drivers/pinctrl/pinctrl-nomadik-db8500.c    |  857 +++++++++++++
+ drivers/pinctrl/pinctrl-nomadik.c           | 1800 +++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-nomadik.h           |   77 ++
+ include/linux/pinctrl/pinctrl-state.h       |   13 +
+ 18 files changed, 3326 insertions(+), 1932 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/pins.c
+ delete mode 100644 arch/arm/mach-ux500/pins.h
+ delete mode 100644 drivers/gpio/gpio-nomadik.c
+ create mode 100644 drivers/pinctrl/pinctrl-nomadik-db8500.c
+ create mode 100644 drivers/pinctrl/pinctrl-nomadik.c
+ create mode 100644 drivers/pinctrl/pinctrl-nomadik.h
+
+-- 
+1.7.9.2
