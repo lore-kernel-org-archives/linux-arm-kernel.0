@@ -1,101 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 May 2012 19:45:06 +0100
-Subject: [PATCH] Prevent process migration during vfp_init()
-In-Reply-To: <CAOsG7try1-E1JOq2w_A2767rbi+iyyahh=H1z9TzY+KLoc8N0g@mail.gmail.com>
-References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
- <20120508111332.GG2263@mudshark.cambridge.arm.com>
- <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
- <20120508180430.GL2263@mudshark.cambridge.arm.com>
- <CAOsG7try1-E1JOq2w_A2767rbi+iyyahh=H1z9TzY+KLoc8N0g@mail.gmail.com>
-Message-ID: <20120508184506.GM2263@mudshark.cambridge.arm.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 08 May 2012 20:46:25 +0200
+Subject: [PATCH v2 3.4-rc6] MTD: NAND: ams-delta: fix request_mem_region()
+ failure
+In-Reply-To: <1336461106.23308.12.camel@sauron.fi.intel.com>
+References: <20120504171125.GD5613@atomide.com>
+ <1336460605.23308.8.camel@sauron.fi.intel.com>
+ <1336461106.23308.12.camel@sauron.fi.intel.com>
+Message-ID: <13373590.4hsHpBS0MY@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2012 at 07:28:08PM +0100, Hyungwoo Yang wrote:
-> Yes, I've already tested without preemption, it seems it is working fine.
-
-Cracking, thanks for confirming that.
-
-> for the failure, it is simple. on my A9 quad, due to heavy loads
-> during "late initcall", sometimes process migration happens just after
-> vfp_enable() but before smp_call_function(). it means there can be a
-> VFP disabled but accessed since smp_call_function() is for the rest of
-> cores not the core running it.
+Dnia wtorek, 8 maja 2012 10:11:46 Artem Bityutskiy pisze:
+> On Tue, 2012-05-08 at 10:03 +0300, Artem Bityutskiy wrote:
+> > On Mon, 2012-05-07 at 22:51 +0200, Janusz Krzysztofik wrote:
+> > > A call to request_mem_region() has been introduced in the omap-
+gpio
+> > > driver recently (commit 96751fcbe5438e95514b025e9cee7a6d38038f40,
+> > > "gpio/omap: Use devm_ API and add request_mem_region"). This 
+change
+> > > prevented the Amstrad Delta NAND driver, which was doing the same 
+in
+> > > order to take control over OMAP MPU I/O lines that the NAND device 
+hangs
+> > > off, from loading successfully.
+> > 
+> > Aiaiai found out that your patch adds this gcc warning:
+> > 
+> > 
+--------------------------------------------------------------------------------
+> > 
+> > Successfully built configuration "l2_omap1_defconfig,arm,arm-unknown-
+linux-gnueabi-", results:
+> > 
+> > --- before_patching.log
+> > +++ after_patching.log
+> > @@ @@
+> > +drivers/mtd/nand/ams-delta.c: In function 'ams_delta_cleanup':
+> > +drivers/mtd/nand/ams-delta.c:285:19: warning: unused variable 'res' 
+[-Wunused-variable]
+> > 
+> > 
+--------------------------------------------------------------------------------
 > 
-> For example, if enable_vfp() is executed on core0 but
-> smp_call_function() is excuted on core1 due to migration, then VFP on
-> core1 is not enabled. it will be enabled next time when the core1
-> online again.
+> But I've fixed this up and pushed to l2-mtd.git.
 
-Yup, your initial explanation was clear enough, I just wanted to check that
-this did indeed solve your testcase given that I've been lucky enough not to
-hit the issue on my boards.
+Many thanks for this.
 
-Can I add your signed-off-by to the following please?
+> From the commit message
+> I have an impression that you are not going to implement that longer
+> term plan.
 
-Will
+I just didn't state 'I'll do it for the next merge window' because my 
+spare time resources are limited, and I've at least one set of changes 
+to the Amstrad Delta code still waiting on my todo list.
 
+I'll try to implement that long term plan as my spare time permits.
 
-Subject: [PATCH] ARM: vfp: ensure preemption is disabled when enabling VFP access
-
-The vfp_enable function enables access to the VFP co-processor register
-space (cp10 and cp11) on the current CPU and must be called with
-preemption disabled. Unfortunately, the vfp_init late initcall does not
-disable preemption and can lead to an oops during boot if thread
-migration occurs at the wrong time and we end up attempting to access
-the FPSID on a CPU with VFP access disabled.
-
-This patch fixes the initcall to call vfp_enable from a non-preemptible
-context on each CPU and adds a BUG_ON(preemptible) to ensure that any
-similar problems are easily spotted in the future.
-
-Reported-by: Hyungwoo Yang <hwoo.yang@gmail.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/vfp/vfpmodule.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index bc683b8..c5767b5 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -11,6 +11,7 @@
- #include <linux/types.h>
- #include <linux/cpu.h>
- #include <linux/cpu_pm.h>
-+#include <linux/hardirq.h>
- #include <linux/kernel.h>
- #include <linux/notifier.h>
- #include <linux/signal.h>
-@@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
- 
- static void vfp_enable(void *unused)
- {
--	u32 access = get_copro_access();
-+	u32 access;
-+
-+	BUG_ON(preemptible());
-+	access = get_copro_access();
- 
- 	/*
- 	 * Enable full access to VFP (cp10 and cp11)
-@@ -657,7 +661,7 @@ static int __init vfp_init(void)
- 	unsigned int cpu_arch = cpu_architecture();
- 
- 	if (cpu_arch >= CPU_ARCH_ARMv6)
--		vfp_enable(NULL);
-+		on_each_cpu(vfp_enable, NULL, 1);
- 
- 	/*
- 	 * First check that there is a VFP that we can use.
-@@ -678,8 +682,6 @@ static int __init vfp_init(void)
- 	} else {
- 		hotcpu_notifier(vfp_hotplug, 0);
- 
--		smp_call_function(vfp_enable, NULL, 1);
--
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
- 		printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
- 			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
--- 
-1.7.4.1
+Thanks,
+Janusz
