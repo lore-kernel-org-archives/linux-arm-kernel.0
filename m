@@ -1,39 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 May 2012 10:10:18 -0600 (MDT)
-Subject: Broken UART I/O wakeups on v3.4-rc4+
-In-Reply-To: <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
-References: <alpine.DEB.2.00.1205072249090.9984@utopia.booyaka.com>
- <CAMrsUdL2ekriQfyM2QqK1h-Wv+r80sk38p8-NYnRJdd9x8UwCw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1205081006480.9984@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2012 09:11:15 -0700
+Subject: [PATCH 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
+ around __omap2_set_globals
+In-Reply-To: <1336489364-19200-4-git-send-email-hvaibhav@ti.com>
+References: <1336489364-19200-1-git-send-email-hvaibhav@ti.com>
+ <1336489364-19200-4-git-send-email-hvaibhav@ti.com>
+Message-ID: <20120508161114.GW5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 May 2012, Raja, Govindraj wrote:
+* Vaibhav Hiremath <hvaibhav@ti.com> [120508 08:10]:
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -20,12 +20,16 @@ config ARCH_OMAP2PLUS_TYPICAL
+>  	help
+>  	  Compile a kernel suitable for booting most boards
+>  
+> +config SOC_HAS_SDRC
+> +	bool "SDRAM Controller support"
+> +
+>  config ARCH_OMAP2
+>  	bool "TI OMAP2"
+>  	depends on ARCH_OMAP2PLUS
+>  	default y
+>  	select CPU_V6
+>  	select MULTI_IRQ_HANDLER
+> +	select SOC_HAS_SDRC
+>  
+>  config ARCH_OMAP3
+>  	bool "TI OMAP3"
 
-> On Tue, May 8, 2012 at 10:35 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> >
->
-> The same is discussed in this thread as in here: 
-> http://www.spinics.net/lists/linux-omap/msg68659.html
+These still need to have OMAP in them, and ideally the type
+of the block. Something like SOC_HAS_OMAP2_SDRC?
 
-OK.
+Regards,
 
-> > Could you please fix this? ?We probably aren't too far from the v3.5 merge
-> > window opening, so there isn't much time to fix it.
-> 
-> okay, one possible solution is to probe pins dynamically
-> and make rx wakeup capable which myself and Tony
-> discussed and came up with this patch [1]
-> 
-> or to add rx wakeup pad support for each board,
-> based on uart used as console.
-
-Oh well, sounds like UART I/O wakeups are going to be broken in v3.4 :-(
-
-Do you have a patch ready for Tony to queue for v3.5 to fix this?  From 
-the above thread, it looks like Tony had some remaining comments to be 
-addressed on your patch.
-
-
-- Paul
+Tony
