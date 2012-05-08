@@ -1,29 +1,83 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 08 May 2012 12:17:40 -0400 (EDT)
-Subject: [PATCH 2/2] remove the debugging restrictions in devicemaps_init()
-In-Reply-To: <20120508071411.GP26481@n2100.arm.linux.org.uk>
-References: <1331876668-32492-1-git-send-email-nico@fluxnic.net>
- <1331876668-32492-3-git-send-email-nico@fluxnic.net>
- <20120506163016.GA7412@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1205072340540.21030@xanadu.home>
- <20120508071411.GP26481@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1205081214220.21030@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 08 May 2012 09:18:06 -0700
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FA927B1.4020108@ti.com> (Benoit Cousson's message of "Tue, 8
+ May 2012 16:03:29 +0200")
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com>
+ <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com>
+ <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
+ <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+ <4FA8FCFF.40105@ti.com>
+ <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
+ <4FA9138D.8010604@ti.com>
+ <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
+ <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com>
+Message-ID: <87wr4mr6io.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 May 2012, Russell King - ARM Linux wrote:
+"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-> On Tue, May 08, 2012 at 12:19:30AM -0400, Nicolas Pitre wrote:
-> > However, the switching itself doesn't involve a full cache flush.
-> 
-> That's where you're wrong.  Look at the switch_mm() helpers in proc-*.S.
-> StrongARM for example calls v4wb_flush_kern_cache_all() here, which needs
-> the cache flushing mappings to be in place in the _current_ page table.
+> On 5/8/2012 4:00 PM, Kevin Hilman wrote:
+>> Jean Pihet<jean.pihet@newoldbits.com>  writes:
+>>
+>> [...]
+>>
+>>>>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
+>>>>>> flags describe what the HW is capable of, and the EMU CD can support
+>>>>>> HW_AUTO
+>>>>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
+>>>>>> next
+>>>>>> power state is OFF, meaning that no retention mode is supported. So any
+>>>>>> transition to idle will go to OFF and lead to a reset upon wakeup.
+>>>>>>
+>>>>>> That being said, being able to transition to OFF during idle is a
+>>>>>> perfectly
+>>>>>> valid state for most powerdomain in OMAP anyway, so we should be able to
+>>>>>> restore from OFF mode smoothly.
+>>>>>>
+>>>>>> It looks to me that what is missing here is *just* a restore path in the
+>>>>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
+>>>>>> :-)
+>>>>>
+>>>>> Although it is perfectly feasible to have a seamless transition of the
+>>>>> EMU power domain, I think the PMU counters will not be accurate
+>>>>> anymore since they stop counting events when going to OFF and re-start
+>>>>> after the state restore.
+>>>>
+>>>>
+>>>> Good point, but I think the PMU might still works fine because located
+>>>> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
+>>>> going to OFF and thus will be reset.
+>>>
+>>> Ever better point ;p Thanks for the precision.
+>>> In any case my point was: can we allow the EMU CD to go OFF or prevent
+>>> it from doing so? We need to answer that question first.
+>>>
+>>
+>> The idea I've suggested is to use runtime PM for this.  As long as the
+>> PMU is in use, it will be runtime PM enabled (and not allowed to go into
+>> HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
+>> then be reset.  The next time it is needed, the runtime resume will need
+>> to do a full re-init.
+>
+> Oh, but does that mean that this driver is not pm_runtime adapted yet?
+>
 
-Right.  I had to be wrong somewhere.
+Actually, it is.  Ming Lei has done it.
 
-What about abstracting the cache area mapping code in a function of its 
-own, and calling it inside install_temp_mm() as well?
+Currently, Will has collected this[1] and is waiting (patiently) for us
+to produce a real fix that doesn't kill PM in the process.
 
+Kevin
 
-Nicolas
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4
