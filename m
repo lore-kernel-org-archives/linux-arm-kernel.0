@@ -1,31 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 11:34:14 -0700
-Subject: [GIT PULL] ARM: OMAP2+: Misc cleanup
-In-Reply-To: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20120508183414.GZ5088@atomide.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 8 May 2012 20:34:50 +0200
+Subject: [PATCH v2 0/4] ARM: S3C24XX: move some code from plat to mach
+ directory
+Message-ID: <201205082034.50658.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [120508 00:18]:
-> Tony,
-> 
-> Please pull the following preparatory cleanup series to add OMAP5 minimal
-> support. Boot tested on OMAP2430 SDP, OMAP3430 SDP and OMAP4430 SDP platforms.
-> 
-> I have dropped {[PATCH 7/7] ARM: OMAP4+: Add prm and cm base init function}
-> from this set since Paul is taking that one in his queue.
+Again the series of small moves of common code from the plat-s3c24xx to the
+mach-s3c24xx directory.
 
-OK thanks, pulling this into cleanup-soc and merging into cleanup branch
-with what we have in devel-hwmod.
- 
-> P.S: While merging this series with linux-omap master, I saw one trivial
-> Makefile conflict.
+This time without the wrong handled irq.c . Hopefully I'll get time to do it
+properly later.
 
-Yes that's with devel-hwmod, I'm basing cleanup branch on that so we have
-all the dependencies out of the way for adding omap5 and am33xx patches
-on top of the cleanup branch.
+As the dev-uart.c move breaks the resource patch by Tushar Behera, I updated
+the patch to fix the correct code and will submit it as a v2 to the resource
+series.
 
-Regards,
+Heiko Stuebner (4):
+  ARM: S3C24XX: move plat-s3c24xx/cpu.c
+  ARM: S3C24XX: move plat-s3c24xx/dev-uart.c into common.c
+  ARM: S3C24XX: move common power-management code to mach-s3c24xx
+  ARM: S3C24XX: move common clock init into common.c
 
-Tony
+ arch/arm/mach-s3c24xx/Makefile                     |    6 +
+ .../{plat-s3c24xx/cpu.c => mach-s3c24xx/common.c}  |   93 ++++++++++++++++++-
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c   |    0
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c       |    0
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S    |    0
+ arch/arm/plat-s3c24xx/Makefile                     |    6 -
+ arch/arm/plat-s3c24xx/clock.c                      |   59 ------------
+ arch/arm/plat-s3c24xx/dev-uart.c                   |  100 --------------------
+ 8 files changed, 98 insertions(+), 166 deletions(-)
+ rename arch/arm/{plat-s3c24xx/cpu.c => mach-s3c24xx/common.c} (75%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c (100%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c (100%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S (100%)
+ delete mode 100644 arch/arm/plat-s3c24xx/clock.c
+ delete mode 100644 arch/arm/plat-s3c24xx/dev-uart.c
+
+-- 
+1.7.5.4
