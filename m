@@ -1,50 +1,20 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 May 2012 14:38:37 +0900
-Subject: [PATCH 2/5] ARM: S3C24XX: move plat-s3c24xx/irq.c into common.c
-In-Reply-To: <201205072230.00758.heiko@sntech.de>
-References: <201205071939.37433.heiko@sntech.de>
- <201205071941.33343.heiko@sntech.de> <201205071959.22122.arnd@arndb.de>
- <201205072230.00758.heiko@sntech.de>
-Message-ID: <017901cd2cdc$d1214c20$7363e460$%kim@samsung.com>
+Date: Tue, 08 May 2012 14:42:07 +0900
+Subject: [PATCH] ARM: EXYNOS: Add platform resource definitions for
+ FIMC-LITE
+In-Reply-To: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
+References: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <017b01cd2cdd$4e4ff570$eaefe050$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Sylwester Nawrocki wrote:
 > 
-> Hi Arnd,
+> Add the gate clocks and register region address definition for
+> FIMC-LITE devices available in Exynos4x12 and Exynos5 SoCs.
 > 
-> Am Montag 07 Mai 2012, 21:59:21 schrieb Arnd Bergmann:
-> > On Monday 07 May 2012, Heiko St?bner wrote:
-> > > Again following the model set out by s3c64xx.
-> > >
-> > > As checkpatch showed a lot of style errors and warning, these got
-> fixed
-> > > too.
-> > >
-> > > Signed-off-by: Heiko Stueber <heiko@sntech.de>
-> >
-> > I object on two grounds:
-> >
-> > 1. there are plans to move irq chip drivers to drivers/irqchip
-> eventually,
-> > so I think it makes little sense to merge the current implementation
-> into
-> > another file. That just makes it harder to split it out again. Better
-> leave
-> > the file named irq.c and just move it to the mach-s3c24xx for now.
-> >
-> > 2. You should *never* move code around and change it at the same time
-> > if you have a choice. Instead if you discover coding style issues with
-> > code you want to move, fix those first and then do a second patch to
-> > move it without further changes. Otherwise it becomes very hard to
-> > check that the coding style changes are actually correct.
-> 
-> thanks for the two pointers, you are of course right with them.
-> I will do another round of the patches.
-> 
-Yes, agree.
-
-I will apply Heiko's this series except 2nd patch.
+This is right description? I can't find your changes for EXYNOS4412 and
+EXYNOS5 here. Only this is for EXYNOS4212 SoC.
 
 Thanks.
 
@@ -53,3 +23,51 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/clock-exynos4212.c |   10 ++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h |    3 +++
+>  2 files changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-
+> exynos/clock-exynos4212.c
+> index 9882312..da397d2 100644
+> --- a/arch/arm/mach-exynos/clock-exynos4212.c
+> +++ b/arch/arm/mach-exynos/clock-exynos4212.c
+> @@ -92,6 +92,16 @@ static struct clk init_clocks_off[] = {
+>  		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
+>  		.enable		= exynos4212_clk_ip_isp1_ctrl,
+>  		.ctrlbit	= (1 << 4),
+> +	}, {
+> +		.name		= "flite",
+> +		.devname	= "exynos-fimc-lite.0",
+> +		.enable		= exynos4212_clk_ip_isp0_ctrl,
+> +		.ctrlbit	= (1 << 4),
+> +	}, {
+> +		.name		= "flite",
+> +		.devname	= "exynos-fimc-lite.1",
+> +		.enable		= exynos4212_clk_ip_isp0_ctrl,
+> +		.ctrlbit	= (1 << 3),
+>  	}
+>  };
+> 
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
+> exynos/include/mach/map.h
+> index 0e2292d..d30643b 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -34,6 +34,9 @@
+> 
+>  #define EXYNOS4_PA_JPEG			0x11840000
+> 
+> +/* x = 0...1 */
+> +#define EXYNOS4_PA_FIMC_LITE(x)		(0x12390000 + ((x) *
+0x10000))
+> +
+>  #define EXYNOS4_PA_G2D			0x12800000
+> 
+>  #define EXYNOS4_PA_I2S0			0x03830000
+> --
+> 1.7.10
