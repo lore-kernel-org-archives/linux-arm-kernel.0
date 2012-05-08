@@ -1,19 +1,30 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Tue, 08 May 2012 10:26:43 +0100
-Subject: [PATCH] ARM: mach-pxa: Use REGULATOR_SUPPLY macro
-In-Reply-To: <87zk9jvxeu.fsf@free.fr>
-References: <1336465510.11954.1.camel@phoenix> <87zk9jvxeu.fsf@free.fr>
-Message-ID: <4FA8E6D3.9090709@cam.ac.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 8 May 2012 12:43:41 +0300
+Subject: [PATCH v2 1/3] omap: mailbox: enable mailbox irq per instance
+In-Reply-To: <CADVn9RHc4b+hLth5j-1Jr+dv2ePB8W1pGAgQiBSgFKuDycG8pA@mail.gmail.com>
+References: <1334360392-1494-1-git-send-email-jgutierrez@ti.com>
+ <1334360392-1494-2-git-send-email-jgutierrez@ti.com>
+ <CAK=WgbY3OaDH9ziavrXG4oM1ztO3mTmL_eoLPOzCHHKQpHn20w@mail.gmail.com>
+ <CADVn9RHc4b+hLth5j-1Jr+dv2ePB8W1pGAgQiBSgFKuDycG8pA@mail.gmail.com>
+Message-ID: <CAK=WgbZBMtn57uHn33OAK_EQizCfiXe2nVHx-4g22vJ7t7DC5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/8/2012 10:23 AM, Robert Jarzmik wrote:
-> For mioa701:
-> Acked-by: Robert Jarzmik<robert.jarzmik@free.fr>
-For stargate2
-Acked-by: Jonathan Cameron <jic23@kernel.org>
->
-> Cheers.
->
-> --
-> Robert
+Hi Juan,
+
+On Tue, May 8, 2012 at 1:09 AM, Gutierrez, Juan <jgutierrez@ti.com> wrote:
+> Startup it is now only used to enable pm runtime of the whole mbox module.
+
+Btw I really doubt we need to do that in a machine-specific handler,
+or whether we really need this startup/shutdown abstraction at all.
+But that's not related to your patch of course...
+
+> I think, if request_irq is called from the generic layer, it is kind
+> of logical to enable_irq next to it.
+
+I somewhat agree, though I was wondering about the implications for
+OMAP1, which didn't seem to enable_irq at startup at all. Not sure
+there's much to do here (unless you have some OMAP1 hardware ? :).
+
+Thanks,
+Ohad.
