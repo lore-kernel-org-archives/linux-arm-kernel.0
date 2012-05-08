@@ -1,27 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 May 2012 09:12:12 -0700
-Subject: [RFC PATCH 4/4] ARM: OMAP2+: CLEANUP: Add new config option
- for different DPLL features
-In-Reply-To: <1336489364-19200-5-git-send-email-hvaibhav@ti.com>
-References: <1336489364-19200-1-git-send-email-hvaibhav@ti.com>
- <1336489364-19200-5-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120508161212.GX5088@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 May 2012 00:12:13 +0800
+Subject: [PATCH 0/5] more clk-next fixes
+In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+Message-ID: <20120508161211.GI2199@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120508 08:10]:
-> This patch cleans up dpll_data structure, making structure
-> fields definition based on feature availability for given SoC,
-> managed using Kconfig rules.
+On Sun, May 06, 2012 at 10:08:25PM -0700, Mike Turquette wrote:
+> If no one complains about these then I'll commit them to clk-next and
+> (finally) send my pull request to Arnd.
 > 
-> SOC_HAS_DPLL_IDLE: idle state
-> SOC_HAS_DPLL_RECAL: recalibration capability
-> SOC_HAS_DPLL_DCO_SEL: dco selection
-> SOC_HAS_DPLL_SDDIV: sigma-delta div factor
-> SOC_HAS_DPLL_FREQSEL: frequency selection
+On mach-mxs:
 
-These too should be SOC_HAS_OMAPXYZ_DPLL_IDLE etc.
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
+Mike,
+
+I haven't seen too many outstanding comments on these patches, except
+the following one that Saravana put on clk-fixed-factor.c, which should
+be easy to fix.
+
+"
+> +     return (parent_rate / fix->div) * fix->mult;
+
+Wouldn't multiplying and then dividing result in better accuracy?
+"
+
+Can you please quickly fix it and publish the patches on your clk-next,
+so that I can ask Arnd to pull my platform porting, on which mach-mxs
+device tree series depends.
+
+-- 
 Regards,
-
-Tony
+Shawn
