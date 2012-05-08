@@ -1,67 +1,136 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 8 May 2012 20:37:31 +0200
-Subject: [PATCH 3/4] ARM: S3C24XX: move common power-management code to
- mach-s3c24xx
+Date: Tue, 8 May 2012 20:38:08 +0200
+Subject: [PATCH 4/4] ARM: S3C24XX: move common clock init into common.c
 In-Reply-To: <201205082034.50658.heiko@sntech.de>
 References: <201205082034.50658.heiko@sntech.de>
-Message-ID: <201205082037.31373.heiko@sntech.de>
+Message-ID: <201205082038.08733.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the basic power-management code used by all s3c24xx machines.
-
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c24xx/Makefile                   |    4 ++++
- arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c |    0
- arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c     |    0
- arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S  |    0
- arch/arm/plat-s3c24xx/Makefile                   |    3 ---
- 5 files changed, 4 insertions(+), 3 deletions(-)
- rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c (100%)
- rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c (100%)
- rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S (100%)
+ arch/arm/mach-s3c24xx/common.c |   18 ++++++++++++
+ arch/arm/plat-s3c24xx/Makefile |    1 -
+ arch/arm/plat-s3c24xx/clock.c  |   59 ----------------------------------------
+ 3 files changed, 18 insertions(+), 60 deletions(-)
+ delete mode 100644 arch/arm/plat-s3c24xx/clock.c
 
-diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
-index d56b990..0ab6ab1 100644
---- a/arch/arm/mach-s3c24xx/Makefile
-+++ b/arch/arm/mach-s3c24xx/Makefile
-@@ -35,6 +35,10 @@ obj-$(CONFIG_S3C2440_DMA)	+= dma-s3c2440.o
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index 5e4ac34..d42423a 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -41,6 +41,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
  
- obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o irq-s3c2443.o clock-s3c2443.o
++#include <mach/regs-clock.h>
+ #include <mach/regs-gpio.h>
+ #include <plat/regs-serial.h>
  
-+# PM
+@@ -52,6 +53,8 @@
+ #include <plat/s3c2416.h>
+ #include <plat/s3c244x.h>
+ #include <plat/s3c2443.h>
++#include <plat/cpu-freq.h>
++#include <plat/pll.h>
+ 
+ /* table of supported CPUs */
+ 
+@@ -307,3 +310,18 @@ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+ 		.nr_resources	= ARRAY_SIZE(s3c2410_uart3_resource),
+ 	},
+ };
 +
-+obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
++/* initialise all the clocks */
 +
- # common code
- 
- obj-$(CONFIG_S3C2443_COMMON)	+= common-s3c2443.o
-diff --git a/arch/arm/plat-s3c24xx/irq-pm.c b/arch/arm/mach-s3c24xx/irq-pm.c
-similarity index 100%
-rename from arch/arm/plat-s3c24xx/irq-pm.c
-rename to arch/arm/mach-s3c24xx/irq-pm.c
-diff --git a/arch/arm/plat-s3c24xx/pm.c b/arch/arm/mach-s3c24xx/pm.c
-similarity index 100%
-rename from arch/arm/plat-s3c24xx/pm.c
-rename to arch/arm/mach-s3c24xx/pm.c
-diff --git a/arch/arm/plat-s3c24xx/sleep.S b/arch/arm/mach-s3c24xx/sleep.S
-similarity index 100%
-rename from arch/arm/plat-s3c24xx/sleep.S
-rename to arch/arm/mach-s3c24xx/sleep.S
++void __init_or_cpufreq s3c24xx_setup_clocks(unsigned long fclk,
++					   unsigned long hclk,
++					   unsigned long pclk)
++{
++	clk_upll.rate = s3c24xx_get_pll(__raw_readl(S3C2410_UPLLCON),
++					clk_xtal.rate);
++
++	clk_mpll.rate = fclk;
++	clk_h.rate = hclk;
++	clk_p.rate = pclk;
++	clk_f.rate = fclk;
++}
 diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
-index 1e3126a..a07bbc9 100644
+index a07bbc9..9f60549c 100644
 --- a/arch/arm/plat-s3c24xx/Makefile
 +++ b/arch/arm/plat-s3c24xx/Makefile
-@@ -21,9 +21,6 @@ obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpu-freq-debugfs.o
+@@ -13,7 +13,6 @@ obj-				:=
+ # Core files
  
- # Architecture dependent builds
+ obj-y				+= irq.o
+-obj-y				+= clock.o
+ obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
  
--obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_PM)		+= irq-pm.o
--obj-$(CONFIG_PM)		+= sleep.o
- obj-$(CONFIG_S3C2410_CLOCK)	+= s3c2410-clock.o
- obj-$(CONFIG_S3C24XX_DMA)	+= dma.o
- obj-$(CONFIG_S3C2410_IOTIMING)	+= s3c2410-iotiming.o
+ obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpu-freq.o
+diff --git a/arch/arm/plat-s3c24xx/clock.c b/arch/arm/plat-s3c24xx/clock.c
+deleted file mode 100644
+index 931d26d..0000000
+--- a/arch/arm/plat-s3c24xx/clock.c
++++ /dev/null
+@@ -1,59 +0,0 @@
+-/* linux/arch/arm/plat-s3c24xx/clock.c
+- *
+- * Copyright (c) 2004-2005 Simtec Electronics
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * S3C24XX Core clock control support
+- *
+- * Based on, and code from linux/arch/arm/mach-versatile/clock.c
+- **
+- **  Copyright (C) 2004 ARM Limited.
+- **  Written by Deep Blue Solutions Limited.
+- *
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-*/
+-
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-
+-#include <mach/regs-clock.h>
+-#include <mach/regs-gpio.h>
+-
+-#include <plat/cpu-freq.h>
+-
+-#include <plat/clock.h>
+-#include <plat/cpu.h>
+-#include <plat/pll.h>
+-
+-/* initialise all the clocks */
+-
+-void __init_or_cpufreq s3c24xx_setup_clocks(unsigned long fclk,
+-					   unsigned long hclk,
+-					   unsigned long pclk)
+-{
+-	clk_upll.rate = s3c24xx_get_pll(__raw_readl(S3C2410_UPLLCON),
+-					clk_xtal.rate);
+-
+-	clk_mpll.rate = fclk;
+-	clk_h.rate = hclk;
+-	clk_p.rate = pclk;
+-	clk_f.rate = fclk;
+-}
 -- 
 1.7.5.4
