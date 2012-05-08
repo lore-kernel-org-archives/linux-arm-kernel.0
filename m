@@ -1,34 +1,20 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 15:38:09 -0700
-Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <1336506724-5494-4-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Wed, 9 May 2012 01:22:03 +0530")
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <87397ajo32.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2012 15:42:31 -0700
+Subject: [PATCH 1/2] input: keypad: move platform_data to
+ <linux/platform_data>
+In-Reply-To: <1331905159-11255-2-git-send-email-sourav.poddar@ti.com>
+References: <1331905159-11255-1-git-send-email-sourav.poddar@ti.com>
+ <1331905159-11255-2-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120508224230.GO5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+* Sourav Poddar <sourav.poddar@ti.com> [120316 06:43]:
+> From: Felipe Balbi <balbi@ti.com>
+> 
+> This patch allows us to drop the OMAP depencendy
+> from the OMAP4 keypad driver.
 
-> The function __omap2_set_globals() can be common across all
-> platforms/architectures, even in case of omap4, internally it
-> calls same set of functions as in __omap2_set_globals() function
-> (except for sdrc).
+Seems safe to apply via linux-input:
 
-OK so far.
-
-> This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-> so that we can reuse same function across omap2/3/4...
-
-But what happens when a single kernel is built that has support for an
-SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
-
-In that case this new SOC_HAS_OMAP2_SDRC will be set, and
-set_globals_sdrc() will be called even for the SoCs without SDRC.
-
-So, rather than add a new Kconfig option for this, I would rather see 
-you using the existing runtime feature check for the SDRC: omap_has_sdrc()
-
-Kevin
+Acked-by: Tony Lindgren <tony@atomide.com>
