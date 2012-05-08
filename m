@@ -1,95 +1,129 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 14:28:40 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FA9794A.7030607@ti.com> (Jon Hunter's message of "Tue, 8 May
- 2012 14:51:38 -0500")
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
- <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
- <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
- <4FA9138D.8010604@ti.com>
- <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
- <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com>
- <87wr4mr6io.fsf@ti.com> <4FA9794A.7030607@ti.com>
-Message-ID: <87mx5il5vb.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 8 May 2012 14:35:41 -0700
+Subject: [PATCH 0/5] more clk-next fixes
+In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
+Message-ID: <CAJOA=zOeV9+1-oAwL-xYtwcz2SvhF_DuM=XENASywtpkzf0ttg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
-
-> On 05/08/2012 11:18 AM, Kevin Hilman wrote:
->> "Cousson, Benoit" <b-cousson@ti.com> writes:
->> 
->>> On 5/8/2012 4:00 PM, Kevin Hilman wrote:
->>>> Jean Pihet<jean.pihet@newoldbits.com>  writes:
->>>>
->>>> [...]
->>>>
->>>>>>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->>>>>>>> flags describe what the HW is capable of, and the EMU CD can support
->>>>>>>> HW_AUTO
->>>>>>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
->>>>>>>> next
->>>>>>>> power state is OFF, meaning that no retention mode is supported. So any
->>>>>>>> transition to idle will go to OFF and lead to a reset upon wakeup.
->>>>>>>>
->>>>>>>> That being said, being able to transition to OFF during idle is a
->>>>>>>> perfectly
->>>>>>>> valid state for most powerdomain in OMAP anyway, so we should be able to
->>>>>>>> restore from OFF mode smoothly.
->>>>>>>>
->>>>>>>> It looks to me that what is missing here is *just* a restore path in the
->>>>>>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
->>>>>>>> :-)
->>>>>>>
->>>>>>> Although it is perfectly feasible to have a seamless transition of the
->>>>>>> EMU power domain, I think the PMU counters will not be accurate
->>>>>>> anymore since they stop counting events when going to OFF and re-start
->>>>>>> after the state restore.
->>>>>>
->>>>>>
->>>>>> Good point, but I think the PMU might still works fine because located
->>>>>> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
->>>>>> going to OFF and thus will be reset.
->>>>>
->>>>> Ever better point ;p Thanks for the precision.
->>>>> In any case my point was: can we allow the EMU CD to go OFF or prevent
->>>>> it from doing so? We need to answer that question first.
->>>>>
->>>>
->>>> The idea I've suggested is to use runtime PM for this.  As long as the
->>>> PMU is in use, it will be runtime PM enabled (and not allowed to go into
->>>> HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
->>>> then be reset.  The next time it is needed, the runtime resume will need
->>>> to do a full re-init.
->>>
->>> Oh, but does that mean that this driver is not pm_runtime adapted yet?
->>>
->> 
->> Actually, it is.  Ming Lei has done it.
->> 
->> Currently, Will has collected this[1] and is waiting (patiently) for us
->> to produce a real fix that doesn't kill PM in the process.
+On 20120506-22:08, Mike Turquette wrote:
+> Hi all,
 >
-> I had to make a couple mods to Ming's patches but I do have something
-> working now that _should_ not break PM. However, per my previous email
-> (in response to Benoit's) I am struggling with the definition of the
-> CLKDM_CAN_XXXXXX_AUTO flags to know the correct way to fix this.
+> These five patches are hopefully the final set of core framework changes
+> for 3.5.  There is the obligatory MAINTAINERS file change, three new
+> fixes and the fixed-factor clock patch.  That last patch is being
+> reposted since three bugs were found in it (one on the list, two in my
+> testing).
 >
-> I was going to send out my patches, but I wanted to get some more
-> feedback on this first.
+> If no one complains about these then I'll commit them to clk-next and
+> (finally) send my pull request to Arnd.
+>
 
-While waiting for feeback, if you set the flags to CAN_FORCE_WAKEUP and
-CAN_HWSUP, can you get the PMU interrupts working after an EMU CD idle
-transition (and reset.)
+Arnd,
 
-Kevin
+Please pull the following changes since commit
+66f75a5d028beaf67c931435fdc3e7823125730c:
+
+  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/mturquette/linux.git clk-next
+
+Mark Brown (2):
+      clk: Remove comment for end of CONFIG_COMMON_CLK section
+      clk: Constify parent name arrays
+
+Mike Turquette (10):
+      clk: core: correct clk_set_rate kerneldoc
+      clk: core: remove dead code paths
+      clk: core: clk_calc_new_rates handles NULL parents
+      clk: core: enforce clk_ops consistency
+      clk: core: copy parent_names & return error codes
+      clk: basic: improve parent_names & return errors
+      MAINTAINERS: add entry for common clk framework
+      clk: prevent spurious parent rate propagation
+      clk: remove COMMON_CLK_DISABLE_UNUSED
+      clk: mux: assign init data
+
+Rajendra Nayak (2):
+      clk: Make clk_get_rate() return 0 on error
+      clk: constify parent name arrays in macros
+
+Rob Herring (2):
+      clk: select CLKDEV_LOOKUP for COMMON_CLK
+      clk: remove trailing whitespace from clk.h
+
+Saravana Kannan (1):
+      clk: Use a separate struct for holding init data.
+
+Sascha Hauer (1):
+      clk: add a fixed factor clock
+
+Shawn Guo (7):
+      clk: use kzalloc in clk_register_mux
+      clk: remove unnecessary EXPORT_SYMBOL_GPL
+      clk: add "const" for clk_ops of basic clks
+      clk: declare clk_ops of basic clks in clk-provider.h
+      clk: always pass parent_rate into .round_rate
+      clk: pass parent_rate into .set_rate
+      clk: propagate round_rate for CLK_SET_RATE_PARENT case
+
+Viresh Kumar (5):
+      clk: Fix typo in comment
+      clk: clk-gate: Create clk_gate_endisable()
+      clk: clk-private: Add DEFINE_CLK macro
+      clk: Don't set clk->new_rate twice
+      clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and
+clk is enabled
+
+ MAINTAINERS                    |   10 ++
+ drivers/clk/Kconfig            |   12 +--
+ drivers/clk/Makefile           |    2 +-
+ drivers/clk/clk-divider.c      |   68 +++++-----
+ drivers/clk/clk-fixed-factor.c |   95 ++++++++++++++
+ drivers/clk/clk-fixed-rate.c   |   49 ++++----
+ drivers/clk/clk-gate.c         |  104 ++++++++--------
+ drivers/clk/clk-mux.c          |   27 +++--
+ drivers/clk/clk.c              |  270 +++++++++++++++++++++++++--------------
+ include/linux/clk-private.h    |   99 +++++++--------
+ include/linux/clk-provider.h   |  118 ++++++++++++------
+ include/linux/clk.h            |    6 +-
+ 12 files changed, 537 insertions(+), 323 deletions(-)
+ create mode 100644 drivers/clk/clk-fixed-factor.c
+
+> Note that the Orion patches aren't here, but I figure that Andrew L.
+> probably wants to check those against the final clk-next before I pull
+> them.
+>
+> Regards,
+> Mike
+>
+> Mike Turquette (4):
+>   MAINTAINERS: add entry for common clk framework
+>   clk: prevent spurious parent rate propagation
+>   clk: remove COMMON_CLK_DISABLE_UNUSED
+>   clk: mux: assign init data
+>
+> Sascha Hauer (1):
+>   clk: add a fixed factor clock
+>
+>  MAINTAINERS                    |   10 ++++
+>  drivers/clk/Kconfig            |   11 -----
+>  drivers/clk/Makefile           |    2 +-
+>  drivers/clk/clk-fixed-factor.c |   95 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/clk-mux.c          |    1 +
+>  drivers/clk/clk.c              |    9 +++-
+>  include/linux/clk-private.h    |   20 ++++++++
+>  include/linux/clk-provider.h   |   23 ++++++++++
+>  8 files changed, 156 insertions(+), 15 deletions(-)
+>  create mode 100644 drivers/clk/clk-fixed-factor.c
+>
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
