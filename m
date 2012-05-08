@@ -1,50 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 May 2012 15:20:00 +0900
-Subject: [GIT PULL] arch/arm/mach-* late_initcall cleanup
-In-Reply-To: <20120505063101.GQ2194@S2101-09.ap.freescale.net>
-References: <CAAQ0ZWQ75tYxbnCHXW-WtDVLyFcf9WdvX=5MBiAOXD+ONrU8-g@mail.gmail.com>
- <20120505063101.GQ2194@S2101-09.ap.freescale.net>
-Message-ID: <018701cd2ce2$999bad80$ccd30880$%kim@samsung.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 8 May 2012 06:24:16 +0000
+Subject: [PATCH v4 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <4FA7F473.7060607@ti.com>
+References: <cover.1335874494.git.afzal@ti.com>
+ <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335874494.git.afzal@ti.com>
+ <4FA04A8C.4050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E98299B@DBDE01.ent.ti.com>
+ <4FA4041D.9010000@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E987159@DBDE01.ent.ti.com>
+ <4FA7F473.7060607@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E987902@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
+Hi Jon,
+
+On Mon, May 07, 2012 at 21:42:35, Hunter, Jon wrote:
+
+> > Clk_prd is a platform data passed to the driver, so platform code
+> > updates it, where else can it be done ?
 > 
-> On Thu, May 03, 2012 at 11:27:48PM +0800, Shawn Guo wrote:
-> > Hi Arnd, Olof,
-> >
-> > Please pull the arch/arm/mach-* late_initcall cleanup series below.  I
-> > have collected acks from most of platform maintainers, and it may be
-> > the time to have them expose on linux-next to ensure they do not
-> > introduce any regression.
-> >
-> > Regards,
-> > Shawn
-> >
-> > ---
-> >
-> > The following changes since commit
-> 66f75a5d028beaf67c931435fdc3e7823125730c:
-> >
-> >   Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-> >
-> > are available in the git repository at:
-> >   git://git.linaro.org/people/shawnguo/linux-2.6.git
-> clean/late_initcall_v2
-> >
-> I just updated the branch with one fixup from Sekhar applied, and the
-> Acked-by from Sekhar and Tony collected.
+> The point is that you can pass what ever you like. You do not need to
+> pass the frequency you can pass the clock handle instead.
+
+As clk rate is required in platform code for timing calculation, and
+already available, period was passed
+
 > 
-Sorry for late. If you need my ack on Samsung stuff, feel free to add:
+> What happens it the clk_get() of the gpmc_l3_clk fails during the init?
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Thanks for bringing this point, invalid clk_prd has to be handled by driver.
 
-(It is available on 4th and 11th patches?)
+> 
+> In fact if you migrate to runtime pm then we should not have the clk_get
+> in the gpmc_init any more.
 
-Thanks.
+Even if converted to RPM, to get clk rate, clk_get has to be done
+somewhere, right ?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Afzal
