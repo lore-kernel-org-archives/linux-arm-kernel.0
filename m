@@ -1,24 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 May 2012 14:21:34 +0200
-Subject: [PATCH 0/4] Add device tree support for gpio-mxs
-In-Reply-To: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
-References: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkda_auTko+ik-efW4_f_fEAa2NOSCqZxN5GV=8LrC6P_OQ@mail.gmail.com>
+Date: Tue, 8 May 2012 14:26:54 +0200
+Subject: Handling of modular boards
+In-Reply-To: <201205041934.08830.arnd@arndb.de>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <201205041934.08830.arnd@arndb.de>
+Message-ID: <CACRpkdb4LGXfJ72uODr841O7M4FGTYKa1X7y6ekeLUw9vaL=mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 5:45 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, May 4, 2012 at 9:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> This patch series cleans up gpio-mxs a bit, and then adds device tree
-> support for the driver. ?Currently, the irqdomain for gpio is still
-> added in platform code, and should be moved into driver later with the
-> help from the generic-irq-chip irqdomain support.
->
-> It's based on mxs device tree branch, and might be easier to go
-> via arm-soc tree.
+> Thanks for getting the discussion started. I've seen the same issue come
+> up for arch/arm/mach-ux500/board-mop500*uib.c and for the beaglebone.
+> I'm sure there are many more, but we should make sure that everyone
+> of these can live with whatever we come up with.
 
-This all looks good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The same issue sort of comes up with any system that uses the idiom
+to have a few GPIO lines indicate in a binary code what version of the
+board we're dealing with and what devices are thus on it, right?
+
+We have this issue for the U9540 reference design and potentially
+on the Snowball as well.
 
 Yours,
 Linus Walleij
