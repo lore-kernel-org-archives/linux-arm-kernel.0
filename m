@@ -1,62 +1,108 @@
 From: j-keerthy@ti.com (J, KEERTHY)
-Date: Tue, 8 May 2012 09:14:16 +0530
-Subject: [PATCH V3 04/10] ARM: OMAP3: hwmod: rename the smartreflex entries
-In-Reply-To: <87r4uvwnpi.fsf@ti.com>
+Date: Tue, 8 May 2012 09:18:48 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <87mx5jy2li.fsf@ti.com>
 References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1AA2@DBDE01.ent.ti.com>
- <CAJ6a13ZSWSa_RpGB9NxtfyChUba9NGivGogpsfyk7oT9pNayjg@mail.gmail.com>
- <87d36fzhkm.fsf@ti.com> <87r4uvwnpi.fsf@ti.com>
-Message-ID: <CAJ6a13ZC6CYG+EtOZeBsCF1Fkz8oZWSzX3T1hNPf-OCOf0oOMw@mail.gmail.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>
+ <87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+Message-ID: <CAJ6a13arx4bNzc1ByXj=E9gwE3hrw7muZUwmbo3doYAzK-pAnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 5:25 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Kevin Hilman <khilman@ti.com> writes:
+On Tue, May 8, 2012 at 5:18 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "AnilKumar, Chimata" <anilkumar@ti.com> writes:
 >
->> "J, KEERTHY" <j-keerthy@ti.com> writes:
->
-> [...]
->
->>>>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
->>>>> index 2edd1e2..d859277 100644
->>>>> --- a/arch/arm/mach-omap2/smartreflex.c
->>>>> +++ b/arch/arm/mach-omap2/smartreflex.c
->>>>> @@ -183,7 +183,7 @@ static void sr_set_regfields(struct omap_sr *sr)
->>>>> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
->>>>> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
->>>>> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
->>>>> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
->>>>> + ? ? ? ? ? ? if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
->>>>
->>>> What if voltage rail is different for mpu and iva? I have seen some devices
->>>> supports SmartReflex have different voltage rails for mpu and iva.
->>>>
+>> On Sat, Apr 28, 2012 at 02:31:17, Hilman, Kevin wrote:
+>>> Hi Mark,
 >>>
->>> I get the point. OMAP3 iva and mpu have a common rail. OMAP4 onwards
->>> even we have different rails for mpu and iva. I will enhance the checks here.
+>>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+>>>
+>>> > On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
+>>> >
+>>> >> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
+>>> >> pre defined Operating Performance Points or the OPPs. Every OPP being
+>>> >> a voltage/frequency pair. Smartreflex is a different
+>>> >> power management technique.
+>>> >
+>>> > But presumably these things should integrate somehow - for example,
+>>> > should devfreq and cpufreq be providing inputs into what AVS is doing,
+>>> > and if so how?
+>>>
+>>> The way it is currently designed, cpufreq/devfreq/regulator layers don't
+>>> need to know about AVS.
+>>>
+>>> The higher-level layers only know about the "nominal" voltage. ?AVS
+>>> hardware does automatic, adaptive, micro-adjustments around that nominal
+>>> voltage, and these micro-adjustments are managed by the AVS hardware
+>>> sending commands to the PMIC. ?(specifically, on OMAP, the AVS sensors
+>>> provide inputs to the voltage processor (VP) which provide inputs to the
+>>> voltage controller (VC) which sends commands to the PMIC[1].)
+>>>
+>>> The driver proposed here is primarily for initializing the various
+>>> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
+>>> adjustments are done in hardware by VC/VP.
+>>>
+>>> The only thing the higher-level layers might potentially need to do to
+>>> enable/disable AVS around transitions (e.g. when changing OPP, AVS is
+>>> disabled before changing OPP and only re-enabled when the new nominal
+>>> voltage has been acheived.)
+>>>
+>>> On OMAP, we handle this inside the OMAP-specific voltage layer which is
+>>> called by the regulator framework, so even the regulators do not need
+>>> any knowledge of AVS.
 >>
->> Rather than enhancing the checks, this SoC specific data should probably
->> just be made part of the SoC specific hwmod dev_attr.
+>> Kevin,
+>>
+>> I want to point out some cases of SR implementation where this may not
+>> be true.
+>>
+>> Devices like DM8168, DM8148 and AM335X use Class 2B implementation of SR.
+>>
+>> Under this, SR module issues an interrupt to ARM when there is a need to
+>> change the voltage based on temperature changes, ageing etc.
+>>
+>> Once the interrupt arrives, kernel needs to adjust voltage using regulator API.
+>> The voltage change is a micro adjustment as in other SR classes.
 >
-> That being said, this is an additional feature we can add after this
-> driver is moved.
+> That can easily be handled writing a plugin specific to class 2B. ?This
+> driver was designed so plugins for other classes can be supported.
 >
-> I would like this series to concentrate on the cleanups necessary to
-> move to drivers/*, then additional features to support other SoCs can be
-> added on top.
->
-> Keerthy, please prepare a patch to generalize this to other SoCs by
-> using dev_attr for this SoC specific data. ? We can add it after this
-> series is merged upstream.
-Kevin,
+> Sure, we might need some enhancements for other classes (we already know
+> that we will for class 1 support.) ?However, the purpose of this series
+> is to do the cleanups necessary for the driver to move to drivers/*.
 
-Ok. I will do that.
+AnilKumar,
+
+The intent of the series as explained by Kevin if to do the necessary clean up
+for the driver to move from mach-omap to drivers/*. We will for sure need
+more enhancements for other classes support.
 
 >
-> Thanks,
+> Support for additional classes can be added after the driver is moved
+> if/when folks are motivated to post that support upstream.
+>
+>> The SR class 2B implementation on these devices does not exist in mainline.
+>> I can point to some public repositories if you are interested in taking a look at
+>> the current code.
+>
+> No thanks. ?We can discuss it when you post support for it to mainline.
 >
 > Kevin
+>
+>> Implementation of this SR method is must on at least the DM8168 device and
+>> I know some customers who are using it on their production systems.
+>>
+>> Regards
+>> AnilKumar
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at ?http://www.tux.org/lkml/
 
 
 
