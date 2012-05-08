@@ -1,126 +1,120 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 8 May 2012 10:30:57 -0700
-Subject: [PATCH V2] clk: give clock chance to change parent at setrate
- stage
-In-Reply-To: <CALZhoSQ1VEQjG5Sdh0FM=OtH3FKB35_Xt=yd+9sVZnijTBwuVQ@mail.gmail.com>
-References: <CAG9bXvmAf-0fmVb8nzWkuAKaMoOJVzR=hThwXpN_izQzM26q-g@mail.gmail.com>
- <1336146319-6803-1-git-send-email-leiwen@marvell.com>
- <CALZhoSQcjrOk3s6NFRs34H5uiYWK+TYeqJpoiwC6XSF+xPXrzg@mail.gmail.com>
- <CALZhoSQ1VEQjG5Sdh0FM=OtH3FKB35_Xt=yd+9sVZnijTBwuVQ@mail.gmail.com>
-Message-ID: <CAJOA=zOP3GQ6Qsiy6KVM6ZJx1=a5yXU2_YS_5y+VigfQkUUS1Q@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 8 May 2012 12:31:58 -0500
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FA8FCFF.40105@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
+ <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+ <4FA8FCFF.40105@ti.com>
+Message-ID: <4FA9588E.9020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 6:08 AM, Lei Wen <adrian.wenl@gmail.com> wrote:
-> Hi Mike,
->
-> On Fri, May 4, 2012 at 11:58 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
->> There is one clock rate changing requirement like those:
->> 1. clock may need specify specific rate binded with specific parent
->> 2. driver care only set_rate, don't care for which parent it is linked
->> 3. It need registering notification to changing voltage
->> 4. It want keep parent and rate changing in an atomic operation, which
->> ? means for chaning parent, it only caching the mux chaning, and
->> ? maintent the relationship in this tree, while do the real parent
->> ? and rate chaning in the set_rate callback. And it requires
->> ? recalculated rate reflect the true rate changing state to make the
->> ? decision to whether sending notification.
->>
->> Base on those assumption, the logic in set_rate is changed a little, the
->> round_rate should return not only best parent_rate, but also best
->> parent. If best parent is changed, we would switch parent first, then do
->> the sub rate chaning.
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> Acked-by: Raul Xiong <raulxiong@gmail.com>
->> ---
->> ?drivers/clk/clk.c ? ? ? ? ? ?| ? 22 +++++++++++++++++++++-
->> ?include/linux/clk-provider.h | ? ?2 ++
->> ?2 files changed, 23 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 9cf6f59..d207617 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -23,6 +23,7 @@ static DEFINE_MUTEX(prepare_lock);
->> ?static HLIST_HEAD(clk_root_list);
->> ?static HLIST_HEAD(clk_orphan_list);
->> ?static LIST_HEAD(clk_notifier_list);
->> +static int __clk_set_parent(struct clk *clk, struct clk *parent);
->>
->> ?/*** ? ? ? ?debugfs support ? ? ? ?***/
->>
->> @@ -767,6 +768,7 @@ static struct clk *clk_calc_new_rates(struct clk
->> *clk, unsigned long rate)
->> ? ? ? ?struct clk *top = clk;
->> ? ? ? ?unsigned long best_parent_rate = clk->parent->rate;
->> ? ? ? ?unsigned long new_rate;
->> + ? ? ? int ret;
->>
->> ? ? ? ?if (!clk->ops->round_rate && !(clk->flags & CLK_SET_RATE_PARENT)) {
->> ? ? ? ? ? ? ? ?clk->new_rate = clk->rate;
->> @@ -785,6 +787,21 @@ static struct clk *clk_calc_new_rates(struct clk
->> *clk, unsigned long rate)
->> ? ? ? ?else
->> ? ? ? ? ? ? ? ?new_rate = clk->ops->round_rate(clk->hw, rate, NULL);
->>
->> + ? ? ? if (clk->hw->new_parent && (clk->hw->new_parent != clk->parent)) {
->> + ? ? ? ? ? ? ? if ((clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count)
->> + ? ? ? ? ? ? ? ? ? ? ? ret = -EBUSY;
->> + ? ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? ? ret = __clk_set_parent(clk, clk->hw->new_parent);
->> +
->> + ? ? ? ? ? ? ? if (ret) {
->> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%s: %s set parent to %s failed\n", __func__,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clk->name, clk->hw->new_parent->name);
->> + ? ? ? ? ? ? ? ? ? ? ? return NULL;
->> + ? ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? ? __clk_reparent(clk, clk->hw->new_parent);
->> + ? ? ? }
->> +
->> ? ? ? ?if (best_parent_rate != clk->parent->rate) {
->> ? ? ? ? ? ? ? ?top = clk_calc_new_rates(clk->parent, best_parent_rate);
->>
->> @@ -1050,7 +1067,10 @@ out:
->>
->> ? ? ? ?clk->parent = new_parent;
->>
->> - ? ? ? __clk_recalc_rates(clk, POST_RATE_CHANGE);
->> + ? ? ? if (!clk->hw->new_parent)
->> + ? ? ? ? ? ? ? __clk_recalc_rates(clk, POST_RATE_CHANGE);
->> + ? ? ? else
->> + ? ? ? ? ? ? ? clk->hw->new_parent = NULL;
->> ?}
->>
->> ?static int __clk_set_parent(struct clk *clk, struct clk *parent)
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 5508897..54dad8a 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -23,9 +23,11 @@
->> ?*
->> ?* clk: pointer to the struct clk instance that points back to this struct
->> ?* clk_hw instance
->> + * new_parent: pointer for caching new parent position
->> ?*/
->> ?struct clk_hw {
->> ? ? ? ?struct clk *clk;
->> + ? ? ? struct clk *new_parent;
->> ?};
->>
->> ?/*
->> --
->> 1.7.5.4
->
-> Any suggestion for this patch, could it be acceptable?
->
+Hi Benoit,
 
-My apologies for the delay.  This one got lost in my inbox.  I'll
-review it today or tomorrow and get back to you.
+On 05/08/2012 06:01 AM, Cousson, Benoit wrote:
 
-Regards,
-Mike
+[...]
 
-> Thanks,
-> Lei
+>>>> P.S. Please note there is also already a different fix in mainline for
+>>>> the EMU clkdm data from Paul which adds the force wakeup flag and
+>>>> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
+>>>> because the hardware is capable.)
+>>>
+>>> Hmmm ... yes saw this, and you will have to excuse me as I don't fully
+>>> follow the logic here. In fact, I am thinking we want the opposite ;-)
+>>>
+>>>  From looking, into this it seems to me that when PMU is running we want
+>>> the EMU clock domain in software-wakeup state and when PMU is not
+>>> running we want in the hardware auto state.
+>>
+>> So far, I'm with you.
+>>
+>>> By keeping the ENABLE_AUTO flag set, as soon as we enable the clock
+>>> domain it is put right back into the HW_AUTO state
+>>
+>> This is only because it was in the HWSUP state when _enable was called.
+>> If clkdm_deny_idle() is used, that behavior will change.
+>>
+>>> and hence PMU is
+>>> not working (see _enable() function in
+>>> arch/arm/mach-omap2/omap_hwmod.c)
+>>>
+>>> So really what I think we want is to remove the ENABLE_AUTO flag to keep
+>>> the clock domain in software wake-up and use the DISABLE_AUTO flag to
+>>> put the clock domain back in HW_AUTO (note this requires a patch to
+>>> perform this 2nd part).
+>>
+>> Well, Paul will have to comment here for the final word, but IIUC, the
+>> hwmod flags are supposed to indicate only what the HW is capable of.  If
+>> we want to change the runtime behavior, we nee to use (or add) APIs to
+>> change the beahvior.  In this case, clkdm_allow_idle(),
+>> clkdm_deny_idle() are probably what is needed here.
+> 
+> Yes, indeed, we should not hack the flags to fix that kind of issue. The
+> flags describe what the HW is capable of, and the EMU CD can support
+> HW_AUTO and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the
+> only valid next power state is OFF, meaning that no retention mode is
+> supported. So any transition to idle will go to OFF and lead to a reset
+> upon wakeup.
+
+No hacking intended here, just getting the flags correct ;-)
+
+So let me start from the beginning ...
+
+1. I agree that for the EMU CD that the valid HW states are HW_AUTO and
+SW_WKUP.
+
+2. When the EMU CD is active (due to something like PMU), we want to
+keep the CD in the SW_WKUP state, otherwise we can automatically
+transition to idle and reset the IP (at least for omap4430).
+
+3. When the EMU CD is inactive, we want to keep the CD in the HW_AUTO
+state because SW_SLEEP is NOT supported.
+
+In the current code, we have the CLKDM_CAN_DISABLE_AUTO flag disabled
+and the CLKDM_CAN_ENABLE_AUTO flag enabled. If CLKDM_CAN_ENABLE_AUTO is
+set then the omap_pm_clkdms_setup() function will place the CD into
+HW_AUTO regardless of CLKDM_CAN_DISABLE_AUTO, and the next time the
+hwmod _enable() is called it is in the HW_AUTO state and so it is
+allowed to idle. This is not what we want. Do you agree?
+
+If I set CLKDM_CAN_DISABLE_AUTO flag and disable CLKDM_CAN_ENABLE_AUTO,
+then I do not have the above problem.
+
+To be honest, with you the more I look and test the code, the more
+confused I am by the definition of the CLKDM_CAN_HWSUP ...
+
+#define CLKDM_CAN_HWSUP	(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
+
+When I look at where these flags are used, I see that
+CLKDM_CAN_ENABLE_AUTO is used in clkdm_allow_idle and
+CLKDM_CAN_DISABLE_AUTO is used in clkdm_deny_idle. So this implies that ...
+
+CLKDM_CAN_ENABLE_AUTO = Supports HW_AUTO state when CD is active
+CLKDM_CAN_DISABLE_AUTO = Does NOT supports HW_AUTO state when CD is active
+
+Are the above the correct definitions? If so why is CLKDM_CAN_HWSUP
+defined as above?
+
+So may be I just needed to understand how these flags are intended to be
+used.
+
+> That being said, being able to transition to OFF during idle is a
+> perfectly valid state for most powerdomain in OMAP anyway, so we should
+> be able to restore from OFF mode smoothly.
+> 
+> It looks to me that what is missing here is *just* a restore path in the
+> PMU/CTI code. But I'm probably missing some nasty details in this issue :-)
+
+Yes agree with this too.
+
+Cheers
+Jon
