@@ -1,73 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 May 2012 14:42:07 +0900
-Subject: [PATCH] ARM: EXYNOS: Add platform resource definitions for
- FIMC-LITE
-In-Reply-To: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
-References: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <017b01cd2cdd$4e4ff570$eaefe050$%kim@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 8 May 2012 05:49:13 +0000
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120507193500.GK5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
+ <20120507191847.GJ5088@atomide.com> <20120507193500.GK5088@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Tue, May 08, 2012 at 01:05:01, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120507 12:22]:
+> > * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
+> > > Hi,
+> > > 
+> > > On Fri, 4 May 2012, Tony Lindgren wrote:
+> > > 
+> > > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
+> > > > Then this becomes just:
+> > > > 
+> > > > #ifdef CONFIG_SOC_OMAP3PLUS
+> > > 
+> > > We might want to consider having separate CONFIG_SOC_* values for each 
+> > > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
+> > > CONFIG_SOC_OMAP3630, etc.
+> > 
+> > Hmm but this would be in addition to the SOC specific options. The goal
+> > is to cut down the ifdeffery needed all over the place to add new SoCs,
+> > see the experimental patch I posted:
+> > 
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
 > 
-> Add the gate clocks and register region address definition for
-> FIMC-LITE devices available in Exynos4x12 and Exynos5 SoCs.
+> Of course we could make this finer grained based on features
+> like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
+> grouping like that in mind.
 > 
-This is right description? I can't find your changes for EXYNOS4412 and
-EXYNOS5 here. Only this is for EXYNOS4212 SoC.
 
-Thanks.
+This is much better approach than both ARCH_OMAPx and SOC_OMAPxxxx.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos4212.c |   10 ++++++++++
->  arch/arm/mach-exynos/include/mach/map.h |    3 +++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-
-> exynos/clock-exynos4212.c
-> index 9882312..da397d2 100644
-> --- a/arch/arm/mach-exynos/clock-exynos4212.c
-> +++ b/arch/arm/mach-exynos/clock-exynos4212.c
-> @@ -92,6 +92,16 @@ static struct clk init_clocks_off[] = {
->  		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
->  		.enable		= exynos4212_clk_ip_isp1_ctrl,
->  		.ctrlbit	= (1 << 4),
-> +	}, {
-> +		.name		= "flite",
-> +		.devname	= "exynos-fimc-lite.0",
-> +		.enable		= exynos4212_clk_ip_isp0_ctrl,
-> +		.ctrlbit	= (1 << 4),
-> +	}, {
-> +		.name		= "flite",
-> +		.devname	= "exynos-fimc-lite.1",
-> +		.enable		= exynos4212_clk_ip_isp0_ctrl,
-> +		.ctrlbit	= (1 << 3),
->  	}
->  };
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
-> exynos/include/mach/map.h
-> index 0e2292d..d30643b 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -34,6 +34,9 @@
-> 
->  #define EXYNOS4_PA_JPEG			0x11840000
-> 
-> +/* x = 0...1 */
-> +#define EXYNOS4_PA_FIMC_LITE(x)		(0x12390000 + ((x) *
-0x10000))
-> +
->  #define EXYNOS4_PA_G2D			0x12800000
-> 
->  #define EXYNOS4_PA_I2S0			0x03830000
-> --
-> 1.7.10
+Thanks,
+Vaibhav
