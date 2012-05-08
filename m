@@ -1,62 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 08 May 2012 18:00:20 +0100
-Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
- Tree
-In-Reply-To: <20120508145758.GV15893@opensource.wolfsonmicro.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
- <20120507170832.GO17002@opensource.wolfsonmicro.com>
- <4FA90BE1.3050304@linaro.org>
- <20120508121940.GL15893@opensource.wolfsonmicro.com>
- <4FA913BA.30908@linaro.org>
- <20120508133411.GP15893@opensource.wolfsonmicro.com>
- <4FA93391.8040905@linaro.org>
- <20120508145758.GV15893@opensource.wolfsonmicro.com>
-Message-ID: <4FA95124.5010309@linaro.org>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 8 May 2012 17:00:28 +0000
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120508154829.GS5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
+ <20120507191847.GJ5088@atomide.com> <20120507193500.GK5088@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA18A6A@DBDE01.ent.ti.com>
+ <20120508154829.GS5088@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA1AEC8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/12 15:57, Mark Brown wrote:
-> On Tue, May 08, 2012 at 03:54:09PM +0100, Lee Jones wrote:
->> On 08/05/12 14:34, Mark Brown wrote:
->
->>> Looking at the usage here it looks like most of this stuff shouldn't be
->>> there even with non-DT stuff, we probably don't want to add DT bindings
->>> for those bits.All the voltage setting is not at all device specific
->>> and can be done using the generic regulator bindings, the forcing on or
->>> off is similarly generic.
->
->> All the generic properties _are_ set using the generic bindings. The
->> only vendor specific values are the initialisation register values
->> referenced above. I'll see what happens when I remove those from DT.
->> I have a feeling that the regulators will just fail though.
->
-> The comments in the arch/arm file indicate otherwise - they were talking
-> about enabling and disabling regulators, and about setting voltages.  It
-> may be that the comments in the arch/arm code are inaccurate but with it
-> being magic numbers you'd really hope they're accurate...
+On Tue, May 08, 2012 at 21:18:29, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120507 22:52]:
+> > On Tue, May 08, 2012 at 01:05:01, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [120507 12:22]:
+> > > > * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
+> > > > > Hi,
+> > > > > 
+> > > > > On Fri, 4 May 2012, Tony Lindgren wrote:
+> > > > > 
+> > > > > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
+> > > > > > Then this becomes just:
+> > > > > > 
+> > > > > > #ifdef CONFIG_SOC_OMAP3PLUS
+> > > > > 
+> > > > > We might want to consider having separate CONFIG_SOC_* values for each 
+> > > > > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
+> > > > > CONFIG_SOC_OMAP3630, etc.
+> > > > 
+> > > > Hmm but this would be in addition to the SOC specific options. The goal
+> > > > is to cut down the ifdeffery needed all over the place to add new SoCs,
+> > > > see the experimental patch I posted:
+> > > > 
+> > > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
+> > > 
+> > > Of course we could make this finer grained based on features
+> > > like SOC_HAS_XYZ or SOC_HAS_OMAP3PLUS_PRMXYZBITS if you have some
+> > > grouping like that in mind.
+> > > 
+> > 
+> > This is much better approach than both ARCH_OMAPx and SOC_OMAPxxxx.
+> 
+> OK good, so now the question is just what groupings we need.. Got any
+> suggestions?
+> 
 
-Fingers crossed. I'll let you know how I get on.
+Tony
 
->>> While looking for the original patch I also noticed that you're not CCing
->>> the mailing list either...  please always CC the subsystem mailing list
->>> on patches.
->
->> You don't appear to have one. I ran get_maintainer.pl on the patch
->> and the only ML it came up with was LKML. If you do have one, you
->> may need to update the MAINTAINERS file.
->
-> LKML is the relevant list here.
+I have submitted first round of cleanup patches in the same direction, can 
+you please take a look at them? Most of them are trivial and should be 
+considered for upstream.
 
-Ah, okay. In retrospect I don't know why I didn't add it to be honest. 
-I'll endeavor to do so next time.
+I am trying to take cleanup thing one-by-one, and keep submitting them. 
+Please let me know if you have any suggestions or pointers for me.
 
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Vaibhav
