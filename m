@@ -1,58 +1,40 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 May 2012 14:18:01 +0200
-Subject: [PATCH 2/2] ARM: smp_twd: use the .update_freq() for periodic mode
-Message-ID: <1336479481-9281-1-git-send-email-linus.walleij@stericsson.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 08 May 2012 08:18:50 -0400
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <4FA90127.1050107@linaro.org> (Lee Jones's message of "Tue, 08
+ May 2012 12:19:03 +0100")
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org>
+ <20120425185747.GC24211@n2100.arm.linux.org.uk>
+ <4FA29E46.6040204@linaro.org>
+ <20120503151253.GE897@n2100.arm.linux.org.uk>
+ <4FA2A4A8.9010208@linaro.org>
+ <20120503163008.GF897@n2100.arm.linux.org.uk>
+ <4FA2B4A3.2040402@linaro.org>
+ <20120503164501.GG897@n2100.arm.linux.org.uk>
+ <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
+ <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
+ <4FA90127.1050107@linaro.org>
+Message-ID: <878vh2rhlh.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Lee,
 
-When the SMP TWD timer is in periodic mode, the frequency update
-function will need to call into the driver to update the periodic
-latch value.
+On Tue, May 08 2012, Lee Jones wrote:
+> I've fixed the issue. How would you like the fix?
+>
+> As a fix patch, or a replacement for the broken one?
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/kernel/smp_twd.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Let's go with a fix patch.  (I may squash it into the original later,
+before sending it to Linus.)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index fef42b2..7bb2e31 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -74,6 +74,23 @@ static int twd_set_next_event(unsigned long evt,
- 	return 0;
- }
- 
-+static void twd_update_freq(enum clock_event_mode mode,
-+			    struct clock_event_device *clk)
-+{
-+	/*
-+	 * The only thing we need to handle here is for the periodic mode,
-+	 * where the loaded value needs to be reprogrammed so the new
-+	 * frequency is used for the next event.
-+	 */
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
- /*
-  * local_timer_ack: checks for a local timer interrupt.
-  *
-@@ -245,6 +262,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->rating = 350;
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
-+	clk->update_freq = twd_update_freq;
- 	clk->irq = twd_ppi;
- 
- 	this_cpu_clk = __this_cpu_ptr(twd_evt);
+Thanks,
+
+- Chris.
 -- 
-1.7.9.2
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
