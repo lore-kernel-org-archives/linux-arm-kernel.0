@@ -1,63 +1,103 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 11:39:34 -0700
-Subject: [PATCH] ARM: OMAP2+: irq: Increase no of supported interrupts to
- 128
-In-Reply-To: <1336486679-15892-1-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Tue, 8 May 2012 19:47:59 +0530")
-References: <1336486679-15892-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <87lil2o6u1.fsf@ti.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Tue, 8 May 2012 20:40:20 +0200
+Subject: [PATCH v2 06/33] ARM: S3C24XX: dev-uart: Use common macro to define
+ resources
+In-Reply-To: <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
+References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
+ <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
+Message-ID: <201205082040.20900.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+From: Tushar Behera <tushar.behera@linaro.org>
 
-> With addition to TI81XX, AM33XX family of devices, the number
-> of interrupts supported has increased to 128, compared to 96.
-> The current implementation for irq handling is hardcoded to use
-> 96 interrupts (with 3 register-sets to handle), this patch cleanups
-> the code, to increase maximum number of interrupts support
-> to 128, with dynamic detection of no of registers required for
-> handling all interrupts.
->
->
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
-> Ideally, we should use dynamic allocation to allocate memory
-> for registers/arrays, 
+CC: Ben Dooks <ben-linux@fluff.org>
+CC: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes since v1: update the patch to apply against the moved dev-uart devices
+As this patch does not touch anything else apart from the uart devices it could
+also be applied on top of the movement patches directly
 
-Yes.
+ arch/arm/mach-s3c24xx/common.c |   56 +++++++++++----------------------------
+ 1 files changed, 16 insertions(+), 40 deletions(-)
 
-> may be too much cleanup for this patch,
-
-There is no such thing as too much cleanup.  ;)  
-And the INTC is in need of it, IMO.
-
-> so as of now restricting to minimal changes to fit devices
-> like, am33xx/ti81xx.
-
-Then someone else will have to do the cleanup later.  It would be
-greatly appreciated if you could do the necessary cleanup in order to
-cleanly add support for more SoCs.  Yes, we probably should've insisted
-when support for TI81xx was added, but that one slipped in under the
-radar.
-
-For starters, the notion of a banks this code is a rather messed up and
-needs a cleanup.  A bank is supposed to be a group of 32 interrupts, 
-and the INTC is made up of 3 (or 4) banks.   However, the current
-code creates a single "bank" of 96 (or 128) interrupts.  
-
-It also confuses what registers are part of the bank and what are global
-to the INTC.  This confusion is both in init and in context save/restore.
-
-IMO, to clean this up, first the notion of banks needs to be fixed in
-that code there is a distinction between what acts on banks and what
-works on the whole INTC.
-
-Then, the init/alloc should be done dynamically based on the number of
-interrupts passed to omap_init_irq()
-
-Kevin
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index d42423a..56cdd34 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -241,55 +241,31 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ /* Serial port registrations */
+ 
+ static struct resource s3c2410_uart0_resource[] = {
+-	[0] = {
+-		.start = S3C2410_PA_UART0,
+-		.end   = S3C2410_PA_UART0 + 0x3fff,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = IRQ_S3CUART_RX0,
+-		.end   = IRQ_S3CUART_ERR0,
+-		.flags = IORESOURCE_IRQ,
+-	}
++	[0] = DEFINE_RES_MEM(S3C2410_PA_UART0, SZ_16K),
++	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX0, \
++			IRQ_S3CUART_ERR0 - IRQ_S3CUART_RX0 + 1, \
++			NULL, IORESOURCE_IRQ)
+ };
+ 
+ static struct resource s3c2410_uart1_resource[] = {
+-	[0] = {
+-		.start = S3C2410_PA_UART1,
+-		.end   = S3C2410_PA_UART1 + 0x3fff,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = IRQ_S3CUART_RX1,
+-		.end   = IRQ_S3CUART_ERR1,
+-		.flags = IORESOURCE_IRQ,
+-	}
++	[0] = DEFINE_RES_MEM(S3C2410_PA_UART1, SZ_16K),
++	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX1, \
++			IRQ_S3CUART_ERR1 - IRQ_S3CUART_RX1 + 1, \
++			NULL, IORESOURCE_IRQ)
+ };
+ 
+ static struct resource s3c2410_uart2_resource[] = {
+-	[0] = {
+-		.start = S3C2410_PA_UART2,
+-		.end   = S3C2410_PA_UART2 + 0x3fff,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = IRQ_S3CUART_RX2,
+-		.end   = IRQ_S3CUART_ERR2,
+-		.flags = IORESOURCE_IRQ,
+-	}
++	[0] = DEFINE_RES_MEM(S3C2410_PA_UART2, SZ_16K),
++	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX2, \
++			IRQ_S3CUART_ERR2 - IRQ_S3CUART_RX2 + 1, \
++			NULL, IORESOURCE_IRQ)
+ };
+ 
+ static struct resource s3c2410_uart3_resource[] = {
+-	[0] = {
+-		.start = S3C2443_PA_UART3,
+-		.end   = S3C2443_PA_UART3 + 0x3fff,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = IRQ_S3CUART_RX3,
+-		.end   = IRQ_S3CUART_ERR3,
+-		.flags = IORESOURCE_IRQ,
+-	},
++	[0] = DEFINE_RES_MEM(S3C2443_PA_UART3, SZ_16K),
++	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX3, \
++			IRQ_S3CUART_ERR3 - IRQ_S3CUART_RX3 + 1, \
++			NULL, IORESOURCE_IRQ)
+ };
+ 
+ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+-- 
+1.7.5.4
