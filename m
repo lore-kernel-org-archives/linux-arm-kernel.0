@@ -1,73 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue,  8 May 2012 15:02:56 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: Kconfig: convert SOC_OMAPAM33XX to SOC_AM33XX
-In-Reply-To: <1336514576-4870-1-git-send-email-khilman@ti.com>
-References: <1336514576-4870-1-git-send-email-khilman@ti.com>
-Message-ID: <1336514576-4870-4-git-send-email-khilman@ti.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 9 May 2012 06:12:15 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FA9794A.7030607@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com>
+ <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com>
+ <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com>
+ <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
+ <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+ <4FA8FCFF.40105@ti.com>
+ <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
+ <4FA9138D.8010604@ti.com>
+ <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
+ <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com>
+ <87wr4mr6io.fsf@ti.com> <4FA9794A.7030607@ti.com>
+Message-ID: <CACVXFVOVFPnvWxtqYPPz2drY3AjPWxJHqF5ZCiEdmEqOrdr4Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to have an OMAP prefix on these SoCs that are in the family
-but arent' really called OMAP.
+On Wed, May 9, 2012 at 3:51 AM, Jon Hunter <jon-hunter@ti.com> wrote:
+>
+>
+> I had to make a couple mods to Ming's patches but I do have something
+> working now that _should_ not break PM. However, per my previous email
+> (in response to Benoit's) I am struggling with the definition of the
+> CLKDM_CAN_XXXXXX_AUTO flags to know the correct way to fix this.
+>
+> I was going to send out my patches, but I wanted to get some more
+> feedback on this first.
 
-Simple rename: CONFIG_SOC_OMAPAM33XX --> CONFIG_SOC_AM33XX
+I can test your patch once I return home from business trip next week.
 
-No functional change.
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/Kconfig  |    2 +-
- arch/arm/mach-omap2/common.h |    2 +-
- arch/arm/mach-omap2/io.c     |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 7f89697..61bf3c3 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -82,7 +82,7 @@ config SOC_TI81XX
- 	depends on ARCH_OMAP3
- 	default y
- 
--config SOC_OMAPAM33XX
-+config SOC_AM33XX
- 	bool "AM33XX support"
- 	depends on ARCH_OMAP3
- 	default y
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index bc0b571..22825db 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -62,7 +62,7 @@ static inline void omapti81xx_map_common_io(void)
- }
- #endif
- 
--#ifdef CONFIG_SOC_OMAPAM33XX
-+#ifdef CONFIG_SOC_AM33XX
- extern void omapam33xx_map_common_io(void);
- #else
- static inline void omapam33xx_map_common_io(void)
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 23063a2..bafa592 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -183,7 +183,7 @@ static struct map_desc omapti81xx_io_desc[] __initdata = {
- };
- #endif
- 
--#ifdef CONFIG_SOC_OMAPAM33XX
-+#ifdef CONFIG_SOC_AM33XX
- static struct map_desc omapam33xx_io_desc[] __initdata = {
- 	{
- 		.virtual	= L4_34XX_VIRT,
-@@ -262,7 +262,7 @@ void __init omapti81xx_map_common_io(void)
- }
- #endif
- 
--#ifdef CONFIG_SOC_OMAPAM33XX
-+#ifdef CONFIG_SOC_AM33XX
- void __init omapam33xx_map_common_io(void)
- {
- 	iotable_init(omapam33xx_io_desc, ARRAY_SIZE(omapam33xx_io_desc));
--- 
-1.7.9.2
+Thanks,
+--
+Ming Lei
