@@ -1,65 +1,75 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 08 May 2012 00:19:30 -0400 (EDT)
-Subject: [PATCH 2/2] remove the debugging restrictions in devicemaps_init()
-In-Reply-To: <20120506163016.GA7412@n2100.arm.linux.org.uk>
-References: <1331876668-32492-1-git-send-email-nico@fluxnic.net>
- <1331876668-32492-3-git-send-email-nico@fluxnic.net>
- <20120506163016.GA7412@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1205072340540.21030@xanadu.home>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 7 May 2012 23:31:49 -0600 (MDT)
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120507191847.GJ5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <alpine.DEB.2.00.1205071259090.9984@utopia.booyaka.com>
+ <20120507191847.GJ5088@atomide.com>
+Message-ID: <alpine.DEB.2.00.1205072321190.9984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 6 May 2012, Russell King - ARM Linux wrote:
+On Mon, 7 May 2012, Tony Lindgren wrote:
 
-> On Fri, Mar 16, 2012 at 01:44:28AM -0400, Nicolas Pitre wrote:
-> > More code is getting involved through devicemaps_init() these days,
-> > including calls to printk() or BUG().  Not being able to access any
-> > device to print out debugging information and only being presented with
-> > a silent kernel crash in that case has become a major inconvenience
-> > lately.
+> * Paul Walmsley <paul@pwsan.com> [120507 12:11]:
+> > On Fri, 4 May 2012, Tony Lindgren wrote:
 > > 
-> > By having the active page table separate from the one being initialized,
-> > it is possible to preserve the initial debug mapping that was set in
-> > head.S until the final page table is ready.  Because there exists some
-> > code that installs a partial mapping in order to probe the hardware
-> > before installing additional mappings, it is necessary to set up the
-> > vector mapping early which enables the fault handler to copy some of
-> > the newly created mappings into our page table copy as needed.
+> > > How about we add CONFIG_SOC_OMAP3PLUS in the clean-up series?
+> > > Then this becomes just:
+> > > 
+> > > #ifdef CONFIG_SOC_OMAP3PLUS
 > > 
-> > This patch implements such a temporary page table copy only for
-> > non LPAE configurations at the moment.
+> > We might want to consider having separate CONFIG_SOC_* values for each 
+> > SoC.  So rather than CONFIG_SOC_OMAP3PLUS, we'd have CONFIG_SOC_OMAP3430, 
+> > CONFIG_SOC_OMAP3630, etc.
 > 
-> I've been thinking about this on and off since you posted it, and I'm now
-> convinced this will cause regressions.  You've probably forgotten about
-> those CPUs which need to read data in order to clear unwanted cache lines
-> from their cache.
+> Hmm but this would be in addition to the SOC specific options. The goal
+> is to cut down the ifdeffery needed all over the place to add new SoCs,
+> see the experimental patch I posted:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
 
-Hmmm... I didn't forget them, but I might not have thought those cases 
-all the way through.
+I see.  Yeah, the problem is that it's hard to figure out which SoCs 
+should go into SOC_OMAP3PLUS.  AM33xx?  TI81xx?  etc.  Some of these chips 
+draw some aspects from chips that we've historically considered part of 
+OMAP3, and other aspects from OMAP4-style chips.
 
-Those CPUs I know about with a need to read memory to clear cache lines 
-are either StrongARM based or XScale based.  But in those cases it is 
-only when cleaning up the whole cache that the process of filling the 
-cache with dummy lines is involved.
+What seems better to me would be to use a more specific, IP block-focused 
+macro as needed.  So to pick a random example, in mach-omap2/control.c, we 
+currently skip compilation of the scratchpad functions unless 
+CONFIG_ARCH_OMAP3 is defined.  Instead of making this 
+SOC_OMAP3PLUS-dependent, or dependent on a mess of CONFIG_SOC_* macros, 
+maybe something like CONFIG_OMAP3430_SCM_SCRATCHPAD_FORMAT?
 
-> This patch would cause all such CPUs to freeze when switching to or from
-> the temporary mapping, because neither page table will contain the necessary
-> mappings to allow those accesses to succeed.
+Of course, for some of these cases, maybe it makes more sense to move the 
+code out into a separate file, control-omap3-scratchpad.c or something, 
+and just conditionally compile it to avoid the #ifdefs.
 
-However, the switching itself doesn't involve a full cache flush.  Only 
-clean_dcache_area() is involved when installing the temporary mapping, 
-and that translates into cpu_dcache_clean_area() which on all those CPUs 
-I previously listed is implemented with a loop of individual cache line 
-clean operations.  Switching back to the real mapping doesn't involve 
-any cache ops since a full cache flush is performed anyway once the new 
-mapping is in place.  TLBs may not be incoherent at that point since 
-both mappings are not conflicting with each other.
+> Just to continue exploring just using the SoC specific options, we would
+> currently end up with more of this kind of nastiness:
+> 
+> #if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) ||      \
+> 					defined(CONFIG_ARCH_OMAP3))
 
-Therefore I don't think there should be any issues even on those CPUs, 
-unless I've overlooked something.
+Yep, agreed that we don't want that.
 
-Maybe you could test this on your Assabet simply by adding a dummy 
-printk() in create_mapping() once this patch is applied?
+> > The other motivation would be to support device manufacturers who only 
+> > wish to build a kernel for the single device that they are shipping.  In 
+> > terms of kernels shipped, this is probably the most popular use-case. With 
+> > something like CONFIG_SOC_OMAPAM33XX, they can avoid building quite a bit 
+> > of code and data (and potentially bugs) that are not needed for their 
+> > specific device.
+> 
+> Sure, but I think you're missing the point: This would be in addition
+> to the SoC specific options. Do you still see issues with that?
+
+Indeed, I misunderstood your proposal, sorry about that.
+
+Anyway, to me it seems like it would be a little better to have CONFIG_* 
+macros that are specific to the IP block in question, only because of the 
+SoC grouping problem that I mentioned above.
 
 
-Nicolas
+- Paul
