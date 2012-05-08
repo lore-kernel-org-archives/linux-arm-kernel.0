@@ -1,36 +1,62 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Wed, 09 May 2012 01:00:12 +0800
-Subject: [PATCH] mfd: da9052: fix of_match_node() arguments
-In-Reply-To: <1336258968-6423-1-git-send-email-olof@lixom.net>
-References: <1336258968-6423-1-git-send-email-olof@lixom.net>
-Message-ID: <4FA9511C.5060007@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 08 May 2012 18:00:20 +0100
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <20120508145758.GV15893@opensource.wolfsonmicro.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FA90BE1.3050304@linaro.org>
+ <20120508121940.GL15893@opensource.wolfsonmicro.com>
+ <4FA913BA.30908@linaro.org>
+ <20120508133411.GP15893@opensource.wolfsonmicro.com>
+ <4FA93391.8040905@linaro.org>
+ <20120508145758.GV15893@opensource.wolfsonmicro.com>
+Message-ID: <4FA95124.5010309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2012?05?06? 07:02), Olof Johansson wrote:
-> The driver calls of_match_node() with the arguments swapped.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->  drivers/mfd/da9052-i2c.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
-> index d8abdb3..8410065 100644
-> --- a/drivers/mfd/da9052-i2c.c
-> +++ b/drivers/mfd/da9052-i2c.c
-> @@ -104,7 +104,7 @@ static int __devinit da9052_i2c_probe(struct i2c_client *client,
->  		struct device_node *np = client->dev.of_node;
->  		const struct of_device_id *deviceid;
->  
-> -		deviceid = of_match_node(np, dialog_dt_ids);
-> +		deviceid = of_match_node(dialog_dt_ids, np);
->  		id = (const struct i2c_device_id *)deviceid->data;
->  	}
->  #endif
+On 08/05/12 15:57, Mark Brown wrote:
+> On Tue, May 08, 2012 at 03:54:09PM +0100, Lee Jones wrote:
+>> On 08/05/12 14:34, Mark Brown wrote:
+>
+>>> Looking at the usage here it looks like most of this stuff shouldn't be
+>>> there even with non-DT stuff, we probably don't want to add DT bindings
+>>> for those bits.All the voltage setting is not at all device specific
+>>> and can be done using the generic regulator bindings, the forcing on or
+>>> off is similarly generic.
+>
+>> All the generic properties _are_ set using the generic bindings. The
+>> only vendor specific values are the initialisation register values
+>> referenced above. I'll see what happens when I remove those from DT.
+>> I have a feeling that the regulators will just fail though.
+>
+> The comments in the arch/arm file indicate otherwise - they were talking
+> about enabling and disabling regulators, and about setting voltages.  It
+> may be that the comments in the arch/arm code are inaccurate but with it
+> being magic numbers you'd really hope they're accurate...
 
-Tested-by: Ying-Chun Liu <paul.liu@linaro.org>
+Fingers crossed. I'll let you know how I get on.
 
+>>> While looking for the original patch I also noticed that you're not CCing
+>>> the mailing list either...  please always CC the subsystem mailing list
+>>> on patches.
+>
+>> You don't appear to have one. I ran get_maintainer.pl on the patch
+>> and the only ML it came up with was LKML. If you do have one, you
+>> may need to update the MAINTAINERS file.
+>
+> LKML is the relevant list here.
 
-Sorry. I don't know how my code works and tested previously.
-But your patch is definited correct.
+Ah, okay. In retrospect I don't know why I didn't add it to be honest. 
+I'll endeavor to do so next time.
+
+Kind regards,
+Lee
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
