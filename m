@@ -1,83 +1,22 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 8 May 2012 10:17:44 +0000
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <87mx5jy2li.fsf@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
- <20120427175657.GP18260@opensource.wolfsonmicro.com>	<87397o3n4y.fsf@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
- <87mx5jy2li.fsf@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 8 May 2012 12:22:22 +0200
+Subject: [PATCH] ARM: mach-pxa: Use REGULATOR_SUPPLY macro
+In-Reply-To: <1336465510.11954.1.camel@phoenix>
+References: <1336465510.11954.1.camel@phoenix>
+Message-ID: <201205081222.22982.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2012 at 05:18:41, Hilman, Kevin wrote:
-> "AnilKumar, Chimata" <anilkumar@ti.com> writes:
-> 
-> > On Sat, Apr 28, 2012 at 02:31:17, Hilman, Kevin wrote:
-> >> Hi Mark,
-> >> 
-> >> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
-> >> 
-> >> > On Fri, Apr 27, 2012 at 11:09:10AM +0530, J, KEERTHY wrote:
-> >> >
-> >> >> Devfreq and cpufreq are related to dynamic frequency/voltage switching between
-> >> >> pre defined Operating Performance Points or the OPPs. Every OPP being
-> >> >> a voltage/frequency pair. Smartreflex is a different
-> >> >> power management technique.
-> >> >
-> >> > But presumably these things should integrate somehow - for example,
-> >> > should devfreq and cpufreq be providing inputs into what AVS is doing,
-> >> > and if so how?
-> >> 
-> >> The way it is currently designed, cpufreq/devfreq/regulator layers don't
-> >> need to know about AVS.
-> >> 
-> >> The higher-level layers only know about the "nominal" voltage.  AVS
-> >> hardware does automatic, adaptive, micro-adjustments around that nominal
-> >> voltage, and these micro-adjustments are managed by the AVS hardware
-> >> sending commands to the PMIC.  (specifically, on OMAP, the AVS sensors
-> >> provide inputs to the voltage processor (VP) which provide inputs to the
-> >> voltage controller (VC) which sends commands to the PMIC[1].)
-> >> 
-> >> The driver proposed here is primarily for initializing the various
-> >> parameters/sensitivity/etc. of the AVS hardware, but the actual voltage
-> >> adjustments are done in hardware by VC/VP.
-> >> 
-> >> The only thing the higher-level layers might potentially need to do to
-> >> enable/disable AVS around transitions (e.g. when changing OPP, AVS is
-> >> disabled before changing OPP and only re-enabled when the new nominal
-> >> voltage has been acheived.)
-> >> 
-> >> On OMAP, we handle this inside the OMAP-specific voltage layer which is
-> >> called by the regulator framework, so even the regulators do not need
-> >> any knowledge of AVS.
-> >
-> > Kevin,
-> >
-> > I want to point out some cases of SR implementation where this may not
-> > be true.
-> >
-> > Devices like DM8168, DM8148 and AM335X use Class 2B implementation of SR.
-> >
-> > Under this, SR module issues an interrupt to ARM when there is a need to
-> > change the voltage based on temperature changes, ageing etc.
-> >
-> > Once the interrupt arrives, kernel needs to adjust voltage using regulator API.
-> > The voltage change is a micro adjustment as in other SR classes.
-> 
-> That can easily be handled writing a plugin specific to class 2B.  This
-> driver was designed so plugins for other classes can be supported.  
-> 
-> Sure, we might need some enhancements for other classes (we already know
-> that we will for class 1 support.)  However, the purpose of this series
-> is to do the cleanups necessary for the driver to move to drivers/*.
-> 
+Dear Axel Lin,
 
-It's perfectly fine with me. My intention was just to highlight that
-class 2B SR will have to interact with regulator layer for voltage
-changes, so I guess it is little different from other SR classes.
+For:
 
-Thanks,
-AnilKumar
+>  arch/arm/mach-pxa/balloon3.c  |    4 +---
+>  arch/arm/mach-pxa/palm27x.c   |    4 +---
+>  arch/arm/mach-pxa/vpac270.c   |    4 +---
+>  arch/arm/mach-pxa/z2.c        |    4 +---
+
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+
+Best regards,
+Marek Vasut
