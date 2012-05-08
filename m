@@ -1,88 +1,70 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 8 May 2012 14:51:38 -0500
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <87wr4mr6io.fsf@ti.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
- <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
- <4FA9138D.8010604@ti.com>
- <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
- <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com> <87wr4mr6io.fsf@ti.com>
-Message-ID: <4FA9794A.7030607@ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 8 May 2012 19:57:34 +0000
+Subject: [PATCH-V5 2/3] arm:omap:am33xx: Add AM335XEVM machine support
+In-Reply-To: <20120508190651.GB5088@atomide.com>
+References: <alpine.DEB.2.00.1205020317151.19695@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA10A64@DBDE01.ent.ti.com>
+ <20120503155717.GE5140@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA1348F@DBDE01.ent.ti.com>
+ <871un1j769.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA1409D@DBDE01.ent.ti.com>
+ <20120504200547.GU5613@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA1778E@DBDE01.ent.ti.com>
+ <20120507173229.GA5088@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA17EEC@DBDE01.ent.ti.com>
+ <20120508190651.GB5088@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA1B377@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/08/2012 11:18 AM, Kevin Hilman wrote:
-> "Cousson, Benoit" <b-cousson@ti.com> writes:
+On Wed, May 09, 2012 at 00:36:51, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120507 11:59]:
+> > On Mon, May 07, 2012 at 23:02:29, Tony Lindgren wrote:
+> > > * Hiremath, Vaibhav <hvaibhav@ti.com> [120507 07:41]:
+> > > > On Sat, May 05, 2012 at 01:35:47, Tony Lindgren wrote:
+> > > > > 
+> > > > > I suggest doing some clean-up patches before adding SOC_AM33XX where
+> > > > > you just convert those to be
+> > > > > 
+> > > > > #if defined(CONFIG_ARCH_OMAP2PLUS) && !defined(CONFIG_ARCH_OMAP2)
+> > > > > 
+> > > > > or something similar depending if they already are inside mach-omap2
+> > > > > directory. This will make them future proof for adding new SoCs
+> > > > > without having to patch all over the place.
+> > > 
+> > > BTW, just noticied that the above won't work the right way in the
+> > > multi-omap case when all of them are compiled in..
+> > > 
+> > > > Cool, I also thought exactly same solution on this, but next thought came to 
+> > > > my mind was, it won't scale up, since we still have dependency on ARCH_OMAP2 
+> > > > option. However, it will be a good temporary solution for our problem, lets 
+> > > > review them first (I will submit shortly).
+> > > 
+> > > ..so probably the best way to deal with that is with the additional
+> > > CONFIG_SOC_OMAP3PLUS and CONFIG_SOC_OMAP4PLUS options that I posted
+> > > at:
+> > > 
+> > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67938.html
+> > > 
+> > > Can you please take a look and see how that works for am33xx?
+> > > 
+> > 
+> > I still don't understand, how this will help am33xx, and for that matter any 
+> > new future devices based on cortex-a8 or a9 core, but not omap exactly 
+> > families? 
+> > As I said earlier, am33xx doesn't fall under either omap3 or omap4; we have 
+> > again same question in front of us, which to follow, either omap3 or omap4??
+> > 
+> > What is the thought process of creating these config options? Isn't it same 
+> > as just replacing ARCH_OMAP3/4 with SOC_OMAP3PLUS and SOC_OMAP4PLUS? What is 
+> > the criteria for the device to get into this umbrella?
 > 
->> On 5/8/2012 4:00 PM, Kevin Hilman wrote:
->>> Jean Pihet<jean.pihet@newoldbits.com>  writes:
->>>
->>> [...]
->>>
->>>>>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->>>>>>> flags describe what the HW is capable of, and the EMU CD can support
->>>>>>> HW_AUTO
->>>>>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
->>>>>>> next
->>>>>>> power state is OFF, meaning that no retention mode is supported. So any
->>>>>>> transition to idle will go to OFF and lead to a reset upon wakeup.
->>>>>>>
->>>>>>> That being said, being able to transition to OFF during idle is a
->>>>>>> perfectly
->>>>>>> valid state for most powerdomain in OMAP anyway, so we should be able to
->>>>>>> restore from OFF mode smoothly.
->>>>>>>
->>>>>>> It looks to me that what is missing here is *just* a restore path in the
->>>>>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
->>>>>>> :-)
->>>>>>
->>>>>> Although it is perfectly feasible to have a seamless transition of the
->>>>>> EMU power domain, I think the PMU counters will not be accurate
->>>>>> anymore since they stop counting events when going to OFF and re-start
->>>>>> after the state restore.
->>>>>
->>>>>
->>>>> Good point, but I think the PMU might still works fine because located
->>>>> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
->>>>> going to OFF and thus will be reset.
->>>>
->>>> Ever better point ;p Thanks for the precision.
->>>> In any case my point was: can we allow the EMU CD to go OFF or prevent
->>>> it from doing so? We need to answer that question first.
->>>>
->>>
->>> The idea I've suggested is to use runtime PM for this.  As long as the
->>> PMU is in use, it will be runtime PM enabled (and not allowed to go into
->>> HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
->>> then be reset.  The next time it is needed, the runtime resume will need
->>> to do a full re-init.
->>
->> Oh, but does that mean that this driver is not pm_runtime adapted yet?
->>
+> Just to recap: As we've discussed elsewhere, these new options need to be finer
+> grained SOC_HAS_OMAPXYZ_ABC type options like you've already posted.
 > 
-> Actually, it is.  Ming Lei has done it.
-> 
-> Currently, Will has collected this[1] and is waiting (patiently) for us
-> to produce a real fix that doesn't kill PM in the process.
 
-I had to make a couple mods to Ming's patches but I do have something
-working now that _should_ not break PM. However, per my previous email
-(in response to Benoit's) I am struggling with the definition of the
-CLKDM_CAN_XXXXXX_AUTO flags to know the correct way to fix this.
+Absolutely... I will be submitting machine and low-level early printk patch
+Based on this only.
 
-I was going to send out my patches, but I wanted to get some more
-feedback on this first.
-
-Cheers
-Jon
+Thanks,
+Vaibhav
