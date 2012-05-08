@@ -1,39 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 May 2012 12:31:32 -0600
-Subject: [GIT PULL] ARM: tegra: dt branch
-Message-ID: <4FA96684.1040608@wwwdotorg.org>
+Date: Tue, 08 May 2012 12:33:28 -0600
+Subject: [GIT PULL] ARM: tegra: debug branch
+Message-ID: <4FA966F8.8090106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch is based on my previous gpio-pinmux pull request.
+This patch allows enhanced automatic selection of the UART to use for
+debug spew.
 
-This series instantiates many new devices from DT on Tegra boards.
-
-The following changes since commit aef7704c6cc36db9618603b22194def441d30432:
-  Stephen Warren (1):
-        pinctrl: tegra: error reporting cleanup
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+  Linus Torvalds (1):
+        Linux 3.4-rc2
 
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-for-3.5/dt
+for-3.5/debug
 
-Laxman Dewangan (1):
-      ARM: dt: tegra: enable als and proximity sensor
+Stephen Warren (1):
+      ARM: tegra: uncompress.h: Implement TEGRA_DEBUG_UART_AUTO_ODMDATA
 
-Olof Johansson (1):
-      ARM: dt: tegra seaboard: add i2c devices
-
-Stephen Warren (5):
-      ARM: dt: tegra seaboard: fix I2C2 SCL rate
-      ARM: dt: tegra seaboard: configure I2C2 pinmux
-      ARM: dt: tegra trimslice: add RTC I2C device
-      ARM: dt: tegra trimslice: enable SDHCI1 controller
-      ARM: dt: tegra trimslice: add support for audio
-
- arch/arm/boot/dts/tegra-cardhu.dts    |    8 ++++++
- arch/arm/boot/dts/tegra-seaboard.dts  |   41
-+++++++++++++++++++++++++++++---
- arch/arm/boot/dts/tegra-trimslice.dts |   24 +++++++++++--------
- arch/arm/boot/dts/tegra-ventana.dts   |    8 ++++++
- 4 files changed, 67 insertions(+), 14 deletions(-)
+ arch/arm/mach-tegra/Kconfig                   |   29 ++++-
+ arch/arm/mach-tegra/include/mach/uncompress.h |  176
+++++++++++++++++++-------
+ 2 files changed, 153 insertions(+), 52 deletions(-)
