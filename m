@@ -1,201 +1,66 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 8 May 2012 14:37:33 +0200
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
- <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
-Message-ID: <4FA9138D.8010604@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 08 May 2012 13:38:18 +0100
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <20120508121940.GL15893@opensource.wolfsonmicro.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FA90BE1.3050304@linaro.org>
+ <20120508121940.GL15893@opensource.wolfsonmicro.com>
+Message-ID: <4FA913BA.30908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Jean,
-
-On 5/8/2012 1:23 PM, Jean Pihet wrote:
-> Hi Benoit,
+On 08/05/12 13:19, Mark Brown wrote:
+> On Tue, May 08, 2012 at 01:04:49PM +0100, Lee Jones wrote:
+>> On 07/05/12 18:08, Mark Brown wrote:
 >
-> On Tue, May 8, 2012 at 1:01 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> Hi Kevin&  Jon,
->>
->>
->> On 5/8/2012 1:28 AM, Kevin Hilman wrote:
->>>
->>> Jon Hunter<jon-hunter@ti.com>    writes:
->>>
->>>> Hi Kevin,
->>>>
->>>> On 05/07/2012 12:15 PM, Kevin Hilman wrote:
->>>>>
->>>>> Jon Hunter<jon-hunter@ti.com>    writes:
->>>>>
->>>>>> Hi Will,
->>>>>>
->>>>>> On 04/26/2012 01:07 PM, Will Deacon wrote:
->>>>>>>
->>>>>>> On Wed, Apr 04, 2012 at 12:15:24PM +0100, Will Deacon wrote:
->>>>>>>>
->>>>>>>> On Wed, Apr 04, 2012 at 12:29:49AM +0100, Paul Walmsley wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Part of the problem is that the clockdomain data for the emu_sys
->>>>>>>>> clockdomain is wrong.  Here's something to try to fix it.  It might
->>>>>>>>> just
->>>>>>>>> be enough to get it to work.
->>>>>>>>
->>>>>>>>
->>>>>>>> Hmm, doesn't seem to work but I do see the following in dmesg when I
->>>>>>>> try to
->>>>>>>> use perf:
->>>>>>>>
->>>>>>>>   powerdomain: waited too long for powerdomain emu_pwrdm to complete
->>>>>>>> transition
->>>>>>>>
->>>>>>>> which is new with your patch.
->>>>>>>
->>>>>>>
->>>>>>> Sorry to nag, but does anybody have a clue where to go from here? I
->>>>>>> can
->>>>>>> start digging in the OMAP PM code, but it's all new territory for me.
->>>>>>
->>>>>>
->>>>>> I did a little playing around with this today and I think that I have
->>>>>> figured out why this was not working (see below). Please can you try the
->>>>>> following patch? I tried this on top of your series for perf/omap4.
->>>>>>
->>>>>> Paul, FYI. If this works for Will then I can re-base on top of the
->>>>>> latest linux-omap and submit to the mailing list.
->>>>>>
->>>>>> Also, the above error about the emu_pwrdm is odd too. I noticed that
->>>>>> the emu_pwrdm is always in the transitioning state. And when I say always, I
->>>>>> mean that even if I check the power domain state while u-boot is running it
->>>>>> is in the transitioning state. So even before the kernel starts.
->>>>>>
->>>>>> Cheers
->>>>>> Jon
->>>>>>
->>>>>>   From 9137ff9c1b382232de7443db0b51b7555846fb62 Mon Sep 17 00:00:00 2001
->>>>>> From: Jon Hunter<jon-hunter@ti.com>
->>>>>> Date: Fri, 4 May 2012 16:48:45 -0500
->>>>>> Subject: [PATCH] ARM: OMAP4: Disable auto enable for EMU CLKDM
->>>>>>
->>>>>> The flag CLKDM_CAN_HWSUP allows the clock-domain to automatically
->>>>>> transition
->>>>>> to the enabled and disabled state. This means that as soon as we force
->>>>>> a
->>>>>> software wake-up on the clock domain, the clock domain will be allowed
->>>>>> to idle
->>>>>> and put back into the hardware auto state. For the EMU clock domain
->>>>>> this is not
->>>>>> what we want. We want to keep the clock domain in the software wakeup
->>>>>> state
->>>>>> while the clock domain is being used and put it back in to the hardware
->>>>>> auto
->>>>>> state when we have finished using the clock domain.
->>>>>>
->>>>>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
->>>>>
->>>>>
->>>>> With this patch, how is the clkdm ever idled?
->>>>
->>>>
->>>> It does not! Sorry, I was so engrossed with figuring out why the EMU
->>>> clkdm was being idled as soon as it was enabled, I forgot to check if is
->>>> ever disabled once we terminated perf :-(
->>>>
->>>>> IIUC, your patch will get PMU interrupts working, but similarily to
->>>>> previous patches in this thread, it works because it *never* allows the
->>>>> EMU clkdm to idle.  This is not a mergeable solution because it will not
->>>>> allow CORE retention (and thus full-chip retention.)
->>>>
->>>>
->>>> Right!
->>>>
->>>>> What we need is a solution that allows the clkdm to idle, and then to be
->>>>> reinitialzed when it wakes up.  Due to the way (I understand) resets in
->>>>> the debugss, allowing the clkdm to idle will cause a reset, so the
->>>>> PMU/CTI interrupts need to be reinitialzied after wakeup.
->>>>
->>>>
->>>> Yes exactly I see that now. I have prototyped the 3 patches and this is
->>>> working AND the EMU clkdm does go back to idle. I can send out to the
->>>> list for review.
->>>
->>>
->>> Perfect, thanks.
->>>
->>>>> Kevin
->>>>>
->>>>> P.S. Please note there is also already a different fix in mainline for
->>>>> the EMU clkdm data from Paul which adds the force wakeup flag and
->>>>> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
->>>>> because the hardware is capable.)
->>>>
->>>>
->>>> Hmmm ... yes saw this, and you will have to excuse me as I don't fully
->>>> follow the logic here. In fact, I am thinking we want the opposite ;-)
->>>>
->>>>   From looking, into this it seems to me that when PMU is running we want
->>>> the EMU clock domain in software-wakeup state and when PMU is not
->>>> running we want in the hardware auto state.
->>>
->>>
->>> So far, I'm with you.
->>>
->>>> By keeping the ENABLE_AUTO flag set, as soon as we enable the clock
->>>> domain it is put right back into the HW_AUTO state
->>>
->>>
->>> This is only because it was in the HWSUP state when _enable was called.
->>> If clkdm_deny_idle() is used, that behavior will change.
->>>
->>>> and hence PMU is
->>>> not working (see _enable() function in
->>>> arch/arm/mach-omap2/omap_hwmod.c)
->>>>
->>>> So really what I think we want is to remove the ENABLE_AUTO flag to keep
->>>> the clock domain in software wake-up and use the DISABLE_AUTO flag to
->>>> put the clock domain back in HW_AUTO (note this requires a patch to
->>>> perform this 2nd part).
->>>
->>>
->>> Well, Paul will have to comment here for the final word, but IIUC, the
->>> hwmod flags are supposed to indicate only what the HW is capable of.  If
->>> we want to change the runtime behavior, we nee to use (or add) APIs to
->>> change the beahvior.  In this case, clkdm_allow_idle(),
->>> clkdm_deny_idle() are probably what is needed here.
->>
->>
->> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->> flags describe what the HW is capable of, and the EMU CD can support HW_AUTO
->> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid next
->> power state is OFF, meaning that no retention mode is supported. So any
->> transition to idle will go to OFF and lead to a reset upon wakeup.
->>
->> That being said, being able to transition to OFF during idle is a perfectly
->> valid state for most powerdomain in OMAP anyway, so we should be able to
->> restore from OFF mode smoothly.
->>
->> It looks to me that what is missing here is *just* a restore path in the
->> PMU/CTI code. But I'm probably missing some nasty details in this issue :-)
-> Although it is perfectly feasible to have a seamless transition of the
-> EMU power domain, I think the PMU counters will not be accurate
-> anymore since they stop counting events when going to OFF and re-start
-> after the state restore.
+>>> You should be using of_regulator_match() for this (I think it's supposed
+>>> to do an equivalent job...) rather than open coding.
+>
+>> of_regulator_match() didn't exist when I wrote this. In fact, it
+>> only made it into -next a couple of days ago. Besides, it doesn't
+>
+> It's been kicking around for review for a little while longer than that
+> (it was waiting for review while Rhyland was on holiday), and in any
+> case half the reason for adding infrastructure is to avoid adding
+> repeated code.
 
-Good point, but I think the PMU might still works fine because located 
-inside the MPU domain. AFAIR, only the path to access the PMU and the 
-CTI is going to OFF and thus will be reset.
-But that whole DEBUGSS is such a nightmare, that I'm not 100% sure about 
-that :-)
+I'm sorry Mark, but I just don't have the time to read all of the 
+mailing lists in order to keep up with, and in-turn use all of the new 
+features which might make it upstream. I only use what I see in the 
+kernel at time of writing, as I have an entire platform to enable and 
+very little time in which to do it.
 
-Regards,
-Benoit
+>> satisfy the needs of this code segment. of_regulator_match() is
+>> a(nother) wrapper around of_get_regulation_constraints(), which is
+>> only used to populate 'struct regulation_constraints constraints'
+>> after being provided with a selection of .compatible strings.
+>
+> I suspect that what you're trying to achieve isn't a good regulator
+> binding but I'm not entirely sure what you're trying to do so perhaps
+> not.  You haven't documented the binding at all which might make things
+> clearer...
+
+Right, I agree with you. I certainly will knock up some documentation 
+for them.
+
+This piece of code plucks pre-defined initialisation values and from the 
+Device Tree and uses them to set-up regulator related registers on the 
+u8500. See 'struct ab8500_regulator_reg_init ab8500_regulator_reg_init' 
+in arch/arm/mach-ux500/board-mop500-regulators.c for reference.
+
+I did run this past Arnd before writing the code and he agreed that this 
+would be suitable; however, if you know of a better way in which I can 
+do this, I'd be pleased to hear of it.
+
+Kind regards,
+Lee
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
