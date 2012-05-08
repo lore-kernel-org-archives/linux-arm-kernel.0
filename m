@@ -1,69 +1,90 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 May 2012 14:26:40 -0400
-Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
-In-Reply-To: <1334883420.3209.230.camel@deadeye>
-References: <1333858733.7150.115.camel@deadeye>
- <1334883420.3209.230.camel@deadeye>
-Message-ID: <20120508182640.GG15711@titan.lakedaemon.net>
+From: hwoo.yang@gmail.com (Hyungwoo Yang)
+Date: Tue, 8 May 2012 11:28:08 -0700
+Subject: [PATCH] Prevent process migration during vfp_init()
+In-Reply-To: <20120508180430.GL2263@mudshark.cambridge.arm.com>
+References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
+ <20120508111332.GG2263@mudshark.cambridge.arm.com>
+ <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
+ <20120508180430.GL2263@mudshark.cambridge.arm.com>
+Message-ID: <CAOsG7try1-E1JOq2w_A2767rbi+iyyahh=H1z9TzY+KLoc8N0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2012 at 01:57:00AM +0100, Ben Hutchings wrote:
-> On Sun, 2012-04-08 at 05:18 +0100, Ben Hutchings wrote:
-> > Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
-> > mpp code to use common orion platform mpp.') seems to have accidentally
-> > inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
-> > which uses MPP9 as a GPIO LED device, this results in the error:
-> > 
-> > [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
-> > 
-> > Reported-by: Henry von Tresckow <hvontres@gmail.com>
-> 
-> Tested-by: Hans Henry von Tresckow <hvontres@gmail.com>
+Yes, I've already tested without preemption, it seems it is working fine.
 
-I'm putting this towards fixes for v3.4, adding the above Tested-by:
+for the failure, it is simple. on my A9 quad, due to heavy loads
+during "late initcall", sometimes process migration happens just after
+vfp_enable() but before smp_call_function(). it means there can be a
+VFP disabled but accessed since smp_call_function() is for the rest of
+cores not the core running it.
 
-thx,
+For example, if enable_vfp() is executed on core0 but
+smp_call_function() is excuted on core1 due to migration, then VFP on
+core1 is not enabled. it will be enabled next time when the core1
+online again.
 
-Jason.
+- Hyungwoo Yang
 
-> 
-> (on the mv2120, and applied to Debian's 3.2 tree)
-> 
-> > References: http://bugs.debian.org/667446
-> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> > Cc: stable at vger.kernel.org [v3.0+]
-> > ---
-> > v2: Add subject of the earlier commit
-> > 
-> > Ben.
-> > 
-> >  arch/arm/mach-orion5x/mpp.h |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-> > index eac6897..db70e79 100644
-> > --- a/arch/arm/mach-orion5x/mpp.h
-> > +++ b/arch/arm/mach-orion5x/mpp.h
-> > @@ -65,8 +65,8 @@
-> >  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
-> >  
-> >  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> > -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
-> > -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-> > +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-> > +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
-> >  
-> >  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
-> >  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
-> 
-> -- 
-> Ben Hutchings
-> This sentence contradicts itself - no actually it doesn't.
-
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Tue, May 8, 2012 at 11:04 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 08, 2012 at 06:24:27PM +0100, Hyungwoo Yang wrote:
+>> I think we don't need preempt_disable()/preempt_enable() call in your proposal.
+>> I mean, since we have enabled on every VFPs in cores online(
+>> on_each_cpu() ), we don't need to worry about accessing a VFP which is
+>> disabled. So we don't need to worry about migration after
+>> "on_each_cpu()", right?
+>
+> Yes, that sounds reasonable to me since any thread migration will imply the
+> barriers we need for the VFP exception vector to be correct. In which case the
+> patch can be further reduced to what I've got below.
+>
+> It seems happy enough on my quad A9 running a bunch of paranoia FP tests --
+> do you have a particular testcase which was exhibiting this failure when you
+> reported the issue?
+>
+> Cheers,
+>
+> Will
+>
+>
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index bc683b8..c5767b5 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -11,6 +11,7 @@
+> ?#include <linux/types.h>
+> ?#include <linux/cpu.h>
+> ?#include <linux/cpu_pm.h>
+> +#include <linux/hardirq.h>
+> ?#include <linux/kernel.h>
+> ?#include <linux/notifier.h>
+> ?#include <linux/signal.h>
+> @@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
+>
+> ?static void vfp_enable(void *unused)
+> ?{
+> - ? ? ? u32 access = get_copro_access();
+> + ? ? ? u32 access;
+> +
+> + ? ? ? BUG_ON(preemptible());
+> + ? ? ? access = get_copro_access();
+>
+> ? ? ? ?/*
+> ? ? ? ? * Enable full access to VFP (cp10 and cp11)
+> @@ -657,7 +661,7 @@ static int __init vfp_init(void)
+> ? ? ? ?unsigned int cpu_arch = cpu_architecture();
+>
+> ? ? ? ?if (cpu_arch >= CPU_ARCH_ARMv6)
+> - ? ? ? ? ? ? ? vfp_enable(NULL);
+> + ? ? ? ? ? ? ? on_each_cpu(vfp_enable, NULL, 1);
+>
+> ? ? ? ?/*
+> ? ? ? ? * First check that there is a VFP that we can use.
+> @@ -678,8 +682,6 @@ static int __init vfp_init(void)
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?hotcpu_notifier(vfp_hotplug, 0);
+>
+> - ? ? ? ? ? ? ? smp_call_function(vfp_enable, NULL, 1);
+> -
+> ? ? ? ? ? ? ? ?VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT; ?/* Extract the architecture version */
+> ? ? ? ? ? ? ? ?printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
+> ? ? ? ? ? ? ? ? ? ? ? ?(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
