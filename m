@@ -1,103 +1,155 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 May 2012 14:59:52 +0100
-Subject: Development tree for Cortex-A15?
-In-Reply-To: <1336485257.47575.YahooMailNeo@web132502.mail.ird.yahoo.com>
-References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
- <bc6e93f98278125c354282f23751b1aa@localhost>
- <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <6e4ad6defa33bf693ec45cae819469f0@localhost>
- <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
- <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
- <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
- <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
- <4FA8FADF.2070701@arm.com>
- <1336485257.47575.YahooMailNeo@web132502.mail.ird.yahoo.com>
-Message-ID: <4FA926D8.2050200@arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 8 May 2012 19:31:57 +0530
+Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM address
+ space.
+In-Reply-To: <20120508124116.GE17798@arm.com>
+References: <1336398149-26153-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120508124116.GE17798@arm.com>
+Message-ID: <CAMQu2gxXB4GyddjrcKWwJ=KXx=MoDs7DdwhbOY85qkVJ1Vv3wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/12 14:54, Jemma Jones wrote:
->> Subject: Re: Development tree for Cortex-A15?
-> 
+On Tue, May 8, 2012 at 6:11 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, May 07, 2012 at 02:42:29PM +0100, Santosh Shilimkar wrote:
+>> From: R Sricharan <r.sricharan@ti.com>
 >>
->> On 08/05/12 11:13, Jemma Jones wrote:
->>>>  Subject: Re: Development tree for Cortex-A15?
->>>>>   Any chance you can send me a .config file that works on the kernel 
->> in
->>>>  this
->>>>>   branch which runs on your A15x1 FastModel?
->>>>
->>>>  Coming in a private email.
->>>
->>>  I didn't seem to get anything?
+>> ARM decompressor code setups entire 4GB address space pages.
+>> Out of the 4GB, about 256MB are setup with normal memory attributes
+>> for needed DRAM and the rest of the address space as Strongly ordered.
 >>
->> As far as I'm concerned, it was delivered:
+>> But since all the sections are mapped in DOMAIN0(Manager), processor
+>> like Cortex-A15, can speculatively prefetch from non-DRAM read sensitive
+>> areas even in the presence of XN(Non-executable). This is because XN
+>> attribute is ignored when domain is Manager.
 >>
->> 2012-05-05 13:09:33 1SQcrl-0006uI-OX <= maz@misterjones.org U=www-data 
->> P=local S=59827 id=7da4dd4bd4f768d907094ce4919bfffe at localhost
->> 2012-05-05 13:09:34 1SQcrl-0006uI-OX => jemmajones81 at yahoo.co.uk R=dnslookup 
->> T=remote_smtp H=mx-eu.mail.am0.yahoodns.net [77.238.184.241]
->> 2012-05-05 13:09:34 1SQcrl-0006uI-OX Completed
+>> This can lead to accesses to non-accessible address regions leading
+>> to various interconnect violations. The issue is observed on OMAP5.
 >>
->> I'll resend it again, but you may want to check your spam folder.
+>> This patch tries to fix the issue by ensuring that non-DRAM region
+>> is marked as a client domain so that XN attribute is effective.
 >>
->>>>>   I'm using the boot-wrapper from
->>>>>   
->> http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
->>>>>   semi hosting mode.
->>>>>
->>>>>   I managed to boot Android from that but I don't seem to be 
->> able to boot
->>>>>   your kernel. It just stops after the boot-wrapper says loading 
->> uImage.
->>>>
->>>>  Which dts file are you using?
->>>
->>>  I don't quite understand yet how the DT stuff is used. When I build the 
->> DTB files then I get vexpress-v2p-ca15-tc1.dtb in my arch/arm/boot directory. I 
->> assume that one is used then for my kernel image?
->>>
->>>  My .config has all the DT stuff enabled I think:
->>>  CONFIG_ARCH_VEXPRESS_DT=y
->>>  CONFIG_ARM_APPENDED_DTB=y
->>>  CONFIG_ARM_ATAG_DTB_COMPAT=y
->>>
->>>  Or is that not correct?
+>> A better alternative is to not map un-used regions but since the
+>> decompressor code is generic, there might be many exceptions
+>> for the devices used like debug console etc.
 >>
->> First, you want to forget about anything TC1 related, it isn't what you need 
->> for the Fast Model.
+>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>> ?arch/arm/boot/compressed/head.S | ? ?7 ++++++-
+>> ?1 files changed, 6 insertions(+), 1 deletions(-)
 >>
->> Step by step instructions:
->> - Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
->> - Build your zImage
->> - From your kernel tree, run:
->>   ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x2.dtb 
->> wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x2.dts
->> - cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
->> - Build your uImage if that's what you're using.
->> - Build your boot-wrapper as usual.
->>
->> That should get you going.
->>
->>>  I have now updated to you latest kvm-arm-3.4 branch.
->>
->> That's very brave of you... ;-)
->>
->>>  But the kernel still does not boot up properly, or at least I don't 
->> seem to get any output. It just goes "Uncompressing Linux... done." 
->> and then does nothing.
->>>  I'm using the FastModel Cortex-A15x2 simulation.
->>
->> Let me know if it gets better with the above. Or not.
->>
-> 
-> It seems as if the CLCD driver is not yet working in this configuration? It does not load for me, because the clcdfb_probe() function fails with board = dev->dev.platform_data being NULL. Is the platform initialization not setting this?
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index dc7e8ce..4dc799b 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -578,7 +578,7 @@ __setup_mmu: ? ? ?sub ? ? r3, r4, #16384 ? ? ? ? ?@ Page directory size
+>> ? ? ? ? ? ? ? mov ? ? r9, r0, lsr #18
+>> ? ? ? ? ? ? ? mov ? ? r9, r9, lsl #18 ? ? ? ? @ start of RAM
+>> ? ? ? ? ? ? ? add ? ? r10, r9, #0x10000000 ? ?@ a reasonable RAM size
+>> - ? ? ? ? ? ? mov ? ? r1, #0x12
+>> + ? ? ? ? ? ? mov ? ? r1, #0x32 ? ? ? ? ? ? ? @ set domain1, XN, valid
+>> ? ? ? ? ? ? ? orr ? ? r1, r1, #3 << 10
+>> ? ? ? ? ? ? ? add ? ? r2, r3, #16384
+>> ?1: ? ? ? ? ? cmp ? ? r1, r9 ? ? ? ? ? ? ? ? ?@ if virt > start of RAM
+>> @@ -587,8 +587,10 @@ __setup_mmu: ? ? sub ? ? r3, r4, #16384 ? ? ? ? ?@ Page directory size
+>> ?#else
+>> ? ? ? ? ? ? ? orrhs ? r1, r1, #0x0c ? ? ? ? ? @ set cacheable, bufferable
+>> ?#endif
+>> + ? ? ? ? ? ? bichs ? r1, r1, #0x20 ? ? ? ? ? @ set domain0 for DRAM
+>> ? ? ? ? ? ? ? cmp ? ? r1, r10 ? ? ? ? ? ? ? ? @ if virt > end of RAM
+>> ? ? ? ? ? ? ? bichs ? r1, r1, #0x0c ? ? ? ? ? @ clear cacheable, bufferable
+>> + ? ? ? ? ? ? orrhs ? r1, r1, #0x20 ? ? ? ? ? @ set domain1
+>
+> I would leave the same domain (0, set as client) and rather change the
+> XN and cacheability bits once we finished with the DRAM. I think it's
+> cleaner assuming we have two domains and the manager one overrides the
+> XN bit.
+>
+Ok. Assuming you mean " it's _not_ cleaner to have two domains where
+manager overrides XN attributes" Note that DRAM can be in the middle of
+4GB address space, so we need to take care of bottom and top address
+space.
 
-No. There is no binding for CLCD, and I've refrained from adding more
-hacks to my tree. If you want to tackle the task of writing a CLCD
-binding and porting the driver to DT, be my guest! :)
+Update patch end of the email. Is that fine with you ?
 
-	M.
+Regards
+Santosh
+
+>From b906ef372f0e2dfa7e1fbc3c87406b1c303d8975 Mon Sep 17 00:00:00 2001
+From: R Sricharan <r.sricharan@ti.com>
+Date: Mon, 7 May 2012 15:11:58 +0530
+Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM address
+ space.
+
+ARM decompressor code setups entire 4GB address space pages.
+Out of the 4GB, about 256MB are setup with normal memory attributes
+for needed DRAM and the rest of the address space as Strongly ordered.
+
+But since all the sections are mapped in DOMAIN0(Manager), processor
+like Cortex-A15, can speculatively prefetch from non-DRAM read sensitive
+areas even in the presence of XN(Non-executable). This is because XN
+attribute is ignored when domain is Manager.
+
+This can lead to accesses to non-accessible address regions leading
+to various interconnect violations. The issue is observed on OMAP5.
+
+This patch tries to fix the issue by ensuring that all regions
+are marked as a client domain so that XN attribute is effective.
+
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/boot/compressed/head.S |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index dc7e8ce..a2602b8 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -578,10 +578,12 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		mov	r9, r0, lsr #18
+ 		mov	r9, r9, lsl #18		@ start of RAM
+ 		add	r10, r9, #0x10000000	@ a reasonable RAM size
+-		mov	r1, #0x12
++		mov	r1, #0x02		@ Default executable section
+ 		orr	r1, r1, #3 << 10
+ 		add	r2, r3, #16384
+ 1:		cmp	r1, r9			@ if virt > start of RAM
++		orrlo	r1, r1, #0x10		@ Mark XN for non DRAM
++		bichs	r1, r1, #0x10		@ clear XN for DRAM
+ #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+ 		orrhs	r1, r1, #0x08		@ set cacheable
+ #else
+@@ -589,6 +591,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ #endif
+ 		cmp	r1, r10			@ if virt > end of RAM
+ 		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
++		orrhs	r1, r1, #0x10		@ Mark XN for non DRAM
+ 		str	r1, [r0], #4		@ 1:1 mapping
+ 		add	r1, r1, #1048576
+ 		teq	r0, r2
+@@ -599,7 +602,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+  * so there is no map overlap problem for up to 1 MB compressed kernel.
+  * If the execution is in RAM then we would only be duplicating the above.
+  */
+-		mov	r1, #0x1e
++		mov	r1, #0x0e		@ Clear XN
+ 		orr	r1, r1, #3 << 10
+ 		mov	r2, pc
+ 		mov	r2, r2, lsr #20
+@@ -658,6 +661,9 @@ __armv7_mmu_cache_on:
+ 		movne	r1, #-1
+ 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+ 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
++		bic	r1, r1, #0x03		@ Clear domain0 bits
++		orr	r1, r1, #0x01		@ Set domain0 as client
++		mcr	p15, 0, r1, c3, c0, 0
+ #endif
+ 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+ 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
 -- 
-Jazz is not dead. It just smells funny...
+1.7.5.4
