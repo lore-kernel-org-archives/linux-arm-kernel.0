@@ -1,225 +1,107 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 8 May 2012 09:22:28 +0530
-Subject: [PATCH V3 Resend 01/12] clk: Add non CONFIG_HAVE_CLK routines
+Date: Tue, 8 May 2012 09:22:37 +0530
+Subject: [PATCH V3 Resend 10/12] gadget/m66592: Remove conditional compilation
+ of clk code
 In-Reply-To: <cover.1336448639.git.viresh.kumar@st.com>
 References: <cover.1336448639.git.viresh.kumar@st.com>
-Message-ID: <0b18e118590344decbc9fe02b5593eddfc3184ef.1336448639.git.viresh.kumar@st.com>
+Message-ID: <60e6ca8b7d1458bf28181bad71c6fd006fbc9e6d.1336448639.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many drivers are shared between architectures that may or may not have HAVE_CLK
-selected for them. To remove compilation errors for them we enclose clk_*()
-calls in these drivers within #ifdef CONFIG_HAVE_CLK, #endif.
-
-This patch removes the need of these CONFIG_HAVE_CLK statements, by introducing
-dummy routines when HAVE_CLK is not selected by platforms. So, definition of
-these routines will always be available. These calls will return error for
-platforms that don't select HAVE_CLK.
+With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+macros.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
 ---
- include/linux/clk.h |  168 +++++++++++++++++++++++++++++++++------------------
- 1 files changed, 109 insertions(+), 59 deletions(-)
+ drivers/usb/gadget/m66592-udc.c |    9 +--------
+ drivers/usb/gadget/m66592-udc.h |    5 -----
+ 2 files changed, 1 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 70cf722..9f84b68 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -84,6 +84,43 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
- #endif /* !CONFIG_COMMON_CLK */
+diff --git a/drivers/usb/gadget/m66592-udc.c b/drivers/usb/gadget/m66592-udc.c
+index 3608b3b..51c24d2 100644
+--- a/drivers/usb/gadget/m66592-udc.c
++++ b/drivers/usb/gadget/m66592-udc.c
+@@ -1583,12 +1583,10 @@ static int __exit m66592_remove(struct platform_device *pdev)
+ 	iounmap(m66592->reg);
+ 	free_irq(platform_get_irq(pdev, 0), m66592);
+ 	m66592_free_request(&m66592->ep[0].ep, m66592->ep0_req);
+-#ifdef CONFIG_HAVE_CLK
+ 	if (m66592->pdata->on_chip) {
+ 		clk_disable(m66592->clk);
+ 		clk_put(m66592->clk);
+ 	}
+-#endif
+ 	kfree(m66592);
+ 	return 0;
+ }
+@@ -1602,9 +1600,7 @@ static int __init m66592_probe(struct platform_device *pdev)
+ 	struct resource *res, *ires;
+ 	void __iomem *reg = NULL;
+ 	struct m66592 *m66592 = NULL;
+-#ifdef CONFIG_HAVE_CLK
+ 	char clk_name[8];
+-#endif
+ 	int ret = 0;
+ 	int i;
  
- /**
-+ * clk_prepare - prepare a clock source
-+ * @clk: clock source
-+ *
-+ * This prepares the clock source for use.
-+ *
-+ * Must not be called from within atomic context.
-+ */
-+#ifdef CONFIG_HAVE_CLK_PREPARE
-+int clk_prepare(struct clk *clk);
-+#else
-+static inline int clk_prepare(struct clk *clk)
-+{
-+	might_sleep();
-+	return 0;
-+}
-+#endif
-+
-+/**
-+ * clk_unprepare - undo preparation of a clock source
-+ * @clk: clock source
-+ *
-+ * This undoes a previously prepared clock.  The caller must balance
-+ * the number of prepare and unprepare calls.
-+ *
-+ * Must not be called from within atomic context.
-+ */
-+#ifdef CONFIG_HAVE_CLK_PREPARE
-+void clk_unprepare(struct clk *clk);
-+#else
-+static inline void clk_unprepare(struct clk *clk)
-+{
-+	might_sleep();
-+}
-+#endif
-+
-+#ifdef CONFIG_HAVE_CLK
-+/**
-  * clk_get - lookup and obtain a reference to a clock producer.
-  * @dev: device for clock "consumer"
-  * @id: clock comsumer ID
-@@ -121,24 +158,6 @@ struct clk *clk_get(struct device *dev, const char *id);
- struct clk *devm_clk_get(struct device *dev, const char *id);
+@@ -1671,7 +1667,6 @@ static int __init m66592_probe(struct platform_device *pdev)
+ 		goto clean_up;
+ 	}
  
- /**
-- * clk_prepare - prepare a clock source
-- * @clk: clock source
-- *
-- * This prepares the clock source for use.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--int clk_prepare(struct clk *clk);
--#else
--static inline int clk_prepare(struct clk *clk)
--{
--	might_sleep();
--	return 0;
--}
+-#ifdef CONFIG_HAVE_CLK
+ 	if (m66592->pdata->on_chip) {
+ 		snprintf(clk_name, sizeof(clk_name), "usbf%d", pdev->id);
+ 		m66592->clk = clk_get(&pdev->dev, clk_name);
+@@ -1683,7 +1678,7 @@ static int __init m66592_probe(struct platform_device *pdev)
+ 		}
+ 		clk_enable(m66592->clk);
+ 	}
+-#endif
++
+ 	INIT_LIST_HEAD(&m66592->gadget.ep_list);
+ 	m66592->gadget.ep0 = &m66592->ep[0].ep;
+ 	INIT_LIST_HEAD(&m66592->gadget.ep0->ep_list);
+@@ -1731,13 +1726,11 @@ err_add_udc:
+ 	m66592_free_request(&m66592->ep[0].ep, m66592->ep0_req);
+ 
+ clean_up3:
+-#ifdef CONFIG_HAVE_CLK
+ 	if (m66592->pdata->on_chip) {
+ 		clk_disable(m66592->clk);
+ 		clk_put(m66592->clk);
+ 	}
+ clean_up2:
+-#endif
+ 	free_irq(ires->start, m66592);
+ clean_up:
+ 	if (m66592) {
+diff --git a/drivers/usb/gadget/m66592-udc.h b/drivers/usb/gadget/m66592-udc.h
+index 9d9f7e3..a044ad3 100644
+--- a/drivers/usb/gadget/m66592-udc.h
++++ b/drivers/usb/gadget/m66592-udc.h
+@@ -13,10 +13,7 @@
+ #ifndef __M66592_UDC_H__
+ #define __M66592_UDC_H__
+ 
+-#ifdef CONFIG_HAVE_CLK
+ #include <linux/clk.h>
 -#endif
 -
--/**
-  * clk_enable - inform the system when the clock source should be running.
-  * @clk: clock source
-  *
-@@ -166,47 +185,6 @@ int clk_enable(struct clk *clk);
-  */
- void clk_disable(struct clk *clk);
+ #include <linux/usb/m66592.h>
  
--
--/**
-- * clk_unprepare - undo preparation of a clock source
-- * @clk: clock source
-- *
-- * This undoes a previously prepared clock.  The caller must balance
-- * the number of prepare and unprepare calls.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--void clk_unprepare(struct clk *clk);
--#else
--static inline void clk_unprepare(struct clk *clk)
--{
--	might_sleep();
--}
+ #define M66592_SYSCFG		0x00
+@@ -468,9 +465,7 @@ struct m66592_ep {
+ struct m66592 {
+ 	spinlock_t		lock;
+ 	void __iomem		*reg;
+-#ifdef CONFIG_HAVE_CLK
+ 	struct clk *clk;
 -#endif
--
--/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
--static inline int clk_prepare_enable(struct clk *clk)
--{
--	int ret;
--
--	ret = clk_prepare(clk);
--	if (ret)
--		return ret;
--	ret = clk_enable(clk);
--	if (ret)
--		clk_unprepare(clk);
--
--	return ret;
--}
--
--/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
--static inline void clk_disable_unprepare(struct clk *clk)
--{
--	clk_disable(clk);
--	clk_unprepare(clk);
--}
--
- /**
-  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-  *		  This is only valid once the clock source has been enabled.
-@@ -297,6 +275,78 @@ struct clk *clk_get_parent(struct clk *clk);
-  */
- struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+ 	struct m66592_platdata	*pdata;
+ 	unsigned long		irq_trigger;
  
-+#else /* !CONFIG_HAVE_CLK */
-+
-+static inline struct clk *clk_get(struct device *dev, const char *id)
-+{
-+	return NULL;
-+}
-+
-+static inline struct clk *devm_clk_get(struct device *dev, const char *id)
-+{
-+	return NULL;
-+}
-+
-+static inline void clk_put(struct clk *clk) {}
-+
-+static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
-+
-+static inline int clk_enable(struct clk *clk)
-+{
-+	return 0;
-+}
-+
-+static inline void clk_disable(struct clk *clk) {}
-+
-+static inline unsigned long clk_get_rate(struct clk *clk)
-+{
-+	return 0;
-+}
-+
-+static inline int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	return 0;
-+}
-+
-+static inline long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	return 0;
-+}
-+
-+static inline int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	return 0;
-+}
-+
-+static inline struct clk *clk_get_parent(struct clk *clk)
-+{
-+	return NULL;
-+}
-+
-+#endif
-+
-+/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
-+static inline int clk_prepare_enable(struct clk *clk)
-+{
-+	int ret;
-+
-+	ret = clk_prepare(clk);
-+	if (ret)
-+		return ret;
-+	ret = clk_enable(clk);
-+	if (ret)
-+		clk_unprepare(clk);
-+
-+	return ret;
-+}
-+
-+/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
-+static inline void clk_disable_unprepare(struct clk *clk)
-+{
-+	clk_disable(clk);
-+	clk_unprepare(clk);
-+}
-+
- /**
-  * clk_add_alias - add a new clock alias
-  * @alias: name for clock alias
 -- 
 1.7.9
