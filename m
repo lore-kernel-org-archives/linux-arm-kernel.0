@@ -1,107 +1,28 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 8 May 2012 17:20:26 -0500
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <87mx5il5vb.fsf@ti.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
- <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
- <4FA9138D.8010604@ti.com>
- <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
- <87aa1isrg2.fsf@ti.com> <4FA927B1.4020108@ti.com> <87wr4mr6io.fsf@ti.com>
- <4FA9794A.7030607@ti.com> <87mx5il5vb.fsf@ti.com>
-Message-ID: <4FA99C2A.7050201@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 09 May 2012 04:04:54 +0530
+Subject: [PATCH] mtd: m25p80: Add support for Winbond W25Q80BW
+Message-ID: <1336516494-22791-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Winbond W25Q80BW is a 8Mbit serial flash memory device.
 
-On 05/08/2012 04:28 PM, Kevin Hilman wrote:
-> Jon Hunter <jon-hunter@ti.com> writes:
-> 
->> On 05/08/2012 11:18 AM, Kevin Hilman wrote:
->>> "Cousson, Benoit" <b-cousson@ti.com> writes:
->>>
->>>> On 5/8/2012 4:00 PM, Kevin Hilman wrote:
->>>>> Jean Pihet<jean.pihet@newoldbits.com>  writes:
->>>>>
->>>>> [...]
->>>>>
->>>>>>>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->>>>>>>>> flags describe what the HW is capable of, and the EMU CD can support
->>>>>>>>> HW_AUTO
->>>>>>>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
->>>>>>>>> next
->>>>>>>>> power state is OFF, meaning that no retention mode is supported. So any
->>>>>>>>> transition to idle will go to OFF and lead to a reset upon wakeup.
->>>>>>>>>
->>>>>>>>> That being said, being able to transition to OFF during idle is a
->>>>>>>>> perfectly
->>>>>>>>> valid state for most powerdomain in OMAP anyway, so we should be able to
->>>>>>>>> restore from OFF mode smoothly.
->>>>>>>>>
->>>>>>>>> It looks to me that what is missing here is *just* a restore path in the
->>>>>>>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
->>>>>>>>> :-)
->>>>>>>>
->>>>>>>> Although it is perfectly feasible to have a seamless transition of the
->>>>>>>> EMU power domain, I think the PMU counters will not be accurate
->>>>>>>> anymore since they stop counting events when going to OFF and re-start
->>>>>>>> after the state restore.
->>>>>>>
->>>>>>>
->>>>>>> Good point, but I think the PMU might still works fine because located
->>>>>>> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
->>>>>>> going to OFF and thus will be reset.
->>>>>>
->>>>>> Ever better point ;p Thanks for the precision.
->>>>>> In any case my point was: can we allow the EMU CD to go OFF or prevent
->>>>>> it from doing so? We need to answer that question first.
->>>>>>
->>>>>
->>>>> The idea I've suggested is to use runtime PM for this.  As long as the
->>>>> PMU is in use, it will be runtime PM enabled (and not allowed to go into
->>>>> HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
->>>>> then be reset.  The next time it is needed, the runtime resume will need
->>>>> to do a full re-init.
->>>>
->>>> Oh, but does that mean that this driver is not pm_runtime adapted yet?
->>>>
->>>
->>> Actually, it is.  Ming Lei has done it.
->>>
->>> Currently, Will has collected this[1] and is waiting (patiently) for us
->>> to produce a real fix that doesn't kill PM in the process.
->>
->> I had to make a couple mods to Ming's patches but I do have something
->> working now that _should_ not break PM. However, per my previous email
->> (in response to Benoit's) I am struggling with the definition of the
->> CLKDM_CAN_XXXXXX_AUTO flags to know the correct way to fix this.
->>
->> I was going to send out my patches, but I wanted to get some more
->> feedback on this first.
-> 
-> While waiting for feeback, if you set the flags to CAN_FORCE_WAKEUP and
-> CAN_HWSUP, can you get the PMU interrupts working after an EMU CD idle
-> transition (and reset.)
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/mtd/devices/m25p80.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Unfortunately, not. By setting CAN_HWSUP, the EMU CD will be put back
-into HW_AUTO state when it is enabled. The hwmod _enable() function will
-first put the CD into SW_WKUP (because CAN_FORCE_WAKEUP is set), but
-because it was previously in HW_AUTO state AND CAN_ENABLE_AUTO is set it
-will be be put back into HW_AUTO again. Hence, we are back where we begun!
-
-CAN_ENABLE_AUTO is causing me a headache, because whenever you call
-clkdm_allow_idle, it will allow it to idle and this happens during the
-_enable() sequence :-(
-
-Does this make sense?
-
-Cheers
-Jon
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index 1924d24..dbd44b1 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -728,6 +728,7 @@ static const struct spi_device_id m25p_ids[] = {
+ 	{ "w25q32", INFO(0xef4016, 0, 64 * 1024,  64, SECT_4K) },
+ 	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
+ 	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
++	{ "w25q80", INFO(0xef5014, 0, 64 * 1024,  16, SECT_4K) },
+ 
+ 	/* Catalyst / On Semiconductor -- non-JEDEC */
+ 	{ "cat25c11", CAT25_INFO(  16, 8, 16, 1) },
+-- 
+1.6.6.rc2
