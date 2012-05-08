@@ -1,69 +1,103 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 May 2012 07:00:45 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
- (Jean Pihet's message of "Tue, 8 May 2012 15:18:44 +0200")
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
- <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
- <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com>
- <CAORVsuWMhVQkQAmsyrprvW-0hK4y=RgGayn0p8WhyksScauBQQ@mail.gmail.com>
- <4FA9138D.8010604@ti.com>
- <CAORVsuWQ6o64Jhpox0ZvjYAfzDJkXCc6XYX2a6o_cOdNyFdA0g@mail.gmail.com>
-Message-ID: <87aa1isrg2.fsf@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 May 2012 14:59:52 +0100
+Subject: Development tree for Cortex-A15?
+In-Reply-To: <1336485257.47575.YahooMailNeo@web132502.mail.ird.yahoo.com>
+References: <1336046199.46241.YahooMailNeo@web132501.mail.ird.yahoo.com>
+ <bc6e93f98278125c354282f23751b1aa@localhost>
+ <1336052155.37772.YahooMailNeo@web132504.mail.ird.yahoo.com>
+ <6e4ad6defa33bf693ec45cae819469f0@localhost>
+ <1336121047.79153.YahooMailNeo@web132504.mail.ird.yahoo.com>
+ <e8545d06e2a63b7b2badc24d8bc1531f@localhost>
+ <1336134008.88695.YahooMailNeo@web132504.mail.ird.yahoo.com>
+ <4f7e5540dd597d8e48fb81a5e1e26313@localhost>
+ <1336472016.29885.YahooMailNeo@web132503.mail.ird.yahoo.com>
+ <4FA8FADF.2070701@arm.com>
+ <1336485257.47575.YahooMailNeo@web132502.mail.ird.yahoo.com>
+Message-ID: <4FA926D8.2050200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
-
-[...]
-
->>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
->>>> flags describe what the HW is capable of, and the EMU CD can support
->>>> HW_AUTO
->>>> and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the only valid
->>>> next
->>>> power state is OFF, meaning that no retention mode is supported. So any
->>>> transition to idle will go to OFF and lead to a reset upon wakeup.
+On 08/05/12 14:54, Jemma Jones wrote:
+>> Subject: Re: Development tree for Cortex-A15?
+> 
+>>
+>> On 08/05/12 11:13, Jemma Jones wrote:
+>>>>  Subject: Re: Development tree for Cortex-A15?
+>>>>>   Any chance you can send me a .config file that works on the kernel 
+>> in
+>>>>  this
+>>>>>   branch which runs on your A15x1 FastModel?
 >>>>
->>>> That being said, being able to transition to OFF during idle is a
->>>> perfectly
->>>> valid state for most powerdomain in OMAP anyway, so we should be able to
->>>> restore from OFF mode smoothly.
->>>>
->>>> It looks to me that what is missing here is *just* a restore path in the
->>>> PMU/CTI code. But I'm probably missing some nasty details in this issue
->>>> :-)
+>>>>  Coming in a private email.
 >>>
->>> Although it is perfectly feasible to have a seamless transition of the
->>> EMU power domain, I think the PMU counters will not be accurate
->>> anymore since they stop counting events when going to OFF and re-start
->>> after the state restore.
+>>>  I didn't seem to get anything?
 >>
+>> As far as I'm concerned, it was delivered:
 >>
->> Good point, but I think the PMU might still works fine because located
->> inside the MPU domain. AFAIR, only the path to access the PMU and the CTI is
->> going to OFF and thus will be reset.
->
-> Ever better point ;p Thanks for the precision.
-> In any case my point was: can we allow the EMU CD to go OFF or prevent
-> it from doing so? We need to answer that question first.
->
+>> 2012-05-05 13:09:33 1SQcrl-0006uI-OX <= maz@misterjones.org U=www-data 
+>> P=local S=59827 id=7da4dd4bd4f768d907094ce4919bfffe at localhost
+>> 2012-05-05 13:09:34 1SQcrl-0006uI-OX => jemmajones81 at yahoo.co.uk R=dnslookup 
+>> T=remote_smtp H=mx-eu.mail.am0.yahoodns.net [77.238.184.241]
+>> 2012-05-05 13:09:34 1SQcrl-0006uI-OX Completed
+>>
+>> I'll resend it again, but you may want to check your spam folder.
+>>
+>>>>>   I'm using the boot-wrapper from
+>>>>>   
+>> http://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git;a=summary in
+>>>>>   semi hosting mode.
+>>>>>
+>>>>>   I managed to boot Android from that but I don't seem to be 
+>> able to boot
+>>>>>   your kernel. It just stops after the boot-wrapper says loading 
+>> uImage.
+>>>>
+>>>>  Which dts file are you using?
+>>>
+>>>  I don't quite understand yet how the DT stuff is used. When I build the 
+>> DTB files then I get vexpress-v2p-ca15-tc1.dtb in my arch/arm/boot directory. I 
+>> assume that one is used then for my kernel image?
+>>>
+>>>  My .config has all the DT stuff enabled I think:
+>>>  CONFIG_ARCH_VEXPRESS_DT=y
+>>>  CONFIG_ARM_APPENDED_DTB=y
+>>>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>>>
+>>>  Or is that not correct?
+>>
+>> First, you want to forget about anything TC1 related, it isn't what you need 
+>> for the Fast Model.
+>>
+>> Step by step instructions:
+>> - Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
+>> - Build your zImage
+>> - From your kernel tree, run:
+>>   ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x2.dtb 
+>> wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x2.dts
+>> - cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
+>> - Build your uImage if that's what you're using.
+>> - Build your boot-wrapper as usual.
+>>
+>> That should get you going.
+>>
+>>>  I have now updated to you latest kvm-arm-3.4 branch.
+>>
+>> That's very brave of you... ;-)
+>>
+>>>  But the kernel still does not boot up properly, or at least I don't 
+>> seem to get any output. It just goes "Uncompressing Linux... done." 
+>> and then does nothing.
+>>>  I'm using the FastModel Cortex-A15x2 simulation.
+>>
+>> Let me know if it gets better with the above. Or not.
+>>
+> 
+> It seems as if the CLCD driver is not yet working in this configuration? It does not load for me, because the clcdfb_probe() function fails with board = dev->dev.platform_data being NULL. Is the platform initialization not setting this?
 
-The idea I've suggested is to use runtime PM for this.  As long as the
-PMU is in use, it will be runtime PM enabled (and not allowed to go into
-HWSUP idle.)  When it is not used, it will be allowed to HWSUP idle, and
-then be reset.  The next time it is needed, the runtime resume will need
-to do a full re-init.
+No. There is no binding for CLCD, and I've refrained from adding more
+hacks to my tree. If you want to tackle the task of writing a CLCD
+binding and porting the driver to DT, be my guest! :)
 
-Kevin
+	M.
+-- 
+Jazz is not dead. It just smells funny...
