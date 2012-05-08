@@ -1,14 +1,13 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 May 2012 12:28:58 -0600
-Subject: [GIT PULL] ARM: tegra: tegra30-audio branch
-Message-ID: <4FA965EA.90607@wwwdotorg.org>
+Date: Tue, 08 May 2012 12:31:32 -0600
+Subject: [GIT PULL] ARM: tegra: dt branch
+Message-ID: <4FA96684.1040608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This branch is based on my previous gpio-pinmux pull request.
 
-This branch instantiates the Tegra ASoC driver on Tegra30, and provides
-various required AUXDATA, clock setup, etc.
+This series instantiates many new devices from DT on Tegra boards.
 
 The following changes since commit aef7704c6cc36db9618603b22194def441d30432:
   Stephen Warren (1):
@@ -17,22 +16,24 @@ The following changes since commit aef7704c6cc36db9618603b22194def441d30432:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-for-3.5/tegra30-audio
+for-3.5/dt
 
-Peter De Schrijver (1):
-      ARM: tegra: Initialize pll_p_out1
+Laxman Dewangan (1):
+      ARM: dt: tegra: enable als and proximity sensor
+
+Olof Johansson (1):
+      ARM: dt: tegra seaboard: add i2c devices
 
 Stephen Warren (5):
-      ARM: tegra: provide clock aliases for AHUB configlink
-      ARM: tegra: set up audio clocks for tegra30 dt
-      ARM: tegra: add AUXDATA required for audio
-      ARM: dt: tegra30.dtsi: Add audio-related nodes
-      ARM: dt: tegra cardhu: basic audio support
+      ARM: dt: tegra seaboard: fix I2C2 SCL rate
+      ARM: dt: tegra seaboard: configure I2C2 pinmux
+      ARM: dt: tegra trimslice: add RTC I2C device
+      ARM: dt: tegra trimslice: enable SDHCI1 controller
+      ARM: dt: tegra trimslice: add support for audio
 
- arch/arm/boot/dts/tegra-cardhu.dts     |   63
-++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/tegra30.dtsi         |   41 +++++++++++++++++++++
- arch/arm/mach-tegra/board-dt-tegra30.c |   10 +++++
- arch/arm/mach-tegra/common.c           |   12 ++++++
- arch/arm/mach-tegra/tegra30_clocks.c   |    9 +++++
- 5 files changed, 135 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra-cardhu.dts    |    8 ++++++
+ arch/arm/boot/dts/tegra-seaboard.dts  |   41
++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/tegra-trimslice.dts |   24 +++++++++++--------
+ arch/arm/boot/dts/tegra-ventana.dts   |    8 ++++++
+ 4 files changed, 67 insertions(+), 14 deletions(-)
