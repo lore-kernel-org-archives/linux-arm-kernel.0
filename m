@@ -1,85 +1,115 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 May 2012 17:19:39 -0700
-Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
-In-Reply-To: <1334913591-26312-7-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Fri, 20 Apr 2012 12:19:49 +0300")
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
- <1334913591-26312-7-git-send-email-t-kristo@ti.com>
-Message-ID: <87pqafv810.fsf@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon,  7 May 2012 17:57:42 -0700
+Subject: [PATCHv4 4/4] cpuidle: coupled: add parallel barrier function
+In-Reply-To: <1336438662-10484-1-git-send-email-ccross@android.com>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+Message-ID: <1336438662-10484-5-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+Adds cpuidle_coupled_parallel_barrier, which can be used by coupled
+cpuidle state enter functions to handle resynchronization after
+determining if any cpu needs to abort.  The normal use case will
+be:
 
-> From: Axel Haslam <axelhaslam@gmail.com>
->
-> On OMAP4, there is no support to read previous logic state
-> or previous memory state achieved when a power domain transitions
-> to RET. Instead there are module level context registers.
->
-> In order to support the powerdomain level logic/mem_off_counters
-> on OMAP4, instead use the previous power state achieved (RET) and
-> the *programmed* logic/mem RET state to derive if a powerdomain lost
-> logic or did not.
+static bool abort_flag;
+static atomic_t abort_barrier;
 
-OK, but this also changes the behavior for OMAP3 as well, right?  I
-don't see in the changelog how this affects OMAP3 and whether it is
-still expected to work on OMAP3.  When changing common code like this,
-the changelog should describe the impacts on to all affected SoCs.
+int arch_cpuidle_enter(struct cpuidle_device *dev, ...)
+{
+	if (arch_turn_off_irq_controller()) {
+	   	/* returns an error if an irq is pending and would be lost
+		   if idle continued and turned off power */
+		abort_flag = true;
+	}
 
-As suggested by Vaibhav Bedia, now might be the right time to add this
-function to the SoC specific function pointers (struct pwrdm_ops.)
+	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
 
-Doing that, the existing function could be used for OMAP3 (and OMAP4 if
-the changelog describes that it can/should be used for both.)
+	if (abort_flag) {
+	   	/* One of the cpus didn't turn off it's irq controller */
+	   	arch_turn_on_irq_controller();
+		return -EINTR;
+	}
 
-Then, when AM33xx support is added, it will be obvious where they will
-need to plugin support for that SoC.
+	/* continue with idle */
+	...
+}
 
-Kevin
+This will cause all cpus to abort idle together if one of them needs
+to abort.
 
-> If the powerdomain is programmed to enter RET state and lose logic
-> in RET state, knowing that the powerdomain entered RET is good enough
-> to derive that the logic was lost as well, in such cases.
->
-> Signed-off-by: Axel Haslam <axelhaslam@gmail.com>
-> [rnayak at ti.com: Updated changelog, updated patch to support mem counters]
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/mach-omap2/powerdomain.c |   16 ++++++++++------
->  1 files changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 96ad3dbe..068f06b 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -124,18 +124,22 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
->  static void _update_logic_membank_counters(struct powerdomain *pwrdm)
->  {
->  	int i;
-> -	u8 prev_logic_pwrst, prev_mem_pwrst;
-> +	int logic_pwrst, mem_pwrst;
-> +
-> +	logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
-> +	if (logic_pwrst == -EINVAL)
-> +		logic_pwrst = pwrdm_read_logic_retst(pwrdm);
->  
-> -	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
->  	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-> -	    (prev_logic_pwrst == PWRDM_POWER_OFF))
-> +	    (logic_pwrst == PWRDM_POWER_OFF))
->  		pwrdm->ret_logic_off_counter++;
->  
->  	for (i = 0; i < pwrdm->banks; i++) {
-> -		prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
-> -
-> +		mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
-> +		if (mem_pwrst == -EINVAL)
-> +			mem_pwrst = pwrdm_read_mem_retst(pwrdm, i);
->  		if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
-> -		    (prev_mem_pwrst == PWRDM_POWER_OFF))
-> +		    (mem_pwrst == PWRDM_POWER_OFF))
->  			pwrdm->ret_mem_off_counter[i]++;
->  	}
->  }
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ drivers/cpuidle/coupled.c |   37 +++++++++++++++++++++++++++++++++++++
+ include/linux/cpuidle.h   |    4 ++++
+ 2 files changed, 41 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+index 93101fb..3e65de1 100644
+--- a/drivers/cpuidle/coupled.c
++++ b/drivers/cpuidle/coupled.c
+@@ -130,6 +130,43 @@ struct cpuidle_coupled {
+ static cpumask_t cpuidle_coupled_poked_mask;
+ 
+ /**
++ * cpuidle_coupled_parallel_barrier - synchronize all online coupled cpus
++ * @dev: cpuidle_device of the calling cpu
++ * @a:   atomic variable to hold the barrier
++ *
++ * No caller to this function will return from this function until all online
++ * cpus in the same coupled group have called this function.  Once any caller
++ * has returned from this function, the barrier is immediately available for
++ * reuse.
++ *
++ * The atomic variable a must be initialized to 0 before any cpu calls
++ * this function, will be reset to 0 before any cpu returns from this function.
++ *
++ * Must only be called from within a coupled idle state handler
++ * (state.enter when state.flags has CPUIDLE_FLAG_COUPLED set).
++ *
++ * Provides full smp barrier semantics before and after calling.
++ */
++void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a)
++{
++	int n = dev->coupled->online_count;
++
++	smp_mb__before_atomic_inc();
++	atomic_inc(a);
++
++	while (atomic_read(a) < n)
++		cpu_relax();
++
++	if (atomic_inc_return(a) == n * 2) {
++		atomic_set(a, 0);
++		return;
++	}
++
++	while (atomic_read(a) > n)
++		cpu_relax();
++}
++
++/**
+  * cpuidle_state_is_coupled - check if a state is part of a coupled set
+  * @dev: struct cpuidle_device for the current cpu
+  * @drv: struct cpuidle_driver for the platform
+diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+index 6038448..5ab7183 100644
+--- a/include/linux/cpuidle.h
++++ b/include/linux/cpuidle.h
+@@ -183,6 +183,10 @@ static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
+ 
+ #endif
+ 
++#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
++void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a);
++#endif
++
+ /******************************
+  * CPUIDLE GOVERNOR INTERFACE *
+  ******************************/
+-- 
+1.7.7.3
