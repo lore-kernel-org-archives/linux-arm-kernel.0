@@ -1,73 +1,144 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 8 May 2012 19:58:49 -0400
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <4FA918BA.3080303@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120425185747.GC24211@n2100.arm.linux.org.uk>
- <4FA29E46.6040204@linaro.org> <20120503151253.GE897@n2100.arm.linux.org.uk>
- <4FA2A4A8.9010208@linaro.org> <20120503163008.GF897@n2100.arm.linux.org.uk>
- <4FA2B4A3.2040402@linaro.org> <20120503164501.GG897@n2100.arm.linux.org.uk>
- <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
- <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
- <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
- <4FA90127.1050107@linaro.org> <878vh2rhlh.fsf@laptop.org>
- <4FA918BA.3080303@linaro.org>
-Message-ID: <CAP=VYLoz0o7qh9TNgWPatAsSjtoKoyaBUW7L+3q1w0PsLkOMOQ@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 8 May 2012 18:59:52 -0500
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <87sjfal65t.fsf@ti.com>
+References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
+ <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
+ <20120403094749.GH17741@mudshark.cambridge.arm.com>
+ <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
+ <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
+ <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
+ <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
+ <20120404111524.GF32505@mudshark.cambridge.arm.com>
+ <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
+ <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
+ <4FA8FCFF.40105@ti.com> <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
+Message-ID: <4FA9B378.8070703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 8:59 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> Here you go Chris.
->
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Tue, 8 May 2012 13:40:02 +0100
-> Subject: [PATCH] MMC: mmci: Fix compiler error when CONFIG_OF is not set
->
-> error: implicit declaration of function 'mmci_dt_populate_generic_pdata'
->
-> This is due to the '#if CONFIG_OF' guards placed around
-> mmci_dt_populate_generic_pdata(), but not around the call to it. We
-> repair this by inserting a stub which elegantly returns when CONFIG_OF
-> is not set.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Hi Kevin,
 
-Please if possible, do not neglect to add the Reported-by: line when
-appropriate.  I've been at this long enough that it really won't change
-my life any if it is there or not there, but for someone new to linux, it
-might make the difference between an "I'm glad I reported that" vs.
-a "Screw them, I'm not reporting anything else in the future."
+On 05/08/2012 04:22 PM, Kevin Hilman wrote:
+> Jon Hunter <jon-hunter@ti.com> writes:
+> 
+>> Hi Benoit,
+>>
+>> On 05/08/2012 06:01 AM, Cousson, Benoit wrote:
+>>
+>> [...]
+>>
+>>>>>> P.S. Please note there is also already a different fix in mainline for
+>>>>>> the EMU clkdm data from Paul which adds the force wakeup flag and
+>>>>>> removes the DISABLE_AUTO flag[1] (but leaves the ENABLE_AUTO flag,
+>>>>>> because the hardware is capable.)
+>>>>>
+>>>>> Hmmm ... yes saw this, and you will have to excuse me as I don't fully
+>>>>> follow the logic here. In fact, I am thinking we want the opposite ;-)
+>>>>>
+>>>>>  From looking, into this it seems to me that when PMU is running we want
+>>>>> the EMU clock domain in software-wakeup state and when PMU is not
+>>>>> running we want in the hardware auto state.
+>>>>
+>>>> So far, I'm with you.
+>>>>
+>>>>> By keeping the ENABLE_AUTO flag set, as soon as we enable the clock
+>>>>> domain it is put right back into the HW_AUTO state
+>>>>
+>>>> This is only because it was in the HWSUP state when _enable was called.
+>>>> If clkdm_deny_idle() is used, that behavior will change.
+>>>>
+>>>>> and hence PMU is
+>>>>> not working (see _enable() function in
+>>>>> arch/arm/mach-omap2/omap_hwmod.c)
+>>>>>
+>>>>> So really what I think we want is to remove the ENABLE_AUTO flag to keep
+>>>>> the clock domain in software wake-up and use the DISABLE_AUTO flag to
+>>>>> put the clock domain back in HW_AUTO (note this requires a patch to
+>>>>> perform this 2nd part).
+>>>>
+>>>> Well, Paul will have to comment here for the final word, but IIUC, the
+>>>> hwmod flags are supposed to indicate only what the HW is capable of.  If
+>>>> we want to change the runtime behavior, we nee to use (or add) APIs to
+>>>> change the beahvior.  In this case, clkdm_allow_idle(),
+>>>> clkdm_deny_idle() are probably what is needed here.
+>>>
+>>> Yes, indeed, we should not hack the flags to fix that kind of issue. The
+>>> flags describe what the HW is capable of, and the EMU CD can support
+>>> HW_AUTO and SW_WAKEUP. AFAIK, the issue with that EMU CD is that the
+>>> only valid next power state is OFF, meaning that no retention mode is
+>>> supported. So any transition to idle will go to OFF and lead to a reset
+>>> upon wakeup.
+>>
+>> No hacking intended here, just getting the flags correct ;-)
+>>
+>> So let me start from the beginning ...
+>>
+>> 1. I agree that for the EMU CD that the valid HW states are HW_AUTO and
+>> SW_WKUP.
+>>
+>> 2. When the EMU CD is active (due to something like PMU), we want to
+>> keep the CD in the SW_WKUP state, otherwise we can automatically
+>> transition to idle and reset the IP (at least for omap4430).
+> 
+>> 3. When the EMU CD is inactive, we want to keep the CD in the HW_AUTO
+>> state because SW_SLEEP is NOT supported.
+>>
+>> In the current code, we have the CLKDM_CAN_DISABLE_AUTO flag disabled
+>> and the CLKDM_CAN_ENABLE_AUTO flag enabled. If CLKDM_CAN_ENABLE_AUTO is
+>> set then the omap_pm_clkdms_setup() function will place the CD into
+>> HW_AUTO regardless of CLKDM_CAN_DISABLE_AUTO, and the next time the
+>> hwmod _enable() is called it is in the HW_AUTO state and so it is
+>> allowed to idle. This is not what we want. Do you agree?
+>>
+>> If I set CLKDM_CAN_DISABLE_AUTO flag and disable CLKDM_CAN_ENABLE_AUTO,
+>> then I do not have the above problem.
+>>
+>> To be honest, with you the more I look and test the code, the more
+>> confused I am by the definition of the CLKDM_CAN_HWSUP ...
+>>
+>> #define CLKDM_CAN_HWSUP	(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
+>>
+>> When I look at where these flags are used, I see that
+>> CLKDM_CAN_ENABLE_AUTO is used in clkdm_allow_idle and
+>> CLKDM_CAN_DISABLE_AUTO is used in clkdm_deny_idle. So this implies that ...
+>>
+>> CLKDM_CAN_ENABLE_AUTO = Supports HW_AUTO state when CD is active
+>> CLKDM_CAN_DISABLE_AUTO = Does NOT supports HW_AUTO state when CD is active
+>>
+>> Are the above the correct definitions? 
+> 
+> Not quite. 
+> 
+> These flags describe the capabilities as defined in CLKTRCTRL field of
+> the CLKSTCTRL register (e.g. CM_EMU_CLKSTCTRL)
+> 
+> CLKDM_CAN_ENABLE_AUTO: IP supports HW_AUTO state (and it can be enabled)
+> CLKDM_CAN_DISABLE_AUTO: HW_AUTO feature can be disabled (a.k.a. NO_SLEEP)
 
-Thanks,
-Paul.
---
+Ok, so it that case it is wrong to set CAN_DISABLE_AUTO for the EMU CD.
 
-> ---
-> ?drivers/mmc/host/mmci.c | ? ?6 ++++++
-> ?1 file changed, 6 insertions(+)
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 2303a16..efc822d 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1241,6 +1241,12 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
-> ? ? ? ? ? ? ? ?pr_warn("%s: Unsupported bus width\n", np->full_name);
-> ? ? ? ?}
-> ?}
-> +#else
-> +static void mmci_dt_populate_generic_pdata(struct device_node *np,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmci_platform_data *pdata)
-> +{
-> + ? ? ? return;
-> +}
-> ?#endif
->
-> ?static int __devinit mmci_probe(struct amba_device *dev,
-> --
-> 1.7.9.5
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-next" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Note that in OMAP4, the latter called NO_SLEEP in the TRM, but in OMAP3
+> it's described as "The automatic hardware-supervised mode is disabled"
+
+Ah-ha. So this explains the naming! Thanks!
+
+> What is confusing to me is that the OMAP4 TRM doesn't list the NO_SLEEP
+> mode as supported by the EMU.   It seems to me that if the IP supports
+> HW_AUTO, it should be able to be enabled *and* disabled. 
+> 
+> Maybe Paul/Benoit can clarify.
+
+Yes, it definitely appears that EMU does not support NO_SLEEP according
+to the TRM. However, even if it did, this would not help in this case as
+we need to keep the CD in the SW_WKUP state while active. However, the
+problem with this is it breaks the current software model that is used
+to manage the CDs.
+
+It is not a good solution, but for this domain it would appear that we
+would need to have another flag, such as, "CAN_ENABLE_AUTO_ON_INACTIVE" :-(
+
+Let me know what you think.
+
+Cheers
+Jon
