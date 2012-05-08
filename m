@@ -1,26 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 May 2012 12:33:28 -0600
-Subject: [GIT PULL] ARM: tegra: debug branch
-Message-ID: <4FA966F8.8090106@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2012 11:34:14 -0700
+Subject: [GIT PULL] ARM: OMAP2+: Misc cleanup
+In-Reply-To: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120508183414.GZ5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows enhanced automatic selection of the UART to use for
-debug spew.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120508 00:18]:
+> Tony,
+> 
+> Please pull the following preparatory cleanup series to add OMAP5 minimal
+> support. Boot tested on OMAP2430 SDP, OMAP3430 SDP and OMAP4430 SDP platforms.
+> 
+> I have dropped {[PATCH 7/7] ARM: OMAP4+: Add prm and cm base init function}
+> from this set since Paul is taking that one in his queue.
 
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
-  Linus Torvalds (1):
-        Linux 3.4-rc2
+OK thanks, pulling this into cleanup-soc and merging into cleanup branch
+with what we have in devel-hwmod.
+ 
+> P.S: While merging this series with linux-omap master, I saw one trivial
+> Makefile conflict.
 
-are available in the git repository at:
+Yes that's with devel-hwmod, I'm basing cleanup branch on that so we have
+all the dependencies out of the way for adding omap5 and am33xx patches
+on top of the cleanup branch.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-for-3.5/debug
+Regards,
 
-Stephen Warren (1):
-      ARM: tegra: uncompress.h: Implement TEGRA_DEBUG_UART_AUTO_ODMDATA
-
- arch/arm/mach-tegra/Kconfig                   |   29 ++++-
- arch/arm/mach-tegra/include/mach/uncompress.h |  176
-++++++++++++++++++-------
- 2 files changed, 153 insertions(+), 52 deletions(-)
+Tony
