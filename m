@@ -1,70 +1,65 @@
-From: tuffkidtt@gmail.com (Gavin Guo)
-Date: Tue, 8 May 2012 11:40:44 +0800
-Subject: Some questions in v6_copy_user_highpage_aliasing
-Message-ID: <CAAh6nknA37QL2FeZDWvGwkndxKkR7RC1c46-DdzVs+2tUcv5=w@mail.gmail.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Tue, 8 May 2012 09:14:16 +0530
+Subject: [PATCH V3 04/10] ARM: OMAP3: hwmod: rename the smartreflex entries
+In-Reply-To: <87r4uvwnpi.fsf@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <1335462041-4949-5-git-send-email-j-keerthy@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1AA2@DBDE01.ent.ti.com>
+ <CAJ6a13ZSWSa_RpGB9NxtfyChUba9NGivGogpsfyk7oT9pNayjg@mail.gmail.com>
+ <87d36fzhkm.fsf@ti.com> <87r4uvwnpi.fsf@ti.com>
+Message-ID: <CAJ6a13ZC6CYG+EtOZeBsCF1Fkz8oZWSzX3T1hNPf-OCOf0oOMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, May 8, 2012 at 5:25 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Kevin Hilman <khilman@ti.com> writes:
+>
+>> "J, KEERTHY" <j-keerthy@ti.com> writes:
+>
+> [...]
+>
+>>>>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+>>>>> index 2edd1e2..d859277 100644
+>>>>> --- a/arch/arm/mach-omap2/smartreflex.c
+>>>>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>>>>> @@ -183,7 +183,7 @@ static void sr_set_regfields(struct omap_sr *sr)
+>>>>> ? ? ? ? ? ? ? sr->err_weight = OMAP3430_SR_ERRWEIGHT;
+>>>>> ? ? ? ? ? ? ? sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+>>>>> ? ? ? ? ? ? ? sr->accum_data = OMAP3430_SR_ACCUMDATA;
+>>>>> - ? ? ? ? ? ? if (!(strcmp(sr->name, "sr1"))) {
+>>>>> + ? ? ? ? ? ? if (!(strcmp(sr->name, "smartreflex_mpu_iva"))) {
+>>>>
+>>>> What if voltage rail is different for mpu and iva? I have seen some devices
+>>>> supports SmartReflex have different voltage rails for mpu and iva.
+>>>>
+>>>
+>>> I get the point. OMAP3 iva and mpu have a common rail. OMAP4 onwards
+>>> even we have different rails for mpu and iva. I will enhance the checks here.
+>>
+>> Rather than enhancing the checks, this SoC specific data should probably
+>> just be made part of the SoC specific hwmod dev_attr.
+>
+> That being said, this is an additional feature we can add after this
+> driver is moved.
+>
+> I would like this series to concentrate on the cleanups necessary to
+> move to drivers/*, then additional features to support other SoCs can be
+> added on top.
+>
+> Keerthy, please prepare a patch to generalize this to other SoCs by
+> using dev_attr for this SoC specific data. ? We can add it after this
+> series is merged upstream.
+Kevin,
 
-I have traced v6_copy_user_highpage_aliasing in arch/arm/mm/copypage-v6.c
-and found some questions.
+Ok. I will do that.
 
- 72 /*
- 73  * Copy the page, taking account of the cache colour.
- 74  */
- 75 static void v6_copy_user_highpage_aliasing(struct page *to,
- 76         struct page *from, unsigned long vaddr)
- 77 {
- 78         unsigned int offset = CACHE_COLOUR(vaddr);
- 79         unsigned long kfrom, kto;
- 80
+>
+> Thanks,
+>
+> Kevin
 
-I think the following statement is to solve aliasing problem that
-kernel & user address map to the same physical frame. When
-the kernel mapping is dirty, writing back is needed before the copy_page()
-is used. Because the color bit of user space address & kernel one
-may be difference which cause inconsistency. Now, the problem is
-what is the scenario of dirty cache. When does the PG_dcache_dirty
-set ? In normal copy-on-write case, I think the if clause will be false.
 
- 81         if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
- 82                 __flush_dcache_page(page_mapping(from), from);
- 83
 
-The problem is similar with before. Two virtual address map to "to",
-in order to avoid the problem that when "kto" is copied with data "kfrom".
-The cache data belong to kernel address mapping to "to" will not match
-with the user one. Thus, invalidation of cache mapped by kernel address
-is needed. But I don't know what will happen if invalidating
-cache is removed. Where is the place that the problem will happen ?
-
- 84         /* FIXME: not highmem safe */
- 85         discard_old_kernel_data(page_address(to));
- 86
- 87         /*
- 88          * Now copy the page using the same cache colour as the
- 89          * pages ultimate destination.
- 90          */
- 91         spin_lock(&v6_lock);
- 92
- 93         set_pte_ext(TOP_PTE(from_address) + offset,
-pfn_pte(page_to_pfn(from), PAGE_KERNEL), 0);
- 94         set_pte_ext(TOP_PTE(to_address) + offset,
-pfn_pte(page_to_pfn(to), PAGE_KERNEL), 0);
- 95
- 96         kfrom = from_address + (offset << PAGE_SHIFT);
- 97         kto   = to_address + (offset << PAGE_SHIFT);
- 98
- 99         flush_tlb_kernel_page(kfrom);
-100         flush_tlb_kernel_page(kto);
-101
-102         copy_page((void *)kto, (void *)kfrom);
-103
-104         spin_unlock(&v6_lock);
-105 }
-
-Thanks for your help, any comment is appreciated.
-
-Regards,
-Gavin
+-- 
+Regards and Thanks,
+Keerthy
