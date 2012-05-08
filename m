@@ -1,46 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 May 2012 12:26:34 -0600
-Subject: [GIT PULL] ARM: tegra: usb-ulpi branch
-Message-ID: <4FA9655A.9020105@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 May 2012 14:26:40 -0400
+Subject: [PATCHv2] ARM: orion5x: Fix GPIO enable bits for MPP9
+In-Reply-To: <1334883420.3209.230.camel@deadeye>
+References: <1333858733.7150.115.camel@deadeye>
+ <1334883420.3209.230.camel@deadeye>
+Message-ID: <20120508182640.GG15711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch is based on my previous gpio-pinmux pull request.
+On Fri, Apr 20, 2012 at 01:57:00AM +0100, Ben Hutchings wrote:
+> On Sun, 2012-04-08 at 05:18 +0100, Ben Hutchings wrote:
+> > Commit 554cdaefd1cf7bb54b209c4e68c7cec87ce442a9 ('ARM: orion5x: Refactor
+> > mpp code to use common orion platform mpp.') seems to have accidentally
+> > inverted the GPIO valid bits for MPP9 (only).  For the mv2120 platform
+> > which uses MPP9 as a GPIO LED device, this results in the error:
+> > 
+> > [   12.711476] leds-gpio: probe of leds-gpio failed with error -22
+> > 
+> > Reported-by: Henry von Tresckow <hvontres@gmail.com>
+> 
+> Tested-by: Hans Henry von Tresckow <hvontres@gmail.com>
 
-The following changes since commit aef7704c6cc36db9618603b22194def441d30432:
-  Stephen Warren (1):
-        pinctrl: tegra: error reporting cleanup
+I'm putting this towards fixes for v3.4, adding the above Tested-by:
 
-are available in the git repository at:
+thx,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-for-3.5/usb-ulpi
+Jason.
 
-Allen Martin (1):
-      ARM: tegra: Add pllc clock init table
+> 
+> (on the mv2120, and applied to Debian's 3.2 tree)
+> 
+> > References: http://bugs.debian.org/667446
+> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> > Cc: stable at vger.kernel.org [v3.0+]
+> > ---
+> > v2: Add subject of the earlier commit
+> > 
+> > Ben.
+> > 
+> >  arch/arm/mach-orion5x/mpp.h |    4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+> > index eac6897..db70e79 100644
+> > --- a/arch/arm/mach-orion5x/mpp.h
+> > +++ b/arch/arm/mach-orion5x/mpp.h
+> > @@ -65,8 +65,8 @@
+> >  #define MPP8_GIGE               MPP(8,  0x1, 0, 0, 1,   1,   1)
+> >  
+> >  #define MPP9_UNUSED		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> > -#define MPP9_GPIO		MPP(9,  0x0, 0, 0, 1,   1,   1)
+> > -#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
+> > +#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
+> > +#define MPP9_GIGE               MPP(9,  0x1, 0, 0, 1,   1,   1)
+> >  
+> >  #define MPP10_UNUSED		MPP(10, 0x0, 0, 0, 1,   1,   1)
+> >  #define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
+> 
+> -- 
+> Ben Hutchings
+> This sentence contradicts itself - no actually it doesn't.
 
-Stephen Warren (6):
-      ARM: tegra: reparent sclk to pll_c_out1
-      ARM: tegra: fix pclk rate
-      ARM: tegra: change pll_p_out4's rate to 24MHz
-      ARM: tegra: don't hard-code USB ULPI PHY reset_gpio
-      ARM: tegra: add USB ULPI PHY reset GPIO to device tree
-      ARM: dt: tegra: pinmux changes for USB ULPI
 
- .../devicetree/bindings/usb/tegra-usb.txt          |    3 ++
- arch/arm/boot/dts/tegra-harmony.dts                |   24
-+++++++++++--------
- arch/arm/boot/dts/tegra-paz00.dts                  |   18 +++++++-------
- arch/arm/boot/dts/tegra-seaboard.dts               |    4 +++
- arch/arm/boot/dts/tegra-trimslice.dts              |   22 ++++++++++-------
- arch/arm/boot/dts/tegra-ventana.dts                |    4 +++
- arch/arm/mach-tegra/board-paz00.c                  |    3 +-
- arch/arm/mach-tegra/board-trimslice.c              |    2 +
- arch/arm/mach-tegra/common.c                       |   10 +++++---
- arch/arm/mach-tegra/devices.c                      |    5 +--
- arch/arm/mach-tegra/devices.h                      |    4 +++
- arch/arm/mach-tegra/include/mach/usb_phy.h         |    4 +-
- arch/arm/mach-tegra/tegra2_clocks.c                |    4 +++
- arch/arm/mach-tegra/usb_phy.c                      |   15 ++++++++++-
- drivers/usb/host/ehci-tegra.c                      |    5 ++-
- 15 files changed, 85 insertions(+), 42 deletions(-)
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
