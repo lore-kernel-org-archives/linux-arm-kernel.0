@@ -1,45 +1,61 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 8 May 2012 21:21:15 +0800
-Subject: [PATCH] ARM: imx6q: make ksz9021rn_phy_fixup depends on config of FEC
-In-Reply-To: <1336478520.23308.36.camel@sauron.fi.intel.com>
-References: <1336478520.23308.36.camel@sauron.fi.intel.com>
-Message-ID: <1336483275-8610-1-git-send-email-richard.zhao@freescale.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 May 2012 14:34:12 +0100
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <4FA913BA.30908@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FA90BE1.3050304@linaro.org>
+ <20120508121940.GL15893@opensource.wolfsonmicro.com>
+ <4FA913BA.30908@linaro.org>
+Message-ID: <20120508133411.GP15893@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build error without choose fec driver.
+On Tue, May 08, 2012 at 01:38:18PM +0100, Lee Jones wrote:
+> On 08/05/12 13:19, Mark Brown wrote:
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/mach-imx/mach-imx6q.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> >It's been kicking around for review for a little while longer than that
+> >(it was waiting for review while Rhyland was on holiday), and in any
+> >case half the reason for adding infrastructure is to avoid adding
+> >repeated code.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index d25c5d8..999de69 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -60,6 +60,7 @@ soft:
- 	soft_restart(0);
- }
- 
-+#if defined(CONFIG_FEC) || defined(CONFIG_FEC_MODULE)
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
-@@ -74,11 +75,14 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 
- 	return 0;
- }
-+#endif
- 
- static void __init imx6q_sabrelite_init(void)
- {
-+#if defined(CONFIG_FEC) || defined(CONFIG_FEC_MODULE)
- 	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
-+#endif
- }
- 
- static void __init imx6q_init_machine(void)
--- 
-1.7.5.4
+> I'm sorry Mark, but I just don't have the time to read all of the
+> mailing lists in order to keep up with, and in-turn use all of the
+> new features which might make it upstream. I only use what I see in
+> the kernel at time of writing, as I have an entire platform to
+> enable and very little time in which to do it.
+
+If you're going to do this you really need to track -next rather than
+-rc for actively developed subsystems - it's not just that you're not
+using the latest APIs here you're submitting code that won't even
+compile against the current subsystem.
+
+> This piece of code plucks pre-defined initialisation values and from
+> the Device Tree and uses them to set-up regulator related registers
+> on the u8500. See 'struct ab8500_regulator_reg_init
+> ab8500_regulator_reg_init' in
+> arch/arm/mach-ux500/board-mop500-regulators.c for reference.
+
+Oh, dear.  It's quite hard to associate this with the code especially
+not without the binding document.  
+
+Looking at the usage here it looks like most of this stuff shouldn't be
+there even with non-DT stuff, we probably don't want to add DT bindings
+for those bits.  All the voltage setting is not at all device specific
+and can be done using the generic regulator bindings, the forcing on or
+off is similarly generic.  There looks to be a large chunk of mode
+setting too.  We probably need to scrub the existing magic number stuff
+prior to trying to do this.
+
+While looking for the original patch I also noticed that you're not CCing
+the mailing list either...  please always CC the subsystem mailing list
+on patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120508/db5f3efc/attachment.sig>
