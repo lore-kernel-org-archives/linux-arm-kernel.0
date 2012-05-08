@@ -1,111 +1,38 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 08 May 2012 14:27:32 +0530
-Subject: [PATCHv4 6/8] ARM: OMAP4: PM: support ret_logic/mem_off_counters
-In-Reply-To: <1336466198.2149.269.camel@sokoban>
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>	
- <1334913591-26312-7-git-send-email-t-kristo@ti.com> <87pqafv810.fsf@ti.com>
- <1336466198.2149.269.camel@sokoban>
-Message-ID: <4FA8DFFC.6050608@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 May 2012 10:01:46 +0100
+Subject: common clock framework
+In-Reply-To: <CAJOA=zPozuanQFWt10PU4mySQ1kV+YV6iO5+BOfDWGPS2Y0aYg@mail.gmail.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+ <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
+ <20120505082840.GQ4141@pengutronix.de>
+ <CAJOA=zPozuanQFWt10PU4mySQ1kV+YV6iO5+BOfDWGPS2Y0aYg@mail.gmail.com>
+Message-ID: <20120508090145.GG15893@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 May 2012 02:06 PM, Tero Kristo wrote:
-> On Mon, 2012-05-07 at 17:19 -0700, Kevin Hilman wrote:
->> Tero Kristo<t-kristo@ti.com>  writes:
->>
->>> From: Axel Haslam<axelhaslam@gmail.com>
->>>
->>> On OMAP4, there is no support to read previous logic state
->>> or previous memory state achieved when a power domain transitions
->>> to RET. Instead there are module level context registers.
->>>
->>> In order to support the powerdomain level logic/mem_off_counters
->>> on OMAP4, instead use the previous power state achieved (RET) and
->>> the *programmed* logic/mem RET state to derive if a powerdomain lost
->>> logic or did not.
->>
->> OK, but this also changes the behavior for OMAP3 as well, right?  I
->> don't see in the changelog how this affects OMAP3 and whether it is
->> still expected to work on OMAP3.  When changing common code like this,
->> the changelog should describe the impacts on to all affected SoCs.
->>
->> As suggested by Vaibhav Bedia, now might be the right time to add this
->> function to the SoC specific function pointers (struct pwrdm_ops.)
->>
->> Doing that, the existing function could be used for OMAP3 (and OMAP4 if
->> the changelog describes that it can/should be used for both.)
->>
->> Then, when AM33xx support is added, it will be obvious where they will
->> need to plugin support for that SoC.
->
-> How about the following patch? It will add a couple of redundant
-> read_prev_pwrst calls, but works in the same way as the original patch,
-> without touching the generic code. Also, as there have been talks about
-> adding caching for some of the pwrdm registers (especially the
-> prev_pwrst), this might not be that big of an issue.
->
-> If this looks good to you, I'll re-post the set with this patch.
->
-> -Tero
->
->
-> diff --git a/arch/arm/mach-omap2/powerdomain44xx.c
-> b/arch/arm/mach-omap2/powerdomain44xx.c
-> index 9bfb8a0..3d5e8d4 100644
-> --- a/arch/arm/mach-omap2/powerdomain44xx.c
-> +++ b/arch/arm/mach-omap2/powerdomain44xx.c
-> @@ -155,6 +155,14 @@ static int omap4_pwrdm_read_logic_retst(struct
-> powerdomain *pwrdm)
->   	return v;
->   }
->
-> +static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
-> +{
-> +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
-> +		return PWRDM_POWER_ON;
-> +
-> +	return omap4_pwrdm_read_logic_retst(pwrdm);
+On Sat, May 05, 2012 at 10:44:17AM -0700, Turquette, Mike wrote:
+> + Mark & Graeme (for audio/pmic perspective)
 
-Looks good to me. Do these ever get called with target state programmed
-to OFF?
+> >> Having clk_set_rate and clk_prepare both hold the same prepare_lock
+> >> mutex seems suboptimal, but it is easy. ?Having reentrant accesses to
+> >> the clock tree is going to be hard... ?I've spent some time thinking
+> >> of ways to solve this, but I would appreciate suggestions. ?I suspect
+> >> the exact same case I'm describing above will affect many SoCs.
 
-regards,
-Rajendra
+> > That's interesting. Here's another one: What will happen when Mark
+> > attaches one of his i2c wolfson chips to a omap core and wants to test
+> > his new clock driver? a clk_prepare on some clock on the wolfson chip
+> > will trigger another clk_prepare inside the i2c driver.
+> > So the reentrancy problem is not limited to prepare vs. set_rate.
 
-> +}
-> +
->   static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8
-> bank)
->   {
->   	u32 m, v;
-> @@ -183,6 +191,14 @@ static int omap4_pwrdm_read_mem_retst(struct
-> powerdomain *pwrdm, u8 bank)
->   	return v;
->   }
->
-> +static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm,
-> u8 bank)
-> +{
-> +	if (omap4_pwrdm_read_prev_pwrst(pwrdm) != PWRDM_POWER_RET)
-> +		return PWRDM_POWER_ON;
-> +
-> +	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
-> +}
-> +
->   static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
->   {
->   	u32 c = 0;
-> @@ -256,9 +272,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
->   	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
->   	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
->   	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
-> +	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
->   	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
->   	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
->   	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
-> +	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
->   	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
->   	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
->   	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
->
->
+This sounds pretty much expected - you'll also see similar things on
+some SoCs where IPs for clocks might get clock gated when not in use and
+reentrancy could crop up while exiting low power modes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120508/d985f537/attachment.sig>
