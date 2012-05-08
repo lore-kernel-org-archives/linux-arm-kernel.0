@@ -1,36 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 May 2012 00:12:13 +0800
-Subject: [PATCH 0/5] more clk-next fixes
-In-Reply-To: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-References: <1336367310-5140-1-git-send-email-mturquette@linaro.org>
-Message-ID: <20120508161211.GI2199@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 08 May 2012 12:17:40 -0400 (EDT)
+Subject: [PATCH 2/2] remove the debugging restrictions in devicemaps_init()
+In-Reply-To: <20120508071411.GP26481@n2100.arm.linux.org.uk>
+References: <1331876668-32492-1-git-send-email-nico@fluxnic.net>
+ <1331876668-32492-3-git-send-email-nico@fluxnic.net>
+ <20120506163016.GA7412@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1205072340540.21030@xanadu.home>
+ <20120508071411.GP26481@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1205081214220.21030@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2012 at 10:08:25PM -0700, Mike Turquette wrote:
-> If no one complains about these then I'll commit them to clk-next and
-> (finally) send my pull request to Arnd.
+On Tue, 8 May 2012, Russell King - ARM Linux wrote:
+
+> On Tue, May 08, 2012 at 12:19:30AM -0400, Nicolas Pitre wrote:
+> > However, the switching itself doesn't involve a full cache flush.
 > 
-On mach-mxs:
+> That's where you're wrong.  Look at the switch_mm() helpers in proc-*.S.
+> StrongARM for example calls v4wb_flush_kern_cache_all() here, which needs
+> the cache flushing mappings to be in place in the _current_ page table.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Right.  I had to be wrong somewhere.
 
-Mike,
+What about abstracting the cache area mapping code in a function of its 
+own, and calling it inside install_temp_mm() as well?
 
-I haven't seen too many outstanding comments on these patches, except
-the following one that Saravana put on clk-fixed-factor.c, which should
-be easy to fix.
 
-"
-> +     return (parent_rate / fix->div) * fix->mult;
-
-Wouldn't multiplying and then dividing result in better accuracy?
-"
-
-Can you please quickly fix it and publish the patches on your clk-next,
-so that I can ask Arnd to pull my platform porting, on which mach-mxs
-device tree series depends.
-
--- 
-Regards,
-Shawn
+Nicolas
