@@ -1,61 +1,50 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 May 2012 11:43:34 +0200
-Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
-Message-ID: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 8 May 2012 11:44:22 +0200
+Subject: [PATCH 01/12] gpio: move the Nomadik GPIO driver to pinctrl
+Message-ID: <1336470262-23483-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This moves the Nomadik "GPIO" driver to the pinctrl subsystem
-and adds the interfaces needed to provide a pinctrl driver for
-the DB8500 ASIC.
+I'm moving this driver over to the pinctrl subsystem to convert
+the custom pin mux/config scheme over to use pinctrl.
 
-It further switches Ux500 over to using it with a combination
-of hogs and runtime controls.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/Makefile                              |    1 -
+ drivers/pinctrl/Makefile                           |    1 +
+ .../gpio-nomadik.c => pinctrl/pinctrl-nomadik.c}   |    0
+ 3 files changed, 1 insertion(+), 1 deletion(-)
+ rename drivers/{gpio/gpio-nomadik.c => pinctrl/pinctrl-nomadik.c} (100%)
 
-The ux500 portions were developed on top of the gpio and pins
-branch earlier sent for integration in the ARM SoC tree.
-
-Linus Walleij (12):
-  gpio: move the Nomadik GPIO driver to pinctrl
-  pinctrl: basic Nomadik pinctrl interface
-  pinctrl/nomadik: break out single GPIO debug function
-  pinctrl/nomadik: reuse GPIO debug function for pins
-  pinctrl/nomadik: implement pin multiplexing
-  pinctrl/nomadik: implement pin configuration
-  pinctrl: add sleep state definition
-  ARM: ux500: switch over to Nomadik pinctrl driver
-  ARM: ux500: delete custom pin control system
-  ARM: ux500: switch to using pinctrl for uart0
-  ARM: ux500: alter MSP registration to return a device pointer
-  ARM: ux500: switch MSP to using pinctrl for pins
-
- arch/arm/mach-ux500/Kconfig                 |    3 +
- arch/arm/mach-ux500/board-mop500-msp.c      |   85 +-
- arch/arm/mach-ux500/board-mop500-pins.c     |  855 ++++++-------
- arch/arm/mach-ux500/board-mop500.c          |   83 +-
- arch/arm/mach-ux500/board-mop500.h          |    6 +-
- arch/arm/mach-ux500/cpu-db8500.c            |    1 +
- arch/arm/mach-ux500/devices-common.h        |   12 +
- arch/arm/mach-ux500/pins.c                  |   88 --
- arch/arm/mach-ux500/pins.h                  |   46 -
- arch/arm/plat-nomadik/include/plat/pincfg.h |   13 +
- drivers/gpio/Makefile                       |    1 -
- drivers/gpio/gpio-nomadik.c                 | 1306 -------------------
- drivers/pinctrl/Kconfig                     |   10 +
- drivers/pinctrl/Makefile                    |    2 +
- drivers/pinctrl/pinctrl-nomadik-db8500.c    |  857 +++++++++++++
- drivers/pinctrl/pinctrl-nomadik.c           | 1800 +++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-nomadik.h           |   77 ++
- include/linux/pinctrl/pinctrl-state.h       |   13 +
- 18 files changed, 3326 insertions(+), 1932 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/pins.c
- delete mode 100644 arch/arm/mach-ux500/pins.h
- delete mode 100644 drivers/gpio/gpio-nomadik.c
- create mode 100644 drivers/pinctrl/pinctrl-nomadik-db8500.c
- create mode 100644 drivers/pinctrl/pinctrl-nomadik.c
- create mode 100644 drivers/pinctrl/pinctrl-nomadik.h
-
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 007f54b..a4193ab 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -36,7 +36,6 @@ obj-$(CONFIG_GPIO_MSM_V1)	+= gpio-msm-v1.o
+ obj-$(CONFIG_GPIO_MSM_V2)	+= gpio-msm-v2.o
+ obj-$(CONFIG_GPIO_MXC)		+= gpio-mxc.o
+ obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
+-obj-$(CONFIG_PLAT_NOMADIK)	+= gpio-nomadik.o
+ obj-$(CONFIG_ARCH_OMAP)		+= gpio-omap.o
+ obj-$(CONFIG_GPIO_PCA953X)	+= gpio-pca953x.o
+ obj-$(CONFIG_GPIO_PCF857X)	+= gpio-pcf857x.o
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 6d4150b..274e069 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_PINCONF)		+= pinconf.o
+ obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
+ obj-$(CONFIG_PINCTRL_PXA3xx)	+= pinctrl-pxa3xx.o
+ obj-$(CONFIG_PINCTRL_MMP2)	+= pinctrl-mmp2.o
++obj-$(CONFIG_PLAT_NOMADIK)	+= pinctrl-nomadik.o
+ obj-$(CONFIG_PINCTRL_PXA168)	+= pinctrl-pxa168.o
+ obj-$(CONFIG_PINCTRL_PXA910)	+= pinctrl-pxa910.o
+ obj-$(CONFIG_PINCTRL_SIRF)	+= pinctrl-sirf.o
+diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+similarity index 100%
+rename from drivers/gpio/gpio-nomadik.c
+rename to drivers/pinctrl/pinctrl-nomadik.c
 -- 
 1.7.9.2
