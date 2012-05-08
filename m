@@ -1,141 +1,74 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 8 May 2012 20:32:44 +0530
-Subject: [RFC PATCH 4/4] ARM: OMAP2+: CLEANUP: Add new config option for
- different DPLL features
-In-Reply-To: <1336489364-19200-1-git-send-email-hvaibhav@ti.com>
-References: <1336489364-19200-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1336489364-19200-5-git-send-email-hvaibhav@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 8 May 2012 10:08:24 -0500
+Subject: [PATCH v4 01/39] ARM: OMAP2+: gpmc: driver conversion
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9878EC@DBDE01.ent.ti.com>
+References: <cover.1335874494.git.afzal@ti.com>
+ <363273a9ef82d6836197929157aa9a8eb8f5171a.1335874494.git.afzal@ti.com>
+ <4FA4035E.6020308@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E987147@DBDE01.ent.ti.com>
+ <4FA7F232.7050802@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9878EC@DBDE01.ent.ti.com>
+Message-ID: <4FA936E8.1080801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up dpll_data structure, making structure
-fields definition based on feature availability for given SoC,
-managed using Kconfig rules.
+Hi  Afzal,
 
-SOC_HAS_DPLL_IDLE: idle state
-SOC_HAS_DPLL_RECAL: recalibration capability
-SOC_HAS_DPLL_DCO_SEL: dco selection
-SOC_HAS_DPLL_SDDIV: sigma-delta div factor
-SOC_HAS_DPLL_FREQSEL: frequency selection
+On 05/08/2012 01:18 AM, Mohammed, Afzal wrote:
+> Hi Jon,
+> 
+> On Mon, May 07, 2012 at 21:32:58, Hunter, Jon wrote:
+> 
+>>>>> +	/* no waitpin */
+>>>>> +	case 0:
+>>>>> +		break;
+>>>>> +	default:
+>>>>> +		dev_err(gpmc->dev, "multiple waitpins selected on CS:%u\n", cs);
+>>>>> +		return -EINVAL;
+>>>>> +		break;
+>>>>> +	}
+>>>>
+>>>> Why not combined case 0 and default? Both are invalid configurations so
+>>>> just report invalid selection.
+>>>
+>>> Case 0 is not invalid, a case where waitpin is not used, default refers
+>>> to when a user selects multiple waitpins wrongly.
+>>
+>> Ok. Then for case 0, just return here. If the polarity is set, you could
+>> print an error here.
+> 
+> Different ways of doing things, this looks cleaner to me as already it is
+> checked, and time of execution in both cases would not differ much.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/Kconfig             |   34 +++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/clock.h |   14 ++++++++++--
- 2 files changed, 45 insertions(+), 3 deletions(-)
+Sure. However, I think that this could be simplified so that it is
+easier to read. At a minimum you may wish to add some comments to
+explain the purposes of the multi-level if-statements as it is not
+intuitive for the reader.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 2277359..93bf5e2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -20,6 +20,21 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	help
- 	  Compile a kernel suitable for booting most boards
+>>>>> +		if (gd->have_waitpin) {
+>>>>> +			if (gd->waitpin != idx ||
+>>>>> +					gd->waitpin_polarity != polarity) {
+>>>>> +				dev_err(gpmc->dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
+>>>>> +					gd->waitpin, gd->waitpin_polarity,
+>>>>> +					gd->name, gd->id);
+>>>>> +				return -EBUSY;
+>>>>> +			}
+>>>>> +		} else {
+>>>>
+>>>> Don't need the else as you are going to return in the above.
+>>>
+>>> Not always, only in case of error
+>>
+>> Ok, but seems that it can be simplified a little.
+>>
+>> What happens if a device uses more than one wait-pin? In other words a
+>> device with two chip-selects that uses two wait-pins?
+> 
+> Please re-read http://www.mail-archive.com/linux-omap at vger.kernel.org/msg67702.html
+> and your reply
 
-+config SOC_HAS_DPLL_IDLE
-+	bool "DPLL idle state support"
-+
-+config SOC_HAS_DPLL_RECAL
-+	bool "DPLL Recalibration support"
-+
-+config SOC_HAS_DPLL_DCO_SEL
-+	bool "DPLL DCO (Digitally Controlled Oscilators) support"
-+
-+config SOC_HAS_DPLL_SDDIV
-+	bool "DPLL Sigma-Delta Divider support"
-+
-+config SOC_HAS_DPLL_FREQSEL
-+	bool "DPLL Freq Select support"
-+
- config SOC_HAS_SDRC
- 	bool "SDRAM Controller support"
+Ok thats fine. Sorry for my repeated questions, but I think that this
+just highlights that this code is not clear in it purpose. So again may
+be some comments would make this all clearer.
 
-@@ -42,6 +57,11 @@ config ARCH_OMAP3
- 	select ARM_CPU_SUSPEND if PM
- 	select MULTI_IRQ_HANDLER
- 	select SOC_HAS_SDRC
-+	select SOC_HAS_DPLL_IDLE
-+	select SOC_HAS_DPLL_RECAL
-+	select SOC_HAS_DPLL_DCO_SEL
-+	select SOC_HAS_DPLL_SDDIV
-+	select SOC_HAS_DPLL_FREQSEL
-
- config ARCH_OMAP4
- 	bool "TI OMAP4"
-@@ -59,6 +79,9 @@ config ARCH_OMAP4
- 	select PM_OPP if PM
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARM_CPU_SUSPEND if PM
-+	select SOC_HAS_DPLL_IDLE
-+	select SOC_HAS_DPLL_RECAL
-+	select SOC_HAS_DPLL_SDDIV
-
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
-@@ -84,16 +107,27 @@ config SOC_OMAP3430
- 	default y
- 	select ARCH_OMAP_OTG
- 	select SOC_HAS_SDRC
-+	select SOC_HAS_DPLL_IDLE
-+	select SOC_HAS_DPLL_RECAL
-+	select SOC_HAS_DPLL_DCO_SEL
-+	select SOC_HAS_DPLL_SDDIV
-+	select SOC_HAS_DPLL_FREQSEL
-
- config SOC_OMAPTI81XX
- 	bool "TI81XX support"
- 	depends on ARCH_OMAP3
- 	default y
-+	select SOC_HAS_DPLL_IDLE
-+	select SOC_HAS_DPLL_RECAL
-+	select SOC_HAS_DPLL_SDDIV
-
- config SOC_OMAPAM33XX
- 	bool "AM33XX support"
- 	depends on ARCH_OMAP3
- 	default y
-+	select SOC_HAS_DPLL_IDLE
-+	select SOC_HAS_DPLL_RECAL
-+	select SOC_HAS_DPLL_SDDIV
-
- config OMAP_PACKAGE_ZAF
-        bool
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index d0ef57c..aa81c04 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -156,18 +156,26 @@ struct dpll_data {
- 	u8			min_divider;
- 	u16			max_divider;
- 	u8			modes;
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-+#if defined(CONFIG_SOC_HAS_DPLL_IDLE)
- 	void __iomem		*autoidle_reg;
- 	void __iomem		*idlest_reg;
- 	u32			autoidle_mask;
--	u32			freqsel_mask;
- 	u32			idlest_mask;
-+#endif
-+#if defined(CONFIG_SOC_HAS_DPLL_FREQSEL)
-+	u32			freqsel_mask;
-+#endif
-+#if defined(CONFIG_SOC_HAS_DPLL_DCO_SEL)
- 	u32			dco_mask;
-+#endif
-+#if defined(CONFIG_SOC_HAS_DPLL_SDDIV)
- 	u32			sddiv_mask;
-+#endif
-+#if defined(CONFIG_SOC_HAS_DPLL_RECAL)
- 	u8			auto_recal_bit;
- 	u8			recal_en_bit;
- 	u8			recal_st_bit;
--#  endif
-+#endif
- 	u8			flags;
- };
-
---
-1.7.0.4
+Jon
