@@ -1,100 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 08 May 2012 13:04:49 +0100
-Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
- Tree
-In-Reply-To: <20120507170832.GO17002@opensource.wolfsonmicro.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
- <20120507170832.GO17002@opensource.wolfsonmicro.com>
-Message-ID: <4FA90BE1.3050304@linaro.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 8 May 2012 14:17:49 +0200
+Subject: [PATCH 1/2] clockevents: add an optional frequency update function
+Message-ID: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/12 18:08, Mark Brown wrote:
-> On Fri, May 04, 2012 at 07:23:24PM +0100, Lee Jones wrote:
->
-> Once again, please try to make sure your changelog matches the
-> subsystem.  This also isn't consistent with the other regulator change
-> further up the series :(
->
-> You've also not included any binding documenation here, binding
-> documentation should be included for new bindings.
->
->>
->> +static __devinit int
->> +ab8500_regulator_of_probe(struct platform_device *pdev, struct device_node *np)
->> +{
->> +	struct regulator_init_data *ab8500_regulator;
->> +	struct device_node *child;
->> +	int err, value, i, id = 0;
->> +
->> +	/* Initialise regulator registers to platform specific values. */
->> +	for (i = 0; i<  ARRAY_SIZE(ab8500_reg_init); i++) {
->> +		err = of_property_read_u32(np, ab8500_reg_init[i].of_name,&value);
->> +		if (err<  0)
->> +			return err;
->> +
->> +		err = ab8500_regulator_init_registers(pdev, i, value);
->> +		if (err<  0)
->> +			return err;
->
-> You should be using of_regulator_match() for this (I think it's supposed
-> to do an equivalent job...) rather than open coding.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-of_regulator_match() didn't exist when I wrote this. In fact, it only 
-made it into -next a couple of days ago. Besides, it doesn't satisfy the 
-needs of this code segment. of_regulator_match() is a(nother) wrapper 
-around of_get_regulation_constraints(), which is only used to populate 
-'struct regulation_constraints constraints' after being provided with a 
-selection of .compatible strings.
+For some clockevents, especially for periodic ones, we get a
+problem when the frequency of the clock driving the event
+changes. We previously have a solution for one-shot events
+that will simply reprogram the next event. This introduces
+an optional callback so that drivers can update constant
+timer latch values derived from HZ.
 
-I'd be happy to use an API for what this is trying to achieve, however 
-there aren't any as far as I know.
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/clockchips.h |    3 +++
+ kernel/time/clockevents.c  |    8 ++++++--
+ 2 files changed, 9 insertions(+), 2 deletions(-)
 
->> +	/* Register each ab8500 regulator found in the Device Tree. */
->> +	for_each_child_of_node(np, child) {
->> +		ab8500_regulator = of_get_regulator_init_data(&pdev->dev, child);
->
-> Definitely don't do this - you should unconditionally register all the
-> regulators that physically exist, this allows users to inspect their
-> state even if they aren't used.
-
-No problem. Thanks for the information. I'll change that and re-submit.
-
-> It's possible the original driver has this bug (I didn't check but
->
->> +		if (strcmp(ab8500_regulator->constraints.name, "dummy"))
->> +			ab8500_regulator_register(pdev, ab8500_regulator, id, child);
->
-> This is really broken - the whole purpose of allowing users to specify a
-> name in the constraints is to allow them to assign a name that's
-> meaningful for their board so they can tie the software in with the
-> schematic which we will display in diagnostics.  Forcing them to specify
-> magic strings as the supply name defeats this and makes diagnostics from
-> the kernel more obscure.
-
-Noted. I'll have that changed to. Thanks.
-
->>   	pdata = dev_get_platdata(ab8500->dev);
->> -	if (!pdata) {
->> -		dev_err(&pdev->dev, "null pdata\n");
->> +	if (!pdata&&  !np) {
->> +		dev_err(&pdev->dev, "null pdata and no device tree found\n");
->>   		return -EINVAL;
->>   	}
->
-> Neither should be mandatory.
-
-Okay.
-
-Thanks for the review Mark. I'll get it fixed up and supply early next week.
-
-Kind regards,
-Lee
-
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 81e803e..c83d008 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -70,6 +70,7 @@ enum clock_event_nofitiers {
+  * @features:		features
+  * @retries:		number of forced programming retries
+  * @set_mode:		set mode function
++ * @update_freq:	function called to update timer clock frequency
+  * @broadcast:		function to broadcast events
+  * @min_delta_ticks:	minimum delta value in ticks stored for reconfiguration
+  * @max_delta_ticks:	maximum delta value in ticks stored for reconfiguration
+@@ -97,6 +98,8 @@ struct clock_event_device {
+ 	void			(*broadcast)(const struct cpumask *mask);
+ 	void			(*set_mode)(enum clock_event_mode mode,
+ 					    struct clock_event_device *);
++	void			(*update_freq)(enum clock_event_mode mode,
++					    struct clock_event_device *);
+ 	unsigned long		min_delta_ticks;
+ 	unsigned long		max_delta_ticks;
+ 
+diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+index 9cd928f..0444bad 100644
+--- a/kernel/time/clockevents.c
++++ b/kernel/time/clockevents.c
+@@ -346,13 +346,17 @@ void clockevents_config_and_register(struct clock_event_device *dev,
+  * @dev:	device to modify
+  * @freq:	new device frequency
+  *
+- * Reconfigure and reprogram a clock event device in oneshot
+- * mode. Must be called on the cpu for which the device delivers per
++ * Reconfigure and reprogram a clock event device.
++ * Must be called on the cpu for which the device delivers per
+  * cpu timer events with interrupts disabled!  Returns 0 on success,
+  * -ETIME when the event is in the past.
+  */
+ int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
+ {
++	/* Call down to the driver to reconfigure for new frequency */
++	if (dev->update_freq)
++		dev->update_freq(dev->mode, dev);
++
+ 	clockevents_config(dev, freq);
+ 
+ 	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.2
