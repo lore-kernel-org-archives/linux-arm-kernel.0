@@ -1,23 +1,17 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 May 2012 15:12:30 -0400
-Subject: [GIT PULL] ARM: kirkwood: fixes for v3.4
-Message-ID: <20120508191230.GI15711@titan.lakedaemon.net>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 8 May 2012 12:19:46 -0700
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAK5ve-J9uTJKC01XFTzU34MY4z_8yVRwTUVXP99Czu=oL-mqxQ@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-J9uTJKC01XFTzU34MY4z_8yVRwTUVXP99Czu=oL-mqxQ@mail.gmail.com>
+Message-ID: <20120508121946.c20adb87.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+On Wed, 9 May 2012 01:45:43 +0800
+Bryan Wu <bryan.wu@canonical.com> wrote:
 
-  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+> Any comments and suggestions about my v9 patchset.
 
-are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_fixes_for_v3.4
-
-Ben Hutchings (1):
-      ARM: orion5x: Fix GPIO enable bits for MPP9
-
-Ian Campbell (1):
-      ARM: kirkwood: add missing kexec.h include
-
- arch/arm/mach-kirkwood/board-dt.c |    1 +
- arch/arm/mach-orion5x/mpp.h       |    4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+The drivers/leds/ changes look OK to me.
