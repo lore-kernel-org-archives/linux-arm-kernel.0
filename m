@@ -1,143 +1,69 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 9 May 2012 01:56:04 +0900
-Subject: [PATCH 01/02] mach-shmobile: Emma Mobile EV2 SoC base support
-In-Reply-To: <201205041307.46080.arnd@arndb.de>
-References: <20120503144645.6390.62303.sendpatchset@w520>
- <20120503144654.6390.56399.sendpatchset@w520>
- <201205041307.46080.arnd@arndb.de>
-Message-ID: <CANqRtoRqiFQEH+xaC9WtHy3v2rAHOZBNPTffOVQoDNuPb9H4-A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 08 May 2012 09:56:51 -0700
+Subject: CPUFREQ maintainence.
+In-Reply-To: <20120430140645.GB12583@redhat.com> (Dave Jones's message of
+ "Mon, 30 Apr 2012 10:06:45 -0400")
+References: <20120430140645.GB12583@redhat.com>
+Message-ID: <877gwmr4q4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 10:07 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 03 May 2012, Magnus Damm wrote:
+Dave Jones <davej@redhat.com> writes:
+
+> This last few releases I've been more of a hindrance than help to getting
+> some of the patches merged upstream, so due to my lack of time, I'm considering
+> removing myself as maintainer, and having patches routed as such instead...
+
+Thanks Dave for your work in maintaining the core all this time!
+
+> ARM -> Russell/relevant ARM subtree maintainers
+> x86 driver patches -> x86 at vger.kernel.org
+> (All the other archs currently supported already go through the arch trees mips/sparc etc)
+
+I will continue to handle the OMAP driver.
+
+> The core doesn't see a huge amount of change these days, I figure patches for
+> that can just go to lkml & Linus/Andrew like any other subsystem.
 >
->> +
->> +/* EMEV2 SMU registers */
->> +#define USIAU0_RSTCTRL 0xe0110094
->> +#define USIBU1_RSTCTRL 0xe01100ac
->> +#define USIBU2_RSTCTRL 0xe01100b0
->> +#define USIBU3_RSTCTRL 0xe01100b4
->> +#define STI_RSTCTRL 0xe0110124
->> +#define USIAU0GCLKCTRL 0xe01104a0
->> +#define USIBU1GCLKCTRL 0xe01104b8
->> +#define USIBU2GCLKCTRL 0xe01104bc
->> +#define USIBU3GCLKCTRL 0xe01104c0
->> +#define STIGCLKCTRL 0xe0110528
->> +#define USIAU0SCLKDIV 0xe011061c
->> +#define USIB2SCLKDIV 0xe011065c
->> +#define USIB3SCLKDIV 0xe0110660
->> +#define STI_CLKSEL 0xe0110688
->
-> Please cast to __iomem* here, e.g. using the IOMEM() macro, as these are
-> virtual addresses.
+> comments?
 
-Sure, will do!
+I suppose we should we create separate MAINTAINERS entries for each of
+the drivers?
 
->> +void __init emev2_clock_init(void)
->> +{
->> + ? ? int k, ret = 0;
->> +
->> + ? ? /* setup STI timer to run on 37.768 kHz and deassert reset */
->> + ? ? __raw_writel(0, STI_CLKSEL);
->> + ? ? __raw_writel(1, STI_RSTCTRL);
->> +
->> + ? ? /* deassert reset for UART0->UART3 */
->> + ? ? __raw_writel(2, USIAU0_RSTCTRL);
->> + ? ? __raw_writel(2, USIBU1_RSTCTRL);
->> + ? ? __raw_writel(2, USIBU2_RSTCTRL);
->> + ? ? __raw_writel(2, USIBU3_RSTCTRL);
->
-> Better use iowrite32 or writel or writel_relaxed here, but not __raw_*.
+If so, here's one to add the OMAP CPUfreq driver to the rest of the OMAP
+PM stuff I maintain.  I Cc'd the linux-omap list in case there are any
+objections to me adding myself.
 
-Ok. Would you like us to convert exiting code for other SoCs as well?
+Kevin
 
->> --- 0003/arch/arm/mach-shmobile/include/mach/common.h
->> +++ work/arch/arm/mach-shmobile/include/mach/common.h 2012-05-03 20:45:56.000000000 +0900
->> @@ -85,4 +85,10 @@ extern void r8a7779_secondary_init(unsig
->> ?extern int r8a7779_boot_secondary(unsigned int cpu);
->> ?extern void r8a7779_smp_prepare_cpus(void);
->>
->> +extern void emev2_init_irq(void);
->> +extern void emev2_map_io(void);
->> +extern void emev2_add_early_devices(void);
->> +extern void emev2_add_standard_devices(void);
->> +extern void emev2_clock_init(void);
->> +
->> ?#endif /* __ARCH_MACH_COMMON_H */
->
-> I would feel more comfortable with a separate header for this than putting
-> it into the same file as everything else, but it's not important to me.
+>From 307f4150416c34936d7f0011d7f1b2146c13f9a0 Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@ti.com>
+Date: Tue, 8 May 2012 09:51:22 -0700
+Subject: [PATCH] MAINTAINERS: add OMAP CPUfreq driver to OMAP Power
+ Management section
 
-I've been thinking about something along those lines myself too.
+Add the OMAP CPUFreq driver to the list of files in the OMAP Power
+Management section.
 
-Perhaps I can also move the existing soc symbols in common.h into
-separate per-soc header files, like for instance moving the sh7372
-symbols to sh7372.h. Not sure if we have enough time for the upcoming
-merge window though, when do you need the code?
+I've already been maintaining this driver, this just makes it
+official.
 
->> --- /dev/null
->> +++ work/arch/arm/mach-shmobile/intc-emev2.c ?2012-05-03 20:45:57.000000000 +0900
->
->> +
->> +void __init emev2_init_irq(void)
->> +{
->> + ? ? void __iomem *gic_dist_base = IOMEM(0xe0028000);
->> + ? ? void __iomem *gic_cpu_base = IOMEM(0xe0020000);
->> +
->> + ? ? /* use GIC to handle interrupts */
->> + ? ? gic_init(0, 29, gic_dist_base, gic_cpu_base);
->> +}
->
-> This could just go into teh setup-emev2.c file, it doesn't actually do much,
-> and the other file is where the constants are coming from anyway. Then you
-> can put it right next to this code:
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ MAINTAINERS |    1 +
+ 1 file changed, 1 insertion(+)
 
-Sure, will do.
-
->> +static struct map_desc emev2_io_desc[] __initdata = {
->> + ? ? /* 128K entity map for 0xe0020000 (GIC) */
->> + ? ? {
->> + ? ? ? ? ? ? .virtual ? ? ? ?= 0xe0020000,
->> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(0xe0020000),
->> + ? ? ? ? ? ? .length ? ? ? ? = SZ_128K,
->> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_UNCACHED
->> + ? ? },
->> + ? ? /* 128K entity map for 0xe0100000 (SMU) */
->> + ? ? {
->> + ? ? ? ? ? ? .virtual ? ? ? ?= 0xe0100000,
->> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(0xe0100000),
->> + ? ? ? ? ? ? .length ? ? ? ? = SZ_128K,
->> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE
->> + ? ? },
->> +};
->> +
->> +void __init emev2_map_io(void)
->> +{
->> + ? ? iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
->> +}
-
-As you said, this iotable can most likely go away too. The only valid
-use case I can think of (which is not included above) is our early
-platform driver based console. Basically, it's the 8250_em driver
-being probed as early as possible. This allows us to get console
-output at MACHINE->init_early() timing. To get that working we rely on
-having entity mappings in our iotable so ioremap() can give us those
-early on. Something does however seem busted with the early ioremap()
-- but I need to spend more time to investigate that. And this is
-totally untested with DT, so it needs more work in general.
-
-I intend to post some SMP support patch together with some DT support
-tomorrow. I also have some GPIO code and some board-level network
-support. Ideally I'd like to go DT-only, but I'm a bit unsure how to
-tie in the SMP bits in a DT-only scenario. And we still have the
-clocks.
-
-If you have time, please let me know how you think my upcoming SMP
-patches can be reworked to be more DT friendly. Also, please note that
-those new patches will still be based on the old V1, but I'll rework
-it all to fit whichever location you prefer.
-
-Thanks for your help!
-
-/ magnus
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7071633..3f5212b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4788,6 +4788,7 @@ M:	Kevin Hilman <khilman@ti.com>
+ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	arch/arm/*omap*/*pm*
++F:	drivers/cpufreq/omap-cpufreq.c
+ 
+ OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
+ M:	Rajendra Nayak <rnayak@ti.com>
+-- 
+1.7.9.2
