@@ -1,42 +1,111 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue,  8 May 2012 09:20:18 +0200
-Subject: [PATCH 03/12] ARM: imx: eukrea_cpuimx25: add watchdog support
+Date: Tue,  8 May 2012 09:20:19 +0200
+Subject: [PATCH 04/12] ARM: imx: eukrea_mbimxsd35: add spi controler and
+ spidev support
 In-Reply-To: <1336461627-30315-1-git-send-email-eric@eukrea.com>
 References: <1336461627-30315-1-git-send-email-eric@eukrea.com>
-Message-ID: <1336461627-30315-3-git-send-email-eric@eukrea.com>
+Message-ID: <1336461627-30315-4-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig                |    1 +
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/Kconfig                      |    1 +
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |   42 ++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index e102f8f..9d7f191 100644
+index 9d7f191..28d89d3 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -163,6 +163,7 @@ config MACH_EUKREA_CPUIMX25SD
- 	select SOC_IMX25
- 	select IMX_HAVE_PLATFORM_FLEXCAN
- 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMXDI_RTC
- 	select IMX_HAVE_PLATFORM_IMX_FB
- 	select IMX_HAVE_PLATFORM_IMX_I2C
-diff --git a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-index b22fb02..d1e04e6 100644
---- a/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-+++ b/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-@@ -136,6 +136,7 @@ static void __init eukrea_cpuimx25_init(void)
- 	imx25_add_mxc_nand(&eukrea_cpuimx25_nand_board_info);
- 	imx25_add_imxdi_rtc(NULL);
- 	imx25_add_fec(&mx25_fec_pdata);
-+	imx25_add_imx2_wdt(NULL);
+@@ -608,6 +608,7 @@ config MACH_EUKREA_MBIMXSD35_BASEBOARD
+ 	select IMX_HAVE_PLATFORM_GPIO_KEYS
+ 	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	select IMX_HAVE_PLATFORM_IPU_CORE
++	select IMX_HAVE_PLATFORM_SPI_IMX
+ 	select LEDS_GPIO_REGISTER
+ 	help
+ 	  This adds board specific devices that can be found on Eukrea's
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index fd8bf8a..557f6c4 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -27,6 +27,7 @@
+ #include <linux/leds.h>
+ #include <linux/platform_device.h>
+ #include <linux/input.h>
++#include <linux/spi/spi.h>
+ #include <video/platform_lcd.h>
+ #include <linux/i2c.h>
  
- 	i2c_register_board_info(0, eukrea_cpuimx25_i2c_devices,
- 				ARRAY_SIZE(eukrea_cpuimx25_i2c_devices));
+@@ -158,12 +159,22 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ 	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
+ 	/* SD1 CD */
+ 	MX35_PAD_LD18__GPIO3_24,
++	/* SPI */
++	MX35_PAD_CSPI1_MOSI__CSPI1_MOSI,
++	MX35_PAD_CSPI1_MISO__CSPI1_MISO,
++	MX35_PAD_CSPI1_SS0__GPIO1_18,
++	MX35_PAD_CSPI1_SS1__GPIO1_19,
++	MX35_PAD_CSPI1_SCLK__CSPI1_SCLK,
++	MX35_PAD_CSPI1_SPI_RDY__GPIO3_5,
+ };
+ 
+ #define GPIO_LED1	IMX_GPIO_NR(3, 29)
+ #define GPIO_SWITCH1	IMX_GPIO_NR(3, 25)
+ #define GPIO_LCDPWR	IMX_GPIO_NR(1, 4)
+ #define GPIO_SD1CD	IMX_GPIO_NR(3, 24)
++#define	GPIO_SPI1_SS0	IMX_GPIO_NR(1, 18)
++#define	GPIO_SPI1_SS1	IMX_GPIO_NR(1, 19)
++#define	GPIO_SPI1_IRQ	IMX_GPIO_NR(3, 5)
+ 
+ static void eukrea_mbimxsd_lcd_power_set(struct plat_lcd_data *pd,
+ 				   unsigned int power)
+@@ -239,6 +250,30 @@ static struct esdhc_platform_data sd1_pdata = {
+ 	.wp_type = ESDHC_WP_NONE,
+ };
+ 
++static struct spi_board_info eukrea_mbimxsd35_spi_board_info[] __initdata = {
++	{
++		.modalias = "spidev",
++		.max_speed_hz = 20000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = SPI_MODE_0,
++	},
++	{
++		.modalias = "spidev",
++		.max_speed_hz = 20000000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = SPI_MODE_0,
++	},
++};
++
++static int eukrea_mbimxsd35_spi_cs[] = {GPIO_SPI1_SS0, GPIO_SPI1_SS1};
++
++static const struct spi_imx_master eukrea_mbimxsd35_spi0_data __initconst = {
++	.chipselect     = eukrea_mbimxsd35_spi_cs,
++	.num_chipselect = ARRAY_SIZE(eukrea_mbimxsd35_spi_cs),
++};
++
+ /*
+  * system init for baseboard usage. Will be called by cpuimx35 init.
+  *
+@@ -274,6 +309,13 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
+ 	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
+ 				ARRAY_SIZE(eukrea_mbimxsd_i2c_devices));
+ 
++	gpio_request(GPIO_SPI1_IRQ, "SPI1_IRQ");
++	gpio_direction_input(GPIO_SPI1_IRQ);
++	gpio_free(GPIO_SPI1_IRQ);
++	imx35_add_spi_imx0(&eukrea_mbimxsd35_spi0_data);
++	spi_register_board_info(eukrea_mbimxsd35_spi_board_info,
++		ARRAY_SIZE(eukrea_mbimxsd35_spi_board_info));
++
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
+ 	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
 -- 
 1.7.7.6
