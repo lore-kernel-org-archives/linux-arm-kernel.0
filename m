@@ -1,47 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 May 2012 16:18:30 +0200
-Subject: [PATCHv3] Add ADC driver for Atmel G20, G45 and X5 boards
-In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4FAA7CB6.8030506@atmel.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 9 May 2012 16:30:51 +0200
+Subject: [PATCH 09/15] drivers/mfd: Enable Device Tree support for the
+ db8500-prcmu
+In-Reply-To: <1336155805-18554-10-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120509143051.GG1794@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2012 11:05 AM, Maxime Ripard :
-> Hi all,
+Hi Lee,
+
+On Fri, May 04, 2012 at 07:23:19PM +0100, Lee Jones wrote:
+> This patch will enable probing to occur during a Device Tree enabled
+> boot. The IRQ base is expected to be located in and will be fetched
+> from the DT itself. We also prevent any of the db8500 regulators
+> from being registered here, as they will be enabled via DT instead.
 > 
-> Here is another version of the patches to bring ADC driver to Atmel boards.
-> Since last version, here is what changed:
->   * Rebased on top of staging-next to move out of staging. Had to change to IIO
->     kfifo buffer along the way.
->   * Reworked the DT bindings according to Jean-Christophe reviews
->   * Made various fixes according to reviews
->   * Support for X5 boards
-> 
-> Thanks,
-> Maxime
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   29 +++++++++++++++++++----------
+>  1 file changed, 19 insertions(+), 10 deletions(-)
+Patch applied, thanks.
 
-Hi Maxime,
+Cheers,
+Samuel.
 
-Thanks for posting this new series. My overall feeling is that it is
-very close to an achievement! Apart from some trivial fixes, you can add
-my :
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-on the whole series.
-
-Jonathan, Arnd, Olof,
-
-As explained by Maxime, this patch series is adding the Atmel ADC driver
-to the out-of-staging iio subsystem. It relies on patches that are in
-staging-next.
-On the other hand, I really wouldn't like to split the series between
-iio and arm-soc...
-My question is: would it be possible to take this series in Jonathan
-iio/staging-next git tree for inclusion in 3.5? Arnd & Olof, is it ok
-for you? Do you want to add your Acked-by on some patches?
-
-Thanks, best regards,
 -- 
-Nicolas Ferre
+Intel Open Source Technology Centre
+http://oss.intel.com/
