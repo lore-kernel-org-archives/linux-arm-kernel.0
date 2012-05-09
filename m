@@ -1,69 +1,78 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 9 May 2012 14:13:35 +0300
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <20120507000329.GB14559@gmail.com>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
- <20120507000329.GB14559@gmail.com>
-Message-ID: <20120509111335.GC20304@tbergstrom-lnx.Nvidia.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 9 May 2012 16:43:42 +0530
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+Message-ID: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 02:03:29AM +0200, Mike Turquette wrote:
-> On 20120503-19:13, Peter De Schrijver wrote:
-> > Hi,
-> > 
-> > I started looking into what would be needed to move our tegra30 clock code
-> > to the common clock framework. The tegra30 clocktree is rather flat. Basically
-> > there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
-> > and peripheral clocks which have a mux (with 4 or more inputs), a divider and
-> > a gate. So almost every peripheral clock can have multiple parents.
-> > 
-> > Some questions:
-> > 
-> > 1) should these peripheral clocks be modelled as 3 different clocks
-> >    (mux -> divider -> gate) or would it be better to make a new clock type for
-> >    this?
-> > 
-> 
-> That is really for you to decide.  If the semantics of the existing mux,
-> divider and gate in drivers/clk/clk-*.c work well for you then I think
-> the answer is "yes".  There is infrastructure for register-access
-> locking in those common types which might help your complex clocks.
-> 
-> Thanks to the parent rate propagation stuff in clk_set_rate it should be
-> possible for your drivers to only be aware of the gate and call
-> clk_set_rate on only that clock, which propagates up to the divider and,
-> if necessary, again propagates up to the mux.
-> 
-> I encourage you to try that first.  But if you find the semantics of
-> those basic clock types aren't cutting it for you then you must create a
-> type which is platform-specific.
-> 
-> > 2) how to define the default parent? in many cases the hw reset value isn't
-> >    a very sensible choice, so the kernel probably needs to set a parent of
-> >    many of them if we don't want to rely on bootloader configuration.
-> 
-> The only related thing handled at the framework level is _discovery_ of
-> the parent during clock registration/initialization.  If you don't trust
-> the bootloader and want to set things up as soon as possible (a wise
-> move) then I suggest you do so from your platform clock code at the same
-> time that you register your clocks with the framework.  Something like:
-> 
-> 	struct clk *c;
-> 	c = clk_register(...);
-> 	if (IS_ERR(c))
-> 		omg_fail();
-> 	clk_set_parent(c, b);
-> 
-> Where 'b' is a parent of 'c'.  Register your clock tree top-down and you
-> can re-parent as you go.
+Hi Arnd,Olof,
 
-Ok. Thanks. One more question. We have some clocks with special features
-such as request lines for clock outputs, delays for clocks recovered from
-an external source or several divisors which are used based on the state
-of the module which is served by the clock (eg. an idle divisor and an active
-divisor). How should these be modelled?
+This is rebased over a (merge of Mike's/clk-next & SPEAr's DT) + Russell's
+patch: CLKDEV: provide helpers for common clock framework rebased over them.
 
-Thanks,
+Other pull requests will be rebased over this one.
 
-Peter.
+The following changes since commit 82d8f4b7ea3ebaf7f6dfe2cd8a25045d9ff95d5b:
+
+  CLKDEV: provide helpers for common clock framework (2012-05-09 14:43:39 +0530)
+
+are available in the git repository at:
+
+  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-clk
+
+for you to fetch changes up to df8e37e5972dd4ea2a4a0e5dbfdab14b00e98b70:
+
+  SPEAr: Switch to common clock framework (2012-05-09 14:44:57 +0530)
+
+----------------------------------------------------------------
+Viresh Kumar (6):
+      SPEAr: clk: Add VCO-PLL Synthesizer clock
+      SPEAr: clk: Add Auxiliary Synthesizer clock
+      SPEAr: clk: Add Fractional Synthesizer clock
+      SPEAr: clk: Add General Purpose Timer Synthesizer clock
+      SPEAr: Call clk_prepare() before calling clk_enable
+      SPEAr: Switch to common clock framework
+
+ MAINTAINERS                                     |    4 +-
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-spear3xx/Makefile                 |    2 +-
+ arch/arm/mach-spear3xx/clock.c                  |  892 --------------------
+ arch/arm/mach-spear3xx/include/mach/generic.h   |    4 +-
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear3xx/include/mach/spear.h     |   13 +
+ arch/arm/mach-spear3xx/spear300.c               |    1 -
+ arch/arm/mach-spear3xx/spear310.c               |    1 -
+ arch/arm/mach-spear3xx/spear320.c               |   12 +-
+ arch/arm/mach-spear3xx/spear3xx.c               |    2 +
+ arch/arm/mach-spear6xx/Makefile                 |    2 +-
+ arch/arm/mach-spear6xx/clock.c                  |  789 ------------------
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h |    2 +
+ arch/arm/mach-spear6xx/spear6xx.c               |    5 +-
+ arch/arm/plat-spear/Makefile                    |    2 +-
+ arch/arm/plat-spear/clock.c                     | 1005 -----------------------
+ arch/arm/plat-spear/include/plat/clock.h        |  249 ------
+ arch/arm/plat-spear/time.c                      |    8 +-
+ drivers/clk/Makefile                            |    3 +
+ drivers/clk/spear/Makefile                      |    8 +
+ drivers/clk/spear/clk-aux-synth.c               |  198 +++++
+ drivers/clk/spear/clk-frac-synth.c              |  165 ++++
+ drivers/clk/spear/clk-gpt-synth.c               |  154 ++++
+ drivers/clk/spear/clk-vco-pll.c                 |  363 ++++++++
+ drivers/clk/spear/clk.c                         |   36 +
+ drivers/clk/spear/clk.h                         |  134 +++
+ drivers/clk/spear/spear3xx_clock.c              |  612 ++++++++++++++
+ drivers/clk/spear/spear6xx_clock.c              |  342 ++++++++
+ 29 files changed, 2056 insertions(+), 2955 deletions(-)
+ delete mode 100644 arch/arm/mach-spear3xx/clock.c
+ delete mode 100644 arch/arm/mach-spear6xx/clock.c
+ delete mode 100644 arch/arm/plat-spear/clock.c
+ delete mode 100644 arch/arm/plat-spear/include/plat/clock.h
+ create mode 100644 drivers/clk/spear/Makefile
+ create mode 100644 drivers/clk/spear/clk-aux-synth.c
+ create mode 100644 drivers/clk/spear/clk-frac-synth.c
+ create mode 100644 drivers/clk/spear/clk-gpt-synth.c
+ create mode 100644 drivers/clk/spear/clk-vco-pll.c
+ create mode 100644 drivers/clk/spear/clk.c
+ create mode 100644 drivers/clk/spear/clk.h
+ create mode 100644 drivers/clk/spear/spear3xx_clock.c
+ create mode 100644 drivers/clk/spear/spear6xx_clock.c
