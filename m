@@ -1,42 +1,37 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 9 May 2012 03:29:17 +0000
-Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201205031527.16149.marex@denx.de>
-References: <1335837363-12376-1-git-send-email-marex@denx.de>
- <201205011555.48430.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B874F8@039-SN2MPN1-022.039d.mgd.msft.net>
- <201205031527.16149.marex@denx.de>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B91EFD@039-SN2MPN1-022.039d.mgd.msft.net>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Wed, 09 May 2012 14:33:21 +0900
+Subject: [PATCH 1/5] video: exynos mipi dsi: enable interrupt again after sw
+ reset
+Message-ID: <4FAA01A1.8090707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> > > Still use IRQF_SHARED for the usb interrupt, but:
-> > > * The IRQ handler in ehci-mxs, that's set in hc_driver.irq would be
-> > > always
-> > > returning IRQ_NONE.
-> > > * The IRQ handler in imx-otg would call the callback registered via
-> > > imx_otg_set_irq_handler() only if the port was actually in host mode
-> >
-> > The interrupt which is registered by hcd core is usb_hcd_irq, it will
-> call
-> > ehci_irq. The hc_driver.irq is included in usb_hcd_irq.
-> 
-> Hm, that's correct. I'll dive in and see if there's any other way around.
-> I
-> think I saw IRQF_DISABLED somewhere there, but that might be just some
-> phantom.
-> Either way, is this direction I'm taking the correct one (have irq
-> handler in
-> imx-otg and send IRQs to gadget/host drivers from there)?
-> 
-Sorry for late as I can't see this email at my inbox.
-If you can handle hcd irq well, I think it is correct direction. 
+I resend this patch by including this series.
+You can refer the original patch by below url.
+http://marc.info/?l=linux-fbdev&m=133610770329570&w=2
 
+When exynos_mipi_update_cfg() is called, mipi dsi registers were become
+sw reset. So, It needs to enable interrupt again.
 
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/exynos/exynos_mipi_dsi.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+index 557091d..49c7351 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi.c
++++ b/drivers/video/exynos/exynos_mipi_dsi.c
+@@ -102,6 +102,8 @@ static void exynos_mipi_update_cfg(struct mipi_dsim_device *dsim)
+ 	/* set display timing. */
+ 	exynos_mipi_dsi_set_display_mode(dsim, dsim->dsim_config);
  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
++	exynos_mipi_dsi_init_interrupt(dsim);
++
+ 	/*
+ 	 * data from Display controller(FIMD) is transferred in video mode
+ 	 * but in case of command mode, all settigs is updated to registers.
+-- 
+1.7.4.1
