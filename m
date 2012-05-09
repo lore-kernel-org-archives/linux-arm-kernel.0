@@ -1,57 +1,117 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 May 2012 21:44:00 +0900
-Subject: [PATCH v2 0/4] ARM: S3C24XX: move some code from plat to mach
- directory
-In-Reply-To: <201205082034.50658.heiko@sntech.de>
-References: <201205082034.50658.heiko@sntech.de>
-Message-ID: <01af01cd2de1$6812da90$38388fb0$%kim@samsung.com>
+Date: Wed, 09 May 2012 21:44:32 +0900
+Subject: [PATCH v2 06/33] ARM: S3C24XX: dev-uart: Use common macro to
+ define resources
+In-Reply-To: <201205082040.20900.heiko@sntech.de>
+References: <1335327163-11794-1-git-send-email-tushar.behera@linaro.org>
+ <1335327163-11794-7-git-send-email-tushar.behera@linaro.org>
+ <201205082040.20900.heiko@sntech.de>
+Message-ID: <01b001cd2de1$7b32a2e0$7197e8a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-> Again the series of small moves of common code from the plat-s3c24xx to
-> the
-> mach-s3c24xx directory.
+> From: Tushar Behera <tushar.behera@linaro.org>
 > 
-> This time without the wrong handled irq.c . Hopefully I'll get time to do
-> it
-> properly later.
+> CC: Ben Dooks <ben-linux@fluff.org>
+> CC: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v1: update the patch to apply against the moved dev-uart
+> devices
+> As this patch does not touch anything else apart from the uart devices it
+> could
+> also be applied on top of the movement patches directly
 > 
-> As the dev-uart.c move breaks the resource patch by Tushar Behera, I
-> updated
-> the patch to fix the correct code and will submit it as a v2 to the
-> resource
-> series.
+>  arch/arm/mach-s3c24xx/common.c |   56
++++++++++++-------------------------
+> ---
+>  1 files changed, 16 insertions(+), 40 deletions(-)
 > 
-> Heiko Stuebner (4):
->   ARM: S3C24XX: move plat-s3c24xx/cpu.c
->   ARM: S3C24XX: move plat-s3c24xx/dev-uart.c into common.c
->   ARM: S3C24XX: move common power-management code to mach-s3c24xx
->   ARM: S3C24XX: move common clock init into common.c
+> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-
+> s3c24xx/common.c
+> index d42423a..56cdd34 100644
+> --- a/arch/arm/mach-s3c24xx/common.c
+> +++ b/arch/arm/mach-s3c24xx/common.c
+> @@ -241,55 +241,31 @@ void __init s3c24xx_init_io(struct map_desc
+> *mach_desc, int size)
+>  /* Serial port registrations */
 > 
->  arch/arm/mach-s3c24xx/Makefile                     |    6 +
->  .../{plat-s3c24xx/cpu.c => mach-s3c24xx/common.c}  |   93
-> ++++++++++++++++++-
->  arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c   |    0
->  arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c       |    0
->  arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S    |    0
->  arch/arm/plat-s3c24xx/Makefile                     |    6 -
->  arch/arm/plat-s3c24xx/clock.c                      |   59 ------------
->  arch/arm/plat-s3c24xx/dev-uart.c                   |  100 --------------------
->  8 files changed, 98 insertions(+), 166 deletions(-)
->  rename arch/arm/{plat-s3c24xx/cpu.c => mach-s3c24xx/common.c} (75%)
->  rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq-pm.c (100%)
->  rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/pm.c (100%)
->  rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/sleep.S (100%)
->  delete mode 100644 arch/arm/plat-s3c24xx/clock.c
->  delete mode 100644 arch/arm/plat-s3c24xx/dev-uart.c
+>  static struct resource s3c2410_uart0_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART0,
+> -		.end   = S3C2410_PA_UART0 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX0,
+> -		.end   = IRQ_S3CUART_ERR0,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART0, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX0, \
+> +			IRQ_S3CUART_ERR0 - IRQ_S3CUART_RX0 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
 > 
+>  static struct resource s3c2410_uart1_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART1,
+> -		.end   = S3C2410_PA_UART1 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX1,
+> -		.end   = IRQ_S3CUART_ERR1,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART1, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX1, \
+> +			IRQ_S3CUART_ERR1 - IRQ_S3CUART_RX1 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  static struct resource s3c2410_uart2_resource[] = {
+> -	[0] = {
+> -		.start = S3C2410_PA_UART2,
+> -		.end   = S3C2410_PA_UART2 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX2,
+> -		.end   = IRQ_S3CUART_ERR2,
+> -		.flags = IORESOURCE_IRQ,
+> -	}
+> +	[0] = DEFINE_RES_MEM(S3C2410_PA_UART2, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX2, \
+> +			IRQ_S3CUART_ERR2 - IRQ_S3CUART_RX2 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  static struct resource s3c2410_uart3_resource[] = {
+> -	[0] = {
+> -		.start = S3C2443_PA_UART3,
+> -		.end   = S3C2443_PA_UART3 + 0x3fff,
+> -		.flags = IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start = IRQ_S3CUART_RX3,
+> -		.end   = IRQ_S3CUART_ERR3,
+> -		.flags = IORESOURCE_IRQ,
+> -	},
+> +	[0] = DEFINE_RES_MEM(S3C2443_PA_UART3, SZ_16K),
+> +	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX3, \
+> +			IRQ_S3CUART_ERR3 - IRQ_S3CUART_RX3 + 1, \
+> +			NULL, IORESOURCE_IRQ)
+>  };
+> 
+>  struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
 > --
 > 1.7.5.4
 
-Thanks for your re-posting.
-Looks better. Will apply this series instead.
+OK, will apply.
 
 Thanks.
 
