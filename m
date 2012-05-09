@@ -1,135 +1,150 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 9 May 2012 16:45:08 -0500
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FAAC549.6010206@ti.com>
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <CAMQu2gxE2STYxUGinzstX6W8jyofH829A__NQBjwLqZd9cqy=w@mail.gmail.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com> <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com> <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com> <4FA45580.8070802@ti.com>
- <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com> <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
- <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com> <4FAAC549.6010206@ti.com>
-Message-ID: <4FAAE564.6040708@ti.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed,  9 May 2012 15:15:03 -0700
+Subject: [PATCH v4] ARM: OMAP: Cleanup Beagleboard DVI reset gpio
+In-Reply-To: <20120509163649.GN5088@atomide.com>
+References: <20120509163649.GN5088@atomide.com>
+Message-ID: <1336601703-27977-1-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This removes several boot warnings from board-omap3beagle.c:
 
-On 05/09/2012 02:28 PM, Jon Hunter wrote:
+ - gpio_request: gpio--22 (DVI reset) status -22
+ - Unable to get DVI reset GPIO
 
-[...]
+There is a combination of leftover code and revision confusion.
+Additionally, xM support is currently a hack.
 
->>>>> No hacking intended here, just getting the flags correct ;-)
->>>>>
->>>>> So let me start from the beginning ...
->>>>>
->>>>> 1. I agree that for the EMU CD that the valid HW states are HW_AUTO and
->>>>> SW_WKUP.
->>>>>
->>>>> 2. When the EMU CD is active (due to something like PMU), we want to
->>>>> keep the CD in the SW_WKUP state, otherwise we can automatically
->>>>> transition to idle and reset the IP (at least for omap4430).
->>>>
->>>>> 3. When the EMU CD is inactive, we want to keep the CD in the HW_AUTO
->>>>> state because SW_SLEEP is NOT supported.
->>>>>
->>>>> In the current code, we have the CLKDM_CAN_DISABLE_AUTO flag disabled
->>>>> and the CLKDM_CAN_ENABLE_AUTO flag enabled. If CLKDM_CAN_ENABLE_AUTO is
->>>>> set then the omap_pm_clkdms_setup() function will place the CD into
->>>>> HW_AUTO regardless of CLKDM_CAN_DISABLE_AUTO, and the next time the
->>>>> hwmod _enable() is called it is in the HW_AUTO state and so it is
->>>>> allowed to idle. This is not what we want. Do you agree?
->>>>>
->>>>> If I set CLKDM_CAN_DISABLE_AUTO flag and disable CLKDM_CAN_ENABLE_AUTO,
->>>>> then I do not have the above problem.
->>>>>
->>>>> To be honest, with you the more I look and test the code, the more
->>>>> confused I am by the definition of the CLKDM_CAN_HWSUP ...
->>>>>
->>>>> #define CLKDM_CAN_HWSUP	(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
->>>>>
->>>>> When I look at where these flags are used, I see that
->>>>> CLKDM_CAN_ENABLE_AUTO is used in clkdm_allow_idle and
->>>>> CLKDM_CAN_DISABLE_AUTO is used in clkdm_deny_idle. So this implies that ...
->>>>>
->>>>> CLKDM_CAN_ENABLE_AUTO = Supports HW_AUTO state when CD is active
->>>>> CLKDM_CAN_DISABLE_AUTO = Does NOT supports HW_AUTO state when CD is active
->>>>>
->>>>> Are the above the correct definitions?
->>>>
->>>> Not quite.
->>>>
->>>> These flags describe the capabilities as defined in CLKTRCTRL field of
->>>> the CLKSTCTRL register (e.g. CM_EMU_CLKSTCTRL)
->>>>
->>>> CLKDM_CAN_ENABLE_AUTO: IP supports HW_AUTO state (and it can be enabled)
->>>> CLKDM_CAN_DISABLE_AUTO: HW_AUTO feature can be disabled (a.k.a. NO_SLEEP)
->>>>
->>>> Note that in OMAP4, the latter called NO_SLEEP in the TRM, but in OMAP3
->>>> it's described as "The automatic hardware-supervised mode is disabled"
->>>
->>> Yeah, in fact this is the source of the current confusion for my point of view.
->>>
->>> We chat about that with Paul some time back.
->>>  
->>> EMU CD does support HW_AUTO and SW_WKUP, so it means that if you want to disable the AUTO mode you can use the SW_WKUP.
->>> Assuming that CLKDM_CAN_DISABLE_AUTO is equivalent to NO_SLEEP is thus not correct. In fact any state != HW_AUTO should be considered a non-automatic mode.
->>> So EMU does support CLKDM_CAN_ENABLE_AUTO, CLKDM_CAN_DISABLE_AUTO and CLKDM_CAN_FORCE_WAKEUP.
->>>
->>> But the way it is implemented does not really allow that, because disable hwsup imply setting state to OMAP34XX_CLKSTCTRL_DISABLE_AUTO.
->>>
->>> void omap4_cminst_clkdm_disable_hwsup(u8 part, s16 inst, u16 cdoffs)
->>> {
->>>         _clktrctrl_write(OMAP34XX_CLKSTCTRL_DISABLE_AUTO, part, inst, cdoffs);
->>> }
->>>
->>> So if we want to allow that, some code change are needed in order to set the clkdm mode to OMAP34XX_CLKSTCTRL_FORCE_WAKEUP if OMAP34XX_CLKSTCTRL_DISABLE_AUTO is not supported.
->>>
->>>> What is confusing to me is that the OMAP4 TRM doesn't list the NO_SLEEP
->>>> mode as supported by the EMU.   It seems to me that if the IP supports
->>>> HW_AUTO, it should be able to be enabled *and* disabled.
->>>
->>> No, not really, this is mostly OMAP3 legacy, and we do have plan to remove these useless modes going forward. We can effectively disable AUTO mode by going to FORCE_WAKEUP.
->>>
->>> - 0x0 NO_SLEEP A clock domain sleep transition is never initiated, irrespective of the hardware conditions.
->>> - 0x1 SW_SLEEP A software-forced sleep transition. The transition is initiated when the associated hardware conditions are satisfied
->>> - 0x2 SW_WKUP A software-forced clock domain wake-up transition is initiated, irrespective of the hardware conditions.
->>> - 0x3 HW_AUTO Hardware-controlled automatic sleep and wake-up transition is initiated by the PRCM module when the associated hardware conditions are satisfied
->>>
->>>
->>> On OMAP4, SW_SLEEP is equivalent to ENABLE_AUTO and 
->>> NO_SLEEP is equivalent to SW_WKUP. There are some slight differences inside the HW, but in term of functionality this is mostly equivalent.
->>>
->>>
->>> Bottom-line, if we fix the omap4_cminst_clkdm_disable_hwsup, we can consider that the EMU CD does support CLKDM_CAN_ENABLE_AUTO, CLKDM_CAN_DISABLE_AUTO and CLKDM_CAN_FORCE_WAKEUP, which is equivalent to CLKDM_CAN_HWSUP | CLKDM_CAN_FORCE_WAKEUP.
->>
->> Per our discussion and just to re-iterate here for OMAP4+ devices, we
->> should have ...
->>
->> CAN_DISABLE_AUTO 	--> SW_WKUP
->> CAN_ENABLE_AUTO		--> HW_AUTO
->> CAN_FORCE_WAKEUP	--> SW_WKUP
->> CAN_FORCE_SLEEP		--> HW_AUTO
->>
->> Hence, the NO_SLEEP and SW_SLEEP should not be used for OMAP4+ (per the
->> equivalents highlighted above). At least that is the current theory :-)
-> 
-> I realise now the the l4cfg CD does not support SW_WKUP and so I guess
-> we still need NO_SLEEP in that case. So that would break the above
-> mapping and we would have to handle it in software.
+For original Beagleboard this removes the double initialization of GPIO
+170, properly configures it as an output, and wraps the initialization
+in an if block so that xM does not attempt to request it.
 
-I have posted my latest series here [1] based upon that from Will [2]
-which attempts to fix the EMU CD based upon the inputs from this thread.
-It is working on my omap4460 panda. Hopefully Ming and/or Will can also
-test. I know that Ming is out this week but said he can test next week.
+For Beagleboard xM it removes reference to GPIO 129 which was part
+of rev A1 and A2 designs, but never functioned. It then properly assigns
+beagle_dvi_device.reset_gpio in beagle_twl_gpio_setup and removes the
+hack of initializing it high. Additionally, it uses
+gpio_set_value_cansleep since this GPIO is connected through i2c.
 
-Cheers
-Jon
+Unfortunately, there is no way to tell the difference between xM A2 and
+A3. However, GPIO 129 does not function on rev A1 and A2, and the TWL
+GPIO used on A3 and beyond is not used on rev A1 and A2, there are no
+problems created by this fix.
 
-[1] http://marc.info/?l=linux-omap&m=133659938028348&w=2
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/omap4
+v4
+ - Rebase onto git://gitorious.org/linux-omap-dss2/linux.git for-l-o-3.5
+ - Use dvi_pd_gpio instead of reset_gpio to match with new naming
+
+v3
+ - Change patch title to include 'ARM: OMAP:'
+ - Actually rename reset_gpio to dvi_reset_gpio
+
+v2
+ - Rename reset_gpio to dvi_reset_gpio to self document
+ - Use gpio_set_value_cansleep since TWL gpio can sleep
+ - Use gpio_is_valid instead of -EINVAL check
+
+Tested on Beagleboard-xM Rev C1 and Beagleboard Rev B4.
+
+Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |   28 ++++++++++++----------------
+ 1 file changed, 12 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 5a66e7e..2f4906e 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -81,13 +81,13 @@ static u8 omap3_beagle_version;
+ static struct {
+ 	int mmc1_gpio_wp;
+ 	int usb_pwr_level;
+-	int reset_gpio;
++	int dvi_pd_gpio;
+ 	int usr_button_gpio;
+ 	int mmc_caps;
+ } beagle_config = {
+ 	.mmc1_gpio_wp = -EINVAL,
+ 	.usb_pwr_level = GPIOF_OUT_INIT_LOW,
+-	.reset_gpio = 129,
++	.dvi_pd_gpio = -EINVAL,
+ 	.usr_button_gpio = 4,
+ 	.mmc_caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+ };
+@@ -126,21 +126,21 @@ static void __init omap3_beagle_init_rev(void)
+ 		printk(KERN_INFO "OMAP3 Beagle Rev: Ax/Bx\n");
+ 		omap3_beagle_version = OMAP3BEAGLE_BOARD_AXBX;
+ 		beagle_config.mmc1_gpio_wp = 29;
+-		beagle_config.reset_gpio = 170;
++		beagle_config.dvi_pd_gpio = 170;
+ 		beagle_config.usr_button_gpio = 7;
+ 		break;
+ 	case 6:
+ 		printk(KERN_INFO "OMAP3 Beagle Rev: C1/C2/C3\n");
+ 		omap3_beagle_version = OMAP3BEAGLE_BOARD_C1_3;
+ 		beagle_config.mmc1_gpio_wp = 23;
+-		beagle_config.reset_gpio = 170;
++		beagle_config.dvi_pd_gpio = 170;
+ 		beagle_config.usr_button_gpio = 7;
+ 		break;
+ 	case 5:
+ 		printk(KERN_INFO "OMAP3 Beagle Rev: C4\n");
+ 		omap3_beagle_version = OMAP3BEAGLE_BOARD_C4;
+ 		beagle_config.mmc1_gpio_wp = 23;
+-		beagle_config.reset_gpio = 170;
++		beagle_config.dvi_pd_gpio = 170;
+ 		beagle_config.usr_button_gpio = 7;
+ 		break;
+ 	case 0:
+@@ -273,11 +273,9 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 		if (r)
+ 			pr_err("%s: unable to configure nDVI_PWR_EN\n",
+ 				__func__);
+-		r = gpio_request_one(gpio + 2, GPIOF_OUT_INIT_HIGH,
+-				     "DVI_LDO_EN");
+-		if (r)
+-			pr_err("%s: unable to configure DVI_LDO_EN\n",
+-				__func__);
++
++		beagle_config.dvi_pd_gpio = gpio + 2;
++
+ 	} else {
+ 		/*
+ 		 * REVISIT: need ehci-omap hooks for external VBUS
+@@ -286,7 +284,7 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 		if (gpio_request_one(gpio + 1, GPIOF_IN, "EHCI_nOC"))
+ 			pr_err("%s: unable to configure EHCI_nOC\n", __func__);
+ 	}
+-	dvi_panel.power_down_gpio = beagle_config.reset_gpio;
++	dvi_panel.power_down_gpio = beagle_config.dvi_pd_gpio;
+ 
+ 	gpio_request_one(gpio + TWL4030_GPIO_MAX, beagle_config.usb_pwr_level,
+ 			"nEN_USB_PWR");
+@@ -498,7 +496,7 @@ static void __init omap3_beagle_init(void)
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 	omap3_beagle_init_rev();
+ 
+-	if (beagle_config.mmc1_gpio_wp != -EINVAL)
++	if (gpio_is_valid(beagle_config.mmc1_gpio_wp))
+ 		omap_mux_init_gpio(beagle_config.mmc1_gpio_wp, OMAP_PIN_INPUT);
+ 	mmc[0].caps = beagle_config.mmc_caps;
+ 	omap_hsmmc_init(mmc);
+@@ -509,15 +507,13 @@ static void __init omap3_beagle_init(void)
+ 
+ 	platform_add_devices(omap3_beagle_devices,
+ 			ARRAY_SIZE(omap3_beagle_devices));
++	if (gpio_is_valid(beagle_config.dvi_pd_gpio))
++		omap_mux_init_gpio(beagle_config.dvi_pd_gpio, OMAP_PIN_OUTPUT);
+ 	omap_display_init(&beagle_dss_data);
+ 	omap_serial_init();
+ 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
+ 				  mt46h32m32lf6_sdrc_params);
+ 
+-	omap_mux_init_gpio(170, OMAP_PIN_INPUT);
+-	/* REVISIT leave DVI powered down until it's needed ... */
+-	gpio_request_one(170, GPIOF_OUT_INIT_HIGH, "DVI_nPD");
+-
+ 	usb_musb_init(NULL);
+ 	usbhs_init(&usbhs_bdata);
+ 	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3beagle_nand_partitions,
+-- 
+1.7.10
