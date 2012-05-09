@@ -1,20 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 May 2012 13:48:30 +0000
-Subject: ARM: ux500: !CONFIG_OF build error drivers/gpio/gpio-nomadik.c
-In-Reply-To: <CACRpkdYa1PcLjOFemsE_LabYqyKhF+wfUCTCCsTpd0=2-gQZWg@mail.gmail.com>
-References: <201205071551.17327.arnd@arndb.de>
- <CACRpkdYa1PcLjOFemsE_LabYqyKhF+wfUCTCCsTpd0=2-gQZWg@mail.gmail.com>
-Message-ID: <201205091348.30765.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 09 May 2012 09:59:56 -0400 (EDT)
+Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
+In-Reply-To: <201205091345.34404.arnd@arndb.de>
+References: <20120509075407.5991.60556.sendpatchset@w520>
+ <201205091212.08239.arnd@arndb.de> <4FAA6DE6.3040001@arm.com>
+ <201205091345.34404.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2012, Linus Walleij wrote:
-> Sure! However I'm floating some patch moving gpio/gpio-nomadik.c to
-> pinctrl/pinctrl-nomadik.c so prepare to handle that merge conflict when
-> pulling that in.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, 9 May 2012, Arnd Bergmann wrote:
 
-In that case, would it be easier if you apply the patch on your branch?
+> FWIW, I would actually prefer merging the 'struct arm_soc_desc', 'struct
+> arm_soc_smp_init_ops' and 'struct arm_soc_smp_ops' structures into a
+> single 'struct smp_ops' for simplicity.
 
-	Arnd
+You can't easily validate correct usage of __init marked code from the 
+rest if everything is pulled in the same struct.  This is why I asked 
+they be split.
+
+
+Nicolas
