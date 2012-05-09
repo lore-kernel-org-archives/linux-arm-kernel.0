@@ -1,37 +1,87 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 09 May 2012 14:33:21 +0900
-Subject: [PATCH 1/5] video: exynos mipi dsi: enable interrupt again after sw
- reset
-Message-ID: <4FAA01A1.8090707@samsung.com>
+Date: Wed, 09 May 2012 14:33:28 +0900
+Subject: [PATCH 3/5] video: exynos mipi dsi: Avoid races in probe()
+Message-ID: <4FAA01A8.4010704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I resend this patch by including this series.
-You can refer the original patch by below url.
-http://marc.info/?l=linux-fbdev&m=133610770329570&w=2
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-When exynos_mipi_update_cfg() is called, mipi dsi registers were become
-sw reset. So, It needs to enable interrupt again.
+Make sure all resources are initialized before interrupt handler is
+registered. Pass full platform device name to request_irq() so it
+can be distinguished which device has requested an interrupt in cases
+there are multiple instances in the system.
 
+Also enable voltage regulators regardless of they have been enabled
+by bootloader or not, to make sure other drivers using same regulators
+don't disable them unexpectedly.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
 Signed-off-by: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/exynos/exynos_mipi_dsi.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/video/exynos/exynos_mipi_dsi.c |   26 ++++++++++++++------------
+ 1 files changed, 14 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index 557091d..49c7351 100644
+index e004f1d..3fcdbf9 100644
 --- a/drivers/video/exynos/exynos_mipi_dsi.c
 +++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -102,6 +102,8 @@ static void exynos_mipi_update_cfg(struct mipi_dsim_device *dsim)
- 	/* set display timing. */
- 	exynos_mipi_dsi_set_display_mode(dsim, dsim->dsim_config);
+@@ -415,27 +415,30 @@ static int exynos_mipi_dsi_probe(struct platform_device *pdev)
+ 		goto err_platform_get_irq;
+ 	}
  
-+	exynos_mipi_dsi_init_interrupt(dsim);
++	init_completion(&dsim_wr_comp);
++	init_completion(&dsim_rd_comp);
++	platform_set_drvdata(pdev, dsim);
 +
- 	/*
- 	 * data from Display controller(FIMD) is transferred in video mode
- 	 * but in case of command mode, all settigs is updated to registers.
+ 	ret = request_irq(dsim->irq, exynos_mipi_dsi_interrupt_handler,
+-			IRQF_SHARED, pdev->name, dsim);
++			IRQF_SHARED, dev_name(&pdev->dev), dsim);
+ 	if (ret != 0) {
+ 		dev_err(&pdev->dev, "failed to request dsim irq\n");
+ 		ret = -EINVAL;
+ 		goto err_bind;
+ 	}
+ 
+-	init_completion(&dsim_wr_comp);
+-	init_completion(&dsim_rd_comp);
+-
+-	/* enable interrupt */
++	/* enable interrupts */
+ 	exynos_mipi_dsi_init_interrupt(dsim);
+ 
+ 	/* initialize mipi-dsi client(lcd panel). */
+ 	if (dsim_ddi->dsim_lcd_drv && dsim_ddi->dsim_lcd_drv->probe)
+ 		dsim_ddi->dsim_lcd_drv->probe(dsim_ddi->dsim_lcd_dev);
+ 
+-	/* in case that mipi got enabled at bootloader. */
+-	if (dsim_pd->enabled)
+-		goto out;
++	/* in case mipi-dsi has been enabled by bootloader */
++	if (dsim_pd->enabled) {
++		exynos_mipi_regulator_enable(dsim);
++		goto done;
++	}
+ 
+ 	/* lcd panel power on. */
+ 	if (dsim_ddi->dsim_lcd_drv && dsim_ddi->dsim_lcd_drv->power_on)
+@@ -455,12 +458,11 @@ static int exynos_mipi_dsi_probe(struct platform_device *pdev)
+ 
+ 	dsim->suspended = false;
+ 
+-out:
++done:
+ 	platform_set_drvdata(pdev, dsim);
+ 
+-	dev_dbg(&pdev->dev, "mipi-dsi driver(%s mode) has been probed.\n",
+-		(dsim_config->e_interface == DSIM_COMMAND) ?
+-			"CPU" : "RGB");
++	dev_dbg(&pdev->dev, "%s() completed sucessfuly (%s mode)\n", __func__,
++		dsim_config->e_interface == DSIM_COMMAND ? "CPU" : "RGB");
+ 
+ 	return 0;
+ 
 -- 
 1.7.4.1
