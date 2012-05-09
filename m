@@ -1,84 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 May 2012 11:16:40 +0200
-Subject: [PATCH 2/6] dma: mxs-dma: let dma_is_apbh and apbh_is_old take
- parameter
-In-Reply-To: <1336554165.1540.172.camel@vkoul-udesk3>
-References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
- <201205091100.34314.marex@denx.de> <1336554165.1540.172.camel@vkoul-udesk3>
-Message-ID: <201205091116.41037.marex@denx.de>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 9 May 2012 10:19:55 +0200
+Subject: [linux-pm] [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage
+ Scaling)
+In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>	<87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
+ <87lil2jp2z.fsf@ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+Message-ID: <7F5F5AD1-DC14-4693-817E-ADCC9EFB3D3D@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Vinod Koul,
 
-> On Wed, 2012-05-09 at 11:00 +0200, Marek Vasut wrote:
-> > Dear Vinod Koul,
-> > 
-> > > On Mon, 2012-05-07 at 22:23 +0800, Shawn Guo wrote:
-> > > > Let macros dma_is_apbh and apbh_is_old take mxs_dma as parameter
-> > > > to make the code easy to read.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > ---
-> > > > 
-> > > >  drivers/dma/mxs-dma.c |   24 ++++++++++++------------
-> > > >  1 files changed, 12 insertions(+), 12 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> > > > index bd27818..e801fbf 100644
-> > > > --- a/drivers/dma/mxs-dma.c
-> > > > +++ b/drivers/dma/mxs-dma.c
-> > > > @@ -38,10 +38,10 @@
-> > > > 
-> > > >  #define MXS_DMA_APBH		0
-> > > >  #define MXS_DMA_APBX		1
-> > > > 
-> > > > -#define dma_is_apbh()		(mxs_dma->dev_id == MXS_DMA_APBH)
-> > > > +#define dma_is_apbh(mxs_dma)	(mxs_dma->dev_id == MXS_DMA_APBH)
-> > > > 
-> > > >  #define APBH_VERSION_LATEST	3
-> > > > 
-> > > > -#define apbh_is_old()		(mxs_dma->version < APBH_VERSION_LATEST)
-> > > > +#define apbh_is_old(mxs_dma)	(mxs_dma->version <
-> > > > APBH_VERSION_LATEST)
-> > > > 
-> > > >  #define HW_APBHX_CTRL0				0x000
-> > > >  #define BM_APBH_CTRL0_APB_BURST8_EN		(1 << 29)
-> > > > 
-> > > > @@ -54,10 +54,10 @@
-> > > > 
-> > > >  #define HW_APBH_VERSION				(cpu_is_mx23() ? 
-0x3f0 :
-> > 0x800)
-> > 
-> > > >  #define HW_APBX_VERSION				0x800
-> > > >  #define BP_APBHX_VERSION_MAJOR			24
-> > > > 
-> > > > -#define HW_APBHX_CHn_NXTCMDAR(n) \
-> > > > -	(((dma_is_apbh() && apbh_is_old()) ? 0x050 : 0x110) + (n) * 
-0x70)
-> > > > -#define HW_APBHX_CHn_SEMA(n) \
-> > > > -	(((dma_is_apbh() && apbh_is_old()) ? 0x080 : 0x140) + (n) * 
-0x70)
-> > > > +#define HW_APBHX_CHn_NXTCMDAR(d, n) \
-> > > > +	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 
-0x70)
-> > > > +#define HW_APBHX_CHn_SEMA(d, n) \
-> > > > +	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 
-0x70)
-> > > 
-> > > while at it, care to say what the above magic numbers mean. Isnt
-> > > terrible clear to me.
-> > 
-> > Check the email above ;-) I think simple comment would be enough here,
-> > but defining those would not hurt either.
+Op 9 mei 2012, om 02:39 heeft Woodruff, Richard het volgende geschreven:
+
+>> From: Hilman, Kevin
+>> Sent: Tuesday, May 08, 2012 5:17 PM
 > 
-> what does 050, 080... and other magic numbers here mean? Why is
-> everything getting multiplied by 0x70.
+>> A basic OMAP AVS driver has been in mainline for a long time, yet we
+>> have not seen support submitted for all of these features.
+> 
+> 1.5/3.5 is a feature.
+> 
+> ABB is requirement for a production useable driver. 
 
-Yep, I'm on the same boat with you. Check Shawn's reply to my mail, carrying the 
-same concern. Well ... Shawn, I guess now that we're two, you better make 
-another set of macros ;-)
+ABB/FBB is also needed for 1GHz support on omap3 based SoCs like AM37xx and DM37xx.
 
-Best regards,
-Marek Vasut
+regards,
+
+Koen
