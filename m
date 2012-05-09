@@ -1,34 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 14:07:41 +0200
-Subject: [RFC 4/5] pinctrl: SPEAr: Add gpio ranges support
-In-Reply-To: <CAOh2x=mG8nJ8QLOJYniysBw=vkNSaQ=m0XHAh0foU3A7ozpuqg@mail.gmail.com>
-References: <cover.1335526926.git.viresh.kumar@st.com>
- <4f7690c68b1fa5ef14b29b88fed50237e068fe4d.1335526926.git.viresh.kumar@st.com>
- <CACRpkdbhbESbQWX=5RC86X9Z+R767oijDB4myw=bSRay9ud-qQ@mail.gmail.com>
- <201205071528.48460.arnd@arndb.de>
- <CAOh2x=mG8nJ8QLOJYniysBw=vkNSaQ=m0XHAh0foU3A7ozpuqg@mail.gmail.com>
-Message-ID: <CACRpkdafExQGNBUq6XKivYYuyTtdcWY=Bt2XetFP=+xx2_T5hA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 12:30:11 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA94B49.5050500@wwwdotorg.org>
+ <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
+Message-ID: <201205091230.11474.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2012 at 5:58 PM, viresh kumar <viresh.linux@gmail.com> wrote:
-> On Mon, May 7, 2012 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday 08 May 2012, Jassi Brar wrote:
+> On 8 May 2012 22:05, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >
+> > The data doesn't need to be part of the DMA controller node in order for
+> > the DMA controller driver to be the entity interpreting it.
+> >
+> I rather say, if the dma controller driver is the entity going to interpret the
+> data, why not provide the data directly through its node at one go?
+> 
+> There is important difference between providing data via clients
+> during runtime vs providing info about every client to the dmac driver
+> at one go during its probe.
 
->> but open-coding is generally ok too. Note that you can sometimes save a lot
->> of lines if you don't first define all those constants as macros but
->> treat a table like this as the place where you put the raw numbers
->> from the data sheet, if that the only code location in which they are
->> used.
->
-> Hmm. Will try to do something better.
+IMHO the important aspect is what that data contains. The dma engine
+device node should only describe what that device looks like in hardware,
+but not how it is being used.  If you have two machines that have the
+same dma engine, but different devices attached to it, the only
+difference in the device tree ought to be in those devices, not in the
+parts that are common.
+> >> That encoding("channel_id") would be dma
+> >> controller specific and if we also manage to contain it within fixed number
+> >> of bytes we could also have common helpers for fetching it,
+> >
+> > I don't think there's any need for it to fit into a fixed number of  bytes
+> >
+> Yeah, I realized that soon after posting.
+> 
+> I think I have run out of ways to explain myself better. FWIW, I won't
+> object to whatever mechanism folks decide after knowing my concerns.
 
-No big deal, you can keep the table as long as I don't get Torvalds backfire
-on me for introducing too many lines of code. I'm a bit sensitive about that
-but it's not like it's super-important.
+I think we should try hard to make it possible to describe your hardware
+correctly, but we don't need to optimize the syntax for that case if that
+means making the common case more complex. I'd rather make the common
+case simple and the exception possible using some extension.
 
-I've come to accept the fact that pin controller have many lines of code,
-since they bascially contain the tables that other platforms put in BIOS
-firmware, and these systems typically don't have BIOS:es so...
-
-Thanks,
-Linus Walleij
+	Arnd
