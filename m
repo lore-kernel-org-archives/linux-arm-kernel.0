@@ -1,38 +1,38 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 9 May 2012 08:36:17 +0000
-Subject: [PATCH 0/3] ARM: OMAP2+: Kconfig: minor cleanup for SOC names
-In-Reply-To: <1336514576-4870-1-git-send-email-khilman@ti.com>
-References: <1336514576-4870-1-git-send-email-khilman@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1BEA1@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 May 2012 10:42:53 +0200
+Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <4FA4C5EA.7030006@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-2-git-send-email-lee.jones@linaro.org>
+ <201205042002.20943.arnd@arndb.de> <4FA4C5EA.7030006@linaro.org>
+Message-ID: <CACRpkda6EvO5O+C86HUefEde3+9FEg2aLFUixr_yaiYXtPjmuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 03:32:53, Hilman, Kevin wrote:
-> The CONFIG_SOC_* names for do not need an OMAP in the name since
-> these are not called OMAP in most places.  Drop the OMAP in the Kconfig
-> names to improve readability.
-> 
-> Also fixes an obvious bug found in the TI81xx code which suggests that
-> nobody is using the highest 32 interrupts on these SoCs, or nobody
-> is using mainline for TI81xx.
-> 
-> Kevin Hilman (3):
->   ARM: OMAP2+: INTC: fix Kconfig option for TI81XX
->   ARM: OMAP2+: Kconfig: convert SOC_OMAPTI81XX to SOC_TI81XX
->   ARM: OMAP2+: Kconfig: convert SOC_OMAPAM33XX to SOC_AM33XX
-> 
->  arch/arm/mach-omap2/Kconfig  |    8 ++++----
->  arch/arm/mach-omap2/common.h |    4 ++--
->  arch/arm/mach-omap2/io.c     |    8 ++++----
->  arch/arm/mach-omap2/irq.c    |    2 +-
->  4 files changed, 11 insertions(+), 11 deletions(-)
-> 
+On Sat, May 5, 2012 at 8:17 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Thanks Kevin, this is much needed change. Now it looks straight definitions.
+> I haven't tested it yet (it builds with no warnings/errors, but I
+> haven't booted it), as I don't have my board immediately to hand,
+> but does this kind of thing better suit what you're looking for?
+>
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 17 Apr 2012 16:04:13 +0100
+> Subject: [PATCH 01/15] i2c/busses: Add Device Tree support to the Nomadik I2C
+> ?driver
+>
+> Here we move the i2c-nomadik's default settings into the driver
+> rather than specifying them from platform code. At the time of
+> this writing we only have one user, the u8500. As new users are
+> added, it is expected that they will be Device Tree compliant.
+> If this is the case, we will look up their initialisation values
+> by compatible entry, then apply them forthwith.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Also, I will rebase my patches future patches on top of this.
+Make sure you test it first though.
 
-Thanks,
-Vaibhav
+Yours,
+Linus Walleij
