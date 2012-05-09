@@ -1,72 +1,59 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 09 May 2012 14:33:29 +0900
-Subject: [PATCH 4/5] video: exynos mipi dsi: Properly interpret the interrupt
- source flags
-Message-ID: <4FAA01A9.4070908@samsung.com>
+Date: Wed, 09 May 2012 14:33:31 +0900
+Subject: [PATCH 5/5] video: exynos mipi dsi: support reverse panel type
+Message-ID: <4FAA01AB.2080804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch adds panel_reverse variable to support reversed s6e8ax0 panel
+type.
 
-Rework the interrupt handler so the RX_DONE, FIFO_EMPTY interrupts are
-properly detected. This prevents missing the interrupts when there are
-other bits set in the INTSRC register than just RX_DONE and FIFO_EMPTY.
-
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
 Signed-off-by: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/exynos/exynos_mipi_dsi_common.c |   28 +++++++++----------------
- 1 files changed, 10 insertions(+), 18 deletions(-)
+ drivers/video/exynos/s6e8ax0.c   |   15 +++++++++++++--
+ include/video/exynos_mipi_dsim.h |    1 +
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c b/drivers/video/exynos/exynos_mipi_dsi_common.c
-index 14909c1..b78d448 100644
---- a/drivers/video/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
-@@ -76,33 +76,25 @@ static unsigned int dpll_table[15] = {
+diff --git a/drivers/video/exynos/s6e8ax0.c b/drivers/video/exynos/s6e8ax0.c
+index 4aa9ac6..05d080b 100644
+--- a/drivers/video/exynos/s6e8ax0.c
++++ b/drivers/video/exynos/s6e8ax0.c
+@@ -293,9 +293,20 @@ static void s6e8ax0_panel_cond(struct s6e8ax0 *lcd)
+ 		0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08, 0x23, 0x23, 0xc0,
+ 		0xc8, 0x08, 0x48, 0xc1, 0x00, 0xc1, 0xff, 0xff, 0xc8
+ 	};
++	static const unsigned char data_to_send_panel_reverse[] = {
++		0xf8, 0x19, 0x35, 0x00, 0x00, 0x00, 0x93, 0x00, 0x3c, 0x7d,
++		0x08, 0x27, 0x7d, 0x3f, 0x00, 0x00, 0x00, 0x20, 0x04, 0x08,
++		0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08, 0x23, 0x23, 0xc0,
++		0xc1, 0x01, 0x41, 0xc1, 0x00, 0xc1, 0xf6, 0xf6, 0xc1
++	};
  
- irqreturn_t exynos_mipi_dsi_interrupt_handler(int irq, void *dev_id)
- {
--	unsigned int intsrc = 0;
--	unsigned int intmsk = 0;
--	struct mipi_dsim_device *dsim = NULL;
--
--	dsim = dev_id;
--	if (!dsim) {
--		dev_dbg(dsim->dev, KERN_ERR "%s:error: wrong parameter\n",
--							__func__);
--		return IRQ_HANDLED;
-+	struct mipi_dsim_device *dsim = dev_id;
-+	unsigned int intsrc, intmsk;
-+
-+	if (dsim == NULL) {
-+		dev_err(dsim->dev, "%s: wrong parameter\n", __func__);
-+		return IRQ_NONE;
- 	}
+-	ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
+-		data_to_send, ARRAY_SIZE(data_to_send));
++	if (lcd->dsim_dev->panel_reverse)
++		ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
++				data_to_send_panel_reverse,
++				ARRAY_SIZE(data_to_send_panel_reverse));
++	else
++		ops->cmd_write(lcd_to_master(lcd), MIPI_DSI_DCS_LONG_WRITE,
++				data_to_send, ARRAY_SIZE(data_to_send));
+ }
  
- 	intsrc = exynos_mipi_dsi_read_interrupt(dsim);
- 	intmsk = exynos_mipi_dsi_read_interrupt_mask(dsim);
-+	intmsk = ~intmsk & intsrc;
+ static void s6e8ax0_display_cond(struct s6e8ax0 *lcd)
+diff --git a/include/video/exynos_mipi_dsim.h b/include/video/exynos_mipi_dsim.h
+index 772c770..83ce5e6 100644
+--- a/include/video/exynos_mipi_dsim.h
++++ b/include/video/exynos_mipi_dsim.h
+@@ -315,6 +315,7 @@ struct mipi_dsim_lcd_device {
+ 	int			id;
+ 	int			bus_id;
+ 	int			irq;
++	int			panel_reverse;
  
--	intmsk = ~(intmsk) & intsrc;
--
--	switch (intmsk) {
--	case INTMSK_RX_DONE:
-+	if (intsrc & INTMSK_RX_DONE) {
- 		complete(&dsim_rd_comp);
- 		dev_dbg(dsim->dev, "MIPI INTMSK_RX_DONE\n");
--		break;
--	case INTMSK_FIFO_EMPTY:
-+	}
-+	if (intsrc & INTMSK_FIFO_EMPTY) {
- 		complete(&dsim_wr_comp);
- 		dev_dbg(dsim->dev, "MIPI INTMSK_FIFO_EMPTY\n");
--		break;
--	default:
--		break;
- 	}
- 
- 	exynos_mipi_dsi_clear_interrupt(dsim, intmsk);
+ 	struct mipi_dsim_device *master;
+ 	void			*platform_data;
 -- 
 1.7.4.1
