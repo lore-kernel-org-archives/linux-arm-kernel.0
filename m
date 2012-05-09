@@ -1,66 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 May 2012 15:02:07 +0200
-Subject: [PATCH 8/9] ARM: AT91: Add ADC driver to the at91sam9x5 dtsi
-In-Reply-To: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336568528-29877-9-git-send-email-maxime.ripard@free-electrons.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Wed, 09 May 2012 14:04:44 +0100
+Subject: [PATCH 1/9] ARM: AT91: Add platform data for the AT91 ADCs
+In-Reply-To: <1336554366-16957-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1336554366-16957-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4FAA6B6C.5080406@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9x5.dtsi |   38 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index dd4ed74..6b3ef43 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -190,6 +190,44 @@
- 				interrupts = <27 4>;
- 				status = "disabled";
- 			};
-+
-+			adc0: adc at f804c000 {
-+				compatible = "atmel,at91sam9260-adc";
-+				reg = <0xf804c000 0x100>;
-+				interrupts = <19 4>;
-+				atmel,adc-use-external;
-+				atmel,adc-channels-used = <0xffff>;
-+				atmel,adc-vref = <3300>;
-+				atmel,adc-num-channels = <12>;
-+				atmel,adc-startup-time = <40>;
-+				atmel,adc-channel-base = <0x50>;
-+				atmel,adc-drdy-mask = <0x1000000>;
-+				atmel,adc-status-register = <0x30>;
-+				atmel,adc-trigger-register = <0xc0>;
-+
-+				trigger at 0 {
-+					trigger-name = "external-rising";
-+					trigger-value = <0x1>;
-+					trigger-external;
-+				};
-+
-+				trigger at 1 {
-+					trigger-name = "external-falling";
-+					trigger-value = <0x2>;
-+					trigger-external;
-+				};
-+
-+				trigger at 2 {
-+					trigger-name = "external-any";
-+					trigger-value = <0x3>;
-+					trigger-external;
-+				};
-+
-+				trigger at 3 {
-+					trigger-name = "continuous";
-+					trigger-value = <0x6>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+On 5/9/2012 10:05 AM, Maxime Ripard wrote:
+> The AT91 SoCs often embeds an ADC. This patch adds the needed
+> platform data to specify the informations required by the driver
+> to work properly.
+>
+> For now, we only need the reference voltage and which channels
+> are available on the board.
+One utterly trivial element inline.
+> Signed-off-by: Maxime Ripard<maxime.ripard@free-electrons.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+>   include/linux/platform_data/at91_adc.h |   61 ++++++++++++++++++++++++++++++++
+>   1 file changed, 61 insertions(+)
+>   create mode 100644 include/linux/platform_data/at91_adc.h
+>
+> diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+> new file mode 100644
+> index 0000000..f9e2f00
+> --- /dev/null
+> +++ b/include/linux/platform_data/at91_adc.h
+> @@ -0,0 +1,61 @@
+> +/*
+> + * Copyright (C) 2011 Free Electrons
+> + *
+> + * Licensed under the GPLv2 or later.
+> + */
+> +
+> +#ifndef _AT91_ADC_H_
+> +#define _AT91_ADC_H_
+> +
+> +/**
+> + * struct at91_adc_reg_desc - Various informations relative to registers
+> + * @channel_base:	Base address for the channel data registers
+> + * @drdy_mask:		Mask of the DRDY field in the relevant registers
+> +			(Interruptions registers mostly)
+> + * @status_register:	Address of the Interrupt Status Register
+> + * @trigger_register:	Address of the Trigger setup register
+> + */
+> +struct at91_adc_reg_desc {
+> +	u8	channel_base;
+> +	u32	drdy_mask;
+> +	u8	status_register;
+> +	u8	trigger_register;
+> +};
+> +
+> +/**
+> + * struct at91_adc_trigger - description of triggers
+> + * @name:		name of the trigger advertised to the user
+> + * @value:		value to set in the ADC's mode register to enable
+> +			the trigger
+> + * @is_external:	is the trigger relies on an external pin ?
+no space before the ? (nitpick of the day ;)
+> + */
+> +struct at91_adc_trigger {
+> +	const char	*name;
+> +	u8		value;
+> +	bool		is_external;
+> +};
+> +
+> +/**
+> + * struct at91_adc_data - platform data for ADC driver
+> + * @channels_used:		channels in use on the board as a bitmask
+> + * @num_channels:		global number of channels available on the board
+> + * @registers:			Registers definition on the board
+> + * @startup_time:		startup time of the ADC in microseconds
+> + * @trigger_list:		Triggers available in the ADC
+> + * @trigger_number:		Number of triggers available in the ADC
+> + * @use_external_triggers:	does the board has external triggers availables
+> + * @vref:			Reference voltage for the ADC in millivolts
+> + */
+> +struct at91_adc_data {
+> +	unsigned long			channels_used;
+> +	u8				num_channels;
+> +	struct at91_adc_reg_desc	*registers;
+> +	u8				startup_time;
+> +	struct at91_adc_trigger		*trigger_list;
+> +	u8				trigger_number;
+> +	bool				use_external_triggers;
+> +	u16				vref;
+> +};
+> +
+> +extern void __init at91_add_device_adc(struct at91_adc_data *data);
+> +#endif
