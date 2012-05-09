@@ -1,19 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 May 2012 11:05:57 +0200
-Subject: [PATCHv3] Add ADC driver for Atmel G20, G45 and X5 boards
-Message-ID: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 May 2012 10:46:53 +0200
+Subject: [PATCH 02/15] ARM: ux500: Remove unused i2c platform_data
+ initialisation code
+In-Reply-To: <1336155805-18554-3-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Here is another version of the patches to bring ADC driver to Atmel boards.
-Since last version, here is what changed:
-  * Rebased on top of staging-next to move out of staging. Had to change to IIO
-    kfifo buffer along the way.
-  * Reworked the DT bindings according to Jean-Christophe reviews
-  * Made various fixes according to reviews
-  * Support for X5 boards
+> Now that u5500 is obsolete, u8500 is the only user of the Nomadik
+> i2c driver.
 
-Thanks,
-Maxime
+Well actually arch/arm/mach-nomadik has this block too,
+but it's not making use of it right now, so why not.
+
+> As such there is no requirement to differentiate between
+> initialisation values. By the time a new SoC is released, almost all
+> of the ux500 platform will be DT:ed, so we can make decisions based
+> on the compatible property instead.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+So why not copy the contents of arch/arm/plat-nomadik/include/plat/i2c.h
+into drivers/i2c/busses/i2c-nomadik.c and delete that header from
+plat at the same time?
+
+Then there sure is no way for platforms to sneak in any platform
+data any other way.
+
+Yours,
+Linus Walleij
