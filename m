@@ -1,46 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 May 2012 10:57:28 +0100
-Subject: [PATCH] Prevent process migration during vfp_init()
-In-Reply-To: <20120509092650.GR26481@n2100.arm.linux.org.uk>
-References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
- <20120508111332.GG2263@mudshark.cambridge.arm.com>
- <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
- <20120508180430.GL2263@mudshark.cambridge.arm.com>
- <20120509092650.GR26481@n2100.arm.linux.org.uk>
-Message-ID: <20120509095727.GA7779@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 09 May 2012 11:28:49 +0100
+Subject: [PATCH 11/15] drivers/mfd: Enable Device Tree for ab8500-core
+ driver
+In-Reply-To: <CACRpkdaju5y6pduWrkH97LujzqJu5hAaGozyHY3Rsvvn7ZyKhA@mail.gmail.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-12-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaju5y6pduWrkH97LujzqJu5hAaGozyHY3Rsvvn7ZyKhA@mail.gmail.com>
+Message-ID: <4FAA46E1.4050708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 10:26:50AM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 08, 2012 at 07:04:30PM +0100, Will Deacon wrote:
-> > It seems happy enough on my quad A9 running a bunch of paranoia FP tests --
-> > do you have a particular testcase which was exhibiting this failure when you
-> > reported the issue?
-> 
-> It's pointless doing FP tests for this level of change - the code you're
-> modifying is only run at startup to enable access to VFP.  If you can
-> execute a single VFP instruction in userspace on each CPU, then your test
-> has passed.  Further VFP instructions do not gain you any additional test
-> coverage.
+On 09/05/12 10:02, Linus Walleij wrote:
+> On Fri, May 4, 2012 at 8:23 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> This patch will allow the ab8500-core driver to be probed and set up
+>> when booting when Device Tree is enabled. This includes platform ID
+>> look-up which identifies the machine it is currently running on. If
+>> we are undergoing a DT enabled boot, we will refuse to setup each of
+>> the other ab8500-* devices, as they will be probed individually by DT.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> (...)
+>> +       else if (np)
+>> +               ret = of_property_read_u32(np, "stericsson,irq-base",&ab8500->irq_base);
+>> +
+>> +       if (ab8500->irq_base == 0) {
+>
+> Shouldn't this be (av8500->irq_base == NO_IRQ) now that we're tranisitioning to
+> use 0 as NO_IRQ?
 
-Agreed -- I ran the tests to ensure that we did execute user VFP instructions
-on each CPU since I'm not sure how VFPified my basic userspace is.
+Sure, why not.
 
-> The only comment I have is whether that BUG_ON(preemptible()) - preferably
-> WARN_ON() - should be inside get_copro_access() itself, in a similar way
-> to smp_processor_id().
+> Apart from that it looks good to me:
+> Acked-by: Linus Walleij<linus.walleij@linaro.org>
 
-I guess the BUG vs WARN debate comes down to what the consequences are of
-continuing if we are preemptible. In the latter case, don't we leave
-ourselves open to kernel exceptions if we try to migrate a VFP-using thread
-onto a CPU without the co-processor permissions set correctly? From a
-debugging point-of-view, the BUG_ON might then be more informative. Why do
-you prefer WARN for this?
 
-We could move the BUG/WARN into get_copro_access, although it will likely be
-used as a pair with set_copro_access so really we want the preempt check to
-be across the two calls.
-
-Cheers,
-
-Will
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
