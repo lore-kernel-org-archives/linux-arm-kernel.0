@@ -1,31 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 May 2012 20:03:09 +0800
-Subject: [PATCH V2 06/11] ASoC: fsl_ssi: convert to use devm_clk_get
-In-Reply-To: <CAAQ0ZWSiRysfkUnu2ZoDXFtiJz-nfrQ-DTKOgCpKpCe5LpQj3Q@mail.gmail.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-7-git-send-email-richard.zhao@freescale.com>
- <20120509115041.GM3955@opensource.wolfsonmicro.com>
- <CAAQ0ZWSiRysfkUnu2ZoDXFtiJz-nfrQ-DTKOgCpKpCe5LpQj3Q@mail.gmail.com>
-Message-ID: <CAAQ0ZWT4nqA8k=xTHcBvW5d7_KnbiLU73adfWv3_PVvG0YXknQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 May 2012 14:07:41 +0200
+Subject: [RFC 4/5] pinctrl: SPEAr: Add gpio ranges support
+In-Reply-To: <CAOh2x=mG8nJ8QLOJYniysBw=vkNSaQ=m0XHAh0foU3A7ozpuqg@mail.gmail.com>
+References: <cover.1335526926.git.viresh.kumar@st.com>
+ <4f7690c68b1fa5ef14b29b88fed50237e068fe4d.1335526926.git.viresh.kumar@st.com>
+ <CACRpkdbhbESbQWX=5RC86X9Z+R767oijDB4myw=bSRay9ud-qQ@mail.gmail.com>
+ <201205071528.48460.arnd@arndb.de>
+ <CAOh2x=mG8nJ8QLOJYniysBw=vkNSaQ=m0XHAh0foU3A7ozpuqg@mail.gmail.com>
+Message-ID: <CACRpkdafExQGNBUq6XKivYYuyTtdcWY=Bt2XetFP=+xx2_T5hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 May 2012 19:59, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 9 May 2012 19:50, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
->> On Wed, May 09, 2012 at 07:33:05PM +0800, Richard Zhao wrote:
->>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->>
->> I'll apply this when devm_clk_get() makes it into mainline (hopefully in
->> the merge window); please remind me if I forget.
->
-> We will have rmk's clkdev branch appear on arm-soc as dependency
-> anyway. ?Can we have this series go over arm-soc tree, since we will
-> have all the dependencies on clk and pinctrl meet and conflicts solved
-> there?
->
-Ah, I just realized that the prerequisite patches on fsl_ssi.c have
-already applied on sound tree, so yes, we have to wait for the next
-merge window then.
+On Mon, May 7, 2012 at 5:58 PM, viresh kumar <viresh.linux@gmail.com> wrote:
+> On Mon, May 7, 2012 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Regards,
-Shawn
+>> but open-coding is generally ok too. Note that you can sometimes save a lot
+>> of lines if you don't first define all those constants as macros but
+>> treat a table like this as the place where you put the raw numbers
+>> from the data sheet, if that the only code location in which they are
+>> used.
+>
+> Hmm. Will try to do something better.
+
+No big deal, you can keep the table as long as I don't get Torvalds backfire
+on me for introducing too many lines of code. I'm a bit sensitive about that
+but it's not like it's super-important.
+
+I've come to accept the fact that pin controller have many lines of code,
+since they bascially contain the tables that other platforms put in BIOS
+firmware, and these systems typically don't have BIOS:es so...
+
+Thanks,
+Linus Walleij
