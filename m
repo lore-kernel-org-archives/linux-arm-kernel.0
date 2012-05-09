@@ -1,47 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 May 2012 12:30:11 +0000
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA94B49.5050500@wwwdotorg.org>
- <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
-Message-ID: <201205091230.11474.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 May 2012 21:37:28 +0900
+Subject: [PATCH] ARM: EXYNOS: fix the hotplug for Cortex-A15
+Message-ID: <01a301cd2de0$7ebaada0$7c3008e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 May 2012, Jassi Brar wrote:
-> On 8 May 2012 22:05, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >
-> > The data doesn't need to be part of the DMA controller node in order for
-> > the DMA controller driver to be the entity interpreting it.
-> >
-> I rather say, if the dma controller driver is the entity going to interpret the
-> data, why not provide the data directly through its node at one go?
-> 
-> There is important difference between providing data via clients
-> during runtime vs providing info about every client to the dmac driver
-> at one go during its probe.
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-IMHO the important aspect is what that data contains. The dma engine
-device node should only describe what that device looks like in hardware,
-but not how it is being used.  If you have two machines that have the
-same dma engine, but different devices attached to it, the only
-difference in the device tree ought to be in those devices, not in the
-parts that are common.
-> >> That encoding("channel_id") would be dma
-> >> controller specific and if we also manage to contain it within fixed number
-> >> of bytes we could also have common helpers for fetching it,
-> >
-> > I don't think there's any need for it to fit into a fixed number of  bytes
-> >
-> Yeah, I realized that soon after posting.
-> 
-> I think I have run out of ways to explain myself better. FWIW, I won't
-> object to whatever mechanism folks decide after knowing my concerns.
+The sequence of cpu_enter_lowpower() for Cortex-A15
+is different from the sequence for Cortex-A9.
+This patch implements cpu_enter_lowpower() for EXYNOS5
+SoC which has Cortex-A15 cores.
 
-I think we should try hard to make it possible to describe your hardware
-correctly, but we don't need to optimize the syntax for that case if that
-means making the common case more complex. I'd rather make the common
-case simple and the exception possible using some extension.
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Note, I didn't see common code for fix of hotplug for Cortex-A15.
+If any regarding patch, please kindly let me know, thanks.
 
-	Arnd
+ arch/arm/mach-exynos/hotplug.c |   39 +++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 9c17a0a..2a444b1 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -21,9 +21,11 @@
+ 
+ #include <mach/regs-pmu.h>
+ 
++#include <plat/cpu.h>
++
+ extern volatile int pen_release;
+ 
+-static inline void cpu_enter_lowpower(void)
++static inline void cpu_enter_lowpower_a9(void)
+ {
+ 	unsigned int v;
+ 
+@@ -45,6 +47,35 @@ static inline void cpu_enter_lowpower(void)
+ 	  : "cc");
+ }
+ 
++static inline void cpu_enter_lowpower_a15(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C)
++	  : "cc");
++
++	flush_cache_all();
++
++	asm volatile(
++	/*
++	* Turn off coherency
++	*/
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	: "=&r" (v)
++	: "Ir" (0x40)
++	: "cc");
++
++	isb();
++	dsb();
++}
++
+ static inline void cpu_leave_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -112,7 +143,11 @@ void platform_cpu_die(unsigned int cpu)
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+-	cpu_enter_lowpower();
++	if (soc_is_exynos5250())
++		cpu_enter_lowpower_a15();
++	else
++		cpu_enter_lowpower_a9();
++
+ 	platform_do_lowpower(cpu, &spurious);
+ 
+ 	/*
+-- 
+1.7.1
