@@ -1,57 +1,42 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 9 May 2012 16:45:36 +0530
-Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
-Message-ID: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 09 May 2012 11:23:49 +0100
+Subject: [PATCH 04/15] ARM: ux500: CONFIG: Compile in support for leds-gpio
+In-Reply-To: <CACRpkdbv780oUaDL1-m4kj5iRr5=1U6QhE975Z4gNADoTNk8YA@mail.gmail.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbv780oUaDL1-m4kj5iRr5=1U6QhE975Z4gNADoTNk8YA@mail.gmail.com>
+Message-ID: <4FAA45B5.2030000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,Olof,
+On 09/05/12 09:49, Linus Walleij wrote:
+> On Fri, May 4, 2012 at 8:23 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> Code exists in the mop500 board file (used for HREF and
+>> Snowball) to initialise Snowball's user LED via the
+>> leds-gpio driver. However, the driver isn't currently
+>> built when using the default configuration file. This
+>> patch aims to change that behavior.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> (...)
+>> +CONFIG_LEDS_GPIO=y
+>>   CONFIG_RTC_CLASS=y
+>>   CONFIG_RTC_DRV_AB8500=y
+>>   CONFIG_RTC_DRV_PL031=y
+>
+> Why not just edit arch/arm/mach-ux500/Kconfig like this:
+>
+> config MACH_SNOWBALL
+>          bool "U8500 Snowball platform"
+>          select MACH_MOP500
+> +        select LEDS_GPIO
 
-This have few more dependencies:
-- ARM: 7376/1: clkdev: Implement managed clk_get()
-- pinctrl branch from Linus
+I can do that. Is it not useful for any of the other platforms?
 
-The following changes since commit 880702fb50ec63a832aaeafcb251295f3c6ce722:
-
-  SPEAr: Update defconfigs (2012-05-09 14:53:53 +0530)
-
-are available in the git repository at:
-
-  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-pinctrl-update
-
-for you to fetch changes up to a8f048037fb467b39ac1aeb15361a2c8366d8a2d:
-
-  SPEAr: Add plgpio node in device tree dtsi files (2012-05-09 14:55:55 +0530)
-
-----------------------------------------------------------------
-Viresh Kumar (6):
-      gpiolib: Add of_get_gpio_chip_by_phandle() helper
-      pinctrl: SPEAr: Don't set all non muxreg bits on pinctrl_disable
-      pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
-      pinctrl: SPEAr: Add plgpio driver
-      pinctrl: SPEAr: Add gpio ranges support
-      SPEAr: Add plgpio node in device tree dtsi files
-
- arch/arm/boot/dts/spear1310-evb.dts       |    4 +
- arch/arm/boot/dts/spear1310.dtsi          |   22 +
- arch/arm/boot/dts/spear1340-evb.dts       |    4 +
- arch/arm/boot/dts/spear1340.dtsi          |   21 +
- arch/arm/boot/dts/spear310-evb.dts        |    4 +
- arch/arm/boot/dts/spear310.dtsi           |   15 +
- arch/arm/boot/dts/spear320-evb.dts        |    4 +
- arch/arm/boot/dts/spear320.dtsi           |   16 +
- drivers/of/gpio.c                         |   32 ++
- drivers/pinctrl/spear/Kconfig             |   11 +
- drivers/pinctrl/spear/Makefile            |    1 +
- drivers/pinctrl/spear/pinctrl-plgpio.c    |  738 +++++++++++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear.c     |  110 ++++-
- drivers/pinctrl/spear/pinctrl-spear.h     |   26 +
- drivers/pinctrl/spear/pinctrl-spear1310.c |  182 +++++++-
- drivers/pinctrl/spear/pinctrl-spear1340.c |    8 +
- drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear3xx.c  |   29 ++
- include/linux/of_gpio.h                   |    9 +-
- 21 files changed, 1228 insertions(+), 14 deletions(-)
- create mode 100644 drivers/pinctrl/spear/pinctrl-plgpio.c
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
