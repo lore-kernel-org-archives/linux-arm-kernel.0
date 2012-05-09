@@ -1,56 +1,132 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 11:44:16 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: Kconfig: convert SOC_OMAPAM33XX to
- SOC_AM33XX
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1C30C@DBDE01.ent.ti.com>
-References: <1336514576-4870-1-git-send-email-khilman@ti.com>
- <1336514576-4870-4-git-send-email-khilman@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1C30C@DBDE01.ent.ti.com>
-Message-ID: <20120509184415.GT5088@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 9 May 2012 19:47:09 +0100
+Subject: [PATCH 2/2] regulator: Add support for MAX77686.
+In-Reply-To: <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
+References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
+ <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
+Message-ID: <20120509184709.GC32037@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120509 04:25]:
-> On Wed, May 09, 2012 at 03:32:56, Hilman, Kevin wrote:
-> > No need to have an OMAP prefix on these SoCs that are in the family
-> > but arent' really called OMAP.
-> > 
-> > Simple rename: CONFIG_SOC_OMAPAM33XX --> CONFIG_SOC_AM33XX
-> > 
-> > No functional change.
-> > 
-> > Signed-off-by: Kevin Hilman <khilman@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/Kconfig  |    2 +-
-> >  arch/arm/mach-omap2/common.h |    2 +-
-> >  arch/arm/mach-omap2/io.c     |    4 ++--
-> >  3 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> 
-> Missed one place to change, Can you merge the below diff?
+On Wed, May 09, 2012 at 09:54:55PM +0530, Yadwinder Singh wrote:
 
-Thanks I'll apply the first one into fixes-non-critical and the
-others into devel-soc branch. Will update with your change too.
+> +/* Voltage maps in mV */
+> +static const struct voltage_map_desc ldo_voltage_map_desc = {
+> +	.min = 800,	.max = 3950,	.step = 50,	.n_bits = 6,
+> +};				/* LDO3 ~ 5, 9 ~ 14, 16 ~ 26 */
 
-Regards,
+Hrm, funnily enough I was just thinking about factoring this stuff out
+into the core after a conversation with Graeme Gregory the other week.
+Let's do that...
 
-Tony
+> +	[MAX77686_EN32KHZ_AP] = NULL,
+> +	[MAX77686_EN32KHZ_CP] = NULL,
 
- 
-> diff --git a/drivers/net/ethernet/ti/Kconfig b/drivers/net/ethernet/ti/Kconfig
-> index b42252c..1b173a6 100644
-> --- a/drivers/net/ethernet/ti/Kconfig
-> +++ b/drivers/net/ethernet/ti/Kconfig
-> @@ -51,7 +51,7 @@ config TI_DAVINCI_CPDMA
-> 
->  config TI_CPSW
->         tristate "TI CPSW Switch Support"
-> -       depends on ARM && (ARCH_DAVINCI || SOC_OMAPAM33XX)
-> +       depends on ARM && (ARCH_DAVINCI || SOC_AM33XX)
->         select TI_DAVINCI_CPDMA
->         select TI_DAVINCI_MDIO
->         ---help---
-> 
-> 
-> Thanks,
-> Vaibhav
+Now that the generic clock API is in mainline these should be moved over
+to use it.
+
+> +static int max77686_get_voltage_unit(int rid)
+> +{
+> +	int unit = 0;
+> +
+> +	switch (rid) {
+> +	case MAX77686_BUCK2...MAX77686_BUCK4:
+> +		unit = 1;	/* BUCK2,3,4 is uV */
+> +		break;
+> +	default:
+> +		unit = 1000;
+
+Why not just list everything in uV?
+
+> +static int max77686_get_voltage(struct regulator_dev *rdev)
+> +{
+
+Implement get_voltage_sel().
+
+> +static inline int max77686_get_voltage_proper_val(const struct voltage_map_desc
+> +						  *desc, int min_vol,
+> +						  int max_vol)
+> +{
+> +	int i = 0;
+> +
+> +	if (desc == NULL)
+> +		return -EINVAL;
+> +
+> +	if (max_vol < desc->min || min_vol > desc->max)
+> +		return -EINVAL;
+> +
+> +	while (desc->min + desc->step * i < min_vol &&
+> +	       desc->min + desc->step * i < desc->max)
+> +		i++;
+
+Why are you iterating here?  Calculate!  Though like I say let's factor
+this out anyway.
+
+> +	if (rid == MAX77686_BUCK2 || rid == MAX77686_BUCK3 ||
+> +	    rid == MAX77686_BUCK4) {
+> +		/* If the voltage is increasing */
+> +		if (org < i)
+> +			udelay(DIV_ROUND_UP(desc->step * (i - org),
+> +					    ramp[max77686->ramp_delay]));
+> +	}
+
+Don't do this, implement set_voltage_time_sel().
+
+> +	.enable = max77686_reg_enable,
+> +	.disable = max77686_reg_disable,
+> +	.set_suspend_enable = max77686_reg_enable,
+> +	.set_suspend_disable = max77686_reg_disable,
+
+You've got the same ops for suspend and non-suspend cases here, this is
+clearly buggy.
+
+> +/* count the number of regulators to be supported in pmic */
+> +	pdata->num_regulators = 0;
+
+Coding style.
+
+> +	if (iodev->dev->of_node) {
+> +		ret = max77686_pmic_dt_parse_pdata(iodev, pdata);
+> +		if (ret)
+> +			return ret;
+
+This ought to use of_regulator_match().
+
+> +	}
+> +
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "platform data not found\n");
+> +		return -ENODEV;
+> +	}
+
+This should be totally fine.
+
+> +	max77686 = kzalloc(sizeof(struct max77686_data), GFP_KERNEL);
+> +	if (!max77686)
+> +		return -ENOMEM;
+
+devm_kzalloc().
+
+> +	if (pdata->ramp_delay) {
+> +		max77686->ramp_delay = pdata->ramp_delay;
+> +		max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
+> +			RAMP_VALUE, RAMP_MASK);
+
+This appears not to actually use the value passed in as platform_data.
+
+> +
+> +	for (i = 0; i < pdata->num_regulators; i++) {
+> +		const struct voltage_map_desc *desc;
+> +		int id = pdata->regulators[i].id;
+> +
+> +		desc = reg_voltage_map[id];
+> +		if (desc)
+> +			regulators[id].n_voltages =
+> +			    (desc->max - desc->min) / desc->step + 1;
+> +
+> +		rdev[i] = regulator_register(&regulators[id], max77686->dev,
+> +					     pdata->regulators[i].initdata,
+> +					     max77686, NULL);
+
+No, you should unconditionally register all regulators the device
+physically has.  This is useful for debug and simplifies the code.
