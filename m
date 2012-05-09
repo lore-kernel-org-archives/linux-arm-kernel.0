@@ -1,25 +1,43 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 9 May 2012 13:13:35 +0300
-Subject: [GIT PULL] ARM: OMAP3+: PRM/hwmod: fix and improve I/O chain
- wakeup support
-In-Reply-To: <20120420165508.GD21106@atomide.com>
-References: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
- <1334910066.2149.33.camel@sokoban>  <20120420165508.GD21106@atomide.com>
-Message-ID: <1336558415.2149.274.camel@sokoban>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 09 May 2012 11:22:46 +0100
+Subject: [PATCH 02/15] ARM: ux500: Remove unused i2c platform_data
+ initialisation code
+In-Reply-To: <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
+Message-ID: <4FAA4576.1020106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-04-20 at 09:55 -0700, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [120420 01:24]:
-> > Hi,
-> > 
-> > What happened with this pull request? It doesn't seem to be in 3.4 at
-> > least.
-> 
-> There was a boot issue on omap3 evm and that branch got dropped.
-> Will merge it again after Paul has figured out the issue.
+On 09/05/12 09:46, Linus Walleij wrote:
+> On Fri, May 4, 2012 at 8:23 PM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> Now that u5500 is obsolete, u8500 is the only user of the Nomadik
+>> i2c driver.
+>
+> Well actually arch/arm/mach-nomadik has this block too,
+> but it's not making use of it right now, so why not.
+>
+>> As such there is no requirement to differentiate between
+>> initialisation values. By the time a new SoC is released, almost all
+>> of the ux500 platform will be DT:ed, so we can make decisions based
+>> on the compatible property instead.
+>>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+>
+> So why not copy the contents of arch/arm/plat-nomadik/include/plat/i2c.h
+> into drivers/i2c/busses/i2c-nomadik.c and delete that header from
+> plat at the same time?
+>
+> Then there sure is no way for platforms to sneak in any platform
+> data any other way.
 
-Paul / Tony, do you want me to re-send the set for this with the OMAP3
-EVM related fix? This was figured out in a separate email chain.
+I have no problem in doing that. Can I submit a separate patch?
 
--Tero
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
