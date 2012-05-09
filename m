@@ -1,67 +1,204 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 08 May 2012 17:41:37 -0700
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
- <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
- <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
- <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
- <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
-Message-ID: <4FA9BD41.2090701@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 May 2012 18:46:34 -0600 (MDT)
+Subject: [PATCH 5/7] ARM: OMAP2: Use hwmod to initialize mmc for 2420
+In-Reply-To: <20120424000835.17783.50945.stgit@muffinssi.local>
+References: <20120424000607.17783.81686.stgit@muffinssi.local>
+ <20120424000835.17783.50945.stgit@muffinssi.local>
+Message-ID: <alpine.DEB.2.00.1205081844530.28088@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2012 10:15 AM, Turquette, Mike wrote:
-> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>  wrote:
->> Hi Mike,
->> Could you please explain more details about how to implement a
->> re-parenting operation as part of it's .set_rate implementation?
->
-> Sure.
->
->> As far as I know, we can not call clk_set_parent in .set_rate function
->> directly, since clk_set_rate and clk_set_parent are using the same
->> prepare_lock.
->
-> That is correct.
->
->> Any other interface can be used to implement it?
->
-> You have two options available to you.
->
-> 1) __clk_reparent can be used from your .set_rate callback today to
-> reflect changes made to the tree topology.  OMAP uses this in our PLL
-> .set_rate implementation: depending on the re-lock frequency the PLL
-> may switch parents dynamically.  __clk_reparent does the
-> framework-level cleanup needed for this (that function is also used
-> when populating the clock tree with new clock nodes).
->
-> 2) __clk_set_parent could be made non-static if you needed this (I've
-> been meaning to talk to Saravana about this since I think MSM needs
-> something like this).
+Hi Tony
 
-Thanks!
+On Mon, 23 Apr 2012, Tony Lindgren wrote:
 
-I don't think I need (2). But I don't think I can use (1) as is either. 
-I can use (1) with some additional code in my set rate op.
+> This allows us to pass dma request lines in platform data to
+> MMC driver the same way as we already do for omap2430 and later.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-While set rate is in progress, both the parents might need to stay 
-enabled for a short duration. So, in my internal set rate, I need to 
-check if my clock is prepared/enabled and call prepare/enable on the 
-"old parent", call __clk_reparent (which will reduce the ref count for 
-the old parents and increase it for the new parents), finish the 
-reparent in HW and then unprepare/disable the old parent if I have 
-prepared/enabled them earlier.
+This might save you some time, I updated this patch to move the device 
+creation code to arch/arm/mach-omap2/msdi.c and to change the hwmod name 
+to 'msdi1' to conform with the new data.  Updated patch below.
 
-It might be beneficial to provide something like a 
-__clk_reparent_start(new_parent, *scratch_pointer) and 
-__clk_reparent_finish(*scratch_pointer) if it will be useful for more 
-than just MSM. Based on this email, I would guess that Tegra would want 
-something similar too.
 
-Thanks,
-Saravana
+- Paul
 
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 23 Apr 2012 17:08:35 -0700
+Subject: [PATCH] ARM: OMAP2: Use hwmod to initialize mmc for 2420
+
+This allows us to pass dma request lines in platform data to
+MMC driver the same way as we already do for omap2430 and later.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/devices.c |   59 -----------------------------------
+ arch/arm/mach-omap2/msdi.c    |   68 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+), 59 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index e433603..263a85f 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -27,7 +27,6 @@
+ 
+ #include "iomap.h"
+ #include <plat/board.h>
+-#include <plat/mmc.h>
+ #include <plat/dma.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/omap_device.h>
+@@ -574,64 +573,6 @@ static inline void omap_init_aes(void) { }
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
+-
+-static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
+-							*mmc_controller)
+-{
+-	if ((mmc_controller->slots[0].switch_pin > 0) && \
+-		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+-					OMAP_PIN_INPUT_PULLUP);
+-	if ((mmc_controller->slots[0].gpio_wp > 0) && \
+-		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+-		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+-					OMAP_PIN_INPUT_PULLUP);
+-
+-	omap_mux_init_signal("sdmmc_cmd", 0);
+-	omap_mux_init_signal("sdmmc_clki", 0);
+-	omap_mux_init_signal("sdmmc_clko", 0);
+-	omap_mux_init_signal("sdmmc_dat0", 0);
+-	omap_mux_init_signal("sdmmc_dat_dir0", 0);
+-	omap_mux_init_signal("sdmmc_cmd_dir", 0);
+-	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
+-		omap_mux_init_signal("sdmmc_dat1", 0);
+-		omap_mux_init_signal("sdmmc_dat2", 0);
+-		omap_mux_init_signal("sdmmc_dat3", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir1", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir2", 0);
+-		omap_mux_init_signal("sdmmc_dat_dir3", 0);
+-	}
+-
+-	/*
+-	 * Use internal loop-back in MMC/SDIO Module Input Clock
+-	 * selection
+-	 */
+-	if (mmc_controller->slots[0].internal_clock) {
+-		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
+-		v |= (1 << 24);
+-		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
+-	}
+-}
+-
+-void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+-{
+-	char *name = "mmci-omap";
+-
+-	if (!mmc_data[0]) {
+-		pr_err("%s fails: Incomplete platform data\n", __func__);
+-		return;
+-	}
+-
+-	omap242x_mmc_mux(mmc_data[0]);
+-	omap_mmc_add(name, 0, OMAP2_MMC1_BASE, OMAP2420_MMC_SIZE,
+-					INT_24XX_MMC_IRQ, mmc_data[0]);
+-}
+-
+-#endif
+-
+-/*-------------------------------------------------------------------------*/
+-
+ #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
+ #define OMAP_HDQ_BASE	0x480B2000
+ static struct resource omap_hdq_resources[] = {
+diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
+index ef2a692..d75839a 100644
+--- a/arch/arm/mach-omap2/msdi.c
++++ b/arch/arm/mach-omap2/msdi.c
+@@ -24,9 +24,11 @@
+ #include <linux/kernel.h>
+ 
+ #include <plat/omap_hwmod.h>
++#include <plat/omap_device.h>
+ #include <plat/mmc.h>
+ 
+ #include "common.h"
++#include "mux.h"
+ 
+ /*
+  * MSDI_CON_OFFSET: offset in bytes of the MSDI IP block's CON register
+@@ -86,3 +88,69 @@ int omap_msdi_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
++				    *mmc_controller)
++{
++	if ((mmc_controller->slots[0].switch_pin > 0) && \
++		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
++		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
++					OMAP_PIN_INPUT_PULLUP);
++	if ((mmc_controller->slots[0].gpio_wp > 0) && \
++		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
++		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
++					OMAP_PIN_INPUT_PULLUP);
++
++	omap_mux_init_signal("sdmmc_cmd", 0);
++	omap_mux_init_signal("sdmmc_clki", 0);
++	omap_mux_init_signal("sdmmc_clko", 0);
++	omap_mux_init_signal("sdmmc_dat0", 0);
++	omap_mux_init_signal("sdmmc_dat_dir0", 0);
++	omap_mux_init_signal("sdmmc_cmd_dir", 0);
++	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
++		omap_mux_init_signal("sdmmc_dat1", 0);
++		omap_mux_init_signal("sdmmc_dat2", 0);
++		omap_mux_init_signal("sdmmc_dat3", 0);
++		omap_mux_init_signal("sdmmc_dat_dir1", 0);
++		omap_mux_init_signal("sdmmc_dat_dir2", 0);
++		omap_mux_init_signal("sdmmc_dat_dir3", 0);
++	}
++
++	/*
++	 * Use internal loop-back in MMC/SDIO Module Input Clock
++	 * selection
++	 */
++	if (mmc_controller->slots[0].internal_clock) {
++		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
++		v |= (1 << 24);
++		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
++	}
++}
++
++void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
++{
++	struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	int id = 0;
++	char *oh_name = "msdi1";
++	char *dev_name = "mmci-omap";
++
++	if (!mmc_data[0]) {
++		pr_err("%s fails: Incomplete platform data\n", __func__);
++		return;
++	}
++
++	omap242x_mmc_mux(mmc_data[0]);
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh) {
++		pr_err("Could not look up %s\n", oh_name);
++		return;
++	}
++	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
++				 sizeof(struct omap_mmc_platform_data), NULL, 0, 0);
++	if (IS_ERR(pdev))
++		WARN(1, "Can'd build omap_device for %s:%s.\n",
++					dev_name, oh->name);
++}
++
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.10
