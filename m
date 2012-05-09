@@ -1,24 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 10:51:56 +0200
-Subject: [PATCH 07/15] drivers/power: Carry out platform_data error
- checking on ab8500 devices
-In-Reply-To: <1336155805-18554-8-git-send-email-lee.jones@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYkqj6Zr=05Byk+tPc1ohjfDoZKCkTmu9zcZpgKxV8wpg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 May 2012 09:24:53 +0200
+Subject: [PATCH 1/2] usb: fsl_mxc_udc.c: add workaround for ENGcm09152
+ for i.MX25
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B91ED2@039-SN2MPN1-022.039d.mgd.msft.net>
+References: <1336461510-30190-1-git-send-email-eric@eukrea.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803B91ED2@039-SN2MPN1-022.039d.mgd.msft.net>
+Message-ID: <20120509072453.GH27341@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, May 09, 2012 at 02:59:52AM +0000, Chen Peter-B29397 wrote:
+>  
+> > 
+> > this patch gives the possibility to workaround bug ENGcm09152
+> > on i.MX25 when the hardware workaround is also implemented on
+> > the board.
+> > It covers the workaround described on page 42 of the following Errata,
+> > titled "USB: UTMI_USBPHY VBUS input impedance implementation error" :
+> > http://cache.freescale.com/files/dsp/doc/errata/IMX25CE.pdf
+> > 
+> 
+> The two patches are ok, I am not sure if sascha is ok for these two
+> as there is cpu_is_xxx code although it is bug fix.
 
-> In their current state the ab8500 power devices explode if platform data
-> isn't provided. This patch prevents this from happening and informs the
-> user of what has happened.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I am ok with these patches. I think we should try hard and merge the
+drivers, but this shouldn't be a reason to block bug fixes.
 
-This or equivalent is already submitted and merged by Anton into the
-power tree I think?
+Sascha
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
