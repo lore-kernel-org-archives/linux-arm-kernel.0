@@ -1,51 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 13:49:25 -0700
+Date: Wed, 9 May 2012 13:50:09 -0700
 Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
  supports omap2+ padconf
-In-Reply-To: <4FAAD141.3090306@wwwdotorg.org>
-References: <20120503065131.GA3738@game.jcrosoft.org>
+In-Reply-To: <CACRpkdaCg7Ocy1wzdZt1x4VrnV1JrmHkLLwF4vV6GvMjXP3BjA@mail.gmail.com>
+References: <20120502172401.GG3739@atomide.com>
+ <20120503065131.GA3738@game.jcrosoft.org>
  <20120503152708.GC5140@atomide.com>
  <4FA30805.5050804@wwwdotorg.org>
  <20120504044305.GD7788@game.jcrosoft.org>
  <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org>
- <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org>
- <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org>
-Message-ID: <20120509204925.GV5088@atomide.com>
+ <CACRpkdaCg7Ocy1wzdZt1x4VrnV1JrmHkLLwF4vV6GvMjXP3BjA@mail.gmail.com>
+Message-ID: <20120509205009.GW5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [120509 13:22]:
-> On 05/04/2012 04:08 PM, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@wwwdotorg.org> [120504 11:59]:
-> >> On 05/04/2012 10:34 AM, Tony Lindgren wrote:
-> >>> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
-> >>>> On 08:03 Fri 04 May     , Tony Lindgren wrote:
-> >>>>>>
-> >>>>>> so I was thinking to do like on gpio
-> >>>>>>
-> >>>>>> uart {
-> >>>>>> 	pin = < &pioA 12 {pararms} >
-> >>>>>>
-> >>>>>> }
-> >>>>>
-> >>>>> Hmm I assume the "12" above the gpio number?
-> >>>> no pin number in the bank because it could not be gpio
-> >>>
-> >>> Yes OK, but pin number 12 in the gpio bank, not in the mux register.
-> >>> Got it.
-> >>
-> >> I'd prefer to avoid any references to GPIOs here; not all muxable pins
-> >> are GPIOs and not all GPIOs are muxable pins. Lets keep the two concepts
-> >> independent.
-> > 
-> > And it seems that &pioA 12 is not always enough information for the pinctrl
-> > driver to request a GPIO. So it's best to specify it separately.
+* Linus Walleij <linus.walleij@linaro.org> [120509 02:13]:
+> On Fri, May 4, 2012 at 5:03 PM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> Why would a pinctrl driver "request a GPIO"?
+> > Also I think we should let the pinctrl
+> > core eventually manage the pins more too. Right now the pins are
+> > a static array in the driver, which makes things unnecessarily
+> > complex for the DT case. It would be nice to also have something like
+> > pinctrl_register/unregister_pin instead of requiring them all
+> > be registered while registering with the framework initially.
+> 
+> Not instead of but in addition to :-)
+> 
+> One does not exclude the other. But a good general idea if you need
+> this, just introduce it.
 
-Hmm what would pinctrl_request_gpio do if the GPIO driver is separate driver?
+Sure agreed it does not exclude the other. Will take a look when
+I have a chance.
 
 Tony
