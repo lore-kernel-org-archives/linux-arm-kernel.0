@@ -1,129 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 May 2012 10:02:14 +0200
-Subject: [PATCH v3 2/3] ARM: imx: Add imx5 cpuidle driver
-In-Reply-To: <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
-References: <1336425407-20308-1-git-send-email-rob.lee@linaro.org>
- <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
-Message-ID: <20120509080214.GJ27341@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 9 May 2012 13:33:54 +0530
+Subject: [PATCH 07/10] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
+In-Reply-To: <1336514694-22393-8-git-send-email-thomas.abraham@linaro.org>
+References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+ <1336514694-22393-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CABb+yY0Yu3Em+oU5+xjzBpxLaTrZ34Gxh4TK0-ra_z23RNBdJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2012 at 04:16:46PM -0500, Robert Lee wrote:
-> Add imx5 cpuidle driver.
-> 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
->  arch/arm/mach-imx/mm-imx5.c |   42 +++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 39 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-> index d6b7e9f..0b3a4cc 100644
-> --- a/arch/arm/mach-imx/mm-imx5.c
-> +++ b/arch/arm/mach-imx/mm-imx5.c
-> @@ -20,26 +20,61 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/common.h>
-> +#include <mach/cpuidle.h>
->  #include <mach/devices-common.h>
->  #include <mach/iomux-v3.h>
->  
->  static struct clk *gpc_dvfs_clk;
->  
-> -static void imx5_idle(void)
-> +static int imx5_idle(void)
->  {
-> +	int ret = 0;
-> +
->  	/* gpc clock is needed for SRPG */
->  	if (gpc_dvfs_clk == NULL) {
->  		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
-
-This clk_get should go away here and be moved somewhere to
-initialization. Also, if getting this clock fails we can still
-do regular cpu_do_idle. Additionally, if clk_get fails, we'll
-have a ERR_PTR value in gpc_dvfs_clk in which case the
-gpc_dvfs_clk == NULL won't trigger next time you are here and
-then you'll enable a nonexisting clock below.
-
->  		if (IS_ERR(gpc_dvfs_clk))
-> -			return;
-> +			return -ENODEV;
->  	}
->  	clk_enable(gpc_dvfs_clk);
->  	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
->  	if (!tzic_enable_wake())
->  		cpu_do_idle();
-> +	else
-> +		ret = -EBUSY;
->  	clk_disable(gpc_dvfs_clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int imx5_cpuidle_enter(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv, int idx)
-> +{
-> +	int ret;
-> +
-> +	ret = imx5_idle();
-> +
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return idx;
->  }
->  
-> +static struct cpuidle_driver imx5_cpuidle_driver = {
-> +	.name			= "imx5_cpuidle",
-> +	.owner			= THIS_MODULE,
-> +	.en_core_tk_irqen	= 1,
-> +	.states[0]	= {
-> +		.enter			= imx5_cpuidle_enter,
-> +		.exit_latency		= 20, /* max latency at 160MHz */
-> +		.target_residency	= 1,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +		.name			= "IMX5 SRPG",
-> +		.desc			= "CPU state retained,powered off",
-> +	},
-
-I wonder why you don't add the default ARM_CPUIDLE_WFI_STATE_PWR state.
-The above is something different, right? It has a greater exit latency
-than ARM_CPUIDLE_WFI_STATE_PWR, so why don't we add it here aswell?
-
-> +	.state_count		= 1,
-> +};
-> +
->  /*
->   * Define the MX50 memory map.
->   */
-> @@ -103,7 +138,7 @@ void __init imx51_init_early(void)
->  	mxc_set_cpu_type(MXC_CPU_MX51);
->  	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
->  	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
-> -	arm_pm_idle = imx5_idle;
-> +	arm_pm_idle = (void (*)(void))imx5_idle;
-
-Still this looks suspicious. Reading this will lead to the question why
-this prototype is casted. Please just add a imx5_pm_idle with the
-correct prototype.
-
->  }
->  
->  void __init imx53_init_early(void)
-> @@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
->  void __init imx51_init_late(void)
->  {
->  	mx51_neon_fixup();
-> +	imx_cpuidle_init(&imx5_cpuidle_driver);
->  }
-> -- 
-> 1.7.10
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On Wed, May 9, 2012 at 3:34 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+>
+> The set_level callback in the controller data, which is used to configure
+> the slave select line, cannot be supported when migrating the driver to
+> device tree based discovery. Since all the platforms currently use gpio
+> as the slave select line, this callback can be removed from the
+> controller data and replaced with call to gpio_set_value in the driver.
+>
+This patch is ok.
+Separately, you might also want to see if we really need the air-tight
+protection of spin_lock_irqsave around enable_cs - IIRC someone
+had a CS coming out of an gpio extender connected over I2C
