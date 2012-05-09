@@ -1,23 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 11:11:25 +0200
-Subject: [PATCH 1/3] ARM: imx: enable pinctrl dummy states
-In-Reply-To: <1335958282-3068-1-git-send-email-b29396@freescale.com>
-References: <1335958282-3068-1-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkdY7vy3rPXR6a0+phgtpOBiycvF+ERgjcP5qdjoq+nDLrw@mail.gmail.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Wed, 09 May 2012 17:11:05 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache coherency
+Message-ID: <4FAA34A9.5020708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 1:31 PM, Dong Aisheng <b29396@freescale.com> wrote:
+Hi, All
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
->
-> Enable pinctrl dummy states for imx platforms without pinctrl
-> support.
->
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+I'm using ARM11 MPCore on linux-2.6.34, unfortunately I have random
+panic/segment fault with task migration. I noticed a patch set
+[ARM11 MPCore: preemption/task migration cache coherency fixups] to fix
+such issues in here:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069851.html
 
-Yours,
-Linus Walleij
+It seems there is no follow ups, is there official patch to fix such
+issues?
+
+
+thanks
+
+-- 
+Love each day!
+
+--bill
