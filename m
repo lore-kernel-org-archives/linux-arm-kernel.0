@@ -1,93 +1,52 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Wed, 09 May 2012 14:04:44 +0100
-Subject: [PATCH 1/9] ARM: AT91: Add platform data for the AT91 ADCs
-In-Reply-To: <1336554366-16957-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
- <1336554366-16957-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4FAA6B6C.5080406@cam.ac.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 May 2012 11:23:27 +0100
+Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM
+ address space.
+In-Reply-To: <CAMQu2gzmZ1Af4sAxoT9WS_akY1gBrqffKE84rnbM_EUK8V8NHQ@mail.gmail.com>
+References: <1336398149-26153-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120508124116.GE17798@arm.com>
+ <CAMQu2gxXB4GyddjrcKWwJ=KXx=MoDs7DdwhbOY85qkVJ1Vv3wA@mail.gmail.com>
+ <20120508215554.GA18980@n2100.arm.linux.org.uk>
+ <CAMQu2gzmZ1Af4sAxoT9WS_akY1gBrqffKE84rnbM_EUK8V8NHQ@mail.gmail.com>
+Message-ID: <20120509102327.GF11099@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/9/2012 10:05 AM, Maxime Ripard wrote:
-> The AT91 SoCs often embeds an ADC. This patch adds the needed
-> platform data to specify the informations required by the driver
-> to work properly.
->
-> For now, we only need the reference voltage and which channels
-> are available on the board.
-One utterly trivial element inline.
-> Signed-off-by: Maxime Ripard<maxime.ripard@free-electrons.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
->   include/linux/platform_data/at91_adc.h |   61 ++++++++++++++++++++++++++++++++
->   1 file changed, 61 insertions(+)
->   create mode 100644 include/linux/platform_data/at91_adc.h
->
-> diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
-> new file mode 100644
-> index 0000000..f9e2f00
-> --- /dev/null
-> +++ b/include/linux/platform_data/at91_adc.h
-> @@ -0,0 +1,61 @@
-> +/*
-> + * Copyright (C) 2011 Free Electrons
-> + *
-> + * Licensed under the GPLv2 or later.
-> + */
-> +
-> +#ifndef _AT91_ADC_H_
-> +#define _AT91_ADC_H_
-> +
-> +/**
-> + * struct at91_adc_reg_desc - Various informations relative to registers
-> + * @channel_base:	Base address for the channel data registers
-> + * @drdy_mask:		Mask of the DRDY field in the relevant registers
-> +			(Interruptions registers mostly)
-> + * @status_register:	Address of the Interrupt Status Register
-> + * @trigger_register:	Address of the Trigger setup register
-> + */
-> +struct at91_adc_reg_desc {
-> +	u8	channel_base;
-> +	u32	drdy_mask;
-> +	u8	status_register;
-> +	u8	trigger_register;
-> +};
-> +
-> +/**
-> + * struct at91_adc_trigger - description of triggers
-> + * @name:		name of the trigger advertised to the user
-> + * @value:		value to set in the ADC's mode register to enable
-> +			the trigger
-> + * @is_external:	is the trigger relies on an external pin ?
-no space before the ? (nitpick of the day ;)
-> + */
-> +struct at91_adc_trigger {
-> +	const char	*name;
-> +	u8		value;
-> +	bool		is_external;
-> +};
-> +
-> +/**
-> + * struct at91_adc_data - platform data for ADC driver
-> + * @channels_used:		channels in use on the board as a bitmask
-> + * @num_channels:		global number of channels available on the board
-> + * @registers:			Registers definition on the board
-> + * @startup_time:		startup time of the ADC in microseconds
-> + * @trigger_list:		Triggers available in the ADC
-> + * @trigger_number:		Number of triggers available in the ADC
-> + * @use_external_triggers:	does the board has external triggers availables
-> + * @vref:			Reference voltage for the ADC in millivolts
-> + */
-> +struct at91_adc_data {
-> +	unsigned long			channels_used;
-> +	u8				num_channels;
-> +	struct at91_adc_reg_desc	*registers;
-> +	u8				startup_time;
-> +	struct at91_adc_trigger		*trigger_list;
-> +	u8				trigger_number;
-> +	bool				use_external_triggers;
-> +	u16				vref;
-> +};
-> +
-> +extern void __init at91_add_device_adc(struct at91_adc_data *data);
-> +#endif
+On Wed, May 09, 2012 at 09:50:28AM +0100, Shilimkar, Santosh wrote:
+> On Wed, May 9, 2012 at 3:25 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, May 08, 2012 at 07:31:57PM +0530, Shilimkar, Santosh wrote:
+> >> Ok. Assuming you mean " it's _not_ cleaner to have two domains where
+> >> manager overrides XN attributes" Note that DRAM can be in the middle of
+> >> 4GB address space, so we need to take care of bottom and top address
+> >> space.
+> >>
+> >> Update patch end of the email. Is that fine with you ?
+> >
+> > This is certainly not cleaner because this will break non-ARMv7.
+> 
+> The only change done common code is  clearing 'XN' bit for DRAM
+> region in page table entries. The other change of setting the DACR
+> register is done in ARMv7 specific code.
+> 
+> So it should work as long as XN bit supported or that
+> bit position is not used. I checked ARMv6(OMAP2) and that seems
+> to be fine.
+> 
+> Can you please help me to understand which ARM version will
+> be broken because of this change and how ? I only have access
+> to ARMv6 and ARMv7 specs.
+
+It's probably ARMv5 and earlier that didn't have an XN bit (introduced
+with ARMv6).
+
+I have an old ARM ARM on my desk and it looks like bit 4 is XN on ARMv6+
+and Implementation Defined on ARMv5 and earlier.  It looks like we set
+it all the time in the current decompressor.
+
+Looking at the arch/arm/mm/mmu.c file, there is this PMD_BIT4 which is
+always set on ARMv5 and earlier except Xscale and XSC3 (see the comment
+in build_mem_type_table).
+
+-- 
+Catalin
