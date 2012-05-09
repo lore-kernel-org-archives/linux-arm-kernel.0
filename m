@@ -1,76 +1,72 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 09 May 2012 14:33:26 +0900
-Subject: [PATCH 2/5] video: exynos mipi dsi: Do not use deprecated
- suspend/resume callbacks
-Message-ID: <4FAA01A6.1020707@samsung.com>
+Date: Wed, 09 May 2012 14:33:29 +0900
+Subject: [PATCH 4/5] video: exynos mipi dsi: Properly interpret the interrupt
+ source flags
+Message-ID: <4FAA01A9.4070908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Use proper PM ops from struct dev_pm_ops rather than the deprecated ones.
+Rework the interrupt handler so the RX_DONE, FIFO_EMPTY interrupts are
+properly detected. This prevents missing the interrupts when there are
+other bits set in the INTSRC register than just RX_DONE and FIFO_EMPTY.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
 Signed-off-by: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/exynos/exynos_mipi_dsi.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+ drivers/video/exynos/exynos_mipi_dsi_common.c |   28 +++++++++----------------
+ 1 files changed, 10 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index 49c7351..e004f1d 100644
---- a/drivers/video/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -517,10 +517,10 @@ static int __devexit exynos_mipi_dsi_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c b/drivers/video/exynos/exynos_mipi_dsi_common.c
+index 14909c1..b78d448 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi_common.c
++++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
+@@ -76,33 +76,25 @@ static unsigned int dpll_table[15] = {
  
--#ifdef CONFIG_PM
--static int exynos_mipi_dsi_suspend(struct platform_device *pdev,
--		pm_message_t state)
-+#ifdef CONFIG_PM_SLEEP
-+static int exynos_mipi_dsi_suspend(struct device *dev)
+ irqreturn_t exynos_mipi_dsi_interrupt_handler(int irq, void *dev_id)
  {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct mipi_dsim_device *dsim = platform_get_drvdata(pdev);
- 	struct mipi_dsim_lcd_driver *client_drv = dsim->dsim_lcd_drv;
- 	struct mipi_dsim_lcd_device *client_dev = dsim->dsim_lcd_dev;
-@@ -546,8 +546,9 @@ static int exynos_mipi_dsi_suspend(struct platform_device *pdev,
- 	return 0;
- }
- 
--static int exynos_mipi_dsi_resume(struct platform_device *pdev)
-+static int exynos_mipi_dsi_resume(struct device *dev)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct mipi_dsim_device *dsim = platform_get_drvdata(pdev);
- 	struct mipi_dsim_lcd_driver *client_drv = dsim->dsim_lcd_drv;
- 	struct mipi_dsim_lcd_device *client_dev = dsim->dsim_lcd_dev;
-@@ -579,19 +580,19 @@ static int exynos_mipi_dsi_resume(struct platform_device *pdev)
- 
- 	return 0;
- }
--#else
--#define exynos_mipi_dsi_suspend NULL
--#define exynos_mipi_dsi_resume NULL
- #endif
- 
-+static const struct dev_pm_ops exynos_mipi_dsi_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(exynos_mipi_dsi_suspend, exynos_mipi_dsi_resume)
-+};
+-	unsigned int intsrc = 0;
+-	unsigned int intmsk = 0;
+-	struct mipi_dsim_device *dsim = NULL;
+-
+-	dsim = dev_id;
+-	if (!dsim) {
+-		dev_dbg(dsim->dev, KERN_ERR "%s:error: wrong parameter\n",
+-							__func__);
+-		return IRQ_HANDLED;
++	struct mipi_dsim_device *dsim = dev_id;
++	unsigned int intsrc, intmsk;
 +
- static struct platform_driver exynos_mipi_dsi_driver = {
- 	.probe = exynos_mipi_dsi_probe,
- 	.remove = __devexit_p(exynos_mipi_dsi_remove),
--	.suspend = exynos_mipi_dsi_suspend,
--	.resume = exynos_mipi_dsi_resume,
- 	.driver = {
- 		   .name = "exynos-mipi-dsim",
- 		   .owner = THIS_MODULE,
-+		   .pm = &exynos_mipi_dsi_pm_ops,
- 	},
- };
++	if (dsim == NULL) {
++		dev_err(dsim->dev, "%s: wrong parameter\n", __func__);
++		return IRQ_NONE;
+ 	}
  
+ 	intsrc = exynos_mipi_dsi_read_interrupt(dsim);
+ 	intmsk = exynos_mipi_dsi_read_interrupt_mask(dsim);
++	intmsk = ~intmsk & intsrc;
+ 
+-	intmsk = ~(intmsk) & intsrc;
+-
+-	switch (intmsk) {
+-	case INTMSK_RX_DONE:
++	if (intsrc & INTMSK_RX_DONE) {
+ 		complete(&dsim_rd_comp);
+ 		dev_dbg(dsim->dev, "MIPI INTMSK_RX_DONE\n");
+-		break;
+-	case INTMSK_FIFO_EMPTY:
++	}
++	if (intsrc & INTMSK_FIFO_EMPTY) {
+ 		complete(&dsim_wr_comp);
+ 		dev_dbg(dsim->dev, "MIPI INTMSK_FIFO_EMPTY\n");
+-		break;
+-	default:
+-		break;
+ 	}
+ 
+ 	exynos_mipi_dsi_clear_interrupt(dsim, intmsk);
 -- 
 1.7.4.1
