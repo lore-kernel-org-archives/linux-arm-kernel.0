@@ -1,28 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 May 2012 14:13:37 +0000
-Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
-In-Reply-To: <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
-References: <20120509075407.5991.60556.sendpatchset@w520>
- <201205091345.34404.arnd@arndb.de>
- <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
-Message-ID: <201205091413.37664.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 9 May 2012 16:18:30 +0200
+Subject: [PATCHv3] Add ADC driver for Atmel G20, G45 and X5 boards
+In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4FAA7CB6.8030506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2012, Nicolas Pitre wrote:
-> On Wed, 9 May 2012, Arnd Bergmann wrote:
+On 05/09/2012 11:05 AM, Maxime Ripard :
+> Hi all,
 > 
-> > FWIW, I would actually prefer merging the 'struct arm_soc_desc', 'struct
-> > arm_soc_smp_init_ops' and 'struct arm_soc_smp_ops' structures into a
-> > single 'struct smp_ops' for simplicity.
+> Here is another version of the patches to bring ADC driver to Atmel boards.
+> Since last version, here is what changed:
+>   * Rebased on top of staging-next to move out of staging. Had to change to IIO
+>     kfifo buffer along the way.
+>   * Reworked the DT bindings according to Jean-Christophe reviews
+>   * Made various fixes according to reviews
+>   * Support for X5 boards
 > 
-> You can't easily validate correct usage of __init marked code from the 
-> rest if everything is pulled in the same struct.  This is why I asked 
-> they be split.
+> Thanks,
+> Maxime
 
-Ah, I see. However, in version 6 of the patch set, each platform
-was marking both structures as __initdata, which seems to make
-your argument pointless because we don't actually validate the
-sections.
+Hi Maxime,
 
-	Arnd
+Thanks for posting this new series. My overall feeling is that it is
+very close to an achievement! Apart from some trivial fixes, you can add
+my :
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+on the whole series.
+
+Jonathan, Arnd, Olof,
+
+As explained by Maxime, this patch series is adding the Atmel ADC driver
+to the out-of-staging iio subsystem. It relies on patches that are in
+staging-next.
+On the other hand, I really wouldn't like to split the series between
+iio and arm-soc...
+My question is: would it be possible to take this series in Jonathan
+iio/staging-next git tree for inclusion in 3.5? Arnd & Olof, is it ok
+for you? Do you want to add your Acked-by on some patches?
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
