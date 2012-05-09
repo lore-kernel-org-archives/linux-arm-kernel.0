@@ -1,92 +1,99 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 09 May 2012 21:54:14 +0200
-Subject: [PATCH 2/2] regulator: Add support for MAX77686.
-In-Reply-To: <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
-References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
- <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
-Message-ID: <4FAACB66.3020706@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 09 May 2012 14:16:13 -0600
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
+ omap2+ padconf
+In-Reply-To: <20120504215758.GV5613@atomide.com>
+References: <20120502172401.GG3739@atomide.com>
+ <4FA42CBF.8010906@wwwdotorg.org> <20120504215758.GV5613@atomide.com>
+Message-ID: <4FAAD08D.1050806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-just a few nitpicks...
-
-On 05/09/2012 06:24 PM, Yadwinder Singh wrote:
-> From: Yadwinder Singh Brar<yadi.brar@samsung.com>
->
-> Add support for PMIC/regulator portion of MAX77686 multifunction device.
-> MAX77686 provides LDOs[1-26] and BUCKs[1-9]. This is initial release of driver
-> which supports setting and getting the voltage of a regulator with I2C
-> interface.
->
-> Signed-off-by: Yadwinder Singh Brar<yadi.brar@samsung.com>
+On 05/04/2012 03:57 PM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [120504 12:27]:
+>> On 05/02/2012 11:24 AM, Tony Lindgren wrote:
+>>
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-simple.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-simple.txt
 ...
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> new file mode 100644
-> index 0000000..4aa9722
-> --- /dev/null
-> +++ b/drivers/regulator/max77686.c
-> @@ -0,0 +1,660 @@
-> +/*
-> + * max77686.c - Regulator driver for the Maxim 77686
-> + *
-> + * Copyright (C) 2012 Samsung Electronics
+>> On the other hand, I worry about whether using "pinctrl-simple" here as
+>> the compatible value is going to cause issues:
+>>
+>> Certainly, this is a pretty simple driver, and most likely reasonably
+>> generic an applicable to many SoCs. However, it doesn't cover a bunch of
+>> cases that I'd still consider "simple". For example, what if each pin
+>> has a separate mux and pinconf register? There are probably many such
+>> small cases that would add up to something more complex. to cover those
+>> cases, will we be able to extend pinctrl-simple to cover them, and
+>> continue to be backwards compatible, or will we need to create a
+>> binding/driver for pinctrl-simple-1, pinctrl-simple-2, pinctrl-simple-3
+>> each of which covers some different, yet still simple, configuration?
+> 
+> Yes getting the binding right is the critical part here, everything else
+> can be added as needed. I was thinking about using separate properties
+> for auxilary registers, but now thinking about it a bit more, it may not
+> be sufficient.
+> 
+> How about we make some of these properties into arrays? For example:
+> 
+> #pinctrl-cells = 6;
+> pinctrl-simple,function-mask = <0x0000ffff 0x0000ffff 0xffff0000>;
+> pinctrl-simple,function-off = <0x7 0x7 0x70000>;
+> pinctrl-simple,pinconf-mask = <0xffff0000 0xffff0000 0x0000ffff>;
 
-I believe this should read:
+I'm not sure what the 3 entries in the array are meant to describe?
 
-   + * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+> Then for handling the set/clear bits case of registers, we could do that
+> automatically if both masks are 0 for some registers. We actually have
+> that for some omap1 where there are three registers per mux with bits
+> to set or clear. And these bits are not the same across all registers..
 
-In patch 1/2 the copyright notice is also not exactly correct.
+>>> +				0x6c 0xf	/* CSI21_DX3 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
+>>> +				0x6e 0xf	/* CSI21_DY3 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
+>>> +				0x70 0xf	/* CSI21_DX4 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
+>>> +				0x72 0xf	/* CSI21_DY4 OMAP_PIN_OUTPUT | OMAP_MUX_MODE7 */
+>>> +			>;
+>>> +		};
+>>> +	};
+>>> +
+>>> +
+>>> +	/* map all uart2 pins as a single function */
+>>> +	uart2_pins: pinmux_uart2_pins {
+>>> +		uart2_pins {
+>>> +			pinctrl-simple,cells = <
+>>> +				0xd8 0x118	/* UART2_CTS OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0 */
+>>> +				0xda 0		/* UART2_RTS OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
+>>> +				0xdc 0x118	/* UART2_RX OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0 */
+>>> +				0xde 0		/* UART2_TX OMAP_PIN_OUTPUT | OMAP_MUX_MODE0 */
+>>> +			>;
+>>> +		};
+>>> +	};
+>>> +
+>>> +	/* map all uart3 pins as separate functions */
+>>> +	uart3_pins: pinmux_uart3_pins {
+>>
+>> From a binding perspective, I don't see why you'd want to allow two cases:
+>>
+>> 1) One node with multiple entries in pinctrl-simple,cells
+>> 2) Multiple nodes each with a single entry in pinctrl-simple,cells
+>>
+>> Why not only allow (1)?
+> 
+> Because we need to specify GPIO for some pins. There may be additional flags
 
-> + * Chiwoong Byun<woong.byun@smasung.com>
+What do you mean by "specify GPIO"?
 
-s/smasung/samsung
+Nothing in this pinctrl-simple binding seems to imply that it's also a
+GPIO controller.
 
-...
-> +static int max77686_get_enable_register(struct regulator_dev *rdev,
-> +					int *reg, int *mask, int *pattern)
-> +{
-> +	int rid = rdev_get_id(rdev);
-> +
-> +	switch (rid) {
-> +	case MAX77686_LDO1...MAX77686_LDO26:
-> +		*reg = MAX77686_REG_LDO1CTRL1 + (rid - MAX77686_LDO1);
-> +		*mask = 0xC0;
-> +		*pattern = 0xC0;
+If "GPIO" is one of the functions that can be mux'd onto a pin, then I'd
+expect that to be represented in exactly the same way as any other
+function that could be mux'd onto the pin.
 
-What about using lower case for all hex numbers ?
+So, I'm not sure what GPIO-related information you want to represent.
 
-...
-> +static int max77686_get_voltage_register(struct regulator_dev *rdev,
-> +					 int *_reg, int *_shift, int *_mask)
-> +{
-...
-> +	case MAX77686_BUCK2:
-> +		reg = MAX77686_REG_BUCK2DVS1;
-> +		mask = 0xff;
-> +		break;
-> +	case MAX77686_BUCK3:
-> +		reg = MAX77686_REG_BUCK3DVS1;
-> +		mask = 0xff;
-> +		break;
-> +	case MAX77686_BUCK4:
-> +		reg = MAX77686_REG_BUCK4DVS1;
-> +		mask = 0xff;
-> +		break;
-> +	case MAX77686_BUCK5...MAX77686_BUCK9:
-> +		reg = MAX77686_REG_BUCK5OUT + (rid - MAX77686_BUCK5) * 2;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	*_reg = reg;
-> +	*_shift = shift;
-> +	*_mask = mask;
-> +
-> +	return 0;
-> +}
+> too, we do have external DMA request lines for few pins available.. I'm not
+> saying pinctrl fwk should know about that, but it's a similar mapping of pins
+> to GPIO lines.
 
-Thanks,
-Sylwester
+Aren't DMA request lines also just another function that can be mux'd
+onto a pin?
