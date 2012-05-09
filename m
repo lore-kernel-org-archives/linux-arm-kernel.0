@@ -1,78 +1,59 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 9 May 2012 09:06:34 +0000
-Subject: [PATCH-V2 4/4] ARM: OMAP2+: CLEANUP: Add new config option for
- different DPLL features
-In-Reply-To: <87ehqui8yp.fsf@ti.com>
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-5-git-send-email-hvaibhav@ti.com> <87ehqui8yp.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1BF47@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 9 May 2012 10:48:54 +0200
+Subject: [PATCH] USB: ohci-at91: add a reset function to fix race condition
+Message-ID: <1336553334-31058-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 04:20:06, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > This patch cleans up dpll_data structure, making structure
-> > fields definition based on feature availability for given SoC,
-> > managed using Kconfig rules.
-> >
-> > SOC_HAS_OMAP3_DPLL_IDLE: idle state
-> > SOC_HAS_OMAP3_DPLL_RECAL: recalibration capability
-> > SOC_HAS_OMAP3_DPLL_DCO_SEL: dco selection
-> > SOC_HAS_OMAP3_DPLL_SDDIV: sigma-delta div factor
-> > SOC_HAS_OMAP3_DPLL_FREQSEL: frequency selection
-> >
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> 
-> Paul is the one to make the call here, but personally I'd much prefer to
-> just see the existing ifdefs go away[1] instead of adding a bunch of new
-> ones.  
-> 
-> Yes, doing so would add a few fields to a struct that may be unused, but
-> IMO, the improvement in readabilitly and maintainability is improved.
-> 
-> Note that the users of these fields are not changed and are still based
-> on Kconfig/Makefile values as before (e.g. CONFIG_ARCH_OMAP3), so to me
-> this creates another layer of obfuscation.
-> 
+A possible race condition appears because we are not initializing
+the ohci->regs before calling usb_hcd_request_irqs().
+We move the call to ohci_init() in hcd->driver->reset() instead of
+hcd->driver->start() to fix this.
+This was experienced when we share the same IRQ line between OHCI and EHCI
+controllers.
 
-This will bring in difference on omap2 alone build OR omap4, am33xx alone 
-builds.
-But again, how much it makes sense, and how much benefits we bring-in by 
-adding config options for every bit-fields (like this) needs to be looked at.
-And that's the reason, I submitted first version as a RFC.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Tested-by: Christian Eggers <christian.eggers@kathrein.de>
+Cc: stable <stable@vger.kernel.org>
+---
+ drivers/usb/host/ohci-at91.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-
-> 
-> [1]
-> diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-> index d0ef57c..656b986 100644
-> --- a/arch/arm/plat-omap/include/plat/clock.h
-> +++ b/arch/arm/plat-omap/include/plat/clock.h
-> @@ -156,7 +156,6 @@ struct dpll_data {
->  	u8			min_divider;
->  	u16			max_divider;
->  	u8			modes;
-> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
->  	void __iomem		*autoidle_reg;
->  	void __iomem		*idlest_reg;
->  	u32			autoidle_mask;
-> @@ -167,7 +166,6 @@ struct dpll_data {
->  	u8			auto_recal_bit;
->  	u8			recal_en_bit;
->  	u8			recal_st_bit;
-> -#  endif
->  	u8			flags;
->  };
->  
-
-Honestly, I wanted to propose this first. 
-I am OK, as long as we all agree on this.
-
-Paul, can you conform on this?
-
-Thanks,
-Vaibhav
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 13ebeca..55d3d64 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -223,7 +223,7 @@ static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
+ /*-------------------------------------------------------------------------*/
+ 
+ static int __devinit
+-ohci_at91_start (struct usb_hcd *hcd)
++ohci_at91_reset (struct usb_hcd *hcd)
+ {
+ 	struct at91_usbh_data	*board = hcd->self.controller->platform_data;
+ 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
+@@ -233,6 +233,14 @@ ohci_at91_start (struct usb_hcd *hcd)
+ 		return ret;
+ 
+ 	ohci->num_ports = board->ports;
++	return 0;
++}
++
++static int __devinit
++ohci_at91_start (struct usb_hcd *hcd)
++{
++	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
++	int			ret;
+ 
+ 	if ((ret = ohci_run(ohci)) < 0) {
+ 		err("can't start %s", hcd->self.bus_name);
+@@ -418,6 +426,7 @@ static const struct hc_driver ohci_at91_hc_driver = {
+ 	/*
+ 	 * basic lifecycle operations
+ 	 */
++	.reset =		ohci_at91_reset,
+ 	.start =		ohci_at91_start,
+ 	.stop =			ohci_stop,
+ 	.shutdown =		ohci_shutdown,
+-- 
+1.7.10
