@@ -1,23 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 May 2012 14:45:40 -0600
-Subject: [PATCH 07/12] pinctrl: add sleep state definition
-In-Reply-To: <1336470310-23709-1-git-send-email-linus.walleij@stericsson.com>
-References: <1336470310-23709-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4FAAD774.6010401@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 20:47:06 +0000
+Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <37e096905f891fc6abdccf8977bd7447@localhost>
+References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+ <201205092027.50059.arnd@arndb.de>
+ <37e096905f891fc6abdccf8977bd7447@localhost>
+Message-ID: <201205092047.06852.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2012 03:45 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> There is an IDLE definition in the pinctrl framework, but for
-> ux500 SLEEP is more apropriate.
-> 
-> I've added some comments on the semantics of the common states
-> so as to avoid misunderstandings.
+On Wednesday 09 May 2012, Marc Zyngier wrote:
+> Ah, I see what you mean. But these registers and interrupt are actually
+> only visible on the hypervizor side. The guest shouldn't see any of this.
 
-> +/**
-> + * @PINCTRL_STATE_DEFAULT: the state the pinctrl handle shall be put
-> + *	on as default, usually this means the pins are up and ready to
+Rihgt, that makes sense.
 
-"into" would be more typical than "on".
+> I suppose we could have a "arm,has-virt-extensions" property in devices
+> that implement the virtualization extensions (GIC, timers...).
+> 
+> What do you think?
+
+Sounds good. I don't have a strong preference whether that should be a
+property like you suggest or a separate "compatible" value, maybe Rob or
+Grant can comment on what they prefer.
+
+On the guest side, is it guaranteed that the virtual GIC looks like
+a real GIC without those extensions? If the actual behavior depends on
+the hypervisor, it might still make sense to add another flag in there
+to tell that it's virtual, even if we don't require it for now.
+
+	Arnd
