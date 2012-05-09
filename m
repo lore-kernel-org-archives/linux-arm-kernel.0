@@ -1,159 +1,34 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Wed, 9 May 2012 09:27:02 -0500
-Subject: [PATCH v3 2/3] ARM: imx: Add imx5 cpuidle driver
-In-Reply-To: <20120509080214.GJ27341@pengutronix.de>
-References: <1336425407-20308-1-git-send-email-rob.lee@linaro.org>
- <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
- <20120509080214.GJ27341@pengutronix.de>
-Message-ID: <CAMXH7KF7eznzF7AzM_JzwJ1jOm-1J4biqd=PvKMSa=ex8YFQrA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 9 May 2012 15:28:37 +0100
+Subject: [PATCH 05/10] ARM: Samsung: Update the device names for spi
+ clock lookup
+In-Reply-To: <CAJuYYwQ+Wn11puF7AdPD41Jntbuj7oZHqNfzQA2T8V=2cigQnw@mail.gmail.com>
+References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+ <1336514694-22393-6-git-send-email-thomas.abraham@linaro.org>
+ <20120509085249.GA28702@sirena.org.uk>
+ <CAJuYYwQ+Wn11puF7AdPD41Jntbuj7oZHqNfzQA2T8V=2cigQnw@mail.gmail.com>
+Message-ID: <20120509142836.GT3955@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+On Wed, May 09, 2012 at 09:40:26PM +0800, Thomas Abraham wrote:
+> On 9 May 2012 16:52, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-On Wed, May 9, 2012 at 3:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, May 07, 2012 at 04:16:46PM -0500, Robert Lee wrote:
->> Add imx5 cpuidle driver.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?arch/arm/mach-imx/mm-imx5.c | ? 42 +++++++++++++++++++++++++++++++++++++++---
->> ?1 file changed, 39 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
->> index d6b7e9f..0b3a4cc 100644
->> --- a/arch/arm/mach-imx/mm-imx5.c
->> +++ b/arch/arm/mach-imx/mm-imx5.c
->> @@ -20,26 +20,61 @@
->>
->> ?#include <mach/hardware.h>
->> ?#include <mach/common.h>
->> +#include <mach/cpuidle.h>
->> ?#include <mach/devices-common.h>
->> ?#include <mach/iomux-v3.h>
->>
->> ?static struct clk *gpc_dvfs_clk;
->>
->> -static void imx5_idle(void)
->> +static int imx5_idle(void)
->> ?{
->> + ? ? int ret = 0;
->> +
->> ? ? ? /* gpc clock is needed for SRPG */
->> ? ? ? if (gpc_dvfs_clk == NULL) {
->> ? ? ? ? ? ? ? gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
->
-> This clk_get should go away here and be moved somewhere to
-> initialization. Also, if getting this clock fails we can still
-> do regular cpu_do_idle. Additionally, if clk_get fails, we'll
-> have a ERR_PTR value in gpc_dvfs_clk in which case the
-> gpc_dvfs_clk == NULL won't trigger next time you are here and
-> then you'll enable a nonexisting clock below.
->
+> > This should've been squashed into the patch that updated to use driver
+> > data in order to avoid breaking bisection.
 
-Agree.  I'd prefer to enable this clock during intialization and just
-leave it running.  It is supposed to be a very low power clock and I
-couldn't measuring any power difference with and without it being
-enabled
+> This patch updates clock devname in the platform code and the
+> modifications to use driver data is in the driver file. So these two
+> changes are kept separate to allow them to be applied to their
+> respective trees.
 
->> ? ? ? ? ? ? ? if (IS_ERR(gpc_dvfs_clk))
->> - ? ? ? ? ? ? ? ? ? ? return;
->> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
->> ? ? ? }
->> ? ? ? clk_enable(gpc_dvfs_clk);
->> ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
->> ? ? ? if (!tzic_enable_wake())
->> ? ? ? ? ? ? ? cpu_do_idle();
->> + ? ? else
->> + ? ? ? ? ? ? ret = -EBUSY;
->> ? ? ? clk_disable(gpc_dvfs_clk);
->> +
->> + ? ? return ret;
->> +}
->> +
->> +static int imx5_cpuidle_enter(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv, int idx)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? ret = imx5_idle();
->> +
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? return ret;
->> +
->> + ? ? return idx;
->> ?}
->>
->> +static struct cpuidle_driver imx5_cpuidle_driver = {
->> + ? ? .name ? ? ? ? ? ? ? ? ? = "imx5_cpuidle",
->> + ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
->> + ? ? .en_core_tk_irqen ? ? ? = 1,
->> + ? ? .states[0] ? ? ?= {
->> + ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= imx5_cpuidle_enter,
->> + ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 20, /* max latency at 160MHz */
->> + ? ? ? ? ? ? .target_residency ? ? ? = 1,
->> + ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
->> + ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IMX5 SRPG",
->> + ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "CPU state retained,powered off",
->> + ? ? },
->
-> I wonder why you don't add the default ARM_CPUIDLE_WFI_STATE_PWR state.
-> The above is something different, right? It has a greater exit latency
-> than ARM_CPUIDLE_WFI_STATE_PWR, so why don't we add it here aswell?
-
-Yes and no.  Yes this is a different state but no, it doesn't have a
-significantly greater exit latency, or at least a large enough exit
-latency to warrant an extra state in my opinion.  According to the
-i.MX5 documentation, the extra exit time beyond basic WFI required for
-the  "WAIT_UNCLOCKED_POWER_OFF" state is 500ns (this is due to a
-difference in i.MX5 hardware implementation compared to all other ARM
-platforms).  In reality, it did require a few more microseconds to
-perform in my testing just based on the extra register writes in
-mx5_cpu_lp_set().  I'd like to clean up mx5_cpu_lp_set() and add a
-global variable to track the previous state and to just exit out if
-the new state is the same as the old.  I could do this cleanup as part
-of this patchset if you prefer that.
-
->
->> + ? ? .state_count ? ? ? ? ? ?= 1,
->> +};
->> +
->> ?/*
->> ? * Define the MX50 memory map.
->> ? */
->> @@ -103,7 +138,7 @@ void __init imx51_init_early(void)
->> ? ? ? mxc_set_cpu_type(MXC_CPU_MX51);
->> ? ? ? mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
->> ? ? ? mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
->> - ? ? arm_pm_idle = imx5_idle;
->> + ? ? arm_pm_idle = (void (*)(void))imx5_idle;
->
-> Still this looks suspicious. Reading this will lead to the question why
-> this prototype is casted. Please just add a imx5_pm_idle with the
-> correct prototype.
-
-Ok.
-
-Thanks,
-Rob
-
->
->> ?}
->>
->> ?void __init imx53_init_early(void)
->> @@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
->> ?void __init imx51_init_late(void)
->> ?{
->> ? ? ? mx51_neon_fixup();
->> + ? ? imx_cpuidle_init(&imx5_cpuidle_driver);
->> ?}
->> --
->> 1.7.10
->>
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+This means that bisection will be broken - anything with only one tree
+won't be able to load the SPI driver successfully until it's merged
+with the other which isn't ideal.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120509/fee290ec/attachment.sig>
