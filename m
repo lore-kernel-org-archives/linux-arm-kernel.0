@@ -1,90 +1,84 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 9 May 2012 09:08:00 +0000
-Subject: [PATCH] ARM: OMAP2+: am33xx: Make am33xx as a separate class
-In-Reply-To: <20120508200833.GD5088@atomide.com>
-References: <1336490630-7272-1-git-send-email-hvaibhav@ti.com>
- <20120508200833.GD5088@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1BF58@DBDE01.ent.ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 9 May 2012 11:16:40 +0200
+Subject: [PATCH 2/6] dma: mxs-dma: let dma_is_apbh and apbh_is_old take
+ parameter
+In-Reply-To: <1336554165.1540.172.camel@vkoul-udesk3>
+References: <1336400595-12964-1-git-send-email-shawn.guo@linaro.org>
+ <201205091100.34314.marex@denx.de> <1336554165.1540.172.camel@vkoul-udesk3>
+Message-ID: <201205091116.41037.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 01:38:34, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120508 08:32]:
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -123,8 +123,11 @@ config SOC_OMAPTI81XX
-> >  
-> >  config SOC_OMAPAM33XX
-> >  	bool "AM33XX support"
-> > -	depends on ARCH_OMAP3
-> > +	depends on ARCH_OMAP2PLUS
+Dear Vinod Koul,
+
+> On Wed, 2012-05-09 at 11:00 +0200, Marek Vasut wrote:
+> > Dear Vinod Koul,
+> > 
+> > > On Mon, 2012-05-07 at 22:23 +0800, Shawn Guo wrote:
+> > > > Let macros dma_is_apbh and apbh_is_old take mxs_dma as parameter
+> > > > to make the code easy to read.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > ---
+> > > > 
+> > > >  drivers/dma/mxs-dma.c |   24 ++++++++++++------------
+> > > >  1 files changed, 12 insertions(+), 12 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> > > > index bd27818..e801fbf 100644
+> > > > --- a/drivers/dma/mxs-dma.c
+> > > > +++ b/drivers/dma/mxs-dma.c
+> > > > @@ -38,10 +38,10 @@
+> > > > 
+> > > >  #define MXS_DMA_APBH		0
+> > > >  #define MXS_DMA_APBX		1
+> > > > 
+> > > > -#define dma_is_apbh()		(mxs_dma->dev_id == MXS_DMA_APBH)
+> > > > +#define dma_is_apbh(mxs_dma)	(mxs_dma->dev_id == MXS_DMA_APBH)
+> > > > 
+> > > >  #define APBH_VERSION_LATEST	3
+> > > > 
+> > > > -#define apbh_is_old()		(mxs_dma->version < APBH_VERSION_LATEST)
+> > > > +#define apbh_is_old(mxs_dma)	(mxs_dma->version <
+> > > > APBH_VERSION_LATEST)
+> > > > 
+> > > >  #define HW_APBHX_CTRL0				0x000
+> > > >  #define BM_APBH_CTRL0_APB_BURST8_EN		(1 << 29)
+> > > > 
+> > > > @@ -54,10 +54,10 @@
+> > > > 
+> > > >  #define HW_APBH_VERSION				(cpu_is_mx23() ? 
+0x3f0 :
+> > 0x800)
+> > 
+> > > >  #define HW_APBX_VERSION				0x800
+> > > >  #define BP_APBHX_VERSION_MAJOR			24
+> > > > 
+> > > > -#define HW_APBHX_CHn_NXTCMDAR(n) \
+> > > > -	(((dma_is_apbh() && apbh_is_old()) ? 0x050 : 0x110) + (n) * 
+0x70)
+> > > > -#define HW_APBHX_CHn_SEMA(n) \
+> > > > -	(((dma_is_apbh() && apbh_is_old()) ? 0x080 : 0x140) + (n) * 
+0x70)
+> > > > +#define HW_APBHX_CHn_NXTCMDAR(d, n) \
+> > > > +	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 
+0x70)
+> > > > +#define HW_APBHX_CHn_SEMA(d, n) \
+> > > > +	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 
+0x70)
+> > > 
+> > > while at it, care to say what the above magic numbers mean. Isnt
+> > > terrible clear to me.
+> > 
+> > Check the email above ;-) I think simple comment would be enough here,
+> > but defining those would not hurt either.
 > 
-> This is not needed, it's inside if ARCH_OMAP2PLUS block.
-> 
+> what does 050, 080... and other magic numbers here mean? Why is
+> everything getting multiplied by 0x70.
 
-Good point, I will remove it.
+Yep, I'm on the same boat with you. Check Shawn's reply to my mail, carrying the 
+same concern. Well ... Shawn, I guess now that we're two, you better make 
+another set of macros ;-)
 
-
-> > --- a/arch/arm/mach-omap2/Makefile
-> > +++ b/arch/arm/mach-omap2/Makefile
-> > @@ -16,6 +16,7 @@ secure-common				= omap-smc.o omap-secure.o
-> >  obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
-> >  obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
-> >  obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
-> > +obj-$(CONFIG_SOC_OMAPAM33XX) += irq.o $(hwmod-common)
-> >  
-> >  ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
-> >  obj-y += mcbsp.o
-> > @@ -93,6 +94,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
-> >  					   cm44xx.o prcm_mpu44xx.o \
-> >  					   prminst44xx.o vc44xx_data.o \
-> >  					   vp44xx_data.o prm44xx.o
-> > +obj-$(CONFIG_SOC_OMAPAM33XX)		+= prcm.o
-> >  
-> >  # OMAP voltage domains
-> >  voltagedomain-common			:= voltage.o vc.o vp.o
-> > @@ -102,6 +104,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
-> >  					   voltagedomains3xxx_data.o
-> >  obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
-> >  					   voltagedomains44xx_data.o
-> > +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(voltagedomain-common)
-> >  
-> >  # OMAP powerdomain framework
-> >  powerdomain-common			+= powerdomain.o powerdomain-common.o
-> > @@ -116,6 +119,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
-> >  obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
-> >  					   powerdomain44xx.o \
-> >  					   powerdomains44xx_data.o
-> > +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(powerdomain-common)
-> >  
-> >  # PRCM clockdomain control
-> >  clockdomain-common			+= clockdomain.o \
-> > @@ -132,6 +136,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clockdomain-common) \
-> >  obj-$(CONFIG_ARCH_OMAP4)		+= $(clockdomain-common) \
-> >  					   clockdomain44xx.o \
-> >  					   clockdomains44xx_data.o
-> > +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(clockdomain-common)
-> >  
-> >  # Clock framework
-> >  obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o \
-> > @@ -149,6 +154,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o \
-> >  					   clkt_iclk.o
-> >  obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common) clock44xx_data.o \
-> >  					   dpll3xxx.o dpll44xx.o
-> > +obj-$(CONFIG_SOC_OMAPAM33XX)		+= $(clock-common) dpll3xxx.o
-> >  
-> >  # OMAP2 clock rate set data (old "OPP" data)
-> >  obj-$(CONFIG_SOC_OMAP2420)		+= opp2420_data.o
-> 
-> Can you please rebase this on what's now in the cleanup branch at commit
-> 382ae00105d9989a821f458084e0428bce10b969? That should simplify the Makefile
-> changes a bit.
-> 
-
-Yes, will do it and submit next version today.
-
-> Other than that looks good to me.
-> 
-
-Thanks,
-Vaibhav
+Best regards,
+Marek Vasut
