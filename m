@@ -1,46 +1,143 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 08:35:36 -0700
-Subject: [GIT PULL] omap fixes for v3.4-rc6, take2
-Message-ID: <20120509153535.GJ5088@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 May 2012 16:48:49 +0100
+Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM
+ address space.
+In-Reply-To: <CAMQu2gzdwXwzhhFLtLXTj5e0a9cFeq5ReUcMT-tGUxTPUcV_4Q@mail.gmail.com>
+References: <1336398149-26153-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120508124116.GE17798@arm.com>
+ <CAMQu2gxXB4GyddjrcKWwJ=KXx=MoDs7DdwhbOY85qkVJ1Vv3wA@mail.gmail.com>
+ <20120508215554.GA18980@n2100.arm.linux.org.uk>
+ <CAMQu2gzmZ1Af4sAxoT9WS_akY1gBrqffKE84rnbM_EUK8V8NHQ@mail.gmail.com>
+ <20120509122348.GA30632@n2100.arm.linux.org.uk>
+ <CAMQu2gzdwXwzhhFLtLXTj5e0a9cFeq5ReUcMT-tGUxTPUcV_4Q@mail.gmail.com>
+Message-ID: <20120509154849.GA10375@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Wed, May 09, 2012 at 06:00:10PM +0530, Shilimkar, Santosh wrote:
+> On Wed, May 9, 2012 at 5:53 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, May 09, 2012 at 02:20:28PM +0530, Shilimkar, Santosh wrote:
+> >> The only change done common code is ?clearing 'XN' bit for DRAM
+> >> region in page table entries. The other change of setting the DACR
+> >> register is done in ARMv7 specific code.
+> >
+> > Yes, XN is an ARMv6+ thing. ?Before ARMv5, it was implementation defined.
+> >
+> > Some implementations used the bit to mean "allow writes to update the
+> > cache". ?Other implementations labelled this bit as "should be zero"
+> > while others labelled it as "should be one".
+> >
+> Good to know.
+> 
+> > The upshot of this is, we know that having this bit as '1' means that
+> > all the CPUs we support today work. ?I would be _very_ concerned to
+> > change this bit to zero as we _really_ don't know how the pre-ARMv6
+> > CPUs would react.
+> >
+> I agree.
+> 
+> > The solution to this is pretty simple - if ARMv6+ needs a different
+> > base section mapping value, then we need to extract that from the code
+> > and pass in the base section mapping value.
+> >
+> > I'll sort out a patch later today for this.
+> Great.
 
-Here's this one updated to drop the non-regression patch and to use updated
-version of Enrico's patch. The other two patches are the same.
+This works for my 4430SDP board.  I haven't booted it on anything else yet.
+Please can you check that this solves the issue for you?  Thanks.
 
-Regards,
+ arch/arm/boot/compressed/head.S |   29 ++++++++++++++++++-----------
+ 1 files changed, 18 insertions(+), 11 deletions(-)
 
-Tony
-
-
-The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
-
-  Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.4-rc6-take-2
-
-for you to fetch changes up to 1a21932edc10de0dfd843797427719e5da43355b:
-
-  ARM: OMAP: igep0020: fix smsc911x dummy regulator id (2012-05-09 08:12:05 -0700)
-
-----------------------------------------------------------------
-Fix two board spefific regressions and one regression caused by bad documentation
-
-----------------------------------------------------------------
-Archit Taneja (1):
-      ARM: OMAP: Revert "ARM: OMAP: ctrl: Fix CONTROL_DSIPHY register fields"
-
-Enrico Butera (1):
-      ARM: OMAP: igep0020: fix smsc911x dummy regulator id
-
-Janusz Krzysztofik (1):
-      ARM: OMAP1: Amstrad Delta: Fix wrong IRQ base in FIQ handler
-
- arch/arm/mach-omap1/ams-delta-fiq.c                |    2 +-
- arch/arm/mach-omap2/board-igep0020.c               |    2 +-
- .../include/mach/ctrl_module_pad_core_44xx.h       |    8 ++++----
- 3 files changed, 6 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index dc7e8ce..5ad33a4 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -567,6 +567,12 @@ __armv3_mpu_cache_on:
+ 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
+ 		mov	pc, lr
+ 
++#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
++#define CB_BITS 0x08
++#else
++#define CB_BITS 0x0c
++#endif
++
+ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		bic	r3, r3, #0xff		@ Align the pointer
+ 		bic	r3, r3, #0x3f00
+@@ -578,17 +584,14 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		mov	r9, r0, lsr #18
+ 		mov	r9, r9, lsl #18		@ start of RAM
+ 		add	r10, r9, #0x10000000	@ a reasonable RAM size
+-		mov	r1, #0x12
+-		orr	r1, r1, #3 << 10
++		mov	r1, #0x12		@ XN|U + section mapping
++		orr	r1, r1, #3 << 10	@ AP=11
+ 		add	r2, r3, #16384
+ 1:		cmp	r1, r9			@ if virt > start of RAM
+-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+-		orrhs	r1, r1, #0x08		@ set cacheable
+-#else
+-		orrhs	r1, r1, #0x0c		@ set cacheable, bufferable
+-#endif
+-		cmp	r1, r10			@ if virt > end of RAM
+-		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
++		cmphs	r10, r1			@   && end of RAM > virt
++		bic	r1, r1, #0x1c		@ clear XN|U + C + B
++		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM
++		orrhs	r1, r1, r6		@ set RAM section settings
+ 		str	r1, [r0], #4		@ 1:1 mapping
+ 		add	r1, r1, #1048576
+ 		teq	r0, r2
+@@ -599,7 +602,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+  * so there is no map overlap problem for up to 1 MB compressed kernel.
+  * If the execution is in RAM then we would only be duplicating the above.
+  */
+-		mov	r1, #0x1e
++		orr	r1, r6, #0x04		@ ensure B is set for this
+ 		orr	r1, r1, #3 << 10
+ 		mov	r2, pc
+ 		mov	r2, r2, lsr #20
+@@ -620,6 +623,7 @@ __arm926ejs_mmu_cache_on:
+ __armv4_mmu_cache_on:
+ 		mov	r12, lr
+ #ifdef CONFIG_MMU
++		mov	r6, #CB_BITS | 0x12	@ U
+ 		bl	__setup_mmu
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
+@@ -641,6 +645,7 @@ __armv7_mmu_cache_on:
+ #ifdef CONFIG_MMU
+ 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
+ 		tst	r11, #0xf		@ VMSA
++		movne	r6, #CB_BITS | 0x02	@ !XN
+ 		blne	__setup_mmu
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
+@@ -655,7 +660,7 @@ __armv7_mmu_cache_on:
+ 		orr	r0, r0, #1 << 25	@ big-endian page tables
+ #endif
+ 		orrne	r0, r0, #1		@ MMU enabled
+-		movne	r1, #-1
++		movne	r1, #0xfffffffd		@ domain 0 = client
+ 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+ 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+ #endif
+@@ -668,6 +673,7 @@ __armv7_mmu_cache_on:
+ 
+ __fa526_cache_on:
+ 		mov	r12, lr
++		mov	r6, #CB_BITS | 0x12	@ U
+ 		bl	__setup_mmu
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c7, c7, 0	@ Invalidate whole cache
+@@ -682,6 +688,7 @@ __fa526_cache_on:
+ 
+ __arm6_mmu_cache_on:
+ 		mov	r12, lr
++		mov	r6, #CB_BITS | 0x12	@ U
+ 		bl	__setup_mmu
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
