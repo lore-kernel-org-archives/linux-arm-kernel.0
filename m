@@ -1,92 +1,215 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 May 2012 15:02:00 +0200
-Subject: [PATCH 1/9] ARM: AT91: Add platform data for the AT91 ADCs
+Date: Wed,  9 May 2012 15:02:03 +0200
+Subject: [PATCH 4/9] AT91: ADC: Add support for the AT91SAM9M10G45-EK board
 In-Reply-To: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336568528-29877-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336568528-29877-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91 SoCs often embeds an ADC. This patch adds the needed
-platform data to specify the informations required by the driver
-to work properly.
-
-For now, we only need the reference voltage and which channels
-are available on the board.
+This patch adds platform data for the AT91 ADC driver support for
+the AT91SAM9M10G45-EK board.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- include/linux/platform_data/at91_adc.h |   61 ++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 include/linux/platform_data/at91_adc.h
+ arch/arm/mach-at91/at91sam9g45.c         |    9 +++
+ arch/arm/mach-at91/at91sam9g45_devices.c |  101 ++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/board-sam9m10g45ek.c  |   12 ++++
+ 3 files changed, 122 insertions(+)
 
-diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
-new file mode 100644
-index 0000000..f9e2f00
---- /dev/null
-+++ b/include/linux/platform_data/at91_adc.h
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright (C) 2011 Free Electrons
-+ *
-+ * Licensed under the GPLv2 or later.
-+ */
-+
-+#ifndef _AT91_ADC_H_
-+#define _AT91_ADC_H_
-+
-+/**
-+ * struct at91_adc_reg_desc - Various informations relative to registers
-+ * @channel_base:	Base address for the channel data registers
-+ * @drdy_mask:		Mask of the DRDY field in the relevant registers
-+			(Interruptions registers mostly)
-+ * @status_register:	Address of the Interrupt Status Register
-+ * @trigger_register:	Address of the Trigger setup register
-+ */
-+struct at91_adc_reg_desc {
-+	u8	channel_base;
-+	u32	drdy_mask;
-+	u8	status_register;
-+	u8	trigger_register;
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index d222f83..30865c6 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -176,6 +176,12 @@ static struct clk vdec_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ 
++static struct clk adc_op_clk = {
++	.name		= "adc_op_clk",
++	.type		= CLK_TYPE_PERIPHERAL,
++	.rate_hz	= 13200000,
 +};
 +
-+/**
-+ * struct at91_adc_trigger - description of triggers
-+ * @name:		name of the trigger advertised to the user
-+ * @value:		value to set in the ADC's mode register to enable
-+			the trigger
-+ * @is_external:	is the trigger relies on an external pin ?
-+ */
-+struct at91_adc_trigger {
-+	const char	*name;
-+	u8		value;
-+	bool		is_external;
+ static struct clk *periph_clocks[] __initdata = {
+ 	&pioA_clk,
+ 	&pioB_clk,
+@@ -204,6 +210,7 @@ static struct clk *periph_clocks[] __initdata = {
+ 	&isi_clk,
+ 	&udphs_clk,
+ 	&mmc1_clk,
++	&adc_op_clk,
+ 	// irq0
+ };
+ 
+@@ -242,6 +249,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
+ 	CLKDEV_CON_ID("pioD", &pioDE_clk),
+ 	CLKDEV_CON_ID("pioE", &pioDE_clk),
++	/* Fake adc clock */
++	CLKDEV_CON_ID("adc_clk", &tsc_clk),
+ };
+ 
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 6b008ae..0c6d9fe 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -19,9 +19,12 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/atmel-mci.h>
+ 
++#include <linux/platform_data/at91_adc.h>
++
+ #include <linux/fb.h>
+ #include <video/atmel_lcdc.h>
+ 
++#include <mach/at91_adc.h>
+ #include <mach/board.h>
+ #include <mach/at91sam9g45.h>
+ #include <mach/at91sam9g45_matrix.h>
+@@ -1207,6 +1210,104 @@ void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data) {}
+ 
+ 
+ /* --------------------------------------------------------------------
++ *  ADC
++ * -------------------------------------------------------------------- */
++
++#if IS_ENABLED(CONFIG_AT91_ADC)
++static struct at91_adc_data adc_data;
++
++static struct resource adc_resources[] = {
++	[0] = {
++		.start	= AT91SAM9G45_BASE_TSC,
++		.end	= AT91SAM9G45_BASE_TSC + SZ_16K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= AT91SAM9G45_ID_TSC,
++		.end	= AT91SAM9G45_ID_TSC,
++		.flags	= IORESOURCE_IRQ,
++	}
 +};
 +
-+/**
-+ * struct at91_adc_data - platform data for ADC driver
-+ * @channels_used:		channels in use on the board as a bitmask
-+ * @num_channels:		global number of channels available on the board
-+ * @registers:			Registers definition on the board
-+ * @startup_time:		startup time of the ADC in microseconds
-+ * @trigger_list:		Triggers available in the ADC
-+ * @trigger_number:		Number of triggers available in the ADC
-+ * @use_external_triggers:	does the board has external triggers availables
-+ * @vref:			Reference voltage for the ADC in millivolts
-+ */
-+struct at91_adc_data {
-+	unsigned long			channels_used;
-+	u8				num_channels;
-+	struct at91_adc_reg_desc	*registers;
-+	u8				startup_time;
-+	struct at91_adc_trigger		*trigger_list;
-+	u8				trigger_number;
-+	bool				use_external_triggers;
-+	u16				vref;
++static struct platform_device at91_adc_device = {
++	.name		= "at91_adc",
++	.id		= -1,
++	.dev		= {
++				.platform_data	= &adc_data,
++	},
++	.resource	= adc_resources,
++	.num_resources	= ARRAY_SIZE(adc_resources),
 +};
 +
-+extern void __init at91_add_device_adc(struct at91_adc_data *data);
++static struct at91_adc_trigger at91_adc_triggers[] = {
++	[0] = {
++		.name = "external-rising",
++		.value = 1,
++		.is_external = true,
++	},
++	[1] = {
++		.name = "external-falling",
++		.value = 2,
++		.is_external = true,
++	},
++	[2] = {
++		.name = "external-any",
++		.value = 3,
++		.is_external = true,
++	},
++	[3] = {
++		.name = "continuous",
++		.value = 6,
++		.is_external = false,
++	},
++};
++
++static struct at91_adc_reg_desc at91_adc_register_g45 = {
++	.channel_base = AT91_ADC_CHR(0),
++	.drdy_mask = AT91_ADC_DRDY,
++	.status_register = AT91_ADC_SR,
++	.trigger_register = 0x08,
++};
++
++void __init at91_add_device_adc(struct at91_adc_data *data)
++{
++	if (!data)
++		return;
++
++	if (test_bit(0, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD20, 0);
++	if (test_bit(1, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD21, 0);
++	if (test_bit(2, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD22, 0);
++	if (test_bit(3, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD23, 0);
++	if (test_bit(4, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD24, 0);
++	if (test_bit(5, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD25, 0);
++	if (test_bit(6, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD26, 0);
++	if (test_bit(7, &data->channels_used))
++		at91_set_gpio_input(AT91_PIN_PD27, 0);
++
++	if (data->use_external_triggers)
++		at91_set_A_periph(AT91_PIN_PD28, 0);
++
++	data->num_channels = 8;
++	data->startup_time = 40;
++	data->registers = &at91_adc_register_g45;
++	data->trigger_number = 4;
++	data->trigger_list = at91_adc_triggers;
++
++	adc_data = *data;
++	platform_device_register(&at91_adc_device);
++}
++#else
++void __init at91_add_device_adc(struct at91_adc_data *data) {}
 +#endif
++
++/* --------------------------------------------------------------------
+  *  RTT
+  * -------------------------------------------------------------------- */
+ 
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index c88e908..337abd2 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -27,6 +27,8 @@
+ #include <linux/atmel-mci.h>
+ #include <linux/delay.h>
+ 
++#include <linux/platform_data/at91_adc.h>
++
+ #include <mach/hardware.h>
+ #include <video/atmel_lcdc.h>
+ #include <media/soc_camera.h>
+@@ -315,6 +317,14 @@ static struct at91_tsadcc_data ek_tsadcc_data = {
+ 	.ts_sample_hold_time	= 0x0a,
+ };
+ 
++/*
++ * ADCs
++ */
++static struct at91_adc_data ek_adc_data = {
++	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7),
++	.use_external_triggers = true,
++	.vref = 3300,
++};
+ 
+ /*
+  * GPIO Buttons
+@@ -480,6 +490,8 @@ static void __init ek_board_init(void)
+ 	at91_add_device_lcdc(&ek_lcdc_data);
+ 	/* Touch Screen */
+ 	at91_add_device_tsadcc(&ek_tsadcc_data);
++	/* ADC */
++	at91_add_device_adc(&ek_adc_data);
+ 	/* Push Buttons */
+ 	ek_add_device_buttons();
+ 	/* AC97 */
 -- 
 1.7.9.5
