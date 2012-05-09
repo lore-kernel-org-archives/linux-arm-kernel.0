@@ -1,70 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 9 May 2012 23:52:47 +0900
-Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
-In-Reply-To: <201205091345.34404.arnd@arndb.de>
-References: <20120509075407.5991.60556.sendpatchset@w520>
- <201205091212.08239.arnd@arndb.de> <4FAA6DE6.3040001@arm.com>
- <201205091345.34404.arnd@arndb.de>
-Message-ID: <CANqRtoSwLJKw-8CiHo8ATV4kXKwULPcC1P7_no1tiNLVH-j_eA@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 9 May 2012 17:08:32 +0200
+Subject: [PATCH 14/15] mfd/db8500-prcmu: Add Device Tree support and
+ enable ux500 platforms
+In-Reply-To: <CACRpkdbQpa+YQ6SNytB-aW9Psr8jE1FO-=iyfJsF71RKmzzqUQ@mail.gmail.com>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <1334867804-31942-15-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbQpa+YQ6SNytB-aW9Psr8jE1FO-=iyfJsF71RKmzzqUQ@mail.gmail.com>
+Message-ID: <20120509150832.GL1794@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 10:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 May 2012, Marc Zyngier wrote:
->> On 09/05/12 13:12, Arnd Bergmann wrote:
->> > On Wednesday 09 May 2012, Magnus Damm wrote:
->> >> ?static unsigned int __init shmobile_smp_get_core_count(void)
->> >> ?{
->> >> @@ -31,6 +32,9 @@ static unsigned int __init shmobile_smp_
->> >> ? ?if (is_r8a7779())
->> >> ? ? ? ? ? ?return r8a7779_get_core_count();
->> >>
->> >> + ?if (is_emev2())
->> >> + ? ? ? ? ?return emev2_get_core_count();
->> >> +
->> >> ? ?return 1;
->> >> ?}
->> >>
->> >> @@ -41,6 +45,9 @@ static void __init shmobile_smp_prepare_
->> >>
->> >> ? ?if (is_r8a7779())
->> >> ? ? ? ? ? ?r8a7779_smp_prepare_cpus();
->> >> +
->> >> + ?if (is_emev2())
->> >> + ? ? ? ? ?emev2_smp_prepare_cpus();
->> >> ?}
->> >>
->> >> ?int shmobile_platform_cpu_kill(unsigned int cpu)
->> >> ...
->> >
->> > This shows that we really want an abstraction for soc-specific SMP ops
->> > even within one platform, and we'll need the same thing for multiplatform.
->> >
->> > Marc Zyngier already proposed a solution for this last year, but I
->> > think we couldn't agree on the details back then before he lost interest.
->> > I think we should pick that up again and get it into 3.6 so the code above
->> > can be simplified and we can do the multiplatform solution. We'll probably
->> > discuss the details in Hong Kong in a couple of weeks, so there is no
->> > point in changing it now, but I'd hope that you can migrate this to
->> > whatever we come up with in the following merge window.
->>
->> I'm happy to revive the series if there is an interest.
->
-> Ok, good. I think we were almost there the last time, but I don't
-> know if Russell still had any objections. Magnus, can you comment on
-> the "[PATCH v6 09/15] ARM: SoC: convert shmobile SMP to SoC descriptor"
-> patch from February to see if it fits your needs?
+Hi Linus,
 
-I took the liberty to give some comments here instead. I've gone
-through the patch and it looks good in general. I have not tested it
-but I'd be happy to fix whatever fallout that may happen.
+On Tue, Apr 24, 2012 at 10:18:04AM +0200, Linus Walleij wrote:
+> On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Here we see the db8500-prcmu driver obtain DT support. In its
+> > current state, all we have to do is offer a matching compatible
+> > node and the driver will register and initialise correctly. We
+> > Also remove any initialisation completed in platform code to
+> > prevent any device duplication.
+> >
+> > CC: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> OK I need Sam's ACK on this too, then it seems a good idea
+> to take all three patches touching the PRCMU driver through the
+> ux500-core tree.
+I just took 2 of them:
 
-The patch is pretty close to be a perfect fit from my point of view.
-This is definitely a step in the right direction. I am however a bit
-hesitant with how the CPU hotplug code ended up, but at the same time
-I don't really have any better suggestions. I think I simply need to
-convert it to be a full per-soc implementation.
+mfd: Enable Device Tree support for the db8500-prcmu
+mfd: Add support for db8500-prcmu regulator supply for nmk-i2c.4
 
-Thanks!
+Since you have not taken any db8500 patches yet on ux500-core, I can carry
+them unless you object to it.
 
-/ magnus
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
