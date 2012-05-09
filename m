@@ -1,57 +1,230 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Wed, 9 May 2012 17:55:20 +0530
-Subject: [RFC 00/12] OMAP DMA engine conversion
-In-Reply-To: <20120423160409.GE24299@n2100.arm.linux.org.uk>
-References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
-Message-ID: <CANrkHUZBPMtAqS4TwwykrOwwvH6J2WeU5cWEx_Hr66UdZdOqJA@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 09 May 2012 16:54:07 +0900
+Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
+Message-ID: <20120509075407.5991.60556.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2012 at 9:34 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> For the full text, please see
->
-> http://lists.arm.linux.org.uk/lurker/message/20120418.100954.7fa7acf8.en.html
->
-> This version contains updates for some of the comments received from the
-> previous round, and adds the OMAP1/2 MMC and SPI drivers to the conversion.
+From: Magnus Damm <damm@opensource.se>
 
-Tested eMMC, SD on omap4 Blaze
-Tested-by: Balaji T K <balajitk@ti.com>
+Prototype code that adds SMP support to EMEV2.
 
->
-> I've also added a note to feature-removal noting that the existing APIs
-> will be removed around 2013 - I'm planning January for that at the
-> moment. ?Having drivers around which are unconverted blocks further work
-> on the DMA engine conversion, so it's actually important that we get
-> as many drivers converted as soon as possible.
->
-> Anything which isn't converted will probably have its DMA code removed,
-> or if that results in the driver not being usable, the driver itself
-> will be removed.
->
-> This series is still in RFC mode...
->
-> ?Documentation/feature-removal-schedule.txt | ? 11 +
-> ?arch/arm/mach-omap1/board-h2-mmc.c ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-omap1/board-h3-mmc.c ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-omap1/board-nokia770.c ? ? ? | ? ?1 -
-> ?arch/arm/mach-omap2/board-n8x0.c ? ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/plat-omap/dma.c ? ? ? ? ? ? ? ? ? | ? 14 +
-> ?arch/arm/plat-omap/include/plat/mmc.h ? ? ?| ? ?2 -
-> ?drivers/dma/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ? 10 +
-> ?drivers/dma/Makefile ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?drivers/dma/omap-dma.c ? ? ? ? ? ? ? ? ? ? | ?521 ++++++++++++++++++++++++++++
-> ?drivers/dma/sa11x0-dma.c ? ? ? ? ? ? ? ? ? | ?249 ++++---------
-> ?drivers/dma/virt-dma.c ? ? ? ? ? ? ? ? ? ? | ? 99 ++++++
-> ?drivers/dma/virt-dma.h ? ? ? ? ? ? ? ? ? ? | ?138 ++++++++
-> ?drivers/mmc/host/omap.c ? ? ? ? ? ? ? ? ? ?| ?369 +++++++++-----------
-> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? ? ? ?| ?206 ++++++------
-> ?drivers/spi/spi-omap2-mcspi.c ? ? ? ? ? ? ?| ?228 +++++++------
-> ?17 files changed, 1268 insertions(+), 586 deletions(-)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+At this point only the most basic form of SMP operation
+is supported. TWD and CPU Hotplug support is excluded.
+
+Based on V1 of the Emma Mobile EV2 code. Needs to be
+reworked to coexist with DT. Work in progress.
+
+Not-yet-signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+  Depends on the following series:
+  "[PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot"
+  And the following patches:
+  "[PATCH] serial8250-em: Emma Mobile UART driver V2"
+  "[PATCH] clocksource: em_sti: Emma Mobile STI driver"
+
+ arch/arm/mach-shmobile/Makefile              |    1 
+ arch/arm/mach-shmobile/include/mach/common.h |    6 +
+ arch/arm/mach-shmobile/platsmp.c             |   16 ++++
+ arch/arm/mach-shmobile/setup-emev2.c         |    7 +
+ arch/arm/mach-shmobile/smp-emev2.c           |   95 ++++++++++++++++++++++++++
+ 5 files changed, 125 insertions(+)
+
+--- 0012/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2012-05-09 16:43:48.000000000 +0900
+@@ -19,6 +19,7 @@ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o
++smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o
+ 
+ # Pinmux setup
+ pfc-y				:=
+--- 0011/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2012-05-09 16:43:48.000000000 +0900
+@@ -91,4 +91,10 @@ extern void emev2_add_early_devices(void
+ extern void emev2_add_standard_devices(void);
+ extern void emev2_clock_init(void);
+ 
++extern unsigned int emev2_get_core_count(void);
++extern int emev2_platform_cpu_kill(unsigned int cpu);
++extern void emev2_secondary_init(unsigned int cpu);
++extern int emev2_boot_secondary(unsigned int cpu);
++extern void emev2_smp_prepare_cpus(void);
++
+ #endif /* __ARCH_MACH_COMMON_H */
+--- 0001/arch/arm/mach-shmobile/platsmp.c
++++ work/arch/arm/mach-shmobile/platsmp.c	2012-05-09 16:43:48.000000000 +0900
+@@ -22,6 +22,7 @@
+ 
+ #define is_sh73a0() (machine_is_ag5evm() || machine_is_kota2())
+ #define is_r8a7779() machine_is_marzen()
++#define is_emev2() machine_is_kzm9d()
+ 
+ static unsigned int __init shmobile_smp_get_core_count(void)
+ {
+@@ -31,6 +32,9 @@ static unsigned int __init shmobile_smp_
+ 	if (is_r8a7779())
+ 		return r8a7779_get_core_count();
+ 
++	if (is_emev2())
++		return emev2_get_core_count();
++
+ 	return 1;
+ }
+ 
+@@ -41,6 +45,9 @@ static void __init shmobile_smp_prepare_
+ 
+ 	if (is_r8a7779())
+ 		r8a7779_smp_prepare_cpus();
++
++	if (is_emev2())
++		emev2_smp_prepare_cpus();
+ }
+ 
+ int shmobile_platform_cpu_kill(unsigned int cpu)
+@@ -48,6 +55,9 @@ int shmobile_platform_cpu_kill(unsigned
+ 	if (is_r8a7779())
+ 		return r8a7779_platform_cpu_kill(cpu);
+ 
++	if (is_emev2())
++		return emev2_platform_cpu_kill(cpu);
++
+ 	return 1;
+ }
+ 
+@@ -60,6 +70,9 @@ void __cpuinit platform_secondary_init(u
+ 
+ 	if (is_r8a7779())
+ 		r8a7779_secondary_init(cpu);
++
++	if (is_emev2())
++		emev2_secondary_init(cpu);
+ }
+ 
+ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -70,6 +83,9 @@ int __cpuinit boot_secondary(unsigned in
+ 	if (is_r8a7779())
+ 		return r8a7779_boot_secondary(cpu);
+ 
++	if (is_emev2())
++		return emev2_boot_secondary(cpu);
++
+ 	return -ENOSYS;
+ }
+ 
+--- 0011/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2012-05-09 16:43:48.000000000 +0900
+@@ -47,6 +47,13 @@ static struct map_desc emev2_io_desc[] _
+ 		.length		= SZ_128K,
+ 		.type		= MT_DEVICE
+ 	},
++	/* 2M mapping for SCU + L2 controller */
++	{
++		.virtual	= 0xf0000000,
++		.pfn		= __phys_to_pfn(0x1e000000),
++		.length		= SZ_2M,
++		.type		= MT_DEVICE
++	},
+ };
+ 
+ void __init emev2_map_io(void)
+--- /dev/null
++++ work/arch/arm/mach-shmobile/smp-emev2.c	2012-05-09 16:44:26.000000000 +0900
+@@ -0,0 +1,95 @@
++/*
++ * SMP support for Emma Mobile EV2
++ *
++ * Copyright (C) 2012  Renesas Solutions Corp.
++ * Copyright (C) 2012  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/spinlock.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <mach/common.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
++#include <asm/hardware/gic.h>
++#include <asm/cacheflush.h>
++
++#define SMU_GENERAL_REG0	IOMEM(0xe01107c0)
++
++static void __iomem *scu_base_addr(void)
++{
++	return IOMEM(0xf0000000);
++}
++
++static DEFINE_SPINLOCK(scu_lock);
++static unsigned long tmp;
++
++static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
++{
++	void __iomem *scu_base = scu_base_addr();
++
++	spin_lock(&scu_lock);
++	tmp = readl(scu_base + 8);
++	tmp &= ~clr;
++	tmp |= set;
++	spin_unlock(&scu_lock);
++
++	/* disable cache coherency after releasing the lock */
++	writel(tmp, scu_base + 8);
++}
++
++unsigned int __init emev2_get_core_count(void)
++{
++	void __iomem *scu_base = scu_base_addr();
++
++	return scu_get_core_count(scu_base);
++}
++
++int emev2_platform_cpu_kill(unsigned int cpu)
++{
++	return 0; /* not supported yet */
++}
++
++void __cpuinit emev2_secondary_init(unsigned int cpu)
++{
++	gic_secondary_init(0);
++}
++
++int __cpuinit emev2_boot_secondary(unsigned int cpu)
++{
++	cpu = cpu_logical_map(cpu);
++
++	/* enable cache coherency */
++	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++
++	/* Tell ROM loader about our vector (in headsmp.S) */
++	writel(__pa(shmobile_secondary_vector), SMU_GENERAL_REG0);
++
++	gic_raise_softirq(cpumask_of(cpu), 1);
++	return 0;
++}
++
++void __init emev2_smp_prepare_cpus(void)
++{
++	int cpu = cpu_logical_map(0);
++
++	scu_enable(scu_base_addr());
++
++	/* enable cache coherency on CPU0 */
++	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++}
