@@ -1,204 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 May 2012 18:46:34 -0600 (MDT)
-Subject: [PATCH 5/7] ARM: OMAP2: Use hwmod to initialize mmc for 2420
-In-Reply-To: <20120424000835.17783.50945.stgit@muffinssi.local>
-References: <20120424000607.17783.81686.stgit@muffinssi.local>
- <20120424000835.17783.50945.stgit@muffinssi.local>
-Message-ID: <alpine.DEB.2.00.1205081844530.28088@utopia.booyaka.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 8 May 2012 20:52:24 -0400
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <87sjfap57x.fsf@laptop.org>
+References: <8762cdur7o.fsf@laptop.org> <4FA3D720.7010004@linaro.org>
+ <87mx5ot6vp.fsf@laptop.org> <4FA3DC27.6030204@linaro.org>
+ <CAP=VYLoLgLmwWTWrJrMBCRLD_BjupjmfV2me6TDeej=ZS=W7hw@mail.gmail.com>
+ <4FA90127.1050107@linaro.org> <878vh2rhlh.fsf@laptop.org>
+ <4FA918BA.3080303@linaro.org>
+ <CAP=VYLoz0o7qh9TNgWPatAsSjtoKoyaBUW7L+3q1w0PsLkOMOQ@mail.gmail.com>
+ <87sjfap57x.fsf@laptop.org>
+Message-ID: <20120509005224.GB6681@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+[Re: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500] On 08/05/2012 (Tue 20:29) Chris Ball wrote:
 
-On Mon, 23 Apr 2012, Tony Lindgren wrote:
-
-> This allows us to pass dma request lines in platform data to
-> MMC driver the same way as we already do for omap2430 and later.
+> Hi Paul,
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> On Tue, May 08 2012, Paul Gortmaker wrote:
+> > On Tue, May 8, 2012 at 8:59 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> Here you go Chris.
+> >>
+> >> From: Lee Jones <lee.jones@linaro.org>
+> >> Date: Tue, 8 May 2012 13:40:02 +0100
+> >> Subject: [PATCH] MMC: mmci: Fix compiler error when CONFIG_OF is not set
+> >>
+> >> error: implicit declaration of function 'mmci_dt_populate_generic_pdata'
+> >>
+> >> This is due to the '#if CONFIG_OF' guards placed around
+> >> mmci_dt_populate_generic_pdata(), but not around the call to it. We
+> >> repair this by inserting a stub which elegantly returns when CONFIG_OF
+> >> is not set.
+> >>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Please if possible, do not neglect to add the Reported-by: line when
+> > appropriate.  I've been at this long enough that it really won't change
+> > my life any if it is there or not there, but for someone new to linux, it
+> > might make the difference between an "I'm glad I reported that" vs.
+> > a "Screw them, I'm not reporting anything else in the future."
+> 
+> Agreed -- I added a Reported-by line when I applied the patch:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=c0a120a4bc68f5dc5f5238e76013cc18bac0ffed
 
-This might save you some time, I updated this patch to move the device 
-creation code to arch/arm/mach-omap2/msdi.c and to change the hwmod name 
-to 'msdi1' to conform with the new data.  Updated patch below.
+Cool, thanks Chris -- you may not hear it, but I'm sure you've
+implicitly helped keep people involved in the triage process.
 
+Paul.
+--
 
-- Paul
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 23 Apr 2012 17:08:35 -0700
-Subject: [PATCH] ARM: OMAP2: Use hwmod to initialize mmc for 2420
-
-This allows us to pass dma request lines in platform data to
-MMC driver the same way as we already do for omap2430 and later.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/devices.c |   59 -----------------------------------
- arch/arm/mach-omap2/msdi.c    |   68 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+), 59 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index e433603..263a85f 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -27,7 +27,6 @@
- 
- #include "iomap.h"
- #include <plat/board.h>
--#include <plat/mmc.h>
- #include <plat/dma.h>
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
-@@ -574,64 +573,6 @@ static inline void omap_init_aes(void) { }
- 
- /*-------------------------------------------------------------------------*/
- 
--#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
--
--static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
--							*mmc_controller)
--{
--	if ((mmc_controller->slots[0].switch_pin > 0) && \
--		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
--		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
--					OMAP_PIN_INPUT_PULLUP);
--	if ((mmc_controller->slots[0].gpio_wp > 0) && \
--		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
--		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
--					OMAP_PIN_INPUT_PULLUP);
--
--	omap_mux_init_signal("sdmmc_cmd", 0);
--	omap_mux_init_signal("sdmmc_clki", 0);
--	omap_mux_init_signal("sdmmc_clko", 0);
--	omap_mux_init_signal("sdmmc_dat0", 0);
--	omap_mux_init_signal("sdmmc_dat_dir0", 0);
--	omap_mux_init_signal("sdmmc_cmd_dir", 0);
--	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
--		omap_mux_init_signal("sdmmc_dat1", 0);
--		omap_mux_init_signal("sdmmc_dat2", 0);
--		omap_mux_init_signal("sdmmc_dat3", 0);
--		omap_mux_init_signal("sdmmc_dat_dir1", 0);
--		omap_mux_init_signal("sdmmc_dat_dir2", 0);
--		omap_mux_init_signal("sdmmc_dat_dir3", 0);
--	}
--
--	/*
--	 * Use internal loop-back in MMC/SDIO Module Input Clock
--	 * selection
--	 */
--	if (mmc_controller->slots[0].internal_clock) {
--		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
--		v |= (1 << 24);
--		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
--	}
--}
--
--void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
--{
--	char *name = "mmci-omap";
--
--	if (!mmc_data[0]) {
--		pr_err("%s fails: Incomplete platform data\n", __func__);
--		return;
--	}
--
--	omap242x_mmc_mux(mmc_data[0]);
--	omap_mmc_add(name, 0, OMAP2_MMC1_BASE, OMAP2420_MMC_SIZE,
--					INT_24XX_MMC_IRQ, mmc_data[0]);
--}
--
--#endif
--
--/*-------------------------------------------------------------------------*/
--
- #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
- #define OMAP_HDQ_BASE	0x480B2000
- static struct resource omap_hdq_resources[] = {
-diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
-index ef2a692..d75839a 100644
---- a/arch/arm/mach-omap2/msdi.c
-+++ b/arch/arm/mach-omap2/msdi.c
-@@ -24,9 +24,11 @@
- #include <linux/kernel.h>
- 
- #include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
- #include <plat/mmc.h>
- 
- #include "common.h"
-+#include "mux.h"
- 
- /*
-  * MSDI_CON_OFFSET: offset in bytes of the MSDI IP block's CON register
-@@ -86,3 +88,69 @@ int omap_msdi_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+static inline void omap242x_mmc_mux(struct omap_mmc_platform_data
-+				    *mmc_controller)
-+{
-+	if ((mmc_controller->slots[0].switch_pin > 0) && \
-+		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
-+		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
-+					OMAP_PIN_INPUT_PULLUP);
-+	if ((mmc_controller->slots[0].gpio_wp > 0) && \
-+		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
-+		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
-+					OMAP_PIN_INPUT_PULLUP);
-+
-+	omap_mux_init_signal("sdmmc_cmd", 0);
-+	omap_mux_init_signal("sdmmc_clki", 0);
-+	omap_mux_init_signal("sdmmc_clko", 0);
-+	omap_mux_init_signal("sdmmc_dat0", 0);
-+	omap_mux_init_signal("sdmmc_dat_dir0", 0);
-+	omap_mux_init_signal("sdmmc_cmd_dir", 0);
-+	if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
-+		omap_mux_init_signal("sdmmc_dat1", 0);
-+		omap_mux_init_signal("sdmmc_dat2", 0);
-+		omap_mux_init_signal("sdmmc_dat3", 0);
-+		omap_mux_init_signal("sdmmc_dat_dir1", 0);
-+		omap_mux_init_signal("sdmmc_dat_dir2", 0);
-+		omap_mux_init_signal("sdmmc_dat_dir3", 0);
-+	}
-+
-+	/*
-+	 * Use internal loop-back in MMC/SDIO Module Input Clock
-+	 * selection
-+	 */
-+	if (mmc_controller->slots[0].internal_clock) {
-+		u32 v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
-+		v |= (1 << 24);
-+		omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
-+	}
-+}
-+
-+void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
-+{
-+	struct platform_device *pdev;
-+	struct omap_hwmod *oh;
-+	int id = 0;
-+	char *oh_name = "msdi1";
-+	char *dev_name = "mmci-omap";
-+
-+	if (!mmc_data[0]) {
-+		pr_err("%s fails: Incomplete platform data\n", __func__);
-+		return;
-+	}
-+
-+	omap242x_mmc_mux(mmc_data[0]);
-+
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh) {
-+		pr_err("Could not look up %s\n", oh_name);
-+		return;
-+	}
-+	pdev = omap_device_build(dev_name, id, oh, mmc_data[0],
-+				 sizeof(struct omap_mmc_platform_data), NULL, 0, 0);
-+	if (IS_ERR(pdev))
-+		WARN(1, "Can'd build omap_device for %s:%s.\n",
-+					dev_name, oh->name);
-+}
-+
--- 
-1.7.10
+> 
+> Thanks,
+> 
+> - Chris.
+> -- 
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
