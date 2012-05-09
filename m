@@ -1,49 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 08:15:11 -0700
-Subject: [GIT PULL] omap fixes for v3.4-rc6
-In-Reply-To: <1673508.aX9Ao89479@avalon>
-References: <20120507223632.GP5088@atomide.com>
- <CAOesGMjHEy0Rz+ow7J3BuUtt3h3SjU+6gG=PPGTu3tMNZXy6nQ@mail.gmail.com>
- <1673508.aX9Ao89479@avalon>
-Message-ID: <20120509151510.GG5088@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 9 May 2012 16:28:28 +0100
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <201205091503.22950.arnd@arndb.de>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205091419.50736.arnd@arndb.de>
+ <20120509144241.GW3955@opensource.wolfsonmicro.com>
+ <201205091503.22950.arnd@arndb.de>
+Message-ID: <20120509152827.GA3955@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [120509 04:09]:
-> Hi Olof,
-> 
-> On Tuesday 08 May 2012 23:48:06 Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Mon, May 7, 2012 at 3:36 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > > The following changes since commit 
-> 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
-> > [..]
-> > 
-> > > Enrico Butera (1):
-> > >      ARM: OMAP: igep0020: fix smsc911x dummy regulator id
-> > 
-> > Hmm. Picking 40 without any kind of comment in the code isn't doing
-> > any favors for future readers. Seems like 1 would be free on this
-> > board, from the rest of the board file to judge (one other
-> > reg-fixed-regulator platform device)?
-> > 
-> > Please either comment why you picked 40 (i.e. it's a random number),
-> > or change it to something a little less random like 1. :)
+On Wed, May 09, 2012 at 03:03:22PM +0000, Arnd Bergmann wrote:
 
-I'll use the update patch from Enrico.
+> I mean that each device providing resources of the new type would need
+> to register its resources to the same root resource with non-conclicting
 
-> > > Laurent Pinchart (1):
-> > >      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
-> > 
-> > Is this a regression? I don't see any recent changes regarding this,
-> > so it's hard to tell. If not then I'd rather hold off for the merge
-> > window given that we're at -rc6.
-> 
-> It's not a regression, I'm fine with holding off until the v3.5 merge window.
+Oh, right - I see what you mean.  I was thinking of creating a
+per-chip parent for each tree rather than trying to make them a unified
+tree, though I guess it's useful for diagnostics.  Multi-level resources
+might be slightly fun with this though I'm not sure how realistic they
+are.
 
-And will move this one into fixes-non-critical.
+> addresses. Having resources hanging in the air without a parent pointer
+> is not good, although we seem to be doing that for a lot of platform
+> devices these days, where we just pass the struct resource from platform
+> code to a driver without ever registering it at each end.
 
-Will send a new pull request shortly.
-
-Tony
+They should all be being registered by the platform core when the
+platform device is registered I think?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120509/c99a5363/attachment-0001.sig>
