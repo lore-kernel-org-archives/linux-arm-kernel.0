@@ -1,40 +1,129 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 9 May 2012 09:57:36 +0200
-Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
-In-Reply-To: <201205051921.13209.arnd@arndb.de>
-References: <20120503144645.6390.62303.sendpatchset@w520>
- <201205050722.45500.arnd@arndb.de> <201205052108.03001.rjw@sisk.pl>
- <201205051921.13209.arnd@arndb.de>
-Message-ID: <CAMuHMdUR4mk6ErCj8o2xt2k3vw9RYe5c7MvtQ3q0Xq2sfnV32A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 May 2012 10:02:14 +0200
+Subject: [PATCH v3 2/3] ARM: imx: Add imx5 cpuidle driver
+In-Reply-To: <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
+References: <1336425407-20308-1-git-send-email-rob.lee@linaro.org>
+ <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120509080214.GJ27341@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 5, 2012 at 9:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 05 May 2012, Rafael J. Wysocki wrote:
->> Now, if you insist on us having a separate mach- directory for every platform
->> (SoC), we can do that I think, but then we should start with splitting up the
->> existing mach-shmobile into a number of SoC-specific directories rather than
->> adding new mach- directories for random new parts, because that goes against
->> our development history to date, which is important too IMHO.
->
-> All the chips in there so far share a common ancestry and they all use a
-> significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
-> sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
-> uses none of those and apparently was developed by NEC before the merger with
-> Renesas.
+On Mon, May 07, 2012 at 04:16:46PM -0500, Robert Lee wrote:
+> Add imx5 cpuidle driver.
+> 
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+>  arch/arm/mach-imx/mm-imx5.c |   42 +++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 39 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+> index d6b7e9f..0b3a4cc 100644
+> --- a/arch/arm/mach-imx/mm-imx5.c
+> +++ b/arch/arm/mach-imx/mm-imx5.c
+> @@ -20,26 +20,61 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> +#include <mach/cpuidle.h>
+>  #include <mach/devices-common.h>
+>  #include <mach/iomux-v3.h>
+>  
+>  static struct clk *gpc_dvfs_clk;
+>  
+> -static void imx5_idle(void)
+> +static int imx5_idle(void)
+>  {
+> +	int ret = 0;
+> +
+>  	/* gpc clock is needed for SRPG */
+>  	if (gpc_dvfs_clk == NULL) {
+>  		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
 
-Ah, I didn't know NEC joined Renesas, but Wikipedia proves you're right.
+This clk_get should go away here and be moved somewhere to
+initialization. Also, if getting this clock fails we can still
+do regular cpu_do_idle. Additionally, if clk_get fails, we'll
+have a ERR_PTR value in gpc_dvfs_clk in which case the
+gpc_dvfs_clk == NULL won't trigger next time you are here and
+then you'll enable a nonexisting clock below.
 
-So, any similarities with the MIPS-based NEC EMMA SOCs, i.e. more code to
-share?
+>  		if (IS_ERR(gpc_dvfs_clk))
+> -			return;
+> +			return -ENODEV;
+>  	}
+>  	clk_enable(gpc_dvfs_clk);
+>  	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+>  	if (!tzic_enable_wake())
+>  		cpu_do_idle();
+> +	else
+> +		ret = -EBUSY;
+>  	clk_disable(gpc_dvfs_clk);
+> +
+> +	return ret;
+> +}
+> +
+> +static int imx5_cpuidle_enter(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int idx)
+> +{
+> +	int ret;
+> +
+> +	ret = imx5_idle();
+> +
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return idx;
+>  }
+>  
+> +static struct cpuidle_driver imx5_cpuidle_driver = {
+> +	.name			= "imx5_cpuidle",
+> +	.owner			= THIS_MODULE,
+> +	.en_core_tk_irqen	= 1,
+> +	.states[0]	= {
+> +		.enter			= imx5_cpuidle_enter,
+> +		.exit_latency		= 20, /* max latency at 160MHz */
+> +		.target_residency	= 1,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +		.name			= "IMX5 SRPG",
+> +		.desc			= "CPU state retained,powered off",
+> +	},
 
-Gr{oetje,eeting}s,
+I wonder why you don't add the default ARM_CPUIDLE_WFI_STATE_PWR state.
+The above is something different, right? It has a greater exit latency
+than ARM_CPUIDLE_WFI_STATE_PWR, so why don't we add it here aswell?
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
+> +	.state_count		= 1,
+> +};
+> +
+>  /*
+>   * Define the MX50 memory map.
+>   */
+> @@ -103,7 +138,7 @@ void __init imx51_init_early(void)
+>  	mxc_set_cpu_type(MXC_CPU_MX51);
+>  	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+>  	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+> -	arm_pm_idle = imx5_idle;
+> +	arm_pm_idle = (void (*)(void))imx5_idle;
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Still this looks suspicious. Reading this will lead to the question why
+this prototype is casted. Please just add a imx5_pm_idle with the
+correct prototype.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+>  }
+>  
+>  void __init imx53_init_early(void)
+> @@ -238,4 +273,5 @@ void __init imx53_soc_init(void)
+>  void __init imx51_init_late(void)
+>  {
+>  	mx51_neon_fixup();
+> +	imx_cpuidle_init(&imx5_cpuidle_driver);
+>  }
+> -- 
+> 1.7.10
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
