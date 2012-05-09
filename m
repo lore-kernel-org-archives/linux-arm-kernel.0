@@ -1,83 +1,69 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 9 May 2012 09:58:12 +0000
-Subject: [PATCH] ARM: OMAP2+: irq: Increase no of supported interrupts
- to 128
-In-Reply-To: <87lil2o6u1.fsf@ti.com>
-References: <1336486679-15892-1-git-send-email-hvaibhav@ti.com>
- <87lil2o6u1.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1C06F@DBDE01.ent.ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 May 2012 14:13:35 +0300
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <20120507000329.GB14559@gmail.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com>
+Message-ID: <20120509111335.GC20304@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 00:09:34, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+On Mon, May 07, 2012 at 02:03:29AM +0200, Mike Turquette wrote:
+> On 20120503-19:13, Peter De Schrijver wrote:
+> > Hi,
+> > 
+> > I started looking into what would be needed to move our tegra30 clock code
+> > to the common clock framework. The tegra30 clocktree is rather flat. Basically
+> > there are a bunch of sources (13 PLLs, external audio clocks, osc and 32Khz)
+> > and peripheral clocks which have a mux (with 4 or more inputs), a divider and
+> > a gate. So almost every peripheral clock can have multiple parents.
+> > 
+> > Some questions:
+> > 
+> > 1) should these peripheral clocks be modelled as 3 different clocks
+> >    (mux -> divider -> gate) or would it be better to make a new clock type for
+> >    this?
+> > 
 > 
-> > With addition to TI81XX, AM33XX family of devices, the number
-> > of interrupts supported has increased to 128, compared to 96.
-> > The current implementation for irq handling is hardcoded to use
-> > 96 interrupts (with 3 register-sets to handle), this patch cleanups
-> > the code, to increase maximum number of interrupts support
-> > to 128, with dynamic detection of no of registers required for
-> > handling all interrupts.
-> >
-> >
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > ---
-> > Ideally, we should use dynamic allocation to allocate memory
-> > for registers/arrays, 
+> That is really for you to decide.  If the semantics of the existing mux,
+> divider and gate in drivers/clk/clk-*.c work well for you then I think
+> the answer is "yes".  There is infrastructure for register-access
+> locking in those common types which might help your complex clocks.
 > 
-> Yes.
+> Thanks to the parent rate propagation stuff in clk_set_rate it should be
+> possible for your drivers to only be aware of the gate and call
+> clk_set_rate on only that clock, which propagates up to the divider and,
+> if necessary, again propagates up to the mux.
 > 
+> I encourage you to try that first.  But if you find the semantics of
+> those basic clock types aren't cutting it for you then you must create a
+> type which is platform-specific.
+> 
+> > 2) how to define the default parent? in many cases the hw reset value isn't
+> >    a very sensible choice, so the kernel probably needs to set a parent of
+> >    many of them if we don't want to rely on bootloader configuration.
+> 
+> The only related thing handled at the framework level is _discovery_ of
+> the parent during clock registration/initialization.  If you don't trust
+> the bootloader and want to set things up as soon as possible (a wise
+> move) then I suggest you do so from your platform clock code at the same
+> time that you register your clocks with the framework.  Something like:
+> 
+> 	struct clk *c;
+> 	c = clk_register(...);
+> 	if (IS_ERR(c))
+> 		omg_fail();
+> 	clk_set_parent(c, b);
+> 
+> Where 'b' is a parent of 'c'.  Register your clock tree top-down and you
+> can re-parent as you go.
 
-Thanks Kevin, I will put this activity in my TODO list.
-
-> > may be too much cleanup for this patch,
-> 
-> There is no such thing as too much cleanup.  ;)  
-> And the INTC is in need of it, IMO.
-> 
-
-Indeed it is in need of cleanup...
-
-
-> > so as of now restricting to minimal changes to fit devices
-> > like, am33xx/ti81xx.
-> 
-> Then someone else will have to do the cleanup later.  It would be
-> greatly appreciated if you could do the necessary cleanup in order to
-> cleanly add support for more SoCs.  Yes, we probably should've insisted
-> when support for TI81xx was added, but that one slipped in under the
-> radar.
-> 
-
-Yeah, I understand. As I said I will put this activity in my TODO list.
-
-> For starters, the notion of a banks this code is a rather messed up and
-> needs a cleanup.  A bank is supposed to be a group of 32 interrupts, 
-> and the INTC is made up of 3 (or 4) banks.   However, the current
-> code creates a single "bank" of 96 (or 128) interrupts.  
-> 
-> It also confuses what registers are part of the bank and what are global
-> to the INTC.  This confusion is both in init and in context save/restore.
-> 
-> IMO, to clean this up, first the notion of banks needs to be fixed in
-> that code there is a distinction between what acts on banks and what
-> works on the whole INTC.
-> 
-> Then, the init/alloc should be done dynamically based on the number of
-> interrupts passed to omap_init_irq()
-> 
-
-Kevin,
-Let me finish up with am33xx baseport upstream activity which is currently 
-going on at full swing, then next thing I will pick up is this code cleanup.
-
-I still feel, this is still a valid cleanup patch, and can be merged, as it 
-is required/used when we do major cleanup.
+Ok. Thanks. One more question. We have some clocks with special features
+such as request lines for clock outputs, delays for clocks recovered from
+an external source or several divisors which are used based on the state
+of the module which is served by the clock (eg. an idle divisor and an active
+divisor). How should these be modelled?
 
 Thanks,
-Vaibhav
+
+Peter.
