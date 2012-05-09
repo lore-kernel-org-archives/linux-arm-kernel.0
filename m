@@ -1,21 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 14:56:34 +0200
-Subject: [PATCH V3 0/5] pinctrl: SPEAr Updates
-In-Reply-To: <cover.1336448307.git.viresh.kumar@st.com>
-References: <cover.1336448307.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdY3SQqKpzz0YsS4bZEUsNmk5ngdtON9C8QtcA1aWQeGqQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  9 May 2012 15:02:00 +0200
+Subject: [PATCH 1/9] ARM: AT91: Add platform data for the AT91 ADCs
+In-Reply-To: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336568528-29877-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 5:40 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+The AT91 SoCs often embeds an ADC. This patch adds the needed
+platform data to specify the informations required by the driver
+to work properly.
 
-> This patchset mainly focuses on providing support to configure SPEAr pads as
-> gpios. For this i have added a gpiolib based driver and few changes in other
-> SPEAr pinctrl drivers.
+For now, we only need the reference voltage and which channels
+are available on the board.
 
-I've already ACK:ed it I think, I guess you will send this as a pull
-request to ARM SoC maintainers since that is where the dependent
-branch is?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ include/linux/platform_data/at91_adc.h |   61 ++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 include/linux/platform_data/at91_adc.h
 
-Yours,
-Linus Walleij
+diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+new file mode 100644
+index 0000000..f9e2f00
+--- /dev/null
++++ b/include/linux/platform_data/at91_adc.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (C) 2011 Free Electrons
++ *
++ * Licensed under the GPLv2 or later.
++ */
++
++#ifndef _AT91_ADC_H_
++#define _AT91_ADC_H_
++
++/**
++ * struct at91_adc_reg_desc - Various informations relative to registers
++ * @channel_base:	Base address for the channel data registers
++ * @drdy_mask:		Mask of the DRDY field in the relevant registers
++			(Interruptions registers mostly)
++ * @status_register:	Address of the Interrupt Status Register
++ * @trigger_register:	Address of the Trigger setup register
++ */
++struct at91_adc_reg_desc {
++	u8	channel_base;
++	u32	drdy_mask;
++	u8	status_register;
++	u8	trigger_register;
++};
++
++/**
++ * struct at91_adc_trigger - description of triggers
++ * @name:		name of the trigger advertised to the user
++ * @value:		value to set in the ADC's mode register to enable
++			the trigger
++ * @is_external:	is the trigger relies on an external pin ?
++ */
++struct at91_adc_trigger {
++	const char	*name;
++	u8		value;
++	bool		is_external;
++};
++
++/**
++ * struct at91_adc_data - platform data for ADC driver
++ * @channels_used:		channels in use on the board as a bitmask
++ * @num_channels:		global number of channels available on the board
++ * @registers:			Registers definition on the board
++ * @startup_time:		startup time of the ADC in microseconds
++ * @trigger_list:		Triggers available in the ADC
++ * @trigger_number:		Number of triggers available in the ADC
++ * @use_external_triggers:	does the board has external triggers availables
++ * @vref:			Reference voltage for the ADC in millivolts
++ */
++struct at91_adc_data {
++	unsigned long			channels_used;
++	u8				num_channels;
++	struct at91_adc_reg_desc	*registers;
++	u8				startup_time;
++	struct at91_adc_trigger		*trigger_list;
++	u8				trigger_number;
++	bool				use_external_triggers;
++	u16				vref;
++};
++
++extern void __init at91_add_device_adc(struct at91_adc_data *data);
++#endif
+-- 
+1.7.9.5
