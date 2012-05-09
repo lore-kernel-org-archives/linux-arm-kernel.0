@@ -1,35 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 13:50:09 -0700
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <CACRpkdaCg7Ocy1wzdZt1x4VrnV1JrmHkLLwF4vV6GvMjXP3BjA@mail.gmail.com>
-References: <20120502172401.GG3739@atomide.com>
- <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com>
- <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org>
- <20120504150342.GI5140@atomide.com>
- <CACRpkdaCg7Ocy1wzdZt1x4VrnV1JrmHkLLwF4vV6GvMjXP3BjA@mail.gmail.com>
-Message-ID: <20120509205009.GW5088@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 09 May 2012 14:53:49 -0600
+Subject: [PATCH 12/12] ARM: ux500: switch MSP to using pinctrl for pins
+In-Reply-To: <1336470347-23886-1-git-send-email-linus.walleij@stericsson.com>
+References: <1336470347-23886-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4FAAD95D.9010108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [120509 02:13]:
-> On Fri, May 4, 2012 at 5:03 PM, Tony Lindgren <tony@atomide.com> wrote:
+On 05/08/2012 03:45 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> > Also I think we should let the pinctrl
-> > core eventually manage the pins more too. Right now the pins are
-> > a static array in the driver, which makes things unnecessarily
-> > complex for the DT case. It would be nice to also have something like
-> > pinctrl_register/unregister_pin instead of requiring them all
-> > be registered while registering with the framework initially.
-> 
-> Not instead of but in addition to :-)
-> 
-> One does not exclude the other. But a good general idea if you need
-> this, just introduce it.
+> The MSP platform data callbacks use the old custom callbacks to
+> set the state of the pins, switch over to using pinctrl.
 
-Sure agreed it does not exclude the other. Will take a look when
-I have a chance.
+Aside from the comments I've already made, I guess you can consider the
+whole series:
 
-Tony
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+I'm not at all familiar with this HW, and didn't look at every detail,
+but at least I see no particular reason not to ack it.
