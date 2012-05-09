@@ -1,43 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 09 May 2012 11:22:46 +0100
-Subject: [PATCH 02/15] ARM: ux500: Remove unused i2c platform_data
- initialisation code
-In-Reply-To: <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
-Message-ID: <4FAA4576.1020106@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  9 May 2012 11:06:05 +0200
+Subject: [PATCH 8/9] Add ADC driver to the at91sam9x5 dtsi
+In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336554366-16957-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/12 09:46, Linus Walleij wrote:
-> On Fri, May 4, 2012 at 8:23 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> Now that u5500 is obsolete, u8500 is the only user of the Nomadik
->> i2c driver.
->
-> Well actually arch/arm/mach-nomadik has this block too,
-> but it's not making use of it right now, so why not.
->
->> As such there is no requirement to differentiate between
->> initialisation values. By the time a new SoC is released, almost all
->> of the ux500 platform will be DT:ed, so we can make decisions based
->> on the compatible property instead.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> So why not copy the contents of arch/arm/plat-nomadik/include/plat/i2c.h
-> into drivers/i2c/busses/i2c-nomadik.c and delete that header from
-> plat at the same time?
->
-> Then there sure is no way for platforms to sneak in any platform
-> data any other way.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi |   38 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-I have no problem in doing that. Can I submit a separate patch?
-
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index dd4ed74..03b9eff 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -190,6 +190,44 @@
+ 				interrupts = <27 4>;
+ 				status = "disabled";
+ 			};
++
++			adc0: adc at f804c000 {
++				compatible = "atmel,at91-adc";
++				reg = <0xf804c000 0x100>;
++				interrupts = <19 4>;
++				atmel,adc-use-external;
++				atmel,adc-channels-used = <0xffff>;
++				atmel,adc-vref = <3300>;
++				atmel,adc-num-channels = <12>;
++				atmel,adc-startup-time = <40>;
++				atmel,adc-channel-base = <0x50>;
++				atmel,adc-drdy-mask = <0x1000000>;
++				atmel,adc-status-register = <0x30>;
++				atmel,adc-trigger-register = <0xc0>;
++
++				trigger at 0 {
++					trigger-name = "external-rising";
++					trigger-value = <0x1>;
++					trigger-external;
++				};
++
++				trigger at 1 {
++					trigger-name = "external-falling";
++					trigger-value = <0x2>;
++					trigger-external;
++				};
++
++				trigger at 2 {
++					trigger-name = "external-any";
++					trigger-value = <0x3>;
++					trigger-external;
++				};
++
++				trigger at 3 {
++					trigger-name = "continuous";
++					trigger-value = <0x6>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
