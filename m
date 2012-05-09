@@ -1,119 +1,71 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 9 May 2012 16:44:24 +0530
-Subject: [GIT PULL] SPEAr13xx support updates for v-3.5
-Message-ID: <1336562064-24407-1-git-send-email-viresh.kumar@st.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 9 May 2012 12:16:15 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120509093334.GS26481@n2100.arm.linux.org.uk>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+Message-ID: <20120509111614.GH3955@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+On Wed, May 09, 2012 at 10:33:34AM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 09, 2012 at 11:27:17AM +0200, Linus Walleij wrote:
 
-The following changes since commit df8e37e5972dd4ea2a4a0e5dbfdab14b00e98b70:
+> > There is a DMAengine helper in ALSA SoC these days,
+> > sound/soc/soc-dmaengine-pcm.c which does not yet include
+> > get position calls, but I expect that's where the ALSA glue will
+> > end up.
 
-  SPEAr: Switch to common clock framework (2012-05-09 14:44:57 +0530)
+> I'm more or less ignoring that because with current DMA engine stuff, it's
+> buggy.  The presence of such a user doesn't really define how this
+> interface supposed to work either.
 
-are available in the git repository at:
+We need to at least include it in the fixes; I'm currently insisting
+that any dmaengine based device uses it.  If we can't come up with a
+standard library to map the dmaengine based DMA controllers to the ALSA
+userspace API something is seriously wrong.  We definitely shouldn't be
+treating it as an API reference but we should be ensuring that it does
+the best possible job with the APIs that do exist and enhancing the
+underlying APIs if that's needed.
 
-  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear13xx
+Looking at the code the current usage doesn't seem obviously wrong so
+there's some work to do - we get a callback assigned on each descriptor
+we submit so it's a bit surprising that this might not get delivered,
+though as has been discussed further up the thread that's something that
+might actually happen and perhaps we need to clarify the interfaces
+here.
 
-for you to fetch changes up to 0e74bbef7c071aafb90ab10728197b1f325d1b5c:
+> Given that counting the number of period callbacks to determine the
+> position is buggy, soc-dmaengine-pcm.c is buggy as it currently stands.
+> I'm willing to bet that if ALSA requests a small period size, and you
+> load a system up with lots of activity, you'll eventually hear
+> corrupted audio.
 
-  SPEAr: Update MAINTAINERS and Documentation (2012-05-09 14:46:46 +0530)
+> It's difficult to test because the corruption will probably only be
+> occasional and it'll be purely audio based - it'll basically play the
+> bit of the buffer that's currently being loaded with new data from time
+> to time because ALSAs idea of where the DMA is vs where the hardware
+> is will gradually slip over time.
 
-----------------------------------------------------------------
-Viresh Kumar (10):
-      SPEAr: Add DT bindings for SPEAr's timer
-      SPEAr13xx: Add header files
-      SPEAr13xx: Add source files
-      SPEAr13xx: Add common clock framework support
-      pinctrl: SPEAr: Create macro for declaring GPIO PINS
-      pinctrl: Add SPEAr13xx pinctrl drivers
-      SPEAr13xx: Add dts and dtsi files
-      SPEAr13xx: Add compilation support
-      SPEAr13xx: Add defconfig
-      SPEAr: Update MAINTAINERS and Documentation
+Right, any driver relying on this code must currently be confident that the
+completion callbacks can actually be delivered before the next period
+expires (for example, by requiring a large enough period size and
+ensuring that the completion gets delivered in hard IRQ context on the
+DMA side so there's less impact from load).  This might break down under
+extreme loads, though if it does I rather suspect that we'd underflow
+anyway.
 
- Documentation/arm/SPEAr/overview.txt               |   32 +-
- .../devicetree/bindings/arm/spear-timer.txt        |   18 +
- Documentation/devicetree/bindings/arm/spear.txt    |   14 +-
- .../devicetree/bindings/pinctrl/pinctrl_spear.txt  |   47 +
- MAINTAINERS                                        |   13 +
- arch/arm/Makefile                                  |    2 +
- arch/arm/boot/dts/spear1310-evb.dts                |  267 +++
- arch/arm/boot/dts/spear1310.dtsi                   |  184 ++
- arch/arm/boot/dts/spear1340-evb.dts                |  283 +++
- arch/arm/boot/dts/spear1340.dtsi                   |   56 +
- arch/arm/boot/dts/spear13xx.dtsi                   |  262 +++
- arch/arm/boot/dts/spear3xx.dtsi                    |    6 +
- arch/arm/boot/dts/spear600.dtsi                    |    6 +
- arch/arm/configs/spear13xx_defconfig               |   91 +
- arch/arm/mach-spear13xx/Kconfig                    |   20 +
- arch/arm/mach-spear13xx/Makefile                   |   10 +
- arch/arm/mach-spear13xx/Makefile.boot              |    6 +
- arch/arm/mach-spear13xx/headsmp.S                  |   47 +
- arch/arm/mach-spear13xx/hotplug.c                  |  119 ++
- arch/arm/mach-spear13xx/include/mach/debug-macro.S |   14 +
- arch/arm/mach-spear13xx/include/mach/dma.h         |  128 ++
- arch/arm/mach-spear13xx/include/mach/generic.h     |   49 +
- arch/arm/mach-spear13xx/include/mach/gpio.h        |   19 +
- arch/arm/mach-spear13xx/include/mach/hardware.h    |    1 +
- arch/arm/mach-spear13xx/include/mach/irqs.h        |   20 +
- arch/arm/mach-spear13xx/include/mach/spear.h       |   62 +
- arch/arm/mach-spear13xx/include/mach/timex.h       |   19 +
- arch/arm/mach-spear13xx/include/mach/uncompress.h  |   19 +
- arch/arm/mach-spear13xx/platsmp.c                  |  127 ++
- arch/arm/mach-spear13xx/spear1310.c                |   88 +
- arch/arm/mach-spear13xx/spear1340.c                |  192 ++
- arch/arm/mach-spear13xx/spear13xx.c                |  197 ++
- arch/arm/mach-spear3xx/include/mach/generic.h      |    2 +-
- arch/arm/mach-spear3xx/include/mach/irqs.h         |    1 -
- arch/arm/mach-spear3xx/include/mach/spear.h        |    1 -
- arch/arm/mach-spear3xx/spear3xx.c                  |    2 +-
- arch/arm/mach-spear6xx/include/mach/generic.h      |    2 +-
- arch/arm/mach-spear6xx/include/mach/irqs.h         |    3 -
- arch/arm/mach-spear6xx/include/mach/spear.h        |    1 -
- arch/arm/mach-spear6xx/spear6xx.c                  |    2 +-
- arch/arm/plat-spear/Kconfig                        |   12 +
- arch/arm/plat-spear/Makefile                       |    5 +-
- arch/arm/plat-spear/restart.c                      |    5 +
- arch/arm/plat-spear/time.c                         |   31 +-
- drivers/clk/spear/Makefile                         |    2 +
- drivers/clk/spear/spear1310_clock.c                | 1106 ++++++++++
- drivers/clk/spear/spear1340_clock.c                |  964 +++++++++
- drivers/pinctrl/spear/Kconfig                      |   10 +
- drivers/pinctrl/spear/Makefile                     |    2 +
- drivers/pinctrl/spear/pinctrl-spear.h              |  251 +++
- drivers/pinctrl/spear/pinctrl-spear1310.c          | 2198 ++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear1340.c          | 1989 ++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear3xx.c           |  103 +-
- 53 files changed, 8965 insertions(+), 145 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spear-timer.txt
- create mode 100644 arch/arm/boot/dts/spear1310-evb.dts
- create mode 100644 arch/arm/boot/dts/spear1310.dtsi
- create mode 100644 arch/arm/boot/dts/spear1340-evb.dts
- create mode 100644 arch/arm/boot/dts/spear1340.dtsi
- create mode 100644 arch/arm/boot/dts/spear13xx.dtsi
- create mode 100644 arch/arm/configs/spear13xx_defconfig
- create mode 100644 arch/arm/mach-spear13xx/Kconfig
- create mode 100644 arch/arm/mach-spear13xx/Makefile
- create mode 100644 arch/arm/mach-spear13xx/Makefile.boot
- create mode 100644 arch/arm/mach-spear13xx/headsmp.S
- create mode 100644 arch/arm/mach-spear13xx/hotplug.c
- create mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-spear13xx/include/mach/dma.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1310_misc_regs.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1340_misc_regs.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-spear13xx/platsmp.c
- create mode 100644 arch/arm/mach-spear13xx/spear1310.c
- create mode 100644 arch/arm/mach-spear13xx/spear1340.c
- create mode 100644 arch/arm/mach-spear13xx/spear13xx.c
- create mode 100644 drivers/clk/spear/spear1310_clock.c
- create mode 100644 drivers/clk/spear/spear1340_clock.c
- create mode 100644 drivers/pinctrl/spear/pinctrl-spear1310.c
- create mode 100644 drivers/pinctrl/spear/pinctrl-spear1340.c
+If we can resolve the issues with reading the current position in
+dmaengine then this should be fairly simple to address more
+comprehensively of course, though there will be some hardware imposed
+limits on what we can do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120509/1bc521af/attachment-0001.sig>
