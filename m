@@ -1,41 +1,56 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 9 May 2012 09:26:09 -0700
-Subject: [PATCH] ARM: OMAP: Cleanup Beagleboard DVI reset gpio
-In-Reply-To: <20120509155555.GL5088@atomide.com>
-References: <87zk9ijp86.fsf@ti.com>
- <1336531746-29027-1-git-send-email-Russ.Dill@ti.com>
- <20120509155555.GL5088@atomide.com>
-Message-ID: <CA+Bv8XZ4FYu+djvOMxhr6MbP8QYn4OL1PTc6TDJt42CpiESYDQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 16:26:27 +0000
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <20120509160747.GA10241@n2100.arm.linux.org.uk>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205091243.13206.arnd@arndb.de>
+ <20120509160747.GA10241@n2100.arm.linux.org.uk>
+Message-ID: <201205091626.27829.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 8:55 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Tomi,
->
-> * Russ Dill <Russ.Dill@ti.com> [120508 19:52]:
->> This removes several boot warnings from board-omap3beagle.c:
->>
->> ?- gpio_request: gpio--22 (DVI reset) status -22
->> ?- Unable to get DVI reset GPIO
->>
->> There is a combination of leftover code and revision confusion.
->> Additionally, xM support is currently a hack.
->>
->> For original Beagleboard this removes the double initialization of GPIO
->> 170, properly configures it as an output, and wraps the initialization
->> in an if block so that xM does not attempt to request it.
->>
->> For Beagleboard xM it removes reference to GPIO 129 which was part
->> of rev A1 and A2 designs, but never functioned. It then properly assigns
->> beagle_dvi_device.reset_gpio in beagle_twl_gpio_setup and removes the
->> hack of initializing it high. Additionally, it uses
->> gpio_set_value_cansleep since this GPIO is connected through i2c.
->>
->> Unfortunately, there is no way to tell the difference between xM A2 and
->> A3. However, GPIO 129 does not function on rev A1 and A2, and the TWL
->> GPIO used on A3 and beyond is not used on rev A1 and A2, there are no
->> problems created by this fix.
->
-> Can you check if this needs updates for your clean up patches?
+On Wednesday 09 May 2012, Russell King - ARM Linux wrote:
+> Instead, we should be having per-device resources trees.  So, for instance,
+> an I2C device with two functions, function 1 say owns register indices
+> 0-0x3f and function 2 owns 0x40-0x7f.  We should have:
+> 
+> struct i2c_blah_driver_info {
+>         struct resource reg_res;
+> };
+> 
+>         priv->reg_res.start = 0;
+>         priv->reg_res.end = 0x7f;
+>         priv->reg_res.flags = 0;
+> 
+>         subdev1->resource[0].start = 0;
+>         subdev1->resource[0].end = 0x3f;
+>         subdev1->resource[0].flags = 0;
+> 
+>         ret = request_resource(&priv->reg_res, &subdev1->resource[0]);
+>         /* check ret */
+> 
+>         subdev2->resource[0].start = 0x40;
+>         subdev2->resource[0].end = 0x7f;
+>         subdev2->resource[0].flags = 0;
+> 
+>         ret = request_resource(&priv->reg_res, &subdev2->resource[0]);
+>         /* check ret */
+> 
+> This means that we end up with lots of per-device resource trees rooted
+> at the top-level-device driver, each effectively with their own separate
+> name spaces.
 
-I'm not sure what you mean, can you be more specific?
+Ah, I had not realized that this is possible. In this case, it certainly
+makes sense to have a separate space for each device that provides a
+register range.
+
+> Do we care about making them appear in procfs?  I suspect at this stage
+> that would be wrong.  If we care at all, they should probably be per-
+> top-level-device sysfs files - and we should have a function which sysfs
+> can use along with the root resource to create that output.
+
+If the resources have separate roots, I see no way how to make them
+all appear in the same procfs file. Having them represented in sysfs
+the way you describe sounds useful but not important.
+
+	Arnd
