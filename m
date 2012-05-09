@@ -1,29 +1,45 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 10 May 2012 00:16:14 +0800
-Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
- consolidate LED driver in ARM
-In-Reply-To: <20120508121946.c20adb87.akpm@linux-foundation.org>
-References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
- <CAK5ve-J9uTJKC01XFTzU34MY4z_8yVRwTUVXP99Czu=oL-mqxQ@mail.gmail.com>
- <20120508121946.c20adb87.akpm@linux-foundation.org>
-Message-ID: <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 May 2012 17:18:39 +0100
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <20120509141316.GS3955@opensource.wolfsonmicro.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205081444.30915.arnd@arndb.de>
+ <20120508153155.GW15893@opensource.wolfsonmicro.com>
+ <201205091243.13206.arnd@arndb.de>
+ <20120509141316.GS3955@opensource.wolfsonmicro.com>
+Message-ID: <20120509161839.GB10241@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 3:19 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Wed, 9 May 2012 01:45:43 +0800
-> Bryan Wu <bryan.wu@canonical.com> wrote:
->
->> Any comments and suggestions about my v9 patchset.
->
-> The drivers/leds/ changes look OK to me.
+On Wed, May 09, 2012 at 03:13:16PM +0100, Mark Brown wrote:
+> On Wed, May 09, 2012 at 12:43:13PM +0000, Arnd Bergmann wrote:
+> > On Tuesday 08 May 2012, Mark Brown wrote:
+> 
+> > > The trick is allocating a bit for that flag, though I was thinking
+> > > earlier on we might be able to get away with carving it out of the bus
+> > > specific bits since I think anything using this wouldn't normally be
+> > > using resources for anything else except interrupts.  It does mean that
+> > > the resource type doesn't do the right thing though.
+> 
+> > Right, or we could try to kill IORESOURCE_BUS, which is hardly used
+> > anywhere and the users either get it wrong (bfin net2272), use it
+> > only in one file (acpi, broadcom-pci) or only for printing the
+> > contents (pnp).
+> 
+> Yeah, I looked at that - PCMCIA seems to be the major sticking point and
+> the usage there appeared totally sane, though it's possible that if I
+> stare at it hard enough I might convince myself that it only needs seven
+> bits and we can steal one.
 
-Thanks a lot, Andrew.
-Richard, what about merging this driver firstly in drivers/leds/?
+Err what?  PCMCIA doesn't use IORESOURCE_BUS.  (Don't get it confused with
+IORESOURCE_BUSY which is totally different).
 
-Best Regards,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.186-168-78255 Mobile
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+IORESOURCE_BUS seems to be used for:
+
+net2272: specifying the register index shift value
+acpi: to get the start/end PCI bus number values
+pnp: for ACPI bus numbers
+x86: PCI bus numbering
+
+So it looks like net2272 is abusing this resource type for its own
+purposes...  The others look like proper use of this resource type.
