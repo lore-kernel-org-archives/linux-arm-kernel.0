@@ -1,34 +1,41 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  9 May 2012 10:33:34 +0300
-Subject: [PATCH v2 3/3] OMAP: omap4panda: Use common configuration for V1V8,
- V2V1 supplies
-In-Reply-To: <1336548814-1005-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1336548814-1005-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1336548814-1005-4-git-send-email-peter.ujfalusi@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 May 2012 10:13:06 +0200
+Subject: [PATCH] ARM: mx35: add cpufreq support
+In-Reply-To: <20120509075618.GA4412@lovely.krouter>
+References: <20120507141437.GA9636@lovely.krouter>
+ <20120509072239.GG27341@pengutronix.de>
+ <20120509075618.GA4412@lovely.krouter>
+Message-ID: <20120509081306.GK27341@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These supplies going to be needed for the twl6040 driver.
+On Wed, May 09, 2012 at 09:56:18AM +0200, Christoph Fritz wrote:
+> Hi Sascha,
+> 
+> On Wed, May 09, 2012 at 09:22:39AM +0200, Sascha Hauer wrote:
+> > On Mon, May 07, 2012 at 04:14:37PM +0200, Christoph Fritz wrote:
+> > > This patch adds the mx35 to the supported cpu-families of the
+> > > "CPUfreq driver for i.MX CPUs".
+> > 
+> > I'm afraid this has to wait another cycle since you are patching a file
+> > that is scheduled to be replaced with common clock framework support.
+> 
+> Has this "scheduled replacement" somewhere (e.g. calendar) been
+> marked? So that I can check in the future before editing "scheduled
+> files".
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+The clock framework conversion has been a hot topic for quite a while
+now, but there hasn't been an official note about it outside the list.
+I can understand that the occasional linux arm kernel reader is not
+aware of it, but we currently have nothing in place to anounce such
+things. (Other than feature-removal.txt which seems not very suitable
+since no feature is removed, only updated)
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 1b782ba..c47feed 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -323,7 +323,9 @@ static int __init omap4_panda_i2c_init(void)
- 			TWL_COMMON_REGULATOR_VANA |
- 			TWL_COMMON_REGULATOR_VCXIO |
- 			TWL_COMMON_REGULATOR_VUSB |
--			TWL_COMMON_REGULATOR_CLK32KG);
-+			TWL_COMMON_REGULATOR_CLK32KG |
-+			TWL_COMMON_REGULATOR_V1V8 |
-+			TWL_COMMON_REGULATOR_V2V1);
- 	omap4_pmic_init("twl6030", &omap4_panda_twldata,
- 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
- 	omap_register_i2c_bus(2, 400, NULL, 0);
+Sascha
+
+
 -- 
-1.7.8.6
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
