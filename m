@@ -1,16 +1,19 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 9 May 2012 08:25:37 +0800
-Subject: [PATCH] ARM: imx6q: register phy fixup only when CONFIG_PHYLIB
- is enabled
-In-Reply-To: <1336484785-8881-1-git-send-email-shawn.guo@linaro.org>
-References: <1336478520.23308.36.camel@sauron.fi.intel.com>
- <1336484785-8881-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120509002536.GF2982@b20223-02.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2012 17:26:46 -0700
+Subject: [PATCH v2] GPMC: add ECC control definitions
+In-Reply-To: <1331204846-19573-1-git-send-email-yegorslists@googlemail.com>
+References: <1331204846-19573-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <20120509002645.GE5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I remembered you picked my patch that move sabrelite board specific
-code to a dedicate function? why not base on that?
+* yegorslists at googlemail.com <yegorslists@googlemail.com> [120308 02:36]:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+> 
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+> v2: READ and WRITE will be configured in the same way, so change the cases accordingly
 
-Thanks
-Richard 
+Applying into devel-gpmc thanks.
+
+Tony
