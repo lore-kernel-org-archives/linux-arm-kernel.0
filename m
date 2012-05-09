@@ -1,151 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 09 May 2012 16:27:31 -0700
-Subject: [PATCH 02/19] ARM: OMAP4: PM: save/restore all CM1/2 settings in
- OFF mode
-In-Reply-To: <1334914432-26456-3-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Fri, 20 Apr 2012 12:33:35 +0300")
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <1334914432-26456-3-git-send-email-t-kristo@ti.com>
-Message-ID: <87ehqtexzw.fsf@ti.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 10 May 2012 07:41:12 +0800
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <201205092038.16722.arnd.bergmann@linaro.org>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+ <201205092038.16722.arnd.bergmann@linaro.org>
+Message-ID: <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
-
-> From: Rajendra Nayak <rnayak@ti.com>
+On Thu, May 10, 2012 at 4:38 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+> On Wednesday 09 May 2012, Andrew Morton wrote:
+>> I'm the LEDs patchmonkey at present. ?I can merge the drivers/leds
+>> change if you like, but there doesn't seem much point in that unless
+>> all the other patches get merged.
+>>
+>> So my preferred approach would be for the patch series to get merged
+>> via some ARM tree.
 >
-> Restore all CM1/2 module registers as they are lost in OFF mode.
+> I'm fine with taking it through arm-soc if that helps.
 
-Except they are still lost since nobody calls these new functions (in
-this patch.)  :)
+That would be great to merge from arm-soc tree, thanks a lot, Arnd and Andrew.
 
-For ease of review, it's preferred to add the *users* of new code in the
-same patch as the new code.
-
-> [nm at ti.com: minor clean ups]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Axel Haslam <axelhaslam@gmail.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/mach-omap2/cm44xx.c |  322 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/cm44xx.h |    2 +
->  2 files changed, 324 insertions(+), 0 deletions(-)
+> In the long run,
+> it would be nice to have a proper maintainer for this again after Richard
+> more or less stepped down from that position. Given that Bryan has shown
+> that he's persistent enough to get this patch series to v9, how about
+> making him the primary maintainer for the entire subsystem? He should
+> know a lot about it already. Bryan?
 >
-> diff --git a/arch/arm/mach-omap2/cm44xx.c b/arch/arm/mach-omap2/cm44xx.c
-> index 535d66e..fb5465b 100644
-> --- a/arch/arm/mach-omap2/cm44xx.c
-> +++ b/arch/arm/mach-omap2/cm44xx.c
-> @@ -21,8 +21,11 @@
->  #include "iomap.h"
->  #include "common.h"
->  #include "cm.h"
-> +#include "cm44xx.h"
->  #include "cm1_44xx.h"
->  #include "cm2_44xx.h"
-> +#include "cminst44xx.h"
-> +#include "prcm44xx.h"
->  #include "cm-regbits-44xx.h"
->  
->  /* CM1 hardware module low-level functions */
-> @@ -50,3 +53,322 @@ void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 reg)
->  {
->  	__raw_writel(val, OMAP44XX_CM2_REGADDR(inst, reg));
->  }
-> +
-> +#define MAX_CM_REGISTERS 51
-> +
-> +struct omap4_cm_reg {
-> +	u16 offset;
-> +	u32 val;
-> +};
-> +
-> +struct omap4_cm_regs {
-> +	u32 mod_off;
-> +	u32 no_reg;
 
-minor: do these need to be u32?
+I do love to start to do more contribution and maintain the
+drivers/leds subsystem with Richard's help, if Richard is fine with
+this, I can send out patch to add a MAINTAINER entry.
 
-> +	struct omap4_cm_reg reg[MAX_CM_REGISTERS];
-> +};
-> +
-> +static struct omap4_cm_regs cm1_regs[] = {
-> +	/* OMAP4430_CM1_OCP_SOCKET_MOD */
-> +	{ .mod_off = OMAP4430_CM1_OCP_SOCKET_INST, .no_reg = 1,
-> +	{{.offset = OMAP4_CM_CM1_PROFILING_CLKCTRL_OFFSET} },
-
-For readability sake, I'd prefer to see this line indented.  And why
-the extra space before the final '}'}
-
-> +	},
-
-[...]
-
-> +static void omap4_cm1_prepare_off(void)
-> +{
-> +	u32 i, j;
-> +	struct omap4_cm_regs *cm_reg = cm1_regs;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(cm1_regs); i++, cm_reg++) {
-> +		for (j = 0; j < cm_reg->no_reg; j++) {
-> +			cm_reg->reg[j].val =
-> +			    omap4_cminst_read_inst_reg(OMAP4430_CM1_PARTITION,
-> +						       cm_reg->mod_off,
-> +						       cm_reg->reg[j].offset);
-> +		}
-> +	}
-> +}
-> +
-> +static void omap4_cm2_prepare_off(void)
-> +{
-> +	u32 i, j;
-> +	struct omap4_cm_regs *cm_reg = cm2_regs;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(cm2_regs); i++, cm_reg++) {
-> +		for (j = 0; j < cm_reg->no_reg; j++) {
-> +			cm_reg->reg[j].val =
-> +			    omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
-> +						       cm_reg->mod_off,
-> +						       cm_reg->reg[j].offset);
-> +		}
-> +	}
-> +}
-
-> +static void omap4_cm1_resume_off(void)
-> +{
-> +	u32 i, j;
-> +	struct omap4_cm_regs *cm_reg = cm1_regs;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(cm1_regs); i++, cm_reg++) {
-> +		for (j = 0; j < cm_reg->no_reg; j++) {
-> +			omap4_cminst_write_inst_reg(cm_reg->reg[j].val,
-> +						    OMAP4430_CM1_PARTITION,
-> +						    cm_reg->mod_off,
-> +						    cm_reg->reg[j].offset);
-> +		}
-> +	}
-> +}
-> +
-> +static void omap4_cm2_resume_off(void)
-> +{
-> +	u32 i, j;
-> +	struct omap4_cm_regs *cm_reg = cm2_regs;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(cm2_regs); i++, cm_reg++) {
-> +		for (j = 0; j < cm_reg->no_reg; j++) {
-> +			omap4_cminst_write_inst_reg(cm_reg->reg[j].val,
-> +						    OMAP4430_CM2_PARTITION,
-> +						    cm_reg->mod_off,
-> +						    cm_reg->reg[j].offset);
-> +		}
-> +	}
-> +}
-
-Notice the two prpare functions (and resume functions) are basically
-identical, except for the partition.
-
-How about adding a .partition field to the struct so there can be a
-single function}
-
-Kevin
+Best Regards,
+-Bryan
