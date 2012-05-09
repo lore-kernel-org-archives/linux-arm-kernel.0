@@ -1,47 +1,28 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 9 May 2012 22:13:28 +0800
-Subject: [PATCH 10/10] spi: s3c64xx: add device tree support
-In-Reply-To: <20120509090716.GC28702@sirena.org.uk>
-References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
- <1336514694-22393-11-git-send-email-thomas.abraham@linaro.org>
- <20120509090716.GC28702@sirena.org.uk>
-Message-ID: <CAJuYYwQF9Hh3wJpPTfXm_5iirvHzgwDu6imuSgH-ggenj=Vc8Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 14:13:37 +0000
+Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
+In-Reply-To: <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
+References: <20120509075407.5991.60556.sendpatchset@w520>
+ <201205091345.34404.arnd@arndb.de>
+ <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
+Message-ID: <201205091413.37664.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 May 2012 17:07, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, May 09, 2012 at 03:34:54AM +0530, Thomas Abraham wrote:
->
->> +- gpios: The gpio specifier for clock, mosi and miso interface lines (in no
->> + ?particular order). The format of the gpio specifier depends on the gpio
->> + ?controller.
->
-> This seems odd... ?This isn't a bitbanging controller, and surely the
-> driver will need to know which signal is which? ?I suspect this is
-> actually for pinmux rather than to identify the signals but that should
-> at least be made clear and really should be being done using the pinmux
-> API.
+On Wednesday 09 May 2012, Nicolas Pitre wrote:
+> On Wed, 9 May 2012, Arnd Bergmann wrote:
+> 
+> > FWIW, I would actually prefer merging the 'struct arm_soc_desc', 'struct
+> > arm_soc_smp_init_ops' and 'struct arm_soc_smp_ops' structures into a
+> > single 'struct smp_ops' for simplicity.
+> 
+> You can't easily validate correct usage of __init marked code from the 
+> rest if everything is pulled in the same struct.  This is why I asked 
+> they be split.
 
-The driver retrieves the list of gpio's that it is allowed to use. The
-gpio numbers for miso, mosi and clk are mandatory but the order in
-which they are specified is not important since the driver never needs
-to which gpio is which interface line. I agree the pinmux api should
-be used here, but the call to pinmux api would be a incremental change
-here, not changing the code this patch is adding.
+Ah, I see. However, in version 6 of the patch set, each platform
+was marking both structures as __initdata, which seems to make
+your argument pointless because we don't actually validate the
+sections.
 
->
->> + ?- samsung,spi-cs-gpio: A gpio specifier that specifies the gpio line used as
->> + ? ?the slave select line by the spi controller. The format of the gpio
->> + ? ?specifier depends on the gpio controller.
->
-> We should really have a binding for this at the SPI level (and ideally
-> some code to manage setting the GPIO too) - it's pretty common to use a
-> GPIO as /CS.
-
-The existing implementations vary in the way the nCS gpio lines are
-specified. For some controllers, the nCS gpio's are included in the
-spi device node whereas in this implementation, the nCS gpio is listed
-in the spi slave device node.
-
-Thanks,
-Thomas.
+	Arnd
