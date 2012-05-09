@@ -1,42 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 May 2012 14:34:51 -0600
-Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
-In-Reply-To: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
-References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4FAAD4EB.4010007@wwwdotorg.org>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Wed, 9 May 2012 20:38:16 +0000
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <20120509122436.1b612004.akpm@linux-foundation.org>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+Message-ID: <201205092038.16722.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2012 03:44 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Wednesday 09 May 2012, Andrew Morton wrote:
+> I'm the LEDs patchmonkey at present.  I can merge the drivers/leds
+> change if you like, but there doesn't seem much point in that unless
+> all the other patches get merged.
 > 
-> This adds a scratch pin control interface to the Nomadik pinctrl
-> driver, and defines the pins and groups in the DB8500 ASIC. We
-> define GPIO ranges to cover the pins exposed. The DB8500 has
-> more pins than this but we restrict the driver to the pins that
-> can be controlled from the combined GPIO and pin control hardware
-> to begin with.
+> So my preferred approach would be for the patch series to get merged
+> via some ARM tree.
 
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+I'm fine with taking it through arm-soc if that helps. In the long run,
+it would be nice to have a proper maintainer for this again after Richard
+more or less stepped down from that position. Given that Bryan has shown
+that he's persistent enough to get this patch series to v9, how about
+making him the primary maintainer for the entire subsystem? He should
+know a lot about it already. Bryan?
 
-> +static int nmk_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
-> +{
-> +	struct nmk_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
-> +
-> +	if (selector >= npct->soc->ngroups)
-> +		return -EINVAL;
-
-I think all the other drivers removed this error-checking from functions
-called by the pinctrl core, assuming that the core would error-check any
-user-supplied data and respect limits in the pinctrl device descriptor.
-
-> +static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
-
-> +	/* Poke in other ASIC variants here */
-> +	if (platid->driver_data == PINCTRL_NMK_DB8500)
-> +		nmk_pinctrl_db8500_init(&npct->soc);
-
-Other platforms have a unique top-level driver for each variant, with
-the probe() function for each variant calling into a utility function.
-That way, the common/utility code doesn't need to contain a
-table/list/... of all the variants. Can the same approach be used here?
+	Arnd
