@@ -1,36 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 9 May 2012 14:27:28 -0600 (MDT)
-Subject: [PATCH 5/7] ARM: OMAP2: Use hwmod to initialize mmc for 2420
-In-Reply-To: <alpine.DEB.2.00.1205081844530.28088@utopia.booyaka.com>
-References: <20120424000607.17783.81686.stgit@muffinssi.local>
- <20120424000835.17783.50945.stgit@muffinssi.local>
- <alpine.DEB.2.00.1205081844530.28088@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1205091426230.28088@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 20:27:49 +0000
+Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <a226ca6e8dd0370afeeb9aa1d67ddfde@localhost>
+References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+ <201205091921.43299.arnd@arndb.de>
+ <a226ca6e8dd0370afeeb9aa1d67ddfde@localhost>
+Message-ID: <201205092027.50059.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Tue, 8 May 2012, Paul Walmsley wrote:
-
-> On Mon, 23 Apr 2012, Tony Lindgren wrote:
-> 
-> > This allows us to pass dma request lines in platform data to
-> > MMC driver the same way as we already do for omap2430 and later.
+On Wednesday 09 May 2012, Marc Zyngier wrote:
+> On Wed, 9 May 2012 19:21:42 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 09 May 2012, Marc Zyngier wrote:
+> >> 
+> >> The GICv2 can have virtualization extension support, consisting
+> >> of an additional set of registers and interrupts. Add the necessary
+> >> binding to the GIC DT documentation.
+> >> 
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Would it make sense to add a way to detect whether a GIC is virtual
+> > or real? Maybe an optional empty "virtual-gic" property or an additional
+> > "compatible" value. Even if we don't need it now, it might come in handy
+> > if we require it already.
 > 
-> This might save you some time, I updated this patch to move the device 
-> creation code to arch/arm/mach-omap2/msdi.c and to change the hwmod name 
-> to 'msdi1' to conform with the new data.  Updated patch below.
+> I don't really see a need for this. When running on a virtual machine, the
+> kernel cannot tell if this is the real thing or not (the virtual CPU
+> interface looks exactly like the normal one once mapped into the guest
+> address space).
+> 
+> Or maybe I just didn't get your use case?
 
-One other thing, the version that was sent yesterday was the 
-second-to-last revision.  Also needed are the following includes in 
-arch/arm/mach-omap2/msdi.c:
+Well, one difference seems to be the VGIC maintainance interrupt that may
+or may not be present, and another one the additional registers. Of course
+you can imply the type of GIC from the presence of this extra data,
+but I think it would be better to make it explicit.
 
-#include <linux/err.h>
-
-#include "control.h"
-
-
-- Paul
+	Arnd
