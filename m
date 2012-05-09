@@ -1,62 +1,24 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 09 May 2012 21:22:20 +0400
-Subject: [PATCH] USB: ohci-at91: add a reset function to fix race condition
-In-Reply-To: <1336553334-31058-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1336553334-31058-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4FAAA7CC.7050208@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 May 2012 10:25:51 -0700
+Subject: [PATCH]: arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule
+ support
+In-Reply-To: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
+References: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
+Message-ID: <20120509172550.GQ5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 09-05-2012 12:48, Nicolas Ferre wrote:
+* Uri Yosef <uri.y@variscite.com> [120312 03:23]:
+> From: Uri yosef <uri.y@variscite.com>
+> 
+>  Hi Tony,
+> 
+>  This patch add device tree support for Variscite OMAP4 System-On-Modeule.
 
-> A possible race condition appears because we are not initializing
-> the ohci->regs before calling usb_hcd_request_irqs().
-> We move the call to ohci_init() in hcd->driver->reset() instead of
-> hcd->driver->start() to fix this.
-> This was experienced when we share the same IRQ line between OHCI and EHCI
-> controllers.
+Do you have an updated version of this available now that MMC mostly works?
 
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Tested-by: Christian Eggers<christian.eggers@kathrein.de>
-> Cc: stable<stable@vger.kernel.org>
-> ---
->   drivers/usb/host/ohci-at91.c |   11 ++++++++++-
->   1 file changed, 10 insertions(+), 1 deletion(-)
+Regards,
 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 13ebeca..55d3d64 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -223,7 +223,7 @@ static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
->   /*-------------------------------------------------------------------------*/
->
->   static int __devinit
-> -ohci_at91_start (struct usb_hcd *hcd)
-> +ohci_at91_reset (struct usb_hcd *hcd)
-
-    Have you run the patch thru scripts/checkpatch.pl? There should be no 
-space between function name and '('.
-
->   {
->   	struct at91_usbh_data	*board = hcd->self.controller->platform_data;
->   	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-> @@ -233,6 +233,14 @@ ohci_at91_start (struct usb_hcd *hcd)
->   		return ret;
->
->   	ohci->num_ports = board->ports;
-> +	return 0;
-> +}
-> +
-> +static int __devinit
-> +ohci_at91_start (struct usb_hcd *hcd)
-
-    Same here.
-
-> +{
-> +	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-
-    And here.
-
-WBR, Sergei
+Tony
