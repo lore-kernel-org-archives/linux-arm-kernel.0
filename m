@@ -1,43 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 10:36:06 -0700
-Subject: [PATCH] ARM: OMAP2+: remove incorrect irq_chip ack field
-In-Reply-To: <1336262212-4455-1-git-send-email-notasas@gmail.com>
-References: <1336262212-4455-1-git-send-email-notasas@gmail.com>
-Message-ID: <20120509173605.GS5088@atomide.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 9 May 2012 13:45:35 -0400 (EDT)
+Subject: [PATCH] USB: ohci-at91: add a reset function to fix race condition
+In-Reply-To: <1336553334-31058-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <Pine.LNX.4.44L0.1205091344550.1658-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [120505 17:00]:
-> Each irq_chip for the main interrupt controller has offsets set for irq
-> masking registers, which added to respective base results in a pointer
-> to appropriate hardware register. However this is not correct for
-> INTC_CONTROL as there is only one INTC_CONTROL register. This does not
-> cause problems because generic ack code is never called, but remove
-> this assignment to avoid confusion.
+On Wed, 9 May 2012, Nicolas Ferre wrote:
 
-Thanks applying into fixes-non-critical.
+> A possible race condition appears because we are not initializing
+> the ohci->regs before calling usb_hcd_request_irqs().
+> We move the call to ohci_init() in hcd->driver->reset() instead of
+> hcd->driver->start() to fix this.
+> This was experienced when we share the same IRQ line between OHCI and EHCI
+> controllers.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Tested-by: Christian Eggers <christian.eggers@kathrein.de>
+> Cc: stable <stable@vger.kernel.org>
 
-Regards,
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-Tony
- 
-> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 > ---
->  arch/arm/mach-omap2/irq.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
+>  drivers/usb/host/ohci-at91.c |   11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 65f0d25..c11e8a8 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -149,7 +149,6 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
->  	ct->chip.irq_mask = irq_gc_mask_disable_reg;
->  	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 13ebeca..55d3d64 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -223,7 +223,7 @@ static void __devexit usb_hcd_at91_remove(struct usb_hcd *hcd,
+>  /*-------------------------------------------------------------------------*/
 >  
-> -	ct->regs.ack = INTC_CONTROL;
->  	ct->regs.enable = INTC_MIR_CLEAR0;
->  	ct->regs.disable = INTC_MIR_SET0;
->  	irq_setup_generic_chip(gc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
-> -- 
-> 1.7.0.4
-> 
+>  static int __devinit
+> -ohci_at91_start (struct usb_hcd *hcd)
+> +ohci_at91_reset (struct usb_hcd *hcd)
+>  {
+>  	struct at91_usbh_data	*board = hcd->self.controller->platform_data;
+>  	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
+> @@ -233,6 +233,14 @@ ohci_at91_start (struct usb_hcd *hcd)
+>  		return ret;
+>  
+>  	ohci->num_ports = board->ports;
+> +	return 0;
+> +}
+> +
+> +static int __devinit
+> +ohci_at91_start (struct usb_hcd *hcd)
+> +{
+> +	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
+> +	int			ret;
+>  
+>  	if ((ret = ohci_run(ohci)) < 0) {
+>  		err("can't start %s", hcd->self.bus_name);
+> @@ -418,6 +426,7 @@ static const struct hc_driver ohci_at91_hc_driver = {
+>  	/*
+>  	 * basic lifecycle operations
+>  	 */
+> +	.reset =		ohci_at91_reset,
+>  	.start =		ohci_at91_start,
+>  	.stop =			ohci_stop,
+>  	.shutdown =		ohci_shutdown,
