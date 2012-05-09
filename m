@@ -1,35 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 May 2012 21:36:43 +0200
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <201205091921.43299.arnd@arndb.de>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
- <201205091921.43299.arnd@arndb.de>
-Message-ID: <a226ca6e8dd0370afeeb9aa1d67ddfde@localhost>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Wed, 09 May 2012 21:54:14 +0200
+Subject: [PATCH 2/2] regulator: Add support for MAX77686.
+In-Reply-To: <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
+References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
+ <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
+Message-ID: <4FAACB66.3020706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2012 19:21:42 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 May 2012, Marc Zyngier wrote:
->> 
->> The GICv2 can have virtualization extension support, consisting
->> of an additional set of registers and interrupts. Add the necessary
->> binding to the GIC DT documentation.
->> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Would it make sense to add a way to detect whether a GIC is virtual
-> or real? Maybe an optional empty "virtual-gic" property or an additional
-> "compatible" value. Even if we don't need it now, it might come in handy
-> if we require it already.
+Hi,
 
-I don't really see a need for this. When running on a virtual machine, the
-kernel cannot tell if this is the real thing or not (the virtual CPU
-interface looks exactly like the normal one once mapped into the guest
-address space).
+just a few nitpicks...
 
-Or maybe I just didn't get your use case?
+On 05/09/2012 06:24 PM, Yadwinder Singh wrote:
+> From: Yadwinder Singh Brar<yadi.brar@samsung.com>
+>
+> Add support for PMIC/regulator portion of MAX77686 multifunction device.
+> MAX77686 provides LDOs[1-26] and BUCKs[1-9]. This is initial release of driver
+> which supports setting and getting the voltage of a regulator with I2C
+> interface.
+>
+> Signed-off-by: Yadwinder Singh Brar<yadi.brar@samsung.com>
+...
+> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+> new file mode 100644
+> index 0000000..4aa9722
+> --- /dev/null
+> +++ b/drivers/regulator/max77686.c
+> @@ -0,0 +1,660 @@
+> +/*
+> + * max77686.c - Regulator driver for the Maxim 77686
+> + *
+> + * Copyright (C) 2012 Samsung Electronics
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+I believe this should read:
+
+   + * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+
+In patch 1/2 the copyright notice is also not exactly correct.
+
+> + * Chiwoong Byun<woong.byun@smasung.com>
+
+s/smasung/samsung
+
+...
+> +static int max77686_get_enable_register(struct regulator_dev *rdev,
+> +					int *reg, int *mask, int *pattern)
+> +{
+> +	int rid = rdev_get_id(rdev);
+> +
+> +	switch (rid) {
+> +	case MAX77686_LDO1...MAX77686_LDO26:
+> +		*reg = MAX77686_REG_LDO1CTRL1 + (rid - MAX77686_LDO1);
+> +		*mask = 0xC0;
+> +		*pattern = 0xC0;
+
+What about using lower case for all hex numbers ?
+
+...
+> +static int max77686_get_voltage_register(struct regulator_dev *rdev,
+> +					 int *_reg, int *_shift, int *_mask)
+> +{
+...
+> +	case MAX77686_BUCK2:
+> +		reg = MAX77686_REG_BUCK2DVS1;
+> +		mask = 0xff;
+> +		break;
+> +	case MAX77686_BUCK3:
+> +		reg = MAX77686_REG_BUCK3DVS1;
+> +		mask = 0xff;
+> +		break;
+> +	case MAX77686_BUCK4:
+> +		reg = MAX77686_REG_BUCK4DVS1;
+> +		mask = 0xff;
+> +		break;
+> +	case MAX77686_BUCK5...MAX77686_BUCK9:
+> +		reg = MAX77686_REG_BUCK5OUT + (rid - MAX77686_BUCK5) * 2;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	*_reg = reg;
+> +	*_shift = shift;
+> +	*_mask = mask;
+> +
+> +	return 0;
+> +}
+
+Thanks,
+Sylwester
