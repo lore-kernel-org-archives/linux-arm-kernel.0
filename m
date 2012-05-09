@@ -1,33 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 09 May 2012 11:24:59 +0100
-Subject: [PATCH 07/15] drivers/power: Carry out platform_data error
- checking on ab8500 devices
-In-Reply-To: <CACRpkdYkqj6Zr=05Byk+tPc1ohjfDoZKCkTmu9zcZpgKxV8wpg@mail.gmail.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdYkqj6Zr=05Byk+tPc1ohjfDoZKCkTmu9zcZpgKxV8wpg@mail.gmail.com>
-Message-ID: <4FAA45FB.500@linaro.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 9 May 2012 19:33:02 +0800
+Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/12 09:51, Linus Walleij wrote:
-> On Fri, May 4, 2012 at 8:23 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> In their current state the ab8500 power devices explode if platform data
->> isn't provided. This patch prevents this from happening and informs the
->> user of what has happened.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> This or equivalent is already submitted and merged by Anton into the
-> power tree I think?
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ sound/soc/fsl/imx-audmux.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-It is, and I sent him a derivative of this patch which he has also 
-applied, hence his can now be ignored.
-
+diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
+index f237003..0803274 100644
+--- a/sound/soc/fsl/imx-audmux.c
++++ b/sound/soc/fsl/imx-audmux.c
+@@ -26,6 +26,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include "imx-audmux.h"
+ 
+@@ -249,6 +250,7 @@ EXPORT_SYMBOL_GPL(imx_audmux_v2_configure_port);
+ static int __devinit imx_audmux_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
++	struct pinctrl *pinctrl;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(imx_audmux_dt_ids, &pdev->dev);
+ 
+@@ -257,6 +259,12 @@ static int __devinit imx_audmux_probe(struct platform_device *pdev)
+ 	if (!audmux_base)
+ 		return -EADDRNOTAVAIL;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		dev_err(&pdev->dev, "setup pinctrl failed!");
++		return PTR_ERR(pinctrl);
++	}
++
+ 	audmux_clk = clk_get(&pdev->dev, "audmux");
+ 	if (IS_ERR(audmux_clk)) {
+ 		dev_dbg(&pdev->dev, "cannot get clock: %ld\n",
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.5.4
