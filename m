@@ -1,35 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 9 May 2012 17:30:24 +0100
-Subject: [PATCH 1/2] mfd: max8925: request resource region
-In-Reply-To: <20120509161839.GB10241@n2100.arm.linux.org.uk>
-References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
- <201205081444.30915.arnd@arndb.de>
- <20120508153155.GW15893@opensource.wolfsonmicro.com>
- <201205091243.13206.arnd@arndb.de>
- <20120509141316.GS3955@opensource.wolfsonmicro.com>
- <20120509161839.GB10241@n2100.arm.linux.org.uk>
-Message-ID: <20120509163023.GH3955@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 May 2012 09:36:49 -0700
+Subject: [PATCH] ARM: OMAP: Cleanup Beagleboard DVI reset gpio
+In-Reply-To: <CA+Bv8XZ4FYu+djvOMxhr6MbP8QYn4OL1PTc6TDJt42CpiESYDQ@mail.gmail.com>
+References: <87zk9ijp86.fsf@ti.com>
+ <1336531746-29027-1-git-send-email-Russ.Dill@ti.com>
+ <20120509155555.GL5088@atomide.com>
+ <CA+Bv8XZ4FYu+djvOMxhr6MbP8QYn4OL1PTc6TDJt42CpiESYDQ@mail.gmail.com>
+Message-ID: <20120509163649.GN5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 05:18:39PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 09, 2012 at 03:13:16PM +0100, Mark Brown wrote:
+* Russ Dill <Russ.Dill@ti.com> [120509 09:29]:
+> On Wed, May 9, 2012 at 8:55 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi Tomi,
+> >
+> > * Russ Dill <Russ.Dill@ti.com> [120508 19:52]:
+> >> This removes several boot warnings from board-omap3beagle.c:
+> >>
+> >> ?- gpio_request: gpio--22 (DVI reset) status -22
+> >> ?- Unable to get DVI reset GPIO
+> >>
+> >> There is a combination of leftover code and revision confusion.
+> >> Additionally, xM support is currently a hack.
+> >>
+> >> For original Beagleboard this removes the double initialization of GPIO
+> >> 170, properly configures it as an output, and wraps the initialization
+> >> in an if block so that xM does not attempt to request it.
+> >>
+> >> For Beagleboard xM it removes reference to GPIO 129 which was part
+> >> of rev A1 and A2 designs, but never functioned. It then properly assigns
+> >> beagle_dvi_device.reset_gpio in beagle_twl_gpio_setup and removes the
+> >> hack of initializing it high. Additionally, it uses
+> >> gpio_set_value_cansleep since this GPIO is connected through i2c.
+> >>
+> >> Unfortunately, there is no way to tell the difference between xM A2 and
+> >> A3. However, GPIO 129 does not function on rev A1 and A2, and the TWL
+> >> GPIO used on A3 and beyond is not used on rev A1 and A2, there are no
+> >> problems created by this fix.
+> >
+> > Can you check if this needs updates for your clean up patches?
+> 
+> I'm not sure what you mean, can you be more specific?
 
-> > Yeah, I looked at that - PCMCIA seems to be the major sticking point and
-> > the usage there appeared totally sane, though it's possible that if I
-> > stare at it hard enough I might convince myself that it only needs seven
-> > bits and we can steal one.
+Tomi has a DSS clean-up series posted that affects the board-*.c
+files.
 
-> Err what?  PCMCIA doesn't use IORESOURCE_BUS.  (Don't get it confused with
-> IORESOURCE_BUSY which is totally different).
+Regards,
 
-I've actually got it confused with IORESOURCE_BITS (because it's there
-for bus-specific usage, as opposed to bus numbers) which it does use -
-sorry.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120509/40e330c3/attachment.sig>
+Tony
