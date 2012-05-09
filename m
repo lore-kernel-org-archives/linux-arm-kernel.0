@@ -1,24 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 May 2012 10:25:51 -0700
-Subject: [PATCH]: arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule
- support
-In-Reply-To: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
-References: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
-Message-ID: <20120509172550.GQ5088@atomide.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 10 May 2012 01:19:31 +0800
+Subject: [PATCH 10/10] spi: s3c64xx: add device tree support
+In-Reply-To: <20120509164706.GJ3955@opensource.wolfsonmicro.com>
+References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+ <1336514694-22393-11-git-send-email-thomas.abraham@linaro.org>
+ <20120509090716.GC28702@sirena.org.uk>
+ <CAJuYYwQF9Hh3wJpPTfXm_5iirvHzgwDu6imuSgH-ggenj=Vc8Q@mail.gmail.com>
+ <20120509143159.GU3955@opensource.wolfsonmicro.com>
+ <CAJuYYwT6SJth83tFSbvENa2h7-M182kGCoBidmw8DvECK0qUzA@mail.gmail.com>
+ <20120509164706.GJ3955@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwTdLbgbU_a_LqdwKJbhh_Nppk5s14kX5C=RExjM3eXNTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10 May 2012 00:47, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, May 10, 2012 at 12:39:29AM +0800, Thomas Abraham wrote:
+>> On 9 May 2012 22:32, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+>
+>> > Yeah, I know. ?I'm saying we should try to come up with a binding for
+>> > this that can be used by new SPI contollers going forward so things are
+>> > consistent.
+>
+>> Ok. For this patch series, I will continue with the samsung specific
+>> binding for the nCS line.
+>
+> How about just renaming your binding to a generic one and documenting it
+> separately? ?It looks like a sensible binding which other people should
+> be able to use so may as well have something there already.
 
-* Uri Yosef <uri.y@variscite.com> [120312 03:23]:
-> From: Uri yosef <uri.y@variscite.com>
-> 
->  Hi Tony,
-> 
->  This patch add device tree support for Variscite OMAP4 System-On-Modeule.
+Ok. I will replace the samsung specific binding with a generic binding
+in the next version of this patch series.
 
-Do you have an updated version of this available now that MMC mostly works?
-
-Regards,
-
-Tony
+Thanks,
+Thomas.
