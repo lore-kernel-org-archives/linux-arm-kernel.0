@@ -1,52 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 May 2012 14:15:18 +0100
-Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
-In-Reply-To: <201205091212.08239.arnd@arndb.de>
-References: <20120509075407.5991.60556.sendpatchset@w520>
- <201205091212.08239.arnd@arndb.de>
-Message-ID: <4FAA6DE6.3040001@arm.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Wed, 9 May 2012 15:16:38 +0200
+Subject: [PATCH] ARM: mx35: add WEIM register addresses
+Message-ID: <20120509131638.GA2057@lovely.krouter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/12 13:12, Arnd Bergmann wrote:
-> On Wednesday 09 May 2012, Magnus Damm wrote:
->>  static unsigned int __init shmobile_smp_get_core_count(void)
->>  {
->> @@ -31,6 +32,9 @@ static unsigned int __init shmobile_smp_
->>  	if (is_r8a7779())
->>  		return r8a7779_get_core_count();
->>  
->> +	if (is_emev2())
->> +		return emev2_get_core_count();
->> +
->>  	return 1;
->>  }
->>  
->> @@ -41,6 +45,9 @@ static void __init shmobile_smp_prepare_
->>  
->>  	if (is_r8a7779())
->>  		r8a7779_smp_prepare_cpus();
->> +
->> +	if (is_emev2())
->> +		emev2_smp_prepare_cpus();
->>  }
->>  
->>  int shmobile_platform_cpu_kill(unsigned int cpu)
->> ...
-> 
-> This shows that we really want an abstraction for soc-specific SMP ops
-> even within one platform, and we'll need the same thing for multiplatform.
-> 
-> Marc Zyngier already proposed a solution for this last year, but I
-> think we couldn't agree on the details back then before he lost interest.
-> I think we should pick that up again and get it into 3.6 so the code above
-> can be simplified and we can do the multiplatform solution. We'll probably
-> discuss the details in Hong Kong in a couple of weeks, so there is no
-> point in changing it now, but I'd hope that you can migrate this to
-> whatever we come up with in the following merge window.
 
-I'm happy to revive the series if there is an interest.
+This patch adds WEIM register addresses to mx35 platform header file.
 
-	M.
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+---
+ arch/arm/plat-mxc/include/mach/mx35.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
+index 80965a9..8b8f424 100644
+--- a/arch/arm/plat-mxc/include/mach/mx35.h
++++ b/arch/arm/plat-mxc/include/mach/mx35.h
+@@ -111,6 +111,11 @@
+ #define MX35_EMI_CTL_BASE_ADDR			(MX35_X_MEMC_BASE_ADDR + 0x4000)
+ #define MX35_PCMCIA_CTL_BASE_ADDR		MX35_EMI_CTL_BASE_ADDR
+ 
++#define MX35_WEIM_CSCRx_BASE_ADDR(cs)	(MX35_WEIM_BASE_ADDR + (cs) * 0x10)
++#define MX35_WEIM_CSCRxU(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs))
++#define MX35_WEIM_CSCRxL(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
++#define MX35_WEIM_CSCRxA(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
++
+ #define MX35_NFC_BASE_ADDR		0xbb000000
+ #define MX35_PCMCIA_MEM_BASE_ADDR	0xbc000000
+ 
 -- 
-Jazz is not dead. It just smells funny...
+1.7.2.5
