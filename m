@@ -1,24 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 May 2012 19:21:42 +0000
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <201205091921.43299.arnd@arndb.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 9 May 2012 12:24:36 -0700
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-J9uTJKC01XFTzU34MY4z_8yVRwTUVXP99Czu=oL-mqxQ@mail.gmail.com>
+ <20120508121946.c20adb87.akpm@linux-foundation.org>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+Message-ID: <20120509122436.1b612004.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2012, Marc Zyngier wrote:
-> 
-> The GICv2 can have virtualization extension support, consisting
-> of an additional set of registers and interrupts. Add the necessary
-> binding to the GIC DT documentation.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, 10 May 2012 00:16:14 +0800
+Bryan Wu <bryan.wu@canonical.com> wrote:
 
-Would it make sense to add a way to detect whether a GIC is virtual
-or real? Maybe an optional empty "virtual-gic" property or an additional
-"compatible" value. Even if we don't need it now, it might come in handy
-if we require it already.
+> On Wed, May 9, 2012 at 3:19 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> > On Wed, 9 May 2012 01:45:43 +0800
+> > Bryan Wu <bryan.wu@canonical.com> wrote:
+> >
+> >> Any comments and suggestions about my v9 patchset.
+> >
+> > The drivers/leds/ changes look OK to me.
+> 
+> Thanks a lot, Andrew.
+> Richard, what about merging this driver firstly in drivers/leds/?
+> 
 
-	Arnd
+I'm the LEDs patchmonkey at present.  I can merge the drivers/leds
+change if you like, but there doesn't seem much point in that unless
+all the other patches get merged.
+
+So my preferred approach would be for the patch series to get merged
+via some ARM tree.
+
+
+
+Failing that, I can merge them all myself.  Acks from ARM maintainers
+and from maintainers of arm-specific drivers are very desirable, but I
+wouldn't be surprised if few are forthcoming.
+
+If nothing happens over the next week or so, please remind me (or resend
+the patch series) and I'll suck them in.
