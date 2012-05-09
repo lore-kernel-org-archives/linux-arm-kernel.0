@@ -1,39 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 May 2012 11:06:02 +0200
-Subject: [PATCH 5/9] Add clocks for X5 boards
-In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336554366-16957-6-git-send-email-maxime.ripard@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 9 May 2012 02:33:07 -0700
+Subject: [GIT PULL 1/5] omap sparse cleanup for v3.5 merge window
+In-Reply-To: <4fa84ef6.8988e50a.7e08.ffff88a0SMTPIN_ADDED@mx.google.com>
+References: <4fa84ef6.8988e50a.7e08.ffff88a0SMTPIN_ADDED@mx.google.com>
+Message-ID: <CAOesGMihBsp0Nr-LwG8ayvcBkViWVCvQDsG75w4HN_h8cX=hAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-at91/at91sam9x5.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+Hi,
 
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 13c8cae..1b144b4 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -120,6 +120,11 @@ static struct clk adc_clk = {
- 	.pmc_mask	= 1 << AT91SAM9X5_ID_ADC,
- 	.type	= CLK_TYPE_PERIPHERAL,
- };
-+static struct clk adc_op_clk = {
-+	.name		= "adc_op_clk",
-+	.type		= CLK_TYPE_PERIPHERAL,
-+	.rate_hz	= 5000000,
-+};
- static struct clk dma0_clk = {
- 	.name		= "dma0_clk",
- 	.pmc_mask	= 1 << AT91SAM9X5_ID_DMA0,
-@@ -205,6 +210,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&tcb0_clk,
- 	&pwm_clk,
- 	&adc_clk,
-+	&adc_op_clk,
- 	&dma0_clk,
- 	&dma1_clk,
- 	&uhphs_clk,
--- 
-1.7.9.5
+On Mon, May 7, 2012 at 3:38 PM, Tony Lindgren <tony@atomide.com> wrote:
+> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+>
+> ?Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-sparse-for-v3.5
+
+Thanks, pulled 1-5. 1-3 went into next/cleanup, 4 and 5 into next/pm.
+
+
+-Olof
