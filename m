@@ -1,62 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 May 2012 11:06:06 +0200
-Subject: [PATCH 9/9] Add DTSI for the G20 SoC
-In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336554366-16957-10-git-send-email-maxime.ripard@free-electrons.com>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Wed, 9 May 2012 14:36:17 +0530
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120507173351.GB5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <CAJ7qFSfkHGF7ehanZP=hyZ27HqSp1ONsT0tUV-wpLne9B4DEaQ@mail.gmail.com>
+ <20120507173351.GB5088@atomide.com>
+Message-ID: <CAJ7qFSeziNRTUsUWc2Owjqs=A99p_WgiVH8vnEBoVB42v2p+pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9g20.dtsi |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Tony,
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 773ef48..2b1ad83 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -197,6 +197,41 @@
- 				interrupts = <10 4>;
- 				status = "disabled";
- 			};
-+
-+			adc0: adc at fffe0000 {
-+				compatible = "atmel,at91sam9g20-adc";
-+				reg = <0xfffe0000 0x100>;
-+				interrupts = <5 4>;
-+				atmel,adc-use-external-triggers;
-+				atmel,adc-channels-used = <0xf>;
-+				atmel,adc-vref = <3300>;
-+				atmel,adc-num-channels = <4>;
-+				atmel,adc-startup-time = <10>;
-+				atmel,adc-channel-base = <0x30>;
-+				atmel,adc-drdy-mask = <0x10000>;
-+				atmel,adc-status-register = <0x1c>;
-+				atmel,adc-trigger-register = <0x04>;
-+
-+				trigger at 0 {
-+					trigger-name = "timer-counter-0";
-+					trigger-value = <0x1>;
-+				};
-+				trigger at 1 {
-+					trigger-name = "timer-counter-1";
-+					trigger-value = <0x3>;
-+				};
-+
-+				trigger at 2 {
-+					trigger-name = "timer-counter-2";
-+					trigger-value = <0x5>;
-+				};
-+
-+				trigger at 3 {
-+					trigger-name = "external";
-+					trigger-value = <0x13>;
-+					trigger-external;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+[snip]
+>> >> -#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) || ? ?\
+>> >> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? defined(CONFIG_ARCH_OMAP3))
+>> >> +#if (defined(CONFIG_ARCH_OMAP5) || defined(CONFIG_ARCH_OMAP4)) && \
+>> >> + ? ? ? ? ? ? !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+>> >> +
+>> >> ?static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
+>> >> ?{
+>> >> ? ? ? WARN(1, "prm: omap2xxx/omap3xxx specific function and "
+>> >
+>> > Maybe these functions could be just set up as __weak to avoid the
+>> > ifdeffery?
+>> >
+>> ?sorry to understand,
+>> ?you mean make this weak and have a strong override for OMAP2 ?
+>
+> Yeah that should do the trick, right?
+ Ok, There are multiple functions under that #ifdef.
+ Also i see that __weak cannot be used for inline functions.
+So should those functions should be moved to .c file and qualify them
+ __weak. There is already a strong override for OMAP2 and 3 which
+should not be a problem.
+
+[OR]
+
+ So after the cleanup patch introducing CONFIG_SOC_OMAP4PLUS
+ it can be changed as
+ #ifdef (CONFIG_SOC_OMAP4PLUS) && !(defined(CONFIG_ARCH_OMAP2) ||
+defined(CONFIG_ARCH_OMAP3))
+
+So this will avoid patching this for the future socs. ?
+
+Thanks,
+ Sricharan
