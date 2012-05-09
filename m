@@ -1,202 +1,180 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 May 2012 20:45:32 +0900
-Subject: [PATCH 07/20] ARM: EXYNOS: Add pre-divider and fout mux clocks for
- bpll and mpll
-In-Reply-To: <1335813270-13083-8-git-send-email-thomas.abraham@linaro.org>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-8-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <019601cd2dd9$3da83780$b8f8a680$%kim@samsung.com>
+Date: Wed, 09 May 2012 20:53:36 +0900
+Subject: [PATCH] ARM: exynos: Adapt to cpuidle core time keeping and irq
+ enable
+In-Reply-To: <CADGdYn6KLNA+EG4DCmvP_ZohORe0LjtUi+7m0DTxcjgqwUC1HQ@mail.gmail.com>
+References: <1335355912-26063-1-git-send-email-amit.kachhap@linaro.org>
+ <4F980DE6.1020504@linaro.org>
+ <CAMXH7KG_=oupDTe7vcbDdp6wb=gHc3s8Z4EwxVeJBPGDNC8FSQ@mail.gmail.com>
+ <CADGdYn6KLNA+EG4DCmvP_ZohORe0LjtUi+7m0DTxcjgqwUC1HQ@mail.gmail.com>
+Message-ID: <019801cd2dda$5dbbc680$19335380$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+amit kachhap wrote:
 > 
-> From: Kisoo Yu <ksoo.yu@samsung.com>
+> Hi Mr Kukjin,
 > 
-> The fout clock of BPLL and MPLL have a selectable source in rev1 of
-> EXYNOS5. The clock options are a fixed divided by 2 clock and the
-> output of the PLL itself. Add support for these new clock instances.
+> Any comment or update about this patch?
 > 
-> Signed-off-by: Kisoo Yu <ksoo.yu@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> [kgene.kim at samsung.com: temporary apply this because I
-> don't want to add pll stuff in each clock not commonly]
+I'm not sure we don't need to check the idle_time?
+Others, looks ok to me.
 
-As I commented, I won't apply this because pll stuff should be added in
-common file such as plat-s5p/clock.c even though the plat-s5p files moved
-into plat-samsung.
+Thanks.
 
-> Temporary-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-No. I didn't sign on this in my topic branch.
-
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c           |   73
-> +++++++++++++++++++++++-
->  arch/arm/mach-exynos/include/mach/regs-clock.h |    2 +
->  arch/arm/plat-s5p/clock.c                      |   11 ----
->  3 files changed, 74 insertions(+), 12 deletions(-)
+> Regards,
+> Amit Daniel
 > 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
-> exynos/clock-exynos5.c
-> index 846741e..7c0f810 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -145,6 +145,39 @@ static struct clksrc_clk exynos5_clk_sclk_apll = {
->  	.reg_div = { .reg = EXYNOS5_CLKDIV_CPU0, .shift = 24, .size = 3 },
->  };
-> 
-> +static struct clk clk_fout_bpll_div2 = {
-> +	.name	= "fout_bpll_div2",
-> +};
-> +
-> +static struct clk *exynos5_clkset_mout_bpll_fout_list[] = {
-> +	[0] = &clk_fout_bpll_div2,
-> +	[1] = &clk_fout_bpll,
-> +};
-> +
-> +static struct clksrc_sources exynos5_clkset_mout_bpll_fout = {
-> +	.sources	= exynos5_clkset_mout_bpll_fout_list,
-> +	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_bpll_fout_list),
-> +};
-> +
-> +static struct clksrc_clk exynos5_clk_mout_bpll_fout = {
-> +	.clk	= {
-> +		.name		= "mout_bpll_fout",
-> +	},
-> +	.sources = &exynos5_clkset_mout_bpll_fout,
-> +	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 0, .size = 1 },
-> +};
-> +
-> +/* Possible clock sources for BPLL Mux */
-> +static struct clk *clk_src_bpll_list[] = {
-> +	[0] = &clk_fin_bpll,
-> +	[1] = &exynos5_clk_mout_bpll_fout.clk,
-> +};
-> +
-> +struct clksrc_sources clk_src_bpll = {
-> +	.sources	= clk_src_bpll_list,
-> +	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
-> +};
-> +
->  static struct clksrc_clk exynos5_clk_mout_bpll = {
->  	.clk	= {
->  		.name		= "mout_bpll",
-> @@ -187,11 +220,43 @@ static struct clksrc_clk exynos5_clk_mout_epll = {
->  	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP2, .shift = 12, .size = 1 },
->  };
-> 
-> +static struct clk clk_fout_mpll_div2 = {
-> +	.name	= "fout_mpll_div2",
-> +};
-> +
-> +static struct clk *exynos5_clkset_mout_mpll_fout_list[] = {
-> +	[0] = &clk_fout_mpll_div2,
-> +	[1] = &clk_fout_mpll,
-> +};
-> +
-> +static struct clksrc_sources exynos5_clkset_mout_mpll_fout = {
-> +	.sources	= exynos5_clkset_mout_mpll_fout_list,
-> +	.nr_sources	= ARRAY_SIZE(exynos5_clkset_mout_mpll_fout_list),
-> +};
-> +
-> +static struct clksrc_clk exynos5_clk_mout_mpll_fout = {
-> +	.clk	= {
-> +		.name		= "mout_mpll_fout",
-> +	},
-> +	.sources = &exynos5_clkset_mout_mpll_fout,
-> +	.reg_src = { .reg = EXYNOS5_PLL_DIV2_SEL, .shift = 4, .size = 1 },
-> +};
-> +
-> +static struct clk *exynos5_clk_src_mpll_list[] = {
-> +	[0] = &clk_fin_mpll,
-> +	[1] = &exynos5_clk_mout_mpll_fout.clk,
-> +};
-> +
-> +struct clksrc_sources exynos5_clk_src_mpll = {
-> +	.sources	= exynos5_clk_src_mpll_list,
-> +	.nr_sources	= ARRAY_SIZE(exynos5_clk_src_mpll_list),
-> +};
-> +
->  struct clksrc_clk exynos5_clk_mout_mpll = {
->  	.clk = {
->  		.name		= "mout_mpll",
->  	},
-> -	.sources = &clk_src_mpll,
-> +	.sources = &exynos5_clk_src_mpll,
->  	.reg_src = { .reg = EXYNOS5_CLKSRC_CORE1, .shift = 8, .size = 1 },
->  };
-> 
-> @@ -946,10 +1011,12 @@ static struct clksrc_clk *exynos5_sysclks[] = {
->  	&exynos5_clk_mout_apll,
->  	&exynos5_clk_sclk_apll,
->  	&exynos5_clk_mout_bpll,
-> +	&exynos5_clk_mout_bpll_fout,
->  	&exynos5_clk_mout_bpll_user,
->  	&exynos5_clk_mout_cpll,
->  	&exynos5_clk_mout_epll,
->  	&exynos5_clk_mout_mpll,
-> +	&exynos5_clk_mout_mpll_fout,
->  	&exynos5_clk_mout_mpll_user,
->  	&exynos5_clk_vpllsrc,
->  	&exynos5_clk_sclk_vpll,
-> @@ -1013,6 +1080,8 @@ static struct clk *exynos5_clks[] __initdata = {
->  	&exynos5_clk_sclk_hdmi27m,
->  	&exynos5_clk_sclk_hdmiphy,
->  	&clk_fout_bpll,
-> +	&clk_fout_bpll_div2,
-> +	&clk_fout_mpll_div2,
->  	&clk_fout_cpll,
->  	&exynos5_clk_armclk,
->  };
-> @@ -1178,8 +1247,10 @@ void __init_or_cpufreq exynos5_setup_clocks(void)
-> 
->  	clk_fout_apll.ops = &exynos5_fout_apll_ops;
->  	clk_fout_bpll.rate = bpll;
-> +	clk_fout_bpll_div2.rate = bpll >> 1;
->  	clk_fout_cpll.rate = cpll;
->  	clk_fout_mpll.rate = mpll;
-> +	clk_fout_mpll_div2.rate = mpll >> 1;
->  	clk_fout_epll.rate = epll;
->  	clk_fout_vpll.rate = vpll;
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
-> b/arch/arm/mach-exynos/include/mach/regs-clock.h
-> index d9578a5..130034d 100644
-> --- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-> @@ -313,6 +313,8 @@
->  #define EXYNOS5_CLKGATE_IP_PERIS		EXYNOS_CLKREG(0x10960)
->  #define EXYNOS5_CLKGATE_BLOCK
-EXYNOS_CLKREG(0x10980)
-> 
-> +#define EXYNOS5_PLL_DIV2_SEL			EXYNOS_CLKREG(0x20A24)
-> +
->  #define EXYNOS5_BPLL_CON0			EXYNOS_CLKREG(0x20110)
->  #define EXYNOS5_CLKSRC_CDREX			EXYNOS_CLKREG(0x20200)
->  #define EXYNOS5_CLKDIV_CDREX			EXYNOS_CLKREG(0x20500)
-> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-> index f68a9bb..bea0907 100644
-> --- a/arch/arm/plat-s5p/clock.c
-> +++ b/arch/arm/plat-s5p/clock.c
-> @@ -115,17 +115,6 @@ struct clksrc_sources clk_src_apll = {
->  	.nr_sources	= ARRAY_SIZE(clk_src_apll_list),
->  };
-> 
-> -/* Possible clock sources for BPLL Mux */
-> -static struct clk *clk_src_bpll_list[] = {
-> -	[0] = &clk_fin_bpll,
-> -	[1] = &clk_fout_bpll,
-> -};
-> -
-> -struct clksrc_sources clk_src_bpll = {
-> -	.sources	= clk_src_bpll_list,
-> -	.nr_sources	= ARRAY_SIZE(clk_src_bpll_list),
-> -};
-> -
->  /* Possible clock sources for CPLL Mux */
->  static struct clk *clk_src_cpll_list[] = {
->  	[0] = &clk_fin_cpll,
-> --
-> 1.7.5.4
+> On Mon, Apr 30, 2012 at 10:13 PM, Rob Lee <rob.lee@linaro.org> wrote:
+> > On Wed, Apr 25, 2012 at 9:44 AM, Daniel Lezcano
+> > <daniel.lezcano@linaro.org> wrote:
+> >> On 04/25/2012 02:11 PM, Amit Daniel Kachhap wrote:
+> >>>
+> >>> This patch enables core cpuidle timekeeping and irq enabling and
+> >>> remove those redundant parts from the exynos cpuidle drivers
+> >>>
+> >>> CC: Daniel Lezcano<daniel.lezcano@linaro.org>
+> >>> CC: Robert Lee<rob.lee@linaro.org>
+> >>> Signed-off-by: Amit Daniel<amit.kachhap@linaro.org>
+> >>> ---
+> >>>  arch/arm/mach-exynos/cpuidle.c |   53
+> >>> ++++-----------------------------------
+> >>>  1 files changed, 6 insertions(+), 47 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-exynos/cpuidle.c
+> >>> b/arch/arm/mach-exynos/cpuidle.c
+> >>> index 33ab4e7..26dac28 100644
+> >>> --- a/arch/arm/mach-exynos/cpuidle.c
+> >>> +++ b/arch/arm/mach-exynos/cpuidle.c
+> >>> @@ -20,6 +20,7 @@
+> >>>  #include<asm/smp_scu.h>
+> >>>  #include<asm/suspend.h>
+> >>>  #include<asm/unified.h>
+> >>> +#include<asm/cpuidle.h>
+> >>>  #include<mach/regs-pmu.h>
+> >>>  #include<mach/pmu.h>
+> >>>
+> >>> @@ -34,22 +35,12 @@
+> >>>
+> >>>  #define S5P_CHECK_AFTR                0xFCBA0D10
+> >>>
+> >>> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> >>> -                       struct cpuidle_driver *drv,
+> >>> -                             int index);
+> >>>  static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> >>>                                struct cpuidle_driver *drv,
+> >>>                                int index);
+> >>>
+> >>>  static struct cpuidle_state exynos4_cpuidle_set[] __initdata = {
+> >>> -       [0] = {
+> >>> -               .enter                  = exynos4_enter_idle,
+> >>> -               .exit_latency           = 1,
+> >>> -               .target_residency       = 100000,
+> >>> -               .flags                  = CPUIDLE_FLAG_TIME_VALID,
+> >>> -               .name                   = "C0",
+> >>> -               .desc                   = "ARM clock gating(WFI)",
+> >>> -       },
+> >>> +       [0] = ARM_CPUIDLE_WFI_STATE,
+> >>>        [1] = {
+> >>>                .enter                  = exynos4_enter_lowpower,
+> >>>                .exit_latency           = 300,
+> >>> @@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[]
+> >>> __initdata = {
+> >>>  static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+> >>>
+> >>>  static struct cpuidle_driver exynos4_idle_driver = {
+> >>> -       .name           = "exynos4_idle",
+> >>> -       .owner          = THIS_MODULE,
+> >>> +       .name                   = "exynos4_idle",
+> >>> +       .owner                  = THIS_MODULE,
+> >>> +       .en_core_tk_irqen       = 1,
+> >>>  };
+> >>>
+> >>>  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+> >>> @@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct
+> >>> cpuidle_device *dev,
+> >>>                                struct cpuidle_driver *drv,
+> >>>                                int index)
+> >>>  {
+> >>> -       struct timeval before, after;
+> >>> -       int idle_time;
+> >>>        unsigned long tmp;
+> >>>
+> >>> -       local_irq_disable();
+> >>> -       do_gettimeofday(&before);
+> >>> -
+> >>>        exynos4_set_wakeupmask();
+> >>>
+> >>>        /* Set value of power down register for aftr mode */
+> >>> @@ -150,34 +137,6 @@ static int exynos4_enter_core0_aftr(struct
+> >>> cpuidle_device *dev,
+> >>>        /* Clear wakeup state register */
+> >>>        __raw_writel(0x0, S5P_WAKEUP_STAT);
+> >>>
+> >>> -       do_gettimeofday(&after);
+> >>> -
+> >>> -       local_irq_enable();
+> >>> -       idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> >>> -                   (after.tv_usec - before.tv_usec);
+> >>> -
+> >>> -       dev->last_residency = idle_time;
+> >>> -       return index;
+> >>> -}
+> >>> -
+> >>> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> >>> -                               struct cpuidle_driver *drv,
+> >>> -                               int index)
+> >>> -{
+> >>> -       struct timeval before, after;
+> >>> -       int idle_time;
+> >>> -
+> >>> -       local_irq_disable();
+> >>> -       do_gettimeofday(&before);
+> >>> -
+> >>> -       cpu_do_idle();
+> >>> -
+> >>> -       do_gettimeofday(&after);
+> >>> -       local_irq_enable();
+> >>> -       idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> >>> -                   (after.tv_usec - before.tv_usec);
+> >>> -
+> >>> -       dev->last_residency = idle_time;
+> >>>        return index;
+> >>>  }
+> >>>
+> >>> @@ -192,7 +151,7 @@ static int exynos4_enter_lowpower(struct
+> >>> cpuidle_device *dev,
+> >>>                new_index = drv->safe_state_index;
+> >>>
+> >>>        if (new_index == 0)
+> >>> -               return exynos4_enter_idle(dev, drv, new_index);
+> >>> +               return arm_cpuidle_simple_enter(dev, drv, new_index);
+> >>>        else
+> >>>                return exynos4_enter_core0_aftr(dev, drv, new_index);
+> >>>  }
+> >
+> > Acked-by: Robert Lee <rob.lee@linaro.org>
+> >
+> >>
+> >>
+> >> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>
+> >> --
+> >>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM
+> SoCs
+> >>
+> >> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> >> <http://twitter.com/#!/linaroorg> Twitter |
+> >> <http://www.linaro.org/linaro-blog/> Blog
+> >>
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
