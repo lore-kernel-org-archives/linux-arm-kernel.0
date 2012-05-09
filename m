@@ -1,33 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 May 2012 20:47:06 +0000
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <37e096905f891fc6abdccf8977bd7447@localhost>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
- <201205092027.50059.arnd@arndb.de>
- <37e096905f891fc6abdccf8977bd7447@localhost>
-Message-ID: <201205092047.06852.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 May 2012 13:49:25 -0700
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
+ supports omap2+ padconf
+In-Reply-To: <4FAAD141.3090306@wwwdotorg.org>
+References: <20120503065131.GA3738@game.jcrosoft.org>
+ <20120503152708.GC5140@atomide.com>
+ <4FA30805.5050804@wwwdotorg.org>
+ <20120504044305.GD7788@game.jcrosoft.org>
+ <20120504150342.GI5140@atomide.com>
+ <20120504153251.GE7788@game.jcrosoft.org>
+ <20120504163420.GA5613@atomide.com>
+ <4FA42631.6060304@wwwdotorg.org>
+ <20120504220809.GW5613@atomide.com>
+ <4FAAD141.3090306@wwwdotorg.org>
+Message-ID: <20120509204925.GV5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2012, Marc Zyngier wrote:
-> Ah, I see what you mean. But these registers and interrupt are actually
-> only visible on the hypervizor side. The guest shouldn't see any of this.
-
-Rihgt, that makes sense.
-
-> I suppose we could have a "arm,has-virt-extensions" property in devices
-> that implement the virtualization extensions (GIC, timers...).
+* Stephen Warren <swarren@wwwdotorg.org> [120509 13:22]:
+> On 05/04/2012 04:08 PM, Tony Lindgren wrote:
+> > * Stephen Warren <swarren@wwwdotorg.org> [120504 11:59]:
+> >> On 05/04/2012 10:34 AM, Tony Lindgren wrote:
+> >>> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
+> >>>> On 08:03 Fri 04 May     , Tony Lindgren wrote:
+> >>>>>>
+> >>>>>> so I was thinking to do like on gpio
+> >>>>>>
+> >>>>>> uart {
+> >>>>>> 	pin = < &pioA 12 {pararms} >
+> >>>>>>
+> >>>>>> }
+> >>>>>
+> >>>>> Hmm I assume the "12" above the gpio number?
+> >>>> no pin number in the bank because it could not be gpio
+> >>>
+> >>> Yes OK, but pin number 12 in the gpio bank, not in the mux register.
+> >>> Got it.
+> >>
+> >> I'd prefer to avoid any references to GPIOs here; not all muxable pins
+> >> are GPIOs and not all GPIOs are muxable pins. Lets keep the two concepts
+> >> independent.
+> > 
+> > And it seems that &pioA 12 is not always enough information for the pinctrl
+> > driver to request a GPIO. So it's best to specify it separately.
 > 
-> What do you think?
+> Why would a pinctrl driver "request a GPIO"?
 
-Sounds good. I don't have a strong preference whether that should be a
-property like you suggest or a separate "compatible" value, maybe Rob or
-Grant can comment on what they prefer.
+Hmm what would pinctrl_request_gpio do if the GPIO driver is separate driver?
 
-On the guest side, is it guaranteed that the virtual GIC looks like
-a real GIC without those extensions? If the actual behavior depends on
-the hypervisor, it might still make sense to add another flag in there
-to tell that it's virtual, even if we don't require it for now.
-
-	Arnd
+Tony
