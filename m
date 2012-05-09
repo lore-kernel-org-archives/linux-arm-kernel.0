@@ -1,73 +1,78 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Tue, 8 May 2012 19:20:26 -0700 (PDT)
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <4FA9BD41.2090701@codeaurora.org>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
- <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
- <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
- <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
- <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
- <4FA9BD41.2090701@codeaurora.org>
-Message-ID: <d460deebb832d7f62b4298c78ad2b791.squirrel@www.codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 May 2012 10:28:33 +0800
+Subject: [GIT PULL] mxs common clk porting for v3.5
+Message-ID: <20120509022830.GA2234@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 05/08/2012 10:15 AM, Turquette, Mike wrote:
->> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>  wrote:
->>> Hi Mike,
->>> Could you please explain more details about how to implement a
->>> re-parenting operation as part of it's .set_rate implementation?
->>
->> Sure.
->>
->>> As far as I know, we can not call clk_set_parent in .set_rate function
->>> directly, since clk_set_rate and clk_set_parent are using the same
->>> prepare_lock.
->>
->> That is correct.
->>
->>> Any other interface can be used to implement it?
->>
->> You have two options available to you.
->>
->> 1) __clk_reparent can be used from your .set_rate callback today to
->> reflect changes made to the tree topology.  OMAP uses this in our PLL
->> .set_rate implementation: depending on the re-lock frequency the PLL
->> may switch parents dynamically.  __clk_reparent does the
->> framework-level cleanup needed for this (that function is also used
->> when populating the clock tree with new clock nodes).
->>
->> 2) __clk_set_parent could be made non-static if you needed this (I've
->> been meaning to talk to Saravana about this since I think MSM needs
->> something like this).
->
-> Thanks!
->
-> I don't think I need (2). But I don't think I can use (1) as is either.
-> I can use (1) with some additional code in my set rate op.
->
-> While set rate is in progress, both the parents might need to stay
-> enabled for a short duration. So, in my internal set rate, I need to
-> check if my clock is prepared/enabled and call prepare/enable on the
-> "old parent", call __clk_reparent (which will reduce the ref count for
-> the old parents and increase it for the new parents), finish the
-> reparent in HW and then unprepare/disable the old parent if I have
-> prepared/enabled them earlier.
->
-> It might be beneficial to provide something like a
-> __clk_reparent_start(new_parent, *scratch_pointer) and
-> __clk_reparent_finish(*scratch_pointer) if it will be useful for more
-> than just MSM. Based on this email, I would guess that Tegra would want
-> something similar too.
+Hi Arnd, Olof,
 
-Thinking more about this, I think this is how any clk op that might change
-the parent should operate. I will try to write up an RFC patch for this
-and send it out soon. I'm in a hurry, so will explain more in the RFC
-patch or in a later email.
+Please pull the mxs common clk porting below for v3.5.  It depends on
+the following two branches.
 
-Thanks,
-Saravana
+[1] git://git.linaro.org/people/mturquette/linux.git clk-next
+[2] http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git clkdev
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+As the mxs device tree conversion will constantly touch clock files,
+to save the conflicts, the updated mxs/dt branch coming later will
+based on this pull-request.  Please abandon the existing mxs/dt branch
+from arm-soc tree.
+
+Regards,
+Shawn
+
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+
+  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git clk/mxs
+
+Shawn Guo (8):
+      clk: mxs: add mxs specific clocks
+      clk: mxs: add clock support for imx23
+      clk: mxs: add clock support for imx28
+      ARM: mxs: request clock for timer
+      ARM: mxs: change the lookup name for fec phy clock
+      ARM: mxs: switch to common clk framework
+      ARM: mxs: remove old clock support
+      ARM: mxs: remove now unused timer_clk argument from mxs_timer_init
+
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mxs/Makefile              |    5 +-
+ arch/arm/mach-mxs/clock-mx23.c          |  536 ---------------------
+ arch/arm/mach-mxs/clock-mx28.c          |  803 -------------------------------
+ arch/arm/mach-mxs/clock.c               |  211 --------
+ arch/arm/mach-mxs/include/mach/clock.h  |   62 ---
+ arch/arm/mach-mxs/include/mach/common.h |    6 +-
+ arch/arm/mach-mxs/mach-mx28evk.c        |    2 +-
+ arch/arm/mach-mxs/regs-clkctrl-mx23.h   |  331 -------------
+ arch/arm/mach-mxs/regs-clkctrl-mx28.h   |  486 -------------------
+ arch/arm/mach-mxs/system.c              |   16 -
+ arch/arm/mach-mxs/timer.c               |   11 +-
+ drivers/clk/Makefile                    |    2 +
+ drivers/clk/mxs/Makefile                |    8 +
+ drivers/clk/mxs/clk-div.c               |  110 +++++
+ drivers/clk/mxs/clk-frac.c              |  139 ++++++
+ drivers/clk/mxs/clk-imx23.c             |  204 ++++++++
+ drivers/clk/mxs/clk-imx28.c             |  337 +++++++++++++
+ drivers/clk/mxs/clk-pll.c               |  116 +++++
+ drivers/clk/mxs/clk-ref.c               |  154 ++++++
+ drivers/clk/mxs/clk.c                   |   28 ++
+ drivers/clk/mxs/clk.h                   |   66 +++
+ 22 files changed, 1178 insertions(+), 2456 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/clock-mx23.c
+ delete mode 100644 arch/arm/mach-mxs/clock-mx28.c
+ delete mode 100644 arch/arm/mach-mxs/clock.c
+ delete mode 100644 arch/arm/mach-mxs/include/mach/clock.h
+ delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
+ delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
+ create mode 100644 drivers/clk/mxs/Makefile
+ create mode 100644 drivers/clk/mxs/clk-div.c
+ create mode 100644 drivers/clk/mxs/clk-frac.c
+ create mode 100644 drivers/clk/mxs/clk-imx23.c
+ create mode 100644 drivers/clk/mxs/clk-imx28.c
+ create mode 100644 drivers/clk/mxs/clk-pll.c
+ create mode 100644 drivers/clk/mxs/clk-ref.c
+ create mode 100644 drivers/clk/mxs/clk.c
+ create mode 100644 drivers/clk/mxs/clk.h
