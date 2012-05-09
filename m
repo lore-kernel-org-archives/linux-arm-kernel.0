@@ -1,70 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 May 2012 13:19:45 +0100
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120509111614.GH3955@opensource.wolfsonmicro.com>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
-Message-ID: <20120509121945.GT26481@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 May 2012 09:29:39 +0200
+Subject: [PATCH] imx21ads : Fix overlapping static i/o mappings
+In-Reply-To: <1335779623-30383-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1335779623-30383-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20120509072939.GI27341@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 12:16:15PM +0100, Mark Brown wrote:
-> Looking at the code the current usage doesn't seem obviously wrong so
-> there's some work to do - we get a callback assigned on each descriptor
-> we submit so it's a bit surprising that this might not get delivered,
-> though as has been discussed further up the thread that's something that
-> might actually happen and perhaps we need to clarify the interfaces
-> here.
+On Mon, Apr 30, 2012 at 11:53:43AM +0200, Jaccon Bastiaansen wrote:
+> The statically defined I/O memory regions for the i.MX21 on chip
+> peripherals and the on board I/O peripherals of the i.MX21ADS board
+> overlap. This results in a kernel crash during startup. This is fixed
+> by reducing the memory range for the on board I/O peripherals to the
+> actually required range.
+> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
 
-Go back and look at my opening email in this thread.  Think about
-the comments in include/linux/interrupt.h about the tasklet guarantees.
-Then look at (eg) the IMX DMA engine driver and ascertain how the
-callback is called.  Then look at soc-dmaengine-pcm's callback
-method.
+Applied, thanks. Please add a ARM i.MX prefix next time to you subject.
+Also, added a Cc stable.
 
-Put all this together and what you get is that there's absolutely no
-guarantee that the callback will be called for each period.
+Sascha
 
-You really won't know if it slips just one or two periods, because your
-audio output won't be affected by that.  It _may_ only become apparant
-if DMA catches up with the part of the buffer you're writing to.
+> ---
+>  arch/arm/mach-imx/mach-mx21ads.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
+> index e432d4a..4460d25 100644
+> --- a/arch/arm/mach-imx/mach-mx21ads.c
+> +++ b/arch/arm/mach-imx/mach-mx21ads.c
+> @@ -32,7 +32,7 @@
+>   * Memory-mapped I/O on MX21ADS base board
+>   */
+>  #define MX21ADS_MMIO_BASE_ADDR   0xf5000000
+> -#define MX21ADS_MMIO_SIZE        SZ_16M
+> +#define MX21ADS_MMIO_SIZE        0xc00000
+>  
+>  #define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
+>  		(MX21ADS_MMIO_BASE_ADDR + (offset))
+> -- 
+> 1.7.1
+> 
+> 
 
-Amd I'm also willing to bet that the IMX DMA engine with ASoC has only
-been tested with an unloaded system.
-
-> If we can resolve the issues with reading the current position in
-> dmaengine then this should be fairly simple to address more
-> comprehensively of course, though there will be some hardware imposed
-> limits on what we can do.
-
-The issue with doing that is it will break existing setups - have a look
-at the various DMA engine implementations of the tx_status method, and
-how many actually set the 'residue' bytes correctly (the answer at the
-moment is none of them do, according to the definition that we've now
-come up with in this thread.)
-
-This is *exactly* the kind of issues we have with DMA engine at present;
-the implementations are at best poor quality, partly because the API is
-poorly documented and no one has particularly thought about these issues.
-Every DMA engine implementation implements the entire API using its own
-private code, so each one has its own differing behaviour.
-
-So, really we're not at the point where ASoC maintainers can insist on
-anything of DMA engine at present; we need to get DMA engine stuff sorted
-out so that we have guaranteed API conditions which can be relied upon by
-all users of the API across each DMA engine driver for any particular
-kernel version.
-
-Until we have that, we're going to hit problems.  See the recent
-brokenness over whether the DMA engine callback is called with spinlocks
-held or not, which then caused drivers to spring up their own tasklets
-which they schedule from the DMA engine callback.
-
-DMA engine is slowly getting better (mainly through my efforts at trying
-to extract common code, and fix down the API issues) but it needs folk
-with strong and good review skills to ensure that we stop the influx of
-non-conforming code and get that non-conforming code fixed.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
