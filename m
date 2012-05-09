@@ -1,37 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  9 May 2012 10:33:31 +0300
-Subject: [PATCH v2 0/3] ARM: OMAP4: register V1V8, V2V1 regulators
-Message-ID: <1336548814-1005-1-git-send-email-peter.ujfalusi@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 9 May 2012 17:12:52 +0900
+Subject: [PATCH 00/02] mach-shmobile: Emma Mobile EV2 - first shot
+In-Reply-To: <CAMuHMdUR4mk6ErCj8o2xt2k3vw9RYe5c7MvtQ3q0Xq2sfnV32A@mail.gmail.com>
+References: <20120503144645.6390.62303.sendpatchset@w520>
+ <201205050722.45500.arnd@arndb.de> <201205052108.03001.rjw@sisk.pl>
+ <201205051921.13209.arnd@arndb.de>
+ <CAMuHMdUR4mk6ErCj8o2xt2k3vw9RYe5c7MvtQ3q0Xq2sfnV32A@mail.gmail.com>
+Message-ID: <CANqRtoTamkCfu0yHiF8oGXdLKDjSxhBO-GqPDJ00Ejw5LkSqkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, May 9, 2012 at 4:57 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Sat, May 5, 2012 at 9:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Saturday 05 May 2012, Rafael J. Wysocki wrote:
+>>> Now, if you insist on us having a separate mach- directory for every platform
+>>> (SoC), we can do that I think, but then we should start with splitting up the
+>>> existing mach-shmobile into a number of SoC-specific directories rather than
+>>> adding new mach- directories for random new parts, because that goes against
+>>> our development history to date, which is important too IMHO.
+>>
+>> All the chips in there so far share a common ancestry and they all use a
+>> significant subset of the same drivers shared with arch/sh: i2c-sh_mobile,
+>> sh-dma-engine, sh_cmt, sh-sci, sh_tmu, intc, pfc and sh_clk. AFAICT, this one
+>> uses none of those and apparently was developed by NEC before the merger with
+>> Renesas.
+>
+> Ah, I didn't know NEC joined Renesas, but Wikipedia proves you're right.
 
-Changes since v1:
-- rebased on 3.4-rc6
+Actually, for those of you who care about details - NEC Electronics
+and Renesas merged into Renesas Electronics. Other parts of NEC are
+still around as usual.
 
-Original intro message:
+> So, any similarities with the MIPS-based NEC EMMA SOCs, i.e. more code to
+> share?
 
-This series adds common configuration for the V1V8, V2V1 regulators from
-twl6030. These regulators are commonly used to feed the twl6040 audio IC on
-OMAP4 based boards (SDP4430, PandaBoards).
+That would be very interested to know. I've grepped the kernel tree
+for existing code matching Uart, STI and GPIO but nothing so far. Does
+anyone know where I can find docs for the MIPS based ones?
 
-The regulator support for the twl6040 MFD driver will be going via MFD tree to
-avoid cross tree issues.
+Good news is that documentation for Emma Mobile EV2 and Emma Mobile
+1-S can be downloaded from renesas.com.
 
-Regards,
-Peter
----
-Peter Ujfalusi (3):
-  OMAP4: twl-common: Add twl6030 V1V8, V2V1 SMPS common configuration
-  OMAP: 4430SDP: Use common configuration for V1V8, V2V1 supplies
-  OMAP: omap4panda: Use common configuration for V1V8, V2V1 supplies
+Cheers,
 
- arch/arm/mach-omap2/board-4430sdp.c    |    4 ++-
- arch/arm/mach-omap2/board-omap4panda.c |    4 ++-
- arch/arm/mach-omap2/twl-common.c       |   43 ++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/twl-common.h       |    2 +
- 4 files changed, 51 insertions(+), 2 deletions(-)
-
--- 
-1.7.8.6
+/ magnus
