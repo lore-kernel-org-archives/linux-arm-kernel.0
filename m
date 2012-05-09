@@ -1,38 +1,49 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 09 May 2012 14:35:59 +0200
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
-Message-ID: <4FAA64AF.9010507@metafoo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 12:43:13 +0000
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <20120508153155.GW15893@opensource.wolfsonmicro.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205081444.30915.arnd@arndb.de>
+ <20120508153155.GW15893@opensource.wolfsonmicro.com>
+Message-ID: <201205091243.13206.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2012 11:27 AM, Linus Walleij wrote:
-> On Wed, May 2, 2012 at 6:27 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> [...]
->>> IIRC had pointed Lars to this API, but quick check of code reveals that
->>> this is unused. I think returning residue as remaining bytes of current
->>> "block" makes sense. This easily gives knowledge of where DMA pointer is
->>> wrt current ongoing transaction. Was that your meaning of end of cyclic
->>> buffer, not sure what end means here?
->>
->> I think the residue thing was something Linus created, which is why he's
->> included in this thread...
+On Tuesday 08 May 2012, Mark Brown wrote:
+> On Tue, May 08, 2012 at 02:44:30PM +0000, Arnd Bergmann wrote:
 > 
-> Lars-Peter Clausen is the person writing the ALSA SoC wrapper.
-> Lars-Peter: do you have plans to implement residue calls for
-> getting buffer position?
+> > How about a IORESOURCE_REGMAP type then with the following semantics:
 > 
+> The trick is allocating a bit for that flag, though I was thinking
+> earlier on we might be able to get away with carving it out of the bus
+> specific bits since I think anything using this wouldn't normally be
+> using resources for anything else except interrupts.  It does mean that
+> the resource type doesn't do the right thing though.
 
-At the time the ALSA wrapper was written there were no DMA engine
-implementations which actually provided residue information, so that's why I
-left it out. But it is really straight forward to add it, given that we can
-agree on a common definition of what the residue should be for cyclic
-transfers. Russel's suggestion to define it as the number of bytes until the
-end of the buffer is in my opinion the best option.
+Right, or we could try to kill IORESOURCE_BUS, which is hardly used
+anywhere and the users either get it wrong (bfin net2272), use it
+only in one file (acpi, broadcom-pci) or only for printing the
+contents (pnp).
 
-- Lars
+> > Each struct regmap gets an embedded resource that gets a unique
+> > range in the IORESOURCE_REGMAP space using allocate_resource,
+> > and each device using that can have its own sub-resources registered
+> > to that.
+> 
+> > Then we add a helper function that pulls out the regmap from the resource
+> > using something like container_of(res->parent, struct regmap, resource)
+> > and calculates the register number by subtracting the parent->start from
+> > res->start.
+> 
+> That feels complicated with the subtraction there, but modulo that this
+> is roughly what's happening now.  We would I think want this to work for
+> non-regmap users too, it's not yet clear that every device with
+> registers is going to fit into regmap (though it's looking more likely
+> as things go on).
+
+I think the subtraction in some form is needed if you want to register
+the resources, to guarantee that they are non-conflicting. Registering
+them has the advantage that we can print them in a similar way to what
+we do for /proc/{ioports,iomem}.
+
+	Arnd
