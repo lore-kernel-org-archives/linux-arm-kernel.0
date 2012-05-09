@@ -1,54 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 9 May 2012 19:27:57 +0100
-Subject: [PATCH 1/2] mfd: Add support for MAX77686.
-In-Reply-To: <1336580695-1184-2-git-send-email-yadi.brar@samsung.com>
-References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
- <1336580695-1184-2-git-send-email-yadi.brar@samsung.com>
-Message-ID: <20120509182757.GB32037@sirena.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 09 May 2012 11:29:26 -0700
+Subject: [linux-pm] [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage
+ Scaling)
+In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+ (Richard Woodruff's message of "Wed, 9 May 2012 00:39:31 +0000")
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com>
+ <87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
+ <87lil2jp2z.fsf@ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+Message-ID: <87pqadgqd5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 09:54:54PM +0530, Yadwinder Singh wrote:
+"Woodruff, Richard" <r-woodruff2@ti.com> writes:
 
-> +int max77686_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
-> +{
-> +	int ret;
-> +
-> +	ret = i2c_smbus_read_byte_data(i2c, reg);
-> +	if (ret < 0)
+>> From: Hilman, Kevin
+>> Sent: Tuesday, May 08, 2012 5:17 PM
+>
+>> A basic OMAP AVS driver has been in mainline for a long time, yet we
+>> have not seen support submitted for all of these features.
+>
+> 1.5/3.5 is a feature.
 
-It would really be better if this used the regmap API - the regulator
-API is starting to build out functionality on top of regmap which this
-won't be able to take advantage of if it doesn't use regmap.
+And I'm still waiting for it to be submitted upstream.
 
-> +	if (of_get_property(dev->of_node, "max77686,wakeup", NULL))
-> +		pd->wakeup = true;
+> ABB is requirement for a production useable driver. Higher speed rated
+> OMAP4 and all OMAP5 added these to be useable. 
 
-You haven't included any binding documentatiojn for the device tree
-bindings - you should do this.
+ditto
 
-> +	max77686 = kzalloc(sizeof(struct max77686_dev), GFP_KERNEL);
-> +	if (max77686 == NULL) {
-> +		dev_err(max77686->dev, "could not allocate memory\n");
-> +		return -ENOMEM;
-> +	}
+> Yes this is effort. Point of mentioning is to raise awareness of need.
 
-devm_kzalloc().
+I'm well aware of the need.
 
-> +	device_init_wakeup(max77686->dev, max77686->wakeup);
+> Yet to be added feature has different meaning than functional gap.
 
-Why is this not just done unconditionally?  There's sysfs files to allow
-userspace control.
+And both need to be submitted upstream.
 
-> +	if (max77686_read_reg(i2c, MAX77686_REG_DEVICE_ID, &data) < 0) {
-> +		ret = -EIO;
-> +		dbg_info("%s : device not found on this channel\n", __func__);
-> +		goto err_mfd;
-> +	} else
-> +		dev_info(max77686->dev, "device found\n");
-
-You should verify that the device ID you read back is the expected one.
-
-> +	dev_err(max77686->dev, "device probe failed : %d\n", ret);
-
-Driver core should do this for you.
+Kevin
