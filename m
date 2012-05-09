@@ -1,35 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 May 2012 09:24:53 +0200
-Subject: [PATCH 1/2] usb: fsl_mxc_udc.c: add workaround for ENGcm09152
- for i.MX25
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B91ED2@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <1336461510-30190-1-git-send-email-eric@eukrea.com>
- <F281D0F91ED19E4D8E63A7504E8A649803B91ED2@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <20120509072453.GH27341@pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed,  9 May 2012 10:33:31 +0300
+Subject: [PATCH v2 0/3] ARM: OMAP4: register V1V8, V2V1 regulators
+Message-ID: <1336548814-1005-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 02:59:52AM +0000, Chen Peter-B29397 wrote:
->  
-> > 
-> > this patch gives the possibility to workaround bug ENGcm09152
-> > on i.MX25 when the hardware workaround is also implemented on
-> > the board.
-> > It covers the workaround described on page 42 of the following Errata,
-> > titled "USB: UTMI_USBPHY VBUS input impedance implementation error" :
-> > http://cache.freescale.com/files/dsp/doc/errata/IMX25CE.pdf
-> > 
-> 
-> The two patches are ok, I am not sure if sascha is ok for these two
-> as there is cpu_is_xxx code although it is bug fix.
+Hello,
 
-I am ok with these patches. I think we should try hard and merge the
-drivers, but this shouldn't be a reason to block bug fixes.
+Changes since v1:
+- rebased on 3.4-rc6
 
-Sascha
+Original intro message:
+
+This series adds common configuration for the V1V8, V2V1 regulators from
+twl6030. These regulators are commonly used to feed the twl6040 audio IC on
+OMAP4 based boards (SDP4430, PandaBoards).
+
+The regulator support for the twl6040 MFD driver will be going via MFD tree to
+avoid cross tree issues.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  OMAP4: twl-common: Add twl6030 V1V8, V2V1 SMPS common configuration
+  OMAP: 4430SDP: Use common configuration for V1V8, V2V1 supplies
+  OMAP: omap4panda: Use common configuration for V1V8, V2V1 supplies
+
+ arch/arm/mach-omap2/board-4430sdp.c    |    4 ++-
+ arch/arm/mach-omap2/board-omap4panda.c |    4 ++-
+ arch/arm/mach-omap2/twl-common.c       |   43 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/twl-common.h       |    2 +
+ 4 files changed, 51 insertions(+), 2 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.8.6
