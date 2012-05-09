@@ -1,31 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 11:09:34 +0200
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
- omap2+ padconf
-In-Reply-To: <20120504150342.GI5140@atomide.com>
-References: <20120502172401.GG3739@atomide.com>
- <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com>
- <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org>
- <20120504150342.GI5140@atomide.com>
-Message-ID: <CACRpkdaCg7Ocy1wzdZt1x4VrnV1JrmHkLLwF4vV6GvMjXP3BjA@mail.gmail.com>
+Date: Wed, 9 May 2012 11:05:42 +0200
+Subject: [PATCH 15/15] ARM: ux500: Disable platform setup of the ab8500
+ when DT is enabled
+In-Reply-To: <1336155805-18554-16-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYDTM4wsnv4ZrEznR-XzQx07oRvL60Mm_1CRPk8GvmuZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2012 at 5:03 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Also I think we should let the pinctrl
-> core eventually manage the pins more too. Right now the pins are
-> a static array in the driver, which makes things unnecessarily
-> complex for the DT case. It would be nice to also have something like
-> pinctrl_register/unregister_pin instead of requiring them all
-> be registered while registering with the framework initially.
+> The final piece of the ab8500 puzzle. Here we prevent any of the ab8500-*
+> drivers from being registered from platform code when Device Tree is
+> enabled, as we expect DT do probe each of these individually. We also
+> provide the relevant compatible strings, so that DT knows which nodes
+> it needs to pay attention to during population.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Not instead of but in addition to :-)
-
-One does not exclude the other. But a good general idea if you need
-this, just introduce it.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
