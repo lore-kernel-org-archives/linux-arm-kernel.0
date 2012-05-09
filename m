@@ -1,87 +1,76 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 09 May 2012 14:33:28 +0900
-Subject: [PATCH 3/5] video: exynos mipi dsi: Avoid races in probe()
-Message-ID: <4FAA01A8.4010704@samsung.com>
+Date: Wed, 09 May 2012 14:33:26 +0900
+Subject: [PATCH 2/5] video: exynos mipi dsi: Do not use deprecated
+ suspend/resume callbacks
+Message-ID: <4FAA01A6.1020707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Make sure all resources are initialized before interrupt handler is
-registered. Pass full platform device name to request_irq() so it
-can be distinguished which device has requested an interrupt in cases
-there are multiple instances in the system.
-
-Also enable voltage regulators regardless of they have been enabled
-by bootloader or not, to make sure other drivers using same regulators
-don't disable them unexpectedly.
+Use proper PM ops from struct dev_pm_ops rather than the deprecated ones.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
 Signed-off-by: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/exynos/exynos_mipi_dsi.c |   26 ++++++++++++++------------
- 1 files changed, 14 insertions(+), 12 deletions(-)
+ drivers/video/exynos/exynos_mipi_dsi.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index e004f1d..3fcdbf9 100644
+index 49c7351..e004f1d 100644
 --- a/drivers/video/exynos/exynos_mipi_dsi.c
 +++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -415,27 +415,30 @@ static int exynos_mipi_dsi_probe(struct platform_device *pdev)
- 		goto err_platform_get_irq;
- 	}
+@@ -517,10 +517,10 @@ static int __devexit exynos_mipi_dsi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-+	init_completion(&dsim_wr_comp);
-+	init_completion(&dsim_rd_comp);
-+	platform_set_drvdata(pdev, dsim);
-+
- 	ret = request_irq(dsim->irq, exynos_mipi_dsi_interrupt_handler,
--			IRQF_SHARED, pdev->name, dsim);
-+			IRQF_SHARED, dev_name(&pdev->dev), dsim);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "failed to request dsim irq\n");
- 		ret = -EINVAL;
- 		goto err_bind;
- 	}
+-#ifdef CONFIG_PM
+-static int exynos_mipi_dsi_suspend(struct platform_device *pdev,
+-		pm_message_t state)
++#ifdef CONFIG_PM_SLEEP
++static int exynos_mipi_dsi_suspend(struct device *dev)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct mipi_dsim_device *dsim = platform_get_drvdata(pdev);
+ 	struct mipi_dsim_lcd_driver *client_drv = dsim->dsim_lcd_drv;
+ 	struct mipi_dsim_lcd_device *client_dev = dsim->dsim_lcd_dev;
+@@ -546,8 +546,9 @@ static int exynos_mipi_dsi_suspend(struct platform_device *pdev,
+ 	return 0;
+ }
  
--	init_completion(&dsim_wr_comp);
--	init_completion(&dsim_rd_comp);
--
--	/* enable interrupt */
-+	/* enable interrupts */
- 	exynos_mipi_dsi_init_interrupt(dsim);
- 
- 	/* initialize mipi-dsi client(lcd panel). */
- 	if (dsim_ddi->dsim_lcd_drv && dsim_ddi->dsim_lcd_drv->probe)
- 		dsim_ddi->dsim_lcd_drv->probe(dsim_ddi->dsim_lcd_dev);
- 
--	/* in case that mipi got enabled at bootloader. */
--	if (dsim_pd->enabled)
--		goto out;
-+	/* in case mipi-dsi has been enabled by bootloader */
-+	if (dsim_pd->enabled) {
-+		exynos_mipi_regulator_enable(dsim);
-+		goto done;
-+	}
- 
- 	/* lcd panel power on. */
- 	if (dsim_ddi->dsim_lcd_drv && dsim_ddi->dsim_lcd_drv->power_on)
-@@ -455,12 +458,11 @@ static int exynos_mipi_dsi_probe(struct platform_device *pdev)
- 
- 	dsim->suspended = false;
- 
--out:
-+done:
- 	platform_set_drvdata(pdev, dsim);
- 
--	dev_dbg(&pdev->dev, "mipi-dsi driver(%s mode) has been probed.\n",
--		(dsim_config->e_interface == DSIM_COMMAND) ?
--			"CPU" : "RGB");
-+	dev_dbg(&pdev->dev, "%s() completed sucessfuly (%s mode)\n", __func__,
-+		dsim_config->e_interface == DSIM_COMMAND ? "CPU" : "RGB");
+-static int exynos_mipi_dsi_resume(struct platform_device *pdev)
++static int exynos_mipi_dsi_resume(struct device *dev)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct mipi_dsim_device *dsim = platform_get_drvdata(pdev);
+ 	struct mipi_dsim_lcd_driver *client_drv = dsim->dsim_lcd_drv;
+ 	struct mipi_dsim_lcd_device *client_dev = dsim->dsim_lcd_dev;
+@@ -579,19 +580,19 @@ static int exynos_mipi_dsi_resume(struct platform_device *pdev)
  
  	return 0;
+ }
+-#else
+-#define exynos_mipi_dsi_suspend NULL
+-#define exynos_mipi_dsi_resume NULL
+ #endif
+ 
++static const struct dev_pm_ops exynos_mipi_dsi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(exynos_mipi_dsi_suspend, exynos_mipi_dsi_resume)
++};
++
+ static struct platform_driver exynos_mipi_dsi_driver = {
+ 	.probe = exynos_mipi_dsi_probe,
+ 	.remove = __devexit_p(exynos_mipi_dsi_remove),
+-	.suspend = exynos_mipi_dsi_suspend,
+-	.resume = exynos_mipi_dsi_resume,
+ 	.driver = {
+ 		   .name = "exynos-mipi-dsim",
+ 		   .owner = THIS_MODULE,
++		   .pm = &exynos_mipi_dsi_pm_ops,
+ 	},
+ };
  
 -- 
 1.7.4.1
