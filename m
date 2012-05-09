@@ -1,26 +1,24 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Wed, 09 May 2012 17:11:05 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache coherency
-Message-ID: <4FAA34A9.5020708@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 May 2012 10:51:56 +0200
+Subject: [PATCH 07/15] drivers/power: Carry out platform_data error
+ checking on ab8500 devices
+In-Reply-To: <1336155805-18554-8-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYkqj6Zr=05Byk+tPc1ohjfDoZKCkTmu9zcZpgKxV8wpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, All
+On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I'm using ARM11 MPCore on linux-2.6.34, unfortunately I have random
-panic/segment fault with task migration. I noticed a patch set
-[ARM11 MPCore: preemption/task migration cache coherency fixups] to fix
-such issues in here:
+> In their current state the ab8500 power devices explode if platform data
+> isn't provided. This patch prevents this from happening and informs the
+> user of what has happened.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069851.html
+This or equivalent is already submitted and merged by Anton into the
+power tree I think?
 
-It seems there is no follow ups, is there official patch to fix such
-issues?
-
-
-thanks
-
--- 
-Love each day!
-
---bill
+Yours,
+Linus Walleij
