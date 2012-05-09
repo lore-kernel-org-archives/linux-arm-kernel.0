@@ -1,49 +1,96 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Wed, 9 May 2012 14:36:17 +0530
-Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <20120507173351.GB5088@atomide.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
- <20120504223933.GX5613@atomide.com>
- <CAJ7qFSfkHGF7ehanZP=hyZ27HqSp1ONsT0tUV-wpLne9B4DEaQ@mail.gmail.com>
- <20120507173351.GB5088@atomide.com>
-Message-ID: <CAJ7qFSeziNRTUsUWc2Owjqs=A99p_WgiVH8vnEBoVB42v2p+pQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 May 2012 20:50:31 +0900
+Subject: [PATCH 00/20] ARM: Samsung: Add support for Exynos5250 Rev1.0
+In-Reply-To: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
+References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <019701cd2dd9$ef5cec50$ce16c4f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Thomas Abraham wrote:
+> 
+> This patch series adds support for Samsung's Exynos5250 Rev1.0. It
+> includes
+> fixes for device tree support, updates for rev1.0 silicon and device tree
+> discovery for combiner and wakeup interrupt controller. This patch series
+> depricates the existing support for Exynos5250 Rev0.0.
+> 
+> This patchset is based and tested on top of v3.4-rc5.
+> 
+> Boojin Kim (1):
+>   ARM: EXYNOS: Support DMA for EXYNOS5250 SoC
+> 
+> Changhwan Youn (2):
+>   ARM: EXYNOS: Modify the GIC physical address for static io-mapping
+>   ARM: EXYNOS: Redefine IRQ_MCT_L0,1 definition
+> 
+> Kisoo Yu (1):
+>   ARM: EXYNOS: Add pre-divider and fout mux clocks for bpll and mpll
+> 
+> Kukjin Kim (2):
+>   ARM: EXYNOS: fix ctrlbit for exynos5_clk_pdma1
+>   ARM: EXYNOS: update irqs for EXYNOS5250 evt1
+> 
+> Sangsu Park (1):
+>   ARM: EXYNOS: add GPC4 bank instance
+> 
+> Thomas Abraham (13):
+>   ARM: EXYNOS: Add watchdog timer clock instance
+>   ARM: Exynos: Remove a new bus_type instance for Exynos5
+>   of/irq: fix interrupt parent lookup procedure
+>   of/irq: add retry support for interrupt controller tree initialization
+>   ARM: Exynos: Add irq_domain support for interrupt combiner
+>   ARM: Exynos: Add device tree support for interrupt combiner
+>   ARM: Exynos: Simplify the wakeup interrupt setup code
+>   ARM: Exynos: Add irq_domain support for gpio wakeup interrupts
+>   ARM: Exynos: Remove arch_initcall for wakeup interrupt initialization
+>   ARM: Exynos: Add device tree support for gpio wakeup interrupt
+> controller
+>   ARM: dts: Update device tree source files for EXYNOS5250
+>   ARM: Exynos5: Add combiner, wakeup interrupt controller and ethernet
+> nodes
+>   ARM: Exynos5: Add AUXDATA for i2c controllers
+> 
+>  .../bindings/arm/samsung/interrupt-combiner.txt    |   52 +++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   63 ++++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   99 ++++--
+>  arch/arm/mach-exynos/Kconfig                       |    7 +-
+>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>  arch/arm/mach-exynos/clock-exynos5.c               |   80 +++++-
+>  arch/arm/mach-exynos/common.c                      |  338
+++++++++++++++------
+>  arch/arm/mach-exynos/dma.c                         |  129 +++++++--
+>  arch/arm/mach-exynos/include/mach/gpio.h           |    9 +-
+>  arch/arm/mach-exynos/include/mach/irqs.h           |   40 ++-
+>  arch/arm/mach-exynos/include/mach/map.h            |    4 +-
+>  arch/arm/mach-exynos/include/mach/regs-clock.h     |    2 +
+>  arch/arm/mach-exynos/include/mach/regs-gpio.h      |    4 +-
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    4 +
+>  arch/arm/mach-exynos/mct.c                         |   17 +-
+>  arch/arm/mach-exynos/pm.c                          |    2 +-
+>  arch/arm/plat-s5p/clock.c                          |   11 -
+>  arch/arm/plat-samsung/Kconfig                      |    2 +-
+>  arch/arm/plat-samsung/include/plat/cpu.h           |    2 +-
+>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 +
+>  drivers/gpio/gpio-samsung.c                        |   11 +-
+>  drivers/of/irq.c                                   |   29 ++-
+>  22 files changed, 698 insertions(+), 210 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
+> 
+> --
+> 1.7.5.4
 
-[snip]
->> >> -#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) || ? ?\
->> >> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? defined(CONFIG_ARCH_OMAP3))
->> >> +#if (defined(CONFIG_ARCH_OMAP5) || defined(CONFIG_ARCH_OMAP4)) && \
->> >> + ? ? ? ? ? ? !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
->> >> +
->> >> ?static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
->> >> ?{
->> >> ? ? ? WARN(1, "prm: omap2xxx/omap3xxx specific function and "
->> >
->> > Maybe these functions could be just set up as __weak to avoid the
->> > ifdeffery?
->> >
->> ?sorry to understand,
->> ?you mean make this weak and have a strong override for OMAP2 ?
->
-> Yeah that should do the trick, right?
- Ok, There are multiple functions under that #ifdef.
- Also i see that __weak cannot be used for inline functions.
-So should those functions should be moved to .c file and qualify them
- __weak. There is already a strong override for OMAP2 and 3 which
-should not be a problem.
+Hi,
 
-[OR]
+Basically, it's ok to me on 1st~9th patches except #7 as I commented. Will
+apply them but need to update #7. And I will look at the others again. If
+any comments, let you know.
 
- So after the cleanup patch introducing CONFIG_SOC_OMAP4PLUS
- it can be changed as
- #ifdef (CONFIG_SOC_OMAP4PLUS) && !(defined(CONFIG_ARCH_OMAP2) ||
-defined(CONFIG_ARCH_OMAP3))
+Thanks.
 
-So this will avoid patching this for the future socs. ?
-
-Thanks,
- Sricharan
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
