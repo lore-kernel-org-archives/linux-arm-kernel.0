@@ -1,43 +1,29 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 9 May 2012 17:08:32 +0200
-Subject: [PATCH 14/15] mfd/db8500-prcmu: Add Device Tree support and
- enable ux500 platforms
-In-Reply-To: <CACRpkdbQpa+YQ6SNytB-aW9Psr8jE1FO-=iyfJsF71RKmzzqUQ@mail.gmail.com>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdbQpa+YQ6SNytB-aW9Psr8jE1FO-=iyfJsF71RKmzzqUQ@mail.gmail.com>
-Message-ID: <20120509150832.GL1794@sortiz-mobl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 May 2012 15:03:22 +0000
+Subject: [PATCH 1/2] mfd: max8925: request resource region
+In-Reply-To: <20120509144241.GW3955@opensource.wolfsonmicro.com>
+References: <1336360249-29963-1-git-send-email-haojian.zhuang@gmail.com>
+ <201205091419.50736.arnd@arndb.de>
+ <20120509144241.GW3955@opensource.wolfsonmicro.com>
+Message-ID: <201205091503.22950.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tue, Apr 24, 2012 at 10:18:04AM +0200, Linus Walleij wrote:
-> On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 09 May 2012, Mark Brown wrote:
+> That's what I'd expect, but you're saying that the values in the child
+> resources are being stored as base+actual values (where base is some
+> random number) rather than either actual values or as offsets within the
+> base range either of which would seem less surprising.  Presumably you'd
+> also need to walk up the tree to subtract all the bases if there was
+> more than one resource.
 > 
-> > Here we see the db8500-prcmu driver obtain DT support. In its
-> > current state, all we have to do is offer a matching compatible
-> > node and the driver will register and initialise correctly. We
-> > Also remove any initialisation completed in platform code to
-> > prevent any device duplication.
-> >
-> > CC: Samuel Ortiz <sameo@linux.intel.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> OK I need Sam's ACK on this too, then it seems a good idea
-> to take all three patches touching the PRCMU driver through the
-> ux500-core tree.
-I just took 2 of them:
+> Perhaps I'm just totally failing to understand what you're saying?
 
-mfd: Enable Device Tree support for the db8500-prcmu
-mfd: Add support for db8500-prcmu regulator supply for nmk-i2c.4
+I mean that each device providing resources of the new type would need
+to register its resources to the same root resource with non-conclicting
+addresses. Having resources hanging in the air without a parent pointer
+is not good, although we seem to be doing that for a lot of platform
+devices these days, where we just pass the struct resource from platform
+code to a driver without ever registering it at each end.
 
-Since you have not taken any db8500 patches yet on ux500-core, I can carry
-them unless you object to it.
-
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+	Arnd
