@@ -1,33 +1,49 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 9 May 2012 17:20:54 +0200
-Subject: [PATCH 12/15] mfd/db8500-prcmu: Register as a platform driver
- instead of only probing
-In-Reply-To: <CACRpkdZB5Hgdb1bGr3uxKYbJgQhatxMR2Pwf7f0NQa7c34gC-Q@mail.gmail.com>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-13-git-send-email-lee.jones@linaro.org>
- <CACRpkdZB5Hgdb1bGr3uxKYbJgQhatxMR2Pwf7f0NQa7c34gC-Q@mail.gmail.com>
-Message-ID: <20120509152054.GM1794@sortiz-mobl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 May 2012 08:15:11 -0700
+Subject: [GIT PULL] omap fixes for v3.4-rc6
+In-Reply-To: <1673508.aX9Ao89479@avalon>
+References: <20120507223632.GP5088@atomide.com>
+ <CAOesGMjHEy0Rz+ow7J3BuUtt3h3SjU+6gG=PPGTu3tMNZXy6nQ@mail.gmail.com>
+ <1673508.aX9Ao89479@avalon>
+Message-ID: <20120509151510.GG5088@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tue, Apr 24, 2012 at 10:07:41AM +0200, Linus Walleij wrote:
-> On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [120509 04:09]:
+> Hi Olof,
 > 
-> > Pass the probe function as part of the platform_driver struct and
-> > register using the more common platform_driver_register call. In
-> > subsequent patches we'll also add DT support into the struct.
-> >
-> > CC: Samuel Ortiz <sameo@linux.intel.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On Tuesday 08 May 2012 23:48:06 Olof Johansson wrote:
+> > Hi,
+> > 
+> > On Mon, May 7, 2012 at 3:36 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > > The following changes since commit 
+> 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
+> > [..]
+> > 
+> > > Enrico Butera (1):
+> > >      ARM: OMAP: igep0020: fix smsc911x dummy regulator id
+> > 
+> > Hmm. Picking 40 without any kind of comment in the code isn't doing
+> > any favors for future readers. Seems like 1 would be free on this
+> > board, from the rest of the board file to judge (one other
+> > reg-fixed-regulator platform device)?
+> > 
+> > Please either comment why you picked 40 (i.e. it's a random number),
+> > or change it to something a little less random like 1. :)
+
+I'll use the update patch from Enrico.
+
+> > > Laurent Pinchart (1):
+> > >      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
+> > 
+> > Is this a regression? I don't see any recent changes regarding this,
+> > so it's hard to tell. If not then I'd rather hold off for the merge
+> > window given that we're at -rc6.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Applied to my for-next branch, thanks.
+> It's not a regression, I'm fine with holding off until the v3.5 merge window.
 
-Cheers,
-Samuel.
+And will move this one into fixes-non-critical.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Will send a new pull request shortly.
+
+Tony
