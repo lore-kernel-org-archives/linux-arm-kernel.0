@@ -1,70 +1,46 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 9 May 2012 13:36:07 +0300
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <4FA9BD41.2090701@codeaurora.org>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
- <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
- <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
- <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
- <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
- <4FA9BD41.2090701@codeaurora.org>
-Message-ID: <20120509103606.GY20304@tbergstrom-lnx.Nvidia.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 9 May 2012 10:43:39 +0200
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B91EFD@039-SN2MPN1-022.039d.mgd.msft.net>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+ <201205031527.16149.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803B91EFD@039-SN2MPN1-022.039d.mgd.msft.net>
+Message-ID: <201205091043.39787.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 02:41:37AM +0200, Saravana Kannan wrote:
-> On 05/08/2012 10:15 AM, Turquette, Mike wrote:
-> > On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>  wrote:
-> >> Hi Mike,
-> >> Could you please explain more details about how to implement a
-> >> re-parenting operation as part of it's .set_rate implementation?
-> >
-> > Sure.
-> >
-> >> As far as I know, we can not call clk_set_parent in .set_rate function
-> >> directly, since clk_set_rate and clk_set_parent are using the same
-> >> prepare_lock.
-> >
-> > That is correct.
-> >
-> >> Any other interface can be used to implement it?
-> >
-> > You have two options available to you.
-> >
-> > 1) __clk_reparent can be used from your .set_rate callback today to
-> > reflect changes made to the tree topology.  OMAP uses this in our PLL
-> > .set_rate implementation: depending on the re-lock frequency the PLL
-> > may switch parents dynamically.  __clk_reparent does the
-> > framework-level cleanup needed for this (that function is also used
-> > when populating the clock tree with new clock nodes).
-> >
-> > 2) __clk_set_parent could be made non-static if you needed this (I've
-> > been meaning to talk to Saravana about this since I think MSM needs
-> > something like this).
-> 
-> Thanks!
-> 
-> I don't think I need (2). But I don't think I can use (1) as is either. 
-> I can use (1) with some additional code in my set rate op.
-> 
-> While set rate is in progress, both the parents might need to stay 
-> enabled for a short duration. So, in my internal set rate, I need to 
-> check if my clock is prepared/enabled and call prepare/enable on the 
-> "old parent", call __clk_reparent (which will reduce the ref count for 
-> the old parents and increase it for the new parents), finish the 
-> reparent in HW and then unprepare/disable the old parent if I have 
-> prepared/enabled them earlier.
-> 
-> It might be beneficial to provide something like a 
-> __clk_reparent_start(new_parent, *scratch_pointer) and 
-> __clk_reparent_finish(*scratch_pointer) if it will be useful for more 
-> than just MSM. Based on this email, I would guess that Tegra would want 
-> something similar too.
-> 
+Dear Chen Peter-B29397,
 
-We also need to reparent clocks using a pll if we want to change the PLLs rate
-while the users are active.
+> > > > Still use IRQF_SHARED for the usb interrupt, but:
+> > > > * The IRQ handler in ehci-mxs, that's set in hc_driver.irq would be
+> > > > always
+> > > > returning IRQ_NONE.
+> > > > * The IRQ handler in imx-otg would call the callback registered via
+> > > > imx_otg_set_irq_handler() only if the port was actually in host mode
+> > > 
+> > > The interrupt which is registered by hcd core is usb_hcd_irq, it will
+> > 
+> > call
+> > 
+> > > ehci_irq. The hc_driver.irq is included in usb_hcd_irq.
+> > 
+> > Hm, that's correct. I'll dive in and see if there's any other way around.
+> > I
+> > think I saw IRQF_DISABLED somewhere there, but that might be just some
+> > phantom.
+> > Either way, is this direction I'm taking the correct one (have irq
+> > handler in
+> > imx-otg and send IRQs to gadget/host drivers from there)?
+> 
+> Sorry for late as I can't see this email at my inbox.
 
-Cheers,
+That's fine :)
 
-Peter.
+> If you can handle hcd irq well, I think it is correct direction.
+
+Good, any other problems you noticed?
+
+Thanks!
+
+Best regards,
+Marek Vasut
