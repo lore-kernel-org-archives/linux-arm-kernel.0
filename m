@@ -1,62 +1,34 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 9 May 2012 08:59:49 +0000
-Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <87397ajo32.fsf@ti.com>
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-4-git-send-email-hvaibhav@ti.com> <87397ajo32.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 May 2012 10:49:52 +0200
+Subject: [PATCH 04/15] ARM: ux500: CONFIG: Compile in support for leds-gpio
+In-Reply-To: <1336155805-18554-5-git-send-email-lee.jones@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbv780oUaDL1-m4kj5iRr5=1U6QhE975Z4gNADoTNk8YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 04:08:09, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > The function __omap2_set_globals() can be common across all
-> > platforms/architectures, even in case of omap4, internally it
-> > calls same set of functions as in __omap2_set_globals() function
-> > (except for sdrc).
-> 
-> OK so far.
-> 
-> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-> > so that we can reuse same function across omap2/3/4...
-> 
-> But what happens when a single kernel is built that has support for an
-> SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
-> 
+On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-As such Nothing...I looking into this direction while implementing.
+> Code exists in the mop500 board file (used for HREF and
+> Snowball) to initialise Snowball's user LED via the
+> leds-gpio driver. However, the driver isn't currently
+> built when using the default configuration file. This
+> patch aims to change that behavior.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+(...)
+> +CONFIG_LEDS_GPIO=y
+> ?CONFIG_RTC_CLASS=y
+> ?CONFIG_RTC_DRV_AB8500=y
+> ?CONFIG_RTC_DRV_PL031=y
 
-In that case, sdrc.c file will be compiled in and execution will jump to
-omap2_set_globals_sdrc(). But inside this function, we are already checking 
-whether the omap2_globals->sdrc and omap2_globals->sms for NULL and then use 
-it.
+Why not just edit arch/arm/mach-ux500/Kconfig like this:
 
-And function omap2_sdrc_init() is also depends on machine, so in case of
-Am33xx, it won't get into sdrc execution at all. And in case of omap4, it 
-will.
+config MACH_SNOWBALL
+        bool "U8500 Snowball platform"
+        select MACH_MOP500
++        select LEDS_GPIO
 
-> In that case this new SOC_HAS_OMAP2_SDRC will be set, and
-> set_globals_sdrc() will be called even for the SoCs without SDRC.
-> 
-> So, rather than add a new Kconfig option for this, I would rather see 
-> you using the existing runtime feature check for the SDRC: omap_has_sdrc()
-> 
-
-There is NO difference between runtime feature check Vs this patch, refer to the function implementation,
-
-void __init omap2_set_globals_sdrc(struct omap_globals *omap2_globals)
-{
-	if (omap2_globals->sdrc)
-		omap2_sdrc_base = omap2_globals->sdrc;
-	if (omap2_globals->sms)
-		omap2_sms_base = omap2_globals->sms;
-}
-
-The initialization happens after checking for NULL, so even if you execute it or not, the variable are set to NULL in case of am33xx.
-
-So I don't find any difference between runtime and this patch.
-
-Thanks,
-Vaibhav
+Yours,
+Linus Walleij
