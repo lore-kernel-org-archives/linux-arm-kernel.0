@@ -1,41 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 May 2012 10:13:06 +0200
-Subject: [PATCH] ARM: mx35: add cpufreq support
-In-Reply-To: <20120509075618.GA4412@lovely.krouter>
-References: <20120507141437.GA9636@lovely.krouter>
- <20120509072239.GG27341@pengutronix.de>
- <20120509075618.GA4412@lovely.krouter>
-Message-ID: <20120509081306.GK27341@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 9 May 2012 13:47:09 +0530
+Subject: [PATCH 00/10] spi: s3c64xx: add support for device tree
+In-Reply-To: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CABb+yY00+Et7sXgb0s6GinOdKu6PeQsWD9A_SoV2M3VKMejz7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 09:56:18AM +0200, Christoph Fritz wrote:
-> Hi Sascha,
-> 
-> On Wed, May 09, 2012 at 09:22:39AM +0200, Sascha Hauer wrote:
-> > On Mon, May 07, 2012 at 04:14:37PM +0200, Christoph Fritz wrote:
-> > > This patch adds the mx35 to the supported cpu-families of the
-> > > "CPUfreq driver for i.MX CPUs".
-> > 
-> > I'm afraid this has to wait another cycle since you are patching a file
-> > that is scheduled to be replaced with common clock framework support.
-> 
-> Has this "scheduled replacement" somewhere (e.g. calendar) been
-> marked? So that I can check in the future before editing "scheduled
-> files".
-
-The clock framework conversion has been a hot topic for quite a while
-now, but there hasn't been an official note about it outside the list.
-I can understand that the occasional linux arm kernel reader is not
-aware of it, but we currently have nothing in place to anounce such
-things. (Other than feature-removal.txt which seems not very suitable
-since no feature is removed, only updated)
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On Wed, May 9, 2012 at 3:34 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> This patch series adds device tree based discovery support for Samsung's
+> s3c64xx compatible spi controller. This is mainly tested for Exynos4210
+> and Exynos5250 with onboard spi nor flash device.
+>
+> This patch series is based on Linux 3.4-rc5 with the following two
+> patch series applied.
+>
+> [1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg10494.html
+> ? ?[PATCH 00/20] ARM: Samsung: Add support for Exynos5250 Rev1.0
+>
+> [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg09640.html
+> ? ?[PATCH 0/6] S3C24XX: Add support for HSSPI on S3C2416/S3C2443
+>
+> Thomas Abraham (10):
+> ?spi: s3c64xx: remove unused S3C64XX_SPI_ST_TRLCNTZ macro
+> ?spi: s3c64xx: move controller information into driver data
+> ?ARM: Samsung: Remove spi hardware controller information from platform data
+> ?ARM: Samsung: Remove pdev pointer paremeter from spi gpio setup functions
+> ?ARM: Samsung: Update the device names for spi clock lookup
+> ?ARM: Samsung: Modify s3c64xx_spi{0|1|2}_set_platdata function
+> ?spi: s3c64xx: Remove the 'set_level' callback from controller data
+> ?ARM: Exynos4: Fix the incorrect hierarchy of spi controller bus clock
+> ?ARM: Exynos5: Add spi clock support
+> ?spi: s3c64xx: add device tree support
+>
+Look ok to me.  FWIW,  Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
