@@ -1,32 +1,67 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Wed, 9 May 2012 00:39:31 +0000
-Subject: [linux-pm] [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage
- Scaling)
-In-Reply-To: <87lil2jp2z.fsf@ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
- <20120427175657.GP18260@opensource.wolfsonmicro.com>	<87397o3n4y.fsf@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
- <87mx5jy2li.fsf@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
- <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
- <87lil2jp2z.fsf@ti.com>
-Message-ID: <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 08 May 2012 17:41:37 -0700
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
+ <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
+ <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
+ <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
+Message-ID: <4FA9BD41.2090701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Hilman, Kevin
-> Sent: Tuesday, May 08, 2012 5:17 PM
+On 05/08/2012 10:15 AM, Turquette, Mike wrote:
+> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>  wrote:
+>> Hi Mike,
+>> Could you please explain more details about how to implement a
+>> re-parenting operation as part of it's .set_rate implementation?
+>
+> Sure.
+>
+>> As far as I know, we can not call clk_set_parent in .set_rate function
+>> directly, since clk_set_rate and clk_set_parent are using the same
+>> prepare_lock.
+>
+> That is correct.
+>
+>> Any other interface can be used to implement it?
+>
+> You have two options available to you.
+>
+> 1) __clk_reparent can be used from your .set_rate callback today to
+> reflect changes made to the tree topology.  OMAP uses this in our PLL
+> .set_rate implementation: depending on the re-lock frequency the PLL
+> may switch parents dynamically.  __clk_reparent does the
+> framework-level cleanup needed for this (that function is also used
+> when populating the clock tree with new clock nodes).
+>
+> 2) __clk_set_parent could be made non-static if you needed this (I've
+> been meaning to talk to Saravana about this since I think MSM needs
+> something like this).
 
-> A basic OMAP AVS driver has been in mainline for a long time, yet we
-> have not seen support submitted for all of these features.
+Thanks!
 
-1.5/3.5 is a feature.
+I don't think I need (2). But I don't think I can use (1) as is either. 
+I can use (1) with some additional code in my set rate op.
 
-ABB is requirement for a production useable driver. Higher speed rated OMAP4 and all OMAP5 added these to be useable. Yes this is effort. Point of mentioning is to raise awareness of need.
+While set rate is in progress, both the parents might need to stay 
+enabled for a short duration. So, in my internal set rate, I need to 
+check if my clock is prepared/enabled and call prepare/enable on the 
+"old parent", call __clk_reparent (which will reduce the ref count for 
+the old parents and increase it for the new parents), finish the 
+reparent in HW and then unprepare/disable the old parent if I have 
+prepared/enabled them earlier.
 
-Yet to be added feature has different meaning than functional gap.
+It might be beneficial to provide something like a 
+__clk_reparent_start(new_parent, *scratch_pointer) and 
+__clk_reparent_finish(*scratch_pointer) if it will be useful for more 
+than just MSM. Based on this email, I would guess that Tegra would want 
+something similar too.
 
-Regards,
-Richard W.
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
