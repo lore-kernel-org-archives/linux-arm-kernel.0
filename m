@@ -1,45 +1,62 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Wed, 9 May 2012 10:41:02 +0200
-Subject: Handling of modular boards
-In-Reply-To: <CACRpkdbyp=BNGn8Eub6vcAgB9CS5PhYcGt2foi8kNxA3oU5Fzg@mail.gmail.com>
-References: <CACRpkdbyp=BNGn8Eub6vcAgB9CS5PhYcGt2foi8kNxA3oU5Fzg@mail.gmail.com>
- <20120504185850.GO14230@opensource.wolfsonmicro.com>
- <4FA432E9.9050606@wwwdotorg.org>
- <20120504204455.GR14230@opensource.wolfsonmicro.com>
-Message-ID: <20120509084102.GA16228@mail.gnudd.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  9 May 2012 11:06:06 +0200
+Subject: [PATCH 9/9] Add DTSI for the G20 SoC
+In-Reply-To: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336554366-16957-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9g20.dtsi |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
->> This is another issue - a similar set of problems does apply to some PCI
->> type cards where the PCI device is essentially a bridge to a typical
->> embedded system - though practically speaking it's much less severe.
-> 
-> I think Alessandro is working on a board like that right now, so looping
-> in Ale to this discussion to get his attention...
-
-> I think Alessandro is working on a board like that right now, so looping
-> in Ale to this discussion to get his attention...
-
-Yes, that's it. The vendor of my thing has wrapped everything under
-pci headers, so the "typical embedded system", which actually is a
-demasculated ARM SoC is self-described by PCI (no need for device tree)
-
-A previous poster said:
->>> b) Doesn't integrate well with hotplug; the DT for the board
->>> configuration is static at boot. What if a board can be unplugged and
->>> another plugged in; a reboot or similar would be needed to adjust the
->>> kernel to this.
-
-I think you need some enumeration mechanism in this case. Actually, I
-think this will become common in the near future, as you can reprogram
-your FPGA devices while the system runs.
-
-The issue is real, and I'm involved in a self-description project; it
-allows to use the well-known bus abstraction (with bus controller,
-devices, drivers) to ease handling soft cores that may come and go
-while the system is alive.
-
-Thank you Linus for involving me, I'll now go to read the whole thread
-/alessandro
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 773ef48..2b1ad83 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -197,6 +197,41 @@
+ 				interrupts = <10 4>;
+ 				status = "disabled";
+ 			};
++
++			adc0: adc at fffe0000 {
++				compatible = "atmel,at91sam9g20-adc";
++				reg = <0xfffe0000 0x100>;
++				interrupts = <5 4>;
++				atmel,adc-use-external-triggers;
++				atmel,adc-channels-used = <0xf>;
++				atmel,adc-vref = <3300>;
++				atmel,adc-num-channels = <4>;
++				atmel,adc-startup-time = <10>;
++				atmel,adc-channel-base = <0x30>;
++				atmel,adc-drdy-mask = <0x10000>;
++				atmel,adc-status-register = <0x1c>;
++				atmel,adc-trigger-register = <0x04>;
++
++				trigger at 0 {
++					trigger-name = "timer-counter-0";
++					trigger-value = <0x1>;
++				};
++				trigger at 1 {
++					trigger-name = "timer-counter-1";
++					trigger-value = <0x3>;
++				};
++
++				trigger at 2 {
++					trigger-name = "timer-counter-2";
++					trigger-value = <0x5>;
++				};
++
++				trigger at 3 {
++					trigger-name = "external";
++					trigger-value = <0x13>;
++					trigger-external;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+-- 
+1.7.9.5
