@@ -1,23 +1,21 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 May 2012 09:59:56 -0400 (EDT)
-Subject: [PATCH] mach-shmobile: Emma Mobile EV2 SMP prototype code
-In-Reply-To: <201205091345.34404.arnd@arndb.de>
-References: <20120509075407.5991.60556.sendpatchset@w520>
- <201205091212.08239.arnd@arndb.de> <4FAA6DE6.3040001@arm.com>
- <201205091345.34404.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1205090955520.21030@xanadu.home>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Wed, 9 May 2012 16:10:36 +0200
+Subject: [PATCH] mfd: da9052: fix of_match_node() arguments
+In-Reply-To: <1336258968-6423-1-git-send-email-olof@lixom.net>
+References: <1336258968-6423-1-git-send-email-olof@lixom.net>
+Message-ID: <20120509141036.GF1794@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2012, Arnd Bergmann wrote:
+Hi Olof,
 
-> FWIW, I would actually prefer merging the 'struct arm_soc_desc', 'struct
-> arm_soc_smp_init_ops' and 'struct arm_soc_smp_ops' structures into a
-> single 'struct smp_ops' for simplicity.
+On Sat, May 05, 2012 at 04:02:48PM -0700, Olof Johansson wrote:
+> The driver calls of_match_node() with the arguments swapped.
+Thanks, patch applied to my for-next branch.
 
-You can't easily validate correct usage of __init marked code from the 
-rest if everything is pulled in the same struct.  This is why I asked 
-they be split.
+Cheers,
+Samuel.
 
-
-Nicolas
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
