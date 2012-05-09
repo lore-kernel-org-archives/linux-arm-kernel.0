@@ -1,64 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 May 2012 11:27:17 +0200
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120502162702.GE3548@n2100.arm.linux.org.uk>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 09 May 2012 13:05:25 +0200
+Subject: [GIT PULL] omap fixes for v3.4-rc6
+In-Reply-To: <CAOesGMjHEy0Rz+ow7J3BuUtt3h3SjU+6gG=PPGTu3tMNZXy6nQ@mail.gmail.com>
+References: <20120507223632.GP5088@atomide.com>
+ <CAOesGMjHEy0Rz+ow7J3BuUtt3h3SjU+6gG=PPGTu3tMNZXy6nQ@mail.gmail.com>
+Message-ID: <1673508.aX9Ao89479@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2012 at 6:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Olof,
 
->> > What is the desired behaviour of the callback for cyclic DMA?
->>
->> Typically cyclic DMA is used in the case of sound. This is where alsa
->> expects the "period" callback for every DMA period.
->> Generally, such notification serves the purpose of letting client know
->> that one "block" has been completed.
->
-> Yes, though as we have this interface as something generic I didn't want
-> to call it "the alsa dma interface".
+On Tuesday 08 May 2012 23:48:06 Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, May 7, 2012 at 3:36 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > The following changes since commit 
+69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
+> [..]
+> 
+> > Enrico Butera (1):
+> >      ARM: OMAP: igep0020: fix smsc911x dummy regulator id
+> 
+> Hmm. Picking 40 without any kind of comment in the code isn't doing
+> any favors for future readers. Seems like 1 would be free on this
+> board, from the rest of the board file to judge (one other
+> reg-fixed-regulator platform device)?
+> 
+> Please either comment why you picked 40 (i.e. it's a random number),
+> or change it to something a little less random like 1. :)
+> 
+> > Laurent Pinchart (1):
+> >      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
+> 
+> Is this a regression? I don't see any recent changes regarding this,
+> so it's hard to tell. If not then I'd rather hold off for the merge
+> window given that we're at -rc6.
 
-There is a DMAengine helper in ALSA SoC these days,
-sound/soc/soc-dmaengine-pcm.c which does not yet include
-get position calls, but I expect that's where the ALSA glue will
-end up.
+It's not a regression, I'm fine with holding off until the v3.5 merge window.
 
->> From what I understand (Dan please correct me as you may know this much
->> better than me), the tx_status tells you wrt passed cookie what is the
->> status. Further, (as you pointed), it also tells you which is last
->> completed cookie and what is the current "running". And wrt the
->> currently "running" cookie it tells you how may bytes are left.
->
-> That means we have a number of buggy drivers on both sides of the API...
-> PL08x for example always total up all the pending bytes from the position
-> in the current descriptor to the last issued descriptor. ?Many other
-> implementations simply always return zero.
+-- 
+Regards,
 
-My bad, when I implemented it, I imagined the semantic to be
-the residue on the *channel* which is not smart, it's better to use
-the cookie as reference, so patch at will.
-
->> IIRC had pointed Lars to this API, but quick check of code reveals that
->> this is unused. I think returning residue as remaining bytes of current
->> "block" makes sense. This easily gives knowledge of where DMA pointer is
->> wrt current ongoing transaction. Was that your meaning of end of cyclic
->> buffer, not sure what end means here?
->
-> I think the residue thing was something Linus created, which is why he's
-> included in this thread...
-
-Lars-Peter Clausen is the person writing the ALSA SoC wrapper.
-Lars-Peter: do you have plans to implement residue calls for
-getting buffer position?
-
-It was originally created to be able to use DMA for ALSA SoC on
-the U300. I still don't know if there is some other viable usecase
-but I expect that things like multimedia codecs would use a DMA
-engine much the same way.
-
-Yours,
-Linus Walleij
+Laurent Pinchart
