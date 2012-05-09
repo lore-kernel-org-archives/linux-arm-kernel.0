@@ -1,105 +1,73 @@
-From: hwoo.yang@gmail.com (Hyungwoo Yang)
-Date: Tue, 8 May 2012 18:54:48 -0700
-Subject: [PATCH] Prevent process migration during vfp_init()
-In-Reply-To: <20120508184506.GM2263@mudshark.cambridge.arm.com>
-References: <CAOsG7tqktqxxU9gtyqojP7KP87cy1jpgT8H==wOe0cQj8=LV+Q@mail.gmail.com>
- <20120508111332.GG2263@mudshark.cambridge.arm.com>
- <CAOsG7tqr__yWp1zmMfy3myRGFmY690f8i8emuXq5d7E=o3E7Vw@mail.gmail.com>
- <20120508180430.GL2263@mudshark.cambridge.arm.com>
- <CAOsG7try1-E1JOq2w_A2767rbi+iyyahh=H1z9TzY+KLoc8N0g@mail.gmail.com>
- <20120508184506.GM2263@mudshark.cambridge.arm.com>
-Message-ID: <CAOsG7tq21MciH0hKW9_cG1KcmOgWn3CoByP_Cfr3Cu3UM93qOA@mail.gmail.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Tue, 8 May 2012 19:20:26 -0700 (PDT)
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <4FA9BD41.2090701@codeaurora.org>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
+ <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
+ <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
+ <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
+ <4FA9BD41.2090701@codeaurora.org>
+Message-ID: <d460deebb832d7f62b4298c78ad2b791.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sure, please go ahead.
-
-On Tue, May 8, 2012 at 11:45 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, May 08, 2012 at 07:28:08PM +0100, Hyungwoo Yang wrote:
->> Yes, I've already tested without preemption, it seems it is working fine.
->
-> Cracking, thanks for confirming that.
->
->> for the failure, it is simple. on my A9 quad, due to heavy loads
->> during "late initcall", sometimes process migration happens just after
->> vfp_enable() but before smp_call_function(). it means there can be a
->> VFP disabled but accessed since smp_call_function() is for the rest of
->> cores not the core running it.
+> On 05/08/2012 10:15 AM, Turquette, Mike wrote:
+>> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>  wrote:
+>>> Hi Mike,
+>>> Could you please explain more details about how to implement a
+>>> re-parenting operation as part of it's .set_rate implementation?
 >>
->> For example, if enable_vfp() is executed on core0 but
->> smp_call_function() is excuted on core1 due to migration, then VFP on
->> core1 is not enabled. it will be enabled next time when the core1
->> online again.
+>> Sure.
+>>
+>>> As far as I know, we can not call clk_set_parent in .set_rate function
+>>> directly, since clk_set_rate and clk_set_parent are using the same
+>>> prepare_lock.
+>>
+>> That is correct.
+>>
+>>> Any other interface can be used to implement it?
+>>
+>> You have two options available to you.
+>>
+>> 1) __clk_reparent can be used from your .set_rate callback today to
+>> reflect changes made to the tree topology.  OMAP uses this in our PLL
+>> .set_rate implementation: depending on the re-lock frequency the PLL
+>> may switch parents dynamically.  __clk_reparent does the
+>> framework-level cleanup needed for this (that function is also used
+>> when populating the clock tree with new clock nodes).
+>>
+>> 2) __clk_set_parent could be made non-static if you needed this (I've
+>> been meaning to talk to Saravana about this since I think MSM needs
+>> something like this).
 >
-> Yup, your initial explanation was clear enough, I just wanted to check that
-> this did indeed solve your testcase given that I've been lucky enough not to
-> hit the issue on my boards.
+> Thanks!
 >
-> Can I add your signed-off-by to the following please?
+> I don't think I need (2). But I don't think I can use (1) as is either.
+> I can use (1) with some additional code in my set rate op.
 >
-> Will
+> While set rate is in progress, both the parents might need to stay
+> enabled for a short duration. So, in my internal set rate, I need to
+> check if my clock is prepared/enabled and call prepare/enable on the
+> "old parent", call __clk_reparent (which will reduce the ref count for
+> the old parents and increase it for the new parents), finish the
+> reparent in HW and then unprepare/disable the old parent if I have
+> prepared/enabled them earlier.
 >
->
-> Subject: [PATCH] ARM: vfp: ensure preemption is disabled when enabling VFP access
->
-> The vfp_enable function enables access to the VFP co-processor register
-> space (cp10 and cp11) on the current CPU and must be called with
-> preemption disabled. Unfortunately, the vfp_init late initcall does not
-> disable preemption and can lead to an oops during boot if thread
-> migration occurs at the wrong time and we end up attempting to access
-> the FPSID on a CPU with VFP access disabled.
->
-> This patch fixes the initcall to call vfp_enable from a non-preemptible
-> context on each CPU and adds a BUG_ON(preemptible) to ensure that any
-> similar problems are easily spotted in the future.
->
-> Reported-by: Hyungwoo Yang <hwoo.yang@gmail.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> ?arch/arm/vfp/vfpmodule.c | ? 10 ++++++----
-> ?1 files changed, 6 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index bc683b8..c5767b5 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -11,6 +11,7 @@
-> ?#include <linux/types.h>
-> ?#include <linux/cpu.h>
-> ?#include <linux/cpu_pm.h>
-> +#include <linux/hardirq.h>
-> ?#include <linux/kernel.h>
-> ?#include <linux/notifier.h>
-> ?#include <linux/signal.h>
-> @@ -432,7 +433,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
->
-> ?static void vfp_enable(void *unused)
-> ?{
-> - ? ? ? u32 access = get_copro_access();
-> + ? ? ? u32 access;
-> +
-> + ? ? ? BUG_ON(preemptible());
-> + ? ? ? access = get_copro_access();
->
-> ? ? ? ?/*
-> ? ? ? ? * Enable full access to VFP (cp10 and cp11)
-> @@ -657,7 +661,7 @@ static int __init vfp_init(void)
-> ? ? ? ?unsigned int cpu_arch = cpu_architecture();
->
-> ? ? ? ?if (cpu_arch >= CPU_ARCH_ARMv6)
-> - ? ? ? ? ? ? ? vfp_enable(NULL);
-> + ? ? ? ? ? ? ? on_each_cpu(vfp_enable, NULL, 1);
->
-> ? ? ? ?/*
-> ? ? ? ? * First check that there is a VFP that we can use.
-> @@ -678,8 +682,6 @@ static int __init vfp_init(void)
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?hotcpu_notifier(vfp_hotplug, 0);
->
-> - ? ? ? ? ? ? ? smp_call_function(vfp_enable, NULL, 1);
-> -
-> ? ? ? ? ? ? ? ?VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT; ?/* Extract the architecture version */
-> ? ? ? ? ? ? ? ?printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
-> --
-> 1.7.4.1
+> It might be beneficial to provide something like a
+> __clk_reparent_start(new_parent, *scratch_pointer) and
+> __clk_reparent_finish(*scratch_pointer) if it will be useful for more
+> than just MSM. Based on this email, I would guess that Tegra would want
+> something similar too.
+
+Thinking more about this, I think this is how any clk op that might change
+the parent should operate. I will try to write up an RFC patch for this
+and send it out soon. I'm in a hurry, so will explain more in the RFC
+patch or in a later email.
+
+Thanks,
+Saravana
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
