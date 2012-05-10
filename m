@@ -1,41 +1,28 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Thu, 10 May 2012 16:52:00 +0530
-Subject: [PATCH 01/13] ARM: OMAP5: id: Add cpu id for ES versions
-In-Reply-To: <4FABA406.1080608@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-2-git-send-email-r.sricharan@ti.com>
- <4FABA406.1080608@ti.com>
-Message-ID: <CAJ7qFSf-r2aXJsh+gP4X9+4kYqnwGu9-jMXOkJNTaEgF6Ug=OA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 May 2012 13:24:45 +0200
+Subject: [PATCH 02/15] ARM: ux500: Remove unused i2c platform_data
+ initialisation code
+In-Reply-To: <4FAA4576.1020106@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ70FasMuTTgBe68xaePB-4UNZ0W44BCxDve7fqXYT+vg@mail.gmail.com>
+ <4FAA4576.1020106@linaro.org>
+Message-ID: <CACRpkdbnXutBe=0Ng70BxTH3Qh87uyU=NO1f4U-8iZyPu2NvaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
->> +void __init omap5xxx_check_revision(void)
->> +{
->> + ? ? u32 idcode;
->> + ? ? u16 hawkeye;
->> + ? ? u8 rev;
->> +
->> + ? ? idcode = read_tap_reg(OMAP_TAP_IDCODE);
->> + ? ? hawkeye = (idcode >> 12) & 0xffff;
->> + ? ? rev = (idcode >> 28) & 0xff;
->> + ? ? switch (hawkeye) {
->> + ? ? case 0xb942:
->> + ? ? ? ? ? ? switch (rev) {
->> + ? ? ? ? ? ? case 0:
->> + ? ? ? ? ? ? ? ? ? ? omap_revision = OMAP5430_REV_ES1_0;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? case 1:
->> + ? ? ? ? ? ? ? ? ? ? omap_revision = OMAP5430_REV_ES2_0;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? default:
->> + ? ? ? ? ? ? ? ? ? ? omap_revision = OMAP5430_REV_ES1_0;
+On Wed, May 9, 2012 at 12:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 09/05/12 09:46, Linus Walleij wrote:
+>> So why not copy the contents of arch/arm/plat-nomadik/include/plat/i2c.h
+>> into drivers/i2c/busses/i2c-nomadik.c and delete that header from
+>> plat at the same time?
+>>
+>> Then there sure is no way for platforms to sneak in any platform
+>> data any other way.
 >
-> Default should always be the latest version supported. i.e. in this case
-> it should be OMAP5430_REV_ES2_0
->
- ok thanks, will correct it.
+> I have no problem in doing that. Can I submit a separate patch?
 
-Thanks,
- Sricharan
+Sure. Acked-by on this then...
+
+Yours,
+Linus Walleij
