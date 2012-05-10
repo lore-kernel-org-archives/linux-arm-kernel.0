@@ -1,71 +1,37 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 10 May 2012 08:12:09 -0500
-Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
-In-Reply-To: <20120510065614.GE31844@pengutronix.de>
-References: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
- <20120510065614.GE31844@pengutronix.de>
-Message-ID: <CAMXH7KFybOyTE_MYSvM=-JqMQeXDhmB+M-1WBkqp4H=dgUDxSA@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 May 2012 15:12:26 +0200
+Subject: i.MX USB Re-Structure
+In-Reply-To: <20120510125834.GT27341@pengutronix.de>
+References: <20120510060523.GA32703@nchen-desktop>
+ <20120510125834.GT27341@pengutronix.de>
+Message-ID: <201205101512.27073.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+Dear Sascha Hauer,
 
-On Thu, May 10, 2012 at 1:56 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Robert,
->
-> On Wed, May 09, 2012 at 07:24:17PM -0500, Robert Lee wrote:
->> A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
->> to use common definitions when accessing registers of peripherals on
->> the AIPS2 bus.
->>
->> This change was tested for mapping conflicts using the iop2v script
->> found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
->> performing a bootup of a default build using imx_v6_v7_defconfig
->> on a imx51 babbage board and imx53 loco board.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> It took me some time to understand your goal. With your change you
-> achieve that
->
-> ? ? ? ?IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
-> ? ? ? ?IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) ==
-> ? ? ? ?IMX_IO_P2V(MX53_AIPS2_BASE_ADDR)
->
-> (which IMHO is more than "allowing ... to use common definitions [for
-> the] AIPS2 bus).
+> On Thu, May 10, 2012 at 02:05:24PM +0800, Peter Chen wrote:
+> > Hi Sascha,
+> > 
+> > Recently, Alexander Shishkin has posted new chipidea patchset
+> > (http://www.spinics.net/lists/linux-usb/msg62975.html)
+> > to support USB driver who use chipidea core. In his structure,
+> > all controller related files (like ehci-mxc.c, fsl-udc-core.c, etc)
+> > will be drivers/usb/chipidea, and no related file will be host, gadget
+> > and otg again.
+> > 
+> > So, it will be different with marek has posted i.mx28 USB driver,
+> > and also different with your proposal in the past. But I think
+> > you and marek may prefer Alexander's structure, and would like
+> > use it for i.mx in future, correct?
+> 
+> I was not aware of this patchset. I only had a short look at it, but
+> yes, it seems to be the way to go, for all SoCs supporting this
+> hardware, be it i.MX, MXS or something else.
 
-Sorry, I just have been more thorough in my description.  In the patch
-I also forgot to change the comments and give the new virtual
-addresses so I can add that in a v2 if this change ends up being
-acceptable.
+Correct, I can't but agree here.
 
->
-> I can confirm that my imx-iop2v script doesn't find a conflict with your
-> change. Having said that I didn't check that the memory regions listed
-> in the script still match the regions that are statically mapped on imx.
->
-> And I wonder why do you need to have the aips2 bus mapped to the same
-> address on all imx5 machines. The future is that the base addresses of
-> the various devices are determined via dt and then the static mappings
-> go away. Do I miss something?
+> Sascha
 
-For now, because both dt and non dt configurations are available for
-imx5, this is needed so that the low power mx5_cpu_lp_set() function
-in pm-imx5.c can be readily used by imx53 and imx50 for low power
-idling.
-
-If this is not acceptable, another option would be to only support
-idle for dt builds that have common base addresses.  This may require
-a temporary hack for cpuidle enablement to enable it for dt but not
-for non-dt since they currently use some common init code.  Or, just
-don't support low power idling at all on imx53 and imx50 until the
-non-dt support is removed.
-
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+Best regards,
+Marek Vasut
