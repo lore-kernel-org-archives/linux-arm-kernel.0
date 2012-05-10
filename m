@@ -1,22 +1,31 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 10 May 2012 14:20:54 +0800
-Subject: [PATCH V2 02/11] ARM: dts: imx6q-sabrelite: add i2c1 pinctrl
- support
-In-Reply-To: <1336563190-19974-3-git-send-email-richard.zhao@freescale.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-3-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120510062053.GD6622@shlinux2.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 May 2012 09:44:23 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FAAE564.6040708@ti.com>
+References: <87ipg76hfm.fsf@ti.com> <4FA8284C.7080803@ti.com>
+ <87k40nzi3i.fsf@ti.com> <4FA8FCFF.40105@ti.com>
+ <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
+ <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com>
+ <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
+Message-ID: <20120510084422.GB27276@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 07:33:01PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
->  arch/arm/boot/dts/imx6q.dtsi          |    7 +++++++
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+On Wed, May 09, 2012 at 10:45:08PM +0100, Jon Hunter wrote:
+> Hi All,
 
-Regards
-Dong Aisheng
+Hi Jon,
+
+> I have posted my latest series here [1] based upon that from Will [2]
+> which attempts to fix the EMU CD based upon the inputs from this thread.
+> It is working on my omap4460 panda. Hopefully Ming and/or Will can also
+> test. I know that Ming is out this week but said he can test next week.
+
+Many thanks to you (+Kevin, Benoit, Paul and co) for persevering with this.
+If I can get my hands on a Panda, I'll see if I can test something this
+week. Any particular tests you want me to run to exercise the interaction
+with PM?
+
+Cheers,
+
+Will
