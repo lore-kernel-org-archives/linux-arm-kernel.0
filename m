@@ -1,154 +1,118 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 May 2012 16:42:10 +0800
-Subject: [PATCH 3/6] ASoC: mxs: mxs-pcm does not need to be a plaform_driver
-In-Reply-To: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336639333-11561-4-git-send-email-shawn.guo@linaro.org>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 10 May 2012 14:23:01 +0530
+Subject: [RESUBMIT PATCH] ARM: OMAP2+: am33xx: Add low level debugging support
+Message-ID: <1336639981-27194-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Same as the commit 518de86 (ASoC: tegra: register 'platform' from DAIs,
-get rid of pdev), it makes mxs-pcm not a platform_driver but helper to
-register "platform", so that the platform_device for mxs-pcm can be
-saved completely.
+From: Afzal Mohammed <afzal@ti.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Add support for low level debugging on AM335X EVM (AM33XX family).
+Currently only support for UART1 console, which is used on AM335X EVM
+is added.
+
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- sound/soc/mxs/mxs-pcm.c      |   24 ++++++------------------
- sound/soc/mxs/mxs-pcm.h      |    3 +++
- sound/soc/mxs/mxs-saif.c     |   25 ++++---------------------
- sound/soc/mxs/mxs-saif.h     |    1 -
- sound/soc/mxs/mxs-sgtl5000.c |    4 ++--
- 5 files changed, 15 insertions(+), 42 deletions(-)
+This patch had been Reviewed and accepted earlier, but got
+missed during last merge window. Resubmitting again, without
+code-change.
 
-diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
-index e373fbb..373dec9 100644
---- a/sound/soc/mxs/mxs-pcm.c
-+++ b/sound/soc/mxs/mxs-pcm.c
-@@ -220,28 +220,16 @@ static struct snd_soc_platform_driver mxs_soc_platform = {
- 	.pcm_free	= mxs_pcm_free,
- };
- 
--static int __devinit mxs_soc_platform_probe(struct platform_device *pdev)
-+int __devinit mxs_pcm_platform_register(struct device *dev)
- {
--	return snd_soc_register_platform(&pdev->dev, &mxs_soc_platform);
-+	return snd_soc_register_platform(dev, &mxs_soc_platform);
- }
-+EXPORT_SYMBOL_GPL(mxs_pcm_platform_register);
- 
--static int __devexit mxs_soc_platform_remove(struct platform_device *pdev)
-+void __devexit mxs_pcm_platform_unregister(struct device *dev)
- {
--	snd_soc_unregister_platform(&pdev->dev);
+ arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
+ arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
+ arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
+ 3 files changed, 26 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
+index cdfc2a1..d7f844a 100644
+--- a/arch/arm/mach-omap2/include/mach/debug-macro.S
++++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+@@ -72,6 +72,8 @@ omap_uart_lsr:	.word	0
+ 		beq	82f			@ configure UART2
+ 		cmp	\rp, #TI81XXUART3	@ ti81Xx UART offsets different
+ 		beq	83f			@ configure UART3
++		cmp	\rp, #AM33XXUART1	@ AM33XX UART offsets different
++		beq	84f			@ configure UART1
+ 		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
+ 		beq	95f			@ configure ZOOM_UART
+
+@@ -100,7 +102,9 @@ omap_uart_lsr:	.word	0
+ 		b	98f
+ 83:		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
+ 		b	98f
 -
--	return 0;
-+	snd_soc_unregister_platform(dev);
- }
--
--static struct platform_driver mxs_pcm_driver = {
--	.driver = {
--		.name = "mxs-pcm-audio",
--		.owner = THIS_MODULE,
--	},
--	.probe = mxs_soc_platform_probe,
--	.remove = __devexit_p(mxs_soc_platform_remove),
--};
--
--module_platform_driver(mxs_pcm_driver);
-+EXPORT_SYMBOL_GPL(mxs_pcm_platform_unregister);
- 
- MODULE_LICENSE("GPL");
--MODULE_ALIAS("platform:mxs-pcm-audio");
-diff --git a/sound/soc/mxs/mxs-pcm.h b/sound/soc/mxs/mxs-pcm.h
-index 5f01a91..35ba2ca 100644
---- a/sound/soc/mxs/mxs-pcm.h
-+++ b/sound/soc/mxs/mxs-pcm.h
-@@ -24,4 +24,7 @@ struct mxs_pcm_dma_params {
- 	int chan_num;
- };
- 
-+int mxs_pcm_platform_register(struct device *dev);
-+void mxs_pcm_platform_unregister(struct device *dev);
++84:		ldr	\rp, =AM33XX_UART1_BASE
++		and	\rp, \rp, #0x00ffffff
++		b	97f
+ 95:		ldr	\rp, =ZOOM_UART_BASE
+ 		str	\rp, [\tmp, #0]		@ omap_uart_phys
+ 		ldr	\rp, =ZOOM_UART_VIRT
+@@ -109,6 +113,17 @@ omap_uart_lsr:	.word	0
+ 		str	\rp, [\tmp, #8]		@ omap_uart_lsr
+ 		b	10b
+
++		/* AM33XX: Store both phys and virt address for the uart */
++97:		add	\rp, \rp, #0x44000000	@ phys base
++		str	\rp, [\tmp, #0]		@ omap_uart_phys
++		sub	\rp, \rp, #0x44000000	@ phys base
++		add	\rp, \rp, #0xf9000000	@ virt base
++		str	\rp, [\tmp, #4]		@ omap_uart_virt
++		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
++		str	\rp, [\tmp, #8]		@ omap_uart_lsr
 +
- #endif
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index 5192db6..fa80ee6 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -713,35 +713,18 @@ static int __devinit mxs_saif_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	saif->soc_platform_pdev = platform_device_alloc(
--					"mxs-pcm-audio", pdev->id);
--	if (!saif->soc_platform_pdev) {
--		ret = -ENOMEM;
--		goto failed_pdev_alloc;
--	}
--
--	platform_set_drvdata(saif->soc_platform_pdev, saif);
--	ret = platform_device_add(saif->soc_platform_pdev);
-+	ret = mxs_pcm_platform_register(&pdev->dev);
- 	if (ret) {
--		dev_err(&pdev->dev, "failed to add soc platform device\n");
--		goto failed_pdev_add;
-+		dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
-+		return ret;
- 	}
- 
- 	return 0;
--
--failed_pdev_add:
--	platform_device_put(saif->soc_platform_pdev);
--failed_pdev_alloc:
--	snd_soc_unregister_dai(&pdev->dev);
--
--	return ret;
- }
- 
- static int __devexit mxs_saif_remove(struct platform_device *pdev)
++		b	10b
++
+ 		/* Store both phys and virt address for the uart */
+ 98:		add	\rp, \rp, #0x48000000	@ phys base
+ 		str	\rp, [\tmp, #0]		@ omap_uart_phys
+diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+index b073e5f..28e2d25 100644
+--- a/arch/arm/plat-omap/include/plat/serial.h
++++ b/arch/arm/plat-omap/include/plat/serial.h
+@@ -60,6 +60,9 @@
+ /* AM3505/3517 UART4 */
+ #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
+
++/* AM33XX serial port */
++#define AM33XX_UART1_BASE	0x44E09000
++
+ /* External port on Zoom2/3 */
+ #define ZOOM_UART_BASE		0x10000000
+ #define ZOOM_UART_VIRT		0xfa400000
+@@ -93,6 +96,7 @@
+ #define TI81XXUART1		81
+ #define TI81XXUART2		82
+ #define TI81XXUART3		83
++#define AM33XXUART1		84
+ #define ZOOM_UART		95		/* Only on zoom2/3 */
+
+ /* This is only used by 8250.c for omap1510 */
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index cc3f11b..ac43233 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -103,6 +103,10 @@ static inline void flush(void)
+ 	_DEBUG_LL_ENTRY(mach, TI81XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
+ 		TI81XXUART##p)
+
++#define DEBUG_LL_AM33XX(p, mach)					\
++	_DEBUG_LL_ENTRY(mach, AM33XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
++		AM33XXUART##p)
++
+ static inline void __arch_decomp_setup(unsigned long arch_id)
  {
--	struct mxs_saif *saif = platform_get_drvdata(pdev);
--
--	platform_device_unregister(saif->soc_platform_pdev);
-+	mxs_pcm_platform_unregister(&pdev->dev);
- 	snd_soc_unregister_dai(&pdev->dev);
- 
- 	return 0;
-diff --git a/sound/soc/mxs/mxs-saif.h b/sound/soc/mxs/mxs-saif.h
-index 12c91e4..3cb342e 100644
---- a/sound/soc/mxs/mxs-saif.h
-+++ b/sound/soc/mxs/mxs-saif.h
-@@ -123,7 +123,6 @@ struct mxs_saif {
- 	unsigned int cur_rate;
- 	unsigned int ongoing;
- 
--	struct platform_device *soc_platform_pdev;
- 	u32 fifo_underrun;
- 	u32 fifo_overrun;
- };
-diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
-index 60f052b..e9e6112 100644
---- a/sound/soc/mxs/mxs-sgtl5000.c
-+++ b/sound/soc/mxs/mxs-sgtl5000.c
-@@ -90,7 +90,7 @@ static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
- 		.codec_dai_name	= "sgtl5000",
- 		.codec_name	= "sgtl5000.0-000a",
- 		.cpu_dai_name	= "mxs-saif.0",
--		.platform_name	= "mxs-pcm-audio.0",
-+		.platform_name	= "mxs-saif.0",
- 		.ops		= &mxs_sgtl5000_hifi_ops,
- 	}, {
- 		.name		= "HiFi Rx",
-@@ -98,7 +98,7 @@ static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
- 		.codec_dai_name	= "sgtl5000",
- 		.codec_name	= "sgtl5000.0-000a",
- 		.cpu_dai_name	= "mxs-saif.1",
--		.platform_name	= "mxs-pcm-audio.1",
-+		.platform_name	= "mxs-saif.1",
- 		.ops		= &mxs_sgtl5000_hifi_ops,
- 	},
- };
--- 
-1.7.5.4
+ 	int port = 0;
+@@ -183,6 +187,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		/* TI8148 base boards using UART1 */
+ 		DEBUG_LL_TI81XX(1, ti8148evm);
+
++		/* AM33XX base boards using UART1 */
++		DEBUG_LL_AM33XX(1, am335xevm);
+ 	} while (0);
+ }
+
+--
+1.7.0.4
