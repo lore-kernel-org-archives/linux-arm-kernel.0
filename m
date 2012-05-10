@@ -1,25 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 May 2012 14:43:42 +0100
-Subject: [PATCH 1/7] mmc: dw_mmc: lookup for optional biu and ciu clocks
-In-Reply-To: <CAAG0J9-NDM9wLKpq04ofPkvFqiWxjmP84ojsP9Hfs0SJ_0FaXg@mail.gmail.com>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-2-git-send-email-thomas.abraham@linaro.org>
- <CAAG0J9-NDM9wLKpq04ofPkvFqiWxjmP84ojsP9Hfs0SJ_0FaXg@mail.gmail.com>
-Message-ID: <20120510134342.GA12727@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 May 2012 13:48:20 +0000
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+In-Reply-To: <CAH9JG2V_9RVPvEHodDD422r=o4QxHcrMO-YXv2KUGYeys=ZjqA@mail.gmail.com>
+References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
+ <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+ <CAH9JG2V_9RVPvEHodDD422r=o4QxHcrMO-YXv2KUGYeys=ZjqA@mail.gmail.com>
+Message-ID: <201205101348.20870.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 03:53:53PM +0100, James Hogan wrote:
-> Hi
+On Thursday 10 May 2012, Kyungmin Park wrote:
+> > And I won't apply new feature for non-dt board file from now on. I think,
+> > we
+> > need to support DT in mach-exynos/ instead of non-DT and DT together, so
+> > please consider to move on dt supporting for Samsung mobile boards.
+> >
 > 
-> On 2 May 2012 06:07, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> > + ? ? ? if (IS_ERR(host->biu_clk))
-> > + ? ? ? ? ? ? ? dev_info(&host->dev, "biu clock not available\n");
+> Probably you misunderstand Arnd word.
 > 
-> In this case, should it set host->biu_clk to NULL or are clk_disable
-> and clk_put guaranteed to handle an IS_ERR value?
+> "From the statements made so far, I can see no clear policy that we can
+> apply to everyone. My take on this is that for any work I spend on
+> multiplatform kernel, I concentrate on the DT-based board files and
+> get them to work together first, but leave it up to the individual
+> subarch maintainers whether they want to add other board files into
+> the mix."
+> 
+> It doesn't mean add new feature to non-DT board. don't add new board file.
 
-I keep saying this.  NULL must be treated as a valid reutrn value from
-clk_get() and must not use this as a sentinel.  The clk namespace is
-that errors are indicated with IS_ERR(clk) returning true.  Everything
-else must be assumed to be valid by drivers.
+This is a completely separate discussion, the problem at hand doesn't
+have anything to do with building a kernel for multiple mach-*
+directories combined that I was referring to in the text you quote.
+
+> In this case, DRM is not yet ready to support DT.
+> 
+> Okay, you can just drop this patches. but please note that this
+> patches are posted at Mar 13 before you decide.
+
+I think it's a good idea to make new features DT-only because this
+way we don't get any regressions and everyone who want to use
+the new feature will be able to test the DT support on his board.
+
+This of course requires that basic DT support is available for the
+systems in question so we don't regress when moving away from the
+old board files. My impression is that we're getting close to that
+point on exynos thanks to Thomas' work on this. AFAICT we don't
+have a DT binding for screen timings yet, so you will still have
+to use auxdata for that or put the timings into the driver.
+
+	Arnd
