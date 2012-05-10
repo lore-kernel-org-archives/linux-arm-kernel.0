@@ -1,31 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 May 2012 12:02:42 +0100
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <20120510105515.GC30103@trinity.fluff.org>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503141853.GC897@n2100.arm.linux.org.uk>
- <20120510105515.GC30103@trinity.fluff.org>
-Message-ID: <20120510110242.GE3190@n2100.arm.linux.org.uk>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Thu, 10 May 2012 16:28:50 +0530
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120510074403.GA3190@n2100.arm.linux.org.uk>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510074403.GA3190@n2100.arm.linux.org.uk>
+Message-ID: <1336647530.15424.384.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 11:55:15AM +0100, Ben Dooks wrote:
-> On Thu, May 03, 2012 at 03:18:53PM +0100, Russell King - ARM Linux wrote:
-> > I think what you're proposing is a totally artificial restriction.
-> > There's no problem with a kernel supporting DT and non-DT together.
-> > We've proven that many many times.  I prove it _every_ night that my
-> > build and boot system runs - the OMAP LDP boots a multiplatform kernel
-> > just fine without DT.
+On Thu, 2012-05-10 at 08:44 +0100, Russell King - ARM Linux wrote:
+> In fact, please look at both imx-dma.c _and_ imx-sdma.c - search for
+> "callback" and have a look at the code around there.
 > 
-> We could have had the same for Samsung's entire range if a bit of work
-> had been applied to do things like PAGE_OFFSET and replaceable IRQ
-> controllers.
+> You will find that imx-dma.c processes one descriptor per tasklet run,
+> and calls the callback under a spinlock.
+> 
+> You'll find that imx-sdma.c always calls callbacks from IRQ context.
+Yup, let me try to fix them!
 
-We never did dynamic PAGE_OFFSET because we _had_ taken the decision with
-the inclusion of XIP support that we weren't going to have self-modifying
-code in the kernel - and loading the offset for every page table walk
-would have been very expensive.
-
-The self-modifying code viewpoint seems to have changed as a result of
-Nicolas moving jobs, from an employer who wanted XIP to one who wants a
-single kernel image, which in itself isn't surprising.
+-- 
+~Vinod
