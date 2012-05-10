@@ -1,28 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 10 May 2012 08:25:27 +0300
-Subject: [PATCH v3 1/2] omap: mailbox: enable mailbox irq per instance
-In-Reply-To: <1336616370-28268-2-git-send-email-jgutierrez@ti.com>
-References: <1336616370-28268-1-git-send-email-jgutierrez@ti.com>
- <1336616370-28268-2-git-send-email-jgutierrez@ti.com>
-Message-ID: <CAK=WgbYhPVRtptozudJ0MLOq4jdQFrnds7UkkNL_Gdo0cuU4Fg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 May 2012 14:39:06 +0800
+Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <20120510003532.GG2982@b20223-02.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
+ <20120509160005.GG3955@opensource.wolfsonmicro.com>
+ <20120510003532.GG2982@b20223-02.ap.freescale.net>
+Message-ID: <20120510063904.GB17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 5:19 AM, Juan Gutierrez <jgutierrez@ti.com> wrote:
-> @@ -338,13 +341,13 @@ struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
-> ? ? ? ?if (!mbox)
-> ? ? ? ? ? ? ? ?return ERR_PTR(-ENOENT);
->
-> + ? ? ? if (nb)
-> + ? ? ? ? ? ? ? blocking_notifier_chain_register(&mbox->notifier, nb);
-> +
-> ? ? ? ?ret = omap_mbox_startup(mbox);
-> ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ?return ERR_PTR(-ENODEV);
+On Thu, May 10, 2012 at 08:35:33AM +0800, Richard Zhao wrote:
+> On Wed, May 09, 2012 at 05:00:06PM +0100, Mark Brown wrote:
+> > On Wed, May 09, 2012 at 07:33:02PM +0800, Richard Zhao wrote:
+> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > 
+> > I guess this depends on some other tree and can't just be directly
+> > applied to ASoC?
+> It's based on your for-next. But for working, it depends on
+> pinctl/for-next.
+> 
+Mark, may I have your ack to have it go through arm-soc?  I will ask
+Arnd pull your sound/for-v3.5 branch into arm-soc as a dependency.
+You need to ensure the branch will not be rebased.
 
-Let's unroll blocking_notifier_chain_register when omap_mbox_startup fails.
-
-Care to do a quick respin of this one with it ?
-
-Thanks,
-Ohad.
+-- 
+Regards,
+Shawn
