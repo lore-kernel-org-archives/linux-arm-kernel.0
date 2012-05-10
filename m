@@ -1,63 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 May 2012 09:48:36 -0600
-Subject: [alsa-devel] [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl
- support
-In-Reply-To: <20120510090459.GH2982@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
- <20120510063904.GB17875@S2101-09.ap.freescale.net>
- <20120510084403.GA3908@opensource.wolfsonmicro.com>
- <20120510090459.GH2982@b20223-02.ap.freescale.net>
-Message-ID: <4FABE354.7010605@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 May 2012 15:53:10 +0000
+Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
+In-Reply-To: <CACRpkdZ+8n-E_8nyq-kO=Y+GYekkjiNXd3nzTqFnxLszpuKKPg@mail.gmail.com>
+References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
+ <CACRpkdaiTsaBT=20UUOx2mYsK4r5rArVqXfU9LMObFVb3iEA9w@mail.gmail.com>
+ <CACRpkdZ+8n-E_8nyq-kO=Y+GYekkjiNXd3nzTqFnxLszpuKKPg@mail.gmail.com>
+Message-ID: <201205101553.11304.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2012 03:05 AM, Richard Zhao wrote:
-> On Thu, May 10, 2012 at 09:44:04AM +0100, Mark Brown wrote:
->> On Thu, May 10, 2012 at 02:39:06PM +0800, Shawn Guo wrote:
->>> On Thu, May 10, 2012 at 08:35:33AM +0800, Richard Zhao wrote:
->>
->>>> It's based on your for-next. But for working, it depends on
->>>> pinctl/for-next.
->>
->>> Mark, may I have your ack to have it go through arm-soc?  I will ask
->>> Arnd pull your sound/for-v3.5 branch into arm-soc as a dependency.
->>> You need to ensure the branch will not be rebased.
->>
->> for-3.5 is the entire undifferentiated blob of ASoC stuff, it's not
->> really suitable for merging elsewhere.  It won't actually get rebased
->> but the idea of merging it into other trees doesn't seem terribly
->> clever, it'd make having topic branches in arm-soc a bit of a joke and
->> if you pull it right now you'll get problems in -next due to the the
->> ux500 stuff.
->>
->> What does "working" mean in this context - what happens without the
->> pinctl changes?
-> devm_pinctrl_get_select_default function is added in below commit which
-> is in pinctrl/for-next.
+On Thursday 10 May 2012, Linus Walleij wrote:
+> Then it's probably a good idea to actually loop in Arnd too...
+> sorry for missing it!
 > 
-> commit 6d4ca1fb467932773da7b808c52f3d7ef4461ba0
-> Author: Stephen Warren <swarren@nvidia.com>
-> Date:   Mon Apr 16 10:51:00 2012 -0600
+> On Thu, May 10, 2012 at 5:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Wed, May 9, 2012 at 10:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
->     pinctrl: implement devm_pinctrl_get()/put()
->     
->     These functions allow the driver core to automatically clean up any
->     allocations made by drivers, thus leading to simplified drivers.
->     
->     Signed-off-by: Stephen Warren <swarren@nvidia.com>
->     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> 
-> So it'll fail compile without pinctrl/for-next. I guess Linus may need
-> to prepare a non-rebase base for others to merge.
+> >>> +static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+> >>
+> >>> +     /* Poke in other ASIC variants here */
+> >>> +     if (platid->driver_data == PINCTRL_NMK_DB8500)
+> >>> +             nmk_pinctrl_db8500_init(&npct->soc);
+> >>
+> >> Other platforms have a unique top-level driver for each variant, with
+> >> the probe() function for each variant calling into a utility function.
+> >> That way, the common/utility code doesn't need to contain a
+> >> table/list/... of all the variants. Can the same approach be used here?
+> >
+> > Of course I could do it that way, but it's not using this feature
+> > of the driver base to have a string identifier telling which version
+> > it is.
+> >
+> > Since I'm unsure, let's ask Arnd.
+> >
+> > Arnd, what is your preferred design pattern of:
+> >
+> > A) sub-drivers that register one struct platform_driver per
+> >  variant, then calls into a shared core driver, or
+> >
+> > B) a shared core driver registering one platform_driver
+> >  with several struct platform_device_id that then call
+> >  sub-drivers depending on which one is found
+> >
+> > Either way is actually OK for me, but I was thinking if one
+> > is preferred over the other.
 
-(CCing Linus)
+Out of those two, I'd always pick B.
 
-There is one already.
+In cases where the variants are different enough that you want to
+put them into separate files, I'd do
 
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
-tag pinctrl-mergebase-20120418
-The commit is in for-next and devel branches, but not the tip of those.
+C) Make the common code one module that just exports symbols but
+registers no platform_driver at all, then put each variant into
+its own module that binds to one ID and calls the exported
+functions from the common module.
+
+	Arnd
