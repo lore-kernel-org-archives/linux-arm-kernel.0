@@ -1,134 +1,96 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 May 2012 11:29:18 -0600
-Subject: [PATCH 2/3] ARM: OMAP AM35xx: clock and hwmod data: fix UART4 data
+Date: Thu, 10 May 2012 11:29:19 -0600
+Subject: [PATCH 3/3] ARM: OMAP: AM35xx: fix UART4 softreset
 In-Reply-To: <20120510172449.13418.66815.stgit@dusk>
 References: <20120510172449.13418.66815.stgit@dusk>
-Message-ID: <20120510172917.13418.14437.stgit@dusk>
+Message-ID: <20120510172918.13418.64781.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing terminators to the arrays of IRQ, DMA, and address space
-structure records in the AM35xx UART4 hwmod data.  Without these
-terminators, the following warnings appear on boot:
+During kernel init, the AM3505/AM3517 UART4 cannot complete its softreset:
 
-omap_uart.3: failed to claim resource 58
-omap_device: omap_uart: build failed (-16)
-WARNING: at /home/paul/linux/arch/arm/mach-omap2/serial.c:375 omap_serial_init_port+0x198/0x284()
-Could not build omap_device for omap_uart: uart4.
+omap_hwmod: uart4: softreset failed (waited 10000 usec)
 
-Also, AM35xx uart4_fck has an incorrect parent clock pointer.  Fix it
-and clean up a whitespace issue.
+This also results in another warning later in the boot process:
 
-Fix some incorrectly-named macros related to AM35xx UART4.
+omap_hwmod: uart4: enabled state can only be entered from initialized, idle, or disabled state
 
+>From empirical observation, the AM35xx UART4 IP block requires either
+uart1_fck or uart2_fck to be enabled while UART4 resets.  Otherwise
+the reset will never complete.  So this patch adds uart1_fck as an
+optional clock for UART4 and adds the appropriate hwmod flag to cause
+uart1_fck to be enabled during the reset process.  (The choice of
+uart1_fck over uart2_fck was arbitrary.)
+
+Unfortunately this observation raises many questions.  Is it necessary
+for uart1_fck or uart2_fck to be controlled with uart4_fck for the
+UART4 to work correctly?  What exactly do the AM35xx UART4 clock
+tree and the related PRCM idle management FSMs look like?  If anyone
+has the ability to answer these questions through empirical functional
+testing, or hardware information from the AM35xx designers, it would
+be greatly appreciated.
+
+Cc: Beno?t Cousson <b-cousson@ti.com>
 Cc: Kyle Manna <kyle.manna@fuel7.com>
 Cc: Mark A. Greer <mgreer@animalcreek.com>
 Cc: Ranjith Lohithakshan <ranjithl@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock3xxx_data.c       |   14 +++++++-------
- arch/arm/mach-omap2/cm-regbits-34xx.h      |    4 ++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 +++++--
- arch/arm/mach-omap2/prcm-common.h          |    4 ++--
- 4 files changed, 16 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/clock3xxx_data.c       |    8 ++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 13102b9..11644bf 100644
+index 11644bf..12c64db 100644
 --- a/arch/arm/mach-omap2/clock3xxx_data.c
 +++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -2490,13 +2490,13 @@ static struct clk uart4_fck = {
+@@ -3201,8 +3201,12 @@ static struct clk vpfe_fck = {
  };
  
- static struct clk uart4_fck_am35xx = {
--	.name           = "uart4_fck",
--	.ops            = &clkops_omap2_dflt_wait,
--	.parent         = &per_48m_fck,
--	.enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit     = OMAP3430_EN_UART4_SHIFT,
--	.clkdm_name     = "core_l4_clkdm",
--	.recalc         = &followparent_recalc,
-+	.name		= "uart4_fck",
-+	.ops		= &clkops_omap2_dflt_wait,
-+	.parent		= &core_48m_fck,
-+	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
-+	.enable_bit	= AM35XX_EN_UART4_SHIFT,
-+	.clkdm_name	= "core_l4_clkdm",
-+	.recalc		= &followparent_recalc,
- };
- 
- static struct clk gpt2_fck = {
-diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
-index 8083a8c..766338f 100644
---- a/arch/arm/mach-omap2/cm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
-@@ -169,8 +169,6 @@
- /* AM35XX specific CM_ICLKEN1_CORE bits */
- #define AM35XX_EN_IPSS_MASK				(1 << 4)
- #define AM35XX_EN_IPSS_SHIFT				4
--#define AM35XX_EN_UART4_MASK				(1 << 23)
--#define AM35XX_EN_UART4_SHIFT				23
- 
- /* CM_ICLKEN2_CORE */
- #define OMAP3430_EN_PKA_MASK				(1 << 4)
-@@ -207,6 +205,8 @@
- #define OMAP3430_ST_DES2_MASK				(1 << 26)
- #define OMAP3430_ST_MSPRO_SHIFT				23
- #define OMAP3430_ST_MSPRO_MASK				(1 << 23)
-+#define AM35XX_ST_UART4_SHIFT				23
-+#define AM35XX_ST_UART4_MASK				(1 << 23)
- #define OMAP3430_ST_HDQ_SHIFT				22
- #define OMAP3430_ST_HDQ_MASK				(1 << 22)
- #define OMAP3430ES1_ST_FAC_SHIFT			8
+ /*
+- * The UART1/2 functional clock acts as the functional
+- * clock for UART4. No separate fclk control available.
++ * The UART1/2 functional clock acts as the functional clock for
++ * UART4. No separate fclk control available.  XXX Well now we have a
++ * uart4_fck that is apparently used as the UART4 functional clock,
++ * but it also seems that uart1_fck or uart2_fck are still needed, at
++ * least for UART4 softresets to complete.  This really needs
++ * clarification.
+  */
+ static struct clk uart4_ick_am35xx = {
+ 	.name		= "uart4_ick",
 diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 678a3aa..c939131 100644
+index c939131..c6653a80 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -526,11 +526,13 @@ static struct omap_hwmod omap36xx_uart4_hwmod = {
- 
- static struct omap_hwmod_irq_info am35xx_uart4_mpu_irqs[] = {
- 	{ .irq = INT_35XX_UART4_IRQ, },
-+	{ .irq = -1 }
+@@ -535,6 +535,20 @@ static struct omap_hwmod_dma_info am35xx_uart4_sdma_reqs[] = {
+ 	{ .dma_req = -1 }
  };
  
- static struct omap_hwmod_dma_info am35xx_uart4_sdma_reqs[] = {
- 	{ .name = "rx", .dma_req = AM35XX_DMA_UART4_RX, },
- 	{ .name = "tx", .dma_req = AM35XX_DMA_UART4_TX, },
-+	{ .dma_req = -1 }
- };
- 
++/*
++ * XXX AM35xx UART4 cannot complete its softreset without uart1_fck or
++ * uart2_fck being enabled.  So we add uart1_fck as an optional clock,
++ * below, and set the HWMOD_CONTROL_OPT_CLKS_IN_RESET.  This really
++ * should not be needed.  The functional clock structure of the AM35xx
++ * UART4 is extremely unclear and opaque; it is unclear what the role
++ * of uart1/2_fck is for the UART4.  Any clarification from either
++ * empirical testing or the AM3505/3517 hardware designers would be
++ * most welcome.
++ */
++static struct omap_hwmod_opt_clk am35xx_uart4_opt_clks[] = {
++	{ .role = "softreset_uart1_fck", .clk = "uart1_fck" },
++};
++
  static struct omap_hwmod am35xx_uart4_hwmod = {
-@@ -542,9 +544,9 @@ static struct omap_hwmod am35xx_uart4_hwmod = {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
- 			.prcm_reg_id = 1,
--			.module_bit = OMAP3430_EN_UART4_SHIFT,
-+			.module_bit = AM35XX_EN_UART4_SHIFT,
- 			.idlest_reg_id = 1,
--			.idlest_idle_bit = OMAP3430_EN_UART4_SHIFT,
-+			.idlest_idle_bit = AM35XX_ST_UART4_SHIFT,
+ 	.name		= "uart4",
+ 	.mpu_irqs	= am35xx_uart4_mpu_irqs,
+@@ -549,6 +563,9 @@ static struct omap_hwmod am35xx_uart4_hwmod = {
+ 			.idlest_idle_bit = AM35XX_ST_UART4_SHIFT,
  		},
  	},
++	.opt_clks	= am35xx_uart4_opt_clks,
++	.opt_clks_cnt	= ARRAY_SIZE(am35xx_uart4_opt_clks),
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
  	.class		= &omap2_uart_class,
-@@ -2188,6 +2190,7 @@ static struct omap_hwmod_addr_space am35xx_uart4_addr_space[] = {
- 		.pa_end		= OMAP3_UART4_AM35XX_BASE + SZ_1K - 1,
- 		.flags		= ADDR_MAP_ON_INIT | ADDR_TYPE_RT,
- 	},
-+	{ }
  };
  
- static struct omap_hwmod_ocp_if am35xx_l4_core__uart4 = {
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index 6da3ba4..cc1398e 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -203,8 +203,8 @@
- #define OMAP3430_EN_MMC2_SHIFT				25
- #define OMAP3430_EN_MMC1_MASK				(1 << 24)
- #define OMAP3430_EN_MMC1_SHIFT				24
--#define OMAP3430_EN_UART4_MASK				(1 << 23)
--#define OMAP3430_EN_UART4_SHIFT				23
-+#define AM35XX_EN_UART4_MASK				(1 << 23)
-+#define AM35XX_EN_UART4_SHIFT				23
- #define OMAP3430_EN_MCSPI4_MASK				(1 << 21)
- #define OMAP3430_EN_MCSPI4_SHIFT			21
- #define OMAP3430_EN_MCSPI3_MASK				(1 << 20)
