@@ -1,37 +1,42 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 10 May 2012 22:47:38 +0530
-Subject: [PATCH 0/4] ARM: OMAP2+: Misc cleanup part2
-In-Reply-To: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
-References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <e9a14034778ef9c8047887de64b5dbae@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 May 2012 11:23:55 -0600
+Subject: [PATCH 1/4] ARM: tegra20: Add Tegra Memory Controller(MC) driver
+In-Reply-To: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <4FABF9AB.6020902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: R Sricharan [mailto:r.sricharan at ti.com]
-> Sent: Thursday, May 10, 2012 10:37 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; santosh.shilimkar at ti.com;
-> tony at atomide.com; b-cousson at ti.com; r.sricharan at ti.com; paul at pswan.com
-> Subject: [PATCH 0/4] ARM: OMAP2+: Misc cleanup part2
->
-> This is a continuation of the previous cleanup series from
-> santosh.shilimkar at ti.com [1]. Patches are outcome of the OMAP5
-> review suggestions from Tony/Benoit/Santosh/Rajendra.
->
-> [1]  http://www.spinics.net/lists/linux-omap/msg69730.html
->
-> R Sricharan (4):
->   ARM: OMAP2+: Introduce CONFIG_SOC_HAS_OMAP_DPLL macro
->   ARM: OMAP2+: Move the stubbed prm and cm functions to prcm.c file and
->     make them __weak.
->   ARM: OMAP2+: Move stubbed secure_sram_reserve function to a common.c
->     and call it __weak
->   ARM: OMAP: counter-32k: Select the CR register offset using the IP
->     scheme.
->
- Forgot to add the below reviewed-by tag.
-   Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 05/10/2012 01:42 AM, Hiroshi DOYU wrote:
+> Tegra Memory Controller(MC) driver for Tegra20
+> Added to support MC General interrupts, mainly for IOMMU(GART).
 
-Thanks,
- Sricharan
+Greg, you appear to have been commiting all of drivers/memory. I assume
+you'll take patches 1 and 3 in this series, and I will take 2 and 4
+through the Tegra tree? I can take them all through the Tegra tree if
+you want. Taking the .dts patches through your tree might cause
+conflicts in 3.6, since I anticipate some DT-wide cleanup in 3.6.
+
+Hiroshi, one question below (same for patch 3)
+
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+
+> @@ -20,6 +20,8 @@ config ARCH_TEGRA_2x_SOC
+>  	select PL310_ERRATA_727915 if CACHE_L2X0
+>  	select PL310_ERRATA_769419 if CACHE_L2X0
+>  	select CPU_FREQ_TABLE if CPU_FREQ
+> +	select MEMORY
+> +	select TEGRA20_MC
+
+Does ARCH_TEGRA_2x_SOC /have/ to select these?
+
+I'd be inclined to drop the change to mach-tegra/Kconfig. As rationale,
+the code works fine without the driver right now. You'd need to make
+config TEGRA*_MC user-visible/selectable though.
+
+You could replace this change with a patch to tegra_defconfig which
+enables MEMORY and TEGRA*_MC, or perhaps make config TEGRA20_MC default y.
+
+What are people's thoughts here?
+
+Aside from this, the series looks fine to me.
