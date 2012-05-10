@@ -1,39 +1,61 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 10 May 2012 05:17:39 +0000
-Subject: [PATCH v4 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FA9380F.90700@ti.com>
-References: <cover.1335874494.git.afzal@ti.com>
- <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335874494.git.afzal@ti.com>
- <4FA04A8C.4050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E98299B@DBDE01.ent.ti.com>
- <4FA4041D.9010000@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E987159@DBDE01.ent.ti.com>
- <4FA7F473.7060607@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E987902@DBDE01.ent.ti.com>
- <4FA9380F.90700@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E98A2AA@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 May 2012 14:51:42 +0800
+Subject: [PATCH V2 10/11] ARM: imx6q: change clkdev device name from
+ xxxx.uart to xxxx.serial
+In-Reply-To: <1336563190-19974-11-git-send-email-richard.zhao@freescale.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-11-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120510065140.GD17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, May 08, 2012 at 20:43:19, Hunter, Jon wrote:
-
-> >> In fact if you migrate to runtime pm then we should not have the clk_get
-> >> in the gpmc_init any more.
-> > 
-> > Even if converted to RPM, to get clk rate, clk_get has to be done
-> > somewhere, right ?
+On Wed, May 09, 2012 at 07:33:09PM +0800, Richard Zhao wrote:
+> It's because the dts changed the node name.
 > 
-> Yes exactly. However, you could now do this in the driver itself like
-> the probe function. Or may be just pass the frequency of the gpmc fclk
-> to the driver and let the driver convert to the period. No reason we
-> need to convert to the period outside of the driver. Hence, we can keep
-> the function to do the conversion static in the driver and don't need to
-> expose externally.
+Dirk had sent the same patch, but I told him that I will rebase my DT
+branch on top Sascha's clk, the issue will be solved by the rebasing,
+so I'm not taking the last two patches.
 
-But platform need period before driver is probed (for calculating
-peripheral timings to be passed for driver)
+Regards,
+Shawn
 
-Regards
-Afzal
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |   20 ++++++++++----------
+>  1 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 096fcfb..4ac1282 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -393,16 +393,16 @@ int __init mx6q_clocks_init(void)
+>  	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+>  	clk_register_clkdev(clk[twd], NULL, "smp_twd");
+>  	clk_register_clkdev(clk[usboh3], NULL, "usboh3");
+> -	clk_register_clkdev(clk[uart_serial], "per", "2020000.uart");
+> -	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.uart");
+> -	clk_register_clkdev(clk[uart_serial], "per", "21e8000.uart");
+> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21e8000.uart");
+> -	clk_register_clkdev(clk[uart_serial], "per", "21ec000.uart");
+> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21ec000.uart");
+> -	clk_register_clkdev(clk[uart_serial], "per", "21f0000.uart");
+> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21f0000.uart");
+> -	clk_register_clkdev(clk[uart_serial], "per", "21f4000.uart");
+> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21f4000.uart");
+> +	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+> +	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+> +	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21e8000.serial");
+> +	clk_register_clkdev(clk[uart_serial], "per", "21ec000.serial");
+> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21ec000.serial");
+> +	clk_register_clkdev(clk[uart_serial], "per", "21f0000.serial");
+> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21f0000.serial");
+> +	clk_register_clkdev(clk[uart_serial], "per", "21f4000.serial");
+> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21f4000.serial");
+>  	clk_register_clkdev(clk[enet], NULL, "2188000.enet");
+>  	clk_register_clkdev(clk[usdhc1], NULL, "2190000.usdhc");
+>  	clk_register_clkdev(clk[usdhc2], NULL, "2194000.usdhc");
+> -- 
+> 1.7.5.4
+> 
+> 
