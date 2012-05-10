@@ -1,47 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 May 2012 10:34:43 +0100
-Subject: [PATCH 2/2] regulator: Add support for MAX77686.
-In-Reply-To: <CAKew6eWEYBP1zXXwLL4eWOhOKZ-HwAfUX_kg8cnsaDyUXVKSkQ@mail.gmail.com>
-References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
- <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
- <20120509184709.GC32037@sirena.org.uk>
- <CAKew6eWEYBP1zXXwLL4eWOhOKZ-HwAfUX_kg8cnsaDyUXVKSkQ@mail.gmail.com>
-Message-ID: <20120510093442.GK3908@opensource.wolfsonmicro.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 10 May 2012 17:34:45 +0800
+Subject: [PATCH V2 08/11] ARM: dts: imx6q-sabrelite: add sound device
+ imx6q-sabrelite-sgtl5000
+In-Reply-To: <20120510064816.GC17875@S2101-09.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-9-git-send-email-richard.zhao@freescale.com>
+ <20120510064816.GC17875@S2101-09.ap.freescale.net>
+Message-ID: <20120510093444.GI2982@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 12:54:24PM +0530, Yadwinder Singh Brar wrote:
-> On Thu, May 10, 2012 at 12:17 AM, Mark Brown
-> > On Wed, May 09, 2012 at 09:54:55PM +0530, Yadwinder Singh wrote:
+On Thu, May 10, 2012 at 02:48:19PM +0800, Shawn Guo wrote:
+> On Wed, May 09, 2012 at 07:33:07PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6q-sabrelite.dts |   14 ++++++++++++++
+> >  1 files changed, 14 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > index 5b51deb..5a35bfd 100644
+> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > @@ -110,4 +110,18 @@
+> >  			regulator-always-on;
+> >  		};
+> >  	};
+> > +
+> > +	sound {
+> > +		compatible = "fsl,imx6q-sabrelite-sgtl5000",
+> > +			     "fsl,imx-audio-sgtl5000";
+> > +		model = "imx6q-sabrelite-sgtl5000";
+> > +		ssi-controller = <&ssi1>;
+> > +		audio-codec = <&codec>;
+> > +		audio-routing =
+> > +			"MIC_IN", "Mic Jack",
+> > +			"Mic Jack", "Mic Bias",
+> 
+> "Mic Bias" is a SUPPLY for both "MIC_IN" and "Mic Jack", so it should
+> look like:
+> 
+>                        "Mic Jack", "Mic Bias",
+>                        "MIC_IN", "Mic Bias",
+Not really. The circuit:
+MIC_IN <-- capacitor <--> Mic Jack
+                      /
+            Mic Bias /
 
-> >> + ? ? [MAX77686_EN32KHZ_AP] = NULL,
-> >> + ? ? [MAX77686_EN32KHZ_CP] = NULL,
+DC can not pass the capacitor. So Mic Bias only supply Jack.
 
-> > Now that the generic clock API is in mainline these should be moved over
-> > to use it.
+Thanks
+Richard
 
-> Sorry, I cann't get your point here. Please explain it little bit more.
-
-These are not regulators, these are clocks.  They should use the clock
-API.
-
-> >> + ? ? if (pdata->ramp_delay) {
-> >> + ? ? ? ? ? ? max77686->ramp_delay = pdata->ramp_delay;
-> >> + ? ? ? ? ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
-> >> + ? ? ? ? ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
-
-> > This appears not to actually use the value passed in as platform_data.
-
-> It gets corresponding index of ramp_rate value in ramp_rate_value
-> table supported by hardware, from platform_data which we write to
-> ramp_rate control bits of control registers.
-
-Why is the driver unconditionally writing these register values here
-rather than setting the ramp delay that was passed in?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120510/52a8cef0/attachment-0001.sig>
+> 
+> Regards,
+> Shawn
+> 
+> > +			"Headphone Jack", "HP_OUT";
+> > +		mux-int-port = <1>;
+> > +		mux-ext-port = <4>;
+> > +	};
+> >  };
+> > -- 
+> > 1.7.5.4
+> > 
+> > 
+> 
