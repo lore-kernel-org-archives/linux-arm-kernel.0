@@ -1,29 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 May 2012 14:39:06 +0800
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <20120510003532.GG2982@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
-Message-ID: <20120510063904.GB17875@S2101-09.ap.freescale.net>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 10 May 2012 05:17:39 +0000
+Subject: [PATCH v4 02/39] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <4FA9380F.90700@ti.com>
+References: <cover.1335874494.git.afzal@ti.com>
+ <e0cf9678cb9a44d2a16401383ab8496eb825c291.1335874494.git.afzal@ti.com>
+ <4FA04A8C.4050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E98299B@DBDE01.ent.ti.com>
+ <4FA4041D.9010000@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E987159@DBDE01.ent.ti.com>
+ <4FA7F473.7060607@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E987902@DBDE01.ent.ti.com>
+ <4FA9380F.90700@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E98A2AA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 08:35:33AM +0800, Richard Zhao wrote:
-> On Wed, May 09, 2012 at 05:00:06PM +0100, Mark Brown wrote:
-> > On Wed, May 09, 2012 at 07:33:02PM +0800, Richard Zhao wrote:
-> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > 
-> > I guess this depends on some other tree and can't just be directly
-> > applied to ASoC?
-> It's based on your for-next. But for working, it depends on
-> pinctl/for-next.
-> 
-Mark, may I have your ack to have it go through arm-soc?  I will ask
-Arnd pull your sound/for-v3.5 branch into arm-soc as a dependency.
-You need to ensure the branch will not be rebased.
+Hi Jon,
 
--- 
-Regards,
-Shawn
+On Tue, May 08, 2012 at 20:43:19, Hunter, Jon wrote:
+
+> >> In fact if you migrate to runtime pm then we should not have the clk_get
+> >> in the gpmc_init any more.
+> > 
+> > Even if converted to RPM, to get clk rate, clk_get has to be done
+> > somewhere, right ?
+> 
+> Yes exactly. However, you could now do this in the driver itself like
+> the probe function. Or may be just pass the frequency of the gpmc fclk
+> to the driver and let the driver convert to the period. No reason we
+> need to convert to the period outside of the driver. Hence, we can keep
+> the function to do the conversion static in the driver and don't need to
+> expose externally.
+
+But platform need period before driver is probed (for calculating
+peripheral timings to be passed for driver)
+
+Regards
+Afzal
