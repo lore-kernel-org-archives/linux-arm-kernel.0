@@ -1,118 +1,26 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 10 May 2012 14:23:01 +0530
-Subject: [RESUBMIT PATCH] ARM: OMAP2+: am33xx: Add low level debugging support
-Message-ID: <1336639981-27194-1-git-send-email-hvaibhav@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 May 2012 09:59:39 +0100
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+Message-ID: <20120510085939.GC3190@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Afzal Mohammed <afzal@ti.com>
+On Thu, May 10, 2012 at 12:14:39AM -0700, Olof Johansson wrote:
+> Russell has published a clkdev branch that you pull instead of
+> applying his patch manually, that way there will be no surprises with
+> respect to conflicts, etc:
+> 
+> git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
+> 
+> It is also in arm-soc as depends/rmk/clkdev now.
 
-Add support for low level debugging on AM335X EVM (AM33XX family).
-Currently only support for UART1 console, which is used on AM335X EVM
-is added.
+I'll mention that I'm considering a patch on top of this to add __must_check
+to the return values for these clkdev clk registration functions.  I've
+noticed that many users aren't checking that, so there's no real way to
+be sure that these things are being created.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
-This patch had been Reviewed and accepted earlier, but got
-missed during last merge window. Resubmitting again, without
-code-change.
-
- arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
- arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
- arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
- 3 files changed, 26 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index cdfc2a1..d7f844a 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -72,6 +72,8 @@ omap_uart_lsr:	.word	0
- 		beq	82f			@ configure UART2
- 		cmp	\rp, #TI81XXUART3	@ ti81Xx UART offsets different
- 		beq	83f			@ configure UART3
-+		cmp	\rp, #AM33XXUART1	@ AM33XX UART offsets different
-+		beq	84f			@ configure UART1
- 		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
- 		beq	95f			@ configure ZOOM_UART
-
-@@ -100,7 +102,9 @@ omap_uart_lsr:	.word	0
- 		b	98f
- 83:		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
- 		b	98f
--
-+84:		ldr	\rp, =AM33XX_UART1_BASE
-+		and	\rp, \rp, #0x00ffffff
-+		b	97f
- 95:		ldr	\rp, =ZOOM_UART_BASE
- 		str	\rp, [\tmp, #0]		@ omap_uart_phys
- 		ldr	\rp, =ZOOM_UART_VIRT
-@@ -109,6 +113,17 @@ omap_uart_lsr:	.word	0
- 		str	\rp, [\tmp, #8]		@ omap_uart_lsr
- 		b	10b
-
-+		/* AM33XX: Store both phys and virt address for the uart */
-+97:		add	\rp, \rp, #0x44000000	@ phys base
-+		str	\rp, [\tmp, #0]		@ omap_uart_phys
-+		sub	\rp, \rp, #0x44000000	@ phys base
-+		add	\rp, \rp, #0xf9000000	@ virt base
-+		str	\rp, [\tmp, #4]		@ omap_uart_virt
-+		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-+		str	\rp, [\tmp, #8]		@ omap_uart_lsr
-+
-+		b	10b
-+
- 		/* Store both phys and virt address for the uart */
- 98:		add	\rp, \rp, #0x48000000	@ phys base
- 		str	\rp, [\tmp, #0]		@ omap_uart_phys
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index b073e5f..28e2d25 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -60,6 +60,9 @@
- /* AM3505/3517 UART4 */
- #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
-
-+/* AM33XX serial port */
-+#define AM33XX_UART1_BASE	0x44E09000
-+
- /* External port on Zoom2/3 */
- #define ZOOM_UART_BASE		0x10000000
- #define ZOOM_UART_VIRT		0xfa400000
-@@ -93,6 +96,7 @@
- #define TI81XXUART1		81
- #define TI81XXUART2		82
- #define TI81XXUART3		83
-+#define AM33XXUART1		84
- #define ZOOM_UART		95		/* Only on zoom2/3 */
-
- /* This is only used by 8250.c for omap1510 */
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index cc3f11b..ac43233 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -103,6 +103,10 @@ static inline void flush(void)
- 	_DEBUG_LL_ENTRY(mach, TI81XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
- 		TI81XXUART##p)
-
-+#define DEBUG_LL_AM33XX(p, mach)					\
-+	_DEBUG_LL_ENTRY(mach, AM33XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
-+		AM33XXUART##p)
-+
- static inline void __arch_decomp_setup(unsigned long arch_id)
- {
- 	int port = 0;
-@@ -183,6 +187,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* TI8148 base boards using UART1 */
- 		DEBUG_LL_TI81XX(1, ti8148evm);
-
-+		/* AM33XX base boards using UART1 */
-+		DEBUG_LL_AM33XX(1, am335xevm);
- 	} while (0);
- }
-
---
-1.7.0.4
+The alternative is we make these functions void and/or add pr_err() inside
+them to report the failures.
