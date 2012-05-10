@@ -1,117 +1,122 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 10 May 2012 15:45:58 -0700
-Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
- driver_find_device()
-In-Reply-To: <4FAC4280.4000100@wwwdotorg.org>
-References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
- <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
- <20120510181611.GA16908@kroah.com> <4FAC1E70.8030907@wwwdotorg.org>
- <20120510222830.GA23084@kroah.com> <4FAC4280.4000100@wwwdotorg.org>
-Message-ID: <20120510224558.GA31803@kroah.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 10 May 2012 15:47:21 -0700
+Subject: [PATCHv4 4/4] cpuidle: coupled: add parallel barrier function
+In-Reply-To: <201205092331.24487.rjw@sisk.pl>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+ <1336438662-10484-5-git-send-email-ccross@android.com>
+ <201205092331.24487.rjw@sisk.pl>
+Message-ID: <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 04:34:40PM -0600, Stephen Warren wrote:
-> On 05/10/2012 04:28 PM, Greg Kroah-Hartman wrote:
-> > On Thu, May 10, 2012 at 02:00:48PM -0600, Stephen Warren wrote:
-> >> On 05/10/2012 12:16 PM, Greg Kroah-Hartman wrote:
-> >>> On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
-> >>>> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
-> >>>>> On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
-> >>>>>> driver_find_device() can be called with an unregistered driver.
-> >>>>>
-> >>>>> Who does that?  Where in the kernel?  Why would you try to do that?
-> >>>>>
-> >>>>>> Need to check driver_private to see if it's populated or not,
-> >>>>>> especially under deferrable probe.
-> >>>>>
-> >>>>> Hm, I don't know if this will really catch a driver that was registered
-> >>>>> and then was unregistered, right?  It seems like moving the real problem
-> >>>>> somewhere else, why not fix the original issue instead?
-> >>>>>
-> >>>>>> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> >>>>>> ---
-> >>>>>> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
-> >>>>>>   http://article.gmane.org/gmane.linux.ports.tegra/4658
-> >>>>>>
-> >>>>>> "tegra_ahb_driver" may not be populated when it's called.
-> >>>>>
-> >>>>> It can?  I don't see that in that patch.
-> >>>>
-> >>>> I think this is what's happening:
-> >>>>
-> >>>> The Tegra SMMU driver is registered using subsys_initcall().
-> >>>>
-> >>>> The Tegra AHB driver is registered using module_platform_driver, so
-> >>>> module_init().
-> >>>>
-> >>>> The device objects for both are registered at basically the same time
-> >>>> during the machine's initialization call, which I think happens before
-> >>>> both or some of the above two calls.
-> >>>>
-> >>>> So, SMMU ends up getting probed before the AHB driver has even been
-> >>>> registered.
-> >>>
-> >>> What do those two drivers have to do with each other?
-> >>
-> >> The AHB HW module contains a bit to say "enable the SMMU". This bit
-> >> cannot be turned on until certain initialization has been performed by
-> >> the SMMU driver.
-> >>
-> >> So, SMMU's probe performs the initialization, then attempts to contact
-> >> the AHB driver to ask it to enable the SMMU.
-> >>
-> >>>> That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
-> >>>> driver hasn't (or may not have) been registered, so driver_find_device()
-> >>>> can experience the issue this patch attempts to solve.
-> >>>
-> >>> It sounds like you have a locking or ordering problem somewhere in this
-> >>> platform, and it needs to be resolved there.  Odds are, this tiny check
-> >>> is the least of your worries, right?
-> >>>
-> >>> Who is doing the driver_find_device() call in the first place?  The
-> >>> driver core?  Or something else?
-> >>
-> >> SMMU's probe calls tegra_ahb_enable_smmu().
-> >>
-> >> tegra_ahb_enable_smmu() needs to find the AHB's struct device so that it
-> >> can find get the driver data associated with it, which contains the
-> >> ioremap'd registers amongst other things.
-> >>
-> >> In order to find the correct device, tegra_ahb_enable_smmu() is passed
-> >> the device tree node of the appropriate AHB that controls the SMMU.
-> >>
-> >> The two drivers use deferred probe to ensure that their relative probe
-> >> order doesn't matter. If AHB is probed first, then
-> >> tegra_ahb_enable_smmu()'s driver_find_device() succeeds, and the AHB
-> >> register is programmed to enable the SMMU. If the SMMU is probed first,
-> >> then tegra_ahb_enable_smmu() returns -EPROBE_DEFER to hold off the SMMU
-> >> from completing its probe. I believe this is exactly the kind of thing
-> >> -EPROBE_DEFER was intended for.
-> > 
-> > Ok, thanks for explaining it better, that would have been nice to have
-> > in the original patch submission :)
-> > 
-> > This fix, is it needed for 3.4, or just 3.5?
-> 
-> The SMMU driver that needs this will be added in 3.6 (so putting this
-> patch in 3.5 would be good to simplify dependencies). It's not needed in
-> 3.4.
+On Wed, May 9, 2012 at 2:31 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Tuesday, May 08, 2012, Colin Cross wrote:
+>> Adds cpuidle_coupled_parallel_barrier, which can be used by coupled
+>> cpuidle state enter functions to handle resynchronization after
+>> determining if any cpu needs to abort. ?The normal use case will
+>> be:
+>>
+>> static bool abort_flag;
+>> static atomic_t abort_barrier;
+>>
+>> int arch_cpuidle_enter(struct cpuidle_device *dev, ...)
+>> {
+>> ? ? ? if (arch_turn_off_irq_controller()) {
+>> ? ? ? ? ? ? ? /* returns an error if an irq is pending and would be lost
+>> ? ? ? ? ? ? ? ? ?if idle continued and turned off power */
+>> ? ? ? ? ? ? ? abort_flag = true;
+>> ? ? ? }
+>>
+>> ? ? ? cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+>>
+>> ? ? ? if (abort_flag) {
+>> ? ? ? ? ? ? ? /* One of the cpus didn't turn off it's irq controller */
+>> ? ? ? ? ? ? ? arch_turn_on_irq_controller();
+>> ? ? ? ? ? ? ? return -EINTR;
+>> ? ? ? }
+>>
+>> ? ? ? /* continue with idle */
+>> ? ? ? ...
+>> }
+>>
+>> This will cause all cpus to abort idle together if one of them needs
+>> to abort.
+>>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Reviewed-by: Kevin Hilman <khilman@ti.com>
+>> Tested-by: Kevin Hilman <khilman@ti.com>
+>> Signed-off-by: Colin Cross <ccross@android.com>
+>> ---
+>> ?drivers/cpuidle/coupled.c | ? 37 +++++++++++++++++++++++++++++++++++++
+>> ?include/linux/cpuidle.h ? | ? ?4 ++++
+>> ?2 files changed, 41 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+>> index 93101fb..3e65de1 100644
+>> --- a/drivers/cpuidle/coupled.c
+>> +++ b/drivers/cpuidle/coupled.c
+>> @@ -130,6 +130,43 @@ struct cpuidle_coupled {
+>> ?static cpumask_t cpuidle_coupled_poked_mask;
+>>
+>> ?/**
+>> + * cpuidle_coupled_parallel_barrier - synchronize all online coupled cpus
+>> + * @dev: cpuidle_device of the calling cpu
+>> + * @a: ? atomic variable to hold the barrier
+>> + *
+>> + * No caller to this function will return from this function until all online
+>> + * cpus in the same coupled group have called this function. ?Once any caller
+>> + * has returned from this function, the barrier is immediately available for
+>> + * reuse.
+>> + *
+>> + * The atomic variable a must be initialized to 0 before any cpu calls
+>> + * this function, will be reset to 0 before any cpu returns from this function.
+>> + *
+>> + * Must only be called from within a coupled idle state handler
+>> + * (state.enter when state.flags has CPUIDLE_FLAG_COUPLED set).
+>> + *
+>> + * Provides full smp barrier semantics before and after calling.
+>> + */
+>> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a)
+>> +{
+>> + ? ? int n = dev->coupled->online_count;
+>> +
+>> + ? ? smp_mb__before_atomic_inc();
+>> + ? ? atomic_inc(a);
+>> +
+>> + ? ? while (atomic_read(a) < n)
+>> + ? ? ? ? ? ? cpu_relax();
+>> +
+>> + ? ? if (atomic_inc_return(a) == n * 2) {
+>> + ? ? ? ? ? ? atomic_set(a, 0);
+>> + ? ? ? ? ? ? return;
+>> + ? ? }
+>> +
+>> + ? ? while (atomic_read(a) > n)
+>> + ? ? ? ? ? ? cpu_relax();
+>> +}
+>
+> Well, this looks like "wait until all CPUs execute this code". ?Don't we have
+> anything like this already somewhere?
+>
+>> +
+>> +/**
+>> ? * cpuidle_state_is_coupled - check if a state is part of a coupled set
+>> ? * @dev: struct cpuidle_device for the current cpu
+>> ? * @drv: struct cpuidle_driver for the platform
+>> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+>> index 6038448..5ab7183 100644
+>> --- a/include/linux/cpuidle.h
+>> +++ b/include/linux/cpuidle.h
+>> @@ -183,6 +183,10 @@ static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
+>>
+>> ?#endif
+>>
+>> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+>> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a);
+>> +#endif
+>
+> Why exactly is the extra Kconfig option necessary?
 
-Ok, good to know.
-
-> > I kind of don't like relying on ->p as a check to see if things are set
-> > up properly, I wonder if we could use the kobject state_initalized field
-> > instead somehow, or maybe state_in_sysfs?  Oh wait, that's in ->p as
-> > well.  Ok, I guess this is as good as it can get.
-> 
-> In the case you mentioned of the driver getting unregistered, can the
-> unregister code clear ->p?
-
-I do not know.  Try it in the bus_remove_driver() call after the
-kobject_put() line, that might do it, but it might cause problems, I
-can't remember at the moment.  It would need a lot of testing
-
-thanks,
-
-greg k-h
+It prevents compiling in coupled.o (2k text section) on the majority
+of kernels that will never use it.
