@@ -1,35 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 10 May 2012 15:19:35 +0200
-Subject: [PATCH] drivers: cma: don't fail if migration returns -EAGAIN
-In-Reply-To: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1336655975-15729-1-git-send-email-m.szyprowski@samsung.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 10 May 2012 21:19:47 +0800
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <1336647530.15424.384.camel@vkoul-udesk3>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510074403.GA3190@n2100.arm.linux.org.uk>
+ <1336647530.15424.384.camel@vkoul-udesk3>
+Message-ID: <CAMiH66E4Cb5LTi3EiU5HQ6492ZA-mD40eFZaaqmbC7hTz-aQxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-alloc_contig_range() function might return -EAGAIN if migrate_pages() call
-fails for some temporarily locked pages. Such case should not be fatal
-to dma_alloc_from_contiguous(), which should retry allocation like in case
-of -EBUSY error.
+On Thu, May 10, 2012 at 6:58 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Thu, 2012-05-10 at 08:44 +0100, Russell King - ARM Linux wrote:
+>> In fact, please look at both imx-dma.c _and_ imx-sdma.c - search for
+>> "callback" and have a look at the code around there.
+>>
+>> You will find that imx-dma.c processes one descriptor per tasklet run,
+>> and calls the callback under a spinlock.
+>>
+>> You'll find that imx-sdma.c always calls callbacks from IRQ context.
+> Yup, let me try to fix them!
+>
+I ever sent you a patch to fix it.
 
-Reported-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/base/dma-contiguous.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Best Regards
+Huang Shijie
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 78efb03..e46e2fb 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -346,7 +346,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
- 		if (ret == 0) {
- 			bitmap_set(cma->bitmap, pageno, count);
- 			break;
--		} else if (ret != -EBUSY) {
-+		} else if (ret != -EBUSY && ret != -EAGAIN) {
- 			goto error;
- 		}
- 		pr_debug("%s(): memory range at %p is busy, retrying\n",
--- 
-1.7.1.569.g6f426
+> --
+> ~Vinod
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
