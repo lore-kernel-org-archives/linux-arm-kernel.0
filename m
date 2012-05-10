@@ -1,122 +1,56 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 10 May 2012 15:47:21 -0700
-Subject: [PATCHv4 4/4] cpuidle: coupled: add parallel barrier function
-In-Reply-To: <201205092331.24487.rjw@sisk.pl>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
- <1336438662-10484-5-git-send-email-ccross@android.com>
- <201205092331.24487.rjw@sisk.pl>
-Message-ID: <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 May 2012 23:54:29 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <1336135550.1540.2.camel@vkoul-udesk3>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <20120504122611.GE26481@n2100.arm.linux.org.uk>
+ <1336135550.1540.2.camel@vkoul-udesk3>
+Message-ID: <20120510225429.GG12727@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 2:31 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Tuesday, May 08, 2012, Colin Cross wrote:
->> Adds cpuidle_coupled_parallel_barrier, which can be used by coupled
->> cpuidle state enter functions to handle resynchronization after
->> determining if any cpu needs to abort. ?The normal use case will
->> be:
->>
->> static bool abort_flag;
->> static atomic_t abort_barrier;
->>
->> int arch_cpuidle_enter(struct cpuidle_device *dev, ...)
->> {
->> ? ? ? if (arch_turn_off_irq_controller()) {
->> ? ? ? ? ? ? ? /* returns an error if an irq is pending and would be lost
->> ? ? ? ? ? ? ? ? ?if idle continued and turned off power */
->> ? ? ? ? ? ? ? abort_flag = true;
->> ? ? ? }
->>
->> ? ? ? cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
->>
->> ? ? ? if (abort_flag) {
->> ? ? ? ? ? ? ? /* One of the cpus didn't turn off it's irq controller */
->> ? ? ? ? ? ? ? arch_turn_on_irq_controller();
->> ? ? ? ? ? ? ? return -EINTR;
->> ? ? ? }
->>
->> ? ? ? /* continue with idle */
->> ? ? ? ...
->> }
->>
->> This will cause all cpus to abort idle together if one of them needs
->> to abort.
->>
->> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Reviewed-by: Kevin Hilman <khilman@ti.com>
->> Tested-by: Kevin Hilman <khilman@ti.com>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> ---
->> ?drivers/cpuidle/coupled.c | ? 37 +++++++++++++++++++++++++++++++++++++
->> ?include/linux/cpuidle.h ? | ? ?4 ++++
->> ?2 files changed, 41 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
->> index 93101fb..3e65de1 100644
->> --- a/drivers/cpuidle/coupled.c
->> +++ b/drivers/cpuidle/coupled.c
->> @@ -130,6 +130,43 @@ struct cpuidle_coupled {
->> ?static cpumask_t cpuidle_coupled_poked_mask;
->>
->> ?/**
->> + * cpuidle_coupled_parallel_barrier - synchronize all online coupled cpus
->> + * @dev: cpuidle_device of the calling cpu
->> + * @a: ? atomic variable to hold the barrier
->> + *
->> + * No caller to this function will return from this function until all online
->> + * cpus in the same coupled group have called this function. ?Once any caller
->> + * has returned from this function, the barrier is immediately available for
->> + * reuse.
->> + *
->> + * The atomic variable a must be initialized to 0 before any cpu calls
->> + * this function, will be reset to 0 before any cpu returns from this function.
->> + *
->> + * Must only be called from within a coupled idle state handler
->> + * (state.enter when state.flags has CPUIDLE_FLAG_COUPLED set).
->> + *
->> + * Provides full smp barrier semantics before and after calling.
->> + */
->> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a)
->> +{
->> + ? ? int n = dev->coupled->online_count;
->> +
->> + ? ? smp_mb__before_atomic_inc();
->> + ? ? atomic_inc(a);
->> +
->> + ? ? while (atomic_read(a) < n)
->> + ? ? ? ? ? ? cpu_relax();
->> +
->> + ? ? if (atomic_inc_return(a) == n * 2) {
->> + ? ? ? ? ? ? atomic_set(a, 0);
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +
->> + ? ? while (atomic_read(a) > n)
->> + ? ? ? ? ? ? cpu_relax();
->> +}
->
-> Well, this looks like "wait until all CPUs execute this code". ?Don't we have
-> anything like this already somewhere?
->
->> +
->> +/**
->> ? * cpuidle_state_is_coupled - check if a state is part of a coupled set
->> ? * @dev: struct cpuidle_device for the current cpu
->> ? * @drv: struct cpuidle_driver for the platform
->> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
->> index 6038448..5ab7183 100644
->> --- a/include/linux/cpuidle.h
->> +++ b/include/linux/cpuidle.h
->> @@ -183,6 +183,10 @@ static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
->>
->> ?#endif
->>
->> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a);
->> +#endif
->
-> Why exactly is the extra Kconfig option necessary?
+On Fri, May 04, 2012 at 06:15:50PM +0530, Vinod Koul wrote:
+> On Fri, 2012-05-04 at 13:26 +0100, Russell King - ARM Linux wrote:
+> > On Wed, May 02, 2012 at 05:27:02PM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, May 02, 2012 at 09:31:15PM +0530, Vinod Koul wrote:
+> > > > From what I understand (Dan please correct me as you may know this much
+> > > > better than me), the tx_status tells you wrt passed cookie what is the
+> > > > status. Further, (as you pointed), it also tells you which is last
+> > > > completed cookie and what is the current "running". And wrt the
+> > > > currently "running" cookie it tells you how may bytes are left.
+> > > 
+> > > That means we have a number of buggy drivers on both sides of the API...
+> > > PL08x for example always total up all the pending bytes from the position
+> > > in the current descriptor to the last issued descriptor.  Many other
+> > > implementations simply always return zero.
+> > 
+> > Right, as there's been no reply on this, I'll see about changing PL08x
+> > and SA11x0 to do exactly this.  I'll also see about implementing it in
+> > the new OMAP DMA engine driver.
+> > 
+> > The semantics I intend to implement are:
+> > 
+> > If the cookie has completed successfully, the residue will be zero.  If
+> > it is queued, it will be the number of bytes in the descriptor identified
+> > by the cookie.  If it is in progress, it will be the number of bytes yet
+> > to be transferred.
+> Today is is supposed to be defined as:
+> * @residue: the remaining number of bytes left to transmit
+> *      on the selected transfer for states DMA_IN_PROGRESS and
+> *      DMA_PAUSED if this is implemented in the driver, else 0
+> So what you are saying is correct and already documented.
 
-It prevents compiling in coupled.o (2k text section) on the majority
-of kernels that will never use it.
+BTW.  Not quite - it's ambiguous, and we really must get rid of that
+'else 0' clause there and require it to be implemented if we're going
+to end up with users of the DMA engine API using it.
+
+The statement also implies that a pending transfer should return a
+residue of zero.  Is that really consistent with what we want this
+API to do?
+
+It also talks about 'bytes left to transmit'.  That could be interpreted
+strictly as the number of bytes to be transferred from the DMA engine
+to the peripheral, or from the DMA engine to memory.  That's not quite
+the same as calculating the residue off the DMA address pointer.
