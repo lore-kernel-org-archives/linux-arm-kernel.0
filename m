@@ -1,67 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 May 2012 11:05:23 -0600
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
- omap2+ padconf
-In-Reply-To: <20120509204925.GV5088@atomide.com>
-References: <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com> <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org> <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org> <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org> <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org> <20120509204925.GV5088@atomide.com>
-Message-ID: <4FABF553.20601@wwwdotorg.org>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Thu, 10 May 2012 22:36:51 +0530
+Subject: [PATCH 0/4] ARM: OMAP2+: Misc cleanup part2
+Message-ID: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2012 02:49 PM, Tony Lindgren wrote:
-> * Stephen Warren <swarren@wwwdotorg.org> [120509 13:22]:
->> On 05/04/2012 04:08 PM, Tony Lindgren wrote:
->>> * Stephen Warren <swarren@wwwdotorg.org> [120504 11:59]:
->>>> On 05/04/2012 10:34 AM, Tony Lindgren wrote:
->>>>> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
->>>>>> On 08:03 Fri 04 May     , Tony Lindgren wrote:
->>>>>>>>
->>>>>>>> so I was thinking to do like on gpio
->>>>>>>>
->>>>>>>> uart {
->>>>>>>> 	pin = < &pioA 12 {pararms} >
->>>>>>>>
->>>>>>>> }
->>>>>>>
->>>>>>> Hmm I assume the "12" above the gpio number?
->>>>>> no pin number in the bank because it could not be gpio
->>>>>
->>>>> Yes OK, but pin number 12 in the gpio bank, not in the mux register.
->>>>> Got it.
->>>>
->>>> I'd prefer to avoid any references to GPIOs here; not all muxable pins
->>>> are GPIOs and not all GPIOs are muxable pins. Lets keep the two concepts
->>>> independent.
->>>
->>> And it seems that &pioA 12 is not always enough information for the pinctrl
->>> driver to request a GPIO. So it's best to specify it separately.
->>
->> Why would a pinctrl driver "request a GPIO"?
-> 
-> Hmm what would pinctrl_request_gpio do if the GPIO driver is separate driver?
+This is a continuation of the previous cleanup series from
+santosh.shilimkar at ti.com [1]. Patches are outcome of the OMAP5
+review suggestions from Tony/Benoit/Santosh/Rajendra. 
 
-Well, that's a GPIO driver requesting a GPIO from the pinctrl system,
-rather than the pinctrl driver requesting a GPIO (sorry to be picky).
+[1]  http://www.spinics.net/lists/linux-omap/msg69730.html
 
-It wasn't at all obvious to me from your binding proposal that you
-intended the pinctrl-simple driver to support the GPIO operations at
-all. If you do want this, I think you'd need some properties (perhaps
-some kind of explicit table) in order to set up the GPIO ID -> pinctrl
-pin ID mapping. I don't recall seeing those; did I just miss them? I
-think we'd want this to be explicit because:
+R Sricharan (4):
+  ARM: OMAP2+: Introduce CONFIG_SOC_HAS_OMAP_DPLL macro
+  ARM: OMAP2+: Move the stubbed prm and cm functions to prcm.c file and
+    make them __weak.
+  ARM: OMAP2+: Move stubbed secure_sram_reserve function to a common.c
+    and call it __weak
+  ARM: OMAP: counter-32k: Select the CR register offset using the IP
+    scheme.
 
-a) It may well be the case that not all users of pinctrl-simple actually
-mux/control GPIOs at all. It's certainly possible to only mux "special
-functions", and have dedicated pins for a GPIO controller.
-
-b) Even when GPIOs do come into the picture, it may be that only some of
-the pins are available as GPIOs.
-
-Also, were you intending pinctrl-simple to actually be the GPIO
-controller itself? That'd be another case that one might consider fairly
-simple, but then extends to being gpio-simple as well as pinctrl-simple...
+ arch/arm/mach-omap2/Kconfig                   |    5 ++
+ arch/arm/mach-omap2/clock.c                   |    2 +-
+ arch/arm/mach-omap2/cminst44xx.h              |   25 --------
+ arch/arm/mach-omap2/prcm.c                    |   77 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h            |   65 ---------------------
+ arch/arm/plat-omap/common.c                   |    9 +++
+ arch/arm/plat-omap/counter_32k.c              |   16 ++++-
+ arch/arm/plat-omap/include/plat/clock.h       |    4 +-
+ arch/arm/plat-omap/include/plat/omap-secure.h |    5 --
+ 9 files changed, 107 insertions(+), 101 deletions(-)
