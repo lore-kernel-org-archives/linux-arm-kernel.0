@@ -1,95 +1,71 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 10 May 2012 15:06:37 +0200
-Subject: [PATCH 01/13] ARM: OMAP5: id: Add cpu id for ES versions
-In-Reply-To: <1336029982-31898-2-git-send-email-r.sricharan@ti.com>
-References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
- <1336029982-31898-2-git-send-email-r.sricharan@ti.com>
-Message-ID: <20120510130637.GA24672@game.jcrosoft.org>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 10 May 2012 08:12:09 -0500
+Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
+In-Reply-To: <20120510065614.GE31844@pengutronix.de>
+References: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+ <20120510065614.GE31844@pengutronix.de>
+Message-ID: <CAMXH7KFybOyTE_MYSvM=-JqMQeXDhmB+M-1WBkqp4H=dgUDxSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:56 Thu 03 May     , R Sricharan wrote:
-> Adding the OMAP5 ES1.0, 2.0 and OMAP5432 cpu revision
-> detection support.
-> 
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/control.h         |    4 +++
->  arch/arm/mach-omap2/id.c              |   47 +++++++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/cpu.h |   23 ++++++++++++++-
->  3 files changed, 72 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-> index a406fd0..9daac6f 100644
-> --- a/arch/arm/mach-omap2/control.h
-> +++ b/arch/arm/mach-omap2/control.h
-> @@ -246,6 +246,10 @@
->  /* TI81XX CONTROL_DEVCONF register offsets */
->  #define TI81XX_CONTROL_DEVICE_ID	(TI81XX_CONTROL_DEVCONF + 0x000)
->  
-> +/* OMAP54XX CONTROL STATUS register */
-> +#define OMAP5XXX_CONTROL_STATUS                0x134
-> +#define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
-> +
->  /*
->   * REVISIT: This list of registers is not comprehensive - there are more
->   * that should be added.
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 0e79b7b..d2ec323 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -50,6 +50,11 @@ int omap_type(void)
->  		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
->  	} else if (cpu_is_omap44xx()) {
->  		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
-> +	} else if (cpu_is_omap54xx()) {
-> +		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
-> +		val &= OMAP5_DEVICETYPE_MASK;
-> +		val >>= 6;
-> +		goto out;
->  	} else {
->  		pr_err("Cannot detect omap type!\n");
->  		goto out;
-> @@ -500,6 +505,48 @@ void __init omap4xxx_check_revision(void)
->  		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
->  }
->  
-> +void __init omap5xxx_check_revision(void)
-> +{
-> +	u32 idcode;
-> +	u16 hawkeye;
-> +	u8 rev;
-> +
-> +	idcode = read_tap_reg(OMAP_TAP_IDCODE);
-> +	hawkeye = (idcode >> 12) & 0xffff;
-> +	rev = (idcode >> 28) & 0xff;
-> +	switch (hawkeye) {
-> +	case 0xb942:
-> +		switch (rev) {
-> +		case 0:
-> +			omap_revision = OMAP5430_REV_ES1_0;
-why do you duplicate this
-> +			break;
-> +		case 1:
-> +			omap_revision = OMAP5430_REV_ES2_0;
-> +			break;
-do this
+Hello Uwe,
 
-		case 0:
-> +		default:
-> +			omap_revision = OMAP5430_REV_ES1_0;
-> +		}
-> +		break;
-> +
-> +	case 0xb998:
-> +		switch (rev) {
-> +		case 0:
-> +			omap_revision = OMAP5432_REV_ES1_0;
-> +			break;
-> +		default:
-ditto here
-> +			omap_revision = OMAP5432_REV_ES1_0;
-> +		}
-Best Regards,
-J.
+On Thu, May 10, 2012 at 1:56 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Robert,
+>
+> On Wed, May 09, 2012 at 07:24:17PM -0500, Robert Lee wrote:
+>> A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
+>> to use common definitions when accessing registers of peripherals on
+>> the AIPS2 bus.
+>>
+>> This change was tested for mapping conflicts using the iop2v script
+>> found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
+>> performing a bootup of a default build using imx_v6_v7_defconfig
+>> on a imx51 babbage board and imx53 loco board.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> It took me some time to understand your goal. With your change you
+> achieve that
+>
+> ? ? ? ?IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
+> ? ? ? ?IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) ==
+> ? ? ? ?IMX_IO_P2V(MX53_AIPS2_BASE_ADDR)
+>
+> (which IMHO is more than "allowing ... to use common definitions [for
+> the] AIPS2 bus).
+
+Sorry, I just have been more thorough in my description.  In the patch
+I also forgot to change the comments and give the new virtual
+addresses so I can add that in a v2 if this change ends up being
+acceptable.
+
+>
+> I can confirm that my imx-iop2v script doesn't find a conflict with your
+> change. Having said that I didn't check that the memory regions listed
+> in the script still match the regions that are statically mapped on imx.
+>
+> And I wonder why do you need to have the aips2 bus mapped to the same
+> address on all imx5 machines. The future is that the base addresses of
+> the various devices are determined via dt and then the static mappings
+> go away. Do I miss something?
+
+For now, because both dt and non dt configurations are available for
+imx5, this is needed so that the low power mx5_cpu_lp_set() function
+in pm-imx5.c can be readily used by imx53 and imx50 for low power
+idling.
+
+If this is not acceptable, another option would be to only support
+idle for dt builds that have common base addresses.  This may require
+a temporary hack for cpuidle enablement to enable it for dt but not
+for non-dt since they currently use some common init code.  Or, just
+don't support low power idling at all on imx53 and imx50 until the
+non-dt support is removed.
+
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
