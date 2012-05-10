@@ -1,262 +1,479 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Thu, 10 May 2012 09:04:06 +0100
-Subject: [PATCH 6/9] IIO: AT91: Add DT support to at91_adc driver
-In-Reply-To: <1336568528-29877-7-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336568528-29877-1-git-send-email-maxime.ripard@free-electrons.com>
- <1336568528-29877-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4FAB7676.2070603@cam.ac.uk>
+From: hdoyu@nvidia.com (Hiroshi DOYU)
+Date: Thu, 10 May 2012 10:42:32 +0300
+Subject: [PATCH 3/4] ARM: tegra30: Add Tegra Memory Controller(MC) driver
+In-Reply-To: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1336635764-30597-3-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All this is fine with me.  I'm far from expert at device tree though so
-over to those that are :)
+Tegra Memory Controller(MC) driver for Tegra30
+Added to support MC General interrupts, mainly for IOMMU(SMMU).
 
-On 5/9/2012 2:02 PM, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard<maxime.ripard@free-electrons.com>
-> Acked-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> ---
->   .../devicetree/bindings/arm/atmel-adc.txt          |   65 ++++++++++
->   drivers/iio/adc/at91_adc.c                         |  132 +++++++++++++++++++-
->   2 files changed, 196 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> new file mode 100644
-> index 0000000..c63097d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -0,0 +1,65 @@
-> +* AT91's Analog to Digital Converter (ADC)
-> +
-> +Required properties:
-> +  - compatible: Should be "atmel,at91sam9260-adc"
-> +  - reg: Should contain ADC registers location and length
-> +  - interrupts: Should contain the IRQ line for the ADC
-> +  - atmel,adc-channel-base: Offset of the first channel data register
-> +  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
-> +    device
-> +  - atmel,adc-drdy-mask: Mask of the DRDY interruption in the ADC
-> +  - atmel,adc-num-channels: Number of channels available in the ADC
-> +  - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
-> +    defined in the datasheet
-> +  - atmel,adc-status-register: Offset of the Interrupt Status Register
-> +  - atmel,adc-trigger-register: Offset of the Trigger Register
-> +  - atmel,adc-vref: Reference voltage in millivolts for the conversions
-> +
-> +Optional properties:
-> +  - atmel,adc-use-external: Boolean to enable of external triggers
-> +
-> +Optional trigger Nodes:
-> +  - Required properties:
-> +    * trigger-name: Name of the trigger exposed to the user
-> +    * trigger-value: Value to put in the Trigger register
-> +      to activate this trigger
-> +  - Optional properties:
-> +    * trigger-external: Is the trigger an external trigger?
-> +
-> +Examples:
-> +adc0: adc at fffb0000 {
-> +	compatible = "atmel,at91sam9260-adc";
-> +	reg =<0xfffb0000 0x100>;
-> +	interrupts =<20 4>;
-> +	atmel,adc-channel-base =<0x30>;
-> +	atmel,adc-channels-used =<0xff>;
-> +	atmel,adc-drdy-mask =<0x10000>;
-> +	atmel,adc-num-channels =<8>;
-> +	atmel,adc-startup-time =<40>;
-> +	atmel,adc-status-register =<0x1c>;
-> +	atmel,adc-trigger-register =<0x08>;
-> +	atmel,adc-use-external;
-> +	atmel,adc-vref =<3300>;
-> +
-> +	trigger at 0 {
-> +		trigger-name = "external-rising";
-> +		trigger-value =<0x1>;
-> +		trigger-external;
-> +	};
-> +	trigger at 1 {
-> +		trigger-name = "external-falling";
-> +		trigger-value =<0x2>;
-> +		trigger-external;
-> +	};
-> +
-> +	trigger at 2 {
-> +		trigger-name = "external-any";
-> +		trigger-value =<0x3>;
-> +		trigger-external;
-> +	};
-> +
-> +	trigger at 3 {
-> +		trigger-name = "continuous";
-> +		trigger-value =<0x6>;
-> +	};
-> +};
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index e5d73b1..d2eca64 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -15,6 +15,8 @@
->   #include<linux/jiffies.h>
->   #include<linux/kernel.h>
->   #include<linux/module.h>
-> +#include<linux/of.h>
-> +#include<linux/of_device.h>
->   #include<linux/platform_device.h>
->   #include<linux/sched.h>
->   #include<linux/slab.h>
-> @@ -415,6 +417,123 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->   	return -EINVAL;
->   }
->
-> +static int at91_adc_probe_dt(struct at91_adc_state *st,
-> +			     struct platform_device *pdev)
-> +{
-> +	struct iio_dev *idev = iio_priv_to_dev(st);
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct device_node *trig_node;
-> +	int i = 0, ret;
-> +	u32 prop;
-> +
-> +	if (!node)
-> +		return -EINVAL;
-> +
-> +	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-channels-used",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-channels-used property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->channels_mask = prop;
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-num-channels",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-num-channels property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->num_channels = prop;
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-startup-time",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-startup-time property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->startup_time = prop;
-> +
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-vref",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-vref property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->vref_mv = prop;
-> +
-> +	st->registers = devm_kzalloc(&idev->dev,
-> +				     sizeof(struct at91_adc_reg_desc),
-> +				     GFP_KERNEL);
-> +	if (!st->registers) {
-> +		dev_err(&idev->dev, "Could not allocate register memory.\n");
-> +		ret = -ENOMEM;
-> +		goto error_ret;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-channel-base",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-channel-base property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->registers->channel_base = prop;
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-drdy-mask",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-drdy-mask property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->registers->drdy_mask = prop;
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-status-register",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-status-register property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->registers->status_register = prop;
-> +
-> +	if (of_property_read_u32(node, "atmel,adc-trigger-register",&prop)) {
-> +		dev_err(&idev->dev, "Missing adc-trigger-register property in the DT.\n");
-> +		ret = -EINVAL;
-> +		goto error_ret;
-> +	}
-> +	st->registers->trigger_register = prop;
-> +
-> +	st->trigger_number = of_get_child_count(node);
-> +	st->trigger_list = devm_kzalloc(&idev->dev, st->trigger_number *
-> +					sizeof(struct at91_adc_trigger),
-> +					GFP_KERNEL);
-> +	if (!st->trigger_list) {
-> +		dev_err(&idev->dev, "Could not allocate trigger list memory.\n");
-> +		ret = -ENOMEM;
-> +		goto error_ret;
-> +	}
-> +
-> +	for_each_child_of_node(node, trig_node) {
-> +		struct at91_adc_trigger *trig = st->trigger_list + i;
-> +		const char *name;
-> +
-> +		if (of_property_read_string(trig_node, "trigger-name",&name)) {
-> +			dev_err(&idev->dev, "Missing trigger-name property in the DT.\n");
-> +			ret = -EINVAL;
-> +			goto error_ret;
-> +		}
-> +	        trig->name = name;
-> +
-> +		if (of_property_read_u32(trig_node, "trigger-value",&prop)) {
-> +			dev_err(&idev->dev, "Missing trigger-value property in the DT.\n");
-> +			ret = -EINVAL;
-> +			goto error_ret;
-> +		}
-> +	        trig->value = prop;
-> +		trig->is_external = of_property_read_bool(trig_node, "trigger-external");
-> +		i++;
-> +	}
-> +
-> +	return 0;
-> +
-> +error_ret:
-> +	return ret;
-> +}
-> +
->   static int at91_adc_probe_pdata(struct at91_adc_state *st,
->   				struct platform_device *pdev)
->   {
-> @@ -456,7 +575,11 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
->
->   	st = iio_priv(idev);
->
-> -	ret = at91_adc_probe_pdata(st, pdev);
-> +	if (pdev->dev.of_node)
-> +		ret = at91_adc_probe_dt(st, pdev);
-> +	else
-> +		ret = at91_adc_probe_pdata(st, pdev);
-> +
->   	if (ret) {
->   		dev_err(&pdev->dev, "No platform data available.\n");
->   		ret = -EINVAL;
-> @@ -658,11 +781,18 @@ static int __devexit at91_adc_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> +static const struct of_device_id at91_adc_dt_ids[] = {
-> +	{ .compatible = "atmel,at91sam9260-adc" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, at91_adc_dt_ids);
-> +
->   static struct platform_driver at91_adc_driver = {
->   	.probe = at91_adc_probe,
->   	.remove = __devexit_p(at91_adc_remove),
->   	.driver = {
->   		   .name = "at91_adc",
-> +		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
->   	},
->   };
->
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+ .../bindings/arm/tegra/nvidia,tegra30-mc.txt       |   18 +
+ arch/arm/mach-tegra/Kconfig                        |    2 +
+ drivers/memory/Kconfig                             |    4 +
+ drivers/memory/Makefile                            |    1 +
+ drivers/memory/tegra30-mc.c                        |  391 ++++++++++++++++++++
+ 5 files changed, 416 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra30-mc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra30-mc.txt
+new file mode 100644
+index 0000000..e47e73f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra30-mc.txt
+@@ -0,0 +1,18 @@
++NVIDIA Tegra30 MC(Memory Controller)
++
++Required properties:
++- compatible : "nvidia,tegra30-mc"
++- reg : Should contain 4 register ranges(address and length); see the
++  example below. Note that the MC registers are interleaved with the
++  SMMU registers, and hence must be represented as multiple ranges.
++- interrupts : Should contain MC General interrupt.
++
++Example:
++	mc {
++		compatible = "nvidia,tegra30-mc";
++		reg = <0x7000f000 0x010
++		       0x7000f03c 0x1b4
++		       0x7000f200 0x028
++		       0x7000f284 0x17c>;
++		interrupts = <0 77 0x04>;
++	};
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index abaf5d0..16fe065 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -43,6 +43,8 @@ config ARCH_TEGRA_3x_SOC
+ 	select ARM_ERRATA_764369
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	select CPU_FREQ_TABLE if CPU_FREQ
++	select MEMORY
++	select TEGRA30_MC
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index ebade16..42e6d66 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -24,4 +24,8 @@ config TEGRA20_MC
+ 	bool
+ 	depends on ARCH_TEGRA_2x_SOC
+ 
++config TEGRA30_MC
++	bool
++	depends on ARCH_TEGRA_3x_SOC
++
+ endif
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index 1f58518..42b3ce9 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_TI_EMIF)		+= emif.o
+ obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
++obj-$(CONFIG_TEGRA30_MC)	+= tegra30-mc.o
+diff --git a/drivers/memory/tegra30-mc.c b/drivers/memory/tegra30-mc.c
+new file mode 100644
+index 0000000..c982125
+--- /dev/null
++++ b/drivers/memory/tegra30-mc.c
+@@ -0,0 +1,391 @@
++/*
++ * Tegra30 Memory Controller
++ *
++ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/ratelimit.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++
++#define DRV_NAME "tegra30-mc"
++
++#define MC_INTSTATUS			0x0
++#define MC_INTMASK			0x4
++
++#define MC_INT_ERR_SHIFT		6
++#define MC_INT_ERR_MASK			(0x1f << MC_INT_ERR_SHIFT)
++#define MC_INT_DECERR_EMEM		BIT(MC_INT_ERR_SHIFT)
++#define MC_INT_SECURITY_VIOLATION	BIT(MC_INT_ERR_SHIFT + 2)
++#define MC_INT_ARBITRATION_EMEM		BIT(MC_INT_ERR_SHIFT + 3)
++#define MC_INT_INVALID_SMMU_PAGE	BIT(MC_INT_ERR_SHIFT + 4)
++
++#define MC_ERR_STATUS			0x8
++#define MC_ERR_ADR			0xc
++
++#define MC_ERR_TYPE_SHIFT		28
++#define MC_ERR_TYPE_MASK		(7 << MC_ERR_TYPE_SHIFT)
++#define MC_ERR_TYPE_DECERR_EMEM		2
++#define MC_ERR_TYPE_SECURITY_TRUSTZONE	3
++#define MC_ERR_TYPE_SECURITY_CARVEOUT	4
++#define MC_ERR_TYPE_INVALID_SMMU_PAGE	6
++
++#define MC_ERR_INVALID_SMMU_PAGE_SHIFT	25
++#define MC_ERR_INVALID_SMMU_PAGE_MASK	(7 << MC_ERR_INVALID_SMMU_PAGE_SHIFT)
++#define MC_ERR_RW_SHIFT			16
++#define MC_ERR_RW			BIT(MC_ERR_RW_SHIFT)
++#define MC_ERR_SECURITY			BIT(MC_ERR_RW_SHIFT + 1)
++
++#define SECURITY_VIOLATION_TYPE		BIT(30)	/* 0=TRUSTZONE, 1=CARVEOUT */
++
++#define MC_EMEM_ARB_CFG			0x90
++#define MC_EMEM_ARB_OUTSTANDING_REQ	0x94
++#define MC_EMEM_ARB_TIMING_RCD		0x98
++#define MC_EMEM_ARB_TIMING_RP		0x9c
++#define MC_EMEM_ARB_TIMING_RC		0xa0
++#define MC_EMEM_ARB_TIMING_RAS		0xa4
++#define MC_EMEM_ARB_TIMING_FAW		0xa8
++#define MC_EMEM_ARB_TIMING_RRD		0xac
++#define MC_EMEM_ARB_TIMING_RAP2PRE	0xb0
++#define MC_EMEM_ARB_TIMING_WAP2PRE	0xb4
++#define MC_EMEM_ARB_TIMING_R2R		0xb8
++#define MC_EMEM_ARB_TIMING_W2W		0xbc
++#define MC_EMEM_ARB_TIMING_R2W		0xc0
++#define MC_EMEM_ARB_TIMING_W2R		0xc4
++
++#define MC_EMEM_ARB_DA_TURNS		0xd0
++#define MC_EMEM_ARB_DA_COVERS		0xd4
++#define MC_EMEM_ARB_MISC0		0xd8
++#define MC_EMEM_ARB_MISC1		0xdc
++
++#define MC_EMEM_ARB_RING3_THROTTLE	0xe4
++#define MC_EMEM_ARB_OVERRIDE		0xe8
++
++#define MC_TIMING_CONTROL		0xfc
++
++#define MC_CLIENT_ID_MASK		0x7f
++
++#define NUM_MC_REG_BANKS		4
++
++struct tegra30_mc {
++	void __iomem *regs[NUM_MC_REG_BANKS];
++	struct device *dev;
++	u32 ctx[0];
++};
++
++static inline u32 mc_readl(struct tegra30_mc *mc, u32 offs)
++{
++	if (offs < 0x10)
++		return readl(mc->regs[0] + offs);
++	BUG_ON(offs < 0x3c);
++	if (offs < 0x1f0)
++		return readl(mc->regs[1] + offs - 0x3c);
++	BUG_ON(offs < 0x200);
++	if (offs < 0x228)
++		return readl(mc->regs[2] + offs - 0x200);
++	BUG_ON(offs < 0x284);
++	if (offs < 0x400)
++		return readl(mc->regs[3] + offs - 0x284);
++	BUG();
++}
++
++static inline void mc_writel(struct tegra30_mc *mc, u32 val, u32 offs)
++{
++	if (offs < 0x10) {
++		writel(val, mc->regs[0] + offs);
++		return;
++	}
++	BUG_ON(offs < 0x3c);
++	if (offs < 0x1f0) {
++		writel(val, mc->regs[1] + offs - 0x3c);
++		return;
++	}
++	BUG_ON(offs < 0x200);
++	if (offs < 0x228) {
++		writel(val, mc->regs[2] + offs - 0x200);
++		return;
++	}
++	BUG_ON(offs < 0x284);
++	if (offs < 0x400) {
++		writel(val, mc->regs[3] + offs - 0x284);
++		return;
++	}
++	BUG();
++}
++
++static const char * const tegra30_mc_client[] = {
++	"csr_ptcr",
++	"cbr_display0a",
++	"cbr_display0ab",
++	"cbr_display0b",
++	"cbr_display0bb",
++	"cbr_display0c",
++	"cbr_display0cb",
++	"cbr_display1b",
++	"cbr_display1bb",
++	"cbr_eppup",
++	"cbr_g2pr",
++	"cbr_g2sr",
++	"cbr_mpeunifbr",
++	"cbr_viruv",
++	"csr_afir",
++	"csr_avpcarm7r",
++	"csr_displayhc",
++	"csr_displayhcb",
++	"csr_fdcdrd",
++	"csr_fdcdrd2",
++	"csr_g2dr",
++	"csr_hdar",
++	"csr_host1xdmar",
++	"csr_host1xr",
++	"csr_idxsrd",
++	"csr_idxsrd2",
++	"csr_mpe_ipred",
++	"csr_mpeamemrd",
++	"csr_mpecsrd",
++	"csr_ppcsahbdmar",
++	"csr_ppcsahbslvr",
++	"csr_satar",
++	"csr_texsrd",
++	"csr_texsrd2",
++	"csr_vdebsevr",
++	"csr_vdember",
++	"csr_vdemcer",
++	"csr_vdetper",
++	"csr_mpcorelpr",
++	"csr_mpcorer",
++	"cbw_eppu",
++	"cbw_eppv",
++	"cbw_eppy",
++	"cbw_mpeunifbw",
++	"cbw_viwsb",
++	"cbw_viwu",
++	"cbw_viwv",
++	"cbw_viwy",
++	"ccw_g2dw",
++	"csw_afiw",
++	"csw_avpcarm7w",
++	"csw_fdcdwr",
++	"csw_fdcdwr2",
++	"csw_hdaw",
++	"csw_host1xw",
++	"csw_ispw",
++	"csw_mpcorelpw",
++	"csw_mpcorew",
++	"csw_mpecswr",
++	"csw_ppcsahbdmaw",
++	"csw_ppcsahbslvw",
++	"csw_sataw",
++	"csw_vdebsevw",
++	"csw_vdedbgw",
++	"csw_vdembew",
++	"csw_vdetpmw",
++};
++
++static void tegra30_mc_decode(struct tegra30_mc *mc, int n)
++{
++	u32 err, addr;
++	const char * const mc_int_err[] = {
++		"MC_DECERR",
++		"Unknown",
++		"MC_SECURITY_ERR",
++		"MC_ARBITRATION_EMEM",
++		"MC_SMMU_ERR",
++	};
++	const char * const err_type[] = {
++		"Unknown",
++		"Unknown",
++		"DECERR_EMEM",
++		"SECURITY_TRUSTZONE",
++		"SECURITY_CARVEOUT",
++		"Unknown",
++		"INVALID_SMMU_PAGE",
++		"Unknown",
++	};
++	char attr[6];
++	int cid, perm, type, idx;
++	const char *client = "Unknown";
++
++	idx = n - MC_INT_ERR_SHIFT;
++	if ((idx < 0) || (idx >= ARRAY_SIZE(mc_int_err)) || (idx == 1)) {
++		pr_err_ratelimited("Unknown interrupt status %08lx\n", BIT(n));
++		return;
++	}
++
++	err = readl(mc + MC_ERR_STATUS);
++
++	type = (err & MC_ERR_TYPE_MASK) >> MC_ERR_TYPE_SHIFT;
++	perm = (err & MC_ERR_INVALID_SMMU_PAGE_MASK) >>
++		MC_ERR_INVALID_SMMU_PAGE_SHIFT;
++	if (type == MC_ERR_TYPE_INVALID_SMMU_PAGE)
++		sprintf(attr, "%c-%c-%c",
++			(perm & BIT(2)) ? 'R' : '-',
++			(perm & BIT(1)) ? 'W' : '-',
++			(perm & BIT(0)) ? 'S' : '-');
++	else
++		attr[0] = '\0';
++
++	cid = err & MC_CLIENT_ID_MASK;
++	if (cid < ARRAY_SIZE(tegra30_mc_client))
++		client = tegra30_mc_client[cid];
++
++	addr = readl(mc + MC_ERR_ADR);
++
++	pr_err_ratelimited("%s (0x%08x): 0x%08x %s (%s %s %s %s)\n",
++			   mc_int_err[idx], err, addr, client,
++			   (err & MC_ERR_SECURITY) ? "secure" : "non-secure",
++			   (err & MC_ERR_RW) ? "write" : "read",
++			   err_type[type], attr);
++}
++
++static const u32 tegra30_mc_ctx[] = {
++	MC_EMEM_ARB_CFG,
++	MC_EMEM_ARB_OUTSTANDING_REQ,
++	MC_EMEM_ARB_TIMING_RCD,
++	MC_EMEM_ARB_TIMING_RP,
++	MC_EMEM_ARB_TIMING_RC,
++	MC_EMEM_ARB_TIMING_RAS,
++	MC_EMEM_ARB_TIMING_FAW,
++	MC_EMEM_ARB_TIMING_RRD,
++	MC_EMEM_ARB_TIMING_RAP2PRE,
++	MC_EMEM_ARB_TIMING_WAP2PRE,
++	MC_EMEM_ARB_TIMING_R2R,
++	MC_EMEM_ARB_TIMING_W2W,
++	MC_EMEM_ARB_TIMING_R2W,
++	MC_EMEM_ARB_TIMING_W2R,
++	MC_EMEM_ARB_DA_TURNS,
++	MC_EMEM_ARB_DA_COVERS,
++	MC_EMEM_ARB_MISC0,
++	MC_EMEM_ARB_MISC1,
++	MC_EMEM_ARB_RING3_THROTTLE,
++	MC_EMEM_ARB_OVERRIDE,
++	MC_INTMASK,
++};
++
++static int tegra30_mc_suspend(struct device *dev)
++{
++	int i;
++	struct tegra30_mc *mc = dev_get_drvdata(dev);
++
++	for (i = 0; i < ARRAY_SIZE(tegra30_mc_ctx); i++)
++		mc->ctx[i] = mc_readl(mc, tegra30_mc_ctx[i]);
++	return 0;
++}
++
++static int tegra30_mc_resume(struct device *dev)
++{
++	int i;
++	struct tegra30_mc *mc = dev_get_drvdata(dev);
++
++	for (i = 0; i < ARRAY_SIZE(tegra30_mc_ctx); i++)
++		mc_writel(mc, mc->ctx[i], tegra30_mc_ctx[i]);
++
++	mc_writel(mc, 1, MC_TIMING_CONTROL);
++	/* Read-back to ensure that write reached */
++	mc_readl(mc, MC_TIMING_CONTROL);
++	return 0;
++}
++
++static UNIVERSAL_DEV_PM_OPS(tegra30_mc_pm,
++			    tegra30_mc_suspend,
++			    tegra30_mc_resume, NULL);
++
++static const struct of_device_id tegra30_mc_of_match[] __devinitconst = {
++	{ .compatible = "nvidia,tegra30-mc", },
++	{},
++};
++
++static irqreturn_t tegra30_mc_isr(int irq, void *data)
++{
++	u32 stat, mask, bit;
++	struct tegra30_mc *mc = data;
++
++	stat = mc_readl(mc, MC_INTSTATUS);
++	mask = mc_readl(mc, MC_INTMASK);
++	mask &= stat;
++	if (!mask)
++		return IRQ_NONE;
++	while ((bit = ffs(mask)) != 0)
++		tegra30_mc_decode(mc, bit - 1);
++	mc_writel(mc, stat, MC_INTSTATUS);
++	return IRQ_HANDLED;
++}
++
++static int __devinit tegra30_mc_probe(struct platform_device *pdev)
++{
++	struct resource *irq;
++	struct tegra30_mc *mc;
++	size_t bytes;
++	int err, i;
++	u32 intmask;
++
++	bytes = sizeof(*mc) + sizeof(u32) * ARRAY_SIZE(tegra30_mc_ctx);
++	mc = devm_kzalloc(&pdev->dev, bytes, GFP_KERNEL);
++	if (!mc)
++		return -ENOMEM;
++	mc->dev = &pdev->dev;
++
++	for (i = 0; i < ARRAY_SIZE(mc->regs); i++) {
++		struct resource *res;
++
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res)
++			return -ENODEV;
++		mc->regs[i] = devm_request_and_ioremap(&pdev->dev, res);
++		if (!mc->regs[i])
++			return -EBUSY;
++	}
++
++	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!irq)
++		return -ENODEV;
++	err = devm_request_irq(&pdev->dev, irq->start, tegra30_mc_isr,
++			       IRQF_SHARED, dev_name(&pdev->dev), mc);
++	if (err)
++		return -ENODEV;
++
++	platform_set_drvdata(pdev, mc);
++
++	intmask = MC_INT_INVALID_SMMU_PAGE |
++		MC_INT_DECERR_EMEM | MC_INT_SECURITY_VIOLATION;
++	mc_writel(mc, intmask, MC_INTMASK);
++	return 0;
++}
++
++static int __devexit tegra30_mc_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver tegra30_mc_driver = {
++	.probe = tegra30_mc_probe,
++	.remove = __devexit_p(tegra30_mc_remove),
++	.driver = {
++		.name = DRV_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = tegra30_mc_of_match,
++		.pm = &tegra30_mc_pm,
++	},
++};
++module_platform_driver(tegra30_mc_driver);
++
++MODULE_AUTHOR("Hiroshi DOYU <hdoyu@nvidia.com>");
++MODULE_DESCRIPTION("Tegra30 MC driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:" DRV_NAME);
+-- 
+1.7.5.4
