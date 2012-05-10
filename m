@@ -1,192 +1,27 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 May 2012 16:42:11 +0800
-Subject: [PATCH 4/6] ASoC: mxs: add device tree support for mxs-saif
-In-Reply-To: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336639333-11561-5-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 10 May 2012 14:34:49 +0800
+Subject: [PATCH V2 01/11] dma: imx-sdma: make channel0 operations atomic
+In-Reply-To: <1336622038.1540.285.camel@vkoul-udesk3>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-2-git-send-email-richard.zhao@freescale.com>
+ <1336622038.1540.285.camel@vkoul-udesk3>
+Message-ID: <20120510063446.GA17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe for mxs-saif driver.
+On Thu, May 10, 2012 at 09:23:58AM +0530, Vinod Koul wrote:
+> On Wed, 2012-05-09 at 19:33 +0800, Richard Zhao wrote:
+> > device_prep_dma_cyclic may be call in audio trigger function which is
+> > atomic context, so we make it atomic too.
+> > 
+> >  - change channel0 lock to spinlock.
+> >  - Use polling to wait for channel0 finish running.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Acked By: Vinod Koul <vinod.koul@linux.intel.com>
+> 
+Applied on imx/dt branch with Vinod's ack.  Thanks.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../devicetree/bindings/sound/mxs-saif.txt         |   36 ++++++++++
- sound/soc/mxs/mxs-saif.c                           |   74 +++++++++++++++-----
- 2 files changed, 93 insertions(+), 17 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/mxs-saif.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/mxs-saif.txt b/Documentation/devicetree/bindings/sound/mxs-saif.txt
-new file mode 100644
-index 0000000..c37ba61
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mxs-saif.txt
-@@ -0,0 +1,36 @@
-+* Freescale MXS Serial Audio Interface (SAIF)
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-saif"
-+- reg: Should contain registers location and length
-+- interrupts: Should contain ERROR and DMA interrupts
-+- fsl,saif-dma-channel: APBX DMA channel for the SAIF
-+
-+Optional properties:
-+- fsl,saif-master: phandle to the master SAIF.  It's only required for
-+  the slave SAIF.
-+
-+Note: Each SAIF controller should have an alias correctly numbered
-+in "aliases" node.
-+
-+Example:
-+
-+aliases {
-+	saif0 = &saif0;
-+	saif1 = &saif1;
-+};
-+
-+saif0: saif at 80042000 {
-+	compatible = "fsl,imx28-saif";
-+	reg = <0x80042000 2000>;
-+	interrupts = <59 80>;
-+	fsl,saif-dma-channel = <4>;
-+};
-+
-+saif1: saif at 80046000 {
-+	compatible = "fsl,imx28-saif";
-+	reg = <0x80046000 2000>;
-+	interrupts = <58 81>;
-+	fsl,saif-dma-channel = <5>;
-+	fsl,saif-master = <&saif0>;
-+};
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index fa80ee6..ca1e77c 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -18,6 +18,8 @@
- 
- #include <linux/module.h>
- #include <linux/init.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/dma-mapping.h>
-@@ -623,35 +625,58 @@ static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
- 
- static int __devinit mxs_saif_probe(struct platform_device *pdev)
- {
-+	struct device_node *np = pdev->dev.of_node;
- 	struct resource *iores, *dmares;
- 	struct mxs_saif *saif;
- 	struct mxs_saif_platform_data *pdata;
- 	struct pinctrl *pinctrl;
- 	int ret = 0;
- 
--	if (pdev->id >= ARRAY_SIZE(mxs_saif))
-+
-+	if (!np && pdev->id >= ARRAY_SIZE(mxs_saif))
- 		return -EINVAL;
- 
- 	saif = devm_kzalloc(&pdev->dev, sizeof(*saif), GFP_KERNEL);
- 	if (!saif)
- 		return -ENOMEM;
- 
--	mxs_saif[pdev->id] = saif;
--	saif->id = pdev->id;
--
--	pdata = pdev->dev.platform_data;
--	if (pdata && !pdata->master_mode) {
--		saif->master_id = pdata->master_id;
--		if (saif->master_id < 0 ||
--			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
--			saif->master_id == saif->id) {
--			dev_err(&pdev->dev, "get wrong master id\n");
--			return -EINVAL;
-+	if (np) {
-+		struct device_node *master;
-+		saif->id = of_alias_get_id(np, "saif");
-+		if (saif->id < 0)
-+			return saif->id;
-+		/*
-+		 * If there is no "fsl,saif-master" phandle, it's a saif
-+		 * master.  Otherwise, it's a slave and its phandle points
-+		 * to the master.
-+		 */
-+		master = of_parse_phandle(np, "fsl,saif-master", 0);
-+		if (!master) {
-+			saif->master_id = saif->id;
-+		} else {
-+			saif->master_id = of_alias_get_id(master, "saif");
-+			if (saif->master_id < 0)
-+				return saif->master_id;
- 		}
- 	} else {
--		saif->master_id = saif->id;
-+		saif->id = pdev->id;
-+
-+		pdata = pdev->dev.platform_data;
-+		if (pdata && !pdata->master_mode) {
-+			saif->master_id = pdata->master_id;
-+			if (saif->master_id < 0 ||
-+				saif->master_id >= ARRAY_SIZE(mxs_saif) ||
-+				saif->master_id == saif->id) {
-+				dev_err(&pdev->dev, "get wrong master id\n");
-+				return -EINVAL;
-+			}
-+		} else {
-+			saif->master_id = saif->id;
-+		}
- 	}
- 
-+	mxs_saif[saif->id] = saif;
-+
- 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
- 	if (IS_ERR(pinctrl)) {
- 		ret = PTR_ERR(pinctrl);
-@@ -676,11 +701,19 @@ static int __devinit mxs_saif_probe(struct platform_device *pdev)
- 
- 	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
- 	if (!dmares) {
--		dev_err(&pdev->dev, "failed to get dma resource: %d\n",
--			ret);
--		return -ENODEV;
-+		/*
-+		 * TODO: This is a temporary solution and should be changed
-+		 * to use generic DMA binding later when the helplers get in.
-+		 */
-+		ret = of_property_read_u32(np, "fsl,saif-dma-channel",
-+					   &saif->dma_param.chan_num);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to get dma channel\n");
-+			return ret;
-+		}
-+	} else {
-+		saif->dma_param.chan_num = dmares->start;
- 	}
--	saif->dma_param.chan_num = dmares->start;
- 
- 	saif->irq = platform_get_irq(pdev, 0);
- 	if (saif->irq < 0) {
-@@ -730,6 +763,12 @@ static int __devexit mxs_saif_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id mxs_saif_dt_ids[] = {
-+	{ .compatible = "fsl,imx28-saif", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_saif_dt_ids);
-+
- static struct platform_driver mxs_saif_driver = {
- 	.probe = mxs_saif_probe,
- 	.remove = __devexit_p(mxs_saif_remove),
-@@ -737,6 +776,7 @@ static struct platform_driver mxs_saif_driver = {
- 	.driver = {
- 		.name = "mxs-saif",
- 		.owner = THIS_MODULE,
-+		.of_match_table = mxs_saif_dt_ids,
- 	},
- };
- 
 -- 
-1.7.5.4
+Regards,
+Shawn
