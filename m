@@ -1,34 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 May 2012 00:14:39 -0700
-Subject: [GIT PULL] SPEAr clk updates for v-3.5
-In-Reply-To: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
-References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi DOYU)
+Date: Thu, 10 May 2012 10:42:31 +0300
+Subject: [PATCH 2/4] ARM: dt: tegra20.dtsi: Add Memory Controller(MC) nodes
+In-Reply-To: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1336635764-30597-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Add Tegra MC(Memory Controller) nodes for tegra20.dtsi.
 
-On Wed, May 9, 2012 at 4:13 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> Hi Arnd,Olof,
->
-> This is rebased over a (merge of Mike's/clk-next & SPEAr's DT) + Russell's
-> patch: CLKDEV: provide helpers for common clock framework rebased over them.
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Russell has published a clkdev branch that you pull instead of
-applying his patch manually, that way there will be no surprises with
-respect to conflicts, etc:
-
-git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
-
-It is also in arm-soc as depends/rmk/clkdev now.
-
-Also, Mike, can you please confirm that your clk-next branch is truly
-stable and will never be rebased before it goes upstream? If it might
-be rebased, can you please provide a separate branch that is
-guaranteed to be stable that we can pull in as the dependency here?
-
-
-Thanks,
-
--Olof
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 24129fb..548b42e 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -211,5 +211,12 @@
+ 		compatible = "nvidia,tegra20-ahb";
+ 		reg = <0x6000c004 0x10c>; /* AHB Arbitration + Gizmo Controller */
+ 	};
++
++	mc {
++		compatible = "nvidia,tegra20-mc";
++		reg = <0x7000f000 0x024
++		       0x7000f03c 0x3c4>;
++		interrupts = <0 77 0x04>;
++	};
+ };
+ 
+-- 
+1.7.5.4
