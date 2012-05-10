@@ -1,28 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 May 2012 10:45:08 +0100
-Subject: [PATCH V2 08/11] ARM: dts: imx6q-sabrelite: add sound device
- imx6q-sabrelite-sgtl5000
-In-Reply-To: <20120510094113.GG17875@S2101-09.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-9-git-send-email-richard.zhao@freescale.com>
- <20120510064816.GC17875@S2101-09.ap.freescale.net>
- <20120510093444.GI2982@b20223-02.ap.freescale.net>
- <20120510094113.GG17875@S2101-09.ap.freescale.net>
-Message-ID: <20120510094508.GN3908@opensource.wolfsonmicro.com>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Thu, 10 May 2012 15:19:08 +0530
+Subject: [PATCH 02/13] ARM: OMAP5: Add minimal support for OMAP5430 SOC
+In-Reply-To: <20120509160042.GM5088@atomide.com>
+References: <1336029982-31898-1-git-send-email-r.sricharan@ti.com>
+ <1336029982-31898-3-git-send-email-r.sricharan@ti.com>
+ <20120504223933.GX5613@atomide.com>
+ <CAJ7qFSfkHGF7ehanZP=hyZ27HqSp1ONsT0tUV-wpLne9B4DEaQ@mail.gmail.com>
+ <20120507173351.GB5088@atomide.com>
+ <CAJ7qFSeziNRTUsUWc2Owjqs=A99p_WgiVH8vnEBoVB42v2p+pQ@mail.gmail.com>
+ <20120509160042.GM5088@atomide.com>
+Message-ID: <CAJ7qFSfnVAHE1jX0UcBcJU0JQPeNjKfgq_tj_yvf=BL0fN4jdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 05:41:15PM +0800, Shawn Guo wrote:
+Tony,
+[snip]
+>> ?So after the cleanup patch introducing CONFIG_SOC_OMAP4PLUS
+>> ?it can be changed as
+>> ?#ifdef (CONFIG_SOC_OMAP4PLUS) && !(defined(CONFIG_ARCH_OMAP2) ||
+>> defined(CONFIG_ARCH_OMAP3))
+>>
+>> So this will avoid patching this for the future socs. ?
+>
+> Well it seems that we've come to a conclusion that if we introduce
+> new config options, they should be based on features instead. So
+> CONFIG_SOC_HAS_OMAPXYZ_BLAH rather than CONFIG_SOC_OMAP4PLUS.
+>
+   Sure thanks for clarifying.
+  Then i will introduce  a relevant config in my cleanup patch first and
+  then add OMAP5.
 
-> The "Mic Bias" here is really a SGTL5000 internal supply.
-
-If it is then what's providing the bias to the mic?  It's common for
-chips to have a micbias supply which comes out of the chip and is used
-by mics, this is my understanding of what this circuit is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120510/58d87148/attachment-0001.sig>
+Thanks,
+ Sricharan
