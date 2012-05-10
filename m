@@ -1,42 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 May 2012 11:23:55 -0600
-Subject: [PATCH 1/4] ARM: tegra20: Add Tegra Memory Controller(MC) driver
-In-Reply-To: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
-References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <4FABF9AB.6020902@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 10 May 2012 11:26:04 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP3+: PRM/hwmod: fix and improve I/O chain
+ wakeup support
+In-Reply-To: <1336558415.2149.274.camel@sokoban>
+References: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
+ <1334910066.2149.33.camel@sokoban> <20120420165508.GD21106@atomide.com>
+ <1336558415.2149.274.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1205101123460.32719@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2012 01:42 AM, Hiroshi DOYU wrote:
-> Tegra Memory Controller(MC) driver for Tegra20
-> Added to support MC General interrupts, mainly for IOMMU(GART).
+Hi Tero,
 
-Greg, you appear to have been commiting all of drivers/memory. I assume
-you'll take patches 1 and 3 in this series, and I will take 2 and 4
-through the Tegra tree? I can take them all through the Tegra tree if
-you want. Taking the .dts patches through your tree might cause
-conflicts in 3.6, since I anticipate some DT-wide cleanup in 3.6.
+On Wed, 9 May 2012, Tero Kristo wrote:
 
-Hiroshi, one question below (same for patch 3)
+> On Fri, 2012-04-20 at 09:55 -0700, Tony Lindgren wrote:
+> > * Tero Kristo <t-kristo@ti.com> [120420 01:24]:
+> > > Hi,
+> > > 
+> > > What happened with this pull request? It doesn't seem to be in 3.4 at
+> > > least.
+> > 
+> > There was a boot issue on omap3 evm and that branch got dropped.
+> > Will merge it again after Paul has figured out the issue.
+> 
+> Paul / Tony, do you want me to re-send the set for this with the OMAP3
+> EVM related fix? This was figured out in a separate email chain.
 
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+Will try to integrate it here.  But maybe if I run into problems here, I 
+might ask for your help.
 
-> @@ -20,6 +20,8 @@ config ARCH_TEGRA_2x_SOC
->  	select PL310_ERRATA_727915 if CACHE_L2X0
->  	select PL310_ERRATA_769419 if CACHE_L2X0
->  	select CPU_FREQ_TABLE if CPU_FREQ
-> +	select MEMORY
-> +	select TEGRA20_MC
+By the way, I regret how long it's taken me to review and handle some of 
+your pending patchsets.  They haven't been forgotten here...
 
-Does ARCH_TEGRA_2x_SOC /have/ to select these?
 
-I'd be inclined to drop the change to mach-tegra/Kconfig. As rationale,
-the code works fine without the driver right now. You'd need to make
-config TEGRA*_MC user-visible/selectable though.
-
-You could replace this change with a patch to tegra_defconfig which
-enables MEMORY and TEGRA*_MC, or perhaps make config TEGRA20_MC default y.
-
-What are people's thoughts here?
-
-Aside from this, the series looks fine to me.
+- Paul
