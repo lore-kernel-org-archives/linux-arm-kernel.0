@@ -1,89 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 May 2012 22:37:26 +0800
-Subject: [PATCH 0/4] MXS: I2C improvements
-In-Reply-To: <201205101317.25786.marex@denx.de>
-References: <1335837621-14816-1-git-send-email-marex@denx.de>
- <201205092033.46812.marex@denx.de>
- <20120510073518.GE17875@S2101-09.ap.freescale.net>
- <201205101317.25786.marex@denx.de>
-Message-ID: <20120510143723.GP17875@S2101-09.ap.freescale.net>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 10 May 2012 23:46:07 +0900
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+In-Reply-To: <201205101348.20870.arnd@arndb.de>
+References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
+ <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+ <CAH9JG2V_9RVPvEHodDD422r=o4QxHcrMO-YXv2KUGYeys=ZjqA@mail.gmail.com>
+ <201205101348.20870.arnd@arndb.de>
+Message-ID: <CAH9JG2U83+q9NKuvZV4s_iHvDTrQ-RCEqx=9L9uwqiMhYMSiHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 01:17:25PM +0200, Marek Vasut wrote:
-> > Sorry, Marek.  Since we are moving over to device tree, I'm not going
-> > to ack the arch/arm/mach-mxs changes, which are introducing more use
-> > of platform data.
-> 
-> Can you please tell me what _exactly_ is the formal reason for
-> NAKing these changes?
+On Thu, May 10, 2012 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 10 May 2012, Kyungmin Park wrote:
+>> > And I won't apply new feature for non-dt board file from now on. I think,
+>> > we
+>> > need to support DT in mach-exynos/ instead of non-DT and DT together, so
+>> > please consider to move on dt supporting for Samsung mobile boards.
+>> >
+>>
+>> Probably you misunderstand Arnd word.
+>>
+>> "From the statements made so far, I can see no clear policy that we can
+>> apply to everyone. My take on this is that for any work I spend on
+>> multiplatform kernel, I concentrate on the DT-based board files and
+>> get them to work together first, but leave it up to the individual
+>> subarch maintainers whether they want to add other board files into
+>> the mix."
+>>
+>> It doesn't mean add new feature to non-DT board. don't add new board file.
+>
+> This is a completely separate discussion, the problem at hand doesn't
+> have anything to do with building a kernel for multiple mach-*
+> directories combined that I was referring to in the text you quote.
+>
+>> In this case, DRM is not yet ready to support DT.
+>>
+>> Okay, you can just drop this patches. but please note that this
+>> patches are posted at Mar 13 before you decide.
+>
+> I think it's a good idea to make new features DT-only because this
+> way we don't get any regressions and everyone who want to use
+> the new feature will be able to test the DT support on his board.
+The 'new feature' is some misleading word. In this case DRM drivers
+are used from v3.2 at drivers. but not registered it at board file.
+Basically agree to move DT and used it finally. Before that bring up
+the board using DRM based graphics.
+>
+> This of course requires that basic DT support is available for the
+> systems in question so we don't regress when moving away from the
+> old board files. My impression is that we're getting close to that
+> point on exynos thanks to Thomas' work on this. AFAICT we don't
+> have a DT binding for screen timings yet, so you will still have
+> to use auxdata for that or put the timings into the driver.
+I'm also thanks to Thomas, he did a lot of works for eyxnos. but most
+parts are missing at least exynos platform.
+e.g., Please see the origen.dts. I wonder it's booted with any
+graphical user interface platform, android or ubuntu.
+Maybe not.
 
-I said I'm not going to ack the changes, not I'm NAKing the changes.
-But since you have put me on that position, ok, I'm now NAKing the
-changes.  The reason is obvious, you are adding something we are trying
-hard to remove.
+Anyway, as discussed in multi-platform support mail threads, we're
+also moving to DT in the big picture. but still want to use existing
+boards as is.
 
-> As far as I can see, they do not introduce
-> new aspects of platform data but rather fix the usage in the
-> current context, so I do not quite understand the reasoning.
-> 
-The i2c-mxs driver currently does not use platform_data at all, the
-first patch creates a new file include/linux/i2c/mxs-i2c.h to introduce
-it.
-
-> I consider your current approach of NAKing these changes very
-> harmful to MXS.
-
-I take it in the opposite way.  It's helpful for MXS, especially
-in the long run.
-
-> If it wasn't for your NAKing every patch for MXS
-> that doesn't use device tree, the platform would currently be in
-> much better shape. By now, you'd already have good SPI driver,
-> this I2C driver and maybe others. I wonder if others agree with
-> me on this one?
-> 
-All the examples you put here are submitted in this development cycle,
-how can they make the MXS support much better already without waiting
-v3.5-rc1 to hit the mainline?
-
-> But now we're waiting for the device tree support, which will
-> take some more time to fully arrive. Maybe 3.5, but I doubt full
-> DT support will hit mainline before 3.6. I'd understand you
-> NAKing patches that don't use DT support if DT support for MXS
-> was already in place, but there is not a trace of it in mainline.
-> 
-I would expect the support will hit mainline in a few weeks with
-v3.5-rc1, so none of the examples you put here, neither SPI driver
-nor I2C changes, can really hit the mainline earlier than DT.
-
-> Finally, consider people who write patches for MXS (remember
-> fixes for mxs-spi,
-
-This is a new driver.
-
-> or this fix for mxs-i2c for example
-> again). They will easily be demotivated by this approach and give
-> up on MXS, probably not reposting these changes.
-
-That's a bit unfortunate.  Let me put an interesting story here.
-When Huang Shijie adds DT support for gpmi-nand driver, he chooses to
-not maintain the compatibility of non-DT support to make the code
-a lot clean and simple.  When I asked how he can do this before all
-those non-DT board files are converted to DT, I was reminded that
-is not a problem because I rejected his board file changes coming along
-with the driver, there is no in-tree board files are users of gpmi-nand
-driver.  What I put here is it's much easier and cleaner to create a DT
-only driver from the beginning than having a non-DT driver and then
-converting it to DT.
-
-> What is the plan
-> on saving all the precious efforts that are currently NAKed by
-> you?  How do we ensure this work does not get lost?
-> 
-If they do not get reposted to have DT support from the beginning,
-I believe other people will do when the need of the patches are seen.
-
--- 
-Regards,
-Shawn
+Thank you,
+Kyungmin Park
