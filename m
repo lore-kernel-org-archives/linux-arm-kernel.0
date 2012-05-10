@@ -1,82 +1,63 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 10 May 2012 18:37:06 +0000
-Subject: [PATCH-V2] ARM: OMAP2+: am33xx: Make am33xx as a separate class
-In-Reply-To: <20120510183024.GH21851@atomide.com>
-References: <1336562667-6741-1-git-send-email-hvaibhav@ti.com>
- <20120509185435.GU5088@atomide.com> <20120510180159.GF21851@atomide.com>
- <20120510180535.GG21851@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA21788@DBDE01.ent.ti.com>
- <20120510183024.GH21851@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA2182F@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 May 2012 11:39:17 -0700
+Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
+Message-ID: <pull-1336675159-747052>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 00:00:25, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120510 11:22]:
-> > On Thu, May 10, 2012 at 23:35:36, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [120510 11:06]:
-> > > > * Tony Lindgren <tony@atomide.com> [120509 11:58]:
-> > > > > * Vaibhav Hiremath <hvaibhav@ti.com> [120509 04:28]:
-> > > > > > Initially, we decided to make am33xx family of device to fall
-> > > > > > under omap3 class (cpu_is_omap34xx() = true), since it carries
-> > > > > > Cortex-A8 core. But while adding complete baseport support
-> > > > > > (like, clock, power and hwmod) support, it is observed that,
-> > > > > > we are creating more and more problems by treating am33xx device
-> > > > > > as omap3 family, as nothing matches between them
-> > > > > > (except cortex-A8 mpu).
-> > > > > 
-> > > > > Thanks applying into devel-soc after updating for soc_is change
-> > > > > and fixing typo in the description that stil said OMAPAM. Updated
-> > > > > patch below.
-> > > > 
-> > > > Turns out we still need to add defined(CONFIG_SOC_AM33XX) around
-> > > > __omap2_set_globals() to keep compile working when omap4 + am33xx
-> > > > are selected without omap2 or 3. Also removed the "default y"
-> > > > for am33xx as that's where we're heading to anyways.
-> > > > 
-> > > > Updated patch below.
-> > > 
-> > > Argh, now it breaks with:
-> > > 
-> > > arch/arm/mach-omap2/built-in.o: In function `omap2_set_globals_am33xx':
-> > > twl-common.c:(.init.text+0x1dd8): undefined reference to `omap2_set_globals_sdrc'
-> > > 
-> > > There are clearly some dependencies to the clean up patches being
-> > > discussed.. So I'll drop this for now until the clean up is sorted
-> > > out.
-> > > 
-> > 
-> > All cleanup patches which I have posted should resolve these issues.
-> > Do you see any issues with them? 
-> > 
-> > ARM: OMAP2+: CLEANUP: All OMAP2PLUS uses omap-device.o target so add
-> > one entry
-> 
-> That looks OK to me.
-> 
-> > ARM: OMAP2+: CLEANUP: Move omap3 dpll ops to dpll3xxx.c
-> 
-> This one should be at least acked by Paul.
-> 
-> > ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef around
-> >     __omap2_set_globals
-> 
-> This one should be acked by both Paul and Kevin. 
->  
-> > You can only drop last patch, on which Kevin had commented, rest all should 
-> > be merged.
-> > 
-> > ARM: OMAP2+: CLEANUP: Add new config option for different DPLL
-> >     Features
-> > 
-> > 
-> > Please let me know if I am missing something.
-> 
-> Looks OK otherwise, just can't quite apply them yet without the acks.
-> 
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
 
-Understood. Let's wait for Kevin and Paul's ack on this.
-I will ping them tomorrow again...
+  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
 
-Thanks,
-Vaibhav
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-non-critical-for-v3.5
+
+for you to fetch changes up to b2f44dc29bfab77b10f3a709f14677f51ce3a4cd:
+
+  ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally (2012-05-09 11:21:45 -0700)
+
+----------------------------------------------------------------
+Omap fixes that were considered too intrusive or not critical for the -rc cycle
+
+----------------------------------------------------------------
+Artem Bityutskiy (1):
+      ARM: OMAP1: fix compilation issue in board-sx1.c
+
+Balaji T K (1):
+      ARM: OMAP4: hsmmc: check for null pointer
+
+Chris Lalancette (1):
+      ARM: OMAP4: Adding ID for OMAP4460 ES1.1
+
+Felipe Contreras (1):
+      ARM: OMAP: fix trivial warnings for dspbridge
+
+Grazvydas Ignotas (1):
+      ARM: OMAP2+: remove incorrect irq_chip ack field
+
+Kevin Hilman (1):
+      ARM: OMAP2+: INTC: fix Kconfig option for TI81XX
+
+Laurent Pinchart (1):
+      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
+
+Tomi Valkeinen (1):
+      ARM: OMAP4: panda: add statics to remove warnings
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Incorrect Register Offsets in OMAP Mailbox
+
+ arch/arm/mach-omap1/Kconfig            |    1 +
+ arch/arm/mach-omap2/board-4430sdp.c    |   44 ------------------------
+ arch/arm/mach-omap2/board-igep0020.c   |   10 +++---
+ arch/arm/mach-omap2/board-omap4panda.c |   57 +++----------------------------
+ arch/arm/mach-omap2/common.h           |    3 ++
+ arch/arm/mach-omap2/dsp.c              |    5 +--
+ arch/arm/mach-omap2/id.c               |    5 ++-
+ arch/arm/mach-omap2/irq.c              |    3 +-
+ arch/arm/mach-omap2/mailbox.c          |    6 ++--
+ arch/arm/mach-omap2/omap4-common.c     |   58 ++++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/devices.c           |    4 +--
+ arch/arm/plat-omap/include/plat/cpu.h  |    1 +
+ 12 files changed, 85 insertions(+), 112 deletions(-)
