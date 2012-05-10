@@ -1,30 +1,46 @@
-From: jose.goncalves@inov.pt (=?UTF-8?q?Jos=C3=A9=20Miguel=20Gon=C3=A7alves?=)
-Date: Thu, 10 May 2012 00:46:49 +0100
-Subject: [PATCH] ARM: SAMSUNG: Fix for S3C2412 EBI memory mapping.
-Message-ID: <1336607209-6409-1-git-send-email-jose.goncalves@inov.pt>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 10 May 2012 08:15:33 +0800
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+ <201205092038.16722.arnd.bergmann@linaro.org>
+ <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
+ <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
+Message-ID: <CAK5ve-+rCv3s+K6Laie=QaPqqZ4Vk1+irYU6S4MBZSquKrMWtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While upgrading the kernel on a S3C2412 based board I've noted that it was impossible to boot the board with a 2.6.32 or upper kernel.
-I've tracked down the problem to the EBI virtual memory mapping that is in conflict with the IO mapping definition in arch/arm/mach-s3c24xx/s3c2412.c.
+On Thu, May 10, 2012 at 7:47 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, May 9, 2012 at 4:41 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> On Thu, May 10, 2012 at 4:38 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+>>> On Wednesday 09 May 2012, Andrew Morton wrote:
+>>>> I'm the LEDs patchmonkey at present. ?I can merge the drivers/leds
+>>>> change if you like, but there doesn't seem much point in that unless
+>>>> all the other patches get merged.
+>>>>
+>>>> So my preferred approach would be for the patch series to get merged
+>>>> via some ARM tree.
+>>>
+>>> I'm fine with taking it through arm-soc if that helps.
+>>
+>> That would be great to merge from arm-soc tree, thanks a lot, Arnd and Andrew.
+>
+> Ok, cool. Do you want to stage a branch in a git repo that we pull, or
+> do you prefer that we pick up the patches as posted? It's easier for
+> us to just do a pull but either way is fine.
+>
 
-Signed-off-by: Jos? Miguel Gon?alves <jose.goncalves@inov.pt>
----
- arch/arm/plat-samsung/include/plat/map-s3c.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Great, I've already put in my kernel tree
 
-diff --git a/arch/arm/plat-samsung/include/plat/map-s3c.h b/arch/arm/plat-samsung/include/plat/map-s3c.h
-index 7d04875..c0c70a8 100644
---- a/arch/arm/plat-samsung/include/plat/map-s3c.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s3c.h
-@@ -22,7 +22,7 @@
- #define S3C24XX_VA_WATCHDOG	S3C_VA_WATCHDOG
- 
- #define S3C2412_VA_SSMC		S3C_ADDR_CPU(0x00000000)
--#define S3C2412_VA_EBI		S3C_ADDR_CPU(0x00010000)
-+#define S3C2412_VA_EBI		S3C_ADDR_CPU(0x00100000)
- 
- #define S3C2410_PA_UART		(0x50000000)
- #define S3C24XX_PA_UART		S3C2410_PA_UART
+Please find these patches here:
+      git://kernel.ubuntu.com/roc/linux-2.6/.git leds
+
+Thanks,
 -- 
-1.7.5.4
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.186-168-78255 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
