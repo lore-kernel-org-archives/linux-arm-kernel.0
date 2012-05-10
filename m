@@ -1,49 +1,48 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Thu, 10 May 2012 00:52:10 +0100
-Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
- consolidate LED driver in ARM
-In-Reply-To: <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
-References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
- <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
- <20120509122436.1b612004.akpm@linux-foundation.org>
- <201205092038.16722.arnd.bergmann@linaro.org>
- <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
-Message-ID: <1336607530.2494.111.camel@ted>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 09 May 2012 17:02:27 -0700
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <CAJOA=zPtTTLc9GyPj_xnS6+J-+79mKjKhPgubmiH6Hq9B=tg1Q@mail.gmail.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
+ <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
+ <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
+ <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
+ <4FA9BD41.2090701@codeaurora.org>
+ <d460deebb832d7f62b4298c78ad2b791.squirrel@www.codeaurora.org>
+ <CAJOA=zPtTTLc9GyPj_xnS6+J-+79mKjKhPgubmiH6Hq9B=tg1Q@mail.gmail.com>
+Message-ID: <4FAB0593.9090502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-10 at 07:41 +0800, Bryan Wu wrote:
-> On Thu, May 10, 2012 at 4:38 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
-> > On Wednesday 09 May 2012, Andrew Morton wrote:
-> >> I'm the LEDs patchmonkey at present.  I can merge the drivers/leds
-> >> change if you like, but there doesn't seem much point in that unless
-> >> all the other patches get merged.
-> >>
-> >> So my preferred approach would be for the patch series to get merged
-> >> via some ARM tree.
-> >
-> > I'm fine with taking it through arm-soc if that helps.
-> 
-> That would be great to merge from arm-soc tree, thanks a lot, Arnd and Andrew.
-> 
-> > In the long run,
-> > it would be nice to have a proper maintainer for this again after Richard
-> > more or less stepped down from that position. Given that Bryan has shown
-> > that he's persistent enough to get this patch series to v9, how about
-> > making him the primary maintainer for the entire subsystem? He should
-> > know a lot about it already. Bryan?
-> >
-> 
-> I do love to start to do more contribution and maintain the
-> drivers/leds subsystem with Richard's help, if Richard is fine with
-> this, I can send out patch to add a MAINTAINER entry.
+On 05/08/2012 11:21 PM, Turquette, Mike wrote:
+> On 20120508-19:20, skannan at codeaurora.org wrote:
+>>> It might be beneficial to provide something like a
+>>> __clk_reparent_start(new_parent, *scratch_pointer) and
+>>> __clk_reparent_finish(*scratch_pointer) if it will be useful for more
+>>> than just MSM. Based on this email, I would guess that Tegra would want
+>>> something similar too.
+>>
+>> Thinking more about this, I think this is how any clk op that might change
+>> the parent should operate. I will try to write up an RFC patch for this
+>> and send it out soon. I'm in a hurry, so will explain more in the RFC
+>> patch or in a later email.
+>
+> I'm interested to see your patch, as I might not be fully understanding
+> your requirements.  Is there any reason why making nested calls to
+> __clk_prepare and clk_enable from your .set_rate callback isn't enough?
+>
 
-I'm ok with that, I'm also happy to stay involved at a distance. I do
-read emails and try and help where I can :). I'm just not doing day to
-day rebuilds of cutting edge kernels so the patch work isn't something
-I've been able to find time for and the Yocto Project is where my main
-focus appears best placed at the moment.
+Sorry if I wasn't clear -- my plan with the current framework IS to make 
+nested (as in, inside the set rate op) calls to __clk_prepare() and 
+enable() as needed. But my point is that everyone really wants to do the 
+same, so we might as well make it better by putting it in the common 
+code and having everyone use it instead of having to redo the same code 
+all over the place.
 
-Cheers,
+Will send out the patch soon.
 
-Richard
+-Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
