@@ -1,31 +1,62 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 10 May 2012 23:14:49 +0530
-Subject: [PATCH 2/4] ARM: OMAP2+: Move the stubbed prm and cm functions to
- prcm.c file and make them __weak.
-In-Reply-To: <alpine.DEB.2.00.1205101140230.32719@utopia.booyaka.com>
-References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
- <1336669615-16454-3-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.00.1205101140230.32719@utopia.booyaka.com>
-Message-ID: <342784e3cecaf14d95b4e1c648726da1@mail.gmail.com>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Thu, 10 May 2012 19:52:32 +0200
+Subject: [PATCH] ARM: davinci: turn off DDR PHY when entering deep sleep
+In-Reply-To: <marcus.folkesson@gmail.com>
+References: <marcus.folkesson@gmail.com>
+Message-ID: <1336672352-23191-1-git-send-email-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
->
-> On Thu, 10 May 2012, R Sricharan wrote:
->
-> > Some prm and cm registers read/write and status functions
-> > are built only for some custom OMAP2+ builds and are stubbed
-> > in header files for other builds under ifdef statements.
-> > But this results in adding new CONFIG_ARCH_OMAPXXX
-> > checks when SOCs are added in the future. So move them
-> > to a common place for OMAP2+ and make them 'weak' implementations.
->
-> Thanks for the patch.  These stubs aren't needed any longer, so we can
-> just get rid of them; no need to mark them __weak.  I've got a patch to
-> just drop them here to be posted soon as part of a larger PRCM cleanup.
->
-  Thanks. I will pick up your series.
+Deepsleep is the most power saving state on the davinci-platform.
+The DDR PHY consumes about 25mW and should be turned off in this low
+power state.
 
-Thanks,
- Sricharan
+Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+---
+ arch/arm/mach-davinci/include/mach/memory.h |    2 ++
+ arch/arm/mach-davinci/sleep.S               |   10 ++++++++++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
+index 7873194..1b1b8ac 100644
+--- a/arch/arm/mach-davinci/include/mach/memory.h
++++ b/arch/arm/mach-davinci/include/mach/memory.h
+@@ -36,6 +36,8 @@
+ #define DDR2_MCLKSTOPEN_BIT	BIT(30)
+ #define DDR2_LPMODEN_BIT	BIT(31)
+ 
++#define DDR2_DRPHYC1R_OFFSET 	0xe4
++#define DDR_PWRDNEN_BIT 		BIT(6)
+ /*
+  * Increase size of DMA-consistent memory region
+  */
+diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+index 5f1e045..30713b2 100644
+--- a/arch/arm/mach-davinci/sleep.S
++++ b/arch/arm/mach-davinci/sleep.S
+@@ -57,6 +57,11 @@ ENTRY(davinci_cpu_suspend)
+ 
+ 	ldmia	r0, {r0-r4}
+ 
++	/* Turn PHY off */
++	ldr	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
++	orr	ip, ip, #DDR_PWRDNEN_BIT 	
++	str	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
++
+ 	/*
+ 	 * Switch DDR to self-refresh mode.
+ 	 */
+@@ -171,6 +176,11 @@ ENTRY(davinci_cpu_suspend)
+ 	bic	ip, ip, #DDR2_LPMODEN_BIT
+ 	str	ip, [r0, #DDR2_SDRCR_OFFSET]
+ 
++	/* Turn PHY on */
++	ldr	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
++	bic	ip, ip, #DDR_PWRDNEN_BIT 	
++	str	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
++
+ 	/* Restore registers and return */
+ 	ldmfd   sp!, {r0-r12, pc}
+ 
+-- 
+1.7.5.4
