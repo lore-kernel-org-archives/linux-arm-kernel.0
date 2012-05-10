@@ -1,35 +1,29 @@
-From: hdoyu@nvidia.com (Hiroshi DOYU)
-Date: Thu, 10 May 2012 10:42:31 +0300
-Subject: [PATCH 2/4] ARM: dt: tegra20.dtsi: Add Memory Controller(MC) nodes
-In-Reply-To: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
-References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1336635764-30597-2-git-send-email-hdoyu@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 May 2012 16:42:08 +0800
+Subject: [PATCH 1/6] ASoC: mxs: add __devinit for mxs_saif_probe
+In-Reply-To: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336639333-11561-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Tegra MC(Memory Controller) nodes for tegra20.dtsi.
-
-Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/tegra20.dtsi |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ sound/soc/mxs/mxs-saif.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 24129fb..548b42e 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -211,5 +211,12 @@
- 		compatible = "nvidia,tegra20-ahb";
- 		reg = <0x6000c004 0x10c>; /* AHB Arbitration + Gizmo Controller */
- 	};
-+
-+	mc {
-+		compatible = "nvidia,tegra20-mc";
-+		reg = <0x7000f000 0x024
-+		       0x7000f03c 0x3c4>;
-+		interrupts = <0 77 0x04>;
-+	};
- };
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index 7fd224b..40d0775 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -621,7 +621,7 @@ static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
+-static int mxs_saif_probe(struct platform_device *pdev)
++static int __devinit mxs_saif_probe(struct platform_device *pdev)
+ {
+ 	struct resource *iores, *dmares;
+ 	struct mxs_saif *saif;
 -- 
 1.7.5.4
