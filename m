@@ -1,78 +1,75 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 10 May 2012 20:17:23 +0900
-Subject: [PATCH 4/7] mmc: dw_mmc: add samsung exynos5250 specific
- extentions
-In-Reply-To: <CAJuYYwS=qExrAjG1kgd=tPYL0pQeP+7xE1SuMaP+do-Eg3D7eQ@mail.gmail.com>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-5-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2XBinh=XAVnt3EnWrEqeTKz34d9yB6wfiuF-J-Se_Q__Q@mail.gmail.com>
- <4FA0E706.8060700@samsung.com>
- <CAJuYYwS=qExrAjG1kgd=tPYL0pQeP+7xE1SuMaP+do-Eg3D7eQ@mail.gmail.com>
-Message-ID: <4FABA3C3.9070300@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 10 May 2012 13:18:00 +0200
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+In-Reply-To: <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
+ <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+Message-ID: <01fb01cd2e9e$8f4cfbf0$ade6f3d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2012 07:55 PM, Thomas Abraham wrote:
+Hello,
 
-> On 2 May 2012 13:19, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> On 05/02/2012 04:01 PM, Kyungmin Park wrote:
->>
->>> Hi,
->>>
->>> On 5/2/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
->>>> The instantiation of the Synopsis Designware controller on Exynos5250
->>>> include extension for SDR and DDR specific tx/rx phase shift timing
->>>> and CIU internal divider. In addition to that, the option to skip the
->>>> command hold stage is also introduced. Add support for these Exynos5250
->>>> specfic extenstions.
-> 
-> [...]
-> 
->>>> @@ -265,6 +266,10 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc,
->>>> struct mmc_command *cmd)
->>>>                      cmdr |= SDMMC_CMD_DAT_WR;
->>>>      }
->>>>
->>>> +    if (slot->host->drv_data->ctrl_type == DW_MCI_TYPE_EXYNOS5250)
->>>> +            if (SDMMC_CLKSEL_GET_SELCLK_DRV(mci_readl(slot->host, CLKSEL)))
->>>> +                    cmdr |= SDMMC_USE_HOLD_REG;
->>> Some other board, custom SOC also can use this HOLD register. So it's
->>> not EXYNOS5250 specific one. I think we introduce the more generic
->>> quirks for this instead of SOC specific.
->>
->> One more, I think that also need to check the IMPLEMENT_HOLD_REG bit in HCON register.
->> It has dependency with that.
-> 
-> The above code is specific to Exynos5250 and hence it is not required
-> to check the IMPLEMENT_HOLD_REG bit in HCON register. On Exynos5250,
-> the hold register is implemented and available.
+On Thursday, May 10, 2012 11:36 AM Kukjin Kim wrote:
 
-Right, the above code is specific for Exynos5250.
-But HOLD_REG should be used in other SoC. it's not only Exynos5250 specific.
-I want more generic code than specific code for Exynos5250.
+> Marek Szyprowski wrote:
+> >
+> > Hello,
+> >
+> > This patch set adds support for Exynos DRM display subsystem for
+> > Universal C210 and NURI boards. Exynos DRM driver has been merged to 3.3
+> > kernel tree and provides unified and more powerful alternative for
+> > s3c-fb and s5p-tv drivers. V2 includes update for the latest changes in
+> > platform data structure (added 'panel' entry).
+> >
+> > Best regards
+> >
+> > Marek Szyprowski
+> > Samsung Poland R&D Center
+> >
+> > Patch summary:
+> >
+> > Marek Szyprowski (3):
+> >   ARM: Exynos: add platform device for core DRM subsystem
+> >   ARM: Exynos: Add DRM core device support for Universal C210 board
+> >   ARM: Exynos: Add DRM core support for NURI board
+> >
+> >  arch/arm/mach-exynos/Kconfig               |    7 ++++++
+> >  arch/arm/mach-exynos/Makefile              |    1 +
+> >  arch/arm/mach-exynos/dev-drm.c             |   29
+> ++++++++++++++++++++++++
+> >  arch/arm/mach-exynos/mach-nuri.c           |   33
+> > ++++++++++++++++++++++++++++
+> >  arch/arm/mach-exynos/mach-universal_c210.c |   33
+> > ++++++++++++++++++++++++++++
+> >  arch/arm/plat-samsung/include/plat/devs.h  |    2 +
+> >  6 files changed, 105 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-exynos/dev-drm.c
+> >
+> > --
+> > 1.7.1.569.g6f426
+> 
+> Well, 2nd and 3rd patches can break multi-platform for EXYNOS SoCs with one
+> kernel image.
 
-Best Regards,
-Jaehoon Chung
+We can switch completely to DRM driver for both boards and remove entries for 
+s3c-fb/tv if this is really needed. IMHO it is a bit lame that the DRM driver
+is already in the mainline, but none of the boards use it. Even if one wants
+to add support for it to his own board, he cannot find any reference code for
+it...
 
+> And I won't apply new feature for non-dt board file from now on. I think, we
+> need to support DT in mach-exynos/ instead of non-DT and DT together, so
+> please consider to move on dt supporting for Samsung mobile boards.
 > 
-> 
->> As Mr.Park is mentioned, this register is clock phasing.
->> In spec, card is enumerated in SDR12 or SDR25 mode, the application must program the use_hold_reg.
-> 
-> Exynos5250 hardware manual specifies additional restrictions on the
-> use of hold register. The above code checks for those restrictions and
-> programs the USE_HOLD_REG accordingly. Please let me know if there is
-> any condition that is not handled by the above code.
-> 
-> Thanks,
-> Thomas.
-> 
->>
->> Best Regards,
->> Jaehoon Chung
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Note that I have a plan to replace board files with DT supporting in
+> mach-exynos/ next time.
+
+Right now the DT support is so incomplete that even basic things like gpio 
+interrupts are not yet supported. This will be a huge regression if you remove
+the existing board files and replace them with DT stubs.
+ 
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
