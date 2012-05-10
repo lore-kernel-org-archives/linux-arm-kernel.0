@@ -1,41 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 May 2012 16:53:27 +0100
-Subject: [GIT PULL] SPEAr clk updates for v-3.5
-In-Reply-To: <20120510153745.GQ17875@S2101-09.ap.freescale.net>
-References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
- <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
- <20120510085939.GC3190@n2100.arm.linux.org.uk>
- <20120510153745.GQ17875@S2101-09.ap.freescale.net>
-Message-ID: <20120510155327.GB12727@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 May 2012 15:57:12 +0000
+Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
+In-Reply-To: <201205101553.11304.arnd@arndb.de>
+References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
+ <CACRpkdZ+8n-E_8nyq-kO=Y+GYekkjiNXd3nzTqFnxLszpuKKPg@mail.gmail.com>
+ <201205101553.11304.arnd@arndb.de>
+Message-ID: <201205101557.12902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 11:37:47PM +0800, Shawn Guo wrote:
-> On Thu, May 10, 2012 at 09:59:39AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, May 10, 2012 at 12:14:39AM -0700, Olof Johansson wrote:
-> > > Russell has published a clkdev branch that you pull instead of
-> > > applying his patch manually, that way there will be no surprises with
-> > > respect to conflicts, etc:
-> > > 
-> > > git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
-> > > 
-> > > It is also in arm-soc as depends/rmk/clkdev now.
-> > 
-> > I'll mention that I'm considering a patch on top of this to add __must_check
-> > to the return values for these clkdev clk registration functions.  I've
-> > noticed that many users aren't checking that, so there's no real way to
-> > be sure that these things are being created.
-> > 
-> I have to admit I'm one of such users.  Does that mean we have to
-> revise the platform porting again?  So ...
+On Thursday 10 May 2012, Arnd Bergmann wrote:
+> > >
+> > > Arnd, what is your preferred design pattern of:
+> > >
+> > > A) sub-drivers that register one struct platform_driver per
+> > >  variant, then calls into a shared core driver, or
+> > >
+> > > B) a shared core driver registering one platform_driver
+> > >  with several struct platform_device_id that then call
+> > >  sub-drivers depending on which one is found
+> > >
+> > > Either way is actually OK for me, but I was thinking if one
+> > > is preferred over the other.
 > 
-> > The alternative is we make these functions void and/or add pr_err() inside
-> > them to report the failures.
-> > 
-> ... I'd vote for this alternative.  (Sorry for users that are checking
-> the return right now.  Any?)
+> Out of those two, I'd always pick B.
+> 
+> In cases where the variants are different enough that you want to
+> put them into separate files, I'd do
+> 
+> C) Make the common code one module that just exports symbols but
+> registers no platform_driver at all, then put each variant into
+> its own module that binds to one ID and calls the exported
+> functions from the common module.
+> 
 
-It's one reason why I mentioned it in this email, to find out how folk
-would like to deal with this.  I have no particular preference as to how
-it gets addressed, just as long as we don't end up with silent failures
-causing hard to debug problems.
+Sorry, I guess A and C are actually the same and I just misread the
+question.
+
+So I'd use A for things that are different enough to put them
+into separate files, and B for things where I'd always build
+all variants in the same driver module anyway, e.g. when only
+a few parameters are different.
+
+	Arnd
