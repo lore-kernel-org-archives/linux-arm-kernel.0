@@ -1,45 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 May 2012 15:57:12 +0000
-Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
-In-Reply-To: <201205101553.11304.arnd@arndb.de>
-References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
- <CACRpkdZ+8n-E_8nyq-kO=Y+GYekkjiNXd3nzTqFnxLszpuKKPg@mail.gmail.com>
- <201205101553.11304.arnd@arndb.de>
-Message-ID: <201205101557.12902.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 May 2012 09:59:15 -0600
+Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+In-Reply-To: <20120510141130.GA20373@kroah.com>
+References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
+ <20120510141130.GA20373@kroah.com>
+Message-ID: <4FABE5D3.9040706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 May 2012, Arnd Bergmann wrote:
-> > >
-> > > Arnd, what is your preferred design pattern of:
-> > >
-> > > A) sub-drivers that register one struct platform_driver per
-> > >  variant, then calls into a shared core driver, or
-> > >
-> > > B) a shared core driver registering one platform_driver
-> > >  with several struct platform_device_id that then call
-> > >  sub-drivers depending on which one is found
-> > >
-> > > Either way is actually OK for me, but I was thinking if one
-> > > is preferred over the other.
+On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
+> On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
+>> driver_find_device() can be called with an unregistered driver.
 > 
-> Out of those two, I'd always pick B.
+> Who does that?  Where in the kernel?  Why would you try to do that?
 > 
-> In cases where the variants are different enough that you want to
-> put them into separate files, I'd do
+>> Need to check driver_private to see if it's populated or not,
+>> especially under deferrable probe.
 > 
-> C) Make the common code one module that just exports symbols but
-> registers no platform_driver at all, then put each variant into
-> its own module that binds to one ID and calls the exported
-> functions from the common module.
+> Hm, I don't know if this will really catch a driver that was registered
+> and then was unregistered, right?  It seems like moving the real problem
+> somewhere else, why not fix the original issue instead?
 > 
+>> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+>> ---
+>> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
+>>   http://article.gmane.org/gmane.linux.ports.tegra/4658
+>>
+>> "tegra_ahb_driver" may not be populated when it's called.
+> 
+> It can?  I don't see that in that patch.
 
-Sorry, I guess A and C are actually the same and I just misread the
-question.
+I think this is what's happening:
 
-So I'd use A for things that are different enough to put them
-into separate files, and B for things where I'd always build
-all variants in the same driver module anyway, e.g. when only
-a few parameters are different.
+The Tegra SMMU driver is registered using subsys_initcall().
 
-	Arnd
+The Tegra AHB driver is registered using module_platform_driver, so
+module_init().
+
+The device objects for both are registered at basically the same time
+during the machine's initialization call, which I think happens before
+both or some of the above two calls.
+
+So, SMMU ends up getting probed before the AHB driver has even been
+registered.
+
+That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
+driver hasn't (or may not have) been registered, so driver_find_device()
+can experience the issue this patch attempts to solve.
