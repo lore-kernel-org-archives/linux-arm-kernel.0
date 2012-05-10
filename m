@@ -1,53 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 10 May 2012 19:32:16 +0200
-Subject: i.MX USB Re-Structure
-In-Reply-To: <4FABE801.7070701@grid-net.com>
-References: <20120510060523.GA32703@nchen-desktop>
- <201205101512.27073.marex@denx.de> <4FABE801.7070701@grid-net.com>
-Message-ID: <201205101932.17054.marex@denx.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 10 May 2012 11:29:13 -0600
+Subject: [PATCH 0/3] ARM: OMAP: AM35xx: fix some boot warnings with AM3505/3517
+Message-ID: <20120510172449.13418.66815.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+Hello,
 
-> On 05/10/2012 06:12 AM, Marek Vasut wrote:
-> > Dear Sascha Hauer,
-> > 
-> >> On Thu, May 10, 2012 at 02:05:24PM +0800, Peter Chen wrote:
-> >>> Hi Sascha,
-> >>> 
-> >>> Recently, Alexander Shishkin has posted new chipidea patchset
-> >>> (http://www.spinics.net/lists/linux-usb/msg62975.html)
-> >>> to support USB driver who use chipidea core. In his structure,
-> >>> all controller related files (like ehci-mxc.c, fsl-udc-core.c, etc)
-> >>> will be drivers/usb/chipidea, and no related file will be host, gadget
-> >>> and otg again.
-> >>> 
-> >>> So, it will be different with marek has posted i.mx28 USB driver,
-> >>> and also different with your proposal in the past. But I think
-> >>> you and marek may prefer Alexander's structure, and would like
-> >>> use it for i.mx in future, correct?
-> >> 
-> >> I was not aware of this patchset. I only had a short look at it, but
-> >> yes, it seems to be the way to go, for all SoCs supporting this
-> >> hardware, be it i.MX, MXS or something else.
-> > 
-> > Correct, I can't but agree here.
-> 
-> http://www.spinics.net/lists/linux-usb/msg63064.html
-> 
-> In followup message referenced above Felipe Balbi said he can't put
-> above patch in v3.5 pull and has to be deferred till 3.6.
-> 
-> So are we left with roll your own i.MX USB support for 3.5? Is Marek's
-> work going to be part of 3.5 pull?
+this series fixes some of the warnings observed at boot with the AM35xx
+boards.  Intended for either the 3.5 or 3.5-rc merge windows.
 
-It won't, it's still RFC. Also, I'd like to flip my work on top of this ci13xxx 
-rework. But for that, it'd be cool if it was possible to push it into v3.5, it'd 
-help a lot. So can we possibly make a compromise in here ?
+Particularly appreciated would be some feedback on the "ARM: OMAP:
+AM35xx: fix UART4 softreset" patch from people who know the AM35xx SoC
+hardware.
 
-> 
-> -Subodh
 
-Best regards,
-Marek Vasut
+- Paul
+
+---
+
+am35xx_hwmod_data_fixes_a_3.5
+   text	   data	    bss	    dec	    hex	filename
+6601274	 724684	5587616	12913574	 c50ba6	vmlinux.omap2plus_defconfig.orig
+6601274	 724748	5587616	12913638	 c50be6	vmlinux.omap2plus_defconfig
+
+Paul Walmsley (3):
+      ARM: OMAP AM35xx: clock and hwmod data: fix AM35xx HSOTGUSB hwmod
+      ARM: OMAP AM35xx: clock and hwmod data: fix UART4 data
+      ARM: OMAP: AM35xx: fix UART4 softreset
+
+
+ arch/arm/mach-omap2/clock3xxx_data.c       |   26 +++++++++++--------
+ arch/arm/mach-omap2/cm-regbits-34xx.h      |    4 +--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   38 ++++++++++++++++++++--------
+ arch/arm/mach-omap2/prcm-common.h          |    4 +--
+ 4 files changed, 46 insertions(+), 26 deletions(-)
