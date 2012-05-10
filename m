@@ -1,141 +1,86 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 11 May 2012 01:29:51 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FABF445.3030105@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <201205041923.07620.arnd@arndb.de>
- <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
- <4FA7F009.5010003@wwwdotorg.org>
- <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
- <4FA94B49.5050500@wwwdotorg.org>
- <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
- <4FAAC111.9020308@wwwdotorg.org>
- <CAJe_Zhcrr2QqoY=H3=3EJLPQBjC3Yc43EDjqYXaNok9-T+=0yw@mail.gmail.com>
- <4FABF445.3030105@wwwdotorg.org>
-Message-ID: <CAJe_ZhduQuHnFyF20VnjZW9uz1szwL6O7=ow+tMqanmeHs58pQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 May 2012 14:00:48 -0600
+Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+In-Reply-To: <20120510181611.GA16908@kroah.com>
+References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
+ <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
+ <20120510181611.GA16908@kroah.com>
+Message-ID: <4FAC1E70.8030907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2012 22:30, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/09/2012 03:38 PM, Jassi Brar wrote:
-
->> One point is about 'qos' here.... something like bandwidth allocation.
->> If the dmac driver knew up-front the max possible clients that could be
->> active simultaneously, it could "divide the bandwidth" accordingly.
->> Again, the example of PL330 employing 2physical channels for better
->> service - LLI (you got it right), where even 1 physical channel would
->> also have served only not as reliably. I believe there would be
->> more such scenarios.
->
-> QoS seems like policy to me, whereas DT is more about describing the HW.
-> Is DT the correct place to describe QoS policy?
->
-> I guess you are talking more about deriving policy from the description
-> of HW, i.e. how many client described in DT.
->
-Yeah, that's what I meant.
-
-> However, for some reason that seems dangerous to me; what if clients
-> can be instantiated some other way?
->
-The other way could be hotplug ?
-Anyway in those machines every channel would be populated
-and dmac driver would always account for the all-ports-plugged case.
-
->
-> For a 1:1 mapping (or 1:n mapping in HW with static selection specified
-> in the DT) between DMA client and DMA controller, perhaps the controller
-> can indeed make QoS decisions based on which (how many) clients are
-> connected to it.
->
-> However, if a DMA client can be serviced by more than 1 DMA engine, and
-> the decision as to which DMA engine to use occurs at run-time by the DMA
-> driver core, rather than being statically configured in the DT, then the
-> DMA controller drivers cannot know ahead of time which will be used
->
-I think the dmac driver would make use of the routing flexibility to sustain its
-'qos', and not the other way around (decide qos based on which one of the
-two dmacs would provide a channel to a client in future).
-Anyways, so far only Samsung SoCs seem to have that flexibility/redundancy
-and I have never had anyone asking for that runtime decision making.
-
->
->> The minor difference being, you use the {request-signal, phandle} pair
->> to find the right channel, I used only 'token'.
->
-> That's a pretty big difference, I think.
->
-> In your proposal, every token was globally unique (well, within the 1 DT
-> file). I'd rather not see any more global numbering schemes.
->
-Probably my shallow experience, but "globally unique, within a file" sounds
-like an oxymoron :)
-I think arbitrary numerical tokens are a reasonable price to pay for the
-robustness and simplicity they bring.
-
->
-> Now, DMA requests are signals /from/ a DMA client to a DMA controller
-> ("send more data please", or "pull more data please"). Hence, I assert
-> that the phandle should refer to the DMA client, not the DMA controller.
->
-OK, though we may just want to convey information about the h/w setup
-from the s/w POV, rather than info to simulate the h/w  ;)
-For ex, the dma api and controller drivers don't really care about
-the fact that the client's driver must set some bit to trigger operation,
-whereas some simulator would need to care about that.
-
-Anyways, I am OK with whatever works well and make things simpler.
-
-
+On 05/10/2012 12:16 PM, Greg Kroah-Hartman wrote:
+> On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
+>> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
+>>> On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
+>>>> driver_find_device() can be called with an unregistered driver.
+>>>
+>>> Who does that?  Where in the kernel?  Why would you try to do that?
+>>>
+>>>> Need to check driver_private to see if it's populated or not,
+>>>> especially under deferrable probe.
+>>>
+>>> Hm, I don't know if this will really catch a driver that was registered
+>>> and then was unregistered, right?  It seems like moving the real problem
+>>> somewhere else, why not fix the original issue instead?
+>>>
+>>>> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+>>>> ---
+>>>> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
+>>>>   http://article.gmane.org/gmane.linux.ports.tegra/4658
+>>>>
+>>>> "tegra_ahb_driver" may not be populated when it's called.
+>>>
+>>> It can?  I don't see that in that patch.
 >>
->> Also note that, a client's dma specifier becomes perfectly general
->> and future-proof
+>> I think this is what's happening:
 >>
->> ? ?client1: spdif {
->> ? ? ? ? ? dma_tx = <278>
->> ? ? ? ? ? dma_rx = <723>
->> ? ? };
+>> The Tegra SMMU driver is registered using subsys_initcall().
 >>
->> otherwise the following representation
+>> The Tegra AHB driver is registered using module_platform_driver, so
+>> module_init().
 >>
->> ? ? client1: spdif {
->> ? ? ? ? ? ? ? ?dma = <&sdma 2 1 &sdma 3 2>;
->> ? ? ?};
+>> The device objects for both are registered at basically the same time
+>> during the machine's initialization call, which I think happens before
+>> both or some of the above two calls.
 >>
->> could break with some weird dma setups (IIANW Russell already finds
->> it wouldn't work for him).
->
-> To solve Russell's HW, we need some way of representing the mux directly
-> in DT irrespective of how the DMA controller or DMA client specify what
-> they're connected to. Anything else isn't representing the HW in DT.
->
-> Also, who knows how to control the mux? We need that to be fully
-> general, and so the mux itself really needs some kind of driver which
-> the DMA core or DMA controller can call into when the channel is
-> allocated in order to set up the mux. Right now, Russell's driver calls
-> in the a platform-/board-provided callback, but we should really
-> architect a generic driver framework for this.
->
-Well, I doubt if there would ever be enough such platforms to warrant a
-new generic framework. For now, I would leave that to be a matter between
-the dmac driver and its DT node.
-Similarly let every dmac, being unique, require DT data in it's own custom
-format - I don't believe we can find a generic DT format for every kind of
-dmac that does exist or would exist. (For ex, you found a way for RMK's
-mux'ed req_lines, but what about assigning priorities to clients which is
-possible with PL08X dmacs but not most others?)
+>> So, SMMU ends up getting probed before the AHB driver has even been
+>> registered.
+> 
+> What do those two drivers have to do with each other?
 
-So, I would strive only to make clients' dma specifier generic.
+The AHB HW module contains a bit to say "enable the SMMU". This bit
+cannot be turned on until certain initialization has been performed by
+the SMMU driver.
 
-> client0: i2s {
->   /* has 2 DMA request output signals: 0, 1 */
-> };
->
-> client1: spdif {
->   /* has 2 DMA request signals: 0, 1 */
-> };
->
-Do we also need to somehow tag these signals for the client to
-differentiate between TX and RX channel ?
+So, SMMU's probe performs the initialization, then attempts to contact
+the AHB driver to ask it to enable the SMMU.
+
+>> That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
+>> driver hasn't (or may not have) been registered, so driver_find_device()
+>> can experience the issue this patch attempts to solve.
+> 
+> It sounds like you have a locking or ordering problem somewhere in this
+> platform, and it needs to be resolved there.  Odds are, this tiny check
+> is the least of your worries, right?
+> 
+> Who is doing the driver_find_device() call in the first place?  The
+> driver core?  Or something else?
+
+SMMU's probe calls tegra_ahb_enable_smmu().
+
+tegra_ahb_enable_smmu() needs to find the AHB's struct device so that it
+can find get the driver data associated with it, which contains the
+ioremap'd registers amongst other things.
+
+In order to find the correct device, tegra_ahb_enable_smmu() is passed
+the device tree node of the appropriate AHB that controls the SMMU.
+
+The two drivers use deferred probe to ensure that their relative probe
+order doesn't matter. If AHB is probed first, then
+tegra_ahb_enable_smmu()'s driver_find_device() succeeds, and the AHB
+register is programmed to enable the SMMU. If the SMMU is probed first,
+then tegra_ahb_enable_smmu() returns -EPROBE_DEFER to hold off the SMMU
+from completing its probe. I believe this is exactly the kind of thing
+-EPROBE_DEFER was intended for.
