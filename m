@@ -1,61 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 May 2012 14:51:42 +0800
-Subject: [PATCH V2 10/11] ARM: imx6q: change clkdev device name from
- xxxx.uart to xxxx.serial
-In-Reply-To: <1336563190-19974-11-git-send-email-richard.zhao@freescale.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-11-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120510065140.GD17875@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 May 2012 00:17:43 -0700
+Subject: [GIT PULL] mxs: device tree support for v3.5
+In-Reply-To: <20120507135451.GI19389@S2101-09.ap.freescale.net>
+References: <20120405013556.GI7264@S2101-09.ap.freescale.net>
+ <CAOesGMjrJe++s-tmgzs2oY1T9GVntngV71-2iqZhfWx2EiZL_g@mail.gmail.com>
+ <20120507135451.GI19389@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMgzs40fBMrYseT3RC0F_7paWiBKSZ8yVU=hCkFf02Q94w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 07:33:09PM +0800, Richard Zhao wrote:
-> It's because the dts changed the node name.
-> 
-Dirk had sent the same patch, but I told him that I will rebase my DT
-branch on top Sascha's clk, the issue will be solved by the rebasing,
-so I'm not taking the last two patches.
+On Mon, May 7, 2012 at 6:54 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sun, Apr 15, 2012 at 11:29:54AM -0700, Olof Johansson wrote:
+>> On Wed, Apr 4, 2012 at 6:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > Hi Arnd, Olof,
+>> >
+>> > Please pull the mxs basic device tree support for -next, so that people
+>> > can start playing and contributing mxs device tree conversion. ?Thanks.
+>> >
+>> > Regards,
+>> > Shawn
+>> >
+>> > ---
+>> > The following changes since commit dd775ae2549217d3ae09363e3edb305d0fa19928:
+>> >
+>> > ?Linux 3.4-rc1 (2012-03-31 16:24:09 -0700)
+>> >
+>> > are available in the git repository at:
+>> > ?git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/dt
+>>
+>> Thanks, pulled.
+>>
+>> Sorry for the delay, we've been late at starting up the branches for 3.5.
+>>
+> Hi Arnd, Olof,
+>
+> Please abandon this branch. ?It will be broken due to the mxs common
+> clk and pinctrl series. ?I'm going to send an updated mxs device tree
+> branch based on common-clk and pinctrl support after I send those two
+> prerequisites to you.
 
-Regards,
-Shawn
+Hrm. It would have probably been better to base the pinctrl and clk
+work on top of this, since we tend to order the dt work before much of
+the other topic branches.
 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c |   20 ++++++++++----------
->  1 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 096fcfb..4ac1282 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -393,16 +393,16 @@ int __init mx6q_clocks_init(void)
->  	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
->  	clk_register_clkdev(clk[twd], NULL, "smp_twd");
->  	clk_register_clkdev(clk[usboh3], NULL, "usboh3");
-> -	clk_register_clkdev(clk[uart_serial], "per", "2020000.uart");
-> -	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.uart");
-> -	clk_register_clkdev(clk[uart_serial], "per", "21e8000.uart");
-> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21e8000.uart");
-> -	clk_register_clkdev(clk[uart_serial], "per", "21ec000.uart");
-> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21ec000.uart");
-> -	clk_register_clkdev(clk[uart_serial], "per", "21f0000.uart");
-> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21f0000.uart");
-> -	clk_register_clkdev(clk[uart_serial], "per", "21f4000.uart");
-> -	clk_register_clkdev(clk[uart_ipg], "ipg", "21f4000.uart");
-> +	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
-> +	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
-> +	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
-> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21e8000.serial");
-> +	clk_register_clkdev(clk[uart_serial], "per", "21ec000.serial");
-> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21ec000.serial");
-> +	clk_register_clkdev(clk[uart_serial], "per", "21f0000.serial");
-> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21f0000.serial");
-> +	clk_register_clkdev(clk[uart_serial], "per", "21f4000.serial");
-> +	clk_register_clkdev(clk[uart_ipg], "ipg", "21f4000.serial");
->  	clk_register_clkdev(clk[enet], NULL, "2188000.enet");
->  	clk_register_clkdev(clk[usdhc1], NULL, "2190000.usdhc");
->  	clk_register_clkdev(clk[usdhc2], NULL, "2194000.usdhc");
-> -- 
-> 1.7.5.4
-> 
-> 
+Anyway, I've rebuilt next/dt without this branch now. I will temporary
+just revert the merge in for-next until it's rebuilt next time.
+
+
+-Olof
