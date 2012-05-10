@@ -1,40 +1,62 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 10 May 2012 11:11:43 -0700
-Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
- consolidate LED driver in ARM
-In-Reply-To: <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
-References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
- <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
- <20120509122436.1b612004.akpm@linux-foundation.org>
- <201205092038.16722.arnd.bergmann@linaro.org>
- <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
- <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
- <CAK5ve-+rCv3s+K6Laie=QaPqqZ4Vk1+irYU6S4MBZSquKrMWtw@mail.gmail.com>
- <alpine.LFD.2.02.1205092122140.21030@xanadu.home>
- <CAK5ve-JC61jFX7+GV9VoZKExbtdxX03jmpkzu5zxHg+Lehy7VQ@mail.gmail.com>
- <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
-Message-ID: <20120510111143.2edb3bc8.akpm@linux-foundation.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 10 May 2012 11:16:11 -0700
+Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+In-Reply-To: <4FABE5D3.9040706@wwwdotorg.org>
+References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
+ <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
+Message-ID: <20120510181611.GA16908@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 May 2012 14:01:35 -0400 (EDT)
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-
-> On Fri, 11 May 2012, Bryan Wu wrote:
-> 
-> > On Thu, May 10, 2012 at 9:25 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > You applied your patches on top of linux-next. __This can't be merged
-> > > upstream until you rebase your patches on something stable such as pure
-> > > v3.4-rc6 for example.
-> > >
+On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
+> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
+> > On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
+> >> driver_find_device() can be called with an unregistered driver.
 > > 
-> > Got it, Nico. As I'm still in US for our Ubuntu Developer Summit, I
-> > plan to rebase and test on my hardware after I'm back to home next
-> > week.
+> > Who does that?  Where in the kernel?  Why would you try to do that?
+> > 
+> >> Need to check driver_private to see if it's populated or not,
+> >> especially under deferrable probe.
+> > 
+> > Hm, I don't know if this will really catch a driver that was registered
+> > and then was unregistered, right?  It seems like moving the real problem
+> > somewhere else, why not fix the original issue instead?
+> > 
+> >> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> >> ---
+> >> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
+> >>   http://article.gmane.org/gmane.linux.ports.tegra/4658
+> >>
+> >> "tegra_ahb_driver" may not be populated when it's called.
+> > 
+> > It can?  I don't see that in that patch.
 > 
-> Given where things are, you risk being too late for this merge window if 
-> you do so, meaning that this cleanup will have to wait yet another 
-> cycle which would be rather disappointing.
+> I think this is what's happening:
+> 
+> The Tegra SMMU driver is registered using subsys_initcall().
+> 
+> The Tegra AHB driver is registered using module_platform_driver, so
+> module_init().
+> 
+> The device objects for both are registered at basically the same time
+> during the machine's initialization call, which I think happens before
+> both or some of the above two calls.
+> 
+> So, SMMU ends up getting probed before the AHB driver has even been
+> registered.
 
-Well, there hasn't been an open merge window for over a month. 
-Cleanups and features should be scheduled for 3.5-rc1.
+What do those two drivers have to do with each other?
+
+> That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
+> driver hasn't (or may not have) been registered, so driver_find_device()
+> can experience the issue this patch attempts to solve.
+
+It sounds like you have a locking or ordering problem somewhere in this
+platform, and it needs to be resolved there.  Odds are, this tiny check
+is the least of your worries, right?
+
+Who is doing the driver_find_device() call in the first place?  The
+driver core?  Or something else?
+
+greg k-h
