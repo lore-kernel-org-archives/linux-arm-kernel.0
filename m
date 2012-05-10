@@ -1,55 +1,72 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 10 May 2012 17:05:00 +0800
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <20120510084403.GA3908@opensource.wolfsonmicro.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
- <20120510063904.GB17875@S2101-09.ap.freescale.net>
- <20120510084403.GA3908@opensource.wolfsonmicro.com>
-Message-ID: <20120510090459.GH2982@b20223-02.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 May 2012 08:44:03 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <1336621458.1540.280.camel@vkoul-udesk3>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+Message-ID: <20120510074403.GA3190@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 09:44:04AM +0100, Mark Brown wrote:
-> On Thu, May 10, 2012 at 02:39:06PM +0800, Shawn Guo wrote:
-> > On Thu, May 10, 2012 at 08:35:33AM +0800, Richard Zhao wrote:
+On Thu, May 10, 2012 at 09:14:18AM +0530, Vinod Koul wrote:
+> On Wed, 2012-05-09 at 13:19 +0100, Russell King - ARM Linux wrote:
+> > On Wed, May 09, 2012 at 12:16:15PM +0100, Mark Brown wrote:
+> > > Looking at the code the current usage doesn't seem obviously wrong so
+> > > there's some work to do - we get a callback assigned on each descriptor
+> > > we submit so it's a bit surprising that this might not get delivered,
+> > > though as has been discussed further up the thread that's something that
+> > > might actually happen and perhaps we need to clarify the interfaces
+> > > here.
+> > 
+> > Go back and look at my opening email in this thread.  Think about
+> > the comments in include/linux/interrupt.h about the tasklet guarantees.
+> > Then look at (eg) the IMX DMA engine driver and ascertain how the
+> > callback is called.  Then look at soc-dmaengine-pcm's callback
+> > method.
+> > 
+> > Put all this together and what you get is that there's absolutely no
+> > guarantee that the callback will be called for each period.
+> > 
+> > You really won't know if it slips just one or two periods, because your
+> > audio output won't be affected by that.  It _may_ only become apparant
+> > if DMA catches up with the part of the buffer you're writing to.
+> > 
+> > Amd I'm also willing to bet that the IMX DMA engine with ASoC has only
+> > been tested with an unloaded system. 
 > 
-> > > It's based on your for-next. But for working, it depends on
-> > > pinctl/for-next.
+> DMAengine mandates the callback be called from tasklet. Yes under a very
+> heavy loaded systems there can be a certain case where callback maybe
+> delayed. Or the tasklet gets scheduled _once_ for couple of dma
+> completions, thus missed
 > 
-> > Mark, may I have your ack to have it go through arm-soc?  I will ask
-> > Arnd pull your sound/for-v3.5 branch into arm-soc as a dependency.
-> > You need to ensure the branch will not be rebased.
+> But tell me what prevents the dmac driver for fixing this. In ISR they
+> can easily find which descriptor is completed and mark them so.
+> In tasklet, it can ensure that all callback are generated including
+> previous missed ones, if that is something the usage of dmaengine needs.
 > 
-> for-3.5 is the entire undifferentiated blob of ASoC stuff, it's not
-> really suitable for merging elsewhere.  It won't actually get rebased
-> but the idea of merging it into other trees doesn't seem terribly
-> clever, it'd make having topic branches in arm-soc a bit of a joke and
-> if you pull it right now you'll get problems in -next due to the the
-> ux500 stuff.
+> For audio needs I think it is fine if we miss, as long as subsequent
+> comes untill we get underrun/overrun.
 > 
-> What does "working" mean in this context - what happens without the
-> pinctl changes?
-devm_pinctrl_get_select_default function is added in below commit which
-is in pinctrl/for-next.
+> Quite a few ASoC drivers use dmaengine today (cyclic was added keeping
+> audio in mind), so adding library helps to avoid each ASoC driver having
+> its own implementation. It indirectly ensures that APIs are properly
+> implemented as well and any bugs due to deviation form std behavior gets
+> identified and fixed!
 
-commit 6d4ca1fb467932773da7b808c52f3d7ef4461ba0
-Author: Stephen Warren <swarren@nvidia.com>
-Date:   Mon Apr 16 10:51:00 2012 -0600
+I'm not going to describe the problem for a third time.  I've said what it
+is.  I've pointed at the drivers which are potentially a problem.  Please
+look over them and you'll see the problem.
 
-    pinctrl: implement devm_pinctrl_get()/put()
-    
-    These functions allow the driver core to automatically clean up any
-    allocations made by drivers, thus leading to simplified drivers.
-    
-    Signed-off-by: Stephen Warren <swarren@nvidia.com>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+In fact, please look at both imx-dma.c _and_ imx-sdma.c - search for
+"callback" and have a look at the code around there.
 
+You will find that imx-dma.c processes one descriptor per tasklet run,
+and calls the callback under a spinlock.
 
-So it'll fail compile without pinctrl/for-next. I guess Linus may need
-to prepare a non-rebase base for others to merge.
-
-Thanks
-Richard
+You'll find that imx-sdma.c always calls callbacks from IRQ context.
