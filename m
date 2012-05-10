@@ -1,72 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 10 May 2012 07:23:56 -0700
-Subject: [PATCH v2] gpio/omap: fix incorrect initialization of
- omap_gpio_mod_init
-In-Reply-To: <CAC83ZvKHDWmNneK5GQgSPhdg88apymEgUr0zm1EVYjfaWG2oXA@mail.gmail.com>
- (Tarun Kanti DebBarma's message of "Thu, 10 May 2012 10:45:13 +0530")
-References: <1335770412-1344-1-git-send-email-tarun.kanti@ti.com>
- <CANOLnOO3bSxoE-8TaXd_Tz=taPOZpfQY+z-=6c7Ovfpf+FCAuw@mail.gmail.com>
- <CAC83ZvLYmPr3qTRUUTom1iOA-czef9EVcM229UMDePnw8sbA+w@mail.gmail.com>
- <1664819.7TVaX0jpJi@acer>
- <CAC83ZvKHDWmNneK5GQgSPhdg88apymEgUr0zm1EVYjfaWG2oXA@mail.gmail.com>
-Message-ID: <87mx5gm7wj.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 10 May 2012 07:27:31 -0700
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+Message-ID: <CAJOA=zNUeZqgb1Bw48YC3xNGJSquCX_p1HT0H-KJ0D534uUfUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
-
-"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
-
-> Hi,
+On Thu, May 10, 2012 at 12:14 AM, Olof Johansson <olof@lixom.net> wrote:
+> Hi Viresh,
 >
-> On Thu, May 10, 2012 at 3:06 AM, Janusz Krzysztofik
-> <jkrzyszt@tis.icnet.pl> wrote:
->> On Mon, 7 May 2012 10:52:28 DebBarma, Tarun Kanti wrote:
->>> On Sun, May 6, 2012 at 3:25 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
->>> > On Mon, Apr 30, 2012 at 10:20 AM, Tarun Kanti DebBarma
->>> > <tarun.kanti@ti.com> wrote:
->>> >> Initialization of irqenable, irqstatus registers is the common
->>> >> operation done in this function for all OMAP platforms, viz. OMAP1,
->>> >> OMAP2+. The latter _gpio_rmw()'s which supposedly got introduced
->>> >> wrongly to take care of OMAP2+ platforms were overwriting initially
->>> >> programmed OMAP1 value breaking functionality on OMAP1.
+> On Wed, May 9, 2012 at 4:13 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+>> Hi Arnd,Olof,
 >>
->> Hi,
->> I can confirm that my other issues with GPIO on Amstrad Delta were not
->> related, and this patch is still required for GPIO interrupts hardware
->> being correctly initialized on OMAP1 in 3.4-rc6. You can add my
->>
->> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
->>
->> if you wish.
-> Thank you for confirming!!
+>> This is rebased over a (merge of Mike's/clk-next & SPEAr's DT) + Russell's
+>> patch: CLKDEV: provide helpers for common clock framework rebased over them.
+>
+> Russell has published a clkdev branch that you pull instead of
+> applying his patch manually, that way there will be no surprises with
+> respect to conflicts, etc:
+>
+> git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
+>
+> It is also in arm-soc as depends/rmk/clkdev now.
+>
+> Also, Mike, can you please confirm that your clk-next branch is truly
+> stable and will never be rebased before it goes upstream? If it might
+> be rebased, can you please provide a separate branch that is
+> guaranteed to be stable that we can pull in as the dependency here?
 
-We'd like to get this one in for v3.4-rc.  Can you queue it?
+clk-next is stable.  It will not be rebased.
 
-I added the tested-by from Janusz and my signoff, and pull request is
-below.
+Regards,
+Mike
 
-Thanks,
-
-Kevin
-
-
-
-The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
-
-  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/fixes/gpio
-
-for you to fetch changes up to 6edd94db250038c8fdf176f23ca4017d2f312509:
-
-  gpio/omap: fix incorrect initialization of omap_gpio_mod_init (2012-05-10 07:16:15 -0700)
-
-----------------------------------------------------------------
-Tarun Kanti DebBarma (1):
-      gpio/omap: fix incorrect initialization of omap_gpio_mod_init
-
- drivers/gpio/gpio-omap.c |    9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+>
+>
+> Thanks,
+>
+> -Olof
