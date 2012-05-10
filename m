@@ -1,63 +1,72 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Thu, 10 May 2012 11:39:17 -0700
-Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
-Message-ID: <pull-1336675159-747052>
+Subject: [GIT PULL 2/10] omap soc clean-up for v3.5 merge window
+In-Reply-To: <pull-1336675159-747052>
+Message-ID: <mailman.9.1336675173.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+The following changes since commit 7a8bcf067d2b11964cb83ce3d753ac2d3ab9843c:
 
-  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+  Merge branch 'devel-hwmod' into cleanup (2012-05-08 10:17:32 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-non-critical-for-v3.5
 
-for you to fetch changes up to b2f44dc29bfab77b10f3a709f14677f51ce3a4cd:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-for-v3.5
 
-  ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally (2012-05-09 11:21:45 -0700)
+for you to fetch changes up to 2c65e7440d56b3b285d1c95563b4dcce8e40dea3:
 
-----------------------------------------------------------------
-Omap fixes that were considered too intrusive or not critical for the -rc cycle
+  GPMC: add ECC control definitions (2012-05-10 09:39:47 -0700)
 
 ----------------------------------------------------------------
-Artem Bityutskiy (1):
-      ARM: OMAP1: fix compilation issue in board-sx1.c
+Clean up to make it easier to add support for new SoCs.
 
-Balaji T K (1):
-      ARM: OMAP4: hsmmc: check for null pointer
+Note that these have a merge dependency to omap-devel-hwmod-for-v3.5
+branch for the Makefile changes.
 
-Chris Lalancette (1):
-      ARM: OMAP4: Adding ID for OMAP4460 ES1.1
+----------------------------------------------------------------
+Kevin Hilman (2):
+      ARM: OMAP: AM35xx: remove redunant cpu_is checks for AM3505
+      ARM: OMAP: AM35xx: convert 3517 detection/flags to AM35xx
 
-Felipe Contreras (1):
-      ARM: OMAP: fix trivial warnings for dspbridge
+R Sricharan (1):
+      ARM: OMAP2+: dma: Define dma capabilities register bitfields and use them.
 
-Grazvydas Ignotas (1):
-      ARM: OMAP2+: remove incorrect irq_chip ack field
+Santosh Shilimkar (6):
+      ARM: OMAP4: Don't compile cm2xxx_3xxx.c for OMAP4 only builds.
+      ARM: OMAP2+: Clean up wrapping multiple objects in Makefile
+      ARM: OMAP4: Remove un-used WakeupGen register defines.
+      ARM: OMAP: dma: Make use of cpu_class_is_omap2() to avoid future patching.
+      ARM: All OMAP2PLUS machines use omap2 directory so just add one entry
+      ARM: OMAP4: Reduce the static IO mapping
 
-Kevin Hilman (1):
-      ARM: OMAP2+: INTC: fix Kconfig option for TI81XX
+Tarun Kanti DebBarma (1):
+      ARM: OMAP2+: dmtimer: remove redundant sysconfig context restore
 
-Laurent Pinchart (1):
-      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
+Tony Lindgren (2):
+      Merge branch 'for_3.5/omap_misc_cleanup' of git://gitorious.org/omap-sw-develoment/linux-omap-dev into cleanup-soc
+      Merge branch 'cleanup-soc' into cleanup
 
-Tomi Valkeinen (1):
-      ARM: OMAP4: panda: add statics to remove warnings
+Yegor Yefremov (1):
+      GPMC: add ECC control definitions
 
-Tony Lindgren (1):
-      ARM: OMAP2+: Incorrect Register Offsets in OMAP Mailbox
-
- arch/arm/mach-omap1/Kconfig            |    1 +
- arch/arm/mach-omap2/board-4430sdp.c    |   44 ------------------------
- arch/arm/mach-omap2/board-igep0020.c   |   10 +++---
- arch/arm/mach-omap2/board-omap4panda.c |   57 +++----------------------------
- arch/arm/mach-omap2/common.h           |    3 ++
- arch/arm/mach-omap2/dsp.c              |    5 +--
- arch/arm/mach-omap2/id.c               |    5 ++-
- arch/arm/mach-omap2/irq.c              |    3 +-
- arch/arm/mach-omap2/mailbox.c          |    6 ++--
- arch/arm/mach-omap2/omap4-common.c     |   58 ++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/devices.c           |    4 +--
- arch/arm/plat-omap/include/plat/cpu.h  |    1 +
- 12 files changed, 85 insertions(+), 112 deletions(-)
+ arch/arm/Makefile                                 |    4 +-
+ arch/arm/mach-omap2/Makefile                      |  167 ++++++++++-----------
+ arch/arm/mach-omap2/dma.c                         |   11 +-
+ arch/arm/mach-omap2/gpmc.c                        |   30 +++-
+ arch/arm/mach-omap2/hsmmc.c                       |    8 +-
+ arch/arm/mach-omap2/id.c                          |    7 +-
+ arch/arm/mach-omap2/include/mach/omap-wakeupgen.h |    8 -
+ arch/arm/mach-omap2/io.c                          |   30 ----
+ arch/arm/mach-omap2/iomap.h                       |   28 ----
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c        |    2 +-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c       |    2 +-
+ arch/arm/mach-omap2/usb-musb.c                    |    2 +-
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c     |    2 +-
+ arch/arm/plat-omap/dma.c                          |    4 +-
+ arch/arm/plat-omap/dmtimer.c                      |    2 -
+ arch/arm/plat-omap/include/plat/cpu.h             |    8 +
+ arch/arm/plat-omap/include/plat/dma.h             |    5 +
+ arch/arm/plat-omap/include/plat/dmtimer.h         |    1 -
+ 18 files changed, 137 insertions(+), 184 deletions(-)
