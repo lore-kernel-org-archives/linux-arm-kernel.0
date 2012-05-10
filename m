@@ -1,31 +1,37 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 May 2012 23:48:24 +0800
-Subject: [alsa-devel] [PATCH V2 08/11] ARM: dts: imx6q-sabrelite: add
- sound device imx6q-sabrelite-sgtl5000
-In-Reply-To: <20120510114956.GI17875@S2101-09.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-9-git-send-email-richard.zhao@freescale.com>
- <20120510064816.GC17875@S2101-09.ap.freescale.net>
- <20120510093444.GI2982@b20223-02.ap.freescale.net>
- <20120510094113.GG17875@S2101-09.ap.freescale.net>
- <20120510094508.GN3908@opensource.wolfsonmicro.com>
- <20120510114956.GI17875@S2101-09.ap.freescale.net>
-Message-ID: <20120510154823.GA18625@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 May 2012 23:37:47 +0800
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <20120510085939.GC3190@n2100.arm.linux.org.uk>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+ <20120510085939.GC3190@n2100.arm.linux.org.uk>
+Message-ID: <20120510153745.GQ17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 07:49:58PM +0800, Shawn Guo wrote:
-> I did not make myself clear, but you made :)  Yes, this is exactly the
-> thing on my mind, and the circuit will look like:
+On Thu, May 10, 2012 at 09:59:39AM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 10, 2012 at 12:14:39AM -0700, Olof Johansson wrote:
+> > Russell has published a clkdev branch that you pull instead of
+> > applying his patch manually, that way there will be no surprises with
+> > respect to conflicts, etc:
+> > 
+> > git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
+> > 
+> > It is also in arm-soc as depends/rmk/clkdev now.
 > 
-It seems I was just misled by the impression that we should have
-a route of MIC_IN <-- Mic Bais.  I just checked through the SGTL5000
-data sheet and it does not really mention about this.
+> I'll mention that I'm considering a patch on top of this to add __must_check
+> to the return values for these clkdev clk registration functions.  I've
+> noticed that many users aren't checking that, so there's no real way to
+> be sure that these things are being created.
+> 
+I have to admit I'm one of such users.  Does that mean we have to
+revise the platform porting again?  So ...
 
-Richard,
-
-Will test your route setting and then apply the patch if everything
-goes fine.
+> The alternative is we make these functions void and/or add pr_err() inside
+> them to report the failures.
+> 
+... I'd vote for this alternative.  (Sorry for users that are checking
+the return right now.  Any?)
 
 -- 
 Regards,
