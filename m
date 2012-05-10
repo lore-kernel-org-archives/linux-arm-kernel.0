@@ -1,44 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 May 2012 12:11:52 -0700
-Subject: [PATCH v2] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
-References: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <20120510191152.GN21851@atomide.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Thu, 10 May 2012 12:36:25 -0700
+Subject: [PATCH 2/3] ARM: OMAP AM35xx: clock and hwmod data: fix UART4 data
+In-Reply-To: <20120510172917.13418.14437.stgit@dusk>
+References: <20120510172449.13418.66815.stgit@dusk>
+ <20120510172917.13418.14437.stgit@dusk>
+Message-ID: <20120510193625.GD20494@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Govindraj.R <govindraj.raja@ti.com> [120510 06:09]:
-> From: "Govindraj.R" <govindraj.raja@ti.com>
+On Thu, May 10, 2012 at 11:29:18AM -0600, Paul Walmsley wrote:
+> Add missing terminators to the arrays of IRQ, DMA, and address space
+> structure records in the AM35xx UART4 hwmod data.  Without these
+> terminators, the following warnings appear on boot:
 > 
-> The commit (bce492c0  ARM: OMAP2+: UART: Fix incorrect population of
-> default uart pads) removed default uart pads that where getting populated
-> and which was making rx pin wakeup capable. If uart pads was used in
+> omap_uart.3: failed to claim resource 58
+> omap_device: omap_uart: build failed (-16)
+> WARNING: at /home/paul/linux/arch/arm/mach-omap2/serial.c:375 omap_serial_init_port+0x198/0x284()
+> Could not build omap_device for omap_uart: uart4.
+> 
+> Also, AM35xx uart4_fck has an incorrect parent clock pointer.  Fix it
+> and clean up a whitespace issue.
+> 
+> Fix some incorrectly-named macros related to AM35xx UART4.
+> 
+> Cc: Kyle Manna <kyle.manna@fuel7.com>
+> Cc: Mark A. Greer <mgreer@animalcreek.com>
+> Cc: Ranjith Lohithakshan <ranjithl@ti.com>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
 
-Nitpick.. this should say "were used" here                 ^^^
-
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -295,8 +353,7 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
->  		bdata.pads = NULL;
->  		bdata.pads_cnt = 0;
->  
-> -		if (cpu_is_omap44xx() || cpu_is_omap34xx())
-> -			omap_serial_fill_default_pads(&bdata);
-> +		omap_serial_check_wakeup(&bdata, uart);
-
-Should this section become:
-
-		if (!info) {
-			omap_serial_check_wakeup(&bdata, uart);
-			omap_serial_init_port(&bdata, NULL);
-		} else {
-			omap_serial_init_port(&bdata, &info[uart->num]);
-		}
-
-As if you have bdata, then there should not be anything to mux,
-right?
-
-Regards,
-
-Tony
+Acked-by: Mark A. Greer <mgreer@animalcreek.com>
+(on an am3517evm)
