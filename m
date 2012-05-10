@@ -1,61 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 May 2012 12:41:35 +0530
-Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM address
- space.
-In-Reply-To: <20120509154849.GA10375@n2100.arm.linux.org.uk>
-References: <1336398149-26153-1-git-send-email-santosh.shilimkar@ti.com>
- <20120508124116.GE17798@arm.com>
- <CAMQu2gxXB4GyddjrcKWwJ=KXx=MoDs7DdwhbOY85qkVJ1Vv3wA@mail.gmail.com>
- <20120508215554.GA18980@n2100.arm.linux.org.uk>
- <CAMQu2gzmZ1Af4sAxoT9WS_akY1gBrqffKE84rnbM_EUK8V8NHQ@mail.gmail.com>
- <20120509122348.GA30632@n2100.arm.linux.org.uk>
- <CAMQu2gzdwXwzhhFLtLXTj5e0a9cFeq5ReUcMT-tGUxTPUcV_4Q@mail.gmail.com>
- <20120509154849.GA10375@n2100.arm.linux.org.uk>
-Message-ID: <4FAB6A27.3050509@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 10 May 2012 15:55:33 +0800
+Subject: [GIT PULL] mxs: device tree support for v3.5
+In-Reply-To: <CAOesGMgzs40fBMrYseT3RC0F_7paWiBKSZ8yVU=hCkFf02Q94w@mail.gmail.com>
+References: <20120405013556.GI7264@S2101-09.ap.freescale.net>
+ <CAOesGMjrJe++s-tmgzs2oY1T9GVntngV71-2iqZhfWx2EiZL_g@mail.gmail.com>
+ <20120507135451.GI19389@S2101-09.ap.freescale.net>
+ <CAOesGMgzs40fBMrYseT3RC0F_7paWiBKSZ8yVU=hCkFf02Q94w@mail.gmail.com>
+Message-ID: <CAAQ0ZWQ9M+fk5dtWxLCK7OWf6kmPC_3-55kkH4v5EsMh9pzA+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2012 09:18 PM, Russell King - ARM Linux wrote:
-> On Wed, May 09, 2012 at 06:00:10PM +0530, Shilimkar, Santosh wrote:
->> On Wed, May 9, 2012 at 5:53 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Wed, May 09, 2012 at 02:20:28PM +0530, Shilimkar, Santosh wrote:
->>>> The only change done common code is  clearing 'XN' bit for DRAM
->>>> region in page table entries. The other change of setting the DACR
->>>> register is done in ARMv7 specific code.
->>>
->>> Yes, XN is an ARMv6+ thing.  Before ARMv5, it was implementation defined.
->>>
->>> Some implementations used the bit to mean "allow writes to update the
->>> cache".  Other implementations labelled this bit as "should be zero"
->>> while others labelled it as "should be one".
->>>
->> Good to know.
->>
->>> The upshot of this is, we know that having this bit as '1' means that
->>> all the CPUs we support today work.  I would be _very_ concerned to
->>> change this bit to zero as we _really_ don't know how the pre-ARMv6
->>> CPUs would react.
->>>
->> I agree.
->>
->>> The solution to this is pretty simple - if ARMv6+ needs a different
->>> base section mapping value, then we need to extract that from the code
->>> and pass in the base section mapping value.
->>>
->>> I'll sort out a patch later today for this.
->> Great.
-> 
-> This works for my 4430SDP board.  I haven't booted it on anything else yet.
-> Please can you check that this solves the issue for you?  Thanks.
-> 
-Yes it does.
-Are you planning to merge below patch as is or split
-the patch like 1) Refactoring 2) ARMv7 fix
+On 10 May 2012 15:17, Olof Johansson <olof@lixom.net> wrote:
+> Hrm. It would have probably been better to base the pinctrl and clk
+> work on top of this, since we tend to order the dt work before much of
+> the other topic branches.
+>
+It will be hard to do.  Device tree support naturally depends on
+pinctrl support.  Pinctrl is actually a blocker for many platforms to
+be converted over to DT.  I'm supporting pinctrl for mach-mxs from the
+beginning we move to DT, and those mxs drivers have to be based on
+pinctrl to have their pins defined in DT to work.
 
-Either is fine with me.
+>From my experience on DT migration, the clock file will constantly be
+touched to change/add clk lookup.  It's hard to tell that there will
+no further DT support touching clock when we convert clock to common
+clk at some point.  I think it will be easier to have DT based on
+common clk series.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Anyway, I've rebuilt next/dt without this branch now. I will temporary
+> just revert the merge in for-next until it's rebuilt next time.
+>
+Thanks, Olof.
 
-Regards
-Santosh
+Regards,
+Shawn
