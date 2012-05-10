@@ -1,48 +1,47 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 10 May 2012 15:45:43 +0530
-Subject: [PATCH 3/7] mmc: dw_mmc: add device tree support
-In-Reply-To: <CAOesGMh_0dShqe+kSB1Xgn9bpLv0j+b9QP+vN9N57XHP1geSHg@mail.gmail.com>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-4-git-send-email-thomas.abraham@linaro.org>
- <CAOesGMh_0dShqe+kSB1Xgn9bpLv0j+b9QP+vN9N57XHP1geSHg@mail.gmail.com>
-Message-ID: <CAJuYYwSmiPNrFhd9xr2AkAbRfJm_gP9ym+AXyy9jyPG3FnFuhA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 10 May 2012 08:56:15 +0200
+Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
+In-Reply-To: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+References: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120510065614.GE31844@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hello Robert,
 
-On 2 May 2012 23:37, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
+On Wed, May 09, 2012 at 07:24:17PM -0500, Robert Lee wrote:
+> A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
+> to use common definitions when accessing registers of peripherals on
+> the AIPS2 bus.
+> 
+> This change was tested for mapping conflicts using the iop2v script
+> found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
+> performing a bootup of a default build using imx_v6_v7_defconfig
+> on a imx51 babbage board and imx53 loco board.
+> 
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+It took me some time to understand your goal. With your change you
+achieve that
 
-[...]
+	IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
+	IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) ==
+	IMX_IO_P2V(MX53_AIPS2_BASE_ADDR)
 
->> +# Slots: The slot specific information are contained within child-nodes with
->> + ?each child-node representing a supported slot. There should be atleast one
->> + ?child node representing a card slot. The name of the slot child node should
->> + ?be 'slot{n}' where n is the unique number of the slot connnected to the
->> + ?controller. The following are optional properties which can be included in
->> + ?the slot child node.
->
-> Since we're talking slots / cards on a bus, I think the addressing
-> model would be useful here. So in the main controller node:
-> ? ?#address-cells = <1>;
-> ? ?#size-cells = <0>;
->
-> And then each slot would need a reg property and possibly unit address:
->
-> ? slot {
-> ? ? ? ?reg = <0>;
-> ? ? ? ?...
-> ? };
->
-> (unit addresses on the slots are only needed if they can't be
-> disambiguated by name, so not needed if you only have one slot).
->
+(which IMHO is more than "allowing ... to use common definitions [for
+the] AIPS2 bus).
 
-Is the addressing model as described above needed in this case? The
-address for a slot is not used by the controller driver code and is
-just a virtual number. It would be sufficient to represent the nodes
-representing the slots with a unique name.
+I can confirm that my imx-iop2v script doesn't find a conflict with your
+change. Having said that I didn't check that the memory regions listed
+in the script still match the regions that are statically mapped on imx.
 
-Thanks,
-Thomas.
+And I wonder why do you need to have the aips2 bus mapped to the same
+address on all imx5 machines. The future is that the base addresses of
+the various devices are determined via dt and then the static mappings
+go away. Do I miss something?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
