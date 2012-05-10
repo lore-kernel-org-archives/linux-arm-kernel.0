@@ -1,87 +1,39 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 May 2012 20:30:12 +0530
-Subject: [PATCHv2 0/3] Add support for DRM display subsystem
-In-Reply-To: <CAH9JG2U83+q9NKuvZV4s_iHvDTrQ-RCEqx=9L9uwqiMhYMSiHA@mail.gmail.com>
-References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
- <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
- <CAH9JG2V_9RVPvEHodDD422r=o4QxHcrMO-YXv2KUGYeys=ZjqA@mail.gmail.com>
- <201205101348.20870.arnd@arndb.de>
- <CAH9JG2U83+q9NKuvZV4s_iHvDTrQ-RCEqx=9L9uwqiMhYMSiHA@mail.gmail.com>
-Message-ID: <CAK9yfHyX9hnyJ0BgxgoP5Jo8tbXhevw6TxwogCeFBen+KmjSKw@mail.gmail.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Thu, 10 May 2012 20:24:00 +0530
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <CAMiH66E4Cb5LTi3EiU5HQ6492ZA-mD40eFZaaqmbC7hTz-aQxA@mail.gmail.com>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510074403.GA3190@n2100.arm.linux.org.uk>
+ <1336647530.15424.384.camel@vkoul-udesk3>
+ <CAMiH66E4Cb5LTi3EiU5HQ6492ZA-mD40eFZaaqmbC7hTz-aQxA@mail.gmail.com>
+Message-ID: <1336661640.15424.625.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2012 20:16, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Thu, May 10, 2012 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Thursday 10 May 2012, Kyungmin Park wrote:
->>> > And I won't apply new feature for non-dt board file from now on. I think,
->>> > we
->>> > need to support DT in mach-exynos/ instead of non-DT and DT together, so
->>> > please consider to move on dt supporting for Samsung mobile boards.
->>> >
->>>
->>> Probably you misunderstand Arnd word.
->>>
->>> "From the statements made so far, I can see no clear policy that we can
->>> apply to everyone. My take on this is that for any work I spend on
->>> multiplatform kernel, I concentrate on the DT-based board files and
->>> get them to work together first, but leave it up to the individual
->>> subarch maintainers whether they want to add other board files into
->>> the mix."
->>>
->>> It doesn't mean add new feature to non-DT board. don't add new board file.
->>
->> This is a completely separate discussion, the problem at hand doesn't
->> have anything to do with building a kernel for multiple mach-*
->> directories combined that I was referring to in the text you quote.
->>
->>> In this case, DRM is not yet ready to support DT.
->>>
->>> Okay, you can just drop this patches. but please note that this
->>> patches are posted at Mar 13 before you decide.
->>
->> I think it's a good idea to make new features DT-only because this
->> way we don't get any regressions and everyone who want to use
->> the new feature will be able to test the DT support on his board.
-> The 'new feature' is some misleading word. In this case DRM drivers
-> are used from v3.2 at drivers. but not registered it at board file.
-> Basically agree to move DT and used it finally. Before that bring up
-> the board using DRM based graphics.
->>
->> This of course requires that basic DT support is available for the
->> systems in question so we don't regress when moving away from the
->> old board files. My impression is that we're getting close to that
->> point on exynos thanks to Thomas' work on this. AFAICT we don't
->> have a DT binding for screen timings yet, so you will still have
->> to use auxdata for that or put the timings into the driver.
-> I'm also thanks to Thomas, he did a lot of works for eyxnos. but most
-> parts are missing at least exynos platform.
-> e.g., Please see the origen.dts. I wonder it's booted with any
-> graphical user interface platform, android or ubuntu.
-> Maybe not.
+On Thu, 2012-05-10 at 21:19 +0800, Huang Shijie wrote:
+> On Thu, May 10, 2012 at 6:58 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> > On Thu, 2012-05-10 at 08:44 +0100, Russell King - ARM Linux wrote:
+> >> In fact, please look at both imx-dma.c _and_ imx-sdma.c - search for
+> >> "callback" and have a look at the code around there.
+> >>
+> >> You will find that imx-dma.c processes one descriptor per tasklet run,
+> >> and calls the callback under a spinlock.
+> >>
+> >> You'll find that imx-sdma.c always calls callbacks from IRQ context.
+> > Yup, let me try to fix them!
+> >
+> I ever sent you a patch to fix it.
+Yes :-), Thank You
 
-We (Samsung Landing team) did manage to boot Origen with Ubuntu using
-DT support. But that is only upto home screen with minimal support.
-
->
-> Anyway, as discussed in multi-platform support mail threads, we're
-> also moving to DT in the big picture. but still want to use existing
-> boards as is.
-
-For Exynos multimedia IPs, for instance, which already have drivers as
-well as platform support in mainline, do we still defer device
-registration in machine file until DT support for these IPs is added?
-
->
-> Thank you,
-> Kyungmin Park
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-
+Looks fine, should show up in -next in a day or so...
 
 
 -- 
-With warm regards,
-Sachin
+~Vinod
