@@ -1,37 +1,72 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 10 May 2012 07:12:21 -0700
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FAAE564.6040708@ti.com> (Jon Hunter's message of "Wed, 9 May
- 2012 16:45:08 -0500")
-References: <20120403092524.GD17741@mudshark.cambridge.arm.com>
- <20120403094749.GH17741@mudshark.cambridge.arm.com>
- <CAMQu2gyFirtVTWpMu4G_qG5sq33J-_s_o2JhVAdrUf7P3qJ3AA@mail.gmail.com>
- <20120403123444.GL17741@mudshark.cambridge.arm.com>
- <878vicsxef.fsf@ti.com>
- <20120403160706.GP17741@mudshark.cambridge.arm.com>
- <87ehs4pfw4.fsf@ti.com>
- <alpine.DEB.2.00.1204031727380.8000@utopia.booyaka.com>
- <20120404111524.GF32505@mudshark.cambridge.arm.com>
- <20120426180719.GC20186@mudshark.cambridge.arm.com>
- <4FA45580.8070802@ti.com> <87ipg76hfm.fsf@ti.com>
- <4FA8284C.7080803@ti.com> <87k40nzi3i.fsf@ti.com>
- <4FA8FCFF.40105@ti.com> <4FA9588E.9020906@ti.com>
- <87sjfal65t.fsf@ti.com> <4FAA4DB9.8060504@ti.com>
- <4FAAB1A3.9040806@ti.com> <4FAAC549.6010206@ti.com>
- <4FAAE564.6040708@ti.com>
-Message-ID: <874nronn0a.fsf@ti.com>
+Date: Thu, 10 May 2012 07:23:56 -0700
+Subject: [PATCH v2] gpio/omap: fix incorrect initialization of
+ omap_gpio_mod_init
+In-Reply-To: <CAC83ZvKHDWmNneK5GQgSPhdg88apymEgUr0zm1EVYjfaWG2oXA@mail.gmail.com>
+ (Tarun Kanti DebBarma's message of "Thu, 10 May 2012 10:45:13 +0530")
+References: <1335770412-1344-1-git-send-email-tarun.kanti@ti.com>
+ <CANOLnOO3bSxoE-8TaXd_Tz=taPOZpfQY+z-=6c7Ovfpf+FCAuw@mail.gmail.com>
+ <CAC83ZvLYmPr3qTRUUTom1iOA-czef9EVcM229UMDePnw8sbA+w@mail.gmail.com>
+ <1664819.7TVaX0jpJi@acer>
+ <CAC83ZvKHDWmNneK5GQgSPhdg88apymEgUr0zm1EVYjfaWG2oXA@mail.gmail.com>
+Message-ID: <87mx5gm7wj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
+Grant,
 
-[...]
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 
-> I have posted my latest series here [1] based upon that from Will [2]
-> which attempts to fix the EMU CD based upon the inputs from this thread.
-> It is working on my omap4460 panda. 
+> Hi,
+>
+> On Thu, May 10, 2012 at 3:06 AM, Janusz Krzysztofik
+> <jkrzyszt@tis.icnet.pl> wrote:
+>> On Mon, 7 May 2012 10:52:28 DebBarma, Tarun Kanti wrote:
+>>> On Sun, May 6, 2012 at 3:25 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+>>> > On Mon, Apr 30, 2012 at 10:20 AM, Tarun Kanti DebBarma
+>>> > <tarun.kanti@ti.com> wrote:
+>>> >> Initialization of irqenable, irqstatus registers is the common
+>>> >> operation done in this function for all OMAP platforms, viz. OMAP1,
+>>> >> OMAP2+. The latter _gpio_rmw()'s which supposedly got introduced
+>>> >> wrongly to take care of OMAP2+ platforms were overwriting initially
+>>> >> programmed OMAP1 value breaking functionality on OMAP1.
+>>
+>> Hi,
+>> I can confirm that my other issues with GPIO on Amstrad Delta were not
+>> related, and this patch is still required for GPIO interrupts hardware
+>> being correctly initialized on OMAP1 in 3.4-rc6. You can add my
+>>
+>> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+>>
+>> if you wish.
+> Thank you for confirming!!
 
-There are some differences between 4430 and 4460 here.  Can you test on
-4430 as well?
+We'd like to get this one in for v3.4-rc.  Can you queue it?
+
+I added the tested-by from Janusz and my signoff, and pull request is
+below.
+
+Thanks,
 
 Kevin
+
+
+
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+
+  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/fixes/gpio
+
+for you to fetch changes up to 6edd94db250038c8fdf176f23ca4017d2f312509:
+
+  gpio/omap: fix incorrect initialization of omap_gpio_mod_init (2012-05-10 07:16:15 -0700)
+
+----------------------------------------------------------------
+Tarun Kanti DebBarma (1):
+      gpio/omap: fix incorrect initialization of omap_gpio_mod_init
+
+ drivers/gpio/gpio-omap.c |    9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
