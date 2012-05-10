@@ -1,47 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 10 May 2012 08:56:15 +0200
-Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
-In-Reply-To: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
-References: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <20120510065614.GE31844@pengutronix.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 10 May 2012 10:45:13 +0530
+Subject: [PATCH v2] gpio/omap: fix incorrect initialization of
+ omap_gpio_mod_init
+In-Reply-To: <1664819.7TVaX0jpJi@acer>
+References: <1335770412-1344-1-git-send-email-tarun.kanti@ti.com>
+ <CANOLnOO3bSxoE-8TaXd_Tz=taPOZpfQY+z-=6c7Ovfpf+FCAuw@mail.gmail.com>
+ <CAC83ZvLYmPr3qTRUUTom1iOA-czef9EVcM229UMDePnw8sbA+w@mail.gmail.com>
+ <1664819.7TVaX0jpJi@acer>
+Message-ID: <CAC83ZvKHDWmNneK5GQgSPhdg88apymEgUr0zm1EVYjfaWG2oXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Robert,
+Hi,
 
-On Wed, May 09, 2012 at 07:24:17PM -0500, Robert Lee wrote:
-> A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
-> to use common definitions when accessing registers of peripherals on
-> the AIPS2 bus.
-> 
-> This change was tested for mapping conflicts using the iop2v script
-> found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
-> performing a bootup of a default build using imx_v6_v7_defconfig
-> on a imx51 babbage board and imx53 loco board.
-> 
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-It took me some time to understand your goal. With your change you
-achieve that
-
-	IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
-	IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) ==
-	IMX_IO_P2V(MX53_AIPS2_BASE_ADDR)
-
-(which IMHO is more than "allowing ... to use common definitions [for
-the] AIPS2 bus).
-
-I can confirm that my imx-iop2v script doesn't find a conflict with your
-change. Having said that I didn't check that the memory regions listed
-in the script still match the regions that are statically mapped on imx.
-
-And I wonder why do you need to have the aips2 bus mapped to the same
-address on all imx5 machines. The future is that the base addresses of
-the various devices are determined via dt and then the static mappings
-go away. Do I miss something?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On Thu, May 10, 2012 at 3:06 AM, Janusz Krzysztofik
+<jkrzyszt@tis.icnet.pl> wrote:
+> On Mon, 7 May 2012 10:52:28 DebBarma, Tarun Kanti wrote:
+>> On Sun, May 6, 2012 at 3:25 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+>> > On Mon, Apr 30, 2012 at 10:20 AM, Tarun Kanti DebBarma
+>> > <tarun.kanti@ti.com> wrote:
+>> >> Initialization of irqenable, irqstatus registers is the common
+>> >> operation done in this function for all OMAP platforms, viz. OMAP1,
+>> >> OMAP2+. The latter _gpio_rmw()'s which supposedly got introduced
+>> >> wrongly to take care of OMAP2+ platforms were overwriting initially
+>> >> programmed OMAP1 value breaking functionality on OMAP1.
+>
+> Hi,
+> I can confirm that my other issues with GPIO on Amstrad Delta were not
+> related, and this patch is still required for GPIO interrupts hardware
+> being correctly initialized on OMAP1 in 3.4-rc6. You can add my
+>
+> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+>
+> if you wish.
+Thank you for confirming!!
+--
+Tarun
+>
+> Thanks,
+> Janusz
