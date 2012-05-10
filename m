@@ -1,62 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 10 May 2012 11:16:11 -0700
-Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
- driver_find_device()
-In-Reply-To: <4FABE5D3.9040706@wwwdotorg.org>
-References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
- <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
-Message-ID: <20120510181611.GA16908@kroah.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 10 May 2012 20:16:21 +0200
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+In-Reply-To: <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
+ <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+Message-ID: <4FAC05F5.1050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
-> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
-> > On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
-> >> driver_find_device() can be called with an unregistered driver.
-> > 
-> > Who does that?  Where in the kernel?  Why would you try to do that?
-> > 
-> >> Need to check driver_private to see if it's populated or not,
-> >> especially under deferrable probe.
-> > 
-> > Hm, I don't know if this will really catch a driver that was registered
-> > and then was unregistered, right?  It seems like moving the real problem
-> > somewhere else, why not fix the original issue instead?
-> > 
-> >> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> >> ---
-> >> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
-> >>   http://article.gmane.org/gmane.linux.ports.tegra/4658
-> >>
-> >> "tegra_ahb_driver" may not be populated when it's called.
-> > 
-> > It can?  I don't see that in that patch.
-> 
-> I think this is what's happening:
-> 
-> The Tegra SMMU driver is registered using subsys_initcall().
-> 
-> The Tegra AHB driver is registered using module_platform_driver, so
-> module_init().
-> 
-> The device objects for both are registered at basically the same time
-> during the machine's initialization call, which I think happens before
-> both or some of the above two calls.
-> 
-> So, SMMU ends up getting probed before the AHB driver has even been
-> registered.
+On 05/10/2012 11:36 AM, Kukjin Kim wrote:
+> Note that I have a plan to replace board files with DT supporting in
+> mach-exynos/ next time.
 
-What do those two drivers have to do with each other?
+What is the purpose of one side decisions like this ? I find it really
+annoying. We have been building those board files through multiple kernel 
+releases, it took much effort and time to create proper drivers and 
+extending frameworks, like video or media.
 
-> That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
-> driver hasn't (or may not have) been registered, so driver_find_device()
-> can experience the issue this patch attempts to solve.
+It is going to take some more effort to make those subsystems DT aware and
+add proper support at the drivers. This is being worked on and touching 
+existing boards doesn't sound like an incentive to me. We have to deal 
+with multiple boards and breaking existing ones which are almost completed
+just adds an effort for us of maintaining them internally. The mainline 
+kernel is going to always be a half-product, not properly tested and 
+validated.
 
-It sounds like you have a locking or ordering problem somewhere in this
-platform, and it needs to be resolved there.  Odds are, this tiny check
-is the least of your worries, right?
+We get new boards that need to be supported in the kernel quite frequently,
+those boards share device IPs, so adapting the drivers to the DT is
+already our goal, for getting new boards supported in the mainline.
 
-Who is doing the driver_find_device() call in the first place?  The
-driver core?  Or something else?
+I have no idea what that "replacing" is going to be about, but if you add
+support for all devices present in those boards and they will all work
+as before - I'll happily accept that. Although I'm afraid it is just going
+to be one big breakage and regression, in the name of "everything must
+migrate to the device tree".
 
-greg k-h
+I would really appreciate more common agreement, rather than putting 
+a spoke in somebody else's wheel.
+
+Once all devices in current mach-exynos board files get proper DT support
+we are going to remove the boards ourselves. I'm sure there is lots of 
+other things that need more attention than that.
+
+--
+Regards,
+Sylwester
