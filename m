@@ -1,37 +1,80 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 May 2012 11:39:17 -0700
-Subject: [GIT PULL 3/10] more omap soc clean-up for v3.5 merge window
+Date: Thu, 10 May 2012 11:39:18 -0700
+Subject: [GIT PULL 4/10] updates for omap PRCM (Power, Reset, Clock Management)
 In-Reply-To: <pull-1336675159-747052>
-Message-ID: <mailman.10.1336675184.1417.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.11.1336675190.1417.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b2f44dc29bfab77b10f3a709f14677f51ce3a4cd:
+The following changes since commit 1df82cd6d7673006ae2ecbe8745bcf44f61c53a8:
 
-  ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally (2012-05-09 11:21:45 -0700)
+  Merge tag 'omap-devel-a-for-3.5' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-hwmod (2012-04-19 17:45:33 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-renames-for-v3.5
 
-for you to fetch changes up to bb6abcf440c4c861a2131c0651b683dbd2edba84:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-devel-prcm-for-v3.5
 
-  ARM: OMAP2+: Kconfig: convert SOC_OMAPAM33XX to SOC_AM33XX (2012-05-10 11:10:07 -0700)
+for you to fetch changes up to 743a6d923f803c861a24d173e1d1818ca8ac0384:
 
-----------------------------------------------------------------
-Simplify some SoC config options before things get too unreadable.
-
-Note that this depends on a fix in omap-fixes-non-critical-for-v3.5,
-so it's based on that.
+  Merge tag 'omap-devel-b-for-3.5' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-prcm (2012-05-08 11:49:09 -0700)
 
 ----------------------------------------------------------------
-Kevin Hilman (2):
-      ARM: OMAP2+: Kconfig: convert SOC_OMAPTI81XX to SOC_TI81XX
-      ARM: OMAP2+: Kconfig: convert SOC_OMAPAM33XX to SOC_AM33XX
 
- arch/arm/mach-omap2/Kconfig     |    8 ++++----
- arch/arm/mach-omap2/common.h    |    4 ++--
- arch/arm/mach-omap2/io.c        |    8 ++++----
- arch/arm/mach-omap2/irq.c       |    2 +-
- drivers/net/ethernet/ti/Kconfig |    2 +-
- 5 files changed, 12 insertions(+), 12 deletions(-)
+Updates for PRCM (Power, Reset, Clock Management).
+
+Note that this depends on omap-devel-hwmod-for-v3.5.
+
+----------------------------------------------------------------
+Kevin Hilman (3):
+      ARM: OMAP3: clock data: replace 3503/3517 flag with AM35x flag for UART4
+      ARM: OMAP3: clock data: treat all AM35x devices the same
+      ARM: OMAP: clock: convert AM3517/3505 detection/flags to AM35xx
+
+Mark A. Greer (1):
+      arm: omap3: clockdomain data: Remove superfluous commas from gfx_sgx_3xxx_wkdeps[]
+
+Paul Walmsley (2):
+      ARM: OMAP3: clock data: add clockdomain for HDQ functional clock
+      Merge branches 'clock_am35xx_cleanup_3.5', 'prm_cm_devel_a_3.5', 'clock_devel_a_3.5' and 'pwrdm_clkdm_cleanup_3.5' into prcm_devel_a_3.5
+
+R Sricharan (1):
+      ARM: OMAP4+: Add prm and cm base init function.
+
+Rajendra Nayak (1):
+      ARM: OMAP3: Fix CM register bit masks
+
+Santosh Shilimkar (1):
+      ARM: OMAP2+: powerdomain: Get rid off duplicate pwrdm_clkdm_state_switch() API
+
+Tarun Kanti DebBarma (1):
+      ARM: OMAP2+: dmtimer: cleanup iclk usage
+
+Tony Lindgren (1):
+      Merge tag 'omap-devel-b-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-prcm
+
+Vaibhav Bedia (1):
+      ARM: OMAP3+: dpll: Configure autoidle mode only if it's supported
+
+Vaibhav Hiremath (1):
+      ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common header
+
+ arch/arm/mach-omap2/clock.c                   |    2 +-
+ arch/arm/mach-omap2/clock3xxx_data.c          |   25 +++++++---------------
+ arch/arm/mach-omap2/clock44xx_data.c          |   11 ----------
+ arch/arm/mach-omap2/clockdomain.c             |    7 +++----
+ arch/arm/mach-omap2/clockdomains3xxx_data.c   |    6 +++---
+ arch/arm/mach-omap2/cm-regbits-34xx.h         |    4 ++--
+ arch/arm/mach-omap2/cminst44xx.c              |   28 ++++++++++++++++---------
+ arch/arm/mach-omap2/common.c                  |    1 +
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/dpll3xxx.c                |   23 +++++++++++++++-----
+ arch/arm/mach-omap2/powerdomain.c             |   10 ---------
+ arch/arm/mach-omap2/powerdomain.h             |    1 -
+ arch/arm/mach-omap2/prcm-common.h             |   17 +++++++++++++++
+ arch/arm/mach-omap2/prcm.c                    |    8 +++++++
+ arch/arm/mach-omap2/prminst44xx.c             |   27 ++++++++++++++----------
+ arch/arm/mach-omap2/timer.c                   |    7 -------
+ arch/arm/plat-omap/include/plat/clkdev_omap.h |    4 +---
+ arch/arm/plat-omap/include/plat/dmtimer.h     |    2 +-
+ 18 files changed, 97 insertions(+), 87 deletions(-)
