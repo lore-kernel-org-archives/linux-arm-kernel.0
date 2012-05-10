@@ -1,73 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 10 May 2012 14:39:39 -0700
-Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Wed, 9 May 2012 08:59:49 +0000")
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-4-git-send-email-hvaibhav@ti.com>
- <87397ajo32.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
-Message-ID: <8762c3ww9w.fsf@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 10 May 2012 14:46:04 -0700
+Subject: [PATCH 3/4] ARM: tegra30: Add Tegra Memory Controller(MC) driver
+In-Reply-To: <1336635764-30597-3-git-send-email-hdoyu@nvidia.com>
+References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+ <1336635764-30597-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120510214604.GA3525@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+On Thu, May 10, 2012 at 10:42:32AM +0300, Hiroshi DOYU wrote:
+> Tegra Memory Controller(MC) driver for Tegra30
+> Added to support MC General interrupts, mainly for IOMMU(SMMU).
 
-> On Wed, May 09, 2012 at 04:08:09, Hilman, Kevin wrote:
->> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->> 
->> > The function __omap2_set_globals() can be common across all
->> > platforms/architectures, even in case of omap4, internally it
->> > calls same set of functions as in __omap2_set_globals() function
->> > (except for sdrc).
->> 
->> OK so far.
->> 
->> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
->> > so that we can reuse same function across omap2/3/4...
->> 
->> But what happens when a single kernel is built that has support for an
->> SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
->> 
->
-> As such Nothing...I looking into this direction while implementing.
->
-> In that case, sdrc.c file will be compiled in and execution will jump to
-> omap2_set_globals_sdrc(). But inside this function, we are already checking 
-> whether the omap2_globals->sdrc and omap2_globals->sms for NULL and then use 
-> it.
->
-> And function omap2_sdrc_init() is also depends on machine, so in case of
-> Am33xx, it won't get into sdrc execution at all. And in case of omap4, it 
-> will.
+I'll apply this, but:
 
-Then why bother with the #ifdef at all?
+> +static inline u32 mc_readl(struct tegra30_mc *mc, u32 offs)
+> +{
+> +	if (offs < 0x10)
+> +		return readl(mc->regs[0] + offs);
+> +	BUG_ON(offs < 0x3c);
+> +	if (offs < 0x1f0)
+> +		return readl(mc->regs[1] + offs - 0x3c);
+> +	BUG_ON(offs < 0x200);
+> +	if (offs < 0x228)
+> +		return readl(mc->regs[2] + offs - 0x200);
+> +	BUG_ON(offs < 0x284);
+> +	if (offs < 0x400)
+> +		return readl(mc->regs[3] + offs - 0x284);
+> +	BUG();
+> +}
 
-If it already safe to call on all SoCs, just get rid of the #ifdef all
-together.
+That's a lot of BUG* calls.  Same thing with the 1/4 patch in this
+series.
 
->> In that case this new SOC_HAS_OMAP2_SDRC will be set, and
->> set_globals_sdrc() will be called even for the SoCs without SDRC.
->> 
->> So, rather than add a new Kconfig option for this, I would rather see 
->> you using the existing runtime feature check for the SDRC: omap_has_sdrc()
->> 
->
-> There is NO difference between runtime feature check Vs this patch, refer to the function implementation,
->
-> void __init omap2_set_globals_sdrc(struct omap_globals *omap2_globals)
-> {
-> 	if (omap2_globals->sdrc)
-> 		omap2_sdrc_base = omap2_globals->sdrc;
-> 	if (omap2_globals->sms)
-> 		omap2_sms_base = omap2_globals->sms;
-> }
->
-> The initialization happens after checking for NULL, so even if you execute it or not, the variable are set to NULL in case of am33xx.
->
-> So I don't find any difference between runtime and this patch.
+We really should not have a BUG call in any driver, as you just stopped
+the whole system.  I can understand this being there for debugging when
+you create the code originally, but as these are things no one should
+ever be able to hit now, you should remove them, right?
 
-Except readability.
+Care to write a follow-on patch removing all of these BUG_ON and BUG
+calls in this and the drivers/memory/tegra20-mc.c driver?
 
-Kevin
+thanks,
+
+greg k-h
