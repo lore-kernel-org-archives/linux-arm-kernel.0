@@ -1,38 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 May 2012 16:00:27 +0200
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <20120510134120.GM2982@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
- <20120510063904.GB17875@S2101-09.ap.freescale.net>
- <20120510084403.GA3908@opensource.wolfsonmicro.com>
- <20120510090459.GH2982@b20223-02.ap.freescale.net>
- <20120510092733.GH3908@opensource.wolfsonmicro.com>
- <20120510102309.GK2982@b20223-02.ap.freescale.net>
- <CACRpkdah3956QLZZ1wTw1PcZ90wWX=Ta9j45jjzWsBtT=nm8-g@mail.gmail.com>
- <20120510134120.GM2982@b20223-02.ap.freescale.net>
-Message-ID: <CACRpkdbQNPjawqJOOb+t1U6erByKpiA3B2Ldfkt3MCQbWBMmQQ@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 10 May 2012 09:10:54 -0500
+Subject: [PATCH v3 2/3] ARM: imx: Add imx5 cpuidle driver
+In-Reply-To: <20120510124130.GS27341@pengutronix.de>
+References: <1336425407-20308-1-git-send-email-rob.lee@linaro.org>
+ <1336425407-20308-3-git-send-email-rob.lee@linaro.org>
+ <20120509080214.GJ27341@pengutronix.de>
+ <CAMXH7KF7eznzF7AzM_JzwJ1jOm-1J4biqd=PvKMSa=ex8YFQrA@mail.gmail.com>
+ <20120510124130.GS27341@pengutronix.de>
+Message-ID: <CAMXH7KGskSa2a-URCV0cP=zh20cJNWx6VNfHZJbh=PHbNgCDfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 3:41 PM, Richard Zhao
-<richard.zhao@freescale.com> wrote:
-
->> Ref:
->> git://git.linaro.org/people/triad/linux-pinctrl.git
+On Thu, May 10, 2012 at 7:41 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, May 09, 2012 at 09:27:02AM -0500, Rob Lee wrote:
+>> Sascha,
 >>
->> The tag pinctrl-mergebase-20120418
-> I only find the tag at your kernel.org git tree. Linaro switched git
-> server again? strange.
+>> >
+>> > This clk_get should go away here and be moved somewhere to
+>> > initialization. Also, if getting this clock fails we can still
+>> > do regular cpu_do_idle. Additionally, if clk_get fails, we'll
+>> > have a ERR_PTR value in gpc_dvfs_clk in which case the
+>> > gpc_dvfs_clk == NULL won't trigger next time you are here and
+>> > then you'll enable a nonexisting clock below.
+>> >
+>>
+>> Agree. ?I'd prefer to enable this clock during intialization and just
+>> leave it running. ?It is supposed to be a very low power clock and I
+>> couldn't measuring any power difference with and without it being
+>> enabled
+>
+> Ok, even better.
+>
+>> >
+>> > I wonder why you don't add the default ARM_CPUIDLE_WFI_STATE_PWR state.
+>> > The above is something different, right? It has a greater exit latency
+>> > than ARM_CPUIDLE_WFI_STATE_PWR, so why don't we add it here aswell?
+>>
+>> Yes and no. ?Yes this is a different state but no, it doesn't have a
+>> significantly greater exit latency, or at least a large enough exit
+>> latency to warrant an extra state in my opinion. ?According to the
+>> i.MX5 documentation, the extra exit time beyond basic WFI required for
+>> the ?"WAIT_UNCLOCKED_POWER_OFF" state is 500ns (this is due to a
+>> difference in i.MX5 hardware implementation compared to all other ARM
+>> platforms). ?In reality, it did require a few more microseconds to
+>> perform in my testing just based on the extra register writes in
+>> mx5_cpu_lp_set(). ?I'd like to clean up mx5_cpu_lp_set() and add a
+>> global variable to track the previous state and to just exit out if
+>> the new state is the same as the old.
+>
+> Do you think it's worth it? You buy skipping the read with an additional
+> test.
+>
 
-No it's me who is strange.
-I meant to link the kernel.org server but my browser cache
-wanted something else.
+I'll run some tests to check.
 
-This is the actual tag.
-http://git.kernel.org/?p=linux/kernel/git/linusw/linux-pinctrl.git;a=commit;h=dcb5dbc305b975cccf40942feba40964069541d3
+Thanks,
+Rob
 
-Yours,
-Linus Walleij
+>> I could do this cleanup as part of this patchset if you prefer that.
+>
+> Yes please. Cleanups before adding new features is always a good reason
+> to apply a patch series ;)
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
