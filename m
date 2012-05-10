@@ -1,39 +1,51 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 10 May 2012 13:21:01 +0300
-Subject: [PATCH 0/3] ARM: OMAP2/3: DSS HWMOD fixes
-Message-ID: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Thu, 10 May 2012 13:21:02 +0300
+Subject: [PATCH 1/3] ARM: OMAP2/3: HWMOD: Add missing flags for dispc class
+In-Reply-To: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1336645264-909-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hwmod class for dispc is missing sysc flags, which this patch adds.
 
-These patches fix DSS hwmod data related to sysc flags. I haven't seen any
-problem produced by these missing bits, but by looking at the TRM it's clear
-that they should be defined.
+OMAP2 is missing SYSS_HAS_RESET_STATUS
 
-However, applying these will cause additional warnings to show during boot:
+OMAP3 is missing SYSS_HAS_RESET_STATUS and SYSC_HAS_CLOCKACTIVITY
 
-omap_hwmod: dss_dispc: softreset failed (waited 10000 usec)
-omap_hwmod: dss_rfbi: softreset failed (waited 10000 usec)
-
-Most likely the softreset fails even now, but as there's no check to verify it,
-no warnings are visible.
-
-I think the reason for the failing softreset is the same problem as we have on
-OMAP4: dss_core hwmod should be enabled before other dss hwmods can be enabled
-(and reset).
-
- Tomi
-
-Tomi Valkeinen (3):
-  ARM: OMAP2/3: HWMOD: Add missing flags for dispc class
-  ARM: OMAP2/3: HWMOD: Add missing flag for rfbi class
-  ARM: OMAP3: HWMOD: Add omap_hwmod_class_sysconfig for dsi
-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 +-
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   15 ++++++++++++++-
- 3 files changed, 17 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+index 2a67297..7d1f71a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+@@ -39,7 +39,8 @@ static struct omap_hwmod_class_sysconfig omap2_dispc_sysc = {
+ 	.sysc_offs	= 0x0010,
+ 	.syss_offs	= 0x0014,
+ 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
+-			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
++			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
++			   SYSS_HAS_RESET_STATUS),
+ 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+ 			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index db86ce9..489c374 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1502,7 +1502,8 @@ static struct omap_hwmod_class_sysconfig omap3_dispc_sysc = {
+ 	.syss_offs	= 0x0014,
+ 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
+ 			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
+-			   SYSC_HAS_ENAWAKEUP),
++			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_CLOCKACTIVITY |
++			   SYSS_HAS_RESET_STATUS),
+ 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+ 			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
 -- 
 1.7.9.5
