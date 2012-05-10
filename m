@@ -1,40 +1,54 @@
-From: snijsure@grid-net.com (Subodh Nijsure)
-Date: Thu, 10 May 2012 09:08:33 -0700
-Subject: i.MX USB Re-Structure
-In-Reply-To: <201205101512.27073.marex@denx.de>
-References: <20120510060523.GA32703@nchen-desktop>
- <20120510125834.GT27341@pengutronix.de> <201205101512.27073.marex@denx.de>
-Message-ID: <4FABE801.7070701@grid-net.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 10 May 2012 10:11:05 -0600
+Subject: Handling of modular boards
+In-Reply-To: <20120510104311.GB30103@trinity.fluff.org>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <4FA432E9.9050606@wwwdotorg.org> <20120510104311.GB30103@trinity.fluff.org>
+Message-ID: <4FABE899.9040602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2012 06:12 AM, Marek Vasut wrote:
-> Dear Sascha Hauer,
->
->> On Thu, May 10, 2012 at 02:05:24PM +0800, Peter Chen wrote:
->>> Hi Sascha,
->>>
->>> Recently, Alexander Shishkin has posted new chipidea patchset
->>> (http://www.spinics.net/lists/linux-usb/msg62975.html)
->>> to support USB driver who use chipidea core. In his structure,
->>> all controller related files (like ehci-mxc.c, fsl-udc-core.c, etc)
->>> will be drivers/usb/chipidea, and no related file will be host, gadget
->>> and otg again.
->>>
->>> So, it will be different with marek has posted i.mx28 USB driver,
->>> and also different with your proposal in the past. But I think
->>> you and marek may prefer Alexander's structure, and would like
->>> use it for i.mx in future, correct?
->> I was not aware of this patchset. I only had a short look at it, but
->> yes, it seems to be the way to go, for all SoCs supporting this
->> hardware, be it i.MX, MXS or something else.
-> Correct, I can't but agree here.
-http://www.spinics.net/lists/linux-usb/msg63064.html
+On 05/10/2012 04:43 AM, Ben Dooks wrote:
+> On Fri, May 04, 2012 at 01:50:01PM -0600, Stephen Warren wrote:
+>> On 05/04/2012 12:58 PM, Mark Brown wrote:
+>>> Quite a few reference platforms (including Wolfson ones, which is why
+>>> I'm particularly interested) use replaceable modules to allow
+>>> configuration changes.  Since we can often identify the configuration at
+>>> runtime we should ideally do that but currently there's no infrastructure 
+>>> to help with that...
+>>
+>> So, I'll respond within the context of device tree, although perhaps you
+>> were looking for something more general?
+>>
+>> I was just asked basically the same question internally to NVIDIA. One
+>> option that was floated was to store the device tree in chunks and have
+>> the bootloader piece them together. You'd start with the DT for the
+>> basic CPU board, probe what HW was available, and then graft in the
+>> content of additional DT chunks and pass the final result to the kernel.
+>> The advantages here are:
+>>
+>> a) The DT is stored in chunks for each plugin board, so there's no bloat
+>> in the DT that gets passed to the kernel; it contains exactly what's on
+>> the board.
+> 
+> Interesting, but how does it sort ofu things like mapping GPIO lines from
+> the add-in board's view to the rest of the system?
 
-In followup message referenced above Felipe Balbi said he can't put 
-above patch in v3.5 pull and has to be deferred till 3.6.
+To be fully general, we'd need to have some kind of proxy GPIO object
+that always exists on the main board, for the plugin boards to provide
+GPIOs to, or consume GPIOs from.
 
-So are we left with roll your own i.MX USB support for 3.5? Is Marek's 
-work going to be part of 3.5 pull?
+The simple case of a GPIO provider being on the main board and the
+consumer being on a plugin board doesn't need this. The case of the GPIO
+provider being on a plugin board, and the only GPIO consumer being on
+the main board might not need this.
 
--Subodh
+But if the GPIO provider is on one plugin board, and the GPIO consumer
+on another, we'd want to have the DT chunks for each plugin board be
+completely independent, so you'd need to route everything through
+something that always exists, in the motherboard's DT. I haven't really
+thought how that would look yet.
+
+I think this is probably true irrespective of whether the bootloader is
+merging the DT chunks, or the kernel did it during boot, or any other
+way of constructing the final complete DT.
