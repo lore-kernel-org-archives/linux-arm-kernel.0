@@ -1,24 +1,35 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 10 May 2012 19:22:55 +0800
-Subject: [alsa-devel] [PATCH 6/6] ARM: dts: enable audio support for
- imx28-evk
-In-Reply-To: <1336639333-11561-7-git-send-email-shawn.guo@linaro.org>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
- <1336639333-11561-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120510112254.GM6622@shlinux2.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 May 2012 12:28:55 +0200
+Subject: i.MX USB Re-Structure
+In-Reply-To: <20120510060523.GA32703@nchen-desktop>
+References: <20120510060523.GA32703@nchen-desktop>
+Message-ID: <201205101228.55954.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 04:42:13PM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx28-evk.dts |   41 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx28.dtsi    |   23 +++++++++++++++++++++
->  2 files changed, 64 insertions(+), 0 deletions(-)
+Dear Peter Chen,
+
+> Hi Sascha,
 > 
-Looks ok to me.
+> Recently, Alexander Shishkin has posted new chipidea patchset
+> (http://www.spinics.net/lists/linux-usb/msg62975.html)
+> to support USB driver who use chipidea core. In his structure,
+> all controller related files (like ehci-mxc.c, fsl-udc-core.c, etc)
+> will be drivers/usb/chipidea, and no related file will be host, gadget
+> and otg again.
+> 
+> So, it will be different with marek has posted i.mx28 USB driver,
+> and also different with your proposal in the past. But I think
+> you and marek may prefer Alexander's structure, and would like
+> use it for i.mx in future, correct?
 
-Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+I noticed the patchset, I don't mind doing another round of rework. The patches 
+look very good actually, very helpful for our purpose too.
 
-Regards
-Dong Aisheng
+> If it is, I may need to cease Freescale i.mx6q USB driver development
+> with your old proposal (Marek mx28 style's). Let me know your suggestion.
+
+SHA's adding mx6q support to my patches?
+
+Best regards,
+Marek Vasut
