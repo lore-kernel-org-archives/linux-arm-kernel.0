@@ -1,62 +1,42 @@
-From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Thu, 10 May 2012 19:52:32 +0200
-Subject: [PATCH] ARM: davinci: turn off DDR PHY when entering deep sleep
-In-Reply-To: <marcus.folkesson@gmail.com>
-References: <marcus.folkesson@gmail.com>
-Message-ID: <1336672352-23191-1-git-send-email-marcus.folkesson@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 May 2012 14:01:35 -0400 (EDT)
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAK5ve-JC61jFX7+GV9VoZKExbtdxX03jmpkzu5zxHg+Lehy7VQ@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+ <201205092038.16722.arnd.bergmann@linaro.org>
+ <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
+ <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
+ <CAK5ve-+rCv3s+K6Laie=QaPqqZ4Vk1+irYU6S4MBZSquKrMWtw@mail.gmail.com>
+ <alpine.LFD.2.02.1205092122140.21030@xanadu.home>
+ <CAK5ve-JC61jFX7+GV9VoZKExbtdxX03jmpkzu5zxHg+Lehy7VQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deepsleep is the most power saving state on the davinci-platform.
-The DDR PHY consumes about 25mW and should be turned off in this low
-power state.
+On Fri, 11 May 2012, Bryan Wu wrote:
 
-Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
----
- arch/arm/mach-davinci/include/mach/memory.h |    2 ++
- arch/arm/mach-davinci/sleep.S               |   10 ++++++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+> On Thu, May 10, 2012 at 9:25 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > You applied your patches on top of linux-next. ?This can't be merged
+> > upstream until you rebase your patches on something stable such as pure
+> > v3.4-rc6 for example.
+> >
+> 
+> Got it, Nico. As I'm still in US for our Ubuntu Developer Summit, I
+> plan to rebase and test on my hardware after I'm back to home next
+> week.
 
-diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
-index 7873194..1b1b8ac 100644
---- a/arch/arm/mach-davinci/include/mach/memory.h
-+++ b/arch/arm/mach-davinci/include/mach/memory.h
-@@ -36,6 +36,8 @@
- #define DDR2_MCLKSTOPEN_BIT	BIT(30)
- #define DDR2_LPMODEN_BIT	BIT(31)
- 
-+#define DDR2_DRPHYC1R_OFFSET 	0xe4
-+#define DDR_PWRDNEN_BIT 		BIT(6)
- /*
-  * Increase size of DMA-consistent memory region
-  */
-diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
-index 5f1e045..30713b2 100644
---- a/arch/arm/mach-davinci/sleep.S
-+++ b/arch/arm/mach-davinci/sleep.S
-@@ -57,6 +57,11 @@ ENTRY(davinci_cpu_suspend)
- 
- 	ldmia	r0, {r0-r4}
- 
-+	/* Turn PHY off */
-+	ldr	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
-+	orr	ip, ip, #DDR_PWRDNEN_BIT 	
-+	str	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
-+
- 	/*
- 	 * Switch DDR to self-refresh mode.
- 	 */
-@@ -171,6 +176,11 @@ ENTRY(davinci_cpu_suspend)
- 	bic	ip, ip, #DDR2_LPMODEN_BIT
- 	str	ip, [r0, #DDR2_SDRCR_OFFSET]
- 
-+	/* Turn PHY on */
-+	ldr	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
-+	bic	ip, ip, #DDR_PWRDNEN_BIT 	
-+	str	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
-+
- 	/* Restore registers and return */
- 	ldmfd   sp!, {r0-r12, pc}
- 
--- 
-1.7.5.4
+Given where things are, you risk being too late for this merge window if 
+you do so, meaning that this cleanup will have to wait yet another 
+cycle which would be rather disappointing.
+
+Given that the probabilities for something to break are rather small if 
+you simply rebase on top of v3.4-rc6 from linux-next, I'd suggest you do 
+the rebase ASAP and perform compilation tests only.  If this can be 
+merged in the arm-soc tree quickly then this will get some exposure and 
+actual testing from others which should be fine.
+
+
+Nicolas
