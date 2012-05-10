@@ -1,54 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 May 2012 11:26:57 +0100
-Subject: [PATCH 11/15] drivers/mfd: Enable Device Tree for ab8500-core
- driver
-In-Reply-To: <CACRpkdaju5y6pduWrkH97LujzqJu5hAaGozyHY3Rsvvn7ZyKhA@mail.gmail.com>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-12-git-send-email-lee.jones@linaro.org>
- <CACRpkdaju5y6pduWrkH97LujzqJu5hAaGozyHY3Rsvvn7ZyKhA@mail.gmail.com>
-Message-ID: <20120510102657.GD3190@n2100.arm.linux.org.uk>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 10 May 2012 11:41:36 +0100
+Subject: Handling of modular boards
+In-Reply-To: <20120504220944.GT14230@opensource.wolfsonmicro.com>
+References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
+ <201205041934.08830.arnd@arndb.de>
+ <20120504203357.6B79B206451@gemini.denx.de>
+ <20120504220944.GT14230@opensource.wolfsonmicro.com>
+Message-ID: <20120510104136.GA30103@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 11:02:27AM +0200, Linus Walleij wrote:
-> On Fri, May 4, 2012 at 8:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, May 04, 2012 at 11:09:45PM +0100, Mark Brown wrote:
+> On Fri, May 04, 2012 at 10:33:57PM +0200, Wolfgang Denk wrote:
 > 
-> > This patch will allow the ab8500-core driver to be probed and set up
-> > when booting when Device Tree is enabled. This includes platform ID
-> > look-up which identifies the machine it is currently running on. If
-> > we are undergoing a DT enabled boot, we will refuse to setup each of
-> > the other ab8500-* devices, as they will be probed individually by DT.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> (...)
-> > + ? ? ? else if (np)
-> > + ? ? ? ? ? ? ? ret = of_property_read_u32(np, "stericsson,irq-base", &ab8500->irq_base);
-> > +
-> > + ? ? ? if (ab8500->irq_base == 0) {
+> > On the other hand, some of the issues we're trying to solve here
+> > for the kernel are also present in the boot loader, so this needs to
+> > do this anyway - whether by inserting new or modifying (enabling or
+> > disabling) existing properties in the DT is not really relevant here.
 > 
-> Shouldn't this be (av8500->irq_base == NO_IRQ) now that we're tranisitioning to
-> use 0 as NO_IRQ?
+> FWIW if the bootloader can usefully handle this stuff I think that's a
+> good approach but there is substantial variation in quality of
+> implementation between bootloaders and even when the bootloader is a
+> good one it's not always practical to update it or the data it relies
+> on.
 
-No it shouldn't.  We want new drivers to be rejecting on explicitly zero
-IRQ numbers and not using NO_IRQ at all.  We want to get rid of NO_IRQ
-entirely.
+I agree, the list of devices should be in the device-tree handed to
+whatever OS is being booted. It isn't a Linux specific problem that
+we're looking at here.
 
-At the moment, NO_IRQ is a marker for "this is a mistake which needs
-fixing" and allows them to be found by grep.
+Any operating system, pre-OS test suite, etc. is going going to need
+this information, and in my view the bootloader should be doing whatever
+is needed to create a device-tree to passed through to the next loaded
+system.
 
-What we need is more of an effort so that platforms do not start numbering
-IRQs at zero, but start at one.
+Also, having the information available to $bootloader means the user
+can verify the presence of the peripherals before the OS is loaded.
 
-(I could fix up SA11x0, which would then allow the SA1111 code to be fixed,
-but I've not had time to look at that during this last cycle.  Others need
-their maintainers who know the code to fix them.)
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-I brought up the issue of the new introduction of NO_IRQ in the previously
-clean versatile express code, and failed to get any reply.
-
-So, I think what I'll do when I've eliminated all those that I can do is
-to remove the definition from our asm/irq.h and cause a load of build
-errors in linux-next.  This seems to be the _only_ way to motivate people
-into fixing these kinds of issues.  Which is awfully sad.  I'd much
-rather people just had the carrot instead but as ever its proven many
-times that people just ignore such things.
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
