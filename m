@@ -1,162 +1,36 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 10 May 2012 19:16:46 +0800
-Subject: [alsa-devel] [PATCH 5/6] ASoC: mxs: add device tree support
- for mxs-sgtl5000
-In-Reply-To: <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
- <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120510111646.GL6622@shlinux2.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 May 2012 12:11:06 +0100
+Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <201205101053.09954.arnd@arndb.de>
+References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+ <201205092047.06852.arnd@arndb.de>
+ <ed0ce2390716adbfc949f86c16dab996@localhost>
+ <201205101053.09954.arnd@arndb.de>
+Message-ID: <4FABA24A.9040209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 04:42:12PM +0800, Shawn Guo wrote:
-> Add device tree probe for mxs-sgtl5000 machine driver.
+On 10/05/12 11:53, Arnd Bergmann wrote:
+> On Wednesday 09 May 2012, Marc Zyngier wrote:
+>>>
+>>> Sounds good. I don't have a strong preference whether that should be a
+>>> property like you suggest or a separate "compatible" value, maybe Rob or
+>>> Grant can comment on what they prefer.
+>>
+>> At the moment, the compatible string should be pretty explicit, as it is
+>> not possible to build an A7 or A15 based SoC without the virtualization
+>> extensions.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Mostly it looks okay to me.
-A few comments.
+> Ok, makes sense. Then again, if you run an A15 guests on an A15 host,
+> the virtual GIC would not have those extensions, right?
 
-> ---
->  .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 ++++++
->  sound/soc/mxs/mxs-sgtl5000.c                       |   57 ++++++++++++++++++++
->  2 files changed, 74 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-> new file mode 100644
-> index 0000000..601c518
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-> @@ -0,0 +1,17 @@
-> +* Freescale MXS audio complex with SGTL5000 codec
-> +
-> +Required properties:
-> +- compatible: "fsl,mxs-audio-sgtl5000"
-> +- model: The user-visible name of this sound complex
-> +- saif-controllers: The phandle list of the MXS SAIF controller
-> +- audio-codec: The phandle of the SGTL5000 audio codec
-> +
-> +Example:
-> +
-> +sound {
-> +	compatible = "fsl,imx28-evk-sgtl5000",
-> +		     "fsl,mxs-audio-sgtl5000";
-> +	model = "imx28-evk-sgtl5000";
-> +	saif-controllers = <&saif0 &saif1>;
-> +	audio-codec = <&sgtl5000>;
-> +};
-> diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
-> index e9e6112..d420f11 100644
-> --- a/sound/soc/mxs/mxs-sgtl5000.c
-> +++ b/sound/soc/mxs/mxs-sgtl5000.c
-> @@ -18,6 +18,8 @@
->  
->  #include <linux/module.h>
->  #include <linux/device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <sound/core.h>
->  #include <sound/pcm.h>
->  #include <sound/soc.h>
-> @@ -110,11 +112,58 @@ static struct snd_soc_card mxs_sgtl5000 = {
->  	.num_links	= ARRAY_SIZE(mxs_sgtl5000_dai),
->  };
->  
-> +static int __devinit mxs_sgtl5000_probe_dt(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *saif_np[2], *codec_np;
-> +	struct platform_device *saif_pdev[2];
-> +	int i, ret = 0;
-> +
-> +	if (!np)
-> +		return 1; /* no device tree */
-> +
-> +	saif_np[0] = of_parse_phandle(np, "saif-controllers", 0);
-> +	saif_np[1] = of_parse_phandle(np, "saif-controllers", 1);
-> +	codec_np = of_parse_phandle(np, "audio-codec", 0);
-> +	if (!saif_np[0] || !saif_np[1] || !codec_np) {
-> +		dev_err(&pdev->dev, "phandle missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-...
+Indeed, they would be inaccessible (the hypervisor should not map them
+into the guest address space). I'd expect the guest kernel not to try to
+use them anyway, as it wouldn't be able to use the HYP mode.
 
-> +
-> +	saif_pdev[0] = of_find_device_by_node(saif_np[0]);
-> +	saif_pdev[1] = of_find_device_by_node(saif_np[1]);
-> +	if (!saif_pdev[0] || !saif_pdev[1]) {
-> +		dev_err(&pdev->dev, "failed to find saif platform device\n");
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-Do we really need this checking?
+But again, this is implementation specific.
 
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		mxs_sgtl5000_dai[i].codec_name = NULL;
-> +		mxs_sgtl5000_dai[i].codec_of_node = codec_np;
-> +		mxs_sgtl5000_dai[i].cpu_dai_name = NULL;
-> +		mxs_sgtl5000_dai[i].cpu_dai_of_node = saif_np[i];
-> +		mxs_sgtl5000_dai[i].platform_name = NULL;
-> +		mxs_sgtl5000_dai[i].platform_of_node = saif_np[i];
-> +	}
-> +
-> +out:
-> +	of_node_put(codec_np);
-> +	of_node_put(saif_np[0]);
-> +	of_node_put(saif_np[1]);
-> +
-> +	return ret;
-> +}
-> +
->  static int __devinit mxs_sgtl5000_probe(struct platform_device *pdev)
->  {
->  	struct snd_soc_card *card = &mxs_sgtl5000;
->  	int ret;
->  
-> +	ret = mxs_sgtl5000_probe_dt(pdev);
-> +	if (ret < 0)
-> +		return ret;
-> +
->  	/*
->  	 * Set an init clock(11.28Mhz) for sgtl5000 initialization(i2c r/w).
->  	 * The Sgtl5000 sysclk is derived from saif0 mclk and it's range
-> @@ -127,6 +176,7 @@ static int __devinit mxs_sgtl5000_probe(struct platform_device *pdev)
->  	card->dev = &pdev->dev;
->  	platform_set_drvdata(pdev, card);
->  
-> +	card->dev = &pdev->dev;
-Repeat assignment?
-
-Regards
-Dong Aisheng
-
->  	ret = snd_soc_register_card(card);
->  	if (ret) {
->  		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
-> @@ -148,10 +198,17 @@ static int __devexit mxs_sgtl5000_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct of_device_id mxs_sgtl5000_dt_ids[] = {
-> +	{ .compatible = "fsl,mxs-audio-sgtl5000", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mxs_sgtl5000_dt_ids);
-> +
->  static struct platform_driver mxs_sgtl5000_audio_driver = {
->  	.driver = {
->  		.name = "mxs-sgtl5000",
->  		.owner = THIS_MODULE,
-> +		.of_match_table = mxs_sgtl5000_dt_ids,
->  	},
->  	.probe = mxs_sgtl5000_probe,
->  	.remove = __devexit_p(mxs_sgtl5000_remove),
-> -- 
-> 1.7.5.4
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
