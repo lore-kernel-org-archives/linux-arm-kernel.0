@@ -1,67 +1,22 @@
 From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Thu, 10 May 2012 09:14:18 +0530
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120509121945.GT26481@n2100.arm.linux.org.uk>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
- <20120509121945.GT26481@n2100.arm.linux.org.uk>
-Message-ID: <1336621458.1540.280.camel@vkoul-udesk3>
+Date: Thu, 10 May 2012 09:23:58 +0530
+Subject: [PATCH V2 01/11] dma: imx-sdma: make channel0 operations atomic
+In-Reply-To: <1336563190-19974-2-git-send-email-richard.zhao@freescale.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1336622038.1540.285.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-09 at 13:19 +0100, Russell King - ARM Linux wrote:
-> On Wed, May 09, 2012 at 12:16:15PM +0100, Mark Brown wrote:
-> > Looking at the code the current usage doesn't seem obviously wrong so
-> > there's some work to do - we get a callback assigned on each descriptor
-> > we submit so it's a bit surprising that this might not get delivered,
-> > though as has been discussed further up the thread that's something that
-> > might actually happen and perhaps we need to clarify the interfaces
-> > here.
+On Wed, 2012-05-09 at 19:33 +0800, Richard Zhao wrote:
+> device_prep_dma_cyclic may be call in audio trigger function which is
+> atomic context, so we make it atomic too.
 > 
-> Go back and look at my opening email in this thread.  Think about
-> the comments in include/linux/interrupt.h about the tasklet guarantees.
-> Then look at (eg) the IMX DMA engine driver and ascertain how the
-> callback is called.  Then look at soc-dmaengine-pcm's callback
-> method.
+>  - change channel0 lock to spinlock.
+>  - Use polling to wait for channel0 finish running.
 > 
-> Put all this together and what you get is that there's absolutely no
-> guarantee that the callback will be called for each period.
-> 
-> You really won't know if it slips just one or two periods, because your
-> audio output won't be affected by that.  It _may_ only become apparant
-> if DMA catches up with the part of the buffer you're writing to.
-> 
-> Amd I'm also willing to bet that the IMX DMA engine with ASoC has only
-> been tested with an unloaded system. 
-
-DMAengine mandates the callback be called from tasklet. Yes under a very
-heavy loaded systems there can be a certain case where callback maybe
-delayed. Or the tasklet gets scheduled _once_ for couple of dma
-completions, thus missed
-
-But tell me what prevents the dmac driver for fixing this. In ISR they
-can easily find which descriptor is completed and mark them so.
-In tasklet, it can ensure that all callback are generated including
-previous missed ones, if that is something the usage of dmaengine needs.
-
-For audio needs I think it is fine if we miss, as long as subsequent
-comes untill we get underrun/overrun.
-
-Quite a few ASoC drivers use dmaengine today (cyclic was added keeping
-audio in mind), so adding library helps to avoid each ASoC driver having
-its own implementation. It indirectly ensures that APIs are properly
-implemented as well and any bugs due to deviation form std behavior gets
-identified and fixed!
-
-> DMA engine is slowly getting better (mainly through my efforts at trying
-> to extract common code, and fix down the API issues) but it needs folk
-> with strong and good review skills to ensure that we stop the influx of
-> non-conforming code and get that non-conforming code fixed.
-Yes and a big Thanks for this. Russell, your contributions are very appreciated.
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Acked By: Vinod Koul <vinod.koul@linux.intel.com>
 
 -- 
 ~Vinod
