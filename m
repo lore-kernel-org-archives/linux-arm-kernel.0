@@ -1,49 +1,39 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 10 May 2012 08:33:39 +0000
-Subject: [GIT PULL] ARM: OMAP2+: Misc cleanup
-In-Reply-To: <20120508183414.GZ5088@atomide.com>
-References: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
- <20120508183414.GZ5088@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA1F2D1@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 10 May 2012 09:44:04 +0100
+Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <20120510063904.GB17875@S2101-09.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
+ <20120509160005.GG3955@opensource.wolfsonmicro.com>
+ <20120510003532.GG2982@b20223-02.ap.freescale.net>
+ <20120510063904.GB17875@S2101-09.ap.freescale.net>
+Message-ID: <20120510084403.GA3908@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 00:04:14, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120508 00:18]:
-> > Tony,
-> > 
-> > Please pull the following preparatory cleanup series to add OMAP5 minimal
-> > support. Boot tested on OMAP2430 SDP, OMAP3430 SDP and OMAP4430 SDP platforms.
-> > 
-> > I have dropped {[PATCH 7/7] ARM: OMAP4+: Add prm and cm base init function}
-> > from this set since Paul is taking that one in his queue.
-> 
-> OK thanks, pulling this into cleanup-soc and merging into cleanup branch
-> with what we have in devel-hwmod.
->  
-Tony,
+On Thu, May 10, 2012 at 02:39:06PM +0800, Shawn Guo wrote:
+> On Thu, May 10, 2012 at 08:35:33AM +0800, Richard Zhao wrote:
 
+> > It's based on your for-next. But for working, it depends on
+> > pinctl/for-next.
 
-Just observed that, while merging cleanup-soc into cleanup branch you have 
-missed couple of lines from Satosh's original patch. Which leads to build 
-break on OMAP2 alone build.
+> Mark, may I have your ack to have it go through arm-soc?  I will ask
+> Arnd pull your sound/for-v3.5 branch into arm-soc as a dependency.
+> You need to ensure the branch will not be rebased.
 
-Can you please merge below change,
+for-3.5 is the entire undifferentiated blob of ASoC stuff, it's not
+really suitable for merging elsewhere.  It won't actually get rebased
+but the idea of merging it into other trees doesn't seem terribly
+clever, it'd make having topic branches in arm-soc a bit of a joke and
+if you pull it right now you'll get problems in -next due to the the
+ux500 stuff.
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 833f153..c82783a 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -122,6 +122,8 @@ obj-$(CONFIG_SOC_AM33XX)            += $(powerdomain-common)
- clockdomain-common                     += clockdomain.o
- clockdomain-common                     += clockdomains_common_data.o
- obj-$(CONFIG_ARCH_OMAP2)               += $(clockdomain-common)
-+obj-$(CONFIG_ARCH_OMAP2)               += clockdomain2xxx_3xxx.o
-+obj-$(CONFIG_ARCH_OMAP2)               += clockdomains2xxx_3xxx_data.o
- obj-$(CONFIG_SOC_OMAP2420)             += clockdomains2420_data.o
- obj-$(CONFIG_SOC_OMAP2430)             += clockdomains2430_data.o
- obj-$(CONFIG_ARCH_OMAP3)               += $(clockdomain-common)
-
-
-Thanks,
-Vaibhav
+What does "working" mean in this context - what happens without the
+pinctl changes?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120510/b22fa77a/attachment-0001.sig>
