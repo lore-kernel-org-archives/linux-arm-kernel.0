@@ -1,34 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 May 2012 16:04:20 -0600 (MDT)
-Subject: [PATCH-V7 0/3] ARM: OMAP: Make OMAP clocksource source selection
- runtime
-In-Reply-To: <2430095.tlzScq1o2g@acer>
-References: <1336031941-23651-1-git-send-email-hvaibhav@ti.com>
- <2430095.tlzScq1o2g@acer>
-Message-ID: <alpine.DEB.2.00.1205101603350.32719@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 May 2012 15:10:13 -0700
+Subject: [PATCH] ARM: OMAP2+: irq: Increase no of supported interrupts
+ to 128
+In-Reply-To: <87d36bvh9a.fsf@ti.com>
+References: <1336486679-15892-1-git-send-email-hvaibhav@ti.com>
+ <87lil2o6u1.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA1C06F@DBDE01.ent.ti.com>
+ <87d36bvh9a.fsf@ti.com>
+Message-ID: <20120510221012.GP21851@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Janusz,
-
-On Thu, 10 May 2012, Janusz Krzysztofik wrote:
-
-> Tried to test this branch, merged into 3.4-rc6, and with my Amstrad 
-> Delta fixes applied, using my custom Amstrad Delta config, but initially 
-> failed because an unrelated issue rised to the surface:
+* Kevin Hilman <khilman@ti.com> [120510 14:53]:
+> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+> >
+> > Let me finish up with am33xx baseport upstream activity which is currently 
+> > going on at full swing, then next thing I will pick up is this code cleanup.
+> >
+> > I still feel, this is still a valid cleanup patch, and can be merged, as it 
+> > is required/used when we do major cleanup.
 > 
-> |   LD      .tmp_vmlinux1
-> | arch/arm/mach-omap1/built-in.o: In function `omap1_usb_init':
-> | lcd_dma.c:(.init.text+0x1420): undefined reference to `ocpi_enable'
-> | make: *** [.tmp_vmlinux1] Error 1
+> Well, Tony can make that decision.
 > 
-> Apparently introduced with commit 
-> d3645d39ad0ed9f09535065676ea0ba114f93cdf, "ARM: OMAP1: OHCI: use 
-> platform_data fn ptr to enable OCPI bus", looks like one or more symbols 
-> exported by the not linked in arch/arm/mach-omap1/ocpi.o may be missing 
-> for non-OMAP16xx configs.
+> Personally, I think this patch continues to add confusion on top of an
+> existing mess, and to me provides the proverbial straw that broke the
+> camel's back.
+> 
+> That being said, the INTC core is an obviously important and sensitive
+> piece of code so needs to be handled with care.
+> 
+> In case Tony decides to merge this patch and allow a future** cleanup,
+> I'll provide some comments.
 
-Thanks for the report, I'll send a fix.
+Heh I agree with Kevin here :)
 
+Tony
 
-- Paul
+ 
+> ** since they rarely happen, we tend to not have too much faith in
+>    promises of mythical "future" cleanups.  This is not because we don't
+>    trust you personally, but simply based on based experience.
