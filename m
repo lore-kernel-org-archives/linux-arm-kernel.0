@@ -1,191 +1,141 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 10 May 2012 21:57:18 +0200
-Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
-Message-ID: <1336679838-30738-1-git-send-email-stigge@antcom.de>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 11 May 2012 01:29:51 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FABF445.3030105@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+ <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+ <4FA94B49.5050500@wwwdotorg.org>
+ <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
+ <4FAAC111.9020308@wwwdotorg.org>
+ <CAJe_Zhcrr2QqoY=H3=3EJLPQBjC3Yc43EDjqYXaNok9-T+=0yw@mail.gmail.com>
+ <4FABF445.3030105@wwwdotorg.org>
+Message-ID: <CAJe_ZhduQuHnFyF20VnjZW9uz1szwL6O7=ow+tMqanmeHs58pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for gpio-lpc32xx.c.
+On 10 May 2012 22:30, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/09/2012 03:38 PM, Jassi Brar wrote:
 
-The various GPIO groups correspond to the different irregular GPIO banks of the
-LPC32xx hardware. Most importantly, there are the GPI(0-27), GPO(0-23) and
-GPIO(0-5) banks. Each bank must be registered individually since they are
-implemented with different functions. Registration is done via gpiochip_add()
-which requires an individual gpio bank subnode in the device tree for each
-call.
+>> One point is about 'qos' here.... something like bandwidth allocation.
+>> If the dmac driver knew up-front the max possible clients that could be
+>> active simultaneously, it could "divide the bandwidth" accordingly.
+>> Again, the example of PL330 employing 2physical channels for better
+>> service - LLI (you got it right), where even 1 physical channel would
+>> also have served only not as reliably. I believe there would be
+>> more such scenarios.
+>
+> QoS seems like policy to me, whereas DT is more about describing the HW.
+> Is DT the correct place to describe QoS policy?
+>
+> I guess you are talking more about deriving policy from the description
+> of HW, i.e. how many client described in DT.
+>
+Yeah, that's what I meant.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> However, for some reason that seems dangerous to me; what if clients
+> can be instantiated some other way?
+>
+The other way could be hotplug ?
+Anyway in those machines every channel would be populated
+and dmac driver would always account for the all-ports-plugged case.
 
----
+>
+> For a 1:1 mapping (or 1:n mapping in HW with static selection specified
+> in the DT) between DMA client and DMA controller, perhaps the controller
+> can indeed make QoS decisions based on which (how many) clients are
+> connected to it.
+>
+> However, if a DMA client can be serviced by more than 1 DMA engine, and
+> the decision as to which DMA engine to use occurs at run-time by the DMA
+> driver core, rather than being statically configured in the DT, then the
+> DMA controller drivers cannot know ahead of time which will be used
+>
+I think the dmac driver would make use of the routing flexibility to sustain its
+'qos', and not the other way around (decide qos based on which one of the
+two dmacs would provide a channel to a client in future).
+Anyways, so far only Samsung SoCs seem to have that flexibility/redundancy
+and I have never had anyone asking for that runtime decision making.
 
-Applies to v3.4-rc6
+>
+>> The minor difference being, you use the {request-signal, phandle} pair
+>> to find the right channel, I used only 'token'.
+>
+> That's a pretty big difference, I think.
+>
+> In your proposal, every token was globally unique (well, within the 1 DT
+> file). I'd rather not see any more global numbering schemes.
+>
+Probably my shallow experience, but "globally unique, within a file" sounds
+like an oxymoron :)
+I think arbitrary numerical tokens are a reasonable price to pay for the
+robustness and simplicity they bring.
 
-Changes since last version:
-* Updated patch description (above)
+>
+> Now, DMA requests are signals /from/ a DMA client to a DMA controller
+> ("send more data please", or "pull more data please"). Hence, I assert
+> that the phandle should refer to the DMA client, not the DMA controller.
+>
+OK, though we may just want to convey information about the h/w setup
+from the s/w POV, rather than info to simulate the h/w  ;)
+For ex, the dma api and controller drivers don't really care about
+the fact that the client's driver must set some bit to trigger operation,
+whereas some simulator would need to care about that.
 
-Thanks to Jean-Christophe PLAGNIOL-VILLARD, Grant Likely, Arnd Bergmann, Jon
-Smirl, Mark Brown for reviewing!
+Anyways, I am OK with whatever works well and make things simpler.
 
-I can also provide a git branch to pull from. On top of which one should I
-provide it, if not mainline rc?
- 
- Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   65 ++++++++++++++++
- arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
- drivers/gpio/gpio-lpc32xx.c                             |   56 +++++++++++++
- 3 files changed, 127 insertions(+), 3 deletions(-)
 
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-@@ -0,0 +1,65 @@
-+NXP LPC32xx SoC GPIO controller
-+
-+Required properties:
-+- compatible: must be "nxp,lpc3220-gpio"
-+- reg: Physical base address and length of the controller's registers.
-+- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
-+  SoC)
-+- #size-cells: Always 0
-+
-+Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
-+- gpio-controller: Marks the device node as a GPIO controller.
-+- #gpio-cells: Should be two. The first cell is the pin number and the
-+  second cell is used to specify optional parameters:
-+  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+- reg: Index of the GPIO group
-+
-+Optional properties of sub-nodes which describe the GPIO groups of LPC32xx:
-+- status: Set to "disabled" if you don't use the respective GPIO group
-+  of the LPC32xx SoC
-+
-+Example:
-+
-+	gpio: gpio at 40028000 {
-+		compatible = "nxp,lpc3220-gpio";
-+		reg = <0x40028000 0x1000>;
-+		/* create a private address space for enumeration */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		gpio_p0: gpio-bank at 0 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <0>;
-+		};
-+
-+		gpio_p1: gpio-bank at 1 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <1>;
-+		};
-+
-+		gpio_p2: gpio-bank at 2 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <2>;
-+		};
-+
-+		gpio_p3: gpio-bank at 3 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <3>;
-+		};
-+
-+		gpi_p3: gpio-bank at 4 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <4>;
-+		};
-+
-+		gpo_p3: gpio-bank at 5 {
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <5>;
-+		};
-+	};
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -1 +1,8 @@
--/* empty */
-+#ifndef __MACH_GPIO_H
-+#define __MACH_GPIO_H
-+
-+#include "gpio-lpc32xx.h"
-+
-+#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
-+
-+#endif /* __MACH_GPIO_H */
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -21,6 +21,9 @@
- #include <linux/io.h>
- #include <linux/errno.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -454,10 +457,59 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 	},
- };
- 
-+/* Empty now, can be removed later when mach-lpc32xx is finally switched over
-+ * to DT support
-+ */
- void __init lpc32xx_gpio_init(void)
- {
-+}
-+
-+static void __devinit lpc32xx_gpiochip_add_dt(struct device_node *node)
-+{
-+	if (of_device_is_available(node)) {
-+		u32 index;
-+		struct gpio_chip *chip;
-+
-+		if (of_property_read_u32(node, "reg", &index) < 0)
-+			return;
-+		if (index >= ARRAY_SIZE(lpc32xx_gpiochip))
-+			return;
-+		chip = &lpc32xx_gpiochip[index].chip;
-+		chip->of_node = of_node_get(node);
-+		gpiochip_add(chip);
-+	}
-+}
-+
-+static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
-+{
-+	struct device_node *node;
- 	int i;
- 
--	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
--		gpiochip_add(&lpc32xx_gpiochip[i].chip);
-+	if (pdev->dev.of_node) {
-+		for_each_child_of_node(pdev->dev.of_node, node)
-+			lpc32xx_gpiochip_add_dt(node);
-+	} else {
-+		for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
-+			gpiochip_add(&lpc32xx_gpiochip[i].chip);
-+	}
-+
-+	return 0;
- }
-+
-+#ifdef CONFIG_OF
-+static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-+	{ .compatible = "nxp,lpc3220-gpio", },
-+	{ },
-+};
-+#endif
-+
-+static struct platform_driver lpc32xx_gpio_driver = {
-+	.driver		= {
-+		.name	= "lpc32xx-gpio",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(lpc32xx_gpio_of_match),
-+	},
-+	.probe		= lpc32xx_gpio_probe,
-+};
-+
-+module_platform_driver(lpc32xx_gpio_driver);
+>>
+>> Also note that, a client's dma specifier becomes perfectly general
+>> and future-proof
+>>
+>> ? ?client1: spdif {
+>> ? ? ? ? ? dma_tx = <278>
+>> ? ? ? ? ? dma_rx = <723>
+>> ? ? };
+>>
+>> otherwise the following representation
+>>
+>> ? ? client1: spdif {
+>> ? ? ? ? ? ? ? ?dma = <&sdma 2 1 &sdma 3 2>;
+>> ? ? ?};
+>>
+>> could break with some weird dma setups (IIANW Russell already finds
+>> it wouldn't work for him).
+>
+> To solve Russell's HW, we need some way of representing the mux directly
+> in DT irrespective of how the DMA controller or DMA client specify what
+> they're connected to. Anything else isn't representing the HW in DT.
+>
+> Also, who knows how to control the mux? We need that to be fully
+> general, and so the mux itself really needs some kind of driver which
+> the DMA core or DMA controller can call into when the channel is
+> allocated in order to set up the mux. Right now, Russell's driver calls
+> in the a platform-/board-provided callback, but we should really
+> architect a generic driver framework for this.
+>
+Well, I doubt if there would ever be enough such platforms to warrant a
+new generic framework. For now, I would leave that to be a matter between
+the dmac driver and its DT node.
+Similarly let every dmac, being unique, require DT data in it's own custom
+format - I don't believe we can find a generic DT format for every kind of
+dmac that does exist or would exist. (For ex, you found a way for RMK's
+mux'ed req_lines, but what about assigning priorities to clients which is
+possible with PL08X dmacs but not most others?)
+
+So, I would strive only to make clients' dma specifier generic.
+
+> client0: i2s {
+>   /* has 2 DMA request output signals: 0, 1 */
+> };
+>
+> client1: spdif {
+>   /* has 2 DMA request signals: 0, 1 */
+> };
+>
+Do we also need to somehow tag these signals for the client to
+differentiate between TX and RX channel ?
