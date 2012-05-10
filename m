@@ -1,41 +1,61 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 10 May 2012 12:47:57 +0300
-Subject: [PATCH 00/19] ARM: OMAP4 device off support
-In-Reply-To: <20120509231418.GC10375@n2100.arm.linux.org.uk>
-References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
- <873979gehh.fsf@ti.com>  <20120509231418.GC10375@n2100.arm.linux.org.uk>
-Message-ID: <1336643277.2149.283.camel@sokoban>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 May 2012 18:56:00 +0900
+Subject: [PATCH] ARM: EXYNOS: Add platform resource definitions for
+ FIMC-LITE
+In-Reply-To: <4FA8CCC9.9030601@samsung.com>
+References: <1336148260-19952-1-git-send-email-s.nawrocki@samsung.com>
+ <017b01cd2cdd$4e4ff570$eaefe050$%kim@samsung.com>
+ <4FA8CCC9.9030601@samsung.com>
+Message-ID: <038401cd2e93$1a571fc0$4f055f40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-10 at 00:14 +0100, Russell King - ARM Linux wrote:
-> On Wed, May 09, 2012 at 03:46:02PM -0700, Kevin Hilman wrote:
-> > Tero Kristo <t-kristo@ti.com> writes:
-> > 
-> > > Hi,
-> > >
-> > > First version for this work. Applies on top of mainline + iochain set +
-> > > OMAP4 core retention set. Working tree available here:
-> > > tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> > > branch: mainline-3.4-omap4-dev-off
-> > 
-> > FYI... seems your get repo is corrupted.  I tried fetching both with git
-> > and https protocols:
-> > 
-> > $ git remote add tero git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> > $ git fetch tero
-> > fatal: The remote end hung up unexpectedly
-> > fatal: protocol error: bad pack heade
-> > $ git remote rm tero
-> > $ git remote add tero https://git.gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> > $ git fetch tero
-> > error: Unable to find 653621e4dd02d4a2117e1b813d9c5f1ccb11c9ed under https://git.gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> > Cannot obtain needed object 653621e4dd02d4a2117e1b813d9c5f1ccb11c9ed
-> > error: Fetch failed.
+Sylwester Nawrocki wrote:
+
 > 
-> You will have a partially transferred pack file in your repository...
+> On 05/08/2012 07:42 AM, Kukjin Kim wrote:
+> > Sylwester Nawrocki wrote:
+> >>
+> >> Add the gate clocks and register region address definition for
+> >> FIMC-LITE devices available in Exynos4x12 and Exynos5 SoCs.
+> >>
+> > This is right description? I can't find your changes for EXYNOS4412 and
+> > EXYNOS5 here. Only this is for EXYNOS4212 SoC.
+> 
+> Sorry, I wasn't precise enough. EXYNOS4_PA_FIMC_LITE is for EXYNOS4212
+> and EXYNOS4412 though. Please note it is initially needed for DT
+platforms,
+> until we get proper clock DT bindings for EXYNOS. Is there, BTW, anyone
+> known to work on converting EXYNOS to the common clock framework ?
+> 
+Yes, my colleague is working on common clock for all of exynos stuff.
 
-Strange, well I pushed 1 new branch and it looks like it is cloning
-properly now.
+> This patch was intended for EXYNOS4212/4412. AFAICS clock code in
+> mach-exynos/clock-exynos4412.c is a subset of the EXYNOS4412 platform:
+> 
+OK.
 
--Tero
+> static void __init exynos4_init_clocks(int xtal)
+> {
+> 	...
+> 	if (soc_is_exynos4210())
+> 		exynos4210_register_clocks();
+> 	else if (soc_is_exynos4212() || soc_is_exynos4412())
+> 		exynos4212_register_clocks();
+> 
+> 	exynos4_register_clocks();
+> 	...
+> }
+> 
+> Should I resend the patch or could you remove " and Exynos5 SoCs"
+> from the description ?
+> 
+I see, let me fix it when I apply this.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
