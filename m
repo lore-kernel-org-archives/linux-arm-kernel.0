@@ -1,50 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 May 2012 17:12:02 +0200
-Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
-In-Reply-To: <CACRpkdaiTsaBT=20UUOx2mYsK4r5rArVqXfU9LMObFVb3iEA9w@mail.gmail.com>
-References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
- <4FAAD4EB.4010007@wwwdotorg.org>
- <CACRpkdaiTsaBT=20UUOx2mYsK4r5rArVqXfU9LMObFVb3iEA9w@mail.gmail.com>
-Message-ID: <CACRpkdZ+8n-E_8nyq-kO=Y+GYekkjiNXd3nzTqFnxLszpuKKPg@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 11 May 2012 00:14:27 +0900
+Subject: [PATCH] drivers: cma: don't fail if migration returns -EAGAIN
+In-Reply-To: <1336655975-15729-1-git-send-email-m.szyprowski@samsung.com>
+References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
+ <1336655975-15729-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120510151427.GB2394@barrios>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Then it's probably a good idea to actually loop in Arnd too...
-sorry for missing it!
+On Thu, May 10, 2012 at 03:19:35PM +0200, Marek Szyprowski wrote:
+> alloc_contig_range() function might return -EAGAIN if migrate_pages() call
 
-On Thu, May 10, 2012 at 5:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 9, 2012 at 10:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+migrate_page never return -EAGAIN and I can't find any -EAGAIN return in alloc_contig_range.
+Am I seeing different tree? 
 
->>> +static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
->>
->>> + ? ? /* Poke in other ASIC variants here */
->>> + ? ? if (platid->driver_data == PINCTRL_NMK_DB8500)
->>> + ? ? ? ? ? ? nmk_pinctrl_db8500_init(&npct->soc);
->>
->> Other platforms have a unique top-level driver for each variant, with
->> the probe() function for each variant calling into a utility function.
->> That way, the common/utility code doesn't need to contain a
->> table/list/... of all the variants. Can the same approach be used here?
->
-> Of course I could do it that way, but it's not using this feature
-> of the driver base to have a string identifier telling which version
-> it is.
->
-> Since I'm unsure, let's ask Arnd.
->
-> Arnd, what is your preferred design pattern of:
->
-> A) sub-drivers that register one struct platform_driver per
-> ?variant, then calls into a shared core driver, or
->
-> B) a shared core driver registering one platform_driver
-> ?with several struct platform_device_id that then call
-> ?sub-drivers depending on which one is found
->
-> Either way is actually OK for me, but I was thinking if one
-> is preferred over the other.
->
-> Yours,
-> Linus Walleij
-
-Linus Walleij
+> fails for some temporarily locked pages. Such case should not be fatal
+> to dma_alloc_from_contiguous(), which should retry allocation like in case
+> of -EBUSY error.
+> 
+> Reported-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/base/dma-contiguous.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 78efb03..e46e2fb 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -346,7 +346,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+>  		if (ret == 0) {
+>  			bitmap_set(cma->bitmap, pageno, count);
+>  			break;
+> -		} else if (ret != -EBUSY) {
+> +		} else if (ret != -EBUSY && ret != -EAGAIN) {
+>  			goto error;
+>  		}
+>  		pr_debug("%s(): memory range at %p is busy, retrying\n",
+> -- 
+> 1.7.1.569.g6f426
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
