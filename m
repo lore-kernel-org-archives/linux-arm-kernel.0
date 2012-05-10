@@ -1,24 +1,32 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 10 May 2012 18:18:59 +0800
-Subject: [PATCH V2 08/11] ARM: dts: imx6q-sabrelite: add sound device
- imx6q-sabrelite-sgtl5000
-In-Reply-To: <20120510094508.GN3908@opensource.wolfsonmicro.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-9-git-send-email-richard.zhao@freescale.com>
- <20120510064816.GC17875@S2101-09.ap.freescale.net>
- <20120510093444.GI2982@b20223-02.ap.freescale.net>
- <20120510094113.GG17875@S2101-09.ap.freescale.net>
- <20120510094508.GN3908@opensource.wolfsonmicro.com>
-Message-ID: <20120510101858.GJ2982@b20223-02.ap.freescale.net>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 10 May 2012 13:21:03 +0300
+Subject: [PATCH 2/3] ARM: OMAP2/3: HWMOD: Add missing flag for rfbi class
+In-Reply-To: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1336645264-909-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 10:45:08AM +0100, Mark Brown wrote:
-> On Thu, May 10, 2012 at 05:41:15PM +0800, Shawn Guo wrote:
-> 
-> > The "Mic Bias" here is really a SGTL5000 internal supply.
-> 
-> If it is then what's providing the bias to the mic?  It's common for
-> chips to have a micbias supply which comes out of the chip and is used
-> by mics, this is my understanding of what this circuit is.
-+1
+hwmod class for rfbi is missing SYSS_HAS_RESET_STATUS, which this patch
+adds.
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+index f08e442..bae4afd 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+@@ -65,7 +65,7 @@ static struct omap_hwmod_class_sysconfig omap2_rfbi_sysc = {
+ 	.sysc_offs	= 0x0010,
+ 	.syss_offs	= 0x0014,
+ 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
+-			   SYSC_HAS_AUTOIDLE),
++			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
+ 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ };
+-- 
+1.7.9.5
