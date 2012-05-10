@@ -1,44 +1,55 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 10 May 2012 11:55:15 +0100
-Subject: Making ARM multiplatform kernels DT-only?
-In-Reply-To: <20120503141853.GC897@n2100.arm.linux.org.uk>
-References: <201205031350.35476.arnd@arndb.de>
- <20120503141853.GC897@n2100.arm.linux.org.uk>
-Message-ID: <20120510105515.GC30103@trinity.fluff.org>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 10 May 2012 16:26:48 +0530
+Subject: [PATCH 2/2] regulator: Add support for MAX77686.
+In-Reply-To: <20120510093442.GK3908@opensource.wolfsonmicro.com>
+References: <1336580695-1184-1-git-send-email-yadi.brar@samsung.com>
+ <1336580695-1184-3-git-send-email-yadi.brar@samsung.com>
+ <20120509184709.GC32037@sirena.org.uk>
+ <CAKew6eWEYBP1zXXwLL4eWOhOKZ-HwAfUX_kg8cnsaDyUXVKSkQ@mail.gmail.com>
+ <20120510093442.GK3908@opensource.wolfsonmicro.com>
+Message-ID: <CAKew6eWRFQMsPFhrA2g54VTTkV4ibMDTeFiz6nHDmZjOmVk__g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2012 at 03:18:53PM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 03, 2012 at 01:50:35PM +0000, Arnd Bergmann wrote:
-> > My feeling is that we should just mandate DT booting for multiplatform
-> > kernels, because it significantly reduces the combinatorial space
-> > at compile time, avoids a lot of legacy board files that we cannot
-> > test anyway, reduces the total kernel size and gives an incentive
-> > for people to move forward to DT with their existing boards.
-> 
-> On this point, I strongly object, especially as I'm one who uses the
-> existing non-DT multiplatform support extensively.  It's really not
-> a problem for what you're trying to achieve.
+Hi Mark,
 
-I object firstly on principle that you don't need the DT support to
-allow this, it could have been done years ago if anyone had taken the
-time to do it.
- 
-> I think what you're proposing is a totally artificial restriction.
-> There's no problem with a kernel supporting DT and non-DT together.
-> We've proven that many many times.  I prove it _every_ night that my
-> build and boot system runs - the OMAP LDP boots a multiplatform kernel
-> just fine without DT.
+On Thu, May 10, 2012 at 3:04 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, May 10, 2012 at 12:54:24PM +0530, Yadwinder Singh Brar wrote:
+>> On Thu, May 10, 2012 at 12:17 AM, Mark Brown
+>> > On Wed, May 09, 2012 at 09:54:55PM +0530, Yadwinder Singh wrote:
+>
+>> >> + ? ? [MAX77686_EN32KHZ_AP] = NULL,
+>> >> + ? ? [MAX77686_EN32KHZ_CP] = NULL,
+>
+>> > Now that the generic clock API is in mainline these should be moved over
+>> > to use it.
+>
+>> Sorry, I cann't get your point here. Please explain it little bit more.
+>
+> These are not regulators, these are clocks. ?They should use the clock
+> API.
+>
 
-We could have had the same for Samsung's entire range if a bit of work
-had been applied to do things like PAGE_OFFSET and replaceable IRQ
-controllers.
+Ok. I got it.
 
-> In any case, this is the least of the worries when you're wanting to
-> build multiple SoCs into the same kernel image.  See my previous reply
-> concerning that.
+>> >> + ? ? if (pdata->ramp_delay) {
+>> >> + ? ? ? ? ? ? max77686->ramp_delay = pdata->ramp_delay;
+>> >> + ? ? ? ? ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
+>> >> + ? ? ? ? ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
+>
+>> > This appears not to actually use the value passed in as platform_data.
+>
+>> It gets corresponding index of ramp_rate value in ramp_rate_value
+>> table supported by hardware, from platform_data which we write to
+>> ramp_rate control bits of control registers.
+>
+> Why is the driver unconditionally writing these register values here
+> rather than setting the ramp delay that was passed in?
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+Here we are setting the max77686->ramp_delay and writing the same
+value(max77686->ramp_delay << 6)@register also.
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+
+Thanks,
+Yadwinder.
