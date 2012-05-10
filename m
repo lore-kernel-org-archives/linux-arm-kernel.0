@@ -1,58 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 May 2012 10:15:58 -0600
-Subject: Handling of modular boards
-In-Reply-To: <4FABB758.7000702@compulab.co.il>
-References: <20120504185850.GO14230@opensource.wolfsonmicro.com>
- <201205041934.08830.arnd@arndb.de>
- <20120504203357.6B79B206451@gemini.denx.de>
- <20120504220944.GT14230@opensource.wolfsonmicro.com>
- <4FABB758.7000702@compulab.co.il>
-Message-ID: <4FABE9BE.2010108@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 May 2012 09:18:26 -0700
+Subject: [GIT PULL] ARM: OMAP2+: Misc cleanup
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA1F2D1@DBDE01.ent.ti.com>
+References: <1336461259-28596-1-git-send-email-santosh.shilimkar@ti.com>
+ <20120508183414.GZ5088@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA1F2D1@DBDE01.ent.ti.com>
+Message-ID: <20120510161825.GD21851@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2012 06:40 AM, Igor Grinberg wrote:
-> On 05/05/12 01:09, Mark Brown wrote:
->> On Fri, May 04, 2012 at 10:33:57PM +0200, Wolfgang Denk wrote:
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120510 01:37]:
+> On Wed, May 09, 2012 at 00:04:14, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [120508 00:18]:
+> > > Tony,
+> > > 
+> > > Please pull the following preparatory cleanup series to add OMAP5 minimal
+> > > support. Boot tested on OMAP2430 SDP, OMAP3430 SDP and OMAP4430 SDP platforms.
+> > > 
+> > > I have dropped {[PATCH 7/7] ARM: OMAP4+: Add prm and cm base init function}
+> > > from this set since Paul is taking that one in his queue.
+> > 
+> > OK thanks, pulling this into cleanup-soc and merging into cleanup branch
+> > with what we have in devel-hwmod.
+> >  
+> Tony,
 > 
->>> On the other hand, some of the issues we're trying to solve
->>> here for the kernel are also present in the boot loader, so
->>> this needs to do this anyway - whether by inserting new or
->>> modifying (enabling or disabling) existing properties in the DT
->>> is not really relevant here.
 > 
->> FWIW if the bootloader can usefully handle this stuff I think
->> that's a good approach but there is substantial variation in
->> quality of implementation between bootloaders and even when the
->> bootloader is a good one it's not always practical to update it
->> or the data it relies on.
+> Just observed that, while merging cleanup-soc into cleanup branch you have 
+> missed couple of lines from Satosh's original patch. Which leads to build 
+> break on OMAP2 alone build.
+
+OK thanks for letting me know, will take a look.
+
+Tony
+ 
+> Can you please merge below change,
 > 
-> I agree on this (and also with Ben), all our boards/extensions/base
-> boards/etc can be discovered in the boot loader and we will use the
-> DT to pass the relevant information on the attached extensions and
-> used base board.
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 833f153..c82783a 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -122,6 +122,8 @@ obj-$(CONFIG_SOC_AM33XX)            += $(powerdomain-common)
+>  clockdomain-common                     += clockdomain.o
+>  clockdomain-common                     += clockdomains_common_data.o
+>  obj-$(CONFIG_ARCH_OMAP2)               += $(clockdomain-common)
+> +obj-$(CONFIG_ARCH_OMAP2)               += clockdomain2xxx_3xxx.o
+> +obj-$(CONFIG_ARCH_OMAP2)               += clockdomains2xxx_3xxx_data.o
+>  obj-$(CONFIG_SOC_OMAP2420)             += clockdomains2420_data.o
+>  obj-$(CONFIG_SOC_OMAP2430)             += clockdomains2430_data.o
+>  obj-$(CONFIG_ARCH_OMAP3)               += $(clockdomain-common)
 > 
-> Also, most (if not all) of our boards/extensions have I2C EEPROM
-> which describes the devices on that board/extension which is useful
-> for building/extending the DT in the bootloader.
-
-I believe that's true for all/many NVIDIA boards too.
-
-But, duplicating all this in every bootloader might not make sense.
-Sure there are some cases where the bootloader needs this information
-(e.g. to load the kernel from an SD card that's on 1 of N plugin
-boards), but there may be much information the bootloader doesn't care
-about.
-
-Would it make sense to write a DT-identifying-and-merging shim that
-can be executed by the bootloader, create the final DT, and then jump
-to the kernel?
-
-Hmmm. That's probably a bad idea, since then it means needing e.g. I2C
-drivers to read the ID EEPROMs, pinmux drivers, ... in the shim.
-
-Perhaps the common shim idea makes sense, but we need a standardized
-API it can use that all bootloaders provide for it to operate.
-
-This is beginning to sound a lot like a UEFI byte code module (I
-assume; I know little about them)
+> 
+> Thanks,
+> Vaibhav
