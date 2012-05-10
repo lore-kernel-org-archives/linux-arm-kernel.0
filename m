@@ -1,48 +1,32 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Fri, 11 May 2012 00:14:27 +0900
-Subject: [PATCH] drivers: cma: don't fail if migration returns -EAGAIN
-In-Reply-To: <1336655975-15729-1-git-send-email-m.szyprowski@samsung.com>
-References: <1333462221-3987-1-git-send-email-m.szyprowski@samsung.com>
- <1336655975-15729-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120510151427.GB2394@barrios>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 May 2012 23:48:24 +0800
+Subject: [alsa-devel] [PATCH V2 08/11] ARM: dts: imx6q-sabrelite: add
+ sound device imx6q-sabrelite-sgtl5000
+In-Reply-To: <20120510114956.GI17875@S2101-09.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-9-git-send-email-richard.zhao@freescale.com>
+ <20120510064816.GC17875@S2101-09.ap.freescale.net>
+ <20120510093444.GI2982@b20223-02.ap.freescale.net>
+ <20120510094113.GG17875@S2101-09.ap.freescale.net>
+ <20120510094508.GN3908@opensource.wolfsonmicro.com>
+ <20120510114956.GI17875@S2101-09.ap.freescale.net>
+Message-ID: <20120510154823.GA18625@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 03:19:35PM +0200, Marek Szyprowski wrote:
-> alloc_contig_range() function might return -EAGAIN if migrate_pages() call
+On Thu, May 10, 2012 at 07:49:58PM +0800, Shawn Guo wrote:
+> I did not make myself clear, but you made :)  Yes, this is exactly the
+> thing on my mind, and the circuit will look like:
+> 
+It seems I was just misled by the impression that we should have
+a route of MIC_IN <-- Mic Bais.  I just checked through the SGTL5000
+data sheet and it does not really mention about this.
 
-migrate_page never return -EAGAIN and I can't find any -EAGAIN return in alloc_contig_range.
-Am I seeing different tree? 
+Richard,
 
-> fails for some temporarily locked pages. Such case should not be fatal
-> to dma_alloc_from_contiguous(), which should retry allocation like in case
-> of -EBUSY error.
-> 
-> Reported-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/base/dma-contiguous.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 78efb03..e46e2fb 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -346,7 +346,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->  		if (ret == 0) {
->  			bitmap_set(cma->bitmap, pageno, count);
->  			break;
-> -		} else if (ret != -EBUSY) {
-> +		} else if (ret != -EBUSY && ret != -EAGAIN) {
->  			goto error;
->  		}
->  		pr_debug("%s(): memory range at %p is busy, retrying\n",
-> -- 
-> 1.7.1.569.g6f426
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+Will test your route setting and then apply the patch if everything
+goes fine.
+
+-- 
+Regards,
+Shawn
