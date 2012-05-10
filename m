@@ -1,35 +1,22 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Wed,  9 May 2012 19:24:17 -0500
-Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
-Message-ID: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 10 May 2012 08:35:33 +0800
+Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <20120509160005.GG3955@opensource.wolfsonmicro.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
+ <20120509160005.GG3955@opensource.wolfsonmicro.com>
+Message-ID: <20120510003532.GG2982@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
-to use common definitions when accessing registers of peripherals on
-the AIPS2 bus.
+On Wed, May 09, 2012 at 05:00:06PM +0100, Mark Brown wrote:
+> On Wed, May 09, 2012 at 07:33:02PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> 
+> I guess this depends on some other tree and can't just be directly
+> applied to ASoC?
+It's based on your for-next. But for working, it depends on
+pinctl/for-next.
 
-This change was tested for mapping conflicts using the iop2v script
-found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
-performing a bootup of a default build using imx_v6_v7_defconfig
-on a imx51 babbage board and imx53 loco board.
-
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/plat-mxc/include/mach/hardware.h |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index 0630513..065cc04 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -96,6 +96,7 @@
-  */
- #define IMX_IO_P2V(x)	(						\
- 			0xf4000000 +					\
-+			(((x) & 0x80000000) >> 7) +			\
- 			(((x) & 0x50000000) >> 6) +			\
- 			(((x) & 0x0b000000) >> 4) +			\
- 			(((x) & 0x000fffff)))
--- 
-1.7.10
+Thanks
+Richard
