@@ -1,32 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 May 2012 10:27:34 +0100
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <20120510090459.GH2982@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
- <20120510063904.GB17875@S2101-09.ap.freescale.net>
- <20120510084403.GA3908@opensource.wolfsonmicro.com>
- <20120510090459.GH2982@b20223-02.ap.freescale.net>
-Message-ID: <20120510092733.GH3908@opensource.wolfsonmicro.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 10 May 2012 15:07:39 +0530
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+Message-ID: <4FAB8C63.2080800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 05:05:00PM +0800, Richard Zhao wrote:
+On 5/10/2012 12:44 PM, Olof Johansson wrote:
+> Also, Mike, can you please confirm that your clk-next branch is truly
+> stable and will never be rebased before it goes upstream? If it might
+> be rebased, can you please provide a separate branch that is
+> guaranteed to be stable that we can pull in as the dependency here?
 
-> devm_pinctrl_get_select_default function is added in below commit which
-> is in pinctrl/for-next.
+Mike already sent a pull request, in reply to a mail. That's why i sent
+my request.
 
-Oh, dear.  That's unfortunate, I guess it's not on a branch in pinctl
-which can be pulled separately (this is what I've been doing with things
-like regmap and regulator - creating new interfaces on easily mergeable
-branches)?  Looking at it from the other perspective, what goes wrong if
-we defer this patch?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120510/447d2db6/attachment-0001.sig>
+-- 
+viresh
