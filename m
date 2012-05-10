@@ -1,50 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 10 May 2012 20:10:22 +0200
-Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
-In-Reply-To: <201205101219.14787.jbe@pengutronix.de>
-References: <1335837363-12376-1-git-send-email-marex@denx.de>
- <201205101219.14787.jbe@pengutronix.de>
-Message-ID: <201205102010.23109.marex@denx.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 10 May 2012 11:11:43 -0700
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+ <201205092038.16722.arnd.bergmann@linaro.org>
+ <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
+ <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
+ <CAK5ve-+rCv3s+K6Laie=QaPqqZ4Vk1+irYU6S4MBZSquKrMWtw@mail.gmail.com>
+ <alpine.LFD.2.02.1205092122140.21030@xanadu.home>
+ <CAK5ve-JC61jFX7+GV9VoZKExbtdxX03jmpkzu5zxHg+Lehy7VQ@mail.gmail.com>
+ <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
+Message-ID: <20120510111143.2edb3bc8.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
+On Thu, 10 May 2012 14:01:35 -0400 (EDT)
+Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
 
-> Hi Marek,
+> On Fri, 11 May 2012, Bryan Wu wrote:
 > 
-> Marek Vasut wrote:
-> > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
-> > the generic USB PHY infrastructure. Also added is glue code for CI13xxx
-> > driver, to allow device mode. This patchset still does NOT support OTG
-> > mode, the device/host mode is selected via platform data.
+> > On Thu, May 10, 2012 at 9:25 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > You applied your patches on top of linux-next. __This can't be merged
+> > > upstream until you rebase your patches on something stable such as pure
+> > > v3.4-rc6 for example.
+> > >
+> > 
+> > Got it, Nico. As I'm still in US for our Ubuntu Developer Summit, I
+> > plan to rebase and test on my hardware after I'm back to home next
+> > week.
 > 
-> When using your patch set with my 3.4-rc6 I get:
-> 
-> After enabling 'CONFIG_USB_EHCI_MXS':
-> 
-> drivers/usb/host/ehci-mxs.c:171: undefined reference to
-> `imx_otg_set_irq_handler'
-> 
-> After enabling 'CONFIG_USB_MXS_PHY':
-> 
-> drivers/usb/otg/imx-otg.c:149: undefined reference to `usb_del_gadget_udc'
-> 
-> And after enabling CONFIG_USB_GADGET it compiles again. But it should be a
-> USB host driver, shouldn't it?
+> Given where things are, you risk being too late for this merge window if 
+> you do so, meaning that this cleanup will have to wait yet another 
+> cycle which would be rather disappointing.
 
-Nice catch, I'll add it into the stack of fixes that need to be made in V8. 
-Though I'd rather rebase V8 on top of usb-next.
-
-btw. this supports both host and gadget mode (not OTG right now), certainly 
-handling the fact the gadget code isn't present in kernel needs to be done. In 
-the meantime, enable also gadget mode and add ci13xxx-mxs into the kernel, it 
-should fix your problem.
-
-Thanks for the report!
-
-> 
-> Regards,
-> Juergen
-
-Best regards,
-Marek Vasut
+Well, there hasn't been an open merge window for over a month. 
+Cleanups and features should be scheduled for 3.5-rc1.
