@@ -1,36 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 May 2012 12:11:06 +0100
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <201205101053.09954.arnd@arndb.de>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
- <201205092047.06852.arnd@arndb.de>
- <ed0ce2390716adbfc949f86c16dab996@localhost>
- <201205101053.09954.arnd@arndb.de>
-Message-ID: <4FABA24A.9040209@arm.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 10 May 2012 19:22:55 +0800
+Subject: [alsa-devel] [PATCH 6/6] ARM: dts: enable audio support for
+ imx28-evk
+In-Reply-To: <1336639333-11561-7-git-send-email-shawn.guo@linaro.org>
+References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+ <1336639333-11561-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120510112254.GM6622@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/12 11:53, Arnd Bergmann wrote:
-> On Wednesday 09 May 2012, Marc Zyngier wrote:
->>>
->>> Sounds good. I don't have a strong preference whether that should be a
->>> property like you suggest or a separate "compatible" value, maybe Rob or
->>> Grant can comment on what they prefer.
->>
->> At the moment, the compatible string should be pretty explicit, as it is
->> not possible to build an A7 or A15 based SoC without the virtualization
->> extensions.
+On Thu, May 10, 2012 at 04:42:13PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx28-evk.dts |   41 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx28.dtsi    |   23 +++++++++++++++++++++
+>  2 files changed, 64 insertions(+), 0 deletions(-)
 > 
-> Ok, makes sense. Then again, if you run an A15 guests on an A15 host,
-> the virtual GIC would not have those extensions, right?
+Looks ok to me.
 
-Indeed, they would be inaccessible (the hypervisor should not map them
-into the guest address space). I'd expect the guest kernel not to try to
-use them anyway, as it wouldn't be able to use the HYP mode.
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-But again, this is implementation specific.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards
+Dong Aisheng
