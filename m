@@ -1,51 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 10 May 2012 13:21:02 +0300
-Subject: [PATCH 1/3] ARM: OMAP2/3: HWMOD: Add missing flags for dispc class
-In-Reply-To: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1336645264-909-2-git-send-email-tomi.valkeinen@ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 10 May 2012 18:23:10 +0800
+Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <20120510092733.GH3908@opensource.wolfsonmicro.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
+ <20120509160005.GG3955@opensource.wolfsonmicro.com>
+ <20120510003532.GG2982@b20223-02.ap.freescale.net>
+ <20120510063904.GB17875@S2101-09.ap.freescale.net>
+ <20120510084403.GA3908@opensource.wolfsonmicro.com>
+ <20120510090459.GH2982@b20223-02.ap.freescale.net>
+ <20120510092733.GH3908@opensource.wolfsonmicro.com>
+Message-ID: <20120510102309.GK2982@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hwmod class for dispc is missing sysc flags, which this patch adds.
+On Thu, May 10, 2012 at 10:27:34AM +0100, Mark Brown wrote:
+> On Thu, May 10, 2012 at 05:05:00PM +0800, Richard Zhao wrote:
+> 
+> > devm_pinctrl_get_select_default function is added in below commit which
+> > is in pinctrl/for-next.
+> 
+> Oh, dear.  That's unfortunate, I guess it's not on a branch in pinctl
+> which can be pulled separately (this is what I've been doing with things
+> like regmap and regulator - creating new interfaces on easily mergeable
+> branches)?  Looking at it from the other perspective, what goes wrong if
+> we defer this patch?
+I prefer to have a non-rebase pinctrl branch. We can not defer pinctrl
+patch for all drivers. pinctrl will be so widely used.
 
-OMAP2 is missing SYSS_HAS_RESET_STATUS
+Hi Linus,
 
-OMAP3 is missing SYSS_HAS_RESET_STATUS and SYSC_HAS_CLOCKACTIVITY
+Could you comment?
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index 2a67297..7d1f71a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -39,7 +39,8 @@ static struct omap_hwmod_class_sysconfig omap2_dispc_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
--			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index db86ce9..489c374 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1502,7 +1502,8 @@ static struct omap_hwmod_class_sysconfig omap3_dispc_sysc = {
- 	.syss_offs	= 0x0014,
- 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
- 			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
--			   SYSC_HAS_ENAWAKEUP),
-+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
--- 
-1.7.9.5
+Thanks
+Richard
