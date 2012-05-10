@@ -1,47 +1,105 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 May 2012 16:27:23 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP1: USB: fix ocpi_enable compile problem on non-1610
- builds
-Message-ID: <alpine.DEB.2.00.1205101625360.32719@utopia.booyaka.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 10 May 2012 15:28:30 -0700
+Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+In-Reply-To: <4FAC1E70.8030907@wwwdotorg.org>
+References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
+ <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
+ <20120510181611.GA16908@kroah.com> <4FAC1E70.8030907@wwwdotorg.org>
+Message-ID: <20120510222830.GA23084@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 10, 2012 at 02:00:48PM -0600, Stephen Warren wrote:
+> On 05/10/2012 12:16 PM, Greg Kroah-Hartman wrote:
+> > On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
+> >> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
+> >>> On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
+> >>>> driver_find_device() can be called with an unregistered driver.
+> >>>
+> >>> Who does that?  Where in the kernel?  Why would you try to do that?
+> >>>
+> >>>> Need to check driver_private to see if it's populated or not,
+> >>>> especially under deferrable probe.
+> >>>
+> >>> Hm, I don't know if this will really catch a driver that was registered
+> >>> and then was unregistered, right?  It seems like moving the real problem
+> >>> somewhere else, why not fix the original issue instead?
+> >>>
+> >>>> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> >>>> ---
+> >>>> In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
+> >>>>   http://article.gmane.org/gmane.linux.ports.tegra/4658
+> >>>>
+> >>>> "tegra_ahb_driver" may not be populated when it's called.
+> >>>
+> >>> It can?  I don't see that in that patch.
+> >>
+> >> I think this is what's happening:
+> >>
+> >> The Tegra SMMU driver is registered using subsys_initcall().
+> >>
+> >> The Tegra AHB driver is registered using module_platform_driver, so
+> >> module_init().
+> >>
+> >> The device objects for both are registered at basically the same time
+> >> during the machine's initialization call, which I think happens before
+> >> both or some of the above two calls.
+> >>
+> >> So, SMMU ends up getting probed before the AHB driver has even been
+> >> registered.
+> > 
+> > What do those two drivers have to do with each other?
+> 
+> The AHB HW module contains a bit to say "enable the SMMU". This bit
+> cannot be turned on until certain initialization has been performed by
+> the SMMU driver.
+> 
+> So, SMMU's probe performs the initialization, then attempts to contact
+> the AHB driver to ask it to enable the SMMU.
+> 
+> >> That's why in patch Hiroshi linked, in tegra_ahb_enable_smmu(), the AHB
+> >> driver hasn't (or may not have) been registered, so driver_find_device()
+> >> can experience the issue this patch attempts to solve.
+> > 
+> > It sounds like you have a locking or ordering problem somewhere in this
+> > platform, and it needs to be resolved there.  Odds are, this tiny check
+> > is the least of your worries, right?
+> > 
+> > Who is doing the driver_find_device() call in the first place?  The
+> > driver core?  Or something else?
+> 
+> SMMU's probe calls tegra_ahb_enable_smmu().
+> 
+> tegra_ahb_enable_smmu() needs to find the AHB's struct device so that it
+> can find get the driver data associated with it, which contains the
+> ioremap'd registers amongst other things.
+> 
+> In order to find the correct device, tegra_ahb_enable_smmu() is passed
+> the device tree node of the appropriate AHB that controls the SMMU.
+> 
+> The two drivers use deferred probe to ensure that their relative probe
+> order doesn't matter. If AHB is probed first, then
+> tegra_ahb_enable_smmu()'s driver_find_device() succeeds, and the AHB
+> register is programmed to enable the SMMU. If the SMMU is probed first,
+> then tegra_ahb_enable_smmu() returns -EPROBE_DEFER to hold off the SMMU
+> from completing its probe. I believe this is exactly the kind of thing
+> -EPROBE_DEFER was intended for.
 
-Janusz Krzysztofik reported the following build break on OMAP1 builds that
-don't include CONFIG_ARCH_OMAP16XX:
+Ok, thanks for explaining it better, that would have been nice to have
+in the original patch submission :)
 
-  LD      .tmp_vmlinux1
-arch/arm/mach-omap1/built-in.o: In function `omap1_usb_init':
-lcd_dma.c:(.init.text+0x1420): undefined reference to `ocpi_enable'
-make: *** [.tmp_vmlinux1] Error 1
+This fix, is it needed for 3.4, or just 3.5?
 
-This was caused by commit d3645d39ad0ed9f09535065676ea0ba114f93cdf
-("ARM: OMAP1: OHCI: use platform_data fn ptr to enable OCPI bus").
-Fix by declaring an empty ocpi_enable() on non-16XX builds, which
-should work until the OCPI code is moved out to drivers/.
+I kind of don't like relying on ->p as a check to see if things are set
+up properly, I wonder if we could use the kobject state_initalized field
+instead somehow, or maybe state_in_sysfs?  Oh wait, that's in ->p as
+well.  Ok, I guess this is as good as it can get.
 
-Cc: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
-Passes a compile test with a 15xx-only config.
+Can someone resend this to me, with the information above in the
+changelog comment, and I'll be glad to apply it?  Again, I need to know
+if this is needed for 3.4 or it can wait for 3.5?
 
- arch/arm/mach-omap1/common.h |    4 ++++
- 1 file changed, 4 insertions(+)
+thanks,
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index a90b9d7..4193383 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -63,6 +63,10 @@ extern bool omap_32k_timer_init(void);
- 
- extern u32 omap_irq_flags;
- 
-+#ifdef CONFIG_ARCH_OMAP16XX
- extern int ocpi_enable(void);
-+#else
-+static inline int ocpi_enable(void) { return 0; }
-+#endif
- 
- #endif /* __ARCH_ARM_MACH_OMAP1_COMMON_H */
--- 
-1.7.10
+greg k-h
