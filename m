@@ -1,60 +1,78 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 10 May 2012 13:17:25 +0200
-Subject: [PATCH 0/4] MXS: I2C improvements
-In-Reply-To: <20120510073518.GE17875@S2101-09.ap.freescale.net>
-References: <1335837621-14816-1-git-send-email-marex@denx.de>
- <201205092033.46812.marex@denx.de>
- <20120510073518.GE17875@S2101-09.ap.freescale.net>
-Message-ID: <201205101317.25786.marex@denx.de>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 10 May 2012 20:17:23 +0900
+Subject: [PATCH 4/7] mmc: dw_mmc: add samsung exynos5250 specific
+ extentions
+In-Reply-To: <CAJuYYwS=qExrAjG1kgd=tPYL0pQeP+7xE1SuMaP+do-Eg3D7eQ@mail.gmail.com>
+References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
+ <1335935266-25289-5-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2XBinh=XAVnt3EnWrEqeTKz34d9yB6wfiuF-J-Se_Q__Q@mail.gmail.com>
+ <4FA0E706.8060700@samsung.com>
+ <CAJuYYwS=qExrAjG1kgd=tPYL0pQeP+7xE1SuMaP+do-Eg3D7eQ@mail.gmail.com>
+Message-ID: <4FABA3C3.9070300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On 05/10/2012 07:55 PM, Thomas Abraham wrote:
 
-> On Wed, May 09, 2012 at 08:33:46PM +0200, Marek Vasut wrote:
-> > > This patchset implements support for adjustment of I2C bus speed via
-> > > platform data. Further, it implements support for DMA transfers into
-> > > the mxs-i2c driver. Lastly, there is a fix for GCC4.7 warning
-> > > included.
-> > > 
-> > > Marek Vasut (4):
-> > >   MXS: Allow passing i2c bus speed via platform data
-> > >   MXS: Set I2C timing registers for mxs-i2c
-> > >   MXS: Implement DMA support into mxs-i2c
-> > >   MXS: Fix GCC4.7 complaint in mxs-i2c
-> > 
-> > Bump?
+> On 2 May 2012 13:19, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> On 05/02/2012 04:01 PM, Kyungmin Park wrote:
+>>
+>>> Hi,
+>>>
+>>> On 5/2/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>>>> The instantiation of the Synopsis Designware controller on Exynos5250
+>>>> include extension for SDR and DDR specific tx/rx phase shift timing
+>>>> and CIU internal divider. In addition to that, the option to skip the
+>>>> command hold stage is also introduced. Add support for these Exynos5250
+>>>> specfic extenstions.
 > 
-> Sorry, Marek.  Since we are moving over to device tree, I'm not going
-> to ack the arch/arm/mach-mxs changes, which are introducing more use
-> of platform data.
+> [...]
+> 
+>>>> @@ -265,6 +266,10 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc,
+>>>> struct mmc_command *cmd)
+>>>>                      cmdr |= SDMMC_CMD_DAT_WR;
+>>>>      }
+>>>>
+>>>> +    if (slot->host->drv_data->ctrl_type == DW_MCI_TYPE_EXYNOS5250)
+>>>> +            if (SDMMC_CLKSEL_GET_SELCLK_DRV(mci_readl(slot->host, CLKSEL)))
+>>>> +                    cmdr |= SDMMC_USE_HOLD_REG;
+>>> Some other board, custom SOC also can use this HOLD register. So it's
+>>> not EXYNOS5250 specific one. I think we introduce the more generic
+>>> quirks for this instead of SOC specific.
+>>
+>> One more, I think that also need to check the IMPLEMENT_HOLD_REG bit in HCON register.
+>> It has dependency with that.
+> 
+> The above code is specific to Exynos5250 and hence it is not required
+> to check the IMPLEMENT_HOLD_REG bit in HCON register. On Exynos5250,
+> the hold register is implemented and available.
 
-Can you please tell me what _exactly_ is the formal reason for
-NAKing these changes?  As far as I can see, they do not introduce
-new aspects of platform data but rather fix the usage in the
-current context, so I do not quite understand the reasoning.
+Right, the above code is specific for Exynos5250.
+But HOLD_REG should be used in other SoC. it's not only Exynos5250 specific.
+I want more generic code than specific code for Exynos5250.
 
-I consider your current approach of NAKing these changes very
-harmful to MXS. If it wasn't for your NAKing every patch for MXS
-that doesn't use device tree, the platform would currently be in
-much better shape. By now, you'd already have good SPI driver,
-this I2C driver and maybe others. I wonder if others agree with
-me on this one?
+Best Regards,
+Jaehoon Chung
 
-But now we're waiting for the device tree support, which will
-take some more time to fully arrive. Maybe 3.5, but I doubt full
-DT support will hit mainline before 3.6. I'd understand you
-NAKing patches that don't use DT support if DT support for MXS
-was already in place, but there is not a trace of it in mainline.
-
-Finally, consider people who write patches for MXS (remember
-fixes for mxs-spi, or this fix for mxs-i2c for example
-again). They will easily be demotivated by this approach and give
-up on MXS, probably not reposting these changes. What is the plan
-on saving all the precious efforts that are currently NAKed by
-you?  How do we ensure this work does not get lost?
-
-Thank you.
-
-Best regards,
-Marek Vasut
+> 
+> 
+>> As Mr.Park is mentioned, this register is clock phasing.
+>> In spec, card is enumerated in SDR12 or SDR25 mode, the application must program the use_hold_reg.
+> 
+> Exynos5250 hardware manual specifies additional restrictions on the
+> use of hold register. The above code checks for those restrictions and
+> programs the USE_HOLD_REG accordingly. Please let me know if there is
+> any condition that is not handled by the above code.
+> 
+> Thanks,
+> Thomas.
+> 
+>>
+>> Best Regards,
+>> Jaehoon Chung
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
