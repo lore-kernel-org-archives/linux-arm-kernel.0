@@ -1,63 +1,50 @@
 From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 10 May 2012 17:03:11 +0530
-Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
-In-Reply-To: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
-References: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
-Message-ID: <CAOh2x=mGdV_wbJC64wvb9+UV_FBgnsat9=ojD8BJYVxT+HoWhQ@mail.gmail.com>
+Date: Thu, 10 May 2012 17:04:24 +0530
+Subject: [GIT PULL] SPEAr SMI updates for v-3.5
+In-Reply-To: <1336562073-24446-1-git-send-email-viresh.kumar@st.com>
+References: <1336562073-24446-1-git-send-email-viresh.kumar@st.com>
+Message-ID: <CAOh2x=kQVQ8W8+vkXGtmBpaqe-5s2o_oSrQ9EYj0UwBWCMP3Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 4:45 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Wed, May 9, 2012 at 4:44 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
 > Hi Arnd,Olof,
 >
-> This have few more dependencies:
-> - ARM: 7376/1: clkdev: Implement managed clk_get()
-> - pinctrl branch from Linus
+> The following changes since commit 0e74bbef7c071aafb90ab10728197b1f325d1b5c:
+>
+> ?SPEAr: Update MAINTAINERS and Documentation (2012-05-09 14:46:46 +0530)
+>
+> are available in the git repository at:
+>
+> ?git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-smi-update
 
 Please pull this instead:
 
 
-The following changes since commit 9f05a80564c35c397c5ce0f0b1106a420c3f5bdc:
+The following changes since commit 78b3015d0ce85e94f75f58f5f04fb1674739bcc8:
 
-  SPEAr: Update defconfigs (2012-05-10 16:15:08 +0530)
+  SPEAr: Update MAINTAINERS and Documentation (2012-05-10 16:15:07 +0530)
 
 are available in the git repository at:
 
-  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-pinctrl-update
+  git://git.stlinux.com/spear/linux-2.6.git for-v3.5-spear-smi-update
 
-for you to fetch changes up to 560a7694d63e2461912d3b99987a3c89ea4b56e2:
+for you to fetch changes up to 9f05a80564c35c397c5ce0f0b1106a420c3f5bdc:
 
-  SPEAr: Add plgpio node in device tree dtsi files (2012-05-10 16:15:09 +0530)
+  SPEAr: Update defconfigs (2012-05-10 16:15:08 +0530)
 
 ----------------------------------------------------------------
-Viresh Kumar (6):
-      gpiolib: Add of_get_gpio_chip_by_phandle() helper
-      pinctrl: SPEAr: Don't set all non muxreg bits on pinctrl_disable
-      pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
-      pinctrl: SPEAr: Add plgpio driver
-      pinctrl: SPEAr: Add gpio ranges support
-      SPEAr: Add plgpio node in device tree dtsi files
+Viresh Kumar (2):
+      SPEAr: Add SMI NOR partition info in dts files
+      SPEAr: Update defconfigs
 
- arch/arm/boot/dts/spear1310-evb.dts       |    4 +
- arch/arm/boot/dts/spear1310.dtsi          |   22 +
- arch/arm/boot/dts/spear1340-evb.dts       |    4 +
- arch/arm/boot/dts/spear1340.dtsi          |   21 +
- arch/arm/boot/dts/spear310-evb.dts        |    4 +
- arch/arm/boot/dts/spear310.dtsi           |   15 +
- arch/arm/boot/dts/spear320-evb.dts        |    4 +
- arch/arm/boot/dts/spear320.dtsi           |   16 +
- drivers/of/gpio.c                         |   32 ++
- drivers/pinctrl/spear/Kconfig             |   11 +
- drivers/pinctrl/spear/Makefile            |    1 +
- drivers/pinctrl/spear/pinctrl-plgpio.c    |  738 +++++++++++++++++++++++++++++
- drivers/pinctrl/spear/pinctrl-spear.c     |  110 ++++-
- drivers/pinctrl/spear/pinctrl-spear.h     |   26 +
- drivers/pinctrl/spear/pinctrl-spear1310.c |  182 +++++++-
- drivers/pinctrl/spear/pinctrl-spear1340.c |    8 +
- drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +
- drivers/pinctrl/spear/pinctrl-spear3xx.c  |   29 ++
- include/linux/of_gpio.h                   |    9 +-
- 21 files changed, 1228 insertions(+), 14 deletions(-)
- create mode 100644 drivers/pinctrl/spear/pinctrl-plgpio.c
+ arch/arm/boot/dts/spear1310-evb.dts  |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/spear1340-evb.dts  |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/spear300-evb.dts   |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/spear310-evb.dts   |   20 ++++++++++++++++++--
+ arch/arm/boot/dts/spear320-evb.dts   |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/spear600-evb.dts   |   29 +++++++++++++++++++++++++++++
+ arch/arm/configs/spear13xx_defconfig |    4 ++++
+ arch/arm/configs/spear3xx_defconfig  |    4 ++++
+ arch/arm/configs/spear6xx_defconfig  |    5 ++++-
+ 9 files changed, 159 insertions(+), 3 deletions(-)
