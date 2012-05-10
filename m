@@ -1,45 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 May 2012 11:05:36 -0700
-Subject: [PATCH-V2] ARM: OMAP2+: am33xx: Make am33xx as a separate class
-In-Reply-To: <20120510180159.GF21851@atomide.com>
-References: <1336562667-6741-1-git-send-email-hvaibhav@ti.com>
- <20120509185435.GU5088@atomide.com>
- <20120510180159.GF21851@atomide.com>
-Message-ID: <20120510180535.GG21851@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 May 2012 20:10:22 +0200
+Subject: [RFC PATCH 00/11 V7] MXS: Add i.MX28 USB Host driver
+In-Reply-To: <201205101219.14787.jbe@pengutronix.de>
+References: <1335837363-12376-1-git-send-email-marex@denx.de>
+ <201205101219.14787.jbe@pengutronix.de>
+Message-ID: <201205102010.23109.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120510 11:06]:
-> * Tony Lindgren <tony@atomide.com> [120509 11:58]:
-> > * Vaibhav Hiremath <hvaibhav@ti.com> [120509 04:28]:
-> > > Initially, we decided to make am33xx family of device to fall
-> > > under omap3 class (cpu_is_omap34xx() = true), since it carries
-> > > Cortex-A8 core. But while adding complete baseport support
-> > > (like, clock, power and hwmod) support, it is observed that,
-> > > we are creating more and more problems by treating am33xx device
-> > > as omap3 family, as nothing matches between them
-> > > (except cortex-A8 mpu).
-> > 
-> > Thanks applying into devel-soc after updating for soc_is change
-> > and fixing typo in the description that stil said OMAPAM. Updated
-> > patch below.
+Dear Juergen Beisert,
+
+> Hi Marek,
 > 
-> Turns out we still need to add defined(CONFIG_SOC_AM33XX) around
-> __omap2_set_globals() to keep compile working when omap4 + am33xx
-> are selected without omap2 or 3. Also removed the "default y"
-> for am33xx as that's where we're heading to anyways.
+> Marek Vasut wrote:
+> > This patchset introduces the USB Host driver for i.MX28 CPU, utilising
+> > the generic USB PHY infrastructure. Also added is glue code for CI13xxx
+> > driver, to allow device mode. This patchset still does NOT support OTG
+> > mode, the device/host mode is selected via platform data.
 > 
-> Updated patch below.
+> When using your patch set with my 3.4-rc6 I get:
+> 
+> After enabling 'CONFIG_USB_EHCI_MXS':
+> 
+> drivers/usb/host/ehci-mxs.c:171: undefined reference to
+> `imx_otg_set_irq_handler'
+> 
+> After enabling 'CONFIG_USB_MXS_PHY':
+> 
+> drivers/usb/otg/imx-otg.c:149: undefined reference to `usb_del_gadget_udc'
+> 
+> And after enabling CONFIG_USB_GADGET it compiles again. But it should be a
+> USB host driver, shouldn't it?
 
-Argh, now it breaks with:
+Nice catch, I'll add it into the stack of fixes that need to be made in V8. 
+Though I'd rather rebase V8 on top of usb-next.
 
-arch/arm/mach-omap2/built-in.o: In function `omap2_set_globals_am33xx':
-twl-common.c:(.init.text+0x1dd8): undefined reference to `omap2_set_globals_sdrc'
+btw. this supports both host and gadget mode (not OTG right now), certainly 
+handling the fact the gadget code isn't present in kernel needs to be done. In 
+the meantime, enable also gadget mode and add ci13xxx-mxs into the kernel, it 
+should fix your problem.
 
-There are clearly some dependencies to the clean up patches being
-discussed.. So I'll drop this for now until the clean up is sorted
-out.
+Thanks for the report!
 
-Regards,
+> 
+> Regards,
+> Juergen
 
-Tony
+Best regards,
+Marek Vasut
