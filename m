@@ -1,96 +1,64 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 10 May 2012 11:29:19 -0600
-Subject: [PATCH 3/3] ARM: OMAP: AM35xx: fix UART4 softreset
-In-Reply-To: <20120510172449.13418.66815.stgit@dusk>
-References: <20120510172449.13418.66815.stgit@dusk>
-Message-ID: <20120510172918.13418.64781.stgit@dusk>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 11 May 2012 01:38:16 +0800
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <alpine.LFD.2.02.1205092122140.21030@xanadu.home>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <CAK5ve-KSyvZSHw7csQ5M88q0008NSrs1kwuyUH3hFqxD0f7BQQ@mail.gmail.com>
+ <20120509122436.1b612004.akpm@linux-foundation.org>
+ <201205092038.16722.arnd.bergmann@linaro.org>
+ <CAK5ve-Ko6EjZsJBW++ofL0eHxiR5W+wafb3T99Rm9a1L8pHLBQ@mail.gmail.com>
+ <CAOesGMhioLshtsYiHCdQxtx7+3GJsCyhgd7c7nDiZC3=3axb6w@mail.gmail.com>
+ <CAK5ve-+rCv3s+K6Laie=QaPqqZ4Vk1+irYU6S4MBZSquKrMWtw@mail.gmail.com>
+ <alpine.LFD.2.02.1205092122140.21030@xanadu.home>
+Message-ID: <CAK5ve-JC61jFX7+GV9VoZKExbtdxX03jmpkzu5zxHg+Lehy7VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During kernel init, the AM3505/AM3517 UART4 cannot complete its softreset:
+On Thu, May 10, 2012 at 9:25 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 10 May 2012, Bryan Wu wrote:
+>
+>> On Thu, May 10, 2012 at 7:47 AM, Olof Johansson <olof@lixom.net> wrote:
+>> > On Wed, May 9, 2012 at 4:41 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> >> On Thu, May 10, 2012 at 4:38 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+>> >>> On Wednesday 09 May 2012, Andrew Morton wrote:
+>> >>>> I'm the LEDs patchmonkey at present. ?I can merge the drivers/leds
+>> >>>> change if you like, but there doesn't seem much point in that unless
+>> >>>> all the other patches get merged.
+>> >>>>
+>> >>>> So my preferred approach would be for the patch series to get merged
+>> >>>> via some ARM tree.
+>> >>>
+>> >>> I'm fine with taking it through arm-soc if that helps.
+>> >>
+>> >> That would be great to merge from arm-soc tree, thanks a lot, Arnd and Andrew.
+>> >
+>> > Ok, cool. Do you want to stage a branch in a git repo that we pull, or
+>> > do you prefer that we pick up the patches as posted? It's easier for
+>> > us to just do a pull but either way is fine.
+>> >
+>>
+>> Great, I've already put in my kernel tree
+>>
+>> Please find these patches here:
+>> ? ? ? git://kernel.ubuntu.com/roc/linux-2.6/.git leds
+>
+> You applied your patches on top of linux-next. ?This can't be merged
+> upstream until you rebase your patches on something stable such as pure
+> v3.4-rc6 for example.
+>
 
-omap_hwmod: uart4: softreset failed (waited 10000 usec)
+Got it, Nico. As I'm still in US for our Ubuntu Developer Summit, I
+plan to rebase and test on my hardware after I'm back to home next
+week.
 
-This also results in another warning later in the boot process:
+Thanks,
+-Bryan
 
-omap_hwmod: uart4: enabled state can only be entered from initialized, idle, or disabled state
 
->From empirical observation, the AM35xx UART4 IP block requires either
-uart1_fck or uart2_fck to be enabled while UART4 resets.  Otherwise
-the reset will never complete.  So this patch adds uart1_fck as an
-optional clock for UART4 and adds the appropriate hwmod flag to cause
-uart1_fck to be enabled during the reset process.  (The choice of
-uart1_fck over uart2_fck was arbitrary.)
 
-Unfortunately this observation raises many questions.  Is it necessary
-for uart1_fck or uart2_fck to be controlled with uart4_fck for the
-UART4 to work correctly?  What exactly do the AM35xx UART4 clock
-tree and the related PRCM idle management FSMs look like?  If anyone
-has the ability to answer these questions through empirical functional
-testing, or hardware information from the AM35xx designers, it would
-be greatly appreciated.
-
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Kyle Manna <kyle.manna@fuel7.com>
-Cc: Mark A. Greer <mgreer@animalcreek.com>
-Cc: Ranjith Lohithakshan <ranjithl@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clock3xxx_data.c       |    8 ++++++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   17 +++++++++++++++++
- 2 files changed, 23 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 11644bf..12c64db 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -3201,8 +3201,12 @@ static struct clk vpfe_fck = {
- };
- 
- /*
-- * The UART1/2 functional clock acts as the functional
-- * clock for UART4. No separate fclk control available.
-+ * The UART1/2 functional clock acts as the functional clock for
-+ * UART4. No separate fclk control available.  XXX Well now we have a
-+ * uart4_fck that is apparently used as the UART4 functional clock,
-+ * but it also seems that uart1_fck or uart2_fck are still needed, at
-+ * least for UART4 softresets to complete.  This really needs
-+ * clarification.
-  */
- static struct clk uart4_ick_am35xx = {
- 	.name		= "uart4_ick",
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index c939131..c6653a80 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -535,6 +535,20 @@ static struct omap_hwmod_dma_info am35xx_uart4_sdma_reqs[] = {
- 	{ .dma_req = -1 }
- };
- 
-+/*
-+ * XXX AM35xx UART4 cannot complete its softreset without uart1_fck or
-+ * uart2_fck being enabled.  So we add uart1_fck as an optional clock,
-+ * below, and set the HWMOD_CONTROL_OPT_CLKS_IN_RESET.  This really
-+ * should not be needed.  The functional clock structure of the AM35xx
-+ * UART4 is extremely unclear and opaque; it is unclear what the role
-+ * of uart1/2_fck is for the UART4.  Any clarification from either
-+ * empirical testing or the AM3505/3517 hardware designers would be
-+ * most welcome.
-+ */
-+static struct omap_hwmod_opt_clk am35xx_uart4_opt_clks[] = {
-+	{ .role = "softreset_uart1_fck", .clk = "uart1_fck" },
-+};
-+
- static struct omap_hwmod am35xx_uart4_hwmod = {
- 	.name		= "uart4",
- 	.mpu_irqs	= am35xx_uart4_mpu_irqs,
-@@ -549,6 +563,9 @@ static struct omap_hwmod am35xx_uart4_hwmod = {
- 			.idlest_idle_bit = AM35XX_ST_UART4_SHIFT,
- 		},
- 	},
-+	.opt_clks	= am35xx_uart4_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(am35xx_uart4_opt_clks),
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.class		= &omap2_uart_class,
- };
- 
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.186-168-78255 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
