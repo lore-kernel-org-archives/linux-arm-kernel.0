@@ -1,67 +1,72 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 11 May 2012 11:08:39 +0530
-Subject: [PATCH] dma: imx-sdma: keep the callbacks invoked in the tasklet
-In-Reply-To: <1335608142-22580-1-git-send-email-b32955@freescale.com>
-References: <1335608142-22580-1-git-send-email-b32955@freescale.com>
-Message-ID: <1336714719.15424.1533.camel@vkoul-udesk3>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 13:49:43 +0800
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <CAOesGMg+fNwxPYo+oDZm=uDKj4s7jZw_U91wfs=JE15xCZPomQ@mail.gmail.com>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+ <20120510085939.GC3190@n2100.arm.linux.org.uk>
+ <20120510153745.GQ17875@S2101-09.ap.freescale.net>
+ <20120510155327.GB12727@n2100.arm.linux.org.uk>
+ <CAOesGMg+fNwxPYo+oDZm=uDKj4s7jZw_U91wfs=JE15xCZPomQ@mail.gmail.com>
+Message-ID: <20120511054940.GU17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-04-28 at 18:15 +0800, Huang Shijie wrote:
-> The current code keeps the callbacks invoked from interrupt context, this
-> does not conform to the Documentation/dmaengine.txt.
+On Thu, May 10, 2012 at 10:33:24PM -0700, Olof Johansson wrote:
+> How about adding the __must_check patch on your for-next branch for a
+> bit, so we can find and fix build fallout on the arm-soc branches
+> through linux-next, maintainers can add build fixes that we pick up
+> and then, after that, the __must_check fix can go upstream? That
+> maintains bisectability on the branches we already have and should
+> avoid more non-checking code to be introduced down the road.
 > 
-> So add tasklet support to fix this issue.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-Applied Thanks
-> ---
->  drivers/dma/imx-sdma.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index a894482..c492079 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -271,6 +271,7 @@ struct sdma_channel {
->  	enum dma_status			status;
->  	unsigned int			chn_count;
->  	unsigned int			chn_real_count;
-> +	struct tasklet_struct		tasklet;
->  };
->  
->  #define IMX_DMA_SG_LOOP		BIT(0)
-> @@ -534,8 +535,10 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
->  		sdmac->desc.callback(sdmac->desc.callback_param);
->  }
->  
-> -static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
-> +static void sdma_tasklet(unsigned long data)
->  {
-> +	struct sdma_channel *sdmac = (struct sdma_channel *) data;
-> +
->  	complete(&sdmac->done);
->  
->  	/* not interested in channel 0 interrupts */
-> @@ -560,7 +563,7 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
->  		int channel = fls(stat) - 1;
->  		struct sdma_channel *sdmac = &sdma->channel[channel];
->  
-> -		mxc_sdma_handle_channel(sdmac);
-> +		tasklet_schedule(&sdmac->tasklet);
->  
->  		__clear_bit(channel, &stat);
->  	}
-> @@ -1361,6 +1364,8 @@ static int __init sdma_probe(struct platform_device *pdev)
->  		dma_cookie_init(&sdmac->chan);
->  		sdmac->channel = i;
->  
-> +		tasklet_init(&sdmac->tasklet, sdma_tasklet,
-> +			     (unsigned long) sdmac);
->  		/*
->  		 * Add the channel to the DMAC list. Do not add channel 0 though
->  		 * because we need it internally in the SDMA driver. This also means
+The function clk_register_clkdev is created to run-time register clk
+lookup.  Mostly the users of the function (platform clk code) will
+have a long list like the below (arch/arm/mach-imx/clk-imx6q.c).
 
+        clk_register_clkdev(clk[mmdc_ch0_axi], NULL, "mmdc_ch0_axi");
+        clk_register_clkdev(clk[mmdc_ch1_axi], NULL, "mmdc_ch1_axi");
+        clk_register_clkdev(clk[gpt_ipg], "ipg", "imx-gpt.0");
+        clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+        clk_register_clkdev(clk[twd], NULL, "smp_twd");
+        clk_register_clkdev(clk[usboh3], NULL, "usboh3");
+        clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+        clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+        clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+        clk_register_clkdev(clk[uart_ipg], "ipg", "21e8000.serial");
+        clk_register_clkdev(clk[uart_serial], "per", "21ec000.serial");
+        clk_register_clkdev(clk[uart_ipg], "ipg", "21ec000.serial");
+        clk_register_clkdev(clk[uart_serial], "per", "21f0000.serial");
+        clk_register_clkdev(clk[uart_ipg], "ipg", "21f0000.serial");
+        clk_register_clkdev(clk[uart_serial], "per", "21f4000.serial");
+        clk_register_clkdev(clk[uart_ipg], "ipg", "21f4000.serial");
+        clk_register_clkdev(clk[enet], NULL, "2188000.ethernet");
+        clk_register_clkdev(clk[usdhc1], NULL, "2190000.usdhc");
+        clk_register_clkdev(clk[usdhc2], NULL, "2194000.usdhc");
+        clk_register_clkdev(clk[usdhc3], NULL, "2198000.usdhc");
+        clk_register_clkdev(clk[usdhc4], NULL, "219c000.usdhc");
+        clk_register_clkdev(clk[i2c1], NULL, "21a0000.i2c");
+        clk_register_clkdev(clk[i2c2], NULL, "21a4000.i2c");
+        clk_register_clkdev(clk[i2c3], NULL, "21a8000.i2c");
+        clk_register_clkdev(clk[ecspi1], NULL, "2008000.ecspi");
+        clk_register_clkdev(clk[ecspi2], NULL, "200c000.ecspi");
+        clk_register_clkdev(clk[ecspi3], NULL, "2010000.ecspi");
+        clk_register_clkdev(clk[ecspi4], NULL, "2014000.ecspi");
+        clk_register_clkdev(clk[ecspi5], NULL, "2018000.ecspi");
+        clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
+        clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
+        clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
+        clk_register_clkdev(clk[ssi1_ipg], NULL, "2028000.ssi");
+        clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+        clk_register_clkdev(clk[ahb], "ahb", NULL);
+        clk_register_clkdev(clk[cko1], "cko1", NULL);
+
+We probably do not want to make the whole clk initialization fail on
+individual clk_register_clkdev call, but just give an error message and
+continue trying to boot.  In that case, clk_register_clkdev can just
+do the job to save users from return checking on every single call in
+that long list?
 
 -- 
-~Vinod
+Regards,
+Shawn
