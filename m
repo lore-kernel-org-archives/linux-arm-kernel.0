@@ -1,217 +1,81 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 11 May 2012 10:29:42 +0200
-Subject: [PATCH 06/12 v2] pinctrl/nomadik: implement pin configuration
-Message-ID: <1336724982-25154-1-git-send-email-linus.walleij@stericsson.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 May 2012 10:30:47 +0200
+Subject: Bad use of highmem with buffer_migrate_page?
+In-Reply-To: <4FAC200D.2080306@codeaurora.org>
+References: <4FAC200D.2080306@codeaurora.org>
+Message-ID: <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hello,
 
-This implements the pin configuration interface for the
-Nomadik pin controller.
+On Thursday, May 10, 2012 10:08 PM Laura Abbott wrote:
 
-As part of the exercise we add a bit in the pin_cfg_t for
-the Nomadik pinctrl driver that indicates if the pin should
-be forced into GPIO mode. This is not done to go behind the
-back of the GPIO subsystem, but to ensure that default modes
-can be set by hogs on boot and system suspend/resume states.
-It was used implicitly by the old code defining all config
-settings and modes in a single config word but we now have
-a split between pinmux and pinconf leading to the need to
-have this.
+> I did a backport of the Contiguous Memory Allocator to a 3.0.8 tree. I
+> wrote fairly simple test case that, in 1MB chunks, allocs up to 40MB
+> from a reserved area, maps, writes, unmaps and then frees in an infinite
+> loop. When running this with another program in parallel to put some
+> stress on the filesystem, I hit data aborts in the filesystem/journal
+> layer, although not always the same backtrace. As an example:
+> 
+> [<c02907a4>] (__ext4_check_dir_entry+0x20/0x184) from [<c029e1a8>]
+> (add_dirent_to_buf+0x70/0x2ac)
+> [<c029e1a8>] (add_dirent_to_buf+0x70/0x2ac) from [<c029f3f0>]
+> (ext4_add_entry+0xd8/0x4bc)
+> [<c029f3f0>] (ext4_add_entry+0xd8/0x4bc) from [<c029fe90>]
+> (ext4_add_nondir+0x14/0x64)
+> [<c029fe90>] (ext4_add_nondir+0x14/0x64) from [<c02a04c4>]
+> (ext4_create+0xd8/0x120)
+> [<c02a04c4>] (ext4_create+0xd8/0x120) from [<c022e134>]
+> (vfs_create+0x74/0xa4)
+> [<c022e134>] (vfs_create+0x74/0xa4) from [<c022ed3c>] (do_last+0x588/0x8d4)
+> [<c022ed3c>] (do_last+0x588/0x8d4) from [<c022fe64>]
+> (path_openat+0xc4/0x394)
+> [<c022fe64>] (path_openat+0xc4/0x394) from [<c0230214>]
+> (do_filp_open+0x30/0x7c)
+> [<c0230214>] (do_filp_open+0x30/0x7c) from [<c0220cb4>]
+> (do_sys_open+0xd8/0x174)
+> [<c0220cb4>] (do_sys_open+0xd8/0x174) from [<c0105ea0>]
+> (ret_fast_syscall+0x0/0x30)
+> 
+> Every panic had the same issue where a struct buffer_head [1] had a
+> b_data that was unexpectedly NULL.
+> 
+> During the course of CMA, buffer_migrate_page could be called to migrate
+> from a CMA page to a new page. buffer_migrate_page calls set_bh_page[2]
+> to set the new page for the buffer_head. If the new page is a highmem
+> page though, the bh->b_data ends up as NULL, which could produce the
+> panics seen above.
+> 
+> This seems to indicate that highmem pages are not not appropriate for
+> use as pages to migrate to. The following made the problem go away for me:
+> 
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -5753,7 +5753,7 @@ static struct page *
+>   __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
+>                               int **resultp)
+>   {
+> -       return alloc_page(GFP_HIGHUSER_MOVABLE);
+> +       return alloc_page(GFP_USER | __GFP_MOVABLE);
+>   }
+> 
+> 
+> Does this seem like an actual issue or is this an artifact of my
+> backport to 3.0? I'm not familiar enough with the filesystem layer to be
+> able to tell where highmem can actually be used.
 
-We also add a bit for explicitly setting sleepmode of the
-pin. This was previously handled by custom calls with the
-_sleep() suffix, but we now have one single interface into
-the configuration so we replace this with a bit indicating
-that the pin shall be configured into sleep mode.
+I will need to investigate this further as this issue doesn't appear on 
+v3.3+ kernels, but I remember I saw something similar when I tried CMA 
+backported to v3.0.
 
-Some of the configuration can be refactored later to use
-less custom fields on the pin_cfg_t but we are currently
-leaving the old function calls in place so we stay
-compatible.
-
-ChangeLog v1->v2:
-- Drop a hunk changing pinmuxing for GPIO and move it
-  over to the preceding pinmux patch.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-nomadik/include/plat/pincfg.h |   13 +++
- drivers/pinctrl/Kconfig                     |    1 +
- drivers/pinctrl/pinctrl-nomadik.c           |  113 +++++++++++++++++++++++++++
- 3 files changed, 127 insertions(+)
-
-diff --git a/arch/arm/plat-nomadik/include/plat/pincfg.h b/arch/arm/plat-nomadik/include/plat/pincfg.h
-index c015133..9c949c7 100644
---- a/arch/arm/plat-nomadik/include/plat/pincfg.h
-+++ b/arch/arm/plat-nomadik/include/plat/pincfg.h
-@@ -124,6 +124,19 @@ typedef unsigned long pin_cfg_t;
- #define PIN_LOWEMI_DISABLED	(0 << PIN_LOWEMI_SHIFT)
- #define PIN_LOWEMI_ENABLED	(1 << PIN_LOWEMI_SHIFT)
+You have pointed to an important issue which we need to solve somehow. CMA
+wasn't fully tested with high mem and it looks that there are some issues here
+and there. Your patch will prevent using highmem for any migration triggered by
+CMA. IMHO this is a bit limited, but right now I have no better idea. For a
+quick backport it should be ok.
  
-+#define PIN_GPIOMODE_SHIFT	26
-+#define PIN_GPIOMODE_MASK	(0x1 << PIN_GPIOMODE_SHIFT)
-+#define PIN_GPIOMODE(x)		(((x) & PIN_GPIOMODE_MASK) >> PIN_GPIOMODE_SHIFT)
-+#define PIN_GPIOMODE_DISABLED	(0 << PIN_GPIOMODE_SHIFT)
-+#define PIN_GPIOMODE_ENABLED	(1 << PIN_GPIOMODE_SHIFT)
-+
-+#define PIN_SLEEPMODE_SHIFT	27
-+#define PIN_SLEEPMODE_MASK	(0x1 << PIN_SLEEPMODE_SHIFT)
-+#define PIN_SLEEPMODE(x)	(((x) & PIN_SLEEPMODE_MASK) >> PIN_SLEEPMODE_SHIFT)
-+#define PIN_SLEEPMODE_DISABLED	(0 << PIN_SLEEPMODE_SHIFT)
-+#define PIN_SLEEPMODE_ENABLED	(1 << PIN_SLEEPMODE_SHIFT)
-+
-+
- /* Shortcuts.  Use these instead of separate DIR, PULL, and VAL.  */
- #define PIN_INPUT_PULLDOWN	(PIN_DIR_INPUT | PIN_PULL_DOWN)
- #define PIN_INPUT_PULLUP	(PIN_DIR_INPUT | PIN_PULL_UP)
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index bbf14dc..81b1967 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -40,6 +40,7 @@ config PINCTRL_NOMADIK
- 	bool "Nomadik pin controller driver"
- 	depends on ARCH_U8500
- 	select PINMUX
-+	select PINCONF
- 
- config PINCTRL_DB8500
- 	bool "DB8500 pin controller driver"
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 8c632e9..b8e01c3 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/pinconf.h>
- /* Since we request GPIOs from ourself */
- #include <linux/pinctrl/consumer.h>
- 
-@@ -1568,10 +1569,122 @@ static struct pinmux_ops nmk_pinmux_ops = {
- 	.gpio_disable_free = nmk_gpio_disable_free,
- };
- 
-+int nmk_pin_config_get(struct pinctrl_dev *pctldev,
-+		       unsigned pin,
-+		       unsigned long *config)
-+{
-+	/* Not implemented */
-+	return -EINVAL;
-+}
-+
-+int nmk_pin_config_set(struct pinctrl_dev *pctldev,
-+		       unsigned pin,
-+		       unsigned long config)
-+{
-+	static const char *pullnames[] = {
-+		[NMK_GPIO_PULL_NONE]	= "none",
-+		[NMK_GPIO_PULL_UP]	= "up",
-+		[NMK_GPIO_PULL_DOWN]	= "down",
-+		[3] /* illegal */	= "??"
-+	};
-+	static const char *slpmnames[] = {
-+		[NMK_GPIO_SLPM_INPUT]		= "input/wakeup",
-+		[NMK_GPIO_SLPM_NOCHANGE]	= "no-change/no-wakeup",
-+	};
-+	struct nmk_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
-+	struct nmk_gpio_chip *nmk_chip;
-+	struct pinctrl_gpio_range *range;
-+	struct gpio_chip *chip;
-+	unsigned bit;
-+
-+	/*
-+	 * The pin config contains pin number and altfunction fields, here
-+	 * we just ignore that part. It's being handled by the framework and
-+	 * pinmux callback respectively.
-+	 */
-+	pin_cfg_t cfg = (pin_cfg_t) config;
-+	int pull = PIN_PULL(cfg);
-+	int slpm = PIN_SLPM(cfg);
-+	int output = PIN_DIR(cfg);
-+	int val = PIN_VAL(cfg);
-+	bool lowemi = PIN_LOWEMI(cfg);
-+	bool gpiomode = PIN_GPIOMODE(cfg);
-+	bool sleep = PIN_SLEEPMODE(cfg);
-+
-+	range = nmk_match_gpio_range(pctldev, pin);
-+	if (!range) {
-+		dev_err(npct->dev, "invalid pin offset %d\n", pin);
-+		return -EINVAL;
-+	}
-+	if (!range->gc) {
-+		dev_err(npct->dev, "GPIO chip missing in range for pin %d\n",
-+			pin);
-+		return -EINVAL;
-+	}
-+	chip = range->gc;
-+	nmk_chip = container_of(chip, struct nmk_gpio_chip, chip);
-+
-+	if (sleep) {
-+		int slpm_pull = PIN_SLPM_PULL(cfg);
-+		int slpm_output = PIN_SLPM_DIR(cfg);
-+		int slpm_val = PIN_SLPM_VAL(cfg);
-+
-+		/* All pins go into GPIO mode at sleep */
-+		gpiomode = true;
-+
-+		/*
-+		 * The SLPM_* values are normal values + 1 to allow zero to
-+		 * mean "same as normal".
-+		 */
-+		if (slpm_pull)
-+			pull = slpm_pull - 1;
-+		if (slpm_output)
-+			output = slpm_output - 1;
-+		if (slpm_val)
-+			val = slpm_val - 1;
-+
-+		dev_dbg(nmk_chip->chip.dev, "pin %d: sleep pull %s, dir %s, val %s\n",
-+			pin,
-+			slpm_pull ? pullnames[pull] : "same",
-+			slpm_output ? (output ? "output" : "input") : "same",
-+			slpm_val ? (val ? "high" : "low") : "same");
-+	}
-+
-+	dev_dbg(nmk_chip->chip.dev, "pin %d [%#lx]: pull %s, slpm %s (%s%s), lowemi %s\n",
-+		pin, cfg, pullnames[pull], slpmnames[slpm],
-+		output ? "output " : "input",
-+		output ? (val ? "high" : "low") : "",
-+		lowemi ? "on" : "off" );
-+
-+	clk_enable(nmk_chip->clk);
-+	bit = pin % NMK_GPIO_PER_CHIP;
-+	if (gpiomode)
-+		/* No glitch when going to GPIO mode */
-+		__nmk_gpio_set_mode(nmk_chip, bit, NMK_GPIO_ALT_GPIO);
-+	if (output)
-+		__nmk_gpio_make_output(nmk_chip, bit, val);
-+	else {
-+		__nmk_gpio_make_input(nmk_chip, bit);
-+		__nmk_gpio_set_pull(nmk_chip, bit, pull);
-+	}
-+	/* TODO: isn't this only applicable on output pins? */
-+	__nmk_gpio_set_lowemi(nmk_chip, bit, lowemi);
-+
-+	__nmk_gpio_set_slpm(nmk_chip, bit, slpm);
-+	clk_disable(nmk_chip->clk);
-+	return 0;
-+}
-+
-+static struct pinconf_ops nmk_pinconf_ops = {
-+	.pin_config_get = nmk_pin_config_get,
-+	.pin_config_set = nmk_pin_config_set,
-+};
-+
- static struct pinctrl_desc nmk_pinctrl_desc = {
- 	.name = "pinctrl-nomadik",
- 	.pctlops = &nmk_pinctrl_ops,
- 	.pmxops = &nmk_pinmux_ops,
-+	.confops = &nmk_pinconf_ops,
- 	.owner = THIS_MODULE,
- };
- 
+Best regards
 -- 
-1.7.9.2
+Marek Szyprowski
+Samsung Poland R&D Center
