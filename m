@@ -1,202 +1,132 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 11 May 2012 15:10:42 +0530
-Subject: [PATCH v3] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
-References: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1336729242-16168-1-git-send-email-govindraj.raja@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 11 May 2012 11:47:39 +0200
+Subject: [PATCH v9 1/2] gpio: Adjust of_xlate API to support multiple GPIO
+ chips
+Message-ID: <1336729660-7670-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+This patch changes the of_xlate API to make it possible to manipulate the
+actual used gc. This way, multiple GPIO banks can be supported with the same DT
+registered GPIO controller.
 
-The commit (bce492c0  ARM: OMAP2+: UART: Fix incorrect population of
-default uart pads) removed default uart pads that where getting populated
-and which was making rx pin wakeup capable. If uart pads were used in
-different mode by any other module then it would fail since the default
-pads took over all the uart pins forcefully. With removal of default pads
-the rx_pad wakeup for console uart while waking up from off mode is broken.
+The issue was discussed upon the integration of LPC32xx's DT support for its
+GPIO (see separate patch).
 
-Utilise the mux api available to probe the availability of mux pins
-in uart mode and probe for availability of uart pin in mux mode0
-if uart is available as uart pin itself then configure rx pin
-as wakeup capable.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-This patch itself doesn't cater to all boards. Boards using uart rx wakeup
-mechanism should ensure the usage of omap_serial_init_port by configuring
-required uart ports and pass necessary mux data, till then this probing of
-uart pins can cater to enabling of rx pad wakeup to most of the boards.
-
-This patch can also throw some boot warning from _omap_mux_get_by_name
-if pin is requested for availability is not present while dynamically probing
-the uart pins availability such boot warnings can be addressed only when board
-files are patched with omap_serial_init_port calls passing the right pads
-needed for a given port.
-
-Discussion Threads for reference:
-http://www.spinics.net/lists/linux-omap/msg69859.html
-http://www.spinics.net/lists/linux-omap/msg68659.html
-
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Russ Dill <russ.dill@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Ameya Palande <ameya.palande@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
+Applies to v3.4-rc6
 
-Patching of all board files would be difficult as even I am not aware of all
-omap-board schematics and uart port usage. So individual board file can be
-enabled accordingly for uart usage by calling omap_serial_init_port call
-with right mux data.
+Changes since last version:
+* Added this patch to the series
 
-for testing: Patch based on v3.4-rc6
-(tested on beagle-xm for off mode rx wakeup)
-Patch targeted for v3.5
+Thanks to Grant Likely for reviewing and advice!
 
- arch/arm/mach-omap2/mux.c    |    3 +-
- arch/arm/mach-omap2/mux.h    |   11 +++++++
- arch/arm/mach-omap2/serial.c |   65 +++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 73 insertions(+), 6 deletions(-)
+ drivers/gpio/gpio-samsung.c |   10 +++++-----
+ drivers/of/gpio.c           |   14 ++++++++------
+ include/asm-generic/gpio.h  |    2 +-
+ include/linux/of_gpio.h     |    2 +-
+ 4 files changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 65c3391..d937ddd 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -217,8 +217,7 @@ static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
- 	return -ENODEV;
- }
+--- linux-2.6.orig/drivers/gpio/gpio-samsung.c
++++ linux-2.6/drivers/gpio/gpio-samsung.c
+@@ -2655,21 +2655,21 @@ static struct samsung_gpio_chip exynos5_
  
--static int __init
--omap_mux_get_by_name(const char *muxname,
-+int __init omap_mux_get_by_name(const char *muxname,
- 			struct omap_mux_partition **found_partition,
- 			struct omap_mux **found_mux)
+ 
+ #if defined(CONFIG_ARCH_EXYNOS) && defined(CONFIG_OF)
+-static int exynos_gpio_xlate(struct gpio_chip *gc,
++static int exynos_gpio_xlate(struct gpio_chip **gc,
+ 			const struct of_phandle_args *gpiospec, u32 *flags)
  {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 69fe060..471e62a 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -59,6 +59,7 @@
- #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
+ 	unsigned int pin;
  
- #define OMAP_MODE_GPIO(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE4)
-+#define OMAP_MODE_UART(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE0)
+-	if (WARN_ON(gc->of_gpio_n_cells < 4))
++	if (WARN_ON((*gc)->of_gpio_n_cells < 4))
+ 		return -EINVAL;
  
- /* Flags for omapX_mux_init */
- #define OMAP_PACKAGE_MASK		0xffff
-@@ -225,8 +226,18 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
+-	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
++	if (WARN_ON(gpiospec->args_count < (*gc)->of_gpio_n_cells))
+ 		return -EINVAL;
+ 
+-	if (gpiospec->args[0] > gc->ngpio)
++	if (gpiospec->args[0] > (*gc)->ngpio)
+ 		return -EINVAL;
+ 
+-	pin = gc->base + gpiospec->args[0];
++	pin = (*gc)->base + gpiospec->args[0];
+ 
+ 	if (s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(gpiospec->args[1])))
+ 		pr_warn("gpio_xlate: failed to set pin function\n");
+--- linux-2.6.orig/drivers/of/gpio.c
++++ linux-2.6/drivers/of/gpio.c
+@@ -64,7 +64,7 @@ int of_get_named_gpio_flags(struct devic
+ 	if (flags)
+ 		*flags = 0;
+ 
+-	ret = gc->of_xlate(gc, &gpiospec, flags);
++	ret = gc->of_xlate(&gc, &gpiospec, flags);
+ 	if (ret < 0)
+ 		goto err1;
+ 
+@@ -114,7 +114,9 @@ EXPORT_SYMBOL(of_gpio_named_count);
+ 
+ /**
+  * of_gpio_simple_xlate - translate gpio_spec to the GPIO number and flags
+- * @gc:		pointer to the gpio_chip structure
++ * @gc:		pointer to pointer to the gpio_chip structure: the xlate
++ *              function can alter *gc itself to make GPIO distribution to
++ *              multiple gpio_chips possible
+  * @np:		device node of the GPIO chip
+  * @gpio_spec:	gpio specifier as found in the device tree
+  * @flags:	a flags pointer to fill in
+@@ -123,7 +125,7 @@ EXPORT_SYMBOL(of_gpio_named_count);
+  * gpio chips. This function performs only one sanity check: whether gpio
+  * is less than ngpios (that is specified in the gpio_chip).
   */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+int omap_mux_get_by_name(const char *muxname,
-+		struct omap_mux_partition **found_partition,
-+		struct omap_mux **found_mux);
- #else
- 
-+static inline int omap_mux_get_by_name(const char *muxname,
-+		struct omap_mux_partition **found_partition,
-+		struct omap_mux **found_mux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
+-int of_gpio_simple_xlate(struct gpio_chip *gc,
++int of_gpio_simple_xlate(struct gpio_chip **gc,
+ 			 const struct of_phandle_args *gpiospec, u32 *flags)
  {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 9fc2f44..2dc50e7 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -57,6 +57,7 @@ struct omap_uart_state {
+ 	/*
+@@ -132,15 +134,15 @@ int of_gpio_simple_xlate(struct gpio_chi
+ 	 * number and the flags from a single gpio cell -- this is possible,
+ 	 * but not recommended).
+ 	 */
+-	if (gc->of_gpio_n_cells < 2) {
++	if ((*gc)->of_gpio_n_cells < 2) {
+ 		WARN_ON(1);
+ 		return -EINVAL;
+ 	}
  
- 	struct list_head node;
- 	struct omap_hwmod *oh;
-+	struct omap_device_pad default_omap_uart_pads[2];
- };
+-	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
++	if (WARN_ON(gpiospec->args_count < (*gc)->of_gpio_n_cells))
+ 		return -EINVAL;
  
- static LIST_HEAD(uart_list);
-@@ -126,11 +127,68 @@ static void omap_uart_set_smartidle(struct platform_device *pdev) {}
- #endif /* CONFIG_PM */
+-	if (gpiospec->args[0] >= gc->ngpio)
++	if (gpiospec->args[0] >= (*gc)->ngpio)
+ 		return -EINVAL;
  
- #ifdef CONFIG_OMAP_MUX
--static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
-+
-+#define OMAP_UART_DEFAULT_PAD_NAME_LEN	28
-+static char rx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN],
-+		tx_pad_name[OMAP_UART_DEFAULT_PAD_NAME_LEN] __initdata;
-+
-+static void  __init
-+omap_serial_fill_uart_tx_rx_pads(struct omap_board_data *bdata,
-+				struct omap_uart_state *uart)
-+{
-+	uart->default_omap_uart_pads[0].name = rx_pad_name;
-+	uart->default_omap_uart_pads[0].flags = OMAP_DEVICE_PAD_REMUX |
-+							OMAP_DEVICE_PAD_WAKEUP;
-+	uart->default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
-+							OMAP_MUX_MODE0;
-+	uart->default_omap_uart_pads[0].idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0;
-+	uart->default_omap_uart_pads[1].name = tx_pad_name;
-+	uart->default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
-+							OMAP_MUX_MODE0;
-+	bdata->pads = uart->default_omap_uart_pads;
-+	bdata->pads_cnt = ARRAY_SIZE(uart->default_omap_uart_pads);
-+}
-+
-+static void  __init omap_serial_check_wakeup(struct omap_board_data *bdata,
-+						struct omap_uart_state *uart)
- {
-+	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
-+	struct omap_mux *rx_mux = NULL, *tx_mux = NULL;
-+	char *rx_fmt, *tx_fmt;
-+	int uart_nr = bdata->id + 1;
-+
-+	if (bdata->id != 2) {
-+		rx_fmt = "uart%d_rx.uart%d_rx";
-+		tx_fmt = "uart%d_tx.uart%d_tx";
-+	} else {
-+		rx_fmt = "uart%d_rx_irrx.uart%d_rx_irrx";
-+		tx_fmt = "uart%d_tx_irtx.uart%d_tx_irtx";
-+	}
-+
-+	snprintf(rx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, rx_fmt,
-+			uart_nr, uart_nr);
-+	snprintf(tx_pad_name, OMAP_UART_DEFAULT_PAD_NAME_LEN, tx_fmt,
-+			uart_nr, uart_nr);
-+
-+	if (omap_mux_get_by_name(rx_pad_name, &rx_partition, &rx_mux) >= 0 &&
-+			omap_mux_get_by_name
-+				(tx_pad_name, &tx_partition, &tx_mux) >= 0) {
-+		u16 tx_mode, rx_mode;
-+
-+		tx_mode = omap_mux_read(tx_partition, tx_mux->reg_offset);
-+		rx_mode = omap_mux_read(rx_partition, rx_mux->reg_offset);
-+
-+		/*
-+		 * Check if uart is used in default tx/rx mode i.e. in mux mode0
-+		 * if yes then configure rx pin for wake up capability
-+		 */
-+		if (OMAP_MODE_UART(rx_mode) && OMAP_MODE_UART(tx_mode))
-+			omap_serial_fill_uart_tx_rx_pads(bdata, uart);
-+	}
- }
- #else
--static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
-+static void __init omap_serial_check_wakeup(struct omap_board_data *bdata
-+		struct omap_uart_state *uart) {}
+ 	if (flags)
+--- linux-2.6.orig/include/asm-generic/gpio.h
++++ linux-2.6/include/asm-generic/gpio.h
+@@ -129,7 +129,7 @@ struct gpio_chip {
+ 	 */
+ 	struct device_node *of_node;
+ 	int of_gpio_n_cells;
+-	int (*of_xlate)(struct gpio_chip *gc,
++	int (*of_xlate)(struct gpio_chip **gc,
+ 		        const struct of_phandle_args *gpiospec, u32 *flags);
  #endif
+ };
+--- linux-2.6.orig/include/linux/of_gpio.h
++++ linux-2.6/include/linux/of_gpio.h
+@@ -59,7 +59,7 @@ extern int of_mm_gpiochip_add(struct dev
+ extern void of_gpiochip_add(struct gpio_chip *gc);
+ extern void of_gpiochip_remove(struct gpio_chip *gc);
+ extern struct gpio_chip *of_node_to_gpiochip(struct device_node *np);
+-extern int of_gpio_simple_xlate(struct gpio_chip *gc,
++extern int of_gpio_simple_xlate(struct gpio_chip **gc,
+ 				const struct of_phandle_args *gpiospec,
+ 				u32 *flags);
  
- char *cmdline_find_option(char *str)
-@@ -295,8 +353,7 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
- 		bdata.pads = NULL;
- 		bdata.pads_cnt = 0;
- 
--		if (cpu_is_omap44xx() || cpu_is_omap34xx())
--			omap_serial_fill_default_pads(&bdata);
-+		omap_serial_check_wakeup(&bdata, uart);
- 
- 		if (!info)
- 			omap_serial_init_port(&bdata, NULL);
--- 
-1.7.9
