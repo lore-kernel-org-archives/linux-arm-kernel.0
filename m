@@ -1,80 +1,165 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 May 2012 15:29:41 +0100
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120511141835.GF3960@opensource.wolfsonmicro.com>
-References: <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
- <20120509121945.GT26481@n2100.arm.linux.org.uk>
- <1336621458.1540.280.camel@vkoul-udesk3>
- <20120510094205.GM3908@opensource.wolfsonmicro.com>
- <1336647675.15424.390.camel@vkoul-udesk3>
- <20120511140710.GC6220@n2100.arm.linux.org.uk>
- <20120511141835.GF3960@opensource.wolfsonmicro.com>
-Message-ID: <20120511142941.GA16214@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 11 May 2012 17:30:04 +0300
+Subject: [PATCH 02/19] ARM: OMAP4: PM: save/restore all CM1/2 settings
+ in OFF mode
+In-Reply-To: <87ehqtexzw.fsf@ti.com>
+References: <1334914432-26456-1-git-send-email-t-kristo@ti.com>
+ <1334914432-26456-3-git-send-email-t-kristo@ti.com> <87ehqtexzw.fsf@ti.com>
+Message-ID: <1336746604.2149.301.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:18:35PM +0100, Mark Brown wrote:
-> On Fri, May 11, 2012 at 03:07:10PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
-> > > This should not be in ASoC library. The driver should be able to detect
-> > > if a tasklet was called for many dma completions and notify the client
-> > > (soc-lib) accordingly.
+On Wed, 2012-05-09 at 16:27 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> > No.  Think about the cyclic case.  How do you correctly record how many
-> > 'periods' have completed so that when your tasklet eventually gets called,
-> > you call its callback the correct number of times?
+> > From: Rajendra Nayak <rnayak@ti.com>
+> >
+> > Restore all CM1/2 module registers as they are lost in OFF mode.
 > 
-> I do think that (separately to what ALSA does) if we're going to have a
-> callback specified per request we really should make sure that they all
-> get run as best as we can since the way the API is written people using
-> non-cyclic transfers may run into the same surprise; for cyclic ones the
-> issue you identify is very real though.
-
-Please stop confusing non-cyclic with cyclic transfers.  We know what the
-required semantics are for non-cyclic transfers and they really aren't
-under discussion here.  I'm focusing 100% on the cyclic case here.
-
-> > It is my opinion that having this emulation of the current position in
-> > soc-dmaengine-pcm is not only causing a wrong direction to be taken here,
-> > but is potentially causing inefficiency by forcing conditions into the API
-> > which we really don't need.
+> Except they are still lost since nobody calls these new functions (in
+> this patch.)  :)
 > 
-> I agree entirely, it's clearly just a bodge for not being able to read
-> the position and we'd be better off fixing that.
+> For ease of review, it's preferred to add the *users* of new code in the
+> same patch as the new code.
+
+I'll fix this for the next version. I think this same comment applies to
+patch #3 also.
+
 > 
-> > > One way to do this would be to ensure that the descriptor is marked in
-> > > irq_handler and then all descriptor completed notified in tasklet.
+> > [nm at ti.com: minor clean ups]
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Axel Haslam <axelhaslam@gmail.com>
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/cm44xx.c |  322 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-omap2/cm44xx.h |    2 +
+> >  2 files changed, 324 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/cm44xx.c b/arch/arm/mach-omap2/cm44xx.c
+> > index 535d66e..fb5465b 100644
+> > --- a/arch/arm/mach-omap2/cm44xx.c
+> > +++ b/arch/arm/mach-omap2/cm44xx.c
+> > @@ -21,8 +21,11 @@
+> >  #include "iomap.h"
+> >  #include "common.h"
+> >  #include "cm.h"
+> > +#include "cm44xx.h"
+> >  #include "cm1_44xx.h"
+> >  #include "cm2_44xx.h"
+> > +#include "cminst44xx.h"
+> > +#include "prcm44xx.h"
+> >  #include "cm-regbits-44xx.h"
+> >  
+> >  /* CM1 hardware module low-level functions */
+> > @@ -50,3 +53,322 @@ void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 reg)
+> >  {
+> >  	__raw_writel(val, OMAP44XX_CM2_REGADDR(inst, reg));
+> >  }
+> > +
+> > +#define MAX_CM_REGISTERS 51
+> > +
+> > +struct omap4_cm_reg {
+> > +	u16 offset;
+> > +	u32 val;
+> > +};
+> > +
+> > +struct omap4_cm_regs {
+> > +	u32 mod_off;
+> > +	u32 no_reg;
 > 
-> > No.  You're assuming that for each IRQ you have the tasklet run exactly
-> > once.  There is no such guarantee.
+> minor: do these need to be u32?
+
+u16 should be good enough to save space I guess, I'll try changing this
+and see what happens.
+
 > 
-> I think the intention here was that the framework keep a list of all
-> pending transfers and then in the tasklet it runs through all the
-> completions up to the most recent one rather than only completing the
-> most recent one.  Easier said than done for cyclic of course...
+> > +	struct omap4_cm_reg reg[MAX_CM_REGISTERS];
+> > +};
+> > +
+> > +static struct omap4_cm_regs cm1_regs[] = {
+> > +	/* OMAP4430_CM1_OCP_SOCKET_MOD */
+> > +	{ .mod_off = OMAP4430_CM1_OCP_SOCKET_INST, .no_reg = 1,
+> > +	{{.offset = OMAP4_CM_CM1_PROFILING_CLKCTRL_OFFSET} },
+> 
+> For readability sake, I'd prefer to see this line indented.  And why
+> the extra space before the final '}'}
 
-That's my point.  And keeping count of N times to call the callback in
-the DMA engine driver is racy at best.
+These tables are horrible, would be better to get rid of them completely
+but I guess that is not possible... I'll look at the indentation.
 
-Here's what I think.  I think the best solution for cyclic transfers
-is as follows:
+> 
+> > +	},
+> 
+> [...]
+> 
+> > +static void omap4_cm1_prepare_off(void)
+> > +{
+> > +	u32 i, j;
+> > +	struct omap4_cm_regs *cm_reg = cm1_regs;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(cm1_regs); i++, cm_reg++) {
+> > +		for (j = 0; j < cm_reg->no_reg; j++) {
+> > +			cm_reg->reg[j].val =
+> > +			    omap4_cminst_read_inst_reg(OMAP4430_CM1_PARTITION,
+> > +						       cm_reg->mod_off,
+> > +						       cm_reg->reg[j].offset);
+> > +		}
+> > +	}
+> > +}
+> > +
+> > +static void omap4_cm2_prepare_off(void)
+> > +{
+> > +	u32 i, j;
+> > +	struct omap4_cm_regs *cm_reg = cm2_regs;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(cm2_regs); i++, cm_reg++) {
+> > +		for (j = 0; j < cm_reg->no_reg; j++) {
+> > +			cm_reg->reg[j].val =
+> > +			    omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
+> > +						       cm_reg->mod_off,
+> > +						       cm_reg->reg[j].offset);
+> > +		}
+> > +	}
+> > +}
+> 
+> > +static void omap4_cm1_resume_off(void)
+> > +{
+> > +	u32 i, j;
+> > +	struct omap4_cm_regs *cm_reg = cm1_regs;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(cm1_regs); i++, cm_reg++) {
+> > +		for (j = 0; j < cm_reg->no_reg; j++) {
+> > +			omap4_cminst_write_inst_reg(cm_reg->reg[j].val,
+> > +						    OMAP4430_CM1_PARTITION,
+> > +						    cm_reg->mod_off,
+> > +						    cm_reg->reg[j].offset);
+> > +		}
+> > +	}
+> > +}
+> > +
+> > +static void omap4_cm2_resume_off(void)
+> > +{
+> > +	u32 i, j;
+> > +	struct omap4_cm_regs *cm_reg = cm2_regs;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(cm2_regs); i++, cm_reg++) {
+> > +		for (j = 0; j < cm_reg->no_reg; j++) {
+> > +			omap4_cminst_write_inst_reg(cm_reg->reg[j].val,
+> > +						    OMAP4430_CM2_PARTITION,
+> > +						    cm_reg->mod_off,
+> > +						    cm_reg->reg[j].offset);
+> > +		}
+> > +	}
+> > +}
+> 
+> Notice the two prpare functions (and resume functions) are basically
+> identical, except for the partition.
+> 
+> How about adding a .partition field to the struct so there can be a
+> single function}
 
-1. The callback will be guaranteed to be called at least _once_ when one
-   or more periods have expired.
+Yea, should be possible. I'll fix this for next rev.
 
-2. There may be fewer callbacks issued than periods have expired.
-
-3. All DMA engine drivers supporting cyclic transfers *must* without
-   exception implement the residue in their tx_status function.
-
-4. The residue returned _must_ be the number of bytes between the next
-   byte to be read or written by DMA to/from memory and the end of the
-   buffer - more explicitly, according to this mathematics:
-	buffer_dma_start_address + buffer_size - next_dma_address
-
-5. Users of DMA engine cyclic transfers are expected to use the tx_status
-   function to determine how many periods have completed on each callback
-   if this information matters to their operation.
+-Tero
