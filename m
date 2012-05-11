@@ -1,29 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 May 2012 12:19:09 +0000
-Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
-In-Reply-To: <20120510234100.7F5463E04A6@localhost>
-References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
- <20120510234100.7F5463E04A6@localhost>
-Message-ID: <201205111219.10025.arnd@arndb.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 11 May 2012 14:19:51 +0200
+Subject: [PATCH] RFC: ARM: msm: re-read DMA IRQ status on each iteration
+Message-ID: <1336738791-15037-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 May 2012, Grant Likely wrote:
-> How about the following instead (very rough, there should be a cleaner
-> way to update the gc pointer in of_xlate):
-> 
->         gpio: gpio at 40028000 {
->                 compatible = "nxp,lpc3220-gpio";
->                 reg = <0x40028000 0x1000>;
->                 gpio-controller;
->                 #gpio-cells = <3>; /* bank, pin, flags */
->         }
-> 
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I thought about that when I suggested the current binding to Roland,
-but the problem with this is that passing the bank as a number is
-not very intuitive when the data sheet has separate number spaces
-for gpio, gpi and gpo here, so it seemed more natural to go with what
-the data sheet describes.
+We have recently found a number or erroneous IRQ handlers in
+the kernel where the flag iterator loop miss IRQs that get
+raised when the loop is executing. This was spotted in the
+MSM DMA driver by Julia Lawall using this cocinelle
+snippet:
 
-	Arnd
+@@
+expression pending,gedr,e1;
+statement S;
+@@
+
+*pending = readl(gedr);
+... when != pending = e1
+while (pending) S
+
+Cc: arve at android.com
+Cc: Brian Swetland <swetland@google.com>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Reported-by: Julia Lawall <julia.lawall@lip6.fr>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+David et al: I'm uncertain about this one since the comment
+says that the read clears the IRQ, such as if the read operation
+itself will latch out the flag register and clear it. (I encountered
+this behaviour in the MOS6569 VIC raster IRQ register $D019 in the
+1980s if I'm not mistaken.)
+---
+ arch/arm/mach-msm/dma.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+index 02cae5e..ee11afe 100644
+--- a/arch/arm/mach-msm/dma.c
++++ b/arch/arm/mach-msm/dma.c
+@@ -147,10 +147,8 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
+ 
+ 	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+ 
+-	int_status = readl(DMOV_ISR); /* read and clear interrupt */
+-	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
+-
+-	while (int_status) {
++	while (int_status = readl(DMOV_ISR)) {
++		PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
+ 		mask = int_status & -int_status;
+ 		id = fls(mask) - 1;
+ 		PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, mask, id);
+-- 
+1.7.9.2
