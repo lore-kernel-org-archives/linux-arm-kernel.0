@@ -1,45 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 10:49:58 +0800
-Subject: [alsa-devel] [PATCH 5/6] ASoC: mxs: add device tree support for
- mxs-sgtl5000
-In-Reply-To: <20120511023302.GN6622@shlinux2.ap.freescale.net>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
- <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
- <20120510111646.GL6622@shlinux2.ap.freescale.net>
- <20120510122001.GM17875@S2101-09.ap.freescale.net>
- <20120511023302.GN6622@shlinux2.ap.freescale.net>
-Message-ID: <20120511024956.GR17875@S2101-09.ap.freescale.net>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 11 May 2012 08:22:56 +0530
+Subject: [PATCH V2 01/11] dma: imx-sdma: make channel0 operations atomic
+In-Reply-To: <20120510123749.GO17875@S2101-09.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <1336563190-19974-2-git-send-email-richard.zhao@freescale.com>
+ <1336622038.1540.285.camel@vkoul-udesk3>
+ <20120510063446.GA17875@S2101-09.ap.freescale.net>
+ <20120510123749.GO17875@S2101-09.ap.freescale.net>
+Message-ID: <1336704776.15424.1354.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 10:33:03AM +0800, Dong Aisheng wrote:
-> Hmm, even we need to do sanity check, i guess this could be done in
-> core since the core will take these nodes as parameter.
-> However, after checking the core a bit, i guess the core has already
-> done this:
+On Thu, 2012-05-10 at 20:37 +0800, Shawn Guo wrote:
+> On Thu, May 10, 2012 at 02:34:49PM +0800, Shawn Guo wrote:
+> > On Thu, May 10, 2012 at 09:23:58AM +0530, Vinod Koul wrote:
+> > > On Wed, 2012-05-09 at 19:33 +0800, Richard Zhao wrote:
+> > > > device_prep_dma_cyclic may be call in audio trigger function which is
+> > > > atomic context, so we make it atomic too.
+> > > > 
+> > > >  - change channel0 lock to spinlock.
+> > > >  - Use polling to wait for channel0 finish running.
+> > > > 
+> > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > Acked By: Vinod Koul <vinod.koul@linux.intel.com>
+> > > 
+> > Applied on imx/dt branch with Vinod's ack.  Thanks.
+> > 
+> Hi Vinod,
 > 
-> /* no, then find CPU DAI from registered DAIs*/
-> list_for_each_entry(cpu_dai, &dai_list, list) {
-> 	if (dai_link->cpu_dai_of_node) {
-> 		if (cpu_dai->dev->of_node != dai_link->cpu_dai_of_node)
-> 			continue;
-> 	} else {
-> 		if (strcmp(cpu_dai->name, dai_link->cpu_dai_name))
-> 			continue;
-> 	}
-> 
-> 	rtd->cpu_dai = cpu_dai;
-> 	goto find_codec;
-> }
-> 
-> It looks if the phandles are not correctly represented, the dai binding
-> will fail, right?
-> 
-Yes, the core will have the sanity check and fail out without reporting
-what's exactly going wrong, unless you turn on ASoC core debug option.
-So what's harm to have the check in driver to fail out as early as
-possible and with the exact message reporting failure cause?
+> Since Mark wouldn't like to have sound tree pulled into arm-soc to help
+> a couple of patches in the series get merged in the coming window, I can
+> not take the series as a whole to go with arm-soc.  It makes less sense
+> to have this patch go arm-soc then, so please take the patch.
+Sure, care to give an ACK before I apply.
 
 -- 
-Regards,
-Shawn
+~Vinod
