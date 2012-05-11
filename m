@@ -1,129 +1,127 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 11 May 2012 20:32:20 +0200
-Subject: [PATCHv4 4/4] cpuidle: coupled: add parallel barrier function
-In-Reply-To: <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
- <201205092331.24487.rjw@sisk.pl>
- <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
-Message-ID: <201205112032.21117.rjw@sisk.pl>
+Date: Fri, 11 May 2012 21:01:59 +0200
+Subject: [GIT PULL] Renesas ARM-based platforms updates for v3.5
+Message-ID: <201205112101.59949.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 11, 2012, Colin Cross wrote:
-> On Wed, May 9, 2012 at 2:31 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Tuesday, May 08, 2012, Colin Cross wrote:
-> >> Adds cpuidle_coupled_parallel_barrier, which can be used by coupled
-> >> cpuidle state enter functions to handle resynchronization after
-> >> determining if any cpu needs to abort.  The normal use case will
-> >> be:
-> >>
-> >> static bool abort_flag;
-> >> static atomic_t abort_barrier;
-> >>
-> >> int arch_cpuidle_enter(struct cpuidle_device *dev, ...)
-> >> {
-> >>       if (arch_turn_off_irq_controller()) {
-> >>               /* returns an error if an irq is pending and would be lost
-> >>                  if idle continued and turned off power */
-> >>               abort_flag = true;
-> >>       }
-> >>
-> >>       cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
-> >>
-> >>       if (abort_flag) {
-> >>               /* One of the cpus didn't turn off it's irq controller */
-> >>               arch_turn_on_irq_controller();
-> >>               return -EINTR;
-> >>       }
-> >>
-> >>       /* continue with idle */
-> >>       ...
-> >> }
-> >>
-> >> This will cause all cpus to abort idle together if one of them needs
-> >> to abort.
-> >>
-> >> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> >> Tested-by: Kevin Hilman <khilman@ti.com>
-> >> Signed-off-by: Colin Cross <ccross@android.com>
-> >> ---
-> >>  drivers/cpuidle/coupled.c |   37 +++++++++++++++++++++++++++++++++++++
-> >>  include/linux/cpuidle.h   |    4 ++++
-> >>  2 files changed, 41 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
-> >> index 93101fb..3e65de1 100644
-> >> --- a/drivers/cpuidle/coupled.c
-> >> +++ b/drivers/cpuidle/coupled.c
-> >> @@ -130,6 +130,43 @@ struct cpuidle_coupled {
-> >>  static cpumask_t cpuidle_coupled_poked_mask;
-> >>
-> >>  /**
-> >> + * cpuidle_coupled_parallel_barrier - synchronize all online coupled cpus
-> >> + * @dev: cpuidle_device of the calling cpu
-> >> + * @a:   atomic variable to hold the barrier
-> >> + *
-> >> + * No caller to this function will return from this function until all online
-> >> + * cpus in the same coupled group have called this function.  Once any caller
-> >> + * has returned from this function, the barrier is immediately available for
-> >> + * reuse.
-> >> + *
-> >> + * The atomic variable a must be initialized to 0 before any cpu calls
-> >> + * this function, will be reset to 0 before any cpu returns from this function.
-> >> + *
-> >> + * Must only be called from within a coupled idle state handler
-> >> + * (state.enter when state.flags has CPUIDLE_FLAG_COUPLED set).
-> >> + *
-> >> + * Provides full smp barrier semantics before and after calling.
-> >> + */
-> >> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a)
-> >> +{
-> >> +     int n = dev->coupled->online_count;
-> >> +
-> >> +     smp_mb__before_atomic_inc();
-> >> +     atomic_inc(a);
-> >> +
-> >> +     while (atomic_read(a) < n)
-> >> +             cpu_relax();
-> >> +
-> >> +     if (atomic_inc_return(a) == n * 2) {
-> >> +             atomic_set(a, 0);
-> >> +             return;
-> >> +     }
-> >> +
-> >> +     while (atomic_read(a) > n)
-> >> +             cpu_relax();
-> >> +}
-> >
-> > Well, this looks like "wait until all CPUs execute this code".  Don't we have
-> > anything like this already somewhere?
-> >
-> >> +
-> >> +/**
-> >>   * cpuidle_state_is_coupled - check if a state is part of a coupled set
-> >>   * @dev: struct cpuidle_device for the current cpu
-> >>   * @drv: struct cpuidle_driver for the platform
-> >> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-> >> index 6038448..5ab7183 100644
-> >> --- a/include/linux/cpuidle.h
-> >> +++ b/include/linux/cpuidle.h
-> >> @@ -183,6 +183,10 @@ static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
-> >>
-> >>  #endif
-> >>
-> >> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> >> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a);
-> >> +#endif
-> >
-> > Why exactly is the extra Kconfig option necessary?
-> 
-> It prevents compiling in coupled.o (2k text section) on the majority
-> of kernels that will never use it.
+Hi,
 
-OK, sorry, for some unknown reason it seemed to me that the option was added by
-this patch.
+Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
 
-Thanks,
-Rafael
+    Linux 3.4-rc6
+
+with top-most commit 5658c94096c16e769203b6dea5e5f04e7ff12633
+
+    Merge branch 'renesas-kzm9g' into renesas-soc-new
+
+from the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git soc-new
+
+to receive new Renesas ARM-based platforms material for v3.5.  Included are:
+
+ * Urgent regression and SMP fixes (also included in the fixes branch that I've
+   just sent a separate pull request for in the hope it is still possible to
+   push them for v3.4).  Two of those fixes are duplicated in the renesas-sh7372
+   branch, which is because I learned that they were fixes for recent
+   regressions after they had gone to that branch.  Sorry about that.
+
+ * Updates for boards based on the sh7372 and r8a7740 SoCs.
+
+ * Support for 2 new boards, armadillo800eva and KZM-A9-GT.
+
+Thanks!
+
+
+ arch/arm/boot/dts/sh7372.dtsi                  |   21 +
+ arch/arm/configs/armadillo800eva_defconfig     |  142 +++++
+ arch/arm/configs/kzm9g_defconfig               |  139 +++++
+ arch/arm/mach-shmobile/Kconfig                 |   16 +-
+ arch/arm/mach-shmobile/Makefile                |    2 +
+ arch/arm/mach-shmobile/board-ag5evm.c          |   22 +-
+ arch/arm/mach-shmobile/board-ap4evb.c          |    2 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c |  778 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-bonito.c          |    2 +-
+ arch/arm/mach-shmobile/board-kzm9g.c           |  454 ++++++++++++++
+ arch/arm/mach-shmobile/board-mackerel.c        |   38 +-
+ arch/arm/mach-shmobile/clock-r8a7740.c         |  128 ++++-
+ arch/arm/mach-shmobile/headsmp.S               |   56 ++-
+ arch/arm/mach-shmobile/include/mach/common.h   |    4 +-
+ arch/arm/mach-shmobile/include/mach/intc.h     |   44 ++
+ arch/arm/mach-shmobile/include/mach/irqs.h     |    2 +-
+ arch/arm/mach-shmobile/include/mach/sh7372.h   |    2 +
+ arch/arm/mach-shmobile/include/mach/sh73a0.h   |    3 +
+ arch/arm/mach-shmobile/intc-sh7372.c           |   34 +-
+ arch/arm/mach-shmobile/pfc-r8a7740.c           |   39 ++
+ arch/arm/mach-shmobile/pfc-sh73a0.c            |    4 +-
+ arch/arm/mach-shmobile/platsmp.c               |    2 +-
+ arch/arm/mach-shmobile/setup-r8a7740.c         |   19 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c         |    4 +
+ arch/arm/mach-shmobile/setup-sh7372.c          |   58 ++
+ arch/arm/mach-shmobile/setup-sh73a0.c          |    4 +
+ arch/arm/mach-shmobile/smp-r8a7779.c           |    8 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c            |    7 +-
+ arch/arm/mach-shmobile/timer.c                 |   27 +-
+ 29 files changed, 1978 insertions(+), 83 deletions(-)
+
+---------------
+
+Bastian Hecht (1):
+      ARM: sh-mobile: mackerel: Add error IRQ resource
+
+Guennadi Liakhovetski (3):
+      ARM: mach-shmobile: sh7372 CEU supports up to 8188x8188 images
+      ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
+      ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
+
+Kuninori Morimoto (38):
+      ARM: mach-shmobile: sh7372: Add FSI DMAEngine support
+      ARM: mach-shmobile: mackerel: Add FSI DMAEngine support
+      ARM: mach-shmobile: bonito: make sure static function
+      ARM: mach-shmobile: r8a7740: add gpio_irq support
+      ARM: mach-shmobile: add armadillo800eva board support.
+      ARM: mach-shmobile: armadillo800eva: add defconfig
+      ARM: mach-shmobile: armadillo800eva: add support LCDC0
+      ARM: mach-shmobile: armadillo800eva: add support gpio_key
+      ARM: mach-shmobile: armadillo800eva: add support sh_eth
+      ARM: mach-shmobile: armadillo800eva: add support ST1232
+      ARM: mach-shmobile: r8a7740: cleanup I2C workaround method
+      ARM: mach-shmobile: clock-r8a7740: add FSI clock
+      ARM: mach-shmobile: clock-r8a7740: add USB clock
+      ARM: mach-shmobile: clock-r8a7740: add SDHI clock
+      ARM: mach-shmobile: clock-r8a7740: add MMCIF clock
+      ARM: mach-shmobile: armadillo800eva: add USB function support
+      ARM: mach-shmobile: armadillo800eva: add SDHI0 support
+      ARM: mach-shmobile: armadillo800eva: add SDHI1 support
+      ARM: mach-shmobile: armadillo800eva: add MMCIF support
+      ARM: mach-shmobile: r8a7740: reserve DMA memory for the frame buffer
+      ARM: mach-shmobile: add KZM-A9-GT board support
+      ARM: mach-shmobile: kzm9g: add defconfig
+      ARM: mach-shmobile: kzm9g: add SMSC 9221 support
+      ARM: mach-shmobile: kzm9g: add external USB Host support
+      ARM: mach-shmobile: kzm9g: add LCDC support
+      ARM: mach-shmobile: kzm9g: add ST1232 Touchscreen support
+      ARM: mach-shmobile: pfc-sh73a0: fixup MSEL2CR MSEL18 for I2C-3
+      ARM: mach-shmobile: sh73a0.h: add GPIO_NR
+      ARM: mach-shmobile: kzm9g: correct screen direction
+      ARM: mach-shmobile: kzm9g: add MMCIF support
+      ARM: mach-shmobile: kzm9g: add SDHI support
+      ARM: mach-shmobile: kzm9g: add PCF8757 gpio-key
+      ARM: mach-shmobile: clock-r8a7740: add sh-eth clock
+      ARM: mach-shmobile: clock-r8a7740: use followparent_recalc on usb24s
+      ARM: mach-shmobile: kzm9g: defconfig update
+      ARM: mach-shmobile: armadillo800eva: defconfig update
+      ARM / mach-shmobile: sh73a0 SMP TWD boot regression fix
+      ARM: mach-shmobile: kzm9g: enable SMP boot
+
+Magnus Damm (9):
+      ARM: mach-shmobile: Introduce shmobile_setup_delay()
+      ARM: mach-shmobile: Introduce INTC_IRQ_PINS_16H
+      ARM: mach-shmobile: Use 0x3400 as INTCS vector offset
+      ARM: mach-shmobile: Use INTC_IRQ_PINS_16H on sh7372
+      ARM: mach-shmobile: Rework sh7372 INTCS demuxer V2
+      ARM: mach-shmobile: sh7372 generic board support via DT V2
+      ARM / mach-shmobile: Use preset_lpj with calibrate_delay()
+      ARM / mach-shmobile: r8a7779 SMP TWD boot regression fix
+      ARM / mach-shmobile: Invalidate caches when booting secondary cores
