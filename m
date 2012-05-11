@@ -1,56 +1,54 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 11 May 2012 09:52:59 -0500
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120511134920.GC2626@mudshark.cambridge.arm.com>
-References: <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
- <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com> <4FAAC549.6010206@ti.com>
- <4FAAE564.6040708@ti.com> <20120510084422.GB27276@mudshark.cambridge.arm.com>
- <4FAC0F05.3060803@ti.com> <20120511122547.GE17453@mudshark.cambridge.arm.com>
- <4FAD1865.70003@ti.com> <20120511134920.GC2626@mudshark.cambridge.arm.com>
-Message-ID: <4FAD27CB.5060102@ti.com>
+From: raulxiong@gmail.com (Raul Xiong)
+Date: Fri, 11 May 2012 22:54:15 +0800
+Subject: [PATCH] cpu_pm: fix some typos in comments
+Message-ID: <CAG9bXvkn6bm1xXpBxqvOxxzSrPPRdvP7RzKrfhSVJebN54psHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Fix some comment typos in function names
 
-On 05/11/2012 08:49 AM, Will Deacon wrote:
-> On Fri, May 11, 2012 at 02:47:17PM +0100, Jon Hunter wrote:
->> On 05/11/2012 07:25 AM, Will Deacon wrote:
->>> I figured I may as well take perf for a spin and see how I got on. The good
->>> news is that the hwmod bits all seem to work as before and the correct IRQs
->>> are requested:
->>>
->>> root at florentine-pogen:~# cat /proc/interrupts
->>>            CPU0       CPU1
->>>  29:      44527      17916       GIC  twd
->>>  33:          0          0       GIC  arm-pmu
->>>  34:          0          0       GIC  arm-pmu
->>>
->>> But, unfortunately, as you can see from the above, I just can't persuade them
->>> to fire. The PMU counters do tick, but they happily increment through zero
->>> without us realising. I retested with my perf/omap4 branch to make sure my
->>> board is ok, and the irqs do fire there.
->>>
->>> Any ideas?
->>
->> Do you disable OMAP2/3 support in the kernel config, so that CPU_HAS_PMU
->> is enabled?
-> 
-> I enabled OMAP3 debug peripherals, so I selected CPU_HAS_PMU that way.
+Signed-off-by: Raul Xiong <raulxiong@gmail.com>
+---
+ kernel/cpu_pm.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-I tried the same (make omap2plus_defconfig and enabled the above
-option), and I do see the interrupts firing on both 4430 and 4460...
+diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+index 249152e..957b151 100644
+--- a/kernel/cpu_pm.c
++++ b/kernel/cpu_pm.c
+@@ -81,7 +81,7 @@ int cpu_pm_unregister_notifier(struct notifier_block *nb)
+ EXPORT_SYMBOL_GPL(cpu_pm_unregister_notifier);
 
-/ # cat /proc/interrupts
-           CPU0       CPU1
- 29:       1023        404       GIC  twd
- 33:        401          0       GIC  arm-pmu
- 34:          0        441       GIC  arm-pmu
+ /**
+- * cpm_pm_enter - CPU low power entry notifier
++ * cpu_pm_enter - CPU low power entry notifier
+ *
+ * Notifies listeners that a single CPU is entering a low power state that may
+ * cause some blocks in the same power domain as the cpu to reset.
+@@ -115,7 +115,7 @@ int cpu_pm_enter(void)
+ EXPORT_SYMBOL_GPL(cpu_pm_enter);
 
+ /**
+- * cpm_pm_exit - CPU low power exit notifier
++ * cpu_pm_exit - CPU low power exit notifier
+ *
+ * Notifies listeners that a single CPU is exiting a low power state that may
+ * have caused some blocks in the same power domain as the cpu to reset.
+@@ -139,7 +139,7 @@ int cpu_pm_exit(void)
+ EXPORT_SYMBOL_GPL(cpu_pm_exit);
 
-What is your kernel commit ID that you applied the patches on top of?
+ /**
+- * cpm_cluster_pm_enter - CPU cluster low power entry notifier
++ * cpu_cluster_pm_enter - CPU cluster low power entry notifier
+ *
+ * Notifies listeners that all cpus in a power domain are entering a low power
+ * state that may cause some blocks in the same power domain to reset.
+@@ -174,7 +174,7 @@ int cpu_cluster_pm_enter(void)
+ EXPORT_SYMBOL_GPL(cpu_cluster_pm_enter);
 
-What board are you using? Blaze, panda, etc, and is it 4430 or 4460?
-
-Cheers
-Jon
+ /**
+- * cpm_cluster_pm_exit - CPU cluster low power exit notifier
++ * cpu_cluster_pm_exit - CPU cluster low power exit notifier
+ *
+ * Notifies listeners that all cpus in a power domain are exiting form a
+ * low power state that may have caused some blocks in the same power domain
