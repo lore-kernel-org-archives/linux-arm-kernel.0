@@ -1,71 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 15:36:56 +0800
-Subject: [PATCH 3/3] mmc: sdhci-imx-esdhc: convert to use pinctrl subsystem
-In-Reply-To: <1335958282-3068-3-git-send-email-b29396@freescale.com>
-References: <1335958282-3068-1-git-send-email-b29396@freescale.com>
- <1335958282-3068-3-git-send-email-b29396@freescale.com>
-Message-ID: <20120511073653.GX17875@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 May 2012 09:47:01 +0200
+Subject: [PATCH 1/5] ARM: imx: add more imx5 ssi clocks
+In-Reply-To: <1336718568-26810-2-git-send-email-shawn.guo@linaro.org>
+References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
+ <1336718568-26810-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120511074701.GD27341@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2012 at 07:31:22PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+On Fri, May 11, 2012 at 02:42:44PM +0800, Shawn Guo wrote:
+> Add more imx5 ssi clocks and lookup for device tree probe.
 > 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> ChangeLog v4->v5:
->  *split arch/arm/mach-imx/* changes into a separate patch
-> ChangeLog v3->v4:
->  * call provide dummies in imx*_soc_init().
-> ChangeLog v2->v3:
->  * patch name updated.
->    v1 name is ARM: imx6q: switch to use pinctrl driver
->  * using pinctrl dummy state to avoid breaking other platforms to use this
->    driver.
-> ChangeLog v1->v2:
->  * using updated binding
-> ---
->  arch/arm/boot/dts/imx6q-arm2.dts   |    4 ++++
->  arch/arm/boot/dts/imx6q.dtsi       |   32 ++++++++++++++++++++++++++++++++
->  drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
->  3 files changed, 45 insertions(+), 0 deletions(-)
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   40 +++++++++++++++++++++++++++++++++++
+>  1 files changed, 40 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+>  	for (i = 0; i < ARRAY_SIZE(clk); i++)
+>  		if (IS_ERR(clk[i]))
+>  			pr_err("i.MX5 clk %d: register failed with %ld\n",
+> @@ -237,6 +269,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
+>  	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+>  	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "imx-ssi.2");
+> +	clk_register_clkdev(clk[ssi_ext1_gate], NULL, "ssi_ext.0");
+> +	clk_register_clkdev(clk[ssi_ext2_gate], NULL, "ssi_ext.1");
 
-Since we now have dummy state enabled for imx6q as well, I just split
-the patches into following two for better separation, with first one
-on my imx/pinctrl/for-3.5 and the second one on imx/dt/for-3.5 branch
-respectively.
+Another thing I just noticed is that you use ssi_ext.0|1 as the device id,
+is that what you want? I think the device id should either match a real
+device present in the system or be NULL.
 
-commit e62d8b8fe73518d1875371a2ee9c5fdd31eba6f8
-Author: Dong Aisheng <dong.aisheng@linaro.org>
-Date:   Fri May 11 14:56:01 2012 +0800
+Sascha
 
-    mmc: sdhci-imx-esdhc: adopt pinctrl support
-
-    Cc: linux-mmc at vger.kernel.org
-    Cc: Chris Ball <cjb@laptop.org>
-    Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-    Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-
- drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-commit 551fd208f204780bac1ca5bce1748ba7a6f7ee6e
-Author: Dong Aisheng <dong.aisheng@linaro.org>
-Date:   Fri May 11 14:58:00 2012 +0800
-
-    ARM: dts: imx6q-arm2: add pinctrl state for usdhc
-
-    Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
- arch/arm/boot/dts/imx6q-arm2.dts |    4 ++++
- arch/arm/boot/dts/imx6q.dtsi     |   32 ++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
-
-Please have a check to see if everything is correct.
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
