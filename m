@@ -1,35 +1,49 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 11 May 2012 14:47:45 +0200
-Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
-Message-ID: <4FAD0A71.80201@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 11 May 2012 14:47:53 +0200
+Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
+In-Reply-To: <201205111219.10025.arnd@arndb.de>
+References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
+ <20120510234100.7F5463E04A6@localhost> <201205111219.10025.arnd@arndb.de>
+Message-ID: <4FAD0A79.8040207@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 05/11/2012 02:19 PM, Arnd Bergmann wrote:
+> On Thursday 10 May 2012, Grant Likely wrote:
+>> How about the following instead (very rough, there should be a cleaner
+>> way to update the gc pointer in of_xlate):
+>>
+>>         gpio: gpio at 40028000 {
+>>                 compatible = "nxp,lpc3220-gpio";
+>>                 reg = <0x40028000 0x1000>;
+>>                 gpio-controller;
+>>                 #gpio-cells = <3>; /* bank, pin, flags */
+>>         }
+>>
+> 
+> I thought about that when I suggested the current binding to Roland,
+> but the problem with this is that passing the bank as a number is
+> not very intuitive when the data sheet has separate number spaces
+> for gpio, gpi and gpo here, so it seemed more natural to go with what
+> the data sheet describes.
 
-Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
-It applies now fine on top of lo/dt branch.
+Right. Personally, I would be fine with either of my v8 (all banks in
+dt, referenced naturally by name) and v9 (one simple DT entry for the
+whole GPIO controller, integer index for referencing banks) patches.
 
-Regards,
-Benoit
+Consider the DT-documented mapping in the latter case:
 
+      0: GPIO P0
+      1: GPIO P1
+      2: GPIO P2
+      3: GPIO P3
+      4: GPI P3
+      5: GPO P3
 
-The following changes since commit 40364b9f5a4d167d97bb6a76cd239ca8cfff056a:
-  Benoit Cousson (1):
-        arm/dts: omap4-panda: Add LEDs support
+Not too difficult and would also be acceptable, IMO.
 
-are available in the git repository at:
+So Arnd and Grant, please agree one of those and pick it. :-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.5/dts/am33xx
+Thanks in advance,
 
-Vaibhav Hiremath (3):
-      arm/dts: Add support for TI AM335x EVM board
-      arm/dts: omap3-evm: Add i2c and twl4030 support
-      arm/dts: Add support for TI AM3517/05 EVM board
-
- arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am3517-evm.dts |   32 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-evm.dts  |   28 +++++++++++++++++++++++++++
- 3 files changed, 99 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-evm.dts
- create mode 100644 arch/arm/boot/dts/am3517-evm.dts
+Roland
