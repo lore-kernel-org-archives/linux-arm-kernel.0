@@ -1,41 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 May 2012 13:25:47 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FAC0F05.3060803@ti.com>
-References: <87k40nzi3i.fsf@ti.com> <4FA8FCFF.40105@ti.com>
- <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
- <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com>
- <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
- <20120510084422.GB27276@mudshark.cambridge.arm.com>
- <4FAC0F05.3060803@ti.com>
-Message-ID: <20120511122547.GE17453@mudshark.cambridge.arm.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Fri, 11 May 2012 13:26:07 +0100
+Subject: [PATCHv3] Add ADC driver for Atmel G20, G45 and X5 boards
+In-Reply-To: <4FACC5B1.80601@free-electrons.com>
+References: <1336554366-16957-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4FAB7D29.9000107@free-electrons.com> <4FAB815A.8040109@atmel.com>
+ <201205101328.36524.arnd@arndb.de> <4FACC5B1.80601@free-electrons.com>
+Message-ID: <4FAD055F.3040404@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 07:55:01PM +0100, Jon Hunter wrote:
-> Hi Will,
-
-Hi Jon,
-
-> For my testing I have just been reading the PM_EMU_PWRSTST register which shows the power state of the EMU power domain. It should read 3 when the power domain is ON and 0 when it is off. I did something like the following (dumping all EMU clock and power domain registers).
-
-I figured I may as well take perf for a spin and see how I got on. The good
-news is that the hwmod bits all seem to work as before and the correct IRQs
-are requested:
-
-root at florentine-pogen:~# cat /proc/interrupts
-           CPU0       CPU1
- 29:      44527      17916       GIC  twd
- 33:          0          0       GIC  arm-pmu
- 34:          0          0       GIC  arm-pmu
-
-But, unfortunately, as you can see from the above, I just can't persuade them
-to fire. The PMU counters do tick, but they happily increment through zero
-without us realising. I retested with my perf/omap4 branch to make sure my
-board is ok, and the irqs do fire there.
-
-Any ideas?
-
-Cheers,
-
-Will
+On 5/11/2012 8:54 AM, Maxime Ripard wrote:
+> Hi Jonathan,
+>
+> Since everyone seems to have put his Acked-By (Nicolas, Arnd and you),
+> are you ok to merge it in your tree ?
+>
+> You still had some minor comments, do you you want me to post a new
+> patchset to the mailing list, or a public git branch would be enough ?
+IIO is still in staging from the point of view of git trees.  Hence Greg
+will actually merge the patches.  Could you send him a clean set
+with all the acks etc. (cc'd on this).
+>
+> Thanks,
+> Maxime
+>
+> Le 10/05/2012 15:28, Arnd Bergmann a ?crit :
+>> On Thursday 10 May 2012, Nicolas Ferre wrote:
+>>> So I would really like to keep the non-DT probing. This will give the
+>>> ability for users to experiment IIO/ADC with whichever kernel revision,
+>>> whichever AT91 SoC they like.
+>>>
+>>> Arnd, we will have to agree on a way to push this work into mainline,
+>>> but please consider keeping the non-DT part for this driver.
+>>
+>> Ok. If the non-DT part is important to you, I suggest you merge it
+>> all through the IIO tree, to avoid dependency problems with the
+>> platform data header file.
+>>
+>> Please add my Acked-by for the arch/arm patches.
+>>
+>> 	Arnd
+>
+>
