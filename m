@@ -1,82 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 May 2012 14:18:54 -0700
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <4FAD7EE7.2070704@wwwdotorg.org>
-References: <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org>
- <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org>
- <20120509204925.GV5088@atomide.com> <4FABF553.20601@wwwdotorg.org>
- <20120510172722.GE21851@atomide.com> <4FAD65D8.30109@wwwdotorg.org>
- <20120511195147.GW21851@atomide.com>
- <4FAD7EE7.2070704@wwwdotorg.org>
-Message-ID: <20120511211854.GB21851@atomide.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 11 May 2012 14:51:24 -0700
+Subject: Bad use of highmem with buffer_migrate_page?
+In-Reply-To: <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
+References: <4FAC200D.2080306@codeaurora.org>
+ <02fc01cd2f50$5d77e4c0$1867ae40$%szyprowski@samsung.com>
+Message-ID: <4FAD89DC.2090307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [120511 14:08]:
-> On 05/11/2012 01:51 PM, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@wwwdotorg.org> [120511 12:21]:
-> >>
-> >> The mapping of GPIO to pinctrl pins would presumably be driven solely by
-> >> the HW design of the pin controller and GPIO, and not by the mux
-> >> selection in the pin controller (otherwise, I'd argue this isn't a
-> >> simple case that should be handled by pinctrl-simple).
-> >>
-> >> As such, I'd expect some properties/table at the top-level of the pin
-> >> controller object to describe the GPIO mapping. In turn, that implies
-> >> that the individual per-pin mux-selection/configuration nodes don't need
-> >> to describe any GPIO-related information.
-> > 
-> > Yes good point. I agree it's a HW design issue, and could be in the properties
-> > for the pin controller object.
-> > 
-> > Just to summarize, the things to consider with the GPIO to mux mapping are:
-> > 
-> > 1. Having this table as static data in the driver is is not a nice
-> >    solution as it seems that we'd currently need six mapping tables for
-> >    omap2+ alone.
-> > 
-> > 2. This table is not needed for most of the (hundreds of) pins, it's
-> >    only needed for a few selected pins, let's say ten or so on an average
-> >    device. So there's no need to stuff the kernel with information about
-> >    the unused GPIO pins.
-> > 
-> > It seems that the conclusion here is that we don't need to worry about
-> > GPIOs in the pinctrl-simple binding for now, and it can be added later
-> > without having to change the basic binding.
-> 
-> The one thing I wanted to resolve here wasn't so much the binding for
-> GPIO interaction here, but the following comment:
-> 
-> You wrote:
-> > I wrote:
-> >> From a binding perspective, I don't see why you'd want to allow two cases:
-> >>
-> >> 1) One node with multiple entries in pinctrl-simple,cells
-> >> 2) Multiple nodes each with a single entry in pinctrl-simple,cells
-> >>
-> >> Why not only allow (1)?
-> >
-> > Because we need to specify GPIO for some pins. There may be additional flags
-> > too, we do have external DMA request lines for few pins available.. I'm not
-> > saying pinctrl fwk should know about that, but it's a similar mapping of pins
-> > to GPIO lines.
-> 
-> I'm asserting that since any GPIO mapping information would be at the
-> top-level of the pinctrl-simple binding, we can in fact only allow
-> option (1) above for the individual pin configuration nodes.
+On 5/11/2012 1:30 AM, Marek Szyprowski wrote:
+> Hello,
+>
+> On Thursday, May 10, 2012 10:08 PM Laura Abbott wrote:
+>
+>> I did a backport of the Contiguous Memory Allocator to a 3.0.8 tree. I
+>> wrote fairly simple test case that, in 1MB chunks, allocs up to 40MB
+>> from a reserved area, maps, writes, unmaps and then frees in an infinite
+>> loop. When running this with another program in parallel to put some
+>> stress on the filesystem, I hit data aborts in the filesystem/journal
+>> layer, although not always the same backtrace. As an example:
+>>
+>> [<c02907a4>] (__ext4_check_dir_entry+0x20/0x184) from [<c029e1a8>]
+>> (add_dirent_to_buf+0x70/0x2ac)
+>> [<c029e1a8>] (add_dirent_to_buf+0x70/0x2ac) from [<c029f3f0>]
+>> (ext4_add_entry+0xd8/0x4bc)
+>> [<c029f3f0>] (ext4_add_entry+0xd8/0x4bc) from [<c029fe90>]
+>> (ext4_add_nondir+0x14/0x64)
+>> [<c029fe90>] (ext4_add_nondir+0x14/0x64) from [<c02a04c4>]
+>> (ext4_create+0xd8/0x120)
+>> [<c02a04c4>] (ext4_create+0xd8/0x120) from [<c022e134>]
+>> (vfs_create+0x74/0xa4)
+>> [<c022e134>] (vfs_create+0x74/0xa4) from [<c022ed3c>] (do_last+0x588/0x8d4)
+>> [<c022ed3c>] (do_last+0x588/0x8d4) from [<c022fe64>]
+>> (path_openat+0xc4/0x394)
+>> [<c022fe64>] (path_openat+0xc4/0x394) from [<c0230214>]
+>> (do_filp_open+0x30/0x7c)
+>> [<c0230214>] (do_filp_open+0x30/0x7c) from [<c0220cb4>]
+>> (do_sys_open+0xd8/0x174)
+>> [<c0220cb4>] (do_sys_open+0xd8/0x174) from [<c0105ea0>]
+>> (ret_fast_syscall+0x0/0x30)
+>>
+>> Every panic had the same issue where a struct buffer_head [1] had a
+>> b_data that was unexpectedly NULL.
+>>
+>> During the course of CMA, buffer_migrate_page could be called to migrate
+>> from a CMA page to a new page. buffer_migrate_page calls set_bh_page[2]
+>> to set the new page for the buffer_head. If the new page is a highmem
+>> page though, the bh->b_data ends up as NULL, which could produce the
+>> panics seen above.
+>>
+>> This seems to indicate that highmem pages are not not appropriate for
+>> use as pages to migrate to. The following made the problem go away for me:
+>>
+>> --- a/mm/page_alloc.c
+>> +++ b/mm/page_alloc.c
+>> @@ -5753,7 +5753,7 @@ static struct page *
+>>    __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
+>>                                int **resultp)
+>>    {
+>> -       return alloc_page(GFP_HIGHUSER_MOVABLE);
+>> +       return alloc_page(GFP_USER | __GFP_MOVABLE);
+>>    }
+>>
+>>
+>> Does this seem like an actual issue or is this an artifact of my
+>> backport to 3.0? I'm not familiar enough with the filesystem layer to be
+>> able to tell where highmem can actually be used.
+>
+> I will need to investigate this further as this issue doesn't appear on
+> v3.3+ kernels, but I remember I saw something similar when I tried CMA
+> backported to v3.0.
+>
 
-Yes I agree. Based on what we have discussed #2 binding can now be dropped.
-At least I don't have any other reasons for pin specific flags that would
-need to be passed in the binding #2 above.
+The 3.0 kernel was the most stable I had around and easiest to work 
+with. I'll be trying 3.4 sometime in the near future.
 
-The only additional data #2 binding provides are the real function names
-for the mux signals. But those can be eventually be shown by userspace debug
-tools, so no need for the kernel to care about them. From kernel and device
-driver point of view the named states are much more generic.
+> You have pointed to an important issue which we need to solve somehow. CMA
+> wasn't fully tested with high mem and it looks that there are some issues here
+> and there. Your patch will prevent using highmem for any migration triggered by
+> CMA. IMHO this is a bit limited, but right now I have no better idea. For a
+> quick backport it should be ok.
+>
 
-Regards,
+All the systems I'll be testing with will have highmem so I'll continue 
+to report any problems I find. I'll be curious if this will show up 
+again when I try 3.4. If it does, I'll see if I can get evidence of why 
+this is the proper fix or a more nuanced patch.
 
-Tony
+> Best regards
+
+Thanks,
+Laura
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
