@@ -1,31 +1,26 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 May 2012 09:15:17 -0600
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <4FAD25A1.2080106@citrix.com>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
- <4FAD1EDE.8010505@citrix.com> <4FAD255A.4080504@arm.com>
- <4FAD25A1.2080106@citrix.com>
-Message-ID: <20120511151517.D25303E0791@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 May 2012 15:17:16 +0000
+Subject: [GIT PULL] mxs common clk porting for v3.5
+In-Reply-To: <20120509022830.GA2234@S2101-09.ap.freescale.net>
+References: <20120509022830.GA2234@S2101-09.ap.freescale.net>
+Message-ID: <201205111517.16807.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012 15:43:45 +0100, David Vrabel <david.vrabel@citrix.com> wrote:
-> On 11/05/12 15:42, Marc Zyngier wrote:
-> > On 11/05/12 15:14, David Vrabel wrote:
-> >> On 09/05/12 18:57, Marc Zyngier wrote:
-> >>> The GICv2 can have virtualization extension support, consisting
-> >>> of an additional set of registers and interrupts. Add the necessary
-> >>> binding to the GIC DT documentation.
-> >>
-> >> This looks fine for Xen.
-> > 
-> > Thanks David. Can I add your Acked-by:?
+On Wednesday 09 May 2012, Shawn Guo wrote:
+> Please pull the mxs common clk porting below for v3.5.  It depends on
+> the following two branches.
 > 
-> Sure.
+> [1] git://git.linaro.org/people/mturquette/linux.git clk-next
+> [2] http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git clkdev
 > 
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
+> As the mxs device tree conversion will constantly touch clock files,
+> to save the conflicts, the updated mxs/dt branch coming later will
+> based on this pull-request.  Please abandon the existing mxs/dt branch
+> from arm-soc tree.
 
-Applied, thanks.
+Pulled into next/clock.
 
-g.
+Thanks,
+
+	Arnd
