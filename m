@@ -1,52 +1,129 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 11 May 2012 20:25:13 +0200
-Subject: [GIT PULL] Urgent fixes (for v3.4 if possible) for Renesas ARM-based
- platforms
-Message-ID: <201205112025.13478.rjw@sisk.pl>
+Date: Fri, 11 May 2012 20:32:20 +0200
+Subject: [PATCHv4 4/4] cpuidle: coupled: add parallel barrier function
+In-Reply-To: <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+ <201205092331.24487.rjw@sisk.pl>
+ <CAMbhsRRzc9hPYLZvuwqsOP3RrF1dZVmzM_qfy_xHNL6mhtJzDA@mail.gmail.com>
+Message-ID: <201205112032.21117.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday, May 11, 2012, Colin Cross wrote:
+> On Wed, May 9, 2012 at 2:31 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Tuesday, May 08, 2012, Colin Cross wrote:
+> >> Adds cpuidle_coupled_parallel_barrier, which can be used by coupled
+> >> cpuidle state enter functions to handle resynchronization after
+> >> determining if any cpu needs to abort.  The normal use case will
+> >> be:
+> >>
+> >> static bool abort_flag;
+> >> static atomic_t abort_barrier;
+> >>
+> >> int arch_cpuidle_enter(struct cpuidle_device *dev, ...)
+> >> {
+> >>       if (arch_turn_off_irq_controller()) {
+> >>               /* returns an error if an irq is pending and would be lost
+> >>                  if idle continued and turned off power */
+> >>               abort_flag = true;
+> >>       }
+> >>
+> >>       cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+> >>
+> >>       if (abort_flag) {
+> >>               /* One of the cpus didn't turn off it's irq controller */
+> >>               arch_turn_on_irq_controller();
+> >>               return -EINTR;
+> >>       }
+> >>
+> >>       /* continue with idle */
+> >>       ...
+> >> }
+> >>
+> >> This will cause all cpus to abort idle together if one of them needs
+> >> to abort.
+> >>
+> >> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> >> Tested-by: Kevin Hilman <khilman@ti.com>
+> >> Signed-off-by: Colin Cross <ccross@android.com>
+> >> ---
+> >>  drivers/cpuidle/coupled.c |   37 +++++++++++++++++++++++++++++++++++++
+> >>  include/linux/cpuidle.h   |    4 ++++
+> >>  2 files changed, 41 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+> >> index 93101fb..3e65de1 100644
+> >> --- a/drivers/cpuidle/coupled.c
+> >> +++ b/drivers/cpuidle/coupled.c
+> >> @@ -130,6 +130,43 @@ struct cpuidle_coupled {
+> >>  static cpumask_t cpuidle_coupled_poked_mask;
+> >>
+> >>  /**
+> >> + * cpuidle_coupled_parallel_barrier - synchronize all online coupled cpus
+> >> + * @dev: cpuidle_device of the calling cpu
+> >> + * @a:   atomic variable to hold the barrier
+> >> + *
+> >> + * No caller to this function will return from this function until all online
+> >> + * cpus in the same coupled group have called this function.  Once any caller
+> >> + * has returned from this function, the barrier is immediately available for
+> >> + * reuse.
+> >> + *
+> >> + * The atomic variable a must be initialized to 0 before any cpu calls
+> >> + * this function, will be reset to 0 before any cpu returns from this function.
+> >> + *
+> >> + * Must only be called from within a coupled idle state handler
+> >> + * (state.enter when state.flags has CPUIDLE_FLAG_COUPLED set).
+> >> + *
+> >> + * Provides full smp barrier semantics before and after calling.
+> >> + */
+> >> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a)
+> >> +{
+> >> +     int n = dev->coupled->online_count;
+> >> +
+> >> +     smp_mb__before_atomic_inc();
+> >> +     atomic_inc(a);
+> >> +
+> >> +     while (atomic_read(a) < n)
+> >> +             cpu_relax();
+> >> +
+> >> +     if (atomic_inc_return(a) == n * 2) {
+> >> +             atomic_set(a, 0);
+> >> +             return;
+> >> +     }
+> >> +
+> >> +     while (atomic_read(a) > n)
+> >> +             cpu_relax();
+> >> +}
+> >
+> > Well, this looks like "wait until all CPUs execute this code".  Don't we have
+> > anything like this already somewhere?
+> >
+> >> +
+> >> +/**
+> >>   * cpuidle_state_is_coupled - check if a state is part of a coupled set
+> >>   * @dev: struct cpuidle_device for the current cpu
+> >>   * @drv: struct cpuidle_driver for the platform
+> >> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+> >> index 6038448..5ab7183 100644
+> >> --- a/include/linux/cpuidle.h
+> >> +++ b/include/linux/cpuidle.h
+> >> @@ -183,6 +183,10 @@ static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
+> >>
+> >>  #endif
+> >>
+> >> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+> >> +void cpuidle_coupled_parallel_barrier(struct cpuidle_device *dev, atomic_t *a);
+> >> +#endif
+> >
+> > Why exactly is the extra Kconfig option necessary?
+> 
+> It prevents compiling in coupled.o (2k text section) on the majority
+> of kernels that will never use it.
 
-Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+OK, sorry, for some unknown reason it seemed to me that the option was added by
+this patch.
 
-    Linux 3.4-rc6
-
-with top-most commit 5fab7b501bf29c08c5b01627b496b6b766bd0165
-
-    ARM / mach-shmobile: Invalidate caches when booting secondary cores
-
-from the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
-
-to receive urgent fixes for Renesas ARM-based platforms.  Four of these commits
-are fixes of regressions new in 3.4-rc and the last one is necessary for SMP to
-work on those systems in general.
-
-Thanks!
-
-
- arch/arm/mach-shmobile/board-ag5evm.c        |   22 +---------
- arch/arm/mach-shmobile/board-mackerel.c      |   22 +---------
- arch/arm/mach-shmobile/headsmp.S             |   56 +++++++++++++++++++++++++-
- arch/arm/mach-shmobile/include/mach/common.h |    2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c       |    4 ++
- arch/arm/mach-shmobile/setup-sh73a0.c        |    4 ++
- arch/arm/mach-shmobile/smp-r8a7779.c         |    8 +++-
- arch/arm/mach-shmobile/smp-sh73a0.c          |    7 +++-
- arch/arm/mach-shmobile/timer.c               |    9 ----
- 9 files changed, 81 insertions(+), 53 deletions(-)
-
----------------
-
-Guennadi Liakhovetski (2):
-      ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
-      ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
-
-Kuninori Morimoto (1):
-      ARM / mach-shmobile: sh73a0 SMP TWD boot regression fix
-
-Magnus Damm (2):
-      ARM / mach-shmobile: r8a7779 SMP TWD boot regression fix
-      ARM / mach-shmobile: Invalidate caches when booting secondary cores
+Thanks,
+Rafael
