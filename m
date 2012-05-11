@@ -1,54 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 May 2012 22:33:24 -0700
-Subject: [GIT PULL] SPEAr clk updates for v-3.5
-In-Reply-To: <20120510155327.GB12727@n2100.arm.linux.org.uk>
-References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
- <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
- <20120510085939.GC3190@n2100.arm.linux.org.uk>
- <20120510153745.GQ17875@S2101-09.ap.freescale.net>
- <20120510155327.GB12727@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMg+fNwxPYo+oDZm=uDKj4s7jZw_U91wfs=JE15xCZPomQ@mail.gmail.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Fri, 11 May 2012 11:08:39 +0530
+Subject: [PATCH] dma: imx-sdma: keep the callbacks invoked in the tasklet
+In-Reply-To: <1335608142-22580-1-git-send-email-b32955@freescale.com>
+References: <1335608142-22580-1-git-send-email-b32955@freescale.com>
+Message-ID: <1336714719.15424.1533.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 8:53 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, May 10, 2012 at 11:37:47PM +0800, Shawn Guo wrote:
->> On Thu, May 10, 2012 at 09:59:39AM +0100, Russell King - ARM Linux wrote:
->> > On Thu, May 10, 2012 at 12:14:39AM -0700, Olof Johansson wrote:
->> > > Russell has published a clkdev branch that you pull instead of
->> > > applying his patch manually, that way there will be no surprises with
->> > > respect to conflicts, etc:
->> > >
->> > > git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
->> > >
->> > > It is also in arm-soc as depends/rmk/clkdev now.
->> >
->> > I'll mention that I'm considering a patch on top of this to add __must_check
->> > to the return values for these clkdev clk registration functions. ?I've
->> > noticed that many users aren't checking that, so there's no real way to
->> > be sure that these things are being created.
->> >
->> I have to admit I'm one of such users. ?Does that mean we have to
->> revise the platform porting again? ?So ...
->>
->> > The alternative is we make these functions void and/or add pr_err() inside
->> > them to report the failures.
->> >
->> ... I'd vote for this alternative. ?(Sorry for users that are checking
->> the return right now. ?Any?)
->
-> It's one reason why I mentioned it in this email, to find out how folk
-> would like to deal with this. ?I have no particular preference as to how
-> it gets addressed, just as long as we don't end up with silent failures
-> causing hard to debug problems.
+On Sat, 2012-04-28 at 18:15 +0800, Huang Shijie wrote:
+> The current code keeps the callbacks invoked from interrupt context, this
+> does not conform to the Documentation/dmaengine.txt.
+> 
+> So add tasklet support to fix this issue.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+Applied Thanks
+> ---
+>  drivers/dma/imx-sdma.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index a894482..c492079 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -271,6 +271,7 @@ struct sdma_channel {
+>  	enum dma_status			status;
+>  	unsigned int			chn_count;
+>  	unsigned int			chn_real_count;
+> +	struct tasklet_struct		tasklet;
+>  };
+>  
+>  #define IMX_DMA_SG_LOOP		BIT(0)
+> @@ -534,8 +535,10 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+>  		sdmac->desc.callback(sdmac->desc.callback_param);
+>  }
+>  
+> -static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
+> +static void sdma_tasklet(unsigned long data)
+>  {
+> +	struct sdma_channel *sdmac = (struct sdma_channel *) data;
+> +
+>  	complete(&sdmac->done);
+>  
+>  	/* not interested in channel 0 interrupts */
+> @@ -560,7 +563,7 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
+>  		int channel = fls(stat) - 1;
+>  		struct sdma_channel *sdmac = &sdma->channel[channel];
+>  
+> -		mxc_sdma_handle_channel(sdmac);
+> +		tasklet_schedule(&sdmac->tasklet);
+>  
+>  		__clear_bit(channel, &stat);
+>  	}
+> @@ -1361,6 +1364,8 @@ static int __init sdma_probe(struct platform_device *pdev)
+>  		dma_cookie_init(&sdmac->chan);
+>  		sdmac->channel = i;
+>  
+> +		tasklet_init(&sdmac->tasklet, sdma_tasklet,
+> +			     (unsigned long) sdmac);
+>  		/*
+>  		 * Add the channel to the DMAC list. Do not add channel 0 though
+>  		 * because we need it internally in the SDMA driver. This also means
 
-How about adding the __must_check patch on your for-next branch for a
-bit, so we can find and fix build fallout on the arm-soc branches
-through linux-next, maintainers can add build fixes that we pick up
-and then, after that, the __must_check fix can go upstream? That
-maintains bisectability on the branches we already have and should
-avoid more non-checking code to be introduced down the road.
 
-
--Olof
+-- 
+~Vinod
