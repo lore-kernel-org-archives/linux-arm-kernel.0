@@ -1,72 +1,50 @@
-From: lee.booi.lim@gmail.com (Lee Booi Lim)
-Date: Fri, 11 May 2012 18:30:20 +0800
-Subject: Why DMA PL330 peripheral transfer does not support burst request?
-Message-ID: <CAGe5uTBouMxJqX9yqizFNYkrNhb4jF=5=Y0NGV=tMDH+MqY25w@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 May 2012 04:36:30 -0600 (MDT)
+Subject: [PATCH 3/3] ARM: OMAP: AM35xx: fix UART4 softreset
+In-Reply-To: <4FACDEDB.7030903@ti.com>
+References: <20120510172449.13418.66815.stgit@dusk>
+ <20120510172918.13418.64781.stgit@dusk> <4FACD255.3080702@ti.com>
+ <alpine.DEB.2.00.1205110316500.3201@utopia.booyaka.com>
+ <4FACDC63.7060605@ti.com>
+ <alpine.DEB.2.00.1205110333240.3201@utopia.booyaka.com>
+ <4FACDEDB.7030903@ti.com>
+Message-ID: <alpine.DEB.2.00.1205110400510.3201@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 11 May 2012, Cousson, Benoit wrote:
 
-I found that DMA driver for PL330 only supports single request and not
-burst request. The burst length is by default set to 1 in both the
-functions pl330_prep_slave_sg and pl330_prep_dma_cyclic
-(linux/drivers/dma/pl330.c).
+> But they are not separately gated for OMAP4 either. This is the modulemode
+> trick that make us think that, but it just means that the PRCM should ensure
+> that this clock is needed when at least one UART modulemode is enabled. In
+> fact the SPI modules are using the same clock.
+> 
+> The modulemode is used to do some reference counting, but the gating is done
+> globally. It was the same with the FCK_EN and ICK_EN in OMAP2&3.
+> 
+> The PRCM spec show only one global gating between FUNC_48M_FCLK and
+> PER_48M_GFCLK. All the modules are sharing the exact same clock.
 
-desc->rqcfg.brst_size = pch->burst_sz;
+Well, on OMAP3 and AM3517, they do not all share the same clock.  If you 
+look at the 34xx TRM vZU Table 17-11 "UART Clocks", you can see that the 
+UART1 and 2 functional clocks are sourced from clocks managed by the CORE 
+clockdomain, while UART3 is sourced from clocks managed by the PER 
+clockdomain.  This is also expressed in our OMAP3 clock tree.
 
-desc->rqcfg.brst_len = 1;
+I realize this is slightly tangential to your point.  As to where the 
+clock gating nodes are actually located on a given piece of silicon, 
+unfortunately I have no way of confirming that, aside from power 
+measurement.  You might be correct about what's going on with the AM3517 
+but it would be nice to get some confirmation from the AM35xx PRCM 
+engineer(s).  At this point one of two possibilities seem likely: either 
+CM_FCLKEN1_CORE.EN_UART4 does nothing, or CM_FCLKEN1_CORE.EN_UART4 is 
+necessary but not sufficient to get the UART4 to work.  If 
+CM_FCLKEN1_CORE.EN_UART4 does not actually do anything then we need to 
+remove it from the kernel and ideally file a documentation bug to get it 
+removed from the TRM.  On the other hand, if we do have to enable 
+CM_FCLKEN1_CORE.EN_UART4 to deassert the IdleAck to UART4, but the PRCM 
+usecounting is broken, then I guess we'll need to add a workaround to the 
+hwmod code to essentially support multiple "main clocks".
 
 
-Even though the device_control (pl330_control) function allows the
-client driver to pass in the burst length through slave DMA
-configuration. The burst_len  is always default to 1.
-
-pch->burst_len = slave_config->src_maxburst;
-
-
-The peripheral transfer request is programmed such a way that it is
-always waiting for single request (
-linux/arch/arm/common/pl330.c)
-. In this case, the burst request would not be handled.
-
-976 static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
-977                 const struct _xfer_spec *pxs, int cyc)
-978 {
-979         int off = 0;
-980
-981         while (cyc--) {
-982                 off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
-983                 off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->r->peri);
-984                 off += _emit_ST(dry_run, &buf[off], ALWAYS);
-985                 off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
-986         }
-987
-988         return off;
-989 }
-990
-991 static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
-992                 const struct _xfer_spec *pxs, int cyc)
-993 {
-994         int off = 0;
-995
-996         while (cyc--) {
-997                 off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
-998                 off += _emit_LD(dry_run, &buf[off], ALWAYS);
-999                 off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->r->peri);
-1000                 off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
-1001         }
-1002
-1003         return off;
-1004 }
-
-May I know is there any reason to constraint the transfer to be single
-and ignore the burst request? If the watermark of burst is hit then
-the dr_type will be set to BURST, in this PL330 will not perform the
-DMA transfer since that the DMASTPS or DMALDPS will be treated as
-DMANOP.
-
-Besides that, DMARMB and DMAWMB are not enforced for peripheral
-transfer. Is it safe to do so?
-
-Thanks,
-Lee Booi
+- Paul
