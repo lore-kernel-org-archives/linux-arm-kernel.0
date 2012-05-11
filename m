@@ -1,40 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 17:13:49 +0800
-Subject: [PATCH 1/5] ARM: imx: add more imx5 ssi clocks
-In-Reply-To: <20120511074222.GC27341@pengutronix.de>
-References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
- <1336718568-26810-2-git-send-email-shawn.guo@linaro.org>
- <20120511074222.GC27341@pengutronix.de>
-Message-ID: <20120511091347.GY17875@S2101-09.ap.freescale.net>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Fri, 11 May 2012 14:43:50 +0530
+Subject: [PATCH v2] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+In-Reply-To: <20120510191152.GN21851@atomide.com>
+References: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
+ <20120510191152.GN21851@atomide.com>
+Message-ID: <CAMrsUdJn6G1p29QZQbo6J_-aadj=tMrfCEM5GMJSUwTdRqg05g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 09:42:22AM +0200, Sascha Hauer wrote:
-> > +	clk_register_clkdev(clk[ssi_ext1_gate], NULL, "ssi_ext.0");
-> > +	clk_register_clkdev(clk[ssi_ext2_gate], NULL, "ssi_ext.1");
-> 
-> At some point I'd like to be able to lookup a clk based on its clkname,
-> given that they have a unique name anyway. The clkdev mechanism does a
-> good job in associating devices with clocks, but it's not very suitable
-> to manipulate the clock tree like you want to do here.
-> 
-I'm fine with that.  But last time, you add clkname into struct
-clk_lookup, I have seen some comments against that.  But let's see.
+On Fri, May 11, 2012 at 12:41 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Govindraj.R <govindraj.raja@ti.com> [120510 06:09]:
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
+>>
+>> The commit (bce492c0 ?ARM: OMAP2+: UART: Fix incorrect population of
+>> default uart pads) removed default uart pads that where getting populated
+>> and which was making rx pin wakeup capable. If uart pads was used in
+>
+> Nitpick.. this should say "were used" here ? ? ? ? ? ? ? ? ^^^
 
-> We could simply do a
-> 
-> 	for_each_clk() {
-> 		clk_register_clkdev(clk, NULL, clk->name);
-> 	}
-> 
-> This at least would prevent us from adding a new clkdev each time
-> somebody wants to do some fixups to the clock tree. I don't know if any
-> plans are existing to do something like this directly in the clock
-> framework instead.
-> 
-I think this has to be get done at framework level, as clk->name is not
-accessible in clock provider, unless we include clk-private.h.
+will change this.
 
--- 
-Regards,
-Shawn
+>
+>> --- a/arch/arm/mach-omap2/serial.c
+>> +++ b/arch/arm/mach-omap2/serial.c
+>> @@ -295,8 +353,7 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
+>> ? ? ? ? ? ? ? bdata.pads = NULL;
+>> ? ? ? ? ? ? ? bdata.pads_cnt = 0;
+>>
+>> - ? ? ? ? ? ? if (cpu_is_omap44xx() || cpu_is_omap34xx())
+>> - ? ? ? ? ? ? ? ? ? ? omap_serial_fill_default_pads(&bdata);
+>> + ? ? ? ? ? ? omap_serial_check_wakeup(&bdata, uart);
+>
+> Should this section become:
+>
+> ? ? ? ? ? ? ? ?if (!info) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_serial_check_wakeup(&bdata, uart);
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_serial_init_port(&bdata, NULL);
+> ? ? ? ? ? ? ? ?} else {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_serial_init_port(&bdata, &info[uart->num]);
+> ? ? ? ? ? ? ? ?}
+>
+> As if you have bdata, then there should not be anything to mux,
+> right?
+
+populating bdata should not depend on port_info,
+omap_serial_board_init takes only port info parameter and tries to populate
+wakeup parameter since it has not received the same from board file.
+And board file may or may not pass port info.
+
+So populating bdata -> for uart wakeup pin should not be coupled with
+availability of port info.
+
+--
+Thanks,
+Govindraj.R
