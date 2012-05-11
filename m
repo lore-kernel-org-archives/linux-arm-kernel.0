@@ -1,37 +1,60 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 11 May 2012 07:01:19 +0000
-Subject: [PATCH-V2 2/4] ARM: OMAP2+: CLEANUP: Move omap3 dpll ops to
- dpll3xxx.c
-In-Reply-To: <alpine.DEB.2.00.1205101701420.32719@utopia.booyaka.com>
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1205101701420.32719@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA221FF@DBDE01.ent.ti.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 11 May 2012 16:03:58 +0900
+Subject: [PATCH] ARM: use common utility function in dma
+Message-ID: <1336719838-11087-1-git-send-email-minchan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 04:32:11, Paul Walmsley wrote:
-> On Wed, 9 May 2012, Vaibhav Hiremath wrote:
-> 
-> > In order to remove unnecessary idefs, move noncore and core
-> > dpll ops to dpll3xxx.c file (where it should have been already).
-> > 
-> > The clkops (clkops_omap3_core_dpll_ops & clkops_omap3_noncore_dpll_ops)
-> > is used in clock data files, and dependency is already handled by
-> > Makefile rule.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> 
-> This is probably okay.
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> 
+mm provides alloc_pages_exact so use it instead of open coded hack.
 
-Thanks Paul,
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+---
+ arch/arm/mm/dma-mapping.c |   23 +++++------------------
+ 1 file changed, 5 insertions(+), 18 deletions(-)
 
-Thanks,
-Vaibhav
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index b982602..98c9bbd 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -184,20 +184,12 @@ static void __dma_clear_buffer(struct page *page, size_t size)
+  */
+ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gfp)
+ {
+-	unsigned long order = get_order(size);
+-	struct page *page, *p, *e;
+-
+-	page = alloc_pages(gfp, order);
+-	if (!page)
++	struct page *page;
++	void *addr = alloc_pages_exact(size, gfp);
++	if (!addr)
+ 		return NULL;
+ 
+-	/*
+-	 * Now split the huge page and free the excess pages
+-	 */
+-	split_page(page, order);
+-	for (p = page + (size >> PAGE_SHIFT), e = page + (1 << order); p < e; p++)
+-		__free_page(p);
+-
++	page = virt_to_page(addr);
+ 	__dma_clear_buffer(page, size);
+ 
+ 	return page;
+@@ -208,12 +200,7 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
+  */
+ static void __dma_free_buffer(struct page *page, size_t size)
+ {
+-	struct page *e = page + (size >> PAGE_SHIFT);
+-
+-	while (page < e) {
+-		__free_page(page);
+-		page++;
+-	}
++	free_pages_exact(page_address(page), size);
+ }
+ 
+ #ifdef CONFIG_MMU
+-- 
+1.7.9.5
