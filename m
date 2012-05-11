@@ -1,75 +1,82 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 11 May 2012 16:01:15 +0800
-Subject: [PATCH 3/3] mmc: sdhci-imx-esdhc: convert to use pinctrl subsystem
-In-Reply-To: <20120511073653.GX17875@S2101-09.ap.freescale.net>
-References: <1335958282-3068-1-git-send-email-b29396@freescale.com>
- <1335958282-3068-3-git-send-email-b29396@freescale.com>
- <20120511073653.GX17875@S2101-09.ap.freescale.net>
-Message-ID: <20120511080114.GO6622@shlinux2.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 11 May 2012 11:03:09 +0300
+Subject: [RFC 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+In-Reply-To: <4FAC4280.4000100@wwwdotorg.org>
+References: <1336635302-29260-1-git-send-email-hdoyu@nvidia.com>
+ <20120510141130.GA20373@kroah.com> <4FABE5D3.9040706@wwwdotorg.org>
+ <20120510181611.GA16908@kroah.com> <4FAC1E70.8030907@wwwdotorg.org>
+ <20120510222830.GA23084@kroah.com> <4FAC4280.4000100@wwwdotorg.org>
+Message-ID: <20120511110309.10beedca497a1af966f94cd8@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:36:56PM +0800, Shawn Guo wrote:
-> On Wed, May 02, 2012 at 07:31:22PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> > ChangeLog v4->v5:
-> >  *split arch/arm/mach-imx/* changes into a separate patch
-> > ChangeLog v3->v4:
-> >  * call provide dummies in imx*_soc_init().
-> > ChangeLog v2->v3:
-> >  * patch name updated.
-> >    v1 name is ARM: imx6q: switch to use pinctrl driver
-> >  * using pinctrl dummy state to avoid breaking other platforms to use this
-> >    driver.
-> > ChangeLog v1->v2:
-> >  * using updated binding
-> > ---
-> >  arch/arm/boot/dts/imx6q-arm2.dts   |    4 ++++
-> >  arch/arm/boot/dts/imx6q.dtsi       |   32 ++++++++++++++++++++++++++++++++
-> >  drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
-> >  3 files changed, 45 insertions(+), 0 deletions(-)
-> 
-> Since we now have dummy state enabled for imx6q as well, I just split
-> the patches into following two for better separation, with first one
-> on my imx/pinctrl/for-3.5 and the second one on imx/dt/for-3.5 branch
-> respectively.
-> 
-> commit e62d8b8fe73518d1875371a2ee9c5fdd31eba6f8
-> Author: Dong Aisheng <dong.aisheng@linaro.org>
-> Date:   Fri May 11 14:56:01 2012 +0800
-> 
->     mmc: sdhci-imx-esdhc: adopt pinctrl support
-> 
->     Cc: linux-mmc at vger.kernel.org
->     Cc: Chris Ball <cjb@laptop.org>
->     Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->     Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
->  drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> commit 551fd208f204780bac1ca5bce1748ba7a6f7ee6e
-> Author: Dong Aisheng <dong.aisheng@linaro.org>
-> Date:   Fri May 11 14:58:00 2012 +0800
-> 
->     ARM: dts: imx6q-arm2: add pinctrl state for usdhc
-> 
->     Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
->  arch/arm/boot/dts/imx6q-arm2.dts |    4 ++++
->  arch/arm/boot/dts/imx6q.dtsi     |   32 ++++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+), 0 deletions(-)
-> 
-> Please have a check to see if everything is correct.
-> 
-Looks good to me.
-Just go ahead.
+Thanks Stephen for explaining the background of this patch.
 
-Regards
-Dong Aisheng
+On Fri, 11 May 2012 00:34:40 +0200
+Stephen Warren <swarren@wwwdotorg.org> wrote:
+
+> On 05/10/2012 04:28 PM, Greg Kroah-Hartman wrote:
+> > On Thu, May 10, 2012 at 02:00:48PM -0600, Stephen Warren wrote:
+> >> On 05/10/2012 12:16 PM, Greg Kroah-Hartman wrote:
+> >>> On Thu, May 10, 2012 at 09:59:15AM -0600, Stephen Warren wrote:
+> >>>> On 05/10/2012 08:11 AM, Greg Kroah-Hartman wrote:
+> >>>>> On Thu, May 10, 2012 at 10:35:02AM +0300, Hiroshi DOYU wrote:
+> >>>>>> driver_find_device() can be called with an unregistered driver.
+...
+> > Can someone resend this to me, with the information above in the
+> > changelog comment, and I'll be glad to apply it?  Again, I need to know
+> > if this is needed for 3.4 or it can wait for 3.5?
+> 
+> I'll let Hiroshi do that.
+
+Greg, here's the update patch with the above explanation. Please take
+this one if the following explanation makes sense.
+
+>From d7cf9b53d3bbcce75ae55a9eed03c7e091529e3d Mon Sep 17 00:00:00 2001
+From: Hiroshi DOYU <hdoyu@nvidia.com>
+Date: Wed, 9 May 2012 14:21:03 +0300
+Subject: [PATCH 1/1] Driver Core: don't oops with unregistered driver in
+ driver_find_device()
+
+driver_find_device() can be called with an unregistered driver. Need
+to check driver_private to see if it's populated or not, especially
+under deferrable probe.
+
+In the case that there are 2 drivers, one depends on the other. With
+-EPROBE_DEFER, two drivers can use deferred probe to ensure that their
+relative probe order doesn't matter. If dependee driver is probed
+first, then the dependant's driver_find_device('dependee')
+succeeds. If the dependant is probed first, then the dependant's
+driver_find_device('dependee') should return NULL, and the dependant
+should get -EPROBE_DEFER. driver_find_device() needs to return NULL if
+it's not populated.
+
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+In [PATCHv5 2/3] ARM: tegra: Add SMMU enabler in AHB:
+  http://article.gmane.org/gmane.linux.ports.tegra/4658
+
+"tegra_ahb_driver" may not be populated when it's called.
+
+For more SMMU/AHB specific discussion, refer to the following thread:
+  https://lkml.org/lkml/2012/5/10/21
+---
+ drivers/base/driver.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/base/driver.c b/drivers/base/driver.c
+index 3ec3896..207c27d 100644
+--- a/drivers/base/driver.c
++++ b/drivers/base/driver.c
+@@ -80,7 +80,7 @@ struct device *driver_find_device(struct device_driver *drv,
+ 	struct klist_iter i;
+ 	struct device *dev;
+ 
+-	if (!drv)
++	if (!drv || !drv->p)
+ 		return NULL;
+ 
+ 	klist_iter_init_node(&drv->p->klist_devices, &i,
+-- 
+1.7.5.4
