@@ -1,61 +1,32 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Fri, 11 May 2012 14:51:05 +0530
-Subject: smp_twd fix for adapting to cpu frequency change
-In-Reply-To: <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
-References: <CAPub14_+XXjKyZVh3E8QQjY4sB4gVB=kaApuODptoizqfEUH_Q@mail.gmail.com>
- <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
-Message-ID: <20120511092105.GR30029@localhost.localdomain>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 May 2012 03:22:47 -0600 (MDT)
+Subject: [PATCH 3/3] ARM: OMAP: AM35xx: fix UART4 softreset
+In-Reply-To: <4FACD255.3080702@ti.com>
+References: <20120510172449.13418.66815.stgit@dusk>
+ <20120510172918.13418.64781.stgit@dusk> <4FACD255.3080702@ti.com>
+Message-ID: <alpine.DEB.2.00.1205110316500.3201@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Beno?t
 
-On Tue, May 08, 2012 at 07:33:56PM +0800, Linus Walleij wrote:
-> Can you test this snippet?
-> Thomas: does this look sane?
-> 
-> >From d40c3c3302a2f89ab973b41b350153c144f6bded Mon Sep 17 00:00:00 2001
-> From: Linus Walleij <linus.walleij@linaro.org>
-> Date: Tue, 8 May 2012 13:26:43 +0200
-> Subject: [PATCH] ARM: smp_twd: reprogram loadvalue for periodic event
-> 
-> The code to handle frequency transitions of the TWD only
-> handle one-shot events. Let's try to account for this by
-> checking the state of the event.
-> 
-> Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/kernel/smp_twd.c |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index fef42b2..98b27e6 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -104,9 +104,17 @@ static void twd_timer_stop(struct clock_event_device *clk)
->   */
->  static void twd_update_frequency(void *data)
->  {
-> +       struct clock_event_device *evt = *__this_cpu_ptr(twd_evt);
-> +
->         twd_timer_rate = clk_get_rate(twd_clk);
-> 
-> -       clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-> +       /* If we're in periodic mode, just put in a new load value */
-> +       if (evt->mode == CLOCK_EVT_MODE_PERIODIC) {
-> +               __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
-> +               return;
-> +       }
-> +
-> +       clockevents_update_freq(evt, twd_timer_rate);
->  }
-> 
->  static int twd_cpufreq_transition(struct notifier_block *nb,
-> -- 
+On Fri, 11 May 2012, Cousson, Benoit wrote:
 
-Thanks, it works.
+> I do not have any clue about that chip, but is this clock really what it is
+> supposed to be? I mean, isn't the uart1_fck the parent of all the UART fck or
+> something like that. Don't we just have an issue becasue the clock names are
+> not accurate?
 
---
-regards
-Shiraz
+I guess that's what I'm trying to find out.
+
+According to the AM3517 TRM rev. B (SPRUGR0B) Figure 14-20 "UART 
+Functional Integration" and Table 14-11 "UART Clocks", all of the UARTs 
+appear to have independent functional clocks.  The table even mentions a 
+CM_FCLKEN1_CORE.EN_UART4 bit.  But the PRCM chapter of this TRM doesn't 
+mention that at all.  So the documentation is not too useful here.
+
+On the rest of the OMAPs, as far as I know, the UART clocks are all 
+separate.
+
+
+- Paul
