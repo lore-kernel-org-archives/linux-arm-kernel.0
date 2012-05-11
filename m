@@ -1,155 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 10 May 2012 17:41:00 -0600
-Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
-In-Reply-To: <1336679838-30738-1-git-send-email-stigge@antcom.de>
-References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120510234100.7F5463E04A6@localhost>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 11 May 2012 10:55:37 +1000
+Subject: [GIT PULL] ep93xx cleanups for 3.5
+Message-ID: <4FAC6389.40607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 May 2012 21:57:18 +0200, Roland Stigge <stigge@antcom.de> wrote:
-> This patch adds device tree support for gpio-lpc32xx.c.
-> 
-> The various GPIO groups correspond to the different irregular GPIO banks of the
-> LPC32xx hardware. Most importantly, there are the GPI(0-27), GPO(0-23) and
-> GPIO(0-5) banks. Each bank must be registered individually since they are
-> implemented with different functions. Registration is done via gpiochip_add()
-> which requires an individual gpio bank subnode in the device tree for each
-> call.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> ---
-> 
-> Applies to v3.4-rc6
-> 
-> Changes since last version:
-> * Updated patch description (above)
-> 
-> Thanks to Jean-Christophe PLAGNIOL-VILLARD, Grant Likely, Arnd Bergmann, Jon
-> Smirl, Mark Brown for reviewing!
-> 
-> I can also provide a git branch to pull from. On top of which one should I
-> provide it, if not mainline rc?
->  
->  Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   65 ++++++++++++++++
->  arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 +-
->  drivers/gpio/gpio-lpc32xx.c                             |   56 +++++++++++++
->  3 files changed, 127 insertions(+), 3 deletions(-)
-> 
-> --- /dev/null
-> +++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-> @@ -0,0 +1,65 @@
-> +NXP LPC32xx SoC GPIO controller
-> +
-> +Required properties:
-> +- compatible: must be "nxp,lpc3220-gpio"
-> +- reg: Physical base address and length of the controller's registers.
-> +- #address-cells: Always 1, for indexing of the subnodes (GPIO groups of the
-> +  SoC)
-> +- #size-cells: Always 0
-> +
-> +Required properties of sub-nodes which describe the GPIO groups of LPC32xx:
-> +- gpio-controller: Marks the device node as a GPIO controller.
-> +- #gpio-cells: Should be two. The first cell is the pin number and the
-> +  second cell is used to specify optional parameters:
-> +  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> +- reg: Index of the GPIO group
-> +
-> +Optional properties of sub-nodes which describe the GPIO groups of LPC32xx:
-> +- status: Set to "disabled" if you don't use the respective GPIO group
-> +  of the LPC32xx SoC
-> +
-> +Example:
-> +
-> +	gpio: gpio at 40028000 {
-> +		compatible = "nxp,lpc3220-gpio";
-> +		reg = <0x40028000 0x1000>;
-> +		/* create a private address space for enumeration */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		gpio_p0: gpio-bank at 0 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <0>;
-> +		};
-> +
-> +		gpio_p1: gpio-bank at 1 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <1>;
-> +		};
-> +
-> +		gpio_p2: gpio-bank at 2 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <2>;
-> +		};
-> +
-> +		gpio_p3: gpio-bank at 3 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <3>;
-> +		};
-> +
-> +		gpi_p3: gpio-bank at 4 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <4>;
-> +		};
-> +
-> +		gpo_p3: gpio-bank at 5 {
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <5>;
-> +		};
-> +	};
+The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
 
-Ugh.  I know this patch has been around for a while, but I can't help
-it, this binding is just really ugly.  It results in a big chunk of
-boilerplate for the gpio controller node just to enumerate the banks
-which will *always* be there.
+  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
 
-The real problem is that one of_xlate function cannot currently be
-used for multiple banks, but there is no good reason why that should
-be so.
+are available in the git repository at:
 
-How about the following instead (very rough, there should be a cleaner
-way to update the gc pointer in of_xlate):
+  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-cleanup-for-3.5
 
-	gpio: gpio at 40028000 {
-		compatible = "nxp,lpc3220-gpio";
-		reg = <0x40028000 0x1000>;
-		gpio-controller;
-		#gpio-cells = <3>; /* bank, pin, flags */
-	}
+for you to fetch changes up to a1eacd79a602707f97201edbac9a03edaaea1847:
 
-Modify gpiolib-of to use:
-of_xlate(struct gpio_chip **gc, const struct of_phandle_args *gpiospec, u32 *flags);
-(so that the value of gc can be modified)
+  arm: ep93xx: use gpio_led_register_device (2012-04-12 09:38:15 +1000)
 
-And then in the driver:
+----------------------------------------------------------------
+H Hartley Sweeten (2):
+      arm: ep93xx: use DEFINE_RES_* macros
+      arm: ep93xx: use gpio_led_register_device
 
-static int lpc32xx_of_xlate(struct gpio_chip **gc, const struct
-                            of_phandle_args *gpiospec, u32 *flags)
-{
-	if (WARN_ON(gpiospec->args_count < 3))
-		return -EINVAL;
+Ryan Mallon (1):
+      Fix build breakage in ep93xx-core
 
-	*gc = &lpc32xx_gpiochip[gpiospec->args[0]].chip;
-	if (flags)
-		*flags = gpiospec->args[2];
-	return gpiospec->args[1];
-}
-
-Make all the gpiochips use the same of_xlate function and of_node
-pointer so that it doesn't matter which one gets matched because the
-xlate always completely resolves the gpio_chip.
-
-Another way to do it would be to split the of_xlate functions out of
-gpio_chip entirely and have a separate registry for gpio device_nodes
-and their xlate functions.
-
-g.
+ arch/arm/mach-ep93xx/Kconfig |    5 ++
+ arch/arm/mach-ep93xx/core.c  |  110 ++++++++----------------------------------
+ 2 files changed, 25 insertions(+), 90 deletions(-)
