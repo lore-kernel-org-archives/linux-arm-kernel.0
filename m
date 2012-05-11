@@ -1,22 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 May 2012 14:46:45 +0200
-Subject: smp_twd fix for adapting to cpu frequency change
-In-Reply-To: <20120511092105.GR30029@localhost.localdomain>
-References: <CAPub14_+XXjKyZVh3E8QQjY4sB4gVB=kaApuODptoizqfEUH_Q@mail.gmail.com>
- <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
- <20120511092105.GR30029@localhost.localdomain>
-Message-ID: <CACRpkdZtcOrq1bZpn+a9Kzgq6ULO4tGb3Az=AOOoamRmDCr2UA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 11 May 2012 14:47:45 +0200
+Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
+Message-ID: <4FAD0A71.80201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 11:21 AM, Shiraz Hashim <shiraz.hashim@st.com> wrote:
+Hi Tony,
 
-> Thanks, it works.
+Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
+It applies now fine on top of lo/dt branch.
 
-OK I take it that I can add your Tested-by: tag on this then :-)
+Regards,
+Benoit
 
-Thomas does it look OK to you too? If I get your ACK I can put this
-into Russell's patch tracker.
 
-Yours,
-Linus Walleij
+The following changes since commit 40364b9f5a4d167d97bb6a76cd239ca8cfff056a:
+  Benoit Cousson (1):
+        arm/dts: omap4-panda: Add LEDs support
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.5/dts/am33xx
+
+Vaibhav Hiremath (3):
+      arm/dts: Add support for TI AM335x EVM board
+      arm/dts: omap3-evm: Add i2c and twl4030 support
+      arm/dts: Add support for TI AM3517/05 EVM board
+
+ arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am3517-evm.dts |   32 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-evm.dts  |   28 +++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-evm.dts
+ create mode 100644 arch/arm/boot/dts/am3517-evm.dts
