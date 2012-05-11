@@ -1,49 +1,25 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 11 May 2012 14:47:53 +0200
-Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
-In-Reply-To: <201205111219.10025.arnd@arndb.de>
-References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
- <20120510234100.7F5463E04A6@localhost> <201205111219.10025.arnd@arndb.de>
-Message-ID: <4FAD0A79.8040207@antcom.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 11 May 2012 09:02:27 -0400
+Subject: [patch v2 3/3] kirkwood: Add iconnect support
+In-Reply-To: <87sjf7exv6.fsf@lebrac.rtp-net.org>
+References: <20120418211638.691400727@rtp-net.org>
+ <201204300011.17388.linux@baker-net.org.uk>
+ <878vhdbtk1.fsf@lebrac.rtp-net.org>
+ <201205012355.38598.linux@baker-net.org.uk>
+ <87sjf7exv6.fsf@lebrac.rtp-net.org>
+Message-ID: <20120511130227.GQ15711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2012 02:19 PM, Arnd Bergmann wrote:
-> On Thursday 10 May 2012, Grant Likely wrote:
->> How about the following instead (very rough, there should be a cleaner
->> way to update the gc pointer in of_xlate):
->>
->>         gpio: gpio at 40028000 {
->>                 compatible = "nxp,lpc3220-gpio";
->>                 reg = <0x40028000 0x1000>;
->>                 gpio-controller;
->>                 #gpio-cells = <3>; /* bank, pin, flags */
->>         }
->>
+On Fri, May 11, 2012 at 01:54:53PM +0200, Arnaud Patard wrote:
+> Hi,
 > 
-> I thought about that when I suggested the current binding to Roland,
-> but the problem with this is that passing the bank as a number is
-> not very intuitive when the data sheet has separate number spaces
-> for gpio, gpi and gpo here, so it seemed more natural to go with what
-> the data sheet describes.
+> I don't see any trace of my patch in arm-soc#for-next. Did I miss to
+> address some comments, preventing it to be merged ?
 
-Right. Personally, I would be fine with either of my v8 (all banks in
-dt, referenced naturally by name) and v9 (one simple DT entry for the
-whole GPIO controller, integer index for referencing banks) patches.
+Nope, I'm just a little behind.  Hopefully I'll get it moving in the
+next day or two.
 
-Consider the DT-documented mapping in the latter case:
+thx,
 
-      0: GPIO P0
-      1: GPIO P1
-      2: GPIO P2
-      3: GPIO P3
-      4: GPI P3
-      5: GPO P3
-
-Not too difficult and would also be acceptable, IMO.
-
-So Arnd and Grant, please agree one of those and pick it. :-)
-
-Thanks in advance,
-
-Roland
+Jason.
