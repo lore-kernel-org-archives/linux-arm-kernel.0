@@ -1,27 +1,48 @@
 From: r.sricharan@ti.com (R, Sricharan)
-Date: Fri, 11 May 2012 11:53:29 +0530
+Date: Fri, 11 May 2012 11:46:32 +0530
 Subject: [PATCH 1/4] ARM: OMAP2+: Introduce CONFIG_SOC_HAS_OMAP_DPLL macro
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA220F3@DBDE01.ent.ti.com>
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA217D2@DBDE01.ent.ti.com>
 References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
  <1336669615-16454-2-git-send-email-r.sricharan@ti.com>
  <79CD15C6BA57404B839C016229A409A83EA217D2@DBDE01.ent.ti.com>
- <CAJ7qFSf9=h-hjSwrcd+n=zK4HyB+=DXGrqsgsMvaL_f1xyQQog@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA220F3@DBDE01.ent.ti.com>
-Message-ID: <CAJ7qFSc8E4PANadi6zC=bHx+OYvFJc-FcjDcznFVwEgG4K7ZPw@mail.gmail.com>
+Message-ID: <CAJ7qFSf9=h-hjSwrcd+n=zK4HyB+=DXGrqsgsMvaL_f1xyQQog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
-
+Vaibhav,
+[snip]
+>> diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+>> index d0ef57c..095bee8 100644
+>> --- a/arch/arm/plat-omap/include/plat/clock.h
+>> +++ b/arch/arm/plat-omap/include/plat/clock.h
+>> @@ -156,7 +156,7 @@ struct dpll_data {
+>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?min_divider;
+>> ? ? ? u16 ? ? ? ? ? ? ? ? ? ? max_divider;
+>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?modes;
+>> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+>> +#ifdef CONFIG_SOC_HAS_OMAP_DPLL
+>> ? ? ? void __iomem ? ? ? ? ? ?*autoidle_reg;
+>> ? ? ? void __iomem ? ? ? ? ? ?*idlest_reg;
+>> ? ? ? u32 ? ? ? ? ? ? ? ? ? ? autoidle_mask;
+>> @@ -167,7 +167,7 @@ struct dpll_data {
+>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?auto_recal_bit;
+>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?recal_en_bit;
+>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?recal_st_bit;
+>> -# ?endif
+>> +#endif
 >
-> Sricharan,
+> I had submitted similar patch recently, and Kevin had suggested that
+> Instead of adding config option, we shoule simply get rid of this ifdef
+> completely.
 >
-> Yesterday, Paul confirmed that, removing ifdef is the way to go. So
-> just few mins back I had submitted patch for the same.
+> Refer to
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg68293.html
 >
-> http://permalink.gmane.org/gmane.linux.ports.arm.omap/76972
 >
- oh ya, was just looking at that.
+> Waiting for Paul to conform here.
+>
+ Thanks for pointing that out. Will check on this and Paul's PRCM series
+ cleanup series then.
 
 Thanks,
  Sricharan
