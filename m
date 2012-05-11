@@ -1,45 +1,20 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 May 2012 11:32:57 -0600
-Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
-In-Reply-To: <201205111322.15191.arnd@arndb.de>
-References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
- <201205111219.10025.arnd@arndb.de> <4FAD0A79.8040207@antcom.de>
- <201205111322.15191.arnd@arndb.de>
-Message-ID: <20120511173257.98E2C3E0791@localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 May 2012 11:54:29 -0600
+Subject: [PATCH 1/3] ARM: tegra20: Make MC optional in Kconfig
+In-Reply-To: <1336719389-28506-1-git-send-email-hdoyu@nvidia.com>
+References: <20120511095012.57f737d1b0d2536e0d367a9b@nvidia.com>
+ <1336719389-28506-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <4FAD5255.1020908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012 13:22:14 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 11 May 2012, Roland Stigge wrote:
-> > Right. Personally, I would be fine with either of my v8 (all banks in
-> > dt, referenced naturally by name) and v9 (one simple DT entry for the
-> > whole GPIO controller, integer index for referencing banks) patches.
-> > 
-> > Consider the DT-documented mapping in the latter case:
-> > 
-> >       0: GPIO P0
-> >       1: GPIO P1
-> >       2: GPIO P2
-> >       3: GPIO P3
-> >       4: GPI P3
-> >       5: GPO P3
-> > 
-> > Not too difficult and would also be acceptable, IMO.
-> > 
-> > So Arnd and Grant, please agree one of those and pick it. :-)
-> > 
+On 05/11/2012 12:56 AM, Hiroshi DOYU wrote:
+> For bare minimal system.
 > 
-> Grant is maintainer for both GPIO and DT, so his opinion is what
-> counts in this case.
-> I was merely giving the background on how we got there so he
-> can make an informed decision.
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
 
-It adds a lot of boilerplate to the DT to split it up into nodes and
-mapping index to a bank isn't onerous.  I think I like the single node
-with #gpio-cells = <3> better.  When DTC handles named constants then
-it will be even easier.
+Patches 1 and 2,
 
-Just need to decide on the best way to implement it.  Arnd, can you
-review Roland's v9 patches for me and give me your opinion?
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-g.
+I'll take patch 3 through the Tegra tree along with the .dts changes.
