@@ -1,79 +1,294 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 11 May 2012 08:30:14 +0530
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120510225429.GG12727@n2100.arm.linux.org.uk>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <20120504122611.GE26481@n2100.arm.linux.org.uk>
- <1336135550.1540.2.camel@vkoul-udesk3>
- <20120510225429.GG12727@n2100.arm.linux.org.uk>
-Message-ID: <1336705214.15424.1369.camel@vkoul-udesk3>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Fri, 11 May 2012 09:21:24 +0530
+Subject: [PATCH V3 07/10] ARM: OMAP2+: SmartReflex: Use per-OPP data
+ structure
+In-Reply-To: <44C9A5C2B412554B8C50A260EB4EF32703971E34@DFLE32.ent.ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <1335462041-4949-8-git-send-email-j-keerthy@ti.com>
+ <44C9A5C2B412554B8C50A260EB4EF32703971E34@DFLE32.ent.ti.com>
+Message-ID: <CAJ6a13akLHpBi5HrA__j8oV09R_eLrsrw2gju-H3j7fQ46o0qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-10 at 23:54 +0100, Russell King - ARM Linux wrote:
-> On Fri, May 04, 2012 at 06:15:50PM +0530, Vinod Koul wrote:
-> > On Fri, 2012-05-04 at 13:26 +0100, Russell King - ARM Linux wrote:
-> > > On Wed, May 02, 2012 at 05:27:02PM +0100, Russell King - ARM Linux wrote:
-> > > > On Wed, May 02, 2012 at 09:31:15PM +0530, Vinod Koul wrote:
-> > > > > From what I understand (Dan please correct me as you may know this much
-> > > > > better than me), the tx_status tells you wrt passed cookie what is the
-> > > > > status. Further, (as you pointed), it also tells you which is last
-> > > > > completed cookie and what is the current "running". And wrt the
-> > > > > currently "running" cookie it tells you how may bytes are left.
-> > > > 
-> > > > That means we have a number of buggy drivers on both sides of the API...
-> > > > PL08x for example always total up all the pending bytes from the position
-> > > > in the current descriptor to the last issued descriptor.  Many other
-> > > > implementations simply always return zero.
-> > > 
-> > > Right, as there's been no reply on this, I'll see about changing PL08x
-> > > and SA11x0 to do exactly this.  I'll also see about implementing it in
-> > > the new OMAP DMA engine driver.
-> > > 
-> > > The semantics I intend to implement are:
-> > > 
-> > > If the cookie has completed successfully, the residue will be zero.  If
-> > > it is queued, it will be the number of bytes in the descriptor identified
-> > > by the cookie.  If it is in progress, it will be the number of bytes yet
-> > > to be transferred.
-> > Today is is supposed to be defined as:
-> > * @residue: the remaining number of bytes left to transmit
-> > *      on the selected transfer for states DMA_IN_PROGRESS and
-> > *      DMA_PAUSED if this is implemented in the driver, else 0
-> > So what you are saying is correct and already documented.
-> 
-> BTW.  Not quite - it's ambiguous, and we really must get rid of that
-> 'else 0' clause there and require it to be implemented if we're going
-> to end up with users of the DMA engine API using it.
-> 
-> The statement also implies that a pending transfer should return a
-> residue of zero.  Is that really consistent with what we want this
-> API to do?
-> 
-> It also talks about 'bytes left to transmit'.  That could be interpreted
-> strictly as the number of bytes to be transferred from the DMA engine
-> to the peripheral, or from the DMA engine to memory.  That's not quite
-> the same as calculating the residue off the DMA address pointer.
-Yes this needs to be mandatory. Let me add that explicitly.
+Hi Greg,
 
-  * @last: last completed DMA cookie
-  * @used: last issued DMA cookie (i.e. the one in progress)
-- * @residue: the remaining number of bytes left to transmit
-- *     on the selected transfer for states DMA_IN_PROGRESS and
-- *     DMA_PAUSED if this is implemented in the driver, else 0
-+ * @residue: is defined as:
-+ *   - for completed descriptor: 0
-+ *   - for descriptors which are in DMA_PAUSED, DMA_IN_PROGRESS:
-+ *     length - (current_addr - start_addr), where:
-+ *             length = descriptor dma length
-+ *             current_addr = current dma pointer queried for dma channel
-+ *             start_addr: starting address of this descriptor
-+ *   This is mandatory and needs to be correctly filled by driver
-  */
-Does this make it clear?
+Thanks for reviewing.
+
+On Fri, May 11, 2012 at 12:41 AM, Guyotte, Greg <gguyotte@ti.com> wrote:
+> Hi Jean,
+>
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of J, KEERTHY
+>> Sent: Thursday, April 26, 2012 12:41 PM
+>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> Hilman, Kevin; rjw at sisk.pl; linux-kernel at vger.kernel.org; linux-
+>> pm at lists.linux-foundation.org
+>> Cc: Pihet-XID, Jean; J, KEERTHY; Paul Walmsley; Gopinath, Thara; Menon,
+>> Nishanth
+>> Subject: [PATCH V3 07/10] ARM: OMAP2+: SmartReflex: Use per-OPP data
+>> structure
+>>
+>> From: Jean Pihet <j-pihet@ti.com>
+>>
+>> The SmartReflex driver incorrectly treats some per-OPP data as data
+>> common to all OPPs (e.g., ERRMINLIMIT). ?Move this data into a per-OPP
+>> data structure.
+>>
+>> Furthermore, in order to make the SmartReflex implementation ready for
+>> the move to drivers/, remove the dependency from the SR driver code
+>> to the voltage layer by querying the data tables only from the SR device
+>> init code.
+>>
+>> Based on Paul's original code for the SmartReflex driver conversion.
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> Signed-off-by: J Keerthy <j-keerthy@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Cc: Thara Gopinath <thara@ti.com>
+>> Cc: Nishanth Menon <nm@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/smartreflex.c | ? 38 +++++++++++++++++---------------
+>> ----
+>> ?arch/arm/mach-omap2/sr_device.c ? | ? 36 +++++++++++++++++++++++++++++---
+>> --
+>> ?include/linux/power/smartreflex.h | ? ?8 +++++-
+>> ?3 files changed, 54 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-
+>> omap2/smartreflex.c
+>> index acef08d..20075de 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -347,22 +347,23 @@ static void sr_v2_disable(struct omap_sr *sr)
+>> ? ? ? sr_write_reg(sr, IRQSTATUS, IRQSTATUS_MCUDISABLEACKINT);
+>> ?}
+>>
+>> -static u32 sr_retrieve_nvalue(struct omap_sr *sr, u32 efuse_offs)
+>> +static struct omap_sr_nvalue_table *sr_retrieve_nvalue_row(
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_sr *sr, u32 efuse_offs)
+>> ?{
+>> ? ? ? int i;
+>>
+>> ? ? ? if (!sr->nvalue_table) {
+>> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Missing ntarget value table\n",
+>> ? ? ? ? ? ? ? ? ? ? ? __func__);
+>> - ? ? ? ? ? ? return 0;
+>> + ? ? ? ? ? ? return NULL;
+>> ? ? ? }
+>>
+>> ? ? ? for (i = 0; i < sr->nvalue_count; i++) {
+>> ? ? ? ? ? ? ? if (sr->nvalue_table[i].efuse_offs == efuse_offs)
+>> - ? ? ? ? ? ? ? ? ? ? return sr->nvalue_table[i].nvalue;
+>> + ? ? ? ? ? ? ? ? ? ? return &sr->nvalue_table[i];
+>> ? ? ? }
+>>
+>> - ? ? return 0;
+>> + ? ? return NULL;
+>> ?}
+>>
+>> ?/* Public Functions */
+>> @@ -586,7 +587,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
+>> long volt)
+>> ?{
+>> ? ? ? struct omap_volt_data *volt_data;
+>> ? ? ? struct omap_sr *sr = _sr_lookup(voltdm);
+>> - ? ? u32 nvalue_reciprocal;
+>> + ? ? struct omap_sr_nvalue_table *nvalue_row;
+>> ? ? ? int ret;
+>>
+>> ? ? ? if (IS_ERR(sr)) {
+>> @@ -602,16 +603,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
+>> long volt)
+>> ? ? ? ? ? ? ? return PTR_ERR(volt_data);
+>> ? ? ? }
+>>
+>> - ? ? nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data-
+>> >sr_efuse_offs);
+>> + ? ? nvalue_row = sr_retrieve_nvalue_row(sr, volt_data->sr_efuse_offs);
+>>
+>> - ? ? if (!nvalue_reciprocal) {
+>> - ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
+>> - ? ? ? ? ? ? ? ? ? ? __func__, volt);
+>> + ? ? if (!nvalue_row) {
+>> + ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: failure getting SR data for this
+>> voltage %ld\n",
+>> + ? ? ? ? ? ? ? ? ? ? ?__func__, volt);
+>> ? ? ? ? ? ? ? return -ENODATA;
+>> ? ? ? }
+>>
+>> ? ? ? /* errminlimit is opp dependent and hence linked to voltage */
+>> - ? ? sr->err_minlimit = volt_data->sr_errminlimit;
+>> + ? ? sr->err_minlimit = nvalue_row->errminlimit;
+>>
+>> ? ? ? pm_runtime_get_sync(&sr->pdev->dev);
+>>
+>> @@ -624,7 +625,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
+>> long volt)
+>> ? ? ? if (ret)
+>> ? ? ? ? ? ? ? return ret;
+>>
+>> - ? ? sr_write_reg(sr, NVALUERECIPROCAL, nvalue_reciprocal);
+>> + ? ? sr_write_reg(sr, NVALUERECIPROCAL, nvalue_row->nvalue);
+>>
+>> ? ? ? /* SRCONFIG - enable SR */
+>> ? ? ? sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, SRCONFIG_SRENABLE);
+>> @@ -872,7 +873,6 @@ static int __init omap_sr_probe(struct platform_device
+>> *pdev)
+>> ? ? ? struct omap_sr_data *pdata = pdev->dev.platform_data;
+>> ? ? ? struct resource *mem, *irq;
+>> ? ? ? struct dentry *nvalue_dir;
+>> - ? ? struct omap_volt_data *volt_data;
+>> ? ? ? int i, ret = 0;
+>>
+>> ? ? ? sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
+>> @@ -990,12 +990,10 @@ static int __init omap_sr_probe(struct
+>> platform_device *pdev)
+>> ? ? ? ? ? ? ? goto err_debugfs;
+>> ? ? ? }
+>>
+>> - ? ? omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
+>> - ? ? if (!volt_data) {
+>> - ? ? ? ? ? ? dev_warn(&pdev->dev, "%s: %s: No Voltage table for the"
+>> - ? ? ? ? ? ? ? ? ? ? " corresponding vdd. Cannot create debugfs"
+>> - ? ? ? ? ? ? ? ? ? ? "entries for n-values\n",
+>> - ? ? ? ? ? ? ? ? ? ? __func__, sr_info->name);
+>> + ? ? if (sr_info->nvalue_count == 0 || !sr_info->nvalue_table) {
+>> + ? ? ? ? ? ? dev_warn(&pdev->dev, "%s: %s: No Voltage table for the
+>> corresponding vdd. Cannot create debugfs entries for n-values\n",
+>> + ? ? ? ? ? ? ? ? ? ? ?__func__, sr_info->name);
+>> +
+>> ? ? ? ? ? ? ? ret = -ENODATA;
+>> ? ? ? ? ? ? ? goto err_debugfs;
+>> ? ? ? }
+>> @@ -1003,8 +1001,8 @@ static int __init omap_sr_probe(struct
+>> platform_device *pdev)
+>> ? ? ? for (i = 0; i < sr_info->nvalue_count; i++) {
+>> ? ? ? ? ? ? ? char name[NVALUE_NAME_LEN + 1];
+>>
+>> - ? ? ? ? ? ? snprintf(name, sizeof(name), "volt_%d",
+>> - ? ? ? ? ? ? ? ? ? ? ?volt_data[i].volt_nominal);
+>> + ? ? ? ? ? ? snprintf(name, sizeof(name), "volt_%lu",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? sr_info->nvalue_table[i].volt_nominal);
+>> ? ? ? ? ? ? ? (void) debugfs_create_x32(name, S_IRUGO | S_IWUSR, nvalue_dir,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &(sr_info->nvalue_table[i].nvalue));
+>> ? ? ? }
+>> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-
+>> omap2/sr_device.c
+>> index e081174..e107e39 100644
+>> --- a/arch/arm/mach-omap2/sr_device.c
+>> +++ b/arch/arm/mach-omap2/sr_device.c
+>> @@ -36,7 +36,10 @@ static void __init sr_set_nvalues(struct omap_volt_data
+>> *volt_data,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_sr_data *sr_data)
+>> ?{
+>> ? ? ? struct omap_sr_nvalue_table *nvalue_table;
+>> - ? ? int i, count = 0;
+>> + ? ? int i, j, count = 0;
+>> +
+>> + ? ? sr_data->nvalue_count = 0;
+>> + ? ? sr_data->nvalue_table = NULL;
+>>
+>> ? ? ? while (volt_data[count].volt_nominal)
+>> ? ? ? ? ? ? ? count++;
+>> @@ -44,8 +47,14 @@ static void __init sr_set_nvalues(struct omap_volt_data
+>> *volt_data,
+>> ? ? ? nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
+>> ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
+>>
+>> - ? ? for (i = 0; i < count; i++) {
+>> + ? ? if (!nvalue_table) {
+>> + ? ? ? ? ? ? pr_err("OMAP: SmartReflex: cannot allocate memory for n-value
+>> table\n");
+>> + ? ? ? ? ? ? return;
+>> + ? ? }
+>> +
+>> + ? ? for (i = 0, j = 0; i < count; i++) {
+>> ? ? ? ? ? ? ? u32 v;
+>> +
+>> ? ? ? ? ? ? ? /*
+>> ? ? ? ? ? ? ? ?* In OMAP4 the efuse registers are 24 bit aligned.
+>> ? ? ? ? ? ? ? ?* A __raw_readl will fail for non-32 bit aligned address
+>> @@ -58,15 +67,30 @@ static void __init sr_set_nvalues(struct
+>> omap_volt_data *volt_data,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_ctrl_readb(offset + 1) << 8 |
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_ctrl_readb(offset + 2) << 16;
+>> ? ? ? ? ? ? ? } else {
+>> - ? ? ? ? ? ? ? ? ? ? ?v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
+>> + ? ? ? ? ? ? ? ? ? ? v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
+>> ? ? ? ? ? ? ? }
+>>
+>> - ? ? ? ? ? ? nvalue_table[i].efuse_offs = volt_data[i].sr_efuse_offs;
+>> - ? ? ? ? ? ? nvalue_table[i].nvalue = v;
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* Many OMAP SoCs don't have the eFuse values set.
+>> + ? ? ? ? ? ? ?* For example, pretty much all OMAP3xxx before
+>> + ? ? ? ? ? ? ?* ES3.something.
+>> + ? ? ? ? ? ? ?*
+>> + ? ? ? ? ? ? ?* XXX There needs to be some way for board files or
+>> + ? ? ? ? ? ? ?* userspace to add these in.
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (v == 0)
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> +
+>> + ? ? ? ? ? ? nvalue_table[j].nvalue = v;
+>> + ? ? ? ? ? ? nvalue_table[j].efuse_offs = volt_data[i].sr_efuse_offs;
+>> + ? ? ? ? ? ? nvalue_table[j].errminlimit = volt_data[i].sr_errminlimit;
+>> + ? ? ? ? ? ? nvalue_table[j].volt_nominal = volt_data[i].volt_nominal;
+>> +
+>> + ? ? ? ? ? ? j++;
+>> ? ? ? }
+>>
+>> ? ? ? sr_data->nvalue_table = nvalue_table;
+>> - ? ? sr_data->nvalue_count = count;
+>> + ? ? sr_data->nvalue_count = j;
+>> ?}
+>>
+>> ?static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+>> diff --git a/include/linux/power/smartreflex.h
+>> b/include/linux/power/smartreflex.h
+>> index 78b795e..222f901 100644
+>> --- a/include/linux/power/smartreflex.h
+>> +++ b/include/linux/power/smartreflex.h
+>> @@ -243,12 +243,16 @@ struct omap_sr_class_data {
+>> ?/**
+>> ? * struct omap_sr_nvalue_table ? ? ? - Smartreflex n-target value info
+>> ? *
+>> - * @efuse_offs: ? ? ?The offset of the efuse where n-target values are stored.
+>> - * @nvalue: ?The n-target value.
+>> + * @efuse_offs: ? ? ? ?The offset of the efuse where n-target values are
+>> stored.
+>> + * @nvalue: ? ?The n-target value.
+>> + * @errminlimit: ?The value of the ERRMINLIMIT bitfield for this n-target
+>> + * @volt_nominal: microvolts DC that the VDD is initially programmed to
+>> ? */
+>> ?struct omap_sr_nvalue_table {
+>> ? ? ? u32 efuse_offs;
+>> ? ? ? u32 nvalue;
+>> + ? ? u32 errminlimit;
+>> + ? ? unsigned long volt_nominal;
+>
+> [GG] I would suggest that we also need to add errmaxlimit and errweight fields to this structure. ?These are very much possible to change per OPP, though it hasn't been common in implementations up to now.
+
+Ok. Since this patch set is focussed on minimal clean up and moving the code
+from mach-omap to drivers this is not addressed. I will sure take this up once
+this is moved.
+
+>
+>> ?};
+>>
+>> ?/**
+>> --
+>> 1.7.5.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+
 
 
 -- 
-~Vinod
+Regards and Thanks,
+Keerthy
