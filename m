@@ -1,146 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 May 2012 00:07:37 -0700
-Subject: [GIT PULL 8/10] omap timer cleanup for v3.5 merge window
-In-Reply-To: <20120510202415.GO21851@atomide.com>
-References: <E1SSYJA-0006UJ-4H@merlin.infradead.org>
- <20120510185130.GJ21851@atomide.com>
- <20120510202415.GO21851@atomide.com>
-Message-ID: <CAOesGMh3-fwR5nVR2kLd59itir+VSZkprjyAwf5nm1FStXGzSA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 May 2012 09:12:50 +0200
+Subject: [PATCH 02/12] pinctrl: basic Nomadik pinctrl interface
+In-Reply-To: <4FAAD4EB.4010007@wwwdotorg.org>
+References: <1336470270-23518-1-git-send-email-linus.walleij@stericsson.com>
+ <4FAAD4EB.4010007@wwwdotorg.org>
+Message-ID: <CACRpkdaveHBEbpY9bARyooCDb9gX8BMYxfAbX+MSVjXodCAX1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+sfr]
+On Wed, May 9, 2012 at 10:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/08/2012 03:44 AM, Linus Walleij wrote:
 
-On Thu, May 10, 2012 at 1:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [120510 11:55]:
->> * Tony Lindgren <tony@atomide.com> [120510 11:49]:
->> > The following changes since commit bfd17879866b36e95c58721da070d9f2ac7f8901:
->> >
->> > ? Merge tag 'omap-devel-c-for-3.5' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into devel-hwmod-data (2012-05-09 09:58:42 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >
->> > ? git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-cleanup-timer-for-v3.5
->> >
->> > for you to fetch changes up to 1fe97c8f6a1de67a5f56e029a818903d5bed8017:
->> >
->> > ? ARM: OMAP: Make OMAP clocksource source selection using kernel param (2012-05-09 10:07:05 -0700)
->> >
->> > ----------------------------------------------------------------
->> > Timer changes to make it easier to support various SoCs
->> >
->> > ----------------------------------------------------------------
->>
->> And this has a conflict for common headers:
-> ...
+>> + ? ? /* Poke in other ASIC variants here */
+>> + ? ? if (platid->driver_data == PINCTRL_NMK_DB8500)
+>> + ? ? ? ? ? ? nmk_pinctrl_db8500_init(&npct->soc);
 >
-> Also looks like this produces a merge conflict with linux-next
-> commit bd0493ea (ARM: 7413/1: move read_{boot,persistent}_clock to
-> the architecture level). To resolve, the line to add
-> register_persistent_clock(NULL, omap_read_persistent_clock);
-> needs to be resolved as below.
+> Other platforms have a unique top-level driver for each variant, with
+> the probe() function for each variant calling into a utility function.
+> That way, the common/utility code doesn't need to contain a
+> table/list/... of all the variants. Can the same approach be used here?
 
-Thanks for the heads up. Stephen, see below for tomorrow's -next rebuild.
+Now I see why I did this, it doesn't show in the patch but this driver
+now has two platform_driver structs and two probes.
 
+So I thought it'd be messy to have the two probes in two different
+files, with criss-cross calling, as simple as that.
 
--Olof
+The goal is to merge them into one probe function providing
+all resources though, I'm refactoring stepwise since the mess
+up in the arch needs to be handled in some separate step
+and I have enough hamming distance already as it is ...
 
->
-> Regards,
->
-> Tony
->
->
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> @@@ -69,40 -69,55 +70,41 @@@ static void omap_read_persistent_clock(
-> ? ? ? ?*ts = *tsp;
-> ?}
->
-> ?-int __init omap_init_clocksource_32k(void)
-> ?+/**
-> ?+ * omap_init_clocksource_32k - setup and register counter 32k as a
-> ?+ * kernel clocksource
-> ?+ * @pbase: base addr of counter_32k module
-> ?+ * @size: size of counter_32k to map
-> ?+ *
-> ?+ * Returns 0 upon success or negative error code upon failure.
-> ?+ *
-> ?+ */
-> ?+int __init omap_init_clocksource_32k(void __iomem *vbase)
-> ?{
-> ?- ? ? ?static char err[] __initdata = KERN_ERR
-> ?- ? ? ? ? ? ? ? ? ? ? ?"%s: can't register clocksource!\n";
-> ?-
-> ?- ? ? ?if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> ?- ? ? ? ? ? ? ?u32 pbase;
-> ?- ? ? ? ? ? ? ?unsigned long size = SZ_4K;
-> ?- ? ? ? ? ? ? ?void __iomem *base;
-> ?- ? ? ? ? ? ? ?struct clk *sync_32k_ick;
-> ?-
-> ?- ? ? ? ? ? ? ?if (cpu_is_omap16xx()) {
-> ?- ? ? ? ? ? ? ? ? ? ? ?pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> ?- ? ? ? ? ? ? ? ? ? ? ?size = SZ_1K;
-> ?- ? ? ? ? ? ? ?} else if (cpu_is_omap2420())
-> ?- ? ? ? ? ? ? ? ? ? ? ?pbase = OMAP2420_32KSYNCT_BASE + 0x10;
-> ?- ? ? ? ? ? ? ?else if (cpu_is_omap2430())
-> ?- ? ? ? ? ? ? ? ? ? ? ?pbase = OMAP2430_32KSYNCT_BASE + 0x10;
-> ?- ? ? ? ? ? ? ?else if (cpu_is_omap34xx())
-> ?- ? ? ? ? ? ? ? ? ? ? ?pbase = OMAP3430_32KSYNCT_BASE + 0x10;
-> ?- ? ? ? ? ? ? ?else if (cpu_is_omap44xx())
-> ?- ? ? ? ? ? ? ? ? ? ? ?pbase = OMAP4430_32KSYNCT_BASE + 0x10;
-> ?- ? ? ? ? ? ? ?else
-> ?- ? ? ? ? ? ? ? ? ? ? ?return -ENODEV;
-> ?-
-> ?- ? ? ? ? ? ? ?/* For this to work we must have a static mapping in io.c for this area */
-> ?- ? ? ? ? ? ? ?base = ioremap(pbase, size);
-> ?- ? ? ? ? ? ? ?if (!base)
-> ?- ? ? ? ? ? ? ? ? ? ? ?return -ENODEV;
-> ?-
-> ?- ? ? ? ? ? ? ?sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
-> ?- ? ? ? ? ? ? ?if (!IS_ERR(sync_32k_ick))
-> ?- ? ? ? ? ? ? ? ? ? ? ?clk_enable(sync_32k_ick);
-> ?-
-> ?- ? ? ? ? ? ? ?timer_32k_base = base;
-> ?-
-> ?- ? ? ? ? ? ? ?/*
-> ?- ? ? ? ? ? ? ? * 120000 rough estimate from the calculations in
-> ?- ? ? ? ? ? ? ? * __clocksource_updatefreq_scale.
-> ?- ? ? ? ? ? ? ? */
-> ?- ? ? ? ? ? ? ?clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
-> ?- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?32768, NSEC_PER_SEC, 120000);
-> ?-
-> ?- ? ? ? ? ? ? ?if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
-> ?- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clocksource_mmio_readl_up))
-> ?- ? ? ? ? ? ? ? ? ? ? ?printk(err, "32k_counter");
-> ?-
-> ?- ? ? ? ? ? ? ?setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-> ?- ? ? ? ? ? ? ?register_persistent_clock(NULL, omap_read_persistent_clock);
-> ?+ ? ? ?int ret;
-> ?+
-> ?+ ? ? ?/*
-> ?+ ? ? ? * 32k sync Counter register offset is at 0x10
-> ?+ ? ? ? */
-> ?+ ? ? ?sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
-> ?+
-> ?+ ? ? ?/*
-> ?+ ? ? ? * 120000 rough estimate from the calculations in
-> ?+ ? ? ? * __clocksource_updatefreq_scale.
-> ?+ ? ? ? */
-> ?+ ? ? ?clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
-> ?+ ? ? ? ? ? ? ? ? ? ? ?32768, NSEC_PER_SEC, 120000);
-> ?+
-> ?+ ? ? ?ret = clocksource_mmio_init(sync32k_cnt_reg, "32k_counter", 32768,
-> ?+ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?250, 32, clocksource_mmio_readl_up);
-> ?+ ? ? ?if (ret) {
-> ?+ ? ? ? ? ? ? ?pr_err("32k_counter: can't register clocksource\n");
-> ?+ ? ? ? ? ? ? ?return ret;
-> ? ? ? ?}
-> ?+
-> ?+ ? ? ?setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-> ?+ ? ? ?pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
-> ++ ? ? ?register_persistent_clock(NULL, omap_read_persistent_clock);
-> ?+
-> ? ? ? ?return 0;
-> ?}
+I'm rolling a v2 with the other change though.
+
+Yours,
+Linus Walleij
