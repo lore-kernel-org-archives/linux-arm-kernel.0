@@ -1,22 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 14:30:33 +0800
-Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
-In-Reply-To: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120511063030.GW17875@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 11 May 2012 12:01:00 +0530
+Subject: [PATCH] ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct
+ dpll_data
+In-Reply-To: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
+References: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <CAMQu2gxdOo1R7gNZoxf6qzb2Ncv6yiDorFeX40=T14q2n8nWpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 07:32:59PM +0800, Richard Zhao wrote:
->   ARM: dts: imx6q-sabrelite: add i2c1 pinctrl support
->   ARM: dts: imx6q-sabrelite: add audmux pinctrl support
->   ARM: imx6q: add ssi1_ipg clk_lookup
->   ARM: imx6q_sabrelite: clk_register_clkdev cko1 for sgtl5000
->   ARM: dts: imx6q-sabrelite: add sound device imx6q-sabrelite-sgtl5000
->   ARM: dts: imx6q-sabrelite: add serial2 pinctrl support
-
-I picked up above 6 patches.  Thanks.
-
--- 
-Regards,
-Shawn
+On Fri, May 11, 2012 at 11:32 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> From: Kevin Hilman <khilman@ti.com>
+>
+> There are certain fields inside 'struct dpll_data' which are
+> included under ARCH_OMAP3 and ARCH_OMAP4 option, which makes it
+> difficult to use it for new devices like, am33xx, ti81xx, etc...
+>
+> So remove the ifdef completely, this will add few fields to the struct
+> unused, but it improves readability and maintainability of the code.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: R Sricharan <r.sricharan@ti.com>
+> ---
+Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
