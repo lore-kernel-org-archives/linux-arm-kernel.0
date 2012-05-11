@@ -1,53 +1,31 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 11 May 2012 16:20:41 +1000
-Subject: [GIT PULL] ep93xx cleanups for 3.5
-In-Reply-To: <CAOesGMiPiYF8d2x5hHBChvTkaGJPGVKZR=wyumhbk1BV=t4eiA@mail.gmail.com>
-References: <4FAC6389.40607@gmail.com>
- <CAOesGMiPiYF8d2x5hHBChvTkaGJPGVKZR=wyumhbk1BV=t4eiA@mail.gmail.com>
-Message-ID: <4FACAFB9.7000506@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 11 May 2012 06:22:20 +0000
+Subject: [PATCH 1/4] ARM: OMAP2+: Introduce CONFIG_SOC_HAS_OMAP_DPLL macro
+In-Reply-To: <CAJ7qFSf9=h-hjSwrcd+n=zK4HyB+=DXGrqsgsMvaL_f1xyQQog@mail.gmail.com>
+References: <1336669615-16454-1-git-send-email-r.sricharan@ti.com>
+ <1336669615-16454-2-git-send-email-r.sricharan@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA217D2@DBDE01.ent.ti.com>
+ <CAJ7qFSf9=h-hjSwrcd+n=zK4HyB+=DXGrqsgsMvaL_f1xyQQog@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA220F3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/12 16:18, Olof Johansson wrote:
+On Fri, May 11, 2012 at 11:46:32, R, Sricharan wrote:
+> Vaibhav,
+> [snip]
+> > Waiting for Paul to conform here.
+> >
+>  Thanks for pointing that out. Will check on this and Paul's PRCM series
+>  cleanup series then.
+> 
 
-> Hi,
-> 
-> On Thu, May 10, 2012 at 5:55 PM, Ryan Mallon <rmallon@gmail.com> wrote:
->> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
->>
->>  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
->>
->> are available in the git repository at:
->>
->>  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-cleanup-for-3.5
->>
->> for you to fetch changes up to a1eacd79a602707f97201edbac9a03edaaea1847:
->>
->>  arm: ep93xx: use gpio_led_register_device (2012-04-12 09:38:15 +1000)
->>
->> ----------------------------------------------------------------
->> H Hartley Sweeten (2):
->>      arm: ep93xx: use DEFINE_RES_* macros
->>      arm: ep93xx: use gpio_led_register_device
->>
->> Ryan Mallon (1):
->>      Fix build breakage in ep93xx-core
-> 
-> Pulled, thanks.
-> 
-> One^WTwo nits: please use the format 'ARM: ep93xx: <...>' on these
-> kind of commits in the future. Also, since you have the commit that
-> introduces the error right before, you can squash it in with the
-> bugfix (and document it in the signed-off-by sequence if you prefer --
-> see SubmittingPatches for examples).
+Sricharan,
+
+Yesterday, Paul confirmed that, removing ifdef is the way to go. So
+just few mins back I had submitted patch for the same.
+
+http://permalink.gmane.org/gmane.linux.ports.arm.omap/76972
 
 
 Thanks,
-
-The reason I didn't squash the patches together was that I had already
-pushed the original broken commit out. I'm still a bit unclear on how to
-fix things on a public stable branch once it has been pushed.
-
-I'll make sure that all patches have the correct subject headers in future.
-
-~Ryan
+Vaibhav
