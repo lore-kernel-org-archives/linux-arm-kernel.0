@@ -1,202 +1,259 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 May 2012 15:35:34 +0200
-Subject: [PATCH 3/9] ARM: AT91: Add the ADC to the sam9g20ek board
+Date: Fri, 11 May 2012 15:35:37 +0200
+Subject: [PATCH 6/9] IIO: AT91: Add DT support to at91_adc driver
 In-Reply-To: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336743340-4578-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336743340-4578-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds platform data for the AT91 ADC driver support for
-the AT91SAM9G20-EK board.
-
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-at91/at91sam9260.c         |    8 +++
- arch/arm/mach-at91/at91sam9260_devices.c |   90 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/board-sam9g20ek.c     |   14 +++++
- 3 files changed, 112 insertions(+)
+ .../devicetree/bindings/arm/atmel-adc.txt          |   65 ++++++++++
+ drivers/iio/adc/at91_adc.c                         |  132 +++++++++++++++++++-
+ 2 files changed, 196 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 46f7742..63d4432 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -55,6 +55,13 @@ static struct clk adc_clk = {
- 	.pmc_mask	= 1 << AT91SAM9260_ID_ADC,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+new file mode 100644
+index 0000000..c63097d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -0,0 +1,65 @@
++* AT91's Analog to Digital Converter (ADC)
 +
-+static struct clk adc_op_clk = {
-+	.name		= "adc_op_clk",
-+	.type		= CLK_TYPE_PERIPHERAL,
-+	.rate_hz	= 5000000,
++Required properties:
++  - compatible: Should be "atmel,at91sam9260-adc"
++  - reg: Should contain ADC registers location and length
++  - interrupts: Should contain the IRQ line for the ADC
++  - atmel,adc-channel-base: Offset of the first channel data register
++  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
++    device
++  - atmel,adc-drdy-mask: Mask of the DRDY interruption in the ADC
++  - atmel,adc-num-channels: Number of channels available in the ADC
++  - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
++    defined in the datasheet
++  - atmel,adc-status-register: Offset of the Interrupt Status Register
++  - atmel,adc-trigger-register: Offset of the Trigger Register
++  - atmel,adc-vref: Reference voltage in millivolts for the conversions
++
++Optional properties:
++  - atmel,adc-use-external: Boolean to enable of external triggers
++ 
++Optional trigger Nodes:
++  - Required properties:
++    * trigger-name: Name of the trigger exposed to the user
++    * trigger-value: Value to put in the Trigger register
++      to activate this trigger
++  - Optional properties:
++    * trigger-external: Is the trigger an external trigger?
++
++Examples:
++adc0: adc at fffb0000 {
++	compatible = "atmel,at91sam9260-adc";
++	reg = <0xfffb0000 0x100>;
++	interrupts = <20 4>;
++	atmel,adc-channel-base = <0x30>;
++	atmel,adc-channels-used = <0xff>;
++	atmel,adc-drdy-mask = <0x10000>;
++	atmel,adc-num-channels = <8>;
++	atmel,adc-startup-time = <40>;
++	atmel,adc-status-register = <0x1c>;
++	atmel,adc-trigger-register = <0x08>;
++	atmel,adc-use-external;
++	atmel,adc-vref = <3300>;
++
++	trigger at 0 {
++		trigger-name = "external-rising";
++		trigger-value = <0x1>;
++		trigger-external;
++	};
++	trigger at 1 {
++		trigger-name = "external-falling";
++		trigger-value = <0x2>;
++		trigger-external;
++	};
++
++	trigger at 2 {
++		trigger-name = "external-any";
++		trigger-value = <0x3>;
++		trigger-external;
++	};
++
++	trigger at 3 {
++		trigger-name = "continuous";
++		trigger-value = <0x6>;
++	};
 +};
-+
- static struct clk usart0_clk = {
- 	.name		= "usart0_clk",
- 	.pmc_mask	= 1 << AT91SAM9260_ID_US0,
-@@ -166,6 +173,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&pioB_clk,
- 	&pioC_clk,
- 	&adc_clk,
-+	&adc_op_clk,
- 	&usart0_clk,
- 	&usart1_clk,
- 	&usart2_clk,
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 5652dde..be0eb26 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -17,12 +17,15 @@
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index e2eb613..f18a95d 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -15,6 +15,8 @@
+ #include <linux/jiffies.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  #include <linux/platform_device.h>
- #include <linux/i2c-gpio.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+@@ -415,6 +417,123 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+ 	return -EINVAL;
+ }
  
-+#include <linux/platform_data/at91_adc.h>
-+
- #include <mach/board.h>
- #include <mach/cpu.h>
- #include <mach/at91sam9260.h>
- #include <mach/at91sam9260_matrix.h>
- #include <mach/at91_matrix.h>
- #include <mach/at91sam9_smc.h>
-+#include <mach/at91_adc.h>
- 
- #include "generic.h"
- 
-@@ -1369,6 +1372,93 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- void __init at91_add_device_cf(struct at91_cf_data * data) {}
- #endif
- 
-+/* --------------------------------------------------------------------
-+ *  ADCs
-+ * -------------------------------------------------------------------- */
-+
-+#if IS_ENABLED(CONFIG_AT91_ADC)
-+static struct at91_adc_data adc_data;
-+
-+static struct resource adc_resources[] = {
-+	[0] = {
-+		.start	= AT91SAM9260_BASE_ADC,
-+		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= AT91SAM9260_ID_ADC,
-+		.end	= AT91SAM9260_ID_ADC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device at91_adc_device = {
-+	.name		= "at91_adc",
-+	.id		= -1,
-+	.dev		= {
-+				.platform_data		= &adc_data,
-+	},
-+	.resource	= adc_resources,
-+	.num_resources	= ARRAY_SIZE(adc_resources),
-+};
-+
-+static struct at91_adc_trigger at91_adc_triggers[] = {
-+	[0] = {
-+		.name = "timer-counter-0",
-+		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
-+	},
-+	[1] = {
-+		.name = "timer-counter-1",
-+		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
-+	},
-+	[2] = {
-+		.name = "timer-counter-2",
-+		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
-+	},
-+	[3] = {
-+		.name = "external",
-+		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
-+		.is_external = true,
-+	},
-+};
-+
-+static struct at91_adc_reg_desc at91_adc_register_g20 = {
-+	.channel_base = AT91_ADC_CHR(0),
-+	.drdy_mask = AT91_ADC_DRDY,
-+	.status_register = AT91_ADC_SR,
-+	.trigger_register = AT91_ADC_MR,
-+};
-+
-+void __init at91_add_device_adc(struct at91_adc_data *data)
++static int at91_adc_probe_dt(struct at91_adc_state *st,
++			     struct platform_device *pdev)
 +{
-+	if (!data)
-+		return;
++	struct iio_dev *idev = iio_priv_to_dev(st);
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *trig_node;
++	int i = 0, ret;
++	u32 prop;
 +
-+	if (test_bit(0, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC0, 0);
-+	if (test_bit(1, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC1, 0);
-+	if (test_bit(2, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC2, 0);
-+	if (test_bit(3, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC3, 0);
++	if (!node)
++		return -EINVAL;
 +
-+	if (data->use_external_triggers)
-+		at91_set_A_periph(AT91_PIN_PA22, 0);
++	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
 +
-+	data->num_channels = 4;
-+	data->startup_time = 10;
-+	data->registers = &at91_adc_register_g20;
-+	data->trigger_number = 4;
-+	data->trigger_list = at91_adc_triggers;
++	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
++		dev_err(&idev->dev, "Missing adc-channels-used property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->channels_mask = prop;
 +
-+	adc_data = *data;
-+	platform_device_register(&at91_adc_device);
++	if (of_property_read_u32(node, "atmel,adc-num-channels", &prop)) {
++		dev_err(&idev->dev, "Missing adc-num-channels property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->num_channels = prop;
++
++	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
++		dev_err(&idev->dev, "Missing adc-startup-time property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->startup_time = prop;
++
++
++	if (of_property_read_u32(node, "atmel,adc-vref", &prop)) {
++		dev_err(&idev->dev, "Missing adc-vref property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->vref_mv = prop;
++
++	st->registers = devm_kzalloc(&idev->dev,
++				     sizeof(struct at91_adc_reg_desc),
++				     GFP_KERNEL);
++	if (!st->registers) {
++		dev_err(&idev->dev, "Could not allocate register memory.\n");
++		ret = -ENOMEM;
++		goto error_ret;
++	}
++
++	if (of_property_read_u32(node, "atmel,adc-channel-base", &prop)) {
++		dev_err(&idev->dev, "Missing adc-channel-base property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->registers->channel_base = prop;
++
++	if (of_property_read_u32(node, "atmel,adc-drdy-mask", &prop)) {
++		dev_err(&idev->dev, "Missing adc-drdy-mask property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->registers->drdy_mask = prop;
++
++	if (of_property_read_u32(node, "atmel,adc-status-register", &prop)) {
++		dev_err(&idev->dev, "Missing adc-status-register property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->registers->status_register = prop;
++
++	if (of_property_read_u32(node, "atmel,adc-trigger-register", &prop)) {
++		dev_err(&idev->dev, "Missing adc-trigger-register property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	st->registers->trigger_register = prop;
++
++	st->trigger_number = of_get_child_count(node);
++	st->trigger_list = devm_kzalloc(&idev->dev, st->trigger_number *
++					sizeof(struct at91_adc_trigger),
++					GFP_KERNEL);
++	if (!st->trigger_list) {
++		dev_err(&idev->dev, "Could not allocate trigger list memory.\n");
++		ret = -ENOMEM;
++		goto error_ret;
++	}
++
++	for_each_child_of_node(node, trig_node) {
++		struct at91_adc_trigger *trig = st->trigger_list + i;
++		const char *name;
++
++		if (of_property_read_string(trig_node, "trigger-name", &name)) {
++			dev_err(&idev->dev, "Missing trigger-name property in the DT.\n");
++			ret = -EINVAL;
++			goto error_ret;
++		}
++	        trig->name = name;
++
++		if (of_property_read_u32(trig_node, "trigger-value", &prop)) {
++			dev_err(&idev->dev, "Missing trigger-value property in the DT.\n");
++			ret = -EINVAL;
++			goto error_ret;
++		}
++	        trig->value = prop;
++		trig->is_external = of_property_read_bool(trig_node, "trigger-external");
++		i++;
++	}
++
++	return 0;
++
++error_ret:
++	return ret;
 +}
-+#else
-+void __init at91_add_device_adc(struct at91_adc_data *data) {}
-+#endif
 +
- /* -------------------------------------------------------------------- */
- /*
-  * These devices are always present and don't need any board-specific
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 8923ec9..291b0fe 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -32,6 +32,8 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/consumer.h>
+ static int at91_adc_probe_pdata(struct at91_adc_state *st,
+ 				struct platform_device *pdev)
+ {
+@@ -456,7 +575,11 @@ static int __devinit at91_adc_probe(struct platform_device *pdev)
  
-+#include <linux/platform_data/at91_adc.h>
-+
- #include <mach/hardware.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -318,6 +320,16 @@ static void __init ek_add_device_buttons(void)
- static void __init ek_add_device_buttons(void) {}
- #endif
+ 	st = iio_priv(idev);
  
-+/*
-+ * ADCs
-+ */
+-	ret = at91_adc_probe_pdata(st, pdev);
++	if (pdev->dev.of_node)
++		ret = at91_adc_probe_dt(st, pdev);
++	else
++		ret = at91_adc_probe_pdata(st, pdev);
 +
-+static struct at91_adc_data ek_adc_data = {
-+	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
-+	.use_external_triggers = true,
-+	.vref = 3300,
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "No platform data available.\n");
+ 		ret = -EINVAL;
+@@ -657,11 +780,18 @@ static int __devexit at91_adc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id at91_adc_dt_ids[] = {
++	{ .compatible = "atmel,at91sam9260-adc" },
++	{},
 +};
++MODULE_DEVICE_TABLE(of, at91_adc_dt_ids);
 +
- #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
- static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
- 	REGULATOR_SUPPLY("AVDD", "0-001b"),
-@@ -393,6 +405,8 @@ static void __init ek_board_init(void)
- 	ek_add_device_gpio_leds();
- 	/* Push Buttons */
- 	ek_add_device_buttons();
-+	/* ADCs */
-+	at91_add_device_adc(&ek_adc_data);
- 	/* PCK0 provides MCLK to the WM8731 */
- 	at91_set_B_periph(AT91_PIN_PC1, 0);
- 	/* SSC (for WM8731) */
+ static struct platform_driver at91_adc_driver = {
+ 	.probe = at91_adc_probe,
+ 	.remove = __devexit_p(at91_adc_remove),
+ 	.driver = {
+ 		   .name = "at91_adc",
++		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.7.9.5
