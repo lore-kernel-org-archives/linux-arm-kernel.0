@@ -1,51 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 May 2012 12:56:20 -0700
-Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
-In-Reply-To: <4FAD0A71.80201@ti.com>
-References: <4FAD0A71.80201@ti.com>
-Message-ID: <20120511195620.GX21851@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 12 May 2012 06:03:07 +0900
+Subject: [PATCH] iommu/exynos: Add iommu driver for Exynos Platforms
+In-Reply-To: <20120511124327.GB11750@amd.com>
+References: <000001cd2f71$62c5c2f0$285148d0$%cho@samsung.com>
+ <20120511124327.GB11750@amd.com>
+Message-ID: <4FAD7E8B.6060407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/11/12 21:43, Joerg Roedel wrote:
+> On Fri, May 11, 2012 at 09:27:09PM +0900, KyongHo wrote:
+>> This is the System MMU driver and IOMMU API implementation for Exynos SOC
+>> platforms. Exynos platforms has more than 10 System MMUs dedicated for each
+>> multimedia accelerators.
+>>
+>> The System MMU driver is already in arc/arm/plat-s5p but it is moved to
+>> drivers/iommu due to Ohad Ben-Cohen gathered IOMMU drivers there
+>>
+>> Any device driver in Exynos platforms that needs to control its System MMU must
+>> call platform_set_sysmmu() to inform System MMU driver who will control it.
+>> platform_set_sysmmu() is defined in<mach/sysmmu.h>
+>>
+>> To compile this patch,
+>> you will need "for-next" branch of the linux-samsung.git:
+>> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> Other patches needed by this patch are merged to the above branch.
+>>
+>> Cc: Joerg Roedel<joerg.roedel@amd.com>
+>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>> Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
+>
+> Looks good.
+>
+> Acked-by: Joerg Roedel<joerg.roedel@amd.com>
+>
+> Please get this merged via the Samsung tree. Since the patch depends on
+> that tree anyway it makes the most sense to be there.
+>
+Joerg,
+OK, I applied with your ack.
 
-* Cousson, Benoit <b-cousson@ti.com> [120511 05:51]:
-> Hi Tony,
-> 
-> Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
-> It applies now fine on top of lo/dt branch.
+Thanks.
 
-It seems that there are still patches being discussed for those SoCs
-and we're pretty much done for this merge window. So unless things
-drag on to -rc8, I'd say we just need to postpone merging new things
-and merge them early around -rc2.
-
-Regards,
-
-Tony
-
-
- 
-> Regards,
-> Benoit
-> 
-> 
-> The following changes since commit 40364b9f5a4d167d97bb6a76cd239ca8cfff056a:
->   Benoit Cousson (1):
->         arm/dts: omap4-panda: Add LEDs support
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.5/dts/am33xx
-> 
-> Vaibhav Hiremath (3):
->       arm/dts: Add support for TI AM335x EVM board
->       arm/dts: omap3-evm: Add i2c and twl4030 support
->       arm/dts: Add support for TI AM3517/05 EVM board
-> 
->  arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/am3517-evm.dts |   32 +++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-evm.dts  |   28 +++++++++++++++++++++++++++
->  3 files changed, 99 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/am335x-evm.dts
->  create mode 100644 arch/arm/boot/dts/am3517-evm.dts
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
