@@ -1,99 +1,85 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 May 2012 13:12:05 -0600
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
- Device Tree bindings
-In-Reply-To: <4F83E041.7040108@linaro.org>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-5-git-send-email-lee.jones@linaro.org>
- <20120406042054.C0C433E0C86@localhost> <4F83E041.7040108@linaro.org>
-Message-ID: <20120511191205.9BD0E3E0791@localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 May 2012 13:17:44 -0600
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
+ omap2+ padconf
+In-Reply-To: <20120510172722.GE21851@atomide.com>
+References: <4FA30805.5050804@wwwdotorg.org>
+ <20120504044305.GD7788@game.jcrosoft.org> <20120504150342.GI5140@atomide.com>
+ <20120504153251.GE7788@game.jcrosoft.org> <20120504163420.GA5613@atomide.com>
+ <4FA42631.6060304@wwwdotorg.org> <20120504220809.GW5613@atomide.com>
+ <4FAAD141.3090306@wwwdotorg.org> <20120509204925.GV5088@atomide.com>
+ <4FABF553.20601@wwwdotorg.org> <20120510172722.GE21851@atomide.com>
+Message-ID: <4FAD65D8.30109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Apr 2012 08:24:49 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> On 06/04/12 05:20, Grant Likely wrote:
-> > On Thu,  5 Apr 2012 10:55:45 +0100, Lee Jones<lee.jones@linaro.org>  wrote:
-> >> Add required documentation for specific gpio-nomadik DT bindings.
-> >>
-> >> Signed-off-by: Lee Jones<lee.jones@linaro.org>
-> >> ---
-> >>   .../devicetree/bindings/gpio/gpio-nmk.txt          |   29 ++++++++++++++++++++
-> >>   1 files changed, 29 insertions(+), 0 deletions(-)
-> >>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/gpio/gpio-nmk.txt b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-> >> new file mode 100644
-> >> index 0000000..1555029
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/gpio/gpio-nmk.txt
-> >> @@ -0,0 +1,29 @@
-> >> +Nomadik GPIO controller
-> >> +
-> >> +Required properties:
-> >> +- compatible           : Should be "stmicroelectronics,nomadik-gpio".
-> >
-> > "stmicroelectronics," is a really long prefix.  You can use simply
-> > "st," here since it has already been defined and documented in
-> > Documentation/devicetree/bindings/vendor-prefixes.txt
+On 05/10/2012 11:27 AM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [120510 10:09]:
+>> On 05/09/2012 02:49 PM, Tony Lindgren wrote:
+>>> * Stephen Warren <swarren@wwwdotorg.org> [120509 13:22]:
+>>>> On 05/04/2012 04:08 PM, Tony Lindgren wrote:
+>>>>> * Stephen Warren <swarren@wwwdotorg.org> [120504 11:59]:
+>>>>>> On 05/04/2012 10:34 AM, Tony Lindgren wrote:
+>>>>>>> * Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> [120504 08:58]:
+>>>>>>>> On 08:03 Fri 04 May     , Tony Lindgren wrote:
+>>>>>>>>>>
+>>>>>>>>>> so I was thinking to do like on gpio
+>>>>>>>>>>
+>>>>>>>>>> uart {
+>>>>>>>>>> 	pin = < &pioA 12 {pararms} >
+>>>>>>>>>>
+>>>>>>>>>> }
+>>>>>>>>>
+>>>>>>>>> Hmm I assume the "12" above the gpio number?
+>>>>>>>> no pin number in the bank because it could not be gpio
+>>>>>>>
+>>>>>>> Yes OK, but pin number 12 in the gpio bank, not in the mux register.
+>>>>>>> Got it.
+>>>>>>
+>>>>>> I'd prefer to avoid any references to GPIOs here; not all muxable pins
+>>>>>> are GPIOs and not all GPIOs are muxable pins. Lets keep the two concepts
+>>>>>> independent.
+>>>>>
+>>>>> And it seems that &pioA 12 is not always enough information for the pinctrl
+>>>>> driver to request a GPIO. So it's best to specify it separately.
+>>>>
+>>>> Why would a pinctrl driver "request a GPIO"?
+>>>
+>>> Hmm what would pinctrl_request_gpio do if the GPIO driver is separate driver?
+>>
+>> Well, that's a GPIO driver requesting a GPIO from the pinctrl system,
+>> rather than the pinctrl driver requesting a GPIO (sorry to be picky).
 > 
-> Absolutely.
+> Oh sorry maybe I misunderstood what pinctrl_request_gpio is doing.
+> Seems like that should work the same way from binding point of view.
+>  
+>> It wasn't at all obvious to me from your binding proposal that you
+>> intended the pinctrl-simple driver to support the GPIO operations at
+>> all. If you do want this, I think you'd need some properties (perhaps
+>> some kind of explicit table) in order to set up the GPIO ID -> pinctrl
+>> pin ID mapping. I don't recall seeing those; did I just miss them? I
+>> think we'd want this to be explicit because:
+>>
+>> a) It may well be the case that not all users of pinctrl-simple actually
+>> mux/control GPIOs at all. It's certainly possible to only mux "special
+>> functions", and have dedicated pins for a GPIO controller.
+>>
+>> b) Even when GPIOs do come into the picture, it may be that only some of
+>> the pins are available as GPIOs.
 > 
-> >> +- reg                  : Physical base address and length of the controller's registers.
-> >> +- interrupts           : The interrupt outputs from the controller.
-> >> +- #gpio-cells          : Should be two:
-> >> +                           The first cell is the pin number.
-> >> +                           The second cell is used to specify optional parameters:
-> >> +                             - bits[3:0] trigger type and level flags:
-> >> +                                 1 = low-to-high edge triggered.
-> >> +                                 2 = high-to-low edge triggered.
-> >> +                                 4 = active high level-sensitive.
-> >> +                                 8 = active low level-sensitive.
-> >
-> > Those look like interrupt flags, not gpio flags.  If the gpio lines
-> > can be used as generic irq input lines, then this node should also
-> > declare itself as an interrupt controller.
+> Right, we need some pinctrl to gpio mapping eventually. That comes
+> automatically from DT for the pins and gpios we care about.
 > 
-> They can and it will do in an up-coming patch.
-> 
-> >> +- gpio-controller      : Marks the device node as a GPIO controller.
-> >> +- supports-sleepmode   : Specifies whether controller can sleep or not
-> >
-> > Typically, custom properites that are for a specific device should be
-> > prefixed with the manufacturer name.  So, something like:
-> > "st,has-sleepmode".
-> 
-> No problem.
-> 
-> >> +- gpio-bank            : Specifies which bank a controller owns.
-> >
-> > What is this for (how is it used)?  It shouldn't be needed to specify
-> > a bank number.
-> 
-> Briefly, it is used like this:
-> 
-> of_property_read_u32(np, "gpio-bank", &bank);
-> chip->base = bank * NMK_GPIO_PER_CHIP;
-> nmk_chip->bank = bank;
-> 
-> Is that wrong? If so, is there a better way to do it?
+> And that's why the binding needs to be flexible enough so we can add
+> optional pin specific options as needed in addition to parsing a larger
+> set of pins with no options.
 
-(sorry for the late reply on this, I've been tied up with other stuff.
-I know you've posted updated patches, but I haven't looked at them
-yet.  This answer may be obsolete by now, but I'm sending it anyway
-for background).
+The mapping of GPIO to pinctrl pins would presumably be driven solely by
+the HW design of the pin controller and GPIO, and not by the mux
+selection in the pin controller (otherwise, I'd argue this isn't a
+simple case that should be handled by pinctrl-simple).
 
-It's not strictly wrong, but it looks a lot like the "cell-index"
-pattern which is appropriate sometimes, but always comes under
-scrutiny first.  It makes me wonder what the driver needs it for.  ie.
-Are the banks all part of a single GPIO device?  If they are really
-independent, the the bank number should be irrelevant because the base
-address identifies how to control the device.  Or, is there a shared
-resource that needs the bank number to access correctly?
-
-If they a single device then a better binding might be a single node
-with #gpio-cells = <3> with the first cell specifying a bank and the
-second specifying the gpio number.  Or if the GPIOs appear in a flat
-number space, then you could use the exact same numbering as found in
-the user-manual for the chip.
-
-g.
+As such, I'd expect some properties/table at the top-level of the pin
+controller object to describe the GPIO mapping. In turn, that implies
+that the individual per-pin mux-selection/configuration nodes don't need
+to describe any GPIO-related information.
