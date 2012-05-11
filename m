@@ -1,40 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 May 2012 14:24:10 +0200
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <1336705214.15424.1369.camel@vkoul-udesk3>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <20120504122611.GE26481@n2100.arm.linux.org.uk>
- <1336135550.1540.2.camel@vkoul-udesk3>
- <20120510225429.GG12727@n2100.arm.linux.org.uk>
- <1336705214.15424.1369.camel@vkoul-udesk3>
-Message-ID: <CACRpkdZpC4pwSCLrZuVg9C=5u5pVQpm8c7HVmshs09wtEOcnqg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 May 2012 13:25:47 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FAC0F05.3060803@ti.com>
+References: <87k40nzi3i.fsf@ti.com> <4FA8FCFF.40105@ti.com>
+ <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com>
+ <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com>
+ <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
+ <20120510084422.GB27276@mudshark.cambridge.arm.com>
+ <4FAC0F05.3060803@ti.com>
+Message-ID: <20120511122547.GE17453@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 5:00 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+On Thu, May 10, 2012 at 07:55:01PM +0100, Jon Hunter wrote:
+> Hi Will,
 
-> Yes this needs to be mandatory. Let me add that explicitly.
->
-> ?* @last: last completed DMA cookie
-> ?* @used: last issued DMA cookie (i.e. the one in progress)
-> - * @residue: the remaining number of bytes left to transmit
-> - * ? ? on the selected transfer for states DMA_IN_PROGRESS and
-> - * ? ? DMA_PAUSED if this is implemented in the driver, else 0
-> + * @residue: is defined as:
-> + * ? - for completed descriptor: 0
-> + * ? - for descriptors which are in DMA_PAUSED, DMA_IN_PROGRESS:
-> + * ? ? length - (current_addr - start_addr), where:
-> + * ? ? ? ? ? ? length = descriptor dma length
-> + * ? ? ? ? ? ? current_addr = current dma pointer queried for dma channel
-> + * ? ? ? ? ? ? start_addr: starting address of this descriptor
-> + * ? This is mandatory and needs to be correctly filled by driver
-> ?*/
-> Does this make it clear?
+Hi Jon,
 
-Looks good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> For my testing I have just been reading the PM_EMU_PWRSTST register which shows the power state of the EMU power domain. It should read 3 when the power domain is ON and 0 when it is off. I did something like the following (dumping all EMU clock and power domain registers).
 
-Yours,
-Linus Walleij
+I figured I may as well take perf for a spin and see how I got on. The good
+news is that the hwmod bits all seem to work as before and the correct IRQs
+are requested:
+
+root at florentine-pogen:~# cat /proc/interrupts
+           CPU0       CPU1
+ 29:      44527      17916       GIC  twd
+ 33:          0          0       GIC  arm-pmu
+ 34:          0          0       GIC  arm-pmu
+
+But, unfortunately, as you can see from the above, I just can't persuade them
+to fire. The PMU counters do tick, but they happily increment through zero
+without us realising. I retested with my perf/omap4 branch to make sure my
+board is ok, and the irqs do fire there.
+
+Any ideas?
+
+Cheers,
+
+Will
