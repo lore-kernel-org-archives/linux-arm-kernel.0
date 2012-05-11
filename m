@@ -1,113 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 22:14:38 +0800
-Subject: [PATCH 5/6] ASoC: mxs: add device tree support for mxs-sgtl5000
-In-Reply-To: <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
-References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
- <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120511141434.GA17875@S2101-09.ap.freescale.net>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 11 May 2012 15:14:54 +0100
+Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4FAD1EDE.8010505@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 04:42:12PM +0800, Shawn Guo wrote:
-> Add device tree probe for mxs-sgtl5000 machine driver.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On 09/05/12 18:57, Marc Zyngier wrote:
+> The GICv2 can have virtualization extension support, consisting
+> of an additional set of registers and interrupts. Add the necessary
+> binding to the GIC DT documentation.
+
+This looks fine for Xen.
+
+David
+
+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 ++++++
->  sound/soc/mxs/mxs-sgtl5000.c                       |   57 ++++++++++++++++++++
->  2 files changed, 74 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
+>  Documentation/devicetree/bindings/arm/gic.txt |   35 +++++++++++++++++++++++-
+>  1 files changed, 33 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-> new file mode 100644
-> index 0000000..601c518
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-> @@ -0,0 +1,17 @@
-> +* Freescale MXS audio complex with SGTL5000 codec
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 9b4b82a..62eb8df 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -11,7 +11,9 @@ have PPIs or SGIs.
+>  Main node required properties:
+>  
+>  - compatible : should be one of:
+> +	"arm,cortex-a15-gic"
+>  	"arm,cortex-a9-gic"
+> +	"arm,cortex-a7-gic"
+>  	"arm,arm11mp-gic"
+>  - interrupt-controller : Identifies the node as an interrupt controller
+>  - #interrupt-cells : Specifies the number of cells needed to encode an
+> @@ -39,8 +41,9 @@ Main node required properties:
+>    the GIC cpu interface register base and size.
+>  
+>  Optional
+> -- interrupts	: Interrupt source of the parent interrupt controller. Only
+> -  present on secondary GICs.
+> +- interrupts	: Interrupt source of the parent interrupt controller on
+> +  secondary GICs, or VGIC maintainance interrupt on primary GIC (see
+> +  below).
+>  
+>  - cpu-offset	: per-cpu offset within the distributor and cpu interface
+>    regions, used when the GIC doesn't have banked registers. The offset is
+> @@ -57,3 +60,31 @@ Example:
+>  		      <0xfff10100 0x100>;
+>  	};
+>  
+> +
+> +* GIC virtualization extensions (VGIC)
+> +
+> +For ARM cores that support the virtualization extensions, additional
+> +properties must be described (they only exist if the GIC is the
+> +primary interrupt controller).
 > +
 > +Required properties:
-> +- compatible: "fsl,mxs-audio-sgtl5000"
-> +- model: The user-visible name of this sound complex
-> +- saif-controllers: The phandle list of the MXS SAIF controller
-> +- audio-codec: The phandle of the SGTL5000 audio codec
+> +
+> +- reg : Additional regions specifying the base physical address and
+> +  size of the VGIC registers. The first additional region is the GIC
+> +  virtual interface control register base and size. The 2nd additional
+> +  region is the GIC virtual cpu interface register base and size.
+> +
+> +- interrupts : VGIC maintainance interrupt.
 > +
 > +Example:
 > +
-> +sound {
-> +	compatible = "fsl,imx28-evk-sgtl5000",
-> +		     "fsl,mxs-audio-sgtl5000";
-> +	model = "imx28-evk-sgtl5000";
-> +	saif-controllers = <&saif0 &saif1>;
-> +	audio-codec = <&sgtl5000>;
-> +};
-> diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
-> index e9e6112..d420f11 100644
-> --- a/sound/soc/mxs/mxs-sgtl5000.c
-> +++ b/sound/soc/mxs/mxs-sgtl5000.c
-> @@ -18,6 +18,8 @@
->  
->  #include <linux/module.h>
->  #include <linux/device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <sound/core.h>
->  #include <sound/pcm.h>
->  #include <sound/soc.h>
-> @@ -110,11 +112,58 @@ static struct snd_soc_card mxs_sgtl5000 = {
->  	.num_links	= ARRAY_SIZE(mxs_sgtl5000_dai),
->  };
->  
-> +static int __devinit mxs_sgtl5000_probe_dt(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *saif_np[2], *codec_np;
-> +	struct platform_device *saif_pdev[2];
-
-The saif_pdev is a left-over which can be removed completely now.
-
-> +	int i, ret = 0;
-> +
-> +	if (!np)
-> +		return 1; /* no device tree */
-> +
-> +	saif_np[0] = of_parse_phandle(np, "saif-controllers", 0);
-> +	saif_np[1] = of_parse_phandle(np, "saif-controllers", 1);
-> +	codec_np = of_parse_phandle(np, "audio-codec", 0);
-> +	if (!saif_np[0] || !saif_np[1] || !codec_np) {
-> +		dev_err(&pdev->dev, "phandle missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	saif_pdev[0] = of_find_device_by_node(saif_np[0]);
-> +	saif_pdev[1] = of_find_device_by_node(saif_np[1]);
-> +	if (!saif_pdev[0] || !saif_pdev[1]) {
-> +		dev_err(&pdev->dev, "failed to find saif platform device\n");
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		mxs_sgtl5000_dai[i].codec_name = NULL;
-> +		mxs_sgtl5000_dai[i].codec_of_node = codec_np;
-> +		mxs_sgtl5000_dai[i].cpu_dai_name = NULL;
-> +		mxs_sgtl5000_dai[i].cpu_dai_of_node = saif_np[i];
-> +		mxs_sgtl5000_dai[i].platform_name = NULL;
-> +		mxs_sgtl5000_dai[i].platform_of_node = saif_np[i];
-> +	}
-> +
-> +out:
-
-The label is used nowhere now.  Will remove it in v2.
-
-> +	of_node_put(codec_np);
-> +	of_node_put(saif_np[0]);
-> +	of_node_put(saif_np[1]);
-> +
-> +	return ret;
-> +}
-> +
-
--- 
-Regards,
-Shawn
+> +	interrupt-controller at 2c001000 {
+> +		compatible = "arm,cortex-a15-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x2c001000 0x1000>,
+> +		      <0x2c002000 0x1000>,
+> +		      <0x2c004000 0x2000>,
+> +		      <0x2c006000 0x2000>;
+> +		interrupts = <1 9 0xf04>;
+> +	};
