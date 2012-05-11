@@ -1,26 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 11 May 2012 02:33:13 -0600 (MDT)
-Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
-In-Reply-To: <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
-References: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
- <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1205110231120.3201@utopia.booyaka.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 May 2012 10:33:36 +0200
+Subject: [PATCH] ARM: dma-mapping: fix build break on no-MMU systems
+In-Reply-To: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
+References: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1336725216-24434-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+Fix the following build issue:
 
-On Fri, 11 May 2012, Olof Johansson wrote:
+arch/arm/mm/dma-mapping.c:726:42: error: 'pgprot_kernel' undeclared
+(first use in this function)
+make[2]: *** [arch/arm/mm/dma-mapping.o] Error 1
 
-> I did notice that omap2plus_defconfig has grown a new warning caused
-> by "ARM: OMAP2+: clean up some cppcheck warnings" (oh, the irony!):
-> 
-> arch/arm/plat-omap/usb.c: In function 'omap_otg_init':
-> arch/arm/plat-omap/usb.c:40:6: warning: unused variable 'status'
-> [-Wunused-variable]
+Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/mm/dma-mapping.c |   17 +++++++++--------
+ 1 files changed, 9 insertions(+), 8 deletions(-)
 
-Thanks, this has been fixed by:
-
-http://marc.info/?l=linux-omap&m=133660322929805&w=2
-
-- Paul
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 2d11aa0..686ef02 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -428,10 +428,19 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
+ 	arm_vmregion_free(&consistent_head, c);
+ }
+ 
++static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
++{
++	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
++			    pgprot_writecombine(prot) :
++			    pgprot_dmacoherent(prot);
++	return prot;
++}
++
+ #else	/* !CONFIG_MMU */
+ 
+ #define __dma_alloc_remap(page, size, gfp, prot, c)	page_address(page)
+ #define __dma_free_remap(addr, size)			do { } while (0)
++#define __get_dma_pgprot(attrs, prot)	__pgprot(0)
+ 
+ #endif	/* CONFIG_MMU */
+ 
+@@ -471,14 +480,6 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+ 	return addr;
+ }
+ 
+-static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
+-{
+-	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+-			    pgprot_writecombine(prot) :
+-			    pgprot_dmacoherent(prot);
+-	return prot;
+-}
+-
+ /*
+  * Allocate DMA-coherent memory space and return both the kernel remapped
+  * virtual and bus address for that space.
+-- 
+1.7.1.569.g6f426
