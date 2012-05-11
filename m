@@ -1,48 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 May 2012 16:02:23 +0100
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <4FAD27CB.5060102@ti.com>
-References: <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com>
- <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
- <20120510084422.GB27276@mudshark.cambridge.arm.com>
- <4FAC0F05.3060803@ti.com>
- <20120511122547.GE17453@mudshark.cambridge.arm.com>
- <4FAD1865.70003@ti.com>
- <20120511134920.GC2626@mudshark.cambridge.arm.com>
- <4FAD27CB.5060102@ti.com>
-Message-ID: <20120511150223.GD2626@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 11 May 2012 16:07:41 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120511142941.GA16214@n2100.arm.linux.org.uk>
+References: <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510094205.GM3908@opensource.wolfsonmicro.com>
+ <1336647675.15424.390.camel@vkoul-udesk3>
+ <20120511140710.GC6220@n2100.arm.linux.org.uk>
+ <20120511141835.GF3960@opensource.wolfsonmicro.com>
+ <20120511142941.GA16214@n2100.arm.linux.org.uk>
+Message-ID: <20120511150741.GH3960@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:52:59PM +0100, Jon Hunter wrote:
-> Hi Will,
+On Fri, May 11, 2012 at 03:29:41PM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 11, 2012 at 03:18:35PM +0100, Mark Brown wrote:
 
-Hello,
+> > I do think that (separately to what ALSA does) if we're going to have a
+> > callback specified per request we really should make sure that they all
+> > get run as best as we can since the way the API is written people using
+> > non-cyclic transfers may run into the same surprise; for cyclic ones the
+> > issue you identify is very real though.
 
-> On 05/11/2012 08:49 AM, Will Deacon wrote:
-> > I enabled OMAP3 debug peripherals, so I selected CPU_HAS_PMU that way.
-> 
-> I tried the same (make omap2plus_defconfig and enabled the above
-> option), and I do see the interrupts firing on both 4430 and 4460...
-> 
-> / # cat /proc/interrupts
->            CPU0       CPU1
->  29:       1023        404       GIC  twd
->  33:        401          0       GIC  arm-pmu
->  34:          0        441       GIC  arm-pmu
+> Please stop confusing non-cyclic with cyclic transfers.  We know what the
+> required semantics are for non-cyclic transfers and they really aren't
+> under discussion here.  I'm focusing 100% on the cyclic case here.
 
-Well, at least it's working for somebody!
+I'm not confusing them - I'm just pretty sure that all the issues which
+you are identifying also apply to the non-cyclic case so while we're
+looking at fixing things we (collectively, not particularly including
+you as you're focused on the cyclic case) should look at that too.
+Right now we're not handling either cyclic or non-cyclic cases well.
 
-> What is your kernel commit ID that you applied the patches on top of?
+> That's my point.  And keeping count of N times to call the callback in
+> the DMA engine driver is racy at best.
 
-7cf543bc ("Linux-omap rebuilt: Updated to -rc6, merged in pending branches,
-please test"). Is there something else I need too?
+Yes, it'll always break down at some point - no argument there.
 
-> What board are you using? Blaze, panda, etc, and is it 4430 or 4460?
+> Here's what I think.  I think the best solution for cyclic transfers
+> is as follows:
 
-Ye olde Panda 4430. It does work with my perf/omap4 branch though using the
-same .config (I can mail it to you separately if you want).
-
-Cheers,
-
-Will
+I agree, for cyclic transfers this is a very good approach.  I'd
+probably even set up a separate callback mechanism for cyclic transfers
+to make this crystal clear and error out if an attempt was made to use
+the linear one.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120511/b42d9312/attachment.sig>
