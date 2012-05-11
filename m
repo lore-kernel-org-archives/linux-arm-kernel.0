@@ -1,176 +1,28 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 11 May 2012 15:14:27 +0800
-Subject: [PATCH Rebase 1/1] dma: imx-sdma: make channel0 operations atomic
-In-Reply-To: <1336717928.15424.1597.camel@vkoul-udesk3>
-References: <1336717928.15424.1597.camel@vkoul-udesk3>
-Message-ID: <1336720467-29770-1-git-send-email-richard.zhao@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 11 May 2012 00:21:52 -0700
+Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
+In-Reply-To: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
+References: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
+Message-ID: <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-device_prep_dma_cyclic may be call in audio trigger function which is
-atomic context, so we make it atomic too.
+Tony,
 
- - change channel0 lock to spinlock.
- - Use polling to wait for channel0 finish running.
+I've pulled all 10 requests. Many of them ended up going into the same
+next/ branch, but that's quite OK. Please double check my merge
+conflict resolutions.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/dma/imx-sdma.c |   57 ++++++++++++++++++++++++++---------------------
- 1 files changed, 31 insertions(+), 26 deletions(-)
+One nit is that at least one of the branches had a few varying patch
+subjects, so just a friendly reminder to sanitize them to ARM: OMAP.*:
+or so when you apply patches.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index d3e38e2..79aa749 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -24,7 +24,7 @@
- #include <linux/mm.h>
- #include <linux/interrupt.h>
- #include <linux/clk.h>
--#include <linux/wait.h>
-+#include <linux/delay.h>
- #include <linux/sched.h>
- #include <linux/semaphore.h>
- #include <linux/spinlock.h>
-@@ -323,7 +323,7 @@ struct sdma_engine {
- 	dma_addr_t			context_phys;
- 	struct dma_device		dma_device;
- 	struct clk			*clk;
--	struct mutex			channel_0_lock;
-+	spinlock_t			channel_0_lock;
- 	struct sdma_script_start_addrs	*script_addrs;
- };
- 
-@@ -401,19 +401,27 @@ static void sdma_enable_channel(struct sdma_engine *sdma, int channel)
- }
- 
- /*
-- * sdma_run_channel - run a channel and wait till it's done
-+ * sdma_run_channel0 - run a channel and wait till it's done
-  */
--static int sdma_run_channel(struct sdma_channel *sdmac)
-+static int sdma_run_channel0(struct sdma_engine *sdma)
- {
--	struct sdma_engine *sdma = sdmac->sdma;
--	int channel = sdmac->channel;
- 	int ret;
-+	unsigned long timeout = 500;
- 
--	init_completion(&sdmac->done);
-+	sdma_enable_channel(sdma, 0);
- 
--	sdma_enable_channel(sdma, channel);
-+	while (!(ret = readl_relaxed(sdma->regs + SDMA_H_INTR) & 1)) {
-+		if (timeout-- <= 0)
-+			break;
-+		udelay(1);
-+	}
- 
--	ret = wait_for_completion_timeout(&sdmac->done, HZ);
-+	if (ret) {
-+		/* Clear the interrupt status */
-+		writel_relaxed(ret, sdma->regs + SDMA_H_INTR);
-+	} else {
-+		dev_err(sdma->dev, "Timeout waiting for CH0 ready\n");
-+	}
- 
- 	return ret ? 0 : -ETIMEDOUT;
- }
-@@ -425,17 +433,17 @@ static int sdma_load_script(struct sdma_engine *sdma, void *buf, int size,
- 	void *buf_virt;
- 	dma_addr_t buf_phys;
- 	int ret;
--
--	mutex_lock(&sdma->channel_0_lock);
-+	unsigned long flags;
- 
- 	buf_virt = dma_alloc_coherent(NULL,
- 			size,
- 			&buf_phys, GFP_KERNEL);
- 	if (!buf_virt) {
--		ret = -ENOMEM;
--		goto err_out;
-+		return -ENOMEM;
- 	}
- 
-+	spin_lock_irqsave(&sdma->channel_0_lock, flags);
-+
- 	bd0->mode.command = C0_SETPM;
- 	bd0->mode.status = BD_DONE | BD_INTR | BD_WRAP | BD_EXTD;
- 	bd0->mode.count = size / 2;
-@@ -444,12 +452,11 @@ static int sdma_load_script(struct sdma_engine *sdma, void *buf, int size,
- 
- 	memcpy(buf_virt, buf, size);
- 
--	ret = sdma_run_channel(&sdma->channel[0]);
-+	ret = sdma_run_channel0(sdma);
- 
--	dma_free_coherent(NULL, size, buf_virt, buf_phys);
-+	spin_unlock_irqrestore(&sdma->channel_0_lock, flags);
- 
--err_out:
--	mutex_unlock(&sdma->channel_0_lock);
-+	dma_free_coherent(NULL, size, buf_virt, buf_phys);
- 
- 	return ret;
- }
-@@ -538,10 +545,6 @@ static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
- {
- 	complete(&sdmac->done);
- 
--	/* not interested in channel 0 interrupts */
--	if (sdmac->channel == 0)
--		return;
--
- 	if (sdmac->flags & IMX_DMA_SG_LOOP)
- 		sdma_handle_channel_loop(sdmac);
- 	else
-@@ -554,6 +557,8 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
- 	unsigned long stat;
- 
- 	stat = readl_relaxed(sdma->regs + SDMA_H_INTR);
-+	/* not interested in channel 0 interrupts */
-+	stat &= ~1;
- 	writel_relaxed(stat, sdma->regs + SDMA_H_INTR);
- 
- 	while (stat) {
-@@ -659,6 +664,7 @@ static int sdma_load_context(struct sdma_channel *sdmac)
- 	struct sdma_context_data *context = sdma->context;
- 	struct sdma_buffer_descriptor *bd0 = sdma->channel[0].bd;
- 	int ret;
-+	unsigned long flags;
- 
- 	if (sdmac->direction == DMA_DEV_TO_MEM) {
- 		load_address = sdmac->pc_from_device;
-@@ -676,7 +682,7 @@ static int sdma_load_context(struct sdma_channel *sdmac)
- 	dev_dbg(sdma->dev, "event_mask0 = 0x%08x\n", (u32)sdmac->event_mask[0]);
- 	dev_dbg(sdma->dev, "event_mask1 = 0x%08x\n", (u32)sdmac->event_mask[1]);
- 
--	mutex_lock(&sdma->channel_0_lock);
-+	spin_lock_irqsave(&sdma->channel_0_lock, flags);
- 
- 	memset(context, 0, sizeof(*context));
- 	context->channel_state.pc = load_address;
-@@ -695,10 +701,9 @@ static int sdma_load_context(struct sdma_channel *sdmac)
- 	bd0->mode.count = sizeof(*context) / 4;
- 	bd0->buffer_addr = sdma->context_phys;
- 	bd0->ext_buffer_addr = 2048 + (sizeof(*context) / 4) * channel;
-+	ret = sdma_run_channel0(sdma);
- 
--	ret = sdma_run_channel(&sdma->channel[0]);
--
--	mutex_unlock(&sdma->channel_0_lock);
-+	spin_unlock_irqrestore(&sdma->channel_0_lock, flags);
- 
- 	return ret;
- }
-@@ -1297,7 +1302,7 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	if (!sdma)
- 		return -ENOMEM;
- 
--	mutex_init(&sdma->channel_0_lock);
-+	spin_lock_init(&sdma->channel_0_lock);
- 
- 	sdma->dev = &pdev->dev;
- 
--- 
-1.7.5.4
+I did notice that omap2plus_defconfig has grown a new warning caused
+by "ARM: OMAP2+: clean up some cppcheck warnings" (oh, the irony!):
+
+arch/arm/plat-omap/usb.c: In function 'omap_otg_init':
+arch/arm/plat-omap/usb.c:40:6: warning: unused variable 'status'
+[-Wunused-variable]
+
+
+-Olof
