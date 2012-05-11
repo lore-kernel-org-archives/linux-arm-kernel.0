@@ -1,25 +1,151 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 22:24:15 +0800
-Subject: [PATCH v2 0/3] Add device tree support for mxs audio
-Message-ID: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 11 May 2012 22:24:16 +0800
+Subject: [PATCH v2 1/3] ASoC: mxs: mxs-pcm does not need to be a plaform_driver
+In-Reply-To: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
+References: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1336746258-23970-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-* Rebased on sound/for-3.5, and consequently the patch of devm_clk_get
-  is dropped.
-* Fixed the issues caught by Dong (Thanks to Dong).
+Same as the commit 518de86 (ASoC: tegra: register 'platform' from DAIs,
+get rid of pdev), it makes mxs-pcm not a platform_driver but helper to
+register "platform", so that the platform_device for mxs-pcm can be
+saved completely.
 
-Shawn Guo (3):
-      ASoC: mxs: mxs-pcm does not need to be a plaform_driver
-      ASoC: mxs: add device tree support for mxs-saif
-      ASoC: mxs: add device tree support for mxs-sgtl5000
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/mxs/mxs-pcm.c      |   24 ++++++------------------
+ sound/soc/mxs/mxs-pcm.h      |    3 +++
+ sound/soc/mxs/mxs-saif.c     |   18 ++++--------------
+ sound/soc/mxs/mxs-saif.h     |    1 -
+ sound/soc/mxs/mxs-sgtl5000.c |    4 ++--
+ 5 files changed, 15 insertions(+), 35 deletions(-)
 
- .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 ++++
- .../devicetree/bindings/sound/mxs-saif.txt         |   36 ++++++++
- sound/soc/mxs/mxs-pcm.c                            |   24 ++----
- sound/soc/mxs/mxs-pcm.h                            |    3 +
- sound/soc/mxs/mxs-saif.c                           |   90 +++++++++++++-------
- sound/soc/mxs/mxs-saif.h                           |    1 -
- sound/soc/mxs/mxs-sgtl5000.c                       |   50 +++++++++++-
- 7 files changed, 168 insertions(+), 53 deletions(-)
+diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
+index e373fbb..373dec9 100644
+--- a/sound/soc/mxs/mxs-pcm.c
++++ b/sound/soc/mxs/mxs-pcm.c
+@@ -220,28 +220,16 @@ static struct snd_soc_platform_driver mxs_soc_platform = {
+ 	.pcm_free	= mxs_pcm_free,
+ };
+ 
+-static int __devinit mxs_soc_platform_probe(struct platform_device *pdev)
++int __devinit mxs_pcm_platform_register(struct device *dev)
+ {
+-	return snd_soc_register_platform(&pdev->dev, &mxs_soc_platform);
++	return snd_soc_register_platform(dev, &mxs_soc_platform);
+ }
++EXPORT_SYMBOL_GPL(mxs_pcm_platform_register);
+ 
+-static int __devexit mxs_soc_platform_remove(struct platform_device *pdev)
++void __devexit mxs_pcm_platform_unregister(struct device *dev)
+ {
+-	snd_soc_unregister_platform(&pdev->dev);
+-
+-	return 0;
++	snd_soc_unregister_platform(dev);
+ }
+-
+-static struct platform_driver mxs_pcm_driver = {
+-	.driver = {
+-		.name = "mxs-pcm-audio",
+-		.owner = THIS_MODULE,
+-	},
+-	.probe = mxs_soc_platform_probe,
+-	.remove = __devexit_p(mxs_soc_platform_remove),
+-};
+-
+-module_platform_driver(mxs_pcm_driver);
++EXPORT_SYMBOL_GPL(mxs_pcm_platform_unregister);
+ 
+ MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:mxs-pcm-audio");
+diff --git a/sound/soc/mxs/mxs-pcm.h b/sound/soc/mxs/mxs-pcm.h
+index 5f01a91..35ba2ca 100644
+--- a/sound/soc/mxs/mxs-pcm.h
++++ b/sound/soc/mxs/mxs-pcm.h
+@@ -24,4 +24,7 @@ struct mxs_pcm_dma_params {
+ 	int chan_num;
+ };
+ 
++int mxs_pcm_platform_register(struct device *dev);
++void mxs_pcm_platform_unregister(struct device *dev);
++
+ #endif
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index a7b8657..356aad8 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -708,24 +708,14 @@ static int __devinit mxs_saif_probe(struct platform_device *pdev)
+ 		goto failed_get_resource;
+ 	}
+ 
+-	saif->soc_platform_pdev = platform_device_alloc(
+-					"mxs-pcm-audio", pdev->id);
+-	if (!saif->soc_platform_pdev) {
+-		ret = -ENOMEM;
+-		goto failed_pdev_alloc;
+-	}
+-
+-	platform_set_drvdata(saif->soc_platform_pdev, saif);
+-	ret = platform_device_add(saif->soc_platform_pdev);
++	ret = mxs_pcm_platform_register(&pdev->dev);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "failed to add soc platform device\n");
+-		goto failed_pdev_add;
++		dev_err(&pdev->dev, "register PCM failed: %d\n", ret);
++		goto failed_pdev_alloc;
+ 	}
+ 
+ 	return 0;
+ 
+-failed_pdev_add:
+-	platform_device_put(saif->soc_platform_pdev);
+ failed_pdev_alloc:
+ 	snd_soc_unregister_dai(&pdev->dev);
+ failed_get_resource:
+@@ -738,7 +728,7 @@ static int __devexit mxs_saif_remove(struct platform_device *pdev)
+ {
+ 	struct mxs_saif *saif = platform_get_drvdata(pdev);
+ 
+-	platform_device_unregister(saif->soc_platform_pdev);
++	mxs_pcm_platform_unregister(&pdev->dev);
+ 	snd_soc_unregister_dai(&pdev->dev);
+ 	clk_put(saif->clk);
+ 
+diff --git a/sound/soc/mxs/mxs-saif.h b/sound/soc/mxs/mxs-saif.h
+index 12c91e4..3cb342e 100644
+--- a/sound/soc/mxs/mxs-saif.h
++++ b/sound/soc/mxs/mxs-saif.h
+@@ -123,7 +123,6 @@ struct mxs_saif {
+ 	unsigned int cur_rate;
+ 	unsigned int ongoing;
+ 
+-	struct platform_device *soc_platform_pdev;
+ 	u32 fifo_underrun;
+ 	u32 fifo_overrun;
+ };
+diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
+index 60f052b..e9e6112 100644
+--- a/sound/soc/mxs/mxs-sgtl5000.c
++++ b/sound/soc/mxs/mxs-sgtl5000.c
+@@ -90,7 +90,7 @@ static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
+ 		.codec_dai_name	= "sgtl5000",
+ 		.codec_name	= "sgtl5000.0-000a",
+ 		.cpu_dai_name	= "mxs-saif.0",
+-		.platform_name	= "mxs-pcm-audio.0",
++		.platform_name	= "mxs-saif.0",
+ 		.ops		= &mxs_sgtl5000_hifi_ops,
+ 	}, {
+ 		.name		= "HiFi Rx",
+@@ -98,7 +98,7 @@ static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
+ 		.codec_dai_name	= "sgtl5000",
+ 		.codec_name	= "sgtl5000.0-000a",
+ 		.cpu_dai_name	= "mxs-saif.1",
+-		.platform_name	= "mxs-pcm-audio.1",
++		.platform_name	= "mxs-saif.1",
+ 		.ops		= &mxs_sgtl5000_hifi_ops,
+ 	},
+ };
+-- 
+1.7.5.4
