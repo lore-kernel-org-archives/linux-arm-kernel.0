@@ -1,80 +1,71 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 10 May 2012 22:08:39 -0400
-Subject: [PATCHv9 10/10] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <1334756652-30830-11-git-send-email-m.szyprowski@samsung.com>
-References: <1334756652-30830-1-git-send-email-m.szyprowski@samsung.com>
- <1334756652-30830-11-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAP=VYLr=NeGvppR4ONpnRh=gjCSPdKxYj1HYh_FvadAeUzcbBQ@mail.gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Fri, 11 May 2012 10:33:03 +0800
+Subject: [alsa-devel] [PATCH 5/6] ASoC: mxs: add device tree support
+ for mxs-sgtl5000
+In-Reply-To: <20120510122001.GM17875@S2101-09.ap.freescale.net>
+References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+ <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
+ <20120510111646.GL6622@shlinux2.ap.freescale.net>
+ <20120510122001.GM17875@S2101-09.ap.freescale.net>
+Message-ID: <20120511023302.GN6622@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2012 at 9:44 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> This patch add a complete implementation of DMA-mapping API for
-> devices which have IOMMU support.
+On Thu, May 10, 2012 at 08:20:04PM +0800, Shawn Guo wrote:
+> On Thu, May 10, 2012 at 07:16:46PM +0800, Dong Aisheng wrote:
+> > > +static int __devinit mxs_sgtl5000_probe_dt(struct platform_device *pdev)
+> > > +{
+> > > +	struct device_node *np = pdev->dev.of_node;
+> > > +	struct device_node *saif_np[2], *codec_np;
+> > > +	struct platform_device *saif_pdev[2];
+> > > +	int i, ret = 0;
+> > > +
+> > > +	if (!np)
+> > > +		return 1; /* no device tree */
+> > > +
+> > > +	saif_np[0] = of_parse_phandle(np, "saif-controllers", 0);
+> > > +	saif_np[1] = of_parse_phandle(np, "saif-controllers", 1);
+> > > +	codec_np = of_parse_phandle(np, "audio-codec", 0);
+> > > +	if (!saif_np[0] || !saif_np[1] || !codec_np) {
+> > > +		dev_err(&pdev->dev, "phandle missing or invalid\n");
+> > > +		return -EINVAL;
+> > > +	}
+> > ...
+> > 
+> > > +
+> > > +	saif_pdev[0] = of_find_device_by_node(saif_np[0]);
+> > > +	saif_pdev[1] = of_find_device_by_node(saif_np[1]);
+> > > +	if (!saif_pdev[0] || !saif_pdev[1]) {
+> > > +		dev_err(&pdev->dev, "failed to find saif platform device\n");
+> > > +		ret = -EINVAL;
+> > > +		goto out;
+> > > +	}
+> > Do we really need this checking?
+> > 
+> Hmm, why not?  We need to ensure that the phandles are correctly
+> represented in device tree.
+> 
+Hmm, even we need to do sanity check, i guess this could be done in
+core since the core will take these nodes as parameter.
+However, after checking the core a bit, i guess the core has already
+done this:
 
-Hi Marek,
+/* no, then find CPU DAI from registered DAIs*/
+list_for_each_entry(cpu_dai, &dai_list, list) {
+	if (dai_link->cpu_dai_of_node) {
+		if (cpu_dai->dev->of_node != dai_link->cpu_dai_of_node)
+			continue;
+	} else {
+		if (strcmp(cpu_dai->name, dai_link->cpu_dai_name))
+			continue;
+	}
 
-It looks like this patch breaks no-MMU builds on ARM, at least
-according to git bisect.  Here is a link to a linux-next failure:
+	rtd->cpu_dai = cpu_dai;
+	goto find_codec;
+}
 
-http://kisskb.ellerman.id.au/kisskb/buildresult/6291233/
+It looks if the phandles are not correctly represented, the dai binding
+will fail, right?
 
-arch/arm/mm/dma-mapping.c:726:42: error: 'pgprot_kernel' undeclared
-(first use in this function)
-make[2]: *** [arch/arm/mm/dma-mapping.o] Error 1
-
-Please have a look, thanks.
-
-Paul.
----
-
-
->
-> This implementation tries to optimize dma address space usage by remapping
-> all possible physical memory chunks into a single dma address space chunk.
->
-> DMA address space is managed on top of the bitmap stored in the
-> dma_iommu_mapping structure stored in device->archdata. Platform setup
-> code has to initialize parameters of the dma address space (base address,
-> size, allocation precision order) with arm_iommu_create_mapping()
-> function.
-> To reduce the size of the bitmap, all allocations are aligned to the
-> specified order of base 4 KiB pages.
->
-> dma_alloc_* functions allocate physical memory in chunks, each with
-> alloc_pages() function to avoid failing if the physical memory gets
-> fragmented. In worst case the allocated buffer is composed of 4 KiB page
-> chunks.
->
-> dma_map_sg() function minimizes the total number of dma address space
-> chunks by merging of physical memory chunks into one larger dma address
-> space chunk. If requested chunk (scatter list entry) boundaries
-> match physical page boundaries, most calls to dma_map_sg() requests will
-> result in creating only one chunk in dma address space.
->
-> dma_map_page() simply creates a mapping for the given page(s) in the dma
-> address space.
->
-> All dma functions also perform required cache operation like their
-> counterparts from the arm linear physical memory mapping version.
->
-> This patch contains code and fixes kindly provided by:
-> - Krishna Reddy <vdumpa@nvidia.com>,
-> - Andrzej Pietrasiewicz <andrzej.p@samsung.com>,
-> - Hiroshi DOYU <hdoyu@nvidia.com>
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Tested-By: Subash Patel <subash.ramaswamy@linaro.org>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? | ? ?8 +
-> ?arch/arm/include/asm/device.h ? ?| ? ?3 +
-> ?arch/arm/include/asm/dma-iommu.h | ? 34 ++
-> ?arch/arm/mm/dma-mapping.c ? ? ? ?| ?727
-> +++++++++++++++++++++++++++++++++++++-
-> ?arch/arm/mm/vmregion.h ? ? ? ? ? | ? ?2 +-
-> ?5 files changed, 759 insertions(+), 15 deletions(-)
-> ?create mode 100644 arch/arm/include/asm/dma-iommu.h
->
+Regards
+Dong Aisheng
