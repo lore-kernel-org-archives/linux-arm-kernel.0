@@ -1,54 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 17:17:27 +0800
-Subject: [PATCH 1/5] ARM: imx: add more imx5 ssi clocks
-In-Reply-To: <20120511074701.GD27341@pengutronix.de>
-References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
- <1336718568-26810-2-git-send-email-shawn.guo@linaro.org>
- <20120511074701.GD27341@pengutronix.de>
-Message-ID: <20120511091725.GZ17875@S2101-09.ap.freescale.net>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Fri, 11 May 2012 14:51:05 +0530
+Subject: smp_twd fix for adapting to cpu frequency change
+In-Reply-To: <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
+References: <CAPub14_+XXjKyZVh3E8QQjY4sB4gVB=kaApuODptoizqfEUH_Q@mail.gmail.com>
+ <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
+Message-ID: <20120511092105.GR30029@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 09:47:01AM +0200, Sascha Hauer wrote:
-> > +	clk_register_clkdev(clk[ssi_ext1_gate], NULL, "ssi_ext.0");
-> > +	clk_register_clkdev(clk[ssi_ext2_gate], NULL, "ssi_ext.1");
+Hi Linus,
+
+On Tue, May 08, 2012 at 07:33:56PM +0800, Linus Walleij wrote:
+> Can you test this snippet?
+> Thomas: does this look sane?
 > 
-> Another thing I just noticed is that you use ssi_ext.0|1 as the device id,
-> is that what you want? I think the device id should either match a real
-> device present in the system or be NULL.
+> >From d40c3c3302a2f89ab973b41b350153c144f6bded Mon Sep 17 00:00:00 2001
+> From: Linus Walleij <linus.walleij@linaro.org>
+> Date: Tue, 8 May 2012 13:26:43 +0200
+> Subject: [PATCH] ARM: smp_twd: reprogram loadvalue for periodic event
 > 
-Good catch.  Thanks, Sascha.  Fixed as below.
+> The code to handle frequency transitions of the TWD only
+> handle one-shot events. Let's try to account for this by
+> checking the state of the event.
+> 
+> Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/kernel/smp_twd.c |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index fef42b2..98b27e6 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -104,9 +104,17 @@ static void twd_timer_stop(struct clock_event_device *clk)
+>   */
+>  static void twd_update_frequency(void *data)
+>  {
+> +       struct clock_event_device *evt = *__this_cpu_ptr(twd_evt);
+> +
+>         twd_timer_rate = clk_get_rate(twd_clk);
+> 
+> -       clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
+> +       /* If we're in periodic mode, just put in a new load value */
+> +       if (evt->mode == CLOCK_EVT_MODE_PERIODIC) {
+> +               __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
+> +               return;
+> +       }
+> +
+> +       clockevents_update_freq(evt, twd_timer_rate);
+>  }
+> 
+>  static int twd_cpufreq_transition(struct notifier_block *nb,
+> -- 
 
-Regards,
-Shawn
+Thanks, it works.
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 26ba1c5..fcd94f3 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -269,8 +269,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
-        clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
-        clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
-        clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "imx-ssi.2");
--       clk_register_clkdev(clk[ssi_ext1_gate], NULL, "ssi_ext.0");
--       clk_register_clkdev(clk[ssi_ext2_gate], NULL, "ssi_ext.1");
-+       clk_register_clkdev(clk[ssi_ext1_gate], "ssi_ext1", NULL);
-+       clk_register_clkdev(clk[ssi_ext2_gate], "ssi_ext2", NULL);
-        clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
-        clk_register_clkdev(clk[cpu_podf], "cpu", NULL);
-        clk_register_clkdev(clk[iim_gate], "iim", NULL);
-diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-index 52455ea..8b002fcd 100644
---- a/arch/arm/mach-imx/imx53-dt.c
-+++ b/arch/arm/mach-imx/imx53-dt.c
-@@ -87,9 +87,9 @@ static void __init imx53_qsb_init(void)
- {
-        struct clk *clk;
-
--       clk = clk_get_sys("ssi_ext.0", NULL);
-+       clk = clk_get_sys(NULL, "ssi_ext1");
-        if (IS_ERR(clk)) {
--               pr_err("failed to get clk ssi_ext.0\n");
-+               pr_err("failed to get clk ssi_ext1\n");
-                return;
-        }
+--
+regards
+Shiraz
