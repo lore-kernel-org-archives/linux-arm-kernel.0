@@ -1,30 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 May 2012 08:21:24 -0700
+Date: Fri, 11 May 2012 08:23:33 -0700
 Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
-In-Reply-To: <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
+In-Reply-To: <CAOesGMg-_KOTrrho1LeLhd0sevUG8hTTacgtwuzCP=BUZJ9VmA@mail.gmail.com>
 References: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
  <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
-Message-ID: <20120511152123.GR21851@atomide.com>
+ <alpine.DEB.2.00.1205110231120.3201@utopia.booyaka.com>
+ <CAOesGMg-_KOTrrho1LeLhd0sevUG8hTTacgtwuzCP=BUZJ9VmA@mail.gmail.com>
+Message-ID: <20120511152332.GS21851@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [120511 00:25]:
-> Tony,
+* Olof Johansson <olof@lixom.net> [120511 01:41]:
+> On Fri, May 11, 2012 at 1:33 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > Hello Olof,
+> >
+> > On Fri, 11 May 2012, Olof Johansson wrote:
+> >
+> >> I did notice that omap2plus_defconfig has grown a new warning caused
+> >> by "ARM: OMAP2+: clean up some cppcheck warnings" (oh, the irony!):
+> >>
+> >> arch/arm/plat-omap/usb.c: In function 'omap_otg_init':
+> >> arch/arm/plat-omap/usb.c:40:6: warning: unused variable 'status'
+> >> [-Wunused-variable]
+> >
+> > Thanks, this has been fixed by:
+> >
+> > http://marc.info/?l=linux-omap&m=133660322929805&w=2
 > 
-> I've pulled all 10 requests. Many of them ended up going into the same
-> next/ branch, but that's quite OK. Please double check my merge
-> conflict resolutions.
-> 
-> One nit is that at least one of the branches had a few varying patch
-> subjects, so just a friendly reminder to sanitize them to ARM: OMAP.*:
-> or so when you apply patches.
+> Sounds good, I'll wait for it to trickle in on a future pull request.
 
-Oops, sorry looks like I missed some of them. Usually I do fix those
-up though, and had my scripts do that automatically when applying
-from k.o patchwork earlier.
+Thanks I'll see if there's some other fixes still needed and
+send a pull request today.
 
-I'll add some checks to my scripts applying from mbox format too.
- 
 Regards,
 
 Tony
