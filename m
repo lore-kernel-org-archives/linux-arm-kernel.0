@@ -1,123 +1,36 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 22:24:18 +0800
-Subject: [PATCH v2 3/3] ASoC: mxs: add device tree support for mxs-sgtl5000
-In-Reply-To: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
-References: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1336746258-23970-4-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 11 May 2012 22:28:56 +0800
+Subject: [PATCH 4/5] ARM: dts: imx51-babbage: enable audio support
+In-Reply-To: <CAOMZO5Azg9=wZvkut+2d6XtU4zdO6jRiTjxUP+ocmpJWmUSJVA@mail.gmail.com>
+References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
+ <1336718568-26810-5-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5Azg9=wZvkut+2d6XtU4zdO6jRiTjxUP+ocmpJWmUSJVA@mail.gmail.com>
+Message-ID: <20120511142851.GB17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe for mxs-sgtl5000 machine driver.
+On Fri, May 11, 2012 at 10:18:13AM -0300, Fabio Estevam wrote:
+> Shawn,
+> 
+> On 5/11/12, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/imx51-babbage.dts |   28 +++++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/imx51.dtsi        |   33
+> 
+> Looking at the Freescale kernel I see some GPIOs that need to be
+> setup, such as audio oscillator enable pin (GPUO4_26), but I don't see
+> any audio related GPIO pin in your patch.
+> 
+Yes, I noticed that.  But it seems to me that the oscillator is enabled
+by default anyway, so for now, I treat it as a fixed-rate clock without
+gating and have the frequency defined in device tree.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 +++++++
- sound/soc/mxs/mxs-sgtl5000.c                       |   46 ++++++++++++++++++++
- 2 files changed, 63 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
+> Will this be added later via pinctrl?
+> 
+For later, we will probably have another basic clk type supported in
+clk framework, fixed-rate clock with a gpio control as the gating.
 
-diff --git a/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-new file mode 100644
-index 0000000..601c518
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
-@@ -0,0 +1,17 @@
-+* Freescale MXS audio complex with SGTL5000 codec
-+
-+Required properties:
-+- compatible: "fsl,mxs-audio-sgtl5000"
-+- model: The user-visible name of this sound complex
-+- saif-controllers: The phandle list of the MXS SAIF controller
-+- audio-codec: The phandle of the SGTL5000 audio codec
-+
-+Example:
-+
-+sound {
-+	compatible = "fsl,imx28-evk-sgtl5000",
-+		     "fsl,mxs-audio-sgtl5000";
-+	model = "imx28-evk-sgtl5000";
-+	saif-controllers = <&saif0 &saif1>;
-+	audio-codec = <&sgtl5000>;
-+};
-diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
-index e9e6112..3e6e876 100644
---- a/sound/soc/mxs/mxs-sgtl5000.c
-+++ b/sound/soc/mxs/mxs-sgtl5000.c
-@@ -18,6 +18,8 @@
- 
- #include <linux/module.h>
- #include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/soc.h>
-@@ -110,11 +112,48 @@ static struct snd_soc_card mxs_sgtl5000 = {
- 	.num_links	= ARRAY_SIZE(mxs_sgtl5000_dai),
- };
- 
-+static int __devinit mxs_sgtl5000_probe_dt(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *saif_np[2], *codec_np;
-+	int i, ret = 0;
-+
-+	if (!np)
-+		return 1; /* no device tree */
-+
-+	saif_np[0] = of_parse_phandle(np, "saif-controllers", 0);
-+	saif_np[1] = of_parse_phandle(np, "saif-controllers", 1);
-+	codec_np = of_parse_phandle(np, "audio-codec", 0);
-+	if (!saif_np[0] || !saif_np[1] || !codec_np) {
-+		dev_err(&pdev->dev, "phandle missing or invalid\n");
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < 2; i++) {
-+		mxs_sgtl5000_dai[i].codec_name = NULL;
-+		mxs_sgtl5000_dai[i].codec_of_node = codec_np;
-+		mxs_sgtl5000_dai[i].cpu_dai_name = NULL;
-+		mxs_sgtl5000_dai[i].cpu_dai_of_node = saif_np[i];
-+		mxs_sgtl5000_dai[i].platform_name = NULL;
-+		mxs_sgtl5000_dai[i].platform_of_node = saif_np[i];
-+	}
-+
-+	of_node_put(codec_np);
-+	of_node_put(saif_np[0]);
-+	of_node_put(saif_np[1]);
-+
-+	return ret;
-+}
-+
- static int __devinit mxs_sgtl5000_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &mxs_sgtl5000;
- 	int ret;
- 
-+	ret = mxs_sgtl5000_probe_dt(pdev);
-+	if (ret < 0)
-+		return ret;
-+
- 	/*
- 	 * Set an init clock(11.28Mhz) for sgtl5000 initialization(i2c r/w).
- 	 * The Sgtl5000 sysclk is derived from saif0 mclk and it's range
-@@ -148,10 +187,17 @@ static int __devexit mxs_sgtl5000_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id mxs_sgtl5000_dt_ids[] = {
-+	{ .compatible = "fsl,mxs-audio-sgtl5000", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_sgtl5000_dt_ids);
-+
- static struct platform_driver mxs_sgtl5000_audio_driver = {
- 	.driver = {
- 		.name = "mxs-sgtl5000",
- 		.owner = THIS_MODULE,
-+		.of_match_table = mxs_sgtl5000_dt_ids,
- 	},
- 	.probe = mxs_sgtl5000_probe,
- 	.remove = __devexit_p(mxs_sgtl5000_remove),
 -- 
-1.7.5.4
+Regards,
+Shawn
