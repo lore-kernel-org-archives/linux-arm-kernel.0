@@ -1,42 +1,113 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 May 2012 15:07:10 +0100
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <1336647675.15424.390.camel@vkoul-udesk3>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
- <20120509121945.GT26481@n2100.arm.linux.org.uk>
- <1336621458.1540.280.camel@vkoul-udesk3>
- <20120510094205.GM3908@opensource.wolfsonmicro.com>
- <1336647675.15424.390.camel@vkoul-udesk3>
-Message-ID: <20120511140710.GC6220@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 22:14:38 +0800
+Subject: [PATCH 5/6] ASoC: mxs: add device tree support for mxs-sgtl5000
+In-Reply-To: <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
+References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+ <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120511141434.GA17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
-> This should not be in ASoC library. The driver should be able to detect
-> if a tasklet was called for many dma completions and notify the client
-> (soc-lib) accordingly.
+On Thu, May 10, 2012 at 04:42:12PM +0800, Shawn Guo wrote:
+> Add device tree probe for mxs-sgtl5000 machine driver.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 ++++++
+>  sound/soc/mxs/mxs-sgtl5000.c                       |   57 ++++++++++++++++++++
+>  2 files changed, 74 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
+> new file mode 100644
+> index 0000000..601c518
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/mxs-audio-sgtl5000.txt
+> @@ -0,0 +1,17 @@
+> +* Freescale MXS audio complex with SGTL5000 codec
+> +
+> +Required properties:
+> +- compatible: "fsl,mxs-audio-sgtl5000"
+> +- model: The user-visible name of this sound complex
+> +- saif-controllers: The phandle list of the MXS SAIF controller
+> +- audio-codec: The phandle of the SGTL5000 audio codec
+> +
+> +Example:
+> +
+> +sound {
+> +	compatible = "fsl,imx28-evk-sgtl5000",
+> +		     "fsl,mxs-audio-sgtl5000";
+> +	model = "imx28-evk-sgtl5000";
+> +	saif-controllers = <&saif0 &saif1>;
+> +	audio-codec = <&sgtl5000>;
+> +};
+> diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
+> index e9e6112..d420f11 100644
+> --- a/sound/soc/mxs/mxs-sgtl5000.c
+> +++ b/sound/soc/mxs/mxs-sgtl5000.c
+> @@ -18,6 +18,8 @@
+>  
+>  #include <linux/module.h>
+>  #include <linux/device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <sound/core.h>
+>  #include <sound/pcm.h>
+>  #include <sound/soc.h>
+> @@ -110,11 +112,58 @@ static struct snd_soc_card mxs_sgtl5000 = {
+>  	.num_links	= ARRAY_SIZE(mxs_sgtl5000_dai),
+>  };
+>  
+> +static int __devinit mxs_sgtl5000_probe_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *saif_np[2], *codec_np;
+> +	struct platform_device *saif_pdev[2];
 
-No.  Think about the cyclic case.  How do you correctly record how many
-'periods' have completed so that when your tasklet eventually gets called,
-you call its callback the correct number of times?
+The saif_pdev is a left-over which can be removed completely now.
 
-I think that's totally pointless and wasteful too from the ALSA core code
-point of view - all the ALSA cares about is that "some periods have
-completed" and ALSA will then ask the low level driver where the DMA is,
-and update things according to the current DMA position.
+> +	int i, ret = 0;
+> +
+> +	if (!np)
+> +		return 1; /* no device tree */
+> +
+> +	saif_np[0] = of_parse_phandle(np, "saif-controllers", 0);
+> +	saif_np[1] = of_parse_phandle(np, "saif-controllers", 1);
+> +	codec_np = of_parse_phandle(np, "audio-codec", 0);
+> +	if (!saif_np[0] || !saif_np[1] || !codec_np) {
+> +		dev_err(&pdev->dev, "phandle missing or invalid\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	saif_pdev[0] = of_find_device_by_node(saif_np[0]);
+> +	saif_pdev[1] = of_find_device_by_node(saif_np[1]);
+> +	if (!saif_pdev[0] || !saif_pdev[1]) {
+> +		dev_err(&pdev->dev, "failed to find saif platform device\n");
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	for (i = 0; i < 2; i++) {
+> +		mxs_sgtl5000_dai[i].codec_name = NULL;
+> +		mxs_sgtl5000_dai[i].codec_of_node = codec_np;
+> +		mxs_sgtl5000_dai[i].cpu_dai_name = NULL;
+> +		mxs_sgtl5000_dai[i].cpu_dai_of_node = saif_np[i];
+> +		mxs_sgtl5000_dai[i].platform_name = NULL;
+> +		mxs_sgtl5000_dai[i].platform_of_node = saif_np[i];
+> +	}
+> +
+> +out:
 
-It is my opinion that having this emulation of the current position in
-soc-dmaengine-pcm is not only causing a wrong direction to be taken here,
-but is potentially causing inefficiency by forcing conditions into the API
-which we really don't need.
+The label is used nowhere now.  Will remove it in v2.
 
-> One way to do this would be to ensure that the descriptor is marked in
-> irq_handler and then all descriptor completed notified in tasklet.
+> +	of_node_put(codec_np);
+> +	of_node_put(saif_np[0]);
+> +	of_node_put(saif_np[1]);
+> +
+> +	return ret;
+> +}
+> +
 
-No.  You're assuming that for each IRQ you have the tasklet run exactly
-once.  There is no such guarantee.
+-- 
+Regards,
+Shawn
