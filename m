@@ -1,52 +1,66 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 11 May 2012 08:16:55 +0200
-Subject: [PATCH 3/4] ARM: tegra30: Add Tegra Memory Controller(MC) driver
-In-Reply-To: <20120510214604.GA3525@kroah.com>
-References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com><1336635764-30597-3-git-send-email-hdoyu@nvidia.com><20120510214604.GA3525@kroah.com>
-Message-ID: <20120511.091655.1764445721704382888.hdoyu@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 May 2012 23:23:11 -0700
+Subject: [GIT PULL] ep93xx cleanups for 3.5
+In-Reply-To: <4FACAFB9.7000506@gmail.com>
+References: <4FAC6389.40607@gmail.com>
+ <CAOesGMiPiYF8d2x5hHBChvTkaGJPGVKZR=wyumhbk1BV=t4eiA@mail.gmail.com>
+ <4FACAFB9.7000506@gmail.com>
+Message-ID: <CAOesGMg2RctVcMUaVz07biWBN_oswA_ROQ63o=D5h8ZzyOeVGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Thu, May 10, 2012 at 11:20 PM, Ryan Mallon <rmallon@gmail.com> wrote:
+> On 11/05/12 16:18, Olof Johansson wrote:
+>
+>> Hi,
+>>
+>> On Thu, May 10, 2012 at 5:55 PM, Ryan Mallon <rmallon@gmail.com> wrote:
+>>> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+>>>
+>>> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>> ?git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-cleanup-for-3.5
+>>>
+>>> for you to fetch changes up to a1eacd79a602707f97201edbac9a03edaaea1847:
+>>>
+>>> ?arm: ep93xx: use gpio_led_register_device (2012-04-12 09:38:15 +1000)
+>>>
+>>> ----------------------------------------------------------------
+>>> H Hartley Sweeten (2):
+>>> ? ? ?arm: ep93xx: use DEFINE_RES_* macros
+>>> ? ? ?arm: ep93xx: use gpio_led_register_device
+>>>
+>>> Ryan Mallon (1):
+>>> ? ? ?Fix build breakage in ep93xx-core
+>>
+>> Pulled, thanks.
+>>
+>> One^WTwo nits: please use the format 'ARM: ep93xx: <...>' on these
+>> kind of commits in the future. Also, since you have the commit that
+>> introduces the error right before, you can squash it in with the
+>> bugfix (and document it in the signed-off-by sequence if you prefer --
+>> see SubmittingPatches for examples).
+>
+>
+> Thanks,
+>
+> The reason I didn't squash the patches together was that I had already
+> pushed the original broken commit out. I'm still a bit unclear on how to
+> fix things on a public stable branch once it has been pushed.
+>
+> I'll make sure that all patches have the correct subject headers in future.
 
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: Re: [PATCH 3/4] ARM: tegra30: Add Tegra Memory Controller(MC) driver
-Date: Thu, 10 May 2012 23:46:04 +0200
-Message-ID: <20120510214604.GA3525@kroah.com>
+Ah yes, if you have a stable branch that makes it hard.
 
-> On Thu, May 10, 2012 at 10:42:32AM +0300, Hiroshi DOYU wrote:
-> > Tegra Memory Controller(MC) driver for Tegra30
-> > Added to support MC General interrupts, mainly for IOMMU(SMMU).
-> 
-> I'll apply this, but:
+Sometimes it helps to have two branches, one stable and one unstable,
+both merged into a for-next branch that goes into Stephen's
+linux-next. That way you can have a patch sit there a little while to
+catch errors like these before you move them over to the stable base.
 
-Thanks.
+Either way, not a big deal unless we end up with a large number of
+these kind of fixes, one or two here or there is fine.
 
-> > +static inline u32 mc_readl(struct tegra30_mc *mc, u32 offs)
-> > +{
-> > +	if (offs < 0x10)
-> > +		return readl(mc->regs[0] + offs);
-> > +	BUG_ON(offs < 0x3c);
-> > +	if (offs < 0x1f0)
-> > +		return readl(mc->regs[1] + offs - 0x3c);
-> > +	BUG_ON(offs < 0x200);
-> > +	if (offs < 0x228)
-> > +		return readl(mc->regs[2] + offs - 0x200);
-> > +	BUG_ON(offs < 0x284);
-> > +	if (offs < 0x400)
-> > +		return readl(mc->regs[3] + offs - 0x284);
-> > +	BUG();
-> > +}
-> 
-> That's a lot of BUG* calls.  Same thing with the 1/4 patch in this
-> series.
-> 
-> We really should not have a BUG call in any driver, as you just stopped
-> the whole system.  I can understand this being there for debugging when
-> you create the code originally, but as these are things no one should
-> ever be able to hit now, you should remove them, right?
-> 
-> Care to write a follow-on patch removing all of these BUG_ON and BUG
-> calls in this and the drivers/memory/tegra20-mc.c driver?
 
-Ok, they are replying to this email.
+-Olof
