@@ -1,26 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 May 2012 10:33:08 +0200
-Subject: [PATCH 12/12] ARM: ux500: switch MSP to using pinctrl for pins
-In-Reply-To: <4FAAD95D.9010108@wwwdotorg.org>
-References: <1336470347-23886-1-git-send-email-linus.walleij@stericsson.com>
- <4FAAD95D.9010108@wwwdotorg.org>
-Message-ID: <CACRpkdYRv5w=P4zTLZiG69rMN5Rt-yah4EdgWfg03oD7Tcvzqw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 May 2012 02:33:13 -0600 (MDT)
+Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
+In-Reply-To: <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
+References: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
+ <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1205110231120.3201@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 10:53 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/08/2012 03:45 AM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> The MSP platform data callbacks use the old custom callbacks to
->> set the state of the pins, switch over to using pinctrl.
->
-> Aside from the comments I've already made, I guess you can consider the
-> whole series:
->
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Hello Olof,
 
-Thanks Stephen! Pushing this through ARM SoC.
+On Fri, 11 May 2012, Olof Johansson wrote:
 
-Yours,
-Linus Walleij
+> I did notice that omap2plus_defconfig has grown a new warning caused
+> by "ARM: OMAP2+: clean up some cppcheck warnings" (oh, the irony!):
+> 
+> arch/arm/plat-omap/usb.c: In function 'omap_otg_init':
+> arch/arm/plat-omap/usb.c:40:6: warning: unused variable 'status'
+> [-Wunused-variable]
+
+Thanks, this has been fixed by:
+
+http://marc.info/?l=linux-omap&m=133660322929805&w=2
+
+- Paul
