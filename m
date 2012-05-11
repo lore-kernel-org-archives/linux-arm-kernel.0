@@ -1,57 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 May 2012 13:27:42 +0000
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <CACRpkdY3Ga0soie+tsALxA1yhzXbyVOj_HbLLWOjRPz6cMLqtQ@mail.gmail.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <20120511053218.GT17875@S2101-09.ap.freescale.net>
- <CACRpkdY3Ga0soie+tsALxA1yhzXbyVOj_HbLLWOjRPz6cMLqtQ@mail.gmail.com>
-Message-ID: <201205111327.42883.arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 May 2012 15:35:32 +0200
+Subject: [PATCH 1/9] ARM: AT91: Add platform data for the AT91 ADCs
+In-Reply-To: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336743340-4578-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 May 2012, Linus Walleij wrote:
-> On Fri, May 11, 2012 at 7:32 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > pinctrl-mergebase-20120418 is not enough for me.  I need mxs and dummy
-> > states support.  So if your devel branch will never be rebased, we can
-> > simply ask Arnd and Olof to get that as the dependent branch?
-> 
-> Hm, yes the devel branch is getting real stable now, so I will only add things
-> on top.
-> 
-> Basically the for-next branch is supposed to be even more stable,
-> but right now it's a copy of devel.
-> 
-> ARM SoC guys: how do you want the pinctrl deps? I can make
-> a tag today if that is preferred.
+The AT91 SoCs often embeds an ADC. This patch adds the needed
+platform data to specify the informations required by the driver
+to work properly.
 
-No need for a signed tag, since we're not going to submit you changes
-upstream. Knowing that we can pull in the for-next branch is good enough,
-so we'll do that for anything that needs it.
+For now, we only need the reference voltage and which channels
+are available on the board.
 
-> Also: short-cut to another subject: how have you other guys managed
-> this? By e.g.:
-> 
-> git fetch <pinctrl tree>
-> 
-> git checkout -b my-pinwork v3.4-rc4
-> git merge pinctrl-tag
-> (develop develop)
-> 
-> Or:
-> 
-> git checkout -b my-pinwork pinctrl-tag
-> 
-> ?
-> 
-> I was a bit uncertain on how to do this for the pending Ux500
-> stuff so better ask. I merged it for now but maybe it's better if
-> I just base the whole pullrequest on top of a stable pinctrl
-> branch?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+---
+ include/linux/platform_data/at91_adc.h |   61 ++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 include/linux/platform_data/at91_adc.h
 
-No strong preference on my side. I've seen both ways getting done.
-In arm-soc we try to do a 'git pull --log --no-ff' for all changes
-that are being pulled into one of the main next/* branches, just
-like torvalds does when he pulls in branches from maintainers.
-
-	Arnd
+diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+new file mode 100644
+index 0000000..e15745b
+--- /dev/null
++++ b/include/linux/platform_data/at91_adc.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (C) 2011 Free Electrons
++ *
++ * Licensed under the GPLv2 or later.
++ */
++
++#ifndef _AT91_ADC_H_
++#define _AT91_ADC_H_
++
++/**
++ * struct at91_adc_reg_desc - Various informations relative to registers
++ * @channel_base:	Base offset for the channel data registers
++ * @drdy_mask:		Mask of the DRDY field in the relevant registers
++			(Interruptions registers mostly)
++ * @status_register:	Offset of the Interrupt Status Register
++ * @trigger_register:	Offset of the Trigger setup register
++ */
++struct at91_adc_reg_desc {
++	u8	channel_base;
++	u32	drdy_mask;
++	u8	status_register;
++	u8	trigger_register;
++};
++
++/**
++ * struct at91_adc_trigger - description of triggers
++ * @name:		name of the trigger advertised to the user
++ * @value:		value to set in the ADC's trigger setup register
++			to enable the trigger
++ * @is_external:	Does the trigger rely on an external pin?
++ */
++struct at91_adc_trigger {
++	const char	*name;
++	u8		value;
++	bool		is_external;
++};
++
++/**
++ * struct at91_adc_data - platform data for ADC driver
++ * @channels_used:		channels in use on the board as a bitmask
++ * @num_channels:		global number of channels available on the board
++ * @registers:			Registers definition on the board
++ * @startup_time:		startup time of the ADC in microseconds
++ * @trigger_list:		Triggers available in the ADC
++ * @trigger_number:		Number of triggers available in the ADC
++ * @use_external_triggers:	does the board has external triggers availables
++ * @vref:			Reference voltage for the ADC in millivolts
++ */
++struct at91_adc_data {
++	unsigned long			channels_used;
++	u8				num_channels;
++	struct at91_adc_reg_desc	*registers;
++	u8				startup_time;
++	struct at91_adc_trigger		*trigger_list;
++	u8				trigger_number;
++	bool				use_external_triggers;
++	u16				vref;
++};
++
++extern void __init at91_add_device_adc(struct at91_adc_data *data);
++#endif
+-- 
+1.7.9.5
