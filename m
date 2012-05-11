@@ -1,50 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 11 May 2012 04:36:30 -0600 (MDT)
-Subject: [PATCH 3/3] ARM: OMAP: AM35xx: fix UART4 softreset
-In-Reply-To: <4FACDEDB.7030903@ti.com>
-References: <20120510172449.13418.66815.stgit@dusk>
- <20120510172918.13418.64781.stgit@dusk> <4FACD255.3080702@ti.com>
- <alpine.DEB.2.00.1205110316500.3201@utopia.booyaka.com>
- <4FACDC63.7060605@ti.com>
- <alpine.DEB.2.00.1205110333240.3201@utopia.booyaka.com>
- <4FACDEDB.7030903@ti.com>
-Message-ID: <alpine.DEB.2.00.1205110400510.3201@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 11 May 2012 19:37:56 +0900
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+In-Reply-To: <CAH9JG2U83+q9NKuvZV4s_iHvDTrQ-RCEqx=9L9uwqiMhYMSiHA@mail.gmail.com>
+References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
+ <037301cd2e90$529112e0$f7b338a0$%kim@samsung.com>
+ <CAH9JG2V_9RVPvEHodDD422r=o4QxHcrMO-YXv2KUGYeys=ZjqA@mail.gmail.com>
+ <201205101348.20870.arnd@arndb.de>
+ <CAH9JG2U83+q9NKuvZV4s_iHvDTrQ-RCEqx=9L9uwqiMhYMSiHA@mail.gmail.com>
+Message-ID: <045401cd2f62$210f3e40$632dbac0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012, Cousson, Benoit wrote:
+OK, I thought again and talked to some guys. It's okay to add updated to the
+non-dt board files on exynos4 for now. I know, until there is dt coverage
+for more drivers, actually it will be difficult to build/support a complete
+system with only dt support.
 
-> But they are not separately gated for OMAP4 either. This is the modulemode
-> trick that make us think that, but it just means that the PRCM should ensure
-> that this clock is needed when at least one UART modulemode is enabled. In
-> fact the SPI modules are using the same clock.
-> 
-> The modulemode is used to do some reference counting, but the gating is done
-> globally. It was the same with the FCK_EN and ICK_EN in OMAP2&3.
-> 
-> The PRCM spec show only one global gating between FUNC_48M_FCLK and
-> PER_48M_GFCLK. All the modules are sharing the exact same clock.
+Note, we need to keep adding more and more support for dt for exynos4 and
+exynos5. Then only we can stop the development of non-dt board files.
 
-Well, on OMAP3 and AM3517, they do not all share the same clock.  If you 
-look at the 34xx TRM vZU Table 17-11 "UART Clocks", you can see that the 
-UART1 and 2 functional clocks are sourced from clocks managed by the CORE 
-clockdomain, while UART3 is sourced from clocks managed by the PER 
-clockdomain.  This is also expressed in our OMAP3 clock tree.
+Thanks for many opinions about this and if any objections, feel free to
+contact me.
 
-I realize this is slightly tangential to your point.  As to where the 
-clock gating nodes are actually located on a given piece of silicon, 
-unfortunately I have no way of confirming that, aside from power 
-measurement.  You might be correct about what's going on with the AM3517 
-but it would be nice to get some confirmation from the AM35xx PRCM 
-engineer(s).  At this point one of two possibilities seem likely: either 
-CM_FCLKEN1_CORE.EN_UART4 does nothing, or CM_FCLKEN1_CORE.EN_UART4 is 
-necessary but not sufficient to get the UART4 to work.  If 
-CM_FCLKEN1_CORE.EN_UART4 does not actually do anything then we need to 
-remove it from the kernel and ideally file a documentation bug to get it 
-removed from the TRM.  On the other hand, if we do have to enable 
-CM_FCLKEN1_CORE.EN_UART4 to deassert the IdleAck to UART4, but the PRCM 
-usecounting is broken, then I guess we'll need to add a workaround to the 
-hwmod code to essentially support multiple "main clocks".
+Thanks.
 
-
-- Paul
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
