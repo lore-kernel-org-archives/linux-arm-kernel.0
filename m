@@ -1,120 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 11 May 2012 06:56:15 +0000
-Subject: [PATCH] ARM: OMAP2+: irq: Increase no of supported interrupts
- to 128
-In-Reply-To: <87d36bvh9a.fsf@ti.com>
-References: <1336486679-15892-1-git-send-email-hvaibhav@ti.com>
- <87lil2o6u1.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1C06F@DBDE01.ent.ti.com>
- <87d36bvh9a.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA221D2@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi DOYU)
+Date: Fri, 11 May 2012 09:56:24 +0300
+Subject: [PATCH 1/3] ARM: tegra20: Make MC optional in Kconfig
+In-Reply-To: <20120511095012.57f737d1b0d2536e0d367a9b@nvidia.com>
+References: <20120511095012.57f737d1b0d2536e0d367a9b@nvidia.com>
+Message-ID: <1336719389-28506-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:19:21, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> 
-> > On Wed, May 09, 2012 at 00:09:34, Hilman, Kevin wrote:
-> >> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> >> 
-> >> > With addition to TI81XX, AM33XX family of devices, the number
-> >> > of interrupts supported has increased to 128, compared to 96.
-> >> > The current implementation for irq handling is hardcoded to use
-> >> > 96 interrupts (with 3 register-sets to handle), this patch cleanups
-> >> > the code, to increase maximum number of interrupts support
-> >> > to 128, with dynamic detection of no of registers required for
-> >> > handling all interrupts.
-> >> >
-> >> >
-> >> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> >> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> >> > Cc: Tony Lindgren <tony@atomide.com>
-> >> > Cc: Kevin Hilman <khilman@ti.com>
-> >> > Cc: Paul Walmsley <paul@pwsan.com>
-> >> > ---
-> >> > Ideally, we should use dynamic allocation to allocate memory
-> >> > for registers/arrays, 
-> >> 
-> >> Yes.
-> >> 
-> >
-> > Thanks Kevin, I will put this activity in my TODO list.
-> >
-> >> > may be too much cleanup for this patch,
-> >> 
-> >> There is no such thing as too much cleanup.  ;)  
-> >> And the INTC is in need of it, IMO.
-> >> 
-> >
-> > Indeed it is in need of cleanup...
-> >
-> >
-> >> > so as of now restricting to minimal changes to fit devices
-> >> > like, am33xx/ti81xx.
-> >> 
-> >> Then someone else will have to do the cleanup later.  It would be
-> >> greatly appreciated if you could do the necessary cleanup in order to
-> >> cleanly add support for more SoCs.  Yes, we probably should've insisted
-> >> when support for TI81xx was added, but that one slipped in under the
-> >> radar.
-> >> 
-> >
-> > Yeah, I understand. As I said I will put this activity in my TODO list.
-> >
-> >> For starters, the notion of a banks this code is a rather messed up and
-> >> needs a cleanup.  A bank is supposed to be a group of 32 interrupts, 
-> >> and the INTC is made up of 3 (or 4) banks.   However, the current
-> >> code creates a single "bank" of 96 (or 128) interrupts.  
-> >> 
-> >> It also confuses what registers are part of the bank and what are global
-> >> to the INTC.  This confusion is both in init and in context save/restore.
-> >> 
-> >> IMO, to clean this up, first the notion of banks needs to be fixed in
-> >> that code there is a distinction between what acts on banks and what
-> >> works on the whole INTC.
-> >> 
-> >> Then, the init/alloc should be done dynamically based on the number of
-> >> interrupts passed to omap_init_irq()
-> >> 
-> >
-> > Kevin,
-> > Let me finish up with am33xx baseport upstream activity which is currently 
-> > going on at full swing, then next thing I will pick up is this code cleanup.
-> >
-> > I still feel, this is still a valid cleanup patch, and can be merged, as it 
-> > is required/used when we do major cleanup.
-> 
-> Well, Tony can make that decision.
-> 
-> Personally, I think this patch continues to add confusion on top of an
-> existing mess, and to me provides the proverbial straw that broke the
-> camel's back.
-> 
-> That being said, the INTC core is an obviously important and sensitive
-> piece of code so needs to be handled with care.
-> 
-> In case Tony decides to merge this patch and allow a future** cleanup,
-> I'll provide some comments.
-> 
+For bare minimal system.
 
-I am OK, lets drop this patch as of now, and I will take this when I start 
-cleanup activity.
+Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig |    2 --
+ drivers/memory/Kconfig      |    8 +++++++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-
-> Kevin
-> 
-> ** since they rarely happen, we tend to not have too much faith in
->    promises of mythical "future" cleanups.  This is not because we don't
->    trust you personally, but simply based on based experience.
-> 
-
-Very nicely said :) :) :)
-
-I agree with you, sometimes priorities changes and things doesn't happen the 
-way we wanted to be.
-
-As I said earlier, I am now full time working on upstream (no ifs and buts); else I wouldn't have committed for this activity.
-
-
-Thanks,
-Vaibhav
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 16fe065..8b6b181 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -20,8 +20,6 @@ config ARCH_TEGRA_2x_SOC
+ 	select PL310_ERRATA_727915 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	select CPU_FREQ_TABLE if CPU_FREQ
+-	select MEMORY
+-	select TEGRA20_MC
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 42e6d66..efc6b36 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -21,8 +21,14 @@ config TI_EMIF
+ 	  temperature changes
+ 
+ config TEGRA20_MC
+-	bool
++	bool "Tegra20 Memory Controller(MC) driver"
++	default y
+ 	depends on ARCH_TEGRA_2x_SOC
++	help
++	  This driver is for the Memory Controller(MC) module available
++	  in Tegra20 SoCs, mainly for a address translation fault
++	  analysis, especially for IOMMU/GART(Graphics Address
++	  Relocation Table) module.
+ 
+ config TEGRA30_MC
+ 	bool
+-- 
+1.7.5.4
