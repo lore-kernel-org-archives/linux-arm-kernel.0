@@ -1,24 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 14:27:57 +0800
-Subject: [PATCH] arm: imx53-qsb: Add Dialog DA9053 PMIC support
-In-Reply-To: <1336500387-25546-1-git-send-email-paulliu@debian.org>
-References: <1336500387-25546-1-git-send-email-paulliu@debian.org>
-Message-ID: <20120511062755.GV17875@S2101-09.ap.freescale.net>
+Date: Fri, 11 May 2012 14:30:33 +0800
+Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
+In-Reply-To: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120511063030.GW17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 02:06:27AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> From: "Ying-Chun Liu (PaulLiu)" <paulliu@debian.org>
-> 
-> Add Dialog DA9053 regulators support for imx53-qsb (Loco board)
-> 
-> Signed-off-by: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+On Wed, May 09, 2012 at 07:32:59PM +0800, Richard Zhao wrote:
+>   ARM: dts: imx6q-sabrelite: add i2c1 pinctrl support
+>   ARM: dts: imx6q-sabrelite: add audmux pinctrl support
+>   ARM: imx6q: add ssi1_ipg clk_lookup
+>   ARM: imx6q_sabrelite: clk_register_clkdev cko1 for sgtl5000
+>   ARM: dts: imx6q-sabrelite: add sound device imx6q-sabrelite-sgtl5000
+>   ARM: dts: imx6q-sabrelite: add serial2 pinctrl support
 
-Applied with the subject changed to:
-
-  ARM: dts: imx53-qsb: Add Dialog DA9053 PMIC support
-
-Thanks for the patch.
+I picked up above 6 patches.  Thanks.
 
 -- 
 Regards,
