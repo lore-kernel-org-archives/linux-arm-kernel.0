@@ -1,27 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 May 2012 10:18:13 -0300
-Subject: [PATCH 4/5] ARM: dts: imx51-babbage: enable audio support
-In-Reply-To: <1336718568-26810-5-git-send-email-shawn.guo@linaro.org>
-References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
- <1336718568-26810-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOMZO5Azg9=wZvkut+2d6XtU4zdO6jRiTjxUP+ocmpJWmUSJVA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 May 2012 13:22:14 +0000
+Subject: [PATCH RESEND v8] gpio: Device tree support for LPC32xx
+In-Reply-To: <4FAD0A79.8040207@antcom.de>
+References: <1336679838-30738-1-git-send-email-stigge@antcom.de>
+ <201205111219.10025.arnd@arndb.de> <4FAD0A79.8040207@antcom.de>
+Message-ID: <201205111322.15191.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Friday 11 May 2012, Roland Stigge wrote:
+> Right. Personally, I would be fine with either of my v8 (all banks in
+> dt, referenced naturally by name) and v9 (one simple DT entry for the
+> whole GPIO controller, integer index for referencing banks) patches.
+> 
+> Consider the DT-documented mapping in the latter case:
+> 
+>       0: GPIO P0
+>       1: GPIO P1
+>       2: GPIO P2
+>       3: GPIO P3
+>       4: GPI P3
+>       5: GPO P3
+> 
+> Not too difficult and would also be acceptable, IMO.
+> 
+> So Arnd and Grant, please agree one of those and pick it. :-)
+> 
 
-On 5/11/12, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts |   28 +++++++++++++++++++++++++++-
->  arch/arm/boot/dts/imx51.dtsi        |   33
+Grant is maintainer for both GPIO and DT, so his opinion is what
+counts in this case.
+I was merely giving the background on how we got there so he
+can make an informed decision.
 
-Looking at the Freescale kernel I see some GPIOs that need to be
-setup, such as audio oscillator enable pin (GPUO4_26), but I don't see
-any audio related GPIO pin in your patch.
-
-Will this be added later via pinctrl?
-
-Regards,
-
-Fabio Estevam
+	Arnd
