@@ -1,56 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 11 May 2012 16:07:41 +0100
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120511142941.GA16214@n2100.arm.linux.org.uk>
-References: <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
- <20120509121945.GT26481@n2100.arm.linux.org.uk>
- <1336621458.1540.280.camel@vkoul-udesk3>
- <20120510094205.GM3908@opensource.wolfsonmicro.com>
- <1336647675.15424.390.camel@vkoul-udesk3>
- <20120511140710.GC6220@n2100.arm.linux.org.uk>
- <20120511141835.GF3960@opensource.wolfsonmicro.com>
- <20120511142941.GA16214@n2100.arm.linux.org.uk>
-Message-ID: <20120511150741.GH3960@opensource.wolfsonmicro.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 11 May 2012 09:10:42 -0600
+Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
+ (VGIC)
+In-Reply-To: <201205092047.06852.arnd@arndb.de>
+References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
+ <201205092027.50059.arnd@arndb.de>
+ <37e096905f891fc6abdccf8977bd7447@localhost>
+ <201205092047.06852.arnd@arndb.de>
+Message-ID: <CACxGe6u+4qZ=6qW8P8LPyQAABv4GS5TXvs+azfX7v--HVLqCBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:29:41PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 11, 2012 at 03:18:35PM +0100, Mark Brown wrote:
+On Wed, May 9, 2012 at 2:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 09 May 2012, Marc Zyngier wrote:
+>> Ah, I see what you mean. But these registers and interrupt are actually
+>> only visible on the hypervizor side. The guest shouldn't see any of this.
+>
+> Rihgt, that makes sense.
+>
+>> I suppose we could have a "arm,has-virt-extensions" property in devices
+>> that implement the virtualization extensions (GIC, timers...).
+>>
+>> What do you think?
+>
+> Sounds good. I don't have a strong preference whether that should be a
+> property like you suggest or a separate "compatible" value, maybe Rob or
+> Grant can comment on what they prefer.
 
-> > I do think that (separately to what ALSA does) if we're going to have a
-> > callback specified per request we really should make sure that they all
-> > get run as best as we can since the way the API is written people using
-> > non-cyclic transfers may run into the same surprise; for cyclic ones the
-> > issue you identify is very real though.
+I don't have a strong opinion either way.  This approach looks fine.
 
-> Please stop confusing non-cyclic with cyclic transfers.  We know what the
-> required semantics are for non-cyclic transfers and they really aren't
-> under discussion here.  I'm focusing 100% on the cyclic case here.
-
-I'm not confusing them - I'm just pretty sure that all the issues which
-you are identifying also apply to the non-cyclic case so while we're
-looking at fixing things we (collectively, not particularly including
-you as you're focused on the cyclic case) should look at that too.
-Right now we're not handling either cyclic or non-cyclic cases well.
-
-> That's my point.  And keeping count of N times to call the callback in
-> the DMA engine driver is racy at best.
-
-Yes, it'll always break down at some point - no argument there.
-
-> Here's what I think.  I think the best solution for cyclic transfers
-> is as follows:
-
-I agree, for cyclic transfers this is a very good approach.  I'd
-probably even set up a separate callback mechanism for cyclic transfers
-to make this crystal clear and error out if an attempt was made to use
-the linear one.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120511/b42d9312/attachment.sig>
+g.
