@@ -1,60 +1,40 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 11 May 2012 14:19:51 +0200
-Subject: [PATCH] RFC: ARM: msm: re-read DMA IRQ status on each iteration
-Message-ID: <1336738791-15037-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 May 2012 14:24:10 +0200
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <1336705214.15424.1369.camel@vkoul-udesk3>
+References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
+ <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <20120504122611.GE26481@n2100.arm.linux.org.uk>
+ <1336135550.1540.2.camel@vkoul-udesk3>
+ <20120510225429.GG12727@n2100.arm.linux.org.uk>
+ <1336705214.15424.1369.camel@vkoul-udesk3>
+Message-ID: <CACRpkdZpC4pwSCLrZuVg9C=5u5pVQpm8c7HVmshs09wtEOcnqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, May 11, 2012 at 5:00 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
 
-We have recently found a number or erroneous IRQ handlers in
-the kernel where the flag iterator loop miss IRQs that get
-raised when the loop is executing. This was spotted in the
-MSM DMA driver by Julia Lawall using this cocinelle
-snippet:
+> Yes this needs to be mandatory. Let me add that explicitly.
+>
+> ?* @last: last completed DMA cookie
+> ?* @used: last issued DMA cookie (i.e. the one in progress)
+> - * @residue: the remaining number of bytes left to transmit
+> - * ? ? on the selected transfer for states DMA_IN_PROGRESS and
+> - * ? ? DMA_PAUSED if this is implemented in the driver, else 0
+> + * @residue: is defined as:
+> + * ? - for completed descriptor: 0
+> + * ? - for descriptors which are in DMA_PAUSED, DMA_IN_PROGRESS:
+> + * ? ? length - (current_addr - start_addr), where:
+> + * ? ? ? ? ? ? length = descriptor dma length
+> + * ? ? ? ? ? ? current_addr = current dma pointer queried for dma channel
+> + * ? ? ? ? ? ? start_addr: starting address of this descriptor
+> + * ? This is mandatory and needs to be correctly filled by driver
+> ?*/
+> Does this make it clear?
 
-@@
-expression pending,gedr,e1;
-statement S;
-@@
+Looks good to me.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-*pending = readl(gedr);
-... when != pending = e1
-while (pending) S
-
-Cc: arve at android.com
-Cc: Brian Swetland <swetland@google.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Reported-by: Julia Lawall <julia.lawall@lip6.fr>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-David et al: I'm uncertain about this one since the comment
-says that the read clears the IRQ, such as if the read operation
-itself will latch out the flag register and clear it. (I encountered
-this behaviour in the MOS6569 VIC raster IRQ register $D019 in the
-1980s if I'm not mistaken.)
----
- arch/arm/mach-msm/dma.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
-index 02cae5e..ee11afe 100644
---- a/arch/arm/mach-msm/dma.c
-+++ b/arch/arm/mach-msm/dma.c
-@@ -147,10 +147,8 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
- 
- 	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
- 
--	int_status = readl(DMOV_ISR); /* read and clear interrupt */
--	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
--
--	while (int_status) {
-+	while (int_status = readl(DMOV_ISR)) {
-+		PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
- 		mask = int_status & -int_status;
- 		id = fls(mask) - 1;
- 		PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, mask, id);
--- 
-1.7.9.2
+Yours,
+Linus Walleij
