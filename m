@@ -1,105 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 11 May 2012 19:45:18 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix for S3C2412 EBI memory mapping.
-In-Reply-To: <4FABC720.5090301@inov.pt>
-References: <1336607209-6409-1-git-send-email-jose.goncalves@inov.pt>
- <036701cd2e8e$cf4cc100$6de64300$%kim@samsung.com> <4FABC720.5090301@inov.pt>
-Message-ID: <045501cd2f63$27de99e0$779bcda0$%kim@samsung.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 11 May 2012 14:24:16 +0300
+Subject: [PATCH] mtd: m25p80: Add support for Winbond W25Q80BW
+In-Reply-To: <1336516494-22791-1-git-send-email-thomas.abraham@linaro.org>
+References: <1336516494-22791-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1336735456.2625.40.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jos? Miguel Gon?alves wrote:
+On Wed, 2012-05-09 at 04:04 +0530, Thomas Abraham wrote:
+> Winbond W25Q80BW is a 8Mbit serial flash memory device.
 > 
-> On 10-05-2012 10:25, Kukjin Kim wrote:
-> > Jos? Miguel Gon?alves wrote:
-> >> While upgrading the kernel on a S3C2412 based board I've noted that it
-> was
-> >> impossible to boot the board with a 2.6.32 or upper kernel.
-> >> I've tracked down the problem to the EBI virtual memory mapping that is
-> in
-> >> conflict with the IO mapping definition in arch/arm/mach-
-> s3c24xx/s3c2412.c.
-> >>
-> >> Signed-off-by: Jos? Miguel Gon?alves<jose.goncalves@inov.pt>
-> >> ---
-> >>   arch/arm/plat-samsung/include/plat/map-s3c.h |    2 +-
-> >>   1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/plat-samsung/include/plat/map-s3c.h
-> b/arch/arm/plat-
-> >> samsung/include/plat/map-s3c.h
-> >> index 7d04875..c0c70a8 100644
-> >> --- a/arch/arm/plat-samsung/include/plat/map-s3c.h
-> >> +++ b/arch/arm/plat-samsung/include/plat/map-s3c.h
-> >> @@ -22,7 +22,7 @@
-> >>   #define S3C24XX_VA_WATCHDOG	S3C_VA_WATCHDOG
-> >>
-> >>   #define S3C2412_VA_SSMC		S3C_ADDR_CPU(0x00000000)
-> >> -#define S3C2412_VA_EBI		S3C_ADDR_CPU(0x00010000)
-> >> +#define S3C2412_VA_EBI		S3C_ADDR_CPU(0x00100000)
-> >>
-> >>   #define S3C2410_PA_UART		(0x50000000)
-> >>   #define S3C24XX_PA_UART		S3C2410_PA_UART
-> >> --
-> >> 1.7.5.4
-> > Yeah, as you said, the mapping for SSMC invade EBI area but I think,
-> just SZ_4K is enough for SSMC. So following is better in this case. How do
-> you think? And there is no problem on your board?
-> >
-> > diff --git a/arch/arm/mach-s3c24xx/s3c2412.c b/arch/arm/mach-
-> s3c24xx/s3c2412.c
-> > index d4bc7f9..ac906bf 100644
-> > --- a/arch/arm/mach-s3c24xx/s3c2412.c
-> > +++ b/arch/arm/mach-s3c24xx/s3c2412.c
-> > @@ -72,7 +72,7 @@ static struct map_desc s3c2412_iodesc[] __initdata = {
-> >   	{
-> >   		.virtual = (unsigned long)S3C2412_VA_SSMC,
-> >   		.pfn     = __phys_to_pfn(S3C2412_PA_SSMC),
-> > -		.length  = SZ_1M,
-> > +		.length  = SZ_4K,
-> >   		.type    = MT_DEVICE,
-> >   	},
-> >   	{
-> >
-> 
-> It does not work! I tried also a 64K length and also did not work. With
-> your patch
-> my console (with earlyprintk set) only displays the following:
-> 
-> ## Booting image at 30800000 ...
->     Image Name:   Linux-3.2.16-inov1
->     Created:      2012-05-10  12:42:49 UTC
->     Image Type:   ARM Linux Kernel Image (uncompressed)
->     Data Size:    1202592 Bytes =  1.1 MB
->     Load Address: 30008000
->     Entry Point:  30008000
->     Verifying Checksum ... OK
-> OK
-> 
-> Starting kernel ...
-> 
-> Uncompressing Linux... done, booting the kernel.
-> Linux version 3.2.16-inov1 (jmpg at st-ze) (gcc version 4.6.4 20120402
-> (prerelease)
-> (crosstool-NG 1.15.2) ) #3 PREEMPT Thu May 10 13:42:48 WEST 2012
-> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> CPU: VIVT data cache, VIVT instruction cache
-> Machine: SMDK2412
-> bootconsole [earlycon0] enabled
-> Memory policy: ECC disabled, Data cache writeback
-> CPU S3C2412 (id 0x32412003)
-> 
-> My guess is that the MMU initialization on the S3C2412 chip only allows a
-> minimum
-> of 1MB for the page size.
-> 
-Hmm, could be... there is no smdk2412 on my desk :(
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-OK, will apply your fix.
-Thanks.
+Pushed to l2-mtd.git, thanks!
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120511/94f0199f/attachment.sig>
