@@ -1,83 +1,59 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 11 May 2012 15:14:54 +0100
-Subject: [PATCH v2] ARM: DT: Add binding for GIC virtualization extentions
- (VGIC)
-In-Reply-To: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
-References: <1336586277-28454-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4FAD1EDE.8010505@citrix.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 11 May 2012 15:18:35 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120511140710.GC6220@n2100.arm.linux.org.uk>
+References: <1335974475.1593.20.camel@vkoul-udesk3>
+ <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510094205.GM3908@opensource.wolfsonmicro.com>
+ <1336647675.15424.390.camel@vkoul-udesk3>
+ <20120511140710.GC6220@n2100.arm.linux.org.uk>
+Message-ID: <20120511141835.GF3960@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/12 18:57, Marc Zyngier wrote:
-> The GICv2 can have virtualization extension support, consisting
-> of an additional set of registers and interrupts. Add the necessary
-> binding to the GIC DT documentation.
+On Fri, May 11, 2012 at 03:07:10PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
+> > This should not be in ASoC library. The driver should be able to detect
+> > if a tasklet was called for many dma completions and notify the client
+> > (soc-lib) accordingly.
 
-This looks fine for Xen.
+> No.  Think about the cyclic case.  How do you correctly record how many
+> 'periods' have completed so that when your tasklet eventually gets called,
+> you call its callback the correct number of times?
 
-David
+I do think that (separately to what ALSA does) if we're going to have a
+callback specified per request we really should make sure that they all
+get run as best as we can since the way the API is written people using
+non-cyclic transfers may run into the same surprise; for cyclic ones the
+issue you identify is very real though.
 
+> It is my opinion that having this emulation of the current position in
+> soc-dmaengine-pcm is not only causing a wrong direction to be taken here,
+> but is potentially causing inefficiency by forcing conditions into the API
+> which we really don't need.
 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt |   35 +++++++++++++++++++++++-
->  1 files changed, 33 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 9b4b82a..62eb8df 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -11,7 +11,9 @@ have PPIs or SGIs.
->  Main node required properties:
->  
->  - compatible : should be one of:
-> +	"arm,cortex-a15-gic"
->  	"arm,cortex-a9-gic"
-> +	"arm,cortex-a7-gic"
->  	"arm,arm11mp-gic"
->  - interrupt-controller : Identifies the node as an interrupt controller
->  - #interrupt-cells : Specifies the number of cells needed to encode an
-> @@ -39,8 +41,9 @@ Main node required properties:
->    the GIC cpu interface register base and size.
->  
->  Optional
-> -- interrupts	: Interrupt source of the parent interrupt controller. Only
-> -  present on secondary GICs.
-> +- interrupts	: Interrupt source of the parent interrupt controller on
-> +  secondary GICs, or VGIC maintainance interrupt on primary GIC (see
-> +  below).
->  
->  - cpu-offset	: per-cpu offset within the distributor and cpu interface
->    regions, used when the GIC doesn't have banked registers. The offset is
-> @@ -57,3 +60,31 @@ Example:
->  		      <0xfff10100 0x100>;
->  	};
->  
-> +
-> +* GIC virtualization extensions (VGIC)
-> +
-> +For ARM cores that support the virtualization extensions, additional
-> +properties must be described (they only exist if the GIC is the
-> +primary interrupt controller).
-> +
-> +Required properties:
-> +
-> +- reg : Additional regions specifying the base physical address and
-> +  size of the VGIC registers. The first additional region is the GIC
-> +  virtual interface control register base and size. The 2nd additional
-> +  region is the GIC virtual cpu interface register base and size.
-> +
-> +- interrupts : VGIC maintainance interrupt.
-> +
-> +Example:
-> +
-> +	interrupt-controller at 2c001000 {
-> +		compatible = "arm,cortex-a15-gic";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x2c001000 0x1000>,
-> +		      <0x2c002000 0x1000>,
-> +		      <0x2c004000 0x2000>,
-> +		      <0x2c006000 0x2000>;
-> +		interrupts = <1 9 0xf04>;
-> +	};
+I agree entirely, it's clearly just a bodge for not being able to read
+the position and we'd be better off fixing that.
+
+> > One way to do this would be to ensure that the descriptor is marked in
+> > irq_handler and then all descriptor completed notified in tasklet.
+
+> No.  You're assuming that for each IRQ you have the tasklet run exactly
+> once.  There is no such guarantee.
+
+I think the intention here was that the framework keep a list of all
+pending transfers and then in the tasklet it runs through all the
+completions up to the most recent one rather than only completing the
+most recent one.  Easier said than done for cyclic of course...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120511/03e91aff/attachment.sig>
