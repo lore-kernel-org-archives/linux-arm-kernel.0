@@ -1,23 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 May 2012 14:20:28 +0000
-Subject: [PATCH] ARM: clps711x: Using a single definition for the PHYS and
- VIRT registers offset
-In-Reply-To: <1336281717-5332-1-git-send-email-shc_work@mail.ru>
-References: <1335764876-14192-1-git-send-email-shc_work@mail.ru>
- <1336281717-5332-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201205111420.28307.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 22:24:15 +0800
+Subject: [PATCH v2 0/3] Add device tree support for mxs audio
+Message-ID: <1336746258-23970-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 May 2012, Alexander Shiyan wrote:
-> Using a single definition for the physical and virtual address register for all
-> variants boards clps711x. This patch also includes the use of a single function
-> clps_read/write in some units.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Changes since v1:
+* Rebased on sound/for-3.5, and consequently the patch of devm_clk_get
+  is dropped.
+* Fixed the issues caught by Dong (Thanks to Dong).
 
-Applied to the clps711x/cleanup branch and pulled into next/cleanup
+Shawn Guo (3):
+      ASoC: mxs: mxs-pcm does not need to be a plaform_driver
+      ASoC: mxs: add device tree support for mxs-saif
+      ASoC: mxs: add device tree support for mxs-sgtl5000
 
-Thanks,
-
-	Arnd
+ .../bindings/sound/mxs-audio-sgtl5000.txt          |   17 ++++
+ .../devicetree/bindings/sound/mxs-saif.txt         |   36 ++++++++
+ sound/soc/mxs/mxs-pcm.c                            |   24 ++----
+ sound/soc/mxs/mxs-pcm.h                            |    3 +
+ sound/soc/mxs/mxs-saif.c                           |   90 +++++++++++++-------
+ sound/soc/mxs/mxs-saif.h                           |    1 -
+ sound/soc/mxs/mxs-sgtl5000.c                       |   50 +++++++++++-
+ 7 files changed, 168 insertions(+), 53 deletions(-)
