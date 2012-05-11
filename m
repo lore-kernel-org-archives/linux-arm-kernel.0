@@ -1,38 +1,18 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 11 May 2012 08:22:56 +0530
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 11:02:38 +0800
 Subject: [PATCH V2 01/11] dma: imx-sdma: make channel0 operations atomic
-In-Reply-To: <20120510123749.GO17875@S2101-09.ap.freescale.net>
+In-Reply-To: <1336704776.15424.1354.camel@vkoul-udesk3>
 References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
  <1336563190-19974-2-git-send-email-richard.zhao@freescale.com>
  <1336622038.1540.285.camel@vkoul-udesk3>
  <20120510063446.GA17875@S2101-09.ap.freescale.net>
  <20120510123749.GO17875@S2101-09.ap.freescale.net>
-Message-ID: <1336704776.15424.1354.camel@vkoul-udesk3>
+ <1336704776.15424.1354.camel@vkoul-udesk3>
+Message-ID: <20120511030236.GS17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-10 at 20:37 +0800, Shawn Guo wrote:
-> On Thu, May 10, 2012 at 02:34:49PM +0800, Shawn Guo wrote:
-> > On Thu, May 10, 2012 at 09:23:58AM +0530, Vinod Koul wrote:
-> > > On Wed, 2012-05-09 at 19:33 +0800, Richard Zhao wrote:
-> > > > device_prep_dma_cyclic may be call in audio trigger function which is
-> > > > atomic context, so we make it atomic too.
-> > > > 
-> > > >  - change channel0 lock to spinlock.
-> > > >  - Use polling to wait for channel0 finish running.
-> > > > 
-> > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > > Acked By: Vinod Koul <vinod.koul@linux.intel.com>
-> > > 
-> > Applied on imx/dt branch with Vinod's ack.  Thanks.
-> > 
-> Hi Vinod,
+On Fri, May 11, 2012 at 08:22:56AM +0530, Vinod Koul wrote:
+> Sure, care to give an ACK before I apply.
 > 
-> Since Mark wouldn't like to have sound tree pulled into arm-soc to help
-> a couple of patches in the series get merged in the coming window, I can
-> not take the series as a whole to go with arm-soc.  It makes less sense
-> to have this patch go arm-soc then, so please take the patch.
-Sure, care to give an ACK before I apply.
-
--- 
-~Vinod
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
