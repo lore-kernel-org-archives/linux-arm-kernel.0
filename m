@@ -1,28 +1,64 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 11 May 2012 12:01:00 +0530
-Subject: [PATCH] ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct
- dpll_data
-In-Reply-To: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
-References: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <CAMQu2gxdOo1R7gNZoxf6qzb2Ncv6yiDorFeX40=T14q2n8nWpg@mail.gmail.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 11 May 2012 12:07:59 +0530
+Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
+ around __omap2_set_globals
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA220A3@DBDE01.ent.ti.com>
+References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
+ <1336506724-5494-4-git-send-email-hvaibhav@ti.com>	<87397ajo32.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
+ <8762c3ww9w.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA220A3@DBDE01.ent.ti.com>
+Message-ID: <7c4ff0c2577bb15874d6adad285cf21c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 11:32 AM, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> From: Kevin Hilman <khilman@ti.com>
+Vaibhav,
+
+> > >> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle
+> sdrc,
+> > >> > so that we can reuse same function across omap2/3/4...
+> > >>
+> > >> But what happens when a single kernel is built that has support
+> for an
+> > >> SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
+> > >>
+> > >
+> > > As such Nothing...I looking into this direction while implementing.
+> > >
+> > > In that case, sdrc.c file will be compiled in and execution will
+> jump to
+> > > omap2_set_globals_sdrc(). But inside this function, we are already
+> checking
+> > > whether the omap2_globals->sdrc and omap2_globals->sms for NULL and
+> then use
+> > > it.
+> > >
+> > > And function omap2_sdrc_init() is also depends on machine, so in
+> case of
+> > > Am33xx, it won't get into sdrc execution at all. And in case of
+> omap4, it
+> > > will.
+> >
+> > Then why bother with the #ifdef at all?
+> >
+> > If it already safe to call on all SoCs, just get rid of the #ifdef
+> all
+> > together.
+> >
 >
-> There are certain fields inside 'struct dpll_data' which are
-> included under ARCH_OMAP3 and ARCH_OMAP4 option, which makes it
-> difficult to use it for new devices like, am33xx, ti81xx, etc...
+> Kevin,
 >
-> So remove the ifdef completely, this will add few fields to the struct
-> unused, but it improves readability and maintainability of the code.
+> sdrc.o target gets built only as "omap-2-3-common", this will not get
+> built
+> for omap4, am33xx, ti81xx, etc...
+> So in order to avoid build break, you have to have some mechanism, and
+> that's where we need to create config option dependent on platform.
 >
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: R Sricharan <r.sricharan@ti.com>
-> ---
-Acked-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Another better way of handling this is adding __weak function.
+>
+> What's your opinion on this?
+>
+  Then how about just allowing to compile for all omap2/3/4 ?
+
+Thanks,
+ Sricharan
