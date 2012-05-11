@@ -1,67 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 May 2012 15:35:39 +0200
-Subject: [PATCH 8/9] ARM: AT91: Add ADC driver to the at91sam9x5 dtsi
-In-Reply-To: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336743340-4578-9-git-send-email-maxime.ripard@free-electrons.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 11 May 2012 08:47:17 -0500
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <20120511122547.GE17453@mudshark.cambridge.arm.com>
+References: <87k40nzi3i.fsf@ti.com> <4FA8FCFF.40105@ti.com>
+ <4FA9588E.9020906@ti.com> <87sjfal65t.fsf@ti.com> <4FAA4DB9.8060504@ti.com>
+ <4FAAB1A3.9040806@ti.com> <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
+ <20120510084422.GB27276@mudshark.cambridge.arm.com> <4FAC0F05.3060803@ti.com>
+ <20120511122547.GE17453@mudshark.cambridge.arm.com>
+Message-ID: <4FAD1865.70003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/boot/dts/at91sam9x5.dtsi |   38 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Hi Will
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index dd4ed74..6b3ef43 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -190,6 +190,44 @@
- 				interrupts = <27 4>;
- 				status = "disabled";
- 			};
-+
-+			adc0: adc at f804c000 {
-+				compatible = "atmel,at91sam9260-adc";
-+				reg = <0xf804c000 0x100>;
-+				interrupts = <19 4>;
-+				atmel,adc-use-external;
-+				atmel,adc-channels-used = <0xffff>;
-+				atmel,adc-vref = <3300>;
-+				atmel,adc-num-channels = <12>;
-+				atmel,adc-startup-time = <40>;
-+				atmel,adc-channel-base = <0x50>;
-+				atmel,adc-drdy-mask = <0x1000000>;
-+				atmel,adc-status-register = <0x30>;
-+				atmel,adc-trigger-register = <0xc0>;
-+
-+				trigger at 0 {
-+					trigger-name = "external-rising";
-+					trigger-value = <0x1>;
-+					trigger-external;
-+				};
-+
-+				trigger at 1 {
-+					trigger-name = "external-falling";
-+					trigger-value = <0x2>;
-+					trigger-external;
-+				};
-+
-+				trigger at 2 {
-+					trigger-name = "external-any";
-+					trigger-value = <0x3>;
-+					trigger-external;
-+				};
-+
-+				trigger at 3 {
-+					trigger-name = "continuous";
-+					trigger-value = <0x6>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+On 05/11/2012 07:25 AM, Will Deacon wrote:
+> On Thu, May 10, 2012 at 07:55:01PM +0100, Jon Hunter wrote:
+>> Hi Will,
+> 
+> Hi Jon,
+> 
+>> For my testing I have just been reading the PM_EMU_PWRSTST register which shows the power state of the EMU power domain. It should read 3 when the power domain is ON and 0 when it is off. I did something like the following (dumping all EMU clock and power domain registers).
+> 
+> I figured I may as well take perf for a spin and see how I got on. The good
+> news is that the hwmod bits all seem to work as before and the correct IRQs
+> are requested:
+> 
+> root at florentine-pogen:~# cat /proc/interrupts
+>            CPU0       CPU1
+>  29:      44527      17916       GIC  twd
+>  33:          0          0       GIC  arm-pmu
+>  34:          0          0       GIC  arm-pmu
+> 
+> But, unfortunately, as you can see from the above, I just can't persuade them
+> to fire. The PMU counters do tick, but they happily increment through zero
+> without us realising. I retested with my perf/omap4 branch to make sure my
+> board is ok, and the irqs do fire there.
+> 
+> Any ideas?
+
+Do you disable OMAP2/3 support in the kernel config, so that CPU_HAS_PMU
+is enabled?
+
+Cheers
+Jon
