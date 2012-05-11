@@ -1,27 +1,24 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 May 2012 16:24:11 -0600
-Subject: [PATCH 4/7] drivers/gpio: gpio-nomadik: Provide documentation for
- Device Tree bindings
-In-Reply-To: <CACRpkdZDQ=Sx2_X=j4+ka59HU3Q2s+KnY1UAaGaU-u82JWd0bQ@mail.gmail.com>
-References: <1333619748-16126-1-git-send-email-lee.jones@linaro.org>
- <1333619748-16126-5-git-send-email-lee.jones@linaro.org>
- <20120406042054.C0C433E0C86@localhost>
- <4F83E041.7040108@linaro.org> <20120511191205.9BD0E3E0791@localhost>
- <CACRpkdZDQ=Sx2_X=j4+ka59HU3Q2s+KnY1UAaGaU-u82JWd0bQ@mail.gmail.com>
-Message-ID: <CACxGe6tm_5bdk+p84mAfy6MhJZdP3VUrMkcO3Sg+Ci2Qznd0FA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 11 May 2012 15:25:17 -0700
+Subject: [PATCH 1/3] ARM: tegra20: Make MC optional in Kconfig
+In-Reply-To: <4FAD5255.1020908@wwwdotorg.org>
+References: <20120511095012.57f737d1b0d2536e0d367a9b@nvidia.com>
+ <1336719389-28506-1-git-send-email-hdoyu@nvidia.com>
+ <4FAD5255.1020908@wwwdotorg.org>
+Message-ID: <20120511222517.GA4259@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 4:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 11, 2012 at 9:12 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->
->> Are the banks all part of a single GPIO device?
->
-> No. The banks are individual pieces of silicon instance, so they
-> each have separate reset and clock lines for example.
->
-> Apart from that I just vaguely grasp what you're discussing here :-)
+On Fri, May 11, 2012 at 11:54:29AM -0600, Stephen Warren wrote:
+> On 05/11/2012 12:56 AM, Hiroshi DOYU wrote:
+> > For bare minimal system.
+> > 
+> > Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> 
+> Patches 1 and 2,
+> 
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Don't worry about it. After reading further, it looks okay.
+Thanks, now applied.
 
-g.
+greg k-h
