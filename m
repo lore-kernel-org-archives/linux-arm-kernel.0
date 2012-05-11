@@ -1,76 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 12 May 2012 06:31:59 +0900
-Subject: [PATCH 1/2] iommu/exynos: fix runtime pm support
-In-Reply-To: <1334154871-4756-2-git-send-email-m.szyprowski@samsung.com>
-References: <1334154871-4756-1-git-send-email-m.szyprowski@samsung.com>
- <1334154871-4756-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4FAD854F.7040403@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 May 2012 15:04:39 -0600
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
+ omap2+ padconf
+In-Reply-To: <20120511195147.GW21851@atomide.com>
+References: <20120504150342.GI5140@atomide.com>
+ <20120504153251.GE7788@game.jcrosoft.org> <20120504163420.GA5613@atomide.com>
+ <4FA42631.6060304@wwwdotorg.org> <20120504220809.GW5613@atomide.com>
+ <4FAAD141.3090306@wwwdotorg.org> <20120509204925.GV5088@atomide.com>
+ <4FABF553.20601@wwwdotorg.org> <20120510172722.GE21851@atomide.com>
+ <4FAD65D8.30109@wwwdotorg.org> <20120511195147.GW21851@atomide.com>
+Message-ID: <4FAD7EE7.2070704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/12 23:34, Marek Szyprowski wrote:
-> Fix registration to runtime pw and add missing resume callback.
->
-> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
-> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
-> ---
->   drivers/iommu/exynos-iommu.c |   20 ++++++++++++++++++--
->   1 files changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index b8daf7c..eef924d 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -651,8 +651,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
->
->   	__set_fault_handler(data,&default_fault_handler);
->
-> -	if (dev->parent)
-> -		pm_runtime_enable(dev);
-> +	pm_runtime_enable(dev);
->
->   	dev_dbg(dev, "(%s) Initialized\n", data->dbgname);
->   	return 0;
-> @@ -674,11 +673,28 @@ err_alloc:
->   	return ret;
->   }
->
-> +static int exynos_pm_resume(struct device *dev)
-> +{
-> +	struct sysmmu_drvdata *data;
-> +
-> +	data = dev_get_drvdata(dev);
-> +
-> +	if (is_sysmmu_active(data))
-> +		__exynos_sysmmu_enable(data, data->pgtable, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +const struct dev_pm_ops exynos_pm_ops = {
-> +	.resume =&exynos_pm_resume,
-> +};
-> +
->   static struct platform_driver exynos_sysmmu_driver = {
->   	.probe		= exynos_sysmmu_probe,
->   	.driver		= {
->   		.owner		= THIS_MODULE,
->   		.name		= "exynos-sysmmu",
-> +		.pm		=&exynos_pm_ops,
->   	}
->   };
->
+On 05/11/2012 01:51 PM, Tony Lindgren wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [120511 12:21]:
+>>
+>> The mapping of GPIO to pinctrl pins would presumably be driven solely by
+>> the HW design of the pin controller and GPIO, and not by the mux
+>> selection in the pin controller (otherwise, I'd argue this isn't a
+>> simple case that should be handled by pinctrl-simple).
+>>
+>> As such, I'd expect some properties/table at the top-level of the pin
+>> controller object to describe the GPIO mapping. In turn, that implies
+>> that the individual per-pin mux-selection/configuration nodes don't need
+>> to describe any GPIO-related information.
+> 
+> Yes good point. I agree it's a HW design issue, and could be in the properties
+> for the pin controller object.
+> 
+> Just to summarize, the things to consider with the GPIO to mux mapping are:
+> 
+> 1. Having this table as static data in the driver is is not a nice
+>    solution as it seems that we'd currently need six mapping tables for
+>    omap2+ alone.
+> 
+> 2. This table is not needed for most of the (hundreds of) pins, it's
+>    only needed for a few selected pins, let's say ten or so on an average
+>    device. So there's no need to stuff the kernel with information about
+>    the unused GPIO pins.
+> 
+> It seems that the conclusion here is that we don't need to worry about
+> GPIOs in the pinctrl-simple binding for now, and it can be added later
+> without having to change the basic binding.
 
-Joerg,
+The one thing I wanted to resolve here wasn't so much the binding for
+GPIO interaction here, but the following comment:
 
-This patch is needed to correct run-time pm for EXYNOS SoCs with System 
-MMU after KyongHo's iommu/exynos patch. So if you're ok on this, let me 
-apply this in samsung tree.
+You wrote:
+> I wrote:
+>> From a binding perspective, I don't see why you'd want to allow two cases:
+>>
+>> 1) One node with multiple entries in pinctrl-simple,cells
+>> 2) Multiple nodes each with a single entry in pinctrl-simple,cells
+>>
+>> Why not only allow (1)?
+>
+> Because we need to specify GPIO for some pins. There may be additional flags
+> too, we do have external DMA request lines for few pins available.. I'm not
+> saying pinctrl fwk should know about that, but it's a similar mapping of pins
+> to GPIO lines.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I'm asserting that since any GPIO mapping information would be at the
+top-level of the pinctrl-simple binding, we can in fact only allow
+option (1) above for the individual pin configuration nodes.
