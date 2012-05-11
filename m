@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 May 2012 15:35:38 +0200
-Subject: [PATCH 7/9] ARM: AT91: Add ADC driver to the at91sam9g45 dtsi
+Date: Fri, 11 May 2012 15:35:40 +0200
+Subject: [PATCH 9/9] ARM: AT91: Add ADC driver to the at91sam9g20 dtsi
 In-Reply-To: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1336743340-4578-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1336743340-4578-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1336743340-4578-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,52 +11,50 @@ Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi |   37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/boot/dts/at91sam9g20.dtsi |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index c804214..7dbccaf 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -199,6 +199,43 @@
- 				interrupts = <25 4>;
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 773ef48..767764c 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -197,6 +197,41 @@
+ 				interrupts = <10 4>;
  				status = "disabled";
  			};
 +
-+			adc0: adc at fffb0000 {
++			adc0: adc at fffe0000 {
 +				compatible = "atmel,at91sam9260-adc";
-+				reg = <0xfffb0000 0x100>;
-+				interrupts = <20 4>;
++				reg = <0xfffe0000 0x100>;
++				interrupts = <5 4>;
 +				atmel,adc-use-external-triggers;
-+				atmel,adc-channels-used = <0xff>;
++				atmel,adc-channels-used = <0xf>;
 +				atmel,adc-vref = <3300>;
-+				atmel,adc-num-channels = <8>;
-+				atmel,adc-startup-time = <40>;
++				atmel,adc-num-channels = <4>;
++				atmel,adc-startup-time = <10>;
 +				atmel,adc-channel-base = <0x30>;
 +				atmel,adc-drdy-mask = <0x10000>;
 +				atmel,adc-status-register = <0x1c>;
-+				atmel,adc-trigger-register = <0x08>;
++				atmel,adc-trigger-register = <0x04>;
 +
 +				trigger at 0 {
-+					trigger-name = "external-rising";
++					trigger-name = "timer-counter-0";
 +					trigger-value = <0x1>;
-+					trigger-external;
 +				};
 +				trigger at 1 {
-+					trigger-name = "external-falling";
-+					trigger-value = <0x2>;
-+					trigger-external;
++					trigger-name = "timer-counter-1";
++					trigger-value = <0x3>;
 +				};
 +
 +				trigger at 2 {
-+					trigger-name = "external-any";
-+					trigger-value = <0x3>;
-+					trigger-external;
++					trigger-name = "timer-counter-2";
++					trigger-value = <0x5>;
 +				};
 +
 +				trigger at 3 {
-+					trigger-name = "continuous";
-+					trigger-value = <0x6>;
++					trigger-name = "external";
++					trigger-value = <0x13>;
++					trigger-external;
 +				};
 +			};
  		};
