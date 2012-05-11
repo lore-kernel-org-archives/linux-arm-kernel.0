@@ -1,27 +1,22 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 11 May 2012 11:03:04 +1000
-Subject: [GIT PULL] ep93xx fixes for 3.5
-Message-ID: <4FAC6548.5060008@gmail.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Fri, 11 May 2012 01:20:31 +0000
+Subject: i.MX USB Re-Structure
+In-Reply-To: <201205101228.55954.marex@denx.de>
+References: <20120510060523.GA32703@nchen-desktop>
+ <201205101228.55954.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803B95F0B@039-SN2MPN1-022.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+ 
+> 
+> > If it is, I may need to cease Freescale i.mx6q USB driver development
+> > with your old proposal (Marek mx28 style's). Let me know your
+> suggestion.
+> 
+> SHA's adding mx6q support to my patches?
+> 
+Sorry, who is SHA?
 
-  Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
-
-are available in the git repository at:
-
-  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.5
-
-for you to fetch changes up to 2b3c83efc9a653af6a24799eeb1a2900ba0439e6:
-
-  dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels (2012-04-20 08:37:19 +1000)
-
-----------------------------------------------------------------
-Rafal Prylowski (2):
-      arm: ep93xx: Don't try to release not acquired GPIO lines
-      dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels
-
- arch/arm/mach-ep93xx/core.c |    2 +-
- drivers/dma/ep93xx_dma.c    |  117 ++++++++++++++++++++++++++++++++++---------
- 2 files changed, 94 insertions(+), 25 deletions(-)
+> Best regards,
+> Marek Vasut
