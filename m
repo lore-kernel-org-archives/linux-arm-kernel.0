@@ -1,62 +1,39 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 11 May 2012 06:09:58 +0000
-Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <8762c3ww9w.fsf@ti.com>
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-4-git-send-email-hvaibhav@ti.com>	<87397ajo32.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
- <8762c3ww9w.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA220A3@DBDE01.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 May 2012 23:15:15 -0700
+Subject: [GIT PULL] ep93xx fixes for 3.5
+In-Reply-To: <4FAC6548.5060008@gmail.com>
+References: <4FAC6548.5060008@gmail.com>
+Message-ID: <CAOesGMjC0J_7NRQWrOkRNqrBbvKoBs3VJPOSSv5P4hqwpAE=OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 03:09:39, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> 
-> > On Wed, May 09, 2012 at 04:08:09, Hilman, Kevin wrote:
-> >> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> >> 
-> >> > The function __omap2_set_globals() can be common across all
-> >> > platforms/architectures, even in case of omap4, internally it
-> >> > calls same set of functions as in __omap2_set_globals() function
-> >> > (except for sdrc).
-> >> 
-> >> OK so far.
-> >> 
-> >> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-> >> > so that we can reuse same function across omap2/3/4...
-> >> 
-> >> But what happens when a single kernel is built that has support for an
-> >> SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
-> >> 
-> >
-> > As such Nothing...I looking into this direction while implementing.
-> >
-> > In that case, sdrc.c file will be compiled in and execution will jump to
-> > omap2_set_globals_sdrc(). But inside this function, we are already checking 
-> > whether the omap2_globals->sdrc and omap2_globals->sms for NULL and then use 
-> > it.
-> >
-> > And function omap2_sdrc_init() is also depends on machine, so in case of
-> > Am33xx, it won't get into sdrc execution at all. And in case of omap4, it 
-> > will.
-> 
-> Then why bother with the #ifdef at all?
-> 
-> If it already safe to call on all SoCs, just get rid of the #ifdef all
-> together.
-> 
+Hi,
 
-Kevin,
+On Thu, May 10, 2012 at 6:03 PM, Ryan Mallon <rmallon@gmail.com> wrote:
+> The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+>
+> ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.5
+>
+> for you to fetch changes up to 2b3c83efc9a653af6a24799eeb1a2900ba0439e6:
+>
+> ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels (2012-04-20 08:37:19 +1000)
+>
+> ----------------------------------------------------------------
+> Rafal Prylowski (2):
+> ? ? ?arm: ep93xx: Don't try to release not acquired GPIO lines
+> ? ? ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels
 
-sdrc.o target gets built only as "omap-2-3-common", this will not get built 
-for omap4, am33xx, ti81xx, etc...
-So in order to avoid build break, you have to have some mechanism, and that's where we need to create config option dependent on platform.
+Technically, this is a feature, not a fix. I also didn't see an ack
+from the DMA maintainer on it since it would normally go in through
+his tree.
 
-Another better way of handling this is adding __weak function.
+Vinod, you OK with this coming through arm-soc? Looks fairly
+uncontroversial so it shouldn't be a big deal but I don't know if it
+might collide with anything else you have queued up.
 
-What's your opinion on this?
 
-Thanks,
-Vaibhav
+-Olof
