@@ -1,34 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 May 2012 13:32:20 +0800
-Subject: [PATCH V2 03/11] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <CACRpkdah3956QLZZ1wTw1PcZ90wWX=Ta9j45jjzWsBtT=nm8-g@mail.gmail.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <1336563190-19974-4-git-send-email-richard.zhao@freescale.com>
- <20120509160005.GG3955@opensource.wolfsonmicro.com>
- <20120510003532.GG2982@b20223-02.ap.freescale.net>
- <20120510063904.GB17875@S2101-09.ap.freescale.net>
- <20120510084403.GA3908@opensource.wolfsonmicro.com>
- <20120510090459.GH2982@b20223-02.ap.freescale.net>
- <20120510092733.GH3908@opensource.wolfsonmicro.com>
- <20120510102309.GK2982@b20223-02.ap.freescale.net>
- <CACRpkdah3956QLZZ1wTw1PcZ90wWX=Ta9j45jjzWsBtT=nm8-g@mail.gmail.com>
-Message-ID: <20120511053218.GT17875@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 May 2012 22:33:24 -0700
+Subject: [GIT PULL] SPEAr clk updates for v-3.5
+In-Reply-To: <20120510155327.GB12727@n2100.arm.linux.org.uk>
+References: <1336562022-24368-1-git-send-email-viresh.kumar@st.com>
+ <CAOesGMj5ubYcjXWRM2z9ZYOfHGn11sXKgDx8dgXy_bDYLH3HLg@mail.gmail.com>
+ <20120510085939.GC3190@n2100.arm.linux.org.uk>
+ <20120510153745.GQ17875@S2101-09.ap.freescale.net>
+ <20120510155327.GB12727@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMg+fNwxPYo+oDZm=uDKj4s7jZw_U91wfs=JE15xCZPomQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2012 at 02:26:31PM +0200, Linus Walleij wrote:
-> The tag pinctrl-mergebase-20120418
-> contains the devm and other changes, Stephen is already using
-> that for Tegra stuff and it's solid as a rock. Newer patches are
-> put on top of this and since pinctrl has no deps in any directions
-> it will be requested for pull as soon as the merge window opens.
-> 
-Hi Linus,
+On Thu, May 10, 2012 at 8:53 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, May 10, 2012 at 11:37:47PM +0800, Shawn Guo wrote:
+>> On Thu, May 10, 2012 at 09:59:39AM +0100, Russell King - ARM Linux wrote:
+>> > On Thu, May 10, 2012 at 12:14:39AM -0700, Olof Johansson wrote:
+>> > > Russell has published a clkdev branch that you pull instead of
+>> > > applying his patch manually, that way there will be no surprises with
+>> > > respect to conflicts, etc:
+>> > >
+>> > > git://ftp.arm.linux.org.uk/~rmk/linux-next.git clkdev
+>> > >
+>> > > It is also in arm-soc as depends/rmk/clkdev now.
+>> >
+>> > I'll mention that I'm considering a patch on top of this to add __must_check
+>> > to the return values for these clkdev clk registration functions. ?I've
+>> > noticed that many users aren't checking that, so there's no real way to
+>> > be sure that these things are being created.
+>> >
+>> I have to admit I'm one of such users. ?Does that mean we have to
+>> revise the platform porting again? ?So ...
+>>
+>> > The alternative is we make these functions void and/or add pr_err() inside
+>> > them to report the failures.
+>> >
+>> ... I'd vote for this alternative. ?(Sorry for users that are checking
+>> the return right now. ?Any?)
+>
+> It's one reason why I mentioned it in this email, to find out how folk
+> would like to deal with this. ?I have no particular preference as to how
+> it gets addressed, just as long as we don't end up with silent failures
+> causing hard to debug problems.
 
-pinctrl-mergebase-20120418 is not enough for me.  I need mxs and dummy
-states support.  So if your devel branch will never be rebased, we can
-simply ask Arnd and Olof to get that as the dependent branch?
+How about adding the __must_check patch on your for-next branch for a
+bit, so we can find and fix build fallout on the arm-soc branches
+through linux-next, maintainers can add build fixes that we pick up
+and then, after that, the __must_check fix can go upstream? That
+maintains bisectability on the branches we already have and should
+avoid more non-checking code to be introduced down the road.
 
--- 
-Regards,
-Shawn
+
+-Olof
