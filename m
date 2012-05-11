@@ -1,30 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 May 2012 04:13:27 +0200
-Subject: i.MX USB Re-Structure
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803B95F0B@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <20120510060523.GA32703@nchen-desktop>
- <201205101228.55954.marex@denx.de>
- <F281D0F91ED19E4D8E63A7504E8A649803B95F0B@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <201205110413.27613.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 10:49:58 +0800
+Subject: [alsa-devel] [PATCH 5/6] ASoC: mxs: add device tree support for
+ mxs-sgtl5000
+In-Reply-To: <20120511023302.GN6622@shlinux2.ap.freescale.net>
+References: <1336639333-11561-1-git-send-email-shawn.guo@linaro.org>
+ <1336639333-11561-6-git-send-email-shawn.guo@linaro.org>
+ <20120510111646.GL6622@shlinux2.ap.freescale.net>
+ <20120510122001.GM17875@S2101-09.ap.freescale.net>
+ <20120511023302.GN6622@shlinux2.ap.freescale.net>
+Message-ID: <20120511024956.GR17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chen Peter-B29397,
-
-> > > If it is, I may need to cease Freescale i.mx6q USB driver development
-> > > with your old proposal (Marek mx28 style's). Let me know your
-> > 
-> > suggestion.
-> > 
-> > SHA's adding mx6q support to my patches?
+On Fri, May 11, 2012 at 10:33:03AM +0800, Dong Aisheng wrote:
+> Hmm, even we need to do sanity check, i guess this could be done in
+> core since the core will take these nodes as parameter.
+> However, after checking the core a bit, i guess the core has already
+> done this:
 > 
-> Sorry, who is SHA?
-
-Sascha Hauer ... I guess ?
-
+> /* no, then find CPU DAI from registered DAIs*/
+> list_for_each_entry(cpu_dai, &dai_list, list) {
+> 	if (dai_link->cpu_dai_of_node) {
+> 		if (cpu_dai->dev->of_node != dai_link->cpu_dai_of_node)
+> 			continue;
+> 	} else {
+> 		if (strcmp(cpu_dai->name, dai_link->cpu_dai_name))
+> 			continue;
+> 	}
 > 
-> > Best regards,
-> > Marek Vasut
+> 	rtd->cpu_dai = cpu_dai;
+> 	goto find_codec;
+> }
+> 
+> It looks if the phandles are not correctly represented, the dai binding
+> will fail, right?
+> 
+Yes, the core will have the sanity check and fail out without reporting
+what's exactly going wrong, unless you turn on ASoC core debug option.
+So what's harm to have the check in driver to fail out as early as
+possible and with the exact message reporting failure cause?
 
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
