@@ -1,54 +1,48 @@
-From: raulxiong@gmail.com (Raul Xiong)
-Date: Fri, 11 May 2012 22:54:15 +0800
-Subject: [PATCH] cpu_pm: fix some typos in comments
-Message-ID: <CAG9bXvkn6bm1xXpBxqvOxxzSrPPRdvP7RzKrfhSVJebN54psHQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 May 2012 16:02:23 +0100
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <4FAD27CB.5060102@ti.com>
+References: <4FAA4DB9.8060504@ti.com> <4FAAB1A3.9040806@ti.com>
+ <4FAAC549.6010206@ti.com> <4FAAE564.6040708@ti.com>
+ <20120510084422.GB27276@mudshark.cambridge.arm.com>
+ <4FAC0F05.3060803@ti.com>
+ <20120511122547.GE17453@mudshark.cambridge.arm.com>
+ <4FAD1865.70003@ti.com>
+ <20120511134920.GC2626@mudshark.cambridge.arm.com>
+ <4FAD27CB.5060102@ti.com>
+Message-ID: <20120511150223.GD2626@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix some comment typos in function names
+On Fri, May 11, 2012 at 03:52:59PM +0100, Jon Hunter wrote:
+> Hi Will,
 
-Signed-off-by: Raul Xiong <raulxiong@gmail.com>
----
- kernel/cpu_pm.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Hello,
 
-diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-index 249152e..957b151 100644
---- a/kernel/cpu_pm.c
-+++ b/kernel/cpu_pm.c
-@@ -81,7 +81,7 @@ int cpu_pm_unregister_notifier(struct notifier_block *nb)
- EXPORT_SYMBOL_GPL(cpu_pm_unregister_notifier);
+> On 05/11/2012 08:49 AM, Will Deacon wrote:
+> > I enabled OMAP3 debug peripherals, so I selected CPU_HAS_PMU that way.
+> 
+> I tried the same (make omap2plus_defconfig and enabled the above
+> option), and I do see the interrupts firing on both 4430 and 4460...
+> 
+> / # cat /proc/interrupts
+>            CPU0       CPU1
+>  29:       1023        404       GIC  twd
+>  33:        401          0       GIC  arm-pmu
+>  34:          0        441       GIC  arm-pmu
 
- /**
-- * cpm_pm_enter - CPU low power entry notifier
-+ * cpu_pm_enter - CPU low power entry notifier
- *
- * Notifies listeners that a single CPU is entering a low power state that may
- * cause some blocks in the same power domain as the cpu to reset.
-@@ -115,7 +115,7 @@ int cpu_pm_enter(void)
- EXPORT_SYMBOL_GPL(cpu_pm_enter);
+Well, at least it's working for somebody!
 
- /**
-- * cpm_pm_exit - CPU low power exit notifier
-+ * cpu_pm_exit - CPU low power exit notifier
- *
- * Notifies listeners that a single CPU is exiting a low power state that may
- * have caused some blocks in the same power domain as the cpu to reset.
-@@ -139,7 +139,7 @@ int cpu_pm_exit(void)
- EXPORT_SYMBOL_GPL(cpu_pm_exit);
+> What is your kernel commit ID that you applied the patches on top of?
 
- /**
-- * cpm_cluster_pm_enter - CPU cluster low power entry notifier
-+ * cpu_cluster_pm_enter - CPU cluster low power entry notifier
- *
- * Notifies listeners that all cpus in a power domain are entering a low power
- * state that may cause some blocks in the same power domain to reset.
-@@ -174,7 +174,7 @@ int cpu_cluster_pm_enter(void)
- EXPORT_SYMBOL_GPL(cpu_cluster_pm_enter);
+7cf543bc ("Linux-omap rebuilt: Updated to -rc6, merged in pending branches,
+please test"). Is there something else I need too?
 
- /**
-- * cpm_cluster_pm_exit - CPU cluster low power exit notifier
-+ * cpu_cluster_pm_exit - CPU cluster low power exit notifier
- *
- * Notifies listeners that all cpus in a power domain are exiting form a
- * low power state that may have caused some blocks in the same power domain
+> What board are you using? Blaze, panda, etc, and is it 4430 or 4460?
+
+Ye olde Panda 4430. It does work with my perf/omap4 branch though using the
+same .config (I can mail it to you separately if you want).
+
+Cheers,
+
+Will
