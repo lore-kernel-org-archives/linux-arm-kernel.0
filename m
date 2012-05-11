@@ -1,24 +1,18 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 11 May 2012 15:25:17 -0700
-Subject: [PATCH 1/3] ARM: tegra20: Make MC optional in Kconfig
-In-Reply-To: <4FAD5255.1020908@wwwdotorg.org>
-References: <20120511095012.57f737d1b0d2536e0d367a9b@nvidia.com>
- <1336719389-28506-1-git-send-email-hdoyu@nvidia.com>
- <4FAD5255.1020908@wwwdotorg.org>
-Message-ID: <20120511222517.GA4259@kroah.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 May 2012 18:31:41 -0400 (EDT)
+Subject: [PATCH RESEND 2/5] net: fec: adopt pinctrl support
+In-Reply-To: <1336352040-28447-3-git-send-email-shawn.guo@linaro.org>
+References: <1336352040-28447-1-git-send-email-shawn.guo@linaro.org>
+ <1336352040-28447-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120511.183141.2020038431368777464.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 11:54:29AM -0600, Stephen Warren wrote:
-> On 05/11/2012 12:56 AM, Hiroshi DOYU wrote:
-> > For bare minimal system.
-> > 
-> > Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> 
-> Patches 1 and 2,
-> 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Mon,  7 May 2012 08:53:57 +0800
 
-Thanks, now applied.
+> Cc: netdev at vger.kernel.org
+> Cc: David S. Miller <davem@davemloft.net>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-greg k-h
+Acked-by: David S. Miller <davem@davemloft.net>
