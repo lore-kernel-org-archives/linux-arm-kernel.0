@@ -1,36 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 May 2012 09:51:50 +0100
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <4FAA34A9.5020708@gmail.com>
-References: <4FAA34A9.5020708@gmail.com>
-Message-ID: <20120511085150.GA17453@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 May 2012 17:13:49 +0800
+Subject: [PATCH 1/5] ARM: imx: add more imx5 ssi clocks
+In-Reply-To: <20120511074222.GC27341@pengutronix.de>
+References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
+ <1336718568-26810-2-git-send-email-shawn.guo@linaro.org>
+ <20120511074222.GC27341@pengutronix.de>
+Message-ID: <20120511091347.GY17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bill,
-
-On Wed, May 09, 2012 at 10:11:05AM +0100, bill4carson wrote:
-> I'm using ARM11 MPCore on linux-2.6.34, unfortunately I have random
-> panic/segment fault with task migration. I noticed a patch set
-> [ARM11 MPCore: preemption/task migration cache coherency fixups] to fix
-> such issues in here:
+On Fri, May 11, 2012 at 09:42:22AM +0200, Sascha Hauer wrote:
+> > +	clk_register_clkdev(clk[ssi_ext1_gate], NULL, "ssi_ext.0");
+> > +	clk_register_clkdev(clk[ssi_ext2_gate], NULL, "ssi_ext.1");
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069851.html
+> At some point I'd like to be able to lookup a clk based on its clkname,
+> given that they have a unique name anyway. The clkdev mechanism does a
+> good job in associating devices with clocks, but it's not very suitable
+> to manipulate the clock tree like you want to do here.
 > 
-> It seems there is no follow ups, is there official patch to fix such
-> issues?
+I'm fine with that.  But last time, you add clkname into struct
+clk_lookup, I have seen some comments against that.  But let's see.
 
-Let's be honest: you haven't given us a lot to go on here. Perhaps you could
-answer the following?
+> We could simply do a
+> 
+> 	for_each_clk() {
+> 		clk_register_clkdev(clk, NULL, clk->name);
+> 	}
+> 
+> This at least would prevent us from adding a new clkdev each time
+> somebody wants to do some fixups to the clock tree. I don't know if any
+> plans are existing to do something like this directly in the clock
+> framework instead.
+> 
+I think this has to be get done at framework level, as clk->name is not
+accessible in clock provider, unless we include clk-private.h.
 
-(1) Do you experience the same issues with a more recent kernel?
-(2) If you apply the patches linked to above, does it fix your problem?
-(3) If you can reproduce on current mainline, do you have a testcase?
-(4) Does disabling CONFIG_PREEMPT make the problem disappear?
-
-That should provide us with some information about the problem.
-
-Thanks,
-
-Will
+-- 
+Regards,
+Shawn
