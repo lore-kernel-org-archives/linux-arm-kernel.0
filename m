@@ -1,37 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 May 2012 08:23:33 -0700
-Subject: [GIT PULL 1/10] omap non-critical fixes for v3.5 merge window
-In-Reply-To: <CAOesGMg-_KOTrrho1LeLhd0sevUG8hTTacgtwuzCP=BUZJ9VmA@mail.gmail.com>
-References: <4fac0be2.e9a0320a.1f37.7e70SMTPIN_ADDED@mx.google.com>
- <CAOesGMi0+fty-x1kq0qo+msya=p5xyQDsB9iFrtht38Rn5V=Eg@mail.gmail.com>
- <alpine.DEB.2.00.1205110231120.3201@utopia.booyaka.com>
- <CAOesGMg-_KOTrrho1LeLhd0sevUG8hTTacgtwuzCP=BUZJ9VmA@mail.gmail.com>
-Message-ID: <20120511152332.GS21851@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 May 2012 15:27:15 +0000
+Subject: [GIT PULL] i.MX common clock support
+In-Reply-To: <20120511151904.GH27341@pengutronix.de>
+References: <20120509071500.GC16535@pengutronix.de>
+ <201205111514.37138.arnd@arndb.de> <20120511151904.GH27341@pengutronix.de>
+Message-ID: <201205111527.15765.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [120511 01:41]:
-> On Fri, May 11, 2012 at 1:33 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> > Hello Olof,
-> >
-> > On Fri, 11 May 2012, Olof Johansson wrote:
-> >
-> >> I did notice that omap2plus_defconfig has grown a new warning caused
-> >> by "ARM: OMAP2+: clean up some cppcheck warnings" (oh, the irony!):
-> >>
-> >> arch/arm/plat-omap/usb.c: In function 'omap_otg_init':
-> >> arch/arm/plat-omap/usb.c:40:6: warning: unused variable 'status'
-> >> [-Wunused-variable]
-> >
-> > Thanks, this has been fixed by:
-> >
-> > http://marc.info/?l=linux-omap&m=133660322929805&w=2
+On Friday 11 May 2012, Sascha Hauer wrote:
+> On Fri, May 11, 2012 at 03:14:36PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 09 May 2012, Sascha Hauer wrote:
+> > > Hi Arnd, Olof,
+> > > 
+> > > Please pull the following i.MX common clock support branch for next.
+> > > 
+> > > Same as with Shawns series this one depends on:
+> > > 
+> > > git://git.linaro.org/people/mturquette/linux.git clk-next
+> > > http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git clkdev
+> > > 
+> > 
+> > I've put all of those on the next/clock branch now.
 > 
-> Sounds good, I'll wait for it to trickle in on a future pull request.
+> So do you want me to rebase my stuff on arm-soc/next/clock then?
+> 
 
-Thanks I'll see if there's some other fixes still needed and
-send a pull request today.
+I'm not sure if we're talking about the same things. I mean I've put
+pulledthe clk-next branch from Mike and the clkdev branch from Russell
+into the next/clock branch and pulled both your imx series and Shawn's
+mxs series on top into the same branch.
 
-Regards,
+If you're talking about those patches, then there is no need to rebase
+them AFAICT. If you have other patches building on your clock series,
+you should rebase them to whatever is the minimum set of dependencies,
+which may or may not be this branch.
 
-Tony
+	Arnd
