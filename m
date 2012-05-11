@@ -1,294 +1,54 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Fri, 11 May 2012 09:21:24 +0530
-Subject: [PATCH V3 07/10] ARM: OMAP2+: SmartReflex: Use per-OPP data
- structure
-In-Reply-To: <44C9A5C2B412554B8C50A260EB4EF32703971E34@DFLE32.ent.ti.com>
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <1335462041-4949-8-git-send-email-j-keerthy@ti.com>
- <44C9A5C2B412554B8C50A260EB4EF32703971E34@DFLE32.ent.ti.com>
-Message-ID: <CAJ6a13akLHpBi5HrA__j8oV09R_eLrsrw2gju-H3j7fQ46o0qw@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 10 May 2012 22:51:59 -0500
+Subject: [PATCH] ARM: imx: Modify IMX_IO_P2V macro
+In-Reply-To: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+References: <1336609457-25502-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAMXH7KFgCnoGR=7VjF48EAZhq31=-oatw-7yWy+Fhoxg9TSksg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hello Uwe and Sascha,
 
-Thanks for reviewing.
-
-On Fri, May 11, 2012 at 12:41 AM, Guyotte, Greg <gguyotte@ti.com> wrote:
-> Hi Jean,
+On Wed, May 9, 2012 at 7:24 PM, Robert Lee <rob.lee@linaro.org> wrote:
+> A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
+> to use common definitions when accessing registers of peripherals on
+> the AIPS2 bus.
 >
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of J, KEERTHY
->> Sent: Thursday, April 26, 2012 12:41 PM
->> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> Hilman, Kevin; rjw at sisk.pl; linux-kernel at vger.kernel.org; linux-
->> pm at lists.linux-foundation.org
->> Cc: Pihet-XID, Jean; J, KEERTHY; Paul Walmsley; Gopinath, Thara; Menon,
->> Nishanth
->> Subject: [PATCH V3 07/10] ARM: OMAP2+: SmartReflex: Use per-OPP data
->> structure
->>
->> From: Jean Pihet <j-pihet@ti.com>
->>
->> The SmartReflex driver incorrectly treats some per-OPP data as data
->> common to all OPPs (e.g., ERRMINLIMIT). ?Move this data into a per-OPP
->> data structure.
->>
->> Furthermore, in order to make the SmartReflex implementation ready for
->> the move to drivers/, remove the dependency from the SR driver code
->> to the voltage layer by querying the data tables only from the SR device
->> init code.
->>
->> Based on Paul's original code for the SmartReflex driver conversion.
->>
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> Signed-off-by: J Keerthy <j-keerthy@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Thara Gopinath <thara@ti.com>
->> Cc: Nishanth Menon <nm@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> ---
->> ?arch/arm/mach-omap2/smartreflex.c | ? 38 +++++++++++++++++---------------
->> ----
->> ?arch/arm/mach-omap2/sr_device.c ? | ? 36 +++++++++++++++++++++++++++++---
->> --
->> ?include/linux/power/smartreflex.h | ? ?8 +++++-
->> ?3 files changed, 54 insertions(+), 28 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-
->> omap2/smartreflex.c
->> index acef08d..20075de 100644
->> --- a/arch/arm/mach-omap2/smartreflex.c
->> +++ b/arch/arm/mach-omap2/smartreflex.c
->> @@ -347,22 +347,23 @@ static void sr_v2_disable(struct omap_sr *sr)
->> ? ? ? sr_write_reg(sr, IRQSTATUS, IRQSTATUS_MCUDISABLEACKINT);
->> ?}
->>
->> -static u32 sr_retrieve_nvalue(struct omap_sr *sr, u32 efuse_offs)
->> +static struct omap_sr_nvalue_table *sr_retrieve_nvalue_row(
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_sr *sr, u32 efuse_offs)
->> ?{
->> ? ? ? int i;
->>
->> ? ? ? if (!sr->nvalue_table) {
->> ? ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: Missing ntarget value table\n",
->> ? ? ? ? ? ? ? ? ? ? ? __func__);
->> - ? ? ? ? ? ? return 0;
->> + ? ? ? ? ? ? return NULL;
->> ? ? ? }
->>
->> ? ? ? for (i = 0; i < sr->nvalue_count; i++) {
->> ? ? ? ? ? ? ? if (sr->nvalue_table[i].efuse_offs == efuse_offs)
->> - ? ? ? ? ? ? ? ? ? ? return sr->nvalue_table[i].nvalue;
->> + ? ? ? ? ? ? ? ? ? ? return &sr->nvalue_table[i];
->> ? ? ? }
->>
->> - ? ? return 0;
->> + ? ? return NULL;
->> ?}
->>
->> ?/* Public Functions */
->> @@ -586,7 +587,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
->> long volt)
->> ?{
->> ? ? ? struct omap_volt_data *volt_data;
->> ? ? ? struct omap_sr *sr = _sr_lookup(voltdm);
->> - ? ? u32 nvalue_reciprocal;
->> + ? ? struct omap_sr_nvalue_table *nvalue_row;
->> ? ? ? int ret;
->>
->> ? ? ? if (IS_ERR(sr)) {
->> @@ -602,16 +603,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
->> long volt)
->> ? ? ? ? ? ? ? return PTR_ERR(volt_data);
->> ? ? ? }
->>
->> - ? ? nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data-
->> >sr_efuse_offs);
->> + ? ? nvalue_row = sr_retrieve_nvalue_row(sr, volt_data->sr_efuse_offs);
->>
->> - ? ? if (!nvalue_reciprocal) {
->> - ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
->> - ? ? ? ? ? ? ? ? ? ? __func__, volt);
->> + ? ? if (!nvalue_row) {
->> + ? ? ? ? ? ? dev_warn(&sr->pdev->dev, "%s: failure getting SR data for this
->> voltage %ld\n",
->> + ? ? ? ? ? ? ? ? ? ? ?__func__, volt);
->> ? ? ? ? ? ? ? return -ENODATA;
->> ? ? ? }
->>
->> ? ? ? /* errminlimit is opp dependent and hence linked to voltage */
->> - ? ? sr->err_minlimit = volt_data->sr_errminlimit;
->> + ? ? sr->err_minlimit = nvalue_row->errminlimit;
->>
->> ? ? ? pm_runtime_get_sync(&sr->pdev->dev);
->>
->> @@ -624,7 +625,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned
->> long volt)
->> ? ? ? if (ret)
->> ? ? ? ? ? ? ? return ret;
->>
->> - ? ? sr_write_reg(sr, NVALUERECIPROCAL, nvalue_reciprocal);
->> + ? ? sr_write_reg(sr, NVALUERECIPROCAL, nvalue_row->nvalue);
->>
->> ? ? ? /* SRCONFIG - enable SR */
->> ? ? ? sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, SRCONFIG_SRENABLE);
->> @@ -872,7 +873,6 @@ static int __init omap_sr_probe(struct platform_device
->> *pdev)
->> ? ? ? struct omap_sr_data *pdata = pdev->dev.platform_data;
->> ? ? ? struct resource *mem, *irq;
->> ? ? ? struct dentry *nvalue_dir;
->> - ? ? struct omap_volt_data *volt_data;
->> ? ? ? int i, ret = 0;
->>
->> ? ? ? sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
->> @@ -990,12 +990,10 @@ static int __init omap_sr_probe(struct
->> platform_device *pdev)
->> ? ? ? ? ? ? ? goto err_debugfs;
->> ? ? ? }
->>
->> - ? ? omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
->> - ? ? if (!volt_data) {
->> - ? ? ? ? ? ? dev_warn(&pdev->dev, "%s: %s: No Voltage table for the"
->> - ? ? ? ? ? ? ? ? ? ? " corresponding vdd. Cannot create debugfs"
->> - ? ? ? ? ? ? ? ? ? ? "entries for n-values\n",
->> - ? ? ? ? ? ? ? ? ? ? __func__, sr_info->name);
->> + ? ? if (sr_info->nvalue_count == 0 || !sr_info->nvalue_table) {
->> + ? ? ? ? ? ? dev_warn(&pdev->dev, "%s: %s: No Voltage table for the
->> corresponding vdd. Cannot create debugfs entries for n-values\n",
->> + ? ? ? ? ? ? ? ? ? ? ?__func__, sr_info->name);
->> +
->> ? ? ? ? ? ? ? ret = -ENODATA;
->> ? ? ? ? ? ? ? goto err_debugfs;
->> ? ? ? }
->> @@ -1003,8 +1001,8 @@ static int __init omap_sr_probe(struct
->> platform_device *pdev)
->> ? ? ? for (i = 0; i < sr_info->nvalue_count; i++) {
->> ? ? ? ? ? ? ? char name[NVALUE_NAME_LEN + 1];
->>
->> - ? ? ? ? ? ? snprintf(name, sizeof(name), "volt_%d",
->> - ? ? ? ? ? ? ? ? ? ? ?volt_data[i].volt_nominal);
->> + ? ? ? ? ? ? snprintf(name, sizeof(name), "volt_%lu",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? sr_info->nvalue_table[i].volt_nominal);
->> ? ? ? ? ? ? ? (void) debugfs_create_x32(name, S_IRUGO | S_IWUSR, nvalue_dir,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &(sr_info->nvalue_table[i].nvalue));
->> ? ? ? }
->> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-
->> omap2/sr_device.c
->> index e081174..e107e39 100644
->> --- a/arch/arm/mach-omap2/sr_device.c
->> +++ b/arch/arm/mach-omap2/sr_device.c
->> @@ -36,7 +36,10 @@ static void __init sr_set_nvalues(struct omap_volt_data
->> *volt_data,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_sr_data *sr_data)
->> ?{
->> ? ? ? struct omap_sr_nvalue_table *nvalue_table;
->> - ? ? int i, count = 0;
->> + ? ? int i, j, count = 0;
->> +
->> + ? ? sr_data->nvalue_count = 0;
->> + ? ? sr_data->nvalue_table = NULL;
->>
->> ? ? ? while (volt_data[count].volt_nominal)
->> ? ? ? ? ? ? ? count++;
->> @@ -44,8 +47,14 @@ static void __init sr_set_nvalues(struct omap_volt_data
->> *volt_data,
->> ? ? ? nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
->> ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
->>
->> - ? ? for (i = 0; i < count; i++) {
->> + ? ? if (!nvalue_table) {
->> + ? ? ? ? ? ? pr_err("OMAP: SmartReflex: cannot allocate memory for n-value
->> table\n");
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +
->> + ? ? for (i = 0, j = 0; i < count; i++) {
->> ? ? ? ? ? ? ? u32 v;
->> +
->> ? ? ? ? ? ? ? /*
->> ? ? ? ? ? ? ? ?* In OMAP4 the efuse registers are 24 bit aligned.
->> ? ? ? ? ? ? ? ?* A __raw_readl will fail for non-32 bit aligned address
->> @@ -58,15 +67,30 @@ static void __init sr_set_nvalues(struct
->> omap_volt_data *volt_data,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_ctrl_readb(offset + 1) << 8 |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_ctrl_readb(offset + 2) << 16;
->> ? ? ? ? ? ? ? } else {
->> - ? ? ? ? ? ? ? ? ? ? ?v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
->> + ? ? ? ? ? ? ? ? ? ? v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
->> ? ? ? ? ? ? ? }
->>
->> - ? ? ? ? ? ? nvalue_table[i].efuse_offs = volt_data[i].sr_efuse_offs;
->> - ? ? ? ? ? ? nvalue_table[i].nvalue = v;
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* Many OMAP SoCs don't have the eFuse values set.
->> + ? ? ? ? ? ? ?* For example, pretty much all OMAP3xxx before
->> + ? ? ? ? ? ? ?* ES3.something.
->> + ? ? ? ? ? ? ?*
->> + ? ? ? ? ? ? ?* XXX There needs to be some way for board files or
->> + ? ? ? ? ? ? ?* userspace to add these in.
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? if (v == 0)
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> +
->> + ? ? ? ? ? ? nvalue_table[j].nvalue = v;
->> + ? ? ? ? ? ? nvalue_table[j].efuse_offs = volt_data[i].sr_efuse_offs;
->> + ? ? ? ? ? ? nvalue_table[j].errminlimit = volt_data[i].sr_errminlimit;
->> + ? ? ? ? ? ? nvalue_table[j].volt_nominal = volt_data[i].volt_nominal;
->> +
->> + ? ? ? ? ? ? j++;
->> ? ? ? }
->>
->> ? ? ? sr_data->nvalue_table = nvalue_table;
->> - ? ? sr_data->nvalue_count = count;
->> + ? ? sr_data->nvalue_count = j;
->> ?}
->>
->> ?static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
->> diff --git a/include/linux/power/smartreflex.h
->> b/include/linux/power/smartreflex.h
->> index 78b795e..222f901 100644
->> --- a/include/linux/power/smartreflex.h
->> +++ b/include/linux/power/smartreflex.h
->> @@ -243,12 +243,16 @@ struct omap_sr_class_data {
->> ?/**
->> ? * struct omap_sr_nvalue_table ? ? ? - Smartreflex n-target value info
->> ? *
->> - * @efuse_offs: ? ? ?The offset of the efuse where n-target values are stored.
->> - * @nvalue: ?The n-target value.
->> + * @efuse_offs: ? ? ? ?The offset of the efuse where n-target values are
->> stored.
->> + * @nvalue: ? ?The n-target value.
->> + * @errminlimit: ?The value of the ERRMINLIMIT bitfield for this n-target
->> + * @volt_nominal: microvolts DC that the VDD is initially programmed to
->> ? */
->> ?struct omap_sr_nvalue_table {
->> ? ? ? u32 efuse_offs;
->> ? ? ? u32 nvalue;
->> + ? ? u32 errminlimit;
->> + ? ? unsigned long volt_nominal;
+> This change was tested for mapping conflicts using the iop2v script
+> found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
+> performing a bootup of a default build using imx_v6_v7_defconfig
+> on a imx51 babbage board and imx53 loco board.
 >
-> [GG] I would suggest that we also need to add errmaxlimit and errweight fields to this structure. ?These are very much possible to change per OPP, though it hasn't been common in implementations up to now.
-
-Ok. Since this patch set is focussed on minimal clean up and moving the code
-from mach-omap to drivers this is not addressed. I will sure take this up once
-this is moved.
-
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> ?arch/arm/plat-mxc/include/mach/hardware.h | ? ?1 +
+> ?1 file changed, 1 insertion(+)
 >
->> ?};
->>
->> ?/**
->> --
->> 1.7.5.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+> index 0630513..065cc04 100644
+> --- a/arch/arm/plat-mxc/include/mach/hardware.h
+> +++ b/arch/arm/plat-mxc/include/mach/hardware.h
+> @@ -96,6 +96,7 @@
+> ?*/
+> ?#define IMX_IO_P2V(x) ?( ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?0xf4000000 + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? (((x) & 0x80000000) >> 7) + ? ? ? ? ? ? ? ? ? ? \
 
+I doubled checked this today and this will result in some of the
+platform addresses being in the 0xf6000000 boundary.  Instead, the '+'
+can be made an '|' and the addresses that get generated all appear to
+be acceptable without any conflicts.
 
+I'll re-submit this patch with the above fix and commet changes as
+part of a imx5 idle cleanup series unless I'm told that a change to
+this macro is unacceptable.
 
--- 
-Regards and Thanks,
-Keerthy
+Thanks,
+Rob
+
+> ? ? ? ? ? ? ? ? ? ? ? ?(((x) & 0x50000000) >> 6) + ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?(((x) & 0x0b000000) >> 4) + ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ? ? ? ? ?(((x) & 0x000fffff)))
+> --
+> 1.7.10
+>
