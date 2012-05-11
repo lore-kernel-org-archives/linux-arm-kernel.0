@@ -1,23 +1,29 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 11 May 2012 14:03:57 +0530
-Subject: [alsa-devel] [PATCH Rebase 1/1] dma: imx-sdma: make channel0
- operations atomic
-In-Reply-To: <1336720467-29770-1-git-send-email-richard.zhao@freescale.com>
-References: <1336717928.15424.1597.camel@vkoul-udesk3>
- <1336720467-29770-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1336725237.15424.1840.camel@vkoul-udesk3>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 11 May 2012 10:41:18 +0200
+Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based probing
+Message-ID: <1336725678-29327-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-11 at 15:14 +0800, Richard Zhao wrote:
-> device_prep_dma_cyclic may be call in audio trigger function which is
-> atomic context, so we make it atomic too.
-> 
->  - change channel0 lock to spinlock.
->  - Use polling to wait for channel0 finish running.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Thanks, Applied to slave-dma -next.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Viresh Kumar <viresh.kumar@st.com>
+Cc: "Mike Turquette" <mturquette@ti.com>
+---
+ drivers/clk/spear/spear6xx_clock.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
+index f9a20b3..bf33c1d 100644
+--- a/drivers/clk/spear/spear6xx_clock.c
++++ b/drivers/clk/spear/spear6xx_clock.c
+@@ -298,7 +298,7 @@ void __init spear6xx_clk_init(void)
+ 
+ 	clk = clk_register_gate(NULL, "gmac_clk", "ahb_clk", 0, PERIP1_CLK_ENB,
+ 			GMAC_CLK_ENB, 0, &_lock);
+-	clk_register_clkdev(clk, NULL, "gmac");
++	clk_register_clkdev(clk, NULL, "e0800000.ethernet");
+ 
+ 	clk = clk_register_gate(NULL, "i2c_clk", "ahb_clk", 0, PERIP1_CLK_ENB,
+ 			I2C_CLK_ENB, 0, &_lock);
 -- 
-~Vinod
+1.7.10.1
