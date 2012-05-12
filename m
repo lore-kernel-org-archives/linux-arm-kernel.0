@@ -1,92 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 12 May 2012 12:16:15 -0400 (EDT)
-Subject: [PATCH 2/2] remove the debugging restrictions in devicemaps_init()
-In-Reply-To: <20120512134916.GB10453@n2100.arm.linux.org.uk>
-References: <1331876668-32492-1-git-send-email-nico@fluxnic.net>
- <1331876668-32492-3-git-send-email-nico@fluxnic.net>
- <20120506163016.GA7412@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1205072340540.21030@xanadu.home>
- <20120508071411.GP26481@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1205081214220.21030@xanadu.home>
- <20120512134916.GB10453@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1205121147550.21030@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 12 May 2012 10:15:04 -0700
+Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA23806@DBDE01.ent.ti.com>
+References: <4FAD0A71.80201@ti.com> <20120511195620.GX21851@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA23806@DBDE01.ent.ti.com>
+Message-ID: <20120512171503.GL5140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 May 2012, Russell King - ARM Linux wrote:
-
-> On Tue, May 08, 2012 at 12:17:40PM -0400, Nicolas Pitre wrote:
-> > On Tue, 8 May 2012, Russell King - ARM Linux wrote:
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120512 01:26]:
+> On Sat, May 12, 2012 at 01:26:20, Tony Lindgren wrote:
+> > Hi,
 > > 
-> > > On Tue, May 08, 2012 at 12:19:30AM -0400, Nicolas Pitre wrote:
-> > > > However, the switching itself doesn't involve a full cache flush.
+> > * Cousson, Benoit <b-cousson@ti.com> [120511 05:51]:
+> > > Hi Tony,
 > > > 
-> > > That's where you're wrong.  Look at the switch_mm() helpers in proc-*.S.
-> > > StrongARM for example calls v4wb_flush_kern_cache_all() here, which needs
-> > > the cache flushing mappings to be in place in the _current_ page table.
+> > > Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
+> > > It applies now fine on top of lo/dt branch.
 > > 
-> > Right.  I had to be wrong somewhere.
+> > It seems that there are still patches being discussed for those SoCs
+> > and we're pretty much done for this merge window. So unless things
+> > drag on to -rc8, I'd say we just need to postpone merging new things
+> > and merge them early around -rc2.
 > > 
-> > What about abstracting the cache area mapping code in a function of its 
-> > own, and calling it inside install_temp_mm() as well?
 > 
-> One of the issues is that we check that the mappings don't conflict -
-> in other words, a section mapping doesn't conflict with a page table
-> mapping.  We need a clean page table to start with before we start
-> populating it with the IO entries, so that we know there's no mappings
-> in IO space to conflict with the newly setup entries.
-> 
-> What we could do is allocate a new page table, use that page table to
-> setup the new mappings, memcpy them to the swapper page table as a
-> final step before we kick the caches and TLB.
+> Oops...
+> It seems like I missed this merge window as well...
 
-That's exactly what my first incarnation of this patch did.
+We can still queue these into linux-omap for testing as
+soon as the patches are ready.
 
-> The down side to that approach is we have people abusing the map_io
-> method for other purposes (people - including you - just don't listen
-> when I tell them that they shouldn't do this kind of stuff) such as
-> setting up mappings which they then immediately access.  (In case
-> you've forgotten, Assabet, the probing of the SCR register at map_io
-> time to discover the platforms configuration.  That set the precident
-> and now other platforms also do this kind of thing.)
+In general, for anything more intrusive we want to have
+the patches sitting in linux-omap master branch and then
+in linux-next for at least a week. Then merging them into
+mainline tree is usually safe to do. The reason for this is
+that mainline kernel is our stable tree, not our
+development tree.
 
-I publicly complained about people doing that back then when I 
-discovered that my first patch did break some platforms that did that -- 
-s3c24xx being a prominent example.  But I certainly didn't remember that 
-I might be the one who is responsible for having done it first.
+We just need to queue most of things between -rc2 and
+-rc4 into the arm-soc tree, and have any issues fixed up
+before the merge window. Trying to cram development
+branches in around -rc6 just causes us a huge maintenance
+nightmare trying to fix up things in the mainline tree
+between -rc1 and -rc4.
 
-Of course there is a catch22 problem, as some platforms, such as 
-s3c24xx, have to probe for the hardware they're on before installing 
-their final mapping.
+Cheers,
 
-> So, I don't think there's any easy solution to this - certainly not
-> one which is going to be fragile or restricted to a small set of
-> configurations.
-
-Well, it would be StrongARM and XScale (excluding XSc3) 
-based configurations that wouldn't work.  While not insignificant, this 
-is not the majority of the platforms people are working on today.  And
-all those reported issues of kernel not booting that would have 
-benefited from this patch were neither on StrongARM nor XScale.
-
-I therefore suggest amending my patch as follows:
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b302a5620b..1e22e3bf71 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -988,7 +988,7 @@ void __init arm_mm_memblock_reserve(void)
- #endif
- }
- 
--#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_ARM_LPAE)
-+#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_ARM_LPAE) && !defined(FLUSH_BASE)
- 
- /*
-  * The debug mappings will be cleared from the initial page table by
-
-This will benefit those platforms that can accommodate it, while the 
-others will simply remain as before.  What do you think?
-
-
-Nicolas
+Tony
