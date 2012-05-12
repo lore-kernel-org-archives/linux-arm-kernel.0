@@ -1,94 +1,136 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 12 May 2012 10:17:28 +0800
-Subject: [GIT PULL] Adopt pinctrl support for imx and mxs drivers
-Message-ID: <20120512021726.GC17875@S2101-09.ap.freescale.net>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 11 May 2012 19:58:50 -0700
+Subject: moving Tegra30 to the common clock framework
+In-Reply-To: <20120509103606.GY20304@tbergstrom-lnx.Nvidia.com>
+References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
+ <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
+ <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
+ <CAAXpJNsJiT7s87p6jS5bdi-83n4bwSaagdSK0w3SbrVz+k+O0g@mail.gmail.com>
+ <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
+ <4FA9BD41.2090701@codeaurora.org>
+ <20120509103606.GY20304@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FADD1EA.8090606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 05/09/2012 03:36 AM, Peter De Schrijver wrote:
+> On Wed, May 09, 2012 at 02:41:37AM +0200, Saravana Kannan wrote:
+>> On 05/08/2012 10:15 AM, Turquette, Mike wrote:
+>>> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>   wrote:
+>>>> Hi Mike,
+>>>> Could you please explain more details about how to implement a
+>>>> re-parenting operation as part of it's .set_rate implementation?
+>>>
+>>> Sure.
+>>>
+>>>> As far as I know, we can not call clk_set_parent in .set_rate function
+>>>> directly, since clk_set_rate and clk_set_parent are using the same
+>>>> prepare_lock.
+>>>
+>>> That is correct.
+>>>
+>>>> Any other interface can be used to implement it?
+>>>
+>>> You have two options available to you.
+>>>
+>>> 1) __clk_reparent can be used from your .set_rate callback today to
+>>> reflect changes made to the tree topology.  OMAP uses this in our PLL
+>>> .set_rate implementation: depending on the re-lock frequency the PLL
+>>> may switch parents dynamically.  __clk_reparent does the
+>>> framework-level cleanup needed for this (that function is also used
+>>> when populating the clock tree with new clock nodes).
+>>>
+>>> 2) __clk_set_parent could be made non-static if you needed this (I've
+>>> been meaning to talk to Saravana about this since I think MSM needs
+>>> something like this).
+>>
+>> Thanks!
+>>
+>> I don't think I need (2). But I don't think I can use (1) as is either.
+>> I can use (1) with some additional code in my set rate op.
+>>
+>> While set rate is in progress, both the parents might need to stay
+>> enabled for a short duration. So, in my internal set rate, I need to
+>> check if my clock is prepared/enabled and call prepare/enable on the
+>> "old parent", call __clk_reparent (which will reduce the ref count for
+>> the old parents and increase it for the new parents), finish the
+>> reparent in HW and then unprepare/disable the old parent if I have
+>> prepared/enabled them earlier.
+>>
+>> It might be beneficial to provide something like a
+>> __clk_reparent_start(new_parent, *scratch_pointer) and
+>> __clk_reparent_finish(*scratch_pointer) if it will be useful for more
+>> than just MSM. Based on this email, I would guess that Tegra would want
+>> something similar too.
+>>
+>
+> We also need to reparent clocks using a pll if we want to change the PLLs rate
+> while the users are active.
 
-This series adds dummy pinctrl states for imx and mxs platforms and
-then adopts pinctrl support for some outstanding imx and mxs drivers.
-The reason that the series mixes two sub-architectures patches is some
-drivers are shared between two sub-architectures, so we need to handle
-them as a whole.
+Peter,
 
-I haven't got the acks from all subsystem maintainers. Considering
-we are close to merge window now, and the change is quite simple while
-mxs device tree series depends on it, I would like to send the pull
-request right away and hopefully to get it expose on linux-next soon.
-I copied subsystem maintainers here in case they see problem to have
-their patches go through arm-soc.
+Is this reparent permanent (as in, stays reparented when you return from 
+clk_set_rate()) or is it a reparenting for just a short duration inside 
+the set_rate ops?
 
-It depends on pinctrl branch below.
+If it's the latter, I don't think you would need any helper code in 
+clock framework other than the already existing __clk_prepare() and 
+clk_enable(). Just turn on the temp parent, reparent to it, do whatever 
+you need to do, and go back to your original parent.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel (or for-next)
+If it's the former (permanent reparent), can I assume that the 
+CLK_SET_RATE_PARENT flag won't be set for this clock? Otherwise, it's 
+going to be quite yucky/convoluted. I'm not sure how well a reparent 
+would work with the code in common clock framwework that walks up the 
+parents to propagate the rate change to them. I wouldn't say that it's 
+wrong to only want to propagate the rate for certain rates and for 
+certain parents, but I will have to stare at the common clock code for a 
+while.
 
-Per Linus, his devel branch is identify to for-next, and both branches
-are stable (non-rebased).
+Mike,
 
-Regards,
-Shawn
+I was looking at the code to make the changes and I noticed this snippet 
+(reformatted for email) in clk_change_rate():
 
-The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
+        if (clk->ops->set_rate)
+                 clk->ops->set_rate(clk->hw, clk->new_rate,
+					clk->parent->rate);
 
-  Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
 
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/pinctrl/for-3.5
+         if (clk->ops->recalc_rate)
+                 clk->rate = clk->ops->recalc_rate(clk->hw,
+                                 clk->parent->rate);
+         else
+                 clk->rate = clk->parent->rate;
 
-Dong Aisheng (3):
-      ARM: imx: enable pinctrl dummy states
-      ARM: imx6q: switch to use pinctrl subsystem
-      mmc: sdhci-imx-esdhc: adopt pinctrl support
+I'm a bit confused. I thought recalc_rates was optional. But if I don't 
+implement it, the clocks rate will get set to parent's rate? Or is that 
+a bug in the code?
 
-Shawn Guo (14):
-      ARM: mxs: enable pinctrl dummy states
-      tty: serial: imx: adopt pinctrl support
-      net: fec: adopt pinctrl support
-      can: flexcan: adopt pinctrl support
-      i2c: imx: adopt pinctrl support
-      spi/imx: adopt pinctrl support
-      serial: amba-pl011: adopt pinctrl support
-      serial: mxs-auart: adopt pinctrl support
-      mmc: mxs-mmc: adopt pinctrl support
-      mtd: nand: gpmi: adopt pinctrl support
-      i2c: mxs: adopt pinctrl support
-      ASoC: mxs-saif: adopt pinctrl support
-      video: mxsfb: adopt pinctrl support
-      ARM: mxs: enable pinctrl support
+Also, if the clock's rate was just set with set_rate, why do we need to 
+recalc the rate by reading hardware? I'm a bit confused. Can you please 
+clarify what's going on here?
 
- arch/arm/Kconfig                        |    1 +
- arch/arm/mach-imx/Kconfig               |    2 ++
- arch/arm/mach-imx/imx51-dt.c            |    3 +++
- arch/arm/mach-imx/imx53-dt.c            |    3 +++
- arch/arm/mach-imx/mach-imx6q.c          |    7 +++++++
- arch/arm/mach-imx/mm-imx1.c             |    2 ++
- arch/arm/mach-imx/mm-imx21.c            |    2 ++
- arch/arm/mach-imx/mm-imx25.c            |    2 ++
- arch/arm/mach-imx/mm-imx27.c            |    2 ++
- arch/arm/mach-imx/mm-imx3.c             |    2 ++
- arch/arm/mach-imx/mm-imx5.c             |    2 ++
- arch/arm/mach-mxs/Kconfig               |    2 ++
- arch/arm/mach-mxs/include/mach/common.h |    2 ++
- arch/arm/mach-mxs/mach-apx4devkit.c     |    2 ++
- arch/arm/mach-mxs/mach-m28evk.c         |    2 ++
- arch/arm/mach-mxs/mach-mx23evk.c        |    2 ++
- arch/arm/mach-mxs/mach-mx28evk.c        |    2 ++
- arch/arm/mach-mxs/mach-stmp378x_devb.c  |    2 ++
- arch/arm/mach-mxs/mach-tx28.c           |    2 ++
- arch/arm/mach-mxs/mm.c                  |   11 +++++++++++
- drivers/i2c/busses/i2c-imx.c            |    8 ++++++++
- drivers/i2c/busses/i2c-mxs.c            |    6 ++++++
- drivers/mmc/host/mxs-mmc.c              |    8 ++++++++
- drivers/mmc/host/sdhci-esdhc-imx.c      |    9 +++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c  |    9 +++++++++
- drivers/net/can/flexcan.c               |    6 ++++++
- drivers/net/ethernet/freescale/fec.c    |    9 +++++++++
- drivers/spi/spi-imx.c                   |    8 ++++++++
- drivers/tty/serial/amba-pl011.c         |    8 ++++++++
- drivers/tty/serial/imx.c                |    8 ++++++++
- drivers/tty/serial/mxs-auart.c          |    8 ++++++++
- drivers/video/mxsfb.c                   |    9 +++++++++
- sound/soc/mxs/mxs-saif.c                |    8 ++++++++
- 33 files changed, 159 insertions(+), 0 deletions(-)
+Would you mind adding more comments inside clk_calc_new_rates() and 
+clk_change_rate() trying to explain what cases you are trying to account 
+for?
+
+Also, in clk_calc_new_rates(),
+
+         if (!clk->ops->round_rate) {
+                 top = clk_calc_new_rates(clk->parent, rate);
+                 new_rate = clk->parent->new_rate;
+
+                 goto out;
+         }
+
+Is the code assuming that if there is no round rate ops that that clock 
+node is only a gating clock (as in, can't change frequency the input 
+freq)? Just trying to understand the assumptions made in the code.
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
