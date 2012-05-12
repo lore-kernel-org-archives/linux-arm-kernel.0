@@ -1,35 +1,54 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 12 May 2012 20:45:15 +0200
-Subject: Stable I2C branch needed as a dependency for Tegra change
-In-Reply-To: <4FA31297.8000904@wwwdotorg.org>
-References: <4FA31297.8000904@wwwdotorg.org>
-Message-ID: <20120512184515.GC28973@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sat, 12 May 2012 21:31:31 +0200 (CEST)
+Subject: [PATCH 3/7] mmc: dw_mmc: add device tree support
+In-Reply-To: <CAJuYYwQj7gzZ9piJAJLcf7SiyJnQ6nZ63-X9ieQ-FCj6TNhQPQ@mail.gmail.com>
+References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
+ <1335935266-25289-4-git-send-email-thomas.abraham@linaro.org>
+ <Pine.LNX.4.64.1205040047280.18111@axis700.grange>
+ <CAJuYYwQj7gzZ9piJAJLcf7SiyJnQ6nZ63-X9ieQ-FCj6TNhQPQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1205122117340.11826@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas
 
-> Is your i2c-embedded/for-next branch stable (i.e. that commit will not
-> be rebased between now and when you send a pull request for 3.5), so I
-> can use it as a baseline for a Tegra branch? If not, could you let me
-> know when it is stable, so I can create the Tegra branch as that time.
+On Sat, 12 May 2012, Thomas Abraham wrote:
 
-Because of my holidays coming along, I'd think my for-next branch is
-done now (except for additions maybe). Yet, when and how to rewind the
-branch and/or offering a stable base in general is another thing I need
-to scratch my head about afterwards.
+> On 4 May 2012 04:18, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> >
+> > What do you think about this patch
+> >
+> > http://www.spinics.net/lists/linux-sh/msg11259.html
+> >
+> > and about using mmc-generic OF properties instead of creating yet another
+> > copy of proprietary ones?
+> 
+> Hi Guennadi,
+> 
+> This patch does not intend to add any custom mmc properties. I checked
+> your patch (in the link mentioned above) and most of the bindings are
+> similar to what you have come up with except for the "ro-gpios" for
+> which I have used "wp-gpios". But this is following what Arnd had
+> proposed here: http://www.spinics.net/lists/linux-mmc/msg13564.html.
 
-Regards,
+Thanks for the link! I didn't know about that patch.
 
-   Wolfram
+> Regarding the MMC_CAP_4_BIT_DATA and MMC_CAP_8_BIT_DATA in your patch,
+> these can be derived from the bus width information that the driver
+> receives.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120512/fbddbaad/attachment.sig>
+Sure. I think, my patch, that I mentioned above, shall be dropped, at 
+least in its present form. But if at least in principle we do want to have 
+a common MMC OF parser for common bindings, some code from your patch 
+would become redundant, I think. BTW, isn't this
+
++	gpio = of_get_named_gpio(np, "wp_gpios", 0);
+
+a typo? Shouldn't it be "wp-gpios" instead?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
