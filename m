@@ -1,65 +1,114 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 May 2012 18:37:56 -0600
-Subject: [PATCH 4/9] ARM: dt: tegra: format regs properties consistently
+Date: Fri, 11 May 2012 18:37:57 -0600
+Subject: [PATCH 5/9] ARM: dt: tegra: consistenly use lower-case for hex
+ constants
 In-Reply-To: <1336783081-16978-1-git-send-email-swarren@wwwdotorg.org>
 References: <1336783081-16978-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1336783081-16978-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1336783081-16978-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Place each reg "entry" on its own line, and wrap the whole list in
-<> rather than each individual entry.
-
-The convention chosen here is slightly arbitrary, but is not consistent
-throughout all Tegra files.
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20.dtsi |    4 ++--
- arch/arm/boot/dts/tegra30.dtsi |    7 ++++---
- 2 files changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/tegra-paz00.dts |    2 +-
+ arch/arm/boot/dts/tegra20.dtsi    |    8 ++++----
+ arch/arm/boot/dts/tegra30.dtsi    |    8 ++++----
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
+index 03b2e65..d469322 100644
+--- a/arch/arm/boot/dts/tegra-paz00.dts
++++ b/arch/arm/boot/dts/tegra-paz00.dts
+@@ -249,7 +249,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,nvec";
+-		reg = <0x7000C500 0x100>;
++		reg = <0x7000c500 0x100>;
+ 		interrupts = <0 92 0x04>;
+ 		clock-frequency = <80000>;
+ 		request-gpios = <&gpio 170 0>; /* gpio PV2 */
 diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index a6b1351..7f718bd 100644
+index 7f718bd..5f9110a 100644
 --- a/arch/arm/boot/dts/tegra20.dtsi
 +++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -13,8 +13,8 @@
- 		compatible = "arm,cortex-a9-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
--		reg = <0x50041000 0x1000>,
--		      <0x50040100 0x0100>;
-+		reg = <0x50041000 0x1000
-+		       0x50040100 0x0100>;
+@@ -48,7 +48,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+-		reg = <0x7000C000 0x100>;
++		reg = <0x7000c000 0x100>;
+ 		interrupts = <0 38 0x04>;
  	};
  
- 	pmu {
+@@ -56,7 +56,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+-		reg = <0x7000C400 0x100>;
++		reg = <0x7000c400 0x100>;
+ 		interrupts = <0 84 0x04>;
+ 	};
+ 
+@@ -64,7 +64,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+-		reg = <0x7000C500 0x100>;
++		reg = <0x7000c500 0x100>;
+ 		interrupts = <0 92 0x04>;
+ 	};
+ 
+@@ -72,7 +72,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c-dvc";
+-		reg = <0x7000D000 0x200>;
++		reg = <0x7000d000 0x200>;
+ 		interrupts = <0 53 0x04>;
+ 	};
+ 
 diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 45547ad..b52378a 100644
+index b52378a..ea829f5 100644
 --- a/arch/arm/boot/dts/tegra30.dtsi
 +++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -13,8 +13,8 @@
- 		compatible = "arm,cortex-a9-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
--		reg = <0x50041000 0x1000>,
--		      <0x50040100 0x0100>;
-+		reg = <0x50041000 0x1000
-+		       0x50040100 0x0100>;
+@@ -66,7 +66,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+-		reg = <0x7000C000 0x100>;
++		reg = <0x7000c000 0x100>;
+ 		interrupts = <0 38 0x04>;
  	};
  
- 	pmu {
-@@ -186,7 +186,8 @@
+@@ -74,7 +74,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+-		reg = <0x7000C400 0x100>;
++		reg = <0x7000c400 0x100>;
+ 		interrupts = <0 84 0x04>;
+ 	};
  
- 	ahub {
- 		compatible = "nvidia,tegra30-ahub";
--		reg = <0x70080000 0x200 0x70080200 0x100>;
-+		reg = <0x70080000 0x200
-+		       0x70080200 0x100>;
- 		interrupts = <0 103 0x04>;
- 		nvidia,dma-request-selector = <&apbdma 1>;
+@@ -82,7 +82,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+-		reg = <0x7000C500 0x100>;
++		reg = <0x7000c500 0x100>;
+ 		interrupts = <0 92 0x04>;
+ 	};
+ 
+@@ -98,7 +98,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+-		reg = <0x7000D000 0x100>;
++		reg = <0x7000d000 0x100>;
+ 		interrupts = <0 53 0x04>;
+ 	};
  
 -- 
 1.7.0.4
