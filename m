@@ -1,47 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 May 2012 15:29:31 -0700
-Subject: [GIT PULL] Samsung fixes for v3.4
-In-Reply-To: <4FAED92C.4090103@samsung.com>
-References: <4FAED92C.4090103@samsung.com>
-Message-ID: <CAOesGMj8PgGRmdQQSnJmAurL1uYM2exxDaeTTWHVe9JQR0zQ-w@mail.gmail.com>
+Date: Sat, 12 May 2012 15:32:59 -0700
+Subject: [GIT PULL][Update x2] Urgent fixes (for v3.4 if possible) for
+ Renesas ARM-based platforms
+In-Reply-To: <201205122309.53928.rjw@sisk.pl>
+References: <201205112025.13478.rjw@sisk.pl> <201205122256.24289.rjw@sisk.pl>
+ <201205122309.53928.rjw@sisk.pl>
+Message-ID: <CAOesGMgULO=os=pp8J3aMQDWuWse308xBtEvfMRcTnSz+JHo7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Rafael,
 
-
-Since we are _so_ close to release, I am going to be picky about what
-kind of patches we're going to accept for 3.4. See below.
-
-On Sat, May 12, 2012 at 2:42 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-
-
-> Changhwan Youn (1):
-> ? ? ?ARM: EXYNOS: fix the hotplug for Cortex-A15
-
-This is a feature, not a bug fix -- cpu hotplug has never worked for
-A15 based on the patch description. So per definition it's 3.5
-material.
-
-Also, I'll send out a comment on the patch itself, it shouldn't check
-for SoC version, it should check for core version. See separate email
-shortly.
-
-> Jose Miguel Goncalves (1):
-> ? ? ?ARM: SAMSUNG: Fix for S3C2412 EBI memory mapping
-
-This has been broken since 2.6.32. Please queue it up in a fixes
-branch for the 3.5 merge window instead, it doesn't qualify as a
-recent regression and thus we shouldn't try to squeeze it in before
-the merge window closes.
-
-> Kukjin Kim (1):
-> ? ? ?ARM: EXYNOS: fix ctrlbit for exynos5_clk_pdma1
+On Sat, May 12, 2012 at 2:09 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> Hi,
 >
-> Marek Szyprowski (1):
-> ? ? ?ARM: EXYNOS: use s5p-timer for UniversalC210 board
+> Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+>
+> ? ?Linux 3.4-rc6
+>
+> with top-most commit e994d5eb7c3e45e13eb4fc882a47238f8dc4d63e
+>
+> ? ?ARM / mach-shmobile: Invalidate caches when booting secondary cores
+>
+> from the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
+>
+> to receive urgent fixes for Renesas ARM-based platforms. ?Four of these commits
+> are fixes of regressions new in 3.4-rc and the last one is necessary for SMP to
+> work on those systems in general.
 
-Those two look appropriate. Please send a new pull request with those two.
+Pulled! Thanks for the quick respin. I'll send them up shortly,
+there's one other 3.4 fixes pull request that I'm waiting on a respin
+for and off they will go.
 
 
 -Olof
