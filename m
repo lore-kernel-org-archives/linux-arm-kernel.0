@@ -1,57 +1,49 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 11 May 2012 18:51:55 -0600
-Subject: [GIT PULL] gpio/omap: cleanups for v3.5
-In-Reply-To: <874nrmtf47.fsf@ti.com>
-References: <874nrmtf47.fsf@ti.com>
-Message-ID: <20120512005156.5131B3E0791@localhost>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Fri, 11 May 2012 18:04:58 -0700
+Subject: [PATCH] RFC: ARM: msm: re-read DMA IRQ status on each iteration
+In-Reply-To: <1336738791-15037-1-git-send-email-linus.walleij@stericsson.com>
+References: <1336738791-15037-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4FADB73A.8050200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012 17:30:48 -0700, Kevin Hilman <khilman@ti.com> wrote:
-> Hi Grant,
-> 
-> Here's the final round of GPIO cleanups for v3.5.  This branch is based
-> on my for_3.5/fixes/gpio branch you just pulled.
-> 
-> Kevin
-> 
-> 
-> The following changes since commit 6edd94db250038c8fdf176f23ca4017d2f312509:
-> 
->   gpio/omap: fix incorrect initialization of omap_gpio_mod_init (2012-05-10 07:16:15 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/gpio/cleanup
+On 05/11/2012 05:19 AM, Linus Walleij wrote:
+> David et al: I'm uncertain about this one since the comment
+> says that the read clears the IRQ, such as if the read operation
+> itself will latch out the flag register and clear it. (I encountered
+> this behaviour in the MOS6569 VIC raster IRQ register $D019 in the
+> 1980s if I'm not mistaken.)
+> ---
+>   arch/arm/mach-msm/dma.c |    6 ++----
+>   1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
+> index 02cae5e..ee11afe 100644
+> --- a/arch/arm/mach-msm/dma.c
+> +++ b/arch/arm/mach-msm/dma.c
+> @@ -147,10 +147,8 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
+>
+>   	spin_lock_irqsave(&msm_dmov_lock, irq_flags);
+>
+> -	int_status = readl(DMOV_ISR); /* read and clear interrupt */
+> -	PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
+> -
+> -	while (int_status) {
+> +	while (int_status = readl(DMOV_ISR)) {
+> +		PRINT_FLOW("msm_datamover_irq_handler: DMOV_ISR %x\n", int_status);
+>   		mask = int_status&  -int_status;
+>   		id = fls(mask) - 1;
+> PRINT_FLOW("msm_datamover_irq_handler %08x %08x id %d\n", int_status, 
+> mask, id);
+This is incorrect. Reading from the DMOV_ISR register there will 
+actually clear it, causing us to
+lose state for interrupts on channels other than the first one 
+processed. If we miss some by not
+re-reading the register, another interrupt will be raised so it isn't a 
+problem.
 
-Applied, thanks.
-
-g.
-
-> 
-> for you to fetch changes up to 1b1287032df3a69d3ef9a486b444f4ffcca50d01:
-> 
->   gpio/omap: fix missing check in *_runtime_suspend() (2012-05-11 17:08:40 -0700)
-> 
-> ----------------------------------------------------------------
-> Tarun Kanti DebBarma (8):
->       gpio/omap: remove virtual_irq_start variable
->       gpio/omap: remove saved_fallingdetect, saved_risingdetect
->       gpio/omap: remove suspend_wakeup field from struct gpio_bank
->       gpio/omap: remove saved_wakeup field from struct gpio_bank
->       gpio/omap: remove retrigger variable in gpio_irq_handler
->       gpio/omap: remove suspend/resume callbacks
->       gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
->       gpio/omap: fix missing check in *_runtime_suspend()
-> 
->  arch/arm/mach-omap1/gpio15xx.c         |    2 -
->  arch/arm/mach-omap1/gpio16xx.c         |    5 --
->  arch/arm/mach-omap1/gpio7xx.c          |    7 ---
->  arch/arm/mach-omap2/gpio.c             |    3 +-
->  arch/arm/plat-omap/include/plat/gpio.h |    3 +-
->  drivers/gpio/gpio-omap.c               |  103 +++++++-------------------------
->  6 files changed, 27 insertions(+), 96 deletions(-)
+Jeff
 
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
