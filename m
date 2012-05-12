@@ -1,150 +1,383 @@
 From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Sat, 12 May 2012 10:53:58 +0200
-Subject: [PATCH 5/5] ARM: at91: Modify board_dt init sequence
+Date: Sat, 12 May 2012 10:53:57 +0200
+Subject: [PATCH 4/5] ARM: at91: add pmc clks definition into device tree
 In-Reply-To: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
 References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
-Message-ID: <1336812838-3649-6-git-send-email-linux-arm@overkiz.com>
+Message-ID: <1336812838-3649-5-git-send-email-linux-arm@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the init sequence defined by board_dt machine.
-PMC common clk implementation needs the slab allocator to be up => late_time_init.
-GPIO needs the GPIO periph clks => after clk inits.
-GPIO irq init needs the GPIO chips => after GPIO inits.
-
+This patch defines some clks for at91sam9260 and sam9g20 SoC.
+All peripherals clocks are not defined yet (only usart, GPIO).
 
 ---
- arch/arm/mach-at91/board-dt.c |   72 +++++++++++++++++++++++++++++++++++++++--
- arch/arm/mach-at91/setup.c    |    8 ++---
- 2 files changed, 74 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/at91sam9260.dtsi |  299 +++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9g20.dtsi |   44 ++++++
+ 2 files changed, 342 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index a1fce05..b12d43f 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -22,6 +22,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
-+#include <asm/mach/time.h>
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index f4605ff..a5379cd 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -64,8 +64,305 @@
+ 			};
  
- #include "generic.h"
- 
-@@ -29,6 +30,11 @@
- static const struct of_device_id irq_of_match[] __initconst = {
- 
- 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
-+	{ /*sentinel*/ }
-+};
+ 			pmc: pmc at fffffc00 {
+-				compatible = "atmel,at91rm9200-pmc";
++				compatible = "atmel,at91-pmc";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0xfffffc00 0x100>;
++				interrupts = <1 4>;
 +
-+static const struct of_device_id gpio_irq_of_match[] __initconst = {
++				capabilities = <0xf031f77 0x1>; /*	SC{ER,DR,SR}, PC{ER,DR,SR}, MOR,
++													MCFR, PLL{AR,BR}, MCKR, PCK{0,1},
++													I{ER,DR,SR,MR}, PLLICPR */
 +
- 	{ .compatible = "atmel,at91rm9200-gpio", .data = at91_gpio_of_irq_setup },
- 	{ .compatible = "atmel,at91sam9x5-gpio", .data = at91_gpio_of_irq_setup },
- 	{ /*sentinel*/ }
-@@ -49,11 +55,73 @@ static const char *at91_dt_board_compat[] __initdata = {
- 	NULL
++
++				slow: osc at 0 {
++					compatible = "atmel,at91-pmc-slow", "fixed-rate";
++					reg = <0>;
++					clock-frequency = <32768>;
++					#clock-cells = <0>;
++					clock-output-names = "slow";
++
++					characteristics {
++						output = <22000 42000>;
++					};
++				};
++
++				main: osc at 1 {
++					compatible = "atmel,at91-pmc-main", "fixed-rate";
++					reg = <1>;
++
++					#clock-cells = <0>;
++					clock-output-names = "main";
++
++					characteristics {
++						output = <3000000 20000000>;
++					};
++				};
++
++				plla: pll at 0 {
++					compatible = "atmel,at91-pmc-pll";
++					reg = <0>;
++
++					#clock-cells = <0>;
++					clocks = <&main>;
++					clock-output-names = "plla";
++
++					mask = <0xf8000000>;
++
++					characteristics {
++						input = <1000000 32000000>;
++						output = <
++								0 0 /* icpll = 0, out = 0 => no such conf*/
++								0 0 /* icpll = 0, out = 1 => no such conf*/
++								0 0 /* icpll = 0, out = 2 => no such conf*/
++								0 0 /* icpll = 0, out = 3 => no such conf*/
++								80000000 160000000 /* icpll = 1, out = 0 => 80 to 160MHz */
++								0 0 /* icpll = 1, out = 1 => no such conf*/
++								150000000 240000000 /* icpll = 1, out = 2 => 80 to 160MHz */
++								0 0 /* icpll = 1, out = 3 => no such conf*/
++							 >;
++					};
++
++				};
++
++				pllb: pll at 1 {
++					compatible = "atmel,at91-pmc-pll";
++					reg = <1>;
++
++					#clock-cells = <0>;
++					clocks = <&main>;
++					clock-output-names = "pllb";
++
++					mask = <0xf8000000>;
++
++					characteristics {
++						input = <1000000 32000000>;
++						output = <
++								0 0 /* icpll = 0, out = 0 => no such conf*/
++								0 0 /* icpll = 0, out = 1 => no such conf*/
++								0 0 /* icpll = 0, out = 2 => no such conf*/
++								0 0 /* icpll = 0, out = 3 => no such conf*/
++								80000000 160000000 /* icpll = 1, out = 0 => 80 to 160MHz */
++								0 0 /* icpll = 1, out = 1 => no such conf*/
++								150000000 240000000 /* icpll = 1, out = 2 => 80 to 160MHz */
++								0 0 /* icpll = 0, out = 3 => no such conf*/
++							 >;
++					};
++
++				};
++
++				pres: master at 0 {
++					compatible = "atmel,at91-pmc-pres";
++					offset = <0x2>;
++
++					#clock-cells = <0>;
++					clocks = <&slow>, <&main>, <&plla>, <&pllb>;
++					clock-output-names = "pres";
++				};
++
++				master: master at 1 {
++					compatible = "atmel,at91-pmc-master";
++					divisors = <1 2 4 6>;
++
++					#clock-cells = <0>;
++					clocks = <&pres>;
++					clock-output-names = "mck";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "mck";
++					};
++
++					lookup at 1 {
++						compatible = "clk-lookup";
++						condid = "usart";
++						devid = "fffff200.serial";
++					};
++
++					characteristics {
++						output = <0 94500000>; /* master clock range at 1.65V*/
++					};
++
++				};
++
++				proc: sys at 0 {
++					compatible = "atmel,at91-pmc-proc";
++					divisor;
++
++					#clock-cells = <0>;
++					clocks = <&pres>;
++					clock-output-names = "proc";
++
++					characteristics {
++						output = <0 189000000>; /* proc clock range at 1.65V*/
++					};
++
++				};
++
++				prog0: sys at 8 {
++					compatible = "atmel,at91-pmc-prog", "atmel,at91-pmc-sys";
++					reg = <8>;
++					css-length = <2>;
++					pres-offset = <2>;
++
++					#clock-cells = <0>;
++					clocks = <&slow>, <&main>, <&plla>, <&pllb>;
++					clock-output-names = "prog0";
++
++				};
++
++				prog1: sys at 9 {
++					compatible = "atmel,at91-pmc-prog", "atmel,at91-pmc-sys";
++					reg = <9>;
++					css-length = <2>;
++					pres-offset = <2>;
++
++					#clock-cells = <0>;
++					clocks = <&slow>, <&main>, <&plla>, <&pllb>;
++					clock-output-names = "prog1";
++
++				};
++
++				usart0ck: periph at 6 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <6>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffb0000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffb0000.serial";
++					};
++				};
++
++				usart1ck: periph at 7 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <7>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffb4000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffb4000.serial";
++					};
++				};
++
++				usart2ck: periph at 8 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <8>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffb8000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffb8000.serial";
++					};
++				};
++
++				usart3ck: periph at 23 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <23>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffd0000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffd0000.serial";
++					};
++				};
++
++				usart4ck: periph at 24 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <24>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffd4000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffd4000.serial";
++					};
++				};
++
++				usart5ck: periph at 25 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <25>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "fffd8000.serial";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "usart";
++						devid = "fffd8000.serial";
++					};
++				};
++
++				pioAck: periph at 2 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <2>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "pioA";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "pioA";
++					};
++				};
++
++				pioBck: periph at 3 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <3>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "pioB";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "pioB";
++					};
++				};
++
++				pioCck: periph at 4 {
++					compatible = "atmel,at91-pmc-periph";
++					reg = <4>;
++
++					#clock-cells = <0>;
++					clocks = <&master>;
++
++					clock-output-names = "pioC";
++
++					lookup at 0 {
++						compatible = "clk-lookup";
++						conid = "pioC";
++					};
++				};
+ 			};
+ 
+ 			rstc at fffffd00 {
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 0eb1a75..ac80065 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -15,4 +15,48 @@
+ 	memory {
+ 		reg = <0x20000000 0x08000000>;
+ 	};
++
++	ahb {
++		apb {
++			pmc: pmc at fffffc00 {
++				plla: pll at 0 {
++
++					mask = <0xff000000>;
++
++					characteristics {
++						input = <2000000 32000000>;
++						output = <
++									745000000 800000000 /* icpll = 0, out = 0 => 745 to 800MHz */
++									695000000 750000000 /* icpll = 0, out = 1 => 695 to 750MHz */
++									645000000 700000000 /* icpll = 0, out = 2 => 645 to 700MHz */
++									595000000 650000000 /* icpll = 0, out = 3 => 595 to 650MHz */
++									545000000 600000000 /* icpll = 1, out = 0 => 545 to 600MHz */
++									495000000 550000000 /* icpll = 1, out = 1 => 495 to 550MHz */
++									445000000 500000000 /* icpll = 1, out = 2 => 445 to 500MHz */
++									400000000 450000000 /* icpll = 1, out = 3 => 400 to 450MHz */
++								 >;
++					};
++				};
++
++				pllb: pll at 1 {
++
++					mask = <0xffe00000>;
++
++					characteristics {
++						input = <2000000 32000000>;
++						output = <
++									30000000 100000000 /* icpll = 0, out = 0 => 30 to 100MHz */
++									0 0 /* icpll = 0, out = 1 => no such conf */
++									0 0 /* icpll = 0, out = 2 => no such conf */
++									0 0 /* icpll = 0, out = 3 => no such conf */
++									0 0 /* icpll = 1, out = 0 => no such conf */
++									0 0 /* icpll = 1, out = 1 => no such conf */
++									0 0 /* icpll = 1, out = 2 => no such conf */
++									0 0 /* icpll = 1, out = 3 => no such conf */
++								 >;
++					};
++				};
++			};
++		};
++	};
  };
- 
-+static void __init at91_dt_late_time_init(void);
-+
-+static void __init at91_dt_timer_init(void) {
-+	late_time_init = at91_dt_late_time_init;
-+}
-+
-+struct sys_timer at91_dt_timer = {
-+	.init = at91_dt_timer_init,
-+};
-+
-+extern void __init at91_pmc_of_init(struct device_node *np);
-+
-+static const struct of_device_id clk_of_match[] __initconst = {
-+
-+	{ .compatible = "atmel,at91-pmc", .data = at91_pmc_of_init },
-+	{ /*sentinel*/ }
-+};
-+
-+static const struct of_device_id timer_of_match[] __initconst = {
-+
-+	{ .compatible = "atmel,at91sam9260-pit", .data = &at91sam926x_timer },
-+	{ /*sentinel*/ }
-+};
-+
-+static void __init at91_dt_late_time_init(void) {
-+	struct device_node *np = NULL;
-+	const struct of_device_id *match;
-+	struct sys_timer *timer;
-+	void (*init_fn) (struct device_node *np);
-+
-+	np = of_find_matching_node(NULL, clk_of_match);
-+	if (!np)
-+		panic("unable to find compatible clock controller node in dtb\n");
-+
-+	match = of_match_node(clk_of_match, np);
-+	init_fn = match->data;
-+	init_fn(np);
-+
-+	of_node_put(np);
-+
-+	at91_dt_initialize();
-+
-+	of_irq_init(gpio_irq_of_match);
-+
-+	np = of_find_matching_node(NULL, timer_of_match);
-+	if (!np)
-+		panic("unable to find compatible sys timer node in dtb\n");
-+
-+	match = of_match_node(timer_of_match, np);
-+
-+	timer = match->data;
-+	timer->init();
-+	at91_dt_timer.suspend = timer->suspend;
-+	at91_dt_timer.resume = timer->resume;
-+#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
-+	at91_dt_timer.offset = timer->offset;
-+#endif
-+
-+	of_node_put(np);
-+}
-+
-+
- DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
- 	/* Maintainer: Atmel */
--	.timer		= &at91sam926x_timer,
-+	.timer		= &at91_dt_timer,
- 	.map_io		= at91_map_io,
--	.init_early	= at91_dt_initialize,
-+/*	.init_early	= at91_dt_initialize, */
- 	.init_irq	= at91_dt_init_irq,
- 	.init_machine	= at91_dt_device_init,
- 	.dt_compat	= at91_dt_board_compat,
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 97cc04d..ac3ee48 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -435,15 +435,14 @@ void __init at91_dt_initialize(void)
- 	at91_dt_shdwc();
- 
- 	/* Init clock subsystem */
--	at91_dt_clock_init();
-+	/*at91_dt_clock_init();*/
- 
- 	/* Register the processor-specific clocks */
--	at91_boot_soc.register_clocks();
-+	/*at91_boot_soc.register_clocks();*/
- 
- 	at91_boot_soc.init();
- }
--#endif
--
-+#else
- void __init at91_initialize(unsigned long main_clock)
- {
- 	at91_boot_soc.ioremap_registers();
-@@ -456,3 +455,4 @@ void __init at91_initialize(unsigned long main_clock)
- 
- 	at91_boot_soc.init();
- }
-+#endif
 -- 
 1.7.9.5
