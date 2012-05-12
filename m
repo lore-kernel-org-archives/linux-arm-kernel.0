@@ -1,17 +1,18 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 12 May 2012 16:00:49 +0800
-Subject: [GIT PULL] Adopt pinctrl support for imx and mxs drivers
-In-Reply-To: <CAOesGMjpRJO5+UsNoo09pAZJo-_WG=Gcf8t8qwboH+-PoOw2-A@mail.gmail.com>
-References: <20120512021726.GC17875@S2101-09.ap.freescale.net>
- <CAOesGMjpRJO5+UsNoo09pAZJo-_WG=Gcf8t8qwboH+-PoOw2-A@mail.gmail.com>
-Message-ID: <20120512080047.GE17875@S2101-09.ap.freescale.net>
+Date: Sat, 12 May 2012 16:01:38 +0800
+Subject: [GIT PULL] imx device tree changes for v3.5
+In-Reply-To: <CAOesGMj3Up4GASQ0O6L41U=DNQjk1A361xRBDfFuiGnM2AjL3A@mail.gmail.com>
+References: <20120512030722.GD17875@S2101-09.ap.freescale.net>
+ <CAOesGMj3Up4GASQ0O6L41U=DNQjk1A361xRBDfFuiGnM2AjL3A@mail.gmail.com>
+Message-ID: <20120512080136.GF17875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 11:55:14PM -0700, Olof Johansson wrote:
-> Please double-check that my conflict resolution in for-next was done right.
+On Fri, May 11, 2012 at 11:56:02PM -0700, Olof Johansson wrote:
+> Pulled, thanks. The conflicts were reasonably contained, but please
+> make sure I resolved them right.
 > 
-Thanks Olof.  It looks all good.
+Thanks, Olof.  It looks all right.
 
 -- 
 Regards,
