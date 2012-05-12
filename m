@@ -1,91 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 May 2012 22:45:52 -0700
-Subject: [PATCH v2] arm: msm: fix up very basic HTC Sapphire support
-In-Reply-To: <1336781737-31470-1-git-send-email-davidb@codeaurora.org>
-References: <CAOesGMiHfQwWXSQwvcEPxY63FEjbsB7ux4dHvAPM99Kf43cDZw@mail.gmail.com>
- <1336781737-31470-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <CAOesGMi1UyNTWjTapVb64QQwTCCFJydLC7zurPP3ULhLRGvu3g@mail.gmail.com>
+Date: Fri, 11 May 2012 22:55:40 -0700
+Subject: [GIT PULL] Urgent fixes (for v3.4 if possible) for Renesas
+ ARM-based platforms
+In-Reply-To: <CANqRtoSDN+vYet+9qiNZQq73BdSiqPL3K+95wCbNL29wDvT4EA@mail.gmail.com>
+References: <201205112025.13478.rjw@sisk.pl>
+ <CAOesGMh3g-7oTNBoj2ZWGw+9P1Sf7V89etLb-iZiVoKDEvhO8w@mail.gmail.com>
+ <CANqRtoSDN+vYet+9qiNZQq73BdSiqPL3K+95wCbNL29wDvT4EA@mail.gmail.com>
+Message-ID: <CAOesGMieNxya9w=2a0Lv06qbVb2SOtiLTYeWW=kQ9sbkSzbtvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hej Magnus,
 
-Sorry, I should have found the below items on the first review and not
-now on the second one, but see below.
+On Fri, May 11, 2012 at 9:28 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
 
-On Fri, May 11, 2012 at 5:15 PM, David Brown <davidb@codeaurora.org> wrote:
-> From: Daniel Walker <dwalker@fifo99.com>
+>>> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
+>>
+>> No such branch (nor tag).
 >
-> Adds sapphire into the make file, and fixes all the code problems that
-> prevented it from building (including adding board-sapphire.h)
+> I believe Rafael will get back to you about that when he gets to his computer.
+
+Yep, good.
+
+>>> Guennadi Liakhovetski (2):
+>>> ? ? ?ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
+>>> ? ? ?ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
+>>
+>> These seem to fix the long-standing build errors on the two platforms,
+>> but that's impossible to tell from reading the commit messages (they
+>> are empty). Care to add one describing why they're important to go in?
 >
-> [davidb at codeaurora.org: Move MACH_TROUT selection back under
-> ARCH_MSM7X00A]
+> I only know that a) some boards don't build without these fixes and b)
+> they used to build just fine.
 >
-> Signed-off-by: Daniel Walker <dwalker@fifo99.com>
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
-> v2 - Moved MACH_TROUT selection back under the ARCH config target
->
-> ?arch/arm/mach-msm/Kconfig ? ? ? ? ?| ? ?9 +-
-> ?arch/arm/mach-msm/Makefile ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-msm/board-sapphire.c | ? 18 +--
-> ?arch/arm/mach-msm/board-sapphire.h | ?224 ++++++++++++++++++++++++++++++++++++
-> ?4 files changed, 234 insertions(+), 18 deletions(-)
-> ?create mode 100644 arch/arm/mach-msm/board-sapphire.h
->
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 1cd40ad..70eae63 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -6,7 +6,7 @@ choice
->
-> ?config ARCH_MSM7X00A
-> ? ? ? ?bool "MSM7x00A / MSM7x01A"
-> - ? ? ? select MACH_TROUT if !MACH_HALIBUT
-> + ? ? ? select MACH_TROUT if (!MACH_HALIBUT && !MACH_SAPPHIRE)
+> Perhaps Guennadi [CC:ed] could be so kind to fill us in with the blanks?
 
-Better, thanks!
-
-
-> diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> index 4ad3969..aff4e5c 100644
-> --- a/arch/arm/mach-msm/Makefile
-> +++ b/arch/arm/mach-msm/Makefile
-> @@ -20,6 +20,7 @@ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-> ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-> ?obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->
-> +obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o devices-msm7x00.o
-> ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
-> ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
-> ?obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-
-Unrelated to this change per se, but it seems like devices-msm7x00.o
-should be on an obj-$(CONFIG_ARCH_MSM7X00A) statement instead of
-duplicated for all boards.
-
-Also, the trout line is mostly duplicated, only delta is panel. Looks
-broken. Both of these things is material for a separate patch though.
-
-> diff --git a/arch/arm/mach-msm/board-sapphire.h b/arch/arm/mach-msm/board-sapphire.h
-> new file mode 100644
-> index 0000000..70f925e
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-sapphire.h
-> @@ -0,0 +1,224 @@
-[..]
-> +void config_sapphire_camera_on_gpios(void);
-> +void config_sapphire_camera_off_gpios(void);
-> +int sapphire_get_smi_size(void);
-> +unsigned int sapphire_get_hwid(void);
-> +unsigned int sapphire_get_skuid(void);
-> +unsigned int is_12pin_camera(void);
-> +int sapphire_is_5M_camera(void);
-> +int sapphire_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on);
-
-Many (all?) of these functions are not to be found in the code. Please
-don't add prototypes for code that isn't there.
+It was pretty obvious once I tried applying them and building that
+they did indeed resolve the build errors. However, the reason I'm
+asking for a better description is that when looking at just the pull
+request, or even the patch full commit description, it was impossible
+to tell why the patch was urgent as a fix. So, while I am not
+questioning that the patch should be included, I'm just requesting to
+make sure it's properly described. That's also good for historical
+purposes when someone is reading the git logs a year from now, etc.
 
 
 -Olof
