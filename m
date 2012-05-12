@@ -1,87 +1,53 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 12 May 2012 22:24:01 +0200
-Subject: [GIT PULL] Urgent fixes (for v3.4 if possible) for Renesas
- ARM-based platforms
-In-Reply-To: <201205122208.13817.rjw@sisk.pl>
-References: <201205112025.13478.rjw@sisk.pl>
- <CAOesGMigY=S+aQX84VP9MVpNUYrMDLEXMCJU3L-x3uYEYOTkmw@mail.gmail.com>
- <201205122208.13817.rjw@sisk.pl>
-Message-ID: <201205122224.01206.rjw@sisk.pl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 13 May 2012 06:42:04 +0900
+Subject: [GIT PULL] Samsung fixes for v3.4
+Message-ID: <4FAED92C.4090103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 12, 2012, Rafael J. Wysocki wrote:
-> On Saturday, May 12, 2012, Olof Johansson wrote:
-> > On Fri, May 11, 2012 at 11:37 PM, Guennadi Liakhovetski
-> > <g.liakhovetski@gmx.de> wrote:
-> > > On Fri, 11 May 2012, Olof Johansson wrote:
-> > >
-> > >> Hej Magnus,
-> > >>
-> > >> On Fri, May 11, 2012 at 9:28 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> > >>
-> > >> >>>  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
-> > >> >>
-> > >> >> No such branch (nor tag).
-> > >> >
-> > >> > I believe Rafael will get back to you about that when he gets to his computer.
-> > >>
-> > >> Yep, good.
-> > >>
-> > >> >>> Guennadi Liakhovetski (2):
-> > >> >>>      ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
-> > >> >>>      ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
-> > >> >>
-> > >> >> These seem to fix the long-standing build errors on the two platforms,
-> > >> >> but that's impossible to tell from reading the commit messages (they
-> > >> >> are empty). Care to add one describing why they're important to go in?
-> > >> >
-> > >> > I only know that a) some boards don't build without these fixes and b)
-> > >> > they used to build just fine.
-> > >> >
-> > >> > Perhaps Guennadi [CC:ed] could be so kind to fill us in with the blanks?
-> > >>
-> > >> It was pretty obvious once I tried applying them and building that
-> > >> they did indeed resolve the build errors. However, the reason I'm
-> > >> asking for a better description is that when looking at just the pull
-> > >> request, or even the patch full commit description, it was impossible
-> > >> to tell why the patch was urgent as a fix. So, while I am not
-> > >> questioning that the patch should be included, I'm just requesting to
-> > >> make sure it's properly described. That's also good for historical
-> > >> purposes when someone is reading the git logs a year from now, etc.
-> > >
-> > > Ok, sorry, I wasn't sure from the previous mail - would you prefer to
-> > > actually extend their commit messages? As described here
-> > >
-> > > http://thread.gmane.org/gmane.linux.kernel.mmc/12744/focus=12748
-> > >
-> > > These patches are a part of a patch-series, so, when they were submitted
-> > > in that context, it was pretty obvious how they relate to the rest.
-> > > However, unfortunately, they are now applied later than the main patches
-> > > in that series, so, their purpose has become much less obvious, and their
-> > > main feature now seems to be not the conversion of the affected platforms,
-> > > but fixing the build.
-> > 
-> > Yeah, that seems to be what happened here, so indeed by now the
-> > commits are a bit out of context.
-> > 
-> > > So, I think, we could use something like this in the
-> > > patch descriptions:
-> > >
-> > > This also fixes modular mmc build on this platform by eliminating the use
-> > > of an inline function, which calls into the mmc core.
-> > 
-> > Sounds good, with a cut-and-paste of the build error that happens
-> > without the patch for extra credit.
-> > 
-> > Rafael, can you add the above or something like it to the commit
-> > messages when you push out the fixes branch?
-> 
-> Well, I've pushed it already, but I can still update it.  Please don't
-> pull from it yet.
+Hi Arnd and Olof,
 
-OK, updated and pushed back.
+Sorry for late request for v3.4.
+If there is a chance, please pull this for v3.4:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-4
 
-Do you want me to send a new pull request for it?
+This is including fixes of hotplug for Cortext-A15(EXYNOS5) and build 
+failure of S3C2412(smdk2412 test) and bit typo for clk_pdma1 of exynos5 
+and build failure of early version of exynos4210 on universalc210 board.
 
-Rafael
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+
+   Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+v3.4-samsung-fixes-4
+
+Changhwan Youn (1):
+       ARM: EXYNOS: fix the hotplug for Cortex-A15
+
+Jose Miguel Goncalves (1):
+       ARM: SAMSUNG: Fix for S3C2412 EBI memory mapping
+
+Kukjin Kim (1):
+       ARM: EXYNOS: fix ctrlbit for exynos5_clk_pdma1
+
+Marek Szyprowski (1):
+       ARM: EXYNOS: use s5p-timer for UniversalC210 board
+
+  arch/arm/mach-exynos/Kconfig                 |    3 ++
+  arch/arm/mach-exynos/clock-exynos5.c         |    2 +-
+  arch/arm/mach-exynos/hotplug.c               |   39 
+++++++++++++++++++++++++-
+  arch/arm/mach-exynos/mach-universal_c210.c   |    4 ++-
+  arch/arm/plat-samsung/include/plat/map-s3c.h |    2 +-
+  5 files changed, 45 insertions(+), 5 deletions(-)
