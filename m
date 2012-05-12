@@ -1,34 +1,56 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 12 May 2012 12:31:28 +0530
-Subject: [PATCH 3/7] mmc: dw_mmc: add device tree support
-In-Reply-To: <Pine.LNX.4.64.1205040047280.18111@axis700.grange>
-References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
- <1335935266-25289-4-git-send-email-thomas.abraham@linaro.org>
- <Pine.LNX.4.64.1205040047280.18111@axis700.grange>
-Message-ID: <CAJuYYwQj7gzZ9piJAJLcf7SiyJnQ6nZ63-X9ieQ-FCj6TNhQPQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 May 2012 00:01:39 -0700
+Subject: [GIT PULL] ep93xx fixes for 3.5
+In-Reply-To: <1336728481.15424.1905.camel@vkoul-udesk3>
+References: <4FAC6548.5060008@gmail.com>
+ <CAOesGMjC0J_7NRQWrOkRNqrBbvKoBs3VJPOSSv5P4hqwpAE=OA@mail.gmail.com>
+ <1336728481.15424.1905.camel@vkoul-udesk3>
+Message-ID: <CAOesGMhvJ3RgYiYbpf+WAVFkW9u1CTJnbPHYby8KuKLiPsr+wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 May 2012 04:18, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+On Fri, May 11, 2012 at 2:28 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Thu, 2012-05-10 at 23:15 -0700, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Thu, May 10, 2012 at 6:03 PM, Ryan Mallon <rmallon@gmail.com> wrote:
+>> > The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
+>> >
+>> > ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
+>> >
+>> > are available in the git repository at:
+>> >
+>> > ?git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.5
+>> >
+>> > for you to fetch changes up to 2b3c83efc9a653af6a24799eeb1a2900ba0439e6:
+>> >
+>> > ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels (2012-04-20 08:37:19 +1000)
+>> >
+>> > ----------------------------------------------------------------
+>> > Rafal Prylowski (2):
+>> > ? ? ?arm: ep93xx: Don't try to release not acquired GPIO lines
+>> > ? ? ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels
+>>
+>> Technically, this is a feature, not a fix. I also didn't see an ack
+>> from the DMA maintainer on it since it would normally go in through
+>> his tree.
+>>
+>> Vinod, you OK with this coming through arm-soc? Looks fairly
+>> uncontroversial so it shouldn't be a big deal but I don't know if it
+>> might collide with anything else you have queued up.
+> Looks okay to me.
+> For: dmaengine/ep93xx_dma: Implement double buffering for M2M DMA
+> channels
 >
-> What do you think about this patch
->
-> http://www.spinics.net/lists/linux-sh/msg11259.html
->
-> and about using mmc-generic OF properties instead of creating yet another
-> copy of proprietary ones?
+> Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
 
-Hi Guennadi,
 
-This patch does not intend to add any custom mmc properties. I checked
-your patch (in the link mentioned above) and most of the bindings are
-similar to what you have come up with except for the "ro-gpios" for
-which I have used "wp-gpios". But this is following what Arnd had
-proposed here: http://www.spinics.net/lists/linux-mmc/msg13564.html.
+Thanks!
 
-Regarding the MMC_CAP_4_BIT_DATA and MMC_CAP_8_BIT_DATA in your patch,
-these can be derived from the bus width information that the driver
-receives.
+Ryan, since the branch has one board fix and one driver feature, I
+pulled it into our next/drivers branch instead of fixes. Either way,
+it's queued for the merge window now.
 
-Thanks,
-Thomas.
+
+
+-Olof
