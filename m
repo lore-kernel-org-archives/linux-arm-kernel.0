@@ -1,52 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 12 May 2012 13:36:30 +0200
-Subject: [PATCH 0/4] MXS: I2C improvements
-In-Reply-To: <201205092033.46812.marex@denx.de>
-References: <1335837621-14816-1-git-send-email-marex@denx.de>
- <201205092033.46812.marex@denx.de>
-Message-ID: <20120512113630.GE20673@pengutronix.de>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Sat, 12 May 2012 13:37:05 +0100
+Subject: [PATCH 2/4 V2] ARM: orion5x: ts78xx fix NAND resource off by one
+In-Reply-To: <1336826227-17020-1-git-send-email-alex@digriz.org.uk>
+References: <1336826227-17020-1-git-send-email-alex@digriz.org.uk>
+Message-ID: <1336826227-17020-3-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 08:33:46PM +0200, Marek Vasut wrote:
-> > This patchset implements support for adjustment of I2C bus speed via
-> > platform data. Further, it implements support for DMA transfers into the
-> > mxs-i2c driver. Lastly, there is a fix for GCC4.7 warning included.
-> > 
-> > Marek Vasut (4):
-> >   MXS: Allow passing i2c bus speed via platform data
-> >   MXS: Set I2C timing registers for mxs-i2c
-> >   MXS: Implement DMA support into mxs-i2c
-> >   MXS: Fix GCC4.7 complaint in mxs-i2c
-> 
-> Bump?
+Changelog:
+ v2: use DEFINE_RES_MEM as suggesed by Hartley Sweeten
+ v1: inital release
 
-Regarding I2C, I think we will have DT support for it already in 3.5.
-So, I am with Shawn here to not introduce new features with new
-platform_data when there is a more recent alternative. So, drop 1/4 and
-refactor 2/4 according to DT (you only need to get and parse the
-"clock-frequency" property).
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ arch/arm/mach-orion5x/ts78xx-setup.c |   14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-3/4 is the most interesting patch of this series, since it is a major
-bugfix. Due to holidays, I won't be able to test it in the next 10 days,
-but I am very eager to get it into 3.5. Since it is a bugfix, we could
-probably get it in after the merge window, but I'll try to make the
-merge window nontheless. If somebody donates Tested or Acked or Reviewed
-tags, that would also help.
-
-I already NACKed 4/4, so I wonder why you resent it.
-
-Thanks,
-
-   Wolfram
-
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index c41f27b..d8670cb 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -292,11 +292,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
+ 	},
+ };
+ 
+-static struct resource ts78xx_ts_nand_resources = {
+-	.start		= TS_NAND_DATA,
+-	.end		= TS_NAND_DATA + 4,
+-	.flags		= IORESOURCE_MEM,
+-};
++static struct resource ts78xx_ts_nand_resources
++			= DEFINE_RES_MEM(TS_NAND_DATA, 4);
+ 
+ static struct platform_device ts78xx_ts_nand_device = {
+ 	.name		= "gen_nand",
+@@ -332,11 +329,8 @@ static void ts78xx_ts_nand_unload(void)
+  ****************************************************************************/
+ #define TS_RNG_DATA	(TS78XX_FPGA_REGS_PHYS_BASE | 0x044)
+ 
+-static struct resource ts78xx_ts_rng_resource = {
+-	.flags		= IORESOURCE_MEM,
+-	.start		= TS_RNG_DATA,
+-	.end		= TS_RNG_DATA + 4 - 1,
+-};
++static struct resource ts78xx_ts_rng_resource
++			= DEFINE_RES_MEM(TS_RNG_DATA, 4);
+ 
+ static struct timeriomem_rng_data ts78xx_ts_rng_data = {
+ 	.period		= 1000000, /* one second */
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120512/dce3f5fa/attachment.sig>
+1.7.10
