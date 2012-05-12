@@ -1,56 +1,61 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 May 2012 00:01:39 -0700
-Subject: [GIT PULL] ep93xx fixes for 3.5
-In-Reply-To: <1336728481.15424.1905.camel@vkoul-udesk3>
-References: <4FAC6548.5060008@gmail.com>
- <CAOesGMjC0J_7NRQWrOkRNqrBbvKoBs3VJPOSSv5P4hqwpAE=OA@mail.gmail.com>
- <1336728481.15424.1905.camel@vkoul-udesk3>
-Message-ID: <CAOesGMhvJ3RgYiYbpf+WAVFkW9u1CTJnbPHYby8KuKLiPsr+wg@mail.gmail.com>
+Date: Sat, 12 May 2012 00:07:29 -0700
+Subject: [PATCH 3/7] mmc: dw_mmc: add device tree support
+In-Reply-To: <CAJuYYwSmiPNrFhd9xr2AkAbRfJm_gP9ym+AXyy9jyPG3FnFuhA@mail.gmail.com>
+References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
+ <1335935266-25289-4-git-send-email-thomas.abraham@linaro.org>
+ <CAOesGMh_0dShqe+kSB1Xgn9bpLv0j+b9QP+vN9N57XHP1geSHg@mail.gmail.com>
+ <CAJuYYwSmiPNrFhd9xr2AkAbRfJm_gP9ym+AXyy9jyPG3FnFuhA@mail.gmail.com>
+Message-ID: <CAOesGMiXfODM=hDp9EP3uQOk041XCvPFfTzDwfkvBWeGWLdCgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 2:28 AM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Thu, 2012-05-10 at 23:15 -0700, Olof Johansson wrote:
->> Hi,
->>
->> On Thu, May 10, 2012 at 6:03 PM, Ryan Mallon <rmallon@gmail.com> wrote:
->> > The following changes since commit 0034102808e0dbbf3a2394b82b1bb40b5778de9e:
->> >
->> > ?Linux 3.4-rc2 (2012-04-07 18:30:41 -0700)
->> >
->> > are available in the git repository at:
->> >
->> > ?git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.5
->> >
->> > for you to fetch changes up to 2b3c83efc9a653af6a24799eeb1a2900ba0439e6:
->> >
->> > ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels (2012-04-20 08:37:19 +1000)
->> >
->> > ----------------------------------------------------------------
->> > Rafal Prylowski (2):
->> > ? ? ?arm: ep93xx: Don't try to release not acquired GPIO lines
->> > ? ? ?dmaengine/ep93xx_dma: Implement double buffering for M2M DMA channels
->>
->> Technically, this is a feature, not a fix. I also didn't see an ack
->> from the DMA maintainer on it since it would normally go in through
->> his tree.
->>
->> Vinod, you OK with this coming through arm-soc? Looks fairly
->> uncontroversial so it shouldn't be a big deal but I don't know if it
->> might collide with anything else you have queued up.
-> Looks okay to me.
-> For: dmaengine/ep93xx_dma: Implement double buffering for M2M DMA
-> channels
+Hi,
+
+On Thu, May 10, 2012 at 3:15 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> Hi Olof,
 >
-> Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
+> On 2 May 2012 23:37, Olof Johansson <olof@lixom.net> wrote:
+>> Hi,
+>
+> [...]
+>
+>>> +# Slots: The slot specific information are contained within child-nodes with
+>>> + ?each child-node representing a supported slot. There should be atleast one
+>>> + ?child node representing a card slot. The name of the slot child node should
+>>> + ?be 'slot{n}' where n is the unique number of the slot connnected to the
+>>> + ?controller. The following are optional properties which can be included in
+>>> + ?the slot child node.
+>>
+>> Since we're talking slots / cards on a bus, I think the addressing
+>> model would be useful here. So in the main controller node:
+>> ? ?#address-cells = <1>;
+>> ? ?#size-cells = <0>;
+>>
+>> And then each slot would need a reg property and possibly unit address:
+>>
+>> ? slot {
+>> ? ? ? ?reg = <0>;
+>> ? ? ? ?...
+>> ? };
+>>
+>> (unit addresses on the slots are only needed if they can't be
+>> disambiguated by name, so not needed if you only have one slot).
+>>
+>
+> Is the addressing model as described above needed in this case? The
+> address for a slot is not used by the controller driver code and is
+> just a virtual number. It would be sufficient to represent the nodes
+> representing the slots with a unique name.
 
+The driver has the concept of slot IDs (slot->id struct member), and
+the hardware definitely enumerates them.
 
-Thanks!
-
-Ryan, since the branch has one board fix and one driver feature, I
-pulled it into our next/drivers branch instead of fixes. Either way,
-it's queued for the merge window now.
-
+So, I think it makes sense to give a chance to enumerate the slots in
+the device tree. Otherwise, how do you know which one is which on
+hardware? It also opens up the flexibility to have the same name for
+both slots if it makes sense to describe a board that way.
 
 
 -Olof
