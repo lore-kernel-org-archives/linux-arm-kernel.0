@@ -1,118 +1,84 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sat, 12 May 2012 15:37:36 +0200 (CEST)
-Subject: [GIT PULL] Urgent fixes (for v3.4 if possible) for Renesas
- ARM-based platforms
-In-Reply-To: <CAOesGMigY=S+aQX84VP9MVpNUYrMDLEXMCJU3L-x3uYEYOTkmw@mail.gmail.com>
-References: <201205112025.13478.rjw@sisk.pl>
- <CAOesGMh3g-7oTNBoj2ZWGw+9P1Sf7V89etLb-iZiVoKDEvhO8w@mail.gmail.com>
- <CANqRtoSDN+vYet+9qiNZQq73BdSiqPL3K+95wCbNL29wDvT4EA@mail.gmail.com>
- <CAOesGMieNxya9w=2a0Lv06qbVb2SOtiLTYeWW=kQ9sbkSzbtvg@mail.gmail.com>
- <Pine.LNX.4.64.1205120832290.7233@axis700.grange>
- <CAOesGMigY=S+aQX84VP9MVpNUYrMDLEXMCJU3L-x3uYEYOTkmw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1205121532190.11826@axis700.grange>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 12 May 2012 19:10:06 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FADA5EC.8040807@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+ <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+ <4FA94B49.5050500@wwwdotorg.org>
+ <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
+ <4FAAC111.9020308@wwwdotorg.org>
+ <CAJe_Zhcrr2QqoY=H3=3EJLPQBjC3Yc43EDjqYXaNok9-T+=0yw@mail.gmail.com>
+ <4FABF445.3030105@wwwdotorg.org>
+ <CAJe_ZhduQuHnFyF20VnjZW9uz1szwL6O7=ow+tMqanmeHs58pQ@mail.gmail.com>
+ <4FAD6848.40700@wwwdotorg.org>
+ <CAJe_Zhc8T-vR8fjFLyT4bz6dj=TUyx0F8k=fAPYn_MnbGW5LBg@mail.gmail.com>
+ <4FADA5EC.8040807@wwwdotorg.org>
+Message-ID: <CAJe_Zhe61GTQQy+ZCVndAd=mrHxGBqyZ8JGZTSHsvE2XRzfGoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2012, Olof Johansson wrote:
+On 12 May 2012 05:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/11/2012 03:06 PM, Jassi Brar wrote:
+>> On 12 May 2012 00:58, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 05/10/2012 01:59 PM, Jassi Brar wrote:
+> ...
+>>>>> client0: i2s {
+>>>>> ? /* has 2 DMA request output signals: 0, 1 */
+>>>>> };
+>>>>>
+>>>>> client1: spdif {
+>>>>> ? /* has 2 DMA request signals: 0, 1 */
+>>>>> };
+>>>>>
+>>>> Do we also need to somehow tag these signals for the client to
+>>>> differentiate between TX and RX channel ?
+>>>
+>>> Yes, the client's DT binding would certainly need to describe how many
+>>> DMA request signals its HW generates, and give a unique ID to each. The
+>>> driver would need to request a DMA channel for a specific one of its DMA
+>>> requests.
+>>>
+>> Did I read "give a unique ID to each" correctly ?
+>
+> It'd be unique relative to that individual device or DT node, not at any
+> larger scope.
+>
+OK.
 
-> On Fri, May 11, 2012 at 11:37 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> > On Fri, 11 May 2012, Olof Johansson wrote:
-> >
-> >> Hej Magnus,
-> >>
-> >> On Fri, May 11, 2012 at 9:28 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>
-> >> >>> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
-> >> >>
-> >> >> No such branch (nor tag).
-> >> >
-> >> > I believe Rafael will get back to you about that when he gets to his computer.
-> >>
-> >> Yep, good.
-> >>
-> >> >>> Guennadi Liakhovetski (2):
-> >> >>> ? ? ?ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
-> >> >>> ? ? ?ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
-> >> >>
-> >> >> These seem to fix the long-standing build errors on the two platforms,
-> >> >> but that's impossible to tell from reading the commit messages (they
-> >> >> are empty). Care to add one describing why they're important to go in?
-> >> >
-> >> > I only know that a) some boards don't build without these fixes and b)
-> >> > they used to build just fine.
-> >> >
-> >> > Perhaps Guennadi [CC:ed] could be so kind to fill us in with the blanks?
-> >>
-> >> It was pretty obvious once I tried applying them and building that
-> >> they did indeed resolve the build errors. However, the reason I'm
-> >> asking for a better description is that when looking at just the pull
-> >> request, or even the patch full commit description, it was impossible
-> >> to tell why the patch was urgent as a fix. So, while I am not
-> >> questioning that the patch should be included, I'm just requesting to
-> >> make sure it's properly described. That's also good for historical
-> >> purposes when someone is reading the git logs a year from now, etc.
-> >
-> > Ok, sorry, I wasn't sure from the previous mail - would you prefer to
-> > actually extend their commit messages? As described here
-> >
-> > http://thread.gmane.org/gmane.linux.kernel.mmc/12744/focus=12748
-> >
-> > These patches are a part of a patch-series, so, when they were submitted
-> > in that context, it was pretty obvious how they relate to the rest.
-> > However, unfortunately, they are now applied later than the main patches
-> > in that series, so, their purpose has become much less obvious, and their
-> > main feature now seems to be not the conversion of the affected platforms,
-> > but fixing the build.
-> 
-> Yeah, that seems to be what happened here, so indeed by now the
-> commits are a bit out of context.
-> 
-> > So, I think, we could use something like this in the
-> > patch descriptions:
-> >
-> > This also fixes modular mmc build on this platform by eliminating the use
-> > of an inline function, which calls into the mmc core.
-> 
-> Sounds good, with a cut-and-paste of the build error that happens
-> without the patch for extra credit.
-> 
-> Rafael, can you add the above or something like it to the commit
-> messages when you push out the fixes branch?
+>> Could you please take some time out to jot down an example of how a
+>> typical client's dma specifier should look.
+>
+> With this proposal, I'm not sure that the client DT node would need any
+> DMA information at all, at least nothing that identifies which DMA
+> controllers, channels, or requests are required to service this
+> node/device's DMA requests - that routing information is all represented
+> in the DMA controller itself.
+>
+> (I think Arnd made the following point earlier in this thread):
+>
+> If you did need to put any other information in DT, then that probably
+> would go in the DMA client node, since it'd presumably be the same
+> irrespective of which DMA controller got used. However, that information
+> presumably wouldn't be needed in DT at all, since the driver would know
+> it, since it'd be a facet of the HW.
+>
+> Note: I'm thinking things like DMA physical address (presumably an
+> offset from the reg property), DMA access size (presumably a fixed
+> property of the HW), DMA burst size (presumably a property of the HW,
+> although at least some HW can be programmed to raise the DMA request
+> signal with a varying number of FIFO entries free, so not fixed), etc.
+>
+Yeah, neither did I think a client node should tell more than IDs of
+its channels
+- which we now decide to simply mention in its binding.
 
-Let me try to make it a bit easier yet: here are the biuld failures from 
-both platforms:
+How do I know if you or someone is interested in reworking the patchset
+or want me to give it a try?
 
-mackerel:
-
-arch/arm/mach-shmobile/built-in.o: In function `mackerel_sdhi0_gpio_cd':
-pfc-sh7372.c:(.text+0x1138): undefined reference to `mmc_detect_change'
-
-ag5evm:
-
-arch/arm/mach-shmobile/built-in.o: In function `ag5evm_sdhi0_gpio_cd':
-pfc-sh73a0.c:(.text+0x7c0): undefined reference to `mmc_detect_change'
-
-Also attaching to this email the patches with added patch descriptions and 
-these error-logs.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-mach-shmobile-convert-mackerel-to-use-the-generi.patch
-Type: text/x-diff
-Size: 2862 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120512/1de6162d/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ARM-mach-shmobile-convert-ag5evm-to-use-the-generic-.patch
-Type: text/x-diff
-Size: 2724 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120512/1de6162d/attachment-0001.bin>
+Thanks,
+Jassi
