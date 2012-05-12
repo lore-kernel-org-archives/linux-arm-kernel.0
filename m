@@ -1,77 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 May 2012 16:07:27 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.4
-Message-ID: <CAOesGMj+Ds+gOX2mSnYb2Cn3e9894bceisPtsnW5qYhT3SPhsA@mail.gmail.com>
+Date: Sat, 12 May 2012 16:29:20 -0700
+Subject: [GIT PULL] Renesas ARM-based platforms: core SoC updates for v3.5
+In-Reply-To: <201205122307.20590.rjw@sisk.pl>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMgFWM6K6969Oz6xGewrRekyrJA-ztGBADxsqnB1w=V2QA@mail.gmail.com>
+ <201205122307.20590.rjw@sisk.pl>
+Message-ID: <CAOesGMgF3oLD9=db9d3rcGKPFzQYvCfBgaYHZmy8LPW46t0Yeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, May 12, 2012 at 2:07 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> Hi,
+>
+> Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+>
+> ? ?Linux 3.4-rc6
+>
+> with top-most commit c8241085e8606a14ef48e6d99556133c48aaddaf
+>
+> ? ?ARM: mach-shmobile: clock-r8a7740: use followparent_recalc on usb24s
+>
+> from the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git soc-core
+>
+> to receive updates of the Renesas ARM-based platforms core code for v3.5.
+> Included are:
+>
+> ?* Shared delay calibration code update from Magnus Damm.
+>
+> ?* The addition of FSI DMAEngine support for the sh7372 SoC from Kuninori Morimoto.
+>
+> ?* Muliple updates of the r8a7740 SoC support code from Kuninori Morimoto.
+>
+> This is based on the Renesas DT updates that have been merged into arm-soc already
+> and on the urgent fixes I've sent a separate pull request for.
+>
+> Thanks!
 
-The following changes since commit e396dbd4ed2ccfd362261b05027bbdccec192b14:
+Rafael,
 
-  Merge tag 'omap-fixes-for-v3.4-rc6-take-2' of
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
-fixes (2012-05-09 09:03:34 -0700)
+This looks good, thanks for splitting things up. I will pull it in a
+little later today when I get a few minutes of quiet.
 
-are available in the git repository at:
+If you start using signed tags, feel free to add the above description
+into there for our convenience. :-)
+
+Also, the diffstat below includes the dependent branches. Feel free to
+send only the delta, but either way works.
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/fixes-for-linus
-
-for you to fetch changes up to 85d5c4a362add39f7491b38ed0160df1dcae1d2b:
-
-  Merge branch 'v3.4-samsung-fixes-5' of
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into
-fixes (2012-05-12 15:41:22 -0700)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.4-rc
-
-I was hoping to be done with fixes for 3.4 but we got two branches from
-subarch maintainers the last couple of days. So here is one last(?) pull
-request for arm-soc containing 7 patches:
-
-- 5 of them are for shmobile dealing with SMP setup and compile failures
-- The remaining two are for regressions on the Samsung platforms
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (2):
-      ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO
-hotplug helper
-      ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO
-hotplug helper
-
-Kukjin Kim (1):
-      ARM: EXYNOS: fix ctrlbit for exynos5_clk_pdma1
-
-Kuninori Morimoto (1):
-      ARM / mach-shmobile: sh73a0 SMP TWD boot regression fix
-
-Magnus Damm (2):
-      ARM / mach-shmobile: r8a7779 SMP TWD boot regression fix
-      ARM / mach-shmobile: Invalidate caches when booting secondary cores
-
-Marek Szyprowski (1):
-      ARM: EXYNOS: use s5p-timer for UniversalC210 board
-
-Olof Johansson (2):
-      Merge branch 'fixes' of git://git.kernel.org/.../rafael/renesas into fixes
-      Merge branch 'v3.4-samsung-fixes-5' of
-git://git.kernel.org/.../kgene/linux-samsung into fixes
-
- arch/arm/mach-exynos/Kconfig                 |  3 +++
- arch/arm/mach-exynos/clock-exynos5.c         |  2 +-
- arch/arm/mach-exynos/mach-universal_c210.c   |  4 +++-
- arch/arm/mach-shmobile/board-ag5evm.c        | 22 ++--------------------
- arch/arm/mach-shmobile/board-mackerel.c      | 22 ++--------------------
- arch/arm/mach-shmobile/headsmp.S             | 56
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-shmobile/include/mach/common.h |  2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c       |  4 ++++
- arch/arm/mach-shmobile/setup-sh73a0.c        |  4 ++++
- arch/arm/mach-shmobile/smp-r8a7779.c         |  8 +++++++-
- arch/arm/mach-shmobile/smp-sh73a0.c          |  7 ++++++-
- arch/arm/mach-shmobile/timer.c               |  9 ---------
- 12 files changed, 88 insertions(+), 55 deletions(-)
+-Olof
