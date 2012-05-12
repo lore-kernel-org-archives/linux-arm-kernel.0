@@ -1,55 +1,42 @@
 From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Sat, 12 May 2012 10:53:56 +0200
-Subject: [PATCH 3/5] ARM: at91: disable specific soc clock init functions
+Date: Sat, 12 May 2012 10:53:54 +0200
+Subject: [PATCH 1/5] ARM: at91: Add PMC registers definitions.
 In-Reply-To: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
 References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
-Message-ID: <1336812838-3649-4-git-send-email-linux-arm@overkiz.com>
+Message-ID: <1336812838-3649-2-git-send-email-linux-arm@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-at91/at91sam9260.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+This patch adds definition of SOSCSEL bit used by pmc-osc.c to know 
+which kind of oscilator is used (internal RC => drift).
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index a27bbec..94eae4f 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -25,13 +25,17 @@
+This patch adds ICPLLR definition used in pll config. 
+---
+ arch/arm/mach-at91/include/mach/at91_pmc.h |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
+index 3660478..845af9e 100644
+--- a/arch/arm/mach-at91/include/mach/at91_pmc.h
++++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
+@@ -149,6 +149,7 @@ extern void __iomem *at91_pmc_base;
+ #define		AT91_PMC_LOCKB		(1 <<  2)		/* PLLB Lock */
+ #define		AT91_PMC_MCKRDY		(1 <<  3)		/* Master Clock */
+ #define		AT91_PMC_LOCKU		(1 <<  6)		/* UPLL Lock [some SAM9] */
++#define		AT91_PMC_SOSCSEL	(1 <<  7)		/* Slow osc external selction */
+ #define		AT91_PMC_PCK0RDY	(1 <<  8)		/* Programmable Clock 0 */
+ #define		AT91_PMC_PCK1RDY	(1 <<  9)		/* Programmable Clock 1 */
+ #define		AT91_PMC_PCK2RDY	(1 << 10)		/* Programmable Clock 2 */
+@@ -158,6 +159,10 @@ extern void __iomem *at91_pmc_base;
+ #define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
+ #define	AT91_PMC_IMR		0x6c			/* Interrupt Mask Register */
  
- #include "soc.h"
- #include "generic.h"
-+#ifndef CONFIG_COMMON_CLK
- #include "clock.h"
-+#else
-+#include <linux/clk.h>
-+#endif
- #include "sam9_smc.h"
- 
- /* --------------------------------------------------------------------
-  *  Clocks
-  * -------------------------------------------------------------------- */
--
-+#ifndef CONFIG_COMMON_CLK
- /*
-  * The peripheral clocks.
-  */
-@@ -267,6 +271,7 @@ static void __init at91sam9260_register_clocks(void)
- 	clk_register(&pck0);
- 	clk_register(&pck1);
- }
-+#endif
- 
- /* --------------------------------------------------------------------
-  *  GPIO
-@@ -382,6 +387,8 @@ struct at91_init_soc __initdata at91sam9260_soc = {
- 	.map_io = at91sam9260_map_io,
- 	.default_irq_priority = at91sam9260_default_irq_priority,
- 	.ioremap_registers = at91sam9260_ioremap_registers,
-+#ifndef CONFIG_COMMON_CLK
- 	.register_clocks = at91sam9260_register_clocks,
-+#endif
- 	.init = at91sam9260_initialize,
- };
++#define	AT91_PMC_PLLICPR	0x80			/* PLL Charge Pump Current Register */
++#define		AT91_PMC_ICPLLA		(1 <<  0)		/* ICPLLA Flag */
++#define		AT91_PMC_ICPLLB		(1 <<  16)		/* ICPLLA Flag */
++
+ #define AT91_PMC_PROT		0xe4			/* Write Protect Mode Register [some SAM9] */
+ #define		AT91_PMC_WPEN		(0x1  <<  0)		/* Write Protect Enable */
+ #define		AT91_PMC_WPKEY		(0xffffff << 8)		/* Write Protect Key */
 -- 
 1.7.9.5
