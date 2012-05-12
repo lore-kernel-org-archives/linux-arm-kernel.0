@@ -1,84 +1,52 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 12 May 2012 19:10:06 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FADA5EC.8040807@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <201205041923.07620.arnd@arndb.de>
- <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
- <4FA7F009.5010003@wwwdotorg.org>
- <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
- <4FA94B49.5050500@wwwdotorg.org>
- <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
- <4FAAC111.9020308@wwwdotorg.org>
- <CAJe_Zhcrr2QqoY=H3=3EJLPQBjC3Yc43EDjqYXaNok9-T+=0yw@mail.gmail.com>
- <4FABF445.3030105@wwwdotorg.org>
- <CAJe_ZhduQuHnFyF20VnjZW9uz1szwL6O7=ow+tMqanmeHs58pQ@mail.gmail.com>
- <4FAD6848.40700@wwwdotorg.org>
- <CAJe_Zhc8T-vR8fjFLyT4bz6dj=TUyx0F8k=fAPYn_MnbGW5LBg@mail.gmail.com>
- <4FADA5EC.8040807@wwwdotorg.org>
-Message-ID: <CAJe_Zhe61GTQQy+ZCVndAd=mrHxGBqyZ8JGZTSHsvE2XRzfGoA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 May 2012 14:49:16 +0100
+Subject: [PATCH 2/2] remove the debugging restrictions in devicemaps_init()
+In-Reply-To: <alpine.LFD.2.02.1205081214220.21030@xanadu.home>
+References: <1331876668-32492-1-git-send-email-nico@fluxnic.net>
+ <1331876668-32492-3-git-send-email-nico@fluxnic.net>
+ <20120506163016.GA7412@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1205072340540.21030@xanadu.home>
+ <20120508071411.GP26481@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1205081214220.21030@xanadu.home>
+Message-ID: <20120512134916.GB10453@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2012 05:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/11/2012 03:06 PM, Jassi Brar wrote:
->> On 12 May 2012 00:58, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 05/10/2012 01:59 PM, Jassi Brar wrote:
-> ...
->>>>> client0: i2s {
->>>>> ? /* has 2 DMA request output signals: 0, 1 */
->>>>> };
->>>>>
->>>>> client1: spdif {
->>>>> ? /* has 2 DMA request signals: 0, 1 */
->>>>> };
->>>>>
->>>> Do we also need to somehow tag these signals for the client to
->>>> differentiate between TX and RX channel ?
->>>
->>> Yes, the client's DT binding would certainly need to describe how many
->>> DMA request signals its HW generates, and give a unique ID to each. The
->>> driver would need to request a DMA channel for a specific one of its DMA
->>> requests.
->>>
->> Did I read "give a unique ID to each" correctly ?
->
-> It'd be unique relative to that individual device or DT node, not at any
-> larger scope.
->
-OK.
+On Tue, May 08, 2012 at 12:17:40PM -0400, Nicolas Pitre wrote:
+> On Tue, 8 May 2012, Russell King - ARM Linux wrote:
+> 
+> > On Tue, May 08, 2012 at 12:19:30AM -0400, Nicolas Pitre wrote:
+> > > However, the switching itself doesn't involve a full cache flush.
+> > 
+> > That's where you're wrong.  Look at the switch_mm() helpers in proc-*.S.
+> > StrongARM for example calls v4wb_flush_kern_cache_all() here, which needs
+> > the cache flushing mappings to be in place in the _current_ page table.
+> 
+> Right.  I had to be wrong somewhere.
+> 
+> What about abstracting the cache area mapping code in a function of its 
+> own, and calling it inside install_temp_mm() as well?
 
->> Could you please take some time out to jot down an example of how a
->> typical client's dma specifier should look.
->
-> With this proposal, I'm not sure that the client DT node would need any
-> DMA information at all, at least nothing that identifies which DMA
-> controllers, channels, or requests are required to service this
-> node/device's DMA requests - that routing information is all represented
-> in the DMA controller itself.
->
-> (I think Arnd made the following point earlier in this thread):
->
-> If you did need to put any other information in DT, then that probably
-> would go in the DMA client node, since it'd presumably be the same
-> irrespective of which DMA controller got used. However, that information
-> presumably wouldn't be needed in DT at all, since the driver would know
-> it, since it'd be a facet of the HW.
->
-> Note: I'm thinking things like DMA physical address (presumably an
-> offset from the reg property), DMA access size (presumably a fixed
-> property of the HW), DMA burst size (presumably a property of the HW,
-> although at least some HW can be programmed to raise the DMA request
-> signal with a varying number of FIFO entries free, so not fixed), etc.
->
-Yeah, neither did I think a client node should tell more than IDs of
-its channels
-- which we now decide to simply mention in its binding.
+One of the issues is that we check that the mappings don't conflict -
+in other words, a section mapping doesn't conflict with a page table
+mapping.  We need a clean page table to start with before we start
+populating it with the IO entries, so that we know there's no mappings
+in IO space to conflict with the newly setup entries.
 
-How do I know if you or someone is interested in reworking the patchset
-or want me to give it a try?
+What we could do is allocate a new page table, use that page table to
+setup the new mappings, memcpy them to the swapper page table as a
+final step before we kick the caches and TLB.
 
-Thanks,
-Jassi
+The down side to that approach is we have people abusing the map_io
+method for other purposes (people - including you - just don't listen
+when I tell them that they shouldn't do this kind of stuff) such as
+setting up mappings which they then immediately access.  (In case
+you've forgotten, Assabet, the probing of the SCR register at map_io
+time to discover the platforms configuration.  That set the precident
+and now other platforms also do this kind of thing.)
+
+So, I don't think there's any easy solution to this - certainly not
+one which is going to be fragile or restricted to a small set of
+configurations.
+
+Overall, I'm not sure it's worth trying to solve this.
