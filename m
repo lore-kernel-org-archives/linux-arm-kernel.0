@@ -1,45 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 May 2012 17:30:48 -0700
-Subject: [GIT PULL] gpio/omap: cleanups for v3.5
-Message-ID: <874nrmtf47.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 11 May 2012 18:37:52 -0600
+Subject: [PATCH 0/9] ARM: dt: tegra: cleanup pass
+Message-ID: <1336783081-16978-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+From: Stephen Warren <swarren@nvidia.com>
 
-Here's the final round of GPIO cleanups for v3.5.  This branch is based
-on my for_3.5/fixes/gpio branch you just pulled.
+I've been wanting to clean up the Tegra .dts files for a little while.
+Here's a set of changes to do so. Hopefully they don't seem to much
+like churn.
 
-Kevin
+I was thinking of putting them into a for-3.6/cleanup branch, but I
+suppose I could put them into 3.5 at the end too. I'd need to base this
+series on the result of merging Tegra's for-3.5/dt and
+for-3.5/tegra30-audio branches. Olof, what are your thoughts here?
 
+I've tested them on Cardhu so far, but still need to test all the other
+boards to make sure I didn't introduce some typo.
 
-The following changes since commit 6edd94db250038c8fdf176f23ca4017d2f312509:
+Stephen Warren (9):
+  ARM: dt: tegra: whitespace cleanup
+  ARM: dt: tegra: remove unnecessary unit addresses
+  ARM: dt: tegra: gpio comment cleanup
+  ARM: dt: tegra: format regs properties consistently
+  ARM: dt: tegra: consistenly use lower-case for hex constants
+  ARM: dt: tegra: remove duplicate device_type property
+  ARM: dt: tegra: sort nodes based on bus order
+  ARM: dt: tegra: consistent basic property ordering
+  ARM: dt: tegra: invert status=disable vs status=okay
 
-  gpio/omap: fix incorrect initialization of omap_gpio_mod_init (2012-05-10 07:16:15 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.5/gpio/cleanup
-
-for you to fetch changes up to 1b1287032df3a69d3ef9a486b444f4ffcca50d01:
-
-  gpio/omap: fix missing check in *_runtime_suspend() (2012-05-11 17:08:40 -0700)
-
-----------------------------------------------------------------
-Tarun Kanti DebBarma (8):
-      gpio/omap: remove virtual_irq_start variable
-      gpio/omap: remove saved_fallingdetect, saved_risingdetect
-      gpio/omap: remove suspend_wakeup field from struct gpio_bank
-      gpio/omap: remove saved_wakeup field from struct gpio_bank
-      gpio/omap: remove retrigger variable in gpio_irq_handler
-      gpio/omap: remove suspend/resume callbacks
-      gpio/omap: remove cpu_is_omapxxxx() checks from *_runtime_resume()
-      gpio/omap: fix missing check in *_runtime_suspend()
-
- arch/arm/mach-omap1/gpio15xx.c         |    2 -
- arch/arm/mach-omap1/gpio16xx.c         |    5 --
- arch/arm/mach-omap1/gpio7xx.c          |    7 ---
- arch/arm/mach-omap2/gpio.c             |    3 +-
- arch/arm/plat-omap/include/plat/gpio.h |    3 +-
- drivers/gpio/gpio-omap.c               |  103 +++++++-------------------------
- 6 files changed, 27 insertions(+), 96 deletions(-)
+ arch/arm/boot/dts/tegra-cardhu.dts    |   62 ++-----
+ arch/arm/boot/dts/tegra-harmony.dts   |  100 +++++------
+ arch/arm/boot/dts/tegra-paz00.dts     |  112 ++++++-------
+ arch/arm/boot/dts/tegra-seaboard.dts  |  176 +++++++++----------
+ arch/arm/boot/dts/tegra-trimslice.dts |   71 ++++-----
+ arch/arm/boot/dts/tegra-ventana.dts   |   90 +++++------
+ arch/arm/boot/dts/tegra20.dtsi        |  277 ++++++++++++++++--------------
+ arch/arm/boot/dts/tegra30.dtsi        |  304 ++++++++++++++++++---------------
+ 8 files changed, 577 insertions(+), 615 deletions(-)
