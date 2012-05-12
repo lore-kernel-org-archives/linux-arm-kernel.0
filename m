@@ -1,42 +1,62 @@
 From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Sat, 12 May 2012 10:53:54 +0200
-Subject: [PATCH 1/5] ARM: at91: Add PMC registers definitions.
-In-Reply-To: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
-References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
-Message-ID: <1336812838-3649-2-git-send-email-linux-arm@overkiz.com>
+Date: Sat, 12 May 2012 10:53:53 +0200
+Subject: [PATCH 0/5] ARM: at91: moving at91 to the common clk framework
+Message-ID: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds definition of SOSCSEL bit used by pmc-osc.c to know 
-which kind of oscilator is used (internal RC => drift).
+This patch implements at91 pmc clks using the the common clk framework.
+This implementation is only used for dt boards and is tightly linked
+with device tree support (requires "DT clock binding support" patch).
 
-This patch adds ICPLLR definition used in pll config. 
----
- arch/arm/mach-at91/include/mach/at91_pmc.h |    5 +++++
- 1 file changed, 5 insertions(+)
+What's missing : 
+ * UTMI and USB (Host and Device) clk drivers.
+ * Devce tree binding documentation
+ * Atmel drivers port to the commonc clk framework:
+   * use clk_prepare_enable instead of clk_enable.
+   * use of_clk_get instead of clk_get when dt is enabled.
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
-index 3660478..845af9e 100644
---- a/arch/arm/mach-at91/include/mach/at91_pmc.h
-+++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
-@@ -149,6 +149,7 @@ extern void __iomem *at91_pmc_base;
- #define		AT91_PMC_LOCKB		(1 <<  2)		/* PLLB Lock */
- #define		AT91_PMC_MCKRDY		(1 <<  3)		/* Master Clock */
- #define		AT91_PMC_LOCKU		(1 <<  6)		/* UPLL Lock [some SAM9] */
-+#define		AT91_PMC_SOSCSEL	(1 <<  7)		/* Slow osc external selction */
- #define		AT91_PMC_PCK0RDY	(1 <<  8)		/* Programmable Clock 0 */
- #define		AT91_PMC_PCK1RDY	(1 <<  9)		/* Programmable Clock 1 */
- #define		AT91_PMC_PCK2RDY	(1 << 10)		/* Programmable Clock 2 */
-@@ -158,6 +159,10 @@ extern void __iomem *at91_pmc_base;
- #define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
- #define	AT91_PMC_IMR		0x6c			/* Interrupt Mask Register */
- 
-+#define	AT91_PMC_PLLICPR	0x80			/* PLL Charge Pump Current Register */
-+#define		AT91_PMC_ICPLLA		(1 <<  0)		/* ICPLLA Flag */
-+#define		AT91_PMC_ICPLLB		(1 <<  16)		/* ICPLLA Flag */
-+
- #define AT91_PMC_PROT		0xe4			/* Write Protect Mode Register [some SAM9] */
- #define		AT91_PMC_WPEN		(0x1  <<  0)		/* Write Protect Enable */
- #define		AT91_PMC_WPKEY		(0xffffff << 8)		/* Write Protect Key */
+I'd like to have some feedback on the implementation and dt binding 
+before adding the missing stuffs.
+
+Best Regards,
+
+Boris
+
+Boris BREZILLON (5):
+  at91: Add at91 PMC registers definitions.
+  at91: Move at91 PMC clks to the common clk framework.
+  at91: disable specific soc clock init function if COMMON_CLK is
+    selected.
+  at91: add pmc clks definition into device tree (at91sam9260, 9g20).
+  at91: Modify board_dt init sequence to use PMC common clk
+    implementation.
+
+ arch/arm/boot/dts/at91sam9260.dtsi         |  299 ++++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9g20.dtsi         |   44 +++
+ arch/arm/mach-at91/Kconfig                 |    1 +
+ arch/arm/mach-at91/Makefile                |    5 +-
+ arch/arm/mach-at91/at91sam9260.c           |    9 +-
+ arch/arm/mach-at91/board-dt.c              |   72 ++++-
+ arch/arm/mach-at91/include/mach/at91_pmc.h |    5 +
+ arch/arm/mach-at91/pmc-master.c            |  401 ++++++++++++++++++++++++++++
+ arch/arm/mach-at91/pmc-osc.c               |  165 ++++++++++++
+ arch/arm/mach-at91/pmc-periph.c            |  111 ++++++++
+ arch/arm/mach-at91/pmc-pll.c               |  371 +++++++++++++++++++++++++
+ arch/arm/mach-at91/pmc-prog.c              |  194 ++++++++++++++
+ arch/arm/mach-at91/pmc-sys.c               |   81 ++++++
+ arch/arm/mach-at91/pmc.c                   |  260 ++++++++++++++++++
+ arch/arm/mach-at91/pmc.h                   |   70 +++++
+ arch/arm/mach-at91/setup.c                 |    8 +-
+ 16 files changed, 2087 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-at91/pmc-master.c
+ create mode 100644 arch/arm/mach-at91/pmc-osc.c
+ create mode 100644 arch/arm/mach-at91/pmc-periph.c
+ create mode 100644 arch/arm/mach-at91/pmc-pll.c
+ create mode 100644 arch/arm/mach-at91/pmc-prog.c
+ create mode 100644 arch/arm/mach-at91/pmc-sys.c
+ create mode 100644 arch/arm/mach-at91/pmc.c
+ create mode 100644 arch/arm/mach-at91/pmc.h
+
 -- 
 1.7.9.5
