@@ -1,83 +1,72 @@
 From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 12 May 2012 22:08:13 +0200
-Subject: [GIT PULL] Urgent fixes (for v3.4 if possible) for Renesas
- ARM-based platforms
-In-Reply-To: <CAOesGMigY=S+aQX84VP9MVpNUYrMDLEXMCJU3L-x3uYEYOTkmw@mail.gmail.com>
-References: <201205112025.13478.rjw@sisk.pl>
- <Pine.LNX.4.64.1205120832290.7233@axis700.grange>
- <CAOesGMigY=S+aQX84VP9MVpNUYrMDLEXMCJU3L-x3uYEYOTkmw@mail.gmail.com>
-Message-ID: <201205122208.13817.rjw@sisk.pl>
+Date: Sat, 12 May 2012 22:17:14 +0200
+Subject: [GIT PULL] Renesas ARM-based platforms updates for v3.5
+In-Reply-To: <201205122158.13999.rjw@sisk.pl>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMgFWM6K6969Oz6xGewrRekyrJA-ztGBADxsqnB1w=V2QA@mail.gmail.com>
+ <201205122158.13999.rjw@sisk.pl>
+Message-ID: <201205122217.14650.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 12, 2012, Olof Johansson wrote:
-> On Fri, May 11, 2012 at 11:37 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> > On Fri, 11 May 2012, Olof Johansson wrote:
-> >
-> >> Hej Magnus,
-> >>
-> >> On Fri, May 11, 2012 at 9:28 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>
-> >> >>>  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
-> >> >>
-> >> >> No such branch (nor tag).
-> >> >
-> >> > I believe Rafael will get back to you about that when he gets to his computer.
-> >>
-> >> Yep, good.
-> >>
-> >> >>> Guennadi Liakhovetski (2):
-> >> >>>      ARM: mach-shmobile: convert ag5evm to use the generic MMC GPIO hotplug helper
-> >> >>>      ARM: mach-shmobile: convert mackerel to use the generic MMC GPIO hotplug helper
-> >> >>
-> >> >> These seem to fix the long-standing build errors on the two platforms,
-> >> >> but that's impossible to tell from reading the commit messages (they
-> >> >> are empty). Care to add one describing why they're important to go in?
-> >> >
-> >> > I only know that a) some boards don't build without these fixes and b)
-> >> > they used to build just fine.
-> >> >
-> >> > Perhaps Guennadi [CC:ed] could be so kind to fill us in with the blanks?
-> >>
-> >> It was pretty obvious once I tried applying them and building that
-> >> they did indeed resolve the build errors. However, the reason I'm
-> >> asking for a better description is that when looking at just the pull
-> >> request, or even the patch full commit description, it was impossible
-> >> to tell why the patch was urgent as a fix. So, while I am not
-> >> questioning that the patch should be included, I'm just requesting to
-> >> make sure it's properly described. That's also good for historical
-> >> purposes when someone is reading the git logs a year from now, etc.
-> >
-> > Ok, sorry, I wasn't sure from the previous mail - would you prefer to
-> > actually extend their commit messages? As described here
-> >
-> > http://thread.gmane.org/gmane.linux.kernel.mmc/12744/focus=12748
-> >
-> > These patches are a part of a patch-series, so, when they were submitted
-> > in that context, it was pretty obvious how they relate to the rest.
-> > However, unfortunately, they are now applied later than the main patches
-> > in that series, so, their purpose has become much less obvious, and their
-> > main feature now seems to be not the conversion of the affected platforms,
-> > but fixing the build.
+On Saturday, May 12, 2012, Rafael J. Wysocki wrote:
+> On Saturday, May 12, 2012, Olof Johansson wrote:
+> > On Fri, May 11, 2012 at 12:01 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > > Hi,
+> > >
+> > > Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+> > >
+> > >    Linux 3.4-rc6
+> > >
+> > > with top-most commit 5658c94096c16e769203b6dea5e5f04e7ff12633
+> > >
+> > >    Merge branch 'renesas-kzm9g' into renesas-soc-new
+> > >
+> > > from the git repository at:
+> > >
+> > >  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git soc-new
+> > >
+> > > to receive new Renesas ARM-based platforms material for v3.5.  Included are:
+> > >
+> > >  * Urgent regression and SMP fixes (also included in the fixes branch that I've
+> > >   just sent a separate pull request for in the hope it is still possible to
+> > >   push them for v3.4).  Two of those fixes are duplicated in the renesas-sh7372
+> > >   branch, which is because I learned that they were fixes for recent
+> > >   regressions after they had gone to that branch.  Sorry about that.
+> > >
+> > >  * Updates for boards based on the sh7372 and r8a7740 SoCs.
+> > >
+> > >  * Support for 2 new boards, armadillo800eva and KZM-A9-GT.
+> > 
+> > Hi Rafael,
+> > 
+> > If you take a look at how the other ARM subarch maintainers organize
+> > the patches that they feed up to us, you'll see that they group them
+> > either per functional topic, or more commonly per subject such as
+> > "core soc updates", "soc driver updates", "board updates", "device
+> > tree updates", "cleanup", and so on.
+> > 
+> > That fits the model we've been having on arm-soc as well, since we
+> > split our tree up per category like that, and send those cross-section
+> > branches between different vendors (but same categories) up to Linus
+> > that way.
+> > 
+> > 
+> > So, would you mind taking a look at what you have in the new-soc
+> > branch and reshuffling things a bit? Looking at the history of the
+> > new-soc branch and the rest of the repo, it seems that you're already
+> > more or less organizing your tree the way I am asking for, it's just
+> > that you merged them all together before sending this pull request.
 > 
-> Yeah, that seems to be what happened here, so indeed by now the
-> commits are a bit out of context.
+> Well.
 > 
-> > So, I think, we could use something like this in the
-> > patch descriptions:
-> >
-> > This also fixes modular mmc build on this platform by eliminating the use
-> > of an inline function, which calls into the mmc core.
-> 
-> Sounds good, with a cut-and-paste of the build error that happens
-> without the patch for extra credit.
-> 
-> Rafael, can you add the above or something like it to the commit
-> messages when you push out the fixes branch?
+> I'd prefer not to rebase any branches and move commits around if that's
+> what you're talking about, because I have a rule that my branches are not
+> rebased, except for the next one.
 
-Well, I've pushed it already, but I can still update it.  Please don't
-pull from it yet.
+I will have to rebase the whole thing anyway because of the changes in
+"fixes", so I think I'll just create new branches and send pull requests
+again.
 
 Thanks,
 Rafael
