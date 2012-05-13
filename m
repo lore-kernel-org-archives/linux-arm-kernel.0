@@ -1,20 +1,21 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 13 May 2012 09:33:26 +0900
-Subject: [GIT PULL] Samsung devel-1 for v3.5
-Message-ID: <4FAF0156.5080306@samsung.com>
+Date: Sun, 13 May 2012 09:41:10 +0900
+Subject: [GIT PULL] Samsung boards update for v3.5
+Message-ID: <4FAF0326.8000408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+Hi Arnd, Olof,
 
-Please pull Samsung devel for v3.5
+Please pull Samsung boards update for v3.5.
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/board-samsung
 
-This is including exynos/iommu, platform of drm and fimc-lite, dma for 
-exynos5250 and s3c24xx-hsspi.
+As there were discussions, some exynos4 boards have been updated because 
+current dt cannot support all features for current board files on exynos4.
 
-Note, the exynos/iommu patch got the ack from Joerg and this should be 
-sent to upstream via arm tree and since it depends on 
-cleanup-samsung-iommu, the cleanup branch is included(merged) in here.
+Note, this should be merged after next/devel-samsung because some 
+platform devices are defined in that.
 
 If any problems, please let me know.
 
@@ -32,89 +33,43 @@ The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
 
 are available in the git repository at:
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/devel-samsung
+next/board-samsung
 
-Boojin Kim (1):
-       ARM: EXYNOS: Support DMA for EXYNOS5250 SoC
+Joonyoung Shim (1):
+       ARM: EXYNOS: Add s3c-hsotg device support for NURI board
 
-Heiko Stuebner (6):
-       ARM: S3C24XX: Add forgotten clock lookup table to S3C2443
-       ARM: S3C24XX: claim spi channels for hsspi in dma-s3c2443
-       ARM: S3C24XX: Add map entries needed by the s3c64xx-spi devices
-       ARM: S3C24XX: Add clock-lookup entries required by s3c64xx-spi
-       ARM: S3C24XX: Add HSSPI setup callback for s3c64xx-spi driver
-       spi/s3c64xx: Allow usage for ARCH_S3C24XX
+Lukasz Majewski (2):
+       ARM: EXYNOS: Add s3c-hsotg device support for GONI board
+       ARM: EXYNOS: Add s3c-hsotg device support for Universal C210 board
 
-Kukjin Kim (2):
-       Merge branch 'next/devel-samsung-iommu' into next/devel-samsung
-       Merge branch 'next/devel-s3c24xx-hsspi' into next/devel-samsung
+Marek Szyprowski (2):
+       ARM: EXYNOS: Add DRM core device support for Universal C210 board
+       ARM: EXYNOS: Add DRM core support for NURI board
 
-KyongHo Cho (3):
-       S5P: SYSMMU: Remove System MMU device driver
-       ARM: EXYNOS: Change System MMU platform device definitions
-       iommu/exynos: Add iommu driver for EXYNOS Platforms
+Mark Brown (1):
+       ARM: S3C64XX: Hook up new style regulator-regulator supplies on 
+Cragganmore
 
-Kyoungil Kim (1):
-       ARM: EXYNOS: To use common config for EXYNOS4 and EXYNOS5 SPI
+Sachin Kamat (5):
+       ARM: EXYNOS: Make BT platform data structure static in 
+mach-origen.c file
+       ARM: EXYNOS: Add DRM device to Origen
+       ARM: EXYNOS: Add DRM device to SMDKV310
+       ARM: EXYNOS: Add MFC device to SMDK4X12
+       ARM: EXYNOS: Add FIMC device to SMDK4X12
 
-Lukasz Majewski (1):
-       ARM: EXYNOS: Add usb otg phy control for EXYNOS4210
+Tushar Behera (1):
+       ARM: EXYNOS: Increase framebuffer virtual size for origen
 
-Marek Szyprowski (1):
-       ARM: EXYNOS: add platform device for core DRM subsystem
-
-Olof Johansson (1):
-       ARM: EXYNOS: add dts files to dtbs target
-
-Sylwester Nawrocki (1):
-       ARM: EXYNOS: Add platform resource definitions for FIMC-LITE
-
-  arch/arm/mach-exynos/Kconfig                    |   24 +-
-  arch/arm/mach-exynos/Makefile                   |    7 +-
-  arch/arm/mach-exynos/Makefile.boot              |    3 +
-  arch/arm/mach-exynos/clock-exynos4.c            |   79 +-
-  arch/arm/mach-exynos/clock-exynos4.h            |    2 +
-  arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
-  arch/arm/mach-exynos/clock-exynos4212.c         |   38 +-
-  arch/arm/mach-exynos/clock-exynos5.c            |   90 ++
-  arch/arm/mach-exynos/dev-drm.c                  |   29 +
-  arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++-----
-  arch/arm/mach-exynos/dma.c                      |  141 +++-
-  arch/arm/mach-exynos/include/mach/irqs.h        |   26 +-
-  arch/arm/mach-exynos/include/mach/map.h         |   45 +
-  arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
-  arch/arm/mach-exynos/include/mach/regs-pmu.h    |    3 +
-  arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 -
-  arch/arm/mach-exynos/include/mach/spi-clocks.h  |    2 +-
-  arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 ++-
-  arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
-  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
-  arch/arm/mach-exynos/setup-usb-phy.c            |   95 ++-
-  arch/arm/mach-s3c24xx/Kconfig                   |    5 +
-  arch/arm/mach-s3c24xx/Makefile                  |    1 +
-  arch/arm/mach-s3c24xx/clock-s3c2416.c           |    1 +
-  arch/arm/mach-s3c24xx/clock-s3c2443.c           |    6 +
-  arch/arm/mach-s3c24xx/common-s3c2443.c          |   15 +-
-  arch/arm/mach-s3c24xx/dma-s3c2443.c             |   16 +-
-  arch/arm/mach-s3c24xx/include/mach/dma.h        |    4 +
-  arch/arm/mach-s3c24xx/include/mach/map.h        |    5 +
-  arch/arm/mach-s3c24xx/setup-spi.c               |   39 +
-  arch/arm/plat-s5p/Kconfig                       |    8 -
-  arch/arm/plat-s5p/Makefile                      |    1 -
-  arch/arm/plat-s5p/sysmmu.c                      |  313 -------
-  arch/arm/plat-samsung/Kconfig                   |    2 +-
-  arch/arm/plat-samsung/include/plat/devs.h       |    3 +-
-  arch/arm/plat-samsung/include/plat/dma-pl330.h  |    1 +
-  arch/arm/plat-samsung/include/plat/sysmmu.h     |   95 --
-  drivers/iommu/Kconfig                           |   21 +
-  drivers/iommu/Makefile                          |    1 +
-  drivers/iommu/exynos-iommu.c                    | 1076 
-+++++++++++++++++++++++
-  drivers/spi/Kconfig                             |    2 +-
-  41 files changed, 1966 insertions(+), 824 deletions(-)
-  create mode 100644 arch/arm/mach-exynos/dev-drm.c
-  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
-  create mode 100644 arch/arm/mach-s3c24xx/setup-spi.c
-  delete mode 100644 arch/arm/plat-s5p/sysmmu.c
-  delete mode 100644 arch/arm/plat-samsung/include/plat/sysmmu.h
-  create mode 100644 drivers/iommu/exynos-iommu.c
+  arch/arm/mach-exynos/Kconfig               |   12 ++++++++
+  arch/arm/mach-exynos/mach-nuri.c           |   42 
+++++++++++++++++++++++++++-
+  arch/arm/mach-exynos/mach-origen.c         |   35 ++++++++++++++++++++++-
+  arch/arm/mach-exynos/mach-smdk4x12.c       |   16 ++++++++++
+  arch/arm/mach-exynos/mach-smdkv310.c       |   30 +++++++++++++++++++
+  arch/arm/mach-exynos/mach-universal_c210.c |   43 
+++++++++++++++++++++++++++++
+  arch/arm/mach-s3c64xx/mach-crag6410.c      |   18 +++++++++++
+  arch/arm/mach-s5pv210/Kconfig              |    1 +
+  arch/arm/mach-s5pv210/mach-goni.c          |    5 +++
+  9 files changed, 200 insertions(+), 2 deletions(-)
