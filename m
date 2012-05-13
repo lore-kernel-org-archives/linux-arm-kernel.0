@@ -1,45 +1,42 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 13 May 2012 15:59:14 -0400
-Subject: [PATCH] ARM: integrator: fix typo in PCI swizzle function
-In-Reply-To: <20120513160925.GA13947@n2100.arm.linux.org.uk>
-References: <1336813546-25766-1-git-send-email-linus.walleij@linaro.org>
- <CAP=VYLrTRQn_MQdB6mVC5qpPB1f6W8Maw8gaPN2TPRDy9c5Nvw@mail.gmail.com>
- <20120513160925.GA13947@n2100.arm.linux.org.uk>
-Message-ID: <CAP=VYLq2RruXJP29n4oE+2nDV=qCbt2Ff-z4GzEobXGcctJW+Q@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 13 May 2012 16:10:43 -0400
+Subject: [PATCH v2] mmc: dt: Consolidate DT bindings
+In-Reply-To: <201205131946.33109.arnd@arndb.de> (Arnd Bergmann's message of
+ "Sun, 13 May 2012 19:46:32 +0000")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <4F75D5C0.5050307@wwwdotorg.org> <871umou38f.fsf_-_@laptop.org>
+ <201205131946.33109.arnd@arndb.de>
+Message-ID: <87pqa7suyk.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2012 at 12:09 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, May 13, 2012 at 12:04:40PM -0400, Paul Gortmaker wrote:
->> On Sat, May 12, 2012 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org>
->> wrote:
->> > The next tree didn't compile due to a typo in commit
->> > cfb32a689949d09f112493de4a1e3e5900db2053
->> > "ARM: PCI: integrator: use common PCI swizzle"
->>
->> While the above commit may have played a role, it wasn't the
->> one that actually caused the final build fail. ?I bisected to the
->> failing commit and sent the same fix for this over a week ago.
->>
->> http://www.spinics.net/lists/arm-kernel/msg172951.html
->>
->> Should I also be Cc'ing arm at kernel.org on all prospective
->> ARM fixes I find in linux-next in the future?
->
-> Take a moment to have a think about whether arm-soc can fix a change
-> that's in my tree...
+Hi Arnd,
 
-Yeah, good point.  I just hate to see wasted/duplicated work and
-was wondering if I was missing something when I just sent the
-above fix to you and linux-arm-kernel vs. logging it in the patch
-tracker and/or expanding the CC list in some way.
+On Sun, May 13 2012, Arnd Bergmann wrote:
+> I've verified that there are no conflicts with anything we have in
+> arm-soc right now, so I think it should just go through your
+> tree.
 
-Paul.
----
+Ah, I based the patch on latest linux-next.  That's why there aren't
+conflicts against arm-soc, but there are conflicts (in the omap and
+tegra dts changes) between the patch and Linus master/mmc-next:
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Applying: mmc: dt: Consolidate DT bindings
+error: patch failed: arch/arm/boot/dts/omap3-beagle.dts:57
+error: patch failed: arch/arm/boot/dts/omap4-panda.dts:55
+error: patch failed: arch/arm/boot/dts/omap4-sdp.dts:94
+error: patch failed: arch/arm/boot/dts/tegra-cardhu.dts:141
+error: patch failed: arch/arm/boot/dts/tegra-harmony.dts:335
+error: patch failed: arch/arm/boot/dts/tegra-ventana.dts:338
+Patch failed at 0001 mmc: dt: Consolidate DT bindings
+
+So I think merging via arm-soc is the only way to get it to Linus
+without conflicts.  (Alternatively I can take it in mmc-next and
+Linus can handle the conflicts.)
+
+Thanks!
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
