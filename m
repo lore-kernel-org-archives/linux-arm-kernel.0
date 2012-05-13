@@ -1,27 +1,142 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 May 2012 17:09:25 +0100
-Subject: [PATCH] ARM: integrator: fix typo in PCI swizzle function
-In-Reply-To: <CAP=VYLrTRQn_MQdB6mVC5qpPB1f6W8Maw8gaPN2TPRDy9c5Nvw@mail.gmail.com>
-References: <1336813546-25766-1-git-send-email-linus.walleij@linaro.org>
- <CAP=VYLrTRQn_MQdB6mVC5qpPB1f6W8Maw8gaPN2TPRDy9c5Nvw@mail.gmail.com>
-Message-ID: <20120513160925.GA13947@n2100.arm.linux.org.uk>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Mon, 14 May 2012 01:48:27 +0800
+Subject: [PATCH V2] mfd: anatop: make register accessor more flexible
+ and rename meaningfully
+In-Reply-To: <1336871882-6796-1-git-send-email-richard.zhao@freescale.com>
+References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
+ <1336871882-6796-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FAFF3EB.4090904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2012 at 12:04:40PM -0400, Paul Gortmaker wrote:
-> On Sat, May 12, 2012 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > The next tree didn't compile due to a typo in commit
-> > cfb32a689949d09f112493de4a1e3e5900db2053
-> > "ARM: PCI: integrator: use common PCI swizzle"
+(2012?05?13? 09:18), Richard Zhao wrote:
+>  - rename to anatop_read_reg and anatop_write_reg
+>  - anatop_read_reg directly return reg value
+>  - anatop_write_reg write reg with mask
 > 
-> While the above commit may have played a role, it wasn't the
-> one that actually caused the final build fail.  I bisected to the
-> failing commit and sent the same fix for this over a week ago.
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> Changes since V1:
+> correct bit operation in anatop_write_reg
 > 
-> http://www.spinics.net/lists/arm-kernel/msg172951.html
+>  drivers/mfd/anatop-mfd.c             |   35 +++++++++++-----------------------
+>  drivers/regulator/anatop-regulator.c |   18 ++++++++---------
+>  include/linux/mfd/anatop.h           |    4 ++--
+>  3 files changed, 21 insertions(+), 36 deletions(-)
 > 
-> Should I also be Cc'ing arm at kernel.org on all prospective
-> ARM fixes I find in linux-next in the future?
+> diff --git a/drivers/mfd/anatop-mfd.c b/drivers/mfd/anatop-mfd.c
+> index 2af4248..6da0634 100644
+> --- a/drivers/mfd/anatop-mfd.c
+> +++ b/drivers/mfd/anatop-mfd.c
+> @@ -41,39 +41,26 @@
+>  #include <linux/of_address.h>
+>  #include <linux/mfd/anatop.h>
+>  
+> -u32 anatop_get_bits(struct anatop *adata, u32 addr, int bit_shift,
+> -		    int bit_width)
+> +u32 anatop_read_reg(struct anatop *adata, u32 addr)
+>  {
+> -	u32 val, mask;
+> -
+> -	if (bit_width == 32)
+> -		mask = ~0;
+> -	else
+> -		mask = (1 << bit_width) - 1;
+> -
+> -	val = readl(adata->ioreg + addr);
+> -	val = (val >> bit_shift) & mask;
+> -
+> -	return val;
+> +	return readl(adata->ioreg + addr);
+>  }
+> -EXPORT_SYMBOL_GPL(anatop_get_bits);
+> +EXPORT_SYMBOL_GPL(anatop_read_reg);
+>  
+> -void anatop_set_bits(struct anatop *adata, u32 addr, int bit_shift,
+> -		     int bit_width, u32 data)
+> +void anatop_write_reg(struct anatop *adata, u32 addr, u32 data, u32 mask)
+>  {
+> -	u32 val, mask;
+> +	u32 val;
+>  
+> -	if (bit_width == 32)
+> -		mask = ~0;
+> -	else
+> -		mask = (1 << bit_width) - 1;
+> +	data &= mask;
+>  
+>  	spin_lock(&adata->reglock);
+> -	val = readl(adata->ioreg + addr) & ~(mask << bit_shift);
+> -	writel((data << bit_shift) | val, adata->ioreg + addr);
+> +	val = readl(adata->ioreg + addr);
+> +	val &= ~mask;
+> +	val |= data;
+> +	writel(val, adata->ioreg + addr);
+>  	spin_unlock(&adata->reglock);
+>  }
+> -EXPORT_SYMBOL_GPL(anatop_set_bits);
+> +EXPORT_SYMBOL_GPL(anatop_write_reg);
+>  
+>  static const struct of_device_id of_anatop_match[] = {
+>  	{ .compatible = "fsl,imx6q-anatop", },
+> diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+> index 81fd606..0a34085 100644
+> --- a/drivers/regulator/anatop-regulator.c
+> +++ b/drivers/regulator/anatop-regulator.c
+> @@ -47,7 +47,7 @@ static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
+>  				  int max_uV, unsigned *selector)
+>  {
+>  	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+> -	u32 val, sel;
+> +	u32 val, sel, mask;
+>  	int uv;
+>  
+>  	uv = min_uV;
+> @@ -71,11 +71,10 @@ static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
+>  	val = anatop_reg->min_bit_val + sel;
+>  	*selector = sel;
+>  	dev_dbg(&reg->dev, "%s: calculated val %d\n", __func__, val);
+> -	anatop_set_bits(anatop_reg->mfd,
+> -			anatop_reg->control_reg,
+> -			anatop_reg->vol_bit_shift,
+> -			anatop_reg->vol_bit_width,
+> -			val);
+> +	mask = ((1 << anatop_reg->vol_bit_width) - 1) <<
+> +		anatop_reg->vol_bit_shift;
+> +	val <<= anatop_reg->vol_bit_shift;
+> +	anatop_write_reg(anatop_reg->mfd, anatop_reg->control_reg, val, mask);
+>  
+>  	return 0;
+>  }
+> @@ -88,10 +87,9 @@ static int anatop_get_voltage_sel(struct regulator_dev *reg)
+>  	if (!anatop_reg->control_reg)
+>  		return -ENOTSUPP;
+>  
+> -	val = anatop_get_bits(anatop_reg->mfd,
+> -			      anatop_reg->control_reg,
+> -			      anatop_reg->vol_bit_shift,
+> -			      anatop_reg->vol_bit_width);
+> +	val = anatop_read_reg(anatop_reg->mfd, anatop_reg->control_reg);
+> +	val = (val & ((1 << anatop_reg->vol_bit_width) - 1)) >>
+> +		anatop_reg->vol_bit_shift;
+>  
+>  	return val - anatop_reg->min_bit_val;
+>  }
+> diff --git a/include/linux/mfd/anatop.h b/include/linux/mfd/anatop.h
+> index 22c1007..7f92acf 100644
+> --- a/include/linux/mfd/anatop.h
+> +++ b/include/linux/mfd/anatop.h
+> @@ -34,7 +34,7 @@ struct anatop {
+>  	spinlock_t reglock;
+>  };
+>  
+> -extern u32 anatop_get_bits(struct anatop *, u32, int, int);
+> -extern void anatop_set_bits(struct anatop *, u32, int, int, u32);
+> +extern u32 anatop_read_reg(struct anatop *, u32);
+> +extern void anatop_write_reg(struct anatop *, u32, u32, u32);
+>  
+>  #endif /*  __LINUX_MFD_ANATOP_H */
 
-Take a moment to have a think about whether arm-soc can fix a change
-that's in my tree...
+Reviewed-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+
+Thanks...
