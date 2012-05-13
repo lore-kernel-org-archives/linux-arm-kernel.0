@@ -1,30 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 13 May 2012 13:18:03 -0700
-Subject: [PATCH 0/9] ARM: dt: tegra: cleanup pass
-In-Reply-To: <1336783081-16978-1-git-send-email-swarren@wwwdotorg.org>
-References: <1336783081-16978-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAOesGMh_adby1fdhoKZ0xovXpAP1nTYOGcDr1DCjZx4yMjR2vQ@mail.gmail.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Sun, 13 May 2012 20:52:42 +0000
+Subject: [PATCH] video: EXYNOS: changes mipi dsi regulator name from vdd10
+ to vdd11
+In-Reply-To: <4FA71563.5050401@samsung.com>
+References: <4FA71563.5050401@samsung.com>
+Message-ID: <4FB01F1A.5030204@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 5:37 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> I've been wanting to clean up the Tegra .dts files for a little while.
-> Here's a set of changes to do so. Hopefully they don't seem to much
-> like churn.
->
-> I was thinking of putting them into a for-3.6/cleanup branch, but I
-> suppose I could put them into 3.5 at the end too. I'd need to base this
-> series on the result of merging Tegra's for-3.5/dt and
-> for-3.5/tegra30-audio branches. Olof, what are your thoughts here?
+On 05/07/2012 12:20 AM, Donghwa Lee wrote:
+> MIPI DSI uses 1.1v regulator, so change its supply name.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-We could merge it with next/dt2 in arm-soc, so it should be fine. Get
-it sent in the next day or two though, please.
+Applied.
 
-> I've tested them on Cardhu so far, but still need to test all the other
-> boards to make sure I didn't introduce some typo.
 
-Series generally looks sane, nice cleanup. Overall:
+Thanks,
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Florian Tobias Schandinat
+
+> ---
+>  drivers/video/exynos/exynos_mipi_dsi.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+> index 95e33f0..2e779d3 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+> @@ -58,7 +58,7 @@ static struct mipi_dsim_platform_data *to_dsim_plat(struct platform_device
+>  }
+>  
+>  static struct regulator_bulk_data supplies[] = {
+> -	{ .supply = "vdd10", },
+> +	{ .supply = "vdd11", },
+>  	{ .supply = "vdd18", },
+>  };
+>  
