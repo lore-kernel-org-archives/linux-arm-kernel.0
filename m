@@ -1,37 +1,65 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 13 May 2012 08:15:07 +0800
-Subject: [GIT PULL] mxs device tree support for v3.5
-In-Reply-To: <87aa1d1ma2.fsf@laptop.org>
-References: <20120512082050.GG17875@S2101-09.ap.freescale.net>
- <20120512112748.GH17875@S2101-09.ap.freescale.net>
- <87aa1d1ma2.fsf@laptop.org>
-Message-ID: <20120513001505.GK17875@S2101-09.ap.freescale.net>
+Date: Sun, 13 May 2012 08:21:23 +0800
+Subject: [PATCH 08/10] mmc: mxs-mmc: add device tree support
+In-Reply-To: <871ump0wjf.fsf@laptop.org>
+References: <1336401793-13753-1-git-send-email-shawn.guo@linaro.org>
+ <1336401793-13753-9-git-send-email-shawn.guo@linaro.org>
+ <87k40h1msl.fsf@laptop.org>
+ <20120513000302.GJ17875@S2101-09.ap.freescale.net>
+ <871ump0wjf.fsf@laptop.org>
+Message-ID: <CAAQ0ZWQ5jhp8WYmOy96U23d9byvWLwthoZ-Empfgm7zykEBPcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2012 at 10:55:49AM -0400, Chris Ball wrote:
-> Hi Shawn,
-> 
+On 13 May 2012 08:11, Chris Ball <cjb@laptop.org> wrote:
+> Hi, adding Arnd,
+>
 > On Sat, May 12 2012, Shawn Guo wrote:
-> > Copy Chris in case he has problem with having mxs-mmc DT series go
-> > through arm-soc tree. 
-> 
-> Thanks, that's okay with me.
-> 
-> I just sent out a small review comment on one of the MMC patches; once
-> that's changed, feel free to add for the series:
-> 
-> Acked-by: Chris Ball <cjb@laptop.org>
-> 
-Typo fixed, tag collected, branch updated.  Thanks, Chris.
+>>> > diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+>>> > new file mode 100644
+>>> > index 0000000..d7c2a40
+>>> > --- /dev/null
+>>> > +++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+>>> > @@ -0,0 +1,26 @@
+>>> > +* Freescale MXS MMC controller
+>>> > +
+>>> > +The Freescale MXS Synchronous Serial Ports (SSP) can act as a MMC controller
+>>> > +to support MMC, SD, and SDIO types of memory cards.
+>>> > +
+>>> > +Required properties:
+>>> > +- compatible: Should be "fsl,<chip>-mmc". ?The supported chips include
+>>> > + ?imx23 and imx28.
+>>> > +- reg: Should contain registers location and length
+>>> > +- interrupts: Should contain ERROR and DMA interrupts
+>>> > +- fsl,ssp-dma-channel: APBH DMA channel for the SSP
+>>> > +- fsl,bus-width: Number of data lines, can be <1>, <4>, or <8>
+>>>
+>>> Please don't use a prefix on "bus-width" -- see Arnd's proposed bindings:
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091993.html
+>>>
+>> Yes, I've been keeping my eyes on the discussion. ?Before that generic
+>> bindings get landed, the vendor prefix can be treated as a marker that
+>> this is something should use generic binding.
+>
+> Sorry, I don't understand this explanation. ?As soon as Arnd's patch
+> lands (possibly even for 3.5), we will be making sure that all of the
+> bindings are consistently using "bus-width" with no prefix -- that's
+> what Arnd's patch does to the existing .dts files. ?Why introduce an
+> inconsistent binding now that we have to change later, instead of
+> getting it right straight away?
+>
+> I'd like bindings going into mainline to be as correct as possible from
+> the moment that they're merged into mainline, because they describe an
+> API with the kernel. ?The fact that we have some bindings currently in
+> the tree that we'll have to change to use the consistent naming scheme
+> Arnd proposes is regrettable, not intentional, so we shouldn't be
+> planning on doing more of it. ?Does that make sense?
+>
+> I'll take a look at merging Arnd's bindings patch and fixing up the
+> review comments on it now; it sounds like we really need to get it
+> merged and adopted very soon.
+>
+In that case, ok, I will remove the prefix right away.
 
-> I notice that Marek Vasut also gave you an Acked-by for the series,
-> but the version of the patches in your git tree doesn't show it.
-> Please make sure to credit people who review your patches by adding
-> their tags into patches before the patches are merged, it's important.
-> 
-Hmm, I collected Marek's tag he put on patch #1, #4, #5, #6 #7.
-
--- 
 Regards,
 Shawn
