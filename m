@@ -1,120 +1,73 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sat, 12 May 2012 22:56:12 -0700
-Subject: [PATCH v2] arm: msm: fix up very basic HTC Sapphire support
-In-Reply-To: <q7bdy899mt3um93hikst04au.1336884464056@email.android.com>
-References: <q7bdy899mt3um93hikst04au.1336884464056@email.android.com>
-Message-ID: <20120513055612.GA7129@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 May 2012 23:29:24 -0700
+Subject: [GIT PULL] Renesas ARM-based platforms: new boards support for
+ v3.5
+In-Reply-To: <201205122323.14967.rjw@sisk.pl>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMgFWM6K6969Oz6xGewrRekyrJA-ztGBADxsqnB1w=V2QA@mail.gmail.com>
+ <201205122307.20590.rjw@sisk.pl> <201205122323.14967.rjw@sisk.pl>
+Message-ID: <CAOesGMj5op-U+-_dvP_cqMUQ7zgzbzvig2ueb2LQTf+4MSEc2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2012 at 09:47:44PM -0700, Daniel Walker wrote:
-> What you did wasn't what I was suggesting you do...
-> 
-> Keep your pull request available as it originally was and ill comment on the thread..
+On Sat, May 12, 2012 at 2:23 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> Hi,
+>
+> Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+>
+> ? ?Linux 3.4-rc6
+>
+> with top-most commit a515be1ca7df947db0f6018a174f49507affcdbc
+>
+> ? ?Merge branch 'renesas-kzm9g' into renesas-board-new
+>
+> from the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git board-new
+>
+> to receive updates of the Renesas ARM-based boards support code for v3.5.
+> Included are:
+>
+> ?* Support for the KZM-A9-GT board from Kuninori Morimoto.
+>
+> ?* Support for the armadillo800eva board from Kuninori Morimoto.
+>
+> This is based on the Renesas core SoC code updates I've sent a separate pull
+> request for.
 
-Please send out updated patches when you've addressed the issues, and
-I'll gladly pull them in.  As for now, Olof has already pulled the
-tree without the Sapphire changes.
 
-David
+Hi Rafael and Magnus,
 
-> Daniel
-> 
-> David Brown <davidb@codeaurora.org> wrote:
-> 
-> >On Fri, May 11, 2012 at 10:45:52PM -0700, Olof Johansson wrote:
-> >
-> >> Sorry, I should have found the below items on the first review and not
-> >> now on the second one, but see below.
-> >
-> >Daniel, I don't mind fixing up minor things, but can you take care of
-> >the other issues that Olof has brought up.
-> >
-> >Thanks,
-> >David
-> >
-> >> On Fri, May 11, 2012 at 5:15 PM, David Brown <davidb@codeaurora.org> wrote:
-> >> > From: Daniel Walker <dwalker@fifo99.com>
-> >> >
-> >> > Adds sapphire into the make file, and fixes all the code problems that
-> >> > prevented it from building (including adding board-sapphire.h)
-> >> >
-> >> > [davidb at codeaurora.org: Move MACH_TROUT selection back under
-> >> > ARCH_MSM7X00A]
-> >> >
-> >> > Signed-off-by: Daniel Walker <dwalker@fifo99.com>
-> >> > Signed-off-by: David Brown <davidb@codeaurora.org>
-> >> > ---
-> >> > v2 - Moved MACH_TROUT selection back under the ARCH config target
-> >> >
-> >> > ?arch/arm/mach-msm/Kconfig ? ? ? ? ?| ? ?9 +-
-> >> > ?arch/arm/mach-msm/Makefile ? ? ? ? | ? ?1 +
-> >> > ?arch/arm/mach-msm/board-sapphire.c | ? 18 +--
-> >> > ?arch/arm/mach-msm/board-sapphire.h | ?224 ++++++++++++++++++++++++++++++++++++
-> >> > ?4 files changed, 234 insertions(+), 18 deletions(-)
-> >> > ?create mode 100644 arch/arm/mach-msm/board-sapphire.h
-> >> >
-> >> > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> >> > index 1cd40ad..70eae63 100644
-> >> > --- a/arch/arm/mach-msm/Kconfig
-> >> > +++ b/arch/arm/mach-msm/Kconfig
-> >> > @@ -6,7 +6,7 @@ choice
-> >> >
-> >> > ?config ARCH_MSM7X00A
-> >> > ? ? ? ?bool "MSM7x00A / MSM7x01A"
-> >> > - ? ? ? select MACH_TROUT if !MACH_HALIBUT
-> >> > + ? ? ? select MACH_TROUT if (!MACH_HALIBUT && !MACH_SAPPHIRE)
-> >> 
-> >> Better, thanks!
-> >> 
-> >> 
-> >> > diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-> >> > index 4ad3969..aff4e5c 100644
-> >> > --- a/arch/arm/mach-msm/Makefile
-> >> > +++ b/arch/arm/mach-msm/Makefile
-> >> > @@ -20,6 +20,7 @@ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-> >> > ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-> >> > ?obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-> >> >
-> >> > +obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o devices-msm7x00.o
-> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
-> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
-> >> > ?obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
-> >> 
-> >> Unrelated to this change per se, but it seems like devices-msm7x00.o
-> >> should be on an obj-$(CONFIG_ARCH_MSM7X00A) statement instead of
-> >> duplicated for all boards.
-> >> 
-> >> Also, the trout line is mostly duplicated, only delta is panel. Looks
-> >> broken. Both of these things is material for a separate patch though.
-> >> 
-> >> > diff --git a/arch/arm/mach-msm/board-sapphire.h b/arch/arm/mach-msm/board-sapphire.h
-> >> > new file mode 100644
-> >> > index 0000000..70f925e
-> >> > --- /dev/null
-> >> > +++ b/arch/arm/mach-msm/board-sapphire.h
-> >> > @@ -0,0 +1,224 @@
-> >> [..]
-> >> > +void config_sapphire_camera_on_gpios(void);
-> >> > +void config_sapphire_camera_off_gpios(void);
-> >> > +int sapphire_get_smi_size(void);
-> >> > +unsigned int sapphire_get_hwid(void);
-> >> > +unsigned int sapphire_get_skuid(void);
-> >> > +unsigned int is_12pin_camera(void);
-> >> > +int sapphire_is_5M_camera(void);
-> >> > +int sapphire_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on);
-> >> 
-> >> Many (all?) of these functions are not to be found in the code. Please
-> >> don't add prototypes for code that isn't there.
-> >> 
-> >> 
-> >> -Olof
-> >
-> >-- 
-> >Sent by an employee of the Qualcomm Innovation Center, Inc.
-> >The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> >
+I know Renesas is very active in adding support for new ARM platforms
+upstream, and that's great. But we also need to figure out how it can
+best be done while still keeping a bound on platform complexity.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+This adds two new board files and two new defconfigs to the arm
+subtree. We have in general said that we are OK with the occasional
+new board file if the vendor is actively working on reducing the rest
+of the subdirectory contents and consolidating over into device tree
+based platforms. But we have also agreed that new (v7+) SoCs/boards
+should be targeting DT board files from introduction nowadays.
+
+Both these SoCs and boards seem to be A9-based, so they would match
+that requirement.
+
+The good news is that meeting the basic requirements for device tree
+probing is easy; using a DT_MACHINE_START() stanza and adding a small
+dts file is really all it takes for the real simple case. Building a
+zImage with the device tree appended (and ARM_ATAG_DTB_COMPAT=y) means
+you can use the same firmware as before and not modify it to handle
+device trees, if that is a limitation you have for your environments.
+
+Also, I would prefer to only see one or a couple of defconfigs that
+can provide full build coverage for the various SoCs and boards, that
+would contain the superset of the required drivers to boot the
+supported boards, etc.
+
+So, I'm going to hold off pulling in this branch right now until we
+can sort out some of the above items.
+
+
+Regards,
+
+-Olof
