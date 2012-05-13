@@ -1,30 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 13 May 2012 20:37:52 +0800
-Subject: [GIT PULL] Adopt pinctrl support for imx and mxs drivers
-In-Reply-To: <20120513103314.GB706@sirena.org.uk>
-References: <20120512021726.GC17875@S2101-09.ap.freescale.net>
- <20120513103314.GB706@sirena.org.uk>
-Message-ID: <CAAQ0ZWT4FTSpLoMEYnOqt-STHz9nadUjxuNNdDWNkLHEDqab0A@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 13 May 2012 16:15:19 +0300
+Subject: [PATCH] ARM: OMAP4: hwspinlocks_init() should be static
+Message-ID: <1336914919-20032-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2012 18:33, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Sat, May 12, 2012 at 10:17:28AM +0800, Shawn Guo wrote:
->
->> I copied subsystem maintainers here in case they see problem to have
->> their patches go through arm-soc.
->
-> Not quite successful there...
->
-I did not copy you here because I have collected your ack on the patch
-below. [1]
+Sparse found out that hwspinlocks_init() wasn't marked static,
+and it should've been.
 
-Regards,
-Shawn
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ arch/arm/mach-omap2/hwspinlock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
->> ? ? ? ASoC: mxs-saif: adopt pinctrl support
->
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-
-[1] http://thread.gmane.org/gmane.linux.serial/7752/focus=97325
+diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
+index 454dfce..8763c85 100644
+--- a/arch/arm/mach-omap2/hwspinlock.c
++++ b/arch/arm/mach-omap2/hwspinlock.c
+@@ -28,7 +28,7 @@ static struct hwspinlock_pdata omap_hwspinlock_pdata __initdata = {
+ 	.base_id = 0,
+ };
+ 
+-int __init hwspinlocks_init(void)
++static int __init hwspinlocks_init(void)
+ {
+ 	int retval = 0;
+ 	struct omap_hwmod *oh;
+-- 
+1.7.5.4
