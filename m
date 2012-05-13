@@ -1,42 +1,35 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 13 May 2012 16:10:43 -0400
-Subject: [PATCH v2] mmc: dt: Consolidate DT bindings
-In-Reply-To: <201205131946.33109.arnd@arndb.de> (Arnd Bergmann's message of
- "Sun, 13 May 2012 19:46:32 +0000")
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <4F75D5C0.5050307@wwwdotorg.org> <871umou38f.fsf_-_@laptop.org>
- <201205131946.33109.arnd@arndb.de>
-Message-ID: <87pqa7suyk.fsf@laptop.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 13 May 2012 23:14:36 +0300
+Subject: [PATCH] remoteproc: fix off-by-one bug in __rproc_free_vrings
+Message-ID: <1336940076-6317-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Subramaniam Chanderashekarapuram <subramaniam.ca@ti.com>
 
-On Sun, May 13 2012, Arnd Bergmann wrote:
-> I've verified that there are no conflicts with anything we have in
-> arm-soc right now, so I think it should just go through your
-> tree.
+Fix a nasty off-by-one bug in __rproc_free_vrings which
+resulted in a memory leak and (for some platforms) failures
+to reload the remote processor.
 
-Ah, I based the patch on latest linux-next.  That's why there aren't
-conflicts against arm-soc, but there are conflicts (in the omap and
-tegra dts changes) between the patch and Linus master/mmc-next:
+Signed-off-by: Subramaniam Chanderashekarapuram <subramaniam.ca@ti.com>
+[ohad at wizery.com: reword commit log, stick with the for loop]
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/remoteproc/remoteproc_core.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Applying: mmc: dt: Consolidate DT bindings
-error: patch failed: arch/arm/boot/dts/omap3-beagle.dts:57
-error: patch failed: arch/arm/boot/dts/omap4-panda.dts:55
-error: patch failed: arch/arm/boot/dts/omap4-sdp.dts:94
-error: patch failed: arch/arm/boot/dts/tegra-cardhu.dts:141
-error: patch failed: arch/arm/boot/dts/tegra-harmony.dts:335
-error: patch failed: arch/arm/boot/dts/tegra-ventana.dts:338
-Patch failed at 0001 mmc: dt: Consolidate DT bindings
-
-So I think merging via arm-soc is the only way to get it to Linus
-without conflicts.  (Alternatively I can take it in mmc-next and
-Linus can handle the conflicts.)
-
-Thanks!
-
-- Chris.
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index ee15c68..e756a0d 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -354,7 +354,7 @@ static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
+ {
+ 	struct rproc *rproc = rvdev->rproc;
+ 
+-	for (i--; i > 0; i--) {
++	for (i--; i >= 0; i--) {
+ 		struct rproc_vring *rvring = &rvdev->vring[i];
+ 		int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
+ 
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.5.4
