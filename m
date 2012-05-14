@@ -1,30 +1,47 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 14 May 2012 19:54:51 +0900
-Subject: [PATCH 03/03] ARM: Undelete KZM9D mach-type
-In-Reply-To: <20120514105424.8596.38355.sendpatchset@w520>
-References: <20120514105424.8596.38355.sendpatchset@w520>
-Message-ID: <20120514105451.8596.92367.sendpatchset@w520>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 14 May 2012 18:54:56 +0800
+Subject: [PATCH v6] MTD: atmel_nand: Update driver to support Programmable
+ Multibit ECC controller
+In-Reply-To: <1336738300.2625.57.camel@sauron.fi.intel.com>
+References: <1336561255-30905-1-git-send-email-josh.wu@atmel.com>
+ <1336738300.2625.57.camel@sauron.fi.intel.com>
+Message-ID: <4FB0E480.1070609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi, Artem
 
-Undelete the KZM9D mach-type to allow build of board
-for EMEV2 SoC support.
+On 5/11/2012 8:11 PM, Artem Bityutskiy wrote:
+> On Wed, 2012-05-09 at 19:00 +0800, Josh Wu wrote:
+>> The Programmable Multibit ECC (PMECC) controller is a programmable binary
+>> BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This controller
+>> can be used to support both SLC and MLC NAND Flash devices. It supports to
+>> generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector of data.
+>>
+>> To use this driver, the user needs to pass in the correction capability and
+>> the sector size.
+>>
+>> This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with JFFS2,
+>> YAFFS2, UBIFS and mtd-utils.
+>>
+>> Signed-off-by: Hong Xu<hong.xu@atmel.com>
+>> Signed-off-by: Josh Wu<josh.wu@atmel.com>
+> The patch is really big - please, split it on more smaller patches.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+OK, I can spit to more patches.
 
- arch/arm/tools/mach-types |    1 +
- 1 file changed, 1 insertion(+)
+> Besides, it does not compile for me:
+>
+> ERROR: "of_flat_dt_is_compatible" [drivers/mtd/nand/atmel_nand.ko] undefined!
+> ERROR: "of_get_flat_dt_root" [drivers/mtd/nand/atmel_nand.ko] undefined!
+> make[2]: *** [__modpost] Error 1
 
---- 0001/arch/arm/tools/mach-types
-+++ work/arch/arm/tools/mach-types	2012-05-14 19:38:03.000000000 +0900
-@@ -530,6 +530,7 @@ nokia_rm680		MACH_NOKIA_RM680	NOKIA_RM68
- msm8960_sim		MACH_MSM8960_SIM	MSM8960_SIM		3230
- msm8960_rumi3		MACH_MSM8960_RUMI3	MSM8960_RUMI3		3231
- gsia18s			MACH_GSIA18S		GSIA18S			3234
-+kzm9d			MACH_KZM9D		KZM9D			3246
- mx53_loco		MACH_MX53_LOCO		MX53_LOCO		3273
- tx53			MACH_TX53		TX53			3279
- encore			MACH_ENCORE		ENCORE			3284
+This function will depend on CONFIG_OF_FLATTREE and 
+CONFIG_OF_EARLY_FLATTREE.
+
+Would it be possible that CONFIG_OF is defined, but above two config 
+options are not defined? Can I see you .config file go get more details?
+
+
+Best Regards,
+Josh Wu
