@@ -1,59 +1,37 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 14 May 2012 18:51:16 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
-Message-ID: <20120514185116.fcde1a3be2fbaae3c4b5f279@canb.auug.org.au>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 14 May 2012 10:52:46 +0200
+Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
+In-Reply-To: <4FB048E4.8070405@linaro.org>
+References: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
+ <4FB048E4.8070405@linaro.org>
+Message-ID: <201205141052.47567.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Am Montag, 14. Mai 2012, 01:51:00 schrieb Daniel Lezcano:
+> On 05/09/2012 04:08 PM, Daniel Lezcano wrote:
+> > These couple of patches use the new cpuidle core api to refactor
+> > some part of the code. The first one declares the states directly
+> > in the driver declaration and the second one use the timekeeping
+> > flag to let the cpuidle core to compute the idle time.
+> > 
+> > I don't have this board, I was not able to test these patches.
+> > 
+> > Daniel Lezcano (2):
+> >    ARM: s3c64xx: cpuidle - declare the states with the new api
+> >    ARM: s3c64xx: cpuidle - use timekeeping wrapper
+> 
+> Are these patches ok for inclusion ?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/video/omap2/displays/panel-taal.c between commit 9c3d5eb71b1f
-("OMAP: DSS2: Remove suspicous and unused TAAL regulator API usage") from
-the omap_dss2 tree and commit 3acc797c1db2 ("OMAPDSS: Taal: move reset
-gpio handling to taal driver") from the arm-soc tree.
+you might want to include the maintainer
 
-Just context changes. I fixed it up (see below) and can carry the fix as
-necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+	Kukjin Kim <kgene.kim@samsung.com>
 
-diff --cc drivers/video/omap2/displays/panel-taal.c
-index 3053399,b2dd88b..0000000
---- a/drivers/video/omap2/displays/panel-taal.c
-+++ b/drivers/video/omap2/displays/panel-taal.c
-@@@ -992,8 -1082,13 +1001,11 @@@ err_gpio
-  	if (bldev != NULL)
-  		backlight_device_unregister(bldev);
-  err_bl:
-+ 	if (gpio_is_valid(panel_data->reset_gpio))
-+ 		gpio_free(panel_data->reset_gpio);
-+ err_rst_gpio:
-  	destroy_workqueue(td->workqueue);
-  err_wq:
- -	free_regulators(panel_config->regulators, panel_config->num_regulators);
- -err_reg:
-  	kfree(td);
-  err:
-  	return r;
-@@@ -1030,6 -1125,12 +1042,9 @@@ static void __exit taal_remove(struct o
-  	/* reset, to be sure that the panel is in a valid state */
-  	taal_hw_reset(dssdev);
-  
- -	free_regulators(td->panel_config->regulators,
- -			td->panel_config->num_regulators);
- -
-+ 	if (gpio_is_valid(panel_data->reset_gpio))
-+ 		gpio_free(panel_data->reset_gpio);
-+ 
-  	kfree(td);
-  }
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/aba3be8b/attachment.sig>
+and the samsung list
+
+	linux-samsung-soc at vger.kernel.org
+
+into your recipients
+
+
+Heiko
