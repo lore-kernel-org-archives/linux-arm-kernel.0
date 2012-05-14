@@ -1,35 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 14 May 2012 13:27:09 +0300
-Subject: [PATCH] ARM: tegra: Fix flow controller accesses
-Message-ID: <1336991229-18859-1-git-send-email-pdeschrijver@nvidia.com>
+From: ki0351.kim@samsung.com (Kyoungil Kim)
+Date: Mon, 14 May 2012 19:30:31 +0900
+Subject: [PATCH] serial: samsung: Add support 4M baudrate for samsung
+ serial
+In-Reply-To: <4FAEF910.902@samsung.com>
+References: <001b01cce24a$b01cb370$10561a50$%kim@samsung.com>
+ <4FAEF910.902@samsung.com>
+Message-ID: <002f01cd31bc$96e9cd90$c4bd68b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-flowctrl_write_cpu_csr uses the cpu halt offsets and vice versa. This patch
-fixes this bug.
+Kukjin Kim wrote:
+> On 02/03/12 17:06, ??? wrote:
+> > At getting the baudrate, the max baudrate parameter value
+> > is changed to 4M.
+> > So samsung serial can support upto 4M baudrate.
+> >
+> > Signed-off-by: Kyoungil Kim<ki0351.kim@samsung.com>
+> > ---
+> >   drivers/tty/serial/samsung.c |    2 +-
+> >   1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> > index a6abe0c..513096d 100644
+> > --- a/drivers/tty/serial/samsung.c
+> > +++ b/drivers/tty/serial/samsung.c
+> > @@ -701,7 +701,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+> >   	 * Ask the core to calculate the divisor for us.
+> >   	 */
+> >
+> > -	baud = uart_get_baud_rate(port, termios, old, 0, 115200*8);
+> > +	baud = uart_get_baud_rate(port, termios, old, 0, 4000000);
+> >   	quot = s3c24xx_serial_getclk(ourport, baud,&clk,&clk_sel);
+> >   	if (baud == 38400&&  (port->flags&  UPF_SPD_MASK) == UPF_SPD_CUST)
+> >   		quot = port->custom_divisor;
+> 
+> Kyoungil,
+> 
+> Is this available on all of Samsung serial?
 
-Reported-by: Dan Willemsen <dwillemsen@nvidia.com>
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/flowctrl.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I'm not sure about that, but it just indicates the max baudrate.
 
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-index fef66a7..f07488e 100644
---- a/arch/arm/mach-tegra/flowctrl.c
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -53,10 +53,10 @@ static void flowctrl_update(u8 offset, u32 value)
- 
- void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
- {
--	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
-+	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
- }
- 
- void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
- {
--	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
-+	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
- }
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Thank you.
+Best Regards.
