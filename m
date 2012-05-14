@@ -1,89 +1,66 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 14 May 2012 09:49:51 +0800
-Subject: [GIT PULL][for 3.5] request pull of power branch in arch-pxa
-Message-ID: <CAN1soZzUi6U0ybxYX=WTGdCaBysL98qjWX7AjnEAGW_bFpVfnQ@mail.gmail.com>
+From: raulxiong@gmail.com (Raul Xiong)
+Date: Mon, 14 May 2012 10:43:31 +0800
+Subject: [PATCH] cpu_pm: fix some typos in comments
+In-Reply-To: <CAG9bXvkn6bm1xXpBxqvOxxzSrPPRdvP7RzKrfhSVJebN54psHQ@mail.gmail.com>
+References: <CAG9bXvkn6bm1xXpBxqvOxxzSrPPRdvP7RzKrfhSVJebN54psHQ@mail.gmail.com>
+Message-ID: <CAG9bXvkm6KVRpca9-YBq9oRiUyFLeaD+gwysCjpMO4Xo69XBXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+2012/5/11 Raul Xiong <raulxiong@gmail.com>:
+> Fix some comment typos in function names
+>
+> Signed-off-by: Raul Xiong <raulxiong@gmail.com>
+> ---
+> ?kernel/cpu_pm.c | ? ?8 ++++----
+> ?1 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+> index 249152e..957b151 100644
+> --- a/kernel/cpu_pm.c
+> +++ b/kernel/cpu_pm.c
+> @@ -81,7 +81,7 @@ int cpu_pm_unregister_notifier(struct notifier_block *nb)
+> ?EXPORT_SYMBOL_GPL(cpu_pm_unregister_notifier);
+>
+> ?/**
+> - * cpm_pm_enter - CPU low power entry notifier
+> + * cpu_pm_enter - CPU low power entry notifier
+> ?*
+> ?* Notifies listeners that a single CPU is entering a low power state that may
+> ?* cause some blocks in the same power domain as the cpu to reset.
+> @@ -115,7 +115,7 @@ int cpu_pm_enter(void)
+> ?EXPORT_SYMBOL_GPL(cpu_pm_enter);
+>
+> ?/**
+> - * cpm_pm_exit - CPU low power exit notifier
+> + * cpu_pm_exit - CPU low power exit notifier
+> ?*
+> ?* Notifies listeners that a single CPU is exiting a low power state that may
+> ?* have caused some blocks in the same power domain as the cpu to reset.
+> @@ -139,7 +139,7 @@ int cpu_pm_exit(void)
+> ?EXPORT_SYMBOL_GPL(cpu_pm_exit);
+>
+> ?/**
+> - * cpm_cluster_pm_enter - CPU cluster low power entry notifier
+> + * cpu_cluster_pm_enter - CPU cluster low power entry notifier
+> ?*
+> ?* Notifies listeners that all cpus in a power domain are entering a low power
+> ?* state that may cause some blocks in the same power domain to reset.
+> @@ -174,7 +174,7 @@ int cpu_cluster_pm_enter(void)
+> ?EXPORT_SYMBOL_GPL(cpu_cluster_pm_enter);
+>
+> ?/**
+> - * cpm_cluster_pm_exit - CPU cluster low power exit notifier
+> + * cpu_cluster_pm_exit - CPU cluster low power exit notifier
+> ?*
+> ?* Notifies listeners that all cpus in a power domain are exiting form a
+> ?* low power state that may have caused some blocks in the same power domain
 
-Please help to merge power branch in arch-pxa tree. These power
-patches are depend
-on dt patches since irq driver is changed in dt patches.
 
-The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
+Hi Colin, all,
 
-  Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
+Is there any problem to accept this patch?
 
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git power
 
-Chao Xie (6):
-      ARM: mmp: move XX_REG definition to addr-map.h
-      ARM: mmp: add PM support for mmp2
-      ARM: mm: proc-mohawk: add suspend resume for mohawk
-      ARM: cache: tauros2: add disable and resume callback
-      ARM: mmp: add pm support for pxa910
-
-Haojian Zhuang (9):
-      ARM: mmp: fix build issue on mmp with device tree
-      ARM: mmp: append CONFIG_MACH_MMP2_DT
-      ARM: mmp: support DT in irq
-      ARM: mmp: support DT in timer
-      gpio: pxa: parse gpio from DTS file
-      ARM: mmp: support mmp2 with device tree
-      ARM: mmp: support pxa910 with device tree
-      ARM: dts: refresh dts file for arch mmp
-      Documentation: update docs for mmp dt
-
- .../devicetree/bindings/arm/mrvl/intc.txt          |   40 ++
- .../devicetree/bindings/arm/{ => mrvl}/mrvl.txt    |    8 +
- .../devicetree/bindings/arm/mrvl/timer.txt         |   13 +
- .../devicetree/bindings/gpio/mrvl-gpio.txt         |   18 +-
- Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   15 +-
- arch/arm/Kconfig                                   |    3 +-
- arch/arm/boot/dts/mmp2-brownstone.dts              |   38 ++
- arch/arm/boot/dts/mmp2.dtsi                        |  220 ++++++++++
- arch/arm/boot/dts/pxa168.dtsi                      |   67 +++-
- arch/arm/boot/dts/pxa910-dkb.dts                   |   38 ++
- arch/arm/boot/dts/pxa910.dtsi                      |  140 ++++++
- arch/arm/mach-mmp/Kconfig                          |   29 +-
- arch/arm/mach-mmp/Makefile                         |   14 +-
- arch/arm/mach-mmp/include/mach/addr-map.h          |   12 +
- arch/arm/mach-mmp/include/mach/entry-macro.S       |    4 +-
- arch/arm/mach-mmp/include/mach/irqs.h              |   27 +-
- arch/arm/mach-mmp/include/mach/pm-mmp2.h           |   61 +++
- arch/arm/mach-mmp/include/mach/pm-pxa910.h         |   77 ++++
- arch/arm/mach-mmp/include/mach/regs-apbc.h         |    3 -
- arch/arm/mach-mmp/include/mach/regs-apmu.h         |    3 -
- arch/arm/mach-mmp/irq-mmp2.c                       |  158 -------
- arch/arm/mach-mmp/irq-pxa168.c                     |   54 ---
- arch/arm/mach-mmp/irq.c                            |  458 ++++++++++++++++++++
- arch/arm/mach-mmp/mmp-dt.c                         |   66 ++--
- arch/arm/mach-mmp/mmp2-dt.c                        |   60 +++
- arch/arm/mach-mmp/pm-mmp2.c                        |  264 +++++++++++
- arch/arm/mach-mmp/pm-pxa910.c                      |  285 ++++++++++++
- arch/arm/mach-mmp/time.c                           |   81 +++-
- arch/arm/mach-mmp/ttc_dkb.c                        |   11 +
- arch/arm/mm/cache-tauros2.c                        |   24 +
- arch/arm/mm/proc-mohawk.S                          |   35 ++
- drivers/gpio/gpio-pxa.c                            |  116 +++++-
- 32 files changed, 2101 insertions(+), 341 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/intc.txt
- rename Documentation/devicetree/bindings/arm/{ => mrvl}/mrvl.txt (53%)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/timer.txt
- create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
- create mode 100644 arch/arm/boot/dts/mmp2.dtsi
- create mode 100644 arch/arm/boot/dts/pxa910-dkb.dts
- create mode 100644 arch/arm/boot/dts/pxa910.dtsi
- create mode 100644 arch/arm/mach-mmp/include/mach/pm-mmp2.h
- create mode 100644 arch/arm/mach-mmp/include/mach/pm-pxa910.h
- delete mode 100644 arch/arm/mach-mmp/irq-mmp2.c
- delete mode 100644 arch/arm/mach-mmp/irq-pxa168.c
- create mode 100644 arch/arm/mach-mmp/irq.c
- create mode 100644 arch/arm/mach-mmp/mmp2-dt.c
- create mode 100644 arch/arm/mach-mmp/pm-mmp2.c
- create mode 100644 arch/arm/mach-mmp/pm-pxa910.c
-
-Regards
-Haojian
+Raul
+Best Regards
