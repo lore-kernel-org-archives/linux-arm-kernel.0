@@ -1,43 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 May 2012 11:11:05 +0200
-Subject: [PATCH 06/15] mfd/ab8500: Remove confusing ab8500-i2c file and
- merge into ab8500-core
-In-Reply-To: <4FB0C52E.9030109@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdanG7KgYuZw29KwZe7wRp-AVZJ9n_hwBEZzf5gDAbGneg@mail.gmail.com>
- <4FB0C52E.9030109@linaro.org>
-Message-ID: <CACRpkda3wWJ2tV2EE+avMtKQbge0gsLuQnutDETm-MnERgZx1Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 14 May 2012 11:22:24 +0200
+Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
+In-Reply-To: <20120514085700.GA2189@sirena.org.uk>
+References: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
+ <4FB048E4.8070405@linaro.org> <201205141052.47567.heiko@sntech.de>
+ <20120514085700.GA2189@sirena.org.uk>
+Message-ID: <4FB0CED0.2000408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 10:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On 09/05/12 13:20, Linus Walleij wrote:
-
->> (...)
->> +static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
->> +static int ab8500_i2c_read(struct ab8500 *ab8500, u16 addr)
->>
->> As you might have noticed, many people have been confused by
->> the "i2c" naming of these things. Yes, there is physically an I2C
->> carrying these out but in Linux terms that's just confusing, it's mixing
->> hardware and software terminology. Take this opportunity to
->> rename them:
->>
->> static int ab8500_prcmu_write(struct ab8500 *ab8500, u16 addr, u8 data)
->> static int ab8500_prcmu_read(struct ab8500 *ab8500, u16 addr)
->>
->> etc, so they have a meaningful name.
+On 05/14/2012 10:57 AM, Mark Brown wrote:
+> On Mon, May 14, 2012 at 10:52:46AM +0200, Heiko St??bner wrote:
+>> Am Montag, 14. Mai 2012, 01:51:00 schrieb Daniel Lezcano:
+>>> On 05/09/2012 04:08 PM, Daniel Lezcano wrote:
 >
+>>> Are these patches ok for inclusion ?
 >
-> Again, something that I'm happy to do, and again something I'd like to do as
-> a separate patch (I'll create a patch-set with this and your other
-> 'clean-up' requests if that's okay with you?)
+>> you might want to include the maintainer
+>
+>> 	Kukjin Kim<kgene.kim@samsung.com>
+>
+>> and the samsung list
+>
+>> 	linux-samsung-soc at vger.kernel.org
+>
+>> into your recipients
+>
+> Also the original author (me).
 
-Sure, what I worry about is that it needs to happen, whether it's done
-in 1,2 or 50 patches is just mechanics, as long as the patches are sent.
+Oh, ok. I thought I did it, sorry.
 
-And Sam can always squash them if they get too plentiful :-)
+   -- Daniel
 
-Yours,
-Linus Walleij
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
