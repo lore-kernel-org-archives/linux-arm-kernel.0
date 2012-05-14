@@ -1,34 +1,45 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Mon, 14 May 2012 15:51:46 +0200
-Subject: [PATCH] ARM: OMAP1: USB: fix ocpi_enable compile problem on
- non-1610 builds
-In-Reply-To: <20120511165306.GT21851@atomide.com>
-References: <alpine.DEB.2.00.1205101625360.32719@utopia.booyaka.com>
- <20120511165306.GT21851@atomide.com>
-Message-ID: <7431581.eQlfa7RL1e@vclass>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 May 2012 22:51:58 +0900
+Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
+In-Reply-To: <4FB0CED0.2000408@linaro.org>
+References: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
+ <4FB048E4.8070405@linaro.org> <201205141052.47567.heiko@sntech.de>
+ <20120514085700.GA2189@sirena.org.uk> <4FB0CED0.2000408@linaro.org>
+Message-ID: <4FB10DFE.40308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 of May 2012 09:53:07 Tony Lindgren wrote:
-> * Paul Walmsley <paul@pwsan.com> [120510 15:31]:
-> > 
-> > Janusz Krzysztofik reported the following build break on OMAP1 builds that
-> > don't include CONFIG_ARCH_OMAP16XX:
-> > 
-> >   LD      .tmp_vmlinux1
-> > arch/arm/mach-omap1/built-in.o: In function `omap1_usb_init':
-> > lcd_dma.c:(.init.text+0x1420): undefined reference to `ocpi_enable'
-> > make: *** [.tmp_vmlinux1] Error 1
-> > 
-> > This was caused by commit d3645d39ad0ed9f09535065676ea0ba114f93cdf
-> > ("ARM: OMAP1: OHCI: use platform_data fn ptr to enable OCPI bus").
-> > Fix by declaring an empty ocpi_enable() on non-16XX builds, which
-> > should work until the OCPI code is moved out to drivers/.
-> 
-> Thanks applying into fixes-for-cleanup branch.
-> 
-> Tony
+On 05/14/12 18:22, Daniel Lezcano wrote:
+> On 05/14/2012 10:57 AM, Mark Brown wrote:
+>> On Mon, May 14, 2012 at 10:52:46AM +0200, Heiko St??bner wrote:
+>>> Am Montag, 14. Mai 2012, 01:51:00 schrieb Daniel Lezcano:
+>>>> On 05/09/2012 04:08 PM, Daniel Lezcano wrote:
+>>
+>>>> Are these patches ok for inclusion ?
+>>
+>>> you might want to include the maintainer
+>>
+>>> Kukjin Kim<kgene.kim@samsung.com>
+>>
+>>> and the samsung list
+>>
+>>> linux-samsung-soc at vger.kernel.org
+>>
+>>> into your recipients
+>>
+>> Also the original author (me).
+>
+> Oh, ok. I thought I did it, sorry.
+>
+Heiko, thanks :-)
 
-FWIW, works with OMAP1510 only config on my Amstrad Delta.
+Daniel, could you please re-submit this series with adding me and Mark 
+Brown in Cc. I couldn't find your patches in my mailbox...
 
-Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
