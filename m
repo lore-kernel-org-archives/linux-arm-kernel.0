@@ -1,39 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 May 2012 14:54:11 -0600
-Subject: [GIT PULL] ARM: tegra: dt2 branch
-In-Reply-To: <201205142037.08752.arnd@arndb.de>
-References: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
- <201205141854.34331.arnd@arndb.de> <4FB1572D.90500@wwwdotorg.org>
- <201205142037.08752.arnd@arndb.de>
-Message-ID: <4FB170F3.8080107@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 May 2012 20:55:12 +0000
+Subject: [GIT PULL] ARM: tegra: for-3.5/ahb branch
+In-Reply-To: <1337024794-25269-1-git-send-email-swarren@wwwdotorg.org>
+References: <1337024794-25269-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201205142055.12881.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2012 02:37 PM, Arnd Bergmann wrote:
-> On Monday 14 May 2012, Stephen Warren wrote:
->> On 05/14/2012 12:54 PM, Arnd Bergmann wrote:
+On Monday 14 May 2012, Stephen Warren wrote:
+> I meant to send this with the other two pull requests this morning, but
+> forgot:-(
 > 
->>>
->>> I can't see anything wrong with your commits but please check again that it all makes
->>> sense and let me know if I should really pull this version.
->>
->> I think that looks OK. I probably just generated the diffstat backwards.
+> This is the last pull request I intend to send for 3.5, except for any
+> bugs that crop up.
 > 
-> Ok, thanks for the confirmation.
+> ----------------------------------------------------------------
 > 
-> I've pulled it into next/dt2 now. In order to merge this with the drivers/mmc branch
-> that contains the common mmc binding, I used the complex resolution below, adding
-> bus-width properties to both the dtsi and the dts files.
+> The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+> 
+>   Linux 3.4-rc3
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.5/ahb
+> 
+> for you to fetch changes up to 89c788bab1f0374ae05aef7560066442ceb55384:
+> 
+>   ARM: tegra: Add SMMU enabler in AHB
+> 
 
-Yeah, sorry about those conflicts. Thanks for fixing them up.
+When I pull the branch, I get an extraneous commit
+"ARM: dt: tegra: Add device tree support for AHB" that adds nodes that are
+already there from another branch. I've removed that commit and applied the
+rest to next/drivers. Please check what I have now.
 
-The changes to tegra-*.dts look fine.
+Thanks,
 
-I wonder if the changes to tegra-*.dtsi shouldn't just be dropped? I'd
-personally err on the side of requiring board files to add this
-property, rather than having things accidentally work because the .dtsi
-file included a default.
-
-BTW, I assume that in 3.6, I should plan to remove the support-8bit
-properties and associated Tegra SDHCI driver code that handles them, and
-rely on the SDHCI core handling this from now on?
+	Arnd
