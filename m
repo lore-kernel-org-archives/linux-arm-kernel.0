@@ -1,60 +1,39 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 14 May 2012 14:57:56 -0700
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-In-Reply-To: <20120514192404.91f9477851ad8485a2112973@canb.auug.org.au>
-References: <20120514192404.91f9477851ad8485a2112973@canb.auug.org.au>
-Message-ID: <CAJOA=zOvLak8ua+0dJTvgOuhF=TrpXaXZt+UXcn9-EEnh1+KBA@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 14 May 2012 15:24:11 -0700
+Subject: [PATCH] ARM: OMAP2+: CLEANUP: Remove ARCH_OMAPx ifdef from struct
+ dpll_data
+In-Reply-To: <1336716163-2960-1-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Fri, 11 May 2012 11:32:43 +0530")
+References: <1336716163-2960-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <87zk9apfjo.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 2:24 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Andrew,
->
-> Today's linux-next merge of the akpm tree got a conflict in
-> drivers/clk/Kconfig between commit d269b974e32c ("clk: remove
-> COMMON_CLK_DISABLE_UNUSED") from the arm-soc tree and commit "clk: remove
-> redundant depends on from drivers/Kconfig" from the akpm tree.
->
-> I fixed it up (see below) and can carry the fix as necessary.
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-Hi Stephen,
+> From: Kevin Hilman <khilman@ti.com>
+>
+> There are certain fields inside 'struct dpll_data' which are
+> included under ARCH_OMAP3 and ARCH_OMAP4 option, which makes it
+> difficult to use it for new devices like, am33xx, ti81xx, etc...
+>
+> So remove the ifdef completely, this will add few fields to the struct
+> unused, but it improves readability and maintainability of the code.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: R Sricharan <r.sricharan@ti.com>
+> ---
+> Since Kevin had provided this idea and code change,
+> making this patch under his authorship.
 
-The fix-up is correct.
+Be sure to give yourself credit for writing the changelog.  Normally, if
+you make changes/additions to patch, you can add a line just before your
+signoff.  Something like:
 
-Thanks,
-Mike
+[hvaibhav at ti.com: wrote detailed changelog]
 
-> --
-> Cheers,
-> Stephen Rothwell ? ? ? ? ? ? ? ? ? ?sfr at canb.auug.org.au
->
-> diff --cc drivers/clk/Kconfig
-> index 4864407,4f10a21..0000000
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@@ -23,9 -22,18 +23,8 @@@ config COMMON_CL
-> ?menu "Common Clock Framework"
-> ? ? ? ?depends on COMMON_CLK
->
-> ?-config COMMON_CLK_DISABLE_UNUSED
-> ?- ? ? ?bool "Disabled unused clocks at boot"
-> ?- ? ? ?---help---
-> ?- ? ? ? ?Traverses the entire clock tree and disables any clocks that are
-> ?- ? ? ? ?enabled in hardware but have not been enabled by any device drivers.
-> ?- ? ? ? ?This saves power and keeps the software model of the clock in line
-> ?- ? ? ? ?with reality.
-> ?-
-> ?- ? ? ? ?If in doubt, say "N".
-> ?-
-> ?config COMMON_CLK_DEBUG
-> ? ? ? ?bool "DebugFS representation of clock tree"
-> - ? ? ? depends on COMMON_CLK
-> ? ? ? ?select DEBUG_FS
-> ? ? ? ?---help---
-> ? ? ? ? ?Creates a directory hierchy in debugfs for visualizing the clk
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Kevin
