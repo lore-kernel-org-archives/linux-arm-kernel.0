@@ -1,53 +1,42 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 14 May 2012 21:04:22 +0800
-Subject: CSR SiRFSoC PRIMA2: SPI compilation broken in 3.4-rc7
-In-Reply-To: <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
-References: <Pine.LNX.4.64.1205141311060.4916@axis700.grange>
- <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
-Message-ID: <CAGsJ_4wupgPZbEdA0dXmbBikON6bFDYHn3U1KnYB_w1PbSE22Q@mail.gmail.com>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Mon, 14 May 2012 21:26:57 +0800
+Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
+In-Reply-To: <20120514094357.GF20367@S2100-06.ap.freescale.net>
+References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
+ <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
+ <20120514035137.GB20367@S2100-06.ap.freescale.net>
+ <20120514080835.GB31985@opensource.wolfsonmicro.com>
+ <4FB0C9D4.2060409@linaro.org>
+ <20120514094357.GF20367@S2100-06.ap.freescale.net>
+Message-ID: <4FB10821.4000004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus/Guennadi,
-
-2012/5/14 Linus Walleij <linus.walleij@linaro.org>:
-> On Mon, May 14, 2012 at 1:14 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
->
->> Might be good to try to fix for 3.4 release:
+(2012?05?14? 17:43), Shawn Guo wrote:
+> On Mon, May 14, 2012 at 05:01:08PM +0800, Ying-Chun Liu (PaulLiu) wrote:
+>> I think what the concern is we probably don't want several
+>> non-continuous memory blocks of misc hardwares.
+>> If we look into the current registers in anatop, it is really sparse.
+>> Several regulators are using non-continuous address and the thermals are
+>> also using different addresses. If the addresses are continuous then we
+>> don't need the mfd driver.
 >>
->> drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_probe':
->> drivers/spi/spi-sirf.c:563: error: implicit declaration of function 'pinmux_get'
->> drivers/spi/spi-sirf.c:563: warning: assignment makes pointer from integer without a cast
->> drivers/spi/spi-sirf.c:568: error: implicit declaration of function 'pinmux_enable'
->> drivers/spi/spi-sirf.c:602: error: implicit declaration of function 'pinmux_disable'
->> drivers/spi/spi-sirf.c:603: error: implicit declaration of function 'pinmux_put'
->> make[3]: *** [drivers/spi/spi-sirf.o] Error 1
->
-> How are you producing this?
->
-> config SPI_SIRF
-> ? ? ? ?tristate "CSR SiRFprimaII SPI controller"
-> ? ? ? ?depends on ARCH_PRIMA2
->
-> So must be on ARCH_PRIMA2, but:
->
-> grep -r PRIMA2 arch/arm/configs/
->
-> So no defconfig can be used to compile this.
->
-> If I could just reproduce it, I could fix it...
->
-> Barry pls submit a defconfig for the PRIMA2 so we can
-> compile it and test for regressions.
+> I do not quite follow that.  The reason we need mfd driver isn't because
+> we do not want to both regulator and thermal drivers to map and access
+> the same address on their own which may have synchronization issue?
+> 
 
-i will send two patches to fix that. one is for pinmux api changes,
-the other one is defconfig of primaii.
+Not sure about the synchronization issue. But currently thermal driver
+in Linaro kernel do map and access the same address on its own now. It
+is not a device driver yet and just access the address directly and
+work. It seems to me that each different type of misc devices in Anatop
+just work alone.
 
->
-> Yours,
-> Linus Walleij
->
+So let's go back to the patch. Why do we need this modification? Anatop
+thermal driver can be written as a device driver and don't need this
+patch. And we might get benefits when thermal driver written in this
+way. Especially some boards do not have a correct fuse data. Any real
+use cases of this patch?
 
-Thanks
-barry
+Yours Sincerely,
+Paul
