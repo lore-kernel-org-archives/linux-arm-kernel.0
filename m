@@ -1,41 +1,50 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 14 May 2012 09:42:06 +0800
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in arch-pxa
-Message-ID: <CAN1soZyM-YQ9EX66EY_fTwPncokra9NpB6QEZ2ExCGizKk9MAA@mail.gmail.com>
+Date: Mon, 14 May 2012 09:46:24 +0800
+Subject: [GIT PULL] [for 3.5] request pull of dt on arch-mmp
+In-Reply-To: <CAOesGMhD480FNUa+QFC_dmxu7aP4jMt5MhfX2MzpT24=1-bqhg@mail.gmail.com>
+References: <CAN1soZxt6c6pTgOeZCBQ4+37hJfOwfxmCC=MAwCpOZZ1dMZ_sA@mail.gmail.com>
+ <CAN1soZyvYVnN61HakQFKav-B1msY8UuVqDJso4OEe2zSaD=ruA@mail.gmail.com>
+ <CAOesGMhD480FNUa+QFC_dmxu7aP4jMt5MhfX2MzpT24=1-bqhg@mail.gmail.com>
+Message-ID: <CAN1soZz2VQRj2gBqRJWwZcCqzPfurZRMpzgiadRhHvp7s+4miA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Wed, May 9, 2012 at 4:56 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Sun, May 6, 2012 at 8:50 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>> On Sat, May 5, 2012 at 4:44 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>>> Hi Arnd & Olof,
+>>>
+>>> Please help to pull dt branch on arch-mmp git tree.
+>>>
+>>> The following changes since commit 69964ea4c7b68c9399f7977aa5b9aa6539a6a98a:
+>>>
+>>> ?Linux 3.4-rc5 (2012-04-29 15:19:10 -0700)
+>>>
+>> Hi Arnd & Olof,
+>>
+>> Pleae help to pull dt branch on arch-pxa git tree.
+>>
+>> Since some power patches are depend on irq driver code and it's
+>> changed in dt branch.
+>> I merged these power patches in dt branch to avoid building issue.
+>
+> The way to do this is to still send two branches, one that includes
+> the dt code, and one that contains the power management changes but
+> that is based on the dt branch, and then explicitly mention in the
+> pull request that there is dependencies between the two.
+>
+> Can you please do that, i.e. reset the dt branch back to only contain
+> the dt changes, and then take what is essentially this later pull and
+> do that as a 'pm' branch instead?
+>
+>
+> Thanks,
+>
+> -Olof
 
-Please help to merge board-specific branch in arch-pxa git tree.
-
-The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
-
-  Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git board-specific
-
-Axel Lin (1):
-      ARM: pxa: Use REGULATOR_SUPPLY macro
-
-Paul Parsons (1):
-      ARM: pxa: hx4700: Add Synaptics NavPoint touchpad
-
- arch/arm/mach-pxa/balloon3.c                |    4 +--
- arch/arm/mach-pxa/cm-x300.c                 |    4 +--
- arch/arm/mach-pxa/em-x270.c                 |    5 +---
- arch/arm/mach-pxa/hx4700.c                  |   37 +++++++++++++++++++-------
- arch/arm/mach-pxa/include/mach/mfp-pxa27x.h |    1 +
- arch/arm/mach-pxa/magician.c                |    8 +----
- arch/arm/mach-pxa/mioa701.c                 |    4 +--
- arch/arm/mach-pxa/palm27x.c                 |    4 +--
- arch/arm/mach-pxa/spitz.c                   |    4 +--
- arch/arm/mach-pxa/stargate2.c               |    5 +---
- arch/arm/mach-pxa/vpac270.c                 |    4 +--
- arch/arm/mach-pxa/z2.c                      |    4 +--
- 12 files changed, 39 insertions(+), 45 deletions(-)
-
+Sure. These two requests will be sent out immediately.
 
 Regards
 Haojian
