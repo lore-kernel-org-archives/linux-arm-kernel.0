@@ -1,40 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 14 May 2012 17:39:15 +0100
-Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
- Tree
-In-Reply-To: <4FB12B73.50302@linaro.org>
-References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
- <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
- <20120507170832.GO17002@opensource.wolfsonmicro.com>
- <4FB12B73.50302@linaro.org>
-Message-ID: <20120514163914.GB25668@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 May 2012 17:39:09 +0100
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low
+ power modes
+In-Reply-To: <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+ <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+Message-ID: <20120514163909.GB13860@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 04:57:39PM +0100, Lee Jones wrote:
-> >>  	pdata = dev_get_platdata(ab8500->dev);
-> >>-	if (!pdata) {
-> >>-		dev_err(&pdev->dev, "null pdata\n");
-> >>+	if (!pdata&&  !np) {
-> >>+		dev_err(&pdev->dev, "null pdata and no device tree found\n");
-> >>  		return -EINVAL;
-> >>  	}
+On Mon, May 14, 2012 at 05:21:50PM +0100, Lorenzo Pieralisi wrote:
+> On Mon, May 14, 2012 at 04:58:59PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, May 14, 2012 at 04:50:22PM +0100, Lorenzo Pieralisi wrote:
+> > > > 2. L2 disable
+> > > > 3. L1 clean & invalidate
+> > > 
+> > > This is wrong again since while cleaning and invalidating the cache (L1 here)
+> > > can still allocate and this must not happen.
+> > 
+> > No it isn't.  There is never anything wrong with allocating new caches lines
+> > into a cache which is going to (eventually) be powered down.  Ever.
+> 
+> What if the cache allocates a dirty cache line moved from L1 of another
+> processor ?
+> 
+> > What would be wrong is if we end up with dirty cache lines in the cache
+> > to be powered down for data which we _care_ about preserving when power
+> > is lost.
+> > 
+> > That's a _very_ _very_ important difference.
+> 
+> That's exactly the point I am making. dirty cache lines can be migrated across
+> processors caches. If we want to shut down a single core we have to be 100%
+> sure that dirty cache lines (if we care about that data, we might be not as you
+> pointed out) must not be present in L1 when we shut the core down. If the C
+> bit in SCTLR is not cleared before cleaning and invalidating this is not
+> guaranteed from an architectural point of view.
+> 
+> Occurences might be rare, but it is still not safe to clean the cache with the
+> C bit set.
 
-> >Neither should be mandatory.
+It's not safe to disable the C bit without first pushing the dirty data out
+to RAM either.  It's a catch-22 situation - because turning the C bit off
+not only stops the caches allocating new lines but also prevents them being
+searched.
 
-> Unfortunately, this has to reside, as without it I'd have to
-> re-write the driver. Something with is completely out of scope of
-> what I'm trying to achieve right now. It's something I'd be happy to
-> do in the future, but not in this patch-set.
+That means your view of cacheable memory suddenly changes beneath you when
+the C bit is turned off.
 
-Why do you need to rewrite the driver?  That doesn't sound terribly
-plausible...   The normal approach to this stuff is to allocate a
-platform data struct unconditionally, why is this impossible in your
-case?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/1788ebec/attachment.sig>
+>From what you're saying - and from my understanding of your cache behaviours,
+even the sequence:
+- clean cache
+- disable C bit
+- clean cache
+is buggy.
+
+I think what you're effectively saying is that it is not possible to safely
+power down a cache on an ARM SMP CPU...
