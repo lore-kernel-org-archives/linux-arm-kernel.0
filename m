@@ -1,134 +1,186 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 May 2012 17:16:22 +0900
-Subject: [PATCH] ARM: EXYNOS4: Support Suspend/Resume for EXYNOS4412
-In-Reply-To: <1332991517-3083-1-git-send-email-inderpal.singh@linaro.org>
-References: <1332991517-3083-1-git-send-email-inderpal.singh@linaro.org>
-Message-ID: <066001cd31a9$d92d6f80$8b884e80$%kim@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 14 May 2012 11:20:58 +0300
+Subject: [PATCH 2/2] arm: omap3: am35x: Disable hlt when using Davinci EMAC
+In-Reply-To: <1336770778-23044-3-git-send-email-mgreer@animalcreek.com>
+References: <1336770778-23044-1-git-send-email-mgreer@animalcreek.com>
+ <1336770778-23044-3-git-send-email-mgreer@animalcreek.com>
+Message-ID: <4FB0C06A.5030503@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inderpal Singh wrote:
+Hi Mark,
+
+Thanks for the great work!
+
+On 05/12/12 00:12, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> This patch provides the suspend/resume support for EXYNOS4412.
+> The am35x family of SoCs has a Davinci EMAC ethernet
+> controller on-chip.  Unfortunately, the EMAC is unable
+> to wake the PRCM when there is network activity which
+> leads to a hung or extremely slow system when the MPU
+> has executed a 'wfi' instruction (because of pm_idle
+> or CPUidle).  To prevent this, add hooks to the EMAC
+> pm_runtime suspend/resume calls so that hlt is disabled
+> whenever the EMAC is in use.
 > 
-> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 > ---
->  arch/arm/mach-exynos/include/mach/regs-pmu.h |   10 +++++++++-
->  arch/arm/mach-exynos/pm.c                    |    2 +-
->  arch/arm/mach-exynos/pmu.c                   |   24
-++++++++++++++++++++----
->  3 files changed, 30 insertions(+), 6 deletions(-)
+>  arch/arm/mach-omap2/am35xx-emac.c     |   44 +++++++++++++++++++++++++++++----
+>  arch/arm/mach-omap2/am35xx-emac.h     |   16 +++++++++---
+>  arch/arm/mach-omap2/board-am3517evm.c |    3 ++-
+>  arch/arm/mach-omap2/board-cm-t3517.c  |    3 ++-
+>  4 files changed, 56 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-
-> exynos/include/mach/regs-pmu.h
-> index 4c53f38..606b199 100644
-> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-> @@ -177,7 +177,7 @@
-> 
->  #define S5P_PMU_LCD1_CONF		S5P_PMUREG(0x3CA0)
-> 
-> -/* Only for EXYNOS4212 */
-> +/* Only for EXYNOS4x12 */
->  #define S5P_ISP_ARM_LOWPWR			S5P_PMUREG(0x1050)
->  #define S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR	S5P_PMUREG(0x1054)
->  #define S5P_DIS_IRQ_ISP_ARM_CENTRAL_LOWPWR	S5P_PMUREG(0x1058)
-> @@ -218,4 +218,12 @@
->  #define S5P_SECSS_MEM_OPTION			S5P_PMUREG(0x2EC8)
->  #define S5P_ROTATOR_MEM_OPTION			S5P_PMUREG(0x2F48)
-> 
-> +/* Only for EXYNOS4412 */
-> +#define S5P_ARM_CORE2_LOWPWR			S5P_PMUREG(0x1020)
-> +#define S5P_DIS_IRQ_CORE2			S5P_PMUREG(0x1024)
-> +#define S5P_DIS_IRQ_CENTRAL2			S5P_PMUREG(0x1028)
-> +#define S5P_ARM_CORE3_LOWPWR			S5P_PMUREG(0x1030)
-> +#define S5P_DIS_IRQ_CORE3			S5P_PMUREG(0x1034)
-> +#define S5P_DIS_IRQ_CENTRAL3			S5P_PMUREG(0x1038)
+> diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+> index 3bb5cb3..22ff968 100644
+> --- a/arch/arm/mach-omap2/am35xx-emac.c
+> +++ b/arch/arm/mach-omap2/am35xx-emac.c
+> @@ -23,6 +23,37 @@
+>  #include "control.h"
+>  #include "am35xx-emac.h"
+>  
+> +/*
+> + * Default pm_lats for the am35x.
+> + * The net effect of using am35xx_emac_pm_lats[] is that
+> + * pm_idle or CPUidle won't be called while the emac
+> + * interface is open.  This is required because the
+> + * EMAC can't wake up PRCM so if the MPU is executing
+> + * a 'wfi' instruction (e.g., from pm_idle or CPUidle),
+> + * it won't break out of it due to emac activity.
+> + */
+> +static int am35xx_emac_deactivate_func(struct omap_device *od)
+> +{
+> +	enable_hlt();
+> +	return omap_device_idle_hwmods(od);
+> +}
 > +
->  #endif /* __ASM_ARCH_REGS_PMU_H */
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 428cfeb..f0bb467 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -313,7 +313,7 @@ static int exynos4_pm_suspend(void)
->  	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
->  	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> 
-> -	if (soc_is_exynos4212()) {
-> +	if (soc_is_exynos4212() || soc_is_exynos4412()) {
->  		tmp = __raw_readl(S5P_CENTRAL_SEQ_OPTION);
->  		tmp &= ~(S5P_USE_STANDBYWFI_ISP_ARM |
->  			 S5P_USE_STANDBYWFE_ISP_ARM);
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index bba48f5..77c6815 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -94,7 +94,7 @@ static struct exynos4_pmu_conf exynos4210_pmu_config[] =
-> {
->  	{ PMU_TABLE_END,},
->  };
-> 
-> -static struct exynos4_pmu_conf exynos4212_pmu_config[] = {
-> +static struct exynos4_pmu_conf exynos4x12_pmu_config[] = {
->  	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
->  	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
->  	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
-> @@ -202,6 +202,16 @@ static struct exynos4_pmu_conf
-exynos4212_pmu_config[]
-> = {
->  	{ PMU_TABLE_END,},
->  };
-> 
-> +static struct exynos4_pmu_conf exynos4412_pmu_config[] = {
-> +	{ S5P_ARM_CORE2_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-> +	{ S5P_DIS_IRQ_CORE2,			{ 0x0, 0x0, 0x0 } },
-> +	{ S5P_DIS_IRQ_CENTRAL2,			{ 0x0, 0x0, 0x0 } },
-> +	{ S5P_ARM_CORE3_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-> +	{ S5P_DIS_IRQ_CORE3,			{ 0x0, 0x0, 0x0 } },
-> +	{ S5P_DIS_IRQ_CENTRAL3,			{ 0x0, 0x0, 0x0 } },
-> +	{ PMU_TABLE_END,},
+> +static int am35xx_emac_activate_func(struct omap_device *od)
+> +{
+> +	disable_hlt();
+> +	return omap_device_enable_hwmods(od);
+> +}
+> +
+> +struct omap_device_pm_latency am35xx_emac_pm_lats[] = {
+> +	{
+> +		.deactivate_func	= am35xx_emac_deactivate_func,
+> +		.activate_func		= am35xx_emac_activate_func,
+> +		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+> +	},
 > +};
 > +
->  void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
->  {
->  	unsigned int i;
-> @@ -209,6 +219,12 @@ void exynos4_sys_powerdown_conf(enum sys_powerdown
-> mode)
->  	for (i = 0; (exynos4_pmu_config[i].reg != PMU_TABLE_END) ; i++)
->  		__raw_writel(exynos4_pmu_config[i].val[mode],
->  				exynos4_pmu_config[i].reg);
+> +int am35xx_emac_pm_lats_size = ARRAY_SIZE(am35xx_emac_pm_lats);
 > +
-> +	if (soc_is_exynos4412()) {
-> +		for (i = 0; exynos4412_pmu_config[i].reg != PMU_TABLE_END ;
-> i++)
-> +			__raw_writel(exynos4412_pmu_config[i].val[mode],
-> +				exynos4412_pmu_config[i].reg);
-> +	}
+>  static void am35xx_enable_emac_int(void)
+>  {
+>  	u32 regval;
+> @@ -61,12 +92,13 @@ static struct emac_platform_data am35xx_emac_pdata = {
+>  static struct mdio_platform_data am35xx_mdio_pdata;
+>  
+>  static int __init omap_davinci_emac_dev_init(struct omap_hwmod *oh,
+> -		void *pdata, int pdata_len)
+> +		void *pdata, int pdata_len,
+> +		struct omap_device_pm_latency *pm_lats, int pm_lats_size)
+>  {
+>  	struct platform_device *pdev;
+>  
+>  	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len,
+> -			NULL, 0, false);
+> +			pm_lats, pm_lats_size, false);
+>  	if (IS_ERR(pdev)) {
+>  		WARN(1, "Can't build omap_device for %s:%s.\n",
+>  					oh->class->name, oh->name);
+> @@ -76,7 +108,8 @@ static int __init omap_davinci_emac_dev_init(struct omap_hwmod *oh,
+>  	return 0;
 >  }
-> 
->  static int __init exynos4_pmu_init(void)
-> @@ -218,9 +234,9 @@ static int __init exynos4_pmu_init(void)
->  	if (soc_is_exynos4210()) {
->  		exynos4_pmu_config = exynos4210_pmu_config;
->  		pr_info("EXYNOS4210 PMU Initialize\n");
-> -	} else if (soc_is_exynos4212()) {
-> -		exynos4_pmu_config = exynos4212_pmu_config;
-> -		pr_info("EXYNOS4212 PMU Initialize\n");
-> +	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
-> +		exynos4_pmu_config = exynos4x12_pmu_config;
-> +		pr_info("EXYNOS4x12 PMU Initialize\n");
->  	} else {
->  		pr_info("EXYNOS4: PMU not supported\n");
->  	}
-> --
-> 1.7.5.4
+>  
+> -void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
+> +void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en,
+> +		struct omap_device_pm_latency *pm_lats, int pm_lats_size)
+>  {
+>  	struct omap_hwmod *oh;
+>  	u32 regval;
+> @@ -91,7 +124,7 @@ void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
+>  	am35xx_mdio_pdata.bus_freq = mdio_bus_freq;
+>  
+>  	ret = omap_davinci_emac_dev_init(oh, &am35xx_mdio_pdata,
+> -					 sizeof(am35xx_mdio_pdata));
+> +					 sizeof(am35xx_mdio_pdata), NULL, 0);
+>  	if (ret) {
+>  		pr_err("Could not build davinci_mdio hwmod device\n");
+>  		return;
+> @@ -106,7 +139,8 @@ void __init am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en)
+>  	am35xx_emac_pdata.rmii_en = rmii_en;
+>  
+>  	ret = omap_davinci_emac_dev_init(oh, &am35xx_emac_pdata,
+> -					 sizeof(am35xx_emac_pdata));
+> +					 sizeof(am35xx_emac_pdata),
+> +					 pm_lats, pm_lats_size);
+>  	if (ret) {
+>  		pr_err("Could not build davinci_emac hwmod device\n");
+>  		return;
+> diff --git a/arch/arm/mach-omap2/am35xx-emac.h b/arch/arm/mach-omap2/am35xx-emac.h
+> index 15c6f9c..7c23808 100644
+> --- a/arch/arm/mach-omap2/am35xx-emac.h
+> +++ b/arch/arm/mach-omap2/am35xx-emac.h
+> @@ -6,10 +6,20 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <plat/omap_device.h>
+> +
+>  #define AM35XX_DEFAULT_MDIO_FREQUENCY	1000000
+>  
+> -#if defined(CONFIG_TI_DAVINCI_EMAC) || defined(CONFIG_TI_DAVINCI_EMAC_MODULE)
+> -void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en);
+> +#if IS_ENABLED(CONFIG_TI_DAVINCI_EMAC)
+> +extern struct omap_device_pm_latency am35xx_emac_pm_lats[];
+> +extern int am35xx_emac_pm_lats_size;
+> +
+> +void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en,
+> +		struct omap_device_pm_latency *pm_lats, int pm_lats_size);
+>  #else
+> -static inline void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en) {}
+> +#define am35xx_emac_pm_lats		NULL
+> +#define am35xx_emac_pm_lats_size	0
+> +
+> +static inline void am35xx_emac_init(unsigned long mdio_bus_freq, u8 rmii_en,
+> +		struct omap_device_pm_latency *pm_lats, int pm_lats_size) {}
+>  #endif
+> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+> index 3645285..fe3a304 100644
+> --- a/arch/arm/mach-omap2/board-am3517evm.c
+> +++ b/arch/arm/mach-omap2/board-am3517evm.c
+> @@ -385,7 +385,8 @@ static void __init am3517_evm_init(void)
+>  	i2c_register_board_info(1, am3517evm_i2c1_boardinfo,
+>  				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
+>  	/*Ethernet*/
+> -	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
+> +	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1,
+> +			 am35xx_emac_pm_lats, am35xx_emac_pm_lats_size);
 
-Looks ok to me, will apply.
+Why is it essential for board file to pass these pm structures?
+Is it something board specific?
+Can't you just use them inside the am35xx-emac.c file?
 
-Thanks.
+>  
+>  	/* MUSB */
+>  	am3517_evm_musb_init();
+> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+> index 9e66e16..0a3dc7a 100644
+> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+> @@ -292,7 +292,8 @@ static void __init cm_t3517_init(void)
+>  	cm_t3517_init_rtc();
+>  	cm_t3517_init_usbh();
+>  	cm_t3517_init_hecc();
+> -	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
+> +	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1,
+> +			 am35xx_emac_pm_lats, am35xx_emac_pm_lats_size);
+>  }
+>  
+>  MACHINE_START(CM_T3517, "Compulab CM-T3517")
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Igor.
