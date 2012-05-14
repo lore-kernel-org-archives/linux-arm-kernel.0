@@ -1,46 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 May 2012 10:53:48 +0200
-Subject: [PATCH 3/5] ARM: imx: add audio codec clk lookup for imx53-qsb
-In-Reply-To: <20120514085002.GE20367@S2100-06.ap.freescale.net>
-References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
- <1336718568-26810-4-git-send-email-shawn.guo@linaro.org>
- <20120514082201.GF21318@pengutronix.de>
- <20120514085002.GE20367@S2100-06.ap.freescale.net>
-Message-ID: <20120514085348.GB30400@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 May 2012 08:54:18 +0000
+Subject: Making ARM multiplatform kernels DT-only?
+In-Reply-To: <201205051317.40357.arnd@arndb.de>
+References: <201205031350.35476.arnd@arndb.de>
+ <20120505080936.GP4141@pengutronix.de> <201205051317.40357.arnd@arndb.de>
+Message-ID: <201205140854.18335.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 04:50:03PM +0800, Shawn Guo wrote:
-> On Mon, May 14, 2012 at 10:22:01AM +0200, Sascha Hauer wrote:
-> > >  static void __init imx53_dt_init(void)
-> > >  {
-> > >  	struct device_node *node;
-> > > @@ -99,6 +115,9 @@ static void __init imx53_dt_init(void)
-> > >  		of_node_put(node);
-> > >  	}
-> > >  
-> > > +	if (of_machine_is_compatible("fsl,imx53-qsb"))
-> > > +		imx53_qsb_init();
-> > > +
-> > 
-> > I wonder if we really want to open this can of worms here. Adding board
-> > specific hacks (or fixups) in this file can become very messy once we
-> > have more than only a few oftree based boards.
-> > 
-> From what I have seen, this is an acceptable solution to board specific
-> setup.  What's the alternative on your mind?
+On Saturday 05 May 2012, Arnd Bergmann wrote:
 
-Right now I do not have an alternative, I just try to see 2 years in the
-future. Maybe until then we can do it this way and then I'll point to
-this post saying 'I told you' ;)
+> From the statements made so far, I can see no clear policy that we can
+> apply to everyone. My take on this is that for any work I spend on
+> multiplatform kernel, I concentrate on the DT-based board files and
+> get them to work together first, but leave it up to the individual
+> subarch maintainers whether they want to add other board files into
+> the mix.
 
-I hope we won't get to that point. The above should be really in the
-devicetree, right?
+A small update that I already posted as a comment in the lwn article
+covering this discussion:
 
-Sascha
+| Over the last week, I've actually tried out building kernels for
+| multiple platforms combined to get a better feeling for the remaining
+| problems. The result is in the testing/multiplatform branch of
+| git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git and it
+| can build arbitrary combinations of four of the five subarchitectures
+| that the Linaro organization is most interested in (imx, omap, ux500 and
+| vexpress, but not exynos for now). Most other platforms should actually
+| be simpler to convert.
+| 
+| However, this kernel is not yet going to be useful on real hardware
+| because I had to disable or add hacks for a number of features (SMP,
+| sparseirq, clocks) that are still being worked on, but as soon as one
+| oatform has all that work done, we can actually build a kernel with
+| everything enabled and run on that particular platform and see what
+| else breaks.
+|
+| Unlike I suggested earlier, this kernel at the moment actually allows
+| enabling all the board files including non-DT ones because that was
+| easier to do with the Kconfig dependencies, but I found two real technical
+| issues that would be solved by making the combined kernel DT-only:
+|
+| 1. The exynos platform defines static platform devices from files
+| shared with five other Samsung platforms that are mutually exclusive
+| because the device definitions depend on platform specific compile-time
+| constants. Using DT probing we can just drop those static platform device
+| definitions and make the conflict go away.
+|
+| 2. With sparse IRQs, a lot of the hardcoded interrupt numbers in static
+| platform device definitions are broken, while the definitions from DT
+| still work. Sparse IRQs are currently needed to build multiplatform
+| kernels and I expect that requirement to stay.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
