@@ -1,7 +1,7 @@
 From: vitalya@ti.com (Vitaly Andrianov)
-Date: Mon, 14 May 2012 13:54:57 -0400
+Date: Mon, 14 May 2012 13:56:29 -0400
 Subject: [PATCH] ARM: LPAE: fix access flag setup in mem_type_table
-Message-ID: <1337018097-27308-1-git-send-email-vitalya@ti.com>
+Message-ID: <1337018189-27356-1-git-send-email-vitalya@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
