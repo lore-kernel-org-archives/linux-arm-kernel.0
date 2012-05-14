@@ -1,41 +1,121 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 May 2012 11:03:38 +0200
-Subject: [GIT PULL] i.MX21 fix for 3.4
-Message-ID: <20120514090338.GD30400@pengutronix.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 14 May 2012 18:39:47 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120514183947.58e82b8bff52d7f0476dfc11@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd
+Hi all,
 
-One small fix for the i.MX21 board. If possible for 3.4, otherwise for
-next.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/plat-omap/counter_32k.c between commit bd0493eaaf5c ("ARM:
+7413/1: move read_{boot,persistent}_clock to the architecture level")
+from the arm tree and commit 1fe97c8f6a1d ("ARM: OMAP: Make OMAP
+clocksource source selection using kernel param") from the arm-soc tree.
 
-Thanks
-  Sascha
-
-The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
-
-  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx21-fixes
-
-for you to fetch changes up to 78d32656aa727fbd864390714638a35ae75d28c9:
-
-  ARM i.MX imx21ads: Fix overlapping static i/o mappings (2012-05-09 09:28:01 +0200)
-
-----------------------------------------------------------------
-ARM i.MX21 SoC fixes
-
-----------------------------------------------------------------
-Jaccon Bastiaansen (1):
-      ARM i.MX imx21ads: Fix overlapping static i/o mappings
-
- arch/arm/mach-imx/mach-mx21ads.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I attempted to fix it up (see below) and can carry the fix as necessary.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/plat-omap/counter_32k.c
+index 44ae077,b2f634b..0000000
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@@ -69,55 -69,40 +70,41 @@@ static void omap_read_persistent_clock(
+  	*ts = *tsp;
+  }
+  
+- int __init omap_init_clocksource_32k(void)
++ /**
++  * omap_init_clocksource_32k - setup and register counter 32k as a
++  * kernel clocksource
++  * @pbase: base addr of counter_32k module
++  * @size: size of counter_32k to map
++  *
++  * Returns 0 upon success or negative error code upon failure.
++  *
++  */
++ int __init omap_init_clocksource_32k(void __iomem *vbase)
+  {
+- 	static char err[] __initdata = KERN_ERR
+- 			"%s: can't register clocksource!\n";
+- 
+- 	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+- 		u32 pbase;
+- 		unsigned long size = SZ_4K;
+- 		void __iomem *base;
+- 		struct clk *sync_32k_ick;
+- 
+- 		if (cpu_is_omap16xx()) {
+- 			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+- 			size = SZ_1K;
+- 		} else if (cpu_is_omap2420())
+- 			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+- 		else if (cpu_is_omap2430())
+- 			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+- 		else if (cpu_is_omap34xx())
+- 			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+- 		else if (cpu_is_omap44xx())
+- 			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+- 		else
+- 			return -ENODEV;
+- 
+- 		/* For this to work we must have a static mapping in io.c for this area */
+- 		base = ioremap(pbase, size);
+- 		if (!base)
+- 			return -ENODEV;
+- 
+- 		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+- 		if (!IS_ERR(sync_32k_ick))
+- 			clk_enable(sync_32k_ick);
+- 
+- 		timer_32k_base = base;
+- 
+- 		/*
+- 		 * 120000 rough estimate from the calculations in
+- 		 * __clocksource_updatefreq_scale.
+- 		 */
+- 		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
+- 				32768, NSEC_PER_SEC, 120000);
+- 
+- 		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
+- 					  clocksource_mmio_readl_up))
+- 			printk(err, "32k_counter");
+- 
+- 		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+- 		register_persistent_clock(NULL, omap_read_persistent_clock);
++ 	int ret;
++ 
++ 	/*
++ 	 * 32k sync Counter register offset is at 0x10
++ 	 */
++ 	sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
++ 
++ 	/*
++ 	 * 120000 rough estimate from the calculations in
++ 	 * __clocksource_updatefreq_scale.
++ 	 */
++ 	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
++ 			32768, NSEC_PER_SEC, 120000);
++ 
++ 	ret = clocksource_mmio_init(sync32k_cnt_reg, "32k_counter", 32768,
++ 				250, 32, clocksource_mmio_readl_up);
++ 	if (ret) {
++ 		pr_err("32k_counter: can't register clocksource\n");
++ 		return ret;
+  	}
++ 
++ 	setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
+++	register_persistent_clock(NULL, omap_read_persistent_clock);
++ 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
++ 
+  	return 0;
+  }
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/8f9c7194/attachment.sig>
