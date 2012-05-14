@@ -1,132 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 May 2012 07:42:23 +0000
-Subject: [PATCH] CS89x0 : Use ioread16/iowrite16 on all platforms
-In-Reply-To: <1336947279-10769-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1336947279-10769-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <201205140742.23478.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 May 2012 16:47:32 +0900
+Subject: [GIT PULL] Samsung devel-1 for v3.5
+In-Reply-To: <CAOesGMhwEpQstrM5Zc4ie=CX2BAoSsfAvJbZYxUpg66NUnxrjw@mail.gmail.com>
+References: <4FAF0156.5080306@samsung.com>
+ <CAOesGMhwEpQstrM5Zc4ie=CX2BAoSsfAvJbZYxUpg66NUnxrjw@mail.gmail.com>
+Message-ID: <064f01cd31a5$d2300660$76901320$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 May 2012, Jaccon Bastiaansen wrote:
-> The use of the inw/outw functions by the cs89x0 platform driver
-> results in NULL pointer references.
+Olof Johansson wrote:
 > 
-> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> On Sat, May 12, 2012 at 5:33 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Hi Arnd, Olof
+> >
+> > Please pull Samsung devel for v3.5
+> >
+> > This is including exynos/iommu, platform of drm and fimc-lite, dma for
+> > exynos5250 and s3c24xx-hsspi.
+> >
+> > Note, the exynos/iommu patch got the ack from Joerg and this should be
+> sent
+> > to upstream via arm tree and since it depends on cleanup-samsung-iommu,
+> the
+> > cleanup branch is included(merged) in here.
+> >
+> > If any problems, please let me know.
+> 
+> Same here, I'll hold off pulling this until we've sorted out the
+> cleanup-samsung-iommu request.
+> 
+Please hold this off for a moment because I need to sort out regarding
+s3c-hsotg patches which cause build error because some patches have been
+already in usb tree for it.
 
-Hi Jaccon,
+If required, I will send separate branch to you.
 
-Thanks for taking on this patch. I think it needs some more work, but you are on
-the right track.
+Thanks.
 
-First of all, the description about should be more specific. I would recommend
-adding at least the specific platform on which you saw it, and something like
-[results in NULL pointer references] on platforms that do not provide ISA-style
-programmed I/O accessors, and accesses the wrong address space on platforms
-that have a PCI I/O space that is not identity-mapped into the physical address
-space.
-
-I would also recommend building the driver with "make C=1" after installing "sparse",
-so you can detect any location where you potentially use the wrong pointer.
-
-> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-> index b9406cb..5a1e5d7 100644
-> --- a/drivers/net/ethernet/cirrus/cs89x0.c
-> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
-> @@ -222,6 +222,7 @@ struct net_local {
->  	int send_underrun;	/* keep track of how many underruns in a row we get */
->  	int force;		/* force various values; see FORCE* above. */
->  	spinlock_t lock;
-> +	unsigned long phys_addr;/* CS89x0 I/O port or physical address. */
->  #if ALLOW_DMA
->  	int use_dma;		/* Flag: we're using dma */
->  	int dma;		/* DMA channel */
-> @@ -231,8 +232,6 @@ struct net_local {
->  	unsigned char *rx_dma_ptr;	/* points to the next packet  */
->  #endif
->  #ifdef CONFIG_CS89x0_PLATFORM
-> -	void __iomem *virt_addr;/* Virtual address for accessing the CS89x0. */
-> -	unsigned long phys_addr;/* Physical address for accessing the CS89x0. */
->  	unsigned long size;	/* Length of CS89x0 memory region. */
->  #endif
->  };
-
-I think it makes sense to remove the #ifdef here and just leave the "size" member
-next to "phys_addr".
-
-More importantly, I would rename the "base_addr" member to "virt_addr" and change
-the type to void __iomem *. This will let you remove a lot of type casts and
-catch potentially broken accesses where the __iomem token still gets passed into
-inw/outw.
-
-> @@ -279,6 +278,47 @@ static int __init dma_fn(char *str)
->  __setup("cs89x0_dma=", dma_fn);
->  #endif	/* !defined(MODULE) && (ALLOW_DMA != 0) */
->  
-> +#ifndef CONFIG_CS89x0_PLATFORM
-> +/*
-> + * This function converts the I/O port addres used by the cs89x0_probe() and
-> + * init_module() functions to the I/O memory address used by the
-> + * cs89x0_probe1() function.
-> + */
-> +static int __init
-> +cs89x0_ioport_probe(struct net_device *dev, unsigned long ioport, int modular)
-> +{
-> +	struct net_local *lp = netdev_priv(dev);
-> +	int ret = 0;
-> +	void __iomem *io_mem;
-> +
-> +	if (!lp)
-> +		return -ENOMEM;
-> +
-> +	lp->phys_addr = ioport;
-> +
-> +	if (!request_region(ioport, NETCARD_IO_EXTENT, DRV_NAME)) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	io_mem = ioport_map(ioport, NETCARD_IO_EXTENT);
-> +	if (!io_mem) {
-> +		ret = -ENOMEM;
-> +		goto release;
-> +	}
-> +
-> +	ret = cs89x0_probe1(dev, ret, modular);
-> +	if (!ret)
-> +		goto out;
-> +
-> +	ioport_unmap(io_mem);
-> +release:
-> +	release_region(ioport, NETCARD_IO_EXTENT);
-> +out:
-> +	return ret;
-> +}
-> +#endif
-
-You don't seem to actually assign the io_mem pointer to base_addr here, so the
-accesses will go to the wrong address in the ISA case. It's generally better
-not to initially "ret" to zero in cases like this, so the compiler can catch
-this kind of bug.
-
-> @@ -373,13 +412,13 @@ writeword(unsigned long base_addr, int portno, u16 value)
->  static u16
->  readword(unsigned long base_addr, int portno)
->  {
-> -	return inw(base_addr + portno);
-> +	return ioread16((void __iomem *)base_addr + portno);
->  }
->  
->  static void
->  writeword(unsigned long base_addr, int portno, u16 value)
->  {
-> -	outw(value, base_addr + portno);
-> +	iowrite16(value, (void __iomem *)(base_addr + portno));
->  }
->  #endif
-
-These functions (and others) should just get changed to take a "void __iomem *"
-pointer instead. In fact, you can remove them now and just call iowrite16 directly,
-since the ixp2000 case in the #ifdef is now obsolete as the platform is getting
-removed and everything just uses ioread/iowrite.
-
-	Arnd
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
