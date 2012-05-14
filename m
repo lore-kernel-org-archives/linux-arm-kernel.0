@@ -1,57 +1,28 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 14 May 2012 14:38:29 +0200 (CEST)
-Subject: CSR SiRFSoC PRIMA2: SPI compilation broken in 3.4-rc7
-In-Reply-To: <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
-References: <Pine.LNX.4.64.1205141311060.4916@axis700.grange>
- <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1205141436150.4916@axis700.grange>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 14 May 2012 14:48:31 +0200
+Subject: [PATCH] omap: dma: Clear status registers on enable/disable irq.
+In-Reply-To: <4FA69DB8.7060000@bitmer.com>
+References: <1334954578-10478-1-git-send-email-oleg.matcovschi@ti.com>
+ <1633215.yCrxk1mQVq@acer> <4FA69DB8.7060000@bitmer.com>
+Message-ID: <5693144.pkJCBoTAMO@vclass>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 May 2012, Linus Walleij wrote:
+On Sunday 06 of May 2012 18:50:16 Jarkko Nikula wrote:
+> On 05/04/2012 10:39 PM, Janusz Krzysztofik wrote:
+> >> This seems like a nice fix to me. As it affects all omaps, I'd like to
+> >> see some tested-by from Janusz/Jarkko/Peter. Can you guys give it a 
+> > try
+> >> with some audio tests?
+> > 
+> > OK, I can do, but perhaps not before next Saturday, when I'm back home, 
+> > able to actually listen to the audio, not only watch the IRQ counters 
+> > rising up ;-).
+> > 
+> Ok from omap3
+> 
+> Tested-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 
-> On Mon, May 14, 2012 at 1:14 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> 
-> > Might be good to try to fix for 3.4 release:
-> >
-> > drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_probe':
-> > drivers/spi/spi-sirf.c:563: error: implicit declaration of function 'pinmux_get'
-> > drivers/spi/spi-sirf.c:563: warning: assignment makes pointer from integer without a cast
-> > drivers/spi/spi-sirf.c:568: error: implicit declaration of function 'pinmux_enable'
-> > drivers/spi/spi-sirf.c:602: error: implicit declaration of function 'pinmux_disable'
-> > drivers/spi/spi-sirf.c:603: error: implicit declaration of function 'pinmux_put'
-> > make[3]: *** [drivers/spi/spi-sirf.o] Error 1
-> 
-> How are you producing this?
-> 
-> config SPI_SIRF
->         tristate "CSR SiRFprimaII SPI controller"
->         depends on ARCH_PRIMA2
-> 
-> So must be on ARCH_PRIMA2, but:
-> 
-> grep -r PRIMA2 arch/arm/configs/
-> 
-> So no defconfig can be used to compile this.
+Works for me on OMAP1.
 
-Yeah, just do "make ARCH=arm menuconfig" (or whatever *config you use) and 
-select PRIMA2, then this SPI driver - nothing super fancy:-) I've sent you 
-my .config off-list.
-
-Thanks
-Guennadi
-
-> If I could just reproduce it, I could fix it...
-> 
-> Barry pls submit a defconfig for the PRIMA2 so we can
-> compile it and test for regressions.
-> 
-> Yours,
-> Linus Walleij
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Tested-by: Janusz Krzyszofik <jkrzyszt@tis.inet.pl>
