@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 May 2012 20:40:39 +0000
+Date: Mon, 14 May 2012 20:45:22 +0000
 Subject: [GIT PULL] ARM: orion/dove: v3.4 fixes
 In-Reply-To: <20120514182722.GM16338@titan.lakedaemon.net>
 References: <20120514182722.GM16338@titan.lakedaemon.net>
-Message-ID: <201205142040.39929.arnd@arndb.de>
+Message-ID: <201205142045.23156.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,14 +30,11 @@ On Monday 14 May 2012, Jason Cooper wrote:
 > Jason Cooper (1):
 >       Merge branch 'v3.4-rc6-cleanup-v2' of git://github.com/lunn/linux
 > into orion_fixes_for_v3.4
-> 
 
-
-Pulled into next/fixes, thanks!
-
-I noticed that none of these are tagged for inclusion into stable. Is that
-intentional? When sending bug fixes, please make sure that each patch that
-you want to get applied on older kernel versions contains a
-'Cc: stable at vger.kernel.org' line!
+I just noticed that you said 'for v3.4', not 'for v3.5'. We're really late
+in the cycle now, so I would only take serious bug fixes and regressions,
+everything else would better go into v3.5. Which of these are critical
+and required for v3.4 (i.e. which ones would you backport if v3.4 was
+already released)?
 
 	Arnd
