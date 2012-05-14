@@ -1,72 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 May 2012 10:22:01 +0200
-Subject: [PATCH 3/5] ARM: imx: add audio codec clk lookup for imx53-qsb
-In-Reply-To: <1336718568-26810-4-git-send-email-shawn.guo@linaro.org>
-References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
- <1336718568-26810-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120514082201.GF21318@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 May 2012 16:48:11 +0800
+Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
+In-Reply-To: <20120514080835.GB31985@opensource.wolfsonmicro.com>
+References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
+ <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
+ <20120514035137.GB20367@S2100-06.ap.freescale.net>
+ <20120514080835.GB31985@opensource.wolfsonmicro.com>
+Message-ID: <20120514084810.GD20367@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 02:42:46PM +0800, Shawn Guo wrote:
-> On imx53-qsb board, the clk ssi_ext.0 is used as the clock input
-> to audio codec sgtl5000.
+On Mon, May 14, 2012 at 09:08:36AM +0100, Mark Brown wrote:
+> On Mon, May 14, 2012 at 11:51:38AM +0800, Shawn Guo wrote:
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/imx53-dt.c |   19 +++++++++++++++++++
->  1 files changed, 19 insertions(+), 0 deletions(-)
+> > From what I see, it's reasonable.  Then the immediate question I have
+> > is, should we remove "struct anatop *adata" from anatop_read_reg and
+> > anatop_write_reg completely?
 > 
-> diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-> index 574eca4..139ec4e 100644
-> --- a/arch/arm/mach-imx/imx53-dt.c
-> +++ b/arch/arm/mach-imx/imx53-dt.c
-> @@ -10,6 +10,9 @@
->   * http://www.gnu.org/copyleft/gpl.html
->   */
->  
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
->  #include <linux/irqdomain.h>
-> @@ -81,6 +84,19 @@ static const struct of_device_id imx53_iomuxc_of_match[] __initconst = {
->  	{ /* sentinel */ }
->  };
->  
-> +static void __init imx53_qsb_init(void)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = clk_get_sys("ssi_ext.0", NULL);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("failed to get clk ssi_ext.0\n");
-> +		return;
-> +	}
-> +
-> +	clk_register_clkdev(clk, NULL, "0-000a");
-> +}
-> +
->  static void __init imx53_dt_init(void)
->  {
->  	struct device_node *node;
-> @@ -99,6 +115,9 @@ static void __init imx53_dt_init(void)
->  		of_node_put(node);
->  	}
->  
-> +	if (of_machine_is_compatible("fsl,imx53-qsb"))
-> +		imx53_qsb_init();
-> +
+> Given the way these things tend to go it's probably guaranteeing that
+> your next round of SoCs will have two register compatible anatop blocks :)
 
-I wonder if we really want to open this can of worms here. Adding board
-specific hacks (or fixups) in this file can become very messy once we
-have more than only a few oftree based boards.
-
-Sascha
+Considering anatop block tends to be a container of misc hardware
+control bits, I haven't really seen any possibility that the future
+SoCs will have multiple anatop blocks.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
