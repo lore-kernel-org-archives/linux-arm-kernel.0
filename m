@@ -1,20 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 May 2012 10:42:59 +0200
-Subject: [PATCH 1/2] pinctrl: mxs: create group for pin config node
-In-Reply-To: <1336922341-7089-2-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 14 May 2012 10:44:54 +0200
+Subject: [PATCH 2/2] pinctrl: mxs: skip gpio nodes for group creation
+In-Reply-To: <1336922341-7089-3-git-send-email-shawn.guo@linaro.org>
 References: <1336922341-7089-1-git-send-email-shawn.guo@linaro.org>
- <1336922341-7089-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdYu-n8GkQkByhKsjsA-r61E7zA+5eDgQ-cpi6L+H+LQ5w@mail.gmail.com>
+ <1336922341-7089-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdYj2-LH2DpdU+SxywfVf6ETfxr90P3-9XvU2JF+hOQ5LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, May 13, 2012 at 5:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> The initial mxs pinctrl support, commit 1772311 (pinctrl: add
-> pinctrl-mxs support) skipped creating group from device tree pin config
-> node. ?Add it to get pin config node work for client device.
+> The recent added mxs gpio device tree bindings require gpio nodes
+> defined under pinctrl node too. ?The pinctrl-mxs driver should skip
+> these node for group parsing and creating.
 >
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks, applied.
+Thanks, applied!
 Linus Walleij
