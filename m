@@ -1,21 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 May 2012 10:26:09 -0600
-Subject: [PATCH] ARM: tegra: Fix flow controller accesses
-In-Reply-To: <1336991229-18859-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1336991229-18859-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4FB13221.3000704@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 14 May 2012 15:12:42 +0100
+Subject: [PATCH] clk: Constify struct clk_init_data
+Message-ID: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2012 04:27 AM, Peter De Schrijver wrote:
-> flowctrl_write_cpu_csr uses the cpu halt offsets and vice versa. This patch
-> fixes this bug.
-> 
-> Reported-by: Dan Willemsen <dwillemsen@nvidia.com>
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Allow drivers to declare their clk_init_data const, the framework really
+shouldn't be modifying the data.
 
-Applied, thanks.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ include/linux/clk-provider.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I fixed the patch description to mention when this problem was introduced.
-
-I'll send a pull request to include this in 3.4-final in a second.
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c1c23b9..fc43ea6 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -143,7 +143,7 @@ struct clk_init_data {
+  */
+ struct clk_hw {
+ 	struct clk *clk;
+-	struct clk_init_data *init;
++	const struct clk_init_data *init;
+ };
+ 
+ /*
+-- 
+1.7.10
