@@ -1,82 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 May 2012 18:15:33 +0100
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low	power
- modes
-In-Reply-To: <20120514163909.GB13860@n2100.arm.linux.org.uk>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
-Message-ID: <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 May 2012 11:20:16 -0600
+Subject: [GIT PULL] ARM: tegra: dt2 branch
+Message-ID: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 14, 2012 at 05:21:50PM +0100, Lorenzo Pieralisi wrote:
-> > On Mon, May 14, 2012 at 04:58:59PM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, May 14, 2012 at 04:50:22PM +0100, Lorenzo Pieralisi wrote:
-> > > > > 2. L2 disable
-> > > > > 3. L1 clean & invalidate
-> > > > 
-> > > > This is wrong again since while cleaning and invalidating the cache (L1 here)
-> > > > can still allocate and this must not happen.
-> > > 
-> > > No it isn't.  There is never anything wrong with allocating new caches lines
-> > > into a cache which is going to (eventually) be powered down.  Ever.
-> > 
-> > What if the cache allocates a dirty cache line moved from L1 of another
-> > processor ?
-> > 
-> > > What would be wrong is if we end up with dirty cache lines in the cache
-> > > to be powered down for data which we _care_ about preserving when power
-> > > is lost.
-> > > 
-> > > That's a _very_ _very_ important difference.
-> > 
-> > That's exactly the point I am making. dirty cache lines can be migrated across
-> > processors caches. If we want to shut down a single core we have to be 100%
-> > sure that dirty cache lines (if we care about that data, we might be not as you
-> > pointed out) must not be present in L1 when we shut the core down. If the C
-> > bit in SCTLR is not cleared before cleaning and invalidating this is not
-> > guaranteed from an architectural point of view.
-> > 
-> > Occurences might be rare, but it is still not safe to clean the cache with the
-> > C bit set.
-> 
-> It's not safe to disable the C bit without first pushing the dirty data out
-> to RAM either.  It's a catch-22 situation - because turning the C bit off
-> not only stops the caches allocating new lines but also prevents them being
-> searched.
+This is some late device tree additions and cleanup for Tegra.
 
-That depends on the processor. On A9 cache is bypassed on A15 it is not,
-data access might still hit in the cache.
+This branch is based on the merge of the following branches from the
+Tegra repo, which are all already pulled into arm-soc:
 
-It is "implementation defined" according to ARM ARM (B2-1265).
-But C bit cleared stops allocation that's true across all implementations.
+for-3.5/tegra30-audio
+for-3.5/usb-ulpi
+for-3.5/dt
+... which are all based on for-3.5/gpio-pinmux
 
-> That means your view of cacheable memory suddenly changes beneath you when
-> the C bit is turned off.
+----------------------------------------------------------------
 
-Yes might be (see above) but the cache operations still work so we do
-not have any problem (well, as long as we clean and invalidate without
-using data that can live in the cache, but that's how it is done on v7 cache
-flush ops and it is perfectly fine).
+The following changes since commit 4b7e870590f65f4e8bb3cdb7f382e1a9dd17dad5:
 
-> From what you're saying - and from my understanding of your cache behaviours,
-> even the sequence:
-> - clean cache
-> - disable C bit
-> - clean cache
-> is buggy.
+  Merge branch 'for-3.5/dt' into for-3.5/dt2-new
 
-No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
+are available in the git repository at:
 
-> 
-> I think what you're effectively saying is that it is not possible to safely
-> power down a cache on an ARM SMP CPU...
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.5/dt2
 
-It is possible, but the final clean must be done with C bit cleared. It is
-belt and braces, agreed, but that's the only way to do it properly.
+for you to fetch changes up to 2a5fdc9adde8476751b63a795e3d66ae2ee3979d:
 
-Lorenzo
+  ARM: dt: tegra: invert status=disable vs status=okay
+
+----------------------------------------------------------------
+
+ arch/arm/boot/dts/tegra-cardhu.dts    |   77 +++++---
+ arch/arm/boot/dts/tegra-harmony.dts   |  100 +++++-----
+ arch/arm/boot/dts/tegra-paz00.dts     |  112 ++++++-----
+ arch/arm/boot/dts/tegra-seaboard.dts  |  176 +++++++++--------
+ arch/arm/boot/dts/tegra-trimslice.dts |   71 ++++---
+ arch/arm/boot/dts/tegra-ventana.dts   |   90 +++++----
+ arch/arm/boot/dts/tegra20.dtsi        |  275 ++++++++++++---------------
+ arch/arm/boot/dts/tegra30.dtsi        |  292 ++++++++++++----------------
+ 8 files changed, 588 insertions(+), 605 deletions(-)
