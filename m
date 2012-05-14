@@ -1,36 +1,57 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 14 May 2012 15:36:17 +0300
-Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <20120509111335.GC20304@tbergstrom-lnx.Nvidia.com>
-References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
- <20120507000329.GB14559@gmail.com>
- <20120509111335.GC20304@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20120514123617.GA20304@tbergstrom-lnx.Nvidia.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 14 May 2012 14:38:29 +0200 (CEST)
+Subject: CSR SiRFSoC PRIMA2: SPI compilation broken in 3.4-rc7
+In-Reply-To: <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
+References: <Pine.LNX.4.64.1205141311060.4916@axis700.grange>
+ <CACRpkdb17CAYazMO86KL1=EgKJ0zbE0RDb_fPnLZ5sKW70Vi2A@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1205141436150.4916@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2012 at 01:13:35PM +0200, Peter De Schrijver wrote:
+On Mon, 14 May 2012, Linus Walleij wrote:
+
+> On Mon, May 14, 2012 at 1:14 PM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
 > 
-> Ok. Thanks. One more question. We have some clocks with special features
-> such as request lines for clock outputs, delays for clocks recovered from
-> an external source or several divisors which are used based on the state
-> of the module which is served by the clock (eg. an idle divisor and an active
-> divisor). How should these be modelled?
+> > Might be good to try to fix for 3.4 release:
+> >
+> > drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_probe':
+> > drivers/spi/spi-sirf.c:563: error: implicit declaration of function 'pinmux_get'
+> > drivers/spi/spi-sirf.c:563: warning: assignment makes pointer from integer without a cast
+> > drivers/spi/spi-sirf.c:568: error: implicit declaration of function 'pinmux_enable'
+> > drivers/spi/spi-sirf.c:602: error: implicit declaration of function 'pinmux_disable'
+> > drivers/spi/spi-sirf.c:603: error: implicit declaration of function 'pinmux_put'
+> > make[3]: *** [drivers/spi/spi-sirf.o] Error 1
+> 
+> How are you producing this?
+> 
+> config SPI_SIRF
+>         tristate "CSR SiRFprimaII SPI controller"
+>         depends on ARCH_PRIMA2
+> 
+> So must be on ARCH_PRIMA2, but:
+> 
+> grep -r PRIMA2 arch/arm/configs/
+> 
+> So no defconfig can be used to compile this.
 
-One more thing: we have muxes where not all possible register values are
-valid. I could make a special mux type which contains a mapping array, but
-that doesn't seem like a good solution to me. Is there a reason why we don't
-have a struct clk_parent like this:
+Yeah, just do "make ARCH=arm menuconfig" (or whatever *config you use) and 
+select PRIMA2, then this SPI driver - nothing super fancy:-) I've sent you 
+my .config off-list.
 
-struct clk_parents {
-	char *name;
-	struct clk *clk;
-	int index;
-}
+Thanks
+Guennadi
 
-where index is the value to be written to the hw to select that clock as a
-parent. It would also avoid having to pass 2 arrays (name and clk pointer).
+> If I could just reproduce it, I could fix it...
+> 
+> Barry pls submit a defconfig for the PRIMA2 so we can
+> compile it and test for regressions.
+> 
+> Yours,
+> Linus Walleij
+> 
 
-Cheers,
-
-Peter.
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
