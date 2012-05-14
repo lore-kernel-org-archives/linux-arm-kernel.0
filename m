@@ -1,91 +1,132 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 May 2012 16:38:54 +0900
-Subject: [GIT PULL] cleanup samsung plat-s3c24xx and s5p for v3.5
-In-Reply-To: <CAOesGMgk+-cqmDmhsjM9fhRpwxV4jNf4y+z1AKWpu8a=6wqkCw@mail.gmail.com>
-References: <4FAEEFD3.9040907@samsung.com>
- <CAOesGMgk+-cqmDmhsjM9fhRpwxV4jNf4y+z1AKWpu8a=6wqkCw@mail.gmail.com>
-Message-ID: <064c01cd31a4$9ddd5c60$d9981520$%kim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 May 2012 07:42:23 +0000
+Subject: [PATCH] CS89x0 : Use ioread16/iowrite16 on all platforms
+In-Reply-To: <1336947279-10769-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1336947279-10769-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <201205140742.23478.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> Hi,
+On Sunday 13 May 2012, Jaccon Bastiaansen wrote:
+> The use of the inw/outw functions by the cs89x0 platform driver
+> results in NULL pointer references.
 > 
-Hi,
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
 
-> On Sat, May 12, 2012 at 4:18 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Hi Arnd, Olof
-> >
-> > Please pull cleanup plat-s3c24xx-s5p for v3.5 Samsung stuff.
-> >
-> > ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > next/cleanup-plat-s3c24xx-s5p
-> >
-> > We can remove plat-s5p directory with this series and I think, the
-> > plat-s3c24xx can be removed next time for one plat-samsung of Samsung
-> stuff.
-> 
-> Nice!
-> 
-> > Note, this is including cleanup-samsung-iommu which is removing s5p
-> iommu
-> > stuff in plat-s5p.
-> 
-> What branch is that? I've not seen a pull request for it.
-> 
-It is next/cleanup-samsung-iommu branch and already included in
-next/cleanup-plat-s3c24xx branch as a base because as I said, that is needed
-to remove plat-s5p directory.
-So in this case, would be better if you could pull following branch before
-pulling next/cleanup-plat-s3c24xx-s5p and sorry for missing pull request it.
+Hi Jaccon,
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/cleanup-samsung-iommu
+Thanks for taking on this patch. I think it needs some more work, but you are on
+the right track.
 
-If any problems, please let me know.
+First of all, the description about should be more specific. I would recommend
+adding at least the specific platform on which you saw it, and something like
+[results in NULL pointer references] on platforms that do not provide ISA-style
+programmed I/O accessors, and accesses the wrong address space on platforms
+that have a PCI I/O space that is not identity-mapped into the physical address
+space.
 
-Thanks.
+I would also recommend building the driver with "make C=1" after installing "sparse",
+so you can detect any location where you potentially use the wrong pointer.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> index b9406cb..5a1e5d7 100644
+> --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+> @@ -222,6 +222,7 @@ struct net_local {
+>  	int send_underrun;	/* keep track of how many underruns in a row we get */
+>  	int force;		/* force various values; see FORCE* above. */
+>  	spinlock_t lock;
+> +	unsigned long phys_addr;/* CS89x0 I/O port or physical address. */
+>  #if ALLOW_DMA
+>  	int use_dma;		/* Flag: we're using dma */
+>  	int dma;		/* DMA channel */
+> @@ -231,8 +232,6 @@ struct net_local {
+>  	unsigned char *rx_dma_ptr;	/* points to the next packet  */
+>  #endif
+>  #ifdef CONFIG_CS89x0_PLATFORM
+> -	void __iomem *virt_addr;/* Virtual address for accessing the CS89x0. */
+> -	unsigned long phys_addr;/* Physical address for accessing the CS89x0. */
+>  	unsigned long size;	/* Length of CS89x0 memory region. */
+>  #endif
+>  };
 
-The following changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3:
+I think it makes sense to remove the #ifdef here and just leave the "size" member
+next to "phys_addr".
 
-  Linux 3.4-rc6 (2012-05-06 15:07:32 -0700)
+More importantly, I would rename the "base_addr" member to "virt_addr" and change
+the type to void __iomem *. This will let you remove a lot of type casts and
+catch potentially broken accesses where the __iomem token still gets passed into
+inw/outw.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/cleanup-samsung-iommu
+> @@ -279,6 +278,47 @@ static int __init dma_fn(char *str)
+>  __setup("cs89x0_dma=", dma_fn);
+>  #endif	/* !defined(MODULE) && (ALLOW_DMA != 0) */
+>  
+> +#ifndef CONFIG_CS89x0_PLATFORM
+> +/*
+> + * This function converts the I/O port addres used by the cs89x0_probe() and
+> + * init_module() functions to the I/O memory address used by the
+> + * cs89x0_probe1() function.
+> + */
+> +static int __init
+> +cs89x0_ioport_probe(struct net_device *dev, unsigned long ioport, int modular)
+> +{
+> +	struct net_local *lp = netdev_priv(dev);
+> +	int ret = 0;
+> +	void __iomem *io_mem;
+> +
+> +	if (!lp)
+> +		return -ENOMEM;
+> +
+> +	lp->phys_addr = ioport;
+> +
+> +	if (!request_region(ioport, NETCARD_IO_EXTENT, DRV_NAME)) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	io_mem = ioport_map(ioport, NETCARD_IO_EXTENT);
+> +	if (!io_mem) {
+> +		ret = -ENOMEM;
+> +		goto release;
+> +	}
+> +
+> +	ret = cs89x0_probe1(dev, ret, modular);
+> +	if (!ret)
+> +		goto out;
+> +
+> +	ioport_unmap(io_mem);
+> +release:
+> +	release_region(ioport, NETCARD_IO_EXTENT);
+> +out:
+> +	return ret;
+> +}
+> +#endif
 
-KyongHo Cho (2):
-      S5P: SYSMMU: Remove System MMU device driver
-      ARM: EXYNOS: Change System MMU platform device definitions
+You don't seem to actually assign the io_mem pointer to base_addr here, so the
+accesses will go to the wrong address in the ISA case. It's generally better
+not to initially "ret" to zero in cases like this, so the compiler can catch
+this kind of bug.
 
- arch/arm/mach-exynos/Kconfig                    |   10 +-
- arch/arm/mach-exynos/Makefile                   |    2 +-
- arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
- arch/arm/mach-exynos/clock-exynos4.h            |    2 +
- arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
- arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
- arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
- arch/arm/mach-exynos/dev-sysmmu.c               |  457
-++++++++++++----------
- arch/arm/mach-exynos/include/mach/irqs.h        |   25 +-
- arch/arm/mach-exynos/include/mach/map.h         |   38 ++
- arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
- arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
- arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
- arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
- arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
- arch/arm/plat-s5p/Kconfig                       |    8 -
- arch/arm/plat-s5p/Makefile                      |    1 -
- arch/arm/plat-s5p/sysmmu.c                      |  313 ----------------
- arch/arm/plat-samsung/include/plat/devs.h       |    1 -
- arch/arm/plat-samsung/include/plat/sysmmu.h     |   95 -----
- 20 files changed, 529 insertions(+), 754 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
- delete mode 100644 arch/arm/plat-s5p/sysmmu.c
- delete mode 100644 arch/arm/plat-samsung/include/plat/sysmmu.h
+> @@ -373,13 +412,13 @@ writeword(unsigned long base_addr, int portno, u16 value)
+>  static u16
+>  readword(unsigned long base_addr, int portno)
+>  {
+> -	return inw(base_addr + portno);
+> +	return ioread16((void __iomem *)base_addr + portno);
+>  }
+>  
+>  static void
+>  writeword(unsigned long base_addr, int portno, u16 value)
+>  {
+> -	outw(value, base_addr + portno);
+> +	iowrite16(value, (void __iomem *)(base_addr + portno));
+>  }
+>  #endif
+
+These functions (and others) should just get changed to take a "void __iomem *"
+pointer instead. In fact, you can remove them now and just call iowrite16 directly,
+since the ixp2000 case in the #ifdef is now obsolete as the platform is getting
+removed and everything just uses ioread/iowrite.
+
+	Arnd
