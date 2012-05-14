@@ -1,44 +1,31 @@
-From: ki0351.kim@samsung.com (Kyoungil Kim)
-Date: Mon, 14 May 2012 19:30:31 +0900
-Subject: [PATCH] serial: samsung: Add support 4M baudrate for samsung
- serial
-In-Reply-To: <4FAEF910.902@samsung.com>
-References: <001b01cce24a$b01cb370$10561a50$%kim@samsung.com>
- <4FAEF910.902@samsung.com>
-Message-ID: <002f01cd31bc$96e9cd90$c4bd68b0$%kim@samsung.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 14 May 2012 19:54:24 +0900
+Subject: [PATCH 00/03] ARM: mach-shmobile: DT_MACHINE and mach-type updates
+Message-ID: <20120514105424.8596.38355.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> On 02/03/12 17:06, ??? wrote:
-> > At getting the baudrate, the max baudrate parameter value
-> > is changed to 4M.
-> > So samsung serial can support upto 4M baudrate.
-> >
-> > Signed-off-by: Kyoungil Kim<ki0351.kim@samsung.com>
-> > ---
-> >   drivers/tty/serial/samsung.c |    2 +-
-> >   1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> > index a6abe0c..513096d 100644
-> > --- a/drivers/tty/serial/samsung.c
-> > +++ b/drivers/tty/serial/samsung.c
-> > @@ -701,7 +701,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
-> >   	 * Ask the core to calculate the divisor for us.
-> >   	 */
-> >
-> > -	baud = uart_get_baud_rate(port, termios, old, 0, 115200*8);
-> > +	baud = uart_get_baud_rate(port, termios, old, 0, 4000000);
-> >   	quot = s3c24xx_serial_getclk(ourport, baud,&clk,&clk_sel);
-> >   	if (baud == 38400&&  (port->flags&  UPF_SPD_MASK) == UPF_SPD_CUST)
-> >   		quot = port->custom_divisor;
-> 
-> Kyoungil,
-> 
-> Is this available on all of Samsung serial?
+ARM: mach-shmobile: DT_MACHINE and mach-type updates
 
-I'm not sure about that, but it just indicates the max baudrate.
+[PATCH 01/03] mach-shmobile: Use DT_MACHINE for KZM9G
+[PATCH 02/03] mach-shmobile: Use DT_MACHINE for armadillo 800 eva
+[PATCH 03/03] ARM: Undelete KZM9D mach-type
 
-Thank you.
-Best Regards.
+These patches contain a few last minute updates for mach-shmobile.
+There are two patches that convert recently added boards to make use
+of DT_MACHINE_START(). Also, slightly unrelated to the new boards,
+but the KZM9D mach-type is undeleted as well. This to allow build
+of the EMEV2-based KZM9D board.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Applies to linux-next 20120514
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts  |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/sh73a0-kzm9g.dts             |   22 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                 |    2 ++
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    8 +++++++-
+ arch/arm/mach-shmobile/board-kzm9g.c           |    8 +++++++-
+ arch/arm/tools/mach-types                      |    1 +
+ 6 files changed, 61 insertions(+), 2 deletions(-)
