@@ -1,17 +1,17 @@
 From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 14 May 2012 18:54:50 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc tree
-Message-ID: <20120514185450.4682573d6cb7c4745c9ea8b5@canb.auug.org.au>
+Date: Mon, 14 May 2012 18:44:25 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the slave-dma tree
+Message-ID: <20120514184425.5747f862e369e2f291bfba69@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
 Today's linux-next merge of the arm-soc tree got a conflict in
-sound/soc/mxs/mxs-saif.c between commit 08641c7c74dd ("ASoC: mxs: add
-device tree support for mxs-saif") from the sound-asoc tree and commit
-f755865f9082 ("ASoC: mxs-saif: adopt pinctrl support") from the arm-soc
-tree.
+drivers/dma/imx-sdma.c between commit 2ccaef0520d1 ("dma: imx-sdma: make
+channel0 operations atomic") from the slave-dma tree and commit
+7560e3f3581e ("dmaengine i.MX SDMA: do not depend on grouped clocks")
+from the arm-soc tree.
 
 Just context changes.  I fixed it up (see below) and can carry the fix as
 necessary.
@@ -19,85 +19,26 @@ necessary.
 Cheers,
 Stephen Rothwell                    sfr at canb.auug.org.au
 
-diff --cc sound/soc/mxs/mxs-saif.c
-index 0642748,7fd224b..0000000
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@@ -628,50 -626,38 +629,57 @@@ static int __devinit mxs_saif_probe(str
-  	struct resource *iores, *dmares;
-  	struct mxs_saif *saif;
-  	struct mxs_saif_platform_data *pdata;
-+ 	struct pinctrl *pinctrl;
-  	int ret = 0;
+diff --cc drivers/dma/imx-sdma.c
+index a472a29,fddccae..0000000
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@@ -323,8 -322,9 +323,9 @@@ struct sdma_engine 
+  	struct sdma_context_data	*context;
+  	dma_addr_t			context_phys;
+  	struct dma_device		dma_device;
+- 	struct clk			*clk;
++ 	struct clk			*clk_ipg;
++ 	struct clk			*clk_ahb;
+ -	struct mutex			channel_0_lock;
+ +	spinlock_t			channel_0_lock;
+  	struct sdma_script_start_addrs	*script_addrs;
+  };
   
- -	if (pdev->id >= ARRAY_SIZE(mxs_saif))
- +
- +	if (!np && pdev->id >= ARRAY_SIZE(mxs_saif))
-  		return -EINVAL;
-  
-  	saif = devm_kzalloc(&pdev->dev, sizeof(*saif), GFP_KERNEL);
-  	if (!saif)
-  		return -ENOMEM;
-  
- -	mxs_saif[pdev->id] = saif;
- -	saif->id = pdev->id;
- -
- -	pdata = pdev->dev.platform_data;
- -	if (pdata && !pdata->master_mode) {
- -		saif->master_id = pdata->master_id;
- -		if (saif->master_id < 0 ||
- -			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
- -			saif->master_id == saif->id) {
- -			dev_err(&pdev->dev, "get wrong master id\n");
- -			return -EINVAL;
- +	if (np) {
- +		struct device_node *master;
- +		saif->id = of_alias_get_id(np, "saif");
- +		if (saif->id < 0)
- +			return saif->id;
- +		/*
- +		 * If there is no "fsl,saif-master" phandle, it's a saif
- +		 * master.  Otherwise, it's a slave and its phandle points
- +		 * to the master.
- +		 */
- +		master = of_parse_phandle(np, "fsl,saif-master", 0);
- +		if (!master) {
- +			saif->master_id = saif->id;
- +		} else {
- +			saif->master_id = of_alias_get_id(master, "saif");
- +			if (saif->master_id < 0)
- +				return saif->master_id;
-  		}
-  	} else {
- -		saif->master_id = saif->id;
- +		saif->id = pdev->id;
- +		pdata = pdev->dev.platform_data;
- +		if (pdata && !pdata->master_mode)
- +			saif->master_id = pdata->master_id;
- +		else
- +			saif->master_id = saif->id;
- +	}
- +
- +	if (saif->master_id < 0 || saif->master_id >= ARRAY_SIZE(mxs_saif)) {
- +		dev_err(&pdev->dev, "get wrong master id\n");
- +		return -EINVAL;
-  	}
-  
- +	mxs_saif[saif->id] = saif;
- +
-+ 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+ 	if (IS_ERR(pinctrl)) {
-+ 		ret = PTR_ERR(pinctrl);
-+ 		return ret;
-+ 	}
-+ 
-  	saif->clk = clk_get(&pdev->dev, NULL);
-  	if (IS_ERR(saif->clk)) {
-  		ret = PTR_ERR(saif->clk);
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/863fc2c8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/375c2918/attachment.sig>
