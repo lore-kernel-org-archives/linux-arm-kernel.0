@@ -1,44 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 May 2012 16:47:32 +0900
-Subject: [GIT PULL] Samsung devel-1 for v3.5
-In-Reply-To: <CAOesGMhwEpQstrM5Zc4ie=CX2BAoSsfAvJbZYxUpg66NUnxrjw@mail.gmail.com>
-References: <4FAF0156.5080306@samsung.com>
- <CAOesGMhwEpQstrM5Zc4ie=CX2BAoSsfAvJbZYxUpg66NUnxrjw@mail.gmail.com>
-Message-ID: <064f01cd31a5$d2300660$76901320$%kim@samsung.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 14 May 2012 15:55:07 +0800
+Subject: [PATCH 1/1] ARM: imx6q: prepare and enable init on clks directly
+ instead of clk_get first
+In-Reply-To: <20120514072934.GA21318@pengutronix.de>
+References: <1336971887-24616-1-git-send-email-richard.zhao@freescale.com>
+ <20120514072934.GA21318@pengutronix.de>
+Message-ID: <20120514075506.GB29393@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Mon, May 14, 2012 at 09:29:34AM +0200, Buddhi wrote:
+> On Mon, May 14, 2012 at 01:04:47PM +0800, Richard Zhao wrote:
+> > This also makes any clk be possible init on.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > 
-> On Sat, May 12, 2012 at 5:33 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Hi Arnd, Olof
-> >
-> > Please pull Samsung devel for v3.5
-> >
-> > This is including exynos/iommu, platform of drm and fimc-lite, dma for
-> > exynos5250 and s3c24xx-hsspi.
-> >
-> > Note, the exynos/iommu patch got the ack from Joerg and this should be
-> sent
-> > to upstream via arm tree and since it depends on cleanup-samsung-iommu,
-> the
-> > cleanup branch is included(merged) in here.
-> >
-> > If any problems, please let me know.
+> This is something I forgot to fix, thanks for doing this.
 > 
-> Same here, I'll hold off pulling this until we've sorted out the
-> cleanup-samsung-iommu request.
+> >  
+> > +static enum mx6q_clks const clks_init_on[] __initconst = {
+> > +	mmdc_ch0_axi, mmdc_ch1_axi, usboh3,
+> > +};
 > 
-Please hold this off for a moment because I need to sort out regarding
-s3c-hsotg patches which cause build error because some patches have been
-already in usb tree for it.
+> BTW, why usboh3? Do we need this? Right now we do not have USB support
+> on i.MX6. Once we have it the clock should be turned on in the USB
+> driver, right?
+I don't know why either. I just convert it.
 
-If required, I will send separate branch to you.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
+Richard
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
