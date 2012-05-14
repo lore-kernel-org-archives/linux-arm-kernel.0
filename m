@@ -1,60 +1,118 @@
-From: nalajala.murali@gmail.com (Murali N)
-Date: Mon, 14 May 2012 12:33:04 +0530
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power modes
-Message-ID: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 14 May 2012 16:13:36 +0900
+Subject: [GIT PULL] Renesas ARM-based platforms: new boards support for
+ v3.5
+In-Reply-To: <CAOesGMj5op-U+-_dvP_cqMUQ7zgzbzvig2ueb2LQTf+4MSEc2Q@mail.gmail.com>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMgFWM6K6969Oz6xGewrRekyrJA-ztGBADxsqnB1w=V2QA@mail.gmail.com>
+ <201205122307.20590.rjw@sisk.pl> <201205122323.14967.rjw@sisk.pl>
+ <CAOesGMj5op-U+-_dvP_cqMUQ7zgzbzvig2ueb2LQTf+4MSEc2Q@mail.gmail.com>
+Message-ID: <CANqRtoQTMKdKmATz5uxCtWaZcEPa2apt9WO4URdhiwEMnst5gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-I have a query on cache flush sequence being followed for L1 & L2
-while target going into deep low power state on CortexA5 MPCore.
-Here are the H/W details & the cache flush sequence i am following in
-my power driver:
+On Sun, May 13, 2012 at 3:29 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, May 12, 2012 at 2:23 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>> Hi,
+>>
+>> Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+>>
+>> ? ?Linux 3.4-rc6
+>>
+>> with top-most commit a515be1ca7df947db0f6018a174f49507affcdbc
+>>
+>> ? ?Merge branch 'renesas-kzm9g' into renesas-board-new
+>>
+>> from the git repository at:
+>>
+>> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git board-new
+>>
+>> to receive updates of the Renesas ARM-based boards support code for v3.5.
+>> Included are:
+>>
+>> ?* Support for the KZM-A9-GT board from Kuninori Morimoto.
+>>
+>> ?* Support for the armadillo800eva board from Kuninori Morimoto.
+>>
+>> This is based on the Renesas core SoC code updates I've sent a separate pull
+>> request for.
+>
+>
+> Hi Rafael and Magnus,
 
-H/W details:
-1.?????? ?APPS processor: CortexA5 MPCore
-2.?????? ?L2 controller: External PL310 r3p2
+Hej Olof!
 
-Sequences:
-a)?While target is going into deep low power mode (where APPS
-processor + L2 loose their power) currently I am following the below
-cache flush sequence.
+> I know Renesas is very active in adding support for new ARM platforms
+> upstream, and that's great. But we also need to figure out how it can
+> best be done while still keeping a bound on platform complexity.
+>
+> This adds two new board files and two new defconfigs to the arm
+> subtree. We have in general said that we are OK with the occasional
+> new board file if the vendor is actively working on reducing the rest
+> of the subdirectory contents and consolidating over into device tree
+> based platforms. But we have also agreed that new (v7+) SoCs/boards
+> should be targeting DT board files from introduction nowadays.
+>
+> Both these SoCs and boards seem to be A9-based, so they would match
+> that requirement.
 
-1.?L2 cache clean & invalidate
-2.?L2 disable
-3.?L1 clean & invalidate
-4.?L1 disable
-5.?WFI
+First of all, I'm glad to hear that you are positive to our work. This
+means a lot to us. I personally agree with the DT direction and to
+move things along we are multiple people working on improving both our
+own situation (drivers, soc) and infrastructure that everyone in the
+kernel community can use (PM, kexec). So I believe we are doing our
+fair share there. At the same time we also need to provide some kind
+of base code that is working as-is.
 
-b)?But when I look the PL310 r3p2 TRM (page no 91) explains the
-sequence to be followed is bit difference than what I am following.
+Regarding the new boards, you are correct that they are using Cortex
+A9. I'm not sure if your policy considers other IP that is tied to the
+ARM block, but in our case we have custom interrupt controllers. On
+r8a7740 it's a A9 with our INTC used instead of the GIC, and on sh73a0
+we make use of the GIC but we have our own cascaded interrupt
+controllers. Unfortunately we don't have any long term DT solution
+ready. I wrote a prototype myself to get other people started, but the
+long term part is still being worked on by Paul Mundt - this since we
+share the interrupt controller code with the SH architecture.
 
-1.?L1 clean & invalidate
-2.?L1 disable
-3.?L2 cache clean & invalidate
-4.?L2 disable
-5.?WFI
+> The good news is that meeting the basic requirements for device tree
+> probing is easy; using a DT_MACHINE_START() stanza and adding a small
+> dts file is really all it takes for the real simple case. Building a
+> zImage with the device tree appended (and ARM_ATAG_DTB_COMPAT=y) means
+> you can use the same firmware as before and not modify it to handle
+> device trees, if that is a limitation you have for your environments.
 
-Is it mandatory that I would follow only the sequence that is
-mentioned in the TRM (i.e. b)? (OR) though TRM says above sequence
-(i.e. b) can i still follow the steps (i.e. a)?
-What are problems that I see, if I don?t follow what TRM says & follow
-the sequence which I have mentioned above (i.e. a)?
+I'd be happy to add a DT_MACHINE_START() implementation for each SoC
+if that make it easier for you guys to merge our code. From a
+usability point of view, I'm quite certain that all our U-boot based
+boards take uImages instead of zImage as kernel image format. I prefer
+zImage myself, but unfortunately it is not my call.
 
-Also I have worked on another target with CortexA5 (Single core with
-same L2 pl310 controller) where i have followed the sequence ?a? for
-quite a long time and don?t see any data corruption issues.
+I believe an uImage on ARM is basically a wrapped zImage.
+Unfortunately I have not been able to find some simple way of
+including DTB in the uImage. So to be able to use these kernels on our
+existing boards that take uImage it seems that I will have to patch
+the kernel locally somehow? I am fine using ARM_ATAG_DTB_COMPAT=y
+during development - actually it is my preferred way - but I'm not so
+comfortable asking our customers to patch their kernel source just to
+be able to build an uImage.
 
-Here my question is, is the above sequence ?b? something special for
-only CortexA5MPCore targets to follow?
+Do you have any recommendation for me?
 
->From the system stability wise I don?t see any improvement after I
-moved to a sequence mentioned in the TRM (i.e. b) for CortexA5 MPCore
-target.
+> Also, I would prefer to only see one or a couple of defconfigs that
+> can provide full build coverage for the various SoCs and boards, that
+> would contain the superset of the required drivers to boot the
+> supported boards, etc.
 
-Please provide your valuable inputs if you guys have seen similar
-issues on other targets?
+I can check with my superiors if we can phase our sh7367 support. If
+so then we have only A8 and A9 in tree which should be easy to support
+with a single kernel configuration. Does that sound like something
+that would simplify things for you?
 
---
-Regards,
-Murali N
+> So, I'm going to hold off pulling in this branch right now until we
+> can sort out some of the above items.
+
+Ok. When can we retry?
+
+Thanks,
+
+/ magnus
