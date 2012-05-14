@@ -1,37 +1,46 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 14 May 2012 10:52:46 +0200
-Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
-In-Reply-To: <4FB048E4.8070405@linaro.org>
-References: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
- <4FB048E4.8070405@linaro.org>
-Message-ID: <201205141052.47567.heiko@sntech.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 May 2012 10:53:48 +0200
+Subject: [PATCH 3/5] ARM: imx: add audio codec clk lookup for imx53-qsb
+In-Reply-To: <20120514085002.GE20367@S2100-06.ap.freescale.net>
+References: <1336718568-26810-1-git-send-email-shawn.guo@linaro.org>
+ <1336718568-26810-4-git-send-email-shawn.guo@linaro.org>
+ <20120514082201.GF21318@pengutronix.de>
+ <20120514085002.GE20367@S2100-06.ap.freescale.net>
+Message-ID: <20120514085348.GB30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 14. Mai 2012, 01:51:00 schrieb Daniel Lezcano:
-> On 05/09/2012 04:08 PM, Daniel Lezcano wrote:
-> > These couple of patches use the new cpuidle core api to refactor
-> > some part of the code. The first one declares the states directly
-> > in the driver declaration and the second one use the timekeeping
-> > flag to let the cpuidle core to compute the idle time.
+On Mon, May 14, 2012 at 04:50:03PM +0800, Shawn Guo wrote:
+> On Mon, May 14, 2012 at 10:22:01AM +0200, Sascha Hauer wrote:
+> > >  static void __init imx53_dt_init(void)
+> > >  {
+> > >  	struct device_node *node;
+> > > @@ -99,6 +115,9 @@ static void __init imx53_dt_init(void)
+> > >  		of_node_put(node);
+> > >  	}
+> > >  
+> > > +	if (of_machine_is_compatible("fsl,imx53-qsb"))
+> > > +		imx53_qsb_init();
+> > > +
 > > 
-> > I don't have this board, I was not able to test these patches.
+> > I wonder if we really want to open this can of worms here. Adding board
+> > specific hacks (or fixups) in this file can become very messy once we
+> > have more than only a few oftree based boards.
 > > 
-> > Daniel Lezcano (2):
-> >    ARM: s3c64xx: cpuidle - declare the states with the new api
-> >    ARM: s3c64xx: cpuidle - use timekeeping wrapper
-> 
-> Are these patches ok for inclusion ?
+> From what I have seen, this is an acceptable solution to board specific
+> setup.  What's the alternative on your mind?
 
-you might want to include the maintainer
+Right now I do not have an alternative, I just try to see 2 years in the
+future. Maybe until then we can do it this way and then I'll point to
+this post saying 'I told you' ;)
 
-	Kukjin Kim <kgene.kim@samsung.com>
+I hope we won't get to that point. The above should be really in the
+devicetree, right?
 
-and the samsung list
+Sascha
 
-	linux-samsung-soc at vger.kernel.org
-
-into your recipients
-
-
-Heiko
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
