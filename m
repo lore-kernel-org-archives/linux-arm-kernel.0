@@ -1,34 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 May 2012 16:58:59 +0100
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low
- power modes
-In-Reply-To: <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
-Message-ID: <20120514155859.GA13860@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 May 2012 17:00:28 +0100
+Subject: [PATCH v4 2/2] ARM: vfp: clear fpscr length and stride bits on
+ entry to sig handler
+In-Reply-To: <20120514145931.GF11088@mudshark.cambridge.arm.com>
+References: <1330009632-1235-1-git-send-email-will.deacon@arm.com>
+ <1330009632-1235-2-git-send-email-will.deacon@arm.com>
+ <1337006035.16954.21.camel@linaro1.home>
+ <20120514145931.GF11088@mudshark.cambridge.arm.com>
+Message-ID: <20120514160028.GG11088@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 04:50:22PM +0100, Lorenzo Pieralisi wrote:
-> > 2. L2 disable
-> > 3. L1 clean & invalidate
+On Mon, May 14, 2012 at 03:59:31PM +0100, Will Deacon wrote:
+> On Mon, May 14, 2012 at 03:33:55PM +0100, Jon Medhurst (Tixy) wrote:
+> > I've bisected a screen corruption problem on vexpress down to this
+> > commit, I've commented at the end of the patch at to what I see the
+> > problem being...
 > 
-> This is wrong again since while cleaning and invalidating the cache (L1 here)
-> can still allocate and this must not happen.
+> Interesting and thanks for the heads up. I've been running with this patch
+> applied for ages and haven't seen any problems myself but I've also been
+> running headless. What's the best way to reproduce the problem on vexpress?
+> I can connect a display if required.
 
-No it isn't.  There is never anything wrong with allocating new caches lines
-into a cache which is going to (eventually) be powered down.  Ever.
+Right, I've managed to trigger it on my board with lxdm, so I'll dig further
+and let you know. The patch I posted doesn't help, so don't waste time
+applying it.
 
-What would be wrong is if we end up with dirty cache lines in the cache
-to be powered down for data which we _care_ about preserving when power
-is lost.
+Cheers,
 
-That's a _very_ _very_ important difference.
-
-Sure, if we're talking about avoiding cache snooping etc, then we may
-wish to disable coherency, but, again, there's absolutely nothing wrong
-with allocating cache lines.
-
-Take a moment to think why this is.  Where's the data pulled into the
-cache stored - in RAM.  The copy in the cache, while it remains clean,
-is just a duplicate of what's already stored elsewhere in the system.
+Will
