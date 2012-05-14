@@ -1,47 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 May 2012 12:38:50 -0600
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
- omap2+ padconf
-In-Reply-To: <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
-References: <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com> <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org> <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org> <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org> <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org> <20120509204925.GV5088@atomide.com>
- <4FABF553.20601@wwwdotorg.org>
- <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
-Message-ID: <4FB1513A.4070002@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 May 2012 18:46:12 +0000
+Subject: [PATCH 1/4] ARM: clps711x: Used own subarch directory for store
+ header file
+In-Reply-To: <1337017571-16208-1-git-send-email-shc_work@mail.ru>
+References: <1337017571-16208-1-git-send-email-shc_work@mail.ru>
+Message-ID: <201205141846.12491.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2012 05:49 PM, Linus Walleij wrote:
-> On Thu, May 10, 2012 at 7:05 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Monday 14 May 2012, Alexander Shiyan wrote:
 > 
->> Also, were you intending pinctrl-simple to actually be the GPIO
->> controller itself? That'd be another case that one might consider fairly
->> simple, but then extends to being gpio-simple as well as pinctrl-simple...
+> Patch created for arm-soc clps711x/cleanup branch.
 > 
-> We have some pinctrl drivers implementing gpiolib too already,
-> and it's unavoidable I think, as some recent discussion about
-> matcing struct gpio_chip and pinctrl GPIO ranges shows.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-I strongly believe we should only do this when the exact same HW module
-is both pinctrl and GPIO.
+Hi Alexander,
 
-When there are separate HW modules, we should have separate drivers. The
-fact that the two drivers need to co-ordinate with each-other isn't a
-good argument to make them one driver.
+I've applied these patches to the clps711x/cleanup branch, but I'm
+not too happy with the submission form.
 
-And irrespective of how the drivers are structured, if there are two HW
-modules, we really need two separate nodes in DT to describe them, since
-the SW architecture (1 vs. 2 drivers) shouldn't influence the DT
-representation unduly.
+Most patches were missing a useful description, which I've had to add
+from looking at the contents. In the future I'd expect you to add such
+a description yourself, ideally one that explains why you need such a
+change, which is something that is not always obvious from the patch
+itself.
 
-> Maybe "-simple" isn't such a good name for this thing. Noone thinks
-> any kind of pin control is simple in any sense of the word anyway :-D
-> 
-> Tony, would pinctrl-dt-only.c be a better name perhaps?
+A comment like "Patch created for arm-soc clps711x/cleanup branch."
+is completely meaningless for the changeset description. It should
+either go into the [PATCH 0/4] cover letter that git-format-patch
+can create for you, or if you send only a single patch, you can put
+it between the '---' line and the diffstat, so it appears in the
+email but not in the changelog.
 
-That might be OK for the filename, but it doesn't seem like a useful
-change for the DT compatible value.
+Finally, don't send patches just one at a time when you know that
+you have more of them. It's annoying for me that I have to go back
+to the same branch and merge it repeatedly when you do this. Better
+send the entire series at once, or for longer ones, send a git
+pull request.
+
+I have not pulled the branches into the main next/cleanup branch,
+so they are not yet scheduled for the next merge window (the earlier
+two ones are). Let me know whether you have more patches for this series,
+I'll put it in once you are done.
+
+	Arnd
