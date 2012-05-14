@@ -1,74 +1,108 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 14 May 2012 21:46:11 +0400
-Subject: [PATCH 4/4] ARM clps711x: Removed unused header mach/time.h
+Date: Mon, 14 May 2012 21:46:09 +0400
+Subject: [PATCH 2/4] ARM: clps711x: Added missing register definitions
 In-Reply-To: <1337017571-16208-1-git-send-email-shc_work@mail.ru>
 References: <1337017571-16208-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1337017571-16208-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1337017571-16208-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All functions from this header already provided by common.c
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/include/mach/time.h |   49 ----------------------------
- 1 files changed, 0 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/time.h
+ arch/arm/mach-clps711x/include/mach/clps711x.h |   46 ++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/include/mach/time.h b/arch/arm/mach-clps711x/include/mach/time.h
-deleted file mode 100644
-index 5f65865..0000000
---- a/arch/arm/mach-clps711x/include/mach/time.h
-+++ /dev/null
-@@ -1,49 +0,0 @@
--/*
-- *  arch/arm/mach-clps711x/include/mach/time.h
-- *
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <asm/leds.h>
--#include <mach/hardware.h>
--
--extern void clps711x_setup_timer(void);
--
--/*
-- * IRQ handler for the timer
-- */
--static irqreturn_t
--p720t_timer_interrupt(int irq, void *dev_id)
--{
--	struct pt_regs *regs = get_irq_regs();
--	do_leds();
--	xtime_update(1);
--#ifndef CONFIG_SMP
--	update_process_times(user_mode(regs));
--#endif
--	do_profile(regs);
--	return IRQ_HANDLED;
--}
--
--/*
-- * Set up timer interrupt, and return the current time in seconds.
-- */
--void __init time_init(void)
--{
--	clps711x_setup_timer();
--	timer_irq.handler = p720t_timer_interrupt;
--	setup_irq(IRQ_TC2OI, &timer_irq);
--}
+diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
+index 3e07591..1dd806f 100644
+--- a/arch/arm/mach-clps711x/include/mach/clps711x.h
++++ b/arch/arm/mach-clps711x/include/mach/clps711x.h
+@@ -87,6 +87,14 @@
+ #define LEDFLSH		(0x22c0)
+ #define SDCONF		(0x2300)
+ #define SDRFPR		(0x2340)
++#define UNIQID		(0x2440)
++#define DAI64FS		(0x2600)
++#define PLLW		(0x2610)
++#define PLLR		(0xa5a8)
++#define RANDID0		(0x2700)
++#define RANDID1		(0x2704)
++#define RANDID2		(0x2708)
++#define RANDID3		(0x270c)
+ 
+ /* common bits: SYSCON1 / SYSCON2 */
+ #define SYSCON_UARTEN		(1 << 8)
+@@ -134,6 +142,8 @@
+ #define SYSFLG1_CTXFF		(1 << 25)
+ #define SYSFLG1_SSIBUSY		(1 << 26)
+ #define SYSFLG1_ID		(1 << 29)
++#define SYSFLG1_VERID(x)	(((x) >> 30) & 3)
++#define SYSFLG1_VERID_MASK	(3 << 30)
+ 
+ #define SYSFLG2_SSRXOF		(1 << 0)
+ #define SYSFLG2_RESVAL		(1 << 1)
+@@ -181,9 +191,12 @@
+ #define UBRLCR_WRDLEN8		(3 << 17)
+ #define UBRLCR_WRDLEN_MASK	(3 << 17)
+ 
++#define SYNCIO_FRMLEN(x)	(((x) & 0x3f) << 7)
++#define SYNCIO_CFGLEN(x)	((x) & 0x7f)
+ #define SYNCIO_SMCKEN		(1 << 13)
+ #define SYNCIO_TXFRMEN		(1 << 14)
+ 
++#define DAIR_RESERVED		(0x0404)
+ #define DAIR_DAIEN		(1 << 16)
+ #define DAIR_ECS		(1 << 17)
+ #define DAIR_LCTM		(1 << 19)
+@@ -210,11 +223,23 @@
+ #define DAISR_LCNE		(1 << 11)
+ #define DAISR_FIFO		(1 << 12)
+ 
++#define DAI64FS_I2SF64		(1 << 0)
++#define DAI64FS_AUDIOCLKEN	(1 << 1)
++#define DAI64FS_AUDIOCLKSRC	(1 << 2)
++#define DAI64FS_MCLK256EN	(1 << 3)
++#define DAI64FS_LOOPBACK	(1 << 5)
++
+ #define SYSCON3_ADCCON		(1 << 0)
++#define SYSCON3_CLKCTL0		(1 << 1)
++#define SYSCON3_CLKCTL1		(1 << 2)
+ #define SYSCON3_DAISEL		(1 << 3)
+ #define SYSCON3_ADCCKNSEN	(1 << 4)
++#define SYSCON3_VERSN(x)	(((x) >> 5) & 7)
++#define SYSCON3_VERSN_MASK	(7 << 5)
+ #define SYSCON3_FASTWAKE	(1 << 8)
+ #define SYSCON3_DAIEN		(1 << 9)
++#define SYSCON3_128FS		SYSCON3_DAIEN
++#define SYSCON3_ENPD67		(1 << 10)
+ 
+ #define SDCONF_ACTIVE		(1 << 10)
+ #define SDCONF_CLKCTL		(1 << 9)
+@@ -229,4 +254,25 @@
+ #define SDCONF_CASLAT_2		(2)
+ #define SDCONF_CASLAT_3		(3)
+ 
++#define MEMCFG_BUS_WIDTH_32	(1)
++#define MEMCFG_BUS_WIDTH_16	(0)
++#define MEMCFG_BUS_WIDTH_8	(3)
++
++#define MEMCFG_WAITSTATE_8_3	(0 << 2)
++#define MEMCFG_WAITSTATE_7_3	(1 << 2)
++#define MEMCFG_WAITSTATE_6_3	(2 << 2)
++#define MEMCFG_WAITSTATE_5_3	(3 << 2)
++#define MEMCFG_WAITSTATE_4_2	(4 << 2)
++#define MEMCFG_WAITSTATE_3_2	(5 << 2)
++#define MEMCFG_WAITSTATE_2_2	(6 << 2)
++#define MEMCFG_WAITSTATE_1_2	(7 << 2)
++#define MEMCFG_WAITSTATE_8_1	(8 << 2)
++#define MEMCFG_WAITSTATE_7_1	(9 << 2)
++#define MEMCFG_WAITSTATE_6_1	(10 << 2)
++#define MEMCFG_WAITSTATE_5_1	(11 << 2)
++#define MEMCFG_WAITSTATE_4_0	(12 << 2)
++#define MEMCFG_WAITSTATE_3_0	(13 << 2)
++#define MEMCFG_WAITSTATE_2_0	(14 << 2)
++#define MEMCFG_WAITSTATE_1_0	(15 << 2)
++
+ #endif /* __MACH_CLPS711X_H */
 -- 
 1.7.3.4
