@@ -1,121 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 14 May 2012 18:39:47 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20120514183947.58e82b8bff52d7f0476dfc11@canb.auug.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 May 2012 11:11:05 +0200
+Subject: [PATCH 06/15] mfd/ab8500: Remove confusing ab8500-i2c file and
+ merge into ab8500-core
+In-Reply-To: <4FB0C52E.9030109@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdanG7KgYuZw29KwZe7wRp-AVZJ9n_hwBEZzf5gDAbGneg@mail.gmail.com>
+ <4FB0C52E.9030109@linaro.org>
+Message-ID: <CACRpkda3wWJ2tV2EE+avMtKQbge0gsLuQnutDETm-MnERgZx1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, May 14, 2012 at 10:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 09/05/12 13:20, Linus Walleij wrote:
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/plat-omap/counter_32k.c between commit bd0493eaaf5c ("ARM:
-7413/1: move read_{boot,persistent}_clock to the architecture level")
-from the arm tree and commit 1fe97c8f6a1d ("ARM: OMAP: Make OMAP
-clocksource source selection using kernel param") from the arm-soc tree.
+>> (...)
+>> +static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
+>> +static int ab8500_i2c_read(struct ab8500 *ab8500, u16 addr)
+>>
+>> As you might have noticed, many people have been confused by
+>> the "i2c" naming of these things. Yes, there is physically an I2C
+>> carrying these out but in Linux terms that's just confusing, it's mixing
+>> hardware and software terminology. Take this opportunity to
+>> rename them:
+>>
+>> static int ab8500_prcmu_write(struct ab8500 *ab8500, u16 addr, u8 data)
+>> static int ab8500_prcmu_read(struct ab8500 *ab8500, u16 addr)
+>>
+>> etc, so they have a meaningful name.
+>
+>
+> Again, something that I'm happy to do, and again something I'd like to do as
+> a separate patch (I'll create a patch-set with this and your other
+> 'clean-up' requests if that's okay with you?)
 
-I attempted to fix it up (see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Sure, what I worry about is that it needs to happen, whether it's done
+in 1,2 or 50 patches is just mechanics, as long as the patches are sent.
 
-diff --cc arch/arm/plat-omap/counter_32k.c
-index 44ae077,b2f634b..0000000
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@@ -69,55 -69,40 +70,41 @@@ static void omap_read_persistent_clock(
-  	*ts = *tsp;
-  }
-  
-- int __init omap_init_clocksource_32k(void)
-+ /**
-+  * omap_init_clocksource_32k - setup and register counter 32k as a
-+  * kernel clocksource
-+  * @pbase: base addr of counter_32k module
-+  * @size: size of counter_32k to map
-+  *
-+  * Returns 0 upon success or negative error code upon failure.
-+  *
-+  */
-+ int __init omap_init_clocksource_32k(void __iomem *vbase)
-  {
-- 	static char err[] __initdata = KERN_ERR
-- 			"%s: can't register clocksource!\n";
-- 
-- 	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-- 		u32 pbase;
-- 		unsigned long size = SZ_4K;
-- 		void __iomem *base;
-- 		struct clk *sync_32k_ick;
-- 
-- 		if (cpu_is_omap16xx()) {
-- 			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-- 			size = SZ_1K;
-- 		} else if (cpu_is_omap2420())
-- 			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
-- 		else if (cpu_is_omap2430())
-- 			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
-- 		else if (cpu_is_omap34xx())
-- 			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
-- 		else if (cpu_is_omap44xx())
-- 			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
-- 		else
-- 			return -ENODEV;
-- 
-- 		/* For this to work we must have a static mapping in io.c for this area */
-- 		base = ioremap(pbase, size);
-- 		if (!base)
-- 			return -ENODEV;
-- 
-- 		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
-- 		if (!IS_ERR(sync_32k_ick))
-- 			clk_enable(sync_32k_ick);
-- 
-- 		timer_32k_base = base;
-- 
-- 		/*
-- 		 * 120000 rough estimate from the calculations in
-- 		 * __clocksource_updatefreq_scale.
-- 		 */
-- 		clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
-- 				32768, NSEC_PER_SEC, 120000);
-- 
-- 		if (clocksource_mmio_init(base, "32k_counter", 32768, 250, 32,
-- 					  clocksource_mmio_readl_up))
-- 			printk(err, "32k_counter");
-- 
-- 		setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-- 		register_persistent_clock(NULL, omap_read_persistent_clock);
-+ 	int ret;
-+ 
-+ 	/*
-+ 	 * 32k sync Counter register offset is at 0x10
-+ 	 */
-+ 	sync32k_cnt_reg = vbase + OMAP2_32KSYNCNT_CR_OFF;
-+ 
-+ 	/*
-+ 	 * 120000 rough estimate from the calculations in
-+ 	 * __clocksource_updatefreq_scale.
-+ 	 */
-+ 	clocks_calc_mult_shift(&persistent_mult, &persistent_shift,
-+ 			32768, NSEC_PER_SEC, 120000);
-+ 
-+ 	ret = clocksource_mmio_init(sync32k_cnt_reg, "32k_counter", 32768,
-+ 				250, 32, clocksource_mmio_readl_up);
-+ 	if (ret) {
-+ 		pr_err("32k_counter: can't register clocksource\n");
-+ 		return ret;
-  	}
-+ 
-+ 	setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
-++	register_persistent_clock(NULL, omap_read_persistent_clock);
-+ 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
-+ 
-  	return 0;
-  }
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/8f9c7194/attachment.sig>
+And Sam can always squash them if they get too plentiful :-)
+
+Yours,
+Linus Walleij
