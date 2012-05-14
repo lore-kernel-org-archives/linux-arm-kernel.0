@@ -1,66 +1,40 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 14 May 2012 15:19:27 +0100
-Subject: [PATCH] clkdev: Add default clkdev.h
-Message-ID: <1337005167-22628-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Mon, 14 May 2012 17:39:15 +0100
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <4FB12B73.50302@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <1336155805-18554-15-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FB12B73.50302@linaro.org>
+Message-ID: <20120514163914.GB25668@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ease the deployment of clkdev by providing a default asm/clkdev.h which
-will be used if the arch does not have an include/asm/clkdev.h.
+On Mon, May 14, 2012 at 04:57:39PM +0100, Lee Jones wrote:
+> >>  	pdata = dev_get_platdata(ab8500->dev);
+> >>-	if (!pdata) {
+> >>-		dev_err(&pdev->dev, "null pdata\n");
+> >>+	if (!pdata&&  !np) {
+> >>+		dev_err(&pdev->dev, "null pdata and no device tree found\n");
+> >>  		return -EINVAL;
+> >>  	}
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- include/asm-generic/Kbuild.asm |    4 ++++
- include/asm-generic/clkdev.h   |   26 ++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 include/asm-generic/clkdev.h
+> >Neither should be mandatory.
 
-diff --git a/include/asm-generic/Kbuild.asm b/include/asm-generic/Kbuild.asm
-index c5d2e5d..da121e0 100644
---- a/include/asm-generic/Kbuild.asm
-+++ b/include/asm-generic/Kbuild.asm
-@@ -13,6 +13,10 @@ ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/include/asm/a.out.h \
- header-y += a.out.h
- endif
- 
-+ifeq ($(wildcard $(srctree)/arch/$(SRCARCH)/include/asm/clkdev.h),)
-+generic-y += clkdev.h
-+endif
-+
- header-y += auxvec.h
- header-y += bitsperlong.h
- header-y += byteorder.h
-diff --git a/include/asm-generic/clkdev.h b/include/asm-generic/clkdev.h
-new file mode 100644
-index 0000000..c362a9d
---- /dev/null
-+++ b/include/asm-generic/clkdev.h
-@@ -0,0 +1,26 @@
-+/*
-+ *  include/asm-generic/clkdev.h
-+ *
-+ * Based on the ARM clkdev.h:
-+ *  Copyright (C) 2008 Russell King.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Helper for the clk API to assist looking up a struct clk.
-+ */
-+#ifndef __ASM_CLKDEV_H
-+#define __ASM_CLKDEV_H
-+
-+#include <linux/slab.h>
-+
-+#define __clk_get(clk)	({ 1; })
-+#define __clk_put(clk)	do { } while (0)
-+
-+static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
-+{
-+	return kzalloc(size, GFP_KERNEL);
-+}
-+
-+#endif
--- 
-1.7.10
+> Unfortunately, this has to reside, as without it I'd have to
+> re-write the driver. Something with is completely out of scope of
+> what I'm trying to achieve right now. It's something I'd be happy to
+> do in the future, but not in this patch-set.
+
+Why do you need to rewrite the driver?  That doesn't sound terribly
+plausible...   The normal approach to this stuff is to allocate a
+platform data struct unconditionally, why is this impossible in your
+case?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/1788ebec/attachment.sig>
