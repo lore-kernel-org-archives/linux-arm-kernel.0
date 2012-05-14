@@ -1,37 +1,28 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 14 May 2012 09:46:25 -0700
-Subject: [PATCH] Removal of last remaining useless system.h includes
-In-Reply-To: <20120514114503.GC10453@n2100.arm.linux.org.uk>
-References: <20120514114503.GC10453@n2100.arm.linux.org.uk>
-Message-ID: <20120514164625.GA20592@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 May 2012 16:18:33 +0000
+Subject: [PATCH 14/15] drivers/regulators: Enable the ab8500 for Device
+ Tree
+In-Reply-To: <4FB12981.8050603@linaro.org>
+References: <1336155805-18554-1-git-send-email-lee.jones@linaro.org>
+ <20120507170832.GO17002@opensource.wolfsonmicro.com>
+ <4FB12981.8050603@linaro.org>
+Message-ID: <201205141618.33954.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 12:45:03PM +0100, Russell King - ARM Linux wrote:
-> mach/system.h is no longer included by anything that matters.  Most of
-> the includes have already gone, and we're left with just four platforms
-> which still have them (for various reasons.)  Let's remove them as
-> they're now unused.
+On Monday 14 May 2012, Lee Jones wrote:
+> > You should be using of_regulator_match() for this (I think it's supposed
+> > to do an equivalent job...) rather than open coding.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This is more a reminder for those maintainers who still haven't responded
-> to the work from about five months ago reworking the ARM restart support,
-> and who need to do some work to get restart support working again for
-> their platforms.
-> 
->  arch/arm/mach-msm/board-sapphire.c           |    1 -
->  arch/arm/mach-msm/include/mach/system.h      |   19 -------------------
->  arch/arm/mach-msm/proc_comm.c                |    1 -
->  arch/arm/mach-msm/smd.c                      |    1 -
+> I've ripped this out completely and the code appears to continue be 
+> fully functional. Happy days! :)
 
-Acked-by: David Brown <davidb@codeaurora.org>
+Ok, very good!
 
-I'm going to poke around here and see if I can get someone to actually
-implement restart.
+Of course it would still be helpful to understand the reasons of
+the person putting that code in originally, but I'm at least comfortable
+with leaving it out for now, and fixing any problems we see in a proper
+way after your code is merged.
 
-David
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	Arnd
