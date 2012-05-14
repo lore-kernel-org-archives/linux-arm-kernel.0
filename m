@@ -1,58 +1,131 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 May 2012 16:06:17 +0200
-Subject: [PATCH 2/2] ARM: s3c64xx: cpuidle - use timekeeping wrapper
-In-Reply-To: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1337004377-17732-3-git-send-email-daniel.lezcano@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 14 May 2012 15:33:55 +0100
+Subject: [PATCH v4 2/2] ARM: vfp: clear fpscr length and stride bits on
+ entry to sig handler
+In-Reply-To: <1330009632-1235-2-git-send-email-will.deacon@arm.com>
+References: <1330009632-1235-1-git-send-email-will.deacon@arm.com>
+ <1330009632-1235-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1337006035.16954.21.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timekeeping is computed from the cpuidle core if we set
-the .en_core_tk_irqen flag. Let's use it and remove the duplicated
-code.
+Hi Will
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-s3c64xx/cpuidle.c |   12 +-----------
- 1 files changed, 1 insertions(+), 11 deletions(-)
+I've bisected a screen corruption problem on vexpress down to this
+commit, I've commented at the end of the patch at to what I see the
+problem being...
 
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index 2750e54..acb197c 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -27,12 +27,7 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv,
- 			      int index)
- {
--	struct timeval before, after;
- 	unsigned long tmp;
--	int idle_time;
--
--	local_irq_disable();
--	do_gettimeofday(&before);
+On Thu, 2012-02-23 at 15:07 +0000, Will Deacon wrote:
+> The ARM PCS mandates that the length and stride bits of the fpscr are
+> cleared on entry to and return from a public interface. Although signal
+> handlers run asynchronously with respect to the interrupted function,
+> the handler itself expects to run as though it has been called like a
+> normal function.
+> 
+> This patch updates the state mirroring the VFP hardware before entry to
+> a signal handler so that it adheres to the PCS. Furthermore, we disable
+> VFP to ensure that we trap on any floating point operation performed by
+> the signal handler and synchronise the hardware appropriately. A check
+> is inserted after the signal handler to avoid redundant flushing if VFP
+> was not used.
+> 
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/vfp/vfpmodule.c |   22 +++++++++++++++++++++-
+>  1 files changed, 21 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index 1dfe7d8..269f40d 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -562,6 +562,21 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp __user *ufp,
+>  
+>  	if (err)
+>  		return -EFAULT;
+> +
+> +	/* Ensure that VFP is disabled. */
+> +	vfp_flush_hwstate(thread);
+> +
+> +	/*
+> +	 * As per the PCS, clear the length and stride bits for function
+> +	 * entry.
+> +	 */
+> +	hwstate->fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
+> +
+> +	/*
+> +	 * Disable VFP in the hwstate so that we can detect if it gets
+> +	 * used.
+> +	 */
+> +	hwstate->fpexc &= ~FPEXC_EN;
+>  	return 0;
+>  }
+>  
+> @@ -574,7 +589,12 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
+>  	unsigned long fpexc;
+>  	int err = 0;
+>  
+> -	vfp_flush_hwstate(thread);
+> +	/*
+> +	 * If VFP has been used, then disable it to avoid corrupting
+> +	 * the new thread state.
+> +	 */
+> +	if (hwstate->fpexc & FPEXC_EN)
+> +		vfp_flush_hwstate(thread);
+>  
+>  	/*
+>  	 * Copy the floating point registers. There can be unused
+
+If the signal handler uses VFP, will it actually cause hwstate->fpexc &
+FPEXC_EN to be set? Won't it instead just enable the VFP in the hardware
+registers? (It looks to me that hwstate only gets updated by
+vfp_flush_hwstate().)
+
+This certainly seems to be the case in my screen corruption situation
+where on entry to vfp_restore_user_hwstate() "fmrx(FPEXC) & FPEXC_EN"
+is true and "hwstate->fpexc & FPEXC_EN" is false.
+
+With the code as it stands this means that on return from a signal
+handler the vfp hardware registers will be in whatever state the signal
+handler left them in, not the thread's state at the point the signal
+happened.
+
+Assuming that I have understood things correctly, then I plan on posting
+a patch that would make code changes like...
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index bc683b8..386a81a 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -574,11 +574,6 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp
+__user *ufp,
+         */
+        hwstate->fpscr &= ~(FPSCR_LENGTH_MASK | FPSCR_STRIDE_MASK);
  
- 	/* Setup PWRCFG to enter idle mode */
- 	tmp = __raw_readl(S3C64XX_PWR_CFG);
-@@ -42,12 +37,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
- 
- 	cpu_do_idle();
- 
--	do_gettimeofday(&after);
--	local_irq_enable();
--	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
--		    (after.tv_usec - before.tv_usec);
--
--	dev->last_residency = idle_time;
- 	return index;
+-       /*
+-        * Disable VFP in the hwstate so that we can detect if it gets
+-        * used.
+-        */
+-       hwstate->fpexc &= ~FPEXC_EN;
+        return 0;
  }
  
-@@ -56,6 +45,7 @@ static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
- static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 	.name	= "s3c64xx_cpuidle",
- 	.owner  = THIS_MODULE,
-+	.en_core_tk_irqen = 1,
- 	.states = {
- 		{
- 			.enter            = s3c64xx_enter_idle,
+@@ -591,12 +586,7 @@ int vfp_restore_user_hwstate(struct user_vfp __user
+*ufp,
+        unsigned long fpexc;
+        int err = 0;
+ 
+-       /*
+-        * If VFP has been used, then disable it to avoid corrupting
+-        * the new thread state.
+-        */
+-       if (hwstate->fpexc & FPEXC_EN)
+-               vfp_flush_hwstate(thread);
++       vfp_flush_hwstate(thread);
+ 
+        /*
+         * Copy the floating point registers. There can be unused
+
+
 -- 
-1.7.5.4
+Tixy 
