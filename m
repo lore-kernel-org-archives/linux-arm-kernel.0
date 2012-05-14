@@ -1,42 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 May 2012 11:20:16 -0600
-Subject: [GIT PULL] ARM: tegra: dt2 branch
-Message-ID: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 14 May 2012 18:20:41 +0100
+Subject: [PATCH 2/2] ARM: S3C64XX: Hook up carrier class modules on Cragganmore
+In-Reply-To: <1337016041-16096-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1337016041-16096-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1337016041-16096-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is some late device tree additions and cleanup for Tegra.
+We now have an additional classs of modules which are enumerated at I2C
+address 0x22. Add hookup for these modules.
 
-This branch is based on the merge of the following branches from the
-Tegra repo, which are all already pulled into arm-soc:
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-for-3.5/tegra30-audio
-for-3.5/usb-ulpi
-for-3.5/dt
-... which are all based on for-3.5/gpio-pinmux
-
-----------------------------------------------------------------
-
-The following changes since commit 4b7e870590f65f4e8bb3cdb7f382e1a9dd17dad5:
-
-  Merge branch 'for-3.5/dt' into for-3.5/dt2-new
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git for-3.5/dt2
-
-for you to fetch changes up to 2a5fdc9adde8476751b63a795e3d66ae2ee3979d:
-
-  ARM: dt: tegra: invert status=disable vs status=okay
-
-----------------------------------------------------------------
-
- arch/arm/boot/dts/tegra-cardhu.dts    |   77 +++++---
- arch/arm/boot/dts/tegra-harmony.dts   |  100 +++++-----
- arch/arm/boot/dts/tegra-paz00.dts     |  112 ++++++-----
- arch/arm/boot/dts/tegra-seaboard.dts  |  176 +++++++++--------
- arch/arm/boot/dts/tegra-trimslice.dts |   71 ++++---
- arch/arm/boot/dts/tegra-ventana.dts   |   90 +++++----
- arch/arm/boot/dts/tegra20.dtsi        |  275 ++++++++++++---------------
- arch/arm/boot/dts/tegra30.dtsi        |  292 ++++++++++++----------------
- 8 files changed, 588 insertions(+), 605 deletions(-)
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 0787b91..48eb76f 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -674,6 +674,7 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ 	  .platform_data = &glenfarclas_pmic_pdata },
+ 
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x20) },
++	{ I2C_BOARD_INFO("wlf-gf-module", 0x22) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x24) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x25) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x26) },
+-- 
+1.7.10
