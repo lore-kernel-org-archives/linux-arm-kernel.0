@@ -1,32 +1,32 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 14 May 2012 19:54:33 +0900
-Subject: [PATCH 01/03] mach-shmobile: Use DT_MACHINE for KZM9G
+Date: Mon, 14 May 2012 19:54:41 +0900
+Subject: [PATCH 02/03] mach-shmobile: Use DT_MACHINE for armadillo 800 eva
 In-Reply-To: <20120514105424.8596.38355.sendpatchset@w520>
 References: <20120514105424.8596.38355.sendpatchset@w520>
-Message-ID: <20120514105433.8596.1974.sendpatchset@w520>
+Message-ID: <20120514105441.8596.31776.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Use DT_MACHINE_START() on the sh73a0 based KZM9G board.
+Use DT_MACHINE_START() on the r8a7740 based armadillo 800 eva board.
 
-Also include a tiny DTS file to describe the board and
-update the Kconfig dependencies to select CONFIG_USE_OF.
+Also include a tiny DTS file to describe the board and update the
+Kconfig dependencies to select CONFIG_USE_OF.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/sh73a0-kzm9g.dts   |   22 ++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig       |    1 +
- arch/arm/mach-shmobile/board-kzm9g.c |    8 +++++++-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts  |   22 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                 |    1 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    8 +++++++-
  3 files changed, 30 insertions(+), 1 deletion(-)
 
 --- /dev/null
-+++ work/arch/arm/boot/dts/sh73a0-kzm9g.dts	2012-05-14 18:37:52.000000000 +0900
++++ work/arch/arm/boot/dts/r8a7740-armadillo800eva.dts	2012-05-14 19:31:57.000000000 +0900
 @@ -0,0 +1,22 @@
 +/*
-+ * Device Tree Source for the KZM-A9-GT board
++ * Device Tree Source for the armadillo 800 eva board
 + *
 + * Copyright (C) 2012 Renesas Solutions Corp.
 + *
@@ -39,43 +39,42 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 +/include/ "skeleton.dtsi"
 +
 +/ {
-+	model = "KZM-A9-GT";
-+	compatible = "renesas,kzm9g";
++	model = "armadillo 800 eva";
++	compatible = "renesas,armadillo800eva";
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x41000000 0x1e800000>;
++		reg = <0x40000000 0x20000000>;
 +	};
 +};
---- 0001/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2012-05-14 18:54:57.000000000 +0900
-@@ -109,6 +109,7 @@ config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
+--- 0002/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2012-05-14 19:32:21.000000000 +0900
+@@ -99,6 +99,7 @@ config MACH_ARMADILLO800EVA
+ 	bool "Armadillo-800 EVA board"
+ 	depends on ARCH_R8A7740
  	select ARCH_REQUIRE_GPIOLIB
 +	select USE_OF
  
- comment "SH-Mobile System Configuration"
- 
---- 0001/arch/arm/mach-shmobile/board-kzm9g.c
-+++ work/arch/arm/mach-shmobile/board-kzm9g.c	2012-05-14 18:33:43.000000000 +0900
-@@ -443,7 +443,12 @@ static void __init kzm_init(void)
- 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+--- 0001/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ work/arch/arm/mach-shmobile/board-armadillo800eva.c	2012-05-14 19:35:27.000000000 +0900
+@@ -768,11 +768,17 @@ static void __init eva_add_early_devices
+ 	shmobile_timer.init = eva_earlytimer_init;
  }
  
--MACHINE_START(KZM9G, "kzm9g")
-+static const char *kzm9g_boards_compat_dt[] __initdata = {
-+	"renesas,kzm9g",
+-MACHINE_START(ARMADILLO800EVA, "armadillo800eva")
++static const char *eva_boards_compat_dt[] __initdata = {
++	"renesas,armadillo800eva",
 +	NULL,
 +};
 +
-+DT_MACHINE_START(KZM9G_DT, "kzm9g")
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-@@ -451,4 +456,5 @@ MACHINE_START(KZM9G, "kzm9g")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= kzm_init,
++DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva")
+ 	.map_io		= r8a7740_map_io,
+ 	.init_early	= eva_add_early_devices,
+ 	.init_irq	= r8a7740_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_machine	= eva_init,
  	.timer		= &shmobile_timer,
-+	.dt_compat	= kzm9g_boards_compat_dt,
++	.dt_compat	= eva_boards_compat_dt,
  MACHINE_END
