@@ -1,40 +1,37 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Mon, 14 May 2012 13:56:29 -0400
-Subject: [PATCH] ARM: LPAE: fix access flag setup in mem_type_table
-Message-ID: <1337018189-27356-1-git-send-email-vitalya@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 May 2012 18:57:29 +0100
+Subject: [PATCH v4 2/2] ARM: vfp: clear fpscr length and stride bits on
+ entry to sig handler
+In-Reply-To: <1337017844.16954.49.camel@linaro1.home>
+References: <1330009632-1235-1-git-send-email-will.deacon@arm.com>
+ <1330009632-1235-2-git-send-email-will.deacon@arm.com>
+ <1337006035.16954.21.camel@linaro1.home>
+ <20120514145931.GF11088@mudshark.cambridge.arm.com>
+ <1337011379.16954.40.camel@linaro1.home>
+ <20120514173757.GJ11088@mudshark.cambridge.arm.com>
+ <1337017844.16954.49.camel@linaro1.home>
+Message-ID: <20120514175728.GK11088@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A zero value for prot_sect in the memory types table implies that
-section mappings should never be created for the memory type in question.
-This is checked for in alloc_init_section().
+On Mon, May 14, 2012 at 06:50:44PM +0100, Jon Medhurst (Tixy) wrote:
+> On Mon, 2012-05-14 at 18:37 +0100, Will Deacon wrote:
+> > You're right, in the lazy case (i.e. SMP) we update the hwstate on
+> > context-switch rather than on the fault. Your quick fix looks good to me
+> > (that is, unconditionally flushing the state after handling a signal). I was
+> > initially worried that the added flushing would cause a performance hit on
+> > the usual path, where VFP is not used in the handler, however since we flush
+> > before the signal handler, it really won't make a lot of difference.
+> > 
+> > I took the liberty of writing a commit message, so can I add your S-o-B to
+> > this please (I wasn't sure which email address to use)?
+> 
+> Thanks, it's the day job, so...
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
 
-With LPAE, we set a bit to mask access flag faults for kernel mappings.
-This breaks the aforementioned (!prot_sect) check in alloc_init_section().
+Cheers Jon, I'll stick this in the patch system tomorrow. If it doesn't make
+the final cut, I'll retrospectively send it to stable when they move to
+3.4.
 
-This patch fixes this bug by first checking for a non-zero
-prot_sect before setting the PMD_SECT_AF flag.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/mmu.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b9fbec2..1e16b20 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -494,7 +494,8 @@ static void __init build_mem_type_table(void)
- 	 */
- 	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
- 		mem_types[i].prot_pte |= PTE_EXT_AF;
--		mem_types[i].prot_sect |= PMD_SECT_AF;
-+		if (mem_types[i].prot_sect)
-+			mem_types[i].prot_sect |= PMD_SECT_AF;
- 	}
- 	kern_pgprot |= PTE_EXT_AF;
- 	vecs_pgprot |= PTE_EXT_AF;
--- 
-1.7.5.4
+Will
