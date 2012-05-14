@@ -1,108 +1,103 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 14 May 2012 13:18:48 +0300
-Subject: [PATCHv2 17/19] ARM: OMAP4: put cpu1 back to sleep if no wake request
+Date: Mon, 14 May 2012 13:18:46 +0300
+Subject: [PATCHv2 15/19] ARM: OMAP4430: PM: workaround for DDR corruption on
+ second CS
 In-Reply-To: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
 References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1336990730-26892-18-git-send-email-t-kristo@ti.com>
+Message-ID: <1336990730-26892-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If AUX_CORE_BOOT0 does not indicate wakeup request for cpu1, put it back
-to off. This is needed during wakeup from device off to prevent cpu1
-from being stuck indefinitely in the wakeup loop and also to prevent
-wakeup problem on GP chips with device off mode.
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
+Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
+Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
+The issue occurs when EMIF_SDRAM_CONFIG is restored first before
+EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
+is not set properly, we apply the required workaround allowing
+the restore sequence to work properly.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap-headsmp.S |   45 ++++++++++++++++++++++++++++++++---
- 1 files changed, 41 insertions(+), 4 deletions(-)
+ .../include/mach/ctrl_module_wkup_44xx.h           |    2 +
+ arch/arm/mach-omap2/pm44xx.c                       |   37 ++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
-index d602555..59c6578 100644
---- a/arch/arm/mach-omap2/omap-headsmp.S
-+++ b/arch/arm/mach-omap2/omap-headsmp.S
-@@ -17,8 +17,37 @@
+diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+index a0af9ba..b763a79 100644
+--- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
++++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+@@ -28,6 +28,8 @@
+ #define OMAP4_CTRL_MODULE_WKUP_IP_REVISION		0x0000
+ #define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO		0x0004
+ #define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG		0x0010
++#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
++#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
+ #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0	0x0460
+ #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1	0x0464
+ #define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2	0x0468
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 215b80e..dfaa254 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -17,12 +17,18 @@
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <asm/system_misc.h>
++#include <linux/io.h>
++
++#include <mach/ctrl_module_wkup_44xx.h>
++#include <mach/hardware.h>
  
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <mach/omap-secure.h>
-+#include "prcm_mpu44xx.h"
-+
-+#define CPU1_PWRSTCTRL (OMAP4430_PRCM_MPU_BASE + OMAP4430_PRCM_MPU_CPU1_INST + \
-+			OMAP4_PM_CPU1_PWRSTCTRL_OFFSET)
+ #include "common.h"
+ #include "clockdomain.h"
+ #include "powerdomain.h"
+ #include "pm.h"
  
- 	__CPUINIT
++#define EMIF_SDRAM_CONFIG2_OFFSET	0xc
 +
-+ENTRY(omap_cpu1_off)
-+	ldr	r12, =CPU1_PWRSTCTRL
-+	ldr	r0, [r12]
-+	and	r0, #3
-+	cmp	r0, #2
-+	beq	exit_cpu1_off
-+
-+	mov	r0, #0x3
-+	mov	r1, #0x0
-+	ldr	r12, =OMAP4_MON_SCU_PWR_INDEX
-+	dsb
-+	smc     #0
-+
-+	isb
-+	dsb
-+	dmb
-+	wfi
-+	nop
-+	nop
-+exit_cpu1_off:
-+	mov	pc, lr
-+ENDPROC(omap_cpu1_off)
-+
- /*
-  * OMAP4 specific entry point for secondary CPU to jump from ROM
-  * code.  This routine also provides a holding flag into which
-@@ -27,32 +56,40 @@
-  * register AuxCoreBoot0.
-  */
- ENTRY(omap_secondary_startup)
--hold:	ldr	r12,=0x103
-+	ldr	r12,=0x103
- 	dsb
- 	smc	#0			@ read from AuxCoreBoot0
- 	mov	r0, r0, lsr #9
- 	mrc	p15, 0, r4, c0, c0, 5
- 	and	r4, r4, #0x0f
- 	cmp	r0, r4
--	bne	hold
-+	beq	omap_cont_boot
-+
-+	bl	omap_cpu1_off
-+	b	omap_secondary_startup
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+ 	u32 next_state;
+@@ -215,6 +221,37 @@ static int __init omap4_pm_init(void)
  
- 	/*
- 	 * we've been released from the wait loop,secondary_stack
- 	 * should now contain the SVC stack for this core
- 	 */
-+omap_cont_boot:
- 	b	secondary_startup
- ENDPROC(omap_secondary_startup)
+ 	pr_err("Power Management for TI OMAP4.\n");
  
- ENTRY(omap_secondary_startup_4460)
--hold_2:	ldr	r12,=0x103
-+	ldr	r12,=0x103
- 	dsb
- 	smc	#0			@ read from AuxCoreBoot0
- 	mov	r0, r0, lsr #9
- 	mrc	p15, 0, r4, c0, c0, 5
- 	and	r4, r4, #0x0f
- 	cmp	r0, r4
--	bne	hold_2
-+	beq	omap4460_cont_boot
++	/*
++	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
++	 * Mode Transition When CS1 Is Used On EMIF":
++	 * Overwrite EMIF1/EMIF2
++	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
++	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
++	 */
++	if (cpu_is_omap443x()) {
++		void __iomem *secure_ctrl_mod;
++		void __iomem *emif1;
++		void __iomem *emif2;
++		u32 val;
 +
-+	bl	omap_cpu1_off
-+	b	omap_secondary_startup_4460
- 
-+omap4460_cont_boot:
- 	/*
- 	 * GIC distributor control register has changed between
- 	 * CortexA9 r1pX and r2pX. The Control Register secure
++		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
++		emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
++		emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
++
++		BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
++
++		val = __raw_readl(emif1 + EMIF_SDRAM_CONFIG2_OFFSET);
++		__raw_writel(val, secure_ctrl_mod +
++			     OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
++		val = __raw_readl(emif2 + EMIF_SDRAM_CONFIG2_OFFSET);
++		__raw_writel(val, secure_ctrl_mod +
++			     OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
++		wmb();
++		iounmap(secure_ctrl_mod);
++		iounmap(emif1);
++		iounmap(emif2);
++	}
++
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		pr_err("Failed to setup powerdomains\n");
 -- 
 1.7.4.1
