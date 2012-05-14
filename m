@@ -1,29 +1,26 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 14 May 2012 09:04:03 +0530
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <1336725678-29327-1-git-send-email-sr@denx.de>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
-Message-ID: <4FB07D2B.6010409@st.com>
+Date: Mon, 14 May 2012 09:32:00 +0530
+Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
+In-Reply-To: <CACRpkdZgSJGcM9cT3yMv1jhUrD9hKXv=VVb1mFSWrMzRPYu-=g@mail.gmail.com>
+References: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
+ <CAOh2x=mGdV_wbJC64wvb9+UV_FBgnsat9=ojD8BJYVxT+HoWhQ@mail.gmail.com>
+ <201205122142.02318.arnd@arndb.de>
+ <CACRpkdZgSJGcM9cT3yMv1jhUrD9hKXv=VVb1mFSWrMzRPYu-=g@mail.gmail.com>
+Message-ID: <4FB083B8.3080801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/11/2012 2:11 PM, Stefan Roese wrote:
-> diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
-> index f9a20b3..bf33c1d 100644
-> --- a/drivers/clk/spear/spear6xx_clock.c
-> +++ b/drivers/clk/spear/spear6xx_clock.c
-> @@ -298,7 +298,7 @@ void __init spear6xx_clk_init(void)
->  
->  	clk = clk_register_gate(NULL, "gmac_clk", "ahb_clk", 0, PERIP1_CLK_ENB,
->  			GMAC_CLK_ENB, 0, &_lock);
-> -	clk_register_clkdev(clk, NULL, "gmac");
-> +	clk_register_clkdev(clk, NULL, "e0800000.ethernet");
->  
->  	clk = clk_register_gate(NULL, "i2c_clk", "ahb_clk", 0, PERIP1_CLK_ENB,
->  			I2C_CLK_ENB, 0, &_lock);
+On 5/13/2012 5:24 AM, Linus Walleij wrote:
+>>> >> Viresh Kumar (6):
+>>> >>       gpiolib: Add of_get_gpio_chip_by_phandle() helper
+>> >
+>> > I thought the first patch "gpiolib: Add of_get_gpio_chip_by_phandle() helper"
+>> > was not actually accepted. What was the outcome of that discussion?
+> None. I am ambivalent and a bit lost so I prefer if Grant advice on this one...
 
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+Grant,
+
+Can we have your view on this patch please? We need to get this patchset in v3.5
 
 -- 
 viresh
