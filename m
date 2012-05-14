@@ -1,66 +1,60 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 14 May 2012 13:04:47 +0800
-Subject: [PATCH 1/1] ARM: imx6q: prepare and enable init on clks directly
- instead of clk_get first
-Message-ID: <1336971887-24616-1-git-send-email-richard.zhao@freescale.com>
+From: nalajala.murali@gmail.com (Murali N)
+Date: Mon, 14 May 2012 12:33:04 +0530
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power modes
+Message-ID: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also makes any clk be possible init on.
+Hi All,
+I have a query on cache flush sequence being followed for L1 & L2
+while target going into deep low power state on CortexA5 MPCore.
+Here are the H/W details & the cache flush sequence i am following in
+my power driver:
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c |   20 ++++++--------------
- 1 files changed, 6 insertions(+), 14 deletions(-)
+H/W details:
+1.?????? ?APPS processor: CortexA5 MPCore
+2.?????? ?L2 controller: External PL310 r3p2
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 1d83d03..f7eb965 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -122,10 +122,6 @@ static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5
- 				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
- 				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_audio", };
- 
--static const char * const clks_init_on[] __initconst = {
--	"mmdc_ch0_axi", "mmdc_ch1_axi", "usboh3",
--};
--
- enum mx6q_clks {
- 	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
- 	pll3_pfd0_720m, pll3_pfd1_540m, pll3_pfd2_508m, pll3_pfd3_454m,
-@@ -160,11 +156,14 @@ enum mx6q_clks {
- 
- static struct clk *clk[clk_max];
- 
-+static enum mx6q_clks const clks_init_on[] __initconst = {
-+	mmdc_ch0_axi, mmdc_ch1_axi, usboh3,
-+};
-+
- int __init mx6q_clocks_init(void)
- {
- 	struct device_node *np;
- 	void __iomem *base;
--	struct clk *c;
- 	int i, irq;
- 
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
-@@ -424,15 +423,8 @@ int __init mx6q_clocks_init(void)
- 	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
- 	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
- 
--	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++) {
--		c = clk_get_sys(clks_init_on[i], NULL);
--		if (IS_ERR(c)) {
--			pr_err("%s: failed to get clk %s", __func__,
--			       clks_init_on[i]);
--			return PTR_ERR(c);
--		}
--		clk_prepare_enable(c);
--	}
-+	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-+		clk_prepare_enable(clk[clks_init_on[i]]);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
- 	base = of_iomap(np, 0);
--- 
-1.7.5.4
+Sequences:
+a)?While target is going into deep low power mode (where APPS
+processor + L2 loose their power) currently I am following the below
+cache flush sequence.
+
+1.?L2 cache clean & invalidate
+2.?L2 disable
+3.?L1 clean & invalidate
+4.?L1 disable
+5.?WFI
+
+b)?But when I look the PL310 r3p2 TRM (page no 91) explains the
+sequence to be followed is bit difference than what I am following.
+
+1.?L1 clean & invalidate
+2.?L1 disable
+3.?L2 cache clean & invalidate
+4.?L2 disable
+5.?WFI
+
+Is it mandatory that I would follow only the sequence that is
+mentioned in the TRM (i.e. b)? (OR) though TRM says above sequence
+(i.e. b) can i still follow the steps (i.e. a)?
+What are problems that I see, if I don?t follow what TRM says & follow
+the sequence which I have mentioned above (i.e. a)?
+
+Also I have worked on another target with CortexA5 (Single core with
+same L2 pl310 controller) where i have followed the sequence ?a? for
+quite a long time and don?t see any data corruption issues.
+
+Here my question is, is the above sequence ?b? something special for
+only CortexA5MPCore targets to follow?
+
+>From the system stability wise I don?t see any improvement after I
+moved to a sequence mentioned in the TRM (i.e. b) for CortexA5 MPCore
+target.
+
+Please provide your valuable inputs if you guys have seen similar
+issues on other targets?
+
+--
+Regards,
+Murali N
