@@ -1,78 +1,50 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 14 May 2012 09:23:40 +0000
-Subject: [PATCH-V2 3/4] ARM: OMAP2+: CLEANUP: Remove unnecessary ifdef
- around __omap2_set_globals
-In-Reply-To: <87k40itmc4.fsf@ti.com>
-References: <1336506724-5494-1-git-send-email-hvaibhav@ti.com>
- <1336506724-5494-4-git-send-email-hvaibhav@ti.com>	<87397ajo32.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA1BF14@DBDE01.ent.ti.com>
- <8762c3ww9w.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA220A3@DBDE01.ent.ti.com>
- <87k40itmc4.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA24AED@DBDE01.ent.ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 14 May 2012 19:24:04 +1000
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+Message-ID: <20120514192404.91f9477851ad8485a2112973@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2012 at 03:24:51, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> 
-> > On Fri, May 11, 2012 at 03:09:39, Hilman, Kevin wrote:
-> >> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-> >> 
-> >> > On Wed, May 09, 2012 at 04:08:09, Hilman, Kevin wrote:
-> >> >> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> >> >> 
-> >> >> > The function __omap2_set_globals() can be common across all
-> >> >> > platforms/architectures, even in case of omap4, internally it
-> >> >> > calls same set of functions as in __omap2_set_globals() function
-> >> >> > (except for sdrc).
-> >> >> 
-> >> >> OK so far.
-> >> >> 
-> >> >> > This patch adds new config flag SOC_HAS_OMAP2_SDRC to handle sdrc,
-> >> >> > so that we can reuse same function across omap2/3/4...
-> >> >> 
-> >> >> But what happens when a single kernel is built that has support for an
-> >> >> SoC with an SDRC (OMAP4) and one that doesn't (AM33xx)?
-> >> >> 
-> >> >
-> >> > As such Nothing...I looking into this direction while implementing.
-> >> >
-> >> > In that case, sdrc.c file will be compiled in and execution will jump to
-> >> > omap2_set_globals_sdrc(). But inside this function, we are already checking 
-> >> > whether the omap2_globals->sdrc and omap2_globals->sms for NULL and then use 
-> >> > it.
-> >> >
-> >> > And function omap2_sdrc_init() is also depends on machine, so in case of
-> >> > Am33xx, it won't get into sdrc execution at all. And in case of omap4, it 
-> >> > will.
-> >> 
-> >> Then why bother with the #ifdef at all?
-> >> 
-> >> If it already safe to call on all SoCs, just get rid of the #ifdef all
-> >> together.
-> >> 
-> >
-> > Kevin,
-> >
-> > sdrc.o target gets built only as "omap-2-3-common", this will not get built 
-> > for omap4, am33xx, ti81xx, etc...
-> 
-> OK, I see what you mean now.  I was confusing because this patch doesn't
-> touch sdrc.c, or the Makefile for sdrc.c.
-> 
+Hi Andrew,
 
-I think I understand the source of confusion here, but now we are on same 
-page...
+Today's linux-next merge of the akpm tree got a conflict in
+drivers/clk/Kconfig between commit d269b974e32c ("clk: remove
+COMMON_CLK_DISABLE_UNUSED") from the arm-soc tree and commit "clk: remove
+redundant depends on from drivers/Kconfig" from the akpm tree.
 
-> > So in order to avoid build break, you have to have some mechanism, and
-> > that's where we need to create config option dependent on platform.
-> 
-> That being the case, for readability sake, I suggest you change the
-> Makefile to use the new config option for sdrc.c as well.
-> 
+I fixed it up (see below) and can carry the fix as necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Will submit the patch for this today.
-
-Thanks,
-Vaibhav
+diff --cc drivers/clk/Kconfig
+index 4864407,4f10a21..0000000
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@@ -23,9 -22,18 +23,8 @@@ config COMMON_CL
+  menu "Common Clock Framework"
+  	depends on COMMON_CLK
+  
+ -config COMMON_CLK_DISABLE_UNUSED
+ -	bool "Disabled unused clocks at boot"
+ -	---help---
+ -	  Traverses the entire clock tree and disables any clocks that are
+ -	  enabled in hardware but have not been enabled by any device drivers.
+ -	  This saves power and keeps the software model of the clock in line
+ -	  with reality.
+ -
+ -	  If in doubt, say "N".
+ -
+  config COMMON_CLK_DEBUG
+  	bool "DebugFS representation of clock tree"
+- 	depends on COMMON_CLK
+  	select DEBUG_FS
+  	---help---
+  	  Creates a directory hierchy in debugfs for visualizing the clk
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120514/b535ead0/attachment.sig>
