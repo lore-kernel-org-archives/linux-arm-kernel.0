@@ -1,34 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 May 2012 01:51:00 +0200
-Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
-In-Reply-To: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1336572489-21457-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <4FB048E4.8070405@linaro.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 14 May 2012 09:27:17 +0800
+Subject: [PATCH] ARM: mach-pxa: Use REGULATOR_SUPPLY macro
+In-Reply-To: <1336485424.10001.YahooMailClassic@web29019.mail.ird.yahoo.com>
+References: <1336465510.11954.1.camel@phoenix>
+ <1336485424.10001.YahooMailClassic@web29019.mail.ird.yahoo.com>
+Message-ID: <CAN1soZy-S7-TceZ2ubkU21=mXs1sb5SgjiuW9whPOw94oG6vZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2012 04:08 PM, Daniel Lezcano wrote:
-> These couple of patches use the new cpuidle core api to refactor
-> some part of the code. The first one declares the states directly
-> in the driver declaration and the second one use the timekeeping
-> flag to let the cpuidle core to compute the idle time.
+On Tue, May 8, 2012 at 9:57 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> Hello Axel,
 >
-> I don't have this board, I was not able to test these patches.
+> --- On Tue, 8/5/12, Axel Lin <axel.lin@gmail.com> wrote:
+>> ?arch/arm/mach-pxa/hx4700.c? ? |???13 ++++---------
 >
-> Daniel Lezcano (2):
->    ARM: s3c64xx: cpuidle - declare the states with the new api
->    ARM: s3c64xx: cpuidle - use timekeeping wrapper
+> The hx4700 patch works for me on linux-3.4.0-rc6.
+>
+> Tested-by: Paul Parsons <lost.distance@yahoo.com>
 >
 
-Are these patches ok for inclusion ?
+Applied
 
-Thanks
--- Daniel
-
-
--- 
-  <http://www.linaro.org/>  Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:<http://www.facebook.com/pages/Linaro>  Facebook |
-<http://twitter.com/#!/linaroorg>  Twitter |
-<http://www.linaro.org/linaro-blog/>  Blog
+Regards
+Haojian
