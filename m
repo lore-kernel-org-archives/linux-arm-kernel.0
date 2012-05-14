@@ -1,43 +1,41 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Mon, 14 May 2012 17:01:08 +0800
-Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
-In-Reply-To: <20120514084810.GD20367@S2100-06.ap.freescale.net>
-References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
- <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
- <20120514035137.GB20367@S2100-06.ap.freescale.net>
- <20120514080835.GB31985@opensource.wolfsonmicro.com>
- <20120514084810.GD20367@S2100-06.ap.freescale.net>
-Message-ID: <4FB0C9D4.2060409@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 May 2012 11:03:38 +0200
+Subject: [GIT PULL] i.MX21 fix for 3.4
+Message-ID: <20120514090338.GD30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2012?05?14? 16:48), Shawn Guo wrote:
-> On Mon, May 14, 2012 at 09:08:36AM +0100, Mark Brown wrote:
->> On Mon, May 14, 2012 at 11:51:38AM +0800, Shawn Guo wrote:
->>
->>> From what I see, it's reasonable.  Then the immediate question I have
->>> is, should we remove "struct anatop *adata" from anatop_read_reg and
->>> anatop_write_reg completely?
->>
->> Given the way these things tend to go it's probably guaranteeing that
->> your next round of SoCs will have two register compatible anatop blocks :)
-> 
-> Considering anatop block tends to be a container of misc hardware
-> control bits, I haven't really seen any possibility that the future
-> SoCs will have multiple anatop blocks.
-> 
+Hi Olof, Arnd
 
-Hi Shawn,
+One small fix for the i.MX21 board. If possible for 3.4, otherwise for
+next.
 
-I think what the concern is we probably don't want several
-non-continuous memory blocks of misc hardwares.
-If we look into the current registers in anatop, it is really sparse.
-Several regulators are using non-continuous address and the thermals are
-also using different addresses. If the addresses are continuous then we
-don't need the mfd driver.
+Thanks
+  Sascha
 
-We've already told Lily Zhang from Freescale and she promises to report
-this problem to some inner team.
+The following changes since commit 66f75a5d028beaf67c931435fdc3e7823125730c:
 
-Yours Sincerely,
-Paul
+  Linux 3.4-rc4 (2012-04-21 14:47:52 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx21-fixes
+
+for you to fetch changes up to 78d32656aa727fbd864390714638a35ae75d28c9:
+
+  ARM i.MX imx21ads: Fix overlapping static i/o mappings (2012-05-09 09:28:01 +0200)
+
+----------------------------------------------------------------
+ARM i.MX21 SoC fixes
+
+----------------------------------------------------------------
+Jaccon Bastiaansen (1):
+      ARM i.MX imx21ads: Fix overlapping static i/o mappings
+
+ arch/arm/mach-imx/mach-mx21ads.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
