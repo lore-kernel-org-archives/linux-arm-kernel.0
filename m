@@ -1,95 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 May 2012 10:54:36 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-Message-ID: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Tue, 15 May 2012 14:28:32 +0530
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <20120515073712.GE10453@n2100.arm.linux.org.uk>
+References: <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510094205.GM3908@opensource.wolfsonmicro.com>
+ <1336647675.15424.390.camel@vkoul-udesk3>
+ <20120511140710.GC6220@n2100.arm.linux.org.uk>
+ <1337058446.16185.5382.camel@vkoul-udesk3>
+ <20120515073712.GE10453@n2100.arm.linux.org.uk>
+Message-ID: <1337072312.16185.5400.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Tue, 2012-05-15 at 08:37 +0100, Russell King - ARM Linux wrote:
+> On Tue, May 15, 2012 at 10:37:26AM +0530, Vinod Koul wrote:
+> > On Fri, 2012-05-11 at 15:07 +0100, Russell King - ARM Linux wrote:
+> > > On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
+> > > > This should not be in ASoC library. The driver should be able to detect
+> > > > if a tasklet was called for many dma completions and notify the client
+> > > > (soc-lib) accordingly.
+> > > 
+> > > No.  Think about the cyclic case.  How do you correctly record how many
+> > > 'periods' have completed so that when your tasklet eventually gets called,
+> > > you call its callback the correct number of times?
+> > In ISR you can find which descriptors the interupt is for and then use
+> > this info in tasklet.
+> 
+> What descriptors?  With cyclic DMA you only have one descriptor.  Your
+> DMA engine may only need to be programmed once to do this too.
+My bad mixed my reply to generic case where you can mark descriptor that
+interrupt is triggered and later in tasklet call pending notifications.
 
-You'll find in this patch set the initial support for a new family of
-ARMv7-compatible Marvell SoCs, that we have choosen to support in the
-arch/arm/mach-armada/ directory.
+Said that, nothing prevents the driver from keeping the count of
+interrupts and calling the callbacks. BUT it makes no sense in cyclic
+case where ALSA wouldn't need this and would need just a notification
+and current position.
 
-At the moment, both the Armada 370 and the Armada XP SoCs are
-supported in this directory, and we are able to build a single kernel
-image that boots on both SoCs. Both SoCs use the PJ4B processor, a
-Marvell-developed ARM core that implements the ARMv7 instruction
-set. We are currently using Marvell evaluation boards for both of
-those SoCs, and the support for those boards is added in this patch
-set.
 
-This preliminary support only includes the necessary code for timer
-and IRQ support, the serial controller is a standard 16550-compatible
-one. The diffstat looks like:
-
- Documentation/devicetree/bindings/arm/armada-mpic.txt  |   23 +
- Documentation/devicetree/bindings/arm/armada-timer.txt |   11 
- Documentation/devicetree/bindings/arm/armada.txt       |   24 +
- MAINTAINERS                                            |    8 
- arch/arm/Kconfig                                       |   12 
- arch/arm/Makefile                                      |    1 
- arch/arm/boot/dts/a370-db.dts                          |   41 ++
- arch/arm/boot/dts/a370.dtsi                            |   23 +
- arch/arm/boot/dts/armada.dtsi                          |   67 ++++
- arch/arm/boot/dts/axp-db.dts                           |   40 ++
- arch/arm/boot/dts/axp.dtsi                             |   43 +++
- arch/arm/configs/armada_defconfig                      |   47 +++
- arch/arm/mach-armada/Kconfig                           |   19 +
- arch/arm/mach-armada/Makefile                          |    3 
- arch/arm/mach-armada/Makefile.boot                     |    1 
- arch/arm/mach-armada/a370-dt.c                         |   41 ++
- arch/arm/mach-armada/axp-dt.c                          |   41 ++
- arch/arm/mach-armada/common.c                          |   56 +++
- arch/arm/mach-armada/common.h                          |   27 +
- arch/arm/mach-armada/include/mach/armada.h             |  234 ++++++++++++++++
- arch/arm/mach-armada/include/mach/bridge-regs.h        |   28 +
- arch/arm/mach-armada/include/mach/debug-macro.S        |   23 +
- arch/arm/mach-armada/include/mach/gpio.h               |   13 
- arch/arm/mach-armada/include/mach/hardware.h           |   18 +
- arch/arm/mach-armada/include/mach/io.h                 |   24 +
- arch/arm/mach-armada/include/mach/irqs.h               |   96 ++++++
- arch/arm/mach-armada/include/mach/system.h             |   21 +
- arch/arm/mach-armada/include/mach/timex.h              |   13 
- arch/arm/mach-armada/include/mach/uncompress.h         |   41 ++
- arch/arm/mach-armada/irq.c                             |  116 ++++++++
- arch/arm/mach-armada/time.c                            |  243 +++++++++++++++++
- 31 files changed, 1398 insertions(+)
-
-This patch set, and the support for those SoCs, is at the moment a
-collaborative effort from Marvell engineers (who have done the initial
-development work) and Free Electrons engineers (who are reshaping the
-code for mainline submission, adding device tree support, etc.). Other
-contributors are expected to join this effort.
-
-The patch set is based on your arm-soc/for-next branch.
-
-We intend to quickly build on top of this initial support with the
-following elements:
-
- * Usage of the clock framework
-
- * Usage the pinctrl subsystem and GPIO subsystems for pin-muxing and
-   GPIO support
-
- * SMP support
-
- * L2 cache support
-
- * Integration with device drivers. Many of the IPs used in these
-   Marvell SoCs are similar to the ones used in previous Marvell SoCs
-   (for SATA, USB and more), but the drivers for those IPs will
-   require modification to add a device tree binding.
-
-Of course, we welcome all comments on this initial submission and are
-ready to quickly submit updated versions of the patch set to take into
-those comments.
-
-Best regards,
-
-Thomas Petazzoni
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+~Vinod
