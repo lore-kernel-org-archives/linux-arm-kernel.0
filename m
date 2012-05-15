@@ -1,255 +1,85 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 15 May 2012 18:08:58 +0000
-Subject: [PATCH v3 4/7] ARM: davinci: net: davinci_emac: add OF support
-In-Reply-To: <1330945804-3379-5-git-send-email-hs@denx.de>
-References: <1330945804-3379-1-git-send-email-hs@denx.de>
- <1330945804-3379-5-git-send-email-hs@denx.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B63EA14401@DBDE01.ent.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 15 May 2012 11:13:42 -0700
+Subject: [RESEND PATCH 1/2] ARM: OMAP2+: nand: Make board_onenand_init()
+ visible to board code
+In-Reply-To: <20120508231653.GP5088@atomide.com> (Tony Lindgren's message of
+ "Tue, 8 May 2012 16:16:54 -0700")
+References: <1333564586-3259-1-git-send-email-javier@dowhile0.org>
+ <CAFqH_52aiDvR_xHY6TUN7igMiq6EqB-Nx9D=sPMCUeUaKLiuQg@mail.gmail.com>
+ <CABxcv=kXukrVYOzjrMGoWzi=GTefh8EsXnTwzcahsfLa1a6Kaw@mail.gmail.com>
+ <20120508231653.GP5088@atomide.com>
+Message-ID: <87zk99jort.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Tony Lindgren <tony@atomide.com> writes:
 
-On Mon, Mar 05, 2012 at 16:40:01, Heiko Schocher wrote:
-> add of support for the davinci_emac driver.
-> 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: netdev at vger.kernel.org
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Anatoly Sivov <mm05@mail.ru>
-> 
-> ---
-> - changes for v2:
->   - add comment from Anatoly Sivov
->     - fix typo in davinci_emac.txt
->   - add comment from Grant Likely:
->     - add prefix "ti,davinci-" to davinci specific property names
->     - remove version property
->     - use compatible name "ti,davinci-dm6460-emac"
->     - use devm_kzalloc()
->     - use of_match_ptr()
->     - document all new properties
->     - remove of_address_to_resource() and do not overwrite
->       resource table
->     - whitespace fixes
->     - remove hw_ram_addr as it is not used in current
->       board code
-> - no changes for v3
-> 
->  .../bindings/arm/davinci/davinci_emac.txt          |   43 +++++++++
->  drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++++++++++++++++-
->  2 files changed, 136 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
-> new file mode 100644
-> index 0000000..a7b0911
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+> * Javier Martinez Canillas <javier@dowhile0.org> [120427 02:33]:
+>> On Wed, Apr 25, 2012 at 9:59 AM, Enric Balletb? i Serra
+>> <eballetbo@gmail.com> wrote:
+>> >
+>> > Tony, as this is a fix ,may be included ?
+>> >
+>> > Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+>> > Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+>> >
+>> > Cheers,
+>> > ? ?Enric
+>> 
+>> Hi Tony, Russel:
+>> 
+>> This patch is a requirement for patch:
+>> 
+>> [RESEND PATCH 2/2] OMAP3: igep0020: Add support for Micron NAND Flash
+>> storage memory
+>> 
+>> which is really important since newer IGEPv2 boards have changed their
+>> flash memory from OneNAND to NAND.
+>> 
+>> This patch-set is necessary to make the board work, otherwise it
+>> doesn't even boot.
+>> 
+>> Could we please include these patches?
+>
+> Thanks for the patience, applying now into board branch finally.
 
-Since DaVinci EMAC driver may be used on platforms other than DaVinci (c6x,
-OMAP), can we place the bindings documentation in bindings/net/?
+This patch breaks the build for platforms that don't use ONENAND.
+Using omap2plus_defconfig, set CONFIG_MTD_ONENAND_OMAP2=n and you'll get
+the build error below[1]
 
-> @@ -0,0 +1,43 @@
-> +* Texas Instruments Davinci EMAC
-> +
-> +This file provides information, what the device node
-> +for the davinci_emac interface contain.
+By removing the static, there is now duplicate definitions in the .c and
+.h files.
 
-s/contain/contains
+The solution is to remove the dummy definition from the .c file.  
 
-> +
-> +Required properties:
-> +- compatible: "ti,davinci-dm6460-emac";
+Tony, feel free to fold the diff below[2] into the original patch to fix
+this compile problem.
 
-There is no device called dm6460. If you intend to only support
-"version 2" of the EMAC IP at this time, you can use dm6467
-(http://www.ti.com/product/tms320dm6467)
+Kevin
 
-> +- reg: Offset and length of the register set for the device
-> +- ti,davinci-ctrl-reg-offset: offset to control register
-> +- ti,davinci-ctrl-mod-reg-offset: offset to control module register
-> +- ti,davinci-ctrl-ram-offset: offset to control module ram
-> +- ti,davinci-ctrl-ram-size: size of control module ram
-> +- ti,davinci-rmii-en: use RMII
-> +- ti,davinci-no-bd-ram: has the emac controller BD RAM
-> +- phy-handle: Contains a phandle to an Ethernet PHY.
-> +              if not, davinci_emac driver defaults to 100/FULL
-> +- interrupts: interrupt mapping for the davinci emac interrupts sources:
-> +              4 sources: <Receive Threshold Interrupt
-> +			  Receive Interrupt
-> +			  Transmit Interrupt
-> +			  Miscellaneous Interrupt>
-> +- pinmux-handle: Contains a handle to configure the pinmux settings.
-> +
-> +Optional properties:
-> +- local-mac-address : 6 bytes, mac address
-> +
-> +Example (enbw_cmc board):
-> +	eth0: emac at 1e20000 {
-> +		compatible = "ti,davinci-dm6460-emac";
-> +		reg = <0x220000 0x4000>;
-> +		ti,davinci-ctrl-reg-offset = <0x3000>;
-> +		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
-> +		ti,davinci-ctrl-ram-offset = <0>;
-> +		ti,davinci-ctrl-ram-size = <0x2000>;
-> +		local-mac-address = [ 00 00 00 00 00 00 ];
-> +		interrupts = <33
-> +				34
-> +				35
-> +				36
-> +				>;
-> +		interrupt-parent = <&intc>;
-> +		pinmux-handle = <&emac_pins>;
-> +	};
-> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-> index 4fa0bcb..56e1c35 100644
-> --- a/drivers/net/ethernet/ti/davinci_emac.c
-> +++ b/drivers/net/ethernet/ti/davinci_emac.c
-> @@ -58,6 +58,12 @@
->  #include <linux/io.h>
->  #include <linux/uaccess.h>
->  #include <linux/davinci_emac.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_net.h>
-> +
-> +#include <mach/mux.h>
->  
->  #include <asm/irq.h>
->  #include <asm/page.h>
-> @@ -339,6 +345,9 @@ struct emac_priv {
->  	u32 rx_addr_type;
->  	atomic_t cur_tx;
->  	const char *phy_id;
-> +#ifdef CONFIG_OF
-> +	struct device_node *phy_node;
-> +#endif
->  	struct phy_device *phydev;
->  	spinlock_t lock;
->  	/*platform specific members*/
-> @@ -1760,6 +1769,82 @@ static const struct net_device_ops emac_netdev_ops = {
->  #endif
->  };
->  
-> +#ifdef CONFIG_OF
-> +static struct emac_platform_data
-> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-> +	struct emac_priv *priv)
-> +{
-> +	struct device_node *np;
-> +	struct device_node *pinmux_np;
-> +	struct emac_platform_data *pdata = NULL;
-> +	const u8 *mac_addr;
-> +	u32 data;
-> +	int ret;
-> +	int version;
-> +
-> +	np = pdev->dev.of_node;
-> +	if (!np)
-> +		goto nodata;
-> +	else
-> +		version = EMAC_VERSION_2;
 
-You could set pdata->version directly here. 
+[1]
+/work/kernel/omap/dev/arch/arm/mach-omap2/board-flash.c:102:111: error: redefinition of 'board_onenand_init'
+/work/kernel/omap/dev/arch/arm/mach-omap2/board-flash.h:56:51: note: previous definition of 'board_onenand_init' was here
+make[2]: *** [arch/arm/mach-omap2/board-flash.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/mach-omap2] Error 2
+make: *** [sub-make] Error 2
 
-> +
-> +	pdata = pdev->dev.platform_data;
-> +	if (!pdata) {
-> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata)
-> +			goto nodata;
-> +	}
-> +	pdata->version = version;
-> +
-> +	mac_addr = of_get_mac_address(np);
-> +	if (mac_addr)
-> +		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
-> +	if (!ret)
-> +		pdata->ctrl_reg_offset = data;
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
-> +		&data);
-> +	if (!ret)
-> +		pdata->ctrl_mod_reg_offset = data;
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
-> +	if (!ret)
-> +		pdata->ctrl_ram_offset = data;
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
-> +	if (!ret)
-> +		pdata->ctrl_ram_size = data;
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
-> +	if (!ret)
-> +		pdata->rmii_en = data;
-> +
-> +	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
-> +	if (!ret)
-> +		pdata->no_bd_ram = data;
-> +
-> +	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
-> +	if (!priv->phy_node)
-> +		pdata->phy_id = "";
-> +
-> +	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
-> +	if (pinmux_np)
-> +		davinci_cfg_reg_of(pinmux_np);
-
-This is a DaVinci specific pinmux function and this
-driver can be used in non-DaVinci platforms like C6x
-and OMAP. So, it will not be correct to call a DaVinci
-specific function here.
-
-Can you drop the pinmux from this patch for now? On DaVinci,
-for pinmux, we need to migrate to drivers/pinctrl/ as well.
-
-Doing this will also make this patch independent of the rest
-of this series can even be merged separately. Can you please
-make these changes and resend just this patch?
-
-> +
-> +	pdev->dev.platform_data = pdata;
-> +nodata:
-> +	return  pdata;
-> +}
-> +#else
-> +static struct emac_platform_data
-> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-> +	struct emac_priv *priv)
-> +{
-> +	return  pdev->dev.platform_data;
-> +}
-> +#endif
->  /**
->   * davinci_emac_probe: EMAC device probe
->   * @pdev: The DaVinci EMAC device that we are removing
-> @@ -1803,7 +1888,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
->  
->  	spin_lock_init(&priv->lock);
->  
-> -	pdata = pdev->dev.platform_data;
-> +	pdata = davinci_emac_of_get_pdata(pdev, priv);
->  	if (!pdata) {
->  		dev_err(&pdev->dev, "no platform data\n");
->  		rc = -ENODEV;
-> @@ -2013,6 +2098,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
->  	.resume		= davinci_emac_resume,
->  };
->  
-> +static const struct of_device_id davinci_emac_of_match[] = {
-> +	{.compatible = "ti,davinci-dm6460-emac", },
-
-This needs to be ti,davinci-dm6467-emac as well.
-
-Thanks,
-Sekhar
+[2]
+diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+index 70a81f9..53c39d2 100644
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -97,11 +97,6 @@ __init board_onenand_init(struct mtd_partition *onenand_parts,
+ 
+ 	gpmc_onenand_init(&board_onenand_data);
+ }
+-#else
+-void
+-__init board_onenand_init(struct mtd_partition *nor_parts, u8 nr_parts, u8 cs)
+-{
+-}
+ #endif /* CONFIG_MTD_ONENAND_OMAP2 || CONFIG_MTD_ONENAND_OMAP2_MODULE */
+ 
+ #if defined(CONFIG_MTD_NAND_OMAP2) || \
