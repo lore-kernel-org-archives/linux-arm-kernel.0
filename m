@@ -1,77 +1,34 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 12:31:46 +0100
-Subject: [PATCH 3/8] arm: mach-armada: add documentation for new device
- tree bindings
-In-Reply-To: <1337072084-21967-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <4FB23EA2.3040109@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 11:40:07 +0000
+Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
+ arch-pxa git tree
+In-Reply-To: <1337074321.33676.YahooMailClassic@web29011.mail.ird.yahoo.com>
+References: <1337074321.33676.YahooMailClassic@web29011.mail.ird.yahoo.com>
+Message-ID: <201205151140.07655.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 09:54, Thomas Petazzoni wrote:
-> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
-> ---
->   .../devicetree/bindings/arm/armada-mpic.txt        |   23 +++++++++++++++++++
->   .../devicetree/bindings/arm/armada-timer.txt       |   11 +++++++++
->   Documentation/devicetree/bindings/arm/armada.txt   |   24 ++++++++++++++++++++
->   3 files changed, 58 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/arm/armada-mpic.txt
->   create mode 100644 Documentation/devicetree/bindings/arm/armada-timer.txt
->   create mode 100644 Documentation/devicetree/bindings/arm/armada.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/armada-mpic.txt b/Documentation/devicetree/bindings/arm/armada-mpic.txt
-> new file mode 100644
-> index 0000000..3571f44
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/armada-mpic.txt
-> @@ -0,0 +1,23 @@
-> +Marvell Armada Interrupt Controller
-> +-----------------------------------
-> +
-> +Required properties:
-> +- compatible: Should be "marvell,mpic"
+On Tuesday 15 May 2012, Paul Parsons wrote:
+> --- On Tue, 15/5/12, Arnd Bergmann <arnd@arndb.de> wrote:
 
-see notes on mrvl, and the usage of very generic names. Maybe find a
-better name than the generic 'mpic'?
+> > 
+> > Did you miss a dependency? Should I revert that patch for
+> > now?
+> 
+> hx4700.c expects to find the clock_rate field in the
+> asic3_platform_data structure.
+> 
+> The clock_rate field is due to be added in V3.5:
+> 
+> http://lkml.indiana.edu/hypermail/linux/kernel/1204.2/00339.html
+> 
 
-> +- interrupt-controller: Identifies the node as an interrupt controller.
-> +- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
-> +  The cell is the IRQ number
-> +- reg: Should contain PMIC registers location and length. First pair
-> +  for the main interrupt registers, second pair for the per-CPU
-> +  interrupt registers
+This is not good, you should not split patches in a way that breaks
+the individual pieces. It would have been better to just take the entire
+patch through either arm-soc or the mfd tree.
 
-you mis-spelled MPIC as PMIC.
+Any suggestions for a way out of this mess? I'm inclined to just
+revert the patch I have and let Samuel pick it up to submit it along
+with the other half.
 
-> diff --git a/Documentation/devicetree/bindings/arm/armada-timer.txt b/Documentation/devicetree/bindings/arm/armada-timer.txt
-> new file mode 100644
-> index 0000000..6bed565
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/armada-timer.txt
-> @@ -0,0 +1,11 @@
-> +Marvell Armada Global Timers
-> +----------------------------
-> +
-> +Required properties:
-> +- compatible: Should be "marvell,timer"
-> +- interrupts: Should contain the list of Global Timer interrupts
-> +- reg: Should contain the base address of the Global Timer registers
-
-I'd say that given you already have a clock-frequency field, just use
-that and detect == 25MHz.
-
-Personally, I would have added a static clock to give to the timer
-something to reference.
-
-> +Optional properties:
-> +- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-> +  Mhz fixed mode (available on Armada XP and not on Armada 370)
-
-See above comment.
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+	Arnd
