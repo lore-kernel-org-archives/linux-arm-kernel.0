@@ -1,65 +1,98 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 16 May 2012 06:31:23 +0800
-Subject: [PATCH] clk: Fix CLK_SET_RATE_GATE flag validation in
- clk_set_rate().
-In-Reply-To: <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <258a747f-c7d8-4f15-8446-2c18fe21ccf3@email.android.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 15 May 2012 15:36:58 -0700
+Subject: [PATCHv5 6/8] ARM: OMAP4: pwrdm: add support for reading prev
+ logic and mem states
+In-Reply-To: <1336989796-26594-7-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Mon, 14 May 2012 13:03:14 +0300")
+References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
+ <1336989796-26594-7-git-send-email-t-kristo@ti.com>
+Message-ID: <87havhax6d.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Tero Kristo <t-kristo@ti.com> writes:
 
+> On OMAP4, there is no support to read previous logic state
+> or previous memory state achieved when a power domain transitions
+> to RET. Instead there are module level context registers.
+>
+> In order to support the powerdomain level logic/mem_off_counters
+> on OMAP4, instead use the previous power state achieved (RET) and
+> the *programmed* logic/mem RET state to derive if a powerdomain lost
+> logic or did not.
+>
+> If the powerdomain is programmed to enter RET state and lose logic
+> in RET state, knowing that the powerdomain entered RET is good enough
+> to derive that the logic was lost as well, in such cases.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Saravana Kannan <skannan@codeaurora.org> wrote:
+Looks OK, but these new functions need some kerneldoc to describe the
+decision making.
 
->The clk_set_rate() code shouldn't check the clock's enable count when
->validating CLK_SET_RATE_GATE flag since the enable count could change
->after
->the validation. Similar to clk_set_parent(), it should instead check
->the
->prepare count. The prepare count should go to zero only when the end
->user
->expects the clock to not be enabled in the future. Since the code
->already
->grabs the prepare count before validation, it's not possible for
->prepare
->count to change after validation and by association not possible for a
->well
->behaving end user to enable the clock while the set rate is in
->progress.
->
->Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->---
->Please let me know if you don't want me to directly email or CC you in
->my
->clock related patches. I don't want to spam anyone. Also, let me know
->if
->you want me add you to my standard list of people to cc in my clock
->patches.
->
-> drivers/clk/clk.c |    2 +-
-> 1 files changed, 1 insertions(+), 1 deletions(-)
->
->diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->index 09b9112..f5b9d3c 100644
->--- a/drivers/clk/clk.c
->+++ b/drivers/clk/clk.c
->@@ -903,7 +903,7 @@ int clk_set_rate(struct clk *clk, unsigned long
->rate)
-> 	if (rate == clk->rate)
-> 		goto out;
-> 
->-	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
->+	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
-The condition becomes more strict. Looks good.
+Kevin
 
-> 		ret = -EBUSY;
-> 		goto out;
-> 	}
->-- 
->1.7.8.3
+> ---
+>  arch/arm/mach-omap2/powerdomain44xx.c |   32 ++++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
 >
->Sent by an employee of the Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
->Forum.
+> diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+> index 601325b..ab00736 100644
+> --- a/arch/arm/mach-omap2/powerdomain44xx.c
+> +++ b/arch/arm/mach-omap2/powerdomain44xx.c
+> @@ -151,6 +151,21 @@ static int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
+>  	return v;
+>  }
+>  
+> +static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+> +{
+> +	int state;
+> +
+> +	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
+> +
+> +	if (state == PWRDM_POWER_OFF)
+> +		return PWRDM_POWER_OFF;
+> +
+> +	if (state != PWRDM_POWER_RET)
+> +		return PWRDM_POWER_ON;
+> +
+> +	return omap4_pwrdm_read_logic_retst(pwrdm);
+> +}
+> +
+>  static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+>  {
+>  	u32 m, v;
+> @@ -179,6 +194,21 @@ static int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
+>  	return v;
+>  }
+>  
+> +static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+> +{
+> +	int state;
+> +
+> +	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
+> +
+> +	if (state == PWRDM_POWER_OFF)
+> +		return PWRDM_POWER_OFF;
+> +
+> +	if (state != PWRDM_POWER_RET)
+> +		return PWRDM_POWER_ON;
+> +
+> +	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
+> +}
+> +
+>  static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+>  {
+>  	u32 c = 0;
+> @@ -217,9 +247,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+>  	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+>  	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+>  	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
+> +	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
+>  	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+>  	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+>  	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
+> +	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
+>  	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+>  	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+>  	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
