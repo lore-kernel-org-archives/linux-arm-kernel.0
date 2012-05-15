@@ -1,19 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 16:30:09 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 15:32:20 +0000
 Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
  with device tree
-In-Reply-To: <4FB26FC2.9050805@codethink.co.uk>
+In-Reply-To: <4FB2714F.5080703@codethink.co.uk>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
- <201205151425.30706.arnd@arndb.de> <4FB26E03.2030401@gmail.com>
- <4FB26FC2.9050805@codethink.co.uk>
-Message-ID: <20120515153009.GD13860@n2100.arm.linux.org.uk>
+ <20120515165813.66b4434e@skate> <4FB2714F.5080703@codethink.co.uk>
+Message-ID: <201205151532.21143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 04:01:22PM +0100, Ben Dooks wrote:
-> It might be worth looking at changing ioremap() to work nicely with
-> large page entries if it hasn't already been done.
+On Tuesday 15 May 2012, Ben Dooks wrote:
+> >
+> > Agreed. When looking at the code, I wasn't sure why PCI mappings were
+> > needed so early. Surely, the minimal mappings to get an UART are quite
+> > useful to have very early, but why PCI?
+> 
+> I think it was because that PCI was initialised early and requires a
+> large mapping space. It is very likely to be legacy kernel stuff that
+> people have kept copying through.
+> 
 
-It's already been done, but not for SMP systems.  There's issues there
-which make that racy and horrible.
+No, as Rob pointed out, we might not need them early, but we definitely
+want a fixed address for the PIO window, which ioremap does not
+provide.
+
+	Arnd
