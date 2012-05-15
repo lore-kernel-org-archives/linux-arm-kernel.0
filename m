@@ -1,73 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 May 2012 10:23:31 +0200
-Subject: [RFC PATCH 0/8 V8] MXS: Add i.MX28 USB Host driver
-Message-ID: <1337070219-3630-1-git-send-email-marex@denx.de>
+Date: Tue, 15 May 2012 10:23:32 +0200
+Subject: [PATCH 1/8] MXS: Make clk_disable return integer
+In-Reply-To: <1337070219-3630-1-git-send-email-marex@denx.de>
+References: <1337070219-3630-1-git-send-email-marex@denx.de>
+Message-ID: <1337070219-3630-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces the USB Host driver for i.MX28 CPU, utilising the
-generic USB PHY infrastructure. This version of patchset is now based on
-ci13xxx rework by Alexander Shishkin.
+This allows subsequent USB clock patch to interchange enable() and disable()
+calls without adding unnecessary switching cruft.
 
-This patchset now depends on the following four patches:
-	http://www.spinics.net/lists/linux-usb/msg63787.html
-
-V2: Introduce stub imx-usb driver that then registers the PHY and EHCI drivers.
-V3: Add the HCD on demand based on the PHY's state (only add HCD if it's host).
-    Currently, only the HOST mode is supported.
-V4: * Introduce ci13xxx gadget glue
-    * Reorder patches in a more sensible order
-    * Introduce platform data, containing VBUS GPIO and port mode (device/gadget)
-    * Rename imx-usb to imx-otg
-    * Drop mx28evk usb host patch
-    * Use more devm_ function
-    * Rework the mxs-phy to register the same interrupt as ehci-mxs (and
-      effectivelly kill bogus otg_set_vbus() call from ehci-mxs ; use standard
-      ehci irq handling in ehci-mxs)
-V5: * Finally move OTG IRQ handling into imx-otg
-    * Move imx_otg_set_{host,peripheral}() into imx-otg
-    * Move imx_otg_work() into imx-otg driver (now it all makes sense, yay!)
-V6: Do PHY-specific job inside the PHY driver
-V7: * Pass only necessary data to the drivers registered by imx-otg
-      (memory, irq, pointer to imx-otg device). This should fix issue pointed
-      out by Lothar Wassmann.
-    * Have single IRQ handler in imx-otg, which then calls host/gadget IRQ
-      handlers only if they're registered via imx_otg_set_irq_handler() call,
-      depending on the current state of the OTG.
-V8: Rework on top of ci13xxx changes by Alex Shishkin
-
-Marek Vasut (8):
-  MXS: Make clk_disable return integer
-  MXS: Add USB EHCI and USB PHY clock handling
-  MXS: Fixup i.MX233 USB base address name
-  MXS: Add data shared between imx-otg and EHCI driver
-  MXS: Add USB PHY driver
-  CI13xxx: Add i.MX233/i.MX28 binding code
-  MXS: Add platform registration hooks for USB EHCI
-  MXS: Enable USB on M28EVK
-
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-mxs/clock-mx28.c                  |   28 +-
- arch/arm/mach-mxs/devices-mx28.h                |    5 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-usb.c        |   84 ++++++
- arch/arm/mach-mxs/include/mach/clock.h          |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |   13 +
- arch/arm/mach-mxs/include/mach/mx23.h           |    8 +-
- arch/arm/mach-mxs/mach-m28evk.c                 |   19 ++
- drivers/usb/chipidea/Makefile                   |    4 +
- drivers/usb/chipidea/ci13xxx_mxs.c              |  201 +++++++++++++++
- drivers/usb/otg/Kconfig                         |   10 +
- drivers/usb/otg/Makefile                        |    1 +
- drivers/usb/otg/mxs-phy.c                       |  313 +++++++++++++++++++++++
- include/linux/usb/mxs-usb.h                     |   39 +++
- 16 files changed, 724 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-usb.c
- create mode 100644 drivers/usb/chipidea/ci13xxx_mxs.c
- create mode 100644 drivers/usb/otg/mxs-phy.c
- create mode 100644 include/linux/usb/mxs-usb.h
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
 Cc: Fabio Estevam <festevam@gmail.com>
@@ -80,6 +23,62 @@ Cc: Shi Make-B15407 <B15407@freescale.com>
 Cc: Stefano Babic <sbabic@denx.de>
 Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Wolfgang Denk <wd@denx.de>
+---
+ arch/arm/mach-mxs/clock-mx28.c         |    7 +++++--
+ arch/arm/mach-mxs/include/mach/clock.h |    2 +-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index cea29c9..43116ba 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -86,7 +86,7 @@ static int _raw_clk_enable(struct clk *clk)
+ 	return 0;
+ }
+ 
+-static void _raw_clk_disable(struct clk *clk)
++static int _raw_clk_disable(struct clk *clk)
+ {
+ 	u32 reg;
+ 
+@@ -95,6 +95,8 @@ static void _raw_clk_disable(struct clk *clk)
+ 		reg |= 1 << clk->enable_shift;
+ 		__raw_writel(reg, clk->enable_reg);
+ 	}
++
++	return 0;
+ }
+ 
+ /*
+@@ -149,7 +151,7 @@ _CLK_ENABLE_PLL(pll1_clk, PLL1, EN_USB_CLKS)
+ _CLK_ENABLE_PLL(pll2_clk, PLL2, CLKGATE)
+ 
+ #define _CLK_DISABLE_PLL(name, r, g)					\
+-static void name##_disable(struct clk *clk)				\
++static int name##_disable(struct clk *clk)				\
+ {									\
+ 	__raw_writel(BM_CLKCTRL_##r##CTRL0_POWER,			\
+ 		     CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+@@ -161,6 +163,7 @@ static void name##_disable(struct clk *clk)				\
+ 		__raw_writel(BM_CLKCTRL_##r##CTRL0_##g,			\
+ 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##r##CTRL0_CLR);	\
+ 									\
++	return 0;							\
+ }
+ 
+ _CLK_DISABLE_PLL(pll0_clk, PLL0, EN_USB_CLKS)
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 592c9ab..21d1fad 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -50,7 +50,7 @@ struct clk {
+ 	int (*enable) (struct clk *);
+ 	/* Function ptr to disable the clock. Leave blank if clock can not
+ 	   be gated. */
+-	void (*disable) (struct clk *);
++	int (*disable) (struct clk *);
+ 	/* Function ptr to set the parent clock of the clock. */
+ 	int (*set_parent) (struct clk *, struct clk *);
+ };
 -- 
 1.7.10
