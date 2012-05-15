@@ -1,120 +1,130 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 15 May 2012 15:41:39 -0700
-Subject: [PATCHv5 8/8] ARM: OMAP4: PM: Added option for enabling OSWR
-In-Reply-To: <1336989796-26594-9-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 14 May 2012 13:03:16 +0300")
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-9-git-send-email-t-kristo@ti.com>
-Message-ID: <87zk999ie4.fsf@ti.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Wed, 16 May 2012 00:37:11 +0200
+Subject: [PATCH V2] CS89x0 : Use ioread16/iowrite16 on all platforms
+In-Reply-To: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20120515223711.GA12674@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com> :
+[...]
+> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> index b9406cb..8081ad5 100644
+> --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+[...]
+> -static int cs89x0_probe1(struct net_device *dev, unsigned long ioaddr, int modular);
+> +static int cs89x0_probe1(struct net_device *dev,
+> +			 void __iomem *ioaddr,
+> +			 int modular);
+> +static int cs89x0_probe1(struct net_device *dev, void __iomem *ioaddr,
+> +			 int modular);
 
-> PM debug now contains a file that can be used to control OSWR support
-> enable / disable on OMAP4. Also removed the off_mode_enable file for
-> the same platform as it is unsupported.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+s/int/bool/ maybe.
 
-I'll gladly take a patch that makes enable_off_mode OMAP3-only, but I am
-not interested managing another new flag for OSWR.
+You may skip the name of the parameters.
 
-For OMAP4, this should just be the default, and any drivers that are
-broken just need to be fixed either by implementing context save/restore
-or by using constraints.
-
-Kevin
-
-> ---
->  arch/arm/mach-omap2/pm-debug.c |   20 ++++++++++++++++----
->  arch/arm/mach-omap2/pm.h       |    1 +
->  arch/arm/mach-omap2/pm44xx.c   |   16 ++++++++++++++++
->  3 files changed, 33 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 814bcd9..d9a8e42 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -39,6 +39,7 @@
->  #include "pm.h"
->  
->  u32 enable_off_mode;
-> +static u32 enable_oswr_mode;
->  
->  #ifdef CONFIG_DEBUG_FS
->  #include <linux/debugfs.h>
-> @@ -247,10 +248,13 @@ static int option_set(void *data, u64 val)
->  			omap_pm_enable_off_mode();
->  		else
->  			omap_pm_disable_off_mode();
-> -		if (cpu_is_omap34xx())
-> -			omap3_pm_off_mode_enable(val);
+[...]
+> +static int __init
+> +cs89x0_ioport_probe(struct net_device *dev, unsigned long ioport, int modular)
+> +{
+> +	struct net_local *lp = netdev_priv(dev);
+> +	int ret;
+> +	void __iomem *io_mem;
 > +
-> +		omap3_pm_off_mode_enable(val);
+> +	if (!lp)
+> +		return -ENOMEM;
+> +
+> +	dev->base_addr = ioport;
+
+(your changes should reduce the use of netdev.base_addr, nice)
+
+[...]
+> +	if (ioport & 1) {
+> +		if (net_debug > 1)
+> +			printk(KERN_INFO "%s: odd ioaddr 0x%lx\n",
+> +			       dev->name,
+> +			       ioport);
+> +		if ((ioport & 2) != 2)
+		if ((ioport & 2) != 2) {
+
+> +			if ((ioread16(io_mem + ADD_PORT) & ADD_MASK) !=
+> +			    ADD_SIG) {
+> +				printk(KERN_ERR "%s: bad signature 0x%x\n",
+> +					dev->name,
+> +					ioread16(io_mem + ADD_PORT));
+
+			u16 blah = ioread16(io_mem + ADD_PORT);
+
+			if ((blah & ADD_MASK) != ADD_SIG) {
+				printk(KERN_ERR "%s: bad signature 0x%x\n",
+					dev->name, blah);
+
+[...]
+>  static void
+> -readwords(unsigned long base_addr, int portno, void *buf, int length)
+> +readwords(void __iomem *base_addr, int portno, void *buf, int length)
+
+You may try the shorter and (arguably) type safer :
+
+static void readwords(struct net_local *lp, int portno, void *buf, int length)
+
+> -writewords(unsigned long base_addr, int portno, void *buf, int length)
+> +writewords(void __iomem *base_addr, int portno, void *buf, int length)
+
+Same thing.
+
+[...]
+> -	/* Grab the region so we can find another board if autoIRQ fails. */
+> -	/* WTF is going on here? */
+> -	if (!request_region(ioaddr & ~3, NETCARD_IO_EXTENT, DRV_NAME)) {
+> -		printk(KERN_ERR "%s: request_region(0x%lx, 0x%x) failed\n",
+> -				DRV_NAME, ioaddr, NETCARD_IO_EXTENT);
+> -		retval = -EBUSY;
+> -		goto out1;
+> -	}
+> +	printk(KERN_DEBUG "PP_addr at %p[%x]: 0x%x\n",
+> +			ioaddr, ADD_PORT, ioread16(ioaddr + ADD_PORT));
+
+Please use spaces after tabs so that ioaddr lines up nicely with KERN_DEBUG.
+
+[...]
+> @@ -1114,7 +1137,10 @@ send_test_pkt(struct net_device *dev)
+>  		return 0;	/* this shouldn't happen */
+>  
+>  	/* Write the contents of the packet */
+> -	writewords(dev->base_addr, TX_FRAME_PORT,test_packet,(ETH_ZLEN+1) >>1);
+> +	writewords(lp->virt_addr,
+> +		   TX_FRAME_PORT,
+> +		   test_packet,
+> +		   (ETH_ZLEN+1) >> 1);
+
+	writewords(lp, TX_FRAME_PORT, test_packet, (ETH_ZLEN + 1) >> 1);
+
+[...]
+> @@ -1631,9 +1656,12 @@ net_rx(struct net_device *dev)
+>  	}
+>  	skb_reserve(skb, 2);	/* longword align L3 header */
+>  
+> -	readwords(ioaddr, RX_FRAME_PORT, skb_put(skb, length), length >> 1);
+> +	readwords(lp->virt_addr,
+> +		  RX_FRAME_PORT,
+> +		  skb_put(skb, length),
+> +		  length >> 1);
+
+	readwords(lp, RX_FRAME_PORT, skb_put(skb, length), length >> 1);
+
+[...]
+> @@ -1928,22 +1960,22 @@ static int __init cs89x0_platform_probe(struct platform_device *pdev)
+>  		goto free;
 >  	}
 >  
-> +	if (option == &enable_oswr_mode)
-> +		omap4_pm_oswr_mode_enable(val);
-> +
->  	return 0;
->  }
->  
-> @@ -274,8 +278,16 @@ static int __init pm_dbg_init(void)
->  
->  	pwrdm_for_each(pwrdms_setup, (void *)d);
->  
-> -	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
-> -				   &enable_off_mode, &pm_dbg_option_fops);
-> +	if (cpu_is_omap34xx())
-> +		(void) debugfs_create_file("enable_off_mode",
-> +			S_IRUGO | S_IWUSR, d, &enable_off_mode,
-> +			&pm_dbg_option_fops);
-> +
-> +	if (cpu_is_omap44xx())
-> +		(void) debugfs_create_file("enable_oswr_mode",
-> +			S_IRUGO | S_IWUSR, d, &enable_oswr_mode,
-> +			&pm_dbg_option_fops);
-> +
->  	pm_dbg_init_done = 1;
->  
->  	return 0;
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 36fa90b..c36ab63 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -17,6 +17,7 @@
->  
->  extern void *omap3_secure_ram_storage;
->  extern void omap3_pm_off_mode_enable(int);
-> +extern void omap4_pm_oswr_mode_enable(int);
->  extern void omap_sram_idle(void);
->  extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
->  extern int omap3_idle_init(void);
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index cc85576..07ac0d3 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -115,6 +115,22 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->  	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
->  }
->  
-> +void omap4_pm_oswr_mode_enable(int enable)
-> +{
-> +	u32 next_logic_state;
-> +	struct power_state *pwrst;
-> +
-> +	if (enable)
-> +		next_logic_state = PWRDM_POWER_OFF;
-> +	else
-> +		next_logic_state = PWRDM_POWER_RET;
-> +
-> +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> +		pwrst->next_logic_state = next_logic_state;
-> +		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
-> +	}
-> +}
-> +
->  /**
->   * omap_default_idle - OMAP4 default ilde routine.'
->   *
+> -	lp->phys_addr = mem_res->start;
+> +	dev->base_addr = mem_res->start;
+
+You may work directly with mem_res->start in this function at the price
+of an extra platform_get_resource() in cs89x0_platform_remove().
+
+-- 
+Ueimor
