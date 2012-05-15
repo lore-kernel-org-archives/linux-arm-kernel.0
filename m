@@ -1,231 +1,64 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 15 May 2012 13:37:34 +0300
-Subject: [PATCH v6] MTD: atmel_nand: Update driver to support
- Programmable Multibit ECC controller
-In-Reply-To: <4FB0E480.1070609@atmel.com>
-References: <1336561255-30905-1-git-send-email-josh.wu@atmel.com>
- <1336738300.2625.57.camel@sauron.fi.intel.com> <4FB0E480.1070609@atmel.com>
-Message-ID: <1337078254.2528.154.camel@sauron.fi.intel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 11:37:57 +0100
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <87y5otepch.fsf@lebrac.rtp-net.org>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515091218.GB6820@lunn.ch> <20120515111757.32847b91@skate>
+ <87y5otepch.fsf@lebrac.rtp-net.org>
+Message-ID: <4FB23205.809@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-05-14 at 18:54 +0800, Josh Wu wrote:
->  make[2]: *** [__modpost] Error 1
-> 
-> This function will depend on CONFIG_OF_FLATTREE and 
-> CONFIG_OF_EARLY_FLATTREE.
+On 15/05/12 11:00, Arnaud Patard (Rtp) wrote:
+> Thomas Petazzoni<thomas.petazzoni@free-electrons.com>  writes:
+>
+> Hi,
+>> Hello Andrew,
+>>
+>> Thanks for the quick feedback!
+>>
+>> Le Tue, 15 May 2012 11:12:18 +0200,
+>> Andrew Lunn<andrew@lunn.ch>  a ?crit :
+>>
+>>>> +/include/ "armada.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +	model = "Marvell Armada 370 family SoC";
+>>>> +	compatible = "marvell,armada370", "marvell,armada";
+>>>
+>>> It should be mrvl, not marvell, in all the compatibility strings.
+>>
+>> Ok, we will change that.
+>>
+>>> Also, we need to be careful with armada. kirkwood is an armada for
+>>> example. It maybe be better to not actually use armada without
+>>> postfix.
+>>
+>> Do you have a recommendation for this? We support both Armada 370 and
+>> Armada XP, so the obvious common prefix for these two platforms is
+>> "armada". Since kirkwood are ARMv5 and those new Armada are ARMv7,
+>> would armadav7 be a better prefix? Then we could have armadav7-370 and
+>> armadav7-xp? Other suggestions?
+>
+> Please be carefull with what you'll choose. There's also Dove SoCs
+> which are v7 too (88AP510 / armada 510 in Marvell namings). I would be
+> tempted to use "mrvl,dove" like was what was used for kirkwood so this
+> won't conflict but still, can be quite confusing.
 
-Then this should be reflected in Kconfig dependencies or the board
-should select these. In any case, the compilation should not fail.
+For the device tree naming, I would go for the device's manufacturing
+code simply to ensure that there is no confusion about what is being
+supported.
 
-> Would it be possible that CONFIG_OF is defined, but above two config 
-> options are not defined? Can I see you .config file go get more details?
+For further compatibility fields, I'm not sure on how good it would be
+to put things that are not at-least sub-sets of what is being supported
+in the compatibilty line... We'd like to avoid changing the kernel too
+much, but adding an extra line or two to selected drivers is not difficult.
 
-Attaching the configuration file.
+The actuall CPU core shouldn't really come in to it, as that is taken
+care of elsewhere in the kernel initialisation sequence.
+
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-CONFIG_EXPERIMENTAL=y
-# CONFIG_LOCALVERSION_AUTO is not set
-CONFIG_SYSVIPC=y
-CONFIG_BSD_PROCESS_ACCT=y
-CONFIG_LOG_BUF_SHIFT=18
-CONFIG_CGROUPS=y
-CONFIG_CGROUP_FREEZER=y
-CONFIG_CPUSETS=y
-CONFIG_CGROUP_CPUACCT=y
-CONFIG_RESOURCE_COUNTERS=y
-CONFIG_CGROUP_SCHED=y
-CONFIG_BLK_DEV_INITRD=y
-# CONFIG_COMPAT_BRK is not set
-CONFIG_PROFILING=y
-CONFIG_KPROBES=y
-CONFIG_MODULES=y
-CONFIG_MODULE_UNLOAD=y
-CONFIG_MODULE_FORCE_UNLOAD=y
-CONFIG_PARTITION_ADVANCED=y
-CONFIG_OSF_PARTITION=y
-CONFIG_AMIGA_PARTITION=y
-CONFIG_MAC_PARTITION=y
-CONFIG_BSD_DISKLABEL=y
-CONFIG_MINIX_SUBPARTITION=y
-CONFIG_SOLARIS_X86_PARTITION=y
-CONFIG_UNIXWARE_DISKLABEL=y
-CONFIG_SGI_PARTITION=y
-CONFIG_SUN_PARTITION=y
-CONFIG_KARMA_PARTITION=y
-CONFIG_EFI_PARTITION=y
-CONFIG_ARCH_AT91=y
-CONFIG_MACH_ONEARM=y
-CONFIG_ARCH_AT91RM9200DK=y
-CONFIG_MACH_AT91RM9200EK=y
-CONFIG_MACH_CSB337=y
-CONFIG_MACH_CSB637=y
-CONFIG_MACH_CARMEVA=y
-CONFIG_MACH_ATEB9200=y
-CONFIG_MACH_KB9200=y
-CONFIG_MACH_PICOTUX2XX=y
-CONFIG_MACH_KAFA=y
-CONFIG_MACH_ECBAT91=y
-CONFIG_MACH_YL9200=y
-CONFIG_MACH_CPUAT91=y
-CONFIG_MACH_ECO920=y
-CONFIG_MACH_RSI_EWS=y
-CONFIG_MTD_AT91_DATAFLASH_CARD=y
-CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
-CONFIG_PCCARD=y
-CONFIG_NO_HZ=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_PREEMPT_VOLUNTARY=y
-CONFIG_USE_OF=y
-CONFIG_KEXEC=y
-CONFIG_CRASH_DUMP=y
-CONFIG_BINFMT_MISC=y
-# CONFIG_SUSPEND is not set
-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-CONFIG_DEBUG_DEVRES=y
-CONFIG_MTD=y
-CONFIG_MTD_TESTS=m
-CONFIG_MTD_REDBOOT_PARTS=m
-CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED=y
-CONFIG_MTD_REDBOOT_PARTS_READONLY=y
-CONFIG_MTD_CMDLINE_PARTS=y
-CONFIG_MTD_AFS_PARTS=y
-CONFIG_MTD_OF_PARTS=y
-CONFIG_MTD_AR7_PARTS=m
-CONFIG_MTD_CHAR=y
-CONFIG_MTD_BLOCK=y
-CONFIG_FTL=m
-CONFIG_NFTL=m
-CONFIG_NFTL_RW=y
-CONFIG_INFTL=m
-CONFIG_RFD_FTL=m
-CONFIG_SSFDC=y
-CONFIG_SM_FTL=m
-CONFIG_MTD_OOPS=m
-CONFIG_MTD_SWAP=y
-CONFIG_MTD_CFI=m
-CONFIG_MTD_JEDECPROBE=m
-CONFIG_MTD_CFI_ADV_OPTIONS=y
-CONFIG_MTD_CFI_GEOMETRY=y
-# CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
-CONFIG_MTD_MAP_BANK_WIDTH_16=y
-# CONFIG_MTD_CFI_I1 is not set
-CONFIG_MTD_CFI_I4=y
-CONFIG_MTD_OTP=y
-CONFIG_MTD_CFI_INTELEXT=m
-CONFIG_MTD_CFI_AMDSTD=m
-CONFIG_MTD_CFI_STAA=m
-CONFIG_MTD_ROM=m
-CONFIG_MTD_ABSENT=m
-CONFIG_MTD_COMPLEX_MAPPINGS=y
-CONFIG_MTD_PHYSMAP=m
-CONFIG_MTD_PHYSMAP_COMPAT=y
-CONFIG_MTD_PHYSMAP_OF=m
-CONFIG_MTD_IMPA7=m
-CONFIG_MTD_PCMCIA=m
-CONFIG_MTD_PCMCIA_ANONYMOUS=y
-CONFIG_MTD_GPIO_ADDR=y
-CONFIG_MTD_PLATRAM=y
-CONFIG_MTD_LATCH_ADDR=m
-CONFIG_MTD_DATAFLASH=m
-CONFIG_MTD_DATAFLASH_WRITE_VERIFY=y
-CONFIG_MTD_DATAFLASH_OTP=y
-CONFIG_MTD_M25P80=m
-CONFIG_MTD_SST25L=m
-CONFIG_MTD_SLRAM=y
-CONFIG_MTD_PHRAM=y
-CONFIG_MTD_MTDRAM=y
-CONFIG_MTD_BLOCK2MTD=m
-CONFIG_MTD_DOC2000=m
-CONFIG_MTD_DOC2001=m
-CONFIG_MTD_DOC2001PLUS=m
-CONFIG_MTD_DOCG3=m
-CONFIG_MTD_DOCPROBE_ADVANCED=y
-CONFIG_MTD_DOCPROBE_HIGH=y
-CONFIG_MTD_NAND_ECC_SMC=y
-CONFIG_MTD_NAND=y
-CONFIG_MTD_NAND_VERIFY_WRITE=y
-CONFIG_MTD_NAND_ECC_BCH=y
-CONFIG_MTD_NAND_MUSEUM_IDS=y
-CONFIG_MTD_NAND_GPIO=y
-CONFIG_MTD_NAND_DISKONCHIP=m
-CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
-CONFIG_MTD_NAND_DOCG4=m
-CONFIG_MTD_NAND_ATMEL=m
-CONFIG_MTD_NAND_NANDSIM=y
-CONFIG_MTD_NAND_PLATFORM=m
-CONFIG_MTD_ALAUDA=m
-CONFIG_MTD_ONENAND=y
-CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-CONFIG_MTD_ONENAND_GENERIC=y
-CONFIG_MTD_ONENAND_2X_PROGRAM=y
-CONFIG_MTD_ONENAND_SIM=m
-CONFIG_MTD_LPDDR=y
-CONFIG_MTD_UBI=y
-CONFIG_MTD_UBI_GLUEBI=m
-# CONFIG_BLK_DEV is not set
-CONFIG_INPUT_FF_MEMLESS=y
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-# CONFIG_INPUT_KEYBOARD is not set
-# CONFIG_INPUT_MOUSE is not set
-# CONFIG_SERIO is not set
-CONFIG_VT_HW_CONSOLE_BINDING=y
-# CONFIG_LEGACY_PTYS is not set
-# CONFIG_DEVKMEM is not set
-CONFIG_SERIAL_8250=y
-CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_SERIAL_8250_NR_UARTS=32
-CONFIG_SERIAL_8250_EXTENDED=y
-CONFIG_SERIAL_8250_MANY_PORTS=y
-CONFIG_SERIAL_8250_SHARE_IRQ=y
-CONFIG_SERIAL_8250_DETECT_IRQ=y
-CONFIG_SERIAL_8250_RSA=y
-# CONFIG_HW_RANDOM is not set
-CONFIG_SPI=y
-# CONFIG_HWMON is not set
-CONFIG_DRM=y
-# CONFIG_HID_SUPPORT is not set
-CONFIG_USB=m
-# CONFIG_IOMMU_SUPPORT is not set
-CONFIG_QUOTA=y
-# CONFIG_PRINT_QUOTA_WARNING is not set
-CONFIG_QFMT_V2=y
-CONFIG_JFFS2_FS=y
-# CONFIG_JFFS2_FS_WRITEBUFFER is not set
-CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-CONFIG_JFFS2_LZO=y
-CONFIG_JFFS2_RUBIN=y
-CONFIG_JFFS2_CMODE_FAVOURLZO=y
-CONFIG_UBIFS_FS=m
-CONFIG_UBIFS_FS_ADVANCED_COMPR=y
-# CONFIG_UBIFS_FS_ZLIB is not set
-CONFIG_UBIFS_FS_DEBUG=y
-CONFIG_LOGFS=m
-CONFIG_CRAMFS=m
-CONFIG_NLS=y
-CONFIG_NLS_DEFAULT="utf8"
-CONFIG_NLS_CODEPAGE_437=y
-CONFIG_NLS_UTF8=y
-CONFIG_PRINTK_TIME=y
-# CONFIG_ENABLE_WARN_DEPRECATED is not set
-CONFIG_FRAME_WARN=2048
-CONFIG_MAGIC_SYSRQ=y
-CONFIG_DEBUG_KERNEL=y
-# CONFIG_SCHED_DEBUG is not set
-CONFIG_SCHEDSTATS=y
-CONFIG_TIMER_STATS=y
-CONFIG_DEBUG_STACK_USAGE=y
-CONFIG_BLK_DEV_IO_TRACE=y
-CONFIG_CRYPTO=y
-# CONFIG_CRYPTO_ANSI_CPRNG is not set
-# CONFIG_CRYPTO_HW is not set
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120515/4c151c77/attachment.sig>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
