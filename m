@@ -1,27 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 15:32:20 +0000
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <4FB2714F.5080703@codethink.co.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 16:36:03 +0100
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120515170020.23c68cac@skate>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515165813.66b4434e@skate> <4FB2714F.5080703@codethink.co.uk>
-Message-ID: <201205151532.21143.arnd@arndb.de>
+ <4FB26E4B.4020609@codethink.co.uk> <20120515170020.23c68cac@skate>
+Message-ID: <4FB277E3.4020805@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Ben Dooks wrote:
-> >
-> > Agreed. When looking at the code, I wasn't sure why PCI mappings were
-> > needed so early. Surely, the minimal mappings to get an UART are quite
-> > useful to have very early, but why PCI?
-> 
-> I think it was because that PCI was initialised early and requires a
-> large mapping space. It is very likely to be legacy kernel stuff that
-> people have kept copying through.
-> 
+On 15/05/12 16:00, Thomas Petazzoni wrote:
+> Le Tue, 15 May 2012 15:55:07 +0100,
+> Ben Dooks<ben.dooks@codethink.co.uk>  a ?crit :
+>
+>>> This preliminary support only includes the necessary code for timer
+>>> and IRQ support, the serial controller is a standard
+>>> 16550-compatible one. The diffstat looks like:
+>>
+>> FYI, built and tested on our system here and it gets to
+>> printing the sched_clock line and getting no further.
+>>
+>> I will have a debug.
+>
+> Hum, strange. On which platform exactly?
 
-No, as Rob pointed out, we might not need them early, but we definitely
-want a fixed address for the PIO window, which ioremap does not
-provide.
+I've tracked this down to the following:
+arch/arm/mach-armada/time.c
 
-	Arnd
+    190          } else {
+    191                  u32 clk;
+    192                  of_property_read_u32(np, "clock-frequency", &clk);
+    193                  WARN_ON(!clk);
+
+The problem is the 'clk' variable is un-initialised and therefore
+the fact my device-tree is missing a clock-frequency property is
+causing the system to use what was in 'clk' which was around 16000
+from the stack.
+
+I suggest that any property that is necessary to a unit operation
+should check that there was something to read. WARN_ON() is fine,
+but they you should not carry on and initialise the unit anyway.
+
+I have now gone and fixed my .dts file and the system now gets to
+the point to try and mount an initrd.
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
