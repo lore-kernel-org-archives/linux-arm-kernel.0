@@ -1,34 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 11:40:07 +0000
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
- arch-pxa git tree
-In-Reply-To: <1337074321.33676.YahooMailClassic@web29011.mail.ird.yahoo.com>
-References: <1337074321.33676.YahooMailClassic@web29011.mail.ird.yahoo.com>
-Message-ID: <201205151140.07655.arnd@arndb.de>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 15 May 2012 17:12:36 +0530
+Subject: [PATCH] ARM: OMAP4: PM: Keep static dep between MPUSS and ABE
+ clockdomain
+Message-ID: <1337082156-30390-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Paul Parsons wrote:
-> --- On Tue, 15/5/12, Arnd Bergmann <arnd@arndb.de> wrote:
+Commit 68523f4233de5f233478dde0a63047b4efb710b8 (ARM: OMAP4:
+Workaround the OCP synchronisation issue with 32K synctimer)
+does not include GP Timers in ABE domain. Since synchronization
+issue is applicable to all GPTIMER[1-12], we also need to set
+static dependency of MPUSS with abe_clkdm and l4_per_clkdm.
+Dependency with l4_per_clkdm timers is already set in commit
+12f27826bdaf56b01cbdfc8bdeb577ebc106dee3 (ARM: OMAP4: PM: Keep
+static dep between MPUSS-EMIF and MPUSS-L3/L4 and DUCATI-L3).
+Therefore, set static dependency of MPUSS with abe_clkdm.
 
-> > 
-> > Did you miss a dependency? Should I revert that patch for
-> > now?
-> 
-> hx4700.c expects to find the clock_rate field in the
-> asic3_platform_data structure.
-> 
-> The clock_rate field is due to be added in V3.5:
-> 
-> http://lkml.indiana.edu/hypermail/linux/kernel/1204.2/00339.html
-> 
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+ arch/arm/mach-omap2/pm44xx.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-This is not good, you should not split patches in a way that breaks
-the individual pieces. It would have been better to just take the entire
-patch through either arm-soc or the mfd tree.
-
-Any suggestions for a way out of this mess? I'm inclined to just
-revert the patch I have and let Samuel pick it up to submit it along
-with the other half.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 8856253..f788e98 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -146,6 +146,7 @@ static int __init omap4_pm_init(void)
+ 	int ret;
+ 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+ 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
++	struct clockdomain *abe_clkdm;
+ 
+ 	if (!cpu_is_omap44xx())
+ 		return -ENODEV;
+@@ -180,8 +181,10 @@ static int __init omap4_pm_init(void)
+ 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
+ 	l4wkup = clkdm_lookup("l4_wkup_clkdm");
+ 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
++	abe_clkdm = clkdm_lookup("abe_clkdm");
+ 	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
+-		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
++		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm) ||
++		(!abe_clkdm))
+ 		goto err2;
+ 
+ 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+@@ -191,6 +194,7 @@ static int __init omap4_pm_init(void)
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
++	ret |= clkdm_add_wkdep(mpuss_clkdm, abe_clkdm);
+ 	if (ret) {
+ 		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 "
+ 				"wakeup dependency\n");
+-- 
+1.7.0.4
