@@ -1,41 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 15 May 2012 16:22:17 -0500
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <20120515174602.26d02f70@skate>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515165813.66b4434e@skate> <4FB2714F.5080703@codethink.co.uk>
- <201205151532.21143.arnd@arndb.de> <20120515174602.26d02f70@skate>
-Message-ID: <4FB2C909.4070207@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 21:22:15 +0000
+Subject: [PATCH V2] CS89x0 : Use ioread16/iowrite16 on all platforms
+In-Reply-To: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <201205152122.15840.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2012 10:46 AM, Thomas Petazzoni wrote:
-> Le Tue, 15 May 2012 15:32:20 +0000,
-> Arnd Bergmann <arnd@arndb.de> a ?crit :
+On Tuesday 15 May 2012, Jaccon Bastiaansen wrote:
 > 
->>>> Agreed. When looking at the code, I wasn't sure why PCI mappings
->>>> were needed so early. Surely, the minimal mappings to get an UART
->>>> are quite useful to have very early, but why PCI?
->>>
->>> I think it was because that PCI was initialised early and requires a
->>> large mapping space. It is very likely to be legacy kernel stuff
->>> that people have kept copying through.
->>
->> No, as Rob pointed out, we might not need them early, but we
->> definitely want a fixed address for the PIO window, which ioremap
->> does not provide.
+> The use of the inw/outw functions by the cs89x0 platform driver
+> results in NULL pointer references on ARM platforms and
+> platforms that do not provide ISA-style programmed I/O accessors.
 > 
-> A fixed address for the PIO window of the PCI registers? Or a fixed
-> address for the PIO window used to access UART registers?
+> Using inw/outw also accesses the wrong address space on platforms
+> that have a PCI I/O space that is not identity-mapped into the
+> physical address space.
 > 
-> I would understand why a fixed address is needed for the latter, but
-> not really for the former.
-> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
 
-I'm not sure which PCI registers you mean, but we're talking about PCI
-I/O space. The i/o space should be a fixed virtual address so that the
-__io() is a constant base for ALL arm platforms. This isn't in place
-yet, but that is the plan. Although current macros are constant base.
+Looks good to me now.
 
-Rob
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Of course we would need some testing on another platform and ideally
+also on an ISA based machine, although that might be hard to
+come by these days...
+
+	Arnd
