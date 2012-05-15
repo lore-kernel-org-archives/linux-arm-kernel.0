@@ -1,42 +1,83 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 15:35:03 +0100
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <201205151425.30706.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
- <201205151425.30706.arnd@arndb.de>
-Message-ID: <4FB26997.9020101@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 May 2012 15:34:28 +0100
+Subject: [PATCH] MTD: LPC32xx MLC NAND driver
+In-Reply-To: <1337091832-10138-1-git-send-email-stigge@antcom.de>
+References: <1337091832-10138-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120515143428.GC13860@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 15:25, Arnd Bergmann wrote:
-> On Tuesday 15 May 2012, Thomas Petazzoni wrote:
->> Le Tue, 15 May 2012 14:53:45 +0100,
->> Ben Dooks<ben.dooks@codethink.co.uk>  a ?crit :
->>
->>> Since the two board support files are identical, except for the names
->>> they print, I'd say this is the job of one file. It can always be
->>> split later.
->>
->> The initial motivation for keeping two files here is that the two SoC
->> have a different number of PCIe memory areas, and those areas are
->> typically mapped in ->map_io(). However:
->>
->>   * Maybe those mappings can be done using a normal ioremap() rather
->>     than in ->map_io(), according to DT informations (but most other ARM
->>     SoC support at the moment seem to do PCI mappings using static
->>     mappings in ->map_io)
->
-> I'm pretty sure we can use ioremap for new PCI implementations now.
-> Also, you can scan the device tree in map_io() if necesary, to see which
-> PCIe ports are enabled.
+On Tue, May 15, 2012 at 04:23:52PM +0200, Roland Stigge wrote:
+> +static int lpc32xx_xmit_dma(struct mtd_info *mtd, dma_addr_t dma,
+> +			    void *mem, int len, enum dma_transfer_direction dir)
+> +{
+> +	struct nand_chip *chip = mtd->priv;
+> +	struct lpc32xx_nand_host *host = chip->priv;
+> +	struct dma_async_tx_descriptor *desc;
+> +	int flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+> +	int res;
+> +	dma_cookie_t cookie;
+> +
+> +	host->dma_slave_config.direction = dir;
+> +	host->dma_slave_config.src_addr = dma;
+> +	host->dma_slave_config.dst_addr = dma;
+> +	if (dmaengine_slave_config(host->dma_chan, &host->dma_slave_config)) {
+> +		dev_err(mtd->dev.parent, "Failed to setup DMA slave\n");
+> +		return -ENXIO;
+> +	}
 
-To be honest, if you need it, then it'd be a good idea to fix anyway.
+Can you explain why you need to issue this call for every transfer?
 
-And at worst you can always construct map_desc entries on the stack
-and call iotable_init()
+The 'direction' argument should be ignored by all modern DMA engine
+drivers (we've decided previously to get rid of it).  As far as I can
+see, the device address nor any of the other parameters ever change
+between transfers.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> +
+> +	sg_init_one(&host->sgl, mem, len);
+> +
+> +	res = dma_map_sg(host->dma_chan->device->dev, &host->sgl, 1, dir);
+
+Also note that dma transfer directions and dma data directions are
+different things.  You shouldn't mix the two.
+
+> +	if (res != 1) {
+> +		dev_err(mtd->dev.parent, "Failed to map sg list\n");
+> +		return -ENXIO;
+> +	}
+> +	desc = dmaengine_prep_slave_sg(host->dma_chan, &host->sgl, 1, dir,
+> +				       flags);
+> +	if (!desc) {
+> +		dev_err(mtd->dev.parent, "Failed to prepare slave sg\n");
+> +		goto out1;
+> +	}
+> +
+> +	init_completion(&host->comp_dma);
+> +	desc->callback = lpc32xx_dma_complete_func;
+> +	desc->callback_param = &host->comp_dma;
+> +
+> +	cookie = dmaengine_submit(desc);
+> +	if (dma_submit_error(cookie)) {
+> +		dev_err(mtd->dev.parent, "Failed to dmaengine_submit()\n");
+> +		goto out1;
+> +	}
+> +	dma_async_issue_pending(host->dma_chan);
+> +
+> +	wait_for_completion_timeout(&host->comp_dma, msecs_to_jiffies(1000));
+> +
+> +	dma_sync_sg_for_cpu(host->dma_chan->device->dev, &host->sgl, 1, dir);
+
+Why sync?  What's wrong with dma_unmap()?  Have you tested this with
+DMA API debugging enabled?
+
+> +	if (dma_set_mask(host->dma_chan->device->dev, 0xFFFFFFFF)) {
+> +		dev_err(mtd->dev.parent, "Failed to set dma mask\n");
+> +		goto out1;
+> +	}
+
+No.  You shouldn't do this to a device that you're not in charge of.  If
+that's important for the DMA engine device, then the DMA engine device
+driver should have already done that.
+
+Otherwise, you'll be potentially modifying the DMA mask for a device
+_you_ don't own, and which is potentially already in use.
