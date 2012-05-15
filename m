@@ -1,57 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 May 2012 13:07:55 -0700
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
- supports omap2+ padconf
-In-Reply-To: <4FB1513A.4070002@wwwdotorg.org>
-References: <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org>
- <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org>
- <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org>
- <20120509204925.GV5088@atomide.com> <4FABF553.20601@wwwdotorg.org>
- <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
- <4FB1513A.4070002@wwwdotorg.org>
-Message-ID: <20120515200754.GD17852@atomide.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 May 2012 13:09:00 -0700
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <20120515200040.GP30400@pengutronix.de>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <20120515194245.GO30400@pengutronix.de> <4FB2B3AA.3010903@codeaurora.org>
+ <20120515200040.GP30400@pengutronix.de>
+Message-ID: <4FB2B7DC.4070706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [120514 11:42]:
-> On 05/12/2012 05:49 PM, Linus Walleij wrote:
-> > On Thu, May 10, 2012 at 7:05 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > 
-> >> Also, were you intending pinctrl-simple to actually be the GPIO
-> >> controller itself? That'd be another case that one might consider fairly
-> >> simple, but then extends to being gpio-simple as well as pinctrl-simple...
-> > 
-> > We have some pinctrl drivers implementing gpiolib too already,
-> > and it's unavoidable I think, as some recent discussion about
-> > matcing struct gpio_chip and pinctrl GPIO ranges shows.
-> 
-> I strongly believe we should only do this when the exact same HW module
-> is both pinctrl and GPIO.
-> 
-> When there are separate HW modules, we should have separate drivers. The
-> fact that the two drivers need to co-ordinate with each-other isn't a
-> good argument to make them one driver.
-> 
-> And irrespective of how the drivers are structured, if there are two HW
-> modules, we really need two separate nodes in DT to describe them, since
-> the SW architecture (1 vs. 2 drivers) shouldn't influence the DT
-> representation unduly.
+On 05/15/2012 01:00 PM, Sascha Hauer wrote:
+> On Tue, May 15, 2012 at 12:51:06PM -0700, Saravana Kannan wrote:
+>>>>   	ret = clk->ops->set_parent(clk->hw, i);
+>>>
+>>> You call ->set_parent while holding a spinlock. This won't work with i2c
+>>> clocks.
+>>
+>> I did account for that. I explained it in the commit text. Please
+>> let me know if any part of that is not clear or is not correct.
+>>
+>
+> I missed this part in the commit log. I have no idea whether we can live
+> with this limitation though.
+>
+> Sascha
+>
 
-Yes.
- 
-> > Maybe "-simple" isn't such a good name for this thing. Noone thinks
-> > any kind of pin control is simple in any sense of the word anyway :-D
-> > 
-> > Tony, would pinctrl-dt-only.c be a better name perhaps?
-> 
-> That might be OK for the filename, but it doesn't seem like a useful
-> change for the DT compatible value.
+It's not really an artificial limitation of the patch. This has to be 
+enforced if the clock is to be managed correctly while allowing 
+.set_parent to NOT be atomic.
 
-Yeah let's see if we can come up with some better name.
+There is no way to guarantee that the enable/disable is properly 
+propagated to the parent clock if we can't guarantee mutual exclusion 
+between changing parents and calling enable/disable.
 
-Regards,
+Since we can't do mutual exclusion be using spinlock (since .set_parent 
+is NOT atomic for these clocks), then only other way of ensuring mutual 
+exclusion is to force an unprepare and then mutually exclude a prepare 
+while changing the parent. This by association (can't enable unprepared 
+clock) mutually excludes the changing of parent and calling enable/disable.
 
-Tony
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
