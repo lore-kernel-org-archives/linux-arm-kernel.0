@@ -1,29 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 20:03:33 +0000
-Subject: [GIT PULL][Update] Renesas ARM-based platforms: new boards
- support for v3.5
-In-Reply-To: <201205151749.59846.rjw@sisk.pl>
-References: <201205112101.59949.rjw@sisk.pl>
- <201205151530.18193.arnd@arndb.de> <201205151749.59846.rjw@sisk.pl>
-Message-ID: <201205152003.33393.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 May 2012 13:07:55 -0700
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that
+ supports omap2+ padconf
+In-Reply-To: <4FB1513A.4070002@wwwdotorg.org>
+References: <20120504150342.GI5140@atomide.com>
+ <20120504153251.GE7788@game.jcrosoft.org>
+ <20120504163420.GA5613@atomide.com>
+ <4FA42631.6060304@wwwdotorg.org>
+ <20120504220809.GW5613@atomide.com>
+ <4FAAD141.3090306@wwwdotorg.org>
+ <20120509204925.GV5088@atomide.com> <4FABF553.20601@wwwdotorg.org>
+ <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
+ <4FB1513A.4070002@wwwdotorg.org>
+Message-ID: <20120515200754.GD17852@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Rafael J. Wysocki wrote:
-> On Tuesday, May 15, 2012, Arnd Bergmann wrote:
-> > On Tuesday 15 May 2012, Arnd Bergmann wrote:
-> > > On Monday 14 May 2012, Rafael J. Wysocki wrote:
-> > I got build errors with the new version now because machine_is_kzm9g is no longer
-> > defined:
+* Stephen Warren <swarren@wwwdotorg.org> [120514 11:42]:
+> On 05/12/2012 05:49 PM, Linus Walleij wrote:
+> > On Thu, May 10, 2012 at 7:05 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > > 
-> > /home/arnd/linux-arm/arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
-> > /home/arnd/linux-arm/arch/arm/mach-shmobile/platsmp.c:29:2: error: implicit declaration of function 'of_machine_is_compatible' [-Werror=implicit-function-declaration]
+> >> Also, were you intending pinctrl-simple to actually be the GPIO
+> >> controller itself? That'd be another case that one might consider fairly
+> >> simple, but then extends to being gpio-simple as well as pinctrl-simple...
 > > 
-> > I'd apply the patch below, unless someone has a better solution
+> > We have some pinctrl drivers implementing gpiolib too already,
+> > and it's unavoidable I think, as some recent discussion about
+> > matcing struct gpio_chip and pinctrl GPIO ranges shows.
 > 
-> Please apply and thanks for the fix!
+> I strongly believe we should only do this when the exact same HW module
+> is both pinctrl and GPIO.
 > 
+> When there are separate HW modules, we should have separate drivers. The
+> fact that the two drivers need to co-ordinate with each-other isn't a
+> good argument to make them one driver.
+> 
+> And irrespective of how the drivers are structured, if there are two HW
+> modules, we really need two separate nodes in DT to describe them, since
+> the SW architecture (1 vs. 2 drivers) shouldn't influence the DT
+> representation unduly.
 
-Ok, applied now.
+Yes.
+ 
+> > Maybe "-simple" isn't such a good name for this thing. Noone thinks
+> > any kind of pin control is simple in any sense of the word anyway :-D
+> > 
+> > Tony, would pinctrl-dt-only.c be a better name perhaps?
+> 
+> That might be OK for the filename, but it doesn't seem like a useful
+> change for the DT compatible value.
 
-	Arnd
+Yeah let's see if we can come up with some better name.
+
+Regards,
+
+Tony
