@@ -1,43 +1,39 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 17:03:27 +0100
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205151106.46761.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201205151106.46761.arnd@arndb.de>
-Message-ID: <4FB27E4F.7010908@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 May 2012 17:03:32 +0100
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <4FB27D4C.6080204@codethink.co.uk>
+References: <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB228AD.5000507@codethink.co.uk> <4FB25A9A.3070306@gmail.com>
+ <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
+ <4FB26904.1060308@codethink.co.uk> <20120515165813.66b4434e@skate>
+ <4FB2714F.5080703@codethink.co.uk>
+ <20120515154145.GE13860@n2100.arm.linux.org.uk>
+ <4FB27D4C.6080204@codethink.co.uk>
+Message-ID: <20120515160332.GG13860@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 12:06, Arnd Bergmann wrote:
-> On Tuesday 15 May 2012, Thomas Petazzoni wrote:
->> You'll find in this patch set the initial support for a new family of
->> ARMv7-compatible Marvell SoCs, that we have choosen to support in the
->> arch/arm/mach-armada/ directory.
+On Tue, May 15, 2012 at 04:59:08PM +0100, Ben Dooks wrote:
+> On 15/05/12 16:41, Russell King - ARM Linux wrote:
+>> On Tue, May 15, 2012 at 04:07:59PM +0100, Ben Dooks wrote:
+>>> I think it was because that PCI was initialised early and requires a
+>>> large mapping space. It is very likely to be legacy kernel stuff that
+>>> people have kept copying through.
 >>
->> At the moment, both the Armada 370 and the Armada XP SoCs are
->> supported in this directory, and we are able to build a single kernel
->> image that boots on both SoCs. Both SoCs use the PJ4B processor, a
->> Marvell-developed ARM core that implements the ARMv7 instruction
->> set. We are currently using Marvell evaluation boards for both of
->> those SoCs, and the support for those boards is added in this patch
->> set.
->>
->> This preliminary support only includes the necessary code for timer
->> and IRQ support, the serial controller is a standard 16550-compatible
->> one. The diffstat looks like:
+>> No.  PCI needs nothing other than access to the configuration space, and
+>> the PCI IO window.  There has _never_ been any hard requirement to map
+>> PCI memory in map_io() because that is _always_ done by drivers calling
+>> ioremap().
 >
-> Hi Thomas,
->
-> The code looks reasonable overall, but I fear your timing is unfortunate
-> and we can't expect to complete the review before the merge window opens.
-> Things would have been much easier if you had posted preliminary versions
-> a few weeks earlier, but my feeling is that this should be treated
-> as v3.6 material.
+> What about inb, outb and their related functions?
 
-I'm happy for this to go in once v3.5 is out as long as the issues
-with the device-tree binding is sorted out and the few issues that
-have cropped up in testing are fixed.
+I said:
+| No.  PCI needs nothing other than access to the configuration space, and
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+| the PCI IO window.
+  ^^^^^^^^^^^^^^^^^^
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+And, as everyone should know, inb(), outb() etc are the PCI/ISA IO
+accessors. So... if you have the PCI IO window mapped, then inb() et.al.
+use _that_ window and there isn't a problem.
