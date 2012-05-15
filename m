@@ -1,28 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 May 2012 13:24:10 -0600
-Subject: [GIT PULL] ARM: tegra: dt2 branch
-In-Reply-To: <201205151915.25543.arnd@arndb.de>
-References: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
- <201205151143.26008.arnd@arndb.de> <4FB2812F.1010500@wwwdotorg.org>
- <201205151915.25543.arnd@arndb.de>
-Message-ID: <4FB2AD5A.2060803@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 15 May 2012 15:25:54 -0400 (EDT)
+Subject: [GIT PULL] ARM: Kirkwood: new boards for v3.5
+In-Reply-To: <4FB2181F.7010609@codethink.co.uk>
+References: <20120515032605.GV16338@titan.lakedaemon.net>
+ <4FB2181F.7010609@codethink.co.uk>
+Message-ID: <alpine.LFD.2.02.1205151521310.1640@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2012 01:15 PM, Arnd Bergmann wrote:
-> On Tuesday 15 May 2012, Stephen Warren wrote:
->>> I think we can't drop it from the driver because of existing powerpc machines
->>> providing the property, but it would be ok if you drop it from your .dts
->>> files.
->>
->> support-8bit is parsed by the Tegra driver only, and only appears in
->> tegra-*.dts across all arch/*/boot.dts. I assume you were talking about
->> some other property, although I can't tell which from a very quick look
->> at arch/powerpc/boot/dts/*.
-> 
-> Right, my mistake.
-> 
-> I guess we could have just removed it right away then.
+On Tue, 15 May 2012, Ben Dooks wrote:
 
-No worries. I'll take an action to do this in 3.6. Thanks for cleaning
-up the bindings.
+> On 15/05/12 04:26, Jason Cooper wrote:
+> >   .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++
+> >   arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
+> >   arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
+> >   arch/arm/boot/dts/kirkwood-ib62x0.dts              |   44 +++
+> >   arch/arm/boot/dts/kirkwood-iconnect.dts            |   26 ++
+> 
+> I thought the idea of going to device-tree was to remove the addition
+> of these? Now instead of .c files we're getting piles of .dts files.
+
+Yes, and this is a good thing.
+
+We're not to that point where DT is sufficiently well implemented and 
+stable on ARM for those files to live somewhere else.  Eventually they 
+will go when they won't have to evolve in lock step anymore.
+
+
+Nicolas
