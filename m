@@ -1,49 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 15 May 2012 12:52:46 -0700
-Subject: [PATCHv5 1/8] ARM: OMAP4: suspend: Program all domains to
- retention
-In-Reply-To: <1336989796-26594-2-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 14 May 2012 13:03:09 +0300")
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-2-git-send-email-t-kristo@ti.com>
-Message-ID: <87fwb1jk6p.fsf@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 15 May 2012 23:51:04 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAyLzJdIEFSTTogY2xwczcxMXg6IEFkZGVkIHN1cHBv?=
+ =?UTF-8?B?cnQgZm9yIENQVSBmcmVxdWVuY2llcyBvdGhlciB0aGFuIDczIE1Ieg==?=
+In-Reply-To: <201205151936.48048.arnd@arndb.de>
+References: <1337104502-5292-1-git-send-email-shc_work@mail.ru>
+ <1337104502-5292-3-git-send-email-shc_work@mail.ru>
+ <201205151936.48048.arnd@arndb.de>
+Message-ID: <E1SUNlw-0007NA-Ej.shc_work-mail-ru@f304.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+Hello.
 
-> From: Rajendra Nayak <rnayak@ti.com>
->
-> Remove the FIXME's in the suspend sequence since
-> we now intend to support system level RET support.
-
-minor: this should probably go at the end of the series, after retention
-is supported.  Otherwise, ending up with only this patch applied
-(e.g. during a git bisect) will lead to a broken boot I suspect.
-
-Kevin
-
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/pm44xx.c |    6 ------
->  1 files changed, 0 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index 8856253..31990d5 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -101,12 +101,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->  	if (!strncmp(pwrdm->name, "cpu", 3))
->  		return 0;
->  
-> -	/*
-> -	 * FIXME: Remove this check when core retention is supported
-> -	 * Only MPUSS power domain is added in the list.
-> -	 */
-> -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
-> -		return 0;
->  
->  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
->  	if (!pwrst)
+Tue, 15 May 2012 19:36:47 +0000 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 15 May 2012, Alexander Shiyan wrote:
+> > Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
+> > This patch adds calculation of system clock frequency and the frequency of
+> > UART, depending on processor speed. Kconfig option "CPU frequency" was added
+> > for this purposes.
+...
+> I think the right way to do this is to move the uart_add_one_port() call
+> and the clps711x_ports array into platform code, so you can modify the
+> frequency at boot time, but leave the uart_driver where it is.
+> That will require some other changes for the console.
+> 
+> It's probably best to leave this patch for after the merge window, so you
+> can come up with a good solution for 3.6, ok?
+OK, Arnd, I'll think about the other implementation.
