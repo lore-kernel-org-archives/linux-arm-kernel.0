@@ -1,27 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 14:53:22 +0000
-Subject: [GIT PULL] Samsung devel-1 for v3.5
-In-Reply-To: <07fe01cd327a$0fde53c0$2f9afb40$%kim@samsung.com>
-References: <4FAF0156.5080306@samsung.com>
- <064f01cd31a5$d2300660$76901320$%kim@samsung.com>
- <07fe01cd327a$0fde53c0$2f9afb40$%kim@samsung.com>
-Message-ID: <201205151453.22430.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 15 May 2012 09:53:55 -0500
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <201205151425.30706.arnd@arndb.de>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
+ <201205151425.30706.arnd@arndb.de>
+Message-ID: <4FB26E03.2030401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Kukjin Kim wrote:
-> Hi Arnd and Olof,
+On 05/15/2012 09:25 AM, Arnd Bergmann wrote:
+> On Tuesday 15 May 2012, Thomas Petazzoni wrote:
+>> Le Tue, 15 May 2012 14:53:45 +0100,
+>> Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
+>>
+>>> Since the two board support files are identical, except for the names
+>>> they print, I'd say this is the job of one file. It can always be
+>>> split later.
+>>
+>> The initial motivation for keeping two files here is that the two SoC
+>> have a different number of PCIe memory areas, and those areas are
+>> typically mapped in ->map_io(). However:
+>>
+>>  * Maybe those mappings can be done using a normal ioremap() rather
+>>    than in ->map_io(), according to DT informations (but most other ARM
+>>    SoC support at the moment seem to do PCI mappings using static
+>>    mappings in ->map_io)
 > 
-> I updated the next/devel-samsung branch. As I said, I separate out the
-> regarding s3c-hsotg patches from here and it will be sent to usb tree. And
-> added support suspend/resume for EXYNOS4412, others same as before.
-> 
-> Please pull Samsung devel-1 for v3.5 from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-samsung
-> 
-> If any problems, please kindly let me know.
+> I'm pretty sure we can use ioremap for new PCI implementations now.
+> Also, you can scan the device tree in map_io() if necesary, to see which
+> PCIe ports are enabled.
 
-Ok, pulled into next/soc2 now to get the dependencies handled first.
+For the i/o windows, they should be static because we want a fixed
+virtual address across platforms. 0xfef00000 is the planned address.
+Memory windows should be ioremap.
 
-	Arnd
+Rob
