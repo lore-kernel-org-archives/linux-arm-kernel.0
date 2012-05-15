@@ -1,29 +1,33 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 15 May 2012 23:51:04 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAyLzJdIEFSTTogY2xwczcxMXg6IEFkZGVkIHN1cHBv?=
- =?UTF-8?B?cnQgZm9yIENQVSBmcmVxdWVuY2llcyBvdGhlciB0aGFuIDczIE1Ieg==?=
-In-Reply-To: <201205151936.48048.arnd@arndb.de>
-References: <1337104502-5292-1-git-send-email-shc_work@mail.ru>
- <1337104502-5292-3-git-send-email-shc_work@mail.ru>
- <201205151936.48048.arnd@arndb.de>
-Message-ID: <E1SUNlw-0007NA-Ej.shc_work-mail-ru@f304.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 19:58:25 +0000
+Subject: [GIT PULL] Renesas ARM-based platforms: new boards support for
+ v3.5
+In-Reply-To: <CANqRtoQTMKdKmATz5uxCtWaZcEPa2apt9WO4URdhiwEMnst5gw@mail.gmail.com>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMj5op-U+-_dvP_cqMUQ7zgzbzvig2ueb2LQTf+4MSEc2Q@mail.gmail.com>
+ <CANqRtoQTMKdKmATz5uxCtWaZcEPa2apt9WO4URdhiwEMnst5gw@mail.gmail.com>
+Message-ID: <201205151958.26035.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-Tue, 15 May 2012 19:36:47 +0000 ?? Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 15 May 2012, Alexander Shiyan wrote:
-> > Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
-> > This patch adds calculation of system clock frequency and the frequency of
-> > UART, depending on processor speed. Kconfig option "CPU frequency" was added
-> > for this purposes.
-...
-> I think the right way to do this is to move the uart_add_one_port() call
-> and the clps711x_ports array into platform code, so you can modify the
-> frequency at boot time, but leave the uart_driver where it is.
-> That will require some other changes for the console.
+On Monday 14 May 2012, Magnus Damm wrote:
+> > Also, I would prefer to only see one or a couple of defconfigs that
+> > can provide full build coverage for the various SoCs and boards, that
+> > would contain the superset of the required drivers to boot the
+> > supported boards, etc.
 > 
-> It's probably best to leave this patch for after the merge window, so you
-> can come up with a good solution for 3.6, ok?
-OK, Arnd, I'll think about the other implementation.
+> I can check with my superiors if we can phase our sh7367 support. If
+> so then we have only A8 and A9 in tree which should be easy to support
+> with a single kernel configuration. Does that sound like something
+> that would simplify things for you?
+
+I think there is no need to go that far. Just providing a defconfig for
+all boards that can already run a common image would be a good step
+forward.
+
+Is there a technical reason why you cannot build sh7367 together with
+the ARMv7 based machines? Most other platforms that have both ARMv6 and
+ARMv7 just build them together, you just can't combine them with any
+ARMv4/v5 platform.
+
+	Arnd
