@@ -1,51 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 15 May 2012 20:31:38 +0800
-Subject: [PATCH 1/2] ARM: dts: add device tree source for imx6dl
-In-Reply-To: <1337084027-19401-1-git-send-email-shawn.guo@linaro.org>
-References: <1337084027-19401-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120515123137.GI20367@S2100-06.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 May 2012 17:50:04 +0530
+Subject: [PATCH 0/2] arm: omap3: am35x: Convert emac to hwmod & disable
+ hlt when open
+In-Reply-To: <874nripckw.fsf@ti.com>
+References: <1336770778-23044-1-git-send-email-mgreer@animalcreek.com>
+ <874nripckw.fsf@ti.com>
+Message-ID: <4FB249F4.4000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 08:13:47PM +0800, Shawn Guo wrote:
-> The imx6dl (i.MX6 DualLite) is a derivative of SoC imx6q, and it's
-> highly compatible with imx6q.  This patch renames imx6q.dtsi to
-> imx6.dtsi with some cosmetic changes, and split out the differences
-> between imx6dl and imx6q into imx6dl.dtsi and imx6q.dtsi respectively.
+Hi Kevin,
+
+On 5/15/2012 4:58 AM, Kevin Hilman wrote:
+> +Sekhar,
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx6.dtsi   |  691 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6dl.dtsi |   62 ++++
->  arch/arm/boot/dts/imx6q.dtsi  |  677 +---------------------------------------
->  3 files changed, 757 insertions(+), 673 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6dl.dtsi
+> "Mark A. Greer" <mgreer@animalcreek.com> writes:
 > 
-The follow changes should be amened.  Sorry for these errors.
+>> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>>
+>> Paul, Kevin,
+>>
+>> These patches convert the davinci emac support for the am35x SoC
+>> to use hwmod and add enable_hlt()/disable_hlt() calls to the
+>> pm_runtime hooks for that driver.
+> 
+> Great.  I didn't look closely at the hwmod data, but the approach is
+> right here, IMO.
+> 
+>> I have converted the davinci_emac driver to use pm_runtime but I
+>> can't formally submit it yet since it requires some changes on the
+>> mach-davinci side that haven't happened yet.  I will send it as an
+>> RFC in a reply to this thread.
+> 
+> Sekhar, are you planning to add runtime PM core support to davinci?
 
-diff --git a/arch/arm/boot/dts/imx6.dtsi b/arch/arm/boot/dts/imx6.dtsi
-index 72e5434..c60864f 100644
---- a/arch/arm/boot/dts/imx6.dtsi
-+++ b/arch/arm/boot/dts/imx6.dtsi
-@@ -501,7 +501,6 @@
-                                        };
-                                };
-                        };
--                       };
+Yes, Vaibhav is going to be working on this and will start very soon.
 
-                        dcic1: dcic at 020e4000 {
-                                reg = <0x020e4000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index b154232..0300189 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -43,7 +43,7 @@
-        };
+> I recommend looking at the simple OMAP1 layer that implements a basic
+> clocks-only runtime PM layer.
 
-        soc {
--               aips2: aips-bus at 02100000 {
-+               aips1: aips-bus at 02000000 {
-                        spba-bus at 02000000 {
-                                ecspi5: ecspi at 02018000 {
-                                        #address-cells = <1>;
+Thanks. I have CCed Vaibhav on this mail for his information.
+
+Regards,
+Sekhar
