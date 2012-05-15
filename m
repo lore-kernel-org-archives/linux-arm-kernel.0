@@ -1,34 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 14:37:55 +0000
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <4FB26904.1060308@codethink.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 May 2012 16:44:38 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FB269CB.4080804@gmail.com>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515161655.504f1403@skate> <4FB26904.1060308@codethink.co.uk>
-Message-ID: <201205151437.55286.arnd@arndb.de>
+ <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
+ <20120515115511.75ece9c3@skate> <4FB269CB.4080804@gmail.com>
+Message-ID: <20120515164438.22258885@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Ben Dooks wrote:
-> >   * Maybe those mappings can be done using a normal ioremap() rather
-> >     than in ->map_io(), according to DT informations (but most other ARM
-> >     SoC support at the moment seem to do PCI mappings using static
-> >     mappings in ->map_io)
-> That's a very old way of doing it. I'm pretty sure there's no reason to
-> get these allocated so early.
+Le Tue, 15 May 2012 09:35:55 -0500,
+Rob Herring <robherring2@gmail.com> a ?crit :
 
-Well, you might actually still want to use static mappings for any large
-areas that are accessed a lot in the kernel, because that lets you
-use larger page TLB entries, which ioremap by itself cannot. The host
-driver should however still use ioremap, it will now just get the area
-that was set up with map_io.
+> Directory location doesn't really have anything to do with what can be
+> in a single kernel binary. We will soon be building single images
+> across mach directories.
 
-> I believe you can probably leave the PCI/PCIe bindings until you have
-> enough kernel state to do ioremap() or similar and then associate the
-> necessary mappings with the bus creation.
+Agreed, but it's not the case right now, and we wanted to submit today
+a kernel that boots on both of those SoCs.
 
-I think it was Stephen Warrent who told me that he can actually do
-a PCI host driver as a loadable module now, with only a few changes
-in the ARM core code.
+The 370 and XP both use the PJ4B core, which is a Marvell
+implementation of an ARMv7 compatible core. The 370 has one PJ4B, and
+the various XP variants have a choice of 2 or 4 PJ4Bs, and various
+other differences. To us, it makes a lot of sense to be able to support
+those SoCs together in the same kernel image and in the same directory,
+even if both concepts are not directly tied together.
 
-	Arnd
+> With some hacks and limitations, Arnd has
+> built (not run) omap2+, u8500, imx and one other in a single kernel.
+> If there's overlap with dove or other platforms, then they should
+> probably all be combined into a single mach directory. One option
+> would be make the new mach directory somewhat generic and then later
+> move dove or others into the new directory.
+
+This would be one solution.
+
+On the naming side, we are really open to what the community prefers.
+We knew there would be quite a bit of discussion around this, because
+there's a lot quite a few Marvell SoCs supported in various places, and
+it's not obvious what's the right place and name for a new SoC family.
+
+What about making it mach-marvell, which would contain the DT-enabled
+SoC support for Marvell SoCs? We can start with 370 and XP today, and
+gradually add future SoCs, or even port previous SoCs as they are moved
+to support the device tree.
+
+Again we're really open on the solution. Lior from Marvell can give all
+the necessary input to explain how the SoC family is organized.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
