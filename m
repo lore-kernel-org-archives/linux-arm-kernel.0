@@ -1,33 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 11:15:41 +0100
-Subject: [PATCH] serial: samsung: Fixed wrong comparison for baudclk_rate
-In-Reply-To: <000101cd3283$5f58eba0$1e0ac2e0$%kim@samsung.com>
-References: <000101cd3283$5f58eba0$1e0ac2e0$%kim@samsung.com>
-Message-ID: <20120515101541.GH10453@n2100.arm.linux.org.uk>
+From: shans95g@gmail.com (Shantanu Gupta)
+Date: Tue, 15 May 2012 15:49:00 +0530
+Subject: [PATCH v2] arm: msm: fix up very basic HTC Sapphire support
+In-Reply-To: <20120513055612.GA7129@codeaurora.org>
+References: <q7bdy899mt3um93hikst04au.1336884464056@email.android.com>
+ <20120513055612.GA7129@codeaurora.org>
+Message-ID: <CAPDArRKgZKR2kdbt-ySx7GrXopNnN+j4hKr1rrDPgxkZ8S2YjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 07:13:28PM +0900, Kyoungil Kim wrote:
-> port->baudclk_rate should be compared to the rate of port->baudclk,
-> because port->baudclk_rate was assigned as the rate of port->baudclk previously.
-> So to check that the current baudclk rate is same as previous rate,
-> the target of comparison sholud be the rate of port->baudclk.
-> 
-> Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
-> Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>	
-> ---
->  drivers/tty/serial/samsung.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index d8b0aee..c4867ea 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -1014,10 +1014,10 @@ static int s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
->  	 * a disturbance in the clock-rate over the change.
->  	 */
->  
-> -	if (IS_ERR(port->clk))
-> +	if (IS_ERR_OR_NULL(port->baudclk))
+Sorry for thread jacking, but do you still have an actively supported
+8x50 board ? ( ie. mahimahi)
 
-NAK.  See my previous emails on the validity of clk_get() return values.
+>> >> On Fri, May 11, 2012 at 5:15 PM, David Brown <davidb@codeaurora.org> wrote:
+>> >> > From: Daniel Walker <dwalker@fifo99.com>
+>> >> >
+>> >> > Adds sapphire into the make file, and fixes all the code problems that
+>> >> > prevented it from building (including adding board-sapphire.h)
+>> >> >
+>> >> > [davidb at codeaurora.org: Move MACH_TROUT selection back under
+>> >> > ARCH_MSM7X00A]
+>> >> >
+>> >> > Signed-off-by: Daniel Walker <dwalker@fifo99.com>
+>> >> > Signed-off-by: David Brown <davidb@codeaurora.org>
+>> >> > ---
+>> >> > v2 - Moved MACH_TROUT selection back under the ARCH config target
+>> >> >
+>> >> > ?arch/arm/mach-msm/Kconfig ? ? ? ? ?| ? ?9 +-
+>> >> > ?arch/arm/mach-msm/Makefile ? ? ? ? | ? ?1 +
+>> >> > ?arch/arm/mach-msm/board-sapphire.c | ? 18 +--
+>> >> > ?arch/arm/mach-msm/board-sapphire.h | ?224 ++++++++++++++++++++++++++++++++++++
+>> >> > ?4 files changed, 234 insertions(+), 18 deletions(-)
+>> >> > ?create mode 100644 arch/arm/mach-msm/board-sapphire.h
+>> >> >
+>> >> > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+>> >> > index 1cd40ad..70eae63 100644
+>> >> > --- a/arch/arm/mach-msm/Kconfig
+>> >> > +++ b/arch/arm/mach-msm/Kconfig
+>> >> > @@ -6,7 +6,7 @@ choice
+>> >> >
+>> >> > ?config ARCH_MSM7X00A
+>> >> > ? ? ? ?bool "MSM7x00A / MSM7x01A"
+>> >> > - ? ? ? select MACH_TROUT if !MACH_HALIBUT
+>> >> > + ? ? ? select MACH_TROUT if (!MACH_HALIBUT && !MACH_SAPPHIRE)
+>> >>
+>> >> Better, thanks!
+>> >>
+>> >>
+>> >> > diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+>> >> > index 4ad3969..aff4e5c 100644
+>> >> > --- a/arch/arm/mach-msm/Makefile
+>> >> > +++ b/arch/arm/mach-msm/Makefile
+>> >> > @@ -20,6 +20,7 @@ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+>> >> > ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+>> >> > ?obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+>> >> >
+>> >> > +obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o devices-msm7x00.o
+>> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
+>> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
+>> >> > ?obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
+>> >>
+>> >> Unrelated to this change per se, but it seems like devices-msm7x00.o
+>> >> should be on an obj-$(CONFIG_ARCH_MSM7X00A) statement instead of
+>> >> duplicated for all boards.
+>> >>
+>> >> Also, the trout line is mostly duplicated, only delta is panel. Looks
+>> >> broken. Both of these things is material for a separate patch though.
+>> >>
+>> >> > diff --git a/arch/arm/mach-msm/board-sapphire.h b/arch/arm/mach-msm/board-sapphire.h
+>> >> > new file mode 100644
+>> >> > index 0000000..70f925e
+>> >> > --- /dev/null
+>> >> > +++ b/arch/arm/mach-msm/board-sapphire.h
+>> >> > @@ -0,0 +1,224 @@
+>> >> [..]
+>> >> > +void config_sapphire_camera_on_gpios(void);
+>> >> > +void config_sapphire_camera_off_gpios(void);
+>> >> > +int sapphire_get_smi_size(void);
+>> >> > +unsigned int sapphire_get_hwid(void);
+>> >> > +unsigned int sapphire_get_skuid(void);
+>> >> > +unsigned int is_12pin_camera(void);
+>> >> > +int sapphire_is_5M_camera(void);
+>> >> > +int sapphire_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on);
+>> >>
+>> >> Many (all?) of these functions are not to be found in the code. Please
+>> >> don't add prototypes for code that isn't there.
+>> >>
+>> >>
+>> >> -Olof
+>> >
+>> >--
+>> >Sent by an employee of the Qualcomm Innovation Center, Inc.
+>> >The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>> >
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
