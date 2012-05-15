@@ -1,41 +1,39 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 15 May 2012 17:50:24 +0200
-Subject: [GIT PULL][Update] Renesas ARM-based platforms: new boards
- support for v3.5
-In-Reply-To: <201205150840.23283.arnd@arndb.de>
-References: <201205112101.59949.rjw@sisk.pl> <201205142343.12682.rjw@sisk.pl>
- <201205150840.23283.arnd@arndb.de>
-Message-ID: <201205151750.24432.rjw@sisk.pl>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 May 2012 17:46:02 +0200
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <201205151532.21143.arnd@arndb.de>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515165813.66b4434e@skate> <4FB2714F.5080703@codethink.co.uk>
+ <201205151532.21143.arnd@arndb.de>
+Message-ID: <20120515174602.26d02f70@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 15, 2012, Arnd Bergmann wrote:
-> On Monday 14 May 2012, Rafael J. Wysocki wrote:
-> > Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+Le Tue, 15 May 2012 15:32:20 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
+
+> > > Agreed. When looking at the code, I wasn't sure why PCI mappings
+> > > were needed so early. Surely, the minimal mappings to get an UART
+> > > are quite useful to have very early, but why PCI?
 > > 
-> >     Linux 3.4-rc6
-> > 
-> > with top-most commit 4fc5e65cdbf736a5311b07aa54a916ccaa91ab5f
-> > 
-> >     Merge branch 'renesas-kzm9g' into renesas-board-new
-> > 
-> > from the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git board-new
-> > 
-> > to receive updates of the Renesas ARM-based boards support code for v3.5.
-> > Included are:
-> > 
-> >  * Support for the KZM-A9-GT board from Kuninori Morimoto and Magnus Damm.
-> > 
-> >  * Support for the armadillo800eva board from Kuninori Morimoto and Magnus Damm.
-> > 
-> > This is based on the Renesas core SoC code updates I've sent a separate pull
-> > request for.
-> > 
+> > I think it was because that PCI was initialised early and requires a
+> > large mapping space. It is very likely to be legacy kernel stuff
+> > that people have kept copying through.
 > 
-> Pulled into next/boards
+> No, as Rob pointed out, we might not need them early, but we
+> definitely want a fixed address for the PIO window, which ioremap
+> does not provide.
 
-Many thanks!
+A fixed address for the PIO window of the PCI registers? Or a fixed
+address for the PIO window used to access UART registers?
 
-Rafael
+I would understand why a fixed address is needed for the latter, but
+not really for the former.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
