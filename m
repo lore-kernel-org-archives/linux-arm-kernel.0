@@ -1,69 +1,24 @@
-From: bryan.buckley@ti.com (Buckley, Bryan)
-Date: Tue, 15 May 2012 13:55:44 -0500
-Subject: [PATCH] ARM: decompressor: Fix mmu mapping for non-DRAM address
- space.
-In-Reply-To: <20120509214040.GB10375@n2100.arm.linux.org.uk>
-References: <1336398149-26153-1-git-send-email-santosh.shilimkar@ti.com>
- <20120508124116.GE17798@arm.com>
- <CAMQu2gxXB4GyddjrcKWwJ=KXx=MoDs7DdwhbOY85qkVJ1Vv3wA@mail.gmail.com>
- <20120508215554.GA18980@n2100.arm.linux.org.uk>
- <CAMQu2gzmZ1Af4sAxoT9WS_akY1gBrqffKE84rnbM_EUK8V8NHQ@mail.gmail.com>
- <20120509122348.GA30632@n2100.arm.linux.org.uk>
- <CAMQu2gzdwXwzhhFLtLXTj5e0a9cFeq5ReUcMT-tGUxTPUcV_4Q@mail.gmail.com>
- <20120509154849.GA10375@n2100.arm.linux.org.uk>
- <CAG_NtY_qv-cv=Yd8CBcP4TrNCXJbTgz5WXvAsmCdQFWEotVhrg@mail.gmail.com>
- <20120509214040.GB10375@n2100.arm.linux.org.uk>
-Message-ID: <CAG_NtY_KH5s-dQx_CY5unn74WUUjbBKyghp-grM-NHFbTAOn-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 19:06:51 +0000
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <4FB27AF4.9050604@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201205151532.21143.arnd@arndb.de> <4FB27AF4.9050604@codethink.co.uk>
+Message-ID: <201205151906.52162.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2012 at 4:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> On Wed, May 09, 2012 at 03:44:08PM -0500, Buckley, Bryan wrote:
-> > On Wed, May 9, 2012 at 10:48 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > >
-> > > On Wed, May 09, 2012 at 06:00:10PM +0530, Shilimkar, Santosh wrote:
-> > > > On Wed, May 9, 2012 at 5:53 PM, Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > > > On Wed, May 09, 2012 at 02:20:28PM +0530, Shilimkar, Santosh wrote:
-> > > > >> The only change done common code is ?clearing 'XN' bit for DRAM
-> > > > >> region in page table entries. The other change of setting the DACR
-> > > > >> register is done in ARMv7 specific code.
-> > > > >
-> > > > > Yes, XN is an ARMv6+ thing. ?Before ARMv5, it was implementation defined.
-> > > > >
-> > > > > Some implementations used the bit to mean "allow writes to update the
-> > > > > cache". ?Other implementations labelled this bit as "should be zero"
-> > > > > while others labelled it as "should be one".
-> > > > >
-> > > > Good to know.
-> > > >
-> > > > > The upshot of this is, we know that having this bit as '1' means that
-> > > > > all the CPUs we support today work. ?I would be _very_ concerned to
-> > > > > change this bit to zero as we _really_ don't know how the pre-ARMv6
-> > > > > CPUs would react.
-> > > > >
-> > > > I agree.
-> > > >
-> > > > > The solution to this is pretty simple - if ARMv6+ needs a different
-> > > > > base section mapping value, then we need to extract that from the code
-> > > > > and pass in the base section mapping value.
-> > > > >
-> > > > > I'll sort out a patch later today for this.
-> > > > Great.
-> > >
-> > > This works for my 4430SDP board. ?I haven't booted it on anything else yet.
-> > > Please can you check that this solves the issue for you? ?Thanks.
-> > >
-> >
-> > Solves the issue for OMAP5. Thanks Russel and company.
->
-> Can I add this attributation for this patch:
->
-> Tested-by: Bryan Buckley <bryan.buckley@ti.com>
->
-> ?
+On Tuesday 15 May 2012, Ben Dooks wrote:
+> Yes, I can see a not a lot of fun with multiple PCIe busses and the
+> need for a single IO space. You'll probably have to reserve a VM
+> area for people to use for legacy-IO accesses.
 
-If still applicable, yes that is fine.
+Yes, that is the plan, across all platforms in the long run actually. 
+
+> With PCIe, there should be less old-style IO as PCIe devices are
+> encouraged to go 32bit MMIO.
+
+It should work nonetheless.
+
+	arnd
