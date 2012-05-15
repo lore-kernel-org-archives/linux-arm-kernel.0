@@ -1,49 +1,24 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 May 2012 18:30:14 +0200
-Subject: [PATCH v1 0/7] preliminary work for adding imx6q_sabrelite usb
- support
-In-Reply-To: <20120515152105.GE23916@kroah.com>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <201205151628.19020.marex@denx.de> <20120515152105.GE23916@kroah.com>
-Message-ID: <201205151830.15009.marex@denx.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 May 2012 18:30:42 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FB2838D.6000507@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
+ <20120515115511.75ece9c3@skate> <4FB269CB.4080804@gmail.com>
+ <20120515164438.22258885@skate> <20120515162201.GZ23254@lunn.ch>
+ <4FB2838D.6000507@codethink.co.uk>
+Message-ID: <20120515163042.GA23254@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Greg KH,
-
-> On Tue, May 15, 2012 at 04:28:18PM +0200, Marek Vasut wrote:
-> > Dear Richard Zhao,
-> > 
-> > > The work is based on usb-next which includes ci13xxx rework by
-> > > Alexander Shishkin.
-> > > 
-> > > Status:
-> > >   - this version only tested host
-> > >   - usbotg controler works at host role
-> > > 
-> > > Todo:
-> > >   - usbh1 has strange system error when enumerate devices for on-board
-> > >   hub. - high speed usb connecton detect failed for the second time.
-> > >   It needs
-> > > 
-> > > hub code hack.
-> > > 
-> > > Thanks Peter Chen for greate help.
-> > 
-> > Hm, I think we should somehow coordinate, because I think we're working
-> > on the same thing and we're duplicating work.
+> >>The 370 and XP both use the PJ4B core
+> >
+> >Could mach-pj4b be an option?
 > 
-> Ok, can the two of you work together on this so I don't get conflicting
-> patches, and so you both can verify it works properly for your systems?
+> Not really, that's the CPU core and will probably get re-used for a
+> number of products.
 
-Yes, I'd prefer to.
+However, if everything is DT based, does that matter? All these
+products end up in here.
 
-Richard, are these 7 patches the only stuff that I have to apply on top of 
-linux-usb/usb-next to get this working?
-
-> thanks,
-> 
-> greg k-h
-
-Best regards,
-Marek Vasut
+	 Andrew
