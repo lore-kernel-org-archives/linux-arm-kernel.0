@@ -1,119 +1,92 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 May 2012 10:27:46 -0600
-Subject: [PATCH 06/20] ARM: EXYNOS: add GPC4 bank instance
-In-Reply-To: <1335813270-13083-7-git-send-email-thomas.abraham@linaro.org>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-7-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120515162747.070303E07AF@localhost>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 May 2012 17:28:51 +0100
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low	power
+ modes
+In-Reply-To: <20120515101505.GG10453@n2100.arm.linux.org.uk>
+References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+ <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+ <20120515094010.GF10453@n2100.arm.linux.org.uk>
+ <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
+ <20120515101505.GG10453@n2100.arm.linux.org.uk>
+Message-ID: <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Apr 2012 12:14:16 -0700, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> From: Sangsu Park <sangsu4u.park@samsung.com>
+On Tue, May 15, 2012 at 11:15:05AM +0100, Russell King - ARM Linux wrote:
+> On Tue, May 15, 2012 at 11:09:02AM +0100, Lorenzo Pieralisi wrote:
+> > On Tue, May 15, 2012 at 10:40:10AM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, May 14, 2012 at 06:15:33PM +0100, Lorenzo Pieralisi wrote:
+> > > > On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
+> > > > > From what you're saying - and from my understanding of your cache behaviours,
+> > > > > even the sequence:
+> > > > > - clean cache
+> > > > > - disable C bit
+> > > > > - clean cache
+> > > > > is buggy.
+> > > > 
+> > > > No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
+> > > 
+> > > It's racy.  Consider this:
+> > > 
+> > > 	- clean cache
+> > > 	- cache speculatively prefetches a dirty cache line from another CPU
+> > > 	- disable C bit
+> > 	- clean cache
 > 
-> Add GPC4 bank instance which is included in rev1 of EXYNOS5.
+> Thank you for totally missing the point and destroying the example.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> [kgene.kim at samsung.com: re-worked on top of v3.4-rc3]
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-Should be merged with the rest of the series I think.
-
-g.
-
-> ---
->  arch/arm/mach-exynos/include/mach/gpio.h |    9 ++++++---
->  arch/arm/mach-exynos/include/mach/irqs.h |    2 +-
->  drivers/gpio/gpio-samsung.c              |   11 ++++++++++-
->  3 files changed, 17 insertions(+), 5 deletions(-)
+> > > At this point, you lose access to that dirty data.  If that dirty data is
+> > > used inbetween disabling the C bit and cleaning the cache for the second
+> > > time, you have data corruption issues.
+> > 
+> > It is not racy. After disabling the C bit the cache clean operations write-back
+> > any dirty cache line to the next cache level. And the CPU is still in coherency
+> > mode so there is not a problem with that either.
 > 
-> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-> index d7498af..eb24f1e 100644
-> --- a/arch/arm/mach-exynos/include/mach/gpio.h
-> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
-> @@ -153,10 +153,11 @@ enum exynos4_gpio_number {
->  #define EXYNOS5_GPIO_B2_NR	(4)
->  #define EXYNOS5_GPIO_B3_NR	(4)
->  #define EXYNOS5_GPIO_C0_NR	(7)
-> -#define EXYNOS5_GPIO_C1_NR	(7)
-> +#define EXYNOS5_GPIO_C1_NR	(4)
->  #define EXYNOS5_GPIO_C2_NR	(7)
->  #define EXYNOS5_GPIO_C3_NR	(7)
-> -#define EXYNOS5_GPIO_D0_NR	(8)
-> +#define EXYNOS5_GPIO_C4_NR	(7)
-> +#define EXYNOS5_GPIO_D0_NR	(4)
->  #define EXYNOS5_GPIO_D1_NR	(8)
->  #define EXYNOS5_GPIO_Y0_NR	(6)
->  #define EXYNOS5_GPIO_Y1_NR	(4)
-> @@ -199,7 +200,8 @@ enum exynos5_gpio_number {
->  	EXYNOS5_GPIO_C1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
->  	EXYNOS5_GPIO_C2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
->  	EXYNOS5_GPIO_C3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
-> -	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-> +	EXYNOS5_GPIO_C4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
-> +	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
->  	EXYNOS5_GPIO_D1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
->  	EXYNOS5_GPIO_Y0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
->  	EXYNOS5_GPIO_Y1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
-> @@ -242,6 +244,7 @@ enum exynos5_gpio_number {
->  #define EXYNOS5_GPC1(_nr)	(EXYNOS5_GPIO_C1_START + (_nr))
->  #define EXYNOS5_GPC2(_nr)	(EXYNOS5_GPIO_C2_START + (_nr))
->  #define EXYNOS5_GPC3(_nr)	(EXYNOS5_GPIO_C3_START + (_nr))
-> +#define EXYNOS5_GPC4(_nr)	(EXYNOS5_GPIO_C4_START + (_nr))
->  #define EXYNOS5_GPD0(_nr)	(EXYNOS5_GPIO_D0_START + (_nr))
->  #define EXYNOS5_GPD1(_nr)	(EXYNOS5_GPIO_D1_START + (_nr))
->  #define EXYNOS5_GPY0(_nr)	(EXYNOS5_GPIO_Y0_START + (_nr))
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-> index ef52f61..ece5624 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -446,7 +446,7 @@
->  
->  #define EXYNOS5_MAX_COMBINER_NR		32
->  
-> -#define EXYNOS5_IRQ_GPIO1_NR_GROUPS	13
-> +#define EXYNOS5_IRQ_GPIO1_NR_GROUPS	14
->  #define EXYNOS5_IRQ_GPIO2_NR_GROUPS	9
->  #define EXYNOS5_IRQ_GPIO3_NR_GROUPS	5
->  #define EXYNOS5_IRQ_GPIO4_NR_GROUPS	1
-> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-> index 19d6fc0..0a2087b 100644
-> --- a/drivers/gpio/gpio-samsung.c
-> +++ b/drivers/gpio/gpio-samsung.c
-> @@ -2452,6 +2452,12 @@ static struct samsung_gpio_chip exynos5_gpios_1[] = {
->  		},
->  	}, {
->  		.chip	= {
-> +			.base	= EXYNOS5_GPC4(0),
-> +			.ngpio	= EXYNOS5_GPIO_C4_NR,
-> +			.label	= "GPC4",
-> +		},
-> +	}, {
-> +		.chip	= {
->  			.base	= EXYNOS5_GPD0(0),
->  			.ngpio	= EXYNOS5_GPIO_D0_NR,
->  			.label	= "GPD0",
-> @@ -2874,8 +2880,11 @@ static __init int samsung_gpiolib_init(void)
->  			goto err_ioremap1;
->  		}
->  
-> +		/* need to set base address for gpc4 */
-> +		exynos5_gpios_1[11].base = gpio_base1 + 0x2E0;
-> +
->  		/* need to set base address for gpx */
-> -		chip = &exynos5_gpios_1[20];
-> +		chip = &exynos5_gpios_1[21];
->  		gpx_base = gpio_base1 + 0xC00;
->  		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
->  			chip->base = gpx_base;
-> -- 
-> 1.7.5.4
+> No.  *THINK* about the exact example I gave you.  Think about what state
+> the CPU sees between that "disable C bit" and the final cache clean (which
+> you seem to be insisting is an atomic operation.)
 > 
+> Please, read what I'm saying rather than re-interpreting it, augmenting it
+> and then answering something entirely different.
+> 
+> > > As I have said, given what you've mentioned, it is impossible to safely
+> > > disable the cache on a SMP system.  In order to do it safely, you need to
+> > > have a way to disable new allocations into the cache _without_ disabling
+> > > the ability for the cache to be searched.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+First off, my apologies, it was not meant to disrupt the discussion, if
+I did sorry about that. Let's try to sum it up:
+
+1) Hitting in the cache when the SCTLR.C is cleared is CPU specific (eg A9
+   does not, A15 does)
+2) as long as they are taking part in coherency (SMP bit set in ACTLR), all
+   Cortex-A cores in a MP configuration with the SCTLR.C bit set can hit in
+   the cache of a CPU that runs with the C bit cleared in SCTLR
+3) The sequence:
+        - clean cache
+        - clear SCTLR.C
+        - clean cache
+
+is correct and we must mandate it, with the following remarks:
+
+        - The first cache clean is superfluos (but does no harm)
+        - The second cache clean must not rely on any data that might
+          sit in the cache
+        - clearing SCTLR.C and cleaning the cache must be coded in
+          assembly in a function carrying out both operations (to avoid
+          stack issues ie cacheable push/pop ops and any global data
+          reference)
+
+4) Current vexpress hotplug code clears ACTLR.SMP bit before clearing
+   SCTLR.C; this is a bug according to this discussion and we must fix
+   it (to avoid copy'n'paste of code that does not follow the standard
+   for platforms that have PM capabilities beyond standbywfi)
+
+Please let me know if I am missing something and thanks for the discussion.
+
+Lorenzo
