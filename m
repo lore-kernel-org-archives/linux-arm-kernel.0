@@ -1,41 +1,28 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Tue, 15 May 2012 10:32:01 +0100 (BST)
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
- arch-pxa git tree
-In-Reply-To: <201205150925.17477.arnd@arndb.de>
-Message-ID: <1337074321.33676.YahooMailClassic@web29011.mail.ird.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 May 2012 10:32:41 +0100
+Subject: [RFC 00/12] OMAP DMA engine conversion
+In-Reply-To: <1337072367.16185.5401.camel@vkoul-udesk3>
+References: <20120423160409.GE24299@n2100.arm.linux.org.uk>
+ <1337055564.16185.5356.camel@vkoul-udesk3>
+ <20120515074141.GA16276@n2100.arm.linux.org.uk>
+ <1337072367.16185.5401.camel@vkoul-udesk3>
+Message-ID: <20120515093241.GB16276@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Tue, May 15, 2012 at 02:29:27PM +0530, Vinod Koul wrote:
+> On Tue, 2012-05-15 at 08:41 +0100, Russell King - ARM Linux wrote:
+> > It's not ready for merging.  While it allows some of the OMAP drivers
+> > to be converted, there's others which need changes to omap-dma.c.
+> > 
+> > So, I'm _not_ planning to see this in for the upcoming merge window.
+> Okay, Thanks for the update. I am waiting for the virtual channel
+> support in this series.
 
---- On Tue, 15/5/12, Arnd Bergmann <arnd@arndb.de> wrote:
-> The last patch in this series causes a build error with
-> magician_defconfig:
-> 
-> /home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2:
-> error: unknown field 'clock_rate' specified in initializer
-> /home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2:
-> error: initialization makes pointer from integer without a
-> cast [-Werror]
-> /home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2:
-> error: (near initialization for 'asic3_platform_data.leds')
-> [-Werror]
-> cc1: all warnings being treated as errors
-> make[2]: *** [arch/arm/mach-pxa/hx4700.o] Error 1
-> make[1]: *** [arch/arm/mach-pxa] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [sub-make] Error 2
-> 
-> Did you miss a dependency? Should I revert that patch for
-> now?
+It's changed a little since the last post to allow it to support the
+tx_status semantics we discussed, and has some rudimentary and untested
+cyclic support.
 
-hx4700.c expects to find the clock_rate field in the
-asic3_platform_data structure.
-
-The clock_rate field is due to be added in V3.5:
-
-http://lkml.indiana.edu/hypermail/linux/kernel/1204.2/00339.html
-
-Regards,
-Paul
+As we're in the final week before the merge window, and this stuff has
+not had any time in linux-next, it's rather late to think about putting
+it in for v3.5.
