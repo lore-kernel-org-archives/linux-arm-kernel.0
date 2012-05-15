@@ -1,32 +1,56 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 15 May 2012 08:48:34 +0530
-Subject: [PATCH 0/3] dmaengine: at_hdmac: slave configuration
-In-Reply-To: <cover.1336644470.git.nicolas.ferre@atmel.com>
-References: <cover.1336644470.git.nicolas.ferre@atmel.com>
-Message-ID: <1337051914.16185.5293.camel@vkoul-udesk3>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 14 May 2012 23:26:05 -0400
+Subject: [GIT PULL] ARM: Kirkwood: new boards for v3.5
+Message-ID: <20120515032605.GV16338@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-10 at 12:17 +0200, Nicolas Ferre wrote:
-> This patch series is composed of two cleanup patches and one "slave
-> configuration" patch. The last one uses configuration data passed through the
-> slave configuration API to setup the DMA controller.
-> Corresponding custom configuration is removed from the slave DMA private
-> structure and its use in the AT91 files. Header definitions are then moved
-> accordingly.
-> 
-> Nicolas Ferre (3):
->   dmaengine: at_hdmac: remove some at_dma_slave comments
->   dmaengine: at_hdmac: remove ATC_DEFAULT_CTRLA constant
->   dmaengine: at_hdmac: take maxburst from slave configuration
-> 
->  arch/arm/mach-at91/at91sam9g45_devices.c   |    1 -
->  arch/arm/mach-at91/include/mach/at_hdmac.h |   26 --------------------------
->  drivers/dma/at_hdmac.c                     |   15 +++++++--------
->  drivers/dma/at_hdmac_regs.h                |   21 ++++++++++++++++++++-
->  4 files changed, 27 insertions(+), 36 deletions(-)
-Applied, Thanks
+The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
 
+  Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
 
--- 
-~Vinod
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git kirkwood_boards_for_v3.5
+
+Arnaud Patard (3):
+      kirkwood/orion: fix orion_gpio_set_blink
+      orion/kirkwood: create a generic function for gpio led blinking
+      kirkwood: Add iconnect support
+
+Jamie Lentin (4):
+      ARM: kirkwood: Basic support for DNS-320 and DNS-325
+      mtd: Add orion_nand devicetree bindings
+      kirkwood: Allow nand to be configured via. devicetree
+      ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
+
+Simon Baatz (1):
+      ARM: kirkwood: Add support for RaidSonic IB-NAS6210/6220 using devicetree
+
+ .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++
+ arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
+ arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |   44 +++
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |   26 ++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   15 +-
+ arch/arm/mach-kirkwood/Kconfig                     |   22 ++
+ arch/arm/mach-kirkwood/Makefile                    |    3 +
+ arch/arm/mach-kirkwood/Makefile.boot               |    4 +
+ arch/arm/mach-kirkwood/board-dnskw.c               |  275 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c                  |   13 +
+ arch/arm/mach-kirkwood/board-ib62x0.c              |  143 ++++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c            |  165 ++++++++++++
+ arch/arm/mach-kirkwood/common.c                    |   12 +
+ arch/arm/mach-kirkwood/common.h                    |   18 ++
+ arch/arm/mach-orion5x/dns323-setup.c               |   25 +--
+ arch/arm/plat-orion/gpio.c                         |   27 ++-
+ arch/arm/plat-orion/include/plat/gpio.h            |    2 +
+ drivers/mtd/nand/orion_nand.c                      |   47 +++-
+ 19 files changed, 985 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ib62x0.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-iconnect.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+ create mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
+ create mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
