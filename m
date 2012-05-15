@@ -1,28 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 May 2012 14:54:12 +0200
-Subject: [PATCH 7/8] arm: mach-armada: add defconfig
-In-Reply-To: <4FB228CF.9040508@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB228CF.9040508@codethink.co.uk>
-Message-ID: <20120515145412.0bdb05d9@skate>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 15 May 2012 21:05:43 +0800
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
+In-Reply-To: <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
+References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
+ <20120515112732.GB10347@shlinux2.ap.freescale.net>
+ <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
+Message-ID: <20120515130542.GD10347@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 15 May 2012 10:58:39 +0100,
-Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
-
-> > diff --git a/arch/arm/configs/armada_defconfig
-> > b/arch/arm/configs/armada_defconfig new file mode 100644
+On Tue, May 15, 2012 at 08:33:58PM +0800, Linus Walleij wrote:
+> On Tue, May 15, 2012 at 1:27 PM, Dong Aisheng
+> <aisheng.dong@freescale.com> wrote:
+> > On Tue, May 15, 2012 at 07:10:58PM +0800, Linus Walleij wrote:
+> >> Dong, will you merge the i.MX stuff through pinctrl or through
+> >> ARM SoC?
+> >
+> > This patch has no dependency on any arm soc stuffs.
+> > I think it's ok to go through pinctrl.
 > 
-> personally, I'd go for armadaxp_defconfig.
+> OK I'll be merging them, I was just thinking if you planned to also
+> make machine changes in this kernel cycle.
+> 
+I did not plan it before, i checked with Shawn and he was also ok to
+go through pinctrl tree.
 
-Unfortunately, this would be very confusing: we support both Armada XP
-and Armada 370 here.
+Thanks
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards
+Dong Aisheng
