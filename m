@@ -1,50 +1,27 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 15 May 2012 22:12:18 +0800
-Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
-In-Reply-To: <20120515140355.GA15199@n2100.arm.linux.org.uk>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
- <20120515140355.GA15199@n2100.arm.linux.org.uk>
-Message-ID: <20120515141217.GA11174@b20223-02.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 14:13:04 +0000
+Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
+In-Reply-To: <CACRpkdbjCBi2tkPE-yV7NdHOsMZ_XHuHr3nDUnRekxDDoqRRfw@mail.gmail.com>
+References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
+ <201205151246.45384.arnd@arndb.de>
+ <CACRpkdbjCBi2tkPE-yV7NdHOsMZ_XHuHr3nDUnRekxDDoqRRfw@mail.gmail.com>
+Message-ID: <201205151413.04763.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 03:03:55PM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 15, 2012 at 09:58:20PM +0800, Richard Zhao wrote:
-> > +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
-> > +	if (!plat_ci) {
-> > +		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	ret = platform_device_add_resources(plat_ci, pdev->resource,
-> > +					    pdev->num_resources);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "can't add resources to platform device\n");
-> > +		goto put_platform;
-> > +	}
-> > +
-> > +	ret = platform_device_add_data(plat_ci, &ci13xxx_imx_udc_driver,
-> > +				       sizeof(ci13xxx_imx_udc_driver));
-> > +	if (ret)
-> > +		goto put_platform;
-> > +
-> > +	plat_ci->dev.dma_mask =
-> > +		kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> > +	if (!plat_ci->dev.dma_mask) {
-> > +		ret = -ENOMEM;
-> > +		goto put_platform;
-> > +	}
-> > +	*plat_ci->dev.dma_mask = DMA_BIT_MASK(32);
-> > +	plat_ci->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> > +
-> > +	ret = platform_device_add(plat_ci);
+On Tuesday 15 May 2012, Linus Walleij wrote:
+> On Tue, May 15, 2012 at 2:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Is there a reason not to use platform_device_register_full() ?
+> > One option would be that you just try to be very early with sending your
+> > branch and arm-soc goes directly after that, another option would be that
+> > we send a pull request for your tree along with the stuff that depends on
+> > it, with your permission.
 > 
-> Also, you don't set the parent device - is there a dependency between
-> 'pdev' and this new platform device you're creating?  If so, it should
-> be a child of 'pdev'.
-Thanks for your comment. All taken.
+> Either way is fine with me, I was planning to send a pull request as soon
+> as the merge window opens anyway. If you need it, I can lock down the
+> pinctrl tree and prepare the pull tag.
 
-Richard
+Ok, that's good then. I guess we can just wait until your pull request is
+out and put a note in the ones from arm-soc that depend on it.
+
+	Arnd
