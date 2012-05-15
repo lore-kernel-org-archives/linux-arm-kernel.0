@@ -1,102 +1,124 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 15 May 2012 21:58:22 +0800
-Subject: [PATCH v1 6/7] ARM: imx6q: add anatop initialization for usb
- controllers
+Date: Tue, 15 May 2012 21:58:23 +0800
+Subject: [PATCH v1 7/7] ARM: dts: imx6q-sabrelite: add usb devices
 In-Reply-To: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
 References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337090303-16046-7-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337090303-16046-8-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx6q.c |   60 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 60 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   19 +++++++++++++-
+ arch/arm/boot/dts/imx6q.dtsi          |   44 +++++++++++++++++++++++++++++++-
+ 2 files changed, 60 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 74e44d3..4530c45 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -22,6 +22,7 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/phy.h>
- #include <linux/micrel_phy.h>
-+#include <linux/mfd/anatop.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
-@@ -82,6 +83,63 @@ static void __init imx6q_sabrelite_init(void)
- 				ksz9021rn_phy_fixup);
- }
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 2f631f2..ccc794e 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -41,10 +41,27 @@
+ 					status = "okay";
+ 				};
+ 			};
+-
++			iomuxc at 020e0000 {
++				gpios {
++					pinctrl_gpio_hog: gpiohog {
++						fsl,pins = <1044 0x80000000
++							   144  0x80000000>;	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
++					};
++				};
++			};
+ 		};
  
-+static void __init imx6q_post_populate(void)
-+{
-+	u32 val;
+ 		aips-bus at 02100000 { /* AIPS2 */
++			usboh3 at 02184000 { /* USB OTG */
++				fsl,vbus-power = <&gpio3 22 0>;
++				status = "okay";
++			};
 +
-+#define HW_ANADIG_USB2_CHRG_DETECT	(0x00000210)
-+#define BM_ANADIG_USB2_CHRG_DETECT_EN_B 0x00100000
-+#define BM_ANADIG_USB2_CHRG_DETECT_CHK_CHRG_B 0x00080000
++			usboh3 at 02184200 { /* USB1 */
++				fsl,hub-reset = <&gpio7 12 0>;
++				status = "okay";
++			};
 +
-+#define HW_ANADIG_USB2_PLL_480_CTRL	(0x00000020)
-+#define BM_ANADIG_USB2_PLL_480_CTRL_BYPASS 0x00010000
-+#define BM_ANADIG_USB2_PLL_480_CTRL_ENABLE 0x00002000
-+#define BM_ANADIG_USB2_PLL_480_CTRL_POWER 0x00001000
-+#define BM_ANADIG_USB2_PLL_480_CTRL_EN_USB_CLKS 0x00000040
-+
-+	/* Some phy and power's special controls for host1
-+	 * 1. The external charger detector needs to be disabled
-+	 * or the signal at DP will be poor
-+	 * 2. The PLL's power and output to usb for host 1
-+	 * is totally controlled by IC, so the Software only needs
-+	 * to enable them at initializtion.
-+	 */
-+
-+	anatop_write_reg(NULL, HW_ANADIG_USB2_CHRG_DETECT,
-+			BM_ANADIG_USB2_CHRG_DETECT_EN_B |
-+			BM_ANADIG_USB2_CHRG_DETECT_CHK_CHRG_B,
-+			~0);
-+	anatop_write_reg(NULL, HW_ANADIG_USB2_PLL_480_CTRL, 0,
-+			BM_ANADIG_USB2_PLL_480_CTRL_BYPASS);
-+
-+	val = BM_ANADIG_USB2_PLL_480_CTRL_ENABLE |
-+	      BM_ANADIG_USB2_PLL_480_CTRL_POWER |
-+	      BM_ANADIG_USB2_PLL_480_CTRL_EN_USB_CLKS;
-+	anatop_write_reg(NULL, HW_ANADIG_USB2_PLL_480_CTRL, val, val);
-+
-+	/* Some phy and power's special controls for otg
-+	 * 1. The external charger detector needs to be disabled
-+	 * or the signal at DP will be poor
-+	 * 2. The EN_USB_CLKS is always enabled.
-+	 * The PLL's power is controlled by usb and others who
-+	 * use pll3 too.
-+	 */
-+#define HW_ANADIG_USB1_CHRG_DETECT      (0x000001b0)
-+#define BM_ANADIG_USB1_CHRG_DETECT_EN_B 0x00100000
-+#define BM_ANADIG_USB1_CHRG_DETECT_CHK_CHRG_B 0x00080000
-+
-+#define HW_ANADIG_USB1_PLL_480_CTRL     (0x00000010)
-+#define BM_ANADIG_USB1_PLL_480_CTRL_EN_USB_CLKS 0x00000040
-+
-+	anatop_write_reg(NULL, HW_ANADIG_USB1_CHRG_DETECT,
-+			BM_ANADIG_USB1_CHRG_DETECT_EN_B
-+			| BM_ANADIG_USB1_CHRG_DETECT_CHK_CHRG_B,
-+			~0);
-+	anatop_write_reg(NULL, HW_ANADIG_USB1_PLL_480_CTRL,
-+			BM_ANADIG_USB1_PLL_480_CTRL_EN_USB_CLKS,
-+			BM_ANADIG_USB1_PLL_480_CTRL_EN_USB_CLKS);
-+}
-+
- static void __init imx6q_init_machine(void)
- {
- 	/*
-@@ -95,6 +153,8 @@ static void __init imx6q_init_machine(void)
+ 			ethernet at 02188000 {
+ 				phy-mode = "rgmii";
+ 				phy-reset-gpios = <&gpio3 23 0>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index b5a15c4..863cb74 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -444,12 +444,14 @@
+ 				};
+ 			};
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-			usbphy at 020c9000 { /* USBPHY1 */
++			usbphy1: usbphy at 020c9000 {
++				compatible = "fsl,imx6q-usbphy";
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 			};
  
-+	imx6q_post_populate();
+-			usbphy at 020ca000 { /* USBPHY2 */
++			usbphy2: usbphy at 020ca000 {
++				compatible = "fsl,imx6q-usbphy";
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 			};
+@@ -485,7 +487,15 @@
+ 				compatible = "fsl,imx6q-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_gpio_hog>;
 +
- 	imx6q_pm_init();
- }
+ 				/* shared pinctrl settings */
++				gpios {
++					pinctrl_gpio_hog: gpiohog {
++					};
++				};
++
+ 				usdhc3 {
+ 					pinctrl_usdhc3_1: usdhc3grp-1 {
+ 						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
+@@ -550,6 +560,36 @@
+ 				reg = <0x0217c000 0x4000>;
+ 			};
  
++			usboh3 at 02184000 { /* USB OTG */
++				compatible = "fsl,imx6q-usboh3";
++				reg = <0x02184000 0x200>;
++				interrupts = <0 43 0x04>;
++				fsl,usbphy = <&usbphy1>;
++				status = "disabled";
++			};
++
++			usboh3 at 02184200 { /* USB1 */
++				compatible = "fsl,imx6q-usboh3";
++				reg = <0x02184200 0x200>;
++				interrupts = <0 40 0x04>;
++				fsl,usbphy = <&usbphy2>;
++				status = "disabled";
++			};
++
++			usboh3 at 02184400 { /* USB2 */
++				compatible = "fsl,imx6q-usboh3";
++				reg = <0x02184400 0x200>;
++				interrupts = <0 41 0x04>;
++				status = "disabled";
++			};
++
++			usboh3 at 02184600 { /* USB3 */
++				compatible = "fsl,imx6q-usboh3";
++				reg = <0x02184600 0x200>;
++				interrupts = <0 42 0x04>;
++				status = "disabled";
++			};
++
+ 			ethernet at 02188000 {
+ 				compatible = "fsl,imx6q-fec";
+ 				reg = <0x02188000 0x4000>;
 -- 
 1.7.5.4
