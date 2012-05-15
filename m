@@ -1,57 +1,202 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 15 May 2012 10:37:26 +0530
-Subject: Cyclic DMA - callback properties and tx_status residue
-In-Reply-To: <20120511140710.GC6220@n2100.arm.linux.org.uk>
-References: <20120502144555.GA4456@n2100.arm.linux.org.uk>
- <1335974475.1593.20.camel@vkoul-udesk3>
- <20120502162702.GE3548@n2100.arm.linux.org.uk>
- <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
- <20120509093334.GS26481@n2100.arm.linux.org.uk>
- <20120509111614.GH3955@opensource.wolfsonmicro.com>
- <20120509121945.GT26481@n2100.arm.linux.org.uk>
- <1336621458.1540.280.camel@vkoul-udesk3>
- <20120510094205.GM3908@opensource.wolfsonmicro.com>
- <1336647675.15424.390.camel@vkoul-udesk3>
- <20120511140710.GC6220@n2100.arm.linux.org.uk>
-Message-ID: <1337058446.16185.5382.camel@vkoul-udesk3>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 15 May 2012 13:56:14 +0800
+Subject: [PATCH] pinctrl: mxs: add gpio range support
+Message-ID: <1337061374-24823-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-11 at 15:07 +0100, Russell King - ARM Linux wrote:
-> On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
-> > This should not be in ASoC library. The driver should be able to detect
-> > if a tasklet was called for many dma completions and notify the client
-> > (soc-lib) accordingly.
-> 
-> No.  Think about the cyclic case.  How do you correctly record how many
-> 'periods' have completed so that when your tasklet eventually gets called,
-> you call its callback the correct number of times?
-In ISR you can find which descriptors the interupt is for and then use
-this info in tasklet.
+The mxs pins are organized in banks and each bank contains 32 pins.
+i.MX23 has 4 banks in total, and every pin in the first 3 banks has
+gpio function available.  i.MX28 has 7 banks and the first 5 banks
+are capable of gpio mode.
 
-> 
-> I think that's totally pointless and wasteful too from the ALSA core code
-> point of view - all the ALSA cares about is that "some periods have
-> completed" and ALSA will then ask the low level driver where the DMA is,
-> and update things according to the current DMA position.
-> 
-> It is my opinion that having this emulation of the current position in
-> soc-dmaengine-pcm is not only causing a wrong direction to be taken here,
-> but is potentially causing inefficiency by forcing conditions into the API
-> which we really don't need.
-> 
-> > One way to do this would be to ensure that the descriptor is marked in
-> > irq_handler and then all descriptor completed notified in tasklet.
-> 
-> No.  You're assuming that for each IRQ you have the tasklet run exactly
-> once.  There is no such guarantee.
-No, I am assuming IRQ is called everytime and takslet sometimes!
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+As the gpio base is runtime determined for each port when booting
+from device tree, the .base of struct pinctrl_gpio_range can only be
+initialized with a offset local to the port, and have to plus gpio base
+of the port at runtime.
 
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/pinctrl/pinctrl-imx23.c |   12 ++++++++
+ drivers/pinctrl/pinctrl-imx28.c |   19 +++++++++++++
+ drivers/pinctrl/pinctrl-mxs.c   |   55 +++++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-mxs.h   |    2 +
+ 4 files changed, 88 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
+index 75d3eff..695b64b 100644
+--- a/drivers/pinctrl/pinctrl-imx23.c
++++ b/drivers/pinctrl/pinctrl-imx23.c
+@@ -261,10 +261,22 @@ static struct mxs_regs imx23_regs = {
+ 	.pull = 0x400,
+ };
+ 
++/*
++ * The .base is initialized as the gpio offset local to the port, and will
++ * have gpio base of the port added at runtime.
++ */
++static struct pinctrl_gpio_range imx23_gpio_ranges[] = {
++	{ .name = "gpio", .id = 0, .base = 0, .pin_base = 0,  .npins = 32, },
++	{ .name = "gpio", .id = 1, .base = 0, .pin_base = 32, .npins = 31, },
++	{ .name = "gpio", .id = 2, .base = 0, .pin_base = 64, .npins = 32, },
++};
++
+ static struct mxs_pinctrl_soc_data imx23_pinctrl_data = {
+ 	.regs = &imx23_regs,
+ 	.pins = imx23_pins,
+ 	.npins = ARRAY_SIZE(imx23_pins),
++	.gpio_ranges = imx23_gpio_ranges,
++	.gpio_num_ranges = ARRAY_SIZE(imx23_gpio_ranges),
+ };
+ 
+ static int __devinit imx23_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/pinctrl-imx28.c b/drivers/pinctrl/pinctrl-imx28.c
+index b973026..c9a8e67 100644
+--- a/drivers/pinctrl/pinctrl-imx28.c
++++ b/drivers/pinctrl/pinctrl-imx28.c
+@@ -377,10 +377,29 @@ static struct mxs_regs imx28_regs = {
+ 	.pull = 0x600,
+ };
+ 
++/*
++ * The .base is initialized as the gpio offset local to the port, and will
++ * have gpio base of the port added at runtime.
++ */
++static struct pinctrl_gpio_range imx28_gpio_ranges[] = {
++	{ .name = "gpio", .id = 0, .base = 0,  .pin_base = 0,   .npins = 8, },
++	{ .name = "gpio", .id = 0, .base = 16, .pin_base = 16,  .npins = 13, },
++	{ .name = "gpio", .id = 1, .base = 0,  .pin_base = 32,  .npins = 32, },
++	{ .name = "gpio", .id = 2, .base = 0,  .pin_base = 64,  .npins = 11, },
++	{ .name = "gpio", .id = 2, .base = 12, .pin_base = 76,  .npins = 10, },
++	{ .name = "gpio", .id = 2, .base = 24, .pin_base = 88,  .npins = 4, },
++	{ .name = "gpio", .id = 3, .base = 0,  .pin_base = 96,  .npins = 19, },
++	{ .name = "gpio", .id = 3, .base = 20, .pin_base = 116, .npins = 11, },
++	{ .name = "gpio", .id = 4, .base = 0,  .pin_base = 128, .npins = 17, },
++	{ .name = "gpio", .id = 4, .base = 20, .pin_base = 148, .npins = 1, },
++};
++
+ static struct mxs_pinctrl_soc_data imx28_pinctrl_data = {
+ 	.regs = &imx28_regs,
+ 	.pins = imx28_pins,
+ 	.npins = ARRAY_SIZE(imx28_pins),
++	.gpio_ranges = imx28_gpio_ranges,
++	.gpio_num_ranges = ARRAY_SIZE(imx28_gpio_ranges),
+ };
+ 
+ static int __devinit imx28_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/pinctrl-mxs.c b/drivers/pinctrl/pinctrl-mxs.c
+index ab63d38..ea33ebc 100644
+--- a/drivers/pinctrl/pinctrl-mxs.c
++++ b/drivers/pinctrl/pinctrl-mxs.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_gpio.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/pinctrl/pinconf.h>
+ #include <linux/pinctrl/pinctrl.h>
+@@ -220,12 +221,41 @@ static void mxs_pinctrl_disable(struct pinctrl_dev *pctldev,
+ 	/* Nothing to do here */
+ }
+ 
++static int mxs_gpio_request_enable(struct pinctrl_dev *pctldev,
++				   struct pinctrl_gpio_range *range,
++				   unsigned pinid)
++{
++	struct mxs_pinctrl_data *d = pinctrl_dev_get_drvdata(pctldev);
++	void __iomem *reg;
++	u8 bank, shift;
++	u16 pin;
++
++	bank = PINID_TO_BANK(pinid);
++	pin = PINID_TO_PIN(pinid);
++	reg = d->base + d->soc->regs->muxsel;
++	reg += bank * 0x20 + pin / 16 * 0x10;
++	shift = pin % 16 * 2;
++
++	writel(0x3 << shift, reg + SET);
++
++	return 0;
++}
++
++static void mxs_gpio_disable_free(struct pinctrl_dev *pctldev,
++				  struct pinctrl_gpio_range *range,
++				  unsigned pinid)
++{
++	/* Nothing to do here */
++}
++
+ static struct pinmux_ops mxs_pinmux_ops = {
+ 	.get_functions_count = mxs_pinctrl_get_funcs_count,
+ 	.get_function_name = mxs_pinctrl_get_func_name,
+ 	.get_function_groups = mxs_pinctrl_get_func_groups,
+ 	.enable = mxs_pinctrl_enable,
+ 	.disable = mxs_pinctrl_disable,
++	.gpio_request_enable = mxs_gpio_request_enable,
++	.gpio_disable_free = mxs_gpio_disable_free,
+ };
+ 
+ static int mxs_pinconf_get(struct pinctrl_dev *pctldev,
+@@ -482,7 +512,9 @@ int __devinit mxs_pinctrl_probe(struct platform_device *pdev,
+ 				struct mxs_pinctrl_soc_data *soc)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
++	struct device_node *child;
+ 	struct mxs_pinctrl_data *d;
++	int id, i, j = 0;
+ 	int ret;
+ 
+ 	d = devm_kzalloc(&pdev->dev, sizeof(*d), GFP_KERNEL);
+@@ -500,6 +532,26 @@ int __devinit mxs_pinctrl_probe(struct platform_device *pdev,
+ 	mxs_pinctrl_desc.npins = d->soc->npins;
+ 	mxs_pinctrl_desc.name = dev_name(&pdev->dev);
+ 
++	for_each_child_of_node(np, child) {
++		if (!of_device_is_compatible(child, "fsl,mxs-gpio"))
++			continue;
++
++		id = of_alias_get_id(child, "gpio");
++		if (id < 0 || id > soc->gpio_num_ranges) {
++			dev_err(&pdev->dev, "invalid gpio id: %d\n", id);
++			return id;
++		}
++
++		for (i = j; i < soc->gpio_num_ranges; i++) {
++			struct pinctrl_gpio_range *range = &soc->gpio_ranges[i];
++			if (range->id == id) {
++				range->gc = of_node_to_gpiochip(child);
++				range->base += range->gc->base;
++				j++;
++			}
++		}
++	}
++
+ 	platform_set_drvdata(pdev, d);
+ 
+ 	ret = mxs_pinctrl_probe_dt(pdev, d);
+@@ -515,6 +567,9 @@ int __devinit mxs_pinctrl_probe(struct platform_device *pdev,
+ 		goto err;
+ 	}
+ 
++	for (i = 0; i < soc->gpio_num_ranges; i++)
++		pinctrl_add_gpio_range(d->pctl, &soc->gpio_ranges[i]);
++
+ 	return 0;
+ 
+ err:
+diff --git a/drivers/pinctrl/pinctrl-mxs.h b/drivers/pinctrl/pinctrl-mxs.h
+index fdd88d0b..7feef15 100644
+--- a/drivers/pinctrl/pinctrl-mxs.h
++++ b/drivers/pinctrl/pinctrl-mxs.h
+@@ -82,6 +82,8 @@ struct mxs_pinctrl_soc_data {
+ 	unsigned nfunctions;
+ 	struct mxs_group *groups;
+ 	unsigned ngroups;
++	struct pinctrl_gpio_range *gpio_ranges;
++	unsigned gpio_num_ranges;
+ };
+ 
+ int mxs_pinctrl_probe(struct platform_device *pdev,
 -- 
-~Vinod
+1.7.4.1
