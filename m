@@ -1,45 +1,56 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 14 May 2012 22:59:41 -0700
-Subject: [PATCH] clk: Constify struct clk_init_data
-In-Reply-To: <4FB1E5F6.7070401@ti.com>
-References: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20120514215304.GB3075@gmail.com> <4FB1AC79.7000901@codeaurora.org>
- <4FB1E5F6.7070401@ti.com>
-Message-ID: <CAJOA=zPYY1PQsRn+TAf3QCFGd14N++8BTxnaPYc400PZgssL4A@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 15 May 2012 06:05:26 +0000
+Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
+In-Reply-To: <20120512171503.GL5140@atomide.com>
+References: <4FAD0A71.80201@ti.com> <20120511195620.GX21851@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA23806@DBDE01.ent.ti.com>
+ <20120512171503.GL5140@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA25EB3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 10:13 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> Hi Saravana,
->
->
-> On Tuesday 15 May 2012 06:38 AM, Saravana Kannan wrote:
->>
->> Btw, I didn't follow up on the other thread we were having, but can you
->> remind me again what was the reason that you thought that only
->> __clk_init() would work for your static init code and __clk_register()
->> won't work?
->
->
-> One of the main reason has been the platform implementation we have to
-> handle some complex mux/divider combo clocks in OMAP2/3 which rely on
-> 'struct clk' pointers. Maybe we can do away with the existing
-> implementation and redo it so we don't have any such limitation, but the
-> quantum of change moving to common clk has been so much that we are
-> trying to minimize on the platform code changes for now. So while
-> we move to common clk it would still be useful to have __clk_init()
-> around for a while till we figure out how to get rid of it for OMAP.
->
+On Sat, May 12, 2012 at 22:45:04, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120512 01:26]:
+> > On Sat, May 12, 2012 at 01:26:20, Tony Lindgren wrote:
+> > > Hi,
+> > > 
+> > > * Cousson, Benoit <b-cousson@ti.com> [120511 05:51]:
+> > > > Hi Tony,
+> > > > 
+> > > > Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
+> > > > It applies now fine on top of lo/dt branch.
+> > > 
+> > > It seems that there are still patches being discussed for those SoCs
+> > > and we're pretty much done for this merge window. So unless things
+> > > drag on to -rc8, I'd say we just need to postpone merging new things
+> > > and merge them early around -rc2.
+> > > 
+> > 
+> > Oops...
+> > It seems like I missed this merge window as well...
+> 
+> We can still queue these into linux-omap for testing as
+> soon as the patches are ready.
+> 
+> In general, for anything more intrusive we want to have
+> the patches sitting in linux-omap master branch and then
+> in linux-next for at least a week. Then merging them into
+> mainline tree is usually safe to do. The reason for this is
+> that mainline kernel is our stable tree, not our
+> development tree.
+> 
+> We just need to queue most of things between -rc2 and
+> -rc4 into the arm-soc tree, and have any issues fixed up
+> before the merge window. Trying to cram development
+> branches in around -rc6 just causes us a huge maintenance
+> nightmare trying to fix up things in the mainline tree
+> between -rc1 and -rc4.
+> 
 
-Just to add to what Rajendra has stated for OMAP: after OMAP's
-conversion is finally made initcall-able then I'll get rid of lots of
-the gross macros and before-the-memory-allocator-is-alive stuff.  I'll
-make sure that no other platforms are using those bits of course, but
-I plan on removing some of this stuff from the core once my platform
-is up to speed.
+Understood Tony...
 
-Regards,
-Mike
+This time I will try to follow up closely and will make sure that we have 
+everything (especially new development) by rc2-rc4 window.
 
-> regards,
-> Rajendra
+Thanks,
+Vaibhav
