@@ -1,101 +1,37 @@
-From: nalajala.murali@gmail.com (Murali N)
-Date: Tue, 15 May 2012 14:55:12 +0530
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
-Message-ID: <CAF0TxbryfrZDRbQg-giXO0=OmK2Bty=oDrMVnFxNPAcXgg_sjg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 09:25:17 +0000
+Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
+ arch-pxa git tree
+In-Reply-To: <CAN1soZzgO7yKfPM8wx9-8i85iq1OW=FxfjRFsOpGd4A_eiyqDQ@mail.gmail.com>
+References: <CAN1soZzgO7yKfPM8wx9-8i85iq1OW=FxfjRFsOpGd4A_eiyqDQ@mail.gmail.com>
+Message-ID: <201205150925.17477.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 10:45 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
->> On Mon, May 14, 2012 at 05:21:50PM +0100, Lorenzo Pieralisi wrote:
->> > On Mon, May 14, 2012 at 04:58:59PM +0100, Russell King - ARM Linux wrote:
->> > > On Mon, May 14, 2012 at 04:50:22PM +0100, Lorenzo Pieralisi wrote:
->> > > > > 2. L2 disable
->> > > > > 3. L1 clean & invalidate
->> > > >
->> > > > This is wrong again since while cleaning and invalidating the cache (L1 here)
->> > > > can still allocate and this must not happen.
->> > >
->> > > No it isn't. ?There is never anything wrong with allocating new caches lines
->> > > into a cache which is going to (eventually) be powered down. ?Ever.
->> >
->> > What if the cache allocates a dirty cache line moved from L1 of another
->> > processor ?
->> >
->> > > What would be wrong is if we end up with dirty cache lines in the cache
->> > > to be powered down for data which we _care_ about preserving when power
->> > > is lost.
->> > >
->> > > That's a _very_ _very_ important difference.
->> >
->> > That's exactly the point I am making. dirty cache lines can be migrated across
->> > processors caches. If we want to shut down a single core we have to be 100%
->> > sure that dirty cache lines (if we care about that data, we might be not as you
->> > pointed out) must not be present in L1 when we shut the core down. If the C
->> > bit in SCTLR is not cleared before cleaning and invalidating this is not
->> > guaranteed from an architectural point of view.
->> >
->> > Occurences might be rare, but it is still not safe to clean the cache with the
->> > C bit set.
->>
->> It's not safe to disable the C bit without first pushing the dirty data out
->> to RAM either. ?It's a catch-22 situation - because turning the C bit off
->> not only stops the caches allocating new lines but also prevents them being
->> searched.
->
-> That depends on the processor. On A9 cache is bypassed on A15 it is not,
-> data access might still hit in the cache.
->
-> It is "implementation defined" according to ARM ARM (B2-1265).
-> But C bit cleared stops allocation that's true across all implementations.
->
->> That means your view of cacheable memory suddenly changes beneath you when
->> the C bit is turned off.
->
-> Yes might be (see above) but the cache operations still work so we do
-> not have any problem (well, as long as we clean and invalidate without
-> using data that can live in the cache, but that's how it is done on v7 cache
-> flush ops and it is perfectly fine).
->
->> From what you're saying - and from my understanding of your cache behaviours,
->> even the sequence:
->> - clean cache
->> - disable C bit
->> - clean cache
->> is buggy.
->
-> No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
->
->>
->> I think what you're effectively saying is that it is not possible to safely
->> power down a cache on an ARM SMP CPU...
->
-> It is possible, but the final clean must be done with C bit cleared. It is
-> belt and braces, agreed, but that's the only way to do it properly.
->
-> Lorenzo
->
+On Tuesday 08 May 2012, Haojian Zhuang wrote:
+> Neil Zhang (4):
+>       ARM: mmp: add usb device support for PXA910
+>       ARM: mmp: add usb device support for ttc dkb
+>       ARM: mmp: add usb host support for PXA168
+>       ARM: mmp: add usb host support for aspen
+> 
+> Paul Parsons (5):
+>       ARM: pxa: hx4700: Initialize DS1WM clock_rate
+>       ARM: pxa: hx4700: Enable ASIC3 GPIO as a wakeup source
+>       ARM: pxa: hx4700: Add PCMCIA/CF support
+>       ARM: pxa: Add standard UART to hx4700_pin_config[]
 
-In my case while powering down the core0, core1 is already in *off*
-state and out of coherency.
-So, while shutting down the CPU0 (cpu1 is already off) still i need to
-follow the steps you have mentioned for effective power down of a
-cache?
-My feel is while going to shutdown effectively i operate in a single
-core mode, so it doesn't make any difference in following either of
-the sequence?
+The last patch in this series causes a build error with magician_defconfig:
 
-Please correct me if i am wrong.
+/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: unknown field 'clock_rate' specified in initializer
+/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: initialization makes pointer from integer without a cast [-Werror]
+/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: (near initialization for 'asic3_platform_data.leds') [-Werror]
+cc1: all warnings being treated as errors
+make[2]: *** [arch/arm/mach-pxa/hx4700.o] Error 1
+make[1]: *** [arch/arm/mach-pxa] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
 
--- 
-Regards,
-Murali N
+Did you miss a dependency? Should I revert that patch for now?
+
+	Arnd
