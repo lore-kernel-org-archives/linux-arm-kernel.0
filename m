@@ -1,48 +1,32 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 16:36:03 +0100
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 May 2012 17:39:09 +0200
 Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120515170020.23c68cac@skate>
+In-Reply-To: <201205151527.01156.arnd@arndb.de>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB26E4B.4020609@codethink.co.uk> <20120515170020.23c68cac@skate>
-Message-ID: <4FB277E3.4020805@codethink.co.uk>
+ <4FB269CB.4080804@gmail.com> <20120515164438.22258885@skate>
+ <201205151527.01156.arnd@arndb.de>
+Message-ID: <20120515173909.383a0d8a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 16:00, Thomas Petazzoni wrote:
-> Le Tue, 15 May 2012 15:55:07 +0100,
-> Ben Dooks<ben.dooks@codethink.co.uk>  a ?crit :
->
->>> This preliminary support only includes the necessary code for timer
->>> and IRQ support, the serial controller is a standard
->>> 16550-compatible one. The diffstat looks like:
->>
->> FYI, built and tested on our system here and it gets to
->> printing the sched_clock line and getting no further.
->>
->> I will have a debug.
->
-> Hum, strange. On which platform exactly?
+Le Tue, 15 May 2012 15:27:00 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-I've tracked this down to the following:
-arch/arm/mach-armada/time.c
+> The problem with mach-marvell is that it would be confusing in the
+> presence of pxa/mmp which I would probably still leave out of that
+> directory, since they are rather different inside.
 
-    190          } else {
-    191                  u32 clk;
-    192                  of_property_read_u32(np, "clock-frequency", &clk);
-    193                  WARN_ON(!clk);
+Sure.
 
-The problem is the 'clk' variable is un-initialised and therefore
-the fact my device-tree is missing a clock-frequency property is
-causing the system to use what was in 'clk' which was around 16000
-from the stack.
+> I think we can just start with the existing plat-orion directory until
+> someone comes up with a better place.
 
-I suggest that any property that is necessary to a unit operation
-should check that there was something to read. WARN_ON() is fine,
-but they you should not carry on and initialise the unit anyway.
+So you want us to put all this new source code that typically belongs
+to a mach-* directory into plat-orion/ ?
 
-I have now gone and fixed my .dts file and the system now gets to
-the point to try and mount an initrd.
-
+Thomas
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
