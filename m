@@ -1,58 +1,79 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 14 May 2012 17:23:16 -0700
-Subject: [UPDATE PATCH] Fix bcmring IO mem mapping.
-Message-ID: <4FB1A1F4.3080503@broadcom.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 14 May 2012 18:08:09 -0700
+Subject: [PATCH] clk: Constify struct clk_init_data
+In-Reply-To: <20120514215304.GB3075@gmail.com>
+References: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <20120514215304.GB3075@gmail.com>
+Message-ID: <4FB1AC79.7000901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BCMRING IO mem static mapping table has overlapping entries which causes bcmring booting issue since v3.2 when kernel started checking this problem.
+On 05/14/2012 02:53 PM, Turquette, Mike wrote:
+> On Mon, May 14, 2012 at 7:12 AM, Mark Brown<broonie@opensource.wolfsonmicro.com>  wrote:
+>> Allow drivers to declare their clk_init_data const, the framework really
+>> shouldn't be modifying the data.
+>>
+>> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+>
+> +interested parties
+>
+> Mark, I like this change but it's reminded me of a few things I meant to
+> bring up on the list in the past.  Certainly some folks will mark their
+> struct clk_hw_init data as __initconst.  Currently none of the
+> documentation mentions that fact and I'm a bit worried about clk code
+> which assumes that hw->init will always be around and freely accesses
+> it.
+>
+> I think that, as a rule, hw->init cannot be assumed to be valid after
+> clk_register returns.  Would anyone else like to weigh in on it?  If so
+> then I'll cook up a follow-up patch to reflect this in the kerneldoc.
 
-It should be fixed anyway so that they are consolidated to make sure the table is valid.
-Comments are also updated accordingly.
+If you mean hw->init pointer can't be assumed to be point to anything 
+valid after clk_register or __clk_register, then yes, I agree with that. 
+But the actual data that hw->init pointed to might still be around and 
+referenced by clk if __clk_register is used.
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+Btw, I didn't follow up on the other thread we were having, but can you 
+remind me again what was the reason that you thought that only 
+__clk_init() would work for your static init code and __clk_register() 
+won't work? Or did I just misunderstand your comment that was trying to 
+say that you didn't want to switch to __clk_register close to kernel 
+release?
 
----
- arch/arm/mach-bcmring/mm.c |   27 +++++++++++----------------
- 1 file changed, 11 insertions(+), 16 deletions(-)
+There are some older threads where I think we are a bit out of sync on 
+the init data (I thought I did what you said you preferred, but you 
+asked me why I did that). I will try to restart them.
 
-diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
-index 1adec78..b46ea07 100644
---- a/arch/arm/mach-bcmring/mm.c
-+++ b/arch/arm/mach-bcmring/mm.c
-@@ -31,24 +31,19 @@
- 	.type = MT_MEMORY }
-  static struct map_desc bcmring_io_desc[] __initdata = {
--	IO_DESC(MM_IO_BASE_NAND, SZ_64K),	/* phys:0x28000000-0x28000FFF  virt:0xE8000000-0xE8000FFF  size:0x00010000 */
--	IO_DESC(MM_IO_BASE_UMI, SZ_64K),	/* phys:0x2C000000-0x2C000FFF  virt:0xEC000000-0xEC000FFF  size:0x00010000 */
--
- 	IO_DESC(MM_IO_BASE_BROM, SZ_64K),	/* phys:0x30000000-0x3000FFFF  virt:0xF3000000-0xF300FFFF  size:0x00010000 */
--	MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),	/* phys:0x31000000-0x31FFFFFF  virt:0xF3100000-0xF31FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_DMA0, SZ_1M),	/* phys:0x32000000-0x32FFFFFF  virt:0xF3200000-0xF32FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_DMA1, SZ_1M),	/* phys:0x33000000-0x33FFFFFF  virt:0xF3300000-0xF33FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_ESW, SZ_1M),	/* phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_CLCD, SZ_1M),	/* phys:0x35000000-0x35FFFFFF  virt:0xF3500000-0xF35FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_APM, SZ_1M),	/* phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_SPUM, SZ_1M),	/* phys:0x37000000-0x37FFFFFF  virt:0xF3700000-0xF37FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),	/* phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),	/* phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x01000000 */
--
-+	MEM_DESC(MM_IO_BASE_ARAM, SZ_1M),	/* phys:0x31000000-0x31FFFFFF  virt:0xF3100000-0xF31FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_DMA0, SZ_1M),	/* phys:0x32000000-0x32FFFFFF  virt:0xF3200000-0xF32FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_DMA1, SZ_1M),	/* phys:0x33000000-0x33FFFFFF  virt:0xF3300000-0xF33FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_ESW, SZ_1M),	        /* phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_CLCD, SZ_1M),	/* phys:0x35000000-0x35FFFFFF  virt:0xF3500000-0xF35FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_APM, SZ_1M),	        /* phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_SPUM, SZ_1M),	/* phys:0x37000000-0x37FFFFFF  virt:0xF3700000-0xF37FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M),	/* phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x00100000 */
-+	IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M),	/* phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x00100000 */
- 	IO_DESC(MM_IO_BASE_VRAM, SZ_64K),	/* phys:0x40000000-0x4000FFFF  virt:0xF4000000-0xF400FFFF  size:0x00010000 */
--	IO_DESC(MM_IO_BASE_CHIPC, SZ_16M),	/* phys:0x80000000-0x80FFFFFF  virt:0xF8000000-0xF8FFFFFF  size:0x01000000 */
--	IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD,
--		SZ_16M),	/* phys:0x0F000000-0x0FFFFFFF  virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-+	IO_DESC(MM_IO_BASE_CHIPC, SZ_8M),	/* phys:0x80000000-0x807FFFFF  virt:0xF8000000-0xF87FFFFF  size:0x00800000 */
-+	IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD, SZ_16M), /* phys:0x0F000000-0x0FFFFFFF virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
- };
-  void __init bcmring_map_io(void)
+Thanks,
+Saravana
+
+>
+> Thanks,
+> Mike
+>
+>> ---
+>>   include/linux/clk-provider.h |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index c1c23b9..fc43ea6 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -143,7 +143,7 @@ struct clk_init_data {
+>>   */
+>>   struct clk_hw {
+>>         struct clk *clk;
+>> -       struct clk_init_data *init;
+>> +       const struct clk_init_data *init;
+>>   };
+>>
+>>   /*
+>> --
+>> 1.7.10
+>>
+>
+
+
 -- 
-1.7.9.5
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
