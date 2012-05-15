@@ -1,16 +1,24 @@
-From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Tue, 15 May 2012 15:25:54 +0800
-Subject: Compile err with raumfeld_defconfig
-Message-ID: <1337066754-20520-1-git-send-email-jgq516@gmail.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 15 May 2012 14:44:03 +0800
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
+In-Reply-To: <1337010369-28687-1-git-send-email-b29396@freescale.com>
+References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120515064401.GA10347@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 14, 2012 at 11:46:08PM +0800, Dong Aisheng-B29396 wrote:
+> +See below for available PIN_FUNC_ID for imx53:
+> +MX53_PAD_GPIO_19__KPP_COL_5				1
+To align with mx6, the id base in the binding doc should start from 0.
+Will update the doc in v2.
 
-Does somebody notice this compile err with raumfeld_defconfig as follows?
+> +MX53_PAD_GPIO_19__GPIO4_5				2
+> +MX53_PAD_GPIO_19__CCM_CLKO				3
+> +MX53_PAD_GPIO_19__SPDIF_OUT1				4
+> +MX53_PAD_GPIO_19__RTC_CE_RTC_EXT_TRIG2			5
+> +MX53_PAD_GPIO_19__ECSPI1_RDY				6
+...
 
-drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
-drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of function 'irq_to_gpio'
-
-Regards,
-Xiao
+Regards
+Dong Aisheng
