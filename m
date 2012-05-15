@@ -1,25 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 13:22:36 +0100
-Subject: [PATCH] ARM: LPAE: fix access flag setup in mem_type_table
-In-Reply-To: <1337018189-27356-1-git-send-email-vitalya@ti.com>
-References: <1337018189-27356-1-git-send-email-vitalya@ti.com>
-Message-ID: <20120515122236.GL10453@n2100.arm.linux.org.uk>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Tue, 15 May 2012 13:22:44 +0100 (BST)
+Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
+ arch-pxa git tree
+In-Reply-To: <201205151140.07655.arnd@arndb.de>
+Message-ID: <1337084564.4250.YahooMailClassic@web29010.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 01:56:29PM -0400, Vitaly Andrianov wrote:
-> A zero value for prot_sect in the memory types table implies that
-> section mappings should never be created for the memory type in question.
-> This is checked for in alloc_init_section().
-> 
-> With LPAE, we set a bit to mask access flag faults for kernel mappings.
-> This breaks the aforementioned (!prot_sect) check in alloc_init_section().
-> 
-> This patch fixes this bug by first checking for a non-zero
-> prot_sect before setting the PMD_SECT_AF flag.
-> 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Hello Arnd,
 
-Same comments as for the previous patch.
+--- On Tue, 15/5/12, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > Did you miss a dependency? Should I revert that
+> patch for
+> > > now?
+> > 
+> > hx4700.c expects to find the clock_rate field in the
+> > asic3_platform_data structure.
+> > 
+> > The clock_rate field is due to be added in V3.5:
+> > 
+> > http://lkml.indiana.edu/hypermail/linux/kernel/1204.2/00339.html
+> > 
+> 
+> This is not good, you should not split patches in a way that
+> breaks
+> the individual pieces. It would have been better to just
+> take the entire
+> patch through either arm-soc or the mfd tree.
+> 
+> Any suggestions for a way out of this mess? I'm inclined to
+> just
+> revert the patch I have and let Samuel pick it up to submit
+> it along
+> with the other half.
+
+I apologise if it's causing problems; I was trying to avoid
+crossing maintainer boundaries.
+
+Revert it and I'll resubmit it unchanged for V3.6.
+
+Regards,
+Paul
