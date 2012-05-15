@@ -1,32 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 12:28:54 +0000
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
- arch-pxa git tree
-In-Reply-To: <1337084564.4250.YahooMailClassic@web29010.mail.ird.yahoo.com>
-References: <1337084564.4250.YahooMailClassic@web29010.mail.ird.yahoo.com>
-Message-ID: <201205151228.54881.arnd@arndb.de>
+From: alior@marvell.com (Lior Amsalem)
+Date: Tue, 15 May 2012 15:26:52 +0300
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FB23B9F.6040708@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB23B9F.6040708@codethink.co.uk>
+Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56A998C34@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Paul Parsons wrote:
-> > This is not good, you should not split patches in a way that
-> > breaks
-> > the individual pieces. It would have been better to just
-> > take the entire
-> > patch through either arm-soc or the mfd tree.
-> > 
-> > Any suggestions for a way out of this mess? I'm inclined to
-> > just
-> > revert the patch I have and let Samuel pick it up to submit
-> > it along
-> > with the other half.
+> -----Original Message-----
+> From: Ben Dooks [mailto:ben.dooks at codethink.co.uk]
+> Sent: Tuesday, May 15, 2012 2:19 PM
+> To: Thomas Petazzoni
+> Cc: Arnd Bergmann; Olof Johansson; Lior Amsalem; Andrew Lunn; Jason
+> Cooper; Nicolas Pitre; Maen Suleiman; Ben Dooks; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm: Add basic support for new Marvell Armada SoC
+> family
 > 
-> I apologise if it's causing problems; I was trying to avoid
-> crossing maintainer boundaries.
+> On 15/05/12 09:54, Thomas Petazzoni wrote:
+[snip]
+
+> >
+> > The patch set is based on your arm-soc/for-next branch.
 > 
-> Revert it and I'll resubmit it unchanged for V3.6.
+> Is there a git tree that can be pulled from?
+https://github.com/Marvell-Semi/EBU_mainline_public/tree/for-next
 
-We can still get it into 3.5, that's not the problem, let's
-just try to keep the kernel bisectible in the process.
+> 
+> > We intend to quickly build on top of this initial support with the
+> > following elements:
+> >
+> >   * Usage of the clock framework
+> 
+> I'd say that was a pretty important part even if it just a couple of static clocks
+> for the tclk and fabric clock.
+> 
+It's one of our tasks list, should be ready soon.
 
-	Arnd
+> >
+> > Best regards,
+> >
+> > Thomas Petazzoni
+> 
+> 
+> --
+> Ben Dooks				http://www.codethink.co.uk/
+> Senior Engineer				Codethink - Providing Genius
+
+Lior Amsalem
