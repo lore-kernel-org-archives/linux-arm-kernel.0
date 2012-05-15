@@ -1,48 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 May 2012 17:55:38 +0900
-Subject: [GIT PULL] Samsung boards update for v3.5
-In-Reply-To: <201205142003.27537.arnd@arndb.de>
-References: <4FAF0326.8000408@samsung.com> <201205142003.27537.arnd@arndb.de>
-Message-ID: <07fb01cd3278$7f918540$7eb48fc0$%kim@samsung.com>
+Date: Tue, 15 May 2012 17:58:12 +0900
+Subject: [PATCH 2/2] ARM: S3C64XX: Hook up carrier class modules on
+ Cragganmore
+In-Reply-To: <1337016041-16096-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1337016041-16096-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1337016041-16096-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <07fc01cd3278$dbbf63f0$933e2bd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-
+Mark Brown wrote:
 > 
-> On Sunday 13 May 2012, Kukjin Kim wrote:
-> > Hi Arnd, Olof,
-> >
-> > Please pull Samsung boards update for v3.5.
-> >    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > next/board-samsung
-> >
-> > As there were discussions, some exynos4 boards have been updated because
-> > current dt cannot support all features for current board files on exynos4.
-> >
-> > Note, this should be merged after next/devel-samsung because some
-> > platform devices are defined in that.
-> >
-> > If any problems, please let me know.
+> We now have an additional classs of modules which are enumerated at I2C
+> address 0x22. Add hookup for these modules.
 > 
-> Pulled into next/boards now.
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-Thanks.
-
-> Since we have not pulled the next/devel-samsung branch yet, and that branch
-> depends on the sysmmu branch, the dependencies won't easily get fulfilled.
-
-Hmm...I know...but in this case, I had no choice for avoid mess conflicts between them with keeping separate topic branches.
-
-> A test build of exynos4_defconfig showed that there is at least no build
-> time problem.
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> index 0787b91..48eb76f 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> @@ -674,6 +674,7 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+>  	  .platform_data = &glenfarclas_pmic_pdata },
 > 
-Yeah, could be. Because current exynos4_defconfig doesn't enable newly added feature such as DRM_EXYNOS which has been included in
-next/devel-samsung branch for its platform device.
+>  	{ I2C_BOARD_INFO("wlf-gf-module", 0x20) },
+> +	{ I2C_BOARD_INFO("wlf-gf-module", 0x22) },
+>  	{ I2C_BOARD_INFO("wlf-gf-module", 0x24) },
+>  	{ I2C_BOARD_INFO("wlf-gf-module", 0x25) },
+>  	{ I2C_BOARD_INFO("wlf-gf-module", 0x26) },
+> --
+> 1.7.10
 
-> What is the dependency you are referring to?
-> 
-Same above.
+Looks good to me, but there is no '{ I2C_BOARD_INFO("wlf-gf-module", 0x20) },' in my tree.
+
+Just adding address 0x22 stuff is enough now?
 
 Thanks.
 
