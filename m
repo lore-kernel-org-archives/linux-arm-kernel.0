@@ -1,7 +1,7 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 14 May 2012 16:48:05 -0700
+Date: Mon, 14 May 2012 17:10:22 -0700
 Subject: moving Tegra30 to the common clock framework
-In-Reply-To: <20120514213634.GA3075@gmail.com>
+In-Reply-To: <20120514110812.GY20304@tbergstrom-lnx.Nvidia.com>
 References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
  <20120507000329.GB14559@gmail.com> <4FA7ECAA.1040104@wwwdotorg.org>
  <CAJOA=zNKDFPOQ9-0EuEy=dtq=g-CKFBq94enTuoB7wVPskbkMg@mail.gmail.com>
@@ -9,152 +9,127 @@ References: <20120503161311.GG20304@tbergstrom-lnx.Nvidia.com>
  <CAJOA=zP4iEZ+CFfCjT1rgU6shOt_PUf2BRB76NEQCoUPZJ9hVg@mail.gmail.com>
  <4FA9BD41.2090701@codeaurora.org>
  <20120509103606.GY20304@tbergstrom-lnx.Nvidia.com>
- <4FADD1EA.8090606@codeaurora.org> <20120514213634.GA3075@gmail.com>
-Message-ID: <4FB199B5.5010607@codeaurora.org>
+ <4FADD1EA.8090606@codeaurora.org> <4FAF392E.7050205@wwwdotorg.org>
+ <20120514110812.GY20304@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FB19EEE.90803@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2012 02:36 PM, Turquette, Mike wrote:
-> On Fri, May 11, 2012 at 7:58 PM, Saravana Kannan<skannan@codeaurora.org>  wrote:
->> Mike,
+On 05/14/2012 04:08 AM, Peter De Schrijver wrote:
+> On Sun, May 13, 2012 at 06:31:42AM +0200, Stephen Warren wrote:
+>> On 05/11/2012 08:58 PM, Saravana Kannan wrote:
+>>> On 05/09/2012 03:36 AM, Peter De Schrijver wrote:
+>>>> On Wed, May 09, 2012 at 02:41:37AM +0200, Saravana Kannan wrote:
+>>>>> On 05/08/2012 10:15 AM, Turquette, Mike wrote:
+>>>>>> On Mon, May 7, 2012 at 10:07 PM, zhoujie wu<zhoujiewu@gmail.com>
+>>>>>> wrote:
+>>>>>>> Hi Mike,
+>>>>>>> Could you please explain more details about how to implement a
+>>>>>>> re-parenting operation as part of it's .set_rate implementation?
+>>>>>>
+>>>>>> Sure.
+>>>>>>
+>>>>>>> As far as I know, we can not call clk_set_parent in .set_rate function
+>>>>>>> directly, since clk_set_rate and clk_set_parent are using the same
+>>>>>>> prepare_lock.
+>>>>>>
+>>>>>> That is correct.
+>>>>>>
+>>>>>>> Any other interface can be used to implement it?
+>>>>>>
+>>>>>> You have two options available to you.
+>>>>>>
+>>>>>> 1) __clk_reparent can be used from your .set_rate callback today to
+>>>>>> reflect changes made to the tree topology.  OMAP uses this in our PLL
+>>>>>> .set_rate implementation: depending on the re-lock frequency the PLL
+>>>>>> may switch parents dynamically.  __clk_reparent does the
+>>>>>> framework-level cleanup needed for this (that function is also used
+>>>>>> when populating the clock tree with new clock nodes).
+>>>>>>
+>>>>>> 2) __clk_set_parent could be made non-static if you needed this (I've
+>>>>>> been meaning to talk to Saravana about this since I think MSM needs
+>>>>>> something like this).
+>>>>>
+>>>>> Thanks!
+>>>>>
+>>>>> I don't think I need (2). But I don't think I can use (1) as is either.
+>>>>> I can use (1) with some additional code in my set rate op.
+>>>>>
+>>>>> While set rate is in progress, both the parents might need to stay
+>>>>> enabled for a short duration. So, in my internal set rate, I need to
+>>>>> check if my clock is prepared/enabled and call prepare/enable on the
+>>>>> "old parent", call __clk_reparent (which will reduce the ref count for
+>>>>> the old parents and increase it for the new parents), finish the
+>>>>> reparent in HW and then unprepare/disable the old parent if I have
+>>>>> prepared/enabled them earlier.
+>>>>>
+>>>>> It might be beneficial to provide something like a
+>>>>> __clk_reparent_start(new_parent, *scratch_pointer) and
+>>>>> __clk_reparent_finish(*scratch_pointer) if it will be useful for more
+>>>>> than just MSM. Based on this email, I would guess that Tegra would want
+>>>>> something similar too.
+>>>>>
+>>>>
+>>>> We also need to reparent clocks using a pll if we want to change the
+>>>> PLLs rate
+>>>> while the users are active.
+>>>
+>>> Peter,
+>>>
+>>> Is this reparent permanent (as in, stays reparented when you return from
+>>> clk_set_rate()) or is it a reparenting for just a short duration inside
+>>> the set_rate ops?
 >>
->> I was looking at the code to make the changes and I noticed this snippet
->> (reformatted for email) in clk_change_rate():
+>> I've seen both cases, and indeed the case sometimes depends on the
+>> target rate of the clock.
 >>
->>        if (clk->ops->set_rate)
->>                 clk->ops->set_rate(clk->hw, clk->new_rate,
->>                                         clk->parent->rate);
+>> For example, when the CPU clock changes, we basically do the following
+>> within set_rate:
 >>
+>> * Set CPU clock parent to some "backup" PLL
+>> * Change the CPU PLL to the desired rate
+>> * Set CPU clock parent to the CPU PLL
 >>
->>         if (clk->ops->recalc_rate)
->>                 clk->rate = clk->ops->recalc_rate(clk->hw,
->>                                 clk->parent->rate);
->>         else
->>                 clk->rate = clk->parent->rate;
+>> However, the lowest CPU clock rate we support is actually the rate that
+>> the backup PLL runs at, so if we're targeting that rate, the CPU clock
+>> set_rate /just/ does:
 >>
->> I'm a bit confused. I thought recalc_rates was optional. But if I don't
->> implement it, the clocks rate will get set to parent's rate? Or is that a
->> bug in the code?
+>> * Set CPU clock parent to some "backup" PLL
 >>
+>> and leaves it there, until a different CPU clock rate is requested, at
+>> which time the CPU clock will be re-parented back to the CPU PLL.
 >
-> It is not a bug.  The handsome ascii art in Documentation/clk.txt covers
-> this requirement.  I have copy/pasted the relevant bits below for
-> convenience:
->
->                             clock hardware characteristics
-> 	     -----------------------------------------------------------
->               | gate | change rate | single parent | multiplexer | root |
->               |------|-------------|---------------|-------------|------|
-> 	     				...
->               |      |             |               |             |      |
-> .recalc_rate |      | y           |               |             |      |
-> .round_rate  |      | y           |               |             |      |
-> .set_rate    |      | y           |               |             |      |
-> 					...
->               |      |             |               |             |      |
-> 	     -----------------------------------------------------------
->
-> The take-away is that a clock that can adjust its rate (eg: implements a
-> .set_rate callback) must also implement .recalc_rate and .round_rate
-> callbacks.
+> The backup PLL and rate are statically defined however. It's not chosen at
+> runtime.
 
-I get the round_rate ops part. But I don't see a need to force a 
-recalc_rate ops. Can we just check for the existence of .set_rate() to 
-figure out if the clock will take up the rate of the parent or will 
-output a different rate?
+Yeah, this is pretty much what MSM has been doing for a while for our 
+CPU clocks too. But in MSM we made the decision of not to control the 
+CPU clocks through the clock APIs. It makes your life so much more 
+easier. Really, the CPU clocks are very different from the rest of the 
+clocks -- the set rate operation of the clock needs the clock to be 
+running. We also never disable the CPU clock we are running on. Just 
+that it might not be as useful as it might appear. It was especially 
+hard when we didn't have clk_prepare/_unprepare().
 
->
->> Also, if the clock's rate was just set with set_rate, why do we need to
->> recalc the rate by reading hardware? I'm a bit confused. Can you please
->> clarify what's going on here?
->>
->
-> This is simply being very cautious.  For platforms adjusting dividers
-> with direct register writes this might feel unnecessary.  However this
-> strict checking is in anticipation of clock hardware that might not
-> actually output the precise rate passed into .set_rate.  In principal
-> this isn't different from how CPUfreq and devfreq drivers inspect rates
-> after requesting them.
+Anyway, not saying this is the only way to proceed or using the clock 
+APIs to control the CPU clock is wrong. Just some food for thought.
 
-Sorry, this still doesn't make much sense to me. This essentially means 
-we can't trust the HW to do what we are asking it to do?
+Anyway, getting back to the point of this thread, you might look at the 
+other email I sent out on Friday [1]. Sorry I forgot to cc you on that. 
+I have a list of people I copy paste when sending clock patches. I can 
+add you to that list if you want (or remove anyone who is annoyed by it).
 
-CPUfreq and devfreq are clients of external clock APIs. That's different 
-from whether the HW will do what the platform driver will ask it to.
-
-Even if this unusual HW exists, I certainly don't want to deal with 
-recalc_rate(). It's also quite a bit of register reads that I would like 
-to avoid. I want to keep the clock APIs as fast as I can since it 
-affects power.
-
-Can we do something like this in clk_change_rate()?
-
-if (ops->set_rate) {
-	ops->set_rate(clk->new_rate,...);
-	clk->rate = clk->new_rate;
-} else {
-	clk->rate = clk->parent->rate;
-}
-
-if (ops->recalc_rate()) {
-	clk->rate = ops->recalc_rate(...);
-}
-
-This code also makes the assumptions more intuitive and easy to understand.
-
->> Would you mind adding more comments inside clk_calc_new_rates() and
->> clk_change_rate() trying to explain what cases you are trying to account
->> for?
->>
->
-> Someday I'll have a comment/kerneldoc cleanup session.  Things in the
-> clock core are likely to change in the next couple of release cycles
-> which will deprecate some of the kerneldoc making a big cleanup
-> unavoidable.
->
-> In the mean time are there any other specific question you have for
-> clk_change_rate?
->
->> Also, in clk_calc_new_rates(),
->>
->>         if (!clk->ops->round_rate) {
->>                 top = clk_calc_new_rates(clk->parent, rate);
->>                 new_rate = clk->parent->new_rate;
->>
->>                 goto out;
->>         }
->>
->> Is the code assuming that if there is no round rate ops that that clock node
->> is only a gating clock (as in, can't change frequency the input freq)? Just
->> trying to understand the assumptions made in the code.
->>
->
-> This is also covered by the ascii art above.  There is no assumption
-> about gating, per se.  However if a clock can adjust it's rate (more
-> specifically, if the input rate for a clock differs from the output
-> rate) then a .round_rate callback must exist.
->
-> The code above reads like it does because in the absence of a
-> .round_rate callback it is implied that the clock cannot set it's own
-> rate and should thus rely on its parent's rate.
-
-I agree that anyone implementing .set_rate should also provide 
-.round_rate. May be we should enforce that in clk_init/clk_register?
-
-But can we please the above "if" check more explicit? "Your rate has to 
-be same as the parent rate since you don't implement set rate" is 
-clearer than "Your rate has to be the same as the parent rate since you 
-don't implement round rate".
-
-	if (!clk->ops->set_rate) {
-		top = clk_calc_new_rates(clk->parent, rate);
-		new_rate = clk->parent->new_rate;
-
-		goto out;
-	}
+If you are doing the parent management inside the .set_rate ops, I 
+believe you will have a race condition with the current clock framework. 
+We need to update the clock framework to provide more APIs to implement 
+this correctly. I was confused by some code and pinged Mike about it. 
+Now that I understand what the code was trying to do, I think I might be 
+able to clean it up a bit and then fix up set rate support.
 
 Thanks,
 Saravana
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.msm/2655
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
