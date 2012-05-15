@@ -1,31 +1,121 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 15 May 2012 16:31:43 +0300
-Subject: [PATCH] MTD: LPC32xx SLC NAND driver
-In-Reply-To: <4FB25837.2050603@antcom.de>
-References: <1336829386-23301-1-git-send-email-stigge@antcom.de>
- <1337068543.2528.143.camel@sauron.fi.intel.com>
- <4FB2109A.2080505@freescale.com> <4FB25837.2050603@antcom.de>
-Message-ID: <1337088703.2528.208.camel@sauron.fi.intel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 15 May 2012 08:31:06 -0500
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <4FB228AD.5000507@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB228AD.5000507@codethink.co.uk>
+Message-ID: <4FB25A9A.3070306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-05-15 at 15:20 +0200, Roland Stigge wrote:
-> >> while ((readl(...))&&  timeout-->  0)
-> >>     cpu_relax();
+On 05/15/2012 04:58 AM, Ben Dooks wrote:
+> On 15/05/12 09:54, Thomas Petazzoni wrote:
+>> From: Gregory CLEMENT<gregory.clement@free-electrons.com>
+>>
+>> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
+>> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Lior Amsalem<alior@marvell.com>
+>> ---
+>>   arch/arm/boot/dts/axp-db.dts  |   40
+>> ++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-armada/Kconfig  |    6 ++++++
+>>   arch/arm/mach-armada/Makefile |    2 +-
+>>   arch/arm/mach-armada/axp-dt.c |   41
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   4 files changed, 88 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/axp-db.dts
+>>   create mode 100644 arch/arm/mach-armada/axp-dt.c
+>>
+>> diff --git a/arch/arm/boot/dts/axp-db.dts b/arch/arm/boot/dts/axp-db.dts
+>> new file mode 100644
+>> index 0000000..916be09
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/axp-db.dts
 > 
-> As I understand loops_per_jiffy, this loop will take much longer than
-> the 100 ms you defined above?
+> see previous comments.
+> 
+>> diff --git a/arch/arm/mach-armada/Kconfig b/arch/arm/mach-armada/Kconfig
+>> index 7995813..2903096 100644
+>> --- a/arch/arm/mach-armada/Kconfig
+>> +++ b/arch/arm/mach-armada/Kconfig
+>> @@ -8,6 +8,12 @@ config MACH_ARMADA_370_DT
+>>         Say 'Y' here if you want your kernel to support
+>>         boards based on Marvell Armada 370 with device tree.
+>>
+>> +config MACH_ARMADA_XP_DT
+>> +    bool "Marvell Armada XP boards with device-tree support"
+>> +    help
+>> +      Say 'Y' here if you want your kernel to support
+>> +      boards based on Marvell Armada XP with device tree.
+>> +
+>>   endmenu
+>>
+>>   endif
+>> diff --git a/arch/arm/mach-armada/Makefile
+>> b/arch/arm/mach-armada/Makefile
+>> index ac39fae..7a3c438 100644
+>> --- a/arch/arm/mach-armada/Makefile
+>> +++ b/arch/arm/mach-armada/Makefile
+>> @@ -1,3 +1,3 @@
+>>   obj-y += common.o irq.o time.o
+>>   obj-$(CONFIG_MACH_ARMADA_370_DT) += a370-dt.o
+>> -
+>> +obj-$(CONFIG_MACH_ARMADA_XP_DT)     += axp-dt.o
+>> diff --git a/arch/arm/mach-armada/axp-dt.c
+>> b/arch/arm/mach-armada/axp-dt.c
+>> new file mode 100644
+>> index 0000000..2c13d4e
+>> --- /dev/null
+>> +++ b/arch/arm/mach-armada/axp-dt.c
+>> @@ -0,0 +1,41 @@
+>> +/*
+>> + * Device Tree support for Armada XP platforms.
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * Lior Amsalem<alior@marvell.com>
+>> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+>> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/init.h>
+>> +#include<linux/of_platform.h>
+>> +#include<asm/mach-types.h>
+>> +#include<asm/mach/arch.h>
+>> +#include<mach/armada.h>
+>> +#include "common.h"
+>> +
+>> +static void __init axp_dt_init(void)
+>> +{
+>> +    of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>> +
+>> +static const char * const axp_dt_board_dt_compat[] = {
+>> +    "marvell,axp-db",
+>> +    NULL,
+> 
+> This is where the device support becomes confusing.
+> 
+> I would strongly advise on using "mrvl,mv78230" as the binding
+> name. It isn't as if you can't have multiple names associated
+> with one binding.
 
-Not sure about much, but longer. The idea is that this is about the
-error path so if we report -EIO with a slight delay - no problem.
+The name here should uniquely identify the board, not the chip. If you
+additionally want to have the chip name, then that should be after the
+board name. However, "marvell,armada" is too generic to be useful.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120515/c143b260/attachment.sig>
+marvell is the documented vendor string, not mrvl.
+
+> Also, given how close they are, do we really need separate machine
+> support files?
+
+There does need to be justification why they need to be separate.
+
+Rob
