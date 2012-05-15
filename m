@@ -1,60 +1,39 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 15 May 2012 09:17:50 +0200
-Subject: [PATCH] gpio/generic: initialize the shadow of direction register
-In-Reply-To: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
-References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20402.798.622618.263780@ipc1.ka-ro>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 15 May 2012 15:34:40 +0800
+Subject: [PATCH 1/1] ARM: mxc: change timer clock to perclk
+Message-ID: <1337067280-11697-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+fix system time goes too fast.
+perclk rate not changed or gated in low power mode, so we
+choose perclk for gpt.
 
-Shawn Guo writes:
-> Same as what the driver does for data register shadow bgc->data,
-> the bgpio_init should also initialize direction register shadow
-> bgc->dir to preserve the existing setting.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/gpio/gpio-generic.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-> index e38dd0c..53222c7 100644
-> --- a/drivers/gpio/gpio-generic.c
-> +++ b/drivers/gpio/gpio-generic.c
-> @@ -394,6 +394,7 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
->  		return ret;
->  
->  	bgc->data = bgc->read_reg(bgc->reg_dat);
-> +	bgc->dir = bgc->read_reg(bgc->reg_dir);
->  
-This will blow up in your face when calling bgpio_init() without any
-direction register (which is well supported by the generic driver).
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/plat-mxc/time.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-You need to do this in the platform specific driver that uses the
-generic driver. See gpio-mxc.c for reference:
-|        err = bgpio_init(&port->bgc, &pdev->dev, 4,
-|                         port->base + GPIO_PSR,
-|                         port->base + GPIO_DR, NULL,
-|                         port->base + GPIO_GDIR, NULL, false);
-|        if (err)
-|                goto out_iounmap;
-|
-|        port->bgc.gc.to_irq = mxc_gpio_to_irq;
-|        port->bgc.gc.base = pdev->id * 32;
-|        port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
-|        port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
-
-
-Lothar Wa?mann
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 99f958c..d865f79 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -58,6 +58,7 @@
+ /* MX31, MX35, MX25, MX5 */
+ #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
+ #define V2_TCTL_CLK_IPG		(1 << 6)
++#define V2_TCTL_CLK_PER		(2 << 6)
+ #define V2_TCTL_FRR		(1 << 9)
+ #define V2_IR			0x0c
+ #define V2_TSTAT		0x08
+@@ -309,7 +310,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+ 
+ 	if (timer_is_v2())
+-		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
++		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+ 	else
+ 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+ 
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.5.4
