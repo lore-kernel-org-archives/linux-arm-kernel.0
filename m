@@ -1,10 +1,10 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 14 May 2012 18:08:09 -0700
+Date: Mon, 14 May 2012 18:19:16 -0700
 Subject: [PATCH] clk: Constify struct clk_init_data
 In-Reply-To: <20120514215304.GB3075@gmail.com>
 References: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
  <20120514215304.GB3075@gmail.com>
-Message-ID: <4FB1AC79.7000901@codeaurora.org>
+Message-ID: <4FB1AF14.3050507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,26 +27,6 @@ On 05/14/2012 02:53 PM, Turquette, Mike wrote:
 > I think that, as a rule, hw->init cannot be assumed to be valid after
 > clk_register returns.  Would anyone else like to weigh in on it?  If so
 > then I'll cook up a follow-up patch to reflect this in the kerneldoc.
-
-If you mean hw->init pointer can't be assumed to be point to anything 
-valid after clk_register or __clk_register, then yes, I agree with that. 
-But the actual data that hw->init pointed to might still be around and 
-referenced by clk if __clk_register is used.
-
-Btw, I didn't follow up on the other thread we were having, but can you 
-remind me again what was the reason that you thought that only 
-__clk_init() would work for your static init code and __clk_register() 
-won't work? Or did I just misunderstand your comment that was trying to 
-say that you didn't want to switch to __clk_register close to kernel 
-release?
-
-There are some older threads where I think we are a bit out of sync on 
-the init data (I thought I did what you said you preferred, but you 
-asked me why I did that). I will try to restart them.
-
-Thanks,
-Saravana
-
 >
 > Thanks,
 > Mike
@@ -65,14 +45,12 @@ Saravana
 >>         struct clk *clk;
 >> -       struct clk_init_data *init;
 >> +       const struct clk_init_data *init;
->>   };
->>
->>   /*
->> --
->> 1.7.10
->>
->
 
+Oh, wait. This won't work for the case where the clock registration is 
+completely dynamic. Say, created from device tree or thru some PCI/USB 
+device probe, etc. That's why I didn't add it before.
+
+-Saravana
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
