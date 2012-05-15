@@ -1,47 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 12:46:45 +0000
-Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
-In-Reply-To: <CACRpkdZrs=rgfadRCcMYxhwqib96vkRdHCoC-27dyAjEu5Y5Ew@mail.gmail.com>
-References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
- <201205151124.13047.arnd@arndb.de>
- <CACRpkdZrs=rgfadRCcMYxhwqib96vkRdHCoC-27dyAjEu5Y5Ew@mail.gmail.com>
-Message-ID: <201205151246.45384.arnd@arndb.de>
+From: alior@marvell.com (Lior Amsalem)
+Date: Tue, 15 May 2012 15:46:57 +0300
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <4FB227CC.8090808@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515092750.GD6820@lunn.ch> <4FB227CC.8090808@codethink.co.uk>
+Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56A998C53@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Linus Walleij wrote:
-> On Tue, May 15, 2012 at 1:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> -----Original Message-----
+> From: Ben Dooks [mailto:ben.dooks at codethink.co.uk]
+> Sent: Tuesday, May 15, 2012 12:54 PM
+> To: Thomas Petazzoni; Arnd Bergmann; Olof Johansson; Ben Dooks; Jason
+> Cooper; Andrew Lunn; Nicolas Pitre; Lior Amsalem; Maen Suleiman; linux-
+> arm-kernel at lists.infradead.org; Gregory CLEMENT
+> Subject: Re: [PATCH 2/8] arm: mach-armada: add source files
 > 
-> > I get build errors with nhk8815_defconfig after this:
+> On 15/05/12 10:27, Andrew Lunn wrote:
 > >
-> > arch/arm/mach-nomadik/built-in.o: In function `nhk8815_eth_init':
-> > /home/arnd/linux-arm/arch/arm/mach-nomadik/board-nhk8815.c:224: undefined reference to `nmk_gpio_set_mode'
-> > arch/arm/mach-nomadik/built-in.o: In function `nhk8815_i2c_init':
-> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:46: undefined reference to `nmk_gpio_set_mode'
-> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:47: undefined reference to `nmk_gpio_set_mode'
-> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:50: undefined reference to `nmk_gpio_set_mode'
-> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:51: undefined reference to `nmk_gpio_set_mode'
+> >> diff --git a/arch/arm/mach-armada/irq.c b/arch/arm/mach-armada/irq.c
+> >> new file mode 100644 index 0000000..7006429
+> >> --- /dev/null
+> >> +++ b/arch/arm/mach-armada/irq.c
+> >> @@ -0,0 +1,116 @@
+> >> +/*
+> >> + * Marvall Armada SoC IRQ handling
+> >> + *
+> >> + * Copyright (C) 2012 Marvell
+> >> + *
+> >> + * Lior Amsalem<alior@marvell.com>
+> >> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+> >> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> >> + *
+> >> + * This file is licensed under the terms of the GNU General Public
+> >> + * License version 2.  This program is licensed "as is" without any
+> >> + * warranty of any kind, whether express or implied.
+> >> + */
+> >> +
+> >> +#include<linux/kernel.h>
+> >> +#include<linux/init.h>
+> >> +#include<linux/irq.h>
+> >> +#include<linux/interrupt.h>
+> >> +#include<linux/io.h>
+> >> +#include<linux/of_address.h>
+> >> +#include<linux/of_irq.h>
+> >> +#include<linux/irqdomain.h>
+> >> +#include<asm/mach/arch.h>
+> >> +#include<asm/exception.h>
+> >> +
+> >> +/* Interrupt Controller Registers Map */
+> >> +#define ARMADA_INT_SET_MASK_OFFS             (0xBC)
+> >> +#define ARMADA_INT_CLEAR_MASK_OFFS           (0xB8)
+> >> +
+> >> +#define ARMADA_INT_SET_ENABLE_OFFS           (0xA30)
+> >> +#define ARMADA_INT_CLEAR_ENABLE_OFFS         (0xA34)
+> >> +
+> >> +#define ARMADA_CPU_INTACK_OFFS               (0xB4)
+> >> +
+> >> +static void __iomem *per_cpu_int_base; static void __iomem
+> >> +*main_int_base; static struct irq_domain *armada_mpic_domain;
+> >> +
+> >> +static void armada_irq_mask(struct irq_data *d) {
+> >> +	writel(d->irq, per_cpu_int_base +
+> ARMADA_INT_CLEAR_MASK_OFFS); }
+> >> +
+> >> +static void armada_irq_unmask(struct irq_data *d) {
+> >> +	writel(d->irq, per_cpu_int_base + ARMADA_INT_SET_MASK_OFFS);
+> }
 > >
-> > Here is my suggested fix:
+> > All the other orion's use the generic-chip interrupt routines. Can
+> > this device also use it? It would also allow you to use the generic DT
+> > bindings.
 > 
-> This looks perfect Arnd, thanks for fixing this!
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Possibly, but there'll need to be support for setting interrupt affinity added
+> at some point, as this is used on multi-core systems.
+Exactly, also:
+1. we're working on SMP implementation, 
+     the interrupt code will also include SMP related changes and additions (affinity and raise_softirq)
+2. The generic-chip uses locking in mask/unmask when system is configured for SMP.
+     We can avoid it with our HW design, so why not.
+3. I've also tried to look into the gic implementation but it seems too far off our HW design.
 
-Ok, applied to next/pinctrl.
+> 
+> --
+> Ben Dooks				http://www.codethink.co.uk/
+> Senior Engineer				Codethink - Providing Genius
 
-On a more general note, how shall we go about merging pinctrl stuff in the
-upcoming merge window? We've got a bunch of changes in arm-soc now that depend
-on your pinctrl/devel branch, and I want to get as many of my own patches
-merged upstream early.
-
-One option would be that you just try to be very early with sending your
-branch and arm-soc goes directly after that, another option would be that
-we send a pull request for your tree along with the stuff that depends on
-it, with your permission.
-
-> I plan to migrate also the Nomadik to pinctrl and delete the old open-coded
-> interfaces in the driver for the next kernel cycle.
-
-Sounds good.
-
-	Arnd
+Lior Amsalem
