@@ -1,63 +1,65 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 15 May 2012 15:22:23 -0700
-Subject: [PATCHv4 4/8] ARM: OMAP4: hwmod: flag hwmods/modules supporting
- module level context status
-In-Reply-To: <4F96DF8C.6040400@ti.com> (Benoit Cousson's message of "Tue, 24
- Apr 2012 19:14:52 +0200")
-References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
- <1334913591-26312-5-git-send-email-t-kristo@ti.com>
- <4F957ACD.2040103@ti.com> <1335278815.2149.93.camel@sokoban>
- <4F96DF8C.6040400@ti.com>
-Message-ID: <87pqa5axuo.fsf@ti.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Wed, 16 May 2012 06:31:23 +0800
+Subject: [PATCH] clk: Fix CLK_SET_RATE_GATE flag validation in
+ clk_set_rate().
+In-Reply-To: <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <258a747f-c7d8-4f15-8446-2c18fe21ccf3@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-> On 4/24/2012 4:46 PM, Tero Kristo wrote:
->> On Mon, 2012-04-23 at 10:52 -0500, Jon Hunter wrote:
->>> Hi Tero,
->>>
->>> On 04/20/2012 04:19 AM, Tero Kristo wrote:
->>>> From: Rajendra Nayak<rnayak@ti.com>
->>>>
->>>> On OMAP4 most modules/hwmods support module level context status. On
->>>> OMAP3 and earlier, we relyed on the power domain level context status.
->>>> Identify all such modules using a 'HWMOD_CONTEXT_REG' flag, all such
->>>> hwmods already have a valid 'context_offs' populated in .prcm structure.
->>>
->>> Is it necessary to add another flag? Can't we just check if context_offs
->>> is non-zero? Would save adding a lot more lines to an already large file
->>> :-)
->>
->> Actually one of the older versions of this patch was just checking
->> against a non-zero value, but it was decided to be changed as
->> potentially the context_offs can be zero even if it is a valid offset.
 
-Potentially?  Is that the case on OMAP4/5 today?  I don't see any for
-OMAP4 in mainline.
+Saravana Kannan <skannan@codeaurora.org> wrote:
 
-If zero really is a valid offset somewhere (where?), then we could use
--1 (or USHRT_MAX in this case.)
-
-> Yeah, but still, every OMAP4 IPs are supporting that except two of
-> them I guess, so it is a pity to add that to every IPs.
+>The clk_set_rate() code shouldn't check the clock's enable count when
+>validating CLK_SET_RATE_GATE flag since the enable count could change
+>after
+>the validation. Similar to clk_set_parent(), it should instead check
+>the
+>prepare count. The prepare count should go to zero only when the end
+>user
+>expects the clock to not be enabled in the future. Since the code
+>already
+>grabs the prepare count before validation, it's not possible for
+>prepare
+>count to change after validation and by association not possible for a
+>well
+>behaving end user to enable the clock while the set rate is in
+>progress.
 >
-> We'd better add a HWMOD_NO_CONTEXT_REG to the few IPs that are not
-> supporting that. Since OMAP 2 & 3 does not have this feature at all,
-> we can check on the cpu revision.
+>Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>---
+>Please let me know if you don't want me to directly email or CC you in
+>my
+>clock related patches. I don't want to spam anyone. Also, let me know
+>if
+>you want me add you to my standard list of people to cc in my clock
+>patches.
 >
-> I think the issue raised by Rajendra was about AM35xx that looks like
-> an OMAP3 variant but does have these registers like an OMAP4
-> variant:-(
+> drivers/clk/clk.c |    2 +-
+> 1 files changed, 1 insertions(+), 1 deletions(-)
+>
+>diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>index 09b9112..f5b9d3c 100644
+>--- a/drivers/clk/clk.c
+>+++ b/drivers/clk/clk.c
+>@@ -903,7 +903,7 @@ int clk_set_rate(struct clk *clk, unsigned long
+>rate)
+> 	if (rate == clk->rate)
+> 		goto out;
+> 
+>-	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
+>+	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
+The condition becomes more strict. Looks good.
 
-If AM335x is missing it for *all* IPs, that's easy enough to solve
-without bloating the data file: just set .context_offs field (or flag)
-to the magic value for all IPs during hwmod registration.
-
-Paul/Benoit should make the call whether to use a special value in the
-.context_offs field (0 or -1) or add a new flag.  If a flag is chosen, I
-agree with Benoit that it should indicate the *lack* of the feature,
-since having the feature is the norm.
-
-Kevin
+> 		ret = -EBUSY;
+> 		goto out;
+> 	}
+>-- 
+>1.7.8.3
+>
+>Sent by an employee of the Qualcomm Innovation Center, Inc.
+>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+>Forum.
