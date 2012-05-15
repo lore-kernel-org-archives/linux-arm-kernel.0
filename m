@@ -1,96 +1,45 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 15 May 2012 20:30:44 +0530
-Subject: [PATCH] ARM: OMAP4: PM: Keep static dep between MPUSS and ABE
- clockdomain
-In-Reply-To: <4FB268F9.9040508@ti.com>
-References: <1337082156-30390-1-git-send-email-tarun.kanti@ti.com>
- <4FB268F9.9040508@ti.com>
-Message-ID: <CAMQu2gy72cbR4+xr6pYQBamNSjLdxUu4s_MkDf=pwrPnB56enA@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 16:01:22 +0100
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <4FB26E03.2030401@gmail.com>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
+ <201205151425.30706.arnd@arndb.de> <4FB26E03.2030401@gmail.com>
+Message-ID: <4FB26FC2.9050805@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 8:02 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> + Paul
+On 15/05/12 15:53, Rob Herring wrote:
+> On 05/15/2012 09:25 AM, Arnd Bergmann wrote:
+>> On Tuesday 15 May 2012, Thomas Petazzoni wrote:
+>>> Le Tue, 15 May 2012 14:53:45 +0100,
+>>> Ben Dooks<ben.dooks@codethink.co.uk>  a ?crit :
+>>>
+>>>> Since the two board support files are identical, except for the names
+>>>> they print, I'd say this is the job of one file. It can always be
+>>>> split later.
+>>>
+>>> The initial motivation for keeping two files here is that the two SoC
+>>> have a different number of PCIe memory areas, and those areas are
+>>> typically mapped in ->map_io(). However:
+>>>
+>>>   * Maybe those mappings can be done using a normal ioremap() rather
+>>>     than in ->map_io(), according to DT informations (but most other ARM
+>>>     SoC support at the moment seem to do PCI mappings using static
+>>>     mappings in ->map_io)
+>>
+>> I'm pretty sure we can use ioremap for new PCI implementations now.
+>> Also, you can scan the device tree in map_io() if necesary, to see which
+>> PCIe ports are enabled.
 >
-> Hi Tarun,
->
-> On 5/15/2012 1:42 PM, Tarun Kanti DebBarma wrote:
->> Commit 68523f4233de5f233478dde0a63047b4efb710b8 (ARM: OMAP4:
->> Workaround the OCP synchronisation issue with 32K synctimer)
->> does not include GP Timers in ABE domain. Since synchronization
->> issue is applicable to all GPTIMER[1-12], we also need to set
->> static dependency of MPUSS with abe_clkdm and l4_per_clkdm.
->> Dependency with l4_per_clkdm timers is already set in commit
->> 12f27826bdaf56b01cbdfc8bdeb577ebc106dee3 (ARM: OMAP4: PM: Keep
->> static dep between MPUSS-EMIF and MPUSS-L3/L4 and DUCATI-L3).
->> Therefore, set static dependency of MPUSS with abe_clkdm.
->
-> It seems to me that these various static dep workaround patches are more and more confusing and should require some further investigation / explanation.
->
-This is a new BUG which has not made it to errata list yet. It will
-make it eventually.
+> For the i/o windows, they should be static because we want a fixed
+> virtual address across platforms. 0xfef00000 is the planned address.
+> Memory windows should be ioremap.
 
-> If we keep doing that we will end up having every clock domains always ON each time the CPU is active. This is a very brute force approach not really acceptable for mainline and for PM point of view.
->
-Indeed.
+It might be worth looking at changing ioremap() to work nicely with
+large page entries if it hasn't already been done.
 
-> Here we are forcing the ABE domain to be ON each time the MPU is ON even if we do not have any timer used inside the domain.
->
-Actually the BUG is really related to timers running on 32KHz and only
-in that case such a WA is needed. BTW, the WA is suggested by hardware
-team.
-
-> It was mostly OK to do that for the wakeup domain due to the small power impact, but doing that on the L4_PER and ABE seems a little bit too much.
->
-L4PER and ABE should not be set default....
-
-> The fix assumes as well that the MPU is the only user of that timer. What if either DSP or IPU uses it as well?
->
-
-> Moreover the previous 68523f4233de5f2 commit did add tons of deps that does not seems to be really justified by any HW errata AFAIK.
-> That does not mean they are not needed, but I think we should either remove them or add some more explanation.
->
-EMIF and L3 are covered as part of the errata's. Most if these static
-deps issues never worked properly and people ended up hacking
-like disable L3 when display ON etc etc.
-
-> + ? ? ? /*
-> + ? ? ? ?* The dynamic dependency between MPUSS -> MEMIF and
-> + ? ? ? ?* MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
-> + ? ? ? ?* expected. The hardware recommendation is to enable static
-> + ? ? ? ?* dependencies for these to avoid system lock ups or random crashes.
-> + ? ? ? ?*/
-> + ? ? ? mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
-> + ? ? ? emif_clkdm = clkdm_lookup("l3_emif_clkdm");
-> + ? ? ? l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
-> + ? ? ? l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
-> + ? ? ? l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
-> + ? ? ? ducati_clkdm = clkdm_lookup("ducati_clkdm");
-> + ? ? ? if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
-> + ? ? ? ? ? ? ? (!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
-> + ? ? ? ? ? ? ? goto err2;
-> +
-> + ? ? ? ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
->
-> AFAIK, this one is the only one covered by an errata. It might be good to add a comment to explained the issue.
->
-> + ? ? ? ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
-> + ? ? ? ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
-> + ? ? ? ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
-> + ? ? ? ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
-> + ? ? ? ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
->
-> Do we have errata for any of these ones?
->
-If we forget about the latest timer issues doing the round only EMIF and L3
-deps with different initiators were needed. L4PER was because of UART
-idle mode issue which I fixed recently. At least with that fix, L4PER should
-be killed. Will be good to take the latest findings on the static deps issues
-and update above list.
-
-These timer OCP sync issue has really created a big mess again...
-Timer is 3 domains. AON, ABE and L4pER and the WA suggested is
-static dep as if it is free. There is no other WA.
-
-Regards
-Santosh
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
