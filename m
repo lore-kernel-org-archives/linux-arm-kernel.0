@@ -1,26 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 May 2012 18:37:09 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Hook up carrier class modules on
- Cragganmore
-In-Reply-To: <07fc01cd3278$dbbf63f0$933e2bd0$%kim@samsung.com>
-References: <1337016041-16096-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1337016041-16096-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <07fc01cd3278$dbbf63f0$933e2bd0$%kim@samsung.com>
-Message-ID: <20120515173706.GD4140@opensource.wolfsonmicro.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Tue, 15 May 2012 12:49:49 -0500
+Subject: [PATCH 1/2] ARM: dts: add device tree source for imx6dl
+In-Reply-To: <1337084027-19401-1-git-send-email-shawn.guo@linaro.org>
+References: <1337084027-19401-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120515124949.546ba4fc3b624a4777e320af@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 05:58:12PM +0900, Kukjin Kim wrote:
+On Tue, 15 May 2012 20:13:47 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> Looks good to me, but there is no '{ I2C_BOARD_INFO("wlf-gf-module", 0x20) },' in my tree.
+> +			snvs at 020cc000 {
+> +				reg = <0x020cc000 0x4000>;
+> +				interrupts = <0 19 0x04 0 20 0x04>;
+> +			};
+> +
 
-> Just adding address 0x22 stuff is enough now?
+this conflicts with the existing binding documented in
+Documentation/devicetree/bindings/crypto/fsl-sec4.txt.
 
-Yes, it is - sorry, context diff for another project.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120515/56b88648/attachment-0001.sig>
+> +			caam at 02100000 {
+> +				reg = <0x02100000 0x40000>;
+> +				interrupts = <0 105 0x04 0 106 0x04>;
+> +			};
+> +
+
+same here.
+
+Kim
