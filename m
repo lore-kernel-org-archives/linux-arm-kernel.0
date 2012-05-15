@@ -1,30 +1,26 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 15 May 2012 08:15:04 -0700
-Subject: [PATCH v2] arm: msm: fix up very basic HTC Sapphire support
-In-Reply-To: <CAPDArRKgZKR2kdbt-ySx7GrXopNnN+j4hKr1rrDPgxkZ8S2YjQ@mail.gmail.com>
-References: <q7bdy899mt3um93hikst04au.1336884464056@email.android.com>
- <20120513055612.GA7129@codeaurora.org>
- <CAPDArRKgZKR2kdbt-ySx7GrXopNnN+j4hKr1rrDPgxkZ8S2YjQ@mail.gmail.com>
-Message-ID: <20120515151504.GA2227@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 15 May 2012 08:19:38 -0700
+Subject: [PATCH v1 1/7] usb: chipidea: permit user select
+ USB_EHCI_ROOT_HUB_TT
+In-Reply-To: <201205151627.15428.marex@denx.de>
+References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
+ <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
+ <201205151627.15428.marex@denx.de>
+Message-ID: <20120515151938.GD23916@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 03:49:00PM +0530, Shantanu Gupta wrote:
+On Tue, May 15, 2012 at 04:27:15PM +0200, Marek Vasut wrote:
+> Dear Richard Zhao,
+> 
+> > The ci13xxx hcd require USB_EHCI_ROOT_HUB_TT.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> 
+> I already sent similar patch a few hours ago.
 
-> Sorry for thread jacking, but do you still have an actively supported
-> 8x50 board ? ( ie. mahimahi)
+But yours was more "complete" :)
 
-I still have a working 8x50 dev board (SURF), but I don't use it very
-much, but I do test it occasionally.  None of my 8x50 phone-type
-devices work any more.  It doesn't look like the mahimahi code has
-ever been compiled, though.
+I'll queue up yours in a bit, thanks.
 
-If no one objects, I'll just send out a patch to remove the
-board-mahimahi.c file, since nothing references it, and it doesn't
-have very useful support, anyway.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+greg k-h
