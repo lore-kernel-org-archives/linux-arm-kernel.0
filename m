@@ -1,46 +1,42 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 15 May 2012 13:43:42 -0700
-Subject: [PATCH] clk: Fix CLK_SET_RATE_GATE flag validation in clk_set_rate().
-In-Reply-To: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 15 May 2012 22:51:27 +0200
+Subject: [Linaro-mm-sig] [PATCH] ARM: LPAE: fix access flag setup in
+ mem_type_table
+In-Reply-To: <20120515122215.GK10453@n2100.arm.linux.org.uk>
+References: <1337018097-27308-1-git-send-email-vitalya@ti.com>
+ <20120515122215.GK10453@n2100.arm.linux.org.uk>
+Message-ID: <4FB2C1CF.2030208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_set_rate() code shouldn't check the clock's enable count when
-validating CLK_SET_RATE_GATE flag since the enable count could change after
-the validation. Similar to clk_set_parent(), it should instead check the
-prepare count. The prepare count should go to zero only when the end user
-expects the clock to not be enabled in the future. Since the code already
-grabs the prepare count before validation, it's not possible for prepare
-count to change after validation and by association not possible for a well
-behaving end user to enable the clock while the set rate is in progress.
+Hello,
 
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
----
-Please let me know if you don't want me to directly email or CC you in my
-clock related patches. I don't want to spam anyone. Also, let me know if
-you want me add you to my standard list of people to cc in my clock
-patches.
+On 5/15/2012 2:22 PM, Russell King - ARM Linux wrote:
+> On Mon, May 14, 2012 at 01:54:57PM -0400, Vitaly Andrianov wrote:
+>> A zero value for prot_sect in the memory types table implies that
+>> section mappings should never be created for the memory type in question.
+>> This is checked for in alloc_init_section().
+>>
+>> With LPAE, we set a bit to mask access flag faults for kernel mappings.
+>> This breaks the aforementioned (!prot_sect) check in alloc_init_section().
+>>
+>> This patch fixes this bug by first checking for a non-zero
+>> prot_sect before setting the PMD_SECT_AF flag.
+>>
+>> Signed-off-by: Vitaly Andrianov<vitalya@ti.com>
+>>
+>> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
+>
+> Please put this in the patch system.  No blank line is needed between
+> s-off-by and acked-by.
 
- drivers/clk/clk.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This patch fixes the issue introduced by adding CMA to ARM architecture 
+which I've pushed for testing to linux-next. I've added it to my 
+for-next-cma branch:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 09b9112..f5b9d3c 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -903,7 +903,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 	if (rate == clk->rate)
- 		goto out;
- 
--	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
-+	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
- 		ret = -EBUSY;
- 		goto out;
- 	}
+http://git.linaro.org/gitweb?p=people/mszyprowski/linux-dma-mapping.git;a=shortlog;h=refs/heads/for-next-cma
+
+Best regards
 -- 
-1.7.8.3
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Marek Szyprowski
+Samsung Poland R&D Center
