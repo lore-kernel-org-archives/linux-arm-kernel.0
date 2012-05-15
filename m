@@ -1,60 +1,28 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 15 May 2012 17:12:36 +0530
-Subject: [PATCH] ARM: OMAP4: PM: Keep static dep between MPUSS and ABE
- clockdomain
-Message-ID: <1337082156-30390-1-git-send-email-tarun.kanti@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 11:43:25 +0000
+Subject: [GIT PULL] ARM: tegra: dt2 branch
+In-Reply-To: <4FB170F3.8080107@wwwdotorg.org>
+References: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
+ <201205142037.08752.arnd@arndb.de> <4FB170F3.8080107@wwwdotorg.org>
+Message-ID: <201205151143.26008.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68523f4233de5f233478dde0a63047b4efb710b8 (ARM: OMAP4:
-Workaround the OCP synchronisation issue with 32K synctimer)
-does not include GP Timers in ABE domain. Since synchronization
-issue is applicable to all GPTIMER[1-12], we also need to set
-static dependency of MPUSS with abe_clkdm and l4_per_clkdm.
-Dependency with l4_per_clkdm timers is already set in commit
-12f27826bdaf56b01cbdfc8bdeb577ebc106dee3 (ARM: OMAP4: PM: Keep
-static dep between MPUSS-EMIF and MPUSS-L3/L4 and DUCATI-L3).
-Therefore, set static dependency of MPUSS with abe_clkdm.
+On Monday 14 May 2012, Stephen Warren wrote:
+> I wonder if the changes to tegra-*.dtsi shouldn't just be dropped? I'd
+> personally err on the side of requiring board files to add this
+> property, rather than having things accidentally work because the .dtsi
+> file included a default.
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- arch/arm/mach-omap2/pm44xx.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+I ended up redoing the merge because I found an embarrasing typo in my patch
+and now dropped the property for the dtsi files.
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 8856253..f788e98 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -146,6 +146,7 @@ static int __init omap4_pm_init(void)
- 	int ret;
- 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
- 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-+	struct clockdomain *abe_clkdm;
- 
- 	if (!cpu_is_omap44xx())
- 		return -ENODEV;
-@@ -180,8 +181,10 @@ static int __init omap4_pm_init(void)
- 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
- 	l4wkup = clkdm_lookup("l4_wkup_clkdm");
- 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
-+	abe_clkdm = clkdm_lookup("abe_clkdm");
- 	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
--		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
-+		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm) ||
-+		(!abe_clkdm))
- 		goto err2;
- 
- 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
-@@ -191,6 +194,7 @@ static int __init omap4_pm_init(void)
- 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
- 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
- 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
-+	ret |= clkdm_add_wkdep(mpuss_clkdm, abe_clkdm);
- 	if (ret) {
- 		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 "
- 				"wakeup dependency\n");
--- 
-1.7.0.4
+> BTW, I assume that in 3.6, I should plan to remove the support-8bit
+> properties and associated Tegra SDHCI driver code that handles them, and
+> rely on the SDHCI core handling this from now on?
+
+I think we can't drop it from the driver because of existing powerpc machines
+providing the property, but it would be ok if you drop it from your .dts
+files.
+
+	Arnd
