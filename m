@@ -1,53 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 10:40:10 +0100
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
-Message-ID: <20120515094010.GF10453@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 May 2012 11:44:21 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120515091838.GC6820@lunn.ch>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515091838.GC6820@lunn.ch>
+Message-ID: <20120515114421.7fce8be6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 06:15:33PM +0100, Lorenzo Pieralisi wrote:
-> On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
-> > From what you're saying - and from my understanding of your cache behaviours,
-> > even the sequence:
-> > - clean cache
-> > - disable C bit
-> > - clean cache
-> > is buggy.
+Le Tue, 15 May 2012 11:18:38 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
+
+> Is mach-armada a good idea? What are many different armada chipsets
+> families:
 > 
-> No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
+> Armada 100, 300, 500, 600, 1000, 15000, XP. 
+> 
+> You only seem to support 300 and XP. Where would the others go? 300 is
+> actually mach-dove, etc. 
 
-It's racy.  Consider this:
+We support 370 and XP in this new mach directory, and we've chosen to
+support them in an unique directory in order to easily validate the fact
+that we are able to build and run a single binary kernel image that
+works on both SoCs.
 
-	- clean cache
-	- cache speculatively prefetches a dirty cache line from another CPU
-	- disable C bit
+We are definitely open to suggestions regarding the naming of the
+directory, or even combining with existing Marvell SoCs support if it
+makes sense. What would be your suggestion on this?
 
-At this point, you lose access to that dirty data.  If that dirty data is
-used inbetween disabling the C bit and cleaning the cache for the second
-time, you have data corruption issues.
-
-Another point which needs to be checked is whether dirty cache lines in
-a CPUs cache which has had the C bit disabled still take part in the
-coherency protocol with other CPUs.  If the answer is no, then that's a
-_major_ problem for the hot unplug code paths.  That effectively means
-that we have a window where a CPU going down actively _corrupts_ the
-data visible to other CPUs.
-
-As I have said, given what you've mentioned, it is impossible to safely
-disable the cache on a SMP system.  In order to do it safely, you need to
-have a way to disable new allocations into the cache _without_ disabling
-the ability for the cache to be searched.
-
-And if we could do that, then the sequence becomes a simple and race free:
-
-	- disable new allocations
-	- clean cache
-	- disable cache
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
