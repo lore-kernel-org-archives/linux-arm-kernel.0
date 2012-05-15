@@ -1,28 +1,39 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 May 2012 17:39:09 +0200
+Date: Tue, 15 May 2012 17:39:54 +0200
 Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205151527.01156.arnd@arndb.de>
+In-Reply-To: <4FB277E3.4020805@codethink.co.uk>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB269CB.4080804@gmail.com> <20120515164438.22258885@skate>
- <201205151527.01156.arnd@arndb.de>
-Message-ID: <20120515173909.383a0d8a@skate>
+ <4FB26E4B.4020609@codethink.co.uk> <20120515170020.23c68cac@skate>
+ <4FB277E3.4020805@codethink.co.uk>
+Message-ID: <20120515173954.18ba2250@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 15 May 2012 15:27:00 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+Le Tue, 15 May 2012 16:36:03 +0100,
+Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
 
-> The problem with mach-marvell is that it would be confusing in the
-> presence of pxa/mmp which I would probably still leave out of that
-> directory, since they are rather different inside.
+> I've tracked this down to the following:
+> arch/arm/mach-armada/time.c
+> 
+>     190          } else {
+>     191                  u32 clk;
+>     192                  of_property_read_u32(np, "clock-frequency",
+> &clk); 193                  WARN_ON(!clk);
+> 
+> The problem is the 'clk' variable is un-initialised and therefore
+> the fact my device-tree is missing a clock-frequency property is
+> causing the system to use what was in 'clk' which was around 16000
+> from the stack.
+> 
+> I suggest that any property that is necessary to a unit operation
+> should check that there was something to read. WARN_ON() is fine,
+> but they you should not carry on and initialise the unit anyway.
+> 
+> I have now gone and fixed my .dts file and the system now gets to
+> the point to try and mount an initrd.
 
-Sure.
-
-> I think we can just start with the existing plat-orion directory until
-> someone comes up with a better place.
-
-So you want us to put all this new source code that typically belongs
-to a mach-* directory into plat-orion/ ?
+Thanks for your report and investigation, you're obviously correct.
+We'll fix that.
 
 Thomas
 -- 
