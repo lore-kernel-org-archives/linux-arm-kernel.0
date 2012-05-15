@@ -1,166 +1,55 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 15 May 2012 11:20:44 -0700
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <4FB29E7C.7010606@codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 15 May 2012 19:27:41 +0100
+Subject: [PATCH 2/4] ASoC: Add mc13783 codec
+In-Reply-To: <1337082832-9764-3-git-send-email-philippe.retornaz@epfl.ch>
+References: <1337082832-9764-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1337082832-9764-2-git-send-email-philippe.retornaz@epfl.ch>
+ <1337082832-9764-3-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <20120515182737.GF19592@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2012 09:59 PM, Saravana Kannan wrote:
-> Without this patch, the following race conditions are possible.
->
-> Race condition 1:
-> * clk-A has two parents - clk-X and clk-Y.
-> * All three are disabled and clk-X is current parent.
-> * Thread A: clk_set_parent(clk-A, clk-Y).
-> * Thread A:<snip execution flow>
-> * Thread A: Grabs enable lock.
-> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
-> * Thread A: Releases enable lock.
-> * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
-> * Thread A: Switches clk-A's parent to clk-Y in hardware.
->
-> clk-A is now enabled in software, but not clocking in hardware.
->
-> Race condition 2:
-> * clk-A has two parents - clk-X and clk-Y.
-> * All three are disabled and clk-X is current parent.
-> * Thread A: clk_set_parent(clk-A, clk-Y).
-> * Thread A:<snip execution flow>
-> * Thread A: Switches parent in hardware to clk-Y.
-> * Thread A: Grabs enable lock.
-> * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
-> * Thread A: Releases enable lock.
-> * Thread B: Calls clk_enable(clk-A)
-> * Thread B: Software state still says parent is clk-X.
-> * Thread B: So, enables clk-X and then itself.
-> * Thread A: Updates parent in software state to clk-Y.
->
-> clk-A is now enabled in software, but not clocking in hardware. clk-X will
-> never be disabled since it's enable count is 1 when no one needs it. clk-Y
-> will throw a warning when clk-A is disabled again (assuming clk-A being
-> disabled in hardware hasn't wedged the system).
->
-> To fix these race conditions, hold the enable lock while switching the clock
-> parent in hardware. But this would force the set_parent() ops to be atomic,
-> which might not be possible if the clock hardware is external to the SoC.
->
-> Since clocks with CLK_SET_PARENT_GATE flag only allow clk_set_parent() on
-> unprepared clocks and calling clk_enable() on an unprepared clock would be
-> violating the clock API usage model, allow set_parent() ops to be sleepable
-> for clocks which have the CLK_SET_PARENT_GATE flag. Putting it another way,
-> if a clock's parent can't be switched without sleeping, then by definition
-> the parent can't be switched while it's prepared (CLK_SET_PARENT_GATE).
->
-> Signed-off-by: Saravana Kannan<skannan@codeaurora.org>
-> Cc: Mike Turquette<mturquette@linaro.org>
-> Cc: Andrew Lunn<andrew@lunn.ch>
-> Cc: Rob Herring<rob.herring@calxeda.com>
-> Cc: Russell King<linux@arm.linux.org.uk>
-> Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
-> Cc: Thomas Gleixner<tglx@linutronix.de>
-> Cc: Arnd Bergman<arnd.bergmann@linaro.org>
-> Cc: Paul Walmsley<paul@pwsan.com>
-> Cc: Shawn Guo<shawn.guo@freescale.com>
-> Cc: Sascha Hauer<s.hauer@pengutronix.de>
-> Cc: Jamie Iles<jamie@jamieiles.com>
-> Cc: Richard Zhao<richard.zhao@linaro.org>
-> Cc: Saravana Kannan<skannan@codeaurora.org>
-> Cc: Magnus Damm<magnus.damm@gmail.com>
-> Cc: Mark Brown<broonie@opensource.wolfsonmicro.com>
-> Cc: Linus Walleij<linus.walleij@stericsson.com>
-> Cc: Stephen Boyd<sboyd@codeaurora.org>
-> Cc: Amit Kucheria<amit.kucheria@linaro.org>
-> Cc: Deepak Saxena<dsaxena@linaro.org>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> ---
-> Additional comments that I'm not sure are fit for the commit text:
->
-> Reason for repeating the call to set_parent() ops and updating clk->parent
-> for the CLK_SET_PARENT_GATE case:
-> * It looks weird to wrap the migration code and the lock/unlock in separate
->    if's.
-> * Once we add proper error checking for the return value of set_parent()
->    ops, the code will look even more convoluted if we try to share the code
->    for CLK_SET_PARENT_GATE case and non-CLK_SET_PARENT_GATE case.
->
-> I realize that clk->parent = parent is repeated in __clk_reparent(). But I
-> left that as is for now in case anyone is using that in one of for-next
-> branches. If no one is using it, we can remove it.
->
-> For a similar reason, clocks that need to do reparenting during
-> clk_set_rate() and don't have CLK_SET_RATE_GATE set can't do it correctly
-> with the current clk-provider APIs provided by the common clock framework.
->
-> __clk_set_parent() should really be split into two APIs for this to work:
-> __clk_pre_reparent() - enable lock grabbed here.
-> __clk_post_reparent() - enable lock released here.
->
->   drivers/clk/clk.c |   16 +++++++++++-----
->   1 files changed, 11 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e5d5dc1..09b9112 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1059,7 +1059,7 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->   {
->   	struct clk *old_parent;
->   	unsigned long flags;
-> -	int ret = -EINVAL;
-> +	int ret;
->   	u8 i;
->
->   	old_parent = clk->parent;
-> @@ -1083,7 +1083,13 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->   	if (i == clk->num_parents) {
->   		pr_debug("%s: clock %s is not a possible parent of clock %s\n",
->   				__func__, parent->name, clk->name);
-> -		goto out;
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (clk->flags&  CLK_SET_PARENT_GATE) {
-> +		ret = clk->ops->set_parent(clk->hw, i);
-> +		clk->parent = parent;
-> +		return ret;
->   	}
->
->   	/* migrate prepare and enable */
-> @@ -1092,23 +1098,23 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->
->   	/* FIXME replace with clk_is_enabled(clk) someday */
->   	spin_lock_irqsave(&enable_lock, flags);
-> +
->   	if (clk->enable_count)
->   		__clk_enable(parent);
-> -	spin_unlock_irqrestore(&enable_lock, flags);
->
->   	/* change clock input source */
->   	ret = clk->ops->set_parent(clk->hw, i);
-> +	clk->parent = parent;
->
->   	/* clean up old prepare and enable */
-> -	spin_lock_irqsave(&enable_lock, flags);
->   	if (clk->enable_count)
->   		__clk_disable(old_parent);
-> +
->   	spin_unlock_irqrestore(&enable_lock, flags);
->
->   	if (clk->prepare_count)
->   		__clk_unprepare(old_parent);
->
-> -out:
->   	return ret;
->   }
->
+On Tue, May 15, 2012 at 01:53:50PM +0200, Philippe R?tornaz wrote:
+> 
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 
-(*nudge*) Thoughts anyone?
+This looks broadly good from a framework point of view but it's a bit
+depressing that there are so many magic numbers even for register names
+- it makes the code rather impenetrable and I wouldn't like to be
+maintaining it.  I'll go ahead and apply it if Samuel is OK with patch 1
+going via ASoC (there's a build dependency).
 
--Saravana
+A few smallish things, please fix incrementally (or roll into a new
+version if you're resubmitting for some reason):
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> +	snd_soc_add_codec_controls(codec, mc13783_control_list,
+> +					ARRAY_SIZE(mc13783_control_list));
+> +
+> +	snd_soc_dapm_new_controls(dapm, mc13783_dapm_widgets,
+> +					ARRAY_SIZE(mc13783_dapm_widgets));
+> +	snd_soc_dapm_add_routes(dapm, mc13783_routes,
+> +					ARRAY_SIZE(mc13783_routes));
+
+These should all be assigned in the CODEC driver structure.
+
+> +static __init int mc13783_init(void)
+> +{
+> +	return platform_driver_register(&mc13783_codec_driver);
+> +}
+> +
+> +static __exit void mc13783_exit(void)
+> +{
+> +	platform_driver_unregister(&mc13783_codec_driver);
+> +}
+> +
+> +module_init(mc13783_init);
+> +module_exit(mc13783_exit);
+
+module_platform_driver().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120515/f884de98/attachment.sig>
