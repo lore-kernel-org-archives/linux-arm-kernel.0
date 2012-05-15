@@ -1,37 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 09:25:17 +0000
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
- arch-pxa git tree
-In-Reply-To: <CAN1soZzgO7yKfPM8wx9-8i85iq1OW=FxfjRFsOpGd4A_eiyqDQ@mail.gmail.com>
-References: <CAN1soZzgO7yKfPM8wx9-8i85iq1OW=FxfjRFsOpGd4A_eiyqDQ@mail.gmail.com>
-Message-ID: <201205150925.17477.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 May 2012 11:27:50 +0200
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120515092750.GD6820@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 May 2012, Haojian Zhuang wrote:
-> Neil Zhang (4):
->       ARM: mmp: add usb device support for PXA910
->       ARM: mmp: add usb device support for ttc dkb
->       ARM: mmp: add usb host support for PXA168
->       ARM: mmp: add usb host support for aspen
-> 
-> Paul Parsons (5):
->       ARM: pxa: hx4700: Initialize DS1WM clock_rate
->       ARM: pxa: hx4700: Enable ASIC3 GPIO as a wakeup source
->       ARM: pxa: hx4700: Add PCMCIA/CF support
->       ARM: pxa: Add standard UART to hx4700_pin_config[]
 
-The last patch in this series causes a build error with magician_defconfig:
+> diff --git a/arch/arm/mach-armada/irq.c b/arch/arm/mach-armada/irq.c
+> new file mode 100644
+> index 0000000..7006429
+> --- /dev/null
+> +++ b/arch/arm/mach-armada/irq.c
+> @@ -0,0 +1,116 @@
+> +/*
+> + * Marvall Armada SoC IRQ handling
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Lior Amsalem <alior@marvell.com>
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/irq.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/exception.h>
+> +
+> +/* Interrupt Controller Registers Map */
+> +#define ARMADA_INT_SET_MASK_OFFS             (0xBC)
+> +#define ARMADA_INT_CLEAR_MASK_OFFS           (0xB8)
+> +
+> +#define ARMADA_INT_SET_ENABLE_OFFS           (0xA30)
+> +#define ARMADA_INT_CLEAR_ENABLE_OFFS         (0xA34)
+> +
+> +#define ARMADA_CPU_INTACK_OFFS               (0xB4)
+> +
+> +static void __iomem *per_cpu_int_base;
+> +static void __iomem *main_int_base;
+> +static struct irq_domain *armada_mpic_domain;
+> +
+> +static void armada_irq_mask(struct irq_data *d)
+> +{
+> +	writel(d->irq, per_cpu_int_base + ARMADA_INT_CLEAR_MASK_OFFS);
+> +}
+> +
+> +static void armada_irq_unmask(struct irq_data *d)
+> +{
+> +	writel(d->irq, per_cpu_int_base + ARMADA_INT_SET_MASK_OFFS);
+> +}
 
-/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: unknown field 'clock_rate' specified in initializer
-/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: initialization makes pointer from integer without a cast [-Werror]
-/home/arnd/linux-arm/arch/arm/mach-pxa/hx4700.c:298:2: error: (near initialization for 'asic3_platform_data.leds') [-Werror]
-cc1: all warnings being treated as errors
-make[2]: *** [arch/arm/mach-pxa/hx4700.o] Error 1
-make[1]: *** [arch/arm/mach-pxa] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [sub-make] Error 2
+All the other orion's use the generic-chip interrupt routines. Can
+this device also use it? It would also allow you to use the generic DT
+bindings.
 
-Did you miss a dependency? Should I revert that patch for now?
-
-	Arnd
+	Andrew
