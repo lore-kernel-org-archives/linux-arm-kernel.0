@@ -1,43 +1,53 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 09:47:27 +0100
-Subject: [GIT PULL] ARM: Kirkwood: new boards for v3.5
-In-Reply-To: <20120515032605.GV16338@titan.lakedaemon.net>
-References: <20120515032605.GV16338@titan.lakedaemon.net>
-Message-ID: <4FB2181F.7010609@codethink.co.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 May 2012 17:55:38 +0900
+Subject: [GIT PULL] Samsung boards update for v3.5
+In-Reply-To: <201205142003.27537.arnd@arndb.de>
+References: <4FAF0326.8000408@samsung.com> <201205142003.27537.arnd@arndb.de>
+Message-ID: <07fb01cd3278$7f918540$7eb48fc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 04:26, Jason Cooper wrote:
-> The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
->
->    Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
->
-> are available in the git repository at:
->    git://git.infradead.org/users/jcooper/linux.git kirkwood_boards_for_v3.5
->
-> Arnaud Patard (3):
->        kirkwood/orion: fix orion_gpio_set_blink
->        orion/kirkwood: create a generic function for gpio led blinking
->        kirkwood: Add iconnect support
->
-> Jamie Lentin (4):
->        ARM: kirkwood: Basic support for DNS-320 and DNS-325
->        mtd: Add orion_nand devicetree bindings
->        kirkwood: Allow nand to be configured via. devicetree
->        ARM: kirkwood: Define DNS-320/DNS-325 NAND in fdt
->
-> Simon Baatz (1):
->        ARM: kirkwood: Add support for RaidSonic IB-NAS6210/6220 using devicetree
->
->   .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++
->   arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
->   arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
->   arch/arm/boot/dts/kirkwood-ib62x0.dts              |   44 +++
->   arch/arm/boot/dts/kirkwood-iconnect.dts            |   26 ++
+Arnd Bergmann wrote:
 
-I thought the idea of going to device-tree was to remove the addition
-of these? Now instead of .c files we're getting piles of .dts files.
+> 
+> On Sunday 13 May 2012, Kukjin Kim wrote:
+> > Hi Arnd, Olof,
+> >
+> > Please pull Samsung boards update for v3.5.
+> >    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/board-samsung
+> >
+> > As there were discussions, some exynos4 boards have been updated because
+> > current dt cannot support all features for current board files on exynos4.
+> >
+> > Note, this should be merged after next/devel-samsung because some
+> > platform devices are defined in that.
+> >
+> > If any problems, please let me know.
+> 
+> Pulled into next/boards now.
+> 
+Thanks.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> Since we have not pulled the next/devel-samsung branch yet, and that branch
+> depends on the sysmmu branch, the dependencies won't easily get fulfilled.
+
+Hmm...I know...but in this case, I had no choice for avoid mess conflicts between them with keeping separate topic branches.
+
+> A test build of exynos4_defconfig showed that there is at least no build
+> time problem.
+> 
+Yeah, could be. Because current exynos4_defconfig doesn't enable newly added feature such as DRM_EXYNOS which has been included in
+next/devel-samsung branch for its platform device.
+
+> What is the dependency you are referring to?
+> 
+Same above.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
