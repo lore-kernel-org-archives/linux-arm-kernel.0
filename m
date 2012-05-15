@@ -1,32 +1,29 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 May 2012 22:00:40 +0200
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <4FB2B3AA.3010903@codeaurora.org>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <20120515194245.GO30400@pengutronix.de>
- <4FB2B3AA.3010903@codeaurora.org>
-Message-ID: <20120515200040.GP30400@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 20:03:33 +0000
+Subject: [GIT PULL][Update] Renesas ARM-based platforms: new boards
+ support for v3.5
+In-Reply-To: <201205151749.59846.rjw@sisk.pl>
+References: <201205112101.59949.rjw@sisk.pl>
+ <201205151530.18193.arnd@arndb.de> <201205151749.59846.rjw@sisk.pl>
+Message-ID: <201205152003.33393.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 12:51:06PM -0700, Saravana Kannan wrote:
-> >>  	ret = clk->ops->set_parent(clk->hw, i);
-> >
-> >You call ->set_parent while holding a spinlock. This won't work with i2c
-> >clocks.
+On Tuesday 15 May 2012, Rafael J. Wysocki wrote:
+> On Tuesday, May 15, 2012, Arnd Bergmann wrote:
+> > On Tuesday 15 May 2012, Arnd Bergmann wrote:
+> > > On Monday 14 May 2012, Rafael J. Wysocki wrote:
+> > I got build errors with the new version now because machine_is_kzm9g is no longer
+> > defined:
+> > 
+> > /home/arnd/linux-arm/arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
+> > /home/arnd/linux-arm/arch/arm/mach-shmobile/platsmp.c:29:2: error: implicit declaration of function 'of_machine_is_compatible' [-Werror=implicit-function-declaration]
+> > 
+> > I'd apply the patch below, unless someone has a better solution
 > 
-> I did account for that. I explained it in the commit text. Please
-> let me know if any part of that is not clear or is not correct.
->
+> Please apply and thanks for the fix!
+> 
 
-I missed this part in the commit log. I have no idea whether we can live
-with this limitation though.
+Ok, applied now.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
