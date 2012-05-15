@@ -1,106 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 May 2012 20:14:01 +0800
-Subject: [PATCH 2/2] ARM: imx: add initial imx6dl-sabreai board support
-Message-ID: <1337084041-19436-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 May 2012 12:57:28 +0100
+Subject: [PATCH] serial: samsung: Fixed wrong comparison for baudclk_rate
+In-Reply-To: <000301cd3291$3a7a6940$af6f3bc0$%kim@samsung.com>
+References: <000101cd3283$5f58eba0$1e0ac2e0$%kim@samsung.com>
+ <20120515101541.GH10453@n2100.arm.linux.org.uk>
+ <000301cd3291$3a7a6940$af6f3bc0$%kim@samsung.com>
+Message-ID: <20120515115728.GJ10453@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial imx6dl-sabreai board support.  With uart, usdhc and
-fec enabled, the board can boot into console with rootfs on nfs
-or SD/MMC cards.
+On Tue, May 15, 2012 at 08:52:39PM +0900, Kyoungil Kim wrote:
+> Russell King wrote:
+> > On Tue, May 15, 2012 at 07:13:28PM +0900, Kyoungil Kim wrote:
+> > > port->baudclk_rate should be compared to the rate of port->baudclk,
+> > > because port->baudclk_rate was assigned as the rate of port->baudclk previously.
+> > > So to check that the current baudclk rate is same as previous rate,
+> > > the target of comparison sholud be the rate of port->baudclk.
+> > >
+> > > Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
+> > > Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+> > > ---
+> > >  drivers/tty/serial/samsung.c |    4 ++--
+> > >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> > > index d8b0aee..c4867ea 100644
+> > > --- a/drivers/tty/serial/samsung.c
+> > > +++ b/drivers/tty/serial/samsung.c
+> > > @@ -1014,10 +1014,10 @@ static int s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
+> > >  	 * a disturbance in the clock-rate over the change.
+> > >  	 */
+> > >
+> > > -	if (IS_ERR(port->clk))
+> > > +	if (IS_ERR_OR_NULL(port->baudclk))
+> > 
+> > NAK.  See my previous emails on the validity of clk_get() return values.
+> 
+> I read your previous emails, but I don't understand.
+> Could you explain more details, please?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- Documentation/devicetree/bindings/arm/fsl.txt |    3 ++
- arch/arm/boot/dts/imx6dl-sabreai.dts          |   42 +++++++++++++++++++++++++
- arch/arm/mach-imx/Makefile.boot               |    1 +
- arch/arm/mach-imx/mach-imx6q.c                |    2 +
- 4 files changed, 48 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-sabreai.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index ac9e751..066bb58 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -41,6 +41,9 @@ i.MX6 Quad SABRE Smart Device Board
- Required root node properties:
-     - compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
- 
-+i.MX6 DualLite SABRE Automotive Infotainment Board;
-+    - compatible = "fsl,imx6dl-sabreai", "fsl,imx6dl";
-+
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm/boot/dts/imx6dl-sabreai.dts b/arch/arm/boot/dts/imx6dl-sabreai.dts
-new file mode 100644
-index 0000000..3e0c1e3
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-sabreai.dts
-@@ -0,0 +1,42 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx6dl.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 DualLite SABRE Automotive Infotainment Board";
-+	compatible = "fsl,imx6dl-sabreai", "fsl,imx6dl";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	soc {
-+		aips2: aips-bus at 02100000 {
-+			ethernet at 02188000 {
-+				phy-mode = "rgmii";
-+				status = "okay";
-+			};
-+
-+			usdhc3: usdhc at 02198000 {
-+				cd-gpios = <&gpio6 15 0>;
-+				wp-gpios = <&gpio1 13 0>;
-+				status = "okay";
-+			};
-+
-+			uart4: serial at 021f0000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index 05541cf..c136c59 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -44,3 +44,4 @@ dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
- dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
- 			   imx6q-sabrelite.dtb \
- 			   imx6q-sabresd.dtb \
-+			   imx6q-sabreai.dtb \
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index b47e98b..bb6c265 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -173,6 +173,8 @@ static struct sys_timer imx6q_timer = {
- };
- 
- static const char *imx6q_dt_compat[] __initdata = {
-+	"fsl,imx6dl-sabreai",
-+	"fsl,imx6dl",
- 	"fsl,imx6q-arm2",
- 	"fsl,imx6q-sabrelite",
- 	"fsl,imx6q-sabresd",
--- 
-1.7.4.1
+Drivers are only allowed to assume that IS_ERR() values for clocks are
+invalid.  Everything else they should not concern themselves with.
