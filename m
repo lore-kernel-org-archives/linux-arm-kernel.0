@@ -1,18 +1,109 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 15 May 2012 19:27:33 +0800
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
-In-Reply-To: <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
-References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
- <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
-Message-ID: <20120515112732.GB10347@shlinux2.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 11:24:12 +0000
+Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
+In-Reply-To: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
+References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201205151124.13047.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 07:10:58PM +0800, Linus Walleij wrote:
-> Dong, will you merge the i.MX stuff through pinctrl or through
-> ARM SoC?
-This patch has no dependency on any arm soc stuffs.
-I think it's ok to go through pinctrl.
+On Tuesday 08 May 2012, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This moves the Nomadik "GPIO" driver to the pinctrl subsystem
+> and adds the interfaces needed to provide a pinctrl driver for
+> the DB8500 ASIC.
+> 
+> It further switches Ux500 over to using it with a combination
+> of hogs and runtime controls.
+> 
+> The ux500 portions were developed on top of the gpio and pins
+> branch earlier sent for integration in the ARM SoC tree.
 
-Regards
-Dong Aisheng
+I get build errors with nhk8815_defconfig after this:
+
+arch/arm/mach-nomadik/built-in.o: In function `nhk8815_eth_init':
+/home/arnd/linux-arm/arch/arm/mach-nomadik/board-nhk8815.c:224: undefined reference to `nmk_gpio_set_mode'
+arch/arm/mach-nomadik/built-in.o: In function `nhk8815_i2c_init':
+/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:46: undefined reference to `nmk_gpio_set_mode'
+/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:47: undefined reference to `nmk_gpio_set_mode'
+/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:50: undefined reference to `nmk_gpio_set_mode'
+/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:51: undefined reference to `nmk_gpio_set_mode'
+
+Here is my suggested fix:
+
+8<-----
+ARM: nomadik: enable PINCTRL_NOMADIK where needed
+
+The nomadik gpio code has been converted to pinctrl, but the nomadik platform
+still expects the old code to be present. Change it to use the new one instead.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5eae559..ce9d88a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -929,6 +929,7 @@ config ARCH_NOMADIK
+ 	select CPU_ARM926T
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
++	select PINCTRL
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	help
+diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
+index 37207d1..bf123c5 100644
+--- a/arch/arm/configs/nhk8815_defconfig
++++ b/arch/arm/configs/nhk8815_defconfig
+@@ -97,6 +97,7 @@ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_GPIO=y
+ CONFIG_DEBUG_GPIO=y
++CONFIG_PINCTRL_NOMADIK=y
+ # CONFIG_HWMON is not set
+ # CONFIG_VGA_CONSOLE is not set
+ CONFIG_RTC_CLASS=y
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index 3c5e0f5..365879b 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -15,6 +15,7 @@ config NOMADIK_8815
+ config I2C_BITBANG_8815NHK
+ 	tristate "Driver for bit-bang busses found on the 8815 NHK"
+ 	depends on I2C && MACH_NOMADIK_8815NHK
++	depends on PINCTRL_NOMADIK
+ 	select I2C_ALGOBIT
+ 	default y
+ 
+diff --git a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
+index 3e8b7f1..826de74 100644
+--- a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
++++ b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
+@@ -62,7 +62,14 @@ enum nmk_gpio_slpm {
+ 
+ extern int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode);
+ extern int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull);
++#ifdef CONFIG_PINCTRL_NOMADIK
+ extern int nmk_gpio_set_mode(int gpio, int gpio_mode);
++#else
++static inline int nmk_gpio_set_mode(int gpio, int gpio_mode)
++{
++	return -ENODEV;
++}
++#endif
+ extern int nmk_gpio_get_mode(int gpio);
+ 
+ extern void nmk_gpio_wakeups_suspend(void);
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 848097e..3755c1d 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -66,7 +66,7 @@ config PINCTRL_IMX28
+ 
+ config PINCTRL_NOMADIK
+ 	bool "Nomadik pin controller driver"
+-	depends on ARCH_U8500
++	depends on ARCH_U8500 || ARCH_NOMADIK
+ 	select PINMUX
+ 	select PINCONF
