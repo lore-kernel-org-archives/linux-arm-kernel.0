@@ -1,26 +1,32 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 15 May 2012 17:56:32 +0200
-Subject: [PATCH] MTD: LPC32xx MLC NAND driver
-In-Reply-To: <4FB27B24.3030604@antcom.de>
-References: <1337091832-10138-1-git-send-email-stigge@antcom.de>
- <20120515143428.GC13860@n2100.arm.linux.org.uk> <4FB27B24.3030604@antcom.de>
-Message-ID: <4FB27CB0.8000308@antcom.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 16:59:08 +0100
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <20120515154145.GE13860@n2100.arm.linux.org.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB228AD.5000507@codethink.co.uk> <4FB25A9A.3070306@gmail.com>
+ <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
+ <4FB26904.1060308@codethink.co.uk> <20120515165813.66b4434e@skate>
+ <4FB2714F.5080703@codethink.co.uk>
+ <20120515154145.GE13860@n2100.arm.linux.org.uk>
+Message-ID: <4FB27D4C.6080204@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2012 05:49 PM, Roland Stigge wrote:
->>> +
->>> +	sg_init_one(&host->sgl, mem, len);
->>> +
->>> +	res = dma_map_sg(host->dma_chan->device->dev, &host->sgl, 1, dir);
->>
->> Also note that dma transfer directions and dma data directions are
->> different things.  You shouldn't mix the two.
+On 15/05/12 16:41, Russell King - ARM Linux wrote:
+> On Tue, May 15, 2012 at 04:07:59PM +0100, Ben Dooks wrote:
+>> I think it was because that PCI was initialised early and requires a
+>> large mapping space. It is very likely to be legacy kernel stuff that
+>> people have kept copying through.
+>
+> No.  PCI needs nothing other than access to the configuration space, and
+> the PCI IO window.  There has _never_ been any hard requirement to map
+> PCI memory in map_io() because that is _always_ done by drivers calling
+> ioremap().
 
-Can I safely use DMA_BIDIRECTIONAL here (practically, it works - just
-tested), because the caller asks for read _or_ write? Or do I need to
-formally convert enum dma_transfer_direction to enum dma_data_direction?
+What about inb, outb and their related functions?
 
-Thanks in advance,
-
-Roland
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
