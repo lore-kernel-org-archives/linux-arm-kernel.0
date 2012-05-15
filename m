@@ -1,73 +1,49 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 15 May 2012 12:51:06 -0700
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <20120515194245.GO30400@pengutronix.de>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <20120515194245.GO30400@pengutronix.de>
-Message-ID: <4FB2B3AA.3010903@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 15 May 2012 12:52:46 -0700
+Subject: [PATCHv5 1/8] ARM: OMAP4: suspend: Program all domains to
+ retention
+In-Reply-To: <1336989796-26594-2-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Mon, 14 May 2012 13:03:09 +0300")
+References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
+ <1336989796-26594-2-git-send-email-t-kristo@ti.com>
+Message-ID: <87fwb1jk6p.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2012 12:42 PM, Sascha Hauer wrote:
-> Hi Saravana,
->
-> On Fri, May 11, 2012 at 09:59:56PM -0700, Saravana Kannan wrote:
->> Without this patch, the following race conditions are possible.
->>
->> Race condition 1:
->> * clk-A has two parents - clk-X and clk-Y.
->> * All three are disabled and clk-X is current parent.
->> * Thread A: clk_set_parent(clk-A, clk-Y).
->> * Thread A:<snip execution flow>
->> * Thread A: Grabs enable lock.
->> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
->> * Thread A: Releases enable lock.
->> * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
->> * Thread A: Switches clk-A's parent to clk-Y in hardware.
->>
->> clk-A is now enabled in software, but not clocking in hardware.
->>
->> Race condition 2:
->> * clk-A has two parents - clk-X and clk-Y.
->> * All three are disabled and clk-X is current parent.
->> * Thread A: clk_set_parent(clk-A, clk-Y).
->> * Thread A:<snip execution flow>
->> * Thread A: Switches parent in hardware to clk-Y.
->> * Thread A: Grabs enable lock.
->> * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
->> * Thread A: Releases enable lock.
->> * Thread B: Calls clk_enable(clk-A)
->> * Thread B: Software state still says parent is clk-X.
->> * Thread B: So, enables clk-X and then itself.
->> * Thread A: Updates parent in software state to clk-Y.
->
-> Had a look at this and I can follow your reasoning and you patch seems
-> to fix this. However, there is a problem,
->
->>
->>   	/* migrate prepare and enable */
->> @@ -1092,23 +1098,23 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
->>
->>   	/* FIXME replace with clk_is_enabled(clk) someday */
->>   	spin_lock_irqsave(&enable_lock, flags);
->> +
->>   	if (clk->enable_count)
->>   		__clk_enable(parent);
->> -	spin_unlock_irqrestore(&enable_lock, flags);
->>
->>   	/* change clock input source */
->>   	ret = clk->ops->set_parent(clk->hw, i);
->
-> You call ->set_parent while holding a spinlock. This won't work with i2c
-> clocks.
+Tero Kristo <t-kristo@ti.com> writes:
 
-I did account for that. I explained it in the commit text. Please let me 
-know if any part of that is not clear or is not correct.
+> From: Rajendra Nayak <rnayak@ti.com>
+>
+> Remove the FIXME's in the suspend sequence since
+> we now intend to support system level RET support.
 
-Thanks,
-Saravana
+minor: this should probably go at the end of the series, after retention
+is supported.  Otherwise, ending up with only this patch applied
+(e.g. during a git bisect) will lead to a broken boot I suspect.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
+
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm44xx.c |    6 ------
+>  1 files changed, 0 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index 8856253..31990d5 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -101,12 +101,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+>  	if (!strncmp(pwrdm->name, "cpu", 3))
+>  		return 0;
+>  
+> -	/*
+> -	 * FIXME: Remove this check when core retention is supported
+> -	 * Only MPUSS power domain is added in the list.
+> -	 */
+> -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
+> -		return 0;
+>  
+>  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+>  	if (!pwrst)
