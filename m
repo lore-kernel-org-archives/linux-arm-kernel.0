@@ -1,22 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 15 May 2012 12:03:20 +0200
-Subject: [PATCH 2/8] arm: mach-armada: add source files
-In-Reply-To: <4FB225DC.6090805@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB225DC.6090805@codethink.co.uk>
-Message-ID: <20120515100320.GF6820@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 May 2012 11:09:02 +0100
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+In-Reply-To: <20120515094010.GF10453@n2100.arm.linux.org.uk>
+References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+ <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+ <20120515094010.GF10453@n2100.arm.linux.org.uk>
+Message-ID: <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >+		timer at d0020300 {
-> >+			       compatible = "marvell,timer";
+On Tue, May 15, 2012 at 10:40:10AM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 14, 2012 at 06:15:33PM +0100, Lorenzo Pieralisi wrote:
+> > On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
+> > > From what you're saying - and from my understanding of your cache behaviours,
+> > > even the sequence:
+> > > - clean cache
+> > > - disable C bit
+> > > - clean cache
+> > > is buggy.
+> > 
+> > No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
 > 
-> Is this really a generic marvell timer block?
+> It's racy.  Consider this:
+> 
+> 	- clean cache
+> 	- cache speculatively prefetches a dirty cache line from another CPU
+> 	- disable C bit
+	- clean cache
 
-Looking at the code below, its very similar to plat-orion timer.
+> At this point, you lose access to that dirty data.  If that dirty data is
+> used inbetween disabling the C bit and cleaning the cache for the second
+> time, you have data corruption issues.
 
-I've not look at all the details, but i suspect it should not have its own timer
-implementation, it should just be using plat-orion functions.
+It is not racy. After disabling the C bit the cache clean operations write-back
+any dirty cache line to the next cache level. And the CPU is still in coherency
+mode so there is not a problem with that either.
 
-	Andrew
+> Another point which needs to be checked is whether dirty cache lines in
+> a CPUs cache which has had the C bit disabled still take part in the
+> coherency protocol with other CPUs.  If the answer is no, then that's a
+> _major_ problem for the hot unplug code paths.  That effectively means
+> that we have a window where a CPU going down actively _corrupts_ the
+> data visible to other CPUs.
+
+See above.
+
+> As I have said, given what you've mentioned, it is impossible to safely
+> disable the cache on a SMP system.  In order to do it safely, you need to
+> have a way to disable new allocations into the cache _without_ disabling
+> the ability for the cache to be searched.
+
+Cache lines can be acted upon with maintenance operations whether the C bit is
+set or clear. For instance caches can be invalidated when the MMU is off
+and the C bit is clear, eg v7 boot.
+
+Cache cleaning and cache enabling/disabling are two different things, that's
+valid for the PL310 as well.
+
+Lorenzo
