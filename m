@@ -1,24 +1,46 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 15 May 2012 14:44:03 +0800
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
-In-Reply-To: <1337010369-28687-1-git-send-email-b29396@freescale.com>
-References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120515064401.GA10347@shlinux2.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 15 May 2012 09:00:58 +0200
+Subject: [PATCH] clk: Constify struct clk_init_data
+In-Reply-To: <4FB1AF14.3050507@codeaurora.org>
+References: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <20120514215304.GB3075@gmail.com> <4FB1AF14.3050507@codeaurora.org>
+Message-ID: <20120515070058.GK30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 11:46:08PM +0800, Dong Aisheng-B29396 wrote:
-> +See below for available PIN_FUNC_ID for imx53:
-> +MX53_PAD_GPIO_19__KPP_COL_5				1
-To align with mx6, the id base in the binding doc should start from 0.
-Will update the doc in v2.
+On Mon, May 14, 2012 at 06:19:16PM -0700, Saravana Kannan wrote:
+> On 05/14/2012 02:53 PM, Turquette, Mike wrote:
+> >On Mon, May 14, 2012 at 7:12 AM, Mark Brown<broonie@opensource.wolfsonmicro.com>  wrote:
+> >>Allow drivers to declare their clk_init_data const, the framework really
+> >>shouldn't be modifying the data.
+> >>
+> >>Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+> >
+> >+interested parties
+> >
+> >>
+> >>diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> >>index c1c23b9..fc43ea6 100644
+> >>--- a/include/linux/clk-provider.h
+> >>+++ b/include/linux/clk-provider.h
+> >>@@ -143,7 +143,7 @@ struct clk_init_data {
+> >>  */
+> >>  struct clk_hw {
+> >>        struct clk *clk;
+> >>-       struct clk_init_data *init;
+> >>+       const struct clk_init_data *init;
+> 
+> Oh, wait. This won't work for the case where the clock registration
+> is completely dynamic. Say, created from device tree or thru some
+> PCI/USB device probe, etc. That's why I didn't add it before.
 
-> +MX53_PAD_GPIO_19__GPIO4_5				2
-> +MX53_PAD_GPIO_19__CCM_CLKO				3
-> +MX53_PAD_GPIO_19__SPDIF_OUT1				4
-> +MX53_PAD_GPIO_19__RTC_CE_RTC_EXT_TRIG2			5
-> +MX53_PAD_GPIO_19__ECSPI1_RDY				6
-...
+Why not? In this case clk_init_data is also only used in clk_register.
+Given that Mark has posted the patch I assume it actually works.
 
-Regards
-Dong Aisheng
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
