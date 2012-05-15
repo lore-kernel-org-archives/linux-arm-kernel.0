@@ -1,109 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 11:24:12 +0000
-Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
-In-Reply-To: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
-References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201205151124.13047.arnd@arndb.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 12:31:46 +0100
+Subject: [PATCH 3/8] arm: mach-armada: add documentation for new device
+ tree bindings
+In-Reply-To: <1337072084-21967-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <4FB23EA2.3040109@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 May 2012, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This moves the Nomadik "GPIO" driver to the pinctrl subsystem
-> and adds the interfaces needed to provide a pinctrl driver for
-> the DB8500 ASIC.
-> 
-> It further switches Ux500 over to using it with a combination
-> of hogs and runtime controls.
-> 
-> The ux500 portions were developed on top of the gpio and pins
-> branch earlier sent for integration in the ARM SoC tree.
+On 15/05/12 09:54, Thomas Petazzoni wrote:
+> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
+> ---
+>   .../devicetree/bindings/arm/armada-mpic.txt        |   23 +++++++++++++++++++
+>   .../devicetree/bindings/arm/armada-timer.txt       |   11 +++++++++
+>   Documentation/devicetree/bindings/arm/armada.txt   |   24 ++++++++++++++++++++
+>   3 files changed, 58 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/armada-mpic.txt
+>   create mode 100644 Documentation/devicetree/bindings/arm/armada-timer.txt
+>   create mode 100644 Documentation/devicetree/bindings/arm/armada.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/armada-mpic.txt b/Documentation/devicetree/bindings/arm/armada-mpic.txt
+> new file mode 100644
+> index 0000000..3571f44
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/armada-mpic.txt
+> @@ -0,0 +1,23 @@
+> +Marvell Armada Interrupt Controller
+> +-----------------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "marvell,mpic"
 
-I get build errors with nhk8815_defconfig after this:
+see notes on mrvl, and the usage of very generic names. Maybe find a
+better name than the generic 'mpic'?
 
-arch/arm/mach-nomadik/built-in.o: In function `nhk8815_eth_init':
-/home/arnd/linux-arm/arch/arm/mach-nomadik/board-nhk8815.c:224: undefined reference to `nmk_gpio_set_mode'
-arch/arm/mach-nomadik/built-in.o: In function `nhk8815_i2c_init':
-/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:46: undefined reference to `nmk_gpio_set_mode'
-/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:47: undefined reference to `nmk_gpio_set_mode'
-/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:50: undefined reference to `nmk_gpio_set_mode'
-/home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:51: undefined reference to `nmk_gpio_set_mode'
+> +- interrupt-controller: Identifies the node as an interrupt controller.
+> +- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
+> +  The cell is the IRQ number
+> +- reg: Should contain PMIC registers location and length. First pair
+> +  for the main interrupt registers, second pair for the per-CPU
+> +  interrupt registers
 
-Here is my suggested fix:
+you mis-spelled MPIC as PMIC.
 
-8<-----
-ARM: nomadik: enable PINCTRL_NOMADIK where needed
+> diff --git a/Documentation/devicetree/bindings/arm/armada-timer.txt b/Documentation/devicetree/bindings/arm/armada-timer.txt
+> new file mode 100644
+> index 0000000..6bed565
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/armada-timer.txt
+> @@ -0,0 +1,11 @@
+> +Marvell Armada Global Timers
+> +----------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "marvell,timer"
+> +- interrupts: Should contain the list of Global Timer interrupts
+> +- reg: Should contain the base address of the Global Timer registers
 
-The nomadik gpio code has been converted to pinctrl, but the nomadik platform
-still expects the old code to be present. Change it to use the new one instead.
+I'd say that given you already have a clock-frequency field, just use
+that and detect == 25MHz.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Personally, I would have added a static clock to give to the timer
+something to reference.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5eae559..ce9d88a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -929,6 +929,7 @@ config ARCH_NOMADIK
- 	select CPU_ARM926T
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
-+	select PINCTRL
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select ARCH_REQUIRE_GPIOLIB
- 	help
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index 37207d1..bf123c5 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -97,6 +97,7 @@ CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
- CONFIG_DEBUG_GPIO=y
-+CONFIG_PINCTRL_NOMADIK=y
- # CONFIG_HWMON is not set
- # CONFIG_VGA_CONSOLE is not set
- CONFIG_RTC_CLASS=y
-diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
-index 3c5e0f5..365879b 100644
---- a/arch/arm/mach-nomadik/Kconfig
-+++ b/arch/arm/mach-nomadik/Kconfig
-@@ -15,6 +15,7 @@ config NOMADIK_8815
- config I2C_BITBANG_8815NHK
- 	tristate "Driver for bit-bang busses found on the 8815 NHK"
- 	depends on I2C && MACH_NOMADIK_8815NHK
-+	depends on PINCTRL_NOMADIK
- 	select I2C_ALGOBIT
- 	default y
- 
-diff --git a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-index 3e8b7f1..826de74 100644
---- a/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-+++ b/arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
-@@ -62,7 +62,14 @@ enum nmk_gpio_slpm {
- 
- extern int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode);
- extern int nmk_gpio_set_pull(int gpio, enum nmk_gpio_pull pull);
-+#ifdef CONFIG_PINCTRL_NOMADIK
- extern int nmk_gpio_set_mode(int gpio, int gpio_mode);
-+#else
-+static inline int nmk_gpio_set_mode(int gpio, int gpio_mode)
-+{
-+	return -ENODEV;
-+}
-+#endif
- extern int nmk_gpio_get_mode(int gpio);
- 
- extern void nmk_gpio_wakeups_suspend(void);
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 848097e..3755c1d 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -66,7 +66,7 @@ config PINCTRL_IMX28
- 
- config PINCTRL_NOMADIK
- 	bool "Nomadik pin controller driver"
--	depends on ARCH_U8500
-+	depends on ARCH_U8500 || ARCH_NOMADIK
- 	select PINMUX
- 	select PINCONF
+> +Optional properties:
+> +- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+> +  Mhz fixed mode (available on Armada XP and not on Armada 370)
+
+See above comment.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
