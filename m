@@ -1,254 +1,98 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 May 2012 10:23:37 +0200
-Subject: [PATCH 6/8] CI13xxx: Add i.MX233/i.MX28 binding code
+Date: Tue, 15 May 2012 10:23:39 +0200
+Subject: [PATCH 8/8] MXS: Enable USB on M28EVK
 In-Reply-To: <1337070219-3630-1-git-send-email-marex@denx.de>
 References: <1337070219-3630-1-git-send-email-marex@denx.de>
-Message-ID: <1337070219-3630-7-git-send-email-marex@denx.de>
+Message-ID: <1337070219-3630-9-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This codes connects the CI13xxx driver with the core found inside of
-the Freescale i.MX244/i.MX28 CPU.
+Enable the first USB port on M28EVK board.
+
+NOTE: The platform data here are not used, they should be replaced when the phy
+      driver evolves.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Chen Peter-B29397 <B29397@freescale.com>
 Cc: Detlev Zundel <dzu@denx.de>
-CC: Dong Aisheng <b29396@freescale.com>
-CC: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-Cc: linux-i2c at vger.kernel.org
-CC: Sascha Hauer <s.hauer@pengutronix.de>
-CC: Shawn Guo <shawn.guo@linaro.org>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Li Frank-B20596 <B20596@freescale.com>
+Cc: Linux USB <linux-usb@vger.kernel.org>
+Cc: Liu JunJie-B08287 <B08287@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Shi Make-B15407 <B15407@freescale.com>
 Cc: Stefano Babic <sbabic@denx.de>
-CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Subodh Nijsure <snijsure@grid-net.com>
 Cc: Wolfgang Denk <wd@denx.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
 ---
- drivers/usb/chipidea/Makefile      |    4 +
- drivers/usb/chipidea/ci13xxx_mxs.c |  201 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 205 insertions(+)
- create mode 100644 drivers/usb/chipidea/ci13xxx_mxs.c
+ arch/arm/mach-mxs/Kconfig       |    2 ++
+ arch/arm/mach-mxs/mach-m28evk.c |   19 +++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index cc34937..266d57d 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -12,3 +12,7 @@ endif
- ifneq ($(CONFIG_ARCH_MSM),)
- 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
- endif
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index c57f996..05f6e84 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -81,6 +81,8 @@ config MODULE_M28
+ 	select MXS_HAVE_PLATFORM_MXS_I2C
+ 	select MXS_HAVE_PLATFORM_MXS_MMC
+ 	select MXS_HAVE_PLATFORM_MXSFB
++	select MXS_HAVE_PLATFORM_USB
++	select USB_ARCH_HAS_EHCI
+ 	select MXS_OCOTP
+ 
+ config MODULE_APX4
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+index 06d7996..fc2dd2d 100644
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ b/arch/arm/mach-mxs/mach-m28evk.c
+@@ -39,6 +39,8 @@
+ 
+ #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+ #define M28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 28)
++#define M28EVK_USB_ENABLE	MXS_GPIO_NR(3, 13)
++#define M28EVK_USBOTG_ENABLE	MXS_GPIO_NR(3, 12)
+ 
+ #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+ #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+@@ -210,6 +212,16 @@ static const iomux_cfg_t m28evk_pads[] __initconst = {
+ 
+ 	/* Backlight */
+ 	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
 +
-+ifneq ($(CONFIG_ARCH_MXS),)
-+	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_mxs.o
-+endif
-diff --git a/drivers/usb/chipidea/ci13xxx_mxs.c b/drivers/usb/chipidea/ci13xxx_mxs.c
-new file mode 100644
-index 0000000..fcca90b
---- /dev/null
-+++ b/drivers/usb/chipidea/ci13xxx_mxs.c
-@@ -0,0 +1,201 @@
-+/*
-+ * drivers/usb/chipidea/ci13xxx_mxs.c
-+ *
-+ * Freescale i.MX233/i.MX28 USB glue driver to CI13xxx core.
-+ *
-+ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-+ * on behalf of DENX Software Engineering GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <linux/usb.h>
-+#include <linux/usb/chipidea.h>
-+#include <linux/usb/ch9.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/usb/ehci_def.h>
-+
-+#include <linux/usb/mxs-usb.h>
-+
-+#include "ci.h"
-+
-+static void ci13xxx_mxs_notify(struct ci13xxx *ci, unsigned event)
-+{
-+	uint32_t status;
-+	struct usb_phy *phy;
-+	struct mxs_ci13xxx_phy_notify notify;
-+
-+	phy = usb_get_transceiver();
-+	if (!phy)
-+		return;
-+
-+	if (event != CI13XXX_CONTROLLER_HOST_IRQ_EVENT)
-+		return;
-+
-+	status = hw_read(ci, OP_USBSTS, ~0);
-+
-+	notify.discon = status & STS_PCD;
-+
-+	usb_phy_notify(phy, &notify);
-+}
-+
-+static struct ci13xxx_udc_driver ci13xxx_mxs_udc_driver = {
-+	.name			= "ci13xxx_mxs",
-+	.flags			= /*CI13XXX_REGS_SHARED |*/
-+				  CI13XXX_REQUIRE_TRANSCEIVER |
-+				  CI13XXX_PULLUP_ON_VBUS |
-+				  CI13XXX_DISABLE_STREAMING,
-+	.capoffset		= 0x100,
-+	.notify_event		= ci13xxx_mxs_notify,
++	/* USB */
++	MX28_PAD_SSP2_SS2__USB0_OVERCURRENT,
++	MX28_PAD_SSP2_SS1__USB1_OVERCURRENT,
++	MX28_PAD_PWM2__USB0_ID |
++		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
++	MX28_PAD_AUART3_TX__GPIO_3_13 |
++		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
++	MX28_PAD_AUART3_RX__GPIO_3_12 |
++		MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP,
+ };
+ 
+ /* led */
+@@ -292,6 +304,11 @@ static const struct mxsfb_platform_data m28evk_mxsfb_pdata __initconst = {
+ 	.ld_intf_width	= STMLCDIF_18BIT,
+ };
+ 
++static struct mxs_usb_platform_data m28_usb_data = {
++	.gpio_vbus		= M28EVK_USBOTG_ENABLE,
++	.gpio_vbus_inverted	= 1,
 +};
 +
-+struct ci13xxx_mxs_data {
-+	struct clk		*clk;
-+	struct platform_device	*pdev;
-+};
+ static struct at24_platform_data m28evk_eeprom = {
+ 	.byte_len = 16384,
+ 	.page_size = 32,
+@@ -344,6 +361,8 @@ static void __init m28evk_init(void)
+ 	mx28_add_mxs_i2c(0);
+ 	i2c_register_board_info(0, m28_stk5v3_i2c_boardinfo,
+ 			ARRAY_SIZE(m28_stk5v3_i2c_boardinfo));
 +
-+static int __devinit ci13xxx_mxs_probe(struct platform_device *pdev)
-+{
-+	struct ci13xxx_mxs_data *data;
-+	int ret;
-+	struct usb_phy *phy;
-+
-+	phy = usb_get_transceiver();
-+	if (!phy)
-+		return -EPROBE_DEFER;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		dev_err(&pdev->dev, "Failed to allocate CI13xxx-MXS data!\n");
-+		return -ENOMEM;
-+	}
-+
-+	ret = usb_phy_init(phy);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to initialize PHY!\n");
-+		return -EINVAL;
-+	}
-+
-+	data->pdev = platform_device_alloc("ci_hdrc", -1);
-+	if (!data->pdev) {
-+		dev_err(&pdev->dev,
-+			"Failed to allocate ci_hdrc platform device!\n");
-+		ret = -ENOMEM;
-+		goto put_phy;
-+	}
-+
-+	/* Add DMA mask */
-+	data->pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-+					sizeof(*data->pdev->dev.dma_mask),
-+					GFP_KERNEL);
-+	if (!data->pdev->dev.dma_mask) {
-+		ret = -ENOMEM;
-+		goto put_platform;
-+	}
-+
-+	*data->pdev->dev.dma_mask = DMA_BIT_MASK(32);
-+	data->pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	ret = platform_device_add_resources(data->pdev, pdev->resource,
-+					    pdev->num_resources);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Failed to add resources to platform device!\n");
-+		goto put_platform;
-+	}
-+
-+	ret = platform_device_add_data(data->pdev, &ci13xxx_mxs_udc_driver,
-+				       sizeof(ci13xxx_mxs_udc_driver));
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Failed to add platform data to platform device!\n");
-+		goto put_platform;
-+	}
-+
-+	/* Claim the Host clock. */
-+	data->clk = clk_get(&pdev->dev, "usb");
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "Failed to claim clock for USB Host\n");
-+		ret = PTR_ERR(data->clk);
-+		goto put_platform;
-+	}
-+
-+	/* Prepare Host clock. */
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to enable clock for USB Host.\n");
-+		goto put_clk;
-+	}
-+
-+	ret = platform_device_add(data->pdev);
-+	if (ret)
-+		goto put_clk;
-+
-+	dev_set_drvdata(&pdev->dev, data);
-+
-+	pm_runtime_no_callbacks(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+
-+	return 0;
-+
-+put_clk:
-+	clk_put(data->clk);
-+put_platform:
-+	platform_device_put(data->pdev);
-+put_phy:
-+	usb_phy_shutdown(phy);
-+	return ret;
-+}
-+
-+static int __devexit ci13xxx_mxs_remove(struct platform_device *pdev)
-+{
-+	struct ci13xxx_mxs_data *data = dev_get_drvdata(&pdev->dev);
-+	struct usb_phy *phy = usb_get_transceiver();
-+
-+	clk_disable_unprepare(data->clk);
-+	clk_put(data->clk);
-+
-+	if (phy)
-+		usb_phy_shutdown(phy);
-+
-+	platform_device_del(data->pdev);
-+	platform_device_put(data->pdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver ci13xxx_mxs_driver = {
-+	.probe		= ci13xxx_mxs_probe,
-+	.remove		= __devexit_p(ci13xxx_mxs_remove),
-+	.driver		= {
-+		.name	= "mxs-usb",
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+module_platform_driver(ci13xxx_mxs_driver);
-+
-+MODULE_ALIAS("platform:mxs-usb");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CI13xxx MXS USB binding");
-+MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
++	mx28_add_mxs_usbh(0, &m28_usb_data);
+ }
+ 
+ static void __init m28evk_timer_init(void)
 -- 
 1.7.10
