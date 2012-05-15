@@ -1,98 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 17:36:18 +0100
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
-References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
- <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
- <20120515094010.GF10453@n2100.arm.linux.org.uk>
- <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
-Message-ID: <20120515163618.GH13860@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 15 May 2012 17:37:33 +0100
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120515163042.GA23254@lunn.ch>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
+ <20120515115511.75ece9c3@skate> <4FB269CB.4080804@gmail.com>
+ <20120515164438.22258885@skate> <20120515162201.GZ23254@lunn.ch>
+ <4FB2838D.6000507@codethink.co.uk> <20120515163042.GA23254@lunn.ch>
+Message-ID: <4FB2864D.5040004@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 05:28:51PM +0100, Lorenzo Pieralisi wrote:
-> On Tue, May 15, 2012 at 11:15:05AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, May 15, 2012 at 11:09:02AM +0100, Lorenzo Pieralisi wrote:
-> > > On Tue, May 15, 2012 at 10:40:10AM +0100, Russell King - ARM Linux wrote:
-> > > > On Mon, May 14, 2012 at 06:15:33PM +0100, Lorenzo Pieralisi wrote:
-> > > > > On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
-> > > > > > From what you're saying - and from my understanding of your cache behaviours,
-> > > > > > even the sequence:
-> > > > > > - clean cache
-> > > > > > - disable C bit
-> > > > > > - clean cache
-> > > > > > is buggy.
-> > > > > 
-> > > > > No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
-> > > > 
-> > > > It's racy.  Consider this:
-> > > > 
-> > > > 	- clean cache
-> > > > 	- cache speculatively prefetches a dirty cache line from another CPU
-> > > > 	- disable C bit
-> > > 	- clean cache
-> > 
-> > Thank you for totally missing the point and destroying the example.
-> > 
-> > > > At this point, you lose access to that dirty data.  If that dirty data is
-> > > > used inbetween disabling the C bit and cleaning the cache for the second
-> > > > time, you have data corruption issues.
-> > > 
-> > > It is not racy. After disabling the C bit the cache clean operations write-back
-> > > any dirty cache line to the next cache level. And the CPU is still in coherency
-> > > mode so there is not a problem with that either.
-> > 
-> > No.  *THINK* about the exact example I gave you.  Think about what state
-> > the CPU sees between that "disable C bit" and the final cache clean (which
-> > you seem to be insisting is an atomic operation.)
-> > 
-> > Please, read what I'm saying rather than re-interpreting it, augmenting it
-> > and then answering something entirely different.
-> > 
-> > > > As I have said, given what you've mentioned, it is impossible to safely
-> > > > disable the cache on a SMP system.  In order to do it safely, you need to
-> > > > have a way to disable new allocations into the cache _without_ disabling
-> > > > the ability for the cache to be searched.
-> 
-> First off, my apologies, it was not meant to disrupt the discussion, if
-> I did sorry about that. Let's try to sum it up:
-> 
-> 1) Hitting in the cache when the SCTLR.C is cleared is CPU specific (eg A9
->    does not, A15 does)
-> 2) as long as they are taking part in coherency (SMP bit set in ACTLR), all
->    Cortex-A cores in a MP configuration with the SCTLR.C bit set can hit in
->    the cache of a CPU that runs with the C bit cleared in SCTLR
-> 3) The sequence:
->         - clean cache
->         - clear SCTLR.C
->         - clean cache
-> 
-> is correct
+On 15/05/12 17:30, Andrew Lunn wrote:
+>>>> The 370 and XP both use the PJ4B core
+>>>
+>>> Could mach-pj4b be an option?
+>>
+>> Not really, that's the CPU core and will probably get re-used for a
+>> number of products.
+>
+> However, if everything is DT based, does that matter? All these
+> products end up in here.
 
-I continue to disagree with that assertion.
+I'd prefer a slightly more segregated directory structure, you'd
+end up with masses of files in one directory if you went of cpu-arch
+as most people use the v5/v6/v7 ARM cores.
 
-I repeat: what happens in this situation on A9:
-
-	- clean cache
-	- cache speculatively prefetches data from another core
-	- clear SCTLR.C
-	- _this_ core accesses the address associated with that prefetched
-	  data
-
-_That_ is a data corruption issue - as soon as SCTLR.C is cleared, the CPUs
-view of data in memory _changes_, and is only restored to what it should
-be when the dirty cache lines are finally flushed out of the cache.  And
-then, hey presto, the data magically changes again.
-
-So, the above sequence is _not_ safe, and it's _not_ "correct".
-
-It _might_ be the closest thing you can get to given the broken hardware
-design, but calling this _correct_ is a silly thing to do when it contains
-such a problem.
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
