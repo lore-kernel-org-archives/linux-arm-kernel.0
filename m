@@ -1,134 +1,43 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 14:53:45 +0100
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <4FB25A9A.3070306@gmail.com>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB228AD.5000507@codethink.co.uk> <4FB25A9A.3070306@gmail.com>
-Message-ID: <4FB25FE9.3060209@codethink.co.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 15 May 2012 21:58:16 +0800
+Subject: [PATCH v1 0/7] preliminary work for adding imx6q_sabrelite usb support
+Message-ID: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 14:31, Rob Herring wrote:
-> On 05/15/2012 04:58 AM, Ben Dooks wrote:
->> On 15/05/12 09:54, Thomas Petazzoni wrote:
->>> From: Gregory CLEMENT<gregory.clement@free-electrons.com>
->>>
->>> Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
->>> Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
->>> Signed-off-by: Lior Amsalem<alior@marvell.com>
->>> ---
->>>    arch/arm/boot/dts/axp-db.dts  |   40
->>> ++++++++++++++++++++++++++++++++++++++++
->>>    arch/arm/mach-armada/Kconfig  |    6 ++++++
->>>    arch/arm/mach-armada/Makefile |    2 +-
->>>    arch/arm/mach-armada/axp-dt.c |   41
->>> +++++++++++++++++++++++++++++++++++++++++
->>>    4 files changed, 88 insertions(+), 1 deletion(-)
->>>    create mode 100644 arch/arm/boot/dts/axp-db.dts
->>>    create mode 100644 arch/arm/mach-armada/axp-dt.c
->>>
->>> diff --git a/arch/arm/boot/dts/axp-db.dts b/arch/arm/boot/dts/axp-db.dts
->>> new file mode 100644
->>> index 0000000..916be09
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/axp-db.dts
->>
->> see previous comments.
->>
->>> diff --git a/arch/arm/mach-armada/Kconfig b/arch/arm/mach-armada/Kconfig
->>> index 7995813..2903096 100644
->>> --- a/arch/arm/mach-armada/Kconfig
->>> +++ b/arch/arm/mach-armada/Kconfig
->>> @@ -8,6 +8,12 @@ config MACH_ARMADA_370_DT
->>>          Say 'Y' here if you want your kernel to support
->>>          boards based on Marvell Armada 370 with device tree.
->>>
->>> +config MACH_ARMADA_XP_DT
->>> +    bool "Marvell Armada XP boards with device-tree support"
->>> +    help
->>> +      Say 'Y' here if you want your kernel to support
->>> +      boards based on Marvell Armada XP with device tree.
->>> +
->>>    endmenu
->>>
->>>    endif
->>> diff --git a/arch/arm/mach-armada/Makefile
->>> b/arch/arm/mach-armada/Makefile
->>> index ac39fae..7a3c438 100644
->>> --- a/arch/arm/mach-armada/Makefile
->>> +++ b/arch/arm/mach-armada/Makefile
->>> @@ -1,3 +1,3 @@
->>>    obj-y += common.o irq.o time.o
->>>    obj-$(CONFIG_MACH_ARMADA_370_DT) += a370-dt.o
->>> -
->>> +obj-$(CONFIG_MACH_ARMADA_XP_DT)     += axp-dt.o
->>> diff --git a/arch/arm/mach-armada/axp-dt.c
->>> b/arch/arm/mach-armada/axp-dt.c
->>> new file mode 100644
->>> index 0000000..2c13d4e
->>> --- /dev/null
->>> +++ b/arch/arm/mach-armada/axp-dt.c
->>> @@ -0,0 +1,41 @@
->>> +/*
->>> + * Device Tree support for Armada XP platforms.
->>> + *
->>> + * Copyright (C) 2012 Marvell
->>> + *
->>> + * Lior Amsalem<alior@marvell.com>
->>> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
->>> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
->>> + *
->>> + * This file is licensed under the terms of the GNU General Public
->>> + * License version 2.  This program is licensed "as is" without any
->>> + * warranty of any kind, whether express or implied.
->>> + */
->>> +
->>> +#include<linux/kernel.h>
->>> +#include<linux/init.h>
->>> +#include<linux/of_platform.h>
->>> +#include<asm/mach-types.h>
->>> +#include<asm/mach/arch.h>
->>> +#include<mach/armada.h>
->>> +#include "common.h"
->>> +
->>> +static void __init axp_dt_init(void)
->>> +{
->>> +    of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>> +}
->>> +
->>> +static const char * const axp_dt_board_dt_compat[] = {
->>> +    "marvell,axp-db",
->>> +    NULL,
->>
->> This is where the device support becomes confusing.
->>
->> I would strongly advise on using "mrvl,mv78230" as the binding
->> name. It isn't as if you can't have multiple names associated
->> with one binding.
->
-> The name here should uniquely identify the board, not the chip. If you
-> additionally want to have the chip name, then that should be after the
-> board name. However, "marvell,armada" is too generic to be useful.
->
-> marvell is the documented vendor string, not mrvl.
+The work is based on usb-next which includes ci13xxx rework by Alexander Shishkin.
 
-I could swear I read it as mrvl in the documentation for device-tree
+Status:
+  - this version only tested host
+  - usbotg controler works at host role
 
->> Also, given how close they are, do we really need separate machine
->> support files?
->
-> There does need to be justification why they need to be separate.
+Todo:
+  - usbh1 has strange system error when enumerate devices for on-board hub.
+  - high speed usb connecton detect failed for the second time. It needs hub code hack.
 
-I'd say for the "core" support that they could all be handled by this
-case catching the "marvell,mv...." and initialising all the core bits
-such as timer, io, irq, etc.
+Thanks Peter Chen for greate help.
 
-Since the two board support files are identical, except for the names
-they print, I'd say this is the job of one file. It can always be split
-later.
+Richard Zhao (7):
+  usb: chipidea: permit user select USB_EHCI_ROOT_HUB_TT
+  usb: chipidea: remove zero check of hw_ep_max
+  usb: chipidea: add imx on-soc utmi phy driver
+  usb: chipidea: add imx driver binding
+  ARM: imx6q: correct device name of usbphy and usboh3 clock export
+  ARM: imx6q: add anatop initialization for usb controllers
+  ARM: dts: imx6q-sabrelite: add usb devices
+
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   19 ++++-
+ arch/arm/boot/dts/imx6q.dtsi          |   44 ++++++++-
+ arch/arm/mach-imx/clk-imx6q.c         |    7 +-
+ arch/arm/mach-imx/mach-imx6q.c        |   60 +++++++++++
+ drivers/usb/chipidea/Makefile         |    4 +
+ drivers/usb/chipidea/ci13xxx_imx.c    |  177 +++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/core.c           |    2 +-
+ drivers/usb/chipidea/phy-imx-utmi.c   |  140 ++++++++++++++++++++++++++
+ drivers/usb/host/Kconfig              |    2 +-
+ 9 files changed, 449 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+ create mode 100644 drivers/usb/chipidea/phy-imx-utmi.c
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.7.5.4
