@@ -1,33 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 May 2012 10:15:43 -0600
-Subject: [GIT PULL] ARM: tegra: dt2 branch
-In-Reply-To: <201205151143.26008.arnd@arndb.de>
-References: <1337016017-30537-1-git-send-email-swarren@wwwdotorg.org>
- <201205142037.08752.arnd@arndb.de> <4FB170F3.8080107@wwwdotorg.org>
- <201205151143.26008.arnd@arndb.de>
-Message-ID: <4FB2812F.1010500@wwwdotorg.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 May 2012 18:22:01 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120515164438.22258885@skate>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
+ <20120515115511.75ece9c3@skate> <4FB269CB.4080804@gmail.com>
+ <20120515164438.22258885@skate>
+Message-ID: <20120515162201.GZ23254@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2012 05:43 AM, Arnd Bergmann wrote:
-> On Monday 14 May 2012, Stephen Warren wrote:
->> I wonder if the changes to tegra-*.dtsi shouldn't just be dropped? I'd
->> personally err on the side of requiring board files to add this
->> property, rather than having things accidentally work because the .dtsi
->> file included a default.
+On Tue, May 15, 2012 at 04:44:38PM +0200, Thomas Petazzoni wrote:
+> Le Tue, 15 May 2012 09:35:55 -0500,
+> Rob Herring <robherring2@gmail.com> a ??crit :
 > 
-> I ended up redoing the merge because I found an embarrasing typo in my patch
-> and now dropped the property for the dtsi files.
+> > Directory location doesn't really have anything to do with what can be
+> > in a single kernel binary. We will soon be building single images
+> > across mach directories.
 > 
->> BTW, I assume that in 3.6, I should plan to remove the support-8bit
->> properties and associated Tegra SDHCI driver code that handles them, and
->> rely on the SDHCI core handling this from now on?
+> Agreed, but it's not the case right now, and we wanted to submit today
+> a kernel that boots on both of those SoCs.
 > 
-> I think we can't drop it from the driver because of existing powerpc machines
-> providing the property, but it would be ok if you drop it from your .dts
-> files.
+> The 370 and XP both use the PJ4B core
 
-support-8bit is parsed by the Tegra driver only, and only appears in
-tegra-*.dts across all arch/*/boot.dts. I assume you were talking about
-some other property, although I can't tell which from a very quick look
-at arch/powerpc/boot/dts/*.
+Could mach-pj4b be an option?
+      
+      Andrew
