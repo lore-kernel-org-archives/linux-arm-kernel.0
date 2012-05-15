@@ -1,53 +1,101 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 15 May 2012 11:18:38 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120515091838.GC6820@lunn.ch>
+From: nalajala.murali@gmail.com (Murali N)
+Date: Tue, 15 May 2012 14:55:12 +0530
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+In-Reply-To: <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+References: <CAF0TxboSEZuHO6mo-F=os9cvNCyAfVjs3j=SSLjgC7DV6Q_jow@mail.gmail.com>
+ <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+Message-ID: <CAF0TxbryfrZDRbQg-giXO0=OmK2Bty=oDrMVnFxNPAcXgg_sjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 10:54:36AM +0200, Thomas Petazzoni wrote:
-> Arnd, Olof,
-> 
-> You'll find in this patch set the initial support for a new family of
-> ARMv7-compatible Marvell SoCs, that we have choosen to support in the
-> arch/arm/mach-armada/ directory.
-> 
-> At the moment, both the Armada 370 and the Armada XP SoCs are
-> supported in this directory, and we are able to build a single kernel
-> image that boots on both SoCs. Both SoCs use the PJ4B processor, a
-> Marvell-developed ARM core that implements the ARMv7 instruction
-> set. We are currently using Marvell evaluation boards for both of
-> those SoCs, and the support for those boards is added in this patch
-> set.
-> 
-> This preliminary support only includes the necessary code for timer
-> and IRQ support, the serial controller is a standard 16550-compatible
-> one. The diffstat looks like:
-> 
->  Documentation/devicetree/bindings/arm/armada-mpic.txt  |   23 +
->  Documentation/devicetree/bindings/arm/armada-timer.txt |   11 
->  Documentation/devicetree/bindings/arm/armada.txt       |   24 +
->  MAINTAINERS                                            |    8 
->  arch/arm/Kconfig                                       |   12 
->  arch/arm/Makefile                                      |    1 
->  arch/arm/boot/dts/a370-db.dts                          |   41 ++
->  arch/arm/boot/dts/a370.dtsi                            |   23 +
->  arch/arm/boot/dts/armada.dtsi                          |   67 ++++
->  arch/arm/boot/dts/axp-db.dts                           |   40 ++
->  arch/arm/boot/dts/axp.dtsi                             |   43 +++
->  arch/arm/configs/armada_defconfig                      |   47 +++
->  arch/arm/mach-armada/Kconfig                           |   19 +
->  arch/arm/mach-armada/Makefile                          |    3 
+On Mon, May 14, 2012 at 10:45 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Mon, May 14, 2012 at 05:39:09PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, May 14, 2012 at 05:21:50PM +0100, Lorenzo Pieralisi wrote:
+>> > On Mon, May 14, 2012 at 04:58:59PM +0100, Russell King - ARM Linux wrote:
+>> > > On Mon, May 14, 2012 at 04:50:22PM +0100, Lorenzo Pieralisi wrote:
+>> > > > > 2. L2 disable
+>> > > > > 3. L1 clean & invalidate
+>> > > >
+>> > > > This is wrong again since while cleaning and invalidating the cache (L1 here)
+>> > > > can still allocate and this must not happen.
+>> > >
+>> > > No it isn't. ?There is never anything wrong with allocating new caches lines
+>> > > into a cache which is going to (eventually) be powered down. ?Ever.
+>> >
+>> > What if the cache allocates a dirty cache line moved from L1 of another
+>> > processor ?
+>> >
+>> > > What would be wrong is if we end up with dirty cache lines in the cache
+>> > > to be powered down for data which we _care_ about preserving when power
+>> > > is lost.
+>> > >
+>> > > That's a _very_ _very_ important difference.
+>> >
+>> > That's exactly the point I am making. dirty cache lines can be migrated across
+>> > processors caches. If we want to shut down a single core we have to be 100%
+>> > sure that dirty cache lines (if we care about that data, we might be not as you
+>> > pointed out) must not be present in L1 when we shut the core down. If the C
+>> > bit in SCTLR is not cleared before cleaning and invalidating this is not
+>> > guaranteed from an architectural point of view.
+>> >
+>> > Occurences might be rare, but it is still not safe to clean the cache with the
+>> > C bit set.
+>>
+>> It's not safe to disable the C bit without first pushing the dirty data out
+>> to RAM either. ?It's a catch-22 situation - because turning the C bit off
+>> not only stops the caches allocating new lines but also prevents them being
+>> searched.
+>
+> That depends on the processor. On A9 cache is bypassed on A15 it is not,
+> data access might still hit in the cache.
+>
+> It is "implementation defined" according to ARM ARM (B2-1265).
+> But C bit cleared stops allocation that's true across all implementations.
+>
+>> That means your view of cacheable memory suddenly changes beneath you when
+>> the C bit is turned off.
+>
+> Yes might be (see above) but the cache operations still work so we do
+> not have any problem (well, as long as we clean and invalidate without
+> using data that can live in the cache, but that's how it is done on v7 cache
+> flush ops and it is perfectly fine).
+>
+>> From what you're saying - and from my understanding of your cache behaviours,
+>> even the sequence:
+>> - clean cache
+>> - disable C bit
+>> - clean cache
+>> is buggy.
+>
+> No, that's correct, works fine on A9 and A15. Second clean is mostly nops.
+>
+>>
+>> I think what you're effectively saying is that it is not possible to safely
+>> power down a cache on an ARM SMP CPU...
+>
+> It is possible, but the final clean must be done with C bit cleared. It is
+> belt and braces, agreed, but that's the only way to do it properly.
+>
+> Lorenzo
+>
 
-Hi Thomas
+In my case while powering down the core0, core1 is already in *off*
+state and out of coherency.
+So, while shutting down the CPU0 (cpu1 is already off) still i need to
+follow the steps you have mentioned for effective power down of a
+cache?
+My feel is while going to shutdown effectively i operate in a single
+core mode, so it doesn't make any difference in following either of
+the sequence?
 
-Is mach-armada a good idea? What are many different armada chipsets families:
+Please correct me if i am wrong.
 
-Armada 100, 300, 500, 600, 1000, 15000, XP. 
-
-You only seem to support 300 and XP. Where would the others go? 300 is
-actually mach-dove, etc. 
-
-	 Andrew
+-- 
+Regards,
+Murali N
