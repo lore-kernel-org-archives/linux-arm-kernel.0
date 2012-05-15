@@ -1,25 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 May 2012 14:33:58 +0200
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
-In-Reply-To: <20120515112732.GB10347@shlinux2.ap.freescale.net>
-References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
- <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
- <20120515112732.GB10347@shlinux2.ap.freescale.net>
-Message-ID: <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
+From: ki0351.kim@samsung.com (Kyoungil Kim)
+Date: Tue, 15 May 2012 21:37:16 +0900
+Subject: [PATCH v2] serial: samsung: Fixed wrong comparison for baudclk_rate
+Message-ID: <000501cd3297$75fba910$61f2fb30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 1:27 PM, Dong Aisheng
-<aisheng.dong@freescale.com> wrote:
-> On Tue, May 15, 2012 at 07:10:58PM +0800, Linus Walleij wrote:
->> Dong, will you merge the i.MX stuff through pinctrl or through
->> ARM SoC?
->
-> This patch has no dependency on any arm soc stuffs.
-> I think it's ok to go through pinctrl.
+port->baudclk_rate should be compared to the rate of port->baudclk,
+because port->baudclk_rate was assigned as the rate of port->baudclk previously.
+So to check that the current baudclk rate is same as previous rate,
+the target of comparison sholud be the rate of port->baudclk.
 
-OK I'll be merging them, I was just thinking if you planned to also
-make machine changes in this kernel cycle.
+Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
+Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+---
+ drivers/tty/serial/samsung.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index d8b0aee..6a6a86a 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -1014,10 +1014,10 @@ static int s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
+ 	 * a disturbance in the clock-rate over the change.
+ 	 */
+ 
+-	if (IS_ERR(port->clk))
++	if (IS_ERR(port->baudclk) || port->baudclk == NULL)
+ 		goto exit;
+ 
+-	if (port->baudclk_rate == clk_get_rate(port->clk))
++	if (port->baudclk_rate == clk_get_rate(port->baudclk))
+ 		goto exit;
+ 
+ 	if (val == CPUFREQ_PRECHANGE) {
+-- 
+1.7.1
