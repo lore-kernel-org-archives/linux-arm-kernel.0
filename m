@@ -1,39 +1,55 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 May 2012 16:27:15 +0200
-Subject: [PATCH v1 1/7] usb: chipidea: permit user select
- USB_EHCI_ROOT_HUB_TT
-In-Reply-To: <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
+Date: Tue, 15 May 2012 16:28:18 +0200
+Subject: [PATCH v1 0/7] preliminary work for adding imx6q_sabrelite usb
+ support
+In-Reply-To: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
 References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
-Message-ID: <201205151627.15428.marex@denx.de>
+Message-ID: <201205151628.19020.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Richard Zhao,
 
-> The ci13xxx hcd require USB_EHCI_ROOT_HUB_TT.
+> The work is based on usb-next which includes ci13xxx rework by Alexander
+> Shishkin.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Status:
+>   - this version only tested host
+>   - usbotg controler works at host role
+> 
+> Todo:
+>   - usbh1 has strange system error when enumerate devices for on-board hub.
+>   - high speed usb connecton detect failed for the second time. It needs
+> hub code hack.
+> 
+> Thanks Peter Chen for greate help.
 
-I already sent similar patch a few hours ago.
+Hm, I think we should somehow coordinate, because I think we're working on the 
+same thing and we're duplicating work.
 
-> ---
->  drivers/usb/host/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 684a7bb..89d0371 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -65,7 +65,7 @@ config USB_EHCI_HCD
+> Richard Zhao (7):
+>   usb: chipidea: permit user select USB_EHCI_ROOT_HUB_TT
+>   usb: chipidea: remove zero check of hw_ep_max
+>   usb: chipidea: add imx on-soc utmi phy driver
+>   usb: chipidea: add imx driver binding
+>   ARM: imx6q: correct device name of usbphy and usboh3 clock export
+>   ARM: imx6q: add anatop initialization for usb controllers
+>   ARM: dts: imx6q-sabrelite: add usb devices
 > 
->  config USB_EHCI_ROOT_HUB_TT
->  	bool "Root Hub Transaction Translators"
-> -	depends on USB_EHCI_HCD
-> +	depends on USB_EHCI_HCD || USB_CHIPIDEA
->  	---help---
->  	  Some EHCI chips have vendor-specific extensions to integrate
->  	  transaction translators, so that no OHCI or UHCI companion
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |   19 ++++-
+>  arch/arm/boot/dts/imx6q.dtsi          |   44 ++++++++-
+>  arch/arm/mach-imx/clk-imx6q.c         |    7 +-
+>  arch/arm/mach-imx/mach-imx6q.c        |   60 +++++++++++
+>  drivers/usb/chipidea/Makefile         |    4 +
+>  drivers/usb/chipidea/ci13xxx_imx.c    |  177
+> +++++++++++++++++++++++++++++++++ drivers/usb/chipidea/core.c           | 
+>   2 +-
+>  drivers/usb/chipidea/phy-imx-utmi.c   |  140 ++++++++++++++++++++++++++
+>  drivers/usb/host/Kconfig              |    2 +-
+>  9 files changed, 449 insertions(+), 6 deletions(-)
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+>  create mode 100644 drivers/usb/chipidea/phy-imx-utmi.c
 
 Best regards,
 Marek Vasut
