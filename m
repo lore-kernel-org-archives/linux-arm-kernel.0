@@ -1,38 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 May 2012 19:30:35 +0100
-Subject: [PATCH 3/4] ASoC: add imx-mc13783 sound support
-In-Reply-To: <1337082832-9764-4-git-send-email-philippe.retornaz@epfl.ch>
-References: <1337082832-9764-1-git-send-email-philippe.retornaz@epfl.ch>
- <1337082832-9764-2-git-send-email-philippe.retornaz@epfl.ch>
- <1337082832-9764-3-git-send-email-philippe.retornaz@epfl.ch>
- <1337082832-9764-4-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20120515183035.GG19592@opensource.wolfsonmicro.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 15 May 2012 11:35:27 -0700
+Subject: [PATCH] arm: omap3: am35x: Set proper powerdomain states
+In-Reply-To: <CAORVsuXouGSdZRKW+T8yvc+23KYr-x0u9FeRXxiET+QmanE_EA@mail.gmail.com>
+References: <1335821208-13098-1-git-send-email-mgreer@animalcreek.com>
+ <CAORVsuXouGSdZRKW+T8yvc+23KYr-x0u9FeRXxiET+QmanE_EA@mail.gmail.com>
+Message-ID: <20120515183527.GB26651@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 01:53:51PM +0200, Philippe R?tornaz wrote:
+On Tue, May 15, 2012 at 09:43:52AM +0200, Jean Pihet wrote:
+> Hi Mark,
 
-> +	ret = snd_soc_dai_set_fmt(codec_dai, FMT_SSI);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = snd_soc_dai_set_fmt(cpu_dai, FMT_SSI);
-> +	if (ret)
-> +		return ret;
+Hi Jean.
 
-Set this in the dai_link structure.  Please fix incrementally unless you
-respin, same comments about apply if Samuel is OK as the CODEC driver.
+> On Mon, Apr 30, 2012 at 11:26 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> >
+> > The am35x family of SoCs only support the PWRSTS_ON
+> > state so create a new set of powerdomain structures
+> > that ensure that only the ON state is entered.
+> >
+> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > ---
 
-> +	ret = snd_soc_dai_set_sysclk(codec_dai, MC13783_CLK_CLIA, 26000000, 0);
-> +	if (ret)
-> +		return ret;
+> > ?void __init omap3xxx_powerdomains_init(void)
+> > ?{
+> > ? ? ? ?unsigned int rev;
+> > @@ -301,21 +403,31 @@ void __init omap3xxx_powerdomains_init(void)
+> > ? ? ? ? ? ? ? ?return;
+> >
+> > ? ? ? ?pwrdm_register_platform_funcs(&omap3_pwrdm_operations);
+> > - ? ? ? pwrdm_register_pwrdms(powerdomains_omap3430_common);
+> >
+> > ? ? ? ?rev = omap_rev();
+> >
+> > - ? ? ? if (rev == OMAP3430_REV_ES1_0)
+> > - ? ? ? ? ? ? ? pwrdm_register_pwrdms(powerdomains_omap3430es1);
+> > - ? ? ? else if (rev == OMAP3430_REV_ES2_0 || rev == OMAP3430_REV_ES2_1 ||
+> > - ? ? ? ? ? ? ? ?rev == OMAP3430_REV_ES3_0 || rev == OMAP3630_REV_ES1_0)
+> > - ? ? ? ? ? ? ? pwrdm_register_pwrdms(powerdomains_omap3430es2_es3_0);
+> > - ? ? ? else if (rev == OMAP3430_REV_ES3_1 || rev == OMAP3430_REV_ES3_1_2 ||
+> > - ? ? ? ? ? ? ? ?rev == AM35XX_REV_ES1_0 || rev == AM35XX_REV_ES1_1 ||
+> > - ? ? ? ? ? ? ? ?rev == OMAP3630_REV_ES1_1 || rev == OMAP3630_REV_ES1_2)
+> > - ? ? ? ? ? ? ? pwrdm_register_pwrdms(powerdomains_omap3430es3_1plus);
+> > - ? ? ? else
+> > - ? ? ? ? ? ? ? WARN(1, "OMAP3 powerdomain init: unknown chip type\n");
+> > + ? ? ? if (rev == AM35XX_REV_ES1_0 || rev == AM35XX_REV_ES1_1) {
+> > + ? ? ? ? ? ? ? pwrdm_register_pwrdms(powerdomains_am35x);
+> > + ? ? ? } else {
+> > + ? ? ? ? ? ? ? pwrdm_register_pwrdms(powerdomains_omap3430_common);
+> Is there a way to avoid the big 'if else' here and have the code
+> organized per chipset revision? A mutliple if-else or -even better
+> IMO- a switch-case would make the code more readable.
 
-We should probably have something for this in the dai_link too but we
-don't.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120515/38198701/attachment.sig>
+We can't avoid it completely because we have to register
+powerdomains_am35x[] [exclusive] OR (powerdomains_omap3430_common[] +
+extras).  What I can do is leave the outside 'if' and turn the code
+inside the 'else' into a switch stmt which should look nicer.
+
+Good idea, thanks. :)
+
+I will submit v2 in a bit.
+
+Mark
