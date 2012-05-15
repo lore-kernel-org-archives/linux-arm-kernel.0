@@ -1,43 +1,76 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 10:51:35 +0100
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120515091838.GC6820@lunn.ch>
+Date: Tue, 15 May 2012 10:54:20 +0100
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <20120515092750.GD6820@lunn.ch>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515091838.GC6820@lunn.ch>
-Message-ID: <4FB22727.6090406@codethink.co.uk>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120515092750.GD6820@lunn.ch>
+Message-ID: <4FB227CC.8090808@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 10:18, Andrew Lunn wrote:
-> On Tue, May 15, 2012 at 10:54:36AM +0200, Thomas Petazzoni wrote:
->> Arnd, Olof,
->>
->> You'll find in this patch set the initial support for a new family of
->> ARMv7-compatible Marvell SoCs, that we have choosen to support in the
->> arch/arm/mach-armada/ directory.
-
-I went for the arch/arm/mach-mv-armadaxp as it kept the marvell socs
-together (ignoring kirkwood and dove for the moment).
-
-I'm not sure how important the naming is as long as it is clear in the
-Kconfig what machines are being supported by the system.
-
-I'd say you can put the core support for multiple difference SoCs into
-the same directory without too much trouble, since there is now no need
-for multiple board files to go in there with it. Shared peripherals can
-either go into the relevant drivers/ directory, or in to some form of
-common directory such as arch/arm/common.
-
-[snip]
-
-> Hi Thomas
+On 15/05/12 10:27, Andrew Lunn wrote:
 >
-> Is mach-armada a good idea? What are many different armada chipsets families:
+>> diff --git a/arch/arm/mach-armada/irq.c b/arch/arm/mach-armada/irq.c
+>> new file mode 100644
+>> index 0000000..7006429
+>> --- /dev/null
+>> +++ b/arch/arm/mach-armada/irq.c
+>> @@ -0,0 +1,116 @@
+>> +/*
+>> + * Marvall Armada SoC IRQ handling
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * Lior Amsalem<alior@marvell.com>
+>> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+>> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/init.h>
+>> +#include<linux/irq.h>
+>> +#include<linux/interrupt.h>
+>> +#include<linux/io.h>
+>> +#include<linux/of_address.h>
+>> +#include<linux/of_irq.h>
+>> +#include<linux/irqdomain.h>
+>> +#include<asm/mach/arch.h>
+>> +#include<asm/exception.h>
+>> +
+>> +/* Interrupt Controller Registers Map */
+>> +#define ARMADA_INT_SET_MASK_OFFS             (0xBC)
+>> +#define ARMADA_INT_CLEAR_MASK_OFFS           (0xB8)
+>> +
+>> +#define ARMADA_INT_SET_ENABLE_OFFS           (0xA30)
+>> +#define ARMADA_INT_CLEAR_ENABLE_OFFS         (0xA34)
+>> +
+>> +#define ARMADA_CPU_INTACK_OFFS               (0xB4)
+>> +
+>> +static void __iomem *per_cpu_int_base;
+>> +static void __iomem *main_int_base;
+>> +static struct irq_domain *armada_mpic_domain;
+>> +
+>> +static void armada_irq_mask(struct irq_data *d)
+>> +{
+>> +	writel(d->irq, per_cpu_int_base + ARMADA_INT_CLEAR_MASK_OFFS);
+>> +}
+>> +
+>> +static void armada_irq_unmask(struct irq_data *d)
+>> +{
+>> +	writel(d->irq, per_cpu_int_base + ARMADA_INT_SET_MASK_OFFS);
+>> +}
 >
-> Armada 100, 300, 500, 600, 1000, 15000, XP.
->
-> You only seem to support 300 and XP. Where would the others go? 300 is
-> actually mach-dove, etc.
+> All the other orion's use the generic-chip interrupt routines. Can
+> this device also use it? It would also allow you to use the generic DT
+> bindings.
+
+Possibly, but there'll need to be support for setting interrupt affinity
+added at some point, as this is used on multi-core systems.
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
