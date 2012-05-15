@@ -1,31 +1,19 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 17:37:33 +0100
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120515163042.GA23254@lunn.ch>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
- <20120515115511.75ece9c3@skate> <4FB269CB.4080804@gmail.com>
- <20120515164438.22258885@skate> <20120515162201.GZ23254@lunn.ch>
- <4FB2838D.6000507@codethink.co.uk> <20120515163042.GA23254@lunn.ch>
-Message-ID: <4FB2864D.5040004@codethink.co.uk>
+From: philippe.retornaz@epfl.ch (=?UTF-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Tue, 15 May 2012 18:42:25 +0200
+Subject: [PATCH 0/1] Enable sound on mx31_3ds
+Message-ID: <1337100146-16459-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 17:30, Andrew Lunn wrote:
->>>> The 370 and XP both use the PJ4B core
->>>
->>> Could mach-pj4b be an option?
->>
->> Not really, that's the CPU core and will probably get re-used for a
->> number of products.
->
-> However, if everything is DT based, does that matter? All these
-> products end up in here.
+Hi
 
-I'd prefer a slightly more segregated directory structure, you'd
-end up with masses of files in one directory if you went of cpu-arch
-as most people use the v5/v6/v7 ARM cores.
+Here is the sound support for mx31_3ds.
+It successfully outputs sound on the loudspeaker.
+It needs the patchset: "MC13783 sound support".
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Philippe R?tornaz (1):
+  mx31_3ds: Add sound support
+
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/mach-mx31_3ds.c |   22 +++++++++++++++++++++-
+ 2 files changed, 22 insertions(+), 1 deletions(-)
