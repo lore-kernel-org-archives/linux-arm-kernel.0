@@ -1,39 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 15 May 2012 15:34:40 +0800
-Subject: [PATCH 1/1] ARM: mxc: change timer clock to perclk
-Message-ID: <1337067280-11697-1-git-send-email-richard.zhao@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 May 2012 08:37:12 +0100
+Subject: Cyclic DMA - callback properties and tx_status residue
+In-Reply-To: <1337058446.16185.5382.camel@vkoul-udesk3>
+References: <20120502162702.GE3548@n2100.arm.linux.org.uk>
+ <CACRpkdYTpP_nW+CJiJNPLgU6fXtR6ku3-OQaA4ceYtB3ZM5sqQ@mail.gmail.com>
+ <20120509093334.GS26481@n2100.arm.linux.org.uk>
+ <20120509111614.GH3955@opensource.wolfsonmicro.com>
+ <20120509121945.GT26481@n2100.arm.linux.org.uk>
+ <1336621458.1540.280.camel@vkoul-udesk3>
+ <20120510094205.GM3908@opensource.wolfsonmicro.com>
+ <1336647675.15424.390.camel@vkoul-udesk3>
+ <20120511140710.GC6220@n2100.arm.linux.org.uk>
+ <1337058446.16185.5382.camel@vkoul-udesk3>
+Message-ID: <20120515073712.GE10453@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix system time goes too fast.
-perclk rate not changed or gated in low power mode, so we
-choose perclk for gpt.
+On Tue, May 15, 2012 at 10:37:26AM +0530, Vinod Koul wrote:
+> On Fri, 2012-05-11 at 15:07 +0100, Russell King - ARM Linux wrote:
+> > On Thu, May 10, 2012 at 04:31:15PM +0530, Vinod Koul wrote:
+> > > This should not be in ASoC library. The driver should be able to detect
+> > > if a tasklet was called for many dma completions and notify the client
+> > > (soc-lib) accordingly.
+> > 
+> > No.  Think about the cyclic case.  How do you correctly record how many
+> > 'periods' have completed so that when your tasklet eventually gets called,
+> > you call its callback the correct number of times?
+> In ISR you can find which descriptors the interupt is for and then use
+> this info in tasklet.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/plat-mxc/time.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-index 99f958c..d865f79 100644
---- a/arch/arm/plat-mxc/time.c
-+++ b/arch/arm/plat-mxc/time.c
-@@ -58,6 +58,7 @@
- /* MX31, MX35, MX25, MX5 */
- #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
- #define V2_TCTL_CLK_IPG		(1 << 6)
-+#define V2_TCTL_CLK_PER		(2 << 6)
- #define V2_TCTL_FRR		(1 << 9)
- #define V2_IR			0x0c
- #define V2_TSTAT		0x08
-@@ -309,7 +310,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
- 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
- 
- 	if (timer_is_v2())
--		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-+		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
- 	else
- 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
- 
--- 
-1.7.5.4
+What descriptors?  With cyclic DMA you only have one descriptor.  Your
+DMA engine may only need to be programmed once to do this too.
