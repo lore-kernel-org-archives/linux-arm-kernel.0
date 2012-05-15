@@ -1,30 +1,24 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 15 May 2012 15:25:54 -0400 (EDT)
-Subject: [GIT PULL] ARM: Kirkwood: new boards for v3.5
-In-Reply-To: <4FB2181F.7010609@codethink.co.uk>
-References: <20120515032605.GV16338@titan.lakedaemon.net>
- <4FB2181F.7010609@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1205151521310.1640@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 19:29:28 +0000
+Subject: [PATCH 1/2] ARM: clps711x: Cleanup IRQ handling
+In-Reply-To: <1337104502-5292-2-git-send-email-shc_work@mail.ru>
+References: <1337104502-5292-1-git-send-email-shc_work@mail.ru>
+ <1337104502-5292-2-git-send-email-shc_work@mail.ru>
+Message-ID: <201205151929.28324.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 May 2012, Ben Dooks wrote:
-
-> On 15/05/12 04:26, Jason Cooper wrote:
-> >   .../devicetree/bindings/mtd/orion-nand.txt         |   50 ++++
-> >   arch/arm/boot/dts/kirkwood-dns320.dts              |   64 +++++
-> >   arch/arm/boot/dts/kirkwood-dns325.dts              |   59 +++++
-> >   arch/arm/boot/dts/kirkwood-ib62x0.dts              |   44 +++
-> >   arch/arm/boot/dts/kirkwood-iconnect.dts            |   26 ++
+On Tuesday 15 May 2012, Alexander Shiyan wrote:
+> This patch contains two changes:
+> - Removed unused definitions from mach/irqs.h
+> - Do not mask interrupts in ack procedure, because we have separate
+>   intX_mask procedure for do it and actually these 2 functions are
+>   called sequentially
 > 
-> I thought the idea of going to device-tree was to remove the addition
-> of these? Now instead of .c files we're getting piles of .dts files.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Yes, and this is a good thing.
+Applied, and pulled it with the other cleanup into the next/cleanup branch.
 
-We're not to that point where DT is sufficiently well implemented and 
-stable on ARM for those files to live somewhere else.  Eventually they 
-will go when they won't have to evolve in lock step anymore.
+Thanks,
 
-
-Nicolas
+	Arnd
