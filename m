@@ -1,57 +1,27 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 14 May 2012 18:19:16 -0700
-Subject: [PATCH] clk: Constify struct clk_init_data
-In-Reply-To: <20120514215304.GB3075@gmail.com>
-References: <1337004763-21250-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20120514215304.GB3075@gmail.com>
-Message-ID: <4FB1AF14.3050507@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 14 May 2012 21:46:29 -0400
+Subject: [GIT PULL RESEND] ARM: mv_cesa: final fix for v3.4
+Message-ID: <20120515014629.GS16338@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2012 02:53 PM, Turquette, Mike wrote:
-> On Mon, May 14, 2012 at 7:12 AM, Mark Brown<broonie@opensource.wolfsonmicro.com>  wrote:
->> Allow drivers to declare their clk_init_data const, the framework really
->> shouldn't be modifying the data.
->>
->> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
->
-> +interested parties
->
-> Mark, I like this change but it's reminded me of a few things I meant to
-> bring up on the list in the past.  Certainly some folks will mark their
-> struct clk_hw_init data as __initconst.  Currently none of the
-> documentation mentions that fact and I'm a bit worried about clk code
-> which assumes that hw->init will always be around and freely accesses
-> it.
->
-> I think that, as a rule, hw->init cannot be assumed to be valid after
-> clk_register returns.  Would anyone else like to weigh in on it?  If so
-> then I'll cook up a follow-up patch to reflect this in the kerneldoc.
->
-> Thanks,
-> Mike
->
->> ---
->>   include/linux/clk-provider.h |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index c1c23b9..fc43ea6 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -143,7 +143,7 @@ struct clk_init_data {
->>   */
->>   struct clk_hw {
->>         struct clk *clk;
->> -       struct clk_init_data *init;
->> +       const struct clk_init_data *init;
+The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
 
-Oh, wait. This won't work for the case where the clock registration is 
-completely dynamic. Say, created from device tree or thru some PCI/USB 
-device probe, etc. That's why I didn't add it before.
+  Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
 
--Saravana
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git marvell_fixes_for_v3.4
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Alexander Clouter (1):
+      crypto: mv_cesa requires on CRYPTO_HASH to build
+
+ drivers/crypto/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+
+Resending not as "Reply-to-all" since the ml server didn't like the
+headers.
+
+thx,
+
+Jason.
