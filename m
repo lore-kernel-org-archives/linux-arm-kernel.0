@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 May 2012 14:26:28 +0200
-Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
-In-Reply-To: <201205151124.13047.arnd@arndb.de>
-References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
- <201205151124.13047.arnd@arndb.de>
-Message-ID: <CACRpkdZrs=rgfadRCcMYxhwqib96vkRdHCoC-27dyAjEu5Y5Ew@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 12:28:54 +0000
+Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
+ arch-pxa git tree
+In-Reply-To: <1337084564.4250.YahooMailClassic@web29010.mail.ird.yahoo.com>
+References: <1337084564.4250.YahooMailClassic@web29010.mail.ird.yahoo.com>
+Message-ID: <201205151228.54881.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 1:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday 15 May 2012, Paul Parsons wrote:
+> > This is not good, you should not split patches in a way that
+> > breaks
+> > the individual pieces. It would have been better to just
+> > take the entire
+> > patch through either arm-soc or the mfd tree.
+> > 
+> > Any suggestions for a way out of this mess? I'm inclined to
+> > just
+> > revert the patch I have and let Samuel pick it up to submit
+> > it along
+> > with the other half.
+> 
+> I apologise if it's causing problems; I was trying to avoid
+> crossing maintainer boundaries.
+> 
+> Revert it and I'll resubmit it unchanged for V3.6.
 
-> I get build errors with nhk8815_defconfig after this:
->
-> arch/arm/mach-nomadik/built-in.o: In function `nhk8815_eth_init':
-> /home/arnd/linux-arm/arch/arm/mach-nomadik/board-nhk8815.c:224: undefined reference to `nmk_gpio_set_mode'
-> arch/arm/mach-nomadik/built-in.o: In function `nhk8815_i2c_init':
-> /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:46: undefined reference to `nmk_gpio_set_mode'
-> /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:47: undefined reference to `nmk_gpio_set_mode'
-> /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:50: undefined reference to `nmk_gpio_set_mode'
-> /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:51: undefined reference to `nmk_gpio_set_mode'
->
-> Here is my suggested fix:
+We can still get it into 3.5, that's not the problem, let's
+just try to keep the kernel bisectible in the process.
 
-This looks perfect Arnd, thanks for fixing this!
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-I plan to migrate also the Nomadik to pinctrl and delete the old open-coded
-interfaces in the driver for the next kernel cycle.
-
-Yours,
-Linus Walleij
+	Arnd
