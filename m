@@ -1,100 +1,96 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 May 2012 21:34:20 +0200
-Subject: [PATCH 1/1] mx31_3ds: Add sound support
-In-Reply-To: <1337100146-16459-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1337100146-16459-1-git-send-email-philippe.retornaz@epfl.ch>
- <1337100146-16459-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20120515193420.GN30400@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 19:36:47 +0000
+Subject: [PATCH 2/2] ARM: clps711x: Added support for CPU frequencies
+ other than 73 MHz
+In-Reply-To: <1337104502-5292-3-git-send-email-shc_work@mail.ru>
+References: <1337104502-5292-1-git-send-email-shc_work@mail.ru>
+ <1337104502-5292-3-git-send-email-shc_work@mail.ru>
+Message-ID: <201205151936.48048.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 06:42:26PM +0200, Philippe R?tornaz wrote:
+On Tuesday 15 May 2012, Alexander Shiyan wrote:
+> Modern CPUs from CLPS711X-line can operate at frequencies other than 73 MHz.
+> This patch adds calculation of system clock frequency and the frequency of
+> UART, depending on processor speed. Kconfig option "CPU frequency" was added
+> for this purposes.
 > 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  arch/arm/mach-imx/Kconfig         |    1 +
->  arch/arm/mach-imx/mach-mx31_3ds.c |   22 +++++++++++++++++++++-
->  2 files changed, 22 insertions(+), 1 deletions(-)
-> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-We have no changes queued so far for this board, so you can safely push
-it via the ASoC tree along with the patches adding sound for the mc13783
+I'm sceptical about this patch. While it is an improvement, it doesn't
+really go far enough and does not make it possible to build a kernel
+that runs on multiple mach-clps711x based machines that each have different
+clock frequencies. It would be much better to make it a run-time option
+like most other platforms rather than hardcode at compile time.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+> index ea036d6..24a7279 100644
+> --- a/arch/arm/mach-clps711x/Kconfig
+> +++ b/arch/arm/mach-clps711x/Kconfig
+> @@ -45,6 +45,15 @@ config ARCH_P720T
+>  config ARCH_FORTUNET
+>  	bool "FORTUNET"
+>  
+> +config EP72XX_CPU_SPEED
+> +	int "CPU frequency"
+> +	default 73728000
+> +	help
+> +	  This is a CPU frequency. This value must be setup in bootlader,
+> +	  before loading kernel.
+> +	  The value can be one of: 18432000, 36864000, 49152000, 73728000 or
+> +	  90316800.
+> +
 
-Sascha
+I think it would be better to express this as a "choice" statement if you end
+up requiring this to be a compile-time option.
 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 0d75480..472d47b 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -151,6 +151,7 @@ config MACH_MX25_3DS
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select IMX_HAVE_PLATFORM_IMXDI_RTC
->  	select IMX_HAVE_PLATFORM_IMX_I2C
-> +	select IMX_HAVE_PLATFORM_IMX_SSI
->  	select IMX_HAVE_PLATFORM_IMX_FB
->  	select IMX_HAVE_PLATFORM_IMX_KEYPAD
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-> index 4d1aab1..4eafdf2 100644
-> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-> @@ -156,6 +156,11 @@ static int mx31_3ds_pins[] = {
->  	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
->  	MX31_PIN_CSI_D5__GPIO3_5, /* CMOS PWDN */
->  	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_GPIO), /* CMOS reset */
-> +	/* SSI */
-> +	MX31_PIN_STXD4__STXD4,
-> +	MX31_PIN_SRXD4__SRXD4,
-> +	MX31_PIN_SCK4__SCK4,
-> +	MX31_PIN_SFS4__SFS4,
->  };
+> diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b
+> diff --git a/arch/arm/mach-clps711x/include/mach/timex.h b/arch/arm/mach-clps711x/include/mach/timex.h
+> index ac8823c..fa5ad13 100644
+> --- a/arch/arm/mach-clps711x/include/mach/timex.h
+> +++ b/arch/arm/mach-clps711x/include/mach/timex.h
+> @@ -20,4 +20,6 @@
+>   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>   */
 >  
->  /*
-> @@ -488,12 +493,23 @@ static struct mc13xxx_regulator_init_data mx31_3ds_regulators[] = {
->  };
->  
->  /* MC13783 */
-> +static struct mc13xxx_codec_platform_data mx31_3ds_codec = {
-> +	.dac_ssi_port = MC13783_SSI1_PORT,
-> +	.adc_ssi_port = MC13783_SSI1_PORT,
-> +};
+> -#define CLOCK_TICK_RATE 512000
+> +#include <mach/hardware.h>
 > +
->  static struct mc13xxx_platform_data mc13783_pdata = {
->  	.regulators = {
->  		.regulators = mx31_3ds_regulators,
->  		.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
->  	},
-> -	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC,
-> +	.codec = &mx31_3ds_codec,
-> +	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC | MC13XXX_USE_CODEC,
-> +
-> +};
-> +
-> +static struct imx_ssi_platform_data mx31_3ds_ssi_pdata = {
-> +	.flags = IMX_SSI_DMA | IMX_SSI_NET,
->  };
->  
->  /* SPI */
-> @@ -741,6 +757,10 @@ static void __init mx31_3ds_init(void)
->  	}
->  
->  	mx31_3ds_init_camera();
-> +
-> +	imx31_add_imx_ssi(0, &mx31_3ds_ssi_pdata);
-> +
-> +	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
->  }
->  
->  static void __init mx31_3ds_timer_init(void)
-> -- 
-> 1.7.0.4
-> 
-> 
+> +#define CLOCK_TICK_RATE		(CONFIG_EP72XX_CPU_SPEED / 144)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+We're actually trying hard to remove CLOCK_TICK_RATE in the long run.
+Most people believe that by now it's completely bogus for all common code,
+but I think Russell still isn't convinced.
+
+> diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
+> index d0f719f..bae678d 100644
+> --- a/drivers/tty/serial/clps711x.c
+> +++ b/drivers/tty/serial/clps711x.c
+> @@ -401,7 +401,7 @@ static struct uart_port clps711x_ports[UART_NR] = {
+>  	{
+>  		.iobase		= SYSCON1,
+>  		.irq		= IRQ_UTXINT1, /* IRQ_URXINT1, IRQ_UMSINT */
+> -		.uartclk	= 3686400,
+> +		.uartclk	= UART_BAUD_BASE,
+>  		.fifosize	= 16,
+>  		.ops		= &clps711x_pops,
+>  		.line		= 0,
+> @@ -410,7 +410,7 @@ static struct uart_port clps711x_ports[UART_NR] = {
+>  	{
+>  		.iobase		= SYSCON2,
+>  		.irq		= IRQ_UTXINT2, /* IRQ_URXINT2 */
+> -		.uartclk	= 3686400,
+> +		.uartclk	= UART_BAUD_BASE,
+>  		.fifosize	= 16,
+>  		.ops		= &clps711x_pops,
+>  		.line		= 1,
+
+I think the right way to do this is to move the uart_add_one_port() call
+and the clps711x_ports array into platform code, so you can modify the
+frequency at boot time, but leave the uart_driver where it is.
+That will require some other changes for the console.
+
+It's probably best to leave this patch for after the merge window, so you
+can come up with a good solution for 3.6, ok?
+
+	Arnd
