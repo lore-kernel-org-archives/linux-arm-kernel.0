@@ -1,94 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2012 13:45:38 +0100
-Subject: [PATCH v2] serial: samsung: Fixed wrong comparison for
- baudclk_rate
-In-Reply-To: <000501cd3297$75fba910$61f2fb30$%kim@samsung.com>
-References: <000501cd3297$75fba910$61f2fb30$%kim@samsung.com>
-Message-ID: <20120515124538.GN10453@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 May 2012 12:46:45 +0000
+Subject: [PATCH 00/12] pinctrl for Ux500 and Nomadik family
+In-Reply-To: <CACRpkdZrs=rgfadRCcMYxhwqib96vkRdHCoC-27dyAjEu5Y5Ew@mail.gmail.com>
+References: <1336470214-23407-1-git-send-email-linus.walleij@stericsson.com>
+ <201205151124.13047.arnd@arndb.de>
+ <CACRpkdZrs=rgfadRCcMYxhwqib96vkRdHCoC-27dyAjEu5Y5Ew@mail.gmail.com>
+Message-ID: <201205151246.45384.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 09:37:16PM +0900, Kyoungil Kim wrote:
-> port->baudclk_rate should be compared to the rate of port->baudclk,
-> because port->baudclk_rate was assigned as the rate of port->baudclk previously.
-> So to check that the current baudclk rate is same as previous rate,
-> the target of comparison sholud be the rate of port->baudclk.
+On Tuesday 15 May 2012, Linus Walleij wrote:
+> On Tue, May 15, 2012 at 1:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
-> Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
-> ---
->  drivers/tty/serial/samsung.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> > I get build errors with nhk8815_defconfig after this:
+> >
+> > arch/arm/mach-nomadik/built-in.o: In function `nhk8815_eth_init':
+> > /home/arnd/linux-arm/arch/arm/mach-nomadik/board-nhk8815.c:224: undefined reference to `nmk_gpio_set_mode'
+> > arch/arm/mach-nomadik/built-in.o: In function `nhk8815_i2c_init':
+> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:46: undefined reference to `nmk_gpio_set_mode'
+> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:47: undefined reference to `nmk_gpio_set_mode'
+> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:50: undefined reference to `nmk_gpio_set_mode'
+> > /home/arnd/linux-arm/arch/arm/mach-nomadik/i2c-8815nhk.c:51: undefined reference to `nmk_gpio_set_mode'
+> >
+> > Here is my suggested fix:
 > 
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index d8b0aee..6a6a86a 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -1014,10 +1014,10 @@ static int s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
->  	 * a disturbance in the clock-rate over the change.
->  	 */
->  
-> -	if (IS_ERR(port->clk))
-> +	if (IS_ERR(port->baudclk) || port->baudclk == NULL)
+> This looks perfect Arnd, thanks for fixing this!
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Still no.  Why are you wanting to detect a NULL baud clock?
+Ok, applied to next/pinctrl.
 
-As I said, drivers have no business interpreting anything but IS_ERR(clk)
-as being an error.  They should not make any other assumptions.
+On a more general note, how shall we go about merging pinctrl stuff in the
+upcoming merge window? We've got a bunch of changes in arm-soc now that depend
+on your pinctrl/devel branch, and I want to get as many of my own patches
+merged upstream early.
 
-Now that I look at this driver, it makes this mistake all over the place.
-This needs to be fixed.  Something like the below should do it.  Please
-check.
+One option would be that you just try to be very early with sending your
+branch and arm-soc goes directly after that, another option would be that
+we send a pull request for your tree along with the stuff that depends on
+it, with your permission.
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index d8b0aee..6a952b1 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -529,7 +529,7 @@ static void s3c24xx_serial_pm(struct uart_port *port, unsigned int level,
- 
- 	switch (level) {
- 	case 3:
--		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
-+		if (!IS_ERR(ourport->baudclk))
- 			clk_disable(ourport->baudclk);
- 
- 		clk_disable(ourport->clk);
-@@ -538,7 +538,7 @@ static void s3c24xx_serial_pm(struct uart_port *port, unsigned int level,
- 	case 0:
- 		clk_enable(ourport->clk);
- 
--		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
-+		if (!IS_ERR(ourport->baudclk))
- 			clk_enable(ourport->baudclk);
- 
- 		break;
-@@ -713,9 +713,9 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
- 	if (ourport->baudclk != clk) {
- 		s3c24xx_serial_setsource(port, clk_sel);
- 
--		if (ourport->baudclk != NULL && !IS_ERR(ourport->baudclk)) {
-+		if (!IS_ERR(ourport->baudclk)) {
- 			clk_disable(ourport->baudclk);
--			ourport->baudclk  = NULL;
-+			ourport->baudclk = ERR_PTR(-EINVAL);
- 		}
- 
- 		clk_enable(clk);
-@@ -1160,6 +1160,9 @@ static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
- 	struct uart_port *port = s3c24xx_dev_to_port(dev);
- 	struct s3c24xx_uart_port *ourport = to_ourport(port);
- 
-+	if (IS_ERR(ourport->baudclk))
-+		return -EINVAL;
-+
- 	return snprintf(buf, PAGE_SIZE, "* %s\n", ourport->baudclk->name);
- }
- 
-@@ -1200,6 +1203,7 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	ourport->baudclk = ERR_PTR(-EINVAL);
- 	ourport->info = ourport->drv_data->info;
- 	ourport->cfg = (pdev->dev.platform_data) ?
- 			(struct s3c2410_uartcfg *)pdev->dev.platform_data :
+> I plan to migrate also the Nomadik to pinctrl and delete the old open-coded
+> interfaces in the driver for the next kernel cycle.
+
+Sounds good.
+
+	Arnd
