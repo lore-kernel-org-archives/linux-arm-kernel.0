@@ -1,24 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 May 2012 19:29:28 +0000
-Subject: [PATCH 1/2] ARM: clps711x: Cleanup IRQ handling
-In-Reply-To: <1337104502-5292-2-git-send-email-shc_work@mail.ru>
-References: <1337104502-5292-1-git-send-email-shc_work@mail.ru>
- <1337104502-5292-2-git-send-email-shc_work@mail.ru>
-Message-ID: <201205151929.28324.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 15 May 2012 21:34:20 +0200
+Subject: [PATCH 1/1] mx31_3ds: Add sound support
+In-Reply-To: <1337100146-16459-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1337100146-16459-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1337100146-16459-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <20120515193420.GN30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Alexander Shiyan wrote:
-> This patch contains two changes:
-> - Removed unused definitions from mach/irqs.h
-> - Do not mask interrupts in ack procedure, because we have separate
->   intX_mask procedure for do it and actually these 2 functions are
->   called sequentially
+On Tue, May 15, 2012 at 06:42:26PM +0200, Philippe R?tornaz wrote:
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> ---
+>  arch/arm/mach-imx/Kconfig         |    1 +
+>  arch/arm/mach-imx/mach-mx31_3ds.c |   22 +++++++++++++++++++++-
+>  2 files changed, 22 insertions(+), 1 deletions(-)
+> 
 
-Applied, and pulled it with the other cleanup into the next/cleanup branch.
+We have no changes queued so far for this board, so you can safely push
+it via the ASoC tree along with the patches adding sound for the mc13783
 
-Thanks,
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-	Arnd
+Sascha
+
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 0d75480..472d47b 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -151,6 +151,7 @@ config MACH_MX25_3DS
+>  	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	select IMX_HAVE_PLATFORM_IMXDI_RTC
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+> +	select IMX_HAVE_PLATFORM_IMX_SSI
+>  	select IMX_HAVE_PLATFORM_IMX_FB
+>  	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+> index 4d1aab1..4eafdf2 100644
+> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -156,6 +156,11 @@ static int mx31_3ds_pins[] = {
+>  	MX31_PIN_CSI_VSYNC__CSI_VSYNC,
+>  	MX31_PIN_CSI_D5__GPIO3_5, /* CMOS PWDN */
+>  	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_GPIO), /* CMOS reset */
+> +	/* SSI */
+> +	MX31_PIN_STXD4__STXD4,
+> +	MX31_PIN_SRXD4__SRXD4,
+> +	MX31_PIN_SCK4__SCK4,
+> +	MX31_PIN_SFS4__SFS4,
+>  };
+>  
+>  /*
+> @@ -488,12 +493,23 @@ static struct mc13xxx_regulator_init_data mx31_3ds_regulators[] = {
+>  };
+>  
+>  /* MC13783 */
+> +static struct mc13xxx_codec_platform_data mx31_3ds_codec = {
+> +	.dac_ssi_port = MC13783_SSI1_PORT,
+> +	.adc_ssi_port = MC13783_SSI1_PORT,
+> +};
+> +
+>  static struct mc13xxx_platform_data mc13783_pdata = {
+>  	.regulators = {
+>  		.regulators = mx31_3ds_regulators,
+>  		.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
+>  	},
+> -	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC,
+> +	.codec = &mx31_3ds_codec,
+> +	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC | MC13XXX_USE_CODEC,
+> +
+> +};
+> +
+> +static struct imx_ssi_platform_data mx31_3ds_ssi_pdata = {
+> +	.flags = IMX_SSI_DMA | IMX_SSI_NET,
+>  };
+>  
+>  /* SPI */
+> @@ -741,6 +757,10 @@ static void __init mx31_3ds_init(void)
+>  	}
+>  
+>  	mx31_3ds_init_camera();
+> +
+> +	imx31_add_imx_ssi(0, &mx31_3ds_ssi_pdata);
+> +
+> +	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+>  }
+>  
+>  static void __init mx31_3ds_timer_init(void)
+> -- 
+> 1.7.0.4
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
