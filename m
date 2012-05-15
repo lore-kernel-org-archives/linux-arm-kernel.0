@@ -1,55 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 May 2012 16:58:13 +0200
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <4FB26904.1060308@codethink.co.uk>
+Date: Tue, 15 May 2012 17:00:20 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FB26E4B.4020609@codethink.co.uk>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB228AD.5000507@codethink.co.uk> <4FB25A9A.3070306@gmail.com>
- <4FB25FE9.3060209@codethink.co.uk> <20120515161655.504f1403@skate>
- <4FB26904.1060308@codethink.co.uk>
-Message-ID: <20120515165813.66b4434e@skate>
+ <4FB26E4B.4020609@codethink.co.uk>
+Message-ID: <20120515170020.23c68cac@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 15 May 2012 15:32:36 +0100,
+Le Tue, 15 May 2012 15:55:07 +0100,
 Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
 
-> Yes, the number of times I've viewed the kernel and seen very similar
-> code replicated multiple times tends to make me burst into tears.
+> > This preliminary support only includes the necessary code for timer
+> > and IRQ support, the serial controller is a standard
+> > 16550-compatible one. The diffstat looks like:
 > 
-> >   * Maybe those mappings can be done using a normal ioremap() rather
-> >     than in ->map_io(), according to DT informations (but most
-> > other ARM SoC support at the moment seem to do PCI mappings using
-> > static mappings in ->map_io)
+> FYI, built and tested on our system here and it gets to
+> printing the sched_clock line and getting no further.
 > 
-> That's a very old way of doing it. I'm pretty sure there's no reason
-> to get these allocated so early.
-> 
-> I believe you can probably leave the PCI/PCIe bindings until you have
-> enough kernel state to do ioremap() or similar and then associate the
-> necessary mappings with the bus creation.
+> I will have a debug.
 
-Agreed. When looking at the code, I wasn't sure why PCI mappings were
-needed so early. Surely, the minimal mappings to get an UART are quite
-useful to have very early, but why PCI?
+Hum, strange. On which platform exactly?
 
-> >   * We probably shouldn't have anticipated this too much, and keep
-> > only one file for this initial submission.
-> 
-> Yes, the less we need to review the better.
+I've built from scratch a kernel image this morning and boot tested it
+on both the DB-78460-BP (Armada XP) and DB-88F6710-BP (Armada 370) this
+morning, and it was working.
 
-We've tried to minimize as much as possible the amount of code for this
-initial submission. We already have some code for PCI, L2 cache
-support, network driver, etc, but we wanted to limit ourselves to the
-strict minimum to get a kernel booting with an initramfs based root
-filesystem.
+> The only comment so far other than the review issues is that
+> we needed to enable CONFIG_HIGMEM to get >780MiB of memory
+> as this system comes with 2048MiB as standard.
 
-> > Thanks for the comments!
-> 
-> I'll get to testing this kernel soon, and report back
+Good point. Will do.
 
-Excellent, thanks!
+Thanks!
 
 Thomas
 -- 
