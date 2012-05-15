@@ -1,48 +1,31 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 May 2012 10:54:53 +0100
-Subject: [PATCH 2/8] arm: mach-armada: add source files
-In-Reply-To: <20120515111757.32847b91@skate>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 May 2012 11:55:11 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FB22727.6090406@codethink.co.uk>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515091218.GB6820@lunn.ch> <20120515111757.32847b91@skate>
-Message-ID: <4FB227ED.9090807@codethink.co.uk>
+ <20120515091838.GC6820@lunn.ch> <4FB22727.6090406@codethink.co.uk>
+Message-ID: <20120515115511.75ece9c3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 10:17, Thomas Petazzoni wrote:
-> Hello Andrew,
->
-> Thanks for the quick feedback!
->
-> Le Tue, 15 May 2012 11:12:18 +0200,
-> Andrew Lunn<andrew@lunn.ch>  a ?crit :
->
->>> +/include/ "armada.dtsi"
->>> +
->>> +/ {
->>> +	model = "Marvell Armada 370 family SoC";
->>> +	compatible = "marvell,armada370", "marvell,armada";
->>
->> It should be mrvl, not marvell, in all the compatibility strings.
->
-> Ok, we will change that.
->
->> Also, we need to be careful with armada. kirkwood is an armada for
->> example. It maybe be better to not actually use armada without
->> postfix.
->
-> Do you have a recommendation for this? We support both Armada 370 and
-> Armada XP, so the obvious common prefix for these two platforms is
-> "armada". Since kirkwood are ARMv5 and those new Armada are ARMv7,
-> would armadav7 be a better prefix? Then we could have armadav7-370 and
-> armadav7-xp? Other suggestions?
+Le Tue, 15 May 2012 10:51:35 +0100,
+Ben Dooks <ben.dooks@codethink.co.uk> a ?crit :
 
-You might want to talk to Marvell about that. I went with armadaxp or
-a shortened axp (although that might have bad connections back to the
-old Alphas)
+> >> You'll find in this patch set the initial support for a new family
+> >> of ARMv7-compatible Marvell SoCs, that we have choosen to support
+> >> in the arch/arm/mach-armada/ directory.
+> 
+> I went for the arch/arm/mach-mv-armadaxp as it kept the marvell socs
+> together (ignoring kirkwood and dove for the moment).
 
-[snip]
+mach-mv-armadaxp would be a good name if we supported only the Armada
+XP SoC, but we also support the Armada 370 SoC within the same
+directory. This makes it easy to build a single binary kernel image
+that boots and runs on both SoCs.
 
+Thomas
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
