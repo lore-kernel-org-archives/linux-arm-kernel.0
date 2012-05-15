@@ -1,102 +1,44 @@
-From: shans95g@gmail.com (Shantanu Gupta)
-Date: Tue, 15 May 2012 15:49:00 +0530
-Subject: [PATCH v2] arm: msm: fix up very basic HTC Sapphire support
-In-Reply-To: <20120513055612.GA7129@codeaurora.org>
-References: <q7bdy899mt3um93hikst04au.1336884464056@email.android.com>
- <20120513055612.GA7129@codeaurora.org>
-Message-ID: <CAPDArRKgZKR2kdbt-ySx7GrXopNnN+j4hKr1rrDPgxkZ8S2YjQ@mail.gmail.com>
+From: kassey1216@gmail.com (Kassey Lee)
+Date: Tue, 15 May 2012 18:19:36 +0800
+Subject: [PATCH V2] dmaengine/amba-pl08x: check slave_channels to avoid kernel
+ panic
+Message-ID: <CAKwPUoyYaXk3DjY8WGHZtM8j3CB2q94RQvEhD-b6FEP5W+7KFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for thread jacking, but do you still have an actively supported
-8x50 board ? ( ie. mahimahi)
+commit 58baed44d52f5e0d87aca575318d71fe3937544c
+Author: Kassey Lee <kassey1216@gmail.com>
+Date:   Wed Apr 11 02:22:26 2012 +0800
 
->> >> On Fri, May 11, 2012 at 5:15 PM, David Brown <davidb@codeaurora.org> wrote:
->> >> > From: Daniel Walker <dwalker@fifo99.com>
->> >> >
->> >> > Adds sapphire into the make file, and fixes all the code problems that
->> >> > prevented it from building (including adding board-sapphire.h)
->> >> >
->> >> > [davidb at codeaurora.org: Move MACH_TROUT selection back under
->> >> > ARCH_MSM7X00A]
->> >> >
->> >> > Signed-off-by: Daniel Walker <dwalker@fifo99.com>
->> >> > Signed-off-by: David Brown <davidb@codeaurora.org>
->> >> > ---
->> >> > v2 - Moved MACH_TROUT selection back under the ARCH config target
->> >> >
->> >> > ?arch/arm/mach-msm/Kconfig ? ? ? ? ?| ? ?9 +-
->> >> > ?arch/arm/mach-msm/Makefile ? ? ? ? | ? ?1 +
->> >> > ?arch/arm/mach-msm/board-sapphire.c | ? 18 +--
->> >> > ?arch/arm/mach-msm/board-sapphire.h | ?224 ++++++++++++++++++++++++++++++++++++
->> >> > ?4 files changed, 234 insertions(+), 18 deletions(-)
->> >> > ?create mode 100644 arch/arm/mach-msm/board-sapphire.h
->> >> >
->> >> > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
->> >> > index 1cd40ad..70eae63 100644
->> >> > --- a/arch/arm/mach-msm/Kconfig
->> >> > +++ b/arch/arm/mach-msm/Kconfig
->> >> > @@ -6,7 +6,7 @@ choice
->> >> >
->> >> > ?config ARCH_MSM7X00A
->> >> > ? ? ? ?bool "MSM7x00A / MSM7x01A"
->> >> > - ? ? ? select MACH_TROUT if !MACH_HALIBUT
->> >> > + ? ? ? select MACH_TROUT if (!MACH_HALIBUT && !MACH_SAPPHIRE)
->> >>
->> >> Better, thanks!
->> >>
->> >>
->> >> > diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
->> >> > index 4ad3969..aff4e5c 100644
->> >> > --- a/arch/arm/mach-msm/Makefile
->> >> > +++ b/arch/arm/mach-msm/Makefile
->> >> > @@ -20,6 +20,7 @@ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
->> >> > ?obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->> >> > ?obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->> >> >
->> >> > +obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o devices-msm7x00.o
->> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
->> >> > ?obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
->> >> > ?obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
->> >>
->> >> Unrelated to this change per se, but it seems like devices-msm7x00.o
->> >> should be on an obj-$(CONFIG_ARCH_MSM7X00A) statement instead of
->> >> duplicated for all boards.
->> >>
->> >> Also, the trout line is mostly duplicated, only delta is panel. Looks
->> >> broken. Both of these things is material for a separate patch though.
->> >>
->> >> > diff --git a/arch/arm/mach-msm/board-sapphire.h b/arch/arm/mach-msm/board-sapphire.h
->> >> > new file mode 100644
->> >> > index 0000000..70f925e
->> >> > --- /dev/null
->> >> > +++ b/arch/arm/mach-msm/board-sapphire.h
->> >> > @@ -0,0 +1,224 @@
->> >> [..]
->> >> > +void config_sapphire_camera_on_gpios(void);
->> >> > +void config_sapphire_camera_off_gpios(void);
->> >> > +int sapphire_get_smi_size(void);
->> >> > +unsigned int sapphire_get_hwid(void);
->> >> > +unsigned int sapphire_get_skuid(void);
->> >> > +unsigned int is_12pin_camera(void);
->> >> > +int sapphire_is_5M_camera(void);
->> >> > +int sapphire_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on);
->> >>
->> >> Many (all?) of these functions are not to be found in the code. Please
->> >> don't add prototypes for code that isn't there.
->> >>
->> >>
->> >> -Olof
->> >
->> >--
->> >Sent by an employee of the Qualcomm Innovation Center, Inc.
->> >The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->> >
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+    dmaengine/amba-pl08x: check slave_channels to avoid kernel panic
+
+    slave_channels is platform dependent, it should
+    be initialized by board.c, and here we need to check it
+    to avoid a NULL panic.
+
+    Signed-off-by: Kassey,Lee <kassey1216@gmail.com>
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 3d704ab..350e1fa 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1688,6 +1688,12 @@ static int
+pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+                chan->state = PL08X_CHAN_IDLE;
+
+                if (slave) {
++                       if (!pl08x->pd->slave_channels) {
++                               dev_err(&pl08x->adev->dev,
++                                       "%s slave_channels is not
+initialized\n", __func__);
++                               kfree(chan);
++                               return -EINVAL;
++                       }
+                        chan->cd = &pl08x->pd->slave_channels[i];
+                        pl08x_dma_slave_init(chan);
+                } else {
+
+
+-- 
+Best regards
+Kassey
