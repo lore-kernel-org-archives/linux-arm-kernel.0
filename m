@@ -1,124 +1,63 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 15 May 2012 21:58:23 +0800
-Subject: [PATCH v1 7/7] ARM: dts: imx6q-sabrelite: add usb devices
-In-Reply-To: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337090303-16046-8-git-send-email-richard.zhao@freescale.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 15 May 2012 19:30:29 +0530
+Subject: [PATCH 18/20] ARM: dts: Update device tree source files for
+ EXYNOS5250
+In-Reply-To: <CAOesGMiSrNoOA5wTEZo4RiZkPvSAMi43CntN6GUepTzx6M++OA@mail.gmail.com>
+References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
+ <1335813270-13083-19-git-send-email-thomas.abraham@linaro.org>
+ <CAOesGMiSrNoOA5wTEZo4RiZkPvSAMi43CntN6GUepTzx6M++OA@mail.gmail.com>
+Message-ID: <CAJuYYwTws16QQzimAp4c1T33nW4XapOLtE8mL8p=aRfRp8V28A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |   19 +++++++++++++-
- arch/arm/boot/dts/imx6q.dtsi          |   44 +++++++++++++++++++++++++++++++-
- 2 files changed, 60 insertions(+), 3 deletions(-)
+On 3 May 2012 01:25, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+>> Updated EXYNOS5 device tree source files to reflect changes in rev1
+>> of EXYNOS5 SoC. This includes new additions to the EXYNOS5 dtsi and
+>> SMDK5250 dts files and few minor fixes.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> ---
+>> ?arch/arm/boot/dts/exynos5250-smdk5250.dts | ? 52 +++++++++++++++++++++++++++++
+>> ?arch/arm/boot/dts/exynos5250.dtsi ? ? ? ? | ? 44 +++++++-----------------
+>> ?2 files changed, 65 insertions(+), 31 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> index 399d17b..bcc4b89 100644
+>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> @@ -23,4 +23,56 @@
+>> ? ? ? ?chosen {
+>> ? ? ? ? ? ? ? ?bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+>> ? ? ? ?};
+>> +
+>> + ? ? ? i2c at 12C60000 {
+>> + ? ? ? ? ? ? ? #address-cells = <1>;
+>> + ? ? ? ? ? ? ? #size-cells = <0>;
+>
+> Two nits:
+>
+> #a-c and #s-c is likely to always be 1/0, so you might as well move
+> these to the dtsi file for the SoC.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 2f631f2..ccc794e 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -41,10 +41,27 @@
- 					status = "okay";
- 				};
- 			};
--
-+			iomuxc at 020e0000 {
-+				gpios {
-+					pinctrl_gpio_hog: gpiohog {
-+						fsl,pins = <1044 0x80000000
-+							   144  0x80000000>;	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
-+					};
-+				};
-+			};
- 		};
- 
- 		aips-bus at 02100000 { /* AIPS2 */
-+			usboh3 at 02184000 { /* USB OTG */
-+				fsl,vbus-power = <&gpio3 22 0>;
-+				status = "okay";
-+			};
-+
-+			usboh3 at 02184200 { /* USB1 */
-+				fsl,hub-reset = <&gpio7 12 0>;
-+				status = "okay";
-+			};
-+
- 			ethernet at 02188000 {
- 				phy-mode = "rgmii";
- 				phy-reset-gpios = <&gpio3 23 0>;
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index b5a15c4..863cb74 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -444,12 +444,14 @@
- 				};
- 			};
- 
--			usbphy at 020c9000 { /* USBPHY1 */
-+			usbphy1: usbphy at 020c9000 {
-+				compatible = "fsl,imx6q-usbphy";
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 			};
- 
--			usbphy at 020ca000 { /* USBPHY2 */
-+			usbphy2: usbphy at 020ca000 {
-+				compatible = "fsl,imx6q-usbphy";
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 			};
-@@ -485,7 +487,15 @@
- 				compatible = "fsl,imx6q-iomuxc";
- 				reg = <0x020e0000 0x4000>;
- 
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_gpio_hog>;
-+
- 				/* shared pinctrl settings */
-+				gpios {
-+					pinctrl_gpio_hog: gpiohog {
-+					};
-+				};
-+
- 				usdhc3 {
- 					pinctrl_usdhc3_1: usdhc3grp-1 {
- 						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
-@@ -550,6 +560,36 @@
- 				reg = <0x0217c000 0x4000>;
- 			};
- 
-+			usboh3 at 02184000 { /* USB OTG */
-+				compatible = "fsl,imx6q-usboh3";
-+				reg = <0x02184000 0x200>;
-+				interrupts = <0 43 0x04>;
-+				fsl,usbphy = <&usbphy1>;
-+				status = "disabled";
-+			};
-+
-+			usboh3 at 02184200 { /* USB1 */
-+				compatible = "fsl,imx6q-usboh3";
-+				reg = <0x02184200 0x200>;
-+				interrupts = <0 40 0x04>;
-+				fsl,usbphy = <&usbphy2>;
-+				status = "disabled";
-+			};
-+
-+			usboh3 at 02184400 { /* USB2 */
-+				compatible = "fsl,imx6q-usboh3";
-+				reg = <0x02184400 0x200>;
-+				interrupts = <0 41 0x04>;
-+				status = "disabled";
-+			};
-+
-+			usboh3 at 02184600 { /* USB3 */
-+				compatible = "fsl,imx6q-usboh3";
-+				reg = <0x02184600 0x200>;
-+				interrupts = <0 42 0x04>;
-+				status = "disabled";
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
--- 
-1.7.5.4
+This is fixed.
+
+>
+> Also, we tend to use non-caps here and in other locations (so it
+> should be 12c60000 here).
+
+The dtsi file uses 'C' instead of 'c'. So any change here in dts file
+would require a change in the dtsi file as well. So adding this change
+in this patch does not seem correct. So I will not do this change for
+now.
+
+Thanks,
+Thomas.
+
+>
+>
+> -Olof
