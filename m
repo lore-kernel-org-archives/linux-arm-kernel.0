@@ -1,31 +1,31 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 15 May 2012 21:58:17 +0800
-Subject: [PATCH v1 1/7] usb: chipidea: permit user select USB_EHCI_ROOT_HUB_TT
+Date: Tue, 15 May 2012 21:58:18 +0800
+Subject: [PATCH v1 2/7] usb: chipidea: remove zero check of hw_ep_max
 In-Reply-To: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
 References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ci13xxx hcd require USB_EHCI_ROOT_HUB_TT.
+It's 0 for host only device.
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- drivers/usb/host/Kconfig |    2 +-
+ drivers/usb/chipidea/core.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 684a7bb..89d0371 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -65,7 +65,7 @@ config USB_EHCI_HCD
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index f568b8e..15e03b3 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -195,7 +195,7 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+ 		ffs_nr(DCCPARAMS_DEN);
+ 	ci->hw_ep_max = reg * 2;   /* cache hw ENDPT_MAX */
  
- config USB_EHCI_ROOT_HUB_TT
- 	bool "Root Hub Transaction Translators"
--	depends on USB_EHCI_HCD
-+	depends on USB_EHCI_HCD || USB_CHIPIDEA
- 	---help---
- 	  Some EHCI chips have vendor-specific extensions to integrate
- 	  transaction translators, so that no OHCI or UHCI companion
+-	if (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX)
++	if (ci->hw_ep_max > ENDPT_MAX)
+ 		return -ENODEV;
+ 
+ 	dev_dbg(ci->dev, "ChipIdea HDRC found, lpm: %d; cap: %p op: %p\n",
 -- 
 1.7.5.4
