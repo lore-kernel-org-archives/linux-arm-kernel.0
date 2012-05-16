@@ -1,69 +1,69 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 May 2012 16:20:36 -0400 (EDT)
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205161946.34179.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201205161528.27318.arnd@arndb.de>
- <alpine.LFD.2.02.1205161246080.1640@xanadu.home>
- <201205161946.34179.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 16 May 2012 22:25:55 +0200
+Subject: [PATCH RESEND v3 2/2] ARM: LPC32xx: Make platform use key driver
+In-Reply-To: <1337199955-26441-1-git-send-email-stigge@antcom.de>
+References: <1337199955-26441-1-git-send-email-stigge@antcom.de>
+Message-ID: <1337199955-26441-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 May 2012, Arnd Bergmann wrote:
+This patch connects the lpc32xx-key driver to the LPC32xx platform (via
+lpc32xx.dtsi), and more specifically to the reference board via its dts file.
+The clock.c file needs to be changed to match the automatic device name to its
+clock.
 
-> On Wednesday 16 May 2012, Nicolas Pitre wrote:
-> > > 
-> > > AFAICT, those are shared between most of those socs, and I would not want
-> > > to change the code in them to the new name.
-> > 
-> > Why not?  Module aliases can be used if that is a concern.
-> > 
-> > > If we change the directory
-> > > name to something completely different, it no longer matches the driver
-> > > names.
-> > 
-> > I wouldn't consider this as a major concern.  For example, the ethernet 
-> > driver that all those SOCs use is not called "orion".
-> 
-> It's not a big thing, I just feel that leaving the drivers alone makes
-> it a bit easier to port patches between kernel versions.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Sure.  My point is that we can rename the SOC directory and leave 
-drivers alone if we wish to minimize churn.  Drivers can be renamed at a 
-later time if that is seen as useful.
+---
+Applies to v3.4-rc7 + LPC32xx DT patches
 
-> Another argument
-> for orion is that it's nicer to read as a function name prefix than
-> mrvl_ebu_* as you suggested. The main counterargument to keeping orion_
-> as I understand it is that it's actually only the name for the oldest
-> members of this family, right? This is a good point, but we also have
-> a lot of other cases in the kernel where code is named after the first
-> thing that used it, e.g. arch/x86 was called arch/i386 for a long time
-> and we still have tons of references to that.
+Please pick this patch for the arm-soc subsystem.
 
-Indeed.  "sa1100" is another example of that and I didn't want to rename 
-it to sa11x0 at the time.
+Changes since v2:
+* DT: Use "keypad,num-rows", "keypad,num-columns" and "linux,keymap" properties
 
-But in the sa1100 or i386 cases, the alternatives are close enough not 
-to cause too much confusion.
+ arch/arm/boot/dts/lpc32xx.dtsi |    2 ++
+ arch/arm/boot/dts/phy3250.dts  |    9 +++++++++
+ arch/arm/mach-lpc32xx/clock.c  |    2 +-
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-In this case, we have wildly different names referring to the same chip 
-family, and "orion" is far from hinting that it also constitute the 
-support for Kirkwood, Dove or (some not all) Armadas, unless you are 
-familiar with some legacy Marvell products.  This is why in this case I 
-think that a directory name change might be appropriate, _especially_ if 
-we're going to cause churn by moving things around already.
-
-I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
-mvebu_*.  Unless someone has another logical identifier to suggest which 
-would capture all that family of SOCs that came out of EBU in Marvell of 
-course.
-
-Since this is code not marketing, we don't have to have something flashy 
-either, as long as it doesn't create more confusion than "orion" does.  
-The various Kconfig help texts are good places to put all the marketing 
-names du jour.
-
-
-Nicolas
+--- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -249,6 +249,8 @@
+ 			key at 40050000 {
+ 				compatible = "nxp,lpc3220-key";
+ 				reg = <0x40050000 0x1000>;
++				interrupts = <54 0>;
++				status = "disable";
+ 			};
+ 
+ 		};
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -135,6 +135,15 @@
+ 			tsc at 40048000 {
+ 				status = "okay";
+ 			};
++
++			key at 40050000 {
++				status = "okay";
++				keypad,num-rows = <1>;
++				keypad,num-columns = <1>;
++				nxp,debounce-delay-ms = <3>;
++				nxp,scan-delay-ms = <34>;
++				linux,keymap = <0x00000002>;
++			};
+ 		};
+ 	};
+ 
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -1134,7 +1134,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_INIT("31020300.i2c", NULL, &clk_i2c2),
+ 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
+ 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
+-	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
++	CLKDEV_INIT("40050000.key", NULL, &clk_kscan),
+ 	CLKDEV_INIT("20020000.flash", NULL, &clk_nand),
+ 	CLKDEV_INIT("200a8000.flash", NULL, &clk_nand_mlc),
+ 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
