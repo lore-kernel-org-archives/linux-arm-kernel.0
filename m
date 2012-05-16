@@ -1,172 +1,99 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 16 May 2012 22:40:32 +0200
-Subject: [PATCH RESEND v9 2/2] gpio: Device tree support for LPC32xx
-In-Reply-To: <1337200832-26630-1-git-send-email-stigge@antcom.de>
-References: <1337200832-26630-1-git-send-email-stigge@antcom.de>
-Message-ID: <1337200832-26630-2-git-send-email-stigge@antcom.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 May 2012 20:52:46 +0000
+Subject: [GIT PULL][for 3.5] clk-next update
+In-Reply-To: <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
+References: <20120516063552.GA5154@gmail.com>
+ <201205161839.03269.arnd@arndb.de>
+ <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
+Message-ID: <201205162052.46513.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support for gpio-lpc32xx.c.
+On Wednesday 16 May 2012, Olof Johansson wrote:
+> 
+> Are you planning on sending the last couple of fixes out before
+> wrapping things up? If I haven't seen a request go out by tomorrow
+> I'll do it, I suppose.
 
-To register the various GPIO banks as (struct) gpio_chips via the same DT
-gpio-controller, we utilize the adjusted of_xlate API to manipulate the
-actually used struct gpio_chip.
+I was planning to, but it's getting rather late here in Germany
+so maybe you can take care of this, too.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+I've just fixed up two of the next/* branches that caused build regressions
+(one was my fault, the other one came from samsung/board2) and started
+building the defconfigs for linux-next, which looks rather bad, so I probably
+won't spend much time trying to fix them up, see below for how far I got.
 
----
-Applies to v3.4-rc7
+	Arnd
 
-Changes since last version:
-* Use new of_xlate API: Register all GPIO banks at once via the
-  same GPIO controller DT entry by manipulating the actually used struct
-  gpio_chip.
-* Updated devicetree binding documentation
-
-Thanks to Jean-Christophe PLAGNIOL-VILLARD, Grant Likely, Arnd Bergmann, Jon
-Smirl, Mark Brown for reviewing!
-
-You can also pull from:
-  git://git.antcom.de/linux-2.6.git dt/gpio
-  http://git.antcom.de/linux-2.6.git dt/gpio
-  http://git.antcom.de/?p=linux-2.6.git;a=shortlog;h=refs/heads/dt/gpio
-
- Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt |   43 ++++++++++++
- arch/arm/mach-lpc32xx/include/mach/gpio.h               |    9 ++
- drivers/gpio/gpio-lpc32xx.c                             |   55 +++++++++++++++-
- 3 files changed, 105 insertions(+), 2 deletions(-)
-
---- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
-@@ -0,0 +1,43 @@
-+NXP LPC32xx SoC GPIO controller
-+
-+Required properties:
-+- compatible: must be "nxp,lpc3220-gpio"
-+- reg: Physical base address and length of the controller's registers.
-+- gpio-controller: Marks the device node as a GPIO controller.
-+- #gpio-cells: Should be 3:
-+   1) bank:
-+      0: GPIO P0
-+      1: GPIO P1
-+      2: GPIO P2
-+      3: GPIO P3
-+      4: GPI P3
-+      5: GPO P3
-+   2) pin number
-+   3) optional parameters:
-+      - bit 0 specifies polarity (0 for normal, 1 for inverted)
-+- reg: Index of the GPIO group
-+
-+Example:
-+
-+	gpio: gpio at 40028000 {
-+		compatible = "nxp,lpc3220-gpio";
-+		reg = <0x40028000 0x1000>;
-+		gpio-controller;
-+		#gpio-cells = <3>; /* bank, pin, flags */
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led0 {
-+			gpios = <&gpio 5 1 1>; /* GPO_P3 1, active low */
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+
-+		led1 {
-+			gpios = <&gpio 5 14 1>; /* GPO_P3 14, active low */
-+			linux,default-trigger = "timer";
-+			default-state = "off";
-+		};
-+	};
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -1 +1,8 @@
--/* empty */
-+#ifndef __MACH_GPIO_H
-+#define __MACH_GPIO_H
-+
-+#include "gpio-lpc32xx.h"
-+
-+#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
-+
-+#endif /* __MACH_GPIO_H */
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -21,6 +21,9 @@
- #include <linux/io.h>
- #include <linux/errno.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -454,10 +457,60 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 	},
- };
- 
-+/* Empty now, can be removed later when mach-lpc32xx is finally switched over
-+ * to DT support
-+ */
- void __init lpc32xx_gpio_init(void)
- {
-+}
-+
-+static int lpc32xx_of_xlate(struct gpio_chip **gc,
-+			    const struct of_phandle_args *gpiospec, u32 *flags)
-+{
-+	u32 bank;
-+	if (WARN_ON(gpiospec->args_count < 3))
-+		return -EINVAL;
-+
-+	bank = gpiospec->args[0];
-+	if (WARN_ON(bank > 5))
-+		return -EINVAL;
-+
-+	*gc = &lpc32xx_gpiochip[bank].chip;
-+	if (flags)
-+		*flags = gpiospec->args[2];
-+	return gpiospec->args[1];
-+}
-+
-+static int __devinit lpc32xx_gpio_probe(struct platform_device *pdev)
-+{
- 	int i;
- 
--	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++)
-+	for (i = 0; i < ARRAY_SIZE(lpc32xx_gpiochip); i++) {
-+		if (pdev->dev.of_node) {
-+			lpc32xx_gpiochip[i].chip.of_xlate = lpc32xx_of_xlate;
-+			lpc32xx_gpiochip[i].chip.of_gpio_n_cells = 3;
-+			lpc32xx_gpiochip[i].chip.of_node = pdev->dev.of_node;
-+		}
- 		gpiochip_add(&lpc32xx_gpiochip[i].chip);
-+	}
-+
-+	return 0;
- }
-+
-+#ifdef CONFIG_OF
-+static struct of_device_id lpc32xx_gpio_of_match[] __devinitdata = {
-+	{ .compatible = "nxp,lpc3220-gpio", },
-+	{ },
-+};
-+#endif
-+
-+static struct platform_driver lpc32xx_gpio_driver = {
-+	.driver		= {
-+		.name	= "lpc32xx-gpio",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(lpc32xx_gpio_of_match),
-+	},
-+	.probe		= lpc32xx_gpio_probe,
-+};
-+
-+module_platform_driver(lpc32xx_gpio_driver);
+----
+acs5k_defconfig
+acs5k_defconfig
+  Generating include/generated/mach-types.h
+/home/arnd/linux-arm/arch/arm/mm/dma-mapping.c: In function 'arm_dma_alloc':
+/home/arnd/linux-arm/arch/arm/mm/dma-mapping.c:675:15: error: 'page' may be used uninitialized in this function [-Werror=uninitialized]
+cc1: all warnings being treated as errors
+make[2]: *** [arch/arm/mm/dma-mapping.o] Error 1
+make[1]: *** [arch/arm/mm] Error 2
+make[1]: *** Waiting for unfinished jobs....
+/home/arnd/linux-arm/kernel/user.c:30:4: error: this decimal constant is unsigned only in ISO C90 [-Werror]
+/home/arnd/linux-arm/kernel/user.c:38:4: error: this decimal constant is unsigned only in ISO C90 [-Werror]
+cc1: all warnings being treated as errors
+acs5k_tiny_defconfig
+afeb9260_defconfig
+ag5evm_defconfig
+/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh73a0.c: In function 'sh73a0_clock_init':
+/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh73a0.c:615:3: error: 'sh_clk_mstp32_register' is deprecated (declared at /home/arnd/linux-arm/include/linux/sh_clk.h:138) [-Werror=deprecated-declarations]
+cc1: all warnings being treated as errors
+make[2]: *** [arch/arm/mach-shmobile/clock-sh73a0.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/mach-shmobile] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
+am200epdkit_defconfig
+ap4evb_defconfig
+/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh7372.c: In function 'sh7372_clock_init':
+/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh7372.c:707:3: error: 'sh_clk_mstp32_register' is deprecated (declared at /home/arnd/linux-arm/include/linux/sh_clk.h:138) [-Werror=deprecated-declarations]
+cc1: all warnings being treated as errors
+make[2]: *** [arch/arm/mach-shmobile/clock-sh7372.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/mach-shmobile] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
+armadillo800eva_defconfig
+assabet_defconfig
+at91_dt_defconfig
+/home/arnd/linux-arm/drivers/usb/gadget/at91_udc.c: In function 'at91_ep_enable':
+/home/arnd/linux-arm/drivers/usb/gadget/at91_udc.c:478:18: error: 'struct at91_ep' has no member named 'desc'
+make[4]: *** [drivers/usb/gadget/at91_udc.o] Error 1
+make[4]: *** Waiting for unfinished jobs....
+make[3]: *** [drivers/usb/gadget] Error 2
+make[3]: *** Waiting for unfinished jobs....
+make[2]: *** [drivers/usb] Error 2
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [drivers] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
+at91rm9200_defconfig
+at91sam9260_defconfig
+at91sam9261_defconfig
+at91sam9263_defconfig
+/home/arnd/linux-arm/fs/fuse/control.c: In function 'fuse_conn_congestion_threshold_write':
+/home/arnd/linux-arm/fs/fuse/control.c:165:29: error: 'val' may be used uninitialized in this function [-Werror=uninitialized]
+/home/arnd/linux-arm/fs/fuse/control.c: In function 'fuse_conn_max_background_write':
+/home/arnd/linux-arm/fs/fuse/control.c:128:23: error: 'val' may be used uninitialized in this function [-Werror=uninitialized]
+cc1: all warnings being treated as errors
+make[3]: *** [fs/fuse/control.o] Error 1
+make[2]: *** [fs/fuse] Error 2
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [fs] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [sub-make] Error 2
+at91sam9g20_defconfig
+at91sam9g45_defconfig
+at91sam9rl_defconfig
+at91x40_defconfig
+badge4_defconfig
+bcmring_defconfig
+bcmring_defconfig.rej
+bonito_defconfig
+cam60_defconfig
