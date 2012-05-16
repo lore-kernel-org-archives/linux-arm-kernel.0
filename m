@@ -1,51 +1,29 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 16 May 2012 15:27:02 +0100
-Subject: [PATCH 2/8] arm: mach-armada: add source files
-In-Reply-To: <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <4FB3B936.6010304@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 May 2012 14:31:04 +0000
+Subject: [GIT PULL] Samsung devel-2 for v3.5
+In-Reply-To: <092f01cd332c$00df3c60$029db520$%kim@samsung.com>
+References: <092f01cd332c$00df3c60$029db520$%kim@samsung.com>
+Message-ID: <201205161431.04565.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/12 09:54, Thomas Petazzoni wrote:
+On Wednesday 16 May 2012, Kukjin Kim wrote:
+> Hi Arnd and Olof,
+> 
+> Here is Samsung devel-2 for v3.5 and it is including update support for
+> EXYNOS5250 SoC.
+> 
+> Please pull from:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/devel-exynos5250-1
+> 
+> Note, this branch has a dependency on next/cleanup-plat-s5p which is already
+> in next/cleanup2 of arm-soc.
+> 
+> If any problems, please kindly let me know.
 
-> diff --git a/arch/arm/mach-armada/common.h b/arch/arm/mach-armada/common.h
-> new file mode 100644
-> index 0000000..e453161
-> --- /dev/null
-> +++ b/arch/arm/mach-armada/common.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Core functions for Marvell Armada System On Chip
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Lior Amsalem<alior@marvell.com>
-> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
-> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __ARCH_ARMADA_COMMON_H
-> +#define __ARCH_ARMADA_COMMON_H
-> +
-> +#include<asm/exception.h>
-> +
-> +extern struct sys_timer armada_timer;
-> +
-> +void armada_map_io(void);
-> +void armada_init_irq(void);
-> +void armada_restart(char, const char *);
-> +asmlinkage void __exception_irq_entry armada_handle_irq(struct pt_regs *regs);
-> +
-> +#endif
+Pulled  into next/soc2 now,
 
-you should have extern before all these function declarations.
+thanks,
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+	Arnd
