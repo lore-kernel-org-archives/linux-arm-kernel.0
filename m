@@ -1,54 +1,45 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 16 May 2012 15:18:28 +0800
-Subject: [PATCH 5/8] MXS: Add USB PHY driver
-In-Reply-To: <20120516050605.GB19137@b20223-02.ap.freescale.net>
-References: <1337070219-3630-1-git-send-email-marex@denx.de>
- <1337070219-3630-6-git-send-email-marex@denx.de>
- <20120516033336.GA19137@b20223-02.ap.freescale.net>
- <201205160630.15212.marex@denx.de>
- <20120516050605.GB19137@b20223-02.ap.freescale.net>
-Message-ID: <20120516071827.GD19137@b20223-02.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 May 2012 07:20:42 +0000
+Subject: [PATCH V2] CS89x0 : Use ioread16/iowrite16 on all platforms
+In-Reply-To: <1337123314.7050.26.camel@joe2Laptop>
+References: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
+ <20120515223711.GA12674@electric-eye.fr.zoreil.com>
+ <1337123314.7050.26.camel@joe2Laptop>
+Message-ID: <201205160720.42995.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Thanks for the review, now how should we put these codes of ours together? Will 
-> > you integrate my code into yours or shall I do it the other way around?
-> either way works for me. but I hope it support imx6 and use DT bindings
-> and other things maybe in next branch.
-Since, anyway we have to use DT, do you mind if I pick your patch and
-add mx28 DT too, and send you for further tuning?
+On Tuesday 15 May 2012, Joe Perches wrote:
+> On Wed, 2012-05-16 at 00:37 +0200, Francois Romieu wrote:
+> > Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com> :
+> > [...]
+> > > diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
+> > > index b9406cb..8081ad5 100644
+> > > --- a/drivers/net/ethernet/cirrus/cs89x0.c
+> > > +++ b/drivers/net/ethernet/cirrus/cs89x0.c
+> > [...]
+> > > -static int cs89x0_probe1(struct net_device *dev, unsigned long ioaddr, int modular);
+> > > +static int cs89x0_probe1(struct net_device *dev,
+> > > +                    void __iomem *ioaddr,
+> > > +                    int modular);
+> > > +static int cs89x0_probe1(struct net_device *dev, void __iomem *ioaddr,
+> > > +                    int modular);
+> > 
+> > s/int/bool/ maybe.
+> > 
+> > You may skip the name of the parameters.
+> 
+> Better would be to not duplicate the prototype
+> and better still would be to reorder the code to
+> avoid the prototype altogether.
 
-Thanks
-Richard
-> > 
-> > Alas, I'd prefer for the PHY to stay separate in drivers/usb/otg,
-> I explained it above.
-> > maybe we can 
-> > also recycle some my mxs binding code for ci13xxx in some way or another, as it 
-> > has MXS specific hacks in it.
-> what hack do you mean?
-> > I think the ci13xxx binding for the rest of i.MX 
-> > (aka mxc) will looks different, won't it? But either way, my mxs/ci13xxx binding 
-> > glue will have to wait until we finish negotiating the phy_notify stuff with 
-> > Greg.
-> Sure. At the same time, we may create new version patch and see response.
-> 
-> Thanks
-> Richard
-> > 
-> > > Thanks
-> > > Richard
-> > > 
-> > > > +module_exit(mxs_phy_exit);
-> > > > +
-> > > > +MODULE_ALIAS("platform:mxs-usb-phy");
-> > > > +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-> > > > +MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
-> > > > +MODULE_LICENSE("GPL");
-> > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I agree that would be best, but let's do one thing at a time. This prototype
+is the first of 16 in a row in that driver. It would be good to remove all
+of them, but that change is totally unrelated to the much more important
+one that Jaccon is doing here.
+
+I'd say leave the prototype as it is for now, just change the type of the ioaddr
+argument in this patch. Patches to fix the numerous other style issues with this
+driver are of course welcome as well.
+
+	Arnd
