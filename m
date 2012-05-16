@@ -1,39 +1,106 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 16 May 2012 03:03:46 +0200
-Subject: [PATCH v1 1/7] usb: chipidea: permit user select
- USB_EHCI_ROOT_HUB_TT
-In-Reply-To: <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-2-git-send-email-richard.zhao@freescale.com>
-Message-ID: <201205160303.46695.marex@denx.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 15 May 2012 20:05:55 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_Zhe61GTQQy+ZCVndAd=mrHxGBqyZ8JGZTSHsvE2XRzfGoA@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <201205041923.07620.arnd@arndb.de>
+ <CAJe_Zhe8jYd1j=ti6FvqxXL7i5mbgf0jqb-84sFMTeUqyAonpw@mail.gmail.com>
+ <4FA7F009.5010003@wwwdotorg.org>
+ <CAJe_ZheHFP9NZEiZfCvS3LL1k7xamzGq4Oep8gfmPRi6RR7R5Q@mail.gmail.com>
+ <4FA94B49.5050500@wwwdotorg.org>
+ <CAJe_Zhf0=Qnsgsc7U_GbKxc0_6DKj33QWs0UW2giyrVEjPnrvw@mail.gmail.com>
+ <4FAAC111.9020308@wwwdotorg.org>
+ <CAJe_Zhcrr2QqoY=H3=3EJLPQBjC3Yc43EDjqYXaNok9-T+=0yw@mail.gmail.com>
+ <4FABF445.3030105@wwwdotorg.org>
+ <CAJe_ZhduQuHnFyF20VnjZW9uz1szwL6O7=ow+tMqanmeHs58pQ@mail.gmail.com>
+ <4FAD6848.40700@wwwdotorg.org>
+ <CAJe_Zhc8T-vR8fjFLyT4bz6dj=TUyx0F8k=fAPYn_MnbGW5LBg@mail.gmail.com>
+ <4FADA5EC.8040807@wwwdotorg.org>
+ <CAJe_Zhe61GTQQy+ZCVndAd=mrHxGBqyZ8JGZTSHsvE2XRzfGoA@mail.gmail.com>
+Message-ID: <4FB2FD73.3010309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Richard Zhao,
+Hi Jassi,
 
-> The ci13xxx hcd require USB_EHCI_ROOT_HUB_TT.
+On 05/12/2012 08:40 AM, Jassi Brar wrote:
+> On 12 May 2012 05:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 05/11/2012 03:06 PM, Jassi Brar wrote:
+>>> On 12 May 2012 00:58, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 05/10/2012 01:59 PM, Jassi Brar wrote:
+>> ...
+>>>>>> client0: i2s {
+>>>>>>   /* has 2 DMA request output signals: 0, 1 */
+>>>>>> };
+>>>>>>
+>>>>>> client1: spdif {
+>>>>>>   /* has 2 DMA request signals: 0, 1 */
+>>>>>> };
+>>>>>>
+>>>>> Do we also need to somehow tag these signals for the client to
+>>>>> differentiate between TX and RX channel ?
+>>>>
+>>>> Yes, the client's DT binding would certainly need to describe how many
+>>>> DMA request signals its HW generates, and give a unique ID to each. The
+>>>> driver would need to request a DMA channel for a specific one of its DMA
+>>>> requests.
+>>>>
+>>> Did I read "give a unique ID to each" correctly ?
+>>
+>> It'd be unique relative to that individual device or DT node, not at any
+>> larger scope.
+>>
+> OK.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-
-Ok, this has been sorted out, that makes it 6 patches to go ;-)
-
-> ---
->  drivers/usb/host/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>>> Could you please take some time out to jot down an example of how a
+>>> typical client's dma specifier should look.
+>>
+>> With this proposal, I'm not sure that the client DT node would need any
+>> DMA information at all, at least nothing that identifies which DMA
+>> controllers, channels, or requests are required to service this
+>> node/device's DMA requests - that routing information is all represented
+>> in the DMA controller itself.
+>>
+>> (I think Arnd made the following point earlier in this thread):
+>>
+>> If you did need to put any other information in DT, then that probably
+>> would go in the DMA client node, since it'd presumably be the same
+>> irrespective of which DMA controller got used. However, that information
+>> presumably wouldn't be needed in DT at all, since the driver would know
+>> it, since it'd be a facet of the HW.
+>>
+>> Note: I'm thinking things like DMA physical address (presumably an
+>> offset from the reg property), DMA access size (presumably a fixed
+>> property of the HW), DMA burst size (presumably a property of the HW,
+>> although at least some HW can be programmed to raise the DMA request
+>> signal with a varying number of FIFO entries free, so not fixed), etc.
+>>
+> Yeah, neither did I think a client node should tell more than IDs of
+> its channels
+> - which we now decide to simply mention in its binding.
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 684a7bb..89d0371 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -65,7 +65,7 @@ config USB_EHCI_HCD
-> 
->  config USB_EHCI_ROOT_HUB_TT
->  	bool "Root Hub Transaction Translators"
-> -	depends on USB_EHCI_HCD
-> +	depends on USB_EHCI_HCD || USB_CHIPIDEA
->  	---help---
->  	  Some EHCI chips have vendor-specific extensions to integrate
->  	  transaction translators, so that no OHCI or UHCI companion
+> How do I know if you or someone is interested in reworking the patchset
+> or want me to give it a try?
 
-Best regards,
-Marek Vasut
+Sorry for not participating more in the discussion here, but I got tied
+up. I was planning on a V4 on the patch-set last week, but it did not
+happen. So I was planning for it this week. The V4 I had in mind was a
+more generic version of what I previously submitted, using xlate
+function to permit different DT tree formats. However, there would be a
+couple default xlate functions for people to use.
+
+I am concerned that this implementation may not address all your
+concerns. So if you have something to propose then please feel free to
+do so.
+
+By the way, what it unclear to me, if you have a client that could use
+more than one channel of multiple controllers, how is the handled? Who
+makes the decision on which to use?
+
+The TI DMAs are somewhat inflexible and simple in this manner that you
+don't have a choice :-)
+
+Cheers
+Jon
