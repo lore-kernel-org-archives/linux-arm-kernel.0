@@ -1,48 +1,45 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 16 May 2012 13:46:50 +0800
-Subject: [PATCH v1 2/7] usb: chipidea: remove zero check of hw_ep_max
-In-Reply-To: <20120516053248.GA22251@nchen-desktop>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
- <20120516053248.GA22251@nchen-desktop>
-Message-ID: <20120516054649.GC19137@b20223-02.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 May 2012 22:51:33 -0700
+Subject: Pre-merge window status of the arm-soc tree
+In-Reply-To: <20120516060115.GC21517@S2100-06.ap.freescale.net>
+References: <CAOesGMjxNs2X9F7vus5z_69wqrZuMc2mMXh1CC0415JNcojHDg@mail.gmail.com>
+ <20120516060115.GC21517@S2100-06.ap.freescale.net>
+Message-ID: <CAOesGMh_hJ2yAdCHwe+=xrSk3KxYONz28kv6z0G2TuzKBup7cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 01:32:50PM +0800, Peter Chen wrote:
-> On Tue, May 15, 2012 at 09:58:18PM +0800, Richard Zhao wrote:
-> > It's 0 for host only device.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/core.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index f568b8e..15e03b3 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -195,7 +195,7 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
-> >  		ffs_nr(DCCPARAMS_DEN);
-> >  	ci->hw_ep_max = reg * 2;   /* cache hw ENDPT_MAX */
-> >  
-> > -	if (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX)
-> > +	if (ci->hw_ep_max > ENDPT_MAX)
-> >  		return -ENODEV;
-> Can you move this get hw_ep_max code to udc.c? As hw_ep_max is only used
-> for device driver. What do you think, Alex?
-Yes, But since Greg has applied the patch, one may need to rebase or let
-it be as it is.
+Hi,
 
-Thanks
-Richard
-> >  
-> >  	dev_dbg(ci->dev, "ChipIdea HDRC found, lpm: %d; cap: %p op: %p\n",
-> > -- 
-> > 1.7.5.4
-> > 
-> 
-> -- 
-> 
-> Best Regards,
-> Peter Chen
+On Tue, May 15, 2012 at 11:01 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> Hi Olof,
+>
+> On Tue, May 15, 2012 at 10:09:18PM -0700, Olof Johansson wrote:
+>> The list of arm-soc topic branches to date are:
+>>
+>> depends/clk/next Common clock infrastructure branch from Mike Turquette
+>> next/maintainers Updates to MAINTAINERS file
+>> next/cleanup ? ? General cleanup patches
+>> next/fixes ? ? ? Fixes (and a few cleanups) that were not urgent enough for 3.4
+>> next/dt ? ? ? ? ?Device tree source and support changes
+>> next/soc ? ? ? ? New SoC support, or soc platform development
+>> next/pinctrl ? ? Changes enabling the new pinctrl subsystem on platforms
+>> next/pm ? ? ? ? ?power management and clock/reset changes
+>> next/boards ? ? ?board changes
+>> next/defconfig ? defconfig updates
+>> next/drivers ? ? drivers or SoC driver configuration updates
+>> next/cleanup2 ? ?cleanups having dependencies on some of the above branches
+>> next/clock ? ? ? patches moving platforms to common clock infrastructure
+>> next/dt2 ? ? ? ? device tree updates with dependencies on above branches
+>> next/soc2 ? ? ? ?New SoC or SoC driver support depending on above branches
+>> next/stmp-dev ? ?library infrastructure for stmp-style device register
+>> layouts and patches using those
+>> staging/cleanup ?late_initcall cleanups (to be moved to a next/* branch)
+>>
+> I think next/stmp-dev should be sorted before next/dt2, since next/dt2
+> contains mxs/dt which depends on next/stmp-dev.
+
+Ah right, seems like I missed documenting that dependency. Thanks for
+pointing it out.
+
+
+-Olof
