@@ -1,49 +1,33 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Wed, 16 May 2012 17:55:27 +0300
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205161200.59362.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515164438.22258885@skate>
- <EE71107DF0D1F24FA2D95041E64AB9E801A56AA0A462@IL-MB01.marvell.com>
- <201205161200.59362.arnd@arndb.de>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56AA0A581@IL-MB01.marvell.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 16 May 2012 17:05:19 +0200
+Subject: [PATCH] ARM: mv78xx0: Fix compiler error in pcie.c
+Message-ID: <1337180719-5655-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, May 16, 2012 3:01 PM
-> To: Lior Amsalem
-> Cc: Thomas Petazzoni; Rob Herring; Ben Dooks; Andrew Lunn; Jason Cooper;
-> Nicolas Pitre; Maen Suleiman; Ben Dooks; Olof Johansson; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm: Add basic support for new Marvell Armada SoC
-> family
-> 
-[snip]
-> 
-> Thanks for the list, very helpful!
-> 
-> So do you think it makes sense to put all of these into mach-orion?
->
-Well, Orion is old and seems like not the best name for a directory to include 
-all the new platforms.
-We are discussing it internally as well and I'll update with our suggestion.
+arch/arm/mach-mv78xx0/pcie.c:256:29: error: 'bus' undeclared (first use in this function)
 
-> 
-> Where does the Armada 1000/1500 (88DE3010/88DE3100) fit in here. Is it
-> related to the EBU family above or the PXA/MMP family, or is it something
-> entirely different?
-> 
-I only know general info, no more than what can be found in Marvell's site: 
-http://www.marvell.com/digital-entertainment/
+caused by the patch:
 
-> Also, I've seen dove (Armada 510) being referred to as PXA510. Is that also an
-> official designation or just a mistake made by people who were confused by
-> the marketing names?
-It was the SoC name at some point, the official name is Armada 510.
+ARM: PCI: dove/kirkwood/mv78xx0: use sys->private_data
 
-> 
-> 	Arnd
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-mv78xx0/pcie.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Lior Amsalem
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index 67357d1..2e56e86 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -253,7 +253,7 @@ mv78xx0_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+ 	u8 pin)
+ {
+-	struct pci_sys_data *sys = bus->sysdata;
++	struct pci_sys_data *sys = dev->bus->sysdata;
+ 	struct pcie_port *pp = sys->private_data;
+ 
+ 	return IRQ_MV78XX0_PCIE_00 + (pp->maj << 2) + pp->min;
+-- 
+1.7.10
