@@ -1,243 +1,146 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 16 May 2012 14:38:44 +0300
-Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
-In-Reply-To: <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
-Message-ID: <878vgscq4b.fsf@ashishki-desk.ger.corp.intel.com>
+From: zhoujiewu@gmail.com (zhoujie wu)
+Date: Wed, 16 May 2012 19:55:27 +0800
+Subject: [PATCH V2] clk: give clock chance to change parent at setrate
+ stage
+In-Reply-To: <CAJOA=zNnKM6ymn=FW2260cVr6hat-ucBkSG8iiRcPt38Sve89w@mail.gmail.com>
+References: <CAG9bXvmAf-0fmVb8nzWkuAKaMoOJVzR=hThwXpN_izQzM26q-g@mail.gmail.com>
+ <1336146319-6803-1-git-send-email-leiwen@marvell.com>
+ <CALZhoSQcjrOk3s6NFRs34H5uiYWK+TYeqJpoiwC6XSF+xPXrzg@mail.gmail.com>
+ <20120509183455.GB19219@gmail.com>
+ <CAAXpJNvafi5oZJDQsE9oxLyKZVVLyLLBP9DUt1+jBw9_reY_8Q@mail.gmail.com>
+ <CAJOA=zNnKM6ymn=FW2260cVr6hat-ucBkSG8iiRcPt38Sve89w@mail.gmail.com>
+Message-ID: <CAAXpJNvdaZxSiCr3Usd0B4iGHLkxshwzfN4LQZ2xZCcwBe8fVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
-
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-
-Besides things that were already pointed out, some minor comments below:
-
-> ---
->  drivers/usb/chipidea/Makefile      |    2 +-
->  drivers/usb/chipidea/ci13xxx_imx.c |  177 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 178 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+2012/5/16 Turquette, Mike <mturquette@ti.com>:
+> On Thu, May 10, 2012 at 2:03 AM, zhoujie wu <zhoujiewu@gmail.com> wrote:
+>> Please help to see below code, we add this as our clock have some
+>> special requirements.
+>> 1) this clock has four sources, and one divider field, and it requests
+>> a trigger bits to trigger HW to issue frequency change.
+>> 2) every set rate operation we want to set mux, divider and trigger
+>> bits at the same time, we don't want to set mux&trigger to change the
+>> parent at the first time, and then set divider&trigger to trigger the
+>> clock rate change the second time, this may bring some interim clock
+>> frequency, which may harmful to HW.
 >
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 0f34c0c..6821385 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -14,5 +14,5 @@ ifneq ($(CONFIG_ARCH_MSM),)
->  endif
->  
->  ifneq ($(CONFIG_ARCH_MXC),)
-> -	obj-$(CONFIG_USB_CHIPIDEA)	+= phy-imx-utmi.o
-> +	obj-$(CONFIG_USB_CHIPIDEA)	+= phy-imx-utmi.o ci13xxx_imx.o
->  endif
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> new file mode 100644
-> index 0000000..5f36f07
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -0,0 +1,177 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/usb/ulpi.h>
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/chipidea.h>
-> +#include <linux/usb/otg.h>
-> +#include <linux/dma-mapping.h>
-> +
-> +#include "ci.h"
-> +
-> +#define pdev_to_phy(pdev) \
-> +	((struct usb_phy *)platform_get_drvdata(pdev))
-> +
-> +static void ci13xxx_imx_notify_event(struct ci13xxx *udc, unsigned event)
-> +{
-> +#if 0
-> +	struct device *dev = udc->gadget.dev.parent;
-> +	int val;
-> +
-> +	switch (event) {
-> +	case CI13XXX_CONTROLLER_RESET_EVENT:
-> +		dev_dbg(dev, "CI13XXX_CONTROLLER_RESET_EVENT received\n");
-> +		writel(0, USB_AHBBURST);
-> +		writel(0, USB_AHBMODE);
-> +		break;
-> +	case CI13XXX_CONTROLLER_STOPPED_EVENT:
-> +		dev_dbg(dev, "CI13XXX_CONTROLLER_STOPPED_EVENT received\n");
-> +		/*
-> +		 * Put the transceiver in non-driving mode. Otherwise host
-> +		 * may not detect soft-disconnection.
-> +		 */
-> +		val = usb_phy_io_read(udc->transceiver, ULPI_FUNC_CTRL);
-> +		val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-> +		val |= ULPI_FUNC_CTRL_OPMODE_NONDRIVING;
-> +		usb_phy_io_write(udc->transceiver, val, ULPI_FUNC_CTRL);
-> +		break;
-> +	default:
-> +		dev_dbg(dev, "unknown ci13xxx_udc event\n");
-> +		break;
-> +	}
-> +#endif
-> +}
-> +
-> +static struct ci13xxx_udc_driver ci13xxx_imx_udc_driver = {
-> +	.name			= "ci13xxx_imx",
-> +	.flags			= CI13XXX_REGS_SHARED |
-> +				  CI13XXX_PULLUP_ON_VBUS |
-> +				  CI13XXX_DISABLE_STREAMING,
-> +	.capoffset		= 0x100,
-
-There's a DEF_CAPOFFSET for this in <linux/usb/chipidea.h>, because this
-is really a single most popular offset of the capability registers in
-chipidea controllers.
-
-> +
-> +	.notify_event		= ci13xxx_imx_notify_event,
-> +};
-> +
-> +static int ci13xxx_imx_probe(struct platform_device *pdev)
-> +{
-> +	struct platform_device *plat_ci, *phy_pdev;
-> +	struct device_node *phy_np;
-> +	struct resource *res;
-> +	int hub_reset, vbus_pwr;
-> +	int ret;
-> +
-> +	dev_dbg(&pdev->dev, "ci13xxx_imx_probe\n");
-
-Certain people don't take kindly to adding debug prints like this one. :)
-
-> +
-> +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
-> +	if (phy_np) {
-> +		phy_pdev = of_find_device_by_node(phy_np);
-> +		if (phy_pdev) {
-> +			struct usb_phy *phy;
-> +			phy = pdev_to_phy(phy_pdev);
-> +			if (phy)
-> +				usb_phy_init(phy);
-> +		}
-> +		of_node_put(phy_np);
-> +	}
-> +
-> +	hub_reset = of_get_named_gpio(pdev->dev.of_node, "fsl,hub-reset", 0);
-> +	if (hub_reset > 0 &&
-> +	    devm_gpio_request(&pdev->dev, hub_reset, "hub-reset")) {
-> +		gpio_direction_output(hub_reset, 0);
-> +		udelay(10);
-> +		gpio_direction_output(hub_reset, 1);
-> +	}
-> +
-> +	/* we only support host now, so enable vbus here */
-> +	vbus_pwr = of_get_named_gpio(pdev->dev.of_node, "fsl,vbus-power", 0);
-> +	if (vbus_pwr > 0 &&
-> +	    devm_gpio_request(&pdev->dev, vbus_pwr, "vbus-pwr")) {
-> +		gpio_direction_output(vbus_pwr, 1);
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "can't get device resources\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
-
-Regarding the instance id here: you probably want to use something more
-meaningful than the starting address. I was thinking about stealing id
-allocator from Felipe's dwc3 (dwc3_get_device_id()), but decided to
-first deal with more important things.
-
-I was considering using idr for this, but it kind of feels like an
-overkill for this purpose. So I'm wondering if it makes sense to
-generalize dwc3_get_device_id() so that other drivers can make use of
-it?
-
-> +	if (!plat_ci) {
-> +		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = platform_device_add_resources(plat_ci, pdev->resource,
-> +					    pdev->num_resources);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "can't add resources to platform device\n");
-> +		goto put_platform;
-> +	}
-> +
-> +	ret = platform_device_add_data(plat_ci, &ci13xxx_imx_udc_driver,
-> +				       sizeof(ci13xxx_imx_udc_driver));
-> +	if (ret)
-> +		goto put_platform;
-> +
-> +	plat_ci->dev.dma_mask =
-> +		kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> +	if (!plat_ci->dev.dma_mask) {
-> +		ret = -ENOMEM;
-> +		goto put_platform;
-> +	}
-> +	*plat_ci->dev.dma_mask = DMA_BIT_MASK(32);
-> +	plat_ci->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> +
-> +	ret = platform_device_add(plat_ci);
-> +	if (ret)
-> +		goto free_dma_mask;
-> +
-> +	pm_runtime_no_callbacks(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +
-> +	return 0;
-> +
-> +free_dma_mask:
-> +	kfree(plat_ci->dev.dma_mask);
-> +	plat_ci->dev.dma_mask = NULL;
-> +put_platform:
-> +	platform_device_put(plat_ci);
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id ci13xxx_imx_dt_ids[] = {
-> +	{ .compatible = "fsl,imx6q-usboh3", },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static struct platform_driver ci13xxx_imx_driver = {
-> +	.probe = ci13xxx_imx_probe,
-> +	.driver = {
-> +		.name = "imx_usboh3",
-> +		.of_match_table = ci13xxx_imx_dt_ids,
-> +	 },
-> +};
-> +
-> +MODULE_ALIAS("platform:imx_usboh3");
-> +
-> +static int __init ci13xxx_imx_init(void)
-> +{
-> +	return platform_driver_register(&ci13xxx_imx_driver);
-> +}
-> +module_init(ci13xxx_imx_init);
-> +
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.7.5.4
+> Are you able to program these bits in separate writes? ?Specifically,
+> can you perform the following sequence:
 >
+> writel(divider_value, register_address);
+> writel(mux_value, register_address);
+> writel(trigger_bit_value, register_address);
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Also can you read from this register or is write-only? ?Specifically,
+> can you perform a read-modify-write sequence to it? ?Looks like you
+> can read since I see alot of "val = readl(cc_reg->base);" in some of
+> your functions below.
+
+Yes, the register is R/W and we could perform a read-modify-write sequence.
+
+>
+> Ideally I'd like to break your clock up into two clocks. ?First a mux,
+> and then the child of that mux is a divider. ?To do so requires that
+> you can make multiple separate writes to your trigger register.
+>
+>> 3) This clock has registered clk notifier to trigger voltage change
+>> when its rate changes.
+>>
+>> In our current implement, we set flag CLK_SET_RATE_PARENT for this clock.
+>
+> At the bottom of this mail you say that you do not wish to use
+> CLK_SET_RATE_PARENT on this clock and that you do no wish to
+> dynamically change the rate of this clock's parent. ?Can you clarify
+> whether or not you want to change the rate of the parent of this
+> "trigger" clock?
+
+Sorry for the confuse, we will not CLK_SET_RATE_PARENT flag for this clock.
+
+>
+> ...
+>> +static int clk_periph_set_rate(struct clk_hw *hw, unsigned long rate)
+>> +{
+> ...
+>> + ? ? ? fsel = asel = clk_periph->clk_tbl[clk_periph->clk_tbl_index].psel_val;
+>> + ? ? ? prate = __clk_get_rate(__clk_get_parent(hw->clk));
+>> + ? ? ? fdiv = prate / rate - 1;
+>> + ? ? ? adiv = prate / clk_periph->clk_tbl[clk_periph->clk_tbl_index].aclk - 1;
+>> +
+>> + ? ? ? fdiv = (fdiv > div_mask(cc_reg, fsel_width)) ? \
+>> + ? ? ? ? ? ? ? div_mask(cc_reg, fsel_width) : fdiv;
+>> + ? ? ? adiv = (adiv > div_mask(cc_reg, asel_width)) ? \
+>> + ? ? ? ? ? ? ? div_mask(cc_reg, asel_width) : adiv;
+>> +
+>> + ? ? ? fsel = fsel << (cc_reg->fsel_shift);
+>> + ? ? ? asel = asel << (cc_reg->asel_shift);
+>> + ? ? ? fdiv = fdiv << (cc_reg->fdiv_shift);
+>> + ? ? ? adiv = adiv << (cc_reg->adiv_shift);
+> ...
+>> + ? ? ? /* trigger fclk change */
+>> + ? ? ? val = readl(cc_reg->base);
+>> + ? ? ? mask = (div_mask(cc_reg, fsel_width) << cc_reg->fsel_shift) |
+>> + ? ? ? ? ? ? ? (div_mask(cc_reg, fdiv_width) << cc_reg->fdiv_width);
+>> + ? ? ? val &= ~mask;
+>> + ? ? ? val |= (fsel | fdiv | (1 << cc_reg->fclk_fc_req));
+>> + ? ? ? printk(KERN_DEBUG "gc_set_rate fclk val = %x\n", val);
+>> + ? ? ? writel(val, cc_reg->base);
+>
+> Can this write above be done in multiple, incremental writes? ?If so
+> then I think breaking this clock up into separate mux and dividers is
+> the way to go. ?Below is an example where I write fdiv separately,
+> then I write fsel and the trigger bit:
+>
+> /* select fclk divider */
+> val = readl(cc_reg->base);
+> mask = (div_mask(cc_reg, fdiv_width) << cc_reg->fdiv_width);
+> val &= ~mask;
+> val |= fdiv;
+> printk(KERN_DEBUG "gc_set_rate fclk val = %x\n", val);
+> writel(val, cc_reg->base);
+>
+> /* select parent and trigger fclk change */
+> val = readl(cc_reg->base);
+> mask = (div_mask(cc_reg, fdiv_width) << cc_reg->fdiv_width);
+> val &= ~mask;
+> val |= (fsel | fdiv | (1 << cc_reg->fclk_fc_req));
+> printk(KERN_DEBUG "gc_set_rate fclk val = %x\n", val);
+> writel(val, cc_reg->base);
+>
+> Will this work for you?
+>
+> Thanks,
+> Mike
+
+If I separate this clock to mux->divider model,
+mux node will NOT set CLK_SET_RATE_PARENT flag
+divider node will set CLK_SET_RATE_PARENT flag
+
+When I want to change this clock's rate, it will at first find proper
+divider with current parent rate,
+if best_parent_rate != cur_parent_rate, this means we should re-parent
+the mux. The mux node rate
+will be change at first, and then divider. Per your suggestion, in mux
+.set_rate ops we disable new parent
+and set mux field, then disable old parent.
+But there is a limitation here,  write to the mux filed doesn't really
+change the source of the parent. It requires
+the trigger bits to be set.
+If we don't set trigger bits here, the source is still not change, we
+could not disable old parent. Where is the proper place to disable it?
+If we set mux and trigger here, we may use some tmp dangerous clock
+rate since divider has not update yet.
+For example, rate 400M = mux_400M/ div_1 at first. When we want to set
+to 533M, we have change mux to 1066M here, we may get tmp rate 1066M =
+1066M/1, but this clock may not run up to 1066M.
+That is why we think it is more safe to set mux&div&trigger the same time.
+
+
+Thanks!
+
+
+
+
+
+-- 
+Zhoujie Wu
