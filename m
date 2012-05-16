@@ -1,36 +1,77 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 16 May 2012 15:36:50 +0200
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <20120516131720.GE9571@n2100.arm.linux.org.uk>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
- <4FB39C62.3030305@antcom.de> <20120516125253.GD9571@n2100.arm.linux.org.uk>
- <4FB3A5E7.7060505@antcom.de> <20120516131720.GE9571@n2100.arm.linux.org.uk>
-Message-ID: <4FB3AD72.2010501@antcom.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 16 May 2012 15:37:21 +0200
+Subject: [PATCH 5/8] MXS: Add USB PHY driver
+In-Reply-To: <20120516103529.GC22251@nchen-desktop>
+References: <1337070219-3630-1-git-send-email-marex@denx.de>
+ <1337070219-3630-6-git-send-email-marex@denx.de>
+ <20120516103529.GC22251@nchen-desktop>
+Message-ID: <201205161537.21382.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2012 03:17 PM, Russell King - ARM Linux wrote:
->>>> * SLC driver says:
->>>>
->>>> lpc32xx-nand 20020000.flash: FIFO not empty!
->>>> lpc32xx-nand 20020000.flash: FIFO held data too long
->>>> lpc32xx-nand 20020000.flash: DMA FIFO failure
->>>>
->>>> Any hints, before I find the time to sort out all the details with
->>>> amba-pl08x?
->>>
->>> Nothing jumps out; it would be useful if you could bisect the small
->>> series - I did the conversion in small steps so it should be easy to
->>> track down.  And it shouldn't take too long to rebuild between each
->>> iteration.  Whatever it is, it's probably going to be a stupid mistake
->>> somewhere.
->>
->> The problem first appears with patch #4.
+Dear Peter Chen,
+
+> On Tue, May 15, 2012 at 10:23:36AM +0200, Marek Vasut wrote:
+> > Add driver that controls the built-in USB PHY in the i.MX233/i.MX28. This
+> > enables the PHY upon powerup and shuts it down on shutdown.
 > 
-> I said it would be something silly...
+> Please add i.mx6q .
+> 
+> > +config USB_MXS_PHY
+> > +	tristate "Freescale i.MX28 USB PHY support"
+> > +	select USB_OTG_UTILS
+> > +	select USB_IMX_COMPOSITE
+> 
+> Seems you will not use imx_otg.c with chipidea framework.
 
-Works fine now, including series 1-7.
+Good catch :)
 
-Thanks,
+> 
+> > + *
+> > + * Freescale i.MX28 USB PHY driver.
+> 
+> use mxs
 
-Roland
+Now ... I think we have two waring opinions in here :)
+
+> > + *
+> > +
+> > +	/* Enable FS/LS compatibility and wakeup IRQs. */
+> > +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
+> > +		BM_USBPHY_CTRL_ENIRQWAKEUP;
+> > +
+> > +	/* Enable IRQ sources. */
+> > +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
+> > +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
+> 
+> Please forget wakeup function currently, as it will make things more
+> complicated.
+> 
+> > +
+> > +	writel(val, x->io_priv + HW_USBPHY_CTRL_SET);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +	/* Disable FS/LS compatibility and wakeup IRQs. */
+> > +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
+> > +		BM_USBPHY_CTRL_ENIRQWAKEUP;
+> > +
+> > +	/* Disable IRQ sources. */
+> > +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
+> > +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
+> > +
+> 
+> The same with above
+> 
+> > +
+> > +MODULE_ALIAS("platform:mxs-usb-phy");
+> > +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
+> > +MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
+> 
+> mxs
+> 
+> > +MODULE_LICENSE("GPL");
+
+Best regards,
+Marek Vasut
