@@ -1,50 +1,31 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 16 May 2012 16:07:21 -0700
-Subject: [PATCHv2 10/19] ARM: OMAP4: PM: Work-around for ROM code BUG
- of IVAHD/TESLA
-In-Reply-To: <87zk976827.fsf@ti.com>
+Date: Wed, 16 May 2012 16:17:23 -0700
+Subject: [PATCHv2 11/19] ARM: OMAP4: PM: save/restore CM L3INSTR registers
+ when MPU hits OSWR/OFF mode
+In-Reply-To: <1336990730-26892-12-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Mon, 14 May 2012 13:18:42 +0300")
 References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-11-git-send-email-t-kristo@ti.com> <87zk976827.fsf@ti.com>
-Message-ID: <4FB43329.50505@ti.com>
+ <1336990730-26892-12-git-send-email-t-kristo@ti.com>
+Message-ID: <87sjez67i4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2012 04:05 PM, Kevin Hilman wrote:
-> Tero Kristo<t-kristo@ti.com>  writes:
->
->> From: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>
->> The ROM BUG is when MPU Domain OFF wake up sequence that can compromise
->> IVA and Tesla execution.
->>
->> At wakeup from MPU OFF on HS device only (not GP device), when
->> restoring the Secure RAM, the ROM Code reconfigures the clocks the
->> same way it is done at Cold Reset.
->
-> Ouch.
->
->> The IVAHD Clocks and Power Domain settings are:
->> 	IVAHD_CM2 IVAHD_CLKCTRL_MODULE_MODE = DISABLE
->> 	IVAHD_CM2 SL2_CLKCTRL_MODULE_MODE = DISABLE
->> 	IVAHD_CM2 SL2_CLKSTCTRL_CLKTRCTRL = HW_AUTO
->> 	IVAHD_PRM IVAHD_PWRSTCTRL_POWERSTATE = OFF
->> The TESLA Clocks and Power Domain settings are:
->> 	TESLA_CM1 TESLA_CLKCTRL_MODULE_MODE = DISABLE
->> 	TESLA_CM1 TESLA_CLKSTCTRL_CLKTRCTRL = HW_AUTO
->> 	TESLA_PRM TESLA_PWRSTCTRL_POWERSTATE = OFF
->>
->> This patch fixes the low power OFF mode code so that the these
->> registers are saved and restore across MPU OFF state.
->>
->> Also because of this limitation, MPU OFF alone is not targeted without
->> device OFF to avoid IVAHD and TESLA execution impact
->
-> I don't see where this restriction is implemented.
->
-> And, can this be hooked into cluster PM notifiers.
+Tero Kristo <t-kristo@ti.com> writes:
 
-Especially since this only effects a subset of revisions, installing the 
-notifier only on effected revisions also removes any overhead on working 
-revisions.
+> From: Rajendra Nayak <rnayak@ti.com>
+>
+> On HS devices on the way out of MPU OSWR and OFF ROM code wrongly
+> overwrites the CM L3INSTR registers. So to avoid this, save them and
+> restore on the way out from MPU OSWR/OFF.
+>
+> This errata applies to all HS/EMU versions of OMAP4.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> [t-kristo at ti.com: added omap4 pm errata support]
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+
+Let's use the cluster PM notifiers here too, using the PM errata check
+when registering the notifier.
 
 Kevin
