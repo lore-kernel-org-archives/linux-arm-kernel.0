@@ -1,40 +1,36 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 16 May 2012 13:48:27 +0300
-Subject: [PATCH v1 2/7] usb: chipidea: remove zero check of hw_ep_max
-In-Reply-To: <20120516053248.GA22251@nchen-desktop>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
- <20120516053248.GA22251@nchen-desktop>
-Message-ID: <87ehqkcsg4.fsf@ashishki-desk.ger.corp.intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 May 2012 12:50:17 +0200
+Subject: i.MX common clock framework fixes
+Message-ID: <1337165421-17118-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
 
-> On Tue, May 15, 2012 at 09:58:18PM +0800, Richard Zhao wrote:
->> It's 0 for host only device.
->> 
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> ---
->>  drivers/usb/chipidea/core.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->> 
->> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> index f568b8e..15e03b3 100644
->> --- a/drivers/usb/chipidea/core.c
->> +++ b/drivers/usb/chipidea/core.c
->> @@ -195,7 +195,7 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
->>  		ffs_nr(DCCPARAMS_DEN);
->>  	ci->hw_ep_max = reg * 2;   /* cache hw ENDPT_MAX */
->>  
->> -	if (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX)
->> +	if (ci->hw_ep_max > ENDPT_MAX)
->>  		return -ENODEV;
-> Can you move this get hw_ep_max code to udc.c? As hw_ep_max is only used
-> for device driver. What do you think, Alex?
+The following patches fix a clk path in the i.MX5 clock code revealed
+by the patch from Richard Zhao switching the timer clock from ipg
+to peripheral clock. I amended the commit log from Richards patches
+a bit, hence I am resending them here.
 
-Yes, I think this needs to go to udc.c in the future.
+Sascha
 
-Regards,
---
-Alex
+----------------------------------------------------------------
+Richard Zhao (2):
+      ARM: i.MX: change timer clock from ipg to perclk
+      ARM: imx6q: prepare and enable init on clks directly instead of clk_get first
+
+Sascha Hauer (2):
+      ARM i.MX5: fix gpt peripheral clock path
+      ARM i.MX: remove now unnecessary argument from mxc_timer_init
+
+ arch/arm/mach-imx/clk-imx1.c            |    3 +--
+ arch/arm/mach-imx/clk-imx21.c           |    4 ++--
+ arch/arm/mach-imx/clk-imx25.c           |    2 +-
+ arch/arm/mach-imx/clk-imx27.c           |    3 +--
+ arch/arm/mach-imx/clk-imx31.c           |    3 +--
+ arch/arm/mach-imx/clk-imx35.c           |    6 ++----
+ arch/arm/mach-imx/clk-imx51-imx53.c     |   12 +++++-------
+ arch/arm/mach-imx/clk-imx6q.c           |   22 +++++++---------------
+ arch/arm/plat-mxc/epit.c                |   11 ++++++++++-
+ arch/arm/plat-mxc/include/mach/common.h |    4 ++--
+ arch/arm/plat-mxc/time.c                |   24 ++++++++++++------------
+ 11 files changed, 44 insertions(+), 50 deletions(-)
