@@ -1,31 +1,64 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 16 May 2012 12:25:21 +0200
-Subject: [PATCH 2/2] ARM: EXYNOS: Remove superfluous udelay
-In-Reply-To: <1337163921-31052-1-git-send-email-l.majewski@samsung.com>
-References: <1337163921-31052-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <1337163921-31052-2-git-send-email-l.majewski@samsung.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 16 May 2012 18:35:30 +0800
+Subject: [PATCH 5/8] MXS: Add USB PHY driver
+In-Reply-To: <1337070219-3630-6-git-send-email-marex@denx.de>
+References: <1337070219-3630-1-git-send-email-marex@denx.de>
+ <1337070219-3630-6-git-send-email-marex@denx.de>
+Message-ID: <20120516103529.GC22251@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This udelay is not needed in the USB device PHY control code.
+On Tue, May 15, 2012 at 10:23:36AM +0200, Marek Vasut wrote:
+> Add driver that controls the built-in USB PHY in the i.MX233/i.MX28. This
+> enables the PHY upon powerup and shuts it down on shutdown.
+Please add i.mx6q .
+> 
+> +config USB_MXS_PHY
+> +	tristate "Freescale i.MX28 USB PHY support"
+> +	select USB_OTG_UTILS
+> +	select USB_IMX_COMPOSITE
+Seems you will not use imx_otg.c with chipidea framework.
+> + *
+> + * Freescale i.MX28 USB PHY driver.
+use mxs
+> + *
+> +
+> +	/* Enable FS/LS compatibility and wakeup IRQs. */
+> +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
+> +		BM_USBPHY_CTRL_ENIRQWAKEUP;
+> +
+> +	/* Enable IRQ sources. */
+> +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
+> +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
+Please forget wakeup function currently, as it will make things more
+complicated.
+> +
+> +	writel(val, x->io_priv + HW_USBPHY_CTRL_SET);
+> +
+> +	return 0;
+> +}
+> +
+> +	/* Disable FS/LS compatibility and wakeup IRQs. */
+> +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
+> +		BM_USBPHY_CTRL_ENIRQWAKEUP;
+> +
+> +	/* Disable IRQ sources. */
+> +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
+> +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
+> +
+The same with above
+> +
+> +MODULE_ALIAS("platform:mxs-usb-phy");
+> +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
+> +MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
+mxs
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.7.10
+> 
+> 
 
-Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/setup-usb-phy.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
-index 403923b..1af0a7f 100644
---- a/arch/arm/mach-exynos/setup-usb-phy.c
-+++ b/arch/arm/mach-exynos/setup-usb-phy.c
-@@ -73,7 +73,6 @@ static int exynos4210_usb_phy0_init(struct platform_device *pdev)
- 
- 	rstcon &= ~PHY0_SWRST_MASK;
- 	writel(rstcon, EXYNOS4_RSTCON);
--	udelay(80);
- 
- 	return 0;
- }
 -- 
-1.7.2.3
+
+Best Regards,
+Peter Chen
