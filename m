@@ -1,127 +1,149 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 15 May 2012 21:33:33 -0500
-Subject: [PATCH v4 4/7] ARM: imx: Enable imx53 low power idle
+Date: Tue, 15 May 2012 21:33:34 -0500
+Subject: [PATCH v4 5/7] ARM: imx: Add common imx cpuidle init functionality.
 In-Reply-To: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
 References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1337135616-8988-5-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337135616-8988-6-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add various functionality needed to enable a imx53 low power idle
-state.  This includes adding the imx53 gpc_dvfs clock and making a
-common imx5_late_init function and initializing all imx53
- MACHINE_STATE late_init calls to imx5_late_init.
+Add common cpuidle init functionality that can be used by various
+imx platforms.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-imx/clock-mx51-mx53.c     |    1 +
- arch/arm/mach-imx/imx53-dt.c            |    1 +
- arch/arm/mach-imx/mach-mx53_ard.c       |    1 +
- arch/arm/mach-imx/mach-mx53_evk.c       |    1 +
- arch/arm/mach-imx/mach-mx53_loco.c      |    1 +
- arch/arm/mach-imx/mach-mx53_smd.c       |    1 +
- arch/arm/mach-imx/mm-imx5.c             |    7 ++++++-
- arch/arm/plat-mxc/include/mach/common.h |    1 +
- 8 files changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/plat-mxc/Makefile               |    1 +
+ arch/arm/plat-mxc/cpuidle.c              |   80 ++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/cpuidle.h |   22 ++++++++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
 
-diff --git a/arch/arm/mach-imx/clock-mx51-mx53.c b/arch/arm/mach-imx/clock-mx51-mx53.c
-index 0847050..decedc6 100644
---- a/arch/arm/mach-imx/clock-mx51-mx53.c
-+++ b/arch/arm/mach-imx/clock-mx51-mx53.c
-@@ -1529,6 +1529,7 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
- 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-+	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
- 	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
- 	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
- 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
-diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-index 4172279..39d2ca7 100644
---- a/arch/arm/mach-imx/imx53-dt.c
-+++ b/arch/arm/mach-imx/imx53-dt.c
-@@ -125,6 +125,7 @@ DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
- 	.handle_irq	= imx53_handle_irq,
- 	.timer		= &imx53_timer,
- 	.init_machine	= imx53_dt_init,
-+	.init_late	= imx5_init_late,
- 	.dt_compat	= imx53_dt_board_compat,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mach-mx53_ard.c b/arch/arm/mach-imx/mach-mx53_ard.c
-index 0564198..afb3d14 100644
---- a/arch/arm/mach-imx/mach-mx53_ard.c
-+++ b/arch/arm/mach-imx/mach-mx53_ard.c
-@@ -266,5 +266,6 @@ MACHINE_START(MX53_ARD, "Freescale MX53 ARD Board")
- 	.handle_irq = imx53_handle_irq,
- 	.timer = &mx53_ard_timer,
- 	.init_machine = mx53_ard_board_init,
-+	.init_late	= imx5_init_late,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mach-mx53_evk.c b/arch/arm/mach-imx/mach-mx53_evk.c
-index 5a72188..929969f 100644
---- a/arch/arm/mach-imx/mach-mx53_evk.c
-+++ b/arch/arm/mach-imx/mach-mx53_evk.c
-@@ -174,5 +174,6 @@ MACHINE_START(MX53_EVK, "Freescale MX53 EVK Board")
- 	.handle_irq = imx53_handle_irq,
- 	.timer = &mx53_evk_timer,
- 	.init_machine = mx53_evk_board_init,
-+	.init_late	= imx5_init_late,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mach-mx53_loco.c b/arch/arm/mach-imx/mach-mx53_loco.c
-index 37f67ca..bc5012b 100644
---- a/arch/arm/mach-imx/mach-mx53_loco.c
-+++ b/arch/arm/mach-imx/mach-mx53_loco.c
-@@ -316,5 +316,6 @@ MACHINE_START(MX53_LOCO, "Freescale MX53 LOCO Board")
- 	.handle_irq = imx53_handle_irq,
- 	.timer = &mx53_loco_timer,
- 	.init_machine = mx53_loco_board_init,
-+	.init_late	= imx5_init_late,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mach-mx53_smd.c b/arch/arm/mach-imx/mach-mx53_smd.c
-index 8e972c5..568190b 100644
---- a/arch/arm/mach-imx/mach-mx53_smd.c
-+++ b/arch/arm/mach-imx/mach-mx53_smd.c
-@@ -163,5 +163,6 @@ MACHINE_START(MX53_SMD, "Freescale MX53 SMD Board")
- 	.handle_irq = imx53_handle_irq,
- 	.timer = &mx53_smd_timer,
- 	.init_machine = mx53_smd_board_init,
-+	.init_late	= imx5_init_late,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index bb38747..7740739 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -216,8 +216,13 @@ void __init imx53_soc_init(void)
- 					ARRAY_SIZE(imx53_audmux_res));
- }
- 
-+void __init imx5_init_late(void)
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index e81290c..63b064b 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
++obj-$(CONFIG_CPU_IDLE) += cpuidle.o
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
+diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+new file mode 100644
+index 0000000..d4cb511
+--- /dev/null
++++ b/arch/arm/plat-mxc/cpuidle.c
+@@ -0,0 +1,80 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/err.h>
++#include <linux/hrtimer.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++
++static struct cpuidle_device __percpu * imx_cpuidle_devices;
++
++static void __init imx_cpuidle_devices_uninit(void)
 +{
-+	imx5_pm_init();
++	int cpu_id;
++	struct cpuidle_device *dev;
++
++	for_each_possible_cpu(cpu_id) {
++		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
++		cpuidle_unregister_device(dev);
++	}
++
++	free_percpu(imx_cpuidle_devices);
 +}
 +
- void __init imx51_init_late(void)
- {
- 	mx51_neon_fixup();
--	imx5_pm_init();
-+	imx5_init_late();
- }
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 5660e1e..6d2e910 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -54,6 +54,7 @@ extern void imx50_soc_init(void);
- extern void imx51_soc_init(void);
- extern void imx53_soc_init(void);
- extern void imx51_init_late(void);
-+extern void imx5_init_late(void);
- extern void epit_timer_init(struct clk *timer_clk, void __iomem *base, int irq);
- extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
- extern int mx1_clocks_init(unsigned long fref);
++int __init imx_cpuidle_init(struct cpuidle_driver *drv)
++{
++	struct cpuidle_device *dev;
++	int cpu_id, ret;
++
++	if (drv->state_count > CPUIDLE_STATE_MAX) {
++		pr_err("%s: state_count exceeds maximum\n", __func__);
++		return -EINVAL;
++	}
++
++	ret = cpuidle_register_driver(drv);
++	if (ret) {
++		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
++			 __func__, ret);
++		return ret;
++	}
++
++	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
++	if (imx_cpuidle_devices == NULL) {
++		ret = -ENOMEM;
++		goto unregister_drv;
++	}
++
++	/* initialize state data for each cpuidle_device */
++	for_each_possible_cpu(cpu_id) {
++		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
++		dev->cpu = cpu_id;
++		dev->state_count = drv->state_count;
++
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("%s: Failed to register cpu %u, error: %d\n",
++				__func__, cpu_id, ret);
++			goto uninit;
++		}
++	}
++
++	return 0;
++
++uninit:
++	imx_cpuidle_devices_uninit();
++
++unregister_drv:
++	cpuidle_unregister_driver(drv);
++	return ret;
++}
+diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
+new file mode 100644
+index 0000000..bc932d1
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/cpuidle.h>
++
++#ifdef CONFIG_CPU_IDLE
++extern int imx_cpuidle_init(struct cpuidle_driver *drv);
++#else
++static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
++{
++	return -ENODEV;
++}
++#endif
 -- 
 1.7.10
