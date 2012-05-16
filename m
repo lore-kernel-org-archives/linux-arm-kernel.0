@@ -1,20 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 May 2012 16:09:32 +0100
-Subject: [PATCH] ARM: mv78xx0: Fix compiler error in pcie.c
-In-Reply-To: <1337180719-5655-1-git-send-email-andrew@lunn.ch>
-References: <1337180719-5655-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120516150932.GG9571@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 May 2012 23:35:09 +0800
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
+In-Reply-To: <CACRpkdZw5Sag5dmpqadTPJyaT5hex1CnASeVRKT5FXWtOKijkQ@mail.gmail.com>
+References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
+ <20120515112732.GB10347@shlinux2.ap.freescale.net>
+ <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
+ <20120516021301.GA21517@S2100-06.ap.freescale.net>
+ <CACRpkdZw5Sag5dmpqadTPJyaT5hex1CnASeVRKT5FXWtOKijkQ@mail.gmail.com>
+Message-ID: <20120516153508.GD3764@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 05:05:19PM +0200, Andrew Lunn wrote:
-> arch/arm/mach-mv78xx0/pcie.c:256:29: error: 'bus' undeclared (first use in this function)
+On Wed, May 16, 2012 at 08:50:48AM +0200, Linus Walleij wrote:
+> Shawn are these patches OK with you? It'd be nice to have some
+> Acked-by: since they are quite big.
 > 
-> caused by the patch:
-> 
-> ARM: PCI: dove/kirkwood/mv78xx0: use sys->private_data
+Yes, I'm fine with the patches.
 
-I've already merged my fix into the original commit in my pci branch
-after you reported the problem in private.
+For v2 of the patches,
 
-Thanks.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+-- 
+Regards,
+Shawn
