@@ -1,26 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 06:57:12 +0000
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120516050708.GF23254@lunn.ch>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201205152135.26759.arnd@arndb.de> <20120516050708.GF23254@lunn.ch>
-Message-ID: <201205160657.12833.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 May 2012 15:29:00 +0800
+Subject: [PATCH] gpio/generic: initialize the shadow of direction register
+In-Reply-To: <20403.20214.297216.188300@ipc1.ka-ro>
+References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
+ <20402.798.622618.263780@ipc1.ka-ro>
+ <20120516053301.GB21517@S2100-06.ap.freescale.net>
+ <20403.20214.297216.188300@ipc1.ka-ro>
+Message-ID: <20120516072859.GE21517@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Andrew Lunn wrote:
+On Wed, May 16, 2012 at 08:53:42AM +0200, Lothar Wa?mann wrote:
+> > @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
+> >                 return ret;
 > > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >         bgc->data = bgc->read_reg(bgc->reg_dat);
+> > +       if (bgc->gc.set == bgpio_set_set)
+> > +               bgc->data = bgc->read_reg(bgc->reg_set);
+> > +       if (bgc->reg_dir)
+> > +               bgc->dir = bgc->read_reg(bgc->reg_dir);
+> > 
+> >         return ret;
+> >  }
+> > 
+> That might change the behaviour of existing implementations.
 > 
-> Has this been tested in any way? If it boots on a few different
-> boards, i would say yes, lets do it.
-> 
-> If this is for the end of the merge window, we have about two weeks
-> for testing. Seems reasonable.
-> 
+Can you be specific?  I do not quite follow on that.
 
-No testing in any way other than building the four defconfigs, but I've been
-rather careful in coming up with a way that would be least invasive. I agree
-it needs real testing anyway.
-
-	Arnd
+-- 
+Regards,
+Shawn
