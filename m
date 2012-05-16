@@ -1,110 +1,23 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 16 May 2012 15:46:03 +0900
-Subject: [PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
-In-Reply-To: <20120516064449.32286.77941.sendpatchset@w520>
-References: <20120516064449.32286.77941.sendpatchset@w520>
-Message-ID: <20120516064603.32286.93274.sendpatchset@w520>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 May 2012 08:50:48 +0200
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
+In-Reply-To: <20120516021301.GA21517@S2100-06.ap.freescale.net>
+References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
+ <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
+ <20120515112732.GB10347@shlinux2.ap.freescale.net>
+ <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
+ <20120516021301.GA21517@S2100-06.ap.freescale.net>
+Message-ID: <CACRpkdZw5Sag5dmpqadTPJyaT5hex1CnASeVRKT5FXWtOKijkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Wed, May 16, 2012 at 4:13 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 
-Use DT_MACHINE_START() on the emev2 based KZM9D board.
+> With the patches going in via pinctrl tree, we can start making machine
+> changes from next cycle.
 
-Also include a tiny DTS file to describe the board and
-update the Kconfig dependencies to select CONFIG_USE_OF.
+Shawn are these patches OK with you? It'd be nice to have some
+Acked-by: since they are quite big.
 
-Update the SMP glue code to use OF for matching.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Changes from V1:
- - none - this is the first public release
-
- arch/arm/boot/dts/emev2-kzm9d.dts    |   26 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig       |    1 +
- arch/arm/mach-shmobile/board-kzm9d.c |    8 +++++++-
- arch/arm/mach-shmobile/platsmp.c     |    3 ++-
- 4 files changed, 36 insertions(+), 2 deletions(-)
-
---- /dev/null
-+++ work/arch/arm/boot/dts/emev2-kzm9d.dts	2012-05-16 15:22:30.000000000 +0900
-@@ -0,0 +1,26 @@
-+/*
-+ * Device Tree Source for the KZM9D board
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+/dts-v1/;
-+
-+/include/ "emev2.dtsi"
-+
-+/ {
-+	model = "EMEV2 KZM9D Board";
-+	compatible = "renesas,kzm9d", "renesas,emev2";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x40000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS1,115200n81";
-+	};
-+};
---- 0010/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2012-05-16 15:03:53.000000000 +0900
-@@ -119,6 +119,7 @@ config MACH_KZM9G
- config MACH_KZM9D
- 	bool "KZM9D board"
- 	depends on ARCH_EMEV2
-+	select USE_OF
- 
- comment "SH-Mobile System Configuration"
- 
---- 0011/arch/arm/mach-shmobile/board-kzm9d.c
-+++ work/arch/arm/mach-shmobile/board-kzm9d.c	2012-05-16 15:17:35.000000000 +0900
-@@ -68,7 +68,12 @@ void __init kzm9d_add_standard_devices(v
- 	platform_add_devices(kzm9d_devices, ARRAY_SIZE(kzm9d_devices));
- }
- 
--MACHINE_START(KZM9D, "kzm9d")
-+static const char *kzm9d_boards_compat_dt[] __initdata = {
-+	"renesas,kzm9d",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(KZM9D_DT, "kzm9d")
- 	.map_io		= emev2_map_io,
- 	.init_early	= emev2_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-@@ -76,4 +81,5 @@ MACHINE_START(KZM9D, "kzm9d")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= kzm9d_add_standard_devices,
- 	.timer		= &shmobile_timer,
-+	.dt_compat	= kzm9d_boards_compat_dt,
- MACHINE_END
---- 0009/arch/arm/mach-shmobile/platsmp.c
-+++ work/arch/arm/mach-shmobile/platsmp.c	2012-05-16 15:17:41.000000000 +0900
-@@ -16,6 +16,7 @@
- #include <linux/device.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <mach/common.h>
-@@ -23,7 +24,7 @@
- 
- #define is_sh73a0() (machine_is_ag5evm() || machine_is_kota2() || machine_is_kzm9g())
- #define is_r8a7779() machine_is_marzen()
--#define is_emev2() machine_is_kzm9d()
-+#define is_emev2() of_machine_is_compatible("renesas,emev2")
- 
- static unsigned int __init shmobile_smp_get_core_count(void)
- {
+Yours,
+Linus Walleij
