@@ -1,213 +1,472 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 16 May 2012 15:25:58 +0200
-Subject: [PATCH 1/4] mmc: atmel-mci: the r/w proof capability lack was not
- well managed
+Date: Wed, 16 May 2012 15:25:59 +0200
+Subject: [PATCH 2/4] mmc: atmel-mci: change the state machine
 In-Reply-To: <1337174761-23988-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1337174761-23988-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337174761-23988-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1337174761-23988-3-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-First mci IPs (mainly on rm9200 and 9261) don't have the r/w proof capability.
-The driver didn't work correctly without this capability in PDC mode because
-of the double buffer switch which is too slow even if we stop the transfer to
-perform this switch.
+The state machine use in atmel-mci can't work with old IP versions (< 0x200).
+This patch allows to have a common state machine for all versions in order to
+remove at91-mci driver only used for old versions.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/mmc/host/atmel-mci.c |   92 +++++++++++++++++++++++++++++++++++------
- 1 files changed, 78 insertions(+), 14 deletions(-)
+ drivers/mmc/host/atmel-mci.c |  278 ++++++++++++++++++++++++------------------
+ 1 files changed, 162 insertions(+), 116 deletions(-)
 
 diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 50e8652..308f8ae 100644
+index 308f8ae..cad830f 100644
 --- a/drivers/mmc/host/atmel-mci.c
 +++ b/drivers/mmc/host/atmel-mci.c
-@@ -91,6 +91,11 @@ struct atmel_mci_dma {
-  * @regs: Pointer to MMIO registers.
-  * @sg: Scatterlist entry currently being processed by PIO or PDC code.
-  * @pio_offset: Offset into the current scatterlist entry.
-+ * @buffer: Buffer used if we don't have the r/w proof capability. We
-+ *      don't have the time to switch pdc buffers so we have to use only
-+ *      one buffer for the full transaction.
-+ * @buf_size: size of the buffer.
-+ * @phys_buf_addr: buffer address needed for pdc.
-  * @cur_slot: The slot which is currently using the controller.
-  * @mrq: The request currently being processed on @cur_slot,
-  *	or NULL if the controller is idle.
-@@ -166,6 +171,9 @@ struct atmel_mci {
+@@ -45,19 +45,19 @@
+ #define ATMCI_DMA_THRESHOLD	16
  
- 	struct scatterlist	*sg;
- 	unsigned int		pio_offset;
-+	unsigned int		*buffer;
-+	unsigned int		buf_size;
-+	dma_addr_t		buf_phys_addr;
+ enum {
+-	EVENT_CMD_COMPLETE = 0,
++	EVENT_CMD_RDY = 0,
+ 	EVENT_XFER_COMPLETE,
+-	EVENT_DATA_COMPLETE,
++	EVENT_NOTBUSY,
+ 	EVENT_DATA_ERROR,
+ };
  
- 	struct atmel_mci_slot	*cur_slot;
- 	struct mmc_request	*mrq;
-@@ -480,6 +488,11 @@ err:
- 	dev_err(&mmc->class_dev, "failed to initialize debugfs for slot\n");
+ enum atmel_mci_state {
+ 	STATE_IDLE = 0,
+ 	STATE_SENDING_CMD,
+-	STATE_SENDING_DATA,
+-	STATE_DATA_BUSY,
++	STATE_DATA_XFER,
++	STATE_WAITING_NOTBUSY,
+ 	STATE_SENDING_STOP,
+-	STATE_DATA_ERROR,
++	STATE_END_REQUEST,
+ };
+ 
+ enum atmci_xfer_dir {
+@@ -709,7 +709,6 @@ static void atmci_pdc_complete(struct atmel_mci *host)
+ 	if (host->data) {
+ 		atmci_set_pending(host, EVENT_XFER_COMPLETE);
+ 		tasklet_schedule(&host->tasklet);
+-		atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
+ 	}
  }
  
-+static inline unsigned int atmci_get_version(struct atmel_mci *host)
-+{
-+	return atmci_readl(host, ATMCI_VERSION) & 0x00000fff;
-+}
-+
- static inline unsigned int atmci_ns_to_clocks(struct atmel_mci *host,
- 					unsigned int ns)
- {
-@@ -603,6 +616,7 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
- 	enum atmci_xfer_dir dir, enum atmci_pdc_buf buf_nb)
- {
- 	u32 pointer_reg, counter_reg;
-+	unsigned int buf_size;
- 
- 	if (dir == XFER_RECEIVE) {
- 		pointer_reg = ATMEL_PDC_RPR;
-@@ -617,8 +631,15 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
- 		counter_reg += ATMEL_PDC_SCND_BUF_OFF;
+@@ -834,7 +833,7 @@ atmci_prepare_data_pdc(struct atmel_mci *host, struct mmc_data *data)
+ 		iflags |= ATMCI_ENDRX | ATMCI_RXBUFF;
+ 	} else {
+ 		dir = DMA_TO_DEVICE;
+-		iflags |= ATMCI_ENDTX | ATMCI_TXBUFE;
++		iflags |= ATMCI_ENDTX | ATMCI_TXBUFE | ATMCI_BLKE;
  	}
  
--	atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
--	if (host->data_size <= sg_dma_len(host->sg)) {
-+	if (!host->caps.has_rwproof) {
-+		buf_size = host->buf_size;
-+		atmci_writel(host, pointer_reg, host->buf_phys_addr);
-+	} else {
-+		buf_size = sg_dma_len(host->sg);
-+		atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
-+	}
-+
-+	if (host->data_size <= buf_size) {
- 		if (host->data_size & 0x3) {
- 			/* If size is different from modulo 4, transfer bytes */
- 			atmci_writel(host, counter_reg, host->data_size);
-@@ -670,7 +691,15 @@ static void atmci_pdc_cleanup(struct atmel_mci *host)
+ 	/* Set BLKLEN */
+@@ -976,8 +975,7 @@ static void atmci_stop_transfer(struct atmel_mci *host)
   */
- static void atmci_pdc_complete(struct atmel_mci *host)
+ static void atmci_stop_transfer_pdc(struct atmel_mci *host)
  {
-+	int transfer_size = host->data->blocks * host->data->blksz;
-+
- 	atmci_writel(host, ATMEL_PDC_PTCR, ATMEL_PDC_RXTDIS | ATMEL_PDC_TXTDIS);
-+
-+	if ((!host->caps.has_rwproof)
-+	    && (host->data->flags & MMC_DATA_READ))
-+		sg_copy_from_buffer(host->data->sg, host->data->sg_len,
-+		                    host->buffer, transfer_size);
-+
- 	atmci_pdc_cleanup(host);
- 
- 	/*
-@@ -817,6 +846,12 @@ atmci_prepare_data_pdc(struct atmel_mci *host, struct mmc_data *data)
- 	/* Configure PDC */
- 	host->data_size = data->blocks * data->blksz;
- 	sg_len = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len, dir);
-+
-+	if ((!host->caps.has_rwproof)
-+	    && (host->data->flags & MMC_DATA_WRITE))
-+		sg_copy_to_buffer(host->data->sg, host->data->sg_len,
-+		                  host->buffer, host->data_size);
-+
- 	if (host->data_size)
- 		atmci_pdc_set_both_buf(host,
- 			((dir == DMA_FROM_DEVICE) ? XFER_RECEIVE : XFER_TRANSMIT));
-@@ -1878,13 +1913,26 @@ static int __init atmci_init_slot(struct atmel_mci *host,
- 		mmc->caps |= MMC_CAP_SDIO_IRQ;
- 	if (host->caps.has_highspeed)
- 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
--	if (slot_data->bus_width >= 4)
-+	/*
-+	 * Without the read/write proof capability, it is strongly suggested to
-+	 * use only one bit for data to prevent fifo underruns and overruns
-+	 * which will corrupt data.
-+	 */
-+	if ((slot_data->bus_width >= 4) && host->caps.has_rwproof)
- 		mmc->caps |= MMC_CAP_4_BIT_DATA;
- 
--	mmc->max_segs = 64;
--	mmc->max_req_size = 32768 * 512;
--	mmc->max_blk_size = 32768;
--	mmc->max_blk_count = 512;
-+	if (atmci_get_version(host) < 0x200) {
-+		mmc->max_segs = 256;
-+		mmc->max_blk_size = 4095;
-+		mmc->max_blk_count = 256;
-+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
-+		mmc->max_seg_size = mmc->max_blk_size * mmc->max_segs;
-+	} else {
-+		mmc->max_segs = 64;
-+		mmc->max_req_size = 32768 * 512;
-+		mmc->max_blk_size = 32768;
-+		mmc->max_blk_count = 512;
-+	}
- 
- 	/* Assume card is present initially */
- 	set_bit(ATMCI_CARD_PRESENT, &slot->flags);
-@@ -2008,11 +2056,6 @@ static bool atmci_configure_dma(struct atmel_mci *host)
- 	}
+-	atmci_set_pending(host, EVENT_XFER_COMPLETE);
+-	atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
++	atmci_writel(host, ATMEL_PDC_PTCR, ATMEL_PDC_RXTDIS | ATMEL_PDC_TXTDIS);
  }
  
--static inline unsigned int atmci_get_version(struct atmel_mci *host)
+ static void atmci_stop_transfer_dma(struct atmel_mci *host)
+@@ -1013,6 +1011,7 @@ static void atmci_start_request(struct atmel_mci *host,
+ 
+ 	host->pending_events = 0;
+ 	host->completed_events = 0;
++	host->cmd_status = 0;
+ 	host->data_status = 0;
+ 
+ 	if (host->need_reset) {
+@@ -1030,7 +1029,7 @@ static void atmci_start_request(struct atmel_mci *host,
+ 
+ 	iflags = atmci_readl(host, ATMCI_IMR);
+ 	if (iflags & ~(ATMCI_SDIOIRQA | ATMCI_SDIOIRQB))
+-		dev_warn(&slot->mmc->class_dev, "WARNING: IMR=0x%08x\n",
++		dev_dbg(&slot->mmc->class_dev, "WARNING: IMR=0x%08x\n",
+ 				iflags);
+ 
+ 	if (unlikely(test_and_clear_bit(ATMCI_CARD_NEED_INIT, &slot->flags))) {
+@@ -1368,19 +1367,6 @@ static void atmci_command_complete(struct atmel_mci *host,
+ 		cmd->error = -EIO;
+ 	else
+ 		cmd->error = 0;
+-
+-	if (cmd->error) {
+-		dev_dbg(&host->pdev->dev,
+-			"command error: status=0x%08x\n", status);
+-
+-		if (cmd->data) {
+-			host->stop_transfer(host);
+-			host->data = NULL;
+-			atmci_writel(host, ATMCI_IDR, ATMCI_NOTBUSY
+-					| ATMCI_TXRDY | ATMCI_RXRDY
+-					| ATMCI_DATA_ERROR_FLAGS);
+-		}
+-	}
+ }
+ 
+ static void atmci_detect_change(unsigned long data)
+@@ -1443,23 +1429,21 @@ static void atmci_detect_change(unsigned long data)
+ 					break;
+ 				case STATE_SENDING_CMD:
+ 					mrq->cmd->error = -ENOMEDIUM;
+-					if (!mrq->data)
+-						break;
+-					/* fall through */
+-				case STATE_SENDING_DATA:
++					if (mrq->data)
++						host->stop_transfer(host);
++					break;
++				case STATE_DATA_XFER:
+ 					mrq->data->error = -ENOMEDIUM;
+ 					host->stop_transfer(host);
+ 					break;
+-				case STATE_DATA_BUSY:
+-				case STATE_DATA_ERROR:
+-					if (mrq->data->error == -EINPROGRESS)
+-						mrq->data->error = -ENOMEDIUM;
+-					if (!mrq->stop)
+-						break;
+-					/* fall through */
++				case STATE_WAITING_NOTBUSY:
++					mrq->data->error = -ENOMEDIUM;
++					break;
+ 				case STATE_SENDING_STOP:
+ 					mrq->stop->error = -ENOMEDIUM;
+ 					break;
++				case STATE_END_REQUEST:
++					break;
+ 				}
+ 
+ 				atmci_request_end(host, mrq);
+@@ -1487,7 +1471,6 @@ static void atmci_tasklet_func(unsigned long priv)
+ 	struct atmel_mci	*host = (struct atmel_mci *)priv;
+ 	struct mmc_request	*mrq = host->mrq;
+ 	struct mmc_data		*data = host->data;
+-	struct mmc_command	*cmd = host->cmd;
+ 	enum atmel_mci_state	state = host->state;
+ 	enum atmel_mci_state	prev_state;
+ 	u32			status;
+@@ -1509,101 +1492,164 @@ static void atmci_tasklet_func(unsigned long priv)
+ 			break;
+ 
+ 		case STATE_SENDING_CMD:
++			/*
++			 * Command has been sent, we are waiting for command
++			 * ready. Then we have three next states possible:
++			 * END_REQUEST by default, WAITING_NOTBUSY if it's a
++			 * command needing it or DATA_XFER if there is data.
++			 */
+ 			if (!atmci_test_and_clear_pending(host,
+-						EVENT_CMD_COMPLETE))
++						EVENT_CMD_RDY))
+ 				break;
+ 
+ 			host->cmd = NULL;
+-			atmci_set_completed(host, EVENT_CMD_COMPLETE);
++			atmci_set_completed(host, EVENT_CMD_RDY);
+ 			atmci_command_complete(host, mrq->cmd);
+-			if (!mrq->data || cmd->error) {
+-				atmci_request_end(host, host->mrq);
+-				goto unlock;
+-			}
++			if (mrq->data) {
++				/*
++				 * If there is a command error don't start
++				 * data transfer.
++				 */
++				if (mrq->cmd->error) {
++					host->stop_transfer(host);
++					host->data = NULL;
++					atmci_writel(host, ATMCI_IDR,
++					             ATMCI_TXRDY | ATMCI_RXRDY
++					             | ATMCI_DATA_ERROR_FLAGS);
++					state = STATE_END_REQUEST;
++				} else
++					state = STATE_DATA_XFER;
++			} else if ((!mrq->data) && (mrq->cmd->flags & MMC_RSP_BUSY)) {
++				atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
++				state = STATE_WAITING_NOTBUSY;
++			} else
++				state = STATE_END_REQUEST;
+ 
+-			prev_state = state = STATE_SENDING_DATA;
+-			/* fall through */
++			break;
+ 
+-		case STATE_SENDING_DATA:
++		case STATE_DATA_XFER:
+ 			if (atmci_test_and_clear_pending(host,
+ 						EVENT_DATA_ERROR)) {
+-				host->stop_transfer(host);
+-				if (data->stop)
+-					atmci_send_stop_cmd(host, data);
+-				state = STATE_DATA_ERROR;
++				atmci_set_completed(host, EVENT_DATA_ERROR);
++				state = STATE_END_REQUEST;
+ 				break;
+ 			}
+ 
++			/*
++			 * A data transfer is in progress. The event expected
++			 * to move to the next state depends of data transfer
++			 * type (PDC or DMA). Once transfer done we can move
++			 * to the next step which is WAITING_NOTBUSY in write
++			 * case and directly SENDING_STOP in read case.
++			 */
+ 			if (!atmci_test_and_clear_pending(host,
+ 						EVENT_XFER_COMPLETE))
+ 				break;
+ 
+ 			atmci_set_completed(host, EVENT_XFER_COMPLETE);
+-			prev_state = state = STATE_DATA_BUSY;
+-			/* fall through */
+ 
+-		case STATE_DATA_BUSY:
+-			if (!atmci_test_and_clear_pending(host,
+-						EVENT_DATA_COMPLETE))
+-				break;
+-
+-			host->data = NULL;
+-			atmci_set_completed(host, EVENT_DATA_COMPLETE);
+-			status = host->data_status;
+-			if (unlikely(status & ATMCI_DATA_ERROR_FLAGS)) {
+-				if (status & ATMCI_DTOE) {
+-					dev_dbg(&host->pdev->dev,
+-							"data timeout error\n");
+-					data->error = -ETIMEDOUT;
+-				} else if (status & ATMCI_DCRCE) {
+-					dev_dbg(&host->pdev->dev,
+-							"data CRC error\n");
+-					data->error = -EILSEQ;
+-				} else {
+-					dev_dbg(&host->pdev->dev,
+-						"data FIFO error (status=%08x)\n",
+-						status);
+-					data->error = -EIO;
+-				}
++			if (host->data->flags & MMC_DATA_WRITE) {
++				atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
++				state = STATE_WAITING_NOTBUSY;
++			} else if (host->mrq->stop) {
++				atmci_writel(host, ATMCI_IER, ATMCI_CMDRDY);
++				atmci_send_stop_cmd(host, data);
++				state = STATE_SENDING_STOP;
+ 			} else {
++				host->data = NULL;
+ 				data->bytes_xfered = data->blocks * data->blksz;
+ 				data->error = 0;
+-				atmci_writel(host, ATMCI_IDR, ATMCI_DATA_ERROR_FLAGS);
++				state = STATE_END_REQUEST;
+ 			}
++			break;
+ 
+-			if (!data->stop) {
+-				atmci_request_end(host, host->mrq);
+-				goto unlock;
+-			}
++		case STATE_WAITING_NOTBUSY:
++			/*
++			 * We can be in the state for two reasons: a command
++			 * requiring waiting not busy signal (stop command
++			 * included) or a write operation. In the latest case,
++			 * we need to send a stop command.
++			 */
++			if (!atmci_test_and_clear_pending(host,
++						EVENT_NOTBUSY))
++				break;
+ 
+-			prev_state = state = STATE_SENDING_STOP;
+-			if (!data->error)
+-				atmci_send_stop_cmd(host, data);
+-			/* fall through */
++			atmci_set_completed(host, EVENT_NOTBUSY);
++
++			if (host->data) {
++				/*
++				 * For some commands such as CMD53, even if
++				 * there is data transfer, there is no stop
++				 * command to send.
++				 */
++				if (host->mrq->stop) {
++					atmci_writel(host, ATMCI_IER,
++					             ATMCI_CMDRDY);
++					atmci_send_stop_cmd(host, data);
++					state = STATE_SENDING_STOP;
++				} else {
++					host->data = NULL;
++					data->bytes_xfered = data->blocks
++					                     * data->blksz;
++					data->error = 0;
++					state = STATE_END_REQUEST;
++				}
++			} else
++				state = STATE_END_REQUEST;
++			break;
+ 
+ 		case STATE_SENDING_STOP:
++			/*
++			 * In this state, it is important to set host->data to
++			 * NULL (which is tested in the waiting notbusy state)
++			 * in order to go to the end request state instead of
++			 * sending stop again.
++			 */
+ 			if (!atmci_test_and_clear_pending(host,
+-						EVENT_CMD_COMPLETE))
++						EVENT_CMD_RDY))
+ 				break;
+ 
+ 			host->cmd = NULL;
++			host->data = NULL;
++			data->bytes_xfered = data->blocks * data->blksz;
++			data->error = 0;
+ 			atmci_command_complete(host, mrq->stop);
+-			atmci_request_end(host, host->mrq);
+-			goto unlock;
++			if (mrq->stop->error) {
++				host->stop_transfer(host);
++				atmci_writel(host, ATMCI_IDR,
++				             ATMCI_TXRDY | ATMCI_RXRDY
++				             | ATMCI_DATA_ERROR_FLAGS);
++				state = STATE_END_REQUEST;
++			} else {
++				atmci_writel(host, ATMCI_IER, ATMCI_NOTBUSY);
++				state = STATE_WAITING_NOTBUSY;
++			}
++			break;
+ 
+-		case STATE_DATA_ERROR:
+-			if (!atmci_test_and_clear_pending(host,
+-						EVENT_XFER_COMPLETE))
+-				break;
++		case STATE_END_REQUEST:
++			atmci_writel(host, ATMCI_IDR, ATMCI_TXRDY | ATMCI_RXRDY
++			                   | ATMCI_DATA_ERROR_FLAGS);
++			status = host->data_status;
++			if (unlikely(status)) {
++				host->stop_transfer(host);
++				host->data = NULL;
++				if (status & ATMCI_DTOE) {
++					data->error = -ETIMEDOUT;
++				} else if (status & ATMCI_DCRCE) {
++					data->error = -EILSEQ;
++				} else {
++					data->error = -EIO;
++				}
++			}
+ 
+-			state = STATE_DATA_BUSY;
++			atmci_request_end(host, host->mrq);
++			state = STATE_IDLE;
+ 			break;
+ 		}
+ 	} while (state != prev_state);
+ 
+ 	host->state = state;
+ 
+-unlock:
+ 	spin_unlock(&host->lock);
+ }
+ 
+@@ -1656,9 +1702,6 @@ static void atmci_read_data_pio(struct atmel_mci *host)
+ 						| ATMCI_DATA_ERROR_FLAGS));
+ 			host->data_status = status;
+ 			data->bytes_xfered += nbytes;
+-			smp_wmb();
+-			atmci_set_pending(host, EVENT_DATA_ERROR);
+-			tasklet_schedule(&host->tasklet);
+ 			return;
+ 		}
+ 	} while (status & ATMCI_RXRDY);
+@@ -1727,9 +1770,6 @@ static void atmci_write_data_pio(struct atmel_mci *host)
+ 						| ATMCI_DATA_ERROR_FLAGS));
+ 			host->data_status = status;
+ 			data->bytes_xfered += nbytes;
+-			smp_wmb();
+-			atmci_set_pending(host, EVENT_DATA_ERROR);
+-			tasklet_schedule(&host->tasklet);
+ 			return;
+ 		}
+ 	} while (status & ATMCI_TXRDY);
+@@ -1747,16 +1787,6 @@ done:
+ 	atmci_set_pending(host, EVENT_XFER_COMPLETE);
+ }
+ 
+-static void atmci_cmd_interrupt(struct atmel_mci *host, u32 status)
 -{
--	return atmci_readl(host, ATMCI_VERSION) & 0x00000fff;
+-	atmci_writel(host, ATMCI_IDR, ATMCI_CMDRDY);
+-
+-	host->cmd_status = status;
+-	smp_wmb();
+-	atmci_set_pending(host, EVENT_CMD_COMPLETE);
+-	tasklet_schedule(&host->tasklet);
 -}
 -
- /*
-  * HSMCI (High Speed MCI) module is not fully compatible with MCI module.
-  * HSMCI provides DMA support and a new config register but no more supports
-@@ -2139,14 +2182,20 @@ static int __init atmci_probe(struct platform_device *pdev)
- 	if (pdata->slot[0].bus_width) {
- 		ret = atmci_init_slot(host, &pdata->slot[0],
- 				0, ATMCI_SDCSEL_SLOT_A, ATMCI_SDIOIRQA);
--		if (!ret)
-+		if (!ret) {
- 			nr_slots++;
-+			host->buf_size = host->slot[0]->mmc->max_req_size;
-+		}
- 	}
- 	if (pdata->slot[1].bus_width) {
- 		ret = atmci_init_slot(host, &pdata->slot[1],
- 				1, ATMCI_SDCSEL_SLOT_B, ATMCI_SDIOIRQB);
--		if (!ret)
-+		if (!ret) {
- 			nr_slots++;
-+			if (host->slot[1]->mmc->max_req_size > host->buf_size)
-+				host->buf_size =
-+					host->slot[1]->mmc->max_req_size;
-+		}
- 	}
+ static void atmci_sdio_interrupt(struct atmel_mci *host, u32 status)
+ {
+ 	int	i;
+@@ -1785,8 +1815,9 @@ static irqreturn_t atmci_interrupt(int irq, void *dev_id)
  
- 	if (!nr_slots) {
-@@ -2154,6 +2203,17 @@ static int __init atmci_probe(struct platform_device *pdev)
- 		goto err_init_slot;
- 	}
+ 		if (pending & ATMCI_DATA_ERROR_FLAGS) {
+ 			atmci_writel(host, ATMCI_IDR, ATMCI_DATA_ERROR_FLAGS
+-					| ATMCI_RXRDY | ATMCI_TXRDY);
+-			pending &= atmci_readl(host, ATMCI_IMR);
++					| ATMCI_RXRDY | ATMCI_TXRDY
++					| ATMCI_ENDRX | ATMCI_ENDTX
++					| ATMCI_RXBUFF | ATMCI_TXBUFE);
  
-+	if (!host->caps.has_rwproof) {
-+		host->buffer = dma_alloc_coherent(&pdev->dev, host->buf_size,
-+		                                  &host->buf_phys_addr,
-+						  GFP_KERNEL);
-+		if (!host->buffer) {
-+			ret = -ENOMEM;
-+			dev_err(&pdev->dev, "buffer allocation failed\n");
-+			goto err_init_slot;
+ 			host->data_status = status;
+ 			smp_wmb();
+@@ -1844,23 +1875,38 @@ static irqreturn_t atmci_interrupt(int irq, void *dev_id)
+ 			}
+ 		}
+ 
++		/*
++		 * First mci IPs, so mainly the ones having pdc, have some
++		 * issues with the notbusy signal. You can't get it after
++		 * data transmission if you have not sent a stop command.
++		 * The appropriate workaround is to use the BLKE signal.
++		 */
++		if (pending & ATMCI_BLKE) {
++			atmci_writel(host, ATMCI_IDR, ATMCI_BLKE);
++			smp_wmb();
++			atmci_set_pending(host, EVENT_NOTBUSY);
++			tasklet_schedule(&host->tasklet);
 +		}
-+	}
+ 
+ 		if (pending & ATMCI_NOTBUSY) {
+-			atmci_writel(host, ATMCI_IDR,
+-					ATMCI_DATA_ERROR_FLAGS | ATMCI_NOTBUSY);
+-			if (!host->data_status)
+-				host->data_status = status;
++			atmci_writel(host, ATMCI_IDR, ATMCI_NOTBUSY);
+ 			smp_wmb();
+-			atmci_set_pending(host, EVENT_DATA_COMPLETE);
++			atmci_set_pending(host, EVENT_NOTBUSY);
+ 			tasklet_schedule(&host->tasklet);
+ 		}
 +
- 	dev_info(&pdev->dev,
- 			"Atmel MCI controller at 0x%08lx irq %d, %u slots\n",
- 			host->mapbase, irq, nr_slots);
-@@ -2180,6 +2240,10 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 		if (pending & ATMCI_RXRDY)
+ 			atmci_read_data_pio(host);
+ 		if (pending & ATMCI_TXRDY)
+ 			atmci_write_data_pio(host);
  
- 	platform_set_drvdata(pdev, NULL);
+-		if (pending & ATMCI_CMDRDY)
+-			atmci_cmd_interrupt(host, status);
++		if (pending & ATMCI_CMDRDY) {
++			atmci_writel(host, ATMCI_IDR, ATMCI_CMDRDY);
++			host->cmd_status = status;
++			smp_wmb();
++			atmci_set_pending(host, EVENT_CMD_RDY);
++			tasklet_schedule(&host->tasklet);
++		}
  
-+	if (host->buffer)
-+		dma_free_coherent(&pdev->dev, host->buf_size,
-+		                  host->buffer, host->buf_phys_addr);
-+
- 	for (i = 0; i < ATMCI_MAX_NR_SLOTS; i++) {
- 		if (host->slot[i])
- 			atmci_cleanup_slot(host->slot[i], i);
+ 		if (pending & (ATMCI_SDIOIRQA | ATMCI_SDIOIRQB))
+ 			atmci_sdio_interrupt(host, status);
 -- 
 1.7.5.4
