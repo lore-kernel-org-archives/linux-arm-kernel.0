@@ -1,28 +1,28 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 16 May 2012 15:57:55 +0800
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add imx53 pinctrl driver
-In-Reply-To: <CACRpkdZw5Sag5dmpqadTPJyaT5hex1CnASeVRKT5FXWtOKijkQ@mail.gmail.com>
-References: <1337010369-28687-1-git-send-email-b29396@freescale.com>
- <CACRpkdbW8eeq0gFTjPRpKesmV4K5zqRHuW6C-UywBn8AtqOLCg@mail.gmail.com>
- <20120515112732.GB10347@shlinux2.ap.freescale.net>
- <CACRpkdaKAF8bznd-sBdcGfdJW_cHSUGFZhnVk4qJ_0LJ8GoUuQ@mail.gmail.com>
- <20120516021301.GA21517@S2100-06.ap.freescale.net>
- <CACRpkdZw5Sag5dmpqadTPJyaT5hex1CnASeVRKT5FXWtOKijkQ@mail.gmail.com>
-Message-ID: <20120516075754.GG10347@shlinux2.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 16 May 2012 08:53:23 +0100
+Subject: [PATCH] clk: wm831x: Add initial WM831x clock driver
+In-Reply-To: <CAJOA=zMRRJB5HZhQPNBbAc0+U=Rgs9v0feDqK-6VRUzGnUEbyA@mail.gmail.com>
+References: <1337004985-22549-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CAJOA=zMRRJB5HZhQPNBbAc0+U=Rgs9v0feDqK-6VRUzGnUEbyA@mail.gmail.com>
+Message-ID: <20120516075322.GA6801@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 02:50:48PM +0800, Linus Walleij wrote:
-> On Wed, May 16, 2012 at 4:13 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> 
-> > With the patches going in via pinctrl tree, we can start making machine
-> > changes from next cycle.
-> 
-> Shawn are these patches OK with you? It'd be nice to have some
-> Acked-by: since they are quite big.
-> 
-Shawn said he's ok with it, but he's not available right now.
-Maybe you could hold a few hours to wait for his tag if needed.
+On Tue, May 15, 2012 at 10:00:51PM -0700, Turquette, Mike wrote:
+> On Mon, May 14, 2012 at 7:16 AM, Mark Brown
+> > The WM831x and WM832x series of PMICs contain a flexible clocking
+> > subsystem intended to provide always on and system core clocks. ?It
+> > features:
 
-Regards
-Dong Aisheng
+> Do you plan to rebase against my clk-next branch?  I've pushed your
+> clk_unregister patch there.
+
+I guess; I had removed the unregistration from the driver partly to
+split out the unregistration so the driver could get merged separately.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120516/f3b57a06/attachment.sig>
