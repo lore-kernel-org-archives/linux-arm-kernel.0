@@ -1,49 +1,94 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Tue, 15 May 2012 21:20:19 -0500
-Subject: [PATCH 0/3] OMAP: control: bootaddr and bootmod APIs
-In-Reply-To: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-References: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <CALLhW=6g59V7UMWMsaiCnr=UYuXo4CRZfpELosfk7xs5XevJTg@mail.gmail.com>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Tue, 15 May 2012 21:33:29 -0500
+Subject: [PATCH v4 0/7] cleanup imx5 idle, add imx5/6 cpuidle
+Message-ID: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2012 21:11, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> Recently a patch went in for tidspbridge code, to ioremap
-> SCM registers and solve a build break[1]. However it has
-> been pointed out before that this is a layer violation
-> given that control module should handle its own registers, this
-> series is an attempt to create APIs for the users of these
-> registers.
->
-> With some adaptations this patch might also make use of it:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg66491.html
->
-> Patch: staging: tidspbridge: use scm functions to set boot address and mode,
-> will be sent separately to staging tree.
->
-> Tested on OMAP3 Beagleboard.
->
-> [1] http://www.mail-archive.com/devel at linuxdriverproject.org/msg18762.html
->
-> Omar Ramirez Luna (3):
-> ?OMAP2+: control: new APIs to configure boot address and mode
-> ?OMAP: dsp: interface to control module functions
-> ?staging: tidspbridge: use scm functions to set boot address and mode
+Cleanup up imx5 idle code and enable imx5 low powe idle for imx53.
 
-Ping.
+Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6Q
+platform cpuidle implementation.
 
-It seems that I unconsciously copied the previous concept, recently I
-dug this thread to explain the reasoning of these patches:
+Based on v3.4-rc7 plus recently submitted/accepted MACHINE_INIT late_initcall
+ patch: http://www.spinics.net/lists/arm-kernel/msg171620.html
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38015.html
+v4 changes:
+ * Added several imx5 idle cleanups to series.
+ * Modified imx_io_p2v function to allow common imx5 AIPS2 bus virutal address
+ * Added comment to tzic_wakeup_enable().
+ * Movied imx5 idle code from mm-imx5.c to pm-imx5.c.
+ * Removed unnecessary time consuming code execution that ran on each idle
+   instance.
+ * modified imx5_pm_init to be a late_initcall
+ * added late_initcall to all imx53 MACHINE_START entries.
+ * enabled imx5 low power idle for imx53
+ * rebased cpuidle driver on top of imx5 cleanup changes.
+ * modified cpuidle driver exit time to reflect removal of unnecessary code
+   
 
-These were provided by Paul, one of them acked by Kevin, somehow they
-were not included and I forgot about them.
+v3 changes:
+ * removed file introduced in v1 no longer needed after v2 [per Shawn Guo]
+ * re-ordered added #includes in alphabetical order [per Shawn Guo]
+ * Remove if(!drv) check to allow handling by stack trace [per Sascha Hauer]
+ * Added missing return value in error meesage [per Shawn Guo]
+ * fixed (void *) casting problem pointed out Sasha Hauer.  Used a different
+   type of casting to properly give warning on improper casting:
+   	arm_pm_idle = (void (*)(void))imx5_idle;
+   Used this casting instead of adding a dummy caller function because
+   adding the dummy function appears to unnecessarily introduce the following
+   additional operations:
+	static void imx5_pm_idle(void)
+	{
+	  a0:	e1a0c00d 	mov	ip, sp
+	  a4:	e92dd800 	push	{fp, ip, lr, pc}
+	  a8:	e24cb004 	sub	fp, ip, #4
+		imx5_idle();
+	  ac:	ebffffd3 	bl	0 <imx5_idle>
+	}
+	  b0:	e89da800 	ldm	sp, {fp, sp, pc}
 
-My set also includes OMAP4 check, which I heard recently was tested
-with the dsp on pandaboard. If needed I can go back to Paul's version
-and re-spin them, with minor changes. Please let me know.
+http://permalink.gmane.org/gmane.linux.linaro.devel/11653
 
-Regards,
+v2 changes:
+ * Removed some unnecessary  spaces [per Jess Juhl]
+ * Added return value for an error message [per Sascha Hauer]
+ * Reworked init scheme to use device tree late_initcall [per Sascha and Shawn]
+ * Moved imx6q and imx5 cpuidle functionality to existing files.
 
-Omar
+https://lkml.org/lkml/2012/5/1/363
+
+v1 initial submission:
+
+https://lkml.org/lkml/2012/4/16/644
+
+Robert Lee (7):
+  ARM: imx: Modify IMX_IO_P2V macro
+  ARM: imx: Add comments to tzic_enable_waker()
+  ARM: imx: clean and consolidate imx5 suspend and idle code
+  ARM: imx: Enable imx53 low power idle
+  ARM: imx: Add common imx cpuidle init functionality.
+  ARM: imx: Add imx5 cpuidle
+  ARM: imx: Add imx6q cpuidle driver
+
+ arch/arm/mach-imx/clock-mx51-mx53.c       |    1 +
+ arch/arm/mach-imx/imx53-dt.c              |    1 +
+ arch/arm/mach-imx/mach-imx6q.c            |   19 ++++++
+ arch/arm/mach-imx/mach-mx53_ard.c         |    1 +
+ arch/arm/mach-imx/mach-mx53_evk.c         |    1 +
+ arch/arm/mach-imx/mach-mx53_loco.c        |    1 +
+ arch/arm/mach-imx/mach-mx53_smd.c         |    1 +
+ arch/arm/mach-imx/mm-imx5.c               |   25 ++-----
+ arch/arm/mach-imx/pm-imx5.c               |  103 +++++++++++++++++++++--------
+ arch/arm/plat-mxc/Makefile                |    1 +
+ arch/arm/plat-mxc/cpuidle.c               |   80 ++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h   |    4 +-
+ arch/arm/plat-mxc/include/mach/cpuidle.h  |   22 ++++++
+ arch/arm/plat-mxc/include/mach/hardware.h |   25 ++++---
+ arch/arm/plat-mxc/tzic.c                  |    4 ++
+ 15 files changed, 231 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+
+-- 
+1.7.10
