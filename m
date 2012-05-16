@@ -1,64 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 16 May 2012 18:35:30 +0800
-Subject: [PATCH 5/8] MXS: Add USB PHY driver
-In-Reply-To: <1337070219-3630-6-git-send-email-marex@denx.de>
-References: <1337070219-3630-1-git-send-email-marex@denx.de>
- <1337070219-3630-6-git-send-email-marex@denx.de>
-Message-ID: <20120516103529.GC22251@nchen-desktop>
+From: philippe.retornaz@epfl.ch (=?UTF-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Wed, 16 May 2012 12:48:24 +0200
+Subject: [PATCH] ASoC: imx-mc13783 cleanup
+In-Reply-To: <20120515183035.GG19592@opensource.wolfsonmicro.com>
+References: <20120515183035.GG19592@opensource.wolfsonmicro.com>
+Message-ID: <1337165304-22686-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 10:23:36AM +0200, Marek Vasut wrote:
-> Add driver that controls the built-in USB PHY in the i.MX233/i.MX28. This
-> enables the PHY upon powerup and shuts it down on shutdown.
-Please add i.mx6q .
-> 
-> +config USB_MXS_PHY
-> +	tristate "Freescale i.MX28 USB PHY support"
-> +	select USB_OTG_UTILS
-> +	select USB_IMX_COMPOSITE
-Seems you will not use imx_otg.c with chipidea framework.
-> + *
-> + * Freescale i.MX28 USB PHY driver.
-use mxs
-> + *
-> +
-> +	/* Enable FS/LS compatibility and wakeup IRQs. */
-> +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
-> +		BM_USBPHY_CTRL_ENIRQWAKEUP;
-> +
-> +	/* Enable IRQ sources. */
-> +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
-> +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
-Please forget wakeup function currently, as it will make things more
-complicated.
-> +
-> +	writel(val, x->io_priv + HW_USBPHY_CTRL_SET);
-> +
-> +	return 0;
-> +}
-> +
-> +	/* Disable FS/LS compatibility and wakeup IRQs. */
-> +	val = BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3 |
-> +		BM_USBPHY_CTRL_ENIRQWAKEUP;
-> +
-> +	/* Disable IRQ sources. */
-> +	val |= BM_USBPHY_CTRL_ENIDCHG_WKUP | BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
-> +		BM_USBPHY_CTRL_ENVBUSCHG_WKUP;
-> +
-The same with above
-> +
-> +MODULE_ALIAS("platform:mxs-usb-phy");
-> +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-> +MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
-mxs
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.7.10
-> 
-> 
 
+Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+---
+ sound/soc/fsl/imx-mc13783.c |    9 +--------
+ 1 files changed, 1 insertions(+), 8 deletions(-)
+
+diff --git a/sound/soc/fsl/imx-mc13783.c b/sound/soc/fsl/imx-mc13783.c
+index a7b7170..f59c349 100644
+--- a/sound/soc/fsl/imx-mc13783.c
++++ b/sound/soc/fsl/imx-mc13783.c
+@@ -37,14 +37,6 @@ static int imx_mc13783_hifi_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+ 	int ret;
+ 
+-	ret = snd_soc_dai_set_fmt(codec_dai, FMT_SSI);
+-	if (ret)
+-		return ret;
+-
+-	ret = snd_soc_dai_set_fmt(cpu_dai, FMT_SSI);
+-	if (ret)
+-		return ret;
+-
+ 	ret = snd_soc_dai_set_tdm_slot(codec_dai, 0xfffffffc, 0xfffffffc,
+ 					4, 16);
+ 	if (ret)
+@@ -75,6 +67,7 @@ static struct snd_soc_dai_link imx_mc13783_dai_mc13783[] = {
+ 		.platform_name	 = "imx-pcm-audio.0",
+ 		.ops		 = &imx_mc13783_hifi_ops,
+ 		.symmetric_rates = 1,
++		.dai_fmt 	 = FMT_SSI,
+ 	},
+ };
+ 
 -- 
-
-Best Regards,
-Peter Chen
+1.7.0.4
