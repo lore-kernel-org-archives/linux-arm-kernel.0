@@ -1,10 +1,10 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 16 May 2012 03:20:01 +0200
-Subject: [PATCH v1 3/7] usb: chipidea: add imx on-soc utmi phy driver
-In-Reply-To: <1337090303-16046-4-git-send-email-richard.zhao@freescale.com>
+Date: Wed, 16 May 2012 03:22:33 +0200
+Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
+In-Reply-To: <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
 References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <201205160320.01482.marex@denx.de>
+ <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
+Message-ID: <201205160322.33429.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,30 +12,34 @@ Dear Richard Zhao,
 
 > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > ---
->  drivers/usb/chipidea/Makefile       |    4 +
->  drivers/usb/chipidea/phy-imx-utmi.c |  140
-> +++++++++++++++++++++++++++++++++++ 2 files changed, 144 insertions(+), 0
+>  drivers/usb/chipidea/Makefile      |    2 +-
+>  drivers/usb/chipidea/ci13xxx_imx.c |  177
+> ++++++++++++++++++++++++++++++++++++ 2 files changed, 178 insertions(+), 1
 > deletions(-)
->  create mode 100644 drivers/usb/chipidea/phy-imx-utmi.c
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
 > 
 > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index cc34937..0f34c0c 100644
+> index 0f34c0c..6821385 100644
 > --- a/drivers/usb/chipidea/Makefile
 > +++ b/drivers/usb/chipidea/Makefile
-> @@ -12,3 +12,7 @@ endif
->  ifneq ($(CONFIG_ARCH_MSM),)
->  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+> @@ -14,5 +14,5 @@ ifneq ($(CONFIG_ARCH_MSM),)
 >  endif
-> +
-> +ifneq ($(CONFIG_ARCH_MXC),)
-> +	obj-$(CONFIG_USB_CHIPIDEA)	+= phy-imx-utmi.o
-> +endif
-> diff --git a/drivers/usb/chipidea/phy-imx-utmi.c
-> b/drivers/usb/chipidea/phy-imx-utmi.c new file mode 100644
-> index 0000000..f7a0fe7
+> 
+>  ifneq ($(CONFIG_ARCH_MXC),)
+> -	obj-$(CONFIG_USB_CHIPIDEA)	+= phy-imx-utmi.o
+> +	obj-$(CONFIG_USB_CHIPIDEA)	+= phy-imx-utmi.o ci13xxx_imx.o
+
+You're not actually supposed to use the UTMI PHY always. The PHY is separate 
+from the USB stuff, so maybe put it into drivers/usb/otg/ like I had my driver 
+placed?
+
+>  endif
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c
+> b/drivers/usb/chipidea/ci13xxx_imx.c new file mode 100644
+> index 0000000..5f36f07
 > --- /dev/null
-> +++ b/drivers/usb/chipidea/phy-imx-utmi.c
-> @@ -0,0 +1,140 @@
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -0,0 +1,177 @@
 > +/*
 > + * Copyright 2012 Freescale Semiconductor, Inc.
 > + *
@@ -48,94 +52,100 @@ Dear Richard Zhao,
 > + */
 > +
 > +#include <linux/module.h>
-> +#include <linux/kernel.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/clk.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/usb/ulpi.h>
+> +#include <linux/usb/gadget.h>
+> +#include <linux/usb/chipidea.h>
 > +#include <linux/usb/otg.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
+> +#include <linux/dma-mapping.h>
 > +
-> +#define DRIVER_NAME "imx_utmi"
+> +#include "ci.h"
 > +
-> +#define HW_USBPHY_PWD	(0x00000000)
+> +#define pdev_to_phy(pdev) \
+> +	((struct usb_phy *)platform_get_drvdata(pdev))
+> +
+> +static void ci13xxx_imx_notify_event(struct ci13xxx *udc, unsigned event)
+> +{
+> +#if 0
 
-Drop the braces here
+Woooo, what a big slab of dead code :-)
 
-> +#define HW_USBPHY_CTRL	0x00000030
+> +	struct device *dev = udc->gadget.dev.parent;
+> +	int val;
 > +
-> +#define BM_USBPHY_CTRL_SFTRST 0x80000000
-> +#define BM_USBPHY_CTRL_CLKGATE 0x40000000
-> +#define BM_USBPHY_CTRL_ENUTMILEVEL3 0x00008000
-> +#define BM_USBPHY_CTRL_ENUTMILEVEL2 0x00004000
+> +	switch (event) {
+> +	case CI13XXX_CONTROLLER_RESET_EVENT:
+> +		dev_dbg(dev, "CI13XXX_CONTROLLER_RESET_EVENT received\n");
+> +		writel(0, USB_AHBBURST);
+> +		writel(0, USB_AHBMODE);
+> +		break;
+> +	case CI13XXX_CONTROLLER_STOPPED_EVENT:
+> +		dev_dbg(dev, "CI13XXX_CONTROLLER_STOPPED_EVENT received\n");
+> +		/*
+> +		 * Put the transceiver in non-driving mode. Otherwise host
+> +		 * may not detect soft-disconnection.
+> +		 */
+> +		val = usb_phy_io_read(udc->transceiver, ULPI_FUNC_CTRL);
+> +		val &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
+> +		val |= ULPI_FUNC_CTRL_OPMODE_NONDRIVING;
+> +		usb_phy_io_write(udc->transceiver, val, ULPI_FUNC_CTRL);
+> +		break;
+> +	default:
+> +		dev_dbg(dev, "unknown ci13xxx_udc event\n");
+> +		break;
+> +	}
+> +#endif
+> +}
 > +
-> +struct imx_utmi_phy {
-> +	struct usb_phy phy;
-> +	struct clk *clk;
+> +static struct ci13xxx_udc_driver ci13xxx_imx_udc_driver = {
+> +	.name			= "ci13xxx_imx",
+> +	.flags			= CI13XXX_REGS_SHARED |
+> +				  CI13XXX_PULLUP_ON_VBUS |
+> +				  CI13XXX_DISABLE_STREAMING,
+> +	.capoffset		= 0x100,
+> +
+> +	.notify_event		= ci13xxx_imx_notify_event,
 > +};
 > +
-> +#define to_imx_phy(p) container_of((p), struct imx_utmi_phy, phy)
-> +
-> +static int imx_utmi_phy_init(struct usb_phy *phy)
+> +static int ci13xxx_imx_probe(struct platform_device *pdev)
 > +{
-> +	struct imx_utmi_phy *imx_phy;
-> +	u32 reg;
-> +
-> +	imx_phy = to_imx_phy(phy);
-> +
-> +	clk_prepare_enable(imx_phy->clk);
-> +
-> +	reg = readl_relaxed(phy->io_priv + HW_USBPHY_CTRL);
-> +	reg &= ~BM_USBPHY_CTRL_CLKGATE;
-> +	writel_relaxed(reg, phy->io_priv + HW_USBPHY_CTRL);
-> +
-> +	/* Reset USBPHY module */
-> +	reg = readl_relaxed(phy->io_priv + HW_USBPHY_CTRL);
-> +	reg |= BM_USBPHY_CTRL_SFTRST;
-> +	writel_relaxed(reg, phy->io_priv + HW_USBPHY_CTRL);
-> +	udelay(10);
-> +
-> +	/* Remove CLKGATE and SFTRST */
-> +	reg = readl_relaxed(phy->io_priv + HW_USBPHY_CTRL);
-> +	reg &= ~(BM_USBPHY_CTRL_CLKGATE | BM_USBPHY_CTRL_SFTRST);
-> +	writel_relaxed(reg, phy->io_priv + HW_USBPHY_CTRL);
-> +	udelay(10);
-
-You might want to check my PHY driver for the proper init sequence ... it uses 
-mxs_reset_block() (or maybe there's already stmp_reset_block() ? )
-
-> +
-> +	/* Power up the PHY */
-> +	writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
-> +	/* enable FS/LS device */
-> +	reg = readl_relaxed(phy->io_priv + HW_USBPHY_CTRL);
-> +	reg |= BM_USBPHY_CTRL_ENUTMILEVEL2 | BM_USBPHY_CTRL_ENUTMILEVEL3;
-> +	writel_relaxed(reg, phy->io_priv + HW_USBPHY_CTRL);
-
-Well, you can retrieve this from my PHY driver ;-)
-
-> +
-> +	return 0;
-> +}
-> +
-> +static void imx_utmi_phy_shutdown(struct usb_phy *phy)
-> +{
-> +	struct imx_utmi_phy *imx_phy;
-> +
-> +	imx_phy = to_imx_phy(phy);
-> +	clk_disable_unprepare(imx_phy->clk);
-
-You forgot to disable the PHY here ... pull it out of my patchset and be done 
-with it ;-)
-
-> +}
-> +
-> +static int imx_utmi_probe(struct platform_device *pdev)
-> +{
+> +	struct platform_device *plat_ci, *phy_pdev;
+> +	struct device_node *phy_np;
 > +	struct resource *res;
-> +	void __iomem *base;
-> +	struct clk *clk;
-> +	struct imx_utmi_phy *imx_phy;
+> +	int hub_reset, vbus_pwr;
+> +	int ret;
+> +
+> +	dev_dbg(&pdev->dev, "ci13xxx_imx_probe\n");
+> +
+> +	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+> +	if (phy_np) {
+> +		phy_pdev = of_find_device_by_node(phy_np);
+> +		if (phy_pdev) {
+> +			struct usb_phy *phy;
+> +			phy = pdev_to_phy(phy_pdev);
+> +			if (phy)
+> +				usb_phy_init(phy);
+> +		}
+> +		of_node_put(phy_np);
+> +	}
+> +
+> +	hub_reset = of_get_named_gpio(pdev->dev.of_node, "fsl,hub-reset", 0);
+> +	if (hub_reset > 0 &&
+> +	    devm_gpio_request(&pdev->dev, hub_reset, "hub-reset")) {
+> +		gpio_direction_output(hub_reset, 0);
+> +		udelay(10);
+> +		gpio_direction_output(hub_reset, 1);
+> +	}
+> +
+> +	/* we only support host now, so enable vbus here */
+> +	vbus_pwr = of_get_named_gpio(pdev->dev.of_node, "fsl,vbus-power", 0);
+> +	if (vbus_pwr > 0 &&
+> +	    devm_gpio_request(&pdev->dev, vbus_pwr, "vbus-pwr")) {
+> +		gpio_direction_output(vbus_pwr, 1);
+> +	}
 > +
 > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 > +	if (!res) {
@@ -143,54 +153,79 @@ with it ;-)
 > +		return -ENOENT;
 > +	}
 > +
-> +	base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!base)
-> +		return -EBUSY;
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	imx_phy = devm_kzalloc(&pdev->dev, sizeof(*imx_phy), GFP_KERNEL);
-> +	if (!imx_phy)
+> +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
+> +	if (!plat_ci) {
+> +		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
 > +		return -ENOMEM;
+> +	}
 > +
-> +	imx_phy->phy.io_priv = base;
-> +	imx_phy->phy.dev = &pdev->dev;
-> +	imx_phy->phy.label = DRIVER_NAME;
-> +	imx_phy->phy.init = imx_utmi_phy_init;
-> +	imx_phy->phy.shutdown = imx_utmi_phy_shutdown;
-> +	imx_phy->clk = clk;
-> +	platform_set_drvdata(pdev, &imx_phy->phy);
+> +	ret = platform_device_add_resources(plat_ci, pdev->resource,
+> +					    pdev->num_resources);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "can't add resources to platform device\n");
+> +		goto put_platform;
+> +	}
+> +
+> +	ret = platform_device_add_data(plat_ci, &ci13xxx_imx_udc_driver,
+> +				       sizeof(ci13xxx_imx_udc_driver));
+> +	if (ret)
+> +		goto put_platform;
+> +
+> +	plat_ci->dev.dma_mask =
+> +		kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+
+Can this not be devm_kzalloc()ated?
+
+> +	if (!plat_ci->dev.dma_mask) {
+> +		ret = -ENOMEM;
+> +		goto put_platform;
+> +	}
+> +	*plat_ci->dev.dma_mask = DMA_BIT_MASK(32);
+> +	plat_ci->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +
+> +	ret = platform_device_add(plat_ci);
+> +	if (ret)
+> +		goto free_dma_mask;
+> +
+> +	pm_runtime_no_callbacks(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
 > +
 > +	return 0;
+> +
+> +free_dma_mask:
+> +	kfree(plat_ci->dev.dma_mask);
+> +	plat_ci->dev.dma_mask = NULL;
+> +put_platform:
+> +	platform_device_put(plat_ci);
+> +
+> +	return ret;
 > +}
 > +
-> +static const struct of_device_id imx_utmi_dt_ids[] = {
-> +	{ .compatible = "fsl,imx6q-usbphy", },
+> +static const struct of_device_id ci13xxx_imx_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6q-usboh3", },
 > +	{ /* sentinel */ }
 > +};
 > +
-> +static struct platform_driver imx_utmi_driver = {
-> +	.probe = imx_utmi_probe,
+> +static struct platform_driver ci13xxx_imx_driver = {
+> +	.probe = ci13xxx_imx_probe,
 > +	.driver = {
-> +		.name = DRIVER_NAME,
-> +		.of_match_table = imx_utmi_dt_ids,
+> +		.name = "imx_usboh3",
+> +		.of_match_table = ci13xxx_imx_dt_ids,
+
+you're missing .remove() call here, check my implementation ;-)
+
 > +	 },
 > +};
 > +
-> +static int __init imx_utmi_init(void)
-> +{
-> +	return platform_driver_register(&imx_utmi_driver);
-> +}
-> +postcore_initcall(imx_utmi_init);
+> +MODULE_ALIAS("platform:imx_usboh3");
 > +
-> +static void __exit imx_utmi_exit(void)
+> +static int __init ci13xxx_imx_init(void)
 > +{
-> +	platform_driver_unregister(&imx_utmi_driver);
+> +	return platform_driver_register(&ci13xxx_imx_driver);
 > +}
+> +module_init(ci13xxx_imx_init);
 
-module_platform_driver() will make this clearer ... check my ci13xxx_mxs.c 
-binding glue for usage.
+module_platform_driver().
 
-> +module_exit(imx_utmi_exit);
+> +
+> +MODULE_LICENSE("GPL v2");
