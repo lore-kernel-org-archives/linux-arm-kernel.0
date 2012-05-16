@@ -1,39 +1,34 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 16 May 2012 11:28:17 -0700
-Subject: [PATCHv2 02/19] ARM: OMAP4: Add SAR ROM base address
-In-Reply-To: <1336990730-26892-3-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 14 May 2012 13:18:33 +0300")
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-3-git-send-email-t-kristo@ti.com>
-Message-ID: <87zk98dlq6.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 May 2012 15:57:44 +0000
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+Message-ID: <201205161557.45362.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+On Wednesday 16 May 2012, Alexey Zaytsev wrote:
+> Hey.
+> 
+> With all the ARM tree rework, I'm wondering, what would be a good (and
+> simple) sub-architecture on which to base new ports. The target is a
+> somewhat dated chip used in ADSL routers, so no DT, or multiplatform.
+> I'm looking at ixp4xx, because I'm somewhat familiar with the
+> platform, but is it a good reference?
 
-> Added in preparation for device off mode. SAR ROM contains the mapping
-> from SAR RAM to IO registers, and this will eventually be parsed during
-> init time to do the reverse before device off.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+For a new subarchitecture, using DT is required, but it should not make
+your work harder. spear3xx/6xx is a good example of an older platform
+that was recently converted (take the arm-soc tree as a base, it contains
+the latest version).
 
-This should be combined with the patch that uses the #define.
+Another good one would be highbank, but that contains a lot of stuff you
+don't need.
 
-Kevin
+ixp4xx is not very actively maintained, so I would not use that as
+a base.
 
-> ---
->  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-> index c0d478e..1a45700 100644
-> --- a/arch/arm/plat-omap/include/plat/omap44xx.h
-> +++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-> @@ -46,6 +46,7 @@
->  #define OMAP44XX_MCPDM_BASE		0x40132000
->  #define OMAP44XX_MCPDM_L3_BASE		0x49032000
->  #define OMAP44XX_SAR_RAM_BASE		0x4a326000
-> +#define OMAP44XX_SAR_ROM_BASE		0x4a05e000
->  
->  #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
->  #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
+What platform are you talking about? I know of a few people that are
+working on getting older platforms ported to Linux, so maybe someone
+is already working on a port.
+
+	Arnd
