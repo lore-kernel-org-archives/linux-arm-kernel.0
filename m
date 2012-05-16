@@ -1,19 +1,18 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 16 May 2012 08:58:27 +0800
-Subject: [PATCH 3/8] MXS: Fixup i.MX233 USB base address name
-In-Reply-To: <1337070219-3630-4-git-send-email-marex@denx.de>
+Date: Wed, 16 May 2012 09:00:43 +0800
+Subject: [PATCH 4/8] MXS: Add data shared between imx-otg and EHCI driver
+In-Reply-To: <1337070219-3630-5-git-send-email-marex@denx.de>
 References: <1337070219-3630-1-git-send-email-marex@denx.de>
- <1337070219-3630-4-git-send-email-marex@denx.de>
-Message-ID: <20120516005826.GH29393@b20223-02.ap.freescale.net>
+ <1337070219-3630-5-git-send-email-marex@denx.de>
+Message-ID: <20120516010042.GI29393@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 10:23:34AM +0200, Marek Vasut wrote:
-> Modify USB EHCI and USB PHY base addresses on the i.MX233 to nicely fit into the
-> whole USB registration scheme.
-> 
-> Based on code by:
-> Tony Lin <tony.lin@freescale.com>
+On Tue, May 15, 2012 at 10:23:35AM +0200, Marek Vasut wrote:
+> This patch adds common data shared between the MXS EHCI HCD driver,
+> the MXS USB Gadget driver and the imx-otg driver. These data allow
+> passing clock and memory stuff from imx-otg driver into the
+> host/gadget driver.
 > 
 > Signed-off-by: Marek Vasut <marex@denx.de>
 > Cc: Chen Peter-B29397 <B29397@freescale.com>
@@ -29,39 +28,59 @@ On Tue, May 15, 2012 at 10:23:34AM +0200, Marek Vasut wrote:
 > Cc: Subodh Nijsure <snijsure@grid-net.com>
 > Cc: Wolfgang Denk <wd@denx.de>
 > ---
->  arch/arm/mach-mxs/include/mach/mx23.h |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  include/linux/usb/mxs-usb.h |   39 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 include/linux/usb/mxs-usb.h
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
-> index 599094b..7955b75 100644
-> --- a/arch/arm/mach-mxs/include/mach/mx23.h
-> +++ b/arch/arm/mach-mxs/include/mach/mx23.h
-> @@ -64,8 +64,8 @@
->  #define MX23_AUART1_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06c000)
->  #define MX23_AUART2_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x06e000)
->  #define MX23_DUART_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x070000)
-> -#define MX23_USBPHY_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
-> -#define MX23_USBCTRL_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
-> +#define MX23_USBPHY0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x07c000)
-> +#define MX23_USBCTRL0_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x080000)
-Why not migrate to DT?
+> diff --git a/include/linux/usb/mxs-usb.h b/include/linux/usb/mxs-usb.h
+> new file mode 100644
+> index 0000000..2678700
+> --- /dev/null
+> +++ b/include/linux/usb/mxs-usb.h
+> @@ -0,0 +1,39 @@
+> +/*
+> + * include/linux/usb/mxs-usb.h
+> + *
+> + * Freescale i.MX USB driver shared data.
+> + *
+> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> + * on behalf of DENX Software Engineering GmbH
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> + */
+> +
+> +#ifndef __INCLUDE_LINUX_USB_MXS_USB_H__
+> +#define __INCLUDE_LINUX_USB_MXS_USB_H__
+> +
+> +#include <linux/types.h>
+> +#include <linux/usb/otg.h>
+> +
+> +struct mxs_usb_platform_data {
+> +	uint32_t		gpio_vbus;
+> +	bool			gpio_vbus_inverted;
+> +};
+hmm..., people don't like platform data. DT?
 
 Thanks
 Richard
->  #define MX23_DRAM_BASE_ADDR		(MX23_IO_BASE_ADDR + 0x0e0000)
->  
->  #define MX23_IO_P2V(x)			MXS_IO_P2V(x)
-> @@ -89,8 +89,8 @@
->  #define MX23_INT_SPDIF_ERROR		10
->  #define MX23_INT_SAIF1_IRQ		10
->  #define MX23_INT_SAIF2_IRQ		10
-> -#define MX23_INT_USB_CTRL		11
-> -#define MX23_INT_USB_WAKEUP		12
-> +#define MX23_INT_USB0			11
-> +#define MX23_INT_USB0_WAKEUP		12
->  #define MX23_INT_GPMI_DMA		13
->  #define MX23_INT_SSP1_DMA		14
->  #define MX23_INT_SSP1_ERROR		15
+> +
+> +struct mxs_ci13xxx_phy_notify {
+> +	bool			discon;
+> +};
+> +
+> +#endif /* __INCLUDE_LINUX_USB_MXS_USB_H__ */
 > -- 
 > 1.7.10
 > 
