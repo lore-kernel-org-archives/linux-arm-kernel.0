@@ -1,149 +1,93 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 15 May 2012 21:33:34 -0500
-Subject: [PATCH v4 5/7] ARM: imx: Add common imx cpuidle init functionality.
+Date: Tue, 15 May 2012 21:33:35 -0500
+Subject: [PATCH v4 6/7] ARM: imx: Add imx5 cpuidle
 In-Reply-To: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
 References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1337135616-8988-6-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337135616-8988-7-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add common cpuidle init functionality that can be used by various
-imx platforms.
+Add cpuidle driver for imx5 platform.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/plat-mxc/Makefile               |    1 +
- arch/arm/plat-mxc/cpuidle.c              |   80 ++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/cpuidle.h |   22 ++++++++
- 3 files changed, 103 insertions(+)
- create mode 100644 arch/arm/plat-mxc/cpuidle.c
- create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+ arch/arm/mach-imx/pm-imx5.c |   44 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index e81290c..63b064b 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-+obj-$(CONFIG_CPU_IDLE) += cpuidle.o
- ifdef CONFIG_SND_IMX_SOC
- obj-y += ssi-fiq.o
- obj-y += ssi-fiq-ksym.o
-diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
-new file mode 100644
-index 0000000..d4cb511
---- /dev/null
-+++ b/arch/arm/plat-mxc/cpuidle.c
-@@ -0,0 +1,80 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index 6e62d79..966c71b 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -12,10 +12,12 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/err.h>
++#include <linux/export.h>
+ #include <asm/cacheflush.h>
+ #include <asm/system_misc.h>
+ #include <asm/tlbflush.h>
+ #include <mach/common.h>
++#include <mach/cpuidle.h>
+ #include <mach/hardware.h>
+ #include "crm-regs-imx5.h"
+ 
+@@ -134,12 +136,48 @@ static const struct platform_suspend_ops mx5_suspend_ops = {
+ 	.enter = mx5_suspend_enter,
+ };
+ 
+-static void imx5_pm_idle(void)
++static inline int imx5_cpu_do_idle(void)
+ {
+-	if (likely(!tzic_enable_wake()))
++	int ret = tzic_enable_wake();
 +
-+#include <linux/cpuidle.h>
-+#include <linux/err.h>
-+#include <linux/hrtimer.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
++	if (likely(!ret))
+ 		cpu_do_idle();
 +
-+static struct cpuidle_device __percpu * imx_cpuidle_devices;
-+
-+static void __init imx_cpuidle_devices_uninit(void)
-+{
-+	int cpu_id;
-+	struct cpuidle_device *dev;
-+
-+	for_each_possible_cpu(cpu_id) {
-+		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-+		cpuidle_unregister_device(dev);
-+	}
-+
-+	free_percpu(imx_cpuidle_devices);
-+}
-+
-+int __init imx_cpuidle_init(struct cpuidle_driver *drv)
-+{
-+	struct cpuidle_device *dev;
-+	int cpu_id, ret;
-+
-+	if (drv->state_count > CPUIDLE_STATE_MAX) {
-+		pr_err("%s: state_count exceeds maximum\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
-+			 __func__, ret);
-+		return ret;
-+	}
-+
-+	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-+	if (imx_cpuidle_devices == NULL) {
-+		ret = -ENOMEM;
-+		goto unregister_drv;
-+	}
-+
-+	/* initialize state data for each cpuidle_device */
-+	for_each_possible_cpu(cpu_id) {
-+		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
-+		dev->cpu = cpu_id;
-+		dev->state_count = drv->state_count;
-+
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("%s: Failed to register cpu %u, error: %d\n",
-+				__func__, cpu_id, ret);
-+			goto uninit;
-+		}
-+	}
-+
-+	return 0;
-+
-+uninit:
-+	imx_cpuidle_devices_uninit();
-+
-+unregister_drv:
-+	cpuidle_unregister_driver(drv);
 +	return ret;
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
-new file mode 100644
-index 0000000..bc932d1
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/cpuidle.h>
-+
-+#ifdef CONFIG_CPU_IDLE
-+extern int imx_cpuidle_init(struct cpuidle_driver *drv);
-+#else
-+static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
+ }
+ 
++static void imx5_pm_idle(void)
 +{
-+	return -ENODEV;
++	imx5_cpu_do_idle();
 +}
-+#endif
++
++static int imx5_cpuidle_enter(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv, int idx)
++{
++	int ret;
++
++	ret = imx5_cpu_do_idle();
++	if (ret < 0)
++		return ret;
++
++	return idx;
++}
++
++static struct cpuidle_driver imx5_cpuidle_driver = {
++	.name			= "imx5_cpuidle",
++	.owner			= THIS_MODULE,
++	.en_core_tk_irqen	= 1,
++	.states[0]	= {
++		.enter			= imx5_cpuidle_enter,
++		.exit_latency		= 2,
++		.target_residency	= 1,
++		.flags			= CPUIDLE_FLAG_TIME_VALID,
++		.name			= "IMX5 SRPG",
++		.desc			= "CPU state retained,powered off",
++	},
++	.state_count		= 1,
++};
++
+ int __init imx5_pm_init(void)
+ {
+ 	int ret;
+@@ -160,5 +198,5 @@ int __init imx5_pm_init(void)
+ 	/* Set the registers to the default cpu idle state. */
+ 	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+ 
+-	return 0;
++	return imx_cpuidle_init(&imx5_cpuidle_driver);
+ }
 -- 
 1.7.10
