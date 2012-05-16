@@ -1,33 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 May 2012 15:21:52 +0900
-Subject: [PATCH 2/2] ARM: S3C64XX: Hook up carrier class modules on
- Cragganmore
-In-Reply-To: <20120515173706.GD4140@opensource.wolfsonmicro.com>
-References: <1337016041-16096-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1337016041-16096-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <07fc01cd3278$dbbf63f0$933e2bd0$%kim@samsung.com>
- <20120515173706.GD4140@opensource.wolfsonmicro.com>
-Message-ID: <093301cd332c$2ed6d060$8c847120$%kim@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 May 2012 23:35:02 -0700
+Subject: [PATCH 2/4] ARM: dt: tegra20.dtsi: Add Memory Controller(MC) nodes
+In-Reply-To: <1336635764-30597-2-git-send-email-hdoyu@nvidia.com>
+References: <1336635764-30597-1-git-send-email-hdoyu@nvidia.com>
+ <1336635764-30597-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <CAOesGMiPvw72006zpSGLBNi-C12MTc_w2QmOPg6YTfXMW+ZSkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Tue, May 15, 2012 at 05:58:12PM +0900, Kukjin Kim wrote:
-> 
-> > Looks good to me, but there is no '{ I2C_BOARD_INFO("wlf-gf-module",
-> 0x20) },' in my tree.
-> 
-> > Just adding address 0x22 stuff is enough now?
-> 
-> Yes, it is - sorry, context diff for another project.
+Hi,
 
-OK, no problem.
+Tiny drive-by nit pick.
 
-Applied and thanks.
+On Thu, May 10, 2012 at 12:42 AM, Hiroshi DOYU <hdoyu@nvidia.com> wrote:
+> Add Tegra MC(Memory Controller) nodes for tegra20.dtsi.
+>
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> ---
+> ?arch/arm/boot/dts/tegra20.dtsi | ? ?7 +++++++
+> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 24129fb..548b42e 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -211,5 +211,12 @@
+> ? ? ? ? ? ? ? ?compatible = "nvidia,tegra20-ahb";
+> ? ? ? ? ? ? ? ?reg = <0x6000c004 0x10c>; /* AHB Arbitration + Gizmo Controller */
+> ? ? ? ?};
+> +
+> + ? ? ? mc {
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+It's common to use a more plain english name here, so
+"memory-controller" would be a good name.
+
+
+
+-Olof
