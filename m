@@ -1,99 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 20:52:46 +0000
-Subject: [GIT PULL][for 3.5] clk-next update
-In-Reply-To: <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
-References: <20120516063552.GA5154@gmail.com>
- <201205161839.03269.arnd@arndb.de>
- <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
-Message-ID: <201205162052.46513.arnd@arndb.de>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 17 May 2012 02:46:38 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201205161942.20296.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FB3D294.4020505@wwwdotorg.org>
+ <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
+ <201205161942.20296.arnd@arndb.de>
+Message-ID: <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Olof Johansson wrote:
-> 
-> Are you planning on sending the last couple of fixes out before
-> wrapping things up? If I haven't seen a request go out by tomorrow
-> I'll do it, I suppose.
+On 17 May 2012 01:12, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> Generic binding to provide a way to provide the client-channel map and
+>> other dmac specific parameters to the dma controller driver
+>>
+>> DMA Model:-
+>> ? Only the most common characteristics of a dma setup are assumed
+>> in this binding.
+>> Client: Some h/w controller that could request a DMA controller in
+>> the system to perform data transfer on its behalf. Example SPI, MMC,
+>> I2S etc.
+>> DMAC: A DMA Controller instance. Example, PL330, PL08X, SDMA etc.
+>>
+>> ?The assumed model of the DMAC, in this binding, has P peripheral
+>> interfaces (P request signals) that could request a data transfer
+>> and C physical channels that actually do the data transfers, hence,
+>> at most C out of P peripherals could be served by the DMAC at any
+>> point of time. Usually C := P, but not always. Usually, any of the
+>> physical channels could be employed by the DMAC driver to serve any
+>> client.
+>> ?The DMAC driver identifies a client by its i/f number, 'peri_id'
+>> on the given DMAC. For example, TX for SPI has 7th while RX_TX
+>> (half-duplex) for MMC has 10th peripheral interface (request-signal)
+>> on a given DMAC. Usually, any of the physical channels could be
+>> employed by the DMAC driver to serve a client.
+>
+Btw, just to be clear... this is not _my_ setup.
+The dma controller manuals might use different terms but underneath
+most(if not all) dma controllers fit this model. At lease every dmac
+on Samsung SoCs and ARM's PL330 and PL08x does.
+In fact, I have trouble imaging some dmac not conforming to this model...
+but then again it could be just me.
 
-I was planning to, but it's getting rather late here in Germany
-so maybe you can take care of this, too.
 
-I've just fixed up two of the next/* branches that caused build regressions
-(one was my fault, the other one came from samsung/board2) and started
-building the defconfigs for linux-next, which looks rather bad, so I probably
-won't spend much time trying to fix them up, see below for how far I got.
+> I'm still anything but convinced by this model. Basically it's the
+> exact opposite of what we do for every other subsystem (irq, pinctrl,
+> regulator, gpio, ...), where the device using some infrastructure
+> contains the information about who provides it, whereas here you
+> move all the information into the device that provides the functionality,
+> and have no handle in the device using it by which the driver can
+> identify it.
+>
+The idea was that a client shouldn't need to know/tell which dma controller
+serves it or which peripheral interface of a dma controller.
+I think in future third-party device IPs, like ARM's Primecell, are only gonna
+get more common so it makes even more sense.
 
-	Arnd
 
-----
-acs5k_defconfig
-acs5k_defconfig
-  Generating include/generated/mach-types.h
-/home/arnd/linux-arm/arch/arm/mm/dma-mapping.c: In function 'arm_dma_alloc':
-/home/arnd/linux-arm/arch/arm/mm/dma-mapping.c:675:15: error: 'page' may be used uninitialized in this function [-Werror=uninitialized]
-cc1: all warnings being treated as errors
-make[2]: *** [arch/arm/mm/dma-mapping.o] Error 1
-make[1]: *** [arch/arm/mm] Error 2
-make[1]: *** Waiting for unfinished jobs....
-/home/arnd/linux-arm/kernel/user.c:30:4: error: this decimal constant is unsigned only in ISO C90 [-Werror]
-/home/arnd/linux-arm/kernel/user.c:38:4: error: this decimal constant is unsigned only in ISO C90 [-Werror]
-cc1: all warnings being treated as errors
-acs5k_tiny_defconfig
-afeb9260_defconfig
-ag5evm_defconfig
-/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh73a0.c: In function 'sh73a0_clock_init':
-/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh73a0.c:615:3: error: 'sh_clk_mstp32_register' is deprecated (declared at /home/arnd/linux-arm/include/linux/sh_clk.h:138) [-Werror=deprecated-declarations]
-cc1: all warnings being treated as errors
-make[2]: *** [arch/arm/mach-shmobile/clock-sh73a0.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [arch/arm/mach-shmobile] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [sub-make] Error 2
-am200epdkit_defconfig
-ap4evb_defconfig
-/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh7372.c: In function 'sh7372_clock_init':
-/home/arnd/linux-arm/arch/arm/mach-shmobile/clock-sh7372.c:707:3: error: 'sh_clk_mstp32_register' is deprecated (declared at /home/arnd/linux-arm/include/linux/sh_clk.h:138) [-Werror=deprecated-declarations]
-cc1: all warnings being treated as errors
-make[2]: *** [arch/arm/mach-shmobile/clock-sh7372.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [arch/arm/mach-shmobile] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [sub-make] Error 2
-armadillo800eva_defconfig
-assabet_defconfig
-at91_dt_defconfig
-/home/arnd/linux-arm/drivers/usb/gadget/at91_udc.c: In function 'at91_ep_enable':
-/home/arnd/linux-arm/drivers/usb/gadget/at91_udc.c:478:18: error: 'struct at91_ep' has no member named 'desc'
-make[4]: *** [drivers/usb/gadget/at91_udc.o] Error 1
-make[4]: *** Waiting for unfinished jobs....
-make[3]: *** [drivers/usb/gadget] Error 2
-make[3]: *** Waiting for unfinished jobs....
-make[2]: *** [drivers/usb] Error 2
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [drivers] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [sub-make] Error 2
-at91rm9200_defconfig
-at91sam9260_defconfig
-at91sam9261_defconfig
-at91sam9263_defconfig
-/home/arnd/linux-arm/fs/fuse/control.c: In function 'fuse_conn_congestion_threshold_write':
-/home/arnd/linux-arm/fs/fuse/control.c:165:29: error: 'val' may be used uninitialized in this function [-Werror=uninitialized]
-/home/arnd/linux-arm/fs/fuse/control.c: In function 'fuse_conn_max_background_write':
-/home/arnd/linux-arm/fs/fuse/control.c:128:23: error: 'val' may be used uninitialized in this function [-Werror=uninitialized]
-cc1: all warnings being treated as errors
-make[3]: *** [fs/fuse/control.o] Error 1
-make[2]: *** [fs/fuse] Error 2
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [fs] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [sub-make] Error 2
-at91sam9g20_defconfig
-at91sam9g45_defconfig
-at91sam9rl_defconfig
-at91x40_defconfig
-badge4_defconfig
-bcmring_defconfig
-bcmring_defconfig.rej
-bonito_defconfig
-cam60_defconfig
+> I believe that it can work and that it solves the problem you are
+> faced with at minimal complexity, but you put the burden of this
+> complexity on everybody who does not have this issue, and make
+> the general binding confusing and harder to read.
+>
+I am sorry if I gave you the wrong impression, but I didn't intend to just
+scratch my personal itch. I truly believed I and Stephen reached a generic
+solution i.e, as much as it could be.
+
+
+> It also adds much more data to the device tree (in source and binary form)
+> because you need to describe every device using a dma controller
+> and have a label to reference it.
+>
+I don't see why one can't add entries to chan-map as and when more
+clients appear for the DMAC ? It should be perfectly ok to specify less
+than the maximum possible clients in chan-map.
+Requiring labels - yes, doesn't sound very nice, but many nodes already do.
+
+> More importantly, you make it very hard to add devices in a board file
+> to a dma controller that already has descriptions for some channels,
+> because you cannot easily extend the chan-map unless you rewrite all of it.
+>
+I am not sure I understand the point.
+
+> We really need something simpler than this for the common case.
+> I have already made suggestions for how to make it still possible
+> to cover the corner case of multiple dma engines connected to the
+> same slave, which would keep the complexity local to those devices
+> that actually need it.
+>
+Thanks $DEITY, I posted a preview. Maybe I should put it on hold.
+And thank you for speaking up immediately. Really!
