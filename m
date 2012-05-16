@@ -1,51 +1,70 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 16 May 2012 14:24:02 +0200
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <20120516110451.GA9571@n2100.arm.linux.org.uk>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
-Message-ID: <4FB39C62.3030305@antcom.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 16 May 2012 18:01:31 +0530
+Subject: [PATCHv5 3/8] ARM: OMAP4460: Workaround for ROM bug because of
+ CA9 r2pX gic control register change
+In-Reply-To: <1336989796-26594-4-git-send-email-t-kristo@ti.com>
+References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
+ <1336989796-26594-4-git-send-email-t-kristo@ti.com>
+Message-ID: <4FB39E23.6060706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tero,
 
-On 05/16/2012 01:04 PM, Russell King - ARM Linux wrote:
-> This series removes the dependence on the dma_slave_config direction
-> argument for the PL08x DMA engine driver, and in doing so, we end up
-> with less code in the driver.
+On Monday 14 May 2012 03:33 PM, Tero Kristo wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> We now compute the cctl values for both directions, and continue to
-> select the appropriate one at prepare time.  If this is found to be
-> invalid, the prepare function will return NULL.
-> 
-> However, we still use the direction argument in the slave configuration
-> call to determine whether we should report and fail an invalid
-> configuration.  Eventually this will be removed.
-> 
-> * This has only been compile tested.  Test feedback welcomed. *
-> 
->  drivers/dma/amba-pl08x.c   |  196 +++++++++++++++++++++++++++++---------------
->  include/linux/amba/pl08x.h |   84 +------------------
->  2 files changed, 134 insertions(+), 146 deletions(-)
-> 
+> GIC distributor control register has changed between CortexA9 r1pX and
+> r2pX. The Control Register secure banked version is now composed of 2
+> bits:
+>      bit 0 == Secure Enable
+>      bit 1 == Non-Secure Enable
 
-After applying series 1-6 (as well as with 1-7), my just posted LPC32xx
-NAND drivers have problems mounting the MTD (basically, NAND page reads,
-DMA dev to mem from NAND controller internal buffers).
+[..]
 
-* SLC driver says:
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> index deffbf1..c3eb9e8 100644
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -33,6 +33,7 @@
+>  
+>  /* SCU base address */
+>  static void __iomem *scu_base;
+> +bool omap4_smp_romcode_errata;
+>  
+>  static DEFINE_SPINLOCK(boot_lock);
+>  
+> @@ -104,6 +105,24 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	 *	4.3.4.2 Power States of CPU0 and CPU1
+>  	 */
+>  	if (booted) {
+> +		/*
+> +		 * GIC distributor control register has changed between
+> +		 * CortexA9 r1pX and r2pX. The Control Register secure
+> +		 * banked version is now composed of 2 bits:
+> +		 * bit 0 == Secure Enable
+> +		 * bit 1 == Non-Secure Enable
+> +		 * The Non-Secure banked register has not changed
+> +		 * Because the ROM Code is based on the r1pX GIC, the CPU1
+> +		 * GIC restoration will cause a problem to CPU0 Non-Secure SW.
+> +		 * The workaround must be:
+> +		 * 1) Before doing the CPU1 wakeup, CPU0 must disable
+> +		 * the GIC distributor
+> +		 * 2) CPU1 must re-enable the GIC distributor on
+> +		 * it's wakeup path.
+> +		 */
+> +		if (omap4_smp_romcode_errata)
+For safety, disable local IRQ here.
+		local_irq_disable();
+> +			gic_dist_disable();
+> +
+And CPU0 needs to wait here till CPU1 re-enables the distributor
+to avoid any random issues.
 
-lpc32xx-nand 20020000.flash: FIFO not empty!
-lpc32xx-nand 20020000.flash: FIFO held data too long
-lpc32xx-nand 20020000.flash: DMA FIFO failure
+The BUG is applicable for CPUIDLE as well with MPUSS OSWR state, but
+we can fix the idle in another patch to avoid dependency.
+Basically above 3 lines should also be part of idle code where we
+wakeup the CPU1 using force wakeup.
 
-* MLC driver just gets bad data resulting in detected bad blocks.
-
-Without the patches, they work as tested.
-
-Any hints, before I find the time to sort out all the details with
-amba-pl08x?
-
-Thanks,
-
-Roland
+Regards
+Santosh
