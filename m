@@ -1,33 +1,92 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 16 May 2012 15:45:07 +0900
-Subject: [PATCH 02/08] ARM: Undelete KZM9D mach-type V3
+Date: Wed, 16 May 2012 15:45:16 +0900
+Subject: [PATCH 03/08] mach-shmobile: KZM9D board support V3
 In-Reply-To: <20120516064449.32286.77941.sendpatchset@w520>
 References: <20120516064449.32286.77941.sendpatchset@w520>
-Message-ID: <20120516064507.32286.10714.sendpatchset@w520>
+Message-ID: <20120516064516.32286.75037.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Undelete the KZM9D mach-type to allow build of board
-for EMEV2 SoC support.
+V3 of basic KZM9D board support. At this point a quite
+thin layer that makes use of the Emma Mobile EV2 SoC code.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
+ Changes since V2:
+ - none, just bumped up version to match the V3 series
+
  Changes since V1:
- - posted before in different series, here just bumped version to match V3
+ - removed now unnecessary ->map_io() callback
+ - reworked includes to use new broken out header file
+ - reworked to fit on top of linux-next
 
- arch/arm/tools/mach-types |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/Kconfig       |    4 +++
+ arch/arm/mach-shmobile/Makefile      |    1 
+ arch/arm/mach-shmobile/board-kzm9d.c |   36 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+)
 
---- 0001/arch/arm/tools/mach-types
-+++ work/arch/arm/tools/mach-types	2012-05-14 19:38:03.000000000 +0900
-@@ -530,6 +530,7 @@ nokia_rm680		MACH_NOKIA_RM680	NOKIA_RM68
- msm8960_sim		MACH_MSM8960_SIM	MSM8960_SIM		3230
- msm8960_rumi3		MACH_MSM8960_RUMI3	MSM8960_RUMI3		3231
- gsia18s			MACH_GSIA18S		GSIA18S			3234
-+kzm9d			MACH_KZM9D		KZM9D			3246
- mx53_loco		MACH_MX53_LOCO		MX53_LOCO		3273
- tx53			MACH_TX53		TX53			3279
- encore			MACH_ENCORE		ENCORE			3284
+--- 0007/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2012-05-12 02:45:51.000000000 +0900
+@@ -115,6 +115,10 @@ config MACH_KZM9G
+ 	depends on ARCH_SH73A0
+ 	select ARCH_REQUIRE_GPIOLIB
+ 
++config MACH_KZM9D
++	bool "KZM9D board"
++	depends on ARCH_EMEV2
++
+ comment "SH-Mobile System Configuration"
+ 
+ config CPU_HAS_INTEVT
+--- 0007/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2012-05-12 02:45:51.000000000 +0900
+@@ -52,6 +52,7 @@ obj-$(CONFIG_MACH_BONITO)	+= board-bonit
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
++obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ 
+ # Framework support
+ obj-$(CONFIG_SMP)		+= $(smp-y)
+--- /dev/null
++++ work/arch/arm/mach-shmobile/board-kzm9d.c	2012-05-12 02:45:52.000000000 +0900
+@@ -0,0 +1,36 @@
++/*
++ * kzm9d board support
++ *
++ * Copyright (C) 2012  Renesas Solutions Corp.
++ * Copyright (C) 2012  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/interrupt.h>
++#include <mach/common.h>
++#include <mach/emev2.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/gic.h>
++
++MACHINE_START(KZM9D, "kzm9d")
++	.init_early	= emev2_add_early_devices,
++	.nr_irqs	= NR_IRQS_LEGACY,
++	.init_irq	= emev2_init_irq,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= emev2_add_standard_devices,
++	.timer		= &shmobile_timer,
++MACHINE_END
