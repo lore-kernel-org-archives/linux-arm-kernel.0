@@ -1,38 +1,37 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 16 May 2012 17:36:30 +0800
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20120516185045.2f9e9274f373d584fd499eb2@canb.auug.org.au>
-References: <20120516185045.2f9e9274f373d584fd499eb2@canb.auug.org.au>
-Message-ID: <CAN1soZzBZUoCR5KgXbWBKAnxaR92CKFWqNMNLnm-dAD3xoH6yw@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 16 May 2012 12:40:17 +0300
+Subject: [PATCH v7 3/3] MTD: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <20403.29677.517067.528042@ipc1.ka-ro>
+References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+ <1337093256-19117-4-git-send-email-josh.wu@atmel.com>
+ <1337160353.24809.26.camel@sauron.fi.intel.com>
+ <20403.29677.517067.528042@ipc1.ka-ro>
+Message-ID: <1337161217.24809.38.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 4:50 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/Kconfig between commit 98fab064d321 ("ARM: Remove unnecessary
-> selection of TICK_ONESHOT") from the arm tree and commit c24b31147a06
-> ("ARM: mmp: support DT in irq") from the arm-soc tree.
->
-> Just context changes. ?I fixed it up (see below) and can carry the fix as
-> necessary.
-> --
-> Cheers,
-> Stephen Rothwell ? ? ? ? ? ? ? ? ? ?sfr at canb.auug.org.au
->
-> diff --cc arch/arm/Kconfig
-> index b1a717c,852b12b..0000000
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@@ -627,6 -616,8 +611,7 @@@ config ARCH_MM
-> ? ? ? ?select CLKDEV_LOOKUP
-> ? ? ? ?select GENERIC_CLOCKEVENTS
-> ? ? ? ?select GPIO_PXA
-> + ? ? ? select IRQ_DOMAIN
-> ?- ? ? ?select TICK_ONESHOT
-> ? ? ? ?select PLAT_PXA
-> ? ? ? ?select SPARSE_IRQ
-> ? ? ? ?select GENERIC_ALLOCATOR
+On Wed, 2012-05-16 at 11:31 +0200, Lothar Wa?mann wrote:
+> > > +		dev_warn(host->dev, "Only 2048 page size is currently " \
+> > > +			"supported for PMECC, rolling back to Software ECC\n");
+> > 
+> > Why do you use backslashes?
+> > 
+> message text should not be split across lines anyway to ease grepping
+> for the message.
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+I think the consensus is that it is personal decision of the author. I
+am not trying to enforce this and I also split messages. In this case I
+was only wondering why that backslash is used? I never saw this before
+in the linux kernel.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120516/ffb6af6a/attachment.sig>
