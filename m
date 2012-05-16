@@ -1,136 +1,101 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 16 May 2012 12:10:45 +0300
-Subject: [PATCHv5 8/8] ARM: OMAP4: PM: Added option for enabling OSWR
-In-Reply-To: <87zk999ie4.fsf@ti.com>
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-9-git-send-email-t-kristo@ti.com> <87zk999ie4.fsf@ti.com>
-Message-ID: <1337159445.2149.355.camel@sokoban>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 16 May 2012 12:17:38 +0300
+Subject: [PATCH v7 0/3] Add PMECC support for at91 nand flash driver
+In-Reply-To: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1337159858.24809.21.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-05-15 at 15:41 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
+On Tue, 2012-05-15 at 22:47 +0800, Josh Wu wrote:
+> Changes since v6,
+> 	split into 3 patches.
+> 	remove of_flat_dt_is_compatible() function. use additional dt parameter "has-pmecc".
+> 	refine the error handling code.
+> 	refine original atmel_nand_init_params() function.
 > 
-> > PM debug now contains a file that can be used to control OSWR support
-> > enable / disable on OMAP4. Also removed the off_mode_enable file for
-> > the same platform as it is unsupported.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Changes since v5,
+> 	add has_pmecc field to replace cpu_has_pmecc() function. Use compatible check in when proble.
+> 	simplify the pmecc_get_ecc_bytes() function.
 > 
-> I'll gladly take a patch that makes enable_off_mode OMAP3-only, but I am
-> not interested managing another new flag for OSWR.
-> 
-> For OMAP4, this should just be the default, and any drivers that are
-> broken just need to be fixed either by implementing context save/restore
-> or by using constraints.
+> Changes since v4,
+> 	fix typo and checkpatch warnings.
+> 	fix according to JC's suggestion. replace cpu_is_xxx() with DT
+> 	modify dt binding atmel nand document to add pmecc support.
+> 	tested in sam9263 without break hw ecc.
+> 	add ecc.strength.
 
-Well, it is not flag as such, as it is static variable internal to
-pm-debug.c. I could drop this, however it is extremely useful as a
-testing feature. Without this, it is difficult to test CSWR / OSWR. If
-you have taken a look at the device-off set, I am actually adding the
-flag back for omap4 there for enabling device off. If this flag is also
-dropped, the device will always just go to device off, in which case
-testing CSWR / OSWR becomes an issue again, and I don't think this is
-ideal.
+Hi,
 
-Speaking of enable_off_mode, it might be possible to change it also be
-static and remove all the references to it from code. Currently it is
-only used from cpuidle34xx.c.
+Aiaiai identified the following issues with your patch-set - could you
+please take a look?
 
--Tero
+--------------------------------------------------------------------------------
 
-> 
-> Kevin
-> 
-> > ---
-> >  arch/arm/mach-omap2/pm-debug.c |   20 ++++++++++++++++----
-> >  arch/arm/mach-omap2/pm.h       |    1 +
-> >  arch/arm/mach-omap2/pm44xx.c   |   16 ++++++++++++++++
-> >  3 files changed, 33 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> > index 814bcd9..d9a8e42 100644
-> > --- a/arch/arm/mach-omap2/pm-debug.c
-> > +++ b/arch/arm/mach-omap2/pm-debug.c
-> > @@ -39,6 +39,7 @@
-> >  #include "pm.h"
-> >  
-> >  u32 enable_off_mode;
-> > +static u32 enable_oswr_mode;
-> >  
-> >  #ifdef CONFIG_DEBUG_FS
-> >  #include <linux/debugfs.h>
-> > @@ -247,10 +248,13 @@ static int option_set(void *data, u64 val)
-> >  			omap_pm_enable_off_mode();
-> >  		else
-> >  			omap_pm_disable_off_mode();
-> > -		if (cpu_is_omap34xx())
-> > -			omap3_pm_off_mode_enable(val);
-> > +
-> > +		omap3_pm_off_mode_enable(val);
-> >  	}
-> >  
-> > +	if (option == &enable_oswr_mode)
-> > +		omap4_pm_oswr_mode_enable(val);
-> > +
-> >  	return 0;
-> >  }
-> >  
-> > @@ -274,8 +278,16 @@ static int __init pm_dbg_init(void)
-> >  
-> >  	pwrdm_for_each(pwrdms_setup, (void *)d);
-> >  
-> > -	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
-> > -				   &enable_off_mode, &pm_dbg_option_fops);
-> > +	if (cpu_is_omap34xx())
-> > +		(void) debugfs_create_file("enable_off_mode",
-> > +			S_IRUGO | S_IWUSR, d, &enable_off_mode,
-> > +			&pm_dbg_option_fops);
-> > +
-> > +	if (cpu_is_omap44xx())
-> > +		(void) debugfs_create_file("enable_oswr_mode",
-> > +			S_IRUGO | S_IWUSR, d, &enable_oswr_mode,
-> > +			&pm_dbg_option_fops);
-> > +
-> >  	pm_dbg_init_done = 1;
-> >  
-> >  	return 0;
-> > diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> > index 36fa90b..c36ab63 100644
-> > --- a/arch/arm/mach-omap2/pm.h
-> > +++ b/arch/arm/mach-omap2/pm.h
-> > @@ -17,6 +17,7 @@
-> >  
-> >  extern void *omap3_secure_ram_storage;
-> >  extern void omap3_pm_off_mode_enable(int);
-> > +extern void omap4_pm_oswr_mode_enable(int);
-> >  extern void omap_sram_idle(void);
-> >  extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
-> >  extern int omap3_idle_init(void);
-> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> > index cc85576..07ac0d3 100644
-> > --- a/arch/arm/mach-omap2/pm44xx.c
-> > +++ b/arch/arm/mach-omap2/pm44xx.c
-> > @@ -115,6 +115,22 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
-> >  	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-> >  }
-> >  
-> > +void omap4_pm_oswr_mode_enable(int enable)
-> > +{
-> > +	u32 next_logic_state;
-> > +	struct power_state *pwrst;
-> > +
-> > +	if (enable)
-> > +		next_logic_state = PWRDM_POWER_OFF;
-> > +	else
-> > +		next_logic_state = PWRDM_POWER_RET;
-> > +
-> > +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> > +		pwrst->next_logic_state = next_logic_state;
-> > +		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
-> > +	}
-> > +}
-> > +
-> >  /**
-> >   * omap_default_idle - OMAP4 default ilde routine.'
-> >   *
+Successfully built configuration "arm-at91cap9_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/nand/atmel_nand.c: In function 'atmel_pmecc_nand_init_params':
++drivers/mtd/nand/atmel_nand.c:910:29: warning: assignment from incompatible pointer type [enabled by default]
++drivers/mtd/nand/atmel_nand.c:910:50: warning: incorrect type in assignment (different argument counts) [sparse]
++drivers/mtd/nand/atmel_nand.c:910:50:    expected int ( *read_page )( ... ) [sparse]
++drivers/mtd/nand/atmel_nand.c:910:50:    got int ( static [toplevel] *<noident> )( ... ) [sparse]
++drivers/mtd/nand/atmel_nand.c:912:30: warning: assignment from incompatible pointer type [enabled by default]
++drivers/mtd/nand/atmel_nand.c:912:51: warning: incorrect type in assignment (different argument counts) [sparse]
++drivers/mtd/nand/atmel_nand.c:912:51:    expected void ( *write_page )( ... ) [sparse]
++drivers/mtd/nand/atmel_nand.c:912:51:    got void ( static [toplevel] *<noident> )( ... ) [sparse]
+
+--------------------------------------------------------------------------------
+
+checkpatch.pl has some complaints:
+
+--------------------------------------------------------------------------------
+
+checkpatch.pl results for patch "[PATCH 3/3] MTD: atmel_nand: Update driver to support Programmable  Multibit ECC controller"
+
+WARNING:LONG_LINE: line over 80 characters
+#60: FILE: drivers/mtd/nand/atmel_nand.c:115:
++       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
+
+WARNING:LONG_LINE: line over 80 characters
+#326: FILE: drivers/mtd/nand/atmel_nand.c:567:
++                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
+
+WARNING:LONG_LINE: line over 80 characters
+#348: FILE: drivers/mtd/nand/atmel_nand.c:589:
++                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
+
+total: 0 errors, 3 warnings, 879 lines checked
+
+--------------------------------------------------------------------------------
+
+checkpatch.pl results for the entire squashed patch-set
+
+WARNING:LONG_LINE: line over 80 characters
+#376: FILE: drivers/mtd/nand/atmel_nand.c:115:
++       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
+
+WARNING:LONG_LINE: line over 80 characters
+#642: FILE: drivers/mtd/nand/atmel_nand.c:567:
++                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
+
+WARNING:LONG_LINE: line over 80 characters
+#664: FILE: drivers/mtd/nand/atmel_nand.c:589:
++                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
+
+total: 0 errors, 3 warnings, 1136 lines checked
+
+--------------------------------------------------------------------------------
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120516/34eaf287/attachment.sig>
