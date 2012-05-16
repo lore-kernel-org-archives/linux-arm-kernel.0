@@ -1,46 +1,120 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 May 2012 07:07:08 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205152135.26759.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515173909.383a0d8a@skate> <201205151626.49173.arnd@arndb.de>
- <201205152135.26759.arnd@arndb.de>
-Message-ID: <20120516050708.GF23254@lunn.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 May 2012 22:09:18 -0700
+Subject: Pre-merge window status of the arm-soc tree
+Message-ID: <CAOesGMjxNs2X9F7vus5z_69wqrZuMc2mMXh1CC0415JNcojHDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 09:35:26PM +0000, Arnd Bergmann wrote:
-> On Tuesday 15 May 2012, Arnd Bergmann wrote:
-> 
-> > Another way would be to reorganize those directories upfront:
-> > 
-> > plat-orion -> mach-orion
-> > mach-*/*.c -> mach/orion/*/*.c
-> > mach-*/include/mach/* -> mach-orion/include/mach/*.h
-> > 
-> > and then go from there. The differences between the headers are fairly
-> > small already, so that should be manageable.
-> 
-> Actually we could do a trivial move of all files into one directory at any
-> time, e.g. at the end of the merge window, to minimize conflicts with
-> other patches.
-> 
-> This is a semi-automated move of all plat-orion based machines into
-> a single mach-orion directory, and we could of course add the new stuff
-> in there as well. I've specifically tried to keep this move simple,
-> even if that means a lot of the easy cleanups for code that are mostly
-> identical are not done here. Cleanups after this could come one at
-> a time to reduce this duplication and simplify the platform.
-> 
-> Obvious next steps are to merge the various Makefile and Kconfig files
-> as well as all the headers, and to actually allow building stuff together.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+As of the writing of this email, we have a total of 753 non-merge change
+sets queued up in arm-soc for the 3.5 merge window, which we have pulled
+in through 103 separate merges from the subarchitecture maintainers.
 
-Has this been tested in any way? If it boots on a few different
-boards, i would say yes, lets do it.
+There are a few pull requests still pending; a couple have been
+requested respins to fix issues and there's open questions on a few
+others.
 
-If this is for the end of the merge window, we have about two weeks
-for testing. Seems reasonable.
+For comparison, last merge window contained 717 non-merge commits (plus
+another 126 fixes later in the cycle) from arm-soc.
 
-	Andrew
+
+With the exceptions of the above mentioned branches, practically all
+requests should have been received by now. If anyone is sitting on
+something they are planning to get into the merge window, let us know
+as soon as possible or we will likely have to postpone it until
+3.6. General rule of thumb is that changes should have landed in
+linux-next by -rc6 or so, and that was over a week ago.
+
+
+
+So, with that taken care of, let's look at some of the statistics.
+
+For this release cycle, we've had 4 external dependencies:
+
+* One branch from Russell's tree providing new clkdev infrastructure
+* Two points on the same branch from the pinctrl tree that various SoCs
+ have been building driver support on top of
+* i2c driver changes for lpc32xx was brought in from the i2c tree
+
+We are also naming Mike Turquette's common clock branch as a
+dependency even though it is going to be sent upstream through
+arm-soc pull requests.
+
+Top contributors for this merge window, per patch count, are:
+
+76     Shawn Guo
+55     Paul Walmsley
+42     Stephen Warren
+37     Kuninori Morimoto
+36     Viresh Kumar
+34     Tushar Behera
+32     Sascha Hauer
+21     Jean-Christophe PLAGNIOL-VILLARD
+20     Linus Walleij
+19     Daniel Lezcano
+
+And looking at the filesystem, most changes have been in:
+
+$ git diff deps for-next --dirstat=1.5
+   6.5% arch/arm/boot/dts/
+  13.6% arch/arm/mach-imx/
+   1.5% arch/arm/mach-ixp2000/include/mach/
+   2.0% arch/arm/mach-ixp2000/
+   2.1% arch/arm/mach-ixp23xx/
+   2.0% arch/arm/mach-mmp/
+   2.8% arch/arm/mach-mxs/
+  10.0% arch/arm/mach-omap2/
+   3.5% arch/arm/mach-spear3xx/
+   6.0% arch/arm/mach-tegra/
+   4.4% arch/arm/mach-ux500/
+   1.6% arch/arm/plat-s5p/
+  16.6% arch/arm/
+   4.6% drivers/clk/spear/
+   1.7% drivers/clk/
+   1.9% drivers/mfd/
+   8.6% drivers/pinctrl/spear/
+   3.1% drivers/pinctrl/
+   4.5% drivers/
+
+The 4.1% of change in mach-ixp2000 and ixp23xx are worth pointing out,
+since it's the removal of those platforms. They haven't seen active
+development since 2006, and no one has expressed interest in keeping
+them alive. Removing unused legacy platforms makes things easier when
+it comes to platform consolidation. There might be a few more
+candidates down the road, but nothing has been planned as of this
+time.
+
+
+Just as with last merge window, we have at mostly the same
+cross-sections of topic branches. This time around we have had a few
+shorter ones for specific subtopics, which is normal depending on what
+the focus ends up being for some of the merge windows.
+
+The list of arm-soc topic branches to date are:
+
+depends/clk/next Common clock infrastructure branch from Mike Turquette
+next/maintainers Updates to MAINTAINERS file
+next/cleanup     General cleanup patches
+next/fixes       Fixes (and a few cleanups) that were not urgent enough for 3.4
+next/dt          Device tree source and support changes
+next/soc         New SoC support, or soc platform development
+next/pinctrl     Changes enabling the new pinctrl subsystem on platforms
+next/pm          power management and clock/reset changes
+next/boards      board changes
+next/defconfig   defconfig updates
+next/drivers     drivers or SoC driver configuration updates
+next/cleanup2    cleanups having dependencies on some of the above branches
+next/clock       patches moving platforms to common clock infrastructure
+next/dt2         device tree updates with dependencies on above branches
+next/soc2        New SoC or SoC driver support depending on above branches
+next/stmp-dev    library infrastructure for stmp-style device register
+layouts and patches using those
+staging/cleanup  late_initcall cleanups (to be moved to a next/* branch)
+
+Another thing that has held steady since last merge window, is that we
+still have a healthy amount of cleanups going in. The ones explicitly
+going into the cleanup branches account for about 1/3rd of the total
+commits, but there are cleanups and refactorings going in through other
+topic branches as well.
+
+
+-Olof
