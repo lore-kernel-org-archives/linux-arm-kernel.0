@@ -1,53 +1,43 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 15 May 2012 23:07:04 -0700
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
- <4FB07D2B.6010409@st.com>
- <CAJOA=zNe0yP5e75=fLTFAZMVZ=DsFF5xxkuear2C7sLD_XrGtA@mail.gmail.com>
- <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
-Message-ID: <CAJOA=zMJBgEG=w2eby=OmNjYmHaLLvayFiOE=wJtgBTM=8U5MA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 May 2012 23:17:36 -0700
+Subject: [GIT PULL] Renesas ARM-based platforms: new boards support for
+ v3.5
+In-Reply-To: <201205151958.26035.arnd@arndb.de>
+References: <201205112101.59949.rjw@sisk.pl>
+ <CAOesGMj5op-U+-_dvP_cqMUQ7zgzbzvig2ueb2LQTf+4MSEc2Q@mail.gmail.com>
+ <CANqRtoQTMKdKmATz5uxCtWaZcEPa2apt9WO4URdhiwEMnst5gw@mail.gmail.com>
+ <201205151958.26035.arnd@arndb.de>
+Message-ID: <CAOesGMg+2wXqMLwq8QrzbHPd98QFZJwuO1No0o0BXEAbhO2O-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 10:56 PM, viresh kumar <viresh.linux@gmail.com> wrote:
+On Tue, May 15, 2012 at 12:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 14 May 2012, Magnus Damm wrote:
+>> > Also, I would prefer to only see one or a couple of defconfigs that
+>> > can provide full build coverage for the various SoCs and boards, that
+>> > would contain the superset of the required drivers to boot the
+>> > supported boards, etc.
+>>
+>> I can check with my superiors if we can phase our sh7367 support. If
+>> so then we have only A8 and A9 in tree which should be easy to support
+>> with a single kernel configuration. Does that sound like something
+>> that would simplify things for you?
 >
-> On May 16, 2012 10:32 AM, "Turquette, Mike" <mturquette@ti.com> wrote:
->>
->> On Sun, May 13, 2012 at 8:34 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
->> > On 5/11/2012 2:11 PM, Stefan Roese wrote:
->> >> diff --git a/drivers/clk/spear/spear6xx_clock.c
->> >> b/drivers/clk/spear/spear6xx_clock.c
->> >> index f9a20b3..bf33c1d 100644
->> >> --- a/drivers/clk/spear/spear6xx_clock.c
->> >> +++ b/drivers/clk/spear/spear6xx_clock.c
->> >> @@ -298,7 +298,7 @@ void __init spear6xx_clk_init(void)
->> >>
->> >> ? ? ? clk = clk_register_gate(NULL, "gmac_clk", "ahb_clk", 0,
->> >> PERIP1_CLK_ENB,
->> >> ? ? ? ? ? ? ? ? ? ? ? GMAC_CLK_ENB, 0, &_lock);
->> >> - ? ? clk_register_clkdev(clk, NULL, "gmac");
->> >> + ? ? clk_register_clkdev(clk, NULL, "e0800000.ethernet");
->> >>
->> >> ? ? ? clk = clk_register_gate(NULL, "i2c_clk", "ahb_clk", 0,
->> >> PERIP1_CLK_ENB,
->> >> ? ? ? ? ? ? ? ? ? ? ? I2C_CLK_ENB, 0, &_lock);
->> >
->> > Acked-by: Viresh Kumar <viresh.kumar@st.com>
->>
->> Do you want me to take this? ?Spear didn't originally go through me
->> but I can take it if that is the intent.
->>
+> I think there is no need to go that far. Just providing a defconfig for
+> all boards that can already run a common image would be a good step
+> forward.
 >
-> Sure. Go ahead.
+> Is there a technical reason why you cannot build sh7367 together with
+> the ARMv7 based machines? Most other platforms that have both ARMv6 and
+> ARMv7 just build them together, you just can't combine them with any
+> ARMv4/v5 platform.
 
-Oops.  I'm working too late.  Wasn't thinking.
+Sorry for the delay in answer, Magnus -- agree with Arnd here.
 
-I don't have spear in my clk-next branch (since clk-next is stable and
-the spear clock stuff went straight to arm-soc).  Instead of having me
-make a new branch based on arm-soc's latest can you just send this
-Arnd/Olof?
+To clarify; I wasn't asking for you to remove the non-v7 platforms,
+just to see if you could trim down the shmobile defconfigs to a
+smaller number by creating a superset of the supported boards in one
+or two configs.
 
-Thanks,
-Mike
+
+-Olof
