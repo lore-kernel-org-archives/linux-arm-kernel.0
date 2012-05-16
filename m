@@ -1,39 +1,26 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 16 May 2012 14:57:09 +0800
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 May 2012 06:57:12 +0000
 Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205152135.26759.arnd@arndb.de>
+In-Reply-To: <20120516050708.GF23254@lunn.ch>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120515173909.383a0d8a@skate> <201205151626.49173.arnd@arndb.de>
- <201205152135.26759.arnd@arndb.de>
-Message-ID: <CAN1soZzzPXXcgoE_8a_gD8WVmMHKDdP_MW3QFR-4W13-z+J+VQ@mail.gmail.com>
+ <201205152135.26759.arnd@arndb.de> <20120516050708.GF23254@lunn.ch>
+Message-ID: <201205160657.12833.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 5:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 15 May 2012, Arnd Bergmann wrote:
->
->> Another way would be to reorganize those directories upfront:
->>
->> plat-orion -> mach-orion
->> mach-*/*.c -> mach/orion/*/*.c
->> mach-*/include/mach/* -> mach-orion/include/mach/*.h
->>
->> and then go from there. The differences between the headers are fairly
->> small already, so that should be manageable.
->
-> Actually we could do a trivial move of all files into one directory at any
-> time, e.g. at the end of the merge window, to minimize conflicts with
-> other patches.
->
-> This is a semi-automated move of all plat-orion based machines into
-> a single mach-orion directory, and we could of course add the new stuff
-> in there as well.
+On Wednesday 16 May 2012, Andrew Lunn wrote:
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Has this been tested in any way? If it boots on a few different
+> boards, i would say yes, lets do it.
+> 
+> If this is for the end of the merge window, we have about two weeks
+> for testing. Seems reasonable.
+> 
 
-mach-orion is better than mach-armada. Armada is just a Logo, not a
-silicon family.
-Silicons with ARMv5/v6/v7 core are all marked with Armada Logo.
+No testing in any way other than building the four defconfigs, but I've been
+rather careful in coming up with a way that would be least invasive. I agree
+it needs real testing anyway.
 
-By the way, silicons in mach-pxa and mach-mmp are also named Armada.
-
-Regards
-Haojian
+	Arnd
