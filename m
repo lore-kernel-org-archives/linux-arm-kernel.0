@@ -1,60 +1,75 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 May 2012 11:46:12 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FB3E5F2.8010301@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
- <4FB2FEBA.1030404@ti.com>
- <CAJe_ZhcrMycgOWf6EiGEjz25C1ZTkB1W=33Qqp4rFpcq-5QsDg@mail.gmail.com>
- <4FB3A87C.1000000@ti.com> <4FB3CF44.4040603@ti.com>
- <CAJe_ZhcQAABe9xF6HEvUq8OT8RoWXTHAsrzyZiGO9bM-GHNiTg@mail.gmail.com>
- <4FB3E00B.4030207@ti.com>
- <CAJe_Zhe_edZ32K50i8AH+wagUkYWRxJpWpZpZ-ddk83LF5vKRg@mail.gmail.com>
- <4FB3E5F2.8010301@ti.com>
-Message-ID: <4FB3E7E4.5060505@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 May 2012 19:47:40 +0200
+Subject: [PATCH v4 4/7] ARM: imx: Enable imx53 low power idle
+In-Reply-To: <1337135616-8988-5-git-send-email-rob.lee@linaro.org>
+References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
+ <1337135616-8988-5-git-send-email-rob.lee@linaro.org>
+Message-ID: <20120516174740.GW30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2012 11:37 AM, Jon Hunter wrote:
+On Tue, May 15, 2012 at 09:33:33PM -0500, Robert Lee wrote:
+> Add various functionality needed to enable a imx53 low power idle
+> state.  This includes adding the imx53 gpc_dvfs clock and making a
+> common imx5_late_init function and initializing all imx53
+>  MACHINE_STATE late_init calls to imx5_late_init.
 > 
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+>  arch/arm/mach-imx/clock-mx51-mx53.c     |    1 +
+>  arch/arm/mach-imx/imx53-dt.c            |    1 +
+>  arch/arm/mach-imx/mach-mx53_ard.c       |    1 +
+>  arch/arm/mach-imx/mach-mx53_evk.c       |    1 +
+>  arch/arm/mach-imx/mach-mx53_loco.c      |    1 +
+>  arch/arm/mach-imx/mach-mx53_smd.c       |    1 +
+>  arch/arm/mach-imx/mm-imx5.c             |    7 ++++++-
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  8 files changed, 13 insertions(+), 1 deletion(-)
 > 
-> On 05/16/2012 12:24 PM, Jassi Brar wrote:
->> On 16 May 2012 22:42, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->>>>> What is still unclear to me, is if you use this token approach how
->>>>> readable is the device-tree? For example, if you have a client that can
->>>>> use one of two dmac and for each dmac the request/channel number is
->>>>> different, then by using a global token how can I determine what the
->>>>> options available for this client are?
->>>>>
->>>> Simple - you/client need not know about any option at all :)
->>>>
->>>> Client driver would simply request some channel and if it
->>>> doesn't get it, it bails out.
->>>>
->>>> It would be the DMACs' DT node that would contain that info.
->>>
->>> Yes, but what if I am doing some custom application and want to modify
->>> the mapping that is being used? So I just wanted to make sure it is easy
->>> to understand assuming that you understand what your h/w is capable of.
->>>
->> Any scenario when a client would want to choose which dma controller
->> it runs on?
->>
->> Because when we say a client could be provided a channel on any of the
->> two given dmacs, it implies that the client wouldn't feel any difference.
-> 
-> That's not my point. I am saying for some reason, maybe QoS, _I_ want to
-> specify which mapping used. I am the one that knows how the h/w is being
-> used and _I_ want to customise the dma/channel mapping in the DT, such
-> that when the client asks for it I know what it is getting. Yes to the
-> client, it does not care, but I do.
+> diff --git a/arch/arm/mach-imx/clock-mx51-mx53.c b/arch/arm/mach-imx/clock-mx51-mx53.c
+> index 0847050..decedc6 100644
+> --- a/arch/arm/mach-imx/clock-mx51-mx53.c
+> +++ b/arch/arm/mach-imx/clock-mx51-mx53.c
+> @@ -1529,6 +1529,7 @@ static struct clk_lookup mx53_lookups[] = {
+>  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+>  	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+>  	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+> +	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
 
-If you really need to do that, you could always just lie in the DT node
-of the DMA controllers you don't want to use, and omit the entry for the
-DMA client(s) you don't want to use it.
+This has to be rebased against the common clock patches.
 
-Still, this all seems like policy that the DT file shouldn't really be
-influencing. Admittedly, I'm not sure how else you'd achieve this.
+>  	.timer = &mx53_smd_timer,
+>  	.init_machine = mx53_smd_board_init,
+> +	.init_late	= imx5_init_late,
+>  	.restart	= mxc_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+> index bb38747..7740739 100644
+> --- a/arch/arm/mach-imx/mm-imx5.c
+> +++ b/arch/arm/mach-imx/mm-imx5.c
+> @@ -216,8 +216,13 @@ void __init imx53_soc_init(void)
+>  					ARRAY_SIZE(imx53_audmux_res));
+>  }
+>  
+> +void __init imx5_init_late(void)
+> +{
+> +	imx5_pm_init();
+> +}
+> +
+>  void __init imx51_init_late(void)
+>  {
+>  	mx51_neon_fixup();
+> -	imx5_pm_init();
+> +	imx5_init_late();
+>  }
+
+Where would you add i.MX53 specific code above? Hint: imx5_init_late is
+the wrong function name.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
