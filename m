@@ -1,43 +1,64 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 16 May 2012 06:10:21 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-In-Reply-To: <201205161303.35080.arnd@arndb.de>
-References: <20120516185812.ce1ab57c3ec72445135a35fc@canb.auug.org.au>
- <201205161054.15610.arnd@arndb.de>
- <20120516124851.GA32064@kroah.com>
- <201205161303.35080.arnd@arndb.de>
-Message-ID: <20120516131021.GA32351@kroah.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 16 May 2012 08:15:40 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_ZhcrMycgOWf6EiGEjz25C1ZTkB1W=33Qqp4rFpcq-5QsDg@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <4FB2FEBA.1030404@ti.com>
+ <CAJe_ZhcrMycgOWf6EiGEjz25C1ZTkB1W=33Qqp4rFpcq-5QsDg@mail.gmail.com>
+Message-ID: <4FB3A87C.1000000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 01:03:34PM +0000, Arnd Bergmann wrote:
-> On Wednesday 16 May 2012, Greg KH wrote:
-> > On Wed, May 16, 2012 at 10:54:15AM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 16 May 2012, Stephen Rothwell wrote:
-> > > > Today's linux-next merge of the arm-soc tree got a conflict in
-> > > > arch/arm/boot/dts/at91sam9g20.dtsi between commit 7cb2e629a240 ("ARM:
-> > > > AT91: Add ADC driver to the at91sam9g20 dtsi") from the staging tree and
-> > > > commit 5b6089cb6f28 ("ARM: at91: add at91sam9260 DT support") from the
-> > > > arm-soc tree.
-> > > > 
-> > > > So, I didn't know what to do with this, so I used the arm-soc version of
-> > > > this file (effectively throwing away the staging tree change).  Hints,
-> > > > anyone?
-> > > 
-> > > I suspect the addition of the adc node should just go into the
-> > > at91sam9260.dtsi file.
-> > 
-> > So does that mean that the staging tree version is correct?  Or that
-> > someone needs to send me a fixup patch here?
+Hi Jassi,
+
+On 05/16/2012 07:37 AM, Jassi Brar wrote:
+> Hi Jon,
 > 
-> The staging tree version adds contents to at91sam9g20.dtsi, and the context
-> gets moved to at91sam9260.dtsi in arm-soc. If we want to resolve it now,
-> I think the best way is to add the change to at91sam9260.dtsi in arm-soc
-> and let you drop that part in staging. There are no hard dependencies
-> since this is new code and it the driver is still correct without the
-> change, it simply won't find the device.
+> On 16 May 2012 06:41, Jon Hunter <jon-hunter@ti.com> wrote:
+>> On 05/04/2012 02:01 PM, Jassi Brar wrote:
+>>>
+>>> +       i2c1: i2c at 1 {
+>>> +               ...
+>>> +               dma = <&sdma 2 1 &sdma 3 2>;
+>>> +               ...
+>>> +       };
+>>>>
+>>> I see this requires a client driver to specify a particular req_line on a
+>>> particular dma controller. I am not sure if this is most optimal.
+>>
+>> Actually, no. The phandle in the DT specifies the DMA controller to use.
+>> Then the client simply asks for a channel with a particular property,
+>> for example, DMA_MEM_TO_DEV (ie. TX) and the channel information is return.
+>>
+> See below.
+> 
+>>> I think such client->req_line map should be provided to the dmac controller
+>>> driver via its dt node in some format. The dmac driver could then populate
+>>> a dma_chan, or similar, only for that req_line and not for the unused one
+>>> which otherwise could also have served the same client.
+>>>
+>>> Ideally the I2C driver should simply ask, say, a channel for TX and another
+>>> for RX, everything else should already be setup via dmac's dt nodes.
+>>
+>> Yes that is the intention here.
+>>
+> But the client is required to specify the dmac that would serve it.
+> Which is more
+> than simply asking for "some suitable channel".
 
-Ok, so if we leave it as-is for now, we can resolve it after 3.5-rc1 is
-out and we see what branch ended up "winning"?  :)
+No this is not the case with what I propose. The client knows nothing
+about the dmac.
 
-greg k-h
+> If you read the whole exchange between I and Stephen, we converged on a
+> scheme of clients' node having nothing to specify and DMAC told all about
+> every client in one palce. Which resembles closer to reality and is
+> much simpler.
+> I already started on a patchset and should be able submit for review
+> in a day or two.
+
+Ok. I look forward to your implementation :-)
+
+Jon
