@@ -1,39 +1,82 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 May 2012 00:21:14 +0800
-Subject: [PATCH] gpio/generic: initialize the shadow of direction register
-In-Reply-To: <20403.46023.772833.889330@ipc1.ka-ro>
-References: <20120516053301.GB21517@S2100-06.ap.freescale.net>
- <20403.20214.297216.188300@ipc1.ka-ro>
- <20120516072859.GE21517@S2100-06.ap.freescale.net>
- <20403.22671.800713.334846@ipc1.ka-ro>
- <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
- <20403.41495.610333.670008@ipc1.ka-ro>
- <20120516133850.GA3764@S2100-06.ap.freescale.net>
- <20403.44198.671025.83880@ipc1.ka-ro>
- <20120516140717.GB3764@S2100-06.ap.freescale.net>
- <20403.46023.772833.889330@ipc1.ka-ro>
-Message-ID: <20120516162113.GF3764@S2100-06.ap.freescale.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 16 May 2012 11:04:29 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FB3CB58.4050107@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
+ <4FA3F308.6030900@ti.com>
+ <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
+ <4FB2FEBA.1030404@ti.com>
+ <CAJe_ZhcrMycgOWf6EiGEjz25C1ZTkB1W=33Qqp4rFpcq-5QsDg@mail.gmail.com>
+ <4FB3A87C.1000000@ti.com> <4FB3CB58.4050107@wwwdotorg.org>
+Message-ID: <4FB3D00D.2050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 04:03:51PM +0200, Lothar Wa?mann wrote:
-> _You_ want to introduce a change that will change the behaviour of
-> existing code, so it's _your_ responsibility to make sure that your
-> change doesn't break other users.
-> 
-> Those are the current users of bgpio:
-> ./drivers/gpio/gpio-sodaville.c:        ret = bgpio_init(&sd->bgpio, &pdev->dev, 4,
-> ./drivers/gpio/gpio-ep93xx.c:   err = bgpio_init(bgc, dev, 1, data, NULL, NULL, dir, NULL, false);
-> ./drivers/gpio/gpio-mxc.c:      err = bgpio_init(&port->bgc, &pdev->dev, 4,
-> ./drivers/gpio/gpio-mxs.c:      err = bgpio_init(&port->bgc, &pdev->dev, 4,
-> 
-> You should at least CC: their maintainers to inform them that the code
-> they are relying on will change its behaviour.
-> 
-Yeah, considering it's impossible for me to test the change on all
-those hardwares, that's the only thing I can do.  Thanks for pointing
-those users to me.
 
--- 
-Regards,
-Shawn
+On 05/16/2012 10:44 AM, Stephen Warren wrote:
+> On 05/16/2012 07:15 AM, Jon Hunter wrote:
+>> Hi Jassi,
+>>
+>> On 05/16/2012 07:37 AM, Jassi Brar wrote:
+>>> Hi Jon,
+>>>
+>>> On 16 May 2012 06:41, Jon Hunter <jon-hunter@ti.com> wrote:
+>>>> On 05/04/2012 02:01 PM, Jassi Brar wrote:
+>>>>>
+>>>>> +       i2c1: i2c at 1 {
+>>>>> +               ...
+>>>>> +               dma = <&sdma 2 1 &sdma 3 2>;
+>>>>> +               ...
+>>>>> +       };
+>>>>>>
+>>>>> I see this requires a client driver to specify a particular req_line on a
+>>>>> particular dma controller. I am not sure if this is most optimal.
+>>>>
+>>>> Actually, no. The phandle in the DT specifies the DMA controller to use.
+>>>> Then the client simply asks for a channel with a particular property,
+>>>> for example, DMA_MEM_TO_DEV (ie. TX) and the channel information is return.
+>>>>
+>>> See below.
+>>>
+>>>>> I think such client->req_line map should be provided to the dmac controller
+>>>>> driver via its dt node in some format. The dmac driver could then populate
+>>>>> a dma_chan, or similar, only for that req_line and not for the unused one
+>>>>> which otherwise could also have served the same client.
+>>>>>
+>>>>> Ideally the I2C driver should simply ask, say, a channel for TX and another
+>>>>> for RX, everything else should already be setup via dmac's dt nodes.
+>>>>
+>>>> Yes that is the intention here.
+>>>>
+>>> But the client is required to specify the dmac that would serve it.
+>>> Which is more
+>>> than simply asking for "some suitable channel".
+>>
+>> No this is not the case with what I propose. The client knows nothing
+>> about the dmac.
+> 
+> I think you're both talking about slightly different things.
+> 
+> Jon: You're talking about the driver code.
+> Jassi: You're talking about the device tree.
+
+Yes you are right. However, I do see Jassi's point now.
+
+> By including a property in the DMA client's DT node that describes which
+> DMA controller services it, the device (the DT node) "knows" about the
+> DMA controllers.
+> 
+> By moving the information to the DMA controller and specifying which DMA
+> clients can be serviced, that DMA client DT node no longer contains any
+> information about the DMA controller that serves it, and hence it's not
+> bound to a single controller, and hence can select from 1 of n
+> controllers at run-time if applicable given the HW.
+
+Yes I see the need for this. My concern (and I just sent another
+follow-up) was how readable is the device-tree for a human by using such
+a token. Is it intuitive enough for a human to understand the options
+available.
+
+Cheers
+Jon
