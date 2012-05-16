@@ -1,45 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 07:20:42 +0000
-Subject: [PATCH V2] CS89x0 : Use ioread16/iowrite16 on all platforms
-In-Reply-To: <1337123314.7050.26.camel@joe2Laptop>
-References: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
- <20120515223711.GA12674@electric-eye.fr.zoreil.com>
- <1337123314.7050.26.camel@joe2Laptop>
-Message-ID: <201205160720.42995.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 May 2012 09:30:30 +0200
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <CAJOA=zNVQUDbHQCgnQ56S50fva2eKUXAH9aVkTbtyvQW+fq9SA@mail.gmail.com>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <CAJOA=zNVQUDbHQCgnQ56S50fva2eKUXAH9aVkTbtyvQW+fq9SA@mail.gmail.com>
+Message-ID: <CACRpkda94B1JDC0T8eafBkHDg8JFy19OAH3NgGZRBLA28i9iRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2012, Joe Perches wrote:
-> On Wed, 2012-05-16 at 00:37 +0200, Francois Romieu wrote:
-> > Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com> :
-> > [...]
-> > > diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-> > > index b9406cb..8081ad5 100644
-> > > --- a/drivers/net/ethernet/cirrus/cs89x0.c
-> > > +++ b/drivers/net/ethernet/cirrus/cs89x0.c
-> > [...]
-> > > -static int cs89x0_probe1(struct net_device *dev, unsigned long ioaddr, int modular);
-> > > +static int cs89x0_probe1(struct net_device *dev,
-> > > +                    void __iomem *ioaddr,
-> > > +                    int modular);
-> > > +static int cs89x0_probe1(struct net_device *dev, void __iomem *ioaddr,
-> > > +                    int modular);
-> > 
-> > s/int/bool/ maybe.
-> > 
-> > You may skip the name of the parameters.
-> 
-> Better would be to not duplicate the prototype
-> and better still would be to reorder the code to
-> avoid the prototype altogether.
+On Wed, May 16, 2012 at 8:00 AM, Turquette, Mike <mturquette@ti.com> wrote:
 
-I agree that would be best, but let's do one thing at a time. This prototype
-is the first of 16 in a row in that driver. It would be good to remove all
-of them, but that change is totally unrelated to the much more important
-one that Jaccon is doing here.
+> The above hunk is a good change since it fixes a bug where we
+> prepare/enable the parent clocks around the .set_parent callback, even
+> when CLK_SET_PARENT_GATE is set. ?It should be a separate patch.
 
-I'd say leave the prototype as it is for now, just change the type of the ioaddr
-argument in this patch. Patches to fix the numerous other style issues with this
-driver are of course welcome as well.
+This makes me think that maybe some of these clk fixes really
+need to add Cc: stable at kernel.org so they get into 3.4 as well.
 
-	Arnd
+Not that there are plenty of in-kernel users, but since people may
+be basing development off the 3.4 tree, it would be good to have
+fixes propagate there.
+
+Linus Walleij
