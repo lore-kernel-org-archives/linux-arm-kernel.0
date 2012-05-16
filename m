@@ -1,34 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 15:57:44 +0000
-Subject: A good sub-architecture to base new ports on?
-In-Reply-To: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
-Message-ID: <201205161557.45362.arnd@arndb.de>
+Date: Wed, 16 May 2012 18:39:02 +0000
+Subject: [GIT PULL][for 3.5] clk-next update
+In-Reply-To: <20120516063552.GA5154@gmail.com>
+References: <20120516063552.GA5154@gmail.com>
+Message-ID: <201205161839.03269.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Alexey Zaytsev wrote:
-> Hey.
+On Wednesday 16 May 2012, Mike Turquette wrote:
+> Arnd & Olof,
 > 
-> With all the ARM tree rework, I'm wondering, what would be a good (and
-> simple) sub-architecture on which to base new ports. The target is a
-> somewhat dated chip used in ADSL routers, so no DT, or multiplatform.
-> I'm looking at ixp4xx, because I'm somewhat familiar with the
-> platform, but is it a good reference?
+> Please pull my clk-next branch.  This is an update on top of the last
+> pull request I sent you (already in arm-soc).
+> 
+> This series is mostly Orion/Kirkwood support accompanied by two small
+> core changes
+> 
+> The following changes since commit f0948f59dbc8e725a96ba16da666e8f5cdd43ba8:
+> 
+>   clk: add a fixed factor clock (2012-05-08 14:13:25 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/mturquette/linux.git clk-next
+> 
 
-For a new subarchitecture, using DT is required, but it should not make
-your work harder. spear3xx/6xx is a good example of an older platform
-that was recently converted (take the arm-soc tree as a base, it contains
-the latest version).
+Pulled into the next/clock branch,
 
-Another good one would be highbank, but that contains a lot of stuff you
-don't need.
+Thanks!
 
-ixp4xx is not very actively maintained, so I would not use that as
-a base.
+Olof, I've rebuild the for-next branch now, and I don't plan to
+work tomorrow, or very much on Friday. I think we're good with the
+merge conflicts between arm-soc branches and with rmk/for-next
+at the moment.
 
-What platform are you talking about? I know of a few people that are
-working on getting older platforms ported to Linux, so maybe someone
-is already working on a port.
+Please handle incoming pull requests at least for tomorrow. I'll
+also be travelling for the next three weeks, so you might have to
+send most of the stuff onwards to Linus. I'll try to cook up
+descriptions for the branches and put them into the contents
+file in the meantime.
 
 	Arnd
