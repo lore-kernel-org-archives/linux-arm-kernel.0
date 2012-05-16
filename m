@@ -1,25 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 13:41:47 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-In-Reply-To: <20120516131021.GA32351@kroah.com>
-References: <20120516185812.ce1ab57c3ec72445135a35fc@canb.auug.org.au>
- <201205161303.35080.arnd@arndb.de> <20120516131021.GA32351@kroah.com>
-Message-ID: <201205161341.47440.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 May 2012 22:07:18 +0800
+Subject: [PATCH] gpio/generic: initialize the shadow of direction register
+In-Reply-To: <20403.44198.671025.83880@ipc1.ka-ro>
+References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
+ <20402.798.622618.263780@ipc1.ka-ro>
+ <20120516053301.GB21517@S2100-06.ap.freescale.net>
+ <20403.20214.297216.188300@ipc1.ka-ro>
+ <20120516072859.GE21517@S2100-06.ap.freescale.net>
+ <20403.22671.800713.334846@ipc1.ka-ro>
+ <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
+ <20403.41495.610333.670008@ipc1.ka-ro>
+ <20120516133850.GA3764@S2100-06.ap.freescale.net>
+ <20403.44198.671025.83880@ipc1.ka-ro>
+Message-ID: <20120516140717.GB3764@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Greg KH wrote:
-> On Wed, May 16, 2012 at 01:03:34PM +0000, Arnd Bergmann wrote:
-> > The staging tree version adds contents to at91sam9g20.dtsi, and the context
-> > gets moved to at91sam9260.dtsi in arm-soc. If we want to resolve it now,
-> > I think the best way is to add the change to at91sam9260.dtsi in arm-soc
-> > and let you drop that part in staging. There are no hard dependencies
-> > since this is new code and it the driver is still correct without the
-> > change, it simply won't find the device.
+On Wed, May 16, 2012 at 03:33:26PM +0200, Lothar Wa?mann wrote:
+> > I'm not fixing a gpio-mxs problem but a gpio-generic one.  Can you help
+> >
+> Yes, I know. And that's exaclty why you should make sure that you
+> don't break other platforms by fixing yours!
 > 
-> Ok, so if we leave it as-is for now, we can resolve it after 3.5-rc1 is
-> out and we see what branch ended up "winning"?  :)
+> > me understand what the new problems could possibly be introduced for
+> > other gpio-generic users by the changes? 
+> > 
+> Another platform using might be working just _because_ of the "broken"
+> behaviour. By fixing that brokenness for your driver you may break
+> that other platform.
+> 
+Can you point me any such platform?
 
-Yes, works for me.
-
-	Arnd
+-- 
+Regards,
+Shawn
