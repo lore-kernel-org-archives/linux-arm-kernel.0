@@ -1,54 +1,54 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 16 May 2012 16:36:27 +0800
-Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
-In-Reply-To: <20120515140355.GA15199@n2100.arm.linux.org.uk>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
- <20120515140355.GA15199@n2100.arm.linux.org.uk>
-Message-ID: <20120516083626.GA21051@b20223-02.ap.freescale.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 16 May 2012 11:37:00 +0300
+Subject: [PATCHv5 1/8] ARM: OMAP4: suspend: Program all domains to
+ retention
+In-Reply-To: <87fwb1jk6p.fsf@ti.com>
+References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
+ <1336989796-26594-2-git-send-email-t-kristo@ti.com> <87fwb1jk6p.fsf@ti.com>
+Message-ID: <1337157420.2149.331.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 03:03:55PM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 15, 2012 at 09:58:20PM +0800, Richard Zhao wrote:
-> > +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
-> > +	if (!plat_ci) {
-> > +		dev_err(&pdev->dev, "can't allocate ci_hdrc platform device\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	ret = platform_device_add_resources(plat_ci, pdev->resource,
-> > +					    pdev->num_resources);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "can't add resources to platform device\n");
-> > +		goto put_platform;
-> > +	}
-> > +
-> > +	ret = platform_device_add_data(plat_ci, &ci13xxx_imx_udc_driver,
-> > +				       sizeof(ci13xxx_imx_udc_driver));
-> > +	if (ret)
-> > +		goto put_platform;
-> > +
-> > +	plat_ci->dev.dma_mask =
-> > +		kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> > +	if (!plat_ci->dev.dma_mask) {
-> > +		ret = -ENOMEM;
-> > +		goto put_platform;
-> > +	}
-> > +	*plat_ci->dev.dma_mask = DMA_BIT_MASK(32);
-> > +	plat_ci->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> > +
-> > +	ret = platform_device_add(plat_ci);
+On Tue, 2012-05-15 at 12:52 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> Is there a reason not to use platform_device_register_full() ?
-platform_device_register_full() allocate the dma_mask but
-platform_device_unregister() didn't free it. I have to free it
-manually? Sounds strange.
+> > From: Rajendra Nayak <rnayak@ti.com>
+> >
+> > Remove the FIXME's in the suspend sequence since
+> > we now intend to support system level RET support.
+> 
+> minor: this should probably go at the end of the series, after retention
+> is supported.  Otherwise, ending up with only this patch applied
+> (e.g. during a git bisect) will lead to a broken boot I suspect.
 
-Thanks
-Richard
+Ok, will move this to the end.
+
+-Tero
+
 > 
-> Also, you don't set the parent device - is there a dependency between
-> 'pdev' and this new platform device you're creating?  If so, it should
-> be a child of 'pdev'.
+> Kevin
 > 
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/pm44xx.c |    6 ------
+> >  1 files changed, 0 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> > index 8856253..31990d5 100644
+> > --- a/arch/arm/mach-omap2/pm44xx.c
+> > +++ b/arch/arm/mach-omap2/pm44xx.c
+> > @@ -101,12 +101,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+> >  	if (!strncmp(pwrdm->name, "cpu", 3))
+> >  		return 0;
+> >  
+> > -	/*
+> > -	 * FIXME: Remove this check when core retention is supported
+> > -	 * Only MPUSS power domain is added in the list.
+> > -	 */
+> > -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
+> > -		return 0;
+> >  
+> >  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+> >  	if (!pwrst)
