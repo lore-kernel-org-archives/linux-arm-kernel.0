@@ -1,32 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 15 May 2012 16:08:34 -0700
-Subject: [PATCH V2] CS89x0 : Use ioread16/iowrite16 on all platforms
-In-Reply-To: <20120515223711.GA12674@electric-eye.fr.zoreil.com>
-References: <1337112906-31033-1-git-send-email-jaccon.bastiaansen@gmail.com>
- <20120515223711.GA12674@electric-eye.fr.zoreil.com>
-Message-ID: <1337123314.7050.26.camel@joe2Laptop>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 16 May 2012 08:25:01 +0800
+Subject: [PATCH] clk: Fix CLK_SET_RATE_GATE flag validation in
+ clk_set_rate().
+In-Reply-To: <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <20120516002500.GD29393@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-16 at 00:37 +0200, Francois Romieu wrote:
-> Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com> :
-> [...]
-> > diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-> > index b9406cb..8081ad5 100644
-> > --- a/drivers/net/ethernet/cirrus/cs89x0.c
-> > +++ b/drivers/net/ethernet/cirrus/cs89x0.c
-> [...]
-> > -static int cs89x0_probe1(struct net_device *dev, unsigned long ioaddr, int modular);
-> > +static int cs89x0_probe1(struct net_device *dev,
-> > +			 void __iomem *ioaddr,
-> > +			 int modular);
-> > +static int cs89x0_probe1(struct net_device *dev, void __iomem *ioaddr,
-> > +			 int modular);
+On Tue, May 15, 2012 at 01:43:42PM -0700, Saravana Kannan wrote:
+> The clk_set_rate() code shouldn't check the clock's enable count when
+> validating CLK_SET_RATE_GATE flag since the enable count could change after
+> the validation. Similar to clk_set_parent(), it should instead check the
+> prepare count. The prepare count should go to zero only when the end user
+> expects the clock to not be enabled in the future. Since the code already
+> grabs the prepare count before validation, it's not possible for prepare
+> count to change after validation and by association not possible for a well
+> behaving end user to enable the clock while the set rate is in progress.
 > 
-> s/int/bool/ maybe.
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Reviewed-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> Please let me know if you don't want me to directly email or CC you in my
+> clock related patches. I don't want to spam anyone. Also, let me know if
+> you want me add you to my standard list of people to cc in my clock
+> patches.
 > 
-> You may skip the name of the parameters.
-
-Better would be to not duplicate the prototype
-and better still would be to reorder the code to
-avoid the prototype altogether.
+>  drivers/clk/clk.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 09b9112..f5b9d3c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -903,7 +903,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+>  	if (rate == clk->rate)
+>  		goto out;
+>  
+> -	if ((clk->flags & CLK_SET_RATE_GATE) && __clk_is_enabled(clk)) {
+> +	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
+>  		ret = -EBUSY;
+>  		goto out;
+>  	}
+> -- 
+> 1.7.8.3
+> 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
