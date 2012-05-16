@@ -1,102 +1,34 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 15 May 2012 21:33:30 -0500
-Subject: [PATCH v4 1/7] ARM: imx: Modify IMX_IO_P2V macro
+Date: Tue, 15 May 2012 21:33:31 -0500
+Subject: [PATCH v4 2/7] ARM: imx: Add comments to tzic_enable_waker()
 In-Reply-To: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
 References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1337135616-8988-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337135616-8988-3-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
-to use common definitions when accessing registers of peripherals on
-the AIPS2 bus.  With this change, IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
-IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) == IMX_IO_P2V(MX53_AIPS2_BASE_ADDR).
-
-This change was tested for mapping conflicts using the iop2v script
-found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
-performing a bootup of a default build using imx_v6_v7_defconfig
-on a imx51 babbage board and imx53 loco board.  The comments were
-modified to reflect the output given by the script which shows the
-virtual address mappings.
+Add additional comments to the tzic_enable_wake() funciton to
+clarify its intended usage.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/plat-mxc/include/mach/hardware.h |   25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ arch/arm/plat-mxc/tzic.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index 0630513..071afd0 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -50,7 +50,7 @@
-  *	IO	0x00200000+0x100000	->	0xf4000000+0x100000
-  * mx21:
-  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
-- *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
-+ *	SAHB1	0x80000000+0x100000	->	0xf5000000+0x100000
-  *	X_MEMC	0xdf000000+0x004000	->	0xf5f00000+0x004000
-  * mx25:
-  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
-@@ -58,47 +58,50 @@
-  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
-  * mx27:
-  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
-- *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
-+ *	SAHB1	0x80000000+0x100000	->	0xf5000000+0x100000
-  *	X_MEMC	0xd8000000+0x100000	->	0xf5c00000+0x100000
-  * mx31:
-  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
-  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
-  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
-- *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
-+ *	X_MEMC	0xb8000000+0x010000	->	0xf5c00000+0x010000
-  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
-  * mx35:
-  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
-  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
-  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
-- *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
-+ *	X_MEMC	0xb8000000+0x010000	->	0xf5c00000+0x010000
-  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
-  * mx50:
-  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
-- *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
-  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
-+ *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
-  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
-  * mx51:
-- *	TZIC	0xe0000000+0x004000	->	0xf5000000+0x004000
-+ *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
-  *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
-+ *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
-  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
-  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
-- *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
-+ *	AIPS2	0x83f00000+0x100000	->	0xf5300000+0x100000
-  * mx53:
-  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
-+ *	DEBUG	0x40000000+0x100000	->	0xf5000000+0x100000
-  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
-  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
-  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
-  * mx6q:
-- *	SCU	0x00a00000+0x001000	->	0xf4000000+0x001000
-+ *	SCU	0x00a00000+0x004000	->	0xf4000000+0x004000
-  *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
-- *	ANATOP	0x020c8000+0x001000	->	0xf42c8000+0x001000
-+ *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
-  *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+index 98308ec..a45dbea 100644
+--- a/arch/arm/plat-mxc/tzic.c
++++ b/arch/arm/plat-mxc/tzic.c
+@@ -190,6 +190,10 @@ void __init tzic_init_irq(void __iomem *irqbase)
+  * tzic_enable_wake() - enable wakeup interrupt
+  *
+  * @return			0 if successful; non-zero otherwise
++ *
++ * This function provides an interrupt synchronization point that is required
++ * by tzic enabled platforms before entering imx specific low power modes (ie,
++ * those low power modes beyond the WAIT_CLOCKED basic ARM WFI only mode).
   */
- #define IMX_IO_P2V(x)	(						\
--			0xf4000000 +					\
-+			(((x) & 0x80000000) >> 7) |			\
-+			(0xf4000000 +					\
- 			(((x) & 0x50000000) >> 6) +			\
- 			(((x) & 0x0b000000) >> 4) +			\
--			(((x) & 0x000fffff)))
-+			(((x) & 0x000fffff))))
- 
- #define IMX_IO_ADDRESS(x)	IOMEM(IMX_IO_P2V(x))
- 
+ int tzic_enable_wake(void)
+ {
 -- 
 1.7.10
