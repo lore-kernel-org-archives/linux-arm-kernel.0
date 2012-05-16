@@ -1,48 +1,40 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 16 May 2012 15:54:37 +0200
-Subject: [PATCH] gpio/generic: initialize the shadow of direction register
-In-Reply-To: <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
-References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
- <20402.798.622618.263780@ipc1.ka-ro>
- <20120516053301.GB21517@S2100-06.ap.freescale.net>
- <20403.20214.297216.188300@ipc1.ka-ro>
- <20120516072859.GE21517@S2100-06.ap.freescale.net>
- <20403.22671.800713.334846@ipc1.ka-ro>
- <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
-Message-ID: <20403.45469.121234.808145@ipc1.ka-ro>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 May 2012 15:56:03 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the staging tree
+In-Reply-To: <201205161054.15610.arnd@arndb.de>
+References: <20120516185812.ce1ab57c3ec72445135a35fc@canb.auug.org.au>
+ <201205161054.15610.arnd@arndb.de>
+Message-ID: <4FB3B1F3.6080102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo writes:
-> On 16 May 2012 15:34, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> > You initialize a variable to a specific value that defaulted to zero
-> > before.
-> >
-> The variable defaulted to zero is causing a problem.  I'm fixing that problem.
+On 05/16/2012 12:54 PM, Arnd Bergmann :
+> On Wednesday 16 May 2012, Stephen Rothwell wrote:
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> arch/arm/boot/dts/at91sam9g20.dtsi between commit 7cb2e629a240 ("ARM:
+>> AT91: Add ADC driver to the at91sam9g20 dtsi") from the staging tree and
+>> commit 5b6089cb6f28 ("ARM: at91: add at91sam9260 DT support") from the
+>> arm-soc tree.
+>>
+>> So, I didn't know what to do with this, so I used the arm-soc version of
+>> this file (effectively throwing away the staging tree change).  Hints,
+>> anyone?
 > 
-Actually I had sent a similar patch in July last year which was
-rejected with the following reasoning:
+> I suspect the addition of the adc node should just go into the
+> at91sam9260.dtsi file.
 
-| I don't know if this is a valid thing to do or not. Not every GPIO
-| controller supports reading back the initial state from the direction
-| register. I suspect it is better to leave initialization of the
-| direction to the gpio controller driver itself.
+Well, not so sure...
 
-See: http://lkml.indiana.edu/hypermail/linux/kernel/1107.0/00908.html
+Hi all,
 
-That's why I came up with the patch to gpio-mxc.c
+I am on the subject till this morning to figure out if the parameters
+are SoC dependent. It seems that the ADC is the same between those two
+platforms but the technology is different: I have to figure out the
+details internally.
 
+I will give you a patch on top of arm-soc soon. It will replace the one
+in staging-next: does it sound good to you?
 
-Lothar Wa?mann
+Bye,
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Nicolas Ferre
