@@ -1,80 +1,62 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 16 May 2012 16:00:38 +0200
-Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
-In-Reply-To: <1337176838-24111-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1337176838-24111-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337176838-24111-2-git-send-email-ludovic.desroches@atmel.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 16 May 2012 16:03:51 +0200
+Subject: [PATCH] gpio/generic: initialize the shadow of direction register
+In-Reply-To: <20120516140717.GB3764@S2100-06.ap.freescale.net>
+References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
+ <20402.798.622618.263780@ipc1.ka-ro>
+ <20120516053301.GB21517@S2100-06.ap.freescale.net>
+ <20403.20214.297216.188300@ipc1.ka-ro>
+ <20120516072859.GE21517@S2100-06.ap.freescale.net>
+ <20403.22671.800713.334846@ipc1.ka-ro>
+ <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
+ <20403.41495.610333.670008@ipc1.ka-ro>
+ <20120516133850.GA3764@S2100-06.ap.freescale.net>
+ <20403.44198.671025.83880@ipc1.ka-ro>
+ <20120516140717.GB3764@S2100-06.ap.freescale.net>
+Message-ID: <20403.46023.772833.889330@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi,
 
-The use of DMA slave config operation requires that the burst size
-(aka chunk size) is specified through this interface.
-Modify atmel-mci slave driver to use this specification on its side.
+Shawn Guo writes:
+> On Wed, May 16, 2012 at 03:33:26PM +0200, Lothar Wa?mann wrote:
+> > > I'm not fixing a gpio-mxs problem but a gpio-generic one.  Can you help
+> > >
+> > Yes, I know. And that's exaclty why you should make sure that you
+> > don't break other platforms by fixing yours!
+> > 
+> > > me understand what the new problems could possibly be introduced for
+> > > other gpio-generic users by the changes? 
+> > > 
+> > Another platform using might be working just _because_ of the "broken"
+> > behaviour. By fixing that brokenness for your driver you may break
+> > that other platform.
+> > 
+> Can you point me any such platform?
+> 
+_You_ want to introduce a change that will change the behaviour of
+existing code, so it's _your_ responsibility to make sure that your
+change doesn't break other users.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com> 
----
- drivers/mmc/host/atmel-mci-regs.h |   14 ++++++++++++++
- drivers/mmc/host/atmel-mci.c      |    7 +++++--
- 2 files changed, 19 insertions(+), 2 deletions(-)
+Those are the current users of bgpio:
+./drivers/gpio/gpio-sodaville.c:        ret = bgpio_init(&sd->bgpio, &pdev->dev, 4,
+./drivers/gpio/gpio-ep93xx.c:   err = bgpio_init(bgc, dev, 1, data, NULL, NULL, dir, NULL, false);
+./drivers/gpio/gpio-mxc.c:      err = bgpio_init(&port->bgc, &pdev->dev, 4,
+./drivers/gpio/gpio-mxs.c:      err = bgpio_init(&port->bgc, &pdev->dev, 4,
 
-diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
-index 787aba1..ab56f7d 100644
---- a/drivers/mmc/host/atmel-mci-regs.h
-+++ b/drivers/mmc/host/atmel-mci-regs.h
-@@ -140,4 +140,18 @@
- #define atmci_writel(port,reg,value)			\
- 	__raw_writel((value), (port)->regs + reg)
- 
-+/*
-+ * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
-+ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
-+ *
-+ * This can be done by finding most significant bit set.
-+ */
-+static inline unsigned int atmci_convert_chksize(unsigned int maxburst)
-+{
-+	if (maxburst > 1)
-+		return fls(maxburst) - 2;
-+	else
-+		return 0;
-+}
-+
- #endif /* __DRIVERS_MMC_ATMEL_MCI_H__ */
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 2dbfb28..50e8652 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -834,6 +834,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
- 	enum dma_data_direction		direction;
- 	enum dma_transfer_direction	slave_dirn;
- 	unsigned int			sglen;
-+	u32				maxburst;
- 	u32 iflags;
- 
- 	data->error = -EINPROGRESS;
-@@ -867,16 +868,18 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
- 	if (!chan)
- 		return -ENODEV;
- 
--	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(3) | ATMCI_DMAEN);
--
- 	if (data->flags & MMC_DATA_READ) {
- 		direction = DMA_FROM_DEVICE;
- 		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
-+		maxburst = atmci_convert_chksize(host->dma_conf.src_maxburst);
- 	} else {
- 		direction = DMA_TO_DEVICE;
- 		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
-+		maxburst = atmci_convert_chksize(host->dma_conf.dst_maxburst);
- 	}
- 
-+	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) | ATMCI_DMAEN);
-+
- 	sglen = dma_map_sg(chan->device->dev, data->sg,
- 			data->sg_len, direction);
- 
+You should at least CC: their maintainers to inform them that the code
+they are relying on will change its behaviour.
+
+
+Lothar Wa?mann
 -- 
-1.7.5.4
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
