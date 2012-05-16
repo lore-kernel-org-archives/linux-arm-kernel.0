@@ -1,32 +1,96 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 May 2012 15:29:00 +0800
-Subject: [PATCH] gpio/generic: initialize the shadow of direction register
-In-Reply-To: <20403.20214.297216.188300@ipc1.ka-ro>
-References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
- <20402.798.622618.263780@ipc1.ka-ro>
- <20120516053301.GB21517@S2100-06.ap.freescale.net>
- <20403.20214.297216.188300@ipc1.ka-ro>
-Message-ID: <20120516072859.GE21517@S2100-06.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 May 2012 08:12:03 +0100
+Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code
+ registration when DT is enabled
+In-Reply-To: <CACRpkdaLG+LwNpKX_52+scLrNbezvRXEuCfF5CAb4XFOSD4xag@mail.gmail.com>
+References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZzAQNJ9ejKJJQJhEPjO9VO+fPHmPeCErg8XOj-dLc3gA@mail.gmail.com>
+ <4F967986.6090808@linaro.org> <201205031257.52100.arnd@arndb.de>
+ <CACRpkdaLG+LwNpKX_52+scLrNbezvRXEuCfF5CAb4XFOSD4xag@mail.gmail.com>
+Message-ID: <4FB35343.4090407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 08:53:42AM +0200, Lothar Wa?mann wrote:
-> > @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
-> >                 return ret;
-> > 
-> >         bgc->data = bgc->read_reg(bgc->reg_dat);
-> > +       if (bgc->gc.set == bgpio_set_set)
-> > +               bgc->data = bgc->read_reg(bgc->reg_set);
-> > +       if (bgc->reg_dir)
-> > +               bgc->dir = bgc->read_reg(bgc->reg_dir);
-> > 
-> >         return ret;
-> >  }
-> > 
-> That might change the behaviour of existing implementations.
+On 03/05/12 18:14, Linus Walleij wrote:
+> On Thu, May 3, 2012 at 2:57 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
 > 
-Can you be specific?  I do not quite follow on that.
+>> This version of the patch looks good, the version that was applied does not.
+>> (...)
+>> Linus and Lee, what's going on here?
+> 
+> Probably just my screwups when applying Lee's patches out-of-order
+> and splitting them.
+> 
+> I saw lee sent a new pull request with his baseline, throw the devcietree
+> branch from me out and use his branch instead.
+
+I've just seen another problem with this.
+
+In the pull request was:
+
+> commit dc315c470b6b69018e6b65beb1e5b0d8f737261d
+> Author: Lee Jones <lee.jones@linaro.org>
+> Date:   Tue Apr 24 10:54:25 2012 +0100
+> 
+>     ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
+>     
+>     Now the SCMC911x is correctly enabled in Device Tree, there is no need
+>     to continue registering it from platform code. In fact, if we continue
+>     doing so, the system will throw an error on boot.
+>     
+>     SAcked-by: Linus Walleij <linus.walleij@linaro.org>
+>     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>     igned-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index cdf0ecf..d554a8b 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -612,7 +612,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>  static struct platform_device *snowball_of_platform_devs[] __initdata = {
+>         &snowball_led_dev,
+>         &snowball_key_dev,
+> -       &snowball_sbnet_dev,
+>         &ab8500_device,
+>  };
+
+But this made it into arm-soc:
+
+> commit f58546a17c5dc2255c40e4bc4287e06a93b5c9a0
+> Author: Lee Jones <lee.jones@linaro.org>
+> Date:   Tue Apr 24 10:54:25 2012 +0100
+> 
+>     ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
+>     
+>     Now the SCMC911x is correctly enabled in Device Tree, there is no need
+>     to continue registering it from platform code. In fact, if we continue
+>     doing so, the system will throw an error on boot.
+>     
+>     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index b885f27..f815015 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -605,7 +605,6 @@ static void __init mop500_uart_init(struct device *parent)
+>  static struct platform_device *snowball_platform_devs[] __initdata = {
+>         &snowball_led_dev,
+>         &snowball_key_dev,
+> -       &snowball_sbnet_dev,
+>         &ab8500_device,
+>  };
+
+Somehow the incorrect *_platform_devs[] was amended.
+
+Some kind of git automatic conflict resolution error?
+
+Kind regards,
+Lee
 
 -- 
-Regards,
-Shawn
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515 
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
