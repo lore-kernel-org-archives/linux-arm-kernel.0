@@ -1,77 +1,40 @@
-From: philippe.retornaz@epfl.ch (=?UTF-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Wed, 16 May 2012 12:49:19 +0200
-Subject: [PATCH] ASoC: mc13783 codec cleanups
-In-Reply-To: <20120515182737.GF19592@opensource.wolfsonmicro.com>
-References: <20120515182737.GF19592@opensource.wolfsonmicro.com>
-Message-ID: <1337165359-22733-1-git-send-email-philippe.retornaz@epfl.ch>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 16 May 2012 13:48:27 +0300
+Subject: [PATCH v1 2/7] usb: chipidea: remove zero check of hw_ep_max
+In-Reply-To: <20120516053248.GA22251@nchen-desktop>
+References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
+ <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
+ <20120516053248.GA22251@nchen-desktop>
+Message-ID: <87ehqkcsg4.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Peter Chen <peter.chen@freescale.com> writes:
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
----
- sound/soc/codecs/mc13783.c |   28 +++++++---------------------
- 1 files changed, 7 insertions(+), 21 deletions(-)
+> On Tue, May 15, 2012 at 09:58:18PM +0800, Richard Zhao wrote:
+>> It's 0 for host only device.
+>> 
+>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> ---
+>>  drivers/usb/chipidea/core.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+>> index f568b8e..15e03b3 100644
+>> --- a/drivers/usb/chipidea/core.c
+>> +++ b/drivers/usb/chipidea/core.c
+>> @@ -195,7 +195,7 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+>>  		ffs_nr(DCCPARAMS_DEN);
+>>  	ci->hw_ep_max = reg * 2;   /* cache hw ENDPT_MAX */
+>>  
+>> -	if (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX)
+>> +	if (ci->hw_ep_max > ENDPT_MAX)
+>>  		return -ENODEV;
+> Can you move this get hw_ep_max code to udc.c? As hw_ep_max is only used
+> for device driver. What do you think, Alex?
 
-diff --git a/sound/soc/codecs/mc13783.c b/sound/soc/codecs/mc13783.c
-index 50fa38b..6276e35 100644
---- a/sound/soc/codecs/mc13783.c
-+++ b/sound/soc/codecs/mc13783.c
-@@ -580,7 +580,6 @@ static struct snd_kcontrol_new mc13783_control_list[] = {
- static int mc13783_probe(struct snd_soc_codec *codec)
- {
- 	struct mc13783_priv *priv = snd_soc_codec_get_drvdata(codec);
--	struct snd_soc_dapm_context *dapm = &codec->dapm;
- 
- 	mc13xxx_lock(priv->mc13xxx);
- 
-@@ -592,14 +591,6 @@ static int mc13783_probe(struct snd_soc_codec *codec)
- 	mc13xxx_reg_write(priv->mc13xxx, MC13783_AUDIO_CODEC, 0x180027);
- 	mc13xxx_reg_write(priv->mc13xxx, MC13783_AUDIO_DAC, 0x0e0004);
- 
--	snd_soc_add_codec_controls(codec, mc13783_control_list,
--					ARRAY_SIZE(mc13783_control_list));
--
--	snd_soc_dapm_new_controls(dapm, mc13783_dapm_widgets,
--					ARRAY_SIZE(mc13783_dapm_widgets));
--	snd_soc_dapm_add_routes(dapm, mc13783_routes,
--					ARRAY_SIZE(mc13783_routes));
--
- 	if (priv->adc_ssi_port == MC13783_SSI1_PORT)
- 		mc13xxx_reg_rmw(priv->mc13xxx, MC13783_AUDIO_CODEC,
- 				AUDIO_SSI_SEL, 0);
-@@ -721,6 +712,12 @@ static struct snd_soc_codec_driver soc_codec_dev_mc13783 = {
- 	.remove		= mc13783_remove,
- 	.read		= mc13783_read,
- 	.write		= mc13783_write,
-+	.controls	= mc13783_control_list,
-+	.num_controls	= ARRAY_SIZE(mc13783_control_list),
-+	.dapm_widgets	= mc13783_dapm_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(mc13783_dapm_widgets),
-+	.dapm_routes	= mc13783_routes,
-+	.num_dapm_routes = ARRAY_SIZE(mc13783_routes),
- };
- 
- static int mc13783_codec_probe(struct platform_device *pdev)
-@@ -781,18 +778,7 @@ static struct platform_driver mc13783_codec_driver = {
- 	.remove = __devexit_p(mc13783_codec_remove),
- };
- 
--static __init int mc13783_init(void)
--{
--	return platform_driver_register(&mc13783_codec_driver);
--}
--
--static __exit void mc13783_exit(void)
--{
--	platform_driver_unregister(&mc13783_codec_driver);
--}
--
--module_init(mc13783_init);
--module_exit(mc13783_exit);
-+module_platform_driver(mc13783_codec_driver);
- 
- MODULE_DESCRIPTION("ASoC MC13783 driver");
- MODULE_AUTHOR("Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>");
--- 
-1.7.0.4
+Yes, I think this needs to go to udc.c in the future.
+
+Regards,
+--
+Alex
