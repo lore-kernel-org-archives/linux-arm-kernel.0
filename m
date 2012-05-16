@@ -1,54 +1,53 @@
 From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 15 May 2012 23:00:50 -0700
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAJOA=zNVQUDbHQCgnQ56S50fva2eKUXAH9aVkTbtyvQW+fq9SA@mail.gmail.com>
+Date: Tue, 15 May 2012 23:07:04 -0700
+Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
+ probing
+In-Reply-To: <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
+References: <1336725678-29327-1-git-send-email-sr@denx.de>
+ <4FB07D2B.6010409@st.com>
+ <CAJOA=zNe0yP5e75=fLTFAZMVZ=DsFF5xxkuear2C7sLD_XrGtA@mail.gmail.com>
+ <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
+Message-ID: <CAJOA=zMJBgEG=w2eby=OmNjYmHaLLvayFiOE=wJtgBTM=8U5MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 9:59 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Since clocks with CLK_SET_PARENT_GATE flag only allow clk_set_parent() on
-> unprepared clocks and calling clk_enable() on an unprepared clock would be
-> violating the clock API usage model, allow set_parent() ops to be sleepable
-> for clocks which have the CLK_SET_PARENT_GATE flag. Putting it another way,
-> if a clock's parent can't be switched without sleeping, then by definition
-> the parent can't be switched while it's prepared (CLK_SET_PARENT_GATE).
+On Tue, May 15, 2012 at 10:56 PM, viresh kumar <viresh.linux@gmail.com> wrote:
 >
-...
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e5d5dc1..09b9112 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1059,7 +1059,7 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
-> ?{
-> ? ? ? ?struct clk *old_parent;
-> ? ? ? ?unsigned long flags;
-> - ? ? ? int ret = -EINVAL;
-> + ? ? ? int ret;
-> ? ? ? ?u8 i;
+> On May 16, 2012 10:32 AM, "Turquette, Mike" <mturquette@ti.com> wrote:
+>>
+>> On Sun, May 13, 2012 at 8:34 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+>> > On 5/11/2012 2:11 PM, Stefan Roese wrote:
+>> >> diff --git a/drivers/clk/spear/spear6xx_clock.c
+>> >> b/drivers/clk/spear/spear6xx_clock.c
+>> >> index f9a20b3..bf33c1d 100644
+>> >> --- a/drivers/clk/spear/spear6xx_clock.c
+>> >> +++ b/drivers/clk/spear/spear6xx_clock.c
+>> >> @@ -298,7 +298,7 @@ void __init spear6xx_clk_init(void)
+>> >>
+>> >> ? ? ? clk = clk_register_gate(NULL, "gmac_clk", "ahb_clk", 0,
+>> >> PERIP1_CLK_ENB,
+>> >> ? ? ? ? ? ? ? ? ? ? ? GMAC_CLK_ENB, 0, &_lock);
+>> >> - ? ? clk_register_clkdev(clk, NULL, "gmac");
+>> >> + ? ? clk_register_clkdev(clk, NULL, "e0800000.ethernet");
+>> >>
+>> >> ? ? ? clk = clk_register_gate(NULL, "i2c_clk", "ahb_clk", 0,
+>> >> PERIP1_CLK_ENB,
+>> >> ? ? ? ? ? ? ? ? ? ? ? I2C_CLK_ENB, 0, &_lock);
+>> >
+>> > Acked-by: Viresh Kumar <viresh.kumar@st.com>
+>>
+>> Do you want me to take this? ?Spear didn't originally go through me
+>> but I can take it if that is the intent.
+>>
 >
-> ? ? ? ?old_parent = clk->parent;
-> @@ -1083,7 +1083,13 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
-> ? ? ? ?if (i == clk->num_parents) {
-> ? ? ? ? ? ? ? ?pr_debug("%s: clock %s is not a possible parent of clock %s\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, parent->name, clk->name);
-> - ? ? ? ? ? ? ? goto out;
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> +
-> + ? ? ? if (clk->flags & CLK_SET_PARENT_GATE) {
-> + ? ? ? ? ? ? ? ret = clk->ops->set_parent(clk->hw, i);
-> + ? ? ? ? ? ? ? clk->parent = parent;
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?}
->
-> ? ? ? ?/* migrate prepare and enable */
+> Sure. Go ahead.
 
-The above hunk is a good change since it fixes a bug where we
-prepare/enable the parent clocks around the .set_parent callback, even
-when CLK_SET_PARENT_GATE is set.  It should be a separate patch.
+Oops.  I'm working too late.  Wasn't thinking.
+
+I don't have spear in my clk-next branch (since clk-next is stable and
+the spear clock stuff went straight to arm-soc).  Instead of having me
+make a new branch based on arm-soc's latest can you just send this
+Arnd/Olof?
 
 Thanks,
 Mike
