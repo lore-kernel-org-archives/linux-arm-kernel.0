@@ -1,220 +1,127 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 16 May 2012 14:46:43 +0530
-Subject: [PATCHv5 3/8] ARM: OMAP4460: Workaround for ROM bug because of
- CA9 r2pX gic control register change
-In-Reply-To: <87zk99ce5q.fsf@ti.com>
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-4-git-send-email-t-kristo@ti.com> <87zk99ce5q.fsf@ti.com>
-Message-ID: <4FB3707B.2080200@ti.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Wed, 16 May 2012 02:19:55 -0700 (PDT)
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <CAJOA=zOjj8AY1Uk7X=1GCGHt-6OUndtwR-e36vdrRmFjhJDynA@mail.gmail.com>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <20120515194245.GO30400@pengutronix.de>
+ <4FB2B3AA.3010903@codeaurora.org>
+ <20120515200040.GP30400@pengutronix.de>
+ <4FB2B7DC.4070706@codeaurora.org>
+ <CAJOA=zOjj8AY1Uk7X=1GCGHt-6OUndtwR-e36vdrRmFjhJDynA@mail.gmail.com>
+Message-ID: <20357906133225932a45e9cefefac829.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012 03:14 AM, Kevin Hilman wrote:
-> Santosh,
-> 
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
->> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> On Tue, May 15, 2012 at 1:09 PM, Saravana Kannan <skannan@codeaurora.org>
+> wrote:
+>> On 05/15/2012 01:00 PM, Sascha Hauer wrote:
+>>>
+>>> On Tue, May 15, 2012 at 12:51:06PM -0700, Saravana Kannan wrote:
+>>>>>>
+>>>>>> ? ? ? ?ret = clk->ops->set_parent(clk->hw, i);
+>>>>>
+>>>>>
+>>>>> You call ->set_parent while holding a spinlock. This won't work with
+>>>>> i2c
+>>>>> clocks.
+>>>>
+>>>>
+>>>> I did account for that. I explained it in the commit text. Please
+>>>> let me know if any part of that is not clear or is not correct.
+>>>>
+>>>
+>>> I missed this part in the commit log. I have no idea whether we can
+>>> live
+>>> with this limitation though.
+>>>
+>>> Sascha
+>>>
 >>
->> GIC distributor control register has changed between CortexA9 r1pX and
->> r2pX. The Control Register secure banked version is now composed of 2
->> bits:
->>      bit 0 == Secure Enable
->>      bit 1 == Non-Secure Enable
->> The Non-Secure banked register has not changed. 
-> 
-> For those without the r1pX TRM handy, please include what this look like
-> before (presumably 1 bit?)  The changelog and in-code comments should
-> both be enhanced.
->
-You are right. There was only one bit previously which was used for
-secure/non-secure mode. So ROM over-writes the non-secure bit
-accidentally.
-
->> Since the ROM Code is based on the r1pX GIC, the CPU1 GIC restoration
->> will cause a problem to CPU0 Non-Secure SW.
-> 
-> Please describe the problem, so we can better understand the specifics
-> of the workaround.
-> 
-> Also, is there an erratum number for this?
-> 
->> The workaround must be:
->>      1) Before doing the CPU1 wakeup, CPU0 must disable
->>         the GIC distributor
->>      2) CPU1 must re-enable the GIC distributor on
->>         it's wakeup path.
-> 
-> Again, because the problem was not described, I am not entirely sure why
-> the workaround "must" be this, and how it fixes the problem.  Remember
-> to put yourself in the shoes of a reviewer who has not been deeply
-> involved in the code, so what seems obvious to you will not be obvious
-> to the reviewer without having to study the code and dig in to the TRMs.
->
-Agree and sorry for assuming that the TRM reference should be enough.
-
->> With this procedure, the GIC configuration done between the
->> CPU0 wakeup and CPU1 wakeup will not be lost but during this
->> short windows, the CPU0 will not receive interrupts
-> 
-> Hmm, so I guess this means that CPU0 always has to wakeup first, even on GP
-> devices? 
-> 
-Yes. Thats the case otherwise too, on all OMAP4 devices :-(
-
-> Also, the changelog doesn't describe what power states this affects, and
-> whether it's an idle problem or just a supend problem.  A quick glance
-> at the code suggests that only suspend is being addressed by this patch.
-> However, with the addition of coupled CPUidle (coming very soon now),
-> won't we have this same problem in idle?  IMO, this patch should address
-> both.
-> 
-MPU OSWR and onwards states only. Will add that info in the changelog.
-
-> This workaround also assumes that you always want CPU1 to wakeup
-> immediately after CPU0.  I guess that will be the case for the coupled
-> states that would be affected by this bug, but the changelog should
-> describe that as well
->
-You are right. It does affect couple idle as well. The old idle code
-was relying on hotplug path and this fix is in that path which helps
-suspend as well as cpuidle with CPU1 hotplug in/out
-
-Actually this BUG is really nasty and the WA is worst.
-
-> Some minor comments below...
-> 
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>  arch/arm/mach-omap2/common.h              |    2 +
->>  arch/arm/mach-omap2/omap-headsmp.S        |   36 +++++++++++++++++++++++++++++
->>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    9 ++++++-
->>  arch/arm/mach-omap2/omap-smp.c            |   28 +++++++++++++++++++++-
->>  arch/arm/mach-omap2/omap4-common.c        |    8 +++++-
->>  5 files changed, 80 insertions(+), 3 deletions(-)
+>> It's not really an artificial limitation of the patch. This has to be
+>> enforced if the clock is to be managed correctly while allowing
+>> .set_parent
+>> to NOT be atomic.
 >>
->> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
->> index 57da7f4..48d1ebe 100644
->> --- a/arch/arm/mach-omap2/common.h
->> +++ b/arch/arm/mach-omap2/common.h
->> @@ -199,6 +199,7 @@ static inline void __iomem *omap4_get_scu_base(void)
->>  #endif
->>  
->>  extern void __init gic_init_irq(void);
->> +extern void gic_dist_disable(void);
->>  extern void omap_smc1(u32 fn, u32 arg);
->>  extern void __iomem *omap4_get_sar_ram_base(void);
->>  extern void omap_do_wfi(void);
->> @@ -206,6 +207,7 @@ extern void omap_do_wfi(void);
->>  #ifdef CONFIG_SMP
->>  /* Needed for secondary core boot */
->>  extern void omap_secondary_startup(void);
->> +extern void omap_secondary_startup_4460(void);
->>  extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
->>  extern void omap_auxcoreboot_addr(u32 cpu_addr);
->>  extern u32 omap_read_auxcoreboot0(void);
->> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
->> index 503ac77..d602555 100644
->> --- a/arch/arm/mach-omap2/omap-headsmp.S
->> +++ b/arch/arm/mach-omap2/omap-headsmp.S
->> @@ -43,3 +43,39 @@ hold:	ldr	r12,=0x103
->>  	b	secondary_startup
->>  ENDPROC(omap_secondary_startup)
->>  
->> +ENTRY(omap_secondary_startup_4460)
->> +hold_2:	ldr	r12,=0x103
->> +	dsb
->> +	smc	#0			@ read from AuxCoreBoot0
->> +	mov	r0, r0, lsr #9
->> +	mrc	p15, 0, r4, c0, c0, 5
->> +	and	r4, r4, #0x0f
->> +	cmp	r0, r4
->> +	bne	hold_2
->> +
->> +	/*
->> +	 * GIC distributor control register has changed between
->> +	 * CortexA9 r1pX and r2pX. The Control Register secure
->> +	 * banked version is now composed of 2 bits:
->> +	 * bit 0 == Secure Enable
->> +	 * bit 1 == Non-Secure Enable
->> +	 * The Non-Secure banked register has not changed
->> +	 * Because the ROM Code is based on the r1pX GIC, the CPU1
->> +	 * GIC restoration will cause a problem to CPU0 Non-Secure SW.
->> +	 * The workaround must be:
->> +	 * 1) Before doing the CPU1 wakeup, CPU0 must disable
->> +	 * the GIC distributor
->> +	 * 2) CPU1 must re-enable the GIC distributor on
->> +	 * it's wakeup path.
->> +	 */
->> +	ldr	r1, =0x48241000
-> 
-> Why not OMAP44XX_GIC_DIST_BASE for readability sake?
+>> There is no way to guarantee that the enable/disable is properly
+>> propagated
+>> to the parent clock if we can't guarantee mutual exclusion between
+>> changing
+>> parents and calling enable/disable.
+>>
 >
-Will fix that.
+> We know for sure that __clk_enable was propagated since it won't
+> return until it is done.  The bigger issue here is the inherent
+> prepare_lock/enable_lock raciness, which this patch does not solve.
+> Your approach above is like putting a band-aid gunshot wound :-)
 
->> +	ldr	r0, [r1]
->> +	orr	r0, #1
->> +	str	r0, [r1]
->> +
->> +	/*
->> +	 * we've been released from the wait loop,secondary_stack
->> +	 * should now contain the SVC stack for this core
->> +	 */
->> +	b	secondary_startup
->> +ENDPROC(omap_secondary_startup_4460)
->> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> index 13670aa..e02c082 100644
->> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> @@ -68,6 +68,7 @@ struct omap4_cpu_pm_info {
->>  	void __iomem *scu_sar_addr;
->>  	void __iomem *wkup_sar_addr;
->>  	void __iomem *l2x0_sar_addr;
->> +	void (*secondary_startup)(void);
->>  };
->>  
->>  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
->> @@ -300,6 +301,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->>  int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
->>  {
->>  	unsigned int cpu_state = 0;
->> +	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
->>  
->>  	if (omap_rev() == OMAP4430_REV_ES1_0)
->>  		return -ENXIO;
->> @@ -309,7 +311,7 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
->>  
->>  	clear_cpu_prev_pwrst(cpu);
->>  	set_cpu_next_pwrst(cpu, power_state);
->> -	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_secondary_startup));
->> +	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
->>  	scu_pwrst_prepare(cpu, power_state);
->>  
->>  	/*
->> @@ -360,6 +362,11 @@ int __init omap4_mpuss_init(void)
->>  	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
->>  	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
->>  	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
->> +	if (cpu_is_omap446x())
->> +		pm_info->secondary_startup = omap_secondary_startup_4460;
->> +	else
->> +		pm_info->secondary_startup = omap_secondary_startup;
-> 
-> Does this exist on 4470 too?
->
-This OMAP4460 issue only. OMAP4470 ROM code BUG is fixed.
+No, I'm not trying to fix a race that's purely between prepare and enable.
+The operation of updating the HW state (calling .set_parent) and the
+operation of updating the SW state (setting clk->parent = new parent) is
+not atomic with respect to other code that cares about the HW/SW state
+(enable/disable). This would be similar to holding the enable spinlock
+around incrementing the enable count but not holding it while calling
+.enable on the clock -- that is just plain wrong.
 
-> Using a PM erratum check here instead of cpu_is* would make this more
-> scalable.  
-> 
-> Same comment for the cpu_is* check in wakeup_secondary()
-> 
-> Then, where the erratum is defined, it should state clearly why this
-> affects 446x and not before (presumably because 4430 has r1pX and 4460
-> has r2pX.)
-> 
-Ok
+If you still claim that's this is nothing more than prepare/enable race,
+then why are we implementing a half-baked enable/disable propagation up
+the parents? In it's current state, it's never guaranteed to be correct
+for ANY clock. Why give an illusion of correctness? Just don't do it --
+that will make the common clock framework less useful, but it's better
+than something that pretends to be correct.
 
-Regards
-Santosh
+Also, just because we pushed the enforcement of correctness between
+clk_prepare() and clk_enable() to the end user doesn't mean we should
+throw up our arms and push all the correctness enforcement to the end
+user. The API should try to limit the amount of burden of correctness that
+we put on the end user. The only thing we should avoid is writing code
+that's correct for the end user only under some circumstances.
+
+It's relatively easy to implement device driver code that ensures that
+enable is only called on a prepared clock (since we have ref counting and
+it's just a matter of matching enables with prepares). But it would be
+much harder to implement useful and power efficient device driver code
+that guarantees that enable/set parent is mutually exclusive. You also
+need to keep in mind the comment I made in the original email about set
+rates that need reparenting. set parent is just another way of setting the
+rate and vice-versa (in many cases). This stance of yours means that any
+clock that needs to reparent during a set rate while the clock is enabled
+can never be implemented correctly.
+
+A very simple example is a device driver that's trying to do power
+management by enabling/disabling clocks in interrupt context and also
+scaling the clock based on load on the device. Those drivers will fail
+horribly if the set rate needs reparenting.
+
+> What is really needed is a way to synchronize all of
+> the clock operations and drop these race conditions. Until that
+> problem is solved OR until it is proven impossible to fix with the
+> API's given to us I won't be taking this patch.  It is invalid for the
+> set of clocks that don't set the CLK_SET_PARENT_GATE flag AND have
+> .set_parent callbacks which might sleep.
+
+This is clearly the opposite of the direction we (the community) decided
+to go with the design of the clock APIs -- clk_prepare/clk_enable split.
+If we need to question that, that should be a separate discussion and not
+part of a discussion where we try to fix issues in the implementation of
+those APIs. There is not much to prove here either -- you just can't
+synchronize between critical sections where some are protected by mutex
+and others by spinlocks. Giving this is a reason to not pick up patches
+that fix bugs is not well justified. Again, I'm not saying your question
+is/isn't justified, just that it's a separate discussion.
+
+> It is invalid for the
+> set of clocks that don't set the CLK_SET_PARENT_GATE flag AND have
+> .set_parent callbacks which might sleep.
+
+Sure, but how does it affect the decision of whether we need to fix a race
+condition? Any clock platform driver that implements this incorrectly can
+be easily caught in testing or code review. Every single call to that set
+parent is going to spew a warning.
+
+Thanks,
+Saravana
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
