@@ -1,51 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 20:13:36 +0000
-Subject: [GIT PULL] Samsung devel-2 for v3.5
-In-Reply-To: <092f01cd332c$00df3c60$029db520$%kim@samsung.com>
-References: <092f01cd332c$00df3c60$029db520$%kim@samsung.com>
-Message-ID: <201205162013.37031.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 May 2012 13:14:58 -0700
+Subject: [GIT PULL][for 3.5] clk-next update
+In-Reply-To: <201205161839.03269.arnd@arndb.de>
+References: <20120516063552.GA5154@gmail.com>
+ <201205161839.03269.arnd@arndb.de>
+Message-ID: <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Kukjin Kim wrote:
+On Wed, May 16, 2012 at 11:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 16 May 2012, Mike Turquette wrote:
+>> Arnd & Olof,
+>>
+>> Please pull my clk-next branch. ?This is an update on top of the last
+>> pull request I sent you (already in arm-soc).
+>>
+>> This series is mostly Orion/Kirkwood support accompanied by two small
+>> core changes
+>>
+>> The following changes since commit f0948f59dbc8e725a96ba16da666e8f5cdd43ba8:
+>>
+>> ? clk: add a fixed factor clock (2012-05-08 14:13:25 -0700)
+>>
+>> are available in the git repository at:
+>>
+>> ? git://git.linaro.org/people/mturquette/linux.git clk-next
+>>
+>
+> Pulled into the next/clock branch,
+>
+> Thanks!
+>
+> Olof, I've rebuild the for-next branch now, and I don't plan to
+> work tomorrow, or very much on Friday. I think we're good with the
+> merge conflicts between arm-soc branches and with rmk/for-next
+> at the moment.
+>
+> Please handle incoming pull requests at least for tomorrow. I'll
+> also be travelling for the next three weeks, so you might have to
+> send most of the stuff onwards to Linus. I'll try to cook up
+> descriptions for the branches and put them into the contents
+> file in the meantime.
 
-> Note, this branch has a dependency on next/cleanup-plat-s5p which is already
-> in next/cleanup2 of arm-soc.
-> 
-> If any problems, please kindly let me know.
+Sounds good.
 
-I've hit a build problem with exynos4_defconfig, which I fixed using this patch.
+Are you planning on sending the last couple of fixes out before
+wrapping things up? If I haven't seen a request go out by tomorrow
+I'll do it, I suppose.
 
-	Arnd
- 
-commit 820f3dd7964f1889baaaaa0c2ba45d05bb619f66
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Wed May 16 22:10:14 2012 +0200
 
-    ARM: exynos: fix building with CONFIG_OF disabled
-    
-    irq_of_parse_and_map does not have an empty definition for the
-    !CONFIG_OF case, so we should not try to call it then:
-    
-    arch/arm/mach-exynos/common.c: In function 'combiner_init':
-    arch/arm/mach-exynos/common.c:576:3: warning: implicit declaration of function 'irq_of_parse_and_map'
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 9900158..4913471 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -568,7 +568,11 @@ void __init combiner_init(void __iomem *combiner_base, struct device_node *np)
- 
- 	for (i = 0; i < max_nr; i++) {
- 		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
--		irq = np ? irq_of_parse_and_map(np, i) : IRQ_SPI(i);
-+		irq = IRQ_SPI(i);
-+#ifdef CONFIG_OF
-+		if (np)
-+			irq = irq_of_parse_and_map(np, i);
-+#endif
- 		combiner_cascade_irq(i, irq);
- 	}
- }
+-Olof
