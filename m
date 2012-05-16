@@ -1,22 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 May 2012 14:33:47 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-In-Reply-To: <4FB3B1F3.6080102@atmel.com>
-References: <20120516185812.ce1ab57c3ec72445135a35fc@canb.auug.org.au>
- <201205161054.15610.arnd@arndb.de> <4FB3B1F3.6080102@atmel.com>
-Message-ID: <201205161433.47416.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 May 2012 23:05:39 +0800
+Subject: [PATCH v1 0/7] preliminary work for adding imx6q_sabrelite usb
+ support
+In-Reply-To: <201205161522.49115.marex@denx.de>
+References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
+ <20120516003748.GE29393@b20223-02.ap.freescale.net>
+ <20120516083414.GB22251@nchen-desktop>
+ <201205161522.49115.marex@denx.de>
+Message-ID: <20120516150538.GC3764@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012, Nicolas Ferre wrote:
-> I am on the subject till this morning to figure out if the parameters
-> are SoC dependent. It seems that the ADC is the same between those two
-> platforms but the technology is different: I have to figure out the
-> details internally.
+On Wed, May 16, 2012 at 03:22:48PM +0200, Marek Vasut wrote:
+> Fine with me, where can I get DT-enabled MXS kernel tree please?
 > 
-> I will give you a patch on top of arm-soc soon. It will replace the one
-> in staging-next: does it sound good to you?
+linux-next
 
-Ok, good.
-
-	Arnd
+-- 
+Regards,
+Shawn
