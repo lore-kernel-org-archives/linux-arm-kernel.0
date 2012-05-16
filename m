@@ -1,96 +1,57 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 15 May 2012 20:11:22 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <CAJe_Zhe-SqDMDGOhrYZtBBJnCYqLR0H07cPKzG4SyUxiLrgFnQ@mail.gmail.com>
- <4FA3F308.6030900@ti.com>
- <CAJe_ZhfFhZVG4gyaaVUgeQedJiSE=zj9nE28XCNH9DkPVgqj=A@mail.gmail.com>
-Message-ID: <4FB2FEBA.1030404@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 16 May 2012 03:14:45 +0200
+Subject: [PATCH] usb: chipidea: improve the validation of endpoint count
+In-Reply-To: <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
+References: <1337090303-16046-3-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337130885-32118-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+The endpoint count is zero for host-only controller. On the other hand,
+the endpoint count is non-zero for OTG capable controller.
 
-On 05/04/2012 02:01 PM, Jassi Brar wrote:
-> On 4 May 2012 20:47, Jon Hunter <jon-hunter@ti.com> wrote:
->> Hi Jassi,
->>
->> On 05/04/2012 01:56 AM, Jassi Brar wrote:
->>> On 1 May 2012 02:47, Jon Hunter <jon-hunter@ti.com> wrote:
->>>> From: Jon Hunter <jon-hunter@ti.com>
->>>>
->>>> This is based upon the work by Benoit Cousson [1] and Nicolas Ferre [2]
->>>> to add some basic helpers to retrieve a DMA controller device_node and the
->>>> DMA request/channel information.
->>>>
->>>> Aim of DMA helpers
->>>> - The purpose of device-tree (as far as I understand), is to describe the
->>>>  capabilites of the hardware. Thinking about DMA controllers purely from the
->>>>  context of the hardware to begin with, we can describe a device in terms of
->>>>  a DMA controller as follows ...
->>>>        1. Number of DMA controllers
->>>>        2. Number of channels (maybe physical or logical)
->>>>        3. Mapping of DMA requests signals to DMA controller
->>>>        4. Number of DMA interrupts
->>>>        5. Mapping of DMA interrupts to channels
->>>> - With the above in mind the aim of the DT DMA helper functions is to extract
->>>>  the above information from the DT and provide to the appropriate driver.
->>>>  However, due to the vast number of DMA controllers and not all are using a
->>>>  common driver (such as DMA Engine) it has been seen that this is not a
->>>>  trivial task.
->>>>
->>> Sorry for being slow, but so far I thought DT is only to provide _h/w_
->>> specific info
->>> to the _controller_ drivers. It was not supposed to provide any info
->>> pertaining to
->>> some API (dmaengine in this case).
->>>
->>> And I believe this is one of few situations where we are better off
->>> not generalizing
->>> the interface - pass controller specific info in the controller
->>> driver's specified format.
->>> Generalizing only seems to complicate things here, when we anyway have machine
->>> specific dtb, which could always have clients requesting and the
->>> controllers given
->>> dma's info in controller driver's specific format.
->>>
->>> Perhaps I am overlooking the need to generalize. If you think so, please help me
->>> understand by pointing out some use case for it.
->>
->> No not really, your points are valid. From reading the previous
->> discussions one of the items that was clearly lacking was the ability to
->> represent and identify a device having more than one DMA controller. In
->> other words, when you request the DMA resource, how do you identify
->> which DMA controller in the system that resource belongs too. With DMA
->> engine there are ways we can do this.
->>
-> Well, if we really can't have dmac drivers make 'intelligent' runtime decision
-> of request mapping on more than one capable controllers, we still can
-> make it simpler than the proposed scheme.
-> 
-> +       i2c1: i2c at 1 {
-> +               ...
-> +               dma = <&sdma 2 1 &sdma 3 2>;
-> +               ...
-> +       };
->>
-> I see this requires a client driver to specify a particular req_line on a
-> particular dma controller. I am not sure if this is most optimal.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Richard Zhao <richard.zhao@freescale.com>
+Cc: alexander.shishkin at linux.intel.com
+Cc: B20596 at freescale.com
+Cc: B29397 at freescale.com
+Cc: dong.aisheng at linaro.org
+Cc: fabio.estevam at freescale.com
+Cc: gregkh at linuxfoundation.org
+Cc: kernel at pengutronix.de
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: marex at denx.de
+Cc: shawn.guo at linaro.org
+To: linux-usb at vger.kernel.org
+---
+ drivers/usb/chipidea/core.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Actually, no. The phandle in the DT specifies the DMA controller to use.
-Then the client simply asks for a channel with a particular property,
-for example, DMA_MEM_TO_DEV (ie. TX) and the channel information is return.
-
-> I think such client->req_line map should be provided to the dmac controller
-> driver via its dt node in some format. The dmac driver could then populate
-> a dma_chan, or similar, only for that req_line and not for the unused one
-> which otherwise could also have served the same client.
-> 
-> Ideally the I2C driver should simply ask, say, a channel for TX and another
-> for RX, everything else should already be setup via dmac's dt nodes.
-
-Yes that is the intention here.
-
-Cheers
-Jon
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index f568b8e..b29a204 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -174,6 +174,7 @@ u8 hw_port_test_get(struct ci13xxx *ci)
+ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+ {
+ 	u32 reg;
++	int dc;
+ 
+ 	/* bank is a module variable */
+ 	ci->hw_bank.abs = base;
+@@ -195,7 +196,12 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+ 		ffs_nr(DCCPARAMS_DEN);
+ 	ci->hw_ep_max = reg * 2;   /* cache hw ENDPT_MAX */
+ 
+-	if (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX)
++	dc = hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC);
++
++	if (dc && (ci->hw_ep_max == 0 || ci->hw_ep_max > ENDPT_MAX))
++		return -ENODEV;
++
++	if (!dc && (ci->hw_ep_max != 0))
+ 		return -ENODEV;
+ 
+ 	dev_dbg(ci->dev, "ChipIdea HDRC found, lpm: %d; cap: %p op: %p\n",
+-- 
+1.7.10
