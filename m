@@ -1,37 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 May 2012 09:53:50 -0600
-Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
- omap2+ padconf
-In-Reply-To: <CACRpkdZCJXy4EMCa0x8pOLUOz=646_housV8qyqMh9AgfwxxUw@mail.gmail.com>
-References: <20120503065131.GA3738@game.jcrosoft.org>
- <20120503152708.GC5140@atomide.com> <4FA30805.5050804@wwwdotorg.org>
- <20120504044305.GD7788@game.jcrosoft.org> <20120504150342.GI5140@atomide.com>
- <20120504153251.GE7788@game.jcrosoft.org> <20120504163420.GA5613@atomide.com>
- <4FA42631.6060304@wwwdotorg.org> <20120504220809.GW5613@atomide.com>
- <4FAAD141.3090306@wwwdotorg.org> <20120509204925.GV5088@atomide.com>
- <4FABF553.20601@wwwdotorg.org>
- <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
- <4FB1513A.4070002@wwwdotorg.org>
- <CACRpkdZCJXy4EMCa0x8pOLUOz=646_housV8qyqMh9AgfwxxUw@mail.gmail.com>
-Message-ID: <4FB3CD8E.3030308@wwwdotorg.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 May 2012 00:17:27 +0800
+Subject: [PATCH] gpio/generic: initialize the shadow of direction register
+In-Reply-To: <20403.45469.121234.808145@ipc1.ka-ro>
+References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
+ <20402.798.622618.263780@ipc1.ka-ro>
+ <20120516053301.GB21517@S2100-06.ap.freescale.net>
+ <20403.20214.297216.188300@ipc1.ka-ro>
+ <20120516072859.GE21517@S2100-06.ap.freescale.net>
+ <20403.22671.800713.334846@ipc1.ka-ro>
+ <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
+ <20403.45469.121234.808145@ipc1.ka-ro>
+Message-ID: <20120516161726.GE3764@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2012 01:14 AM, Linus Walleij wrote:
-> On Mon, May 14, 2012 at 8:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/12/2012 05:49 PM, Linus Walleij wrote:
-...
->>> Maybe "-simple" isn't such a good name for this thing. Noone thinks
->>> any kind of pin control is simple in any sense of the word anyway :-D
->>>
->>> Tony, would pinctrl-dt-only.c be a better name perhaps?
->>
->> That might be OK for the filename, but it doesn't seem like a useful
->> change for the DT compatible value.
+On Wed, May 16, 2012 at 03:54:37PM +0200, Lothar Wa?mann wrote:
+> Actually I had sent a similar patch in July last year which was
+> rejected with the following reasoning:
 > 
-> Oh I didn't think of these. Hm from a generic world running Windows
-> Mobile etc I take it that this is seen as simple mappings then?
+> | I don't know if this is a valid thing to do or not. Not every GPIO
+> | controller supports reading back the initial state from the direction
+> | register. I suspect it is better to leave initialization of the
+> | direction to the gpio controller driver itself.
+> 
+> See: http://lkml.indiana.edu/hypermail/linux/kernel/1107.0/00908.html
+> 
+> That's why I came up with the patch to gpio-mxc.c
+> 
+Thanks for the whole story, Lothar.  Hopefully, with the additional
+condition checking added, Grant would agree it's the right thing to do.
+I will send v2 of the patch to see what we get from people.
 
-I can't think of anything that's much better than pinctrl-simple.
-Perhaps pinctrl-generic; at least that doesn't imply it's simple if we
-keep adding features:-)
+-- 
+Regards,
+Shawn
