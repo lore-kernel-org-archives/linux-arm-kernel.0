@@ -1,32 +1,39 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 15 May 2012 22:40:11 -0700
-Subject: [PATCH] clk: Fix CLK_SET_RATE_GATE flag validation in
- clk_set_rate().
-In-Reply-To: <20120516002500.GD29393@b20223-02.ap.freescale.net>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <1337114622-11292-1-git-send-email-skannan@codeaurora.org>
- <20120516002500.GD29393@b20223-02.ap.freescale.net>
-Message-ID: <CAJOA=zP4kS1CPry5nWo-mTba+9dAdK_a+rUrNCkQrzgixa3kRg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 May 2012 14:01:16 +0800
+Subject: Pre-merge window status of the arm-soc tree
+In-Reply-To: <CAOesGMjxNs2X9F7vus5z_69wqrZuMc2mMXh1CC0415JNcojHDg@mail.gmail.com>
+References: <CAOesGMjxNs2X9F7vus5z_69wqrZuMc2mMXh1CC0415JNcojHDg@mail.gmail.com>
+Message-ID: <20120516060115.GC21517@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 5:25 PM, Richard Zhao
-<richard.zhao@freescale.com> wrote:
-> On Tue, May 15, 2012 at 01:43:42PM -0700, Saravana Kannan wrote:
->> The clk_set_rate() code shouldn't check the clock's enable count when
->> validating CLK_SET_RATE_GATE flag since the enable count could change after
->> the validation. Similar to clk_set_parent(), it should instead check the
->> prepare count. The prepare count should go to zero only when the end user
->> expects the clock to not be enabled in the future. Since the code already
->> grabs the prepare count before validation, it's not possible for prepare
->> count to change after validation and by association not possible for a well
->> behaving end user to enable the clock while the set rate is in progress.
->>
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> Reviewed-by: Richard Zhao <richard.zhao@freescale.com>
+Hi Olof,
 
-Looks good to me.  I'll take into clk-next for one final pull request
-to arm-soc.
+On Tue, May 15, 2012 at 10:09:18PM -0700, Olof Johansson wrote:
+> The list of arm-soc topic branches to date are:
+> 
+> depends/clk/next Common clock infrastructure branch from Mike Turquette
+> next/maintainers Updates to MAINTAINERS file
+> next/cleanup     General cleanup patches
+> next/fixes       Fixes (and a few cleanups) that were not urgent enough for 3.4
+> next/dt          Device tree source and support changes
+> next/soc         New SoC support, or soc platform development
+> next/pinctrl     Changes enabling the new pinctrl subsystem on platforms
+> next/pm          power management and clock/reset changes
+> next/boards      board changes
+> next/defconfig   defconfig updates
+> next/drivers     drivers or SoC driver configuration updates
+> next/cleanup2    cleanups having dependencies on some of the above branches
+> next/clock       patches moving platforms to common clock infrastructure
+> next/dt2         device tree updates with dependencies on above branches
+> next/soc2        New SoC or SoC driver support depending on above branches
+> next/stmp-dev    library infrastructure for stmp-style device register
+> layouts and patches using those
+> staging/cleanup  late_initcall cleanups (to be moved to a next/* branch)
+> 
+I think next/stmp-dev should be sorted before next/dt2, since next/dt2
+contains mxs/dt which depends on next/stmp-dev.
 
-Thanks,
-Mike
+-- 
+Regards,
+Shawn
