@@ -1,32 +1,68 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 May 2012 14:14:58 +0800
-Subject: [PATCH 1/2] ARM: dts: add device tree source for imx6dl
-In-Reply-To: <20120515124949.546ba4fc3b624a4777e320af@freescale.com>
-References: <1337084027-19401-1-git-send-email-shawn.guo@linaro.org>
- <20120515124949.546ba4fc3b624a4777e320af@freescale.com>
-Message-ID: <20120516061457.GD21517@S2100-06.ap.freescale.net>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Tue, 15 May 2012 22:59:45 -0700
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <4FB2B7DC.4070706@codeaurora.org>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <20120515194245.GO30400@pengutronix.de> <4FB2B3AA.3010903@codeaurora.org>
+ <20120515200040.GP30400@pengutronix.de> <4FB2B7DC.4070706@codeaurora.org>
+Message-ID: <CAJOA=zOjj8AY1Uk7X=1GCGHt-6OUndtwR-e36vdrRmFjhJDynA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 12:49:49PM -0500, Kim Phillips wrote:
-> On Tue, 15 May 2012 20:13:47 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > +			snvs at 020cc000 {
-> > +				reg = <0x020cc000 0x4000>;
-> > +				interrupts = <0 19 0x04 0 20 0x04>;
-> > +			};
-> > +
-> 
-> this conflicts with the existing binding documented in
-> Documentation/devicetree/bindings/crypto/fsl-sec4.txt.
-> 
-Oh, great to know that we already have a binding for it.  Thanks for the
-info, Kim.  Right now, these blocks in imx6.dtsi are just placeholders
-with only IO space and interrupt numbers given, and the proper
-compatible and other properties will be added per the binding you point
-here when we actually have them supported for imx6.
+On Tue, May 15, 2012 at 1:09 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 05/15/2012 01:00 PM, Sascha Hauer wrote:
+>>
+>> On Tue, May 15, 2012 at 12:51:06PM -0700, Saravana Kannan wrote:
+>>>>>
+>>>>> ? ? ? ?ret = clk->ops->set_parent(clk->hw, i);
+>>>>
+>>>>
+>>>> You call ->set_parent while holding a spinlock. This won't work with i2c
+>>>> clocks.
+>>>
+>>>
+>>> I did account for that. I explained it in the commit text. Please
+>>> let me know if any part of that is not clear or is not correct.
+>>>
+>>
+>> I missed this part in the commit log. I have no idea whether we can live
+>> with this limitation though.
+>>
+>> Sascha
+>>
+>
+> It's not really an artificial limitation of the patch. This has to be
+> enforced if the clock is to be managed correctly while allowing .set_parent
+> to NOT be atomic.
+>
+> There is no way to guarantee that the enable/disable is properly propagated
+> to the parent clock if we can't guarantee mutual exclusion between changing
+> parents and calling enable/disable.
+>
 
--- 
-Regards,
-Shawn
+We know for sure that __clk_enable was propagated since it won't
+return until it is done.  The bigger issue here is the inherent
+prepare_lock/enable_lock raciness, which this patch does not solve.
+Your approach above is like putting a band-aid gunshot wound :-)
+
+This change essentially forces clocks with sleeping .set_parent
+callbacks to be gated during clk_set_parent or else cause a big WARN
+and dump_stack.  What is really needed is a way to synchronize all of
+the clock operations and drop these race conditions.  Until that
+problem is solved OR until it is proven impossible to fix with the
+API's given to us I won't be taking this patch.  It is invalid for the
+set of clocks that don't set the CLK_SET_PARENT_GATE flag AND have
+.set_parent callbacks which might sleep.
+
+> Since we can't do mutual exclusion be using spinlock (since .set_parent is
+> NOT atomic for these clocks), then only other way of ensuring mutual
+> exclusion is to force an unprepare and then mutually exclude a prepare while
+> changing the parent. This by association (can't enable unprepared clock)
+> mutually excludes the changing of parent and calling enable/disable.
+
+Right, but this is a workaround to a larger endemic problem.  I
+completely get what you're trying to do but this fix isn't enough.
+
+Thanks,
+Mike
