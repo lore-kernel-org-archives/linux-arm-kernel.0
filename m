@@ -1,31 +1,51 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 16 May 2012 17:18:47 +0300
-Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
-In-Reply-To: <20120516130823.GA30755@b20223-02.ap.freescale.net>
-References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
- <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
- <878vgscq4b.fsf@ashishki-desk.ger.corp.intel.com>
- <20120516130823.GA30755@b20223-02.ap.freescale.net>
-Message-ID: <87txzgb454.fsf@ashishki-desk.ger.corp.intel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 16 May 2012 15:27:02 +0100
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <4FB3B936.6010304@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+On 15/05/12 09:54, Thomas Petazzoni wrote:
 
-> On Wed, May 16, 2012 at 02:38:44PM +0300, Alexander Shishkin wrote:
->> > +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
->> 
->> Regarding the instance id here: you probably want to use something more
->> meaningful than the starting address. I was thinking about stealing id
->> allocator from Felipe's dwc3 (dwc3_get_device_id()), but decided to
->> first deal with more important things.
-> hmm... Is dwc3_get_device_id() really meaningful than base address?
-> It just record the sequence number.
+> diff --git a/arch/arm/mach-armada/common.h b/arch/arm/mach-armada/common.h
+> new file mode 100644
+> index 0000000..e453161
+> --- /dev/null
+> +++ b/arch/arm/mach-armada/common.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Core functions for Marvell Armada System On Chip
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Lior Amsalem<alior@marvell.com>
+> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __ARCH_ARMADA_COMMON_H
+> +#define __ARCH_ARMADA_COMMON_H
+> +
+> +#include<asm/exception.h>
+> +
+> +extern struct sys_timer armada_timer;
+> +
+> +void armada_map_io(void);
+> +void armada_init_irq(void);
+> +void armada_restart(char, const char *);
+> +asmlinkage void __exception_irq_entry armada_handle_irq(struct pt_regs *regs);
+> +
+> +#endif
 
-Well, if you indeed have more than one controller, you might want to
-know, for example, which one registered first. Or, one might simply not
-like the look of "/sys/bus/platform/devices/ci_hdrc.-5898240".
+you should have extern before all these function declarations.
 
-Regards,
---
-Alex
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
