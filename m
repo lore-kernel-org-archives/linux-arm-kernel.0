@@ -1,65 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 16 May 2012 15:36:23 +0200
-Subject: [PATCH 5/8] MXS: Add USB PHY driver
-In-Reply-To: <20120516071827.GD19137@b20223-02.ap.freescale.net>
-References: <1337070219-3630-1-git-send-email-marex@denx.de>
- <20120516050605.GB19137@b20223-02.ap.freescale.net>
- <20120516071827.GD19137@b20223-02.ap.freescale.net>
-Message-ID: <201205161536.24078.marex@denx.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 16 May 2012 15:36:50 +0200
+Subject: [RFC] pl08x: don't use dma_slave_config direction argument
+In-Reply-To: <20120516131720.GE9571@n2100.arm.linux.org.uk>
+References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
+ <4FB39C62.3030305@antcom.de> <20120516125253.GD9571@n2100.arm.linux.org.uk>
+ <4FB3A5E7.7060505@antcom.de> <20120516131720.GE9571@n2100.arm.linux.org.uk>
+Message-ID: <4FB3AD72.2010501@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Richard Zhao,
-
-> > > Thanks for the review, now how should we put these codes of ours
-> > > together? Will you integrate my code into yours or shall I do it the
-> > > other way around?
-> > 
-> > either way works for me. but I hope it support imx6 and use DT bindings
-> > and other things maybe in next branch.
+On 05/16/2012 03:17 PM, Russell King - ARM Linux wrote:
+>>>> * SLC driver says:
+>>>>
+>>>> lpc32xx-nand 20020000.flash: FIFO not empty!
+>>>> lpc32xx-nand 20020000.flash: FIFO held data too long
+>>>> lpc32xx-nand 20020000.flash: DMA FIFO failure
+>>>>
+>>>> Any hints, before I find the time to sort out all the details with
+>>>> amba-pl08x?
+>>>
+>>> Nothing jumps out; it would be useful if you could bisect the small
+>>> series - I did the conversion in small steps so it should be easy to
+>>> track down.  And it shouldn't take too long to rebuild between each
+>>> iteration.  Whatever it is, it's probably going to be a stupid mistake
+>>> somewhere.
+>>
+>> The problem first appears with patch #4.
 > 
-> Since, anyway we have to use DT, do you mind if I pick your patch and
-> add mx28 DT too, and send you for further tuning?
+> I said it would be something silly...
 
-I don't mind at all, go ahead. Thanks for that :)
+Works fine now, including series 1-7.
 
-> Thanks
-> Richard
-> 
-> > > Alas, I'd prefer for the PHY to stay separate in drivers/usb/otg,
-> > 
-> > I explained it above.
-> > 
-> > > maybe we can
-> > > also recycle some my mxs binding code for ci13xxx in some way or
-> > > another, as it has MXS specific hacks in it.
-> > 
-> > what hack do you mean?
-> > 
-> > > I think the ci13xxx binding for the rest of i.MX
-> > > (aka mxc) will looks different, won't it? But either way, my
-> > > mxs/ci13xxx binding glue will have to wait until we finish negotiating
-> > > the phy_notify stuff with Greg.
-> > 
-> > Sure. At the same time, we may create new version patch and see response.
-> > 
-> > Thanks
-> > Richard
-> > 
-> > > > Thanks
-> > > > Richard
-> > > > 
-> > > > > +module_exit(mxs_phy_exit);
-> > > > > +
-> > > > > +MODULE_ALIAS("platform:mxs-usb-phy");
-> > > > > +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-> > > > > +MODULE_DESCRIPTION("Freescale i.MX28 USB PHY driver");
-> > > > > +MODULE_LICENSE("GPL");
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
 
-Best regards,
-Marek Vasut
+Roland
