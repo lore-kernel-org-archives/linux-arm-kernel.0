@@ -1,89 +1,67 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 15 May 2012 23:35:52 -0700
-Subject: [GIT PULL][for 3.5] clk-next update
-Message-ID: <20120516063552.GA5154@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 16 May 2012 15:44:49 +0900
+Subject: [PATCH 00/08] mach-shmobile: Emma Mobile EV2 support V3
+Message-ID: <20120516064449.32286.77941.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd & Olof,
+mach-shmobile: Emma Mobile EV2 support V3
 
-Please pull my clk-next branch.  This is an update on top of the last
-pull request I sent you (already in arm-soc).
+[PATCH 01/08] mach-shmobile: Emma Mobile EV2 SoC base support V3
+[PATCH 02/08] ARM: Undelete KZM9D mach-type V3
+[PATCH 03/08] mach-shmobile: KZM9D board support V3
+[PATCH 04/08] mach-shmobile: Emma Mobile EV2 SMP support V3
+[PATCH 05/08] mach-shmobile: Emma Mobile EV2 GPIO support V3
+[PATCH 06/08] mach-shmobile: KZM9D board Ethernet support V3
+[PATCH 07/08] mach-shmobile: Emma Mobile EV2 DT support V3
+[PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
 
-This series is mostly Orion/Kirkwood support accompanied by two small
-core changes
+This series are the third iteration of Emma Mobile EV2 support
+for mach-shmobile. Yet another dual core Cortex-A9 SoC.
 
-The following changes since commit f0948f59dbc8e725a96ba16da666e8f5cdd43ba8:
+At this point serial, timer and gpio are supported as platform
+devices. Serial and timer also come with DT bindings.
 
-  clk: add a fixed factor clock (2012-05-08 14:13:25 -0700)
+Basic SMP support is in place, but CPU hotplug and TWD needs
+more work.
 
-are available in the git repository at:
+Clocks are enabled in the case of the KZM9D board support
+via platform devices. In the DT case there are no clocks
+enabled. So anyone playing around with DT will have to accept
+the fact that it is very limited at tis point. All features with
+upstream support can however be enabled via regular platform devices.
 
-  git://git.linaro.org/people/mturquette/linux.git clk-next
+Many thanks to Arnd for his endless reviews and helpful
+suggestions and a lot of patience!
 
-for you to fetch changes up to 7e0fa1b5fa91d9aa456d102c273b2cf0f2e95d39:
+To build this you also need whatever included in linux-next
+as of 20120514 plus the following patches:
 
-  clk: Fix CLK_SET_RATE_GATE flag validation in clk_set_rate(). (2012-05-15 22:42:10 -0700)
+[PATCH 01/03] clockevents: Make clockevents_config() a global symbol
+[PATCH 02/03] clocksource: em_sti: Emma Mobile STI driver V2
+[PATCH 03/03] clocksource: em_sti: Add DT support
+[PATCH] gpio: Emma Mobile GPIO driver V2
 
-----------------------------------------------------------------
-Andrew Lunn (14):
-      ARM: Orion: Add clocks using the generic clk infrastructure.
-      ARM: Orion: SPI: Add clk/clkdev support.
-      ARM: Orion: Eth: Add clk/clkdev support.
-      ARM: Orion: WDT: Add clk/clkdev support
-      ARM: Orion: UART: Get the clock rate via clk_get_rate().
-      ARM: Orion: SATA: Add per channel clk/clkdev support.
-      ARM: Orion: EHCI: Add support for enabling clocks
-      ARM: Orion: NAND: Add support for clk, if there is one.
-      ARM: Orion: SDIO: Add support for clk.
-      ARM: Orion: CESA: Add support for clk
-      ARM: Orion: XOR: Add support for clk
-      ARM: Orion: PCIE: Add support for clk
-      ARM: Orion: Audio: Add clk/clkdev support
-      ARM: Kirkwood: Replace clock gating
+The only update since V2 of this series is DT related bits
+in [7/8] and [8/8] plus the mach-type change in [2/8].
 
-Mark Brown (1):
-      clk: Provide dummy clk_unregister()
+In case the GPIO driver does not get merged it should be possible
+to omit [5/8] and [6/8] and still have a working but limited system.
 
-Saravana Kannan (1):
-      clk: Fix CLK_SET_RATE_GATE flag validation in clk_set_rate().
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
- arch/arm/Kconfig                                  |    1 +
- arch/arm/mach-dove/common.c                       |   39 +--
- arch/arm/mach-dove/dove-db-setup.c                |    1 -
- arch/arm/mach-kirkwood/board-dreamplug.c          |    1 -
- arch/arm/mach-kirkwood/board-dt.c                 |    3 +
- arch/arm/mach-kirkwood/common.c                   |  274 ++++++++++++++-------
- arch/arm/mach-kirkwood/common.h                   |    1 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |   16 ++
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c    |    1 -
- arch/arm/mach-kirkwood/pcie.c                     |   25 +-
- arch/arm/mach-kirkwood/rd88f6192-nas-setup.c      |    1 -
- arch/arm/mach-kirkwood/t5325-setup.c              |    1 -
- arch/arm/mach-kirkwood/tsx1x-common.c             |    1 -
- arch/arm/mach-mv78xx0/common.c                    |   45 ++--
- arch/arm/mach-orion5x/common.c                    |   27 +-
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c      |    1 -
- arch/arm/plat-orion/common.c                      |  104 ++++----
- arch/arm/plat-orion/include/plat/common.h         |   34 +--
- arch/arm/plat-orion/include/plat/orion_wdt.h      |   18 --
- arch/arm/plat-orion/pcie.c                        |    4 +-
- drivers/ata/sata_mv.c                             |   40 ++-
- drivers/clk/clk.c                                 |   11 +-
- drivers/crypto/mv_cesa.c                          |   14 ++
- drivers/dma/mv_xor.c                              |   15 ++
- drivers/dma/mv_xor.h                              |    1 +
- drivers/mmc/host/mvsdio.c                         |   14 ++
- drivers/mtd/nand/orion_nand.c                     |   18 ++
- drivers/net/ethernet/marvell/mv643xx_eth.c        |   42 +++-
- drivers/spi/spi-orion.c                           |   30 ++-
- drivers/usb/host/ehci-orion.c                     |   16 ++
- drivers/watchdog/orion_wdt.c                      |   16 +-
- include/linux/clk-provider.h                      |    2 +
- include/linux/mv643xx_eth.h                       |    1 -
- include/linux/spi/orion_spi.h                     |   17 --
- sound/soc/kirkwood/kirkwood-i2s.c                 |   13 +
- sound/soc/kirkwood/kirkwood.h                     |    1 +
- 36 files changed, 585 insertions(+), 264 deletions(-)
- delete mode 100644 arch/arm/plat-orion/include/plat/orion_wdt.h
- delete mode 100644 include/linux/spi/orion_spi.h
+ Applies to linux-next 20120514
+
+ arch/arm/boot/dts/emev2-kzm9d.dts           |   26 +
+ arch/arm/boot/dts/emev2.dtsi                |   63 +++
+ arch/arm/mach-shmobile/Kconfig              |   11 
+ arch/arm/mach-shmobile/Makefile             |    3 
+ arch/arm/mach-shmobile/board-kzm9d.c        |   89 +++++
+ arch/arm/mach-shmobile/clock-emev2.c        |  249 ++++++++++++++
+ arch/arm/mach-shmobile/include/mach/emev2.h |   19 +
+ arch/arm/mach-shmobile/platsmp.c            |   20 +
+ arch/arm/mach-shmobile/setup-emev2.c        |  454 ++++++++++++++++++++++++++-
+ arch/arm/mach-shmobile/smp-emev2.c          |   97 +++++
+ arch/arm/tools/mach-types                   |    1 
+ 11 files changed, 1028 insertions(+), 4 deletions(-)
