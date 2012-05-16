@@ -1,96 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 May 2012 08:12:03 +0100
-Subject: [PATCH 7.2/15] ARM: ux500: Disable SMSC911x platform code
- registration when DT is enabled
-In-Reply-To: <CACRpkdaLG+LwNpKX_52+scLrNbezvRXEuCfF5CAb4XFOSD4xag@mail.gmail.com>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdZzAQNJ9ejKJJQJhEPjO9VO+fPHmPeCErg8XOj-dLc3gA@mail.gmail.com>
- <4F967986.6090808@linaro.org> <201205031257.52100.arnd@arndb.de>
- <CACRpkdaLG+LwNpKX_52+scLrNbezvRXEuCfF5CAb4XFOSD4xag@mail.gmail.com>
-Message-ID: <4FB35343.4090407@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 May 2012 09:14:47 +0200
+Subject: [PATCH] pinctrl: Add generic pinctrl-simple driver that supports
+ omap2+ padconf
+In-Reply-To: <4FB1513A.4070002@wwwdotorg.org>
+References: <20120503065131.GA3738@game.jcrosoft.org>
+ <20120503152708.GC5140@atomide.com>
+ <4FA30805.5050804@wwwdotorg.org>
+ <20120504044305.GD7788@game.jcrosoft.org>
+ <20120504150342.GI5140@atomide.com>
+ <20120504153251.GE7788@game.jcrosoft.org>
+ <20120504163420.GA5613@atomide.com>
+ <4FA42631.6060304@wwwdotorg.org>
+ <20120504220809.GW5613@atomide.com>
+ <4FAAD141.3090306@wwwdotorg.org>
+ <20120509204925.GV5088@atomide.com> <4FABF553.20601@wwwdotorg.org>
+ <CACRpkdbqjofEi-5J+GTMOXFK1VvbXqa6At1fKXCge+5_y6aaRA@mail.gmail.com>
+ <4FB1513A.4070002@wwwdotorg.org>
+Message-ID: <CACRpkdZCJXy4EMCa0x8pOLUOz=646_housV8qyqMh9AgfwxxUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/12 18:14, Linus Walleij wrote:
-> On Thu, May 3, 2012 at 2:57 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
-> 
->> This version of the patch looks good, the version that was applied does not.
->> (...)
->> Linus and Lee, what's going on here?
-> 
-> Probably just my screwups when applying Lee's patches out-of-order
-> and splitting them.
-> 
-> I saw lee sent a new pull request with his baseline, throw the devcietree
-> branch from me out and use his branch instead.
+On Mon, May 14, 2012 at 8:38 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/12/2012 05:49 PM, Linus Walleij wrote:
+>>
+>> We have some pinctrl drivers implementing gpiolib too already,
+>> and it's unavoidable I think, as some recent discussion about
+>> matcing struct gpio_chip and pinctrl GPIO ranges shows.
+>
+> I strongly believe we should only do this when the exact same HW module
+> is both pinctrl and GPIO.
 
-I've just seen another problem with this.
+Yep so this is what I have done for pinctrl-nomadik.c
 
-In the pull request was:
+> When there are separate HW modules, we should have separate drivers. The
+> fact that the two drivers need to co-ordinate with each-other isn't a
+> good argument to make them one driver.
 
-> commit dc315c470b6b69018e6b65beb1e5b0d8f737261d
-> Author: Lee Jones <lee.jones@linaro.org>
-> Date:   Tue Apr 24 10:54:25 2012 +0100
-> 
->     ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
->     
->     Now the SCMC911x is correctly enabled in Device Tree, there is no need
->     to continue registering it from platform code. In fact, if we continue
->     doing so, the system will throw an error on boot.
->     
->     SAcked-by: Linus Walleij <linus.walleij@linaro.org>
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     igned-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index cdf0ecf..d554a8b 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -612,7 +612,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
->  static struct platform_device *snowball_of_platform_devs[] __initdata = {
->         &snowball_led_dev,
->         &snowball_key_dev,
-> -       &snowball_sbnet_dev,
->         &ab8500_device,
->  };
+So this matches the pinctrl-u300.c/pinctrl-coh901.c design pattern.
 
-But this made it into arm-soc:
+>> Maybe "-simple" isn't such a good name for this thing. Noone thinks
+>> any kind of pin control is simple in any sense of the word anyway :-D
+>>
+>> Tony, would pinctrl-dt-only.c be a better name perhaps?
+>
+> That might be OK for the filename, but it doesn't seem like a useful
+> change for the DT compatible value.
 
-> commit f58546a17c5dc2255c40e4bc4287e06a93b5c9a0
-> Author: Lee Jones <lee.jones@linaro.org>
-> Date:   Tue Apr 24 10:54:25 2012 +0100
-> 
->     ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
->     
->     Now the SCMC911x is correctly enabled in Device Tree, there is no need
->     to continue registering it from platform code. In fact, if we continue
->     doing so, the system will throw an error on boot.
->     
->     Signed-off-by: Lee Jones <lee.jones@linaro.org>
->     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index b885f27..f815015 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -605,7 +605,6 @@ static void __init mop500_uart_init(struct device *parent)
->  static struct platform_device *snowball_platform_devs[] __initdata = {
->         &snowball_led_dev,
->         &snowball_key_dev,
-> -       &snowball_sbnet_dev,
->         &ab8500_device,
->  };
+Oh I didn't think of these. Hm from a generic world running Windows
+Mobile etc I take it that this is seen as simple mappings then?
 
-Somehow the incorrect *_platform_devs[] was amended.
-
-Some kind of git automatic conflict resolution error?
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515 
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
