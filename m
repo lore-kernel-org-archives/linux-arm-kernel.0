@@ -1,93 +1,119 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 17 May 2012 02:46:38 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205161942.20296.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FB3D294.4020505@wwwdotorg.org>
- <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
- <201205161942.20296.arnd@arndb.de>
-Message-ID: <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 May 2012 14:17:46 -0700
+Subject: [GIT PULL][for 3.5] clk-next update
+In-Reply-To: <201205162052.46513.arnd@arndb.de>
+References: <20120516063552.GA5154@gmail.com>
+ <201205161839.03269.arnd@arndb.de>
+ <CAOesGMh6w9gHwwn5MJ7MSkP9S-2RmjrwOtj77RfCMpBrEtupDg@mail.gmail.com>
+ <201205162052.46513.arnd@arndb.de>
+Message-ID: <CAOesGMhwSKLVLVCSSo17FyqJ1FmyTb=NkkbvV0-KGZ69_us9MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 May 2012 01:12, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, May 16, 2012 at 1:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 16 May 2012, Olof Johansson wrote:
 >>
->> Generic binding to provide a way to provide the client-channel map and
->> other dmac specific parameters to the dma controller driver
->>
->> DMA Model:-
->> ? Only the most common characteristics of a dma setup are assumed
->> in this binding.
->> Client: Some h/w controller that could request a DMA controller in
->> the system to perform data transfer on its behalf. Example SPI, MMC,
->> I2S etc.
->> DMAC: A DMA Controller instance. Example, PL330, PL08X, SDMA etc.
->>
->> ?The assumed model of the DMAC, in this binding, has P peripheral
->> interfaces (P request signals) that could request a data transfer
->> and C physical channels that actually do the data transfers, hence,
->> at most C out of P peripherals could be served by the DMAC at any
->> point of time. Usually C := P, but not always. Usually, any of the
->> physical channels could be employed by the DMAC driver to serve any
->> client.
->> ?The DMAC driver identifies a client by its i/f number, 'peri_id'
->> on the given DMAC. For example, TX for SPI has 7th while RX_TX
->> (half-duplex) for MMC has 10th peripheral interface (request-signal)
->> on a given DMAC. Usually, any of the physical channels could be
->> employed by the DMAC driver to serve a client.
+>> Are you planning on sending the last couple of fixes out before
+>> wrapping things up? If I haven't seen a request go out by tomorrow
+>> I'll do it, I suppose.
 >
-Btw, just to be clear... this is not _my_ setup.
-The dma controller manuals might use different terms but underneath
-most(if not all) dma controllers fit this model. At lease every dmac
-on Samsung SoCs and ARM's PL330 and PL08x does.
-In fact, I have trouble imaging some dmac not conforming to this model...
-but then again it could be just me.
+> I was planning to, but it's getting rather late here in Germany
+> so maybe you can take care of this, too.
+
+Sure.
+
+> I've just fixed up two of the next/* branches that caused build regressions
+> (one was my fault, the other one came from samsung/board2) and started
+> building the defconfigs for linux-next, which looks rather bad, so I probably
+> won't spend much time trying to fix them up, see below for how far I got.
+
+Hmm. The _errors_ i get with next-0516 isn't nearly that bad but I
+think you build with -Werror?
+
+What I see here with last night's build is below. Some of these have
+been broken for a very long time (ixp4xx for example).
+
+buildall.arm.at91_dt_defconfig.log.failed:drivers/usb/gadget/at91_udc.c:478:18:
+error: 'struct at91_ep' has no member named 'desc'
+buildall.arm.ezx_defconfig.log.failed:drivers/mfd/ezx-pcap.c:205:2:
+error: implicit declaration of function 'irq_to_gpio'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:218:2:
+error: implicit declaration of function '__gpio_get_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:224:2:
+error: implicit declaration of function '__gpio_set_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:218:2:
+error: implicit declaration of function '__gpio_get_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:224:2:
+error: implicit declaration of function '__gpio_set_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:218:2:
+error: implicit declaration of function '__gpio_get_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:224:2:
+error: implicit declaration of function '__gpio_set_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:218:2:
+error: implicit declaration of function '__gpio_get_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:224:2:
+error: implicit declaration of function '__gpio_set_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:218:2:
+error: implicit declaration of function '__gpio_get_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.ixp4xx_defconfig.log.failed:include/asm-generic/gpio.h:224:2:
+error: implicit declaration of function '__gpio_set_value'
+[-Werror=implicit-function-declaration]
+buildall.arm.kota2_defconfig.log.failed:arch/arm/mach-shmobile/platsmp.c:29:2:
+error: implicit declaration of function 'of_machine_is_compatible'
+[-Werror=implicit-function-declaration]
+buildall.arm.kzm9g_defconfig.log.failed:arch/arm/mach-shmobile/platsmp.c:29:2:
+error: implicit declaration of function 'of_machine_is_compatible'
+[-Werror=implicit-function-declaration]
+buildall.arm.marzen_defconfig.log.failed:arch/arm/mach-shmobile/platsmp.c:29:2:
+error: implicit declaration of function 'of_machine_is_compatible'
+[-Werror=implicit-function-declaration]
+buildall.arm.marzen_defconfig.log.failed:fs/inode.c:1775:6: error:
+redefinition of 'inode_dio_wait'
+buildall.arm.mv78xx0_defconfig.log.failed:arch/arm/mach-mv78xx0/pcie.c:256:29:
+error: 'bus' undeclared (first use in this function)
+buildall.arm.netx_defconfig.log.failed:arch/arm/mach-netx/fb.c:72:6:
+error: redefinition of 'clk_disable'
+buildall.arm.netx_defconfig.log.failed:arch/arm/mach-netx/fb.c:76:5:
+error: redefinition of 'clk_set_rate'
+buildall.arm.netx_defconfig.log.failed:arch/arm/mach-netx/fb.c:81:5:
+error: redefinition of 'clk_enable'
+buildall.arm.netx_defconfig.log.failed:arch/arm/mach-netx/fb.c:86:13:
+error: redefinition of 'clk_get'
+buildall.arm.netx_defconfig.log.failed:arch/arm/mach-netx/fb.c:91:6:
+error: redefinition of 'clk_put'
+buildall.arm.prima2_defconfig.log.failed:drivers/spi/spi-sirf.c:563:2:
+error: implicit declaration of function 'pinmux_get'
+[-Werror=implicit-function-declaration]
+buildall.arm.prima2_defconfig.log.failed:drivers/spi/spi-sirf.c:568:2:
+error: implicit declaration of function 'pinmux_enable'
+[-Werror=implicit-function-declaration]
+buildall.arm.prima2_defconfig.log.failed:drivers/spi/spi-sirf.c:602:2:
+error: implicit declaration of function 'pinmux_disable'
+[-Werror=implicit-function-declaration]
+buildall.arm.prima2_defconfig.log.failed:drivers/spi/spi-sirf.c:603:2:
+error: implicit declaration of function 'pinmux_put'
+[-Werror=implicit-function-declaration]
+buildall.arm.raumfeld_defconfig.log.failed:drivers/input/touchscreen/eeti_ts.c:65:2:
+error: implicit declaration of function 'irq_to_gpio'
+[-Werror=implicit-function-declaration]
+buildall.arm.tegra_defconfig.log.failed:drivers/iommu/tegra-smmu.c:930:2:
+error: implicit declaration of function 'of_get_dma_window'
+[-Werror=implicit-function-declaration]
+buildall.arm.xcep_defconfig.log.failed:fs/inode.c:1775:6: error:
+redefinition of 'inode_dio_wait'
+buildall.arm.xcep_defconfig.log.failed:fs/nfs/direct.c:459:2: error:
+implicit declaration of function 'inode_dio_done'
+[-Werror=implicit-function-declaration]
 
 
-> I'm still anything but convinced by this model. Basically it's the
-> exact opposite of what we do for every other subsystem (irq, pinctrl,
-> regulator, gpio, ...), where the device using some infrastructure
-> contains the information about who provides it, whereas here you
-> move all the information into the device that provides the functionality,
-> and have no handle in the device using it by which the driver can
-> identify it.
->
-The idea was that a client shouldn't need to know/tell which dma controller
-serves it or which peripheral interface of a dma controller.
-I think in future third-party device IPs, like ARM's Primecell, are only gonna
-get more common so it makes even more sense.
-
-
-> I believe that it can work and that it solves the problem you are
-> faced with at minimal complexity, but you put the burden of this
-> complexity on everybody who does not have this issue, and make
-> the general binding confusing and harder to read.
->
-I am sorry if I gave you the wrong impression, but I didn't intend to just
-scratch my personal itch. I truly believed I and Stephen reached a generic
-solution i.e, as much as it could be.
-
-
-> It also adds much more data to the device tree (in source and binary form)
-> because you need to describe every device using a dma controller
-> and have a label to reference it.
->
-I don't see why one can't add entries to chan-map as and when more
-clients appear for the DMAC ? It should be perfectly ok to specify less
-than the maximum possible clients in chan-map.
-Requiring labels - yes, doesn't sound very nice, but many nodes already do.
-
-> More importantly, you make it very hard to add devices in a board file
-> to a dma controller that already has descriptions for some channels,
-> because you cannot easily extend the chan-map unless you rewrite all of it.
->
-I am not sure I understand the point.
-
-> We really need something simpler than this for the common case.
-> I have already made suggestions for how to make it still possible
-> to cover the corner case of multiple dma engines connected to the
-> same slave, which would keep the complexity local to those devices
-> that actually need it.
->
-Thanks $DEITY, I posted a preview. Maybe I should put it on hold.
-And thank you for speaking up immediately. Really!
+-Olof
