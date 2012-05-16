@@ -1,94 +1,102 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 15 May 2012 21:33:29 -0500
-Subject: [PATCH v4 0/7] cleanup imx5 idle, add imx5/6 cpuidle
-Message-ID: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
+Date: Tue, 15 May 2012 21:33:30 -0500
+Subject: [PATCH v4 1/7] ARM: imx: Modify IMX_IO_P2V macro
+In-Reply-To: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
+References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337135616-8988-2-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup up imx5 idle code and enable imx5 low powe idle for imx53.
+A change is needed in the IMX_IO_P2V macro to allow all imx5 platforms
+to use common definitions when accessing registers of peripherals on
+the AIPS2 bus.  With this change, IMX_IO_P2V(MX50_AIPS2_BASE_ADDR) ==
+IMX_IO_P2V(MX51_AIPS2_BASE_ADDR) == IMX_IO_P2V(MX53_AIPS2_BASE_ADDR).
 
-Add common imx cpuidle initialization functionality and add a i.MX5 and i.MX6Q
-platform cpuidle implementation.
+This change was tested for mapping conflicts using the iop2v script
+found at git://git.pengutronix.de/git/ukl/imx-iop2v.git and by
+performing a bootup of a default build using imx_v6_v7_defconfig
+on a imx51 babbage board and imx53 loco board.  The comments were
+modified to reflect the output given by the script which shows the
+virtual address mappings.
 
-Based on v3.4-rc7 plus recently submitted/accepted MACHINE_INIT late_initcall
- patch: http://www.spinics.net/lists/arm-kernel/msg171620.html
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
+ arch/arm/plat-mxc/include/mach/hardware.h |   25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
-v4 changes:
- * Added several imx5 idle cleanups to series.
- * Modified imx_io_p2v function to allow common imx5 AIPS2 bus virutal address
- * Added comment to tzic_wakeup_enable().
- * Movied imx5 idle code from mm-imx5.c to pm-imx5.c.
- * Removed unnecessary time consuming code execution that ran on each idle
-   instance.
- * modified imx5_pm_init to be a late_initcall
- * added late_initcall to all imx53 MACHINE_START entries.
- * enabled imx5 low power idle for imx53
- * rebased cpuidle driver on top of imx5 cleanup changes.
- * modified cpuidle driver exit time to reflect removal of unnecessary code
-   
-
-v3 changes:
- * removed file introduced in v1 no longer needed after v2 [per Shawn Guo]
- * re-ordered added #includes in alphabetical order [per Shawn Guo]
- * Remove if(!drv) check to allow handling by stack trace [per Sascha Hauer]
- * Added missing return value in error meesage [per Shawn Guo]
- * fixed (void *) casting problem pointed out Sasha Hauer.  Used a different
-   type of casting to properly give warning on improper casting:
-   	arm_pm_idle = (void (*)(void))imx5_idle;
-   Used this casting instead of adding a dummy caller function because
-   adding the dummy function appears to unnecessarily introduce the following
-   additional operations:
-	static void imx5_pm_idle(void)
-	{
-	  a0:	e1a0c00d 	mov	ip, sp
-	  a4:	e92dd800 	push	{fp, ip, lr, pc}
-	  a8:	e24cb004 	sub	fp, ip, #4
-		imx5_idle();
-	  ac:	ebffffd3 	bl	0 <imx5_idle>
-	}
-	  b0:	e89da800 	ldm	sp, {fp, sp, pc}
-
-http://permalink.gmane.org/gmane.linux.linaro.devel/11653
-
-v2 changes:
- * Removed some unnecessary  spaces [per Jess Juhl]
- * Added return value for an error message [per Sascha Hauer]
- * Reworked init scheme to use device tree late_initcall [per Sascha and Shawn]
- * Moved imx6q and imx5 cpuidle functionality to existing files.
-
-https://lkml.org/lkml/2012/5/1/363
-
-v1 initial submission:
-
-https://lkml.org/lkml/2012/4/16/644
-
-Robert Lee (7):
-  ARM: imx: Modify IMX_IO_P2V macro
-  ARM: imx: Add comments to tzic_enable_waker()
-  ARM: imx: clean and consolidate imx5 suspend and idle code
-  ARM: imx: Enable imx53 low power idle
-  ARM: imx: Add common imx cpuidle init functionality.
-  ARM: imx: Add imx5 cpuidle
-  ARM: imx: Add imx6q cpuidle driver
-
- arch/arm/mach-imx/clock-mx51-mx53.c       |    1 +
- arch/arm/mach-imx/imx53-dt.c              |    1 +
- arch/arm/mach-imx/mach-imx6q.c            |   19 ++++++
- arch/arm/mach-imx/mach-mx53_ard.c         |    1 +
- arch/arm/mach-imx/mach-mx53_evk.c         |    1 +
- arch/arm/mach-imx/mach-mx53_loco.c        |    1 +
- arch/arm/mach-imx/mach-mx53_smd.c         |    1 +
- arch/arm/mach-imx/mm-imx5.c               |   25 ++-----
- arch/arm/mach-imx/pm-imx5.c               |  103 +++++++++++++++++++++--------
- arch/arm/plat-mxc/Makefile                |    1 +
- arch/arm/plat-mxc/cpuidle.c               |   80 ++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/common.h   |    4 +-
- arch/arm/plat-mxc/include/mach/cpuidle.h  |   22 ++++++
- arch/arm/plat-mxc/include/mach/hardware.h |   25 ++++---
- arch/arm/plat-mxc/tzic.c                  |    4 ++
- 15 files changed, 231 insertions(+), 58 deletions(-)
- create mode 100644 arch/arm/plat-mxc/cpuidle.c
- create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
-
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+index 0630513..071afd0 100644
+--- a/arch/arm/plat-mxc/include/mach/hardware.h
++++ b/arch/arm/plat-mxc/include/mach/hardware.h
+@@ -50,7 +50,7 @@
+  *	IO	0x00200000+0x100000	->	0xf4000000+0x100000
+  * mx21:
+  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
+- *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
++ *	SAHB1	0x80000000+0x100000	->	0xf5000000+0x100000
+  *	X_MEMC	0xdf000000+0x004000	->	0xf5f00000+0x004000
+  * mx25:
+  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+@@ -58,47 +58,50 @@
+  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+  * mx27:
+  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
+- *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
++ *	SAHB1	0x80000000+0x100000	->	0xf5000000+0x100000
+  *	X_MEMC	0xd8000000+0x100000	->	0xf5c00000+0x100000
+  * mx31:
+  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
+  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+- *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
++ *	X_MEMC	0xb8000000+0x010000	->	0xf5c00000+0x010000
+  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+  * mx35:
+  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
+  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+- *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
++ *	X_MEMC	0xb8000000+0x010000	->	0xf5c00000+0x010000
+  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+  * mx50:
+  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
+- *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
++ *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
+  * mx51:
+- *	TZIC	0xe0000000+0x004000	->	0xf5000000+0x004000
++ *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
+  *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
++ *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
+  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
+  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
+- *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
++ *	AIPS2	0x83f00000+0x100000	->	0xf5300000+0x100000
+  * mx53:
+  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
++ *	DEBUG	0x40000000+0x100000	->	0xf5000000+0x100000
+  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
+  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
+  * mx6q:
+- *	SCU	0x00a00000+0x001000	->	0xf4000000+0x001000
++ *	SCU	0x00a00000+0x004000	->	0xf4000000+0x004000
+  *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
+- *	ANATOP	0x020c8000+0x001000	->	0xf42c8000+0x001000
++ *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
+  *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
+  */
+ #define IMX_IO_P2V(x)	(						\
+-			0xf4000000 +					\
++			(((x) & 0x80000000) >> 7) |			\
++			(0xf4000000 +					\
+ 			(((x) & 0x50000000) >> 6) +			\
+ 			(((x) & 0x0b000000) >> 4) +			\
+-			(((x) & 0x000fffff)))
++			(((x) & 0x000fffff))))
+ 
+ #define IMX_IO_ADDRESS(x)	IOMEM(IMX_IO_P2V(x))
+ 
 -- 
 1.7.10
