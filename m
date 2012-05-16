@@ -1,25 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 May 2012 09:30:30 +0200
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <CAJOA=zNVQUDbHQCgnQ56S50fva2eKUXAH9aVkTbtyvQW+fq9SA@mail.gmail.com>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <CAJOA=zNVQUDbHQCgnQ56S50fva2eKUXAH9aVkTbtyvQW+fq9SA@mail.gmail.com>
-Message-ID: <CACRpkda94B1JDC0T8eafBkHDg8JFy19OAH3NgGZRBLA28i9iRQ@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 16 May 2012 09:34:39 +0200
+Subject: [PATCH] gpio/generic: initialize the shadow of direction register
+In-Reply-To: <20120516072859.GE21517@S2100-06.ap.freescale.net>
+References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
+ <20402.798.622618.263780@ipc1.ka-ro>
+ <20120516053301.GB21517@S2100-06.ap.freescale.net>
+ <20403.20214.297216.188300@ipc1.ka-ro>
+ <20120516072859.GE21517@S2100-06.ap.freescale.net>
+Message-ID: <20403.22671.800713.334846@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 8:00 AM, Turquette, Mike <mturquette@ti.com> wrote:
+Shawn Guo writes:
+> On Wed, May 16, 2012 at 08:53:42AM +0200, Lothar Wa?mann wrote:
+> > > @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
+> > >                 return ret;
+> > > 
+> > >         bgc->data = bgc->read_reg(bgc->reg_dat);
+> > > +       if (bgc->gc.set == bgpio_set_set)
+> > > +               bgc->data = bgc->read_reg(bgc->reg_set);
+> > > +       if (bgc->reg_dir)
+> > > +               bgc->dir = bgc->read_reg(bgc->reg_dir);
+> > > 
+> > >         return ret;
+> > >  }
+> > > 
+> > That might change the behaviour of existing implementations.
+> > 
+> Can you be specific?  I do not quite follow on that.
+> 
+You initialize a variable to a specific value that defaulted to zero
+before.
 
-> The above hunk is a good change since it fixes a bug where we
-> prepare/enable the parent clocks around the .set_parent callback, even
-> when CLK_SET_PARENT_GATE is set. ?It should be a separate patch.
 
-This makes me think that maybe some of these clk fixes really
-need to add Cc: stable at kernel.org so they get into 3.4 as well.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Not that there are plenty of in-kernel users, but since people may
-be basing development off the 3.4 tree, it would be good to have
-fixes propagate there.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Linus Walleij
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
