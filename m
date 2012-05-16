@@ -1,33 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 May 2012 17:05:19 +0200
-Subject: [PATCH] ARM: mv78xx0: Fix compiler error in pcie.c
-Message-ID: <1337180719-5655-1-git-send-email-andrew@lunn.ch>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 16 May 2012 16:06:39 +0100
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <4FB3C27F.1010906@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-mv78xx0/pcie.c:256:29: error: 'bus' undeclared (first use in this function)
+On 15/05/12 09:54, Thomas Petazzoni wrote:
 
-caused by the patch:
 
-ARM: PCI: dove/kirkwood/mv78xx0: use sys->private_data
+> diff --git a/arch/arm/mach-armada/common.h b/arch/arm/mach-armada/common.h
+> new file mode 100644
+> index 0000000..e453161
+> --- /dev/null
+> +++ b/arch/arm/mach-armada/common.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Core functions for Marvell Armada System On Chip
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Lior Amsalem<alior@marvell.com>
+> + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __ARCH_ARMADA_COMMON_H
+> +#define __ARCH_ARMADA_COMMON_H
+> +
+> +#include<asm/exception.h>
+> +
+> +extern struct sys_timer armada_timer;
+> +
+> +void armada_map_io(void);
+> +void armada_init_irq(void);
+> +void armada_restart(char, const char *);
+> +asmlinkage void __exception_irq_entry armada_handle_irq(struct pt_regs *regs);
+> +
+> +#endif
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-mv78xx0/pcie.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+As a note, I don't think you need the `__exception_irq_entry` or the
+`asmlinkage` on the declaration of armada_handle_irq, so you could
+probably drop the include of <asm/exception.h> too.
 
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index 67357d1..2e56e86 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -253,7 +253,7 @@ mv78xx0_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- static int __init mv78xx0_pcie_map_irq(const struct pci_dev *dev, u8 slot,
- 	u8 pin)
- {
--	struct pci_sys_data *sys = bus->sysdata;
-+	struct pci_sys_data *sys = dev->bus->sysdata;
- 	struct pcie_port *pp = sys->private_data;
- 
- 	return IRQ_MV78XX0_PCIE_00 + (pp->maj << 2) + pp->min;
 -- 
-1.7.10
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
