@@ -1,29 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 17 May 2012 08:06:01 -0700
-Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20
- dtsi files
-In-Reply-To: <201205161850.54765.arnd@arndb.de>
-References: <4FB3B1F3.6080102@atmel.com>
- <1337182626-13033-1-git-send-email-nicolas.ferre@atmel.com>
- <201205161850.54765.arnd@arndb.de>
-Message-ID: <20120517150601.GA28104@kroah.com>
+From: alexey.zaytsev@gmail.com (Alexey Zaytsev)
+Date: Thu, 17 May 2012 18:29:23 +0300
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <201205161557.45362.arnd@arndb.de>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <201205161557.45362.arnd@arndb.de>
+Message-ID: <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
-> On Wednesday 16 May 2012, Nicolas Ferre wrote:
-> > Now that the bulk of at91sam9g20-related nodes are located in at91sam9260.dtsi,
-> > we have to re-create the path to this ADC node for SoC specific parts.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Should we apply this patch in arm-soc so that Greg can drop the hunk that
-> no longer applies?
+On Wed, May 16, 2012 at 6:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 16 May 2012, Alexey Zaytsev wrote:
+>> Hey.
+>>
+>> With all the ARM tree rework, I'm wondering, what would be a good (and
+>> simple) sub-architecture on which to base new ports. The target is a
+>> somewhat dated chip used in ADSL routers, so no DT, or multiplatform.
+>> I'm looking at ixp4xx, because I'm somewhat familiar with the
+>> platform, but is it a good reference?
+>
 
-It's not a "no longer applies", it's a "this does not merge".  The patch
-is in my tree, unless you want me to revert it, it's going to stay there
-until it goes to Linus.
+Thanks for the reply.
 
-thanks,
+> For a new subarchitecture, using DT is required, but it should not make
+> your work harder. spear3xx/6xx is a good example of an older platform
+> that was recently converted (take the arm-soc tree as a base, it contains
+> the latest version).
 
-greg k-h
+Will do. Thanks for the arm-soc pointer.
+
+> Another good one would be highbank, but that contains a lot of stuff you
+> don't need.
+>
+> ixp4xx is not very actively maintained, so I would not use that as
+> a base.
+>
+> What platform are you talking about? I know of a few people that are
+> working on getting older platforms ported to Linux, so maybe someone
+> is already working on a port.
+
+It's a 'Solos' soc from Connexant. They released kernel code for
+2.6.11, and I'm up-porting it to the current kernel. I know at least
+two other people interested in the port, adding them to CC. If you
+know anyone else, it would be great to share the effort.
