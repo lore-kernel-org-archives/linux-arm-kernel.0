@@ -1,72 +1,106 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 17 May 2012 12:40:59 +0530
-Subject: [PATCHv2 03/19] ARM: OMAP4: PM: Add device-off support
-In-Reply-To: <87obpn92jy.fsf@ti.com>
+Date: Thu, 17 May 2012 12:42:30 +0530
+Subject: [PATCHv2 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
+ on second CS
+In-Reply-To: <87mx573boy.fsf@ti.com>
 References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-4-git-send-email-t-kristo@ti.com> <87obpn92jy.fsf@ti.com>
-Message-ID: <CAMQu2gzwwVNVbNob4k-DXj04Hj4NgW9FuT0JQbvf7wOBkhf9CQ@mail.gmail.com>
+ <1336990730-26892-16-git-send-email-t-kristo@ti.com> <87mx573boy.fsf@ti.com>
+Message-ID: <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 4:06 AM, Kevin Hilman <khilman@ti.com> wrote:
-> +Jean for functional power states
->
+On Thu, May 17, 2012 at 5:45 AM, Kevin Hilman <khilman@ti.com> wrote:
 > Tero Kristo <t-kristo@ti.com> writes:
 >
->> This patch adds device off support to OMAP4 device type.
+>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
+>> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
+>> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
+>> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
+>> is not set properly, we apply the required workaround allowing
+>> the restore sequence to work properly.
 >
-> Description is rather thin for a patch that is doing so much.
+> Please summarize the workaround here as well.
 >
->> OFF mode is disabled by default,
->
-> why?
->
->> however, there are two ways to enable OFF mode:
->> a) In the board file, call omap4_pm_off_mode_enable(1)
->> b) Enable OFF mode using the debugfs entry
->> echo "1">/sys/kernel/debug/pm_debug/enable_off_mode
->> (conversely echo '0' will disable it as well).
->
-> This part needs to be a separate patch.
->
-> But, as stated in the core retention series, I'd like to move away from
-> these global flags all together.
->
-> The way we manage the disabling of certain states (like off) is already
-> clumsy for OMAP3, and it's getting worse with OMAP4. ?Basically, I think
-> this feature needs to be supported by using constraints on functional
-> power states. ? Having checks all over the place is getting unwieldy and
-> not attractive to maintain.
->
-> The combination of constraints and functional power states should make
-> this much more manageable. ? Until we have that, I'd prefer to keep
-> the debugfs enable/disable stuff as separate patches at the end of the
-> series used only for testing.
->
+ok
 >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> [t-kristo at ti.com: largely re-structured the code]
+>> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 37 ++++++++++++++++++++
+>> ?2 files changed, 39 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>> index a0af9ba..b763a79 100644
+>> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>> @@ -28,6 +28,8 @@
+>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? ? 0x0000
+>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? ? 0x0004
+>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ?0x0010
+>> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ? ?0x0114
+>> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ? ?0x011c
+>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ?0x0460
+>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ?0x0464
+>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ?0x0468
+>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+>> index 215b80e..dfaa254 100644
+>> --- a/arch/arm/mach-omap2/pm44xx.c
+>> +++ b/arch/arm/mach-omap2/pm44xx.c
+>> @@ -17,12 +17,18 @@
+>> ?#include <linux/err.h>
+>> ?#include <linux/slab.h>
+>> ?#include <asm/system_misc.h>
+>> +#include <linux/io.h>
+>> +
+>> +#include <mach/ctrl_module_wkup_44xx.h>
+>> +#include <mach/hardware.h>
+>>
+>> ?#include "common.h"
+>> ?#include "clockdomain.h"
+>> ?#include "powerdomain.h"
+>> ?#include "pm.h"
+>>
+>> +#define EMIF_SDRAM_CONFIG2_OFFSET ? ?0xc
+>> +
+>> ?struct power_state {
+>> ? ? ? struct powerdomain *pwrdm;
+>> ? ? ? u32 next_state;
+>> @@ -215,6 +221,37 @@ static int __init omap4_pm_init(void)
+>>
+>> ? ? ? pr_err("Power Management for TI OMAP4.\n");
+>>
+>> + ? ? /*
+>> + ? ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
+>> + ? ? ?* Mode Transition When CS1 Is Used On EMIF":
+>> + ? ? ?* Overwrite EMIF1/EMIF2
+>> + ? ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
+>> + ? ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
+>> + ? ? ?*/
+>> + ? ? if (cpu_is_omap443x()) {
 >
-> then the sign-off above from Santosh probably doesn't apply anymore.
-> You should change that to a Cc and just mention tht this is based upon
-> some original work from Santosh.
+> This should probably be done later in this function, after PM_ERRATUM
+> flags are setup, and then it should use a PM_ERRATUM flag instead of cpu_is*
 >
-> First, ?some general comments:
+ok
+
+>> + ? ? ? ? ? ? void __iomem *secure_ctrl_mod;
+>> + ? ? ? ? ? ? void __iomem *emif1;
+>> + ? ? ? ? ? ? void __iomem *emif2;
+>> + ? ? ? ? ? ? u32 val;
+>> +
+>> + ? ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+>> + ? ? ? ? ? ? emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
+>> + ? ? ? ? ? ? emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
+>> +
+>> + ? ? ? ? ? ? BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
 >
-> There is a lot going on in this patch, so it is hard to follow what all
-> is related, and why. ?Just a quick glance suggests it needs to be broken
-> up into at least a few parts:
+> Please avoid BUG_ON() and use proper error recovery. ?This is not a
+> condition where the entire kernel should panic.
 >
-> - low-level PRM support: new APIs for various off-mode features)
-> ?(should probably be done on top of functional power states)
-> - powerdomain core support or "achievable" states
-> ?(should probably be done on top of functional power states)
-> - IRQ/GIC context save/restore
-> - secure RAM save/restore (this has been tightly coupled to the GIC
-> ?but it's not obvious why)
-> - PM debug support to enable/disable off-mode
-> ?(for testing only, not for merge)
->
-Further split sounds good to me.
+Agree. WARN_ON() should suffice.
 
 Regards
 santosh
