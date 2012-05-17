@@ -1,351 +1,238 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 May 2012 16:53:53 -0600
-Subject: [PATCH] ARM: dt: tegra: add Whistler device tree file
-Message-ID: <1337295233-14575-1-git-send-email-swarren@wwwdotorg.org>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Thu, 17 May 2012 16:03:43 -0700
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+Message-ID: <4FB583CF.2080801@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
 
-Whistler is a highly configurable Tegra evaluation and development board.
-This change adds support for the following specific configuration:
+Should one be able to run top of the linux-next on MX28 EVK hardware 
+with DT support enabled?
+I have attached boot log I see when I try to do that.
 
-E1120 motherboard
-E1108 CPU board
-E1116 PMU board
+Further if one enables, CONFIG_MTD_NAND_GPMI_NAND=y 
+CONFIG_MTD_NAND_PLATFORM=y code in 
+drivers/mtd/nand/gpmi-nand/gpmi-nand.c doesn't compile because of this code:
 
-The motherboard configuration switches are set as follows:
-SW1=0 SW2=0 SW3=5
-S1/S2/S3/S4 all on, except S3 7/8 are off.
+         pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+         if (IS_ERR(pinctrl)) {
+                 ret = PTR_ERR(pinctrl);
+                 goto exit_pin;
+         }
 
-Other combinations of daugher boards may work to varying degrees, but will
-likely require some SW adjustment.
+-Subodh
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra-whistler.dts |  303 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/Makefile.boot    |    1 +
- 2 files changed, 304 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra-whistler.dts
-
-diff --git a/arch/arm/boot/dts/tegra-whistler.dts b/arch/arm/boot/dts/tegra-whistler.dts
-new file mode 100644
-index 0000000..2548648
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra-whistler.dts
-@@ -0,0 +1,303 @@
-+/dts-v1/;
-+
-+/include/ "tegra20.dtsi"
-+
-+/ {
-+	model = "NVIDIA Tegra2 Whistler evaluation board";
-+	compatible = "nvidia,whistler", "nvidia,tegra20";
-+
-+	memory {
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	pinmux {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&state_default>;
-+
-+		state_default: pinmux {
-+			ata {
-+				nvidia,pins = "ata", "atb", "ate", "gma", "gmb",
-+					"gmc", "gmd", "gpu";
-+				nvidia,function = "gmi";
-+			};
-+			atc {
-+				nvidia,pins = "atc", "atd";
-+				nvidia,function = "sdio4";
-+			};
-+			cdev1 {
-+				nvidia,pins = "cdev1";
-+				nvidia,function = "plla_out";
-+			};
-+			cdev2 {
-+				nvidia,pins = "cdev2";
-+				nvidia,function = "osc";
-+			};
-+			crtp {
-+				nvidia,pins = "crtp";
-+				nvidia,function = "crt";
-+			};
-+			csus {
-+				nvidia,pins = "csus";
-+				nvidia,function = "vi_sensor_clk";
-+			};
-+			dap1 {
-+				nvidia,pins = "dap1";
-+				nvidia,function = "dap1";
-+			};
-+			dap2 {
-+				nvidia,pins = "dap2";
-+				nvidia,function = "dap2";
-+			};
-+			dap3 {
-+				nvidia,pins = "dap3";
-+				nvidia,function = "dap3";
-+			};
-+			dap4 {
-+				nvidia,pins = "dap4";
-+				nvidia,function = "dap4";
-+			};
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "i2c2";
-+			};
-+			dta {
-+				nvidia,pins = "dta", "dtb", "dtc", "dtd";
-+				nvidia,function = "vi";
-+			};
-+			dte {
-+				nvidia,pins = "dte";
-+				nvidia,function = "rsvd1";
-+			};
-+			dtf {
-+				nvidia,pins = "dtf";
-+				nvidia,function = "i2c3";
-+			};
-+			gme {
-+				nvidia,pins = "gme";
-+				nvidia,function = "dap5";
-+			};
-+			gpu7 {
-+				nvidia,pins = "gpu7";
-+				nvidia,function = "rtck";
-+			};
-+			gpv {
-+				nvidia,pins = "gpv";
-+				nvidia,function = "pcie";
-+			};
-+			hdint {
-+				nvidia,pins = "hdint", "pta";
-+				nvidia,function = "hdmi";
-+			};
-+			i2cp {
-+				nvidia,pins = "i2cp";
-+				nvidia,function = "i2cp";
-+			};
-+			irrx {
-+				nvidia,pins = "irrx", "irtx";
-+				nvidia,function = "uartb";
-+			};
-+			kbca {
-+				nvidia,pins = "kbca", "kbcc", "kbce", "kbcf";
-+				nvidia,function = "kbc";
-+			};
-+			kbcb {
-+				nvidia,pins = "kbcb", "kbcd";
-+				nvidia,function = "sdio2";
-+			};
-+			lcsn {
-+				nvidia,pins = "lcsn", "lsck", "lsda", "lsdi",
-+					"spia", "spib", "spic";
-+				nvidia,function = "spi3";
-+			};
-+			ld0 {
-+				nvidia,pins = "ld0", "ld1", "ld2", "ld3", "ld4",
-+					"ld5", "ld6", "ld7", "ld8", "ld9",
-+					"ld10", "ld11", "ld12", "ld13", "ld14",
-+					"ld15", "ld16", "ld17", "ldc", "ldi",
-+					"lhp0", "lhp1", "lhp2", "lhs", "lm0",
-+					"lm1", "lpp", "lpw0", "lpw1", "lpw2",
-+					"lsc0", "lsc1", "lspi", "lvp0", "lvp1",
-+					"lvs";
-+				nvidia,function = "displaya";
-+			};
-+			owc {
-+				nvidia,pins = "owc", "uac";
-+				nvidia,function = "owr";
-+			};
-+			pmc {
-+				nvidia,pins = "pmc";
-+				nvidia,function = "pwr_on";
-+			};
-+			rm {
-+				nvidia,pins = "rm";
-+				nvidia,function = "i2c1";
-+			};
-+			sdb {
-+				nvidia,pins = "sdb", "sdc", "sdd", "slxa",
-+					"slxc", "slxd", "slxk";
-+				nvidia,function = "sdio3";
-+			};
-+			sdio1 {
-+				nvidia,pins = "sdio1";
-+				nvidia,function = "sdio1";
-+			};
-+			spdi {
-+				nvidia,pins = "spdi", "spdo";
-+				nvidia,function = "rsvd2";
-+			};
-+			spid {
-+				nvidia,pins = "spid", "spie", "spig", "spih";
-+				nvidia,function = "spi2_alt";
-+			};
-+			spif {
-+				nvidia,pins = "spif";
-+				nvidia,function = "spi2";
-+			};
-+			uaa {
-+				nvidia,pins = "uaa", "uab";
-+				nvidia,function = "uarta";
-+			};
-+			uad {
-+				nvidia,pins = "uad";
-+				nvidia,function = "irda";
-+			};
-+			uca {
-+				nvidia,pins = "uca", "ucb";
-+				nvidia,function = "uartc";
-+			};
-+			uda {
-+				nvidia,pins = "uda";
-+				nvidia,function = "spi1";
-+			};
-+			conf_ata {
-+				nvidia,pins = "ata", "atb", "atc", "ddc", "gma",
-+					"gmb", "gmc", "gmd", "irrx", "irtx",
-+					"kbca", "kbcb", "kbcc", "kbcd", "kbce",
-+					"kbcf", "sdc", "sdd", "spie", "spig",
-+					"spih", "uaa", "uab", "uad", "uca",
-+					"ucb";
-+				nvidia,pull = <2>;
-+				nvidia,tristate = <0>;
-+			};
-+			conf_atd {
-+				nvidia,pins = "atd", "ate", "cdev1", "csus",
-+					"dap1", "dap2", "dap3", "dap4", "dte",
-+					"dtf", "gpu", "gpu7", "gpv", "i2cp",
-+					"rm", "sdio1", "slxa", "slxc", "slxd",
-+					"slxk", "spdi", "spdo", "uac", "uda";
-+				nvidia,pull = <0>;
-+				nvidia,tristate = <0>;
-+			};
-+			conf_cdev2 {
-+				nvidia,pins = "cdev2", "spia", "spib";
-+				nvidia,pull = <1>;
-+				nvidia,tristate = <1>;
-+			};
-+			conf_ck32 {
-+				nvidia,pins = "ck32", "ddrc", "lc", "pmca",
-+					"pmcb", "pmcc", "pmcd", "xm2c",
-+					"xm2d";
-+				nvidia,pull = <0>;
-+			};
-+			conf_crtp {
-+				nvidia,pins = "crtp";
-+				nvidia,pull = <0>;
-+				nvidia,tristate = <1>;
-+			};
-+			conf_dta {
-+				nvidia,pins = "dta", "dtb", "dtc", "dtd",
-+					"spid", "spif";
-+				nvidia,pull = <1>;
-+				nvidia,tristate = <0>;
-+			};
-+			conf_gme {
-+				nvidia,pins = "gme", "owc", "pta", "spic";
-+				nvidia,pull = <2>;
-+				nvidia,tristate = <1>;
-+			};
-+			conf_ld17_0 {
-+				nvidia,pins = "ld17_0", "ld19_18", "ld21_20",
-+					"ld23_22";
-+				nvidia,pull = <1>;
-+			};
-+			conf_ls {
-+				nvidia,pins = "ls", "pmce";
-+				nvidia,pull = <2>;
-+			};
-+			drive_dap1 {
-+				nvidia,pins = "drive_dap1";
-+				nvidia,high-speed-mode = <0>;
-+				nvidia,schmitt = <1>;
-+				nvidia,low-power-mode = <0>;
-+				nvidia,pull-down-strength = <0>;
-+				nvidia,pull-up-strength = <0>;
-+				nvidia,slew-rate-rising = <0>;
-+				nvidia,slew-rate-falling = <0>;
-+			};
-+		};
-+	};
-+
-+	i2s at 70002800 {
-+		status = "okay";
-+	};
-+
-+	serial at 70006000 {
-+		status = "okay";
-+		clock-frequency = <216000000>;
-+	};
-+
-+	i2c at 7000d000 {
-+		status = "okay";
-+		clock-frequency = <100000>;
-+
-+		codec: codec at 1a {
-+			compatible = "wlf,wm8753";
-+			reg = <0x1a>;
-+		};
-+
-+		tca6416: gpio at 20 {
-+			compatible = "ti,tca6416";
-+			reg = <0x20>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+	};
-+
-+	usb at c5000000 {
-+		status = "okay";
-+		nvidia,vbus-gpio = <&tca6416 0 0>; /* GPIO_PMU0 */
-+	};
-+
-+	usb at c5008000 {
-+		status = "okay";
-+		nvidia,vbus-gpio = <&tca6416 1 0>; /* GPIO_PMU1 */
-+	};
-+
-+	sdhci at c8000400 {
-+		status = "okay";
-+		wp-gpios = <&gpio 173 0>; /* gpio PV5 */
-+		support-8bit;
-+		bus-width = <8>;
-+	};
-+
-+	sdhci at c8000600 {
-+		status = "okay";
-+		support-8bit;
-+		bus-width = <8>;
-+	};
-+
-+	sound {
-+		compatible = "nvidia,tegra-audio-wm8753-whistler",
-+			     "nvidia,tegra-audio-wm8753";
-+		nvidia,model = "NVIDIA Tegra Whistler";
-+
-+		nvidia,audio-routing =
-+			"Headphone Jack", "LOUT1",
-+			"Headphone Jack", "ROUT1",
-+			"MIC2", "Mic Jack",
-+			"MIC2N", "Mic Jack";
-+
-+		nvidia,i2s-controller = <&tegra_i2s1>;
-+		nvidia,audio-codec = <&codec>;
-+	};
-+};
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index 9a82094..2d1993e 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -7,4 +7,5 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
- dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
- dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
- dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-+dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra-whistler.dtb
- dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra-cardhu.dtb
--- 
-1.7.0.4
+[    0.000000] Booting Linux on physical CPU 0
+[    0.000000] Linux version 3.4.0-rc7-next-20120516-dirty 
+(snijsure at subodh-desktop) (gcc version 4.3.3 (Sour
+cery G++ Lite 2009q1-203) ) #3 Thu May 17 15:40:42 PDT 2012
+[    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: Freescale i.MX28 (Device Tree), model: Freescale 
+i.MX28 Evaluation Kit
+[    0.000000] Memory policy: ECC disabled, Data cache writeback
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  
+Total pages: 16256
+[    0.000000] Kernel command line: -e console=ttyAMA0,115200 
+ip=192.168.137.2::192.168.137.254:255
+.255.255.0::eth0: root=/dev/nfs 
+nfsroot=192.168.137.254:/tftpboot/,v3,tcp noinitrd
+[    0.000000] PID hash table entries: 256 (order: -2, 1024 bytes)
+[    0.000000] Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
+[    0.000000] Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
+[    0.000000] Memory: 64MB = 64MB total
+[    0.000000] Memory: 55792k/55792k available, 9744k reserved, 0K highmem
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     vmalloc : 0xc4800000 - 0xff000000   ( 936 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xc4000000   (  64 MB)
+[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0446220   (4345 kB)
+[    0.000000]       .init : 0xc0447000 - 0xc046a000   ( 140 kB)
+[    0.000000]       .data : 0xc046a000 - 0xc04a9f38   ( 256 kB)
+[    0.000000]        .bss : 0xc04a9f5c - 0xc08e3c30   (4328 kB)
+[    0.000000] SLUB: Genslabs=13, HWalign=32, Order=0-3, MinObjects=0, 
+CPUs=1, Nodes=1
+[    0.000000] NR_IRQS:304
+[    0.000000] sched_clock: 32 bits at 100 Hz, resolution 10000000ns, 
+wraps every 4294967286ms
+[    0.000000] Console: colour dummy device 80x30
+[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, 
+Inc., Ingo Molnar
+[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
+[    0.000000] ... MAX_LOCK_DEPTH:          48
+[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
+[    0.000000] ... CLASSHASH_SIZE:          4096
+[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
+[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
+[    0.000000] ... CHAINHASH_SIZE:          16384
+[    0.000000]  memory used by lock dependency info: 3679 kB
+[    0.000000]  per task-struct memory footprint: 1152 bytes
+[    0.080000] Calibrating delay loop... 226.09 BogoMIPS (lpj=1130496)
+[    0.080000] pid_max: default: 32768 minimum: 301
+[    0.080000] Mount-cache hash table entries: 512
+[    0.090000] CPU: Testing write buffer coherency: ok
+[    0.090000] Setting up static identity map for 0x4031baf8 - 0x4031bb50
+[    0.100000] devtmpfs: initialized
+[    0.100000] initlevel:0=early, 4 registered initcalls
+[    0.100000] initlevel:1=core, 19 registered initcalls
+[    0.100000] pinctrl core: initialized pinctrl subsystem
+[    0.110000] dummy:
+[    0.110000] NET: Registered protocol family 16
+[    0.110000] initlevel:2=postcore, 12 registered initcalls
+[    0.110000] initlevel:3=arch, 9 registered initcalls
+[    0.120000] gpiochip_add: registered GPIOs 0 to 31 on device: gpio.0
+[    0.120000] gpiochip_add: registered GPIOs 32 to 63 on device: gpio.1
+[    0.120000] gpiochip_add: registered GPIOs 64 to 95 on device: gpio.2
+[    0.120000] gpiochip_add: registered GPIOs 96 to 127 on device: gpio.3
+[    0.120000] gpiochip_add: registered GPIOs 128 to 159 on device: gpio.4
+[    0.130000] No ATAGs?
+[    0.130000] Serial: AMBA PL011 UART driver
+[    0.130000] 80074000.serial: ttyAMA0 at MMIO 0x80074000 (irq = 47) is 
+a PL011 rev2
+[    0.350000] console [ttyAMA0] enabled
+[    0.360000] initlevel:4=subsys, 27 registered initcalls
+[    0.380000] bio: create slab <bio-0> at 0
+[    0.390000] mxs-dma 80004000.dma-apbh: initialized
+[    0.400000] mxs-dma 80024000.dma-apbx: initialized
+[    0.410000] 3P3V: 3300 mV
+[    0.410000] Advanced Linux Sound Architecture Driver Version 1.0.25.
+[    0.420000] initlevel:5=fs, 18 registered initcalls
+[    0.420000] Switching to clocksource mxs_timer
+[    0.550000] NET: Registered protocol family 2
+[    0.550000] IP route cache hash table entries: 1024 (order: 0, 4096 
+bytes)
+[    0.560000] TCP established hash table entries: 2048 (order: 2, 16384 
+bytes)
+[    0.570000] TCP bind hash table entries: 2048 (order: 4, 73728 bytes)
+[    0.580000] TCP: Hash tables configured (established 2048 bind 2048)
+[    0.580000] TCP: reno registered
+[    0.590000] UDP hash table entries: 64 (order: 0, 5120 bytes)
+[    0.590000] UDP-Lite hash table entries: 64 (order: 0, 5120 bytes)
+[    0.600000] NET: Registered protocol family 1
+[    0.610000] RPC: Registered named UNIX socket transport module.
+[    0.610000] RPC: Registered udp transport module.
+[    0.620000] RPC: Registered tcp transport module.
+[    0.620000] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.630000] initlevel:6=device, 110 registered initcalls
+[    0.640000] NetWinder Floating Point Emulator V0.97 (double precision)
+[    0.680000] NFS: Registering the id_resolver key type
+[    0.690000] Key type id_resolver registered
+[    0.700000] msgmni has been set to 108
+[    0.700000] Block layer SCSI generic (bsg) driver version 0.4 loaded 
+(major 253)
+[    0.710000] io scheduler noop registered (default)
+[    0.720000] uart-pl011 80074000.serial: no DMA platform data
+[    0.790000] fec_enet_mii_bus: probed
+[    0.800000] mousedev: PS/2 mouse device common for all mice
+[    0.810000] i2c /dev entries driver
+[    0.820000] stmp_reset_block(f5010000): module reset timeout
+[    0.820000] INFO: trying to register non-static key.
+[    0.820000] the code is fine but needs lockdep annotation.
+[    0.820000] turning off the locking correctness validator.
+[    0.820000] [<c0015134>] (unwind_backtrace+0x0/0xf8) from 
+[<c005a154>] (__lock_acquire+0xb94/0xc1c)
+[    0.820000] [<c005a154>] (__lock_acquire+0xb94/0xc1c) from 
+[<c005a2c0>] (lock_acquire+0xe4/0xfc)
+[    0.820000] [<c005a2c0>] (lock_acquire+0xe4/0xfc) from [<c031b3b0>] 
+(_raw_spin_lock+0x2c/0x3c)
+[    0.820000] [<c031b3b0>] (_raw_spin_lock+0x2c/0x3c) from [<c0243a24>] 
+(mxs_mmc_irq_handler+0x1c/0x108)
+[    0.820000] [<c0243a24>] (mxs_mmc_irq_handler+0x1c/0x108) from 
+[<c0067a94>] (handle_irq_event_percpu+0x70/
+0x250)
+[    0.820000] [<c0067a94>] (handle_irq_event_percpu+0x70/0x250) from 
+[<c0067cb0>] (handle_irq_event+0x3c/0x5
+c)
+[    0.820000] [<c0067cb0>] (handle_irq_event+0x3c/0x5c) from 
+[<c006a3a0>] (handle_level_irq+0x8c/0x118)
+[    0.820000] [<c006a3a0>] (handle_level_irq+0x8c/0x118) from 
+[<c006763c>] (generic_handle_irq+0x34/0x40)
+[    0.820000] [<c006763c>] (generic_handle_irq+0x34/0x40) from 
+[<c00103dc>] (handle_IRQ+0x30/0x84)
+[    0.820000] [<c00103dc>] (handle_IRQ+0x30/0x84) from [<c000f174>] 
+(__irq_svc+0x34/0x60)
+[    0.820000] [<c000f174>] (__irq_svc+0x34/0x60) from [<c031b8c8>] 
+(_raw_spin_unlock_irqrestore+0x28/0x2c)
+[    0.820000] [<c031b8c8>] (_raw_spin_unlock_irqrestore+0x28/0x2c) from 
+[<c0068a08>] (__setup_irq+0x160/0x3f
+c)
+[    0.820000] [<c0068a08>] (__setup_irq+0x160/0x3fc) from [<c0068ec4>] 
+(request_threaded_irq+0xc8/0x130)
+[    0.820000] [<c0068ec4>] (request_threaded_irq+0xc8/0x130) from 
+[<c006ab9c>] (devm_request_threaded_irq+0x
+58/0x8c)
+[    0.820000] [<c006ab9c>] (devm_request_threaded_irq+0x58/0x8c) from 
+[<c0243840>] (mxs_mmc_probe+0x378/0x54
+0)
+[    0.820000] [<c0243840>] (mxs_mmc_probe+0x378/0x540) from 
+[<c01ecf60>] (platform_drv_probe+0x18/0x1c)
+[    0.820000] [<c01ecf60>] (platform_drv_probe+0x18/0x1c) from 
+[<c01ebbc0>] (driver_probe_device+0x80/0x214)
+[    0.820000] [<c01ebbc0>] (driver_probe_device+0x80/0x214) from 
+[<c01ebde8>] (__driver_attach+0x94/0x98)
+[    0.820000] [<c01ebde8>] (__driver_attach+0x94/0x98) from 
+[<c01ea450>] (bus_for_each_dev+0x60/0x8c)
+[    0.820000] [<c01ea450>] (bus_for_each_dev+0x60/0x8c) from 
+[<c01eac30>] (bus_add_driver+0xb0/0x268)
+[    0.820000] [<c01eac30>] (bus_add_driver+0xb0/0x268) from 
+[<c01ec3b8>] (driver_register+0x58/0x12c)
+[    0.820000] [<c01ec3b8>] (driver_register+0x58/0x12c) from 
+[<c000879c>] (do_one_initcall+0x30/0x16c)
+[    0.820000] [<c000879c>] (do_one_initcall+0x30/0x16c) from 
+[<c0447328>] (kernel_init+0x110/0x1e4)
+[    0.820000] [<c0447328>] (kernel_init+0x110/0x1e4) from [<c00104a8>] 
+(kernel_thread_exit+0x0/0x8)
+[    0.820000] BUG: spinlock lockup on CPU#0, swapper/1
+[    0.820000]  lock: 0xc3992f24, .magic: 00000000, .owner: <none>/-1, 
+.owner_cpu: 0
+[    0.820000] [<c0015134>] (unwind_backtrace+0x0/0xf8) from 
+[<c01b44fc>] (do_raw_spin_lock+0xec/0x140)
+[    0.820000] [<c01b44fc>] (do_raw_spin_lock+0xec/0x140) from 
+[<c0243a24>] (mxs_mmc_irq_handler+0x1c/0x108)
+[    0.820000] [<c0243a24>] (mxs_mmc_irq_handler+0x1c/0x108) from 
+[<c0067a94>] (handle_irq_event_percpu+0x70/
+0x250)
+[    0.820000] [<c0067a94>] (handle_irq_event_percpu+0x70/0x250) from 
+[<c0067cb0>] (handle_irq_event+0x3c/0x5
+c)
+[    0.820000] [<c0067cb0>] (handle_irq_event+0x3c/0x5c) from 
+[<c006a3a0>] (handle_level_irq+0x8c/0x118)
+[    0.820000] [<c006a3a0>] (handle_level_irq+0x8c/0x118) from 
+[<c006763c>] (generic_handle_irq+0x34/0x40)
+[    0.820000] [<c006763c>] (generic_handle_irq+0x34/0x40) from 
+[<c00103dc>] (handle_IRQ+0x30/0x84)
+[    0.820000] [<c00103dc>] (handle_IRQ+0x30/0x84) from [<c000f174>] 
+(__irq_svc+0x34/0x60)
+[    0.820000] [<c000f174>] (__irq_svc+0x34/0x60) from [<c031b8c8>] 
+(_raw_spin_unlock_irqrestore+0x28/0x2c)
+[    0.820000] [<c031b8c8>] (_raw_spin_unlock_irqrestore+0x28/0x2c) from 
+[<c0068a08>] (__setup_irq+0x160/0x3f
+c)
+[    0.820000] [<c0068a08>] (__setup_irq+0x160/0x3fc) from [<c0068ec4>] 
+(request_threaded_irq+0xc8/0x130)
+[    0.820000] [<c0068ec4>] (request_threaded_irq+0xc8/0x130) from 
+[<c006ab9c>] (devm_request_threaded_irq+0x
+58/0x8c)
+[    0.820000] [<c006ab9c>] (devm_request_threaded_irq+0x58/0x8c) from 
+[<c0243840>] (mxs_mmc_probe+0x378/0x54
+0)
+[    0.820000] [<c0243840>] (mxs_mmc_probe+0x378/0x540) from 
+[<c01ecf60>] (platform_drv_probe+0x18/0x1c)
+[    0.820000] [<c01ecf60>] (platform_drv_probe+0x18/0x1c) from 
+[<c01ebbc0>] (driver_probe_device+0x80/0x214)
+[    0.820000] [<c01ebbc0>] (driver_probe_device+0x80/0x214) from 
+[<c01ebde8>] (__driver_attach+0x94/0x98)
+[    0.820000] [<c01ebde8>] (__driver_attach+0x94/0x98) from 
+[<c01ea450>] (bus_for_each_dev+0x60/0x8c)
+[    0.820000] [<c01ea450>] (bus_for_each_dev+0x60/0x8c) from 
+[<c01eac30>] (bus_add_driver+0xb0/0x268)
+[    0.820000] [<c01eac30>] (bus_add_driver+0xb0/0x268) from 
+[<c01ec3b8>] (driver_register+0x58/0x12c)
+[    0.820000] [<c01ec3b8>] (driver_register+0x58/0x12c) from 
+[<c000879c>] (do_one_initcall+0x30/0x16c)
+[    0.820000] [<c000879c>] (do_one_initcall+0x30/0x16c) from 
+[<c0447328>] (kernel_init+0x110/0x1e4)
+[    0.820000] [<c0447328>] (kernel_init+0x110/0x1e4) from [<c00104a8>] 
+(kernel_thread_exit+0x0/0x8
