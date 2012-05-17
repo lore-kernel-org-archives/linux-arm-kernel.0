@@ -1,41 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 May 2012 13:55:44 +0100
-Subject: [PATCH v7 3/3] MTD: atmel_nand: Update driver to support
- Programmable Multibit ECC controller
-In-Reply-To: <1337255011.2564.2.camel@koala>
-References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
- <1337093256-19117-4-git-send-email-josh.wu@atmel.com>
- <1337160353.24809.26.camel@sauron.fi.intel.com>
- <20403.29677.517067.528042@ipc1.ka-ro>
- <1337161217.24809.38.camel@sauron.fi.intel.com> <4FB49C60.5030002@atmel.com>
- <1337255011.2564.2.camel@koala>
-Message-ID: <20120517125544.GJ9571@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 17 May 2012 15:13:51 +0200
+Subject: [PATCHv10 01/11] common: add dma_mmap_from_coherent() function
+In-Reply-To: <1337260441-8121-1-git-send-email-m.szyprowski@samsung.com>
+References: <1337260441-8121-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1337260441-8121-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 02:43:31PM +0300, Artem Bityutskiy wrote:
-> On Thu, 2012-05-17 at 14:36 +0800, Josh Wu wrote:
-> > >> message text should not be split across lines anyway to ease grepping
-> > >> for the message.
-> > > I think the consensus is that it is personal decision of the author. I
-> > > am not trying to enforce this and I also split messages. In this case I
-> > > was only wondering why that backslash is used? I never saw this before
-> > > in the linux kernel.
-> > >
-> > 
-> > oh, I add the backslash only because if without it, there should be a 
-> > warning about message is splitting into two lines.
-> 
-> Backslash is not needed in C. The preprocessor removes it anyway. We do
-> not put them.
-> 
-> > Now I think I will just keep the text message in one line. That will 
-> > avoid any warnings. thanks.
-> 
-> You can just remove the backslashes. I think your lines splitting is
-> fine otherwise.
+Add a common helper for dma-mapping core for mapping a coherent buffer
+to userspace.
 
-It's also preferred _not_ to wrap error messages as that makes them
-harder to grep for.  Linus has mentioned this several times on LKML
-and has corrected error messages that he encounters that he can't
-find via grep.
+Reported-by: Subash Patel <subashrp@gmail.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Tested-By: Subash Patel <subash.ramaswamy@linaro.org>
+---
+ drivers/base/dma-coherent.c        |   42 ++++++++++++++++++++++++++++++++++++
+ include/asm-generic/dma-coherent.h |    4 +++-
+ 2 files changed, 45 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index bb0025c..1b85949 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -10,6 +10,7 @@
+ struct dma_coherent_mem {
+ 	void		*virt_base;
+ 	dma_addr_t	device_base;
++	phys_addr_t	pfn_base;
+ 	int		size;
+ 	int		flags;
+ 	unsigned long	*bitmap;
+@@ -44,6 +45,7 @@ int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
+ 
+ 	dev->dma_mem->virt_base = mem_base;
+ 	dev->dma_mem->device_base = device_addr;
++	dev->dma_mem->pfn_base = PFN_DOWN(bus_addr);
+ 	dev->dma_mem->size = pages;
+ 	dev->dma_mem->flags = flags;
+ 
+@@ -176,3 +178,43 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dma_release_from_coherent);
++
++/**
++ * dma_mmap_from_coherent() - try to mmap the memory allocated from
++ * per-device coherent memory pool to userspace
++ * @dev:	device from which the memory was allocated
++ * @vma:	vm_area for the userspace memory
++ * @vaddr:	cpu address returned by dma_alloc_from_coherent
++ * @size:	size of the memory buffer allocated by dma_alloc_from_coherent
++ *
++ * This checks whether the memory was allocated from the per-device
++ * coherent memory pool and if so, maps that memory to the provided vma.
++ *
++ * Returns 1 if we correctly mapped the memory, or 0 if
++ * dma_release_coherent() should proceed with mapping memory from
++ * generic pools.
++ */
++int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
++			   void *vaddr, size_t size, int *ret)
++{
++	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++
++	if (mem && vaddr >= mem->virt_base && vaddr + size <=
++		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
++		unsigned long off = vma->vm_pgoff;
++		int start = (vaddr - mem->virt_base) >> PAGE_SHIFT;
++		int user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
++		int count = size >> PAGE_SHIFT;
++
++		*ret = -ENXIO;
++		if (off < count && user_count <= count - off) {
++			unsigned pfn = mem->pfn_base + start + off;
++			*ret = remap_pfn_range(vma, vma->vm_start, pfn,
++					       user_count << PAGE_SHIFT,
++					       vma->vm_page_prot);
++		}
++		return 1;
++	}
++	return 0;
++}
++EXPORT_SYMBOL(dma_mmap_from_coherent);
+diff --git a/include/asm-generic/dma-coherent.h b/include/asm-generic/dma-coherent.h
+index 85a3ffa..abfb268 100644
+--- a/include/asm-generic/dma-coherent.h
++++ b/include/asm-generic/dma-coherent.h
+@@ -3,13 +3,15 @@
+ 
+ #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
+ /*
+- * These two functions are only for dma allocator.
++ * These three functions are only for dma allocator.
+  * Don't use them in device drivers.
+  */
+ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 				       dma_addr_t *dma_handle, void **ret);
+ int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
+ 
++int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
++			    void *cpu_addr, size_t size, int *ret);
+ /*
+  * Standard interface
+  */
+-- 
+1.7.10.1
