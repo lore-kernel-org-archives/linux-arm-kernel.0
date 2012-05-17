@@ -1,31 +1,65 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 May 2012 17:35:30 -0600
-Subject: [PATCH 02/15] drivers/gpio: gpio-nomadik: Add support for
- irqdomains
-In-Reply-To: <CACRpkdabAJt7YbfOBCgg0hktp8sffFrf6r5zT0hrETMcijcCpQ@mail.gmail.com>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdabAJt7YbfOBCgg0hktp8sffFrf6r5zT0hrETMcijcCpQ@mail.gmail.com>
-Message-ID: <20120517233530.299033E062C@localhost>
+Date: Thu, 17 May 2012 17:38:32 -0600
+Subject: [PATCH 0/9] ux500/Nomadik GPIO and pins update
+In-Reply-To: <1335172440-27470-1-git-send-email-linus.walleij@stericsson.com>
+References: <1335172440-27470-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120517233832.E67E43E062C@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2012 14:25:21 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Apr 19, 2012 at 10:36 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, 23 Apr 2012 11:14:00 +0200, Linus Walleij <linus.walleij@stericsson.com> wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> > Add irq domain support to the gpio-nomadik GPIO driver. This
-> > enables its users to support dynamic IRQ assignment, which is
-> > requried by Device Tree.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This is basically an update and sync of Nomadik and ux500 GPIO
+> development.
 > 
-> Hey, it works!
+> If you wonder why I introduce a deviant pin configuration path
+> not using the pin config subsystem it is because I want to build
+> atop of this work which I know works. It will be switched over
+> to pinctrl in later patch sets on top of this.
 > 
-> Applied to my gpio-and-pin ux500 branch.
+> This is *almost* orthogonal to other ux500 development, but
+> there *might* be conflicts with Lee Jones' Device Tree work,
+> so I will try to create a separate orthogonal ux500 GPIO branch
+> for this stuff.
 > 
-> Note to Grant: I'm shepherding the ux500 GPIO patches for
-> funneling through the ARM SoC tree.
+> Linus Walleij (4):
+>   gpio/nomadik: use typesafe __io_address()
+>   plat-nomadik: new sleep mode pincfg macros
+>   ARM: ux500: remove a bunch of internal pull-ups
+>   ARM: ux500: update pin handling
+> 
+> Rabin Vincent (5):
+>   gpio/nomadik: don't set SLPM to 1 for non-wakeup pins
+>   gpio/nomadik: cache [rf]w?imsc
+>   gpio/nomadik: fix spurious interrupts with SKE
+>   gpio/nomadik: support low EMI mode
+>   ARM: ux500: implement pin API
 
-Okay, I'll happily ignore the ux500 patches then.  :-)
+for the whole series:
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 g.
+
+> 
+>  arch/arm/mach-ux500/Makefile                      |    2 +-
+>  arch/arm/mach-ux500/board-mop500-pins.c           |  394 ++++++++++++++++-----
+>  arch/arm/mach-ux500/board-mop500.h                |    4 +
+>  arch/arm/mach-ux500/pins-db8500.h                 |   72 ++--
+>  arch/arm/mach-ux500/pins.c                        |   88 +++++
+>  arch/arm/mach-ux500/pins.h                        |   46 +++
+>  arch/arm/plat-nomadik/include/plat/gpio-nomadik.h |    1 +
+>  arch/arm/plat-nomadik/include/plat/pincfg.h       |   19 +
+>  drivers/gpio/gpio-nomadik.c                       |  129 +++++--
+>  9 files changed, 591 insertions(+), 164 deletions(-)
+>  create mode 100644 arch/arm/mach-ux500/pins.c
+>  create mode 100644 arch/arm/mach-ux500/pins.h
+> 
+> -- 
+> 1.7.9.2
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
