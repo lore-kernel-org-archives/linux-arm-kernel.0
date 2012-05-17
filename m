@@ -1,26 +1,40 @@
-From: rob@landley.net (Rob Landley)
-Date: Wed, 16 May 2012 20:09:17 -0500
-Subject: [PATCH RESEND] Documentation: devicetree: Fix value format
- description
-In-Reply-To: <1337200436-26528-1-git-send-email-stigge@antcom.de>
-References: <1337200436-26528-1-git-send-email-stigge@antcom.de>
-Message-ID: <4FB44FBD.1000408@landley.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 17 May 2012 10:41:19 +0800
+Subject: [PATCH v1 4/7] usb: chipidea: add imx driver binding
+In-Reply-To: <87txzgb454.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1337090303-16046-1-git-send-email-richard.zhao@freescale.com>
+ <1337090303-16046-5-git-send-email-richard.zhao@freescale.com>
+ <878vgscq4b.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120516130823.GA30755@b20223-02.ap.freescale.net>
+ <87txzgb454.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120517024118.GB30755@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2012 03:33 PM, Roland Stigge wrote:
-> Numeric values in dts files can be specified in decimal and hex (the latter
-> prefixed 0x). The current documentation is updated with this patch to prevent
-> confusion about what is meant with values without "0x" (previously hex, now
-> dec).
+On Wed, May 16, 2012 at 05:18:47PM +0300, Alexander Shishkin wrote:
+> Richard Zhao <richard.zhao@freescale.com> writes:
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Rob Landley <rob@landley.net>
+> > On Wed, May 16, 2012 at 02:38:44PM +0300, Alexander Shishkin wrote:
+> >> > +	plat_ci = platform_device_alloc("ci_hdrc", (int)res->start);
+> >> 
+> >> Regarding the instance id here: you probably want to use something more
+> >> meaningful than the starting address. I was thinking about stealing id
+> >> allocator from Felipe's dwc3 (dwc3_get_device_id()), but decided to
+> >> first deal with more important things.
+> > hmm... Is dwc3_get_device_id() really meaningful than base address?
+> > It just record the sequence number.
+> 
+> Well, if you indeed have more than one controller, you might want to
+> know, for example, which one registered first. Or, one might simply not
+> like the look of "/sys/bus/platform/devices/ci_hdrc.-5898240".
+ah, it's singed integer. Then I agree dwc3_get_device_id() is a better
+and simple way, and we can find the physical device by looking at
+ci_hdrc devicie's parent.
 
-This should go in through the device tree tree. (There's policy
-involved, not just documenting the status quo.)
-
-Rob
--- 
-GNU/Linux isn't: Linux=GPLv2, GNU=GPLv3+, they can't share code.
-Either it's "mere aggregation", or a license violation.  Pick one.
+Thanks
+Richard
+> 
+> Regards,
+> --
+> Alex
+> 
