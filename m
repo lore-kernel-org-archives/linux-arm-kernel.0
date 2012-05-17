@@ -1,23 +1,128 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 17 May 2012 13:28:57 +0100
-Subject: [PATCH 2/2] ARM: s3c64xx: cpuidle - use timekeeping wrapper
-In-Reply-To: <1337004377-17732-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
- <1337004377-17732-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20120517122857.GH26337@opensource.wolfsonmicro.com>
+From: uri.y@variscite.com (Uri Yosef)
+Date: Thu, 17 May 2012 15:17:31 +0300
+Subject: [PATCH] arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule support
+In-Reply-To: <20120509213156.GZ5140@atomide.com>
+References: <20120509213156.GZ5140@atomide.com>
+Message-ID: <1337257051-5004-1-git-send-email-uri.y@variscite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2012 at 04:06:17PM +0200, Daniel Lezcano wrote:
-> The timekeeping is computed from the cpuidle core if we set
-> the .en_core_tk_irqen flag. Let's use it and remove the duplicated
-> code.
+Hi Tony,
 
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120517/ede2bb6e/attachment.sig>
+This is the updated DTS patch for Vatiscite OMAP4 SOM support
+
+Regatds,
+Uri Yosef
+
+
+Signed-off-by: Uri Yosef <uri.y@variscite.com>
+
+---
+ arch/arm/boot/dts/omap4-var_som.dts |   96 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 96 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
+
+diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var_som.dts
+new file mode 100644
+index 0000000..d41161d
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-var_som.dts
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap4.dtsi"
++
++/ {
++	model = "Variscite OMAP4 SOM";
++	compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>; /* 1 GB */
++	};
++
++	vdd_eth: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "VDD_ETH";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++		regulator-boot-on;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <400000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
++		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
++		interrupt-parent = <&gic>;
++	};
++};
++
++/include/ "twl6030.dtsi"
++
++&i2c2 {
++	clock-frequency = <400000>;
++};
++
++&i2c3 {
++	clock-frequency = <400000>;
++
++	/*
++	 * Temperature Sensor
++	 * http://www.ti.com/lit/ds/symlink/tmp105.pdf
++	 */
++	tmp105 at 49 {
++		compatible = "ti,tmp105";
++		reg = <0x49>;
++	};
++};
++
++&i2c4 {
++	clock-frequency = <400000>;
++};
++
++&mcspi1 {
++	eth at 0 {
++		compatible = "ks8851";
++		spi-max-frequency = <24000000>;
++		reg = <0>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <11>; /* gpio line 171 */
++		vdd-supply = <&vdd_eth>;
++	};
++};
++
++&mmc1 {
++	vmmc-supply = <&vmmc>;
++	ti,bus-width = <8>;
++	ti,non-removable;
++};
++
++&mmc2 {
++	status = "disable";
++};
++
++&mmc3 {
++	status = "disable";
++};
++
++&mmc4 {
++	status = "disable";
++};
++
++&mmc5 {
++	ti,bus-width = <4>;
++};
+-- 
+1.7.5.4
