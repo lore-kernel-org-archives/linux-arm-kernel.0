@@ -1,86 +1,100 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 17 May 2012 12:51:00 +0530
-Subject: [PATCH v3 4/7] ARM: davinci: net: davinci_emac: add OF support
-In-Reply-To: <4FB49B7B.60506@denx.de>
-References: <1330945804-3379-1-git-send-email-hs@denx.de>
- <1330945804-3379-5-git-send-email-hs@denx.de>
- <DF0F476B391FA8409C78302C7BA518B63EA14401@DBDE01.ent.ti.com>
- <4FB49B7B.60506@denx.de>
-Message-ID: <4FB4A6DC.20208@ti.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 17 May 2012 13:00:58 +0530
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+In-Reply-To: <CAF0TxboKHYDzaCSd0L-i4qCf5-3YY8UDx7z4BDUxkb-tD+zA2g@mail.gmail.com>
+References: <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
+ <20120514155859.GA13860@n2100.arm.linux.org.uk>
+ <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
+ <20120514163909.GB13860@n2100.arm.linux.org.uk>
+ <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
+ <20120515094010.GF10453@n2100.arm.linux.org.uk>
+ <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
+ <20120515101505.GG10453@n2100.arm.linux.org.uk>
+ <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
+ <20120515163618.GH13860@n2100.arm.linux.org.uk>
+ <20120515181737.GM10057@mudshark.cambridge.arm.com>
+ <CAF0TxboKHYDzaCSd0L-i4qCf5-3YY8UDx7z4BDUxkb-tD+zA2g@mail.gmail.com>
+Message-ID: <CAMQu2gzGgiNMrYyfYAiXH1Uc9WD=BXaDsff9c5fwuPtV+BHk-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/17/2012 12:02 PM, Heiko Schocher wrote:
-> Nori, Sekhar wrote:
->> On Mon, Mar 05, 2012 at 16:40:01, Heiko Schocher wrote:
-
->>> +#ifdef CONFIG_OF
->>> +static struct emac_platform_data
->>> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
->>> +	struct emac_priv *priv)
->>> +{
->>> +	struct device_node *np;
->>> +	struct device_node *pinmux_np;
->>> +	struct emac_platform_data *pdata = NULL;
->>> +	const u8 *mac_addr;
->>> +	u32 data;
->>> +	int ret;
->>> +	int version;
->>> +
->>> +	np = pdev->dev.of_node;
->>> +	if (!np)
->>> +		goto nodata;
->>> +	else
->>> +		version = EMAC_VERSION_2;
+On Thu, May 17, 2012 at 10:31 AM, Murali N <nalajala.murali@gmail.com> wrote:
+> On Tue, May 15, 2012 at 11:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Russell,
 >>
->> You could set pdata->version directly here. 
-> 
-> done.
-
-Just noticed that pdata is not setup at this time. I guess you will be
-moving around some code to do this.
-
->>> +
->>> +	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
->>> +	if (pinmux_np)
->>> +		davinci_cfg_reg_of(pinmux_np);
+>> On Tue, May 15, 2012 at 05:36:18PM +0100, Russell King - ARM Linux wrote:
+>>> I repeat: what happens in this situation on A9:
+>>>
+>>> ? ? ? - clean cache
+>>> ? ? ? - cache speculatively prefetches data from another core
 >>
->> This is a DaVinci specific pinmux function and this
->> driver can be used in non-DaVinci platforms like C6x
->> and OMAP. So, it will not be correct to call a DaVinci
->> specific function here.
-> 
-> Ah, right!
-> 
->> Can you drop the pinmux from this patch for now? On DaVinci,
-> 
-> Done ... Hmm.. so I think, I should drop this for all patches
-> from my patchset, right?
+>> If this prefetching occurs then either:
+>>
+>> ? ? ? ?(a) The line is clean (no problem)
+>>
+>> ? ? ? ?(b) Another core has written some data and we end up (speculatively)
+>> ? ? ? ? ? ?loading dirty lines
+>>
+>> Case (b) is only a problem if we actually commit to using the data later on.
+>>
+>>> ? ? ? - clear SCTLR.C
+>>> ? ? ? - _this_ core accesses the address associated with that prefetched
+>>> ? ? ? ? data
+>>
+>> Yes. At this point it is cpu-specific whether or not we hit our dirty lines
+>> from above. On A9, we will get the stale data from memory. However, this is
+>> exactly the same situation we would find ourselves in if we tried to access
+>> dirty data held in any cache with our SCTLR.C bit cleared. We're no longer
+>> coherent at this stage, so need to avoid accessing shared data.
+>>
+>>> _That_ is a data corruption issue - as soon as SCTLR.C is cleared, the CPUs
+>>> view of data in memory _changes_, and is only restored to what it should
+>>> be when the dirty cache lines are finally flushed out of the cache. ?And
+>>> then, hey presto, the data magically changes again.
+>>
+>> Well we still can't see dirty data in any of the other L1 caches, so our view
+>> of memory is going to be constantly out of date. The tricky bit is ensuring
+>> that we don't rely on data being written by anybody else (and if we write
+>> data ourself, we need to make sure it's suitably aligned so as not to get
+>> clobbered by evictions from the other caches).
+>>
+>> Will
+>
+> how about following the below sequence still cause any possible problems?
+>
+> 1. L1 clean & invalidate
+> 2. L2 clean & invalidate
+> 3. Disable L2
+> 4. L1 clean & invalidate
+> 5. Disable "C" bit
+> 6. WFI
+>
+This is wrong if the code path is common for
+CPU and CPU cluster power down. As Russell pointed
+out the corner cases, the sequence I got working without any
+issues so far on OMAP is like below ...
 
-Yes.
+- L1 clean & invalidate
+- Disable "C" bit
+- ISB
+- L1 clean & invalidate
+- Disable SMP bit
+- ISB
+- Check for cluster state
+if cluster == OFF
+- L2 clean & invalidate
+isb
+dsb
+WFI
+NOP ( To avoid speculative aborts if any)
+NOP
+NOP
+NOP
 
-> 
->> for pinmux, we need to migrate to drivers/pinctrl/ as well.
-> 
-> Ah, I see ... take a look at it, maybe I find time to do here
-> something ... or do you know about work in progress here?
+No. of NOPS depends on the pipeline depth.
 
-There is no work in progress within TI. So, if you are interested in
-taking a stab it it, it will be great.
+Hope it helps
 
-> 
->> Doing this will also make this patch independent of the rest
->> of this series can even be merged separately. Can you please
->> make these changes and resend just this patch?
-> 
-> Yep, I do some test with the changes you requested and resend
-> this patch ... do you prefer some tree, which I should use as
-> base?
-
-This one should ideally merge through the network subsystem so may be
-base it on the net-next tree?
-
-http://git.kernel.org/?p=linux/kernel/git/davem/net-next.git;a=summary
-
-Thanks,
-Sekhar
+Regards
+Santosh
