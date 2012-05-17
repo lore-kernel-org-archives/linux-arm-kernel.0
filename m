@@ -1,54 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 May 2012 21:04:58 +0000
-Subject: A good sub-architecture to base new ports on?
-In-Reply-To: <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
- <201205161557.45362.arnd@arndb.de>
- <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
-Message-ID: <201205172104.59097.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 17 May 2012 15:21:12 -0600
+Subject: [PATCH V2 1/3] ARM: tegra: trimslice: enable PCIe when booting from
+ device tree
+Message-ID: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 May 2012, Alexey Zaytsev wrote:
-> On Wed, May 16, 2012 at 6:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 16 May 2012, Alexey Zaytsev wrote:
-> > Another good one would be highbank, but that contains a lot of stuff you
-> > don't need.
-> >
-> > ixp4xx is not very actively maintained, so I would not use that as
-> > a base.
-> >
-> > What platform are you talking about? I know of a few people that are
-> > working on getting older platforms ported to Linux, so maybe someone
-> > is already working on a port.
-> 
-> It's a 'Solos' soc from Connexant. They released kernel code for
-> 2.6.11, and I'm up-porting it to the current kernel. I know at least
-> two other people interested in the port, adding them to CC. If you
-> know anyone else, it would be great to share the effort.
+From: Stephen Warren <swarren@nvidia.com>
 
-I haven't heard of that architecture before, but I just found the 2.6.11
-source you mentioned. spear6xx is probably a good example in that case,
-being from a similar age.
+There currently aren't bindings for the Tegra PCIe controller. Work on
+this is in progress, but not yet complete. Manually initialize PCIe when
+booting from device tree, in order to bring DT support to the same
+feature level as board files, which will in turn allow board files to be
+deprecated.
 
-Most of the arch code has actually moved to other subsystems nowadays
-and would not be considered part of the platform but instead goes to
+PCIe hosts the wired Ethernet controller on TrimSlice.
 
-timer -> drivers/clksource
-watchdog -> drivers/watchdog
-msc+crypto -> drivers/crypto
-spi -> drivers/spi
-defaultrestore -> use gpio-keys and a shell script in user space
-gpio -> drivers/gpio
-gpio-if -> use existing sysfs insterface rather than new driver
-udc -> probably similar enough to one that is already there that you
-       can resuse code
-drivers/serial/solos-serial -> drivers/tty/serial (from /drivers/serial)
-driver/net/arm/solos-ether -> drivers/net/ethernet/conexant
+To support this, add infra-structure to board-dt-tegra20.c for board-
+specific initialization code. Once device tree support for the relevant
+features is in place, this code will be removed.
 
-My guess is that getting basic functionality (serial, timer, gpio, spi,
-watchdog) is all fairly straightforward when you do it right. Ethernet
-is going to be harder but is just one driver, and it's hard to tell
-how much work the crypto stuff needs.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Use .init_late hook in DT_MACHINE_START instead of an explicit late
+initcall.
+---
+ arch/arm/mach-tegra/board-dt-tegra20.c |   36 +++++++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index eb7249d..9537f20 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -98,6 +98,40 @@ static void __init tegra_dt_init(void)
+ 				tegra20_auxdata_lookup, NULL);
+ }
+ 
++#ifdef CONFIG_MACH_TRIMSLICE
++static void __init trimslice_init(void)
++{
++	int ret;
++
++	ret = tegra_pcie_init(true, true);
++	if (ret)
++		pr_err("tegra_pci_init() failed: %d\n", ret);
++}
++#endif
++
++static struct {
++	char *machine;
++	void (*init)(void);
++} board_init_funcs[] = {
++#ifdef CONFIG_MACH_TRIMSLICE
++	{ "compulab,trimslice", trimslice_init },
++#endif
++};
++
++static void __init tegra_dt_init_late(void)
++{
++	int i;
++
++	tegra_init_late();
++
++	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
++		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
++			board_init_funcs[i].init();
++			break;
++		}
++	}
++}
++
+ static const char *tegra20_dt_board_compat[] = {
+ 	"nvidia,tegra20",
+ 	NULL
+@@ -110,7 +144,7 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer		= &tegra_timer,
+ 	.init_machine	= tegra_dt_init,
+-	.init_late	= tegra_init_late,
++	.init_late	= tegra_dt_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra20_dt_board_compat,
+ MACHINE_END
+-- 
+1.7.0.4
