@@ -1,142 +1,51 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 May 2012 18:53:06 +0200
-Subject: [PATCH 3/3] ARM: dma-mapping: add support for dma_get_sgtable()
-In-Reply-To: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
-References: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1337273586-11089-4-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 May 2012 18:03:29 +0100
+Subject: [RFC] pl08x: don't use dma_slave_config direction argument
+In-Reply-To: <20120516110451.GA9571@n2100.arm.linux.org.uk>
+References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
+Message-ID: <20120517170329.GB19548@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dma_get_sgtable() function which is required to let
-drivers to share the buffers allocated by DMA-mapping subsystem. Right
-now the driver gets a dma address of the allocated buffer and the kernel
-virtual mapping for it. If it wants to share it with other device (= map
-into its dma address space) it usually hacks around kernel virtual
-addresses to get pointers to pages or assumes that both devices share
-the DMA address space. Both solutions are just hacks for the special
-cases, which should be avoided in the final version of buffer sharing.
-To solve this issue in a generic way, a new call to DMA mapping has been
-introduced - dma_get_sgtable(). It allocates a scatter-list which
-describes the allocated buffer and lets the driver(s) to use it with
-other device(s) by calling dma_map_sg() on it.
+On Wed, May 16, 2012 at 12:04:51PM +0100, Russell King - ARM Linux wrote:
+> This series removes the dependence on the dma_slave_config direction
+> argument for the PL08x DMA engine driver, and in doing so, we end up
+> with less code in the driver.
 
-This patch adds this extension only to ARM architecture, mainly to
-demonstrate the buffer sharing. I plan to provide some generic
-implementations for other architectures once this idea gets accepted.
+I've just been testing this on the Versatile PB926 with my only working
+peripheral (PL011) and the runtime PM support which was added to the PL08x
+driver is totally breaking this setup.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/include/asm/dma-mapping.h |   12 ++++++++++++
- arch/arm/mm/dma-mapping.c          |   31 +++++++++++++++++++++++++++++++
- include/linux/dma-mapping.h        |    3 +++
- 3 files changed, 46 insertions(+)
+It's causing lockdep to spit out:
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 80777d87..2e37778 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -221,6 +221,15 @@ static inline int dma_mmap_writecombine(struct device *dev, struct vm_area_struc
- 	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
- }
- 
-+static inline int dma_get_sgtable(struct device *dev, struct sg_table *sgt,
-+				  void *cpu_addr, dma_addr_t dma_addr,
-+				  size_t size, struct dma_attrs *attrs)
-+{
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+	BUG_ON(!ops);
-+	return ops->get_sgtable(dev, sgt, cpu_addr, dma_addr, size, attrs);
-+}
-+
- /*
-  * This can be called during boot to increase the size of the consistent
-  * DMA region above it's default value of 2MB. It must be called before the
-@@ -280,6 +289,9 @@ extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
- 		enum dma_data_direction);
- extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
- 		enum dma_data_direction);
-+extern int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
-+		void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+		struct dma_attrs *attrs);
- 
- #endif /* __KERNEL__ */
- #endif
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 23d0ace..b140440 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -120,6 +120,7 @@ struct dma_map_ops arm_dma_ops = {
- 	.alloc			= arm_dma_alloc,
- 	.free			= arm_dma_free,
- 	.mmap			= arm_dma_mmap,
-+	.get_sgtable		= arm_dma_get_sgtable,
- 	.map_page		= arm_dma_map_page,
- 	.unmap_page		= arm_dma_unmap_page,
- 	.map_sg			= arm_dma_map_sg,
-@@ -529,6 +530,21 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 	__dma_free_buffer(pfn_to_page(dma_to_pfn(dev, handle)), size);
- }
- 
-+int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
-+		 void *cpu_addr, dma_addr_t handle, size_t size,
-+		 struct dma_attrs *attrs)
-+{
-+	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
-+	int ret;
-+
-+	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-+	if (unlikely(ret))
-+		return ret;
-+
-+	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
-+	return 0;
-+}
-+
- static void dma_cache_maint_page(struct page *page, unsigned long offset,
- 	size_t size, enum dma_data_direction dir,
- 	void (*op)(const void *, size_t, int))
-@@ -1042,6 +1058,20 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	__iommu_free_buffer(dev, pages, size);
- }
- 
-+static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
-+				 void *cpu_addr, dma_addr_t dma_addr,
-+				 size_t size, struct dma_attrs *attrs)
-+{
-+	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
-+
-+	if (!pages)
-+		return -ENXIO;
-+
-+	return sg_alloc_table_from_pages(sgt, pages, count, 0, size,
-+					 GFP_KERNEL);
-+}
-+
- /*
-  * Map a part of the scatter-gather list into contiguous io address space
-  */
-@@ -1301,6 +1331,7 @@ struct dma_map_ops iommu_ops = {
- 	.alloc		= arm_iommu_alloc_attrs,
- 	.free		= arm_iommu_free_attrs,
- 	.mmap		= arm_iommu_mmap_attrs,
-+	.get_sgtable	= arm_iommu_get_sgtable,
- 
- 	.map_page		= arm_iommu_map_page,
- 	.unmap_page		= arm_iommu_unmap_page,
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index dfc099e..94af418 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -18,6 +18,9 @@ struct dma_map_ops {
- 	int (*mmap)(struct device *, struct vm_area_struct *,
- 			  void *, dma_addr_t, size_t, struct dma_attrs *attrs);
- 
-+	int (*get_sgtable)(struct device *dev, struct sg_table *sgt, void *,
-+			   dma_addr_t, size_t, struct dma_attrs *attrs);
-+
- 	dma_addr_t (*map_page)(struct device *dev, struct page *page,
- 			       unsigned long offset, size_t size,
- 			       enum dma_data_direction dir,
--- 
-1.7.10.1
+[ INFO: inconsistent lock state ]
+inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
+init/1 [HC0[0]:SC0[0]:HE1:SE1] takes:
+ (&port_lock_key){?.....}, at: [<c01b59ac>] uart_start+0x24/0x74
+{IN-HARDIRQ-W} state was registered at:
+...
+  [<c01b97f8>] pl011_int+0x1c/0x4a8
+...
+stack backtrace:
+[<c00561b4>] (trace_hardirqs_on+0x0/0x18) from [<c02dfc6c>] (_raw_spin_unlock_irq+0x30/0x64)
+[<c02dfc3c>] (_raw_spin_unlock_irq+0x0/0x64) from [<c01c6214>] (__rpm_callback+0x30/0x60)
+[<c01c61e4>] (__rpm_callback+0x0/0x60) from [<c01c733c>] (rpm_resume+0x3e0/0x568)
+...
+[<c019b7a8>] (pl08x_prep_slave_sg+0x0/0x270) from [<c01b953c>] (pl011_dma_tx_refill+0x104/0x1c8)
+[<c01b9438>] (pl011_dma_tx_refill+0x0/0x1c8) from [<c01b9704>] (pl011_start_tx+0x38/0x110)
+
+Basically, uart_start() has taken the port spinlock with IRQs disabled.
+We then go through the PL011 start_tx function, eventually into the
+PL08x driver to start the transmit DMA.
+
+The PL08x driver then calls pm_runtime_get_sync(), when then invokes
+__rpm_callback.  This unconditionally enables IRQs underneath the
+per-port spinlock, allowing potential deadlock with PL011's interrupt
+handler.
+
+So, the only solution I can see is to strip out all the runtime PM stuff
+from PL08x, which is buggy anyway.
+
+And it's taken all afternoon to work out what's going on here... because
+it can't spit that debug out because it deadlocks in the PL011 console
+write function on the very same lock...  This is extremely nasty.
