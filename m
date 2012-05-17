@@ -1,43 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 May 2012 21:22:05 +0000
-Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
- when DT is enabled
-In-Reply-To: <1337262323-27692-13-git-send-email-lee.jones@linaro.org>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <1337262323-27692-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <201205172122.05611.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 17 May 2012 15:23:53 -0600
+Subject: [PATCH 7/7] MMC: mmci: Add required documentation for Device Tree
+ bindings
+In-Reply-To: <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120517212353.0F9E53E0621@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 May 2012, Lee Jones wrote:
-> @@ -601,7 +601,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
->  
->  static struct platform_device *snowball_of_platform_devs[] __initdata = {
->         &snowball_key_dev,
-> -       &ab8500_device,
->  };
->  
->  static void __init mop500_init_machine(void)
-> @@ -767,6 +766,9 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->  static const struct of_device_id u8500_local_bus_nodes[] = {
->         /* only create devices below soc node */
->         { .compatible = "stericsson,db8500", },
-> +       { .compatible = "stericsson,db8500-prcmu", },
-> +       { .compatible = "stericsson,ab8500", },
-> +       { .compatible = "stericsson,ab8500-regulator", },
->         { .compatible = "simple-bus"},
->         { },
->  };
+On Fri, 13 Apr 2012 15:05:09 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> This provides full documentation detailing each compulsory,
+> optional and device (variant) specific properties available
+> for use within the MMCI Device Tree.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-You remove the ab8500_device registration from snowball but add the prcmu and ab8500
-in a place that is common to all three machines, so they will show up twice
-on mop500 and hrefv60. If those two are not broken before this patch, I think
-they are after it.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-I think the two options you have here are to either remove the ab8500 device from
-mop500_platform_devs[] too (essentially registering mop500_gpio_keys_device
-and ab8500_device separately when you need them, instead of doing the loop),
-or to split u8500_local_bus_nodes so you use a different table for snowball
-from the one you use for the other boards.
+Should be merged with the mmc driver code changes.
 
-	Arnd
+g.
+
+> ---
+>  Documentation/devicetree/bindings/mmc/mmci.txt |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/mmci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+> new file mode 100644
+> index 0000000..14a81d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+> @@ -0,0 +1,19 @@
+> +* ARM PrimeCell MultiMedia Card Interface (MMCI) PL180/1
+> +
+> +The ARM PrimeCell MMCI PL180 and PL181 provides and interface for
+> +reading and writing to MultiMedia and SD cards alike.
+> +
+> +Required properties:
+> +- compatible             : contains "arm,pl18x", "arm,primecell".
+> +- reg                    : contains pl18x registers and length.
+> +- interrupts             : contains the device IRQ(s).
+> +- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
+> +
+> +Optional properties:
+> +- wp-gpios               : contains any write protect (ro) gpios
+> +- cd-gpios               : contains any card detection gpios
+> +- cd-inverted            : indicates whether the cd gpio is inverted
+> +- max-frequency          : contains the maximum operating frequency
+> +- bus-width              : number of data lines, can be <1>, <4>, or <8>
+> +- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable
+> +- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable
+> -- 
+> 1.7.9.1
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
