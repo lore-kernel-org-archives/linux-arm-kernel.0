@@ -1,64 +1,61 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 17 May 2012 11:28:55 +0800
-Subject: [PATCH] ARM: PRIMA2: fix irq domain size and IRQ mask of internal
- interrupt controller
-Message-ID: <1337225335-14133-1-git-send-email-Barry.Song@csr.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 17 May 2012 09:35:39 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FB43F69.1070608@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FB3D294.4020505@wwwdotorg.org>
+ <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
+ <201205161942.20296.arnd@arndb.de> <4FB43F69.1070608@wwwdotorg.org>
+Message-ID: <CAJe_ZheKUoM+UjagtfmqLha-vwQr4J+CdEjvtR8t0cmdOQJPyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
-
-the old codes will cause 3.4 kernel warning as irq domain size is wrong:
-------------[ cut here ]------------
-WARNING: at kernel/irq/irqdomain.c:74 irq_domain_legacy_revmap+0x24/0x48()
-Modules linked in:
-[<c0013f50>] (unwind_backtrace+0x0/0xf8) from [<c001e7d8>] (warn_slowpath_common+0x54/0x64)
-[<c001e7d8>] (warn_slowpath_common+0x54/0x64) from [<c001e804>] (warn_slowpath_null+0x1c/0x24)
-[<c001e804>] (warn_slowpath_null+0x1c/0x24) from [<c005c3c4>] (irq_domain_legacy_revmap+0x24/0x48)
-[<c005c3c4>] (irq_domain_legacy_revmap+0x24/0x48) from [<c005c704>] (irq_create_mapping+0x20/0x120)
-[<c005c704>] (irq_create_mapping+0x20/0x120) from [<c005c880>] (irq_create_of_mapping+0x7c/0xf0)
-[<c005c880>] (irq_create_of_mapping+0x7c/0xf0) from [<c01a6c48>] (irq_of_parse_and_map+0x2c/0x34)
-[<c01a6c48>] (irq_of_parse_and_map+0x2c/0x34) from [<c01a6c68>] (of_irq_to_resource+0x18/0x74)
-[<c01a6c68>] (of_irq_to_resource+0x18/0x74) from [<c01a6ce8>] (of_irq_count+0x24/0x34)
-[<c01a6ce8>] (of_irq_count+0x24/0x34) from [<c01a7220>] (of_device_alloc+0x58/0x158)
-[<c01a7220>] (of_device_alloc+0x58/0x158) from [<c01a735c>] (of_platform_device_create_pdata+0x3c/0x80)
-[<c01a735c>] (of_platform_device_create_pdata+0x3c/0x80) from [<c01a7468>] (of_platform_bus_create+0xc8/0x190)
-[<c01a7468>] (of_platform_bus_create+0xc8/0x190) from [<c01a74cc>] (of_platform_bus_create+0x12c/0x190)
----[ end trace 1b75b31a2719ed32 ]---
-
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/irq.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
-index 37c2de9..a7b9415 100644
---- a/arch/arm/mach-prima2/irq.c
-+++ b/arch/arm/mach-prima2/irq.c
-@@ -42,7 +42,8 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- static __init void sirfsoc_irq_init(void)
- {
- 	sirfsoc_alloc_gc(sirfsoc_intc_base, 0, 32);
--	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32, SIRFSOC_INTENAL_IRQ_END - 32);
-+	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32,
-+			SIRFSOC_INTENAL_IRQ_END + 1 - 32);
- 
- 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL0);
- 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL1);
-@@ -68,7 +69,8 @@ void __init sirfsoc_of_irq_init(void)
- 	if (!sirfsoc_intc_base)
- 		panic("unable to map intc cpu registers\n");
- 
--	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-+	irq_domain_add_legacy(np, SIRFSOC_INTENAL_IRQ_END + 1, 0, 0,
-+		&irq_domain_simple_ops, NULL);
- 
- 	of_node_put(np);
- 
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+On 17 May 2012 05:29, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>> Generic binding to provide a way to provide the client-channel map and
+>>> other dmac specific parameters to the dma controller driver
+>>>
+>>> DMA Model:-
+>>> ? Only the most common characteristics of a dma setup are assumed
+>>> in this binding.
+>>> Client: Some h/w controller that could request a DMA controller in
+>>> the system to perform data transfer on its behalf. Example SPI, MMC,
+>>> I2S etc.
+>>> DMAC: A DMA Controller instance. Example, PL330, PL08X, SDMA etc.
+>>>
+>>> ?The assumed model of the DMAC, in this binding, has P peripheral
+>>> interfaces (P request signals) that could request a data transfer
+>>> and C physical channels that actually do the data transfers, hence,
+>>> at most C out of P peripherals could be served by the DMAC at any
+>>> point of time. Usually C := P, but not always. Usually, any of the
+>>> physical channels could be employed by the DMAC driver to serve any
+>>> client.
+>>> ?The DMAC driver identifies a client by its i/f number, 'peri_id'
+>>> on the given DMAC. For example, TX for SPI has 7th while RX_TX
+>>> (half-duplex) for MMC has 10th peripheral interface (request-signal)
+>>> on a given DMAC. Usually, any of the physical channels could be
+>>> employed by the DMAC driver to serve a client.
+>>
+>> I'm still anything but convinced by this model. Basically it's the
+>> exact opposite of what we do for every other subsystem (irq, pinctrl,
+>> regulator, gpio, ...), where the device using some infrastructure
+>> contains the information about who provides it, whereas here you
+>> move all the information into the device that provides the functionality,
+>> and have no handle in the device using it by which the driver can
+>> identify it.
+>
+> Yes, I guess this is backwards. But, the HW is a little different too;
+> GPIOs (and probably interrupts) don't have multiple places they could
+> come from.
+>
+> The problem is that if we did something like this in the DMA client:
+>
+> dma-reqs = <&dmac1 DMAC1_DMA_REQ_6 &dmac1 DMAC1_DMA_REQ_8>;
+>
+> how do we know if the client is emitting 2 DMA request signals that get
+> routed to two different inputs on the DMA controller, or whether this is
+> two alternatives for the same signal.
+>
+FWIW, I wouldn't lose sleep over the possibility of redundancy on same DMAC.
+If a client's request signal is routed to 2 inputs, they are usually
+on different DMACs.
