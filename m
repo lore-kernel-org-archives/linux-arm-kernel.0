@@ -1,22 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 May 2012 10:17:03 +0100
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <4FB3AD72.2010501@antcom.de>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
- <4FB39C62.3030305@antcom.de> <20120516125253.GD9571@n2100.arm.linux.org.uk>
- <4FB3A5E7.7060505@antcom.de> <20120516131720.GE9571@n2100.arm.linux.org.uk>
- <4FB3AD72.2010501@antcom.de>
-Message-ID: <20120517091703.GH9571@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 17 May 2012 11:41:21 +0200
+Subject: [GIT PULL] i.MX common clock fixes
+Message-ID: <20120517094121.GY30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 03:36:50PM +0200, Roland Stigge wrote:
-> Works fine now, including series 1-7.
+Hi Arnd, Olof,
 
-Great, I'll re-post the series, and then maybe we can get some tested-bys
-on it.
+Please pull the following fixes to the i.MX common clock conversion
+based on the imx/clock branch in arm-soc.
 
-I think it's too close to the merge window to consider queuing it up for
-this window - so I think it'll have to wait until the following window.
-That will give it a reasonable amount of time to sit in linux-next and
-hopefully any users of it will report any problems.
+Thanks
+ Sascha
+
+The following changes since commit 4f5a9fd341e8ffd825ecf56155df6fe6c3d732b1:
+
+  Merge branch 'imx/pinctrl' into imx/clock (2012-05-14 15:30:52 +0200)
+
+are available in the git repository at:
+
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-clk-common-fixes
+
+for you to fetch changes up to b0286f20c36d0c1e7537489daddaf574abf403dd:
+
+  ARM: imx6q: prepare and enable init on clks directly instead of clk_get first (2012-05-16 12:46:23 +0200)
+
+----------------------------------------------------------------
+Some fixes for the fresh i.MX common clock support
+
+----------------------------------------------------------------
+Richard Zhao (2):
+      ARM: i.MX: change timer clock from ipg to perclk
+      ARM: imx6q: prepare and enable init on clks directly instead of clk_get first
+
+Sascha Hauer (2):
+      ARM i.MX5: fix gpt peripheral clock path
+      ARM i.MX: remove now unnecessary argument from mxc_timer_init
+
+ arch/arm/mach-imx/clk-imx1.c            |    3 +--
+ arch/arm/mach-imx/clk-imx21.c           |    4 ++--
+ arch/arm/mach-imx/clk-imx25.c           |    2 +-
+ arch/arm/mach-imx/clk-imx27.c           |    3 +--
+ arch/arm/mach-imx/clk-imx31.c           |    3 +--
+ arch/arm/mach-imx/clk-imx35.c           |    6 ++----
+ arch/arm/mach-imx/clk-imx51-imx53.c     |   12 +++++-------
+ arch/arm/mach-imx/clk-imx6q.c           |   22 +++++++---------------
+ arch/arm/plat-mxc/epit.c                |   11 ++++++++++-
+ arch/arm/plat-mxc/include/mach/common.h |    4 ++--
+ arch/arm/plat-mxc/time.c                |   24 ++++++++++++------------
+ 11 files changed, 44 insertions(+), 50 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
