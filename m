@@ -1,73 +1,104 @@
-From: nalajala.murali@gmail.com (Murali N)
-Date: Thu, 17 May 2012 10:31:02 +0530
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <20120515181737.GM10057@mudshark.cambridge.arm.com>
-References: <20120514155022.GA3792@e102568-lin.cambridge.arm.com>
- <20120514155859.GA13860@n2100.arm.linux.org.uk>
- <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
- <20120515094010.GF10453@n2100.arm.linux.org.uk>
- <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
- <20120515163618.GH13860@n2100.arm.linux.org.uk>
- <20120515181737.GM10057@mudshark.cambridge.arm.com>
-Message-ID: <CAF0TxboKHYDzaCSd0L-i4qCf5-3YY8UDx7z4BDUxkb-tD+zA2g@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 May 2012 22:16:36 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.4
+Message-ID: <20120517051636.GA25029@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 11:47 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Russell,
->
-> On Tue, May 15, 2012 at 05:36:18PM +0100, Russell King - ARM Linux wrote:
->> I repeat: what happens in this situation on A9:
->>
->> ? ? ? - clean cache
->> ? ? ? - cache speculatively prefetches data from another core
->
-> If this prefetching occurs then either:
->
-> ? ? ? ?(a) The line is clean (no problem)
->
-> ? ? ? ?(b) Another core has written some data and we end up (speculatively)
-> ? ? ? ? ? ?loading dirty lines
->
-> Case (b) is only a problem if we actually commit to using the data later on.
->
->> ? ? ? - clear SCTLR.C
->> ? ? ? - _this_ core accesses the address associated with that prefetched
->> ? ? ? ? data
->
-> Yes. At this point it is cpu-specific whether or not we hit our dirty lines
-> from above. On A9, we will get the stale data from memory. However, this is
-> exactly the same situation we would find ourselves in if we tried to access
-> dirty data held in any cache with our SCTLR.C bit cleared. We're no longer
-> coherent at this stage, so need to avoid accessing shared data.
->
->> _That_ is a data corruption issue - as soon as SCTLR.C is cleared, the CPUs
->> view of data in memory _changes_, and is only restored to what it should
->> be when the dirty cache lines are finally flushed out of the cache. ?And
->> then, hey presto, the data magically changes again.
->
-> Well we still can't see dirty data in any of the other L1 caches, so our view
-> of memory is going to be constantly out of date. The tricky bit is ensuring
-> that we don't rely on data being written by anybody else (and if we write
-> data ourself, we need to make sure it's suitably aligned so as not to get
-> clobbered by evictions from the other caches).
->
-> Will
+Hi Linus,
 
-how about following the below sequence still cause any possible problems?
+The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
 
-1. L1 clean & invalidate
-2. L2 clean & invalidate
-3. Disable L2
-4. L1 clean & invalidate
-5. Disable "C" bit
-6. WFI
+  Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
 
--- 
-Regards,
-Murali N
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to ad3b8a83933e83e5a2a08956211343bda269e778:
+
+  ARM: PRIMA2: fix irq domain size and IRQ mask of internal interrupt controller (2012-05-16 21:52:13 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.4
+
+I will stop trying to predict when we're done with fixes for a release.
+
+Here's another small batch of three patches for arm-soc:
+
+- A fix for a boot time WARN_ON() due to irq domain conversion on PRIMA2
+- Fix for a regression in Tegra SMP spinup code due to swapped register offsets
+- Fixed config dependency for mv_cesa crypto driver to avoid build breakage
+
+----------------------------------------------------------------
+Alexander Clouter (1):
+      crypto: mv_cesa requires on CRYPTO_HASH to build
+
+Arnd Bergmann (2):
+      Merge branch 'marvell_fixes_for_v3.4' of git://git.infradead.org/users/jcooper/linux into fixes
+      Merge branch 'for-3.4/fixes-for-final' of git://git.kernel.org/.../swarren/linux-tegra into fixes
+
+Barry Song (1):
+      ARM: PRIMA2: fix irq domain size and IRQ mask of internal interrupt controller
+
+Peter De Schrijver (1):
+      ARM: tegra: Fix flow controller accesses
+
+ arch/arm/mach-prima2/irq.c     | 6 ++++--
+ arch/arm/mach-tegra/flowctrl.c | 4 ++--
+ drivers/crypto/Kconfig         | 1 +
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
+index 37c2de9..a7b9415 100644
+--- a/arch/arm/mach-prima2/irq.c
++++ b/arch/arm/mach-prima2/irq.c
+@@ -42,7 +42,8 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
+ static __init void sirfsoc_irq_init(void)
+ {
+ 	sirfsoc_alloc_gc(sirfsoc_intc_base, 0, 32);
+-	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32, SIRFSOC_INTENAL_IRQ_END - 32);
++	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32,
++			SIRFSOC_INTENAL_IRQ_END + 1 - 32);
+ 
+ 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL0);
+ 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL1);
+@@ -68,7 +69,8 @@ void __init sirfsoc_of_irq_init(void)
+ 	if (!sirfsoc_intc_base)
+ 		panic("unable to map intc cpu registers\n");
+ 
+-	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
++	irq_domain_add_legacy(np, SIRFSOC_INTENAL_IRQ_END + 1, 0, 0,
++		&irq_domain_simple_ops, NULL);
+ 
+ 	of_node_put(np);
+ 
+diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
+index fef66a7..f07488e 100644
+--- a/arch/arm/mach-tegra/flowctrl.c
++++ b/arch/arm/mach-tegra/flowctrl.c
+@@ -53,10 +53,10 @@ static void flowctrl_update(u8 offset, u32 value)
+ 
+ void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
+ {
+-	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
++	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
+ }
+ 
+ void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
+ {
+-	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
++	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
+ }
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index ab9abb4..dd414d9 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -164,6 +164,7 @@ config CRYPTO_DEV_MV_CESA
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_AES
+ 	select CRYPTO_BLKCIPHER2
++	select CRYPTO_HASH
+ 	help
+ 	  This driver allows you to utilize the Cryptographic Engines and
+ 	  Security Accelerator (CESA) which can be found on the Marvell Orion
