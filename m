@@ -1,166 +1,97 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 May 2012 15:21:13 -0600
-Subject: [PATCH V2 2/3] ARM: tegra: harmony: init regulators,
- PCIe when booting from DT
+Date: Thu, 17 May 2012 15:21:14 -0600
+Subject: [PATCH V2 3/3] ARM: tegra: paz00: enable WiFi rfkill when booting
+ from device tree
 In-Reply-To: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
 References: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1337289674-18581-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1337289674-18581-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-There currently aren't bindings for the Tegra PCIe controller. Work on
-this is in progress, but not yet complete. Manually initialize PCIe when
+There currently aren't bindings for a WiFi rfkill button, and defining
+a good binding is non-trivial. Manually register this "device" when
 booting from device tree, in order to bring DT support to the same
 feature level as board files, which will in turn allow board files to be
 deprecated.
 
-PCIe on Harmony requires various regulators to be registered and enabled
-before initializing the PCIe controller. Note that since the I2C
-controllers are instantiated from DT, we must use i2c_new_device() to
-register the PMU rather than i2c_register_board_info().
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/board-dt-tegra20.c    |   20 ++++++++++++++++++++
- arch/arm/mach-tegra/board-harmony-pcie.c  |   15 ++++++++++-----
- arch/arm/mach-tegra/board-harmony-power.c |   25 ++++++++++++++++++++++++-
- arch/arm/mach-tegra/board.h               |    7 +++++++
- 4 files changed, 61 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/board-dt-tegra20.c |   10 ++++++++++
+ arch/arm/mach-tegra/board-paz00.c      |    7 ++++++-
+ arch/arm/mach-tegra/board.h            |    2 ++
+ 3 files changed, 18 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 9537f20..7771386 100644
+index 7771386..8b4e6e1 100644
 --- a/arch/arm/mach-tegra/board-dt-tegra20.c
 +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -109,6 +109,23 @@ static void __init trimslice_init(void)
+@@ -126,6 +126,13 @@ static void __init harmony_init(void)
  }
  #endif
  
-+#ifdef CONFIG_MACH_HARMONY
-+static void __init harmony_init(void)
++#ifdef CONFIG_MACH_PAZ00
++static void __init paz00_init(void)
 +{
-+	int ret;
-+
-+	ret = harmony_regulator_init();
-+	if (ret) {
-+		pr_err("harmony_regulator_init() failed: %d\n", ret);
-+		return;
-+	}
-+
-+	ret = harmony_pcie_init();
-+	if (ret)
-+		pr_err("harmony_pcie_init() failed: %d\n", ret);
++	tegra_paz00_wifikill_init();
 +}
 +#endif
 +
  static struct {
  	char *machine;
  	void (*init)(void);
-@@ -116,6 +133,9 @@ static struct {
- #ifdef CONFIG_MACH_TRIMSLICE
- 	{ "compulab,trimslice", trimslice_init },
+@@ -136,6 +143,9 @@ static struct {
+ #ifdef CONFIG_MACH_HARMONY
+ 	{ "nvidia,harmony", harmony_init },
  #endif
-+#ifdef CONFIG_MACH_HARMONY
-+	{ "nvidia,harmony", harmony_init },
++#ifdef CONFIG_MACH_PAZ00
++	{ "compal,paz00", paz00_init },
 +#endif
  };
  
  static void __init tegra_dt_init_late(void)
-diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-index 33c4fed..e8c3fda 100644
---- a/arch/arm/mach-tegra/board-harmony-pcie.c
-+++ b/arch/arm/mach-tegra/board-harmony-pcie.c
-@@ -27,14 +27,11 @@
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index bbc1907..4b64af5 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -148,7 +148,6 @@ static struct platform_device *paz00_devices[] __initdata = {
+ 	&debug_uart,
+ 	&tegra_sdhci_device4,
+ 	&tegra_sdhci_device1,
+-	&wifi_rfkill_device,
+ 	&leds_gpio,
+ 	&gpio_keys_device,
+ };
+@@ -201,6 +200,11 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+ 	.is_8bit	= 1,
+ };
  
- #ifdef CONFIG_TEGRA_PCI
- 
--static int __init harmony_pcie_init(void)
-+int __init harmony_pcie_init(void)
- {
- 	struct regulator *regulator = NULL;
- 	int err;
- 
--	if (!machine_is_harmony())
--		return 0;
--
- 	err = gpio_request(TEGRA_GPIO_EN_VDD_1V05_GPIO, "EN_VDD_1V05");
- 	if (err)
- 		return err;
-@@ -62,7 +59,15 @@ err_reg:
- 	return err;
- }
- 
-+static int __init harmony_pcie_initcall(void)
++void __init tegra_paz00_wifikill_init(void)
 +{
-+	if (!machine_is_harmony())
-+		return 0;
-+
-+	return harmony_pcie_init();
++	platform_device_register(&wifi_rfkill_device);
 +}
 +
- /* PCI should be initialized after I2C, mfd and regulators */
--subsys_initcall_sync(harmony_pcie_init);
-+subsys_initcall_sync(harmony_pcie_initcall);
- 
- #endif
-diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
-index 82f3230..44dcb2e 100644
---- a/arch/arm/mach-tegra/board-harmony-power.c
-+++ b/arch/arm/mach-tegra/board-harmony-power.c
-@@ -20,6 +20,10 @@
- #include <linux/gpio.h>
- #include <linux/regulator/machine.h>
- #include <linux/mfd/tps6586x.h>
-+#include <linux/of.h>
-+#include <linux/of_i2c.h>
-+
-+#include <asm/mach-types.h>
- 
- #include <mach/irqs.h>
- 
-@@ -110,7 +114,26 @@ static struct i2c_board_info __initdata harmony_regulators[] = {
- 
- int __init harmony_regulator_init(void)
+ static void __init tegra_paz00_init(void)
  {
--	i2c_register_board_info(3, harmony_regulators, 1);
-+	if (machine_is_harmony()) {
-+		i2c_register_board_info(3, harmony_regulators, 1);
-+	} else { /* Harmony, booted using device tree */
-+		struct device_node *np;
-+		struct i2c_adapter *adapter;
-+
-+		np = of_find_node_by_path("/i2c at 7000d000");
-+		if (np == NULL) {
-+			pr_err("Could not find device_node for DVC I2C\n");
-+			return -ENODEV;
-+		}
-+
-+		adapter = of_find_i2c_adapter_by_node(np);
-+		if (!adapter) {
-+			pr_err("Could not find i2c_adapter for DVC I2C\n");
-+			return -ENODEV;
-+		}
-+
-+		i2c_new_device(adapter, harmony_regulators);
-+	}
+ 	tegra_clk_init_from_table(paz00_clk_init_table);
+@@ -211,6 +215,7 @@ static void __init tegra_paz00_init(void)
+ 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
  
- 	return 0;
- }
+ 	platform_add_devices(paz00_devices, ARRAY_SIZE(paz00_devices));
++	tegra_paz00_wifikill_init();
+ 
+ 	paz00_i2c_init();
+ 	paz00_usb_init();
 diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 6501496..097e0e1 100644
+index 097e0e1..f88e514 100644
 --- a/arch/arm/mach-tegra/board.h
 +++ b/arch/arm/mach-tegra/board.h
-@@ -46,5 +46,12 @@ int __init tegra_powergate_debugfs_init(void);
- static inline int tegra_powergate_debugfs_init(void) { return 0; }
+@@ -53,5 +53,7 @@ int __init harmony_pcie_init(void);
+ static inline int harmony_pcie_init(void) { return 0; }
  #endif
  
-+int __init harmony_regulator_init(void);
-+#ifdef CONFIG_TEGRA_PCI
-+int __init harmony_pcie_init(void);
-+#else
-+static inline int harmony_pcie_init(void) { return 0; }
-+#endif
++void __init tegra_paz00_wifikill_init(void);
 +
  extern struct sys_timer tegra_timer;
  #endif
