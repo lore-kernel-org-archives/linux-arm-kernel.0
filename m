@@ -1,113 +1,67 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 May 2012 09:47:06 -0700
-Subject: [PATCHv2 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
- on second CS
-In-Reply-To: <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
- (Santosh Shilimkar's message of "Thu, 17 May 2012 12:42:30 +0530")
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-16-git-send-email-t-kristo@ti.com>
- <87mx573boy.fsf@ti.com>
- <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
-Message-ID: <87vcjuzred.fsf@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 17 May 2012 18:53:03 +0200
+Subject: [PATCH/RFC 0/3] ARM: DMA-mapping: new extensions for buffer sharing
+Message-ID: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+Hello,
 
-> On Thu, May 17, 2012 at 5:45 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Tero Kristo <t-kristo@ti.com> writes:
->>
->>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
->>> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
->>> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
->>> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
->>> is not set properly, we apply the required workaround allowing
->>> the restore sequence to work properly.
->>
->> Please summarize the workaround here as well.
->>
-> ok
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> ---
->>> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
->>> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 37 ++++++++++++++++++++
->>> ?2 files changed, 39 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> index a0af9ba..b763a79 100644
->>> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->>> @@ -28,6 +28,8 @@
->>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? ? 0x0000
->>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? ? 0x0004
->>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ?0x0010
->>> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ? ?0x0114
->>> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ? ?0x011c
->>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ?0x0460
->>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ?0x0464
->>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ?0x0468
->>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->>> index 215b80e..dfaa254 100644
->>> --- a/arch/arm/mach-omap2/pm44xx.c
->>> +++ b/arch/arm/mach-omap2/pm44xx.c
->>> @@ -17,12 +17,18 @@
->>> ?#include <linux/err.h>
->>> ?#include <linux/slab.h>
->>> ?#include <asm/system_misc.h>
->>> +#include <linux/io.h>
->>> +
->>> +#include <mach/ctrl_module_wkup_44xx.h>
->>> +#include <mach/hardware.h>
->>>
->>> ?#include "common.h"
->>> ?#include "clockdomain.h"
->>> ?#include "powerdomain.h"
->>> ?#include "pm.h"
->>>
->>> +#define EMIF_SDRAM_CONFIG2_OFFSET ? ?0xc
->>> +
->>> ?struct power_state {
->>> ? ? ? struct powerdomain *pwrdm;
->>> ? ? ? u32 next_state;
->>> @@ -215,6 +221,37 @@ static int __init omap4_pm_init(void)
->>>
->>> ? ? ? pr_err("Power Management for TI OMAP4.\n");
->>>
->>> + ? ? /*
->>> + ? ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
->>> + ? ? ?* Mode Transition When CS1 Is Used On EMIF":
->>> + ? ? ?* Overwrite EMIF1/EMIF2
->>> + ? ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
->>> + ? ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
->>> + ? ? ?*/
->>> + ? ? if (cpu_is_omap443x()) {
->>
->> This should probably be done later in this function, after PM_ERRATUM
->> flags are setup, and then it should use a PM_ERRATUM flag instead of cpu_is*
->>
-> ok
->
->>> + ? ? ? ? ? ? void __iomem *secure_ctrl_mod;
->>> + ? ? ? ? ? ? void __iomem *emif1;
->>> + ? ? ? ? ? ? void __iomem *emif2;
->>> + ? ? ? ? ? ? u32 val;
->>> +
->>> + ? ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
->>> + ? ? ? ? ? ? emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
->>> + ? ? ? ? ? ? emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
->>> +
->>> + ? ? ? ? ? ? BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
->>
->> Please avoid BUG_ON() and use proper error recovery. ?This is not a
->> condition where the entire kernel should panic.
->>
-> Agree. WARN_ON() should suffice.
+This patch series introduces a new features to DMA mapping subsystem
+to let drivers share the allocated buffers (preferably using recently
+introduced dma_buf framework) easy and efficient.
 
-A WARN_ON() is ok (but noisy).  Better is a pr_warn() with some proper
-error recovery.
+The first extension is DMA_ATTR_NO_KERNEL_MAPPING attribute. It is
+intended for use with dma_{alloc, mmap, free}_attrs functions. It can be
+used to notify dma-mapping core that the driver will not use kernel
+mapping for the allocated buffer at all, so the core can skip creating
+it. This saves precious kernel virtual address space. Such buffer can be
+accessed from userspace, after calling dma_mmap_attrs() for it (a
+typical use case for multimedia buffers). The value returned by
+dma_alloc_attrs() with this attribute should be considered as a DMA
+cookie, which needs to be passed to dma_mmap_attrs() and
+dma_free_attrs() funtions.
 
-Kevin
+The second extension is required to let drivers to share the buffers
+allocated by DMA-mapping subsystem. Right now the driver gets a dma
+address of the allocated buffer and the kernel virtual mapping for it.
+If it wants to share it with other device (= map into its dma address
+space) it usually hacks around kernel virtual addresses to get pointers
+to pages or assumes that both devices share the DMA address space. Both
+solutions are just hacks for the special cases, which should be avoided
+in the final version of buffer sharing. To solve this issue in a generic
+way, a new call to DMA mapping has been introduced - dma_get_sgtable().
+It allocates a scatter-list which describes the allocated buffer and
+lets the driver(s) to use it with other device(s) by calling
+dma_map_sg() on it.
+
+The proposed patches have been generated on top of the ARM DMA-mapping
+redesign patch series on Linux v3.4-rc7. They are also available on the
+following GIT branch:
+
+git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc7-arm-dma-v10-ext
+
+with all require patches on top of vanilla v3.4-rc7 kernel.
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (3):
+  common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING attribute
+  ARM: dma-mapping: add support for DMA_ATTR_NO_KERNEL_MAPPING
+    attribute
+  ARM: dma-mapping: add support for dma_get_sgtable()
+
+ Documentation/DMA-attributes.txt   |   18 +++++++++++++
+ arch/arm/include/asm/dma-mapping.h |   12 +++++++++
+ arch/arm/mm/dma-mapping.c          |   51 ++++++++++++++++++++++++++++++++----
+ include/linux/dma-attrs.h          |    1 +
+ include/linux/dma-mapping.h        |    3 +++
+ 5 files changed, 80 insertions(+), 5 deletions(-)
+
+-- 
+1.7.10.1
