@@ -1,104 +1,135 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 May 2012 22:16:36 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.4
-Message-ID: <20120517051636.GA25029@quad.lixom.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 17 May 2012 14:32:07 +0800
+Subject: [PATCH v7 0/3] Add PMECC support for at91 nand flash driver
+In-Reply-To: <1337159858.24809.21.camel@sauron.fi.intel.com>
+References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+ <1337159858.24809.21.camel@sauron.fi.intel.com>
+Message-ID: <4FB49B67.2040705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi, Artem
 
-The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
+On 5/16/2012 5:17 PM, Artem Bityutskiy wrote:
+> On Tue, 2012-05-15 at 22:47 +0800, Josh Wu wrote:
+>> Changes since v6,
+>> 	split into 3 patches.
+>> 	remove of_flat_dt_is_compatible() function. use additional dt parameter "has-pmecc".
+>> 	refine the error handling code.
+>> 	refine original atmel_nand_init_params() function.
+>>
+>> Changes since v5,
+>> 	add has_pmecc field to replace cpu_has_pmecc() function. Use compatible check in when proble.
+>> 	simplify the pmecc_get_ecc_bytes() function.
+>>
+>> Changes since v4,
+>> 	fix typo and checkpatch warnings.
+>> 	fix according to JC's suggestion. replace cpu_is_xxx() with DT
+>> 	modify dt binding atmel nand document to add pmecc support.
+>> 	tested in sam9263 without break hw ecc.
+>> 	add ecc.strength.
+> Hi,
+>
+> Aiaiai identified the following issues with your patch-set - could you
+> please take a look?
 
-  Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
+sure.
 
-are available in the git repository at:
+>
+> --------------------------------------------------------------------------------
+>
+> Successfully built configuration "arm-at91cap9_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+>
+> --- before_patching.log
+> +++ after_patching.log
+> @@ @@
+> +drivers/mtd/nand/atmel_nand.c: In function 'atmel_pmecc_nand_init_params':
+> +drivers/mtd/nand/atmel_nand.c:910:29: warning: assignment from incompatible pointer type [enabled by default]
+> +drivers/mtd/nand/atmel_nand.c:910:50: warning: incorrect type in assignment (different argument counts) [sparse]
+> +drivers/mtd/nand/atmel_nand.c:910:50:    expected int ( *read_page )( ... ) [sparse]
+> +drivers/mtd/nand/atmel_nand.c:910:50:    got int ( static [toplevel] *<noident>  )( ... ) [sparse]
+> +drivers/mtd/nand/atmel_nand.c:912:30: warning: assignment from incompatible pointer type [enabled by default]
+> +drivers/mtd/nand/atmel_nand.c:912:51: warning: incorrect type in assignment (different argument counts) [sparse]
+> +drivers/mtd/nand/atmel_nand.c:912:51:    expected void ( *write_page )( ... ) [sparse]
+> +drivers/mtd/nand/atmel_nand.c:912:51:    got void ( static [toplevel] *<noident>  )( ... ) [sparse]
+>
+> --------------------------------------------------------------------------------
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Since I used Code Sourcery tools-chain (2010q1-202) to compile the code 
+and I didn't get any warning.
 
-for you to fetch changes up to ad3b8a83933e83e5a2a08956211343bda269e778:
+So I am not sure what's caused above warnings. From the warning message, 
+I don't know the reason exactly.
 
-  ARM: PRIMA2: fix irq domain size and IRQ mask of internal interrupt controller (2012-05-16 21:52:13 -0700)
+I just checked the PMECC read/write functions definition in my patch
 
-----------------------------------------------------------------
-ARM: SoC fixes for 3.4
++static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
++		struct nand_chip *chip, uint8_t *buf, int32_t page)
 
-I will stop trying to predict when we're done with fixes for a release.
++static void atmel_nand_pmecc_write_page(struct mtd_info *mtd,
++		struct nand_chip *chip, const uint8_t *buf)
 
-Here's another small batch of three patches for arm-soc:
 
-- A fix for a boot time WARN_ON() due to irq domain conversion on PRIMA2
-- Fix for a regression in Tegra SMP spinup code due to swapped register offsets
-- Fixed config dependency for mv_cesa crypto driver to avoid build breakage
+compare with the original HW read function (no write function)
 
-----------------------------------------------------------------
-Alexander Clouter (1):
-      crypto: mv_cesa requires on CRYPTO_HASH to build
+static int atmel_nand_read_page(struct mtd_info *mtd,
+		struct nand_chip *chip, uint8_t *buf, int page)
 
-Arnd Bergmann (2):
-      Merge branch 'marvell_fixes_for_v3.4' of git://git.infradead.org/users/jcooper/linux into fixes
-      Merge branch 'for-3.4/fixes-for-final' of git://git.kernel.org/.../swarren/linux-tegra into fixes
 
-Barry Song (1):
-      ARM: PRIMA2: fix irq domain size and IRQ mask of internal interrupt controller
+The only difference is int32_t, and I don't think the warning is caused 
+by this int32_t.
 
-Peter De Schrijver (1):
-      ARM: tegra: Fix flow controller accesses
+Could you have any ideas to fix such warning? That should be very 
+helpful for me.
 
- arch/arm/mach-prima2/irq.c     | 6 ++++--
- arch/arm/mach-tegra/flowctrl.c | 4 ++--
- drivers/crypto/Kconfig         | 1 +
- 3 files changed, 7 insertions(+), 4 deletions(-)
+>
+> checkpatch.pl has some complaints:
+>
+> --------------------------------------------------------------------------------
+>
+> checkpatch.pl results for patch "[PATCH 3/3] MTD: atmel_nand: Update driver to support Programmable  Multibit ECC controller"
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #60: FILE: drivers/mtd/nand/atmel_nand.c:115:
+> +       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #326: FILE: drivers/mtd/nand/atmel_nand.c:567:
+> +                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #348: FILE: drivers/mtd/nand/atmel_nand.c:589:
+> +                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
+>
+> total: 0 errors, 3 warnings, 879 lines checked
+>
+> --------------------------------------------------------------------------------
+>
+> checkpatch.pl results for the entire squashed patch-set
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #376: FILE: drivers/mtd/nand/atmel_nand.c:115:
+> +       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
 
-diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
-index 37c2de9..a7b9415 100644
---- a/arch/arm/mach-prima2/irq.c
-+++ b/arch/arm/mach-prima2/irq.c
-@@ -42,7 +42,8 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- static __init void sirfsoc_irq_init(void)
- {
- 	sirfsoc_alloc_gc(sirfsoc_intc_base, 0, 32);
--	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32, SIRFSOC_INTENAL_IRQ_END - 32);
-+	sirfsoc_alloc_gc(sirfsoc_intc_base + 4, 32,
-+			SIRFSOC_INTENAL_IRQ_END + 1 - 32);
- 
- 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL0);
- 	writel_relaxed(0, sirfsoc_intc_base + SIRFSOC_INT_RISC_LEVEL1);
-@@ -68,7 +69,8 @@ void __init sirfsoc_of_irq_init(void)
- 	if (!sirfsoc_intc_base)
- 		panic("unable to map intc cpu registers\n");
- 
--	irq_domain_add_legacy(np, 32, 0, 0, &irq_domain_simple_ops, NULL);
-+	irq_domain_add_legacy(np, SIRFSOC_INTENAL_IRQ_END + 1, 0, 0,
-+		&irq_domain_simple_ops, NULL);
- 
- 	of_node_put(np);
- 
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-index fef66a7..f07488e 100644
---- a/arch/arm/mach-tegra/flowctrl.c
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -53,10 +53,10 @@ static void flowctrl_update(u8 offset, u32 value)
- 
- void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
- {
--	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
-+	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
- }
- 
- void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
- {
--	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
-+	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
- }
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index ab9abb4..dd414d9 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -164,6 +164,7 @@ config CRYPTO_DEV_MV_CESA
- 	select CRYPTO_ALGAPI
- 	select CRYPTO_AES
- 	select CRYPTO_BLKCIPHER2
-+	select CRYPTO_HASH
- 	help
- 	  This driver allows you to utilize the Cryptographic Engines and
- 	  Security Accelerator (CESA) which can be found on the Marvell Orion
+I'll fix it.
+
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #642: FILE: drivers/mtd/nand/atmel_nand.c:567:
+> +                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
+>
+> WARNING:LONG_LINE: line over 80 characters
+> #664: FILE: drivers/mtd/nand/atmel_nand.c:589:
+> +                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
+>
+> total: 0 errors, 3 warnings, 1136 lines checked
+
+For these two warnings, I would like to keep it for more readable. but 
+if you would like to fix the warning, then I can fix them too by split 
+into two lines.
+
+> --------------------------------------------------------------------------------
+>
+Thanks
+Best Regards,
+Josh Wu
