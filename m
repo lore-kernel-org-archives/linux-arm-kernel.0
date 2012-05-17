@@ -1,139 +1,59 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 17 May 2012 22:05:34 +0530
-Subject: [PATCH 3/3] ARM: dts: Add nodes for dw_mmc controllers for Samsung
- Exynos5250 platforms
-In-Reply-To: <1337272534-30370-1-git-send-email-thomas.abraham@linaro.org>
-References: <1337272534-30370-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1337272534-30370-4-git-send-email-thomas.abraham@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 May 2012 09:37:42 -0700
+Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
+ (Santosh Shilimkar's message of "Thu, 17 May 2012 14:22:52 +0530")
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-5-git-send-email-t-kristo@ti.com>
+ <87d363928g.fsf@ti.com>
+ <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
+ <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
+Message-ID: <87mx56227d.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the four instances of dw_mmc controllers in Exynos5250
-and enable instance 0 and 2 for the smdk5250 board.
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   59 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++
- 2 files changed, 91 insertions(+), 0 deletions(-)
+> On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+>> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>> Tero Kristo <t-kristo@ti.com> writes:
+>>>
+>>>> From: Rajendra Nayak <rnayak@ti.com>
+>>>>
+>>>> SAR/ROM code restores only CORE DPLL to its original state
+>>>> post wakeup from OFF mode.
+>>>> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
+>>>> are saved and restored here during an OFF transition.
+>>>>
+>>>> [nm at ti.com: minor cleanups]
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>
+>>> Some general comments:
+>>>
+>>> - the register dump/print doesn't belong here. ?If needed, should be a
+>>> ?debug feature if needed.
+>>>
+>>> - Rather than hooking into omap4_enter_lowpower(), should use
+>>> ?the cluster PM enter/exit notifier chain.
+>>>
+>> This is again specific to device OFF only and not related to CPU
+>> cluster state as such. So I don't think notifiers should be used here.
+>>
+>> O.w even when we attempt just MPU OSWR C-state, all these functions will
+>> get called in notifier chain.
+>>
+> Just a thought, we can have a separate notifier chain for device OFF. It can
+> allow use to get rid of 'enable_off_mode" kind of flags and can be
+> used by many drivers too.
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index dbc4bdb..ac408c8 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -16,6 +16,13 @@
- 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
- 	compatible = "samsung,smdk5250", "samsung,exynos5250";
- 
-+	aliases {
-+		mshc0 = &mshc_0;
-+		mshc1 = &mshc_1;
-+		mshc2 = &mshc_2;
-+		mshc3 = &mshc_3;
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
-@@ -86,4 +93,56 @@
- 	i2c at 12CD0000 {
- 		status = "disabled";
- 	};
-+
-+	mshc_0: dwmmc0 at 12200000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		card-detection-broken;
-+		no-write-protect;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+			cd-gpios = <&gpc0 2 2 3 3>;
-+			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-+				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-+				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-+				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-+				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-+		};
-+	};
-+
-+	mshc_1: dwmmc1 at 12210000 {
-+		status = "disabled";
-+	};
-+
-+	mshc_2: dwmmc2 at 12220000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		card-detection-broken;
-+		no-write-protect;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			cd-gpios = <&gpc3 2 2 3 3>;
-+			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
-+				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
-+				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
-+				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
-+				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-+		};
-+	};
-+
-+	mshc_3: dwmmc3 at 12230000 {
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index af12491..a6a497f 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -169,6 +169,38 @@
- 		interrupts = <0 63 0>;
- 	};
- 
-+	dwmmc0 at 12200000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12200000 0x1000>;
-+		interrupts = <0 75 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc1 at 12210000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12210000 0x1000>;
-+		interrupts = <0 76 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc2 at 12220000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12220000 0x1000>;
-+		interrupts = <0 77 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc3 at 12230000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12230000 0x1000>;
-+		interrupts = <0 78 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.6.6.rc2
+Yes, I like this idea.
+
+It allows a much cleaner collection of all the activities needed for
+device off.
+
+Kevin
