@@ -1,73 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 16 May 2012 17:33:25 -0700
-Subject: [PATCHv2 18/19] ARM: OMAP4460: wakeupgen: set GIC_CPU0 backup
- status flag always
-In-Reply-To: <1336990730-26892-19-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 14 May 2012 13:18:49 +0300")
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-19-git-send-email-t-kristo@ti.com>
-Message-ID: <87sjez1wa2.fsf@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 May 2012 10:16:15 +0800
+Subject: [PATCH RFC 1/1] pinctrl: improve gpio support for dt
+In-Reply-To: <1337090839-21224-1-git-send-email-b29396@freescale.com>
+References: <1337090839-21224-1-git-send-email-b29396@freescale.com>
+Message-ID: <20120517021614.GG3764@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+On Tue, May 15, 2012 at 10:07:19PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> For dt, the gpio base may be dynamically allocated, thus the original
+> implementation of gpio support based on static gpio number and pin id
+> map may not be easy to use for dt.
+> 
+> One solution is a) use alias id for gpio node and refer to it in gpio
+> range, then we can get the fixed the gpio devices for this range and
+> b) get gpio chip from node which is specified in gpio range structure,
+> then get the dynamically allocated gpio chip base and c) using the chip
+> gpio base and offset to map to a physical pin id for dt.
+> 
+> To implement that, we need add two members in pinctrl_gpio_range structure,
+> 'np' the gpio node for this range and 'off' the offset in this gpio range
+> of the gpio chip.
+> 
+> For devicetree, user can use this two member instead of range->base
+> to create the map, the core will dynamically set the correct range->base
+> based on the gpio base plus gpio offset.
+> 
+> For example:
+> static struct pinctrl_gpio_range imx28_gpio_ranges[] = {
+> 	{ .name = "gpio", .id = 0, .pin_base = 0,   .npins = 8,	 .np = np_gpio0	.off = 0,},
+> 	{ .name = "gpio", .id = 0, .pin_base = 16,  .npins = 13, .np = np_gpio0 .off = 16,},
+> 	{ .name = "gpio", .id = 1, .pin_base = 32,  .npins = 32, .np = np_gpio1 .off = 16},
 
-> Without this, CPU0 will crash in the ROM code during wakeup from
-> device off. This patch also clears the GIC save area, to prevent
-> ROM code from writing garbage to the GIC registers during wakeup.
-> The actual GIC restore is done by kernel.
->
-> This bug fix applies only to OMAP4460, it is fixed on OMAP4470.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+How do you have .np statically assigned?
 
-Please create/use PM_ERRATUM flag.
-
-Kevin
-
-> ---
->  arch/arm/mach-omap2/omap-wakeupgen.c   |   14 ++++++++++++++
->  arch/arm/mach-omap2/omap4-sar-layout.h |    1 +
->  2 files changed, 15 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-> index c7c4db4..30da299 100644
-> --- a/arch/arm/mach-omap2/omap-wakeupgen.c
-> +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-> @@ -447,10 +447,24 @@ int __init omap_wakeupgen_init(void)
->  
->  	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
->  		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
-> +		/* Clean GIC SAR area */
-> +		for (i = SAR_BACKUP_STATUS_OFFSET; i < WAKEUPGENENB_OFFSET_CPU0;
-> +			i += 4)
-> +			sar_writel(0, i, 0);
-> +
->  		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU0_OFFSET, 0);
->  		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU1_OFFSET, 0);
->  		for (i = 0; i < max_spi_reg; i++)
->  			sar_writel(GIC_ISR_NON_SECURE, ICDISR_SPI_OFFSET, i);
-> +
-> +		/*
-> +		 * Set CPU0 GIC backup flag permanently for omap4460,
-> +		 * this is needed because of the ROM code bug that breaks
-> +		 * GIC during wakeup from device off
-> +		 */
-> +		if (cpu_is_omap446x())
-> +			__raw_writel(SAR_BACKUP_STATUS_GIC_CPU0,
-> +				     sar_base + SAR_BACKUP_STATUS_OFFSET);
->  		iounmap(sar_base);
->  		sar_base = NULL;
->  	} else {
-> diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-> index 0056667..e621c51 100644
-> --- a/arch/arm/mach-omap2/omap4-sar-layout.h
-> +++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-> @@ -88,6 +88,7 @@
->  #define ICDISR_CPU0_OFFSET			(SAR_BANK3_OFFSET + 0x50c)
->  #define ICDISR_CPU1_OFFSET			(SAR_BANK3_OFFSET + 0x510)
->  #define ICDISR_SPI_OFFSET			(SAR_BANK3_OFFSET + 0x514)
-> +#define SAR_BACKUP_STATUS_GIC_CPU0		0x1
->  
->  /* WakeUpGen save restore offset from OMAP44XX_SAR_RAM_BASE */
->  #define WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x684)
+-- 
+Regards,
+Shawn
