@@ -1,177 +1,552 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 May 2012 10:15:57 -0700
-Subject: [PATCHv5 3/8] ARM: OMAP4460: Workaround for ROM bug because of
- CA9 r2pX gic control register change
-In-Reply-To: <CAMQu2gxKmeEnZr8PHZjuC_PUUzjbn7gDkG5NDKM6h2kuS+aJVQ@mail.gmail.com>
- (Santosh Shilimkar's message of "Thu, 17 May 2012 12:16:31 +0530")
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-4-git-send-email-t-kristo@ti.com>
- <87zk99ce5q.fsf@ti.com> <4FB3707B.2080200@ti.com>
- <4FB39C5A.5080404@ti.com> <87mx586pci.fsf@ti.com>
- <CAMQu2gxKmeEnZr8PHZjuC_PUUzjbn7gDkG5NDKM6h2kuS+aJVQ@mail.gmail.com>
-Message-ID: <87txzeybhu.fsf@ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 17 May 2012 10:38:14 -0700
+Subject: [PATCH RESEND v3 1/2] input: keyboard: Add keys driver for the
+ LPC32xx SoC
+In-Reply-To: <1337199955-26441-1-git-send-email-stigge@antcom.de>
+References: <1337199955-26441-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120517173814.GA26948@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+Hi Roland,
 
-> On Wed, May 16, 2012 at 10:21 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> Kevin,
->>>
->>> On Wednesday 16 May 2012 02:46 PM, Santosh Shilimkar wrote:
->>>> On Wednesday 16 May 2012 03:14 AM, Kevin Hilman wrote:
->>>>> Santosh,
->>>>>
->>>>> Tero Kristo <t-kristo@ti.com> writes:
->>>>>
->>>>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>>
->>>>>> GIC distributor control register has changed between CortexA9 r1pX and
->>>>>> r2pX. The Control Register secure banked version is now composed of 2
->>>>>> bits:
->>>>>> ? ? ?bit 0 == Secure Enable
->>>>>> ? ? ?bit 1 == Non-Secure Enable
->>>>>> The Non-Secure banked register has not changed.
->>>>>
->>>>> For those without the r1pX TRM handy, please include what this look like
->>>>> before (presumably 1 bit?) ?The changelog and in-code comments should
->>>>> both be enhanced.
->>>>>
->>>> You are right. There was only one bit previously which was used for
->>>> secure/non-secure mode. So ROM over-writes the non-secure bit
->>>> accidentally.
->>>>
->>>>>> Since the ROM Code is based on the r1pX GIC, the CPU1 GIC restoration
->>>>>> will cause a problem to CPU0 Non-Secure SW.
->>>>>
->>>>> Please describe the problem, so we can better understand the specifics
->>>>> of the workaround.
->>>>>
->>> Below is the updated changelog.
->>
->> Much better, thanks. ?But it still took me several reads to fully
->> understand. ?Maybe it's because the cold I have is stuffing up my head,
->> so it takes me awhile to understand... ?Anyways, some minor comments to
->> help clarify...
->>
->> Sorry to be so picky about changelogs, but this is a really nasty bug,
->> and the workaround has some rather important side effects, so I want the
->> description of the bug and the workaround to be well described.
->>
->>> --------------
->>> ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX gic control
->>> register change
->>>
->>> With MPUSS programmed to OSWR(Open Switch retention), GIC context is
->>> lost. On the CPU wakeup paths, ROM code gets executed which will setup
->>> GIC secure configurations and restore the GIC context if it was saved
->>> based on SAR_BACKUP_STATUS.
->>>
->>> The ROM Code GIC distributor restoration is split in two parts:
->>> CPU specific register done by each CPU and common register done by
->>> only one CPU. If the GIC Distributor Control Register = 1, the
->>> second CPU will not do the common GIC restoration.
->>
->> s/second CPU/second CPU to wake up/
->>
-> ok
->>> GIC distributor control register has changed between CortexA9 r1pX and
->>> r2pX. The Control Register secure banked version is now composed of 2
->>> bits vs only one bit before r1px:
->>
->> before r1pX?
-> I mean r1px, r0px etc.
->>
->>> ? ? ?bit 0 == Secure Enable
->>> ? ? ?bit 1 == Non-Secure Enable
->>
->> And what did this look like for r1pX? ? ?Presumably bit0 was non-secure
->> enable?
->>
-> Yes. Same bit is used. It's banked bit which has secure and non-secure view.
->
->>> Hence the value of Control register will be 3 and not 1 as the r1pX
->>> based ROM code expects.
->>
->> Why will it be 3?
->>
->> Will it be 3 on GP devices?
->>
-> Yes. Because you have 2 bits. Since both bits will be set [ Bit 1 will
-> be set by ROM code]
-> and bit 0 will be set by Linux.
+On Wed, May 16, 2012 at 10:25:54PM +0200, Roland Stigge wrote:
+> This patch adds a driver for the key scan interface of the LPC32xx SoC
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+> Applies to v3.4-rc7
+> 
+> Please pick this patch for the input subsystem.
+> 
+> Changes since v2:
+> * Fixed case of lpc32XX_* -> lpc32xx_*
+> * Removed unnecessary casts
+> * Removed unnecessary unlikely()
+> * Use unsigned for key bits
+> * Included Russell's lpc32xx_mod_states() algorithm change suggestion
+> * Replaced (res == NULL) with (!res)
+> * clk_enable() -> clk_prepare_enable()
+> * Moved clk_prepare_enable() and clk_disable_unprepare() to input's
+>   open()/close() callbacks to save power
+> * Handle clk_prepare_enable() return value appropriately
+> * DT: Use "keypad,num-rows", "keypad,num-columns" and "linux,keymap" properties
+> 
+> Thanks to Axel Lin and Russell King for reviewing!
+> 
+>  Documentation/devicetree/bindings/input/lpc32xx-key.txt |   28 +
+>  drivers/input/keyboard/Kconfig                          |   10 
+>  drivers/input/keyboard/Makefile                         |    1 
+>  drivers/input/keyboard/lpc32xx-keys.c                   |  382 ++++++++++++++++
+>  4 files changed, 421 insertions(+)
+> 
+> --- /dev/null
+> +++ linux-2.6/Documentation/devicetree/bindings/input/lpc32xx-key.txt
+> @@ -0,0 +1,28 @@
+> +NXP LPC32xx Key Scan Interface
+> +
+> +Required Properties:
+> +- compatible: Should be "nxp,lpc3220-key"
+> +- reg: Physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: The interrupt number to the cpu.
+> +- keypad,num-rows: Number of rows and columns, e.g. 1: 1x1, 6: 6x6
+> +- keypad,num-columns: Must be equal to keypad,num-rows since LPC32xx only
+> +  supports square matrices
+> +- nxp,debounce-delay-ms: Debounce delay in ms
+> +- nxp,scan-delay-ms: Repeated scan period in ms
+> +- linux,keymap: the key-code to be reported when the key is pressed
+> +  and released, see also
+> +  Documentation/devicetree/bindings/input/matrix-keymap.txt
+> +
+> +Example:
+> +
+> +	key at 40050000 {
+> +		compatible = "nxp,lpc3220-key";
+> +		reg = <0x40050000 0x1000>;
+> +		interrupts = <54 0>;
+> +		keypad,num-rows = <1>;
+> +		keypad,num-columns = <1>;
+> +		nxp,debounce-delay-ms = <3>;
+> +		nxp,scan-delay-ms = <34>;
+> +		linux,keymap = <0x00000002>;
+> +	};
+> --- linux-2.6.orig/drivers/input/keyboard/Kconfig
+> +++ linux-2.6/drivers/input/keyboard/Kconfig
+> @@ -318,6 +318,16 @@ config KEYBOARD_LOCOMO
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called locomokbd.
+>  
+> +config KEYBOARD_LPC32XX
+> +	tristate "LPC32XX matrix key scanner support"
+> +	depends on ARCH_LPC32XX
+> +	help
+> +	  Say Y here if you want to use NXP LPC32XX SoC key scanner interface,
+> +	  connected to a key matrix.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called lpc32xx-keys.
+> +
+>  config KEYBOARD_MAPLE
+>  	tristate "Maple bus keyboard"
+>  	depends on SH_DREAMCAST && MAPLE
+> --- linux-2.6.orig/drivers/input/keyboard/Makefile
+> +++ linux-2.6/drivers/input/keyboard/Makefile
+> @@ -25,6 +25,7 @@ obj-$(CONFIG_KEYBOARD_HP7XX)		+= jornada
+>  obj-$(CONFIG_KEYBOARD_LKKBD)		+= lkkbd.o
+>  obj-$(CONFIG_KEYBOARD_LM8323)		+= lm8323.o
+>  obj-$(CONFIG_KEYBOARD_LOCOMO)		+= locomokbd.o
+> +obj-$(CONFIG_KEYBOARD_LPC32XX)		+= lpc32xx-keys.o
+>  obj-$(CONFIG_KEYBOARD_MAPLE)		+= maple_keyb.o
+>  obj-$(CONFIG_KEYBOARD_MATRIX)		+= matrix_keypad.o
+>  obj-$(CONFIG_KEYBOARD_MAX7359)		+= max7359_keypad.o
+> --- /dev/null
+> +++ linux-2.6/drivers/input/keyboard/lpc32xx-keys.c
+> @@ -0,0 +1,382 @@
+> +/*
+> + * NXP LPC32xx SoC Key Scan Interface
+> + *
+> + * Authors:
+> + *    Kevin Wells <kevin.wells@nxp.com>
+> + *    Roland Stigge <stigge@antcom.de>
+> + *
+> + * Copyright (C) 2010 NXP Semiconductors
+> + * Copyright (C) 2012 Roland Stigge
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/slab.h>
+> +#include <linux/irq.h>
+> +#include <linux/pm.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/input.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +
+> +/*
+> + * Key scanner register offsets
+> + */
+> +#define LPC32XX_KS_DEB(x)			((x) + 0x00)
+> +#define LPC32XX_KS_STATE_COND(x)		((x) + 0x04)
+> +#define LPC32XX_KS_IRQ(x)			((x) + 0x08)
+> +#define LPC32XX_KS_SCAN_CTL(x)			((x) + 0x0C)
+> +#define LPC32XX_KS_FAST_TST(x)			((x) + 0x10)
+> +#define LPC32XX_KS_MATRIX_DIM(x)		((x) + 0x14)
+> +#define LPC32XX_KS_DATA(x, y)			((x) + 0x40 + ((y) << 2))
+> +
+> +#define LPC32XX_KSCAN_DEB_NUM_DEB_PASS(n)	((n) & 0xFF)
+> +
+> +#define LPC32XX_KSCAN_SCOND_IN_IDLE		0x0
+> +#define LPC32XX_KSCAN_SCOND_IN_SCANONCE		0x1
+> +#define LPC32XX_KSCAN_SCOND_IN_IRQGEN		0x2
+> +#define LPC32XX_KSCAN_SCOND_IN_SCAN_MATRIX	0x3
+> +
+> +#define LPC32XX_KSCAN_IRQ_PENDING_CLR		0x1
+> +
+> +#define LPC32XX_KSCAN_SCTRL_SCAN_DELAY(n)	((n) & 0xFF)
+> +
+> +#define LPC32XX_KSCAN_FTST_FORCESCANONCE	0x1
+> +#define LPC32XX_KSCAN_FTST_USE32K_CLK		0x2
+> +
+> +#define LPC32XX_KSCAN_MSEL_SELECT(n)		((n) & 0xF)
+> +
+> +/*
+> + * Key scanner platform configuration structure
+> + */
+> +struct lpc32xx_kscan_cfg {
+> +	u32	matrix_sz;	/* Size of matrix in XxY, ie. 3 = 3x3 */
+> +	int	*keymap;	/* Pointer to key map for the scan matrix */
+> +	u32	deb_clks;	/* Debounce clocks (based on 32KHz clock) */
+> +	u32	scan_delay;	/* Scan delay (based on 32KHz clock) */
+> +};
 
-Why will the secure enable bit be set on GP devices?
+Hmm, this is not usedul if it is hidden in this driver. You need to
+decide if you want to split it into a separate header file and place it
+in include/linux/input/... or include/linux/platform_data/... so that it
+can be used by the platform code, or make your driver pure DT driver and
+have it depend on DT support and require all board carry DT bindings.
 
->>> So he CPU1 on it's wakeup ROM code path, will
->>
->> s/it's/its/
->>
-> ok
->>> go to the GIC initialization procedure and will so reset the full GIC
->>> and NS GIC distributor Enable bit will get cleared.
->>
->> This is where it's confusing.
->>
-> Hmm.
->
->> On r2pX, NS enable bit is bit 1. ?It's not mentioned here, but I'm
->> assuming that it's bit 0 on r1pX, right? (I can't seem to find an r1pX
->> TRM)
->>
-> Yes. As I mentioned earlier, will make that more clear.
->
->> Since ROM code is r1pX-based, I would assume that it would continue to
->> clear bit 0, which is only now the secure enable bit?
->>
->> Or, is it the case that ROM code clears all the bits? ?That should be described.
->>
-> ROM code reads the register value and compares it with value == 1
-> " If the GIC Distributor Control Register = 1, the
-> second CPU will not do the common GIC restoration"
-> On r2Px, the value becomes 3 and entire ROM code logic goofs up
-> and take wrong code path.
+> +
+> +struct lpc32xx_kscan_drv {
+> +	struct input_dev *input;
+> +	struct lpc32xx_kscan_cfg *kscancfg;
+> +	struct clk *clk;
+> +	void __iomem *kscan_base;
+> +	int irq;
+> +	u8 lastkeystates[8];
+> +};
+> +
+> +static void lpc32xx_mod_states(struct lpc32xx_kscan_drv *kscandat, int off)
+> +{
+> +	u8 key;
+> +	int j;
+> +	unsigned changed, scancode, keycode;
+> +
+> +	key = readl(LPC32XX_KS_DATA(kscandat->kscan_base, off));
+> +	changed = key ^ kscandat->lastkeystates[off];
+> +	if (changed) {
+> +		for (j = 0; j < kscandat->kscancfg->matrix_sz; j++) {
+> +			if (changed & (1 << j)) {
+> +				/* Key state changed, signal an event */
+> +				scancode =
+> +				    (j * kscandat->kscancfg->matrix_sz) + off;
 
-That part is clear.  
+Please use:
 
-What's not at all clear is what the ROM code does *after* this.  Does it
-clear both bits?  or just bit 0?  Since it's r1pX based, I would expect
-that it doesn't touch anything other than bit 0.
+	scancode = MATRIX_SCAN_CODE(j, off, kscandat->row_shift);
 
->>> Since the GIC distributor gets disabled in a live system, CPU1 will
->>> hang because the interrupts stop firing.
->>> ? ? ?1) Before doing the CPU1 wakeup, CPU0 must disable
->>> ? ? ? ? the GIC distributor and wait for it to be enabled.
->>
->> what does 'disable GIC distributor' mean. ?secure? non-secure? both?
->>
-> HLOS is a non-secure view so it can disable only non-secure bit.
+BTW, instead of "j" and "off" maybe switch to "row" and "col" naming?
 
-The changelog is not talking about the HLOS, it's talking about the ROM
-code, which presumably can set/clear both bits.
+> +				keycode = kscandat->kscancfg->keymap[scancode];
+> +				input_report_key(kscandat->input, keycode,
+> +						 key & (1 << j));
 
->>> ? ? ?2) CPU1 must re-enable the GIC distributor on
->>> ? ? ? ? it's wakeup path.
->>
->> Describe why this works. ?e.g. because it cause ROM code to skip its
->> broken restore path.
->>
-> ROM code logic find the control register value 1 because bit 1 is
-> cleared by non-secure SW during the check.
+You might consider emitting MSC_SCAN as well.
 
-and because it finds the control regster value to be 1...
+> +			}
+> +		}
+> +
+> +		kscandat->lastkeystates[off] = key;
+> +	}
+> +}
+> +
+> +static irqreturn_t lpc32xx_kscan_irq(int irq, void *dev_id)
+> +{
+> +	int i;
+> +	struct lpc32xx_kscan_drv *kscandat = dev_id;
+> +
+> +	for (i = 0; i < kscandat->kscancfg->matrix_sz; i++)
+> +		lpc32xx_mod_states(kscandat, i);
+> +
+> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
+> +
+> +	input_sync(kscandat->input);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int lpc32xx_kscan_open(struct input_dev *dev)
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
+> +
+> +	return clk_prepare_enable(kscandat->clk);
+> +}
+> +
+> +static void lpc32xx_kscan_close(struct input_dev *dev)
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
+> +
+> +	clk_disable_unprepare(kscandat->clk);
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static struct lpc32xx_kscan_cfg *lpc32xx_parse_dt(struct device *dev)
+> +{
+> +	struct lpc32xx_kscan_cfg *pdata;
+> +	struct device_node *np = dev->of_node;
+> +	int key_count;
+> +	int i;
+> +	u32 rows, columns;
+> +	const __be32 *prop;
+> +	int proplen;
+> +
+> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(dev, "could not allocate memory for platform data\n");
+> +		return NULL;
+> +	}
+> +
+> +	of_property_read_u32(np, "keypad,num-rows", &rows);
+> +	of_property_read_u32(np, "keypad,num-columns", &columns);
+> +	if (!rows || rows != columns) {
+> +		dev_err(dev, "rows and columns must be specified and be equal!\n");
 
-Santosh, I do understand what is happening here.  But I play dumb so
-that it will be described in great detail in the changelog so that when
-I forget (and you forget) we can go back to this and get a quick
-understanding of both the bug and the workaround.
+Why?
 
-Since you are very deeply familiar with this bug, it's understandably
-hard to write this changelog since most things probably seem obvious to
-you.  A suggestion would be to have a few colleagues that are not
-familiar with this bug read the changelog and try and describe it back
-to you.
+> +		return NULL;
+> +	}
+> +
+> +	pdata->matrix_sz = rows;
+> +	key_count = rows * columns;
+> +
+> +	of_property_read_u32(np, "nxp,debounce-delay-ms", &pdata->deb_clks);
+> +	of_property_read_u32(np, "nxp,scan-delay-ms", &pdata->scan_delay);
+> +	if (!pdata->deb_clks || !pdata->scan_delay) {
+> +		dev_err(dev, "debounce or scan delay not specified\n");
+> +		return NULL;
+> +	}
+> +
+> +	pdata->keymap = devm_kzalloc(dev, sizeof(int) * key_count, GFP_KERNEL);
+> +	if (!pdata->keymap) {
+> +		dev_err(dev, "could not allocate memory for keymap\n");
+> +		return NULL;
+> +	}
+> +
+> +	prop = of_get_property(np, "linux,keymap", &proplen);
+> +	if (!prop) {
+> +		dev_err(dev, "linux,keymap not specified\n");
+> +		return NULL;
+> +	}
+> +
+> +	if (proplen % sizeof(u32)) {
+> +		dev_err(dev, "bad linux,keymap property size: %d\n", proplen);
+> +		return NULL;
+> +	}
+> +	proplen /= sizeof(u32);
+> +
+> +	for (i = 0; i < proplen; i++) {
+> +		u32 tmp = be32_to_cpup(prop + i);
+> +		u32 row, column, key_code;
+> +
+> +		row = (tmp >> 24) & 0xff;
+> +		column = (tmp >> 16) & 0xff;
+> +		key_code = tmp & 0xffff;
+> +		pdata->keymap[row * columns + column] = key_code;
+> +	}
 
-Kevin
+If you use matrix_keypad_build_keymap() most of this code will go away.
+
+> +
+> +	return pdata;
+> +}
+> +#else
+> +static struct lpc32xx_kscan_cfg *lpc32xx_parse_dt(struct device *dev)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+> +
+> +static int __devinit lpc32xx_kscan_probe(struct platform_device *pdev)
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat;
+> +	struct resource *res;
+> +	int retval, i, keynum;
+> +
+> +	kscandat = kzalloc(sizeof(struct lpc32xx_kscan_drv), GFP_KERNEL);
+> +	if (!kscandat) {
+> +		dev_err(&pdev->dev, "failed to allocate memory\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "failed to get platform I/O memory\n");
+> +		retval = -EBUSY;
+> +		goto out1;
+> +	}
+> +
+> +	kscandat->kscan_base = devm_request_and_ioremap(&pdev->dev, res);
+
+I would prefer you did not mix devm_* and nonmanaged resources in the
+driver; stick with nonmanaged ones.
+
+> +	if (kscandat->kscan_base == NULL) {
+> +		dev_err(&pdev->dev, "failed to request and remap I/O memory\n");
+> +		retval = -EBUSY;
+> +		goto out1;
+> +	}
+> +
+> +	/* Get the key scanner clock */
+> +	kscandat->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(kscandat->clk)) {
+> +		dev_err(&pdev->dev, "failed to get clock\n");
+> +		retval = -ENODEV;
+
+Do not clobber retval:
+
+		retval = PTR_ERR(kscandat->clk);
+
+BTW, can we call it "error" pleasei since you return "0" explicitly on
+success?
+
+> +		goto out1;
+> +	}
+> +
+> +	kscandat->irq = platform_get_irq(pdev, 0);
+> +	if ((kscandat->irq < 0) || (kscandat->irq >= NR_IRQS)) {
+> +		dev_err(&pdev->dev, "failed to get platform irq\n");
+> +		retval = -EINVAL;
+> +		goto out2;
+> +	}
+> +	retval = request_irq(kscandat->irq, lpc32xx_kscan_irq,
+> +			     0, pdev->name, kscandat);
+> +	if (retval) {
+> +		dev_err(&pdev->dev, "failed to request irq\n");
+> +		goto out2;
+> +	}
+> +
+> +	kscandat->input = input_allocate_device();
+> +	if (kscandat->input == NULL) {
+> +		dev_err(&pdev->dev, "failed to allocate device\n");
+> +		retval = -ENOMEM;
+> +		goto out3;
+> +	}
+> +
+> +	if (pdev->dev.of_node)
+> +		kscandat->kscancfg = lpc32xx_parse_dt(&pdev->dev);
+> +	else
+> +		kscandat->kscancfg = pdev->dev.platform_data;
+> +	if (!kscandat->kscancfg) {
+> +		dev_err(&pdev->dev, "failed to get platform data\n");
+> +		retval = -EINVAL;
+> +		goto out4;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, kscandat);
+> +
+> +	/* Setup key input */
+> +	kscandat->input->evbit[0]	= BIT_MASK(EV_KEY);
+> +	kscandat->input->name		= pdev->name;
+> +	kscandat->input->phys		= "matrix-keys/input0";
+> +	kscandat->input->dev.parent	=  &pdev->dev;
+> +	kscandat->input->id.vendor	= 0x0001;
+> +	kscandat->input->id.product	= 0x0001;
+> +	kscandat->input->id.version	= 0x0100;
+> +	kscandat->input->open		= &lpc32xx_kscan_open;
+
+No need for '&'.
+
+> +	kscandat->input->close		= &lpc32xx_kscan_close;
+
+> +	keynum = kscandat->kscancfg->matrix_sz * kscandat->kscancfg->matrix_sz;
+> +	for (i = 0; i < keynum; i++)
+> +		__set_bit(kscandat->kscancfg->keymap[i],
+> +			kscandat->input->keybit);
+
+This should use matrix_keypad_build_keymap() with support for OF maps
+(see 'next' branch in my tree).
+
+> +
+> +	input_set_drvdata(kscandat->input, kscandat);
+> +	input_set_capability(kscandat->input, EV_MSC, MSC_SCAN);
+> +
+> +	retval = input_register_device(kscandat->input);
+> +	if (retval) {
+> +		dev_err(&pdev->dev, "failed to register input device\n");
+> +		goto out4;
+> +	}
+> +
+> +	/* Configure the key scanner */
+> +	writel(kscandat->kscancfg->deb_clks,
+> +		LPC32XX_KS_DEB(kscandat->kscan_base));
+> +	writel(kscandat->kscancfg->scan_delay,
+> +		LPC32XX_KS_SCAN_CTL(kscandat->kscan_base));
+> +	writel(LPC32XX_KSCAN_FTST_USE32K_CLK,
+> +		LPC32XX_KS_FAST_TST(kscandat->kscan_base));
+> +	writel(kscandat->kscancfg->matrix_sz,
+> +		LPC32XX_KS_MATRIX_DIM(kscandat->kscan_base));
+> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
+> +
+> +	return 0;
+> +
+> +out4:
+> +	input_free_device(kscandat->input);
+> +out3:
+> +	free_irq(kscandat->irq, pdev);
+> +out2:
+> +	clk_put(kscandat->clk);
+> +out1:
+> +	kfree(kscandat);
+> +
+> +	return retval;
+> +}
+> +
+> +static int __devexit lpc32xx_kscan_remove(struct platform_device *pdev)
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
+> +
+> +	free_irq(kscandat->irq, pdev);
+> +	input_unregister_device(kscandat->input);
+> +	clk_put(kscandat->clk);
+> +	kfree(kscandat);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+
+Please use CONFIG_PM_SLEEP since you do not use runtime PM.
+
+> +static int lpc32xx_kscan_suspend(struct platform_device *pdev,
+> +	pm_message_t state)
+
+Please convert to dev_pm_ops structure instead of legacy PM methods.
+
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
+> +
+> +	/* Clear IRQ and disable clock */
+> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
+> +	clk_disable_unprepare(kscandat->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int lpc32xx_kscan_resume(struct platform_device *pdev)
+> +{
+> +	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
+> +
+> +	/* Enable clock and clear IRQ */
+> +	clk_prepare_enable(kscandat->clk);
+> +	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
+> +
+> +	return 0;
+> +}
+> +#else
+> +#define lpc32xx_kscan_suspend	NULL
+> +#define lpc32xx_kscan_resume	NULL
+> +#endif
+
+Use "static SIMPLE_DEV_PM_OPS()" outside of #ifdef block. You won't need
+defining lpc32xx_kscan_suspend/lpc32xx_kscan_resume to NULL.
+
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id lpc32xx_kscan_match[] = {
+> +	{ .compatible = "nxp,lpc3220-key" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, lpc32xx_kscan_match);
+> +#endif
+> +
+> +static struct platform_driver lpc32xx_kscan_driver = {
+> +	.probe		= lpc32xx_kscan_probe,
+> +	.remove		= __devexit_p(lpc32xx_kscan_remove),
+> +	.suspend	= lpc32xx_kscan_suspend,
+> +	.resume		= lpc32xx_kscan_resume,
+
+These 2 should go away.
+
+> +	.driver		= {
+> +		.name	= "lpc32xx_keys",
+> +		.of_match_table = of_match_ptr(lpc32xx_kscan_match),
+
+		.pm	= lpc32xx_kscan_pm_ops,
+		.owner	= THIS_MODULE,
+> +	}
+> +};
+> +
+> +module_platform_driver(lpc32xx_kscan_driver);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Kevin Wells <kevin.wells@nxp.com>");
+> +MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
+> +MODULE_DESCRIPTION("Key scanner driver for LPC32XX devices");
+
+Thanks.
+
+-- 
+Dmitry
