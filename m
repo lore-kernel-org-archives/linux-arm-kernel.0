@@ -1,211 +1,122 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 May 2012 14:45:14 +0100
-Subject: [PATCH 09/18] regulator: ab8500: Split up probe() into manageable
- pieces
+Date: Thu, 17 May 2012 14:45:15 +0100
+Subject: [PATCH 10/18] ARM: ux500: Add support for ab8500 regulators into the
+ Device Tree
 In-Reply-To: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
 References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337262323-27692-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ab8500's probe() function is becoming quite large, so in the lead
-up to Device Tree enablement which will fork the thread of execution
-this patch splits it into 3 main areas; basic error checking will
-remain in probe(), but regulator register initialisation and regulator
-registration have been moved to their own functions which will
-be called in sequence by probe() and the DT equivalent.
+Here we supply the information required to setup regulators
+successfully on Snowball and other db8500 variants which use
+the ab8500 regulators.
 
-Cc: linux-kernel at vger.kernel.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/ab8500.c |  150 +++++++++++++++++++++++++-------------------
- 1 file changed, 87 insertions(+), 63 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi  |   68 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/snowball.dts |    2 ++
+ 2 files changed, 70 insertions(+)
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index d156390..3571b54 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -708,11 +708,92 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
- 	REG_INIT(AB8500_REGUCTRLDISCH2,		0x04, 0x44, 0x16),
- };
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 1188925..e69c3fa 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -202,6 +202,74 @@
+ 				reg = <5>; /* mailbox 5 is i2c */
+ 				interrupts = <0 40 0x4>;
+ 				stericsson,irq-base = <520>;
++
++				ab8500-regulators {
++					compatible = "stericsson,ab8500-regulator";
++
++					// supplies to the display/camera
++					ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
++						regulator-name = "V-DISPLAY";
++						regulator-min-microvolt = <2500000>;
++						regulator-max-microvolt = <2900000>;
++						regulator-boot-on;
++						/* BUG: If turned off MMC will be affected. */
++						regulator-always-on;
++					};
++
++					// supplies to the on-board eMMC
++					ab8500_ldo_aux2_reg: ab8500_ldo_aux2 {
++						regulator-name = "V-eMMC1";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					// supply for VAUX3; SDcard slots
++					ab8500_ldo_aux3_reg: ab8500_ldo_aux3 {
++						regulator-name = "V-MMC-SD";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					// supply for v-intcore12; VINTCORE12 LDO
++					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
++						regulator-name = "V-INTCORE";
++					};
++
++					// supply for tvout; gpadc; TVOUT LDO
++					ab8500_ldo_tvout_reg: ab8500_ldo_tvout {
++						regulator-name = "V-TVOUT";
++					};
++
++					// supply for ab8500-usb; USB LDO
++					ab8500_ldo_usb_reg: ab8500_ldo_usb {
++						regulator-name = "dummy";
++					};
++
++					// supply for ab8500-vaudio; VAUDIO LDO
++					ab8500_ldo_audio_reg: ab8500_ldo_audio {
++						regulator-name = "V-AUD";
++					};
++
++					// supply for v-anamic1 VAMic1-LDO
++					ab8500_ldo_anamic1_reg: ab8500_ldo_anamic1 {
++						regulator-name = "V-AMIC1";
++					};
++
++					// supply for v-amic2; VAMIC2 LDO; reuse constants for AMIC1
++					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
++						regulator-name = "V-AMIC2";
++					};
++
++					// supply for v-dmic; VDMIC LDO
++					ab8500_ldo_dmic_reg: ab8500_ldo_dmic {
++						regulator-name = "V-DMIC";
++					};
++
++					// supply for U8500 CSI/DSI; VANA LDO
++					ab8500_ldo_ana_reg: ab8500_ldo_ana {
++						regulator-name = "V-CSI/DSI";
++					};
++				};
+ 			};
+ 		};
  
-+static __devinit int
-+ab8500_regulator_init_registers(struct platform_device *pdev, int id, int value)
-+{
-+	int err;
-+
-+	if (value & ~ab8500_reg_init[id].mask) {
-+		dev_err(&pdev->dev,
-+			"Configuration error: value outside mask.\n");
-+		return -EINVAL;
-+	}
-+
-+	err = abx500_mask_and_set_register_interruptible(
-+		&pdev->dev,
-+		ab8500_reg_init[id].bank,
-+		ab8500_reg_init[id].addr,
-+		ab8500_reg_init[id].mask,
-+		value);
-+	if (err < 0) {
-+		dev_err(&pdev->dev,
-+			"Failed to initialize 0x%02x, 0x%02x.\n",
-+			ab8500_reg_init[id].bank,
-+			ab8500_reg_init[id].addr);
-+		return err;
-+	}
-+
-+	dev_vdbg(&pdev->dev,
-+		"init: 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
-+		ab8500_reg_init[id].bank,
-+		ab8500_reg_init[id].addr,
-+		ab8500_reg_init[id].mask,
-+		value);
-+
-+	return 0;
-+}
-+
-+static __devinit int ab8500_regulator_register(struct platform_device *pdev,
-+					struct regulator_init_data *init_data,
-+					int id,
-+					struct device_node *np)
-+{
-+	struct ab8500_regulator_info *info = NULL;
-+	struct regulator_config config = { };
-+	int err;
-+
-+	/* assign per-regulator data */
-+	info = &ab8500_regulator_info[id];
-+	info->dev = &pdev->dev;
-+
-+	config.dev = &pdev->dev;
-+	config.init_data = init_data;
-+	config.driver_data = info;
-+	config.of_node = np;
-+
-+	/* fix for hardware before ab8500v2.0 */
-+	if (abx500_get_chip_id(info->dev) < 0x20) {
-+		if (info->desc.id == AB8500_LDO_AUX3) {
-+			info->desc.n_voltages =
-+				ARRAY_SIZE(ldo_vauxn_voltages);
-+			info->voltages = ldo_vauxn_voltages;
-+			info->voltages_len =
-+				ARRAY_SIZE(ldo_vauxn_voltages);
-+			info->voltage_mask = 0xf;
-+		}
-+	}
-+
-+	/* register regulator with framework */
-+	info->regulator = regulator_register(&info->desc, &config);
-+	if (IS_ERR(info->regulator)) {
-+		err = PTR_ERR(info->regulator);
-+		dev_err(&pdev->dev, "failed to register regulator %s\n",
-+			info->desc.name);
-+		/* when we fail, un-register all earlier regulators */
-+		while (--id >= 0) {
-+			info = &ab8500_regulator_info[id];
-+			regulator_unregister(info->regulator);
-+		}
-+		return err;
-+	}
-+
-+	return 0;
-+}
-+
- static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
- {
- 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
- 	struct ab8500_platform_data *pdata;
--	struct regulator_config config = { };
- 	int i, err;
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 579c304..6b00350 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -94,6 +94,7 @@
+ 			arm,primecell-periphid = <0x10480180>;
+ 			max-frequency = <50000000>;
+ 			bus-width = <8>;
++			vmmc-supply = <&ab8500_ldo_aux3_reg>;
+ 			mmc-cap-mmc-highspeed;
  
- 	if (!ab8500) {
-@@ -733,8 +814,7 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
+ 			cd-gpios  = <&gpio6 26 0x4>; // 218
+@@ -107,6 +108,7 @@
+ 			arm,primecell-periphid = <0x10480180>;
+ 		        max-frequency = <50000000>;
+ 			bus-width = <8>;
++			vmmc-supply = <&ab8500_ldo_aux2_reg>;
+ 			mmc-cap-mmc-highspeed;
  
- 	/* initialize registers */
- 	for (i = 0; i < pdata->num_regulator_reg_init; i++) {
--		int id;
--		u8 value;
-+		int id, value;
- 
- 		id = pdata->regulator_reg_init[i].id;
- 		value = pdata->regulator_reg_init[i].value;
-@@ -745,73 +825,17 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
- 				"Configuration error: id outside range.\n");
- 			return -EINVAL;
- 		}
--		if (value & ~ab8500_reg_init[id].mask) {
--			dev_err(&pdev->dev,
--				"Configuration error: value outside mask.\n");
--			return -EINVAL;
--		}
- 
--		/* initialize register */
--		err = abx500_mask_and_set_register_interruptible(&pdev->dev,
--			ab8500_reg_init[id].bank,
--			ab8500_reg_init[id].addr,
--			ab8500_reg_init[id].mask,
--			value);
--		if (err < 0) {
--			dev_err(&pdev->dev,
--				"Failed to initialize 0x%02x, 0x%02x.\n",
--				ab8500_reg_init[id].bank,
--				ab8500_reg_init[id].addr);
-+		err = ab8500_regulator_init_registers(pdev, id, value);
-+		if (err < 0)
- 			return err;
--		}
--		dev_vdbg(&pdev->dev,
--			"  init: 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
--			ab8500_reg_init[id].bank,
--			ab8500_reg_init[id].addr,
--			ab8500_reg_init[id].mask,
--			value);
- 	}
- 
- 	/* register all regulators */
- 	for (i = 0; i < ARRAY_SIZE(ab8500_regulator_info); i++) {
--		struct ab8500_regulator_info *info = NULL;
--
--		/* assign per-regulator data */
--		info = &ab8500_regulator_info[i];
--		info->dev = &pdev->dev;
--
--		config.dev = &pdev->dev;
--		config.init_data = &pdata->regulator[i];
--		config.driver_data = info;
--
--		/* fix for hardware before ab8500v2.0 */
--		if (abx500_get_chip_id(info->dev) < 0x20) {
--			if (info->desc.id == AB8500_LDO_AUX3) {
--				info->desc.n_voltages =
--					ARRAY_SIZE(ldo_vauxn_voltages);
--				info->voltages = ldo_vauxn_voltages;
--				info->voltages_len =
--					ARRAY_SIZE(ldo_vauxn_voltages);
--				info->voltage_mask = 0xf;
--			}
--		}
--
--		/* register regulator with framework */
--		info->regulator = regulator_register(&info->desc, &config);
--		if (IS_ERR(info->regulator)) {
--			err = PTR_ERR(info->regulator);
--			dev_err(&pdev->dev, "failed to register regulator %s\n",
--					info->desc.name);
--			/* when we fail, un-register all earlier regulators */
--			while (--i >= 0) {
--				info = &ab8500_regulator_info[i];
--				regulator_unregister(info->regulator);
--			}
-+		err = ab8500_regulator_register(pdev, &pdata->regulator[i], i, NULL);
-+		if (err < 0)
- 			return err;
--		}
--
--		dev_vdbg(rdev_get_dev(info->regulator),
--			"%s-probed\n", info->desc.name);
- 	}
- 
- 	return 0;
+ 			status = "okay";
 -- 
 1.7.9.5
