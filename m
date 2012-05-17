@@ -1,44 +1,27 @@
-From: alexey.zaytsev@gmail.com (Alexey Zaytsev)
-Date: Thu, 17 May 2012 18:29:23 +0300
-Subject: A good sub-architecture to base new ports on?
-In-Reply-To: <201205161557.45362.arnd@arndb.de>
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
- <201205161557.45362.arnd@arndb.de>
-Message-ID: <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 17 May 2012 21:09:21 +0530
+Subject: [PATCH 3/7] mmc: dw_mmc: add device tree support
+In-Reply-To: <Pine.LNX.4.64.1205122117340.11826@axis700.grange>
+References: <1335935266-25289-1-git-send-email-thomas.abraham@linaro.org>
+ <1335935266-25289-4-git-send-email-thomas.abraham@linaro.org>
+ <Pine.LNX.4.64.1205040047280.18111@axis700.grange>
+ <CAJuYYwQj7gzZ9piJAJLcf7SiyJnQ6nZ63-X9ieQ-FCj6TNhQPQ@mail.gmail.com>
+ <Pine.LNX.4.64.1205122117340.11826@axis700.grange>
+Message-ID: <CAJuYYwTf=+Nkw2Ox9MYLybovSH8dNttYQzV4-Gg2xvZnVffZXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 6:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 16 May 2012, Alexey Zaytsev wrote:
->> Hey.
->>
->> With all the ARM tree rework, I'm wondering, what would be a good (and
->> simple) sub-architecture on which to base new ports. The target is a
->> somewhat dated chip used in ADSL routers, so no DT, or multiplatform.
->> I'm looking at ixp4xx, because I'm somewhat familiar with the
->> platform, but is it a good reference?
+On 13 May 2012 01:01, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> Sure. I think, my patch, that I mentioned above, shall be dropped, at
+> least in its present form. But if at least in principle we do want to have
+> a common MMC OF parser for common bindings, some code from your patch
+> would become redundant, I think. BTW, isn't this
 >
-
-Thanks for the reply.
-
-> For a new subarchitecture, using DT is required, but it should not make
-> your work harder. spear3xx/6xx is a good example of an older platform
-> that was recently converted (take the arm-soc tree as a base, it contains
-> the latest version).
-
-Will do. Thanks for the arm-soc pointer.
-
-> Another good one would be highbank, but that contains a lot of stuff you
-> don't need.
+> + ? ? ? gpio = of_get_named_gpio(np, "wp_gpios", 0);
 >
-> ixp4xx is not very actively maintained, so I would not use that as
-> a base.
->
-> What platform are you talking about? I know of a few people that are
-> working on getting older platforms ported to Linux, so maybe someone
-> is already working on a port.
+> a typo? Shouldn't it be "wp-gpios" instead?
 
-It's a 'Solos' soc from Connexant. They released kernel code for
-2.6.11, and I'm up-porting it to the current kernel. I know at least
-two other people interested in the port, adding them to CC. If you
-know anyone else, it would be great to share the effort.
+Yes, it is a typo. Thanks for your review. This is fixed now.
+
+Regards,
+Thomas.
