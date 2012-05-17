@@ -1,67 +1,63 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 May 2012 18:53:03 +0200
-Subject: [PATCH/RFC 0/3] ARM: DMA-mapping: new extensions for buffer sharing
-Message-ID: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 17 May 2012 18:53:04 +0200
+Subject: [PATCH 1/3] common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING
+ attribute
+In-Reply-To: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
+References: <1337273586-11089-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1337273586-11089-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds DMA_ATTR_NO_KERNEL_MAPPING attribute which lets the
+platform to avoid creating a kernel virtual mapping for the allocated
+buffer. On some architectures creating such mapping is non-trivial task
+and consumes very limited resources (like kernel virtual address space
+or dma consistent address space). Buffers allocated with this attribute
+can be only passed to user space by calling dma_mmap_attrs().
 
-This patch series introduces a new features to DMA mapping subsystem
-to let drivers share the allocated buffers (preferably using recently
-introduced dma_buf framework) easy and efficient.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/DMA-attributes.txt |   18 ++++++++++++++++++
+ include/linux/dma-attrs.h        |    1 +
+ 2 files changed, 19 insertions(+)
 
-The first extension is DMA_ATTR_NO_KERNEL_MAPPING attribute. It is
-intended for use with dma_{alloc, mmap, free}_attrs functions. It can be
-used to notify dma-mapping core that the driver will not use kernel
-mapping for the allocated buffer at all, so the core can skip creating
-it. This saves precious kernel virtual address space. Such buffer can be
-accessed from userspace, after calling dma_mmap_attrs() for it (a
-typical use case for multimedia buffers). The value returned by
-dma_alloc_attrs() with this attribute should be considered as a DMA
-cookie, which needs to be passed to dma_mmap_attrs() and
-dma_free_attrs() funtions.
-
-The second extension is required to let drivers to share the buffers
-allocated by DMA-mapping subsystem. Right now the driver gets a dma
-address of the allocated buffer and the kernel virtual mapping for it.
-If it wants to share it with other device (= map into its dma address
-space) it usually hacks around kernel virtual addresses to get pointers
-to pages or assumes that both devices share the DMA address space. Both
-solutions are just hacks for the special cases, which should be avoided
-in the final version of buffer sharing. To solve this issue in a generic
-way, a new call to DMA mapping has been introduced - dma_get_sgtable().
-It allocates a scatter-list which describes the allocated buffer and
-lets the driver(s) to use it with other device(s) by calling
-dma_map_sg() on it.
-
-The proposed patches have been generated on top of the ARM DMA-mapping
-redesign patch series on Linux v3.4-rc7. They are also available on the
-following GIT branch:
-
-git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc7-arm-dma-v10-ext
-
-with all require patches on top of vanilla v3.4-rc7 kernel.
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-Patch summary:
-
-Marek Szyprowski (3):
-  common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING attribute
-  ARM: dma-mapping: add support for DMA_ATTR_NO_KERNEL_MAPPING
-    attribute
-  ARM: dma-mapping: add support for dma_get_sgtable()
-
- Documentation/DMA-attributes.txt   |   18 +++++++++++++
- arch/arm/include/asm/dma-mapping.h |   12 +++++++++
- arch/arm/mm/dma-mapping.c          |   51 ++++++++++++++++++++++++++++++++----
- include/linux/dma-attrs.h          |    1 +
- include/linux/dma-mapping.h        |    3 +++
- 5 files changed, 80 insertions(+), 5 deletions(-)
-
+diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
+index 5c72eed..725580d 100644
+--- a/Documentation/DMA-attributes.txt
++++ b/Documentation/DMA-attributes.txt
+@@ -49,3 +49,21 @@ DMA_ATTR_NON_CONSISTENT lets the platform to choose to return either
+ consistent or non-consistent memory as it sees fit.  By using this API,
+ you are guaranteeing to the platform that you have all the correct and
+ necessary sync points for this memory in the driver.
++
++DMA_ATTR_NO_KERNEL_MAPPING
++--------------------------
++
++DMA_ATTR_NO_KERNEL_MAPPING lets the platform to avoid creating a kernel
++virtual mapping for the allocated buffer. On some architectures creating
++such mapping is non-trivial task and consumes very limited resources
++(like kernel virtual address space or dma consistent address space).
++Buffers allocated with this attribute can be only passed to user space
++by calling dma_mmap_attrs(). By using this API, you are guaranteeing
++that you won't dereference the pointer returned by dma_alloc_attr(). You
++can threat it as a cookie that must be passed to dma_mmap_attrs() and
++dma_free_attrs(). Make sure that both of these also get this attribute
++set on each call.
++
++Since it is optional for platforms to implement
++DMA_ATTR_NO_KERNEL_MAPPING, those that do not will simply ignore the
++attribute and exhibit default behavior.
+diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+index 547ab56..a37c10c 100644
+--- a/include/linux/dma-attrs.h
++++ b/include/linux/dma-attrs.h
+@@ -15,6 +15,7 @@ enum dma_attr {
+ 	DMA_ATTR_WEAK_ORDERING,
+ 	DMA_ATTR_WRITE_COMBINE,
+ 	DMA_ATTR_NON_CONSISTENT,
++	DMA_ATTR_NO_KERNEL_MAPPING,
+ 	DMA_ATTR_MAX,
+ };
+ 
 -- 
 1.7.10.1
