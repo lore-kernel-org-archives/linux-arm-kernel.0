@@ -1,35 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 May 2012 14:45:23 +0100
-Subject: [PATCH 18/18] ARM: ux500: Add support for input/ponkey into the
- db8500's Device Tree
-In-Reply-To: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337262323-27692-19-git-send-email-lee.jones@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 17 May 2012 14:52:36 +0100
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <20120517132223.GB9650@n2100.arm.linux.org.uk>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FB3D294.4020505@wwwdotorg.org>
+ <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
+ <201205161942.20296.arnd@arndb.de>
+ <20120517132223.GB9650@n2100.arm.linux.org.uk>
+Message-ID: <20120517135236.GA5807@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/db8500.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+On Thu, May 17, 2012 at 02:22:23PM +0100, Russell King - ARM Linux wrote:
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index e14001b..076831c 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -215,6 +215,13 @@
- 					vddadc-supply = <&ab8500_ldo_tvout_reg>;
- 				};
- 
-+				ab8500-ponkey {
-+					compatible = "stericsson,ab8500-ponkey";
-+					interrupts = <0 6 0x4
-+						      0 7 0x4>;
-+					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
-+				};
-+
- 				ab8500-regulators {
- 					compatible = "stericsson,ab8500-regulator";
- 
--- 
-1.7.9.5
+> DMA on the other hand seems to have cases where you can make a choice
+> between two or more providers of the service.  The impression that I'm
+> getting from this thread is that it's difficult to describe that kind
+> of relationship in DT - DT is good at describing "A provides X to C"
+> but not "A _or_ B provides X to C and you can chose either A or B
+> depending on <something> to satisfy X".
+
+A similar thing exists in a lot of clock trees - often the final clock
+block before an IP block includes a mux which could come from one of a
+number of sources.
