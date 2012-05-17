@@ -1,52 +1,139 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 17 May 2012 22:05:33 +0530
-Subject: [PATCH 2/3] ARM: Exynos5: Add AUXDATA support for MSHC controllers
+Date: Thu, 17 May 2012 22:05:34 +0530
+Subject: [PATCH 3/3] ARM: dts: Add nodes for dw_mmc controllers for Samsung
+ Exynos5250 platforms
 In-Reply-To: <1337272534-30370-1-git-send-email-thomas.abraham@linaro.org>
 References: <1337272534-30370-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1337272534-30370-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1337272534-30370-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entries if MSHC controllers in AUXDATA table for correct device name
-initialization.
+Add device nodes for the four instances of dw_mmc controllers in Exynos5250
+and enable instance 0 and 2 for the smdk5250 board.
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/include/mach/map.h |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c  |    8 ++++++++
- 2 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   59 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++
+ 2 files changed, 91 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index cf7d200..1f3e61a 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -129,6 +129,7 @@
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index dbc4bdb..ac408c8 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -16,6 +16,13 @@
+ 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+ 	compatible = "samsung,smdk5250", "samsung,exynos5250";
  
- #define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
- #define EXYNOS4_PA_DWMCI		0x12550000
-+#define EXYNOS5_PA_DWMCI(x)		(0x12200000 + ((x) * 0x10000))
++	aliases {
++		mshc0 = &mshc_0;
++		mshc1 = &mshc_1;
++		mshc2 = &mshc_2;
++		mshc3 = &mshc_3;
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
+@@ -86,4 +93,56 @@
+ 	i2c at 12CD0000 {
+ 		status = "disabled";
+ 	};
++
++	mshc_0: dwmmc0 at 12200000 {
++		num-slots = <1>;
++		supports-highspeed;
++		card-detection-broken;
++		no-write-protect;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-sdr-timing = <2 3 3>;
++		samsung,dw-mshc-ddr-timing = <1 2 3>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <8>;
++			cd-gpios = <&gpc0 2 2 3 3>;
++			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
++				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
++				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
++				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
++				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
++		};
++	};
++
++	mshc_1: dwmmc1 at 12210000 {
++		status = "disabled";
++	};
++
++	mshc_2: dwmmc2 at 12220000 {
++		num-slots = <1>;
++		supports-highspeed;
++		card-detection-broken;
++		no-write-protect;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-sdr-timing = <2 3 3>;
++		samsung,dw-mshc-ddr-timing = <1 2 3>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <4>;
++			cd-gpios = <&gpc3 2 2 3 3>;
++			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
++				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
++				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
++				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
++				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
++		};
++	};
++
++	mshc_3: dwmmc3 at 12230000 {
++		status = "disabled";
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index af12491..a6a497f 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -169,6 +169,38 @@
+ 		interrupts = <0 63 0>;
+ 	};
  
- #define EXYNOS4_PA_SATA			0x12560000
- #define EXYNOS4_PA_SATAPHY		0x125D0000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 00e25fc..2cb0c6a 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -72,6 +72,14 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"s3c2440-i2c.0", NULL),
- 	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(1),
- 				"s3c2440-i2c.1", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5250-dw-mshc", EXYNOS5_PA_DWMCI(0),
-+				"dw_mmc.0", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5250-dw-mshc", EXYNOS5_PA_DWMCI(1),
-+				"dw_mmc.1", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5250-dw-mshc", EXYNOS5_PA_DWMCI(2),
-+				"dw_mmc.2", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5250-dw-mshc", EXYNOS5_PA_DWMCI(3),
-+				"dw_mmc.3", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
++	dwmmc0 at 12200000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12200000 0x1000>;
++		interrupts = <0 75 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc1 at 12210000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12210000 0x1000>;
++		interrupts = <0 76 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc2 at 12220000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12220000 0x1000>;
++		interrupts = <0 77 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc3 at 12230000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12230000 0x1000>;
++		interrupts = <0 78 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.6.6.rc2
