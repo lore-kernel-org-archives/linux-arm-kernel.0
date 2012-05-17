@@ -1,33 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 May 2012 15:35:03 +0800
-Subject: [PATCH 2/2] gpio/mxc: remove basic_mmio_gpio shadow fixup
-In-Reply-To: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
-References: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1337240103-4756-3-git-send-email-shawn.guo@linaro.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 17 May 2012 14:22:52 +0530
+Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
+ <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
+Message-ID: <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 7cc9c7c (gpio/generic: initialize basic_mmio_gpio shadow
-variables properly) fixing the basic_mmio_gpio shadow variables in
-gpio-generic, the fixup in gpio-mxc can be removed now.
+On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
+>>
+>>> From: Rajendra Nayak <rnayak@ti.com>
+>>>
+>>> SAR/ROM code restores only CORE DPLL to its original state
+>>> post wakeup from OFF mode.
+>>> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
+>>> are saved and restored here during an OFF transition.
+>>>
+>>> [nm at ti.com: minor cleanups]
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>
+>> Some general comments:
+>>
+>> - the register dump/print doesn't belong here. ?If needed, should be a
+>> ?debug feature if needed.
+>>
+>> - Rather than hooking into omap4_enter_lowpower(), should use
+>> ?the cluster PM enter/exit notifier chain.
+>>
+> This is again specific to device OFF only and not related to CPU
+> cluster state as such. So I don't think notifiers should be used here.
+>
+> O.w even when we attempt just MPU OSWR C-state, all these functions will
+> get called in notifier chain.
+>
+Just a thought, we can have a separate notifier chain for device OFF. It can
+allow use to get rid of 'enable_off_mode" kind of flags and can be
+used by many drivers too.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/gpio/gpio-mxc.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index e791476..dbaac01 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -423,8 +423,6 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 
- 	port->bgc.gc.to_irq = mxc_gpio_to_irq;
- 	port->bgc.gc.base = pdev->id * 32;
--	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
--	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
- 
- 	err = gpiochip_add(&port->bgc.gc);
- 	if (err)
--- 
-1.7.5.4
+Regards
+Santosh
