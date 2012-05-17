@@ -1,219 +1,274 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 May 2012 15:30:35 +0100
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <20120516110451.GA9571@n2100.arm.linux.org.uk>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
-Message-ID: <20120517143035.GA19548@n2100.arm.linux.org.uk>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 17 May 2012 09:34:26 -0500
+Subject: [PATCH v4 3/7] ARM: imx: clean and consolidate imx5 suspend and
+ idle code
+In-Reply-To: <20120516173815.GV30400@pengutronix.de>
+References: <1337135616-8988-1-git-send-email-rob.lee@linaro.org>
+ <1337135616-8988-4-git-send-email-rob.lee@linaro.org>
+ <20120516173815.GV30400@pengutronix.de>
+Message-ID: <CAMXH7KFQvLC-tJRLR-3KqRZTY1=VG2me5HqLGzpo6Y4BnC2Dug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Wed, May 16, 2012 at 12:38 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Robert,
+>
+> Overall this looks ok now, some comments inline.
+>
+> Sascha
+>
+> On Tue, May 15, 2012 at 09:33:32PM -0500, Robert Lee wrote:
+>> The imx5 idle code that existed in mm-imx5.c is moved to pm-imx5.c.
+>> The imx5_pm_init call is now exported and called during the
+>> MACHINE_START late_init in supported imx5 platforms.
+>>
+>> Remove various enabling/disabling of the gpc_dvfs clock and
+>> enable it once during initialization. ?This is a very low
+>> power clock that must be enabled during low power operations.
+>>
+>> There are only two "suspend_state_t" imx5 low power modes ever
+>> used. ?STOP_POWER_OFF for suspend to mem and
+>> WAIT_UNCLOCKED_POWER_OFF for idle and suspend to standby. ?The
+>> latter mode only requires 500 nanoseconds of extra hardware
+>> exit time beyond a basic WFI operation (WAIT_CLOCKED mode) so
+>> no other idle mode is necessary. ?Given this information, it
+>> is more efficient to keep the registers in the often used
+>> WAIT_UNCLOCKED_POWER_OFF state and only to and from the
+>> STOP_POWER_OFF register state as needed when suspend to
+>> mem is required.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/mach-imx/mm-imx5.c ? ? ? ? ? ? | ? 20 +---------
+>> ?arch/arm/mach-imx/pm-imx5.c ? ? ? ? ? ? | ? 63 ++++++++++++++++++-------------
+>> ?arch/arm/plat-mxc/include/mach/common.h | ? ?3 +-
+>> ?3 files changed, 40 insertions(+), 46 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+>> index d6b7e9f..bb38747 100644
+>> --- a/arch/arm/mach-imx/mm-imx5.c
+>> +++ b/arch/arm/mach-imx/mm-imx5.c
+>> @@ -15,7 +15,6 @@
+>> ?#include <linux/init.h>
+>> ?#include <linux/clk.h>
+>>
+>> -#include <asm/system_misc.h>
+>> ?#include <asm/mach/map.h>
+>>
+>> ?#include <mach/hardware.h>
+>> @@ -23,23 +22,6 @@
+>> ?#include <mach/devices-common.h>
+>> ?#include <mach/iomux-v3.h>
+>>
+>> -static struct clk *gpc_dvfs_clk;
+>> -
+>> -static void imx5_idle(void)
+>> -{
+>> - ? ? /* gpc clock is needed for SRPG */
+>> - ? ? if (gpc_dvfs_clk == NULL) {
+>> - ? ? ? ? ? ? gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+>> - ? ? ? ? ? ? if (IS_ERR(gpc_dvfs_clk))
+>> - ? ? ? ? ? ? ? ? ? ? return;
+>> - ? ? }
+>> - ? ? clk_enable(gpc_dvfs_clk);
+>> - ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+>> - ? ? if (!tzic_enable_wake())
+>> - ? ? ? ? ? ? cpu_do_idle();
+>> - ? ? clk_disable(gpc_dvfs_clk);
+>> -}
+>> -
+>> ?/*
+>> ? * Define the MX50 memory map.
+>> ? */
+>> @@ -103,7 +85,6 @@ void __init imx51_init_early(void)
+>> ? ? ? mxc_set_cpu_type(MXC_CPU_MX51);
+>> ? ? ? mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+>> ? ? ? mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+>> - ? ? arm_pm_idle = imx5_idle;
+>> ?}
+>>
+>> ?void __init imx53_init_early(void)
+>> @@ -238,4 +219,5 @@ void __init imx53_soc_init(void)
+>> ?void __init imx51_init_late(void)
+>> ?{
+>> ? ? ? mx51_neon_fixup();
+>> + ? ? imx5_pm_init();
+>> ?}
+>> diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+>> index e26a9cb..6e62d79 100644
+>> --- a/arch/arm/mach-imx/pm-imx5.c
+>> +++ b/arch/arm/mach-imx/pm-imx5.c
+>> @@ -13,18 +13,27 @@
+>> ?#include <linux/io.h>
+>> ?#include <linux/err.h>
+>> ?#include <asm/cacheflush.h>
+>> +#include <asm/system_misc.h>
+>> ?#include <asm/tlbflush.h>
+>> ?#include <mach/common.h>
+>> ?#include <mach/hardware.h>
+>> ?#include "crm-regs-imx5.h"
+>>
+>> -static struct clk *gpc_dvfs_clk;
+>> +/*
+>> + * The WAIT_UNCLOCKED_POWER_OFF state only requires <= 500ns to exit.
+>> + * This is also the lowest power state possible without affecting
+>> + * non-cpu parts of the system. ?For these reasons, imx5 should default
+>> + * to always using this state for cpu idling. ?The PM_SUSPEND_STANDBY also
+>> + * uses this state and needs to take no action when registers remain confgiured
+>> + * for this state.
+>> + */
+>> +#define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+>>
+>> ?/*
+>> ? * set cpu low power mode before WFI instruction. This function is called
+>> ? * mx5 because it can be used for mx50, mx51, and mx53.
+>> ? */
+>> -void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+>> +static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+>> ?{
+>> ? ? ? u32 plat_lpc, arm_srpgcr, ccm_clpcr;
+>> ? ? ? u32 empgc0, empgc1;
+>> @@ -87,11 +96,6 @@ void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+>> ? ? ? }
+>> ?}
+>>
+>> -static int mx5_suspend_prepare(void)
+>> -{
+>> - ? ? return clk_prepare_enable(gpc_dvfs_clk);
+>> -}
+>> -
+>> ?static int mx5_suspend_enter(suspend_state_t state)
+>> ?{
+>> ? ? ? switch (state) {
+>> @@ -99,7 +103,7 @@ static int mx5_suspend_enter(suspend_state_t state)
+>> ? ? ? ? ? ? ? mx5_cpu_lp_set(STOP_POWER_OFF);
+>> ? ? ? ? ? ? ? break;
+>> ? ? ? case PM_SUSPEND_STANDBY:
+>> - ? ? ? ? ? ? mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+>> + ? ? ? ? ? ? /* DEFAULT_IDLE_STATE already configured */
+>> ? ? ? ? ? ? ? break;
+>> ? ? ? default:
+>> ? ? ? ? ? ? ? return -EINVAL;
+>> @@ -114,12 +118,10 @@ static int mx5_suspend_enter(suspend_state_t state)
+>> ? ? ? ? ? ? ? __raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
+>> ? ? ? }
+>> ? ? ? cpu_do_idle();
+>> - ? ? return 0;
+>> -}
+>>
+>> -static void mx5_suspend_finish(void)
+>> -{
+>> - ? ? clk_disable_unprepare(gpc_dvfs_clk);
+>> + ? ? /* return registers to default idle state */
+>> + ? ? mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+>> + ? ? return 0;
+>> ?}
+>>
+>> ?static int mx5_pm_valid(suspend_state_t state)
+>> @@ -129,25 +131,34 @@ static int mx5_pm_valid(suspend_state_t state)
+>>
+>> ?static const struct platform_suspend_ops mx5_suspend_ops = {
+>> ? ? ? .valid = mx5_pm_valid,
+>> - ? ? .prepare = mx5_suspend_prepare,
+>> ? ? ? .enter = mx5_suspend_enter,
+>> - ? ? .finish = mx5_suspend_finish,
+>> ?};
+>>
+>> -static int __init mx5_pm_init(void)
+>> +static void imx5_pm_idle(void)
+>> +{
+>> + ? ? if (likely(!tzic_enable_wake()))
+>> + ? ? ? ? ? ? cpu_do_idle();
+>> +}
+>> +
+>> +int __init imx5_pm_init(void)
+>> ?{
+>> - ? ? if (!cpu_is_mx51() && !cpu_is_mx53())
+>> - ? ? ? ? ? ? return 0;
+>> + ? ? int ret;
+>> + ? ? struct clk *gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+>> +
+>> + ? ? if (IS_ERR(gpc_dvfs_clk))
+>> + ? ? ? ? ? ? return (int)gpc_dvfs_clk;
+>
+> PTR_ERR please
+>
 
-Is there any reason you can see not to do this?
+Thanks.  Will fix in v5.
 
-I ultimately need to kill off the passing of struct pl08x_dma_chan to
-these functions, because that's preventing me moving the struct into
-drivers/dma - which I need to in order to convert amba-pl08x.c to use
-virt-dma.c.
+>> +
+>> + ? ? ret = clk_enable(gpc_dvfs_clk);
+>
+> clk_prepare_enable
+>
 
-The only use of pl08x_dma_chan in the functions below is for the debug
-prints, which I suggest we just kill off - or we could change them to
-be cd->bus_id, which is the same thing anyway.
+Thanks.  Will fix in v5.
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 45868bb..30efe77 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-...
-+/* State of the big DMA mux */
-+static u32 current_mux;
-+static u32 mux_users;
-+static DEFINE_SPINLOCK(current_mux_lock);
-+
-+static int pl081_get_signal(struct pl08x_dma_chan *ch, const struct pl08x_channel_data *cd)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&current_mux_lock, flags);
-+	/*
-+	 * We're on the same mux so fine, go ahead!
-+	 */
-+	if (cd->muxval == current_mux) {
-+		mux_users ++;
-+		spin_unlock_irqrestore(&current_mux_lock, flags);
-+		/* We still have to write it since it may be OFF by default */
-+		val = readl(__io_address(REALVIEW_SYS_DMAPSR));
-+		val &= 0xFFFFFFFCU;
-+		val |= current_mux;
-+		writel(val, __io_address(REALVIEW_SYS_DMAPSR));
-+		return cd->min_signal;
-+	}
-+	/*
-+	 * If we're not on the same mux and there are already
-+	 * users on the other mux setting, tough luck, the client
-+	 * can come back and retry or give up and fall back to
-+	 * PIO mode.
-+	 */
-+	if (mux_users) {
-+		spin_unlock_irqrestore(&current_mux_lock, flags);
-+		return -EBUSY;
-+	}
-+
-+	/* Switch mux setting */
-+	current_mux = cd->muxval;
-+
-+	val = readl(__io_address(REALVIEW_SYS_DMAPSR));
-+	val &= 0xFFFFFFFCU;
-+	val |= cd->muxval;
-+	writel(val, __io_address(REALVIEW_SYS_DMAPSR));
-+
-+	pr_info("%s: muxing in %s in bank %d writing value "
-+		"%08x to register %08x\n",
-+		__func__, ch->name, cd->muxval,
-+		val, REALVIEW_SYS_DMAPSR);
-+
-+	spin_unlock_irqrestore(&current_mux_lock, flags);
-+
-+	return cd->min_signal;
-+}
-+
-+static void pl081_put_signal(struct pl08x_dma_chan *ch, int signal)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&current_mux_lock, flags);
-+	mux_users--;
-+	spin_unlock_irqrestore(&current_mux_lock, flags);
-+}
-...
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 6bbd74e..5570894 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-...
-+/* This is a lock for the above muxing array */
-+static DEFINE_SPINLOCK(muxlock);
-+
-+static int pl080_get_signal(struct pl08x_dma_chan *ch, const struct pl08x_channel_data *cd)
-+{
-+	pr_debug("requesting DMA signal on channel %s\n", ch->name);
-+
-+	/*
-+	 * The AB926EJ-S is simple - only static assignments
-+	 * so the channel is already muxed in and ready to go.
-+	 */
-+	if (machine_is_versatile_ab())
-+		return cd->min_signal;
-+
-+	/* The PB926EJ-S is hairier */
-+	if (machine_is_versatile_pb()) {
-+		unsigned long flags;
-+		int i;
-+
-+		if (cd->min_signal > ARRAY_SIZE(pl080_muxtab) ||
-+		    cd->max_signal > ARRAY_SIZE(pl080_muxtab) ||
-+		    (cd->max_signal < cd->min_signal)) {
-+			pr_err("%s: illegal muxing constraints for %s\n",
-+			       __func__, ch->name);
-+			return -EINVAL;
-+		}
-+		/* Try to find a signal to use */
-+		spin_lock_irqsave(&muxlock, flags);
-+		for (i = cd->min_signal; i <= cd->max_signal; i++) {
-+			if (!pl080_muxtab[i].user) {
-+				u32 val;
-+
-+				pl080_muxtab[i].user = ch;
-+				/* If the channels need to be muxed in, mux them! */
-+				if (pl080_muxtab[i].ctrlreg) {
-+					val = readl(__io_address(pl080_muxtab[i].ctrlreg));
-+					val &= 0xFFFFFF60U;
-+					val |= 0x80; /* Turn on muxing */
-+					val |= cd->muxval; /* Mux in the right peripheral */
-+					writel(val, __io_address(pl080_muxtab[i].ctrlreg));
-+					pr_debug("%s: muxing in %s at channel %d writing value "
-+						 "%08x to register %08x\n",
-+						 __func__, ch->name, i,
-+						 val, pl080_muxtab[i].ctrlreg);
-+				}
-+				spin_unlock_irqrestore(&muxlock, flags);
-+				return pl080_muxtab[i].id;
-+			}
-+		}
-+		spin_unlock_irqrestore(&muxlock, flags);
-+	}
-+
-+	return -EBUSY;
-+}
-+
-+static void pl080_put_signal(struct pl08x_dma_chan *ch, int signal)
-+{
-+	unsigned long flags;
-+	int i;
-+
-+	pr_debug("releasing DMA signal on channel %s\n", ch->name);
-+
-+	spin_lock_irqsave(&muxlock, flags);
-+	for (i = 0; i < ARRAY_SIZE(pl080_muxtab); i++) {
-+		if (pl080_muxtab[i].id == signal) {
-+			WARN_ON(pl080_muxtab[i].user != ch);
-+			pl080_muxtab[i].user = NULL;
-+
-+			if (pl080_muxtab[i].ctrlreg) {
-+				u32 val;
-+
-+				val = readl(__io_address(pl080_muxtab[i].ctrlreg));
-+				val &= 0xFFFFFF60U; /* Disable, select no channel */
-+				writel(val, __io_address(pl080_muxtab[i].ctrlreg));
-+				pr_debug("%s: muxing out %s@channel %d writing value "
-+				       "%08x to register %08x\n",
-+				       __func__, ch->name, i,
-+				       val, pl080_muxtab[i].ctrlreg);
-+			}
-+			spin_unlock_irqrestore(&muxlock, flags);
-+			return;
-+		}
-+	}
-+	spin_unlock_irqrestore(&muxlock, flags);
-+	pr_debug("%s: unable to release muxing on channel %s\n",
-+	       __func__, ch->name);
-+}
-...
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index e62dd87..afe4640 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -947,7 +947,7 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
- 	 * Can the platform allow us to use this channel?
- 	 */
- 	if (plchan->slave && pl08x->pd->get_signal) {
--		ret = pl08x->pd->get_signal(plchan);
-+		ret = pl08x->pd->get_signal(plchan, plchan->cd);
- 		if (ret < 0) {
- 			dev_dbg(&pl08x->adev->dev,
- 				"unable to use physical channel %d for transfer on %s due to platform restrictions\n",
-@@ -982,7 +982,7 @@ static void release_phy_channel(struct pl08x_dma_chan *plchan)
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 
- 	if ((plchan->phychan->signal >= 0) && pl08x->pd->put_signal) {
--		pl08x->pd->put_signal(plchan);
-+		pl08x->pd->put_signal(plchan, plchan->phychan->signal);
- 		plchan->phychan->signal = -1;
- 	}
- 	pl08x_put_phy_channel(pl08x, plchan->phychan);
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 9331b68..f7312f8 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -147,8 +147,8 @@ struct pl08x_platform_data {
- 	const struct pl08x_channel_data *slave_channels;
- 	unsigned int num_slave_channels;
- 	struct pl08x_channel_data memcpy_channel;
--	int (*get_signal)(struct pl08x_dma_chan *);
--	void (*put_signal)(struct pl08x_dma_chan *);
-+	int (*get_signal)(struct pl08x_dma_chan *, const struct pl08x_channel_data *);
-+	void (*put_signal)(struct pl08x_dma_chan *, int);
- 	u8 lli_buses;
- 	u8 mem_buses;
- };
+>> + ? ? if (ret)
+>> + ? ? ? ? ? ? return ret;
+>> +
+>> + ? ? if (cpu_is_mx51())
+>> + ? ? ? ? ? ? suspend_set_ops(&mx5_suspend_ops);
+>
+> Now this is called only in i.MX51 context, so you can skip the cpu_is
+>
+
+After this patch series this is also called in i.MX53 context.  I'm
+not confident about the i.MX53 suspend/resume and would prefer to
+perform further testing and address issues with it in a separate patch
+series.
+
+>>
+>> - ? ? if (gpc_dvfs_clk == NULL)
+>> - ? ? ? ? ? ? gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+>> + ? ? arm_pm_idle = imx5_pm_idle;
+>>
+>> - ? ? if (!IS_ERR(gpc_dvfs_clk)) {
+>> - ? ? ? ? ? ? if (cpu_is_mx51())
+>> - ? ? ? ? ? ? ? ? ? ? suspend_set_ops(&mx5_suspend_ops);
+>> - ? ? } else
+>> - ? ? ? ? ? ? return -EPERM;
+>> + ? ? /* Set the registers to the default cpu idle state. */
+>> + ? ? mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+>>
+>> ? ? ? return 0;
+>> ?}
+>> -device_initcall(mx5_pm_init);
+>> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+>> index cf663d8..5660e1e 100644
+>> --- a/arch/arm/plat-mxc/include/mach/common.h
+>> +++ b/arch/arm/plat-mxc/include/mach/common.h
+>> @@ -95,7 +95,6 @@ enum mx3_cpu_pwr_mode {
+>> ?};
+>>
+>> ?extern void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
+>> -extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+>> ?extern void imx_print_silicon_rev(const char *cpu, int srev);
+>>
+>> ?void avic_handle_irq(struct pt_regs *);
+>> @@ -146,8 +145,10 @@ extern void imx6q_clock_map_io(void);
+>>
+>> ?#ifdef CONFIG_PM
+>> ?extern void imx6q_pm_init(void);
+>> +extern int imx5_pm_init(void);
+>> ?#else
+>> ?static inline void imx6q_pm_init(void) {}
+>> +static inline int imx5_pm_init(void) { return -ENODEV; }
+>
+> Why not make it return void like imx6? We do not check the return value
+> anyway.
+
+Will change in v5.
+
+Thanks,
+Rob
+
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
