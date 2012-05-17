@@ -1,27 +1,30 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Thu, 17 May 2012 20:40:58 +0200
-Subject: [PATCH] ARM: mx35: add cpufreq support
-In-Reply-To: <20120517182036.GK30400@pengutronix.de>
-References: <20120507141437.GA9636@lovely.krouter>
- <20120509072239.GG27341@pengutronix.de>
- <20120509075618.GA4412@lovely.krouter>
- <20120509081306.GK27341@pengutronix.de> <1337276960.4970.4.camel@lovely>
- <20120517182036.GK30400@pengutronix.de>
-Message-ID: <1337280058.4970.6.camel@lovely>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 17 May 2012 21:45:25 +0300
+Subject: [PATCH 1/7] remoteproc: resource table overhaul
+In-Reply-To: <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
+References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
+ <1330589497-4139-2-git-send-email-ohad@wizery.com>
+ <4F6354E4.8030704@monstr.eu>
+ <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
+Message-ID: <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-17 at 20:20 +0200, Sascha Hauer wrote:
-> On Thu, May 17, 2012 at 07:49:20PM +0200, Christoph Fritz wrote:
+Hi Michal,
 
-> > Is there already a version I can rebase the patch?
-> > 
-> > On your repo at git://git.pengutronix.de/git/imx/linux-2.6.git I can't
-> > find the new clock framework or even a work-in-progress version.
-> 
-> They are in linux-next now.
+On Sat, Mar 17, 2012 at 8:39 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> IOW: you can probably just wait a bit until this patch is ready and
+> take it into your tree. It will most likely bring back the behavior you
+> need :)
 
-Great, I'll rebase over this weekend.
+Does something like the attached help ?
 
 Thanks,
- Christoph
+Ohad.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-remoteproc-allocate-vrings-on-demand-free-when-not-n.patch
+Type: application/octet-stream
+Size: 9560 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120517/27874fce/attachment-0001.obj>
