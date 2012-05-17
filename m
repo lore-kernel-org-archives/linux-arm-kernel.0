@@ -1,41 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 May 2012 10:16:15 +0800
-Subject: [PATCH RFC 1/1] pinctrl: improve gpio support for dt
-In-Reply-To: <1337090839-21224-1-git-send-email-b29396@freescale.com>
-References: <1337090839-21224-1-git-send-email-b29396@freescale.com>
-Message-ID: <20120517021614.GG3764@S2100-06.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 May 2012 21:02:15 -0500
+Subject: [PATCH v2 0/2] Highbank clock support using DT
+Message-ID: <1337220137-31666-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 10:07:19PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> For dt, the gpio base may be dynamically allocated, thus the original
-> implementation of gpio support based on static gpio number and pin id
-> map may not be easy to use for dt.
-> 
-> One solution is a) use alias id for gpio node and refer to it in gpio
-> range, then we can get the fixed the gpio devices for this range and
-> b) get gpio chip from node which is specified in gpio range structure,
-> then get the dynamically allocated gpio chip base and c) using the chip
-> gpio base and offset to map to a physical pin id for dt.
-> 
-> To implement that, we need add two members in pinctrl_gpio_range structure,
-> 'np' the gpio node for this range and 'off' the offset in this gpio range
-> of the gpio chip.
-> 
-> For devicetree, user can use this two member instead of range->base
-> to create the map, the core will dynamically set the correct range->base
-> based on the gpio base plus gpio offset.
-> 
-> For example:
-> static struct pinctrl_gpio_range imx28_gpio_ranges[] = {
-> 	{ .name = "gpio", .id = 0, .pin_base = 0,   .npins = 8,	 .np = np_gpio0	.off = 0,},
-> 	{ .name = "gpio", .id = 0, .pin_base = 16,  .npins = 13, .np = np_gpio0 .off = 16,},
-> 	{ .name = "gpio", .id = 1, .pin_base = 32,  .npins = 32, .np = np_gpio1 .off = 16},
+From: Rob Herring <rob.herring@calxeda.com>
 
-How do you have .np statically assigned?
+This series adds clock support to highbank using common clock
+infrastructure and DT clock bindings. The DT clock bindings were previously
+posted here:
+
+https://lkml.org/lkml/2012/4/9/322
+
+Changes in this version:
+- add Documentation for bindings
+- rebase to clk-next
+- add A9 periphclk divider handling instead of hardcoding
+- a fix to the PLL relock sequence
+
+Mike, It's getting a bit late, but I could not get back to this sooner. I
+intend to send this and the DT patches by the end of the week.
+
+Rob
+
+Rob Herring (2):
+  dt: add clock binding doc to primecell bindings
+  clk: add highbank clock support
+
+ .../devicetree/bindings/arm/primecell.txt          |    6 +
+ .../devicetree/bindings/clock/calxeda.txt          |   17 +
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/highbank.dts                     |   91 +++++-
+ arch/arm/mach-highbank/Makefile                    |    2 +-
+ arch/arm/mach-highbank/clock.c                     |   62 ----
+ arch/arm/mach-highbank/highbank.c                  |    7 +
+ drivers/clk/Makefile                               |    4 +-
+ drivers/clk/clk-highbank.c                         |  345 ++++++++++++++++++++
+ 9 files changed, 470 insertions(+), 65 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/calxeda.txt
+ delete mode 100644 arch/arm/mach-highbank/clock.c
+ create mode 100644 drivers/clk/clk-highbank.c
 
 -- 
-Regards,
-Shawn
+1.7.9.5
