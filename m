@@ -1,59 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 May 2012 09:37:42 -0700
-Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
- (Santosh Shilimkar's message of "Thu, 17 May 2012 14:22:52 +0530")
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-5-git-send-email-t-kristo@ti.com>
- <87d363928g.fsf@ti.com>
- <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
- <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
-Message-ID: <87mx56227d.fsf@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 17 May 2012 12:40:37 -0400
+Subject: [PATCH 1/5] arm: remove ability to select CONFIG_MCA
+In-Reply-To: <1337272841-25931-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1337272841-25931-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1337272841-25931-2-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+It isn't clear to me why this ever existed, as I've never heard
+of an ARM board with an MCA bus.  Regardless, the MCA bus support
+is going away, so remove the ability to select it from ARM.
 
-> On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> Tero Kristo <t-kristo@ti.com> writes:
->>>
->>>> From: Rajendra Nayak <rnayak@ti.com>
->>>>
->>>> SAR/ROM code restores only CORE DPLL to its original state
->>>> post wakeup from OFF mode.
->>>> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
->>>> are saved and restored here during an OFF transition.
->>>>
->>>> [nm at ti.com: minor cleanups]
->>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>
->>> Some general comments:
->>>
->>> - the register dump/print doesn't belong here. ?If needed, should be a
->>> ?debug feature if needed.
->>>
->>> - Rather than hooking into omap4_enter_lowpower(), should use
->>> ?the cluster PM enter/exit notifier chain.
->>>
->> This is again specific to device OFF only and not related to CPU
->> cluster state as such. So I don't think notifiers should be used here.
->>
->> O.w even when we attempt just MPU OSWR C-state, all these functions will
->> get called in notifier chain.
->>
-> Just a thought, we can have a separate notifier chain for device OFF. It can
-> allow use to get rid of 'enable_off_mode" kind of flags and can be
-> used by many drivers too.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ arch/arm/Kconfig |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-Yes, I like this idea.
-
-It allows a much cleaner collection of all the activities needed for
-device off.
-
-Kevin
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 36586dba..695cc39 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -101,14 +101,6 @@ config EISA
+ config SBUS
+ 	bool
+ 
+-config MCA
+-	bool
+-	help
+-	  MicroChannel Architecture is found in some IBM PS/2 machines and
+-	  laptops.  It is a bus system similar to PCI or ISA. See
+-	  <file:Documentation/mca.txt> (and especially the web page given
+-	  there) before attempting to build an MCA bus kernel.
+-
+ config STACKTRACE_SUPPORT
+ 	bool
+ 	default y
+-- 
+1.7.9.1
