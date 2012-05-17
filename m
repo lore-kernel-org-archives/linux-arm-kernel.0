@@ -1,55 +1,25 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 17 May 2012 15:55:03 +0900
-Subject: [PATCH v2] serial: samsung: Fixed wrong comparison
- for	baudclk_rate
-In-Reply-To: <20120515124538.GN10453@n2100.arm.linux.org.uk>
-References: <000501cd3297$75fba910$61f2fb30$%kim@samsung.com>
- <20120515124538.GN10453@n2100.arm.linux.org.uk>
-Message-ID: <0b1f01cd33f9$fc9503f0$f5bf0bd0$%kim@samsung.com>
+Date: Thu, 17 May 2012 15:57:45 +0900
+Subject: [PATCH 0/2] ARM: S3C64xx: cpuidle cleanups
+In-Reply-To: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <0b2001cd33fa$5cd05490$1670fdb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Daniel Lezcano wrote:
 > 
-> On Tue, May 15, 2012 at 09:37:16PM +0900, Kyoungil Kim wrote:
-> > port->baudclk_rate should be compared to the rate of port->baudclk,
-> > because port->baudclk_rate was assigned as the rate of port->baudclk
-> previously.
-> > So to check that the current baudclk rate is same as previous rate,
-> > the target of comparison sholud be the rate of port->baudclk.
-> >
-> > Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
-> > Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
-> > ---
-> >  drivers/tty/serial/samsung.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> > index d8b0aee..6a6a86a 100644
-> > --- a/drivers/tty/serial/samsung.c
-> > +++ b/drivers/tty/serial/samsung.c
-> > @@ -1014,10 +1014,10 @@ static int
-> s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
-> >  	 * a disturbance in the clock-rate over the change.
-> >  	 */
-> >
-> > -	if (IS_ERR(port->clk))
-> > +	if (IS_ERR(port->baudclk) || port->baudclk == NULL)
+> These couple of patches use the new cpuidle core api to refactor
+> some part of the code. The first one declares the states directly
+> in the driver declaration and the second one use the timekeeping
+> flag to let the cpuidle core to compute the idle time.
 > 
-> Still no.  Why are you wanting to detect a NULL baud clock?
-> 
-> As I said, drivers have no business interpreting anything but IS_ERR(clk)
-> as being an error.  They should not make any other assumptions.
-> 
-> Now that I look at this driver, it makes this mistake all over the place.
-> This needs to be fixed.  Something like the below should do it.  Please
-> check.
-> 
+Basically, looks ok to me.
 
-Russell, thanks for your kindly pointing out.
-
-Kyoungil, could you please re-submit for this as per Russell's suggestion
-(with Russell's patch)?
+> I don't have this board, I was not able to test these patches.
+> 
+Mark, could you please check this patches on your board?
+Now, my smdk6410 has some problem to test this :(
 
 Thanks.
 
@@ -59,61 +29,14 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index d8b0aee..6a952b1 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -529,7 +529,7 @@ static void s3c24xx_serial_pm(struct uart_port *port,
-> unsigned int level,
+> Daniel Lezcano (2):
+>   ARM: s3c64xx: cpuidle - declare the states with the new api
+>   ARM: s3c64xx: cpuidle - use timekeeping wrapper
 > 
->  	switch (level) {
->  	case 3:
-> -		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
-> +		if (!IS_ERR(ourport->baudclk))
->  			clk_disable(ourport->baudclk);
+>  arch/arm/mach-s3c64xx/cpuidle.c |   45
++++++++++++++----------------------
+> ----
+>  1 files changed, 15 insertions(+), 30 deletions(-)
 > 
->  		clk_disable(ourport->clk);
-> @@ -538,7 +538,7 @@ static void s3c24xx_serial_pm(struct uart_port *port,
-> unsigned int level,
->  	case 0:
->  		clk_enable(ourport->clk);
-> 
-> -		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
-> +		if (!IS_ERR(ourport->baudclk))
->  			clk_enable(ourport->baudclk);
-> 
->  		break;
-> @@ -713,9 +713,9 @@ static void s3c24xx_serial_set_termios(struct
-> uart_port *port,
->  	if (ourport->baudclk != clk) {
->  		s3c24xx_serial_setsource(port, clk_sel);
-> 
-> -		if (ourport->baudclk != NULL && !IS_ERR(ourport->baudclk)) {
-> +		if (!IS_ERR(ourport->baudclk)) {
->  			clk_disable(ourport->baudclk);
-> -			ourport->baudclk  = NULL;
-> +			ourport->baudclk = ERR_PTR(-EINVAL);
->  		}
-> 
->  		clk_enable(clk);
-> @@ -1160,6 +1160,9 @@ static ssize_t s3c24xx_serial_show_clksrc(struct
-> device *dev,
->  	struct uart_port *port = s3c24xx_dev_to_port(dev);
->  	struct s3c24xx_uart_port *ourport = to_ourport(port);
-> 
-> +	if (IS_ERR(ourport->baudclk))
-> +		return -EINVAL;
-> +
->  	return snprintf(buf, PAGE_SIZE, "* %s\n", ourport->baudclk->name);
->  }
-> 
-> @@ -1200,6 +1203,7 @@ static int s3c24xx_serial_probe(struct
-> platform_device *pdev)
->  		return -ENODEV;
->  	}
-> 
-> +	ourport->baudclk = ERR_PTR(-EINVAL);
->  	ourport->info = ourport->drv_data->info;
->  	ourport->cfg = (pdev->dev.platform_data) ?
->  			(struct s3c2410_uartcfg *)pdev->dev.platform_data :
+> --
+> 1.7.5.4
