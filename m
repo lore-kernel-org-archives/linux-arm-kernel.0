@@ -1,135 +1,294 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 17 May 2012 14:32:07 +0800
-Subject: [PATCH v7 0/3] Add PMECC support for at91 nand flash driver
-In-Reply-To: <1337159858.24809.21.camel@sauron.fi.intel.com>
-References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
- <1337159858.24809.21.camel@sauron.fi.intel.com>
-Message-ID: <4FB49B67.2040705@atmel.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 17 May 2012 08:32:27 +0200
+Subject: [PATCH v3 4/7] ARM: davinci: net: davinci_emac: add OF support
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B63EA14401@DBDE01.ent.ti.com>
+References: <1330945804-3379-1-git-send-email-hs@denx.de>
+ <1330945804-3379-5-git-send-email-hs@denx.de>
+ <DF0F476B391FA8409C78302C7BA518B63EA14401@DBDE01.ent.ti.com>
+Message-ID: <4FB49B7B.60506@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Artem
+Hello Nori,
 
-On 5/16/2012 5:17 PM, Artem Bityutskiy wrote:
-> On Tue, 2012-05-15 at 22:47 +0800, Josh Wu wrote:
->> Changes since v6,
->> 	split into 3 patches.
->> 	remove of_flat_dt_is_compatible() function. use additional dt parameter "has-pmecc".
->> 	refine the error handling code.
->> 	refine original atmel_nand_init_params() function.
+thanks for the review!
+
+Nori, Sekhar wrote:
+> Hi Heiko,
+> 
+> On Mon, Mar 05, 2012 at 16:40:01, Heiko Schocher wrote:
+>> add of support for the davinci_emac driver.
 >>
->> Changes since v5,
->> 	add has_pmecc field to replace cpu_has_pmecc() function. Use compatible check in when proble.
->> 	simplify the pmecc_get_ecc_bytes() function.
+>> Signed-off-by: Heiko Schocher <hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: netdev at vger.kernel.org
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Wolfgang Denk <wd@denx.de>
+>> Cc: Anatoly Sivov <mm05@mail.ru>
 >>
->> Changes since v4,
->> 	fix typo and checkpatch warnings.
->> 	fix according to JC's suggestion. replace cpu_is_xxx() with DT
->> 	modify dt binding atmel nand document to add pmecc support.
->> 	tested in sam9263 without break hw ecc.
->> 	add ecc.strength.
-> Hi,
->
-> Aiaiai identified the following issues with your patch-set - could you
-> please take a look?
+>> ---
+>> - changes for v2:
+>>   - add comment from Anatoly Sivov
+>>     - fix typo in davinci_emac.txt
+>>   - add comment from Grant Likely:
+>>     - add prefix "ti,davinci-" to davinci specific property names
+>>     - remove version property
+>>     - use compatible name "ti,davinci-dm6460-emac"
+>>     - use devm_kzalloc()
+>>     - use of_match_ptr()
+>>     - document all new properties
+>>     - remove of_address_to_resource() and do not overwrite
+>>       resource table
+>>     - whitespace fixes
+>>     - remove hw_ram_addr as it is not used in current
+>>       board code
+>> - no changes for v3
+>>
+>>  .../bindings/arm/davinci/davinci_emac.txt          |   43 +++++++++
+>>  drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++++++++++++++++-
+>>  2 files changed, 136 insertions(+), 1 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+>> new file mode 100644
+>> index 0000000..a7b0911
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+> 
+> Since DaVinci EMAC driver may be used on platforms other than DaVinci (c6x,
+> OMAP), can we place the bindings documentation in bindings/net/?
 
-sure.
+Done.
 
->
-> --------------------------------------------------------------------------------
->
-> Successfully built configuration "arm-at91cap9_defconfig,arm,arm-unknown-linux-gnueabi-", results:
->
-> --- before_patching.log
-> +++ after_patching.log
-> @@ @@
-> +drivers/mtd/nand/atmel_nand.c: In function 'atmel_pmecc_nand_init_params':
-> +drivers/mtd/nand/atmel_nand.c:910:29: warning: assignment from incompatible pointer type [enabled by default]
-> +drivers/mtd/nand/atmel_nand.c:910:50: warning: incorrect type in assignment (different argument counts) [sparse]
-> +drivers/mtd/nand/atmel_nand.c:910:50:    expected int ( *read_page )( ... ) [sparse]
-> +drivers/mtd/nand/atmel_nand.c:910:50:    got int ( static [toplevel] *<noident>  )( ... ) [sparse]
-> +drivers/mtd/nand/atmel_nand.c:912:30: warning: assignment from incompatible pointer type [enabled by default]
-> +drivers/mtd/nand/atmel_nand.c:912:51: warning: incorrect type in assignment (different argument counts) [sparse]
-> +drivers/mtd/nand/atmel_nand.c:912:51:    expected void ( *write_page )( ... ) [sparse]
-> +drivers/mtd/nand/atmel_nand.c:912:51:    got void ( static [toplevel] *<noident>  )( ... ) [sparse]
->
-> --------------------------------------------------------------------------------
+>> @@ -0,0 +1,43 @@
+>> +* Texas Instruments Davinci EMAC
+>> +
+>> +This file provides information, what the device node
+>> +for the davinci_emac interface contain.
+> 
+> s/contain/contains
 
-Since I used Code Sourcery tools-chain (2010q1-202) to compile the code 
-and I didn't get any warning.
+fixed.
 
-So I am not sure what's caused above warnings. From the warning message, 
-I don't know the reason exactly.
+>> +
+>> +Required properties:
+>> +- compatible: "ti,davinci-dm6460-emac";
+> 
+> There is no device called dm6460. If you intend to only support
+> "version 2" of the EMAC IP at this time, you can use dm6467
+> (http://www.ti.com/product/tms320dm6467)
 
-I just checked the PMECC read/write functions definition in my patch
+renamed to "ti,davinci-dm6467-emac"
 
-+static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
-+		struct nand_chip *chip, uint8_t *buf, int32_t page)
+>> +- reg: Offset and length of the register set for the device
+>> +- ti,davinci-ctrl-reg-offset: offset to control register
+>> +- ti,davinci-ctrl-mod-reg-offset: offset to control module register
+>> +- ti,davinci-ctrl-ram-offset: offset to control module ram
+>> +- ti,davinci-ctrl-ram-size: size of control module ram
+>> +- ti,davinci-rmii-en: use RMII
+>> +- ti,davinci-no-bd-ram: has the emac controller BD RAM
+>> +- phy-handle: Contains a phandle to an Ethernet PHY.
+>> +              if not, davinci_emac driver defaults to 100/FULL
+>> +- interrupts: interrupt mapping for the davinci emac interrupts sources:
+>> +              4 sources: <Receive Threshold Interrupt
+>> +			  Receive Interrupt
+>> +			  Transmit Interrupt
+>> +			  Miscellaneous Interrupt>
+>> +- pinmux-handle: Contains a handle to configure the pinmux settings.
 
-+static void atmel_nand_pmecc_write_page(struct mtd_info *mtd,
-+		struct nand_chip *chip, const uint8_t *buf)
+removed.
 
+>> +
+>> +Optional properties:
+>> +- local-mac-address : 6 bytes, mac address
+>> +
+>> +Example (enbw_cmc board):
+>> +	eth0: emac at 1e20000 {
+>> +		compatible = "ti,davinci-dm6460-emac";
+>> +		reg = <0x220000 0x4000>;
+>> +		ti,davinci-ctrl-reg-offset = <0x3000>;
+>> +		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
+>> +		ti,davinci-ctrl-ram-offset = <0>;
+>> +		ti,davinci-ctrl-ram-size = <0x2000>;
+>> +		local-mac-address = [ 00 00 00 00 00 00 ];
+>> +		interrupts = <33
+>> +				34
+>> +				35
+>> +				36
+>> +				>;
+>> +		interrupt-parent = <&intc>;
+>> +		pinmux-handle = <&emac_pins>;
 
-compare with the original HW read function (no write function)
+removed.
 
-static int atmel_nand_read_page(struct mtd_info *mtd,
-		struct nand_chip *chip, uint8_t *buf, int page)
+>> +	};
+>> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+>> index 4fa0bcb..56e1c35 100644
+>> --- a/drivers/net/ethernet/ti/davinci_emac.c
+>> +++ b/drivers/net/ethernet/ti/davinci_emac.c
+>> @@ -58,6 +58,12 @@
+>>  #include <linux/io.h>
+>>  #include <linux/uaccess.h>
+>>  #include <linux/davinci_emac.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/of_net.h>
+>> +
+>> +#include <mach/mux.h>
+>>  
+>>  #include <asm/irq.h>
+>>  #include <asm/page.h>
+>> @@ -339,6 +345,9 @@ struct emac_priv {
+>>  	u32 rx_addr_type;
+>>  	atomic_t cur_tx;
+>>  	const char *phy_id;
+>> +#ifdef CONFIG_OF
+>> +	struct device_node *phy_node;
+>> +#endif
+>>  	struct phy_device *phydev;
+>>  	spinlock_t lock;
+>>  	/*platform specific members*/
+>> @@ -1760,6 +1769,82 @@ static const struct net_device_ops emac_netdev_ops = {
+>>  #endif
+>>  };
+>>  
+>> +#ifdef CONFIG_OF
+>> +static struct emac_platform_data
+>> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+>> +	struct emac_priv *priv)
+>> +{
+>> +	struct device_node *np;
+>> +	struct device_node *pinmux_np;
+>> +	struct emac_platform_data *pdata = NULL;
+>> +	const u8 *mac_addr;
+>> +	u32 data;
+>> +	int ret;
+>> +	int version;
+>> +
+>> +	np = pdev->dev.of_node;
+>> +	if (!np)
+>> +		goto nodata;
+>> +	else
+>> +		version = EMAC_VERSION_2;
+> 
+> You could set pdata->version directly here. 
 
+done.
 
-The only difference is int32_t, and I don't think the warning is caused 
-by this int32_t.
+>> +
+>> +	pdata = pdev->dev.platform_data;
+>> +	if (!pdata) {
+>> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>> +		if (!pdata)
+>> +			goto nodata;
+>> +	}
+>> +	pdata->version = version;
+>> +
+>> +	mac_addr = of_get_mac_address(np);
+>> +	if (mac_addr)
+>> +		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_reg_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
+>> +		&data);
+>> +	if (!ret)
+>> +		pdata->ctrl_mod_reg_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_ram_offset = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
+>> +	if (!ret)
+>> +		pdata->ctrl_ram_size = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
+>> +	if (!ret)
+>> +		pdata->rmii_en = data;
+>> +
+>> +	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
+>> +	if (!ret)
+>> +		pdata->no_bd_ram = data;
+>> +
+>> +	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
+>> +	if (!priv->phy_node)
+>> +		pdata->phy_id = "";
+>> +
+>> +	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
+>> +	if (pinmux_np)
+>> +		davinci_cfg_reg_of(pinmux_np);
+> 
+> This is a DaVinci specific pinmux function and this
+> driver can be used in non-DaVinci platforms like C6x
+> and OMAP. So, it will not be correct to call a DaVinci
+> specific function here.
 
-Could you have any ideas to fix such warning? That should be very 
-helpful for me.
+Ah, right!
 
->
-> checkpatch.pl has some complaints:
->
-> --------------------------------------------------------------------------------
->
-> checkpatch.pl results for patch "[PATCH 3/3] MTD: atmel_nand: Update driver to support Programmable  Multibit ECC controller"
->
-> WARNING:LONG_LINE: line over 80 characters
-> #60: FILE: drivers/mtd/nand/atmel_nand.c:115:
-> +       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
->
-> WARNING:LONG_LINE: line over 80 characters
-> #326: FILE: drivers/mtd/nand/atmel_nand.c:567:
-> +                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
->
-> WARNING:LONG_LINE: line over 80 characters
-> #348: FILE: drivers/mtd/nand/atmel_nand.c:589:
-> +                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
->
-> total: 0 errors, 3 warnings, 879 lines checked
->
-> --------------------------------------------------------------------------------
->
-> checkpatch.pl results for the entire squashed patch-set
->
-> WARNING:LONG_LINE: line over 80 characters
-> #376: FILE: drivers/mtd/nand/atmel_nand.c:115:
-> +       int16_t                 smu[AT_NB_ERROR_MAX + 2][2 * AT_NB_ERROR_MAX + 1];
+> Can you drop the pinmux from this patch for now? On DaVinci,
 
-I'll fix it.
+Done ... Hmm.. so I think, I should drop this for all patches
+from my patchset, right?
 
->
-> WARNING:LONG_LINE: line over 80 characters
-> #642: FILE: drivers/mtd/nand/atmel_nand.c:567:
-> +                               a = readw_relaxed(alpha_to + tmp % host->cw_len);
->
-> WARNING:LONG_LINE: line over 80 characters
-> #664: FILE: drivers/mtd/nand/atmel_nand.c:589:
-> +                               a = readw_relaxed(index_of + host->smu[i + 1][k]);
->
-> total: 0 errors, 3 warnings, 1136 lines checked
+> for pinmux, we need to migrate to drivers/pinctrl/ as well.
 
-For these two warnings, I would like to keep it for more readable. but 
-if you would like to fix the warning, then I can fix them too by split 
-into two lines.
+Ah, I see ... take a look at it, maybe I find time to do here
+something ... or do you know about work in progress here?
 
-> --------------------------------------------------------------------------------
->
-Thanks
-Best Regards,
-Josh Wu
+> Doing this will also make this patch independent of the rest
+> of this series can even be merged separately. Can you please
+> make these changes and resend just this patch?
+
+Yep, I do some test with the changes you requested and resend
+this patch ... do you prefer some tree, which I should use as
+base?
+
+>> +
+>> +	pdev->dev.platform_data = pdata;
+>> +nodata:
+>> +	return  pdata;
+>> +}
+>> +#else
+>> +static struct emac_platform_data
+>> +	*davinci_emac_of_get_pdata(struct platform_device *pdev,
+>> +	struct emac_priv *priv)
+>> +{
+>> +	return  pdev->dev.platform_data;
+>> +}
+>> +#endif
+>>  /**
+>>   * davinci_emac_probe: EMAC device probe
+>>   * @pdev: The DaVinci EMAC device that we are removing
+>> @@ -1803,7 +1888,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+>>  
+>>  	spin_lock_init(&priv->lock);
+>>  
+>> -	pdata = pdev->dev.platform_data;
+>> +	pdata = davinci_emac_of_get_pdata(pdev, priv);
+>>  	if (!pdata) {
+>>  		dev_err(&pdev->dev, "no platform data\n");
+>>  		rc = -ENODEV;
+>> @@ -2013,6 +2098,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
+>>  	.resume		= davinci_emac_resume,
+>>  };
+>>  
+>> +static const struct of_device_id davinci_emac_of_match[] = {
+>> +	{.compatible = "ti,davinci-dm6460-emac", },
+> 
+> This needs to be ti,davinci-dm6467-emac as well.
+
+Yep, fixed.
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
