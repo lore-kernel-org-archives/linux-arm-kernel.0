@@ -1,39 +1,174 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 May 2012 14:39:14 -0600
-Subject: [PATCH] gpio/generic: initialize the shadow of direction register
-In-Reply-To: <20120516161726.GE3764@S2100-06.ap.freescale.net>
-References: <1337054198-24674-1-git-send-email-shawn.guo@linaro.org>
- <20402.798.622618.263780@ipc1.ka-ro>
- <20120516053301.GB21517@S2100-06.ap.freescale.net>
- <20403.20214.297216.188300@ipc1.ka-ro>
- <20120516072859.GE21517@S2100-06.ap.freescale.net>
- <20403.22671.800713.334846@ipc1.ka-ro>
- <CAAQ0ZWRpm8mrBnseepV17QMGZcz3W=vw4yYJR5UvSGg2i5dvgg@mail.gmail.com>
- <20403.45469.121234.808145@ipc1.ka-ro>
- <20120516161726.GE3764@S2100-06.ap.freescale.net>
-Message-ID: <20120517203914.411A73E0621@localhost>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 17 May 2012 13:42:16 -0700
+Subject: [PATCH V3 Resend 07/12] ata/sata_mv: Remove conditional
+ compilation of clk code
+In-Reply-To: <ae865cae6b4961dea0e48d07da74b181c3958507.1336448639.git.viresh.kumar@st.com>
+References: <cover.1336448639.git.viresh.kumar@st.com>
+ <ae865cae6b4961dea0e48d07da74b181c3958507.1336448639.git.viresh.kumar@st.com>
+Message-ID: <20120517134216.8590c88a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2012 00:17:27 +0800, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Wed, May 16, 2012 at 03:54:37PM +0200, Lothar Wa??mann wrote:
-> > Actually I had sent a similar patch in July last year which was
-> > rejected with the following reasoning:
-> > 
-> > | I don't know if this is a valid thing to do or not. Not every GPIO
-> > | controller supports reading back the initial state from the direction
-> > | register. I suspect it is better to leave initialization of the
-> > | direction to the gpio controller driver itself.
-> > 
-> > See: http://lkml.indiana.edu/hypermail/linux/kernel/1107.0/00908.html
-> > 
-> > That's why I came up with the patch to gpio-mxc.c
-> > 
-> Thanks for the whole story, Lothar.  Hopefully, with the additional
-> condition checking added, Grant would agree it's the right thing to do.
-> I will send v2 of the patch to see what we get from people.
+On Tue, 8 May 2012 09:22:34 +0530
+Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Yup, if there was some kind of conditional checking then it would be
-fine.
+> With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in clk.h,
+> there is no need to have clk code enclosed in #ifdef CONFIG_HAVE_CLK, #endif
+> macros.
 
-g.
+There have been significant changes to drivers/ata/sata_mv.c in
+linux-next so I have reworked the patch as below.
+
+I notice that with x86_64 allmodconfig (CONFIG_HAVE_CLK=n), this patch
+adds quite a lot of program text:
+
+   text    data     bss     dec     hex filename
+  26926    2657    7648   37231    916f drivers/ata/sata_mv.o
+  27528    2657    7832   38017    9481 drivers/ata/sata_mv.o
+
+This is an unacceptable increase for a purely cosmetic change!
+
+For some reason,
+ata-pata_arasan-remove-conditional-compilation-of-clk-code.patch
+shrinks drivers/ata/pata_arasan_cf.o by 60 bytes, so that's good.
+
+drivers/net/can/c_can/c_can_platform.o got 18 bytes bigger, which we
+can live with.
+
+
+
+I checked a few other patches and didn't see similar code bloat.
+
+I note that usb-musb-remove-conditional-compilation-of-clk-code.patch
+accidentally fixed the build of drivers/usb/musb/ux500.c.  In the
+mainline kernel I get
+
+drivers/usb/musb/ux500.c: In function 'ux500_probe':
+drivers/usb/musb/ux500.c:89: error: expected expression before 'do'
+drivers/usb/musb/ux500.c: In function 'ux500_resume':
+drivers/usb/musb/ux500.c:175: error: expected expression before 'do'
+
+possibly because this driver isn't supposed to be built with x86_64
+allmodconfig, but someone obviously has a borked clk_enable()
+definition.  drivers/usb/gadget/pxa25x_udc.c does it wrongly.
+
+Anyway, I will drop
+ata-sata_mv-remove-conditional-compilation-of-clk-code.patch - please
+grab current linux-next and see what we can do about the code size
+issue?
+
+Thanks.
+
+
+From: Viresh Kumar <viresh.kumar@st.com>
+Subject: ata/sata_mv: remove conditional compilation of clk code
+
+With addition of dummy clk_*() calls for non CONFIG_HAVE_CLK cases in
+clk.h, there is no need to have clk code enclosed in #ifdef
+CONFIG_HAVE_CLK, #endif macros.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Cc: Jeff Garzik <jgarzik@redhat.com>
+Cc: Russell King <rmk@arm.linux.org.uk>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ drivers/ata/sata_mv.c |   14 --------------
+ 1 file changed, 14 deletions(-)
+
+diff -puN drivers/ata/sata_mv.c~ata-sata_mv-remove-conditional-compilation-of-clk-code drivers/ata/sata_mv.c
+--- a/drivers/ata/sata_mv.c~ata-sata_mv-remove-conditional-compilation-of-clk-code
++++ a/drivers/ata/sata_mv.c
+@@ -551,10 +551,8 @@ struct mv_host_priv {
+ 	u32			irq_mask_offset;
+ 	u32			unmask_all_irqs;
+ 
+-#if defined(CONFIG_HAVE_CLK)
+ 	struct clk		*clk;
+ 	struct clk              **port_clks;
+-#endif
+ 	/*
+ 	 * These consistent DMA memory pools give us guaranteed
+ 	 * alignment for hardware-accessed data structures,
+@@ -4028,9 +4026,7 @@ static int mv_platform_probe(struct plat
+ 	struct resource *res;
+ 	int n_ports = 0;
+ 	int rc;
+-#if defined(CONFIG_HAVE_CLK)
+ 	int port;
+-#endif
+ 
+ 	ata_print_version_once(&pdev->dev, DRV_VERSION);
+ 
+@@ -4058,13 +4054,11 @@ static int mv_platform_probe(struct plat
+ 
+ 	if (!host || !hpriv)
+ 		return -ENOMEM;
+-#if defined(CONFIG_HAVE_CLK)
+ 	hpriv->port_clks = devm_kzalloc(&pdev->dev,
+ 					sizeof(struct clk *) * n_ports,
+ 					GFP_KERNEL);
+ 	if (!hpriv->port_clks)
+ 		return -ENOMEM;
+-#endif
+ 	host->private_data = hpriv;
+ 	hpriv->n_ports = n_ports;
+ 	hpriv->board_idx = chip_soc;
+@@ -4074,7 +4068,6 @@ static int mv_platform_probe(struct plat
+ 				   resource_size(res));
+ 	hpriv->base -= SATAHC0_REG_BASE;
+ 
+-#if defined(CONFIG_HAVE_CLK)
+ 	hpriv->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(hpriv->clk))
+ 		dev_notice(&pdev->dev, "cannot get optional clkdev\n");
+@@ -4088,7 +4081,6 @@ static int mv_platform_probe(struct plat
+ 		if (!IS_ERR(hpriv->port_clks[port]))
+ 			clk_prepare_enable(hpriv->port_clks[port]);
+ 	}
+-#endif
+ 
+ 	/*
+ 	 * (Re-)program MBUS remapping windows if we are asked to.
+@@ -4115,7 +4107,6 @@ static int mv_platform_probe(struct plat
+ 		return 0;
+ 
+ err:
+-#if defined(CONFIG_HAVE_CLK)
+ 	if (!IS_ERR(hpriv->clk)) {
+ 		clk_disable_unprepare(hpriv->clk);
+ 		clk_put(hpriv->clk);
+@@ -4126,7 +4117,6 @@ err:
+ 			clk_put(hpriv->port_clks[port]);
+ 		}
+ 	}
+-#endif
+ 
+ 	return rc;
+ }
+@@ -4142,13 +4132,10 @@ err:
+ static int __devexit mv_platform_remove(struct platform_device *pdev)
+ {
+ 	struct ata_host *host = platform_get_drvdata(pdev);
+-#if defined(CONFIG_HAVE_CLK)
+ 	struct mv_host_priv *hpriv = host->private_data;
+ 	int port;
+-#endif
+ 	ata_host_detach(host);
+ 
+-#if defined(CONFIG_HAVE_CLK)
+ 	if (!IS_ERR(hpriv->clk)) {
+ 		clk_disable_unprepare(hpriv->clk);
+ 		clk_put(hpriv->clk);
+@@ -4159,7 +4146,6 @@ static int __devexit mv_platform_remove(
+ 			clk_put(hpriv->port_clks[port]);
+ 		}
+ 	}
+-#endif
+ 	return 0;
+ }
+ 
+_
