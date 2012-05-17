@@ -1,37 +1,45 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Fri, 18 May 2012 00:42:05 +0200
-Subject: [PATCH] ARM: mx35: add cpufreq support
-In-Reply-To: <1337280058.4970.6.camel@lovely>
-References: <20120507141437.GA9636@lovely.krouter>
- <20120509072239.GG27341@pengutronix.de>
- <20120509075618.GA4412@lovely.krouter>
- <20120509081306.GK27341@pengutronix.de>
- <1337276960.4970.4.camel@lovely>
- <20120517182036.GK30400@pengutronix.de>
- <1337280058.4970.6.camel@lovely>
-Message-ID: <20120517224205.GA7021@mars>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 18 May 2012 08:44:46 +1000
+Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20
+ dtsi files
+In-Reply-To: <20120517150601.GA28104@kroah.com>
+References: <4FB3B1F3.6080102@atmel.com>
+ <1337182626-13033-1-git-send-email-nicolas.ferre@atmel.com>
+ <201205161850.54765.arnd@arndb.de>
+ <20120517150601.GA28104@kroah.com>
+Message-ID: <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 08:40:58PM +0200, Christoph Fritz wrote:
-> On Thu, 2012-05-17 at 20:20 +0200, Sascha Hauer wrote:
-> > On Thu, May 17, 2012 at 07:49:20PM +0200, Christoph Fritz wrote:
-> 
-> > > Is there already a version I can rebase the patch?
+Hi all,
+
+On Thu, 17 May 2012 08:06:01 -0700 Greg KH <gregkh@linuxfoundation.org> wrote:
+>
+> On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 16 May 2012, Nicolas Ferre wrote:
+> > > Now that the bulk of at91sam9g20-related nodes are located in at91sam9260.dtsi,
+> > > we have to re-create the path to this ADC node for SoC specific parts.
 > > > 
-> > > On your repo at git://git.pengutronix.de/git/imx/linux-2.6.git I can't
-> > > find the new clock framework or even a work-in-progress version.
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > > 
-> > They are in linux-next now.
+> > Should we apply this patch in arm-soc so that Greg can drop the hunk that
+> > no longer applies?
+> 
+> It's not a "no longer applies", it's a "this does not merge".  The patch
+> is in my tree, unless you want me to revert it, it's going to stay there
+> until it goes to Linus.
 
-There changed a lot of stuff: Where should I register the function to
-set/get the cpu frequency?
+Just apply the patch to the arm-soc tree - then the merge resolution
+becomes "use the arm-soc version".   There is no need for Greg to revert
+the other patch.
 
-To get an idea of how it should be done, I looked at imx51: Is there
-cpufreq-support still implemented/working?  I can see the
-arch/arm/mach-imx/cpu_op-mx51.c but not its correlating
-clk_cpu_set_rate function in arch/arm/mach-imx/clk-imx51-imx53.c.
-
- Thanks,
-  -- Christoph
- 
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120518/210f51f5/attachment.sig>
