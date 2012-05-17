@@ -1,49 +1,147 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 May 2012 14:45:12 +0100
-Subject: [PATCH 07/18] ARM: ux500: PRCMU related configuration and layout
- corrections for Device Tree
+Date: Thu, 17 May 2012 14:45:13 +0100
+Subject: [PATCH 08/18] mfd: Enable Device Tree for ab8500-core driver
 In-Reply-To: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
 References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337262323-27692-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337262323-27692-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apply db8500 related PRCMU Device Tree settings and clean up some formatting
-errors. We also remove one of the PRCMU assigned IRQs, as it is currently not
-used.
+This patch will allow the ab8500-core driver to be probed and set up
+when booting when Device Tree is enabled. This includes platform ID
+look-up which identifies the machine it is currently running on. If
+we are undergoing a DT enabled boot, we will refuse to setup each of
+the other ab8500-* devices, as they will be probed individually by DT.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/mfd/ab8500-core.c |   73 +++++++++++++++++++++++++++++++--------------
+ 1 file changed, 51 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 9a62f86..1188925 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -187,12 +187,12 @@
- 		prcmu at 80157000 {
- 			compatible = "stericsson,db8500-prcmu";
- 			reg = <0x80157000 0x1000>;
--			interrupts = <46 47>;
-+			interrupts = <0 47 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 0e2df71..bc6c2d5 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -20,6 +20,8 @@
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/regulator/ab8500.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  
--				prcmu-timer-4 at 80157450 {
-+			prcmu-timer-4 at 80157450 {
- 				compatible = "stericsson,db8500-prcmu-timer-4";
- 				reg = <0x80157450 0xC>;
- 			};
-@@ -201,6 +201,7 @@
- 				compatible = "stericsson,ab8500";
- 				reg = <5>; /* mailbox 5 is i2c */
- 				interrupts = <0 40 0x4>;
-+				stericsson,irq-base = <520>;
- 			};
- 		};
+ /*
+  * Interrupt register offsets
+@@ -1112,11 +1114,20 @@ static struct attribute_group ab9540_attr_group = {
+ 	.attrs	= ab9540_sysfs_entries,
+ };
  
++static const struct of_device_id ab8500_match[] = {
++	{
++		.compatible = "stericsson,ab8500",
++		.data = (void *)AB8500_VERSION_AB8500,
++	},
++	{},
++};
++
+ static int __devinit ab8500_probe(struct platform_device *pdev)
+ {
+ 	struct ab8500_platform_data *plat = dev_get_platdata(&pdev->dev);
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+-	enum ab8500_version version = platid->driver_data;
++	enum ab8500_version version = AB8500_VERSION_UNDEFINED;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct ab8500 *ab8500;
+ 	struct resource *resource;
+ 	int ret;
+@@ -1129,6 +1140,14 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+ 
+ 	if (plat)
+ 		ab8500->irq_base = plat->irq_base;
++	else if (np)
++		ret = of_property_read_u32(np, "stericsson,irq-base", &ab8500->irq_base);
++
++	if (!ab8500->irq_base) {
++		dev_info(&pdev->dev, "couldn't find irq-base\n");
++		ret = -EINVAL;
++		goto out_free_ab8500;
++	}
+ 
+ 	ab8500->dev = &pdev->dev;
+ 
+@@ -1150,6 +1169,12 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, ab8500);
+ 
++	if (platid)
++		version = platid->driver_data;
++	else if (np)
++		version = (unsigned int)
++			of_match_device(ab8500_match, &pdev->dev)->data;
++
+ 	if (version != AB8500_VERSION_UNDEFINED)
+ 		ab8500->version = version;
+ 	else {
+@@ -1246,29 +1271,32 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+ 			goto out_removeirq;
+ 	}
+ 
+-	ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
+-			      ARRAY_SIZE(abx500_common_devs), NULL,
+-			      ab8500->irq_base);
+-
+-	if (ret)
+-		goto out_freeirq;
++	if (!np) {
++		ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
++				ARRAY_SIZE(abx500_common_devs), NULL,
++				ab8500->irq_base);
+ 
+-	if (is_ab9540(ab8500))
+-		ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
+-			      ARRAY_SIZE(ab9540_devs), NULL,
+-			      ab8500->irq_base);
+-	else
+-		ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
+-			      ARRAY_SIZE(ab8500_devs), NULL,
+-			      ab8500->irq_base);
+-
+-	if (is_ab9540(ab8500) || is_ab8505(ab8500))
+-		ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
+-			      ARRAY_SIZE(ab9540_ab8505_devs), NULL,
+-			      ab8500->irq_base);
++		if (ret)
++			goto out_freeirq;
++
++		if (is_ab9540(ab8500))
++			ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
++					ARRAY_SIZE(ab9540_devs), NULL,
++					ab8500->irq_base);
++		else
++			ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
++					ARRAY_SIZE(ab8500_devs), NULL,
++					ab8500->irq_base);
++		if (ret)
++			goto out_freeirq;
+ 
+-	if (ret)
+-		goto out_freeirq;
++		if (is_ab9540(ab8500) || is_ab8505(ab8500))
++			ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
++					ARRAY_SIZE(ab9540_ab8505_devs), NULL,
++					ab8500->irq_base);
++		if (ret)
++			goto out_freeirq;
++	}
+ 
+ 	if (!no_bm) {
+ 		/* Add battery management devices */
+@@ -1338,6 +1366,7 @@ static struct platform_driver ab8500_core_driver = {
+ 	.driver = {
+ 		.name = "ab8500-core",
+ 		.owner = THIS_MODULE,
++		.of_match_table = ab8500_match,
+ 	},
+ 	.probe	= ab8500_probe,
+ 	.remove	= __devexit_p(ab8500_remove),
 -- 
 1.7.9.5
