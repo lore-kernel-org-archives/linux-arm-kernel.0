@@ -1,90 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 17 May 2012 16:02:09 +0900
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle - declare the states with the
- new api
-In-Reply-To: <1337004377-17732-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
- <1337004377-17732-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <0b2101cd33fa$fa678020$ef368060$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 17 May 2012 12:32:00 +0530
+Subject: [PATCHv2 06/19] ARM: OMAP4: PM: Add SAR backup support towards
+ device OFF
+In-Reply-To: <87aa177my3.fsf@ti.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-7-git-send-email-t-kristo@ti.com> <87aa177my3.fsf@ti.com>
+Message-ID: <CAMQu2gznJ0q-Eqevh9dWn+vw69to91kfFG6hYDvTbGj3zwT0FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano wrote:
-> 
-> The states are now part of the cpuidle_driver structure, so we can
-> declare the states in this structure directly. That saves us an extra
-> variable declaration and a memcpy.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-s3c64xx/cpuidle.c |   33 ++++++++++++++-------------------
->  1 files changed, 14 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-
-> s3c64xx/cpuidle.c
-> index 179460f..2750e54 100644
-> --- a/arch/arm/mach-s3c64xx/cpuidle.c
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -51,33 +51,28 @@ static int s3c64xx_enter_idle(struct cpuidle_device
-> *dev,
->  	return index;
->  }
-> 
-> -static struct cpuidle_state s3c64xx_cpuidle_set[] = {
-> -	[0] = {
-> -		.enter			= s3c64xx_enter_idle,
-> -		.exit_latency		= 1,
-> -		.target_residency	= 1,
-> -		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> -		.name			= "IDLE",
-> -		.desc			= "System active, ARM gated",
-> -	},
-> -};
-> +static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
-> 
->  static struct cpuidle_driver s3c64xx_cpuidle_driver = {
-> -	.name		= "s3c64xx_cpuidle",
-> -	.owner		= THIS_MODULE,
-> -	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> -};
-> -
-> -static struct cpuidle_device s3c64xx_cpuidle_device = {
-> -	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> +	.name	= "s3c64xx_cpuidle",
-> +	.owner  = THIS_MODULE,
+On Thu, May 17, 2012 at 4:28 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
+>
+>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> The SAR RAM is maintained during Device OFF mode.
+>
+> so why is this patch bothering to save and restore it?
+>
+SAR RAM is maintained(not powered down) but somebody needs to
+feel the contents which will be preserved :-)
 
-I'd preferred to use original 'tab'
+> -ECONFUSED
+>
+>> The register layout
+>> is fixed in SAR ROM. SAR is split into 4 banks with different
+>> privilege accesses based on device type
+>>
+>> ?---------------------------------------------------------------
+>> ?Access mode ? ? ? ? ?Bank ? ?Address Range
+>> ?---------------------------------------------------------------
+>> ?HS/GP : Public ? ? ? ? ? ? ? 1 ? ? ? 0x4A32_6000 - 0x4A32_6FFF (4kB)
+>> ?HS/GP : Public ? ? ? ? ? ? ? 2 ? ? ? 0x4A32_7000 - 0x4A32_73FF (1kB)
+>>
+>> ?HS/EMU : Secured
+>> ?GP : Public ? ? ? ? ?3 ? ? ? 0x4A32_8000 - 0x4A32_87FF (2kB)
+>>
+>> ?HS/GP :Secure
+>> ?write once. ? ? ? ? ?4 ? ? ? 0x4A32_9000 - 0x4A32_93FF (1kB)
+>> ?---------------------------------------------------------------
+>>
+>> The save process is done entirely by software and restore is done by
+>> hardware using the auto-restore feature. The restore feature is enabled
+>> by default and cannot be disabled. The software must save the data
+>> to be restored in a dedicated location in SAR RAM.
+>
+> Some general comments:
+>
+> - can the cluster PM notifier be used for the save path?
+>
+Nope. This is for device OFF only case. CPU Cluster state as such
+has no dependency.
 
-> +	.states = {
-> +		{
-> +			.enter            = s3c64xx_enter_idle,
-> +			.exit_latency     = 1,
-> +			.target_residency = 1,
-> +			.flags            = CPUIDLE_FLAG_TIME_VALID,
-> +			.name             = "IDLE",
-> +			.desc             = "System active, ARM gated",
-> +		},
-> +	},
-> +	.state_count = 1,
->  };
-> 
->  static int __init s3c64xx_init_cpuidle(void)
->  {
->  	int ret;
-> 
-> -	memcpy(s3c64xx_cpuidle_driver.states, s3c64xx_cpuidle_set,
-> -	       sizeof(s3c64xx_cpuidle_set));
->  	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
-> 
->  	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
-> --
-> 1.7.5.4
+> - This patch adds lots of data that is immediately removed by the next
+> ?patch. ?Probably the two just need to be combined.
+>
+iormap() hunk from this patch can be completely dropped since
+it is getting fixed in next patch. Other infrastructure is maintained.
 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> - BUG_ON() should not be used unless there is absolutely no recovery
+> ?path, since it casues a full kernel panic. ? Instead, some error
+> ?recovery should be added.
+>
+WARN_ON should suffice.
