@@ -1,27 +1,113 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 17 May 2012 09:46:59 -0700
-Subject: [GIT PULL] Samsung usb stuff for v3.5
-In-Reply-To: <0b1401cd33f8$b5aca930$2105fb90$%kim@samsung.com>
-References: <0b1401cd33f8$b5aca930$2105fb90$%kim@samsung.com>
-Message-ID: <20120517164659.GA22415@kroah.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 May 2012 09:47:06 -0700
+Subject: [PATCHv2 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
+ on second CS
+In-Reply-To: <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
+ (Santosh Shilimkar's message of "Thu, 17 May 2012 12:42:30 +0530")
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-16-git-send-email-t-kristo@ti.com>
+ <87mx573boy.fsf@ti.com>
+ <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
+Message-ID: <87vcjuzred.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 03:45:55PM +0900, Kukjin Kim wrote:
-> Hi Greg and Felipe,
-> 
-> Please pull Samsung 's3c-hsotg' UDC support for EXYNOS4210 and S5PV210 from:
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.5-for-usb
-> 
-> Since it has a dependency on 'usb: hsotg: samsung ...' patches which have
-> been already in usb tree now, so would be better if you could pull this
-> series in your tree. Or this can be sent to upstream in the end of upcoming
-> merge window after pulling usb tree. But I think usb tree is better in this
-> case.
-> 
-> If any problems, please kindly let me know.
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-All pulled into my usb-next branch now, thanks.
+> On Thu, May 17, 2012 at 5:45 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
+>>
+>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>
+>>> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
+>>> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
+>>> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
+>>> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
+>>> is not set properly, we apply the required workaround allowing
+>>> the restore sequence to work properly.
+>>
+>> Please summarize the workaround here as well.
+>>
+> ok
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>> ---
+>>> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
+>>> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 37 ++++++++++++++++++++
+>>> ?2 files changed, 39 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>>> index a0af9ba..b763a79 100644
+>>> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>>> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+>>> @@ -28,6 +28,8 @@
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? ? 0x0000
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? ? 0x0004
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ?0x0010
+>>> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ? ?0x0114
+>>> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ? ?0x011c
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ?0x0460
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ?0x0464
+>>> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ?0x0468
+>>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+>>> index 215b80e..dfaa254 100644
+>>> --- a/arch/arm/mach-omap2/pm44xx.c
+>>> +++ b/arch/arm/mach-omap2/pm44xx.c
+>>> @@ -17,12 +17,18 @@
+>>> ?#include <linux/err.h>
+>>> ?#include <linux/slab.h>
+>>> ?#include <asm/system_misc.h>
+>>> +#include <linux/io.h>
+>>> +
+>>> +#include <mach/ctrl_module_wkup_44xx.h>
+>>> +#include <mach/hardware.h>
+>>>
+>>> ?#include "common.h"
+>>> ?#include "clockdomain.h"
+>>> ?#include "powerdomain.h"
+>>> ?#include "pm.h"
+>>>
+>>> +#define EMIF_SDRAM_CONFIG2_OFFSET ? ?0xc
+>>> +
+>>> ?struct power_state {
+>>> ? ? ? struct powerdomain *pwrdm;
+>>> ? ? ? u32 next_state;
+>>> @@ -215,6 +221,37 @@ static int __init omap4_pm_init(void)
+>>>
+>>> ? ? ? pr_err("Power Management for TI OMAP4.\n");
+>>>
+>>> + ? ? /*
+>>> + ? ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
+>>> + ? ? ?* Mode Transition When CS1 Is Used On EMIF":
+>>> + ? ? ?* Overwrite EMIF1/EMIF2
+>>> + ? ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
+>>> + ? ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
+>>> + ? ? ?*/
+>>> + ? ? if (cpu_is_omap443x()) {
+>>
+>> This should probably be done later in this function, after PM_ERRATUM
+>> flags are setup, and then it should use a PM_ERRATUM flag instead of cpu_is*
+>>
+> ok
+>
+>>> + ? ? ? ? ? ? void __iomem *secure_ctrl_mod;
+>>> + ? ? ? ? ? ? void __iomem *emif1;
+>>> + ? ? ? ? ? ? void __iomem *emif2;
+>>> + ? ? ? ? ? ? u32 val;
+>>> +
+>>> + ? ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+>>> + ? ? ? ? ? ? emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
+>>> + ? ? ? ? ? ? emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
+>>> +
+>>> + ? ? ? ? ? ? BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
+>>
+>> Please avoid BUG_ON() and use proper error recovery. ?This is not a
+>> condition where the entire kernel should panic.
+>>
+> Agree. WARN_ON() should suffice.
 
-greg k-h
+A WARN_ON() is ok (but noisy).  Better is a pr_warn() with some proper
+error recovery.
+
+Kevin
