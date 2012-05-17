@@ -1,75 +1,41 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 17 May 2012 08:45:31 -0400
-Subject: [PATCH 2/2] mmc: at91-mci: this driver is now deprecated
-In-Reply-To: <1337183519-25459-3-git-send-email-ludovic.desroches@atmel.com>
- (ludovic desroches's message of "Wed, 16 May 2012 17:51:59 +0200")
-References: <1337183519-25459-1-git-send-email-ludovic.desroches@atmel.com>
- <1337183519-25459-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <87k40b3ris.fsf@laptop.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 May 2012 13:55:44 +0100
+Subject: [PATCH v7 3/3] MTD: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <1337255011.2564.2.camel@koala>
+References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+ <1337093256-19117-4-git-send-email-josh.wu@atmel.com>
+ <1337160353.24809.26.camel@sauron.fi.intel.com>
+ <20403.29677.517067.528042@ipc1.ka-ro>
+ <1337161217.24809.38.camel@sauron.fi.intel.com> <4FB49C60.5030002@atmel.com>
+ <1337255011.2564.2.camel@koala>
+Message-ID: <20120517125544.GJ9571@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 17, 2012 at 02:43:31PM +0300, Artem Bityutskiy wrote:
+> On Thu, 2012-05-17 at 14:36 +0800, Josh Wu wrote:
+> > >> message text should not be split across lines anyway to ease grepping
+> > >> for the message.
+> > > I think the consensus is that it is personal decision of the author. I
+> > > am not trying to enforce this and I also split messages. In this case I
+> > > was only wondering why that backslash is used? I never saw this before
+> > > in the linux kernel.
+> > >
+> > 
+> > oh, I add the backslash only because if without it, there should be a 
+> > warning about message is splitting into two lines.
+> 
+> Backslash is not needed in C. The preprocessor removes it anyway. We do
+> not put them.
+> 
+> > Now I think I will just keep the text message in one line. That will 
+> > avoid any warnings. thanks.
+> 
+> You can just remove the backslashes. I think your lines splitting is
+> fine otherwise.
 
-On Wed, May 16 2012, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> at91-mci is deprecated since atmel-mci can deal with all chips.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  Documentation/feature-removal-schedule.txt |   11 +++++++++++
->  drivers/mmc/host/Kconfig                   |    7 +++++--
->  2 files changed, 16 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-> index 03ca210..8b4aef2 100644
-> --- a/Documentation/feature-removal-schedule.txt
-> +++ b/Documentation/feature-removal-schedule.txt
-> @@ -539,3 +539,14 @@ When:	3.6
->  Why:	setitimer is not returning -EFAULT if user pointer is NULL. This
->  	violates the spec.
->  Who:	Sasikantha Babu <sasikanth.v19@gmail.com>
-> +
-> +----------------------------
-> +
-> +What:	at91-mci driver ("CONFIG_MMC_AT91")
-> +When:	3.7
-> +Why:	There two mci drivers: at91-mci and atmel-mci. The PDC support was
-             ^ are
-
-> +	added to atmel-mci as a first step to support more chips. Then
-> +	at91-mci was kept only for old IP versions (on at91rm9200 and
-> +	at91sam9261). The support of these IP versions has just been added
-> +	so atmel-mci can be used for all chips.
-> +Who:	Ludovic Desroches <ludovic.desroches@atmel.com>
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 2bc06e7..f150591 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -278,10 +278,13 @@ choice
->  	  Choose which driver to use for the Atmel MCI Silicon
->  
->  config MMC_AT91
-> -	tristate "AT91 SD/MMC Card Interface support"
-> +	tristate "AT91 SD/MMC Card Interface support (DEPRECATED)"
->  	depends on ARCH_AT91
->  	help
-> -	  This selects the AT91 MCI controller.
-> +	  This selects the AT91 MCI controller. This driver will be
-> +	  remove soon (for more information have a look to
-          ^ removed
-> +	  Documentation/feature-removal-schedule.txt). Please use
-> +	  MMC_ATMEL_MCI.
->  
->  	  If unsure, say N.
-
-Seems like I should take this patch 2/2, and then someone else should
-merge 1/2?
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+It's also preferred _not_ to wrap error messages as that makes them
+harder to grep for.  Linus has mentioned this several times on LKML
+and has corrected error messages that he encounters that he can't
+find via grep.
