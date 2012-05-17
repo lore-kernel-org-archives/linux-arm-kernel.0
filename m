@@ -1,45 +1,351 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 18 May 2012 08:44:46 +1000
-Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20
- dtsi files
-In-Reply-To: <20120517150601.GA28104@kroah.com>
-References: <4FB3B1F3.6080102@atmel.com>
- <1337182626-13033-1-git-send-email-nicolas.ferre@atmel.com>
- <201205161850.54765.arnd@arndb.de>
- <20120517150601.GA28104@kroah.com>
-Message-ID: <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 17 May 2012 16:53:53 -0600
+Subject: [PATCH] ARM: dt: tegra: add Whistler device tree file
+Message-ID: <1337295233-14575-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Thu, 17 May 2012 08:06:01 -0700 Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 16 May 2012, Nicolas Ferre wrote:
-> > > Now that the bulk of at91sam9g20-related nodes are located in at91sam9260.dtsi,
-> > > we have to re-create the path to this ADC node for SoC specific parts.
-> > > 
-> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > Should we apply this patch in arm-soc so that Greg can drop the hunk that
-> > no longer applies?
-> 
-> It's not a "no longer applies", it's a "this does not merge".  The patch
-> is in my tree, unless you want me to revert it, it's going to stay there
-> until it goes to Linus.
+Whistler is a highly configurable Tegra evaluation and development board.
+This change adds support for the following specific configuration:
 
-Just apply the patch to the arm-soc tree - then the merge resolution
-becomes "use the arm-soc version".   There is no need for Greg to revert
-the other patch.
+E1120 motherboard
+E1108 CPU board
+E1116 PMU board
 
+The motherboard configuration switches are set as follows:
+SW1=0 SW2=0 SW3=5
+S1/S2/S3/S4 all on, except S3 7/8 are off.
+
+Other combinations of daugher boards may work to varying degrees, but will
+likely require some SW adjustment.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-whistler.dts |  303 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile.boot    |    1 +
+ 2 files changed, 304 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-whistler.dts
+
+diff --git a/arch/arm/boot/dts/tegra-whistler.dts b/arch/arm/boot/dts/tegra-whistler.dts
+new file mode 100644
+index 0000000..2548648
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra-whistler.dts
+@@ -0,0 +1,303 @@
++/dts-v1/;
++
++/include/ "tegra20.dtsi"
++
++/ {
++	model = "NVIDIA Tegra2 Whistler evaluation board";
++	compatible = "nvidia,whistler", "nvidia,tegra20";
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	pinmux {
++		pinctrl-names = "default";
++		pinctrl-0 = <&state_default>;
++
++		state_default: pinmux {
++			ata {
++				nvidia,pins = "ata", "atb", "ate", "gma", "gmb",
++					"gmc", "gmd", "gpu";
++				nvidia,function = "gmi";
++			};
++			atc {
++				nvidia,pins = "atc", "atd";
++				nvidia,function = "sdio4";
++			};
++			cdev1 {
++				nvidia,pins = "cdev1";
++				nvidia,function = "plla_out";
++			};
++			cdev2 {
++				nvidia,pins = "cdev2";
++				nvidia,function = "osc";
++			};
++			crtp {
++				nvidia,pins = "crtp";
++				nvidia,function = "crt";
++			};
++			csus {
++				nvidia,pins = "csus";
++				nvidia,function = "vi_sensor_clk";
++			};
++			dap1 {
++				nvidia,pins = "dap1";
++				nvidia,function = "dap1";
++			};
++			dap2 {
++				nvidia,pins = "dap2";
++				nvidia,function = "dap2";
++			};
++			dap3 {
++				nvidia,pins = "dap3";
++				nvidia,function = "dap3";
++			};
++			dap4 {
++				nvidia,pins = "dap4";
++				nvidia,function = "dap4";
++			};
++			ddc {
++				nvidia,pins = "ddc";
++				nvidia,function = "i2c2";
++			};
++			dta {
++				nvidia,pins = "dta", "dtb", "dtc", "dtd";
++				nvidia,function = "vi";
++			};
++			dte {
++				nvidia,pins = "dte";
++				nvidia,function = "rsvd1";
++			};
++			dtf {
++				nvidia,pins = "dtf";
++				nvidia,function = "i2c3";
++			};
++			gme {
++				nvidia,pins = "gme";
++				nvidia,function = "dap5";
++			};
++			gpu7 {
++				nvidia,pins = "gpu7";
++				nvidia,function = "rtck";
++			};
++			gpv {
++				nvidia,pins = "gpv";
++				nvidia,function = "pcie";
++			};
++			hdint {
++				nvidia,pins = "hdint", "pta";
++				nvidia,function = "hdmi";
++			};
++			i2cp {
++				nvidia,pins = "i2cp";
++				nvidia,function = "i2cp";
++			};
++			irrx {
++				nvidia,pins = "irrx", "irtx";
++				nvidia,function = "uartb";
++			};
++			kbca {
++				nvidia,pins = "kbca", "kbcc", "kbce", "kbcf";
++				nvidia,function = "kbc";
++			};
++			kbcb {
++				nvidia,pins = "kbcb", "kbcd";
++				nvidia,function = "sdio2";
++			};
++			lcsn {
++				nvidia,pins = "lcsn", "lsck", "lsda", "lsdi",
++					"spia", "spib", "spic";
++				nvidia,function = "spi3";
++			};
++			ld0 {
++				nvidia,pins = "ld0", "ld1", "ld2", "ld3", "ld4",
++					"ld5", "ld6", "ld7", "ld8", "ld9",
++					"ld10", "ld11", "ld12", "ld13", "ld14",
++					"ld15", "ld16", "ld17", "ldc", "ldi",
++					"lhp0", "lhp1", "lhp2", "lhs", "lm0",
++					"lm1", "lpp", "lpw0", "lpw1", "lpw2",
++					"lsc0", "lsc1", "lspi", "lvp0", "lvp1",
++					"lvs";
++				nvidia,function = "displaya";
++			};
++			owc {
++				nvidia,pins = "owc", "uac";
++				nvidia,function = "owr";
++			};
++			pmc {
++				nvidia,pins = "pmc";
++				nvidia,function = "pwr_on";
++			};
++			rm {
++				nvidia,pins = "rm";
++				nvidia,function = "i2c1";
++			};
++			sdb {
++				nvidia,pins = "sdb", "sdc", "sdd", "slxa",
++					"slxc", "slxd", "slxk";
++				nvidia,function = "sdio3";
++			};
++			sdio1 {
++				nvidia,pins = "sdio1";
++				nvidia,function = "sdio1";
++			};
++			spdi {
++				nvidia,pins = "spdi", "spdo";
++				nvidia,function = "rsvd2";
++			};
++			spid {
++				nvidia,pins = "spid", "spie", "spig", "spih";
++				nvidia,function = "spi2_alt";
++			};
++			spif {
++				nvidia,pins = "spif";
++				nvidia,function = "spi2";
++			};
++			uaa {
++				nvidia,pins = "uaa", "uab";
++				nvidia,function = "uarta";
++			};
++			uad {
++				nvidia,pins = "uad";
++				nvidia,function = "irda";
++			};
++			uca {
++				nvidia,pins = "uca", "ucb";
++				nvidia,function = "uartc";
++			};
++			uda {
++				nvidia,pins = "uda";
++				nvidia,function = "spi1";
++			};
++			conf_ata {
++				nvidia,pins = "ata", "atb", "atc", "ddc", "gma",
++					"gmb", "gmc", "gmd", "irrx", "irtx",
++					"kbca", "kbcb", "kbcc", "kbcd", "kbce",
++					"kbcf", "sdc", "sdd", "spie", "spig",
++					"spih", "uaa", "uab", "uad", "uca",
++					"ucb";
++				nvidia,pull = <2>;
++				nvidia,tristate = <0>;
++			};
++			conf_atd {
++				nvidia,pins = "atd", "ate", "cdev1", "csus",
++					"dap1", "dap2", "dap3", "dap4", "dte",
++					"dtf", "gpu", "gpu7", "gpv", "i2cp",
++					"rm", "sdio1", "slxa", "slxc", "slxd",
++					"slxk", "spdi", "spdo", "uac", "uda";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			conf_cdev2 {
++				nvidia,pins = "cdev2", "spia", "spib";
++				nvidia,pull = <1>;
++				nvidia,tristate = <1>;
++			};
++			conf_ck32 {
++				nvidia,pins = "ck32", "ddrc", "lc", "pmca",
++					"pmcb", "pmcc", "pmcd", "xm2c",
++					"xm2d";
++				nvidia,pull = <0>;
++			};
++			conf_crtp {
++				nvidia,pins = "crtp";
++				nvidia,pull = <0>;
++				nvidia,tristate = <1>;
++			};
++			conf_dta {
++				nvidia,pins = "dta", "dtb", "dtc", "dtd",
++					"spid", "spif";
++				nvidia,pull = <1>;
++				nvidia,tristate = <0>;
++			};
++			conf_gme {
++				nvidia,pins = "gme", "owc", "pta", "spic";
++				nvidia,pull = <2>;
++				nvidia,tristate = <1>;
++			};
++			conf_ld17_0 {
++				nvidia,pins = "ld17_0", "ld19_18", "ld21_20",
++					"ld23_22";
++				nvidia,pull = <1>;
++			};
++			conf_ls {
++				nvidia,pins = "ls", "pmce";
++				nvidia,pull = <2>;
++			};
++			drive_dap1 {
++				nvidia,pins = "drive_dap1";
++				nvidia,high-speed-mode = <0>;
++				nvidia,schmitt = <1>;
++				nvidia,low-power-mode = <0>;
++				nvidia,pull-down-strength = <0>;
++				nvidia,pull-up-strength = <0>;
++				nvidia,slew-rate-rising = <0>;
++				nvidia,slew-rate-falling = <0>;
++			};
++		};
++	};
++
++	i2s at 70002800 {
++		status = "okay";
++	};
++
++	serial at 70006000 {
++		status = "okay";
++		clock-frequency = <216000000>;
++	};
++
++	i2c at 7000d000 {
++		status = "okay";
++		clock-frequency = <100000>;
++
++		codec: codec at 1a {
++			compatible = "wlf,wm8753";
++			reg = <0x1a>;
++		};
++
++		tca6416: gpio at 20 {
++			compatible = "ti,tca6416";
++			reg = <0x20>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
++	};
++
++	usb at c5000000 {
++		status = "okay";
++		nvidia,vbus-gpio = <&tca6416 0 0>; /* GPIO_PMU0 */
++	};
++
++	usb at c5008000 {
++		status = "okay";
++		nvidia,vbus-gpio = <&tca6416 1 0>; /* GPIO_PMU1 */
++	};
++
++	sdhci at c8000400 {
++		status = "okay";
++		wp-gpios = <&gpio 173 0>; /* gpio PV5 */
++		support-8bit;
++		bus-width = <8>;
++	};
++
++	sdhci at c8000600 {
++		status = "okay";
++		support-8bit;
++		bus-width = <8>;
++	};
++
++	sound {
++		compatible = "nvidia,tegra-audio-wm8753-whistler",
++			     "nvidia,tegra-audio-wm8753";
++		nvidia,model = "NVIDIA Tegra Whistler";
++
++		nvidia,audio-routing =
++			"Headphone Jack", "LOUT1",
++			"Headphone Jack", "ROUT1",
++			"MIC2", "Mic Jack",
++			"MIC2N", "Mic Jack";
++
++		nvidia,i2s-controller = <&tegra_i2s1>;
++		nvidia,audio-codec = <&codec>;
++	};
++};
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index 9a82094..2d1993e 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -7,4 +7,5 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
+ dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
+ dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
+ dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
++dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra-whistler.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra-cardhu.dtb
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120518/210f51f5/attachment.sig>
+1.7.0.4
