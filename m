@@ -1,106 +1,140 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 17 May 2012 12:42:30 +0530
-Subject: [PATCHv2 15/19] ARM: OMAP4430: PM: workaround for DDR corruption
- on second CS
-In-Reply-To: <87mx573boy.fsf@ti.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-16-git-send-email-t-kristo@ti.com> <87mx573boy.fsf@ti.com>
-Message-ID: <CAMQu2gzOeX3W1HouzVHf7uvMHtdTp7=E22fk6Uq81sxcdM5nxg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 17 May 2012 17:18:10 +1000
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+Message-ID: <20120517171810.64d248977f410292c18086cd@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 5:45 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
->
->> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Work around for Errata ID: i632 "LPDDR2 Corruption After OFF Mode
->> Transition When CS1 Is Used On EMIF" which impacts OMAP443x silicon
->> The issue occurs when EMIF_SDRAM_CONFIG is restored first before
->> EMIF_SDRAM_CONFIG_2 is not yet restored, the register configuration
->> is not set properly, we apply the required workaround allowing
->> the restore sequence to work properly.
->
-> Please summarize the workaround here as well.
->
-ok
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> [t-kristo at ti.com: moved workaround from omap-sar.c to pm44xx.c]
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? ?2 +
->> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ? 37 ++++++++++++++++++++
->> ?2 files changed, 39 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> index a0af9ba..b763a79 100644
->> --- a/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> +++ b/arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
->> @@ -28,6 +28,8 @@
->> ?#define OMAP4_CTRL_MODULE_WKUP_IP_REVISION ? ? ? ? ? 0x0000
->> ?#define OMAP4_CTRL_MODULE_WKUP_IP_HWINFO ? ? ? ? ? ? 0x0004
->> ?#define OMAP4_CTRL_MODULE_WKUP_IP_SYSCONFIG ? ? ? ? ?0x0010
->> +#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG ? ?0x0114
->> +#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG ? ?0x011c
->> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_0 ?0x0460
->> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_1 ?0x0464
->> ?#define OMAP4_CTRL_MODULE_WKUP_CONF_DEBUG_SEL_TST_2 ?0x0468
->> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->> index 215b80e..dfaa254 100644
->> --- a/arch/arm/mach-omap2/pm44xx.c
->> +++ b/arch/arm/mach-omap2/pm44xx.c
->> @@ -17,12 +17,18 @@
->> ?#include <linux/err.h>
->> ?#include <linux/slab.h>
->> ?#include <asm/system_misc.h>
->> +#include <linux/io.h>
->> +
->> +#include <mach/ctrl_module_wkup_44xx.h>
->> +#include <mach/hardware.h>
->>
->> ?#include "common.h"
->> ?#include "clockdomain.h"
->> ?#include "powerdomain.h"
->> ?#include "pm.h"
->>
->> +#define EMIF_SDRAM_CONFIG2_OFFSET ? ?0xc
->> +
->> ?struct power_state {
->> ? ? ? struct powerdomain *pwrdm;
->> ? ? ? u32 next_state;
->> @@ -215,6 +221,37 @@ static int __init omap4_pm_init(void)
->>
->> ? ? ? pr_err("Power Management for TI OMAP4.\n");
->>
->> + ? ? /*
->> + ? ? ?* Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
->> + ? ? ?* Mode Transition When CS1 Is Used On EMIF":
->> + ? ? ?* Overwrite EMIF1/EMIF2
->> + ? ? ?* SECURE_EMIF1_SDRAM_CONFIG2_REG
->> + ? ? ?* SECURE_EMIF2_SDRAM_CONFIG2_REG
->> + ? ? ?*/
->> + ? ? if (cpu_is_omap443x()) {
->
-> This should probably be done later in this function, after PM_ERRATUM
-> flags are setup, and then it should use a PM_ERRATUM flag instead of cpu_is*
->
-ok
+Hi Andrew,
 
->> + ? ? ? ? ? ? void __iomem *secure_ctrl_mod;
->> + ? ? ? ? ? ? void __iomem *emif1;
->> + ? ? ? ? ? ? void __iomem *emif2;
->> + ? ? ? ? ? ? u32 val;
->> +
->> + ? ? ? ? ? ? secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
->> + ? ? ? ? ? ? emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
->> + ? ? ? ? ? ? emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
->> +
->> + ? ? ? ? ? ? BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
->
-> Please avoid BUG_ON() and use proper error recovery. ?This is not a
-> condition where the entire kernel should panic.
->
-Agree. WARN_ON() should suffice.
+Today's linux-next merge of the akpm tree got a conflict in
+drivers/ata/sata_mv.c between commit eee989902aab ("ARM: Orion: SATA: Add
+per channel clk/clkdev support") from the arm-soc tree and commit
+"ata/sata_mv: remove conditional compilation of clk code" from the akpm
+tree.
 
-Regards
-santosh
+I fixed it up (see below) and can carry the fix as necessary.
+
+[I used the arm-soc version with all the conditionals on CONFIG_HAVE_CLK
+removed.]
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/ata/sata_mv.c
+index 24712ad,37503b8..0000000
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@@ -551,10 -551,7 +551,8 @@@ struct mv_host_priv 
+  	u32			irq_mask_offset;
+  	u32			unmask_all_irqs;
+  
+- #if defined(CONFIG_HAVE_CLK)
+  	struct clk		*clk;
+ +	struct clk              **port_clks;
+- #endif
+  	/*
+  	 * These consistent DMA memory pools give us guaranteed
+  	 * alignment for hardware-accessed data structures,
+@@@ -4028,9 -4025,6 +4026,7 @@@ static int mv_platform_probe(struct pla
+  	struct resource *res;
+  	int n_ports = 0;
+  	int rc;
+- #if defined(CONFIG_HAVE_CLK)
+ +	int port;
+- #endif
+  
+  	ata_print_version_once(&pdev->dev, DRV_VERSION);
+  
+@@@ -4058,13 -4052,6 +4054,11 @@@
+  
+  	if (!host || !hpriv)
+  		return -ENOMEM;
+- #if defined(CONFIG_HAVE_CLK)
+ +	hpriv->port_clks = devm_kzalloc(&pdev->dev,
+ +					sizeof(struct clk *) * n_ports,
+ +					GFP_KERNEL);
+ +	if (!hpriv->port_clks)
+ +		return -ENOMEM;
+- #endif
+  	host->private_data = hpriv;
+  	hpriv->n_ports = n_ports;
+  	hpriv->board_idx = chip_soc;
+@@@ -4074,21 -4061,11 +4068,19 @@@
+  				   resource_size(res));
+  	hpriv->base -= SATAHC0_REG_BASE;
+  
+- #if defined(CONFIG_HAVE_CLK)
+  	hpriv->clk = clk_get(&pdev->dev, NULL);
+  	if (IS_ERR(hpriv->clk))
+ -		dev_notice(&pdev->dev, "cannot get clkdev\n");
+ +		dev_notice(&pdev->dev, "cannot get optional clkdev\n");
+  	else
+ -		clk_enable(hpriv->clk);
+ +		clk_prepare_enable(hpriv->clk);
+ +
+ +	for (port = 0; port < n_ports; port++) {
+ +		char port_number[16];
+ +		sprintf(port_number, "%d", port);
+ +		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
+ +		if (!IS_ERR(hpriv->port_clks[port]))
+ +			clk_prepare_enable(hpriv->port_clks[port]);
+ +	}
+- #endif
+  
+  	/*
+  	 * (Re-)program MBUS remapping windows if we are asked to.
+@@@ -4115,18 -4092,10 +4107,16 @@@
+  		return 0;
+  
+  err:
+- #if defined(CONFIG_HAVE_CLK)
+  	if (!IS_ERR(hpriv->clk)) {
+ -		clk_disable(hpriv->clk);
+ +		clk_disable_unprepare(hpriv->clk);
+  		clk_put(hpriv->clk);
+  	}
+ +	for (port = 0; port < n_ports; port++) {
+ +		if (!IS_ERR(hpriv->port_clks[port])) {
+ +			clk_disable_unprepare(hpriv->port_clks[port]);
+ +			clk_put(hpriv->port_clks[port]);
+ +		}
+ +	}
+- #endif
+  
+  	return rc;
+  }
+@@@ -4142,24 -4111,13 +4132,20 @@@
+  static int __devexit mv_platform_remove(struct platform_device *pdev)
+  {
+  	struct ata_host *host = platform_get_drvdata(pdev);
+- #if defined(CONFIG_HAVE_CLK)
+  	struct mv_host_priv *hpriv = host->private_data;
+ +	int port;
+- #endif
+  	ata_host_detach(host);
+  
+- #if defined(CONFIG_HAVE_CLK)
+  	if (!IS_ERR(hpriv->clk)) {
+ -		clk_disable(hpriv->clk);
+ +		clk_disable_unprepare(hpriv->clk);
+  		clk_put(hpriv->clk);
+  	}
+ +	for (port = 0; port < host->n_ports; port++) {
+ +		if (!IS_ERR(hpriv->port_clks[port])) {
+ +			clk_disable_unprepare(hpriv->port_clks[port]);
+ +			clk_put(hpriv->port_clks[port]);
+ +		}
+ +	}
+- #endif
+  	return 0;
+  }
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120517/a1b6f284/attachment.sig>
