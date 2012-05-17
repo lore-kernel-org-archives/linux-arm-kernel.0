@@ -1,46 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 May 2012 17:10:04 -0700
-Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
-In-Reply-To: <87mx56s6nz.fsf@ti.com>
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
- <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
- <87y5oqtpnw.fsf@ti.com> <20120517231251.GH17852@atomide.com>
- <87mx56s6nz.fsf@ti.com>
-Message-ID: <20120518001004.GJ17852@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 May 2012 19:31:46 -0400
+Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
+ with device tree
+In-Reply-To: <201205151423.31044.arnd@arndb.de>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <EE71107DF0D1F24FA2D95041E64AB9E801A56A998C6C@IL-MB01.marvell.com>
+ <20120515131935.GI6820@lunn.ch> <201205151423.31044.arnd@arndb.de>
+Message-ID: <20120517233146.GG16338@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120517 17:00]:
+On Tue, May 15, 2012 at 02:23:30PM +0000, Arnd Bergmann wrote:
+> On Tuesday 15 May 2012, Andrew Lunn wrote:
+> > > > I would strongly advise on using "mrvl,mv78230" as the binding name. It isn't
+> > > > as if you can't have multiple names associated with one binding.
+> > > > 
+> > > > Also, given how close they are, do we really need separate machine support
+> > > > files?
+> > > The problem with 78230 is that it's only one flavor of the AXP
+> > > family which includes 78230, 78260 and 78460 resulting different
+> > > core count, L2 size, DRAM bandwidth, etc.
+> > 
+> > Can you explain the naming scheme and mapping to device numbers?
+> > Please don't limit it to these new devices, but also include the
+> > existing supported devices. From that we might be able to figure out
+> > and appropriate naming scheme.
 > 
-> Argh, then $SUBJECT patch here has caused brokeness in multiple ways.
-> It managed to break both runtime suspend and runtime resume at the same
-> time. :(
+> The names and numbers are already extremely confusing in the code we have.
+> Maybe we can use the addition of the new code as an excuse to clean up
+> what we have ;-)
+
+Agreed.
+
+> I agree that "armada" is a rather bad choice, because chips under that name
+> include both the pxa/mmp family and the orion/kirkwood/mv78xx0/dove family
+> which AFAICT don't have much in common at all besides the CPU cores.
 > 
-> The change added by this patch to runtime_suspend effectively disables
-> the fix I did in 68942edb09 (gpio/omap: fix wakeups on level-triggered GPIOs)
-> causing the sluggish network problems to reappear, since that GPIO IRQ
-> is no longer causing wakeups.
->
-> Simple fix is below, which just moves the check added in $SUBJECT patch
-> below the workaround for the edge/level fix.  Can you confirm it works
-> on Zoom3 (applies on gpio/next + my previous fix.)
+> One option would be to move all DT-enabled board files under plat-orion
+> once they are fully done, and leave just the non-DT board files in the
+> individual directories until they have all been converted. We can start
+> with the platform code that's being discussed here and move over the
+> kirkwood and orion5x board-dt.c files once they don't depend on anything
+> else in those directories any more.
 
-Thanks yes having both of your fixes applied fixes the issues I was
-seeing, so for both:
+I wish we had thought of this a few months ago... ;-)
 
-Tested-by: Tony Lindgren <tony@atomide.com>
- 
-> I didn't notice the same problem on Overo, but I guess it's because
-> Overo had some enabled non-wakeup GPIOs in the same bank, so it didn't
-> bypass the level-triggered IRQ fix.
+thx,
 
-Makes sense for why it only appears on some boards.
- 
-> In the mean time, they're availble in my for_3.5/fixes/gpio-2 branch.
-
-I'll merge that also into l-o master for some more testing before
-the merge window.
-
-Regards,
-
-Tony
+Jason.
