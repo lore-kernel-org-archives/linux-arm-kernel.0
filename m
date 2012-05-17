@@ -1,62 +1,54 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 May 2012 12:54:41 +0200
-Subject: [PATCHv2 0/4] ARM: replace custom consistent dma region with vmalloc
-Message-ID: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 17 May 2012 12:54:43 +0200
+Subject: [PATCHv2 2/4] mm: vmalloc: export find_vm_area() function
+In-Reply-To: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1337252085-22039-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+find_vm_area() function is usefull for other core subsystems (like
+dma-mapping) to get access to vm_area internals.
 
-Recent changes to ioremap and unification of vmalloc regions on ARM
-significantly reduces the possible size of the consistent dma region.
-They are significantly limited allowed dma coherent/writecombine
-allocations.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ include/linux/vmalloc.h |    1 +
+ mm/vmalloc.c            |   10 +++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-This experimental patchset replaces custom consistent dma regions usage
-in dma-mapping framework in favour of generic vmalloc areas created on
-demand for each coherent and writecombine allocations. The main purpose
-for this patchset is to remove 2MiB limit of dma coherent/writecombine
-allocations.
-
-Atomic allocations are served from special pool preallocated on boot,
-becasue vmalloc areas cannot be reliably created in atomic context.
-
-This patch is based on vanilla v3.4-rc7 release.
-
-Atomic allocations have been tested with s3c-sdhci driver on Samsung
-UniversalC210 board with dmabounce code enabled to force
-dma_alloc_coherent() use on each dma_map_* call (some of them are made
-from interrupts).
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-Changelog:
-
-v2:
-- added support for atomic allocations (served from preallocated pool)
-- minor cleanup here and there
-- rebased onto v3.4-rc7
-
-v1: http://thread.gmane.org/gmane.linux.kernel.mm/76703
-- initial version
-
-Patch summary:
-
-Marek Szyprowski (4):
-  mm: vmalloc: use const void * for caller argument
-  mm: vmalloc: export find_vm_area() function
-  mm: vmalloc: add VM_DMA flag to indicate areas used by dma-mapping
-    framework
-  ARM: dma-mapping: remove custom consistent dma region
-
- Documentation/kernel-parameters.txt |    4 +
- arch/arm/include/asm/dma-mapping.h  |    2 +-
- arch/arm/mm/dma-mapping.c           |  360 ++++++++++++++++-------------------
- include/linux/vmalloc.h             |   10 +-
- mm/vmalloc.c                        |   31 ++--
- 5 files changed, 185 insertions(+), 196 deletions(-)
-
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index 2e28f4d..6071e91 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -93,6 +93,7 @@ extern struct vm_struct *__get_vm_area_caller(unsigned long size,
+ 					unsigned long start, unsigned long end,
+ 					const void *caller);
+ extern struct vm_struct *remove_vm_area(const void *addr);
++extern struct vm_struct *find_vm_area(const void *addr);
+ 
+ extern int map_vm_area(struct vm_struct *area, pgprot_t prot,
+ 			struct page ***pages);
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 8bc7f3ef..8cb7f22 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1402,7 +1402,15 @@ struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
+ 						-1, GFP_KERNEL, caller);
+ }
+ 
+-static struct vm_struct *find_vm_area(const void *addr)
++/**
++ *	find_vm_area  -  find a continuous kernel virtual area
++ *	@addr:		base address
++ *
++ *	Search for the kernel VM area starting at @addr, and return it.
++ *	It is up to the caller to do all required locking to keep the returned
++ *	pointer valid.
++ */
++struct vm_struct *find_vm_area(const void *addr)
+ {
+ 	struct vmap_area *va;
+ 
 -- 
 1.7.10.1
