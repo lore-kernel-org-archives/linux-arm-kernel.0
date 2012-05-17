@@ -1,159 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 May 2012 15:21:07 -0700
-Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
-In-Reply-To: <1335536018-16004-9-git-send-email-tarun.kanti@ti.com> (Tarun
- Kanti DebBarma's message of "Fri, 27 Apr 2012 19:43:38 +0530")
-References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
- <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87y5oqtpnw.fsf@ti.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 18 May 2012 00:42:05 +0200
+Subject: [PATCH] ARM: mx35: add cpufreq support
+In-Reply-To: <1337280058.4970.6.camel@lovely>
+References: <20120507141437.GA9636@lovely.krouter>
+ <20120509072239.GG27341@pengutronix.de>
+ <20120509075618.GA4412@lovely.krouter>
+ <20120509081306.GK27341@pengutronix.de>
+ <1337276960.4970.4.camel@lovely>
+ <20120517182036.GK30400@pengutronix.de>
+ <1337280058.4970.6.camel@lovely>
+Message-ID: <20120517224205.GA7021@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun, Santosh,
+On Thu, May 17, 2012 at 08:40:58PM +0200, Christoph Fritz wrote:
+> On Thu, 2012-05-17 at 20:20 +0200, Sascha Hauer wrote:
+> > On Thu, May 17, 2012 at 07:49:20PM +0200, Christoph Fritz wrote:
+> 
+> > > Is there already a version I can rebase the patch?
+> > > 
+> > > On your repo at git://git.pengutronix.de/git/imx/linux-2.6.git I can't
+> > > find the new clock framework or even a work-in-progress version.
+> > 
+> > They are in linux-next now.
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+There changed a lot of stuff: Where should I register the function to
+set/get the cpu frequency?
 
-> We do checking for bank->enabled_non_wakeup_gpios in order
-> to skip redundant operations. Somehow, the check got missed
-> while doing the cleanup series.
->
-> Just to make sure that we do context restore correctly in
-> *_runtime_resume(), the bank->workaround_enabled check is
-> moved after context restore. Otherwise, it would prevent
-> context restore when bank->enabled_non_wakeup_gpios is 0.
->
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Cousson, Benoit <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+To get an idea of how it should be done, I looked at imx51: Is there
+cpufreq-support still implemented/working?  I can see the
+arch/arm/mach-imx/cpu_op-mx51.c but not its correlating
+clk_cpu_set_rate function in arch/arm/mach-imx/clk-imx51-imx53.c.
 
-I just noticed that this patch has caused some strange problems, notably
-with the GPIO IRQ used by smsc911x NIC (Overo, Zoom3, 2430SDP, etc. etc.)
-
-The patch itself is OK, but it has exposed a bug in other parts of the
-context restore path that was previously hidden.
-
-We seem to have been finding lots of GPIO bugs by just testing the
-network chips with GPIO IRQs.  Can I suggest that a platform with a GPIO
-IRQ NIC be added to the test platforms you're using? 
-
-> ---
->  drivers/gpio/gpio-omap.c |   13 ++++++++-----
->  1 files changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index d238f84..59a4af1 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1160,6 +1160,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
->  
->  	spin_lock_irqsave(&bank->lock, flags);
->  
-> +	if (!bank->enabled_non_wakeup_gpios)
-> +		goto update_gpio_context_count;
-> +
->  	/*
->  	 * Only edges can generate a wakeup event to the PRCM.
->  	 *
-> @@ -1235,11 +1238,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
->  	__raw_writel(bank->context.risingdetect,
->  		     bank->base + bank->regs->risingdetect);
->  
-> -	if (!bank->workaround_enabled) {
-> -		spin_unlock_irqrestore(&bank->lock, flags);
-> -		return 0;
-> -	}
-> -
-
-My moving this below, you exposed some buggy code that can now get
-executed in non-OFF mode, wherease before $SUBJECT patch, it would never
-be exectued in non-OFF mode.
-
->  	if (bank->get_context_loss_count) {
->  		context_lost_cnt_after =
->  			bank->get_context_loss_count(bank->dev);
-
-...right below this line, we have:
-
-		if (context_lost_cnt_after != bank->context_loss_count ||
-						!context_lost_cnt_after) {
-			omap_gpio_restore_context(bank);
-
-While we've never hit off-mode, context_lost_cnt_after will always be
-zero.  However, becasue of the !context_lost_cnt_after check there, we
-will *always* restore the bank context, even though context has never
-been lost.
-
-I have no idea why that !context_lost_cnt_after check is there, but
-clearly it is wrong.  Now that you moved the 'workraound_enabled' check
-below this section, as long as off-mode is disabled, the some GPIO
-context will be restored here on *every* runtime PM transition.
-
-The patch below fixes the problem.
-
-Grant, after Tarun/Santosh have a chance to review/ack this, can you
-still get this in for 3.5?  If not, getting it into -rc should be fine.
-
-Kevin
-
-
->From 83874df8e0dd78a3609f5ba81d608df7217fd212 Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@ti.com>
-Date: Thu, 17 May 2012 14:52:56 -0700
-Subject: [PATCH] gpio/omap: fix broken context restore for non-OFF mode
- transitions
-
-The fix in commit 1b12870 (gpio/omap: fix missing check in
-*_runtime_suspend()) exposed another bug in the context restore path.
-
-Currently, the per-bank context restore happens whenever the context
-loss count is different in runtime suspend and runtime resume *and*
-whenever the per-bank contex_loss_count == 0:
-
-	if (context_lost_cnt_after != bank->context_loss_count ||
-					!context_lost_cnt_after) {
-		omap_gpio_restore_context(bank);
-
-Restoring context when the context_lost_cnt_after == 0 is clearly
-wrong, since this will be true until the first off-mode transition
-(which could be never, if off-mode is never enabled.)  This check
-causes the context to be restored on *every* runtime PM transition.
-
-Before commit 1b12870 (gpio/omap: fix missing check in
-*_runtime_suspend()), this code was never executed in non-OFF mode, so
-there were never spurious context restores happening.  After that
-change though, spurious context restores could happen.
-
-To fix, simply remove the !context_lost_cnt_after check. It is not
-needed.
-
-This bug was found when noticing that the smc911x NIC on 3530/Overo
-was not working, and git bisect tracked it down to this patch.  It
-seems that the spurious context restore was causing the smsc911x to
-not be properly probed on this platform.
-
-Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- drivers/gpio/gpio-omap.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 9b71f04..b570a6a 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1238,8 +1238,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
- 	if (bank->get_context_loss_count) {
- 		context_lost_cnt_after =
- 			bank->get_context_loss_count(bank->dev);
--		if (context_lost_cnt_after != bank->context_loss_count ||
--						!context_lost_cnt_after) {
-+		if (context_lost_cnt_after != bank->context_loss_count) {
- 			omap_gpio_restore_context(bank);
- 		} else {
- 			spin_unlock_irqrestore(&bank->lock, flags);
--- 
-1.7.9.2
+ Thanks,
+  -- Christoph
+ 
