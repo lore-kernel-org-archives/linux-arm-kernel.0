@@ -1,147 +1,211 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 May 2012 14:45:13 +0100
-Subject: [PATCH 08/18] mfd: Enable Device Tree for ab8500-core driver
+Date: Thu, 17 May 2012 14:45:14 +0100
+Subject: [PATCH 09/18] regulator: ab8500: Split up probe() into manageable
+ pieces
 In-Reply-To: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
 References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337262323-27692-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will allow the ab8500-core driver to be probed and set up
-when booting when Device Tree is enabled. This includes platform ID
-look-up which identifies the machine it is currently running on. If
-we are undergoing a DT enabled boot, we will refuse to setup each of
-the other ab8500-* devices, as they will be probed individually by DT.
+ab8500's probe() function is becoming quite large, so in the lead
+up to Device Tree enablement which will fork the thread of execution
+this patch splits it into 3 main areas; basic error checking will
+remain in probe(), but regulator register initialisation and regulator
+registration have been moved to their own functions which will
+be called in sequence by probe() and the DT equivalent.
 
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-core.c |   73 +++++++++++++++++++++++++++++++--------------
- 1 file changed, 51 insertions(+), 22 deletions(-)
+ drivers/regulator/ab8500.c |  150 +++++++++++++++++++++++++-------------------
+ 1 file changed, 87 insertions(+), 63 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 0e2df71..bc6c2d5 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -20,6 +20,8 @@
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/regulator/ab8500.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- /*
-  * Interrupt register offsets
-@@ -1112,11 +1114,20 @@ static struct attribute_group ab9540_attr_group = {
- 	.attrs	= ab9540_sysfs_entries,
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index d156390..3571b54 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -708,11 +708,92 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
+ 	REG_INIT(AB8500_REGUCTRLDISCH2,		0x04, 0x44, 0x16),
  };
  
-+static const struct of_device_id ab8500_match[] = {
-+	{
-+		.compatible = "stericsson,ab8500",
-+		.data = (void *)AB8500_VERSION_AB8500,
-+	},
-+	{},
-+};
++static __devinit int
++ab8500_regulator_init_registers(struct platform_device *pdev, int id, int value)
++{
++	int err;
 +
- static int __devinit ab8500_probe(struct platform_device *pdev)
- {
- 	struct ab8500_platform_data *plat = dev_get_platdata(&pdev->dev);
- 	const struct platform_device_id *platid = platform_get_device_id(pdev);
--	enum ab8500_version version = platid->driver_data;
-+	enum ab8500_version version = AB8500_VERSION_UNDEFINED;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct ab8500 *ab8500;
- 	struct resource *resource;
- 	int ret;
-@@ -1129,6 +1140,14 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 
- 	if (plat)
- 		ab8500->irq_base = plat->irq_base;
-+	else if (np)
-+		ret = of_property_read_u32(np, "stericsson,irq-base", &ab8500->irq_base);
-+
-+	if (!ab8500->irq_base) {
-+		dev_info(&pdev->dev, "couldn't find irq-base\n");
-+		ret = -EINVAL;
-+		goto out_free_ab8500;
++	if (value & ~ab8500_reg_init[id].mask) {
++		dev_err(&pdev->dev,
++			"Configuration error: value outside mask.\n");
++		return -EINVAL;
 +	}
- 
- 	ab8500->dev = &pdev->dev;
- 
-@@ -1150,6 +1169,12 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ab8500);
- 
-+	if (platid)
-+		version = platid->driver_data;
-+	else if (np)
-+		version = (unsigned int)
-+			of_match_device(ab8500_match, &pdev->dev)->data;
 +
- 	if (version != AB8500_VERSION_UNDEFINED)
- 		ab8500->version = version;
- 	else {
-@@ -1246,29 +1271,32 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
- 			goto out_removeirq;
++	err = abx500_mask_and_set_register_interruptible(
++		&pdev->dev,
++		ab8500_reg_init[id].bank,
++		ab8500_reg_init[id].addr,
++		ab8500_reg_init[id].mask,
++		value);
++	if (err < 0) {
++		dev_err(&pdev->dev,
++			"Failed to initialize 0x%02x, 0x%02x.\n",
++			ab8500_reg_init[id].bank,
++			ab8500_reg_init[id].addr);
++		return err;
++	}
++
++	dev_vdbg(&pdev->dev,
++		"init: 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
++		ab8500_reg_init[id].bank,
++		ab8500_reg_init[id].addr,
++		ab8500_reg_init[id].mask,
++		value);
++
++	return 0;
++}
++
++static __devinit int ab8500_regulator_register(struct platform_device *pdev,
++					struct regulator_init_data *init_data,
++					int id,
++					struct device_node *np)
++{
++	struct ab8500_regulator_info *info = NULL;
++	struct regulator_config config = { };
++	int err;
++
++	/* assign per-regulator data */
++	info = &ab8500_regulator_info[id];
++	info->dev = &pdev->dev;
++
++	config.dev = &pdev->dev;
++	config.init_data = init_data;
++	config.driver_data = info;
++	config.of_node = np;
++
++	/* fix for hardware before ab8500v2.0 */
++	if (abx500_get_chip_id(info->dev) < 0x20) {
++		if (info->desc.id == AB8500_LDO_AUX3) {
++			info->desc.n_voltages =
++				ARRAY_SIZE(ldo_vauxn_voltages);
++			info->voltages = ldo_vauxn_voltages;
++			info->voltages_len =
++				ARRAY_SIZE(ldo_vauxn_voltages);
++			info->voltage_mask = 0xf;
++		}
++	}
++
++	/* register regulator with framework */
++	info->regulator = regulator_register(&info->desc, &config);
++	if (IS_ERR(info->regulator)) {
++		err = PTR_ERR(info->regulator);
++		dev_err(&pdev->dev, "failed to register regulator %s\n",
++			info->desc.name);
++		/* when we fail, un-register all earlier regulators */
++		while (--id >= 0) {
++			info = &ab8500_regulator_info[id];
++			regulator_unregister(info->regulator);
++		}
++		return err;
++	}
++
++	return 0;
++}
++
+ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
+ 	struct ab8500_platform_data *pdata;
+-	struct regulator_config config = { };
+ 	int i, err;
+ 
+ 	if (!ab8500) {
+@@ -733,8 +814,7 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
+ 
+ 	/* initialize registers */
+ 	for (i = 0; i < pdata->num_regulator_reg_init; i++) {
+-		int id;
+-		u8 value;
++		int id, value;
+ 
+ 		id = pdata->regulator_reg_init[i].id;
+ 		value = pdata->regulator_reg_init[i].value;
+@@ -745,73 +825,17 @@ static __devinit int ab8500_regulator_probe(struct platform_device *pdev)
+ 				"Configuration error: id outside range.\n");
+ 			return -EINVAL;
+ 		}
+-		if (value & ~ab8500_reg_init[id].mask) {
+-			dev_err(&pdev->dev,
+-				"Configuration error: value outside mask.\n");
+-			return -EINVAL;
+-		}
+ 
+-		/* initialize register */
+-		err = abx500_mask_and_set_register_interruptible(&pdev->dev,
+-			ab8500_reg_init[id].bank,
+-			ab8500_reg_init[id].addr,
+-			ab8500_reg_init[id].mask,
+-			value);
+-		if (err < 0) {
+-			dev_err(&pdev->dev,
+-				"Failed to initialize 0x%02x, 0x%02x.\n",
+-				ab8500_reg_init[id].bank,
+-				ab8500_reg_init[id].addr);
++		err = ab8500_regulator_init_registers(pdev, id, value);
++		if (err < 0)
+ 			return err;
+-		}
+-		dev_vdbg(&pdev->dev,
+-			"  init: 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
+-			ab8500_reg_init[id].bank,
+-			ab8500_reg_init[id].addr,
+-			ab8500_reg_init[id].mask,
+-			value);
  	}
  
--	ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
--			      ARRAY_SIZE(abx500_common_devs), NULL,
--			      ab8500->irq_base);
+ 	/* register all regulators */
+ 	for (i = 0; i < ARRAY_SIZE(ab8500_regulator_info); i++) {
+-		struct ab8500_regulator_info *info = NULL;
 -
--	if (ret)
--		goto out_freeirq;
-+	if (!np) {
-+		ret = mfd_add_devices(ab8500->dev, 0, abx500_common_devs,
-+				ARRAY_SIZE(abx500_common_devs), NULL,
-+				ab8500->irq_base);
- 
--	if (is_ab9540(ab8500))
--		ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
--			      ARRAY_SIZE(ab9540_devs), NULL,
--			      ab8500->irq_base);
--	else
--		ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
--			      ARRAY_SIZE(ab8500_devs), NULL,
--			      ab8500->irq_base);
+-		/* assign per-regulator data */
+-		info = &ab8500_regulator_info[i];
+-		info->dev = &pdev->dev;
 -
--	if (is_ab9540(ab8500) || is_ab8505(ab8500))
--		ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
--			      ARRAY_SIZE(ab9540_ab8505_devs), NULL,
--			      ab8500->irq_base);
-+		if (ret)
-+			goto out_freeirq;
-+
-+		if (is_ab9540(ab8500))
-+			ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
-+					ARRAY_SIZE(ab9540_devs), NULL,
-+					ab8500->irq_base);
-+		else
-+			ret = mfd_add_devices(ab8500->dev, 0, ab8500_devs,
-+					ARRAY_SIZE(ab8500_devs), NULL,
-+					ab8500->irq_base);
-+		if (ret)
-+			goto out_freeirq;
+-		config.dev = &pdev->dev;
+-		config.init_data = &pdata->regulator[i];
+-		config.driver_data = info;
+-
+-		/* fix for hardware before ab8500v2.0 */
+-		if (abx500_get_chip_id(info->dev) < 0x20) {
+-			if (info->desc.id == AB8500_LDO_AUX3) {
+-				info->desc.n_voltages =
+-					ARRAY_SIZE(ldo_vauxn_voltages);
+-				info->voltages = ldo_vauxn_voltages;
+-				info->voltages_len =
+-					ARRAY_SIZE(ldo_vauxn_voltages);
+-				info->voltage_mask = 0xf;
+-			}
+-		}
+-
+-		/* register regulator with framework */
+-		info->regulator = regulator_register(&info->desc, &config);
+-		if (IS_ERR(info->regulator)) {
+-			err = PTR_ERR(info->regulator);
+-			dev_err(&pdev->dev, "failed to register regulator %s\n",
+-					info->desc.name);
+-			/* when we fail, un-register all earlier regulators */
+-			while (--i >= 0) {
+-				info = &ab8500_regulator_info[i];
+-				regulator_unregister(info->regulator);
+-			}
++		err = ab8500_regulator_register(pdev, &pdata->regulator[i], i, NULL);
++		if (err < 0)
+ 			return err;
+-		}
+-
+-		dev_vdbg(rdev_get_dev(info->regulator),
+-			"%s-probed\n", info->desc.name);
+ 	}
  
--	if (ret)
--		goto out_freeirq;
-+		if (is_ab9540(ab8500) || is_ab8505(ab8500))
-+			ret = mfd_add_devices(ab8500->dev, 0, ab9540_ab8505_devs,
-+					ARRAY_SIZE(ab9540_ab8505_devs), NULL,
-+					ab8500->irq_base);
-+		if (ret)
-+			goto out_freeirq;
-+	}
- 
- 	if (!no_bm) {
- 		/* Add battery management devices */
-@@ -1338,6 +1366,7 @@ static struct platform_driver ab8500_core_driver = {
- 	.driver = {
- 		.name = "ab8500-core",
- 		.owner = THIS_MODULE,
-+		.of_match_table = ab8500_match,
- 	},
- 	.probe	= ab8500_probe,
- 	.remove	= __devexit_p(ab8500_remove),
+ 	return 0;
 -- 
 1.7.9.5
