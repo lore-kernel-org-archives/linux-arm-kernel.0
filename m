@@ -1,65 +1,125 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 May 2012 17:38:32 -0600
-Subject: [PATCH 0/9] ux500/Nomadik GPIO and pins update
-In-Reply-To: <1335172440-27470-1-git-send-email-linus.walleij@stericsson.com>
-References: <1335172440-27470-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120517233832.E67E43E062C@localhost>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 May 2012 16:56:48 -0700
+Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
+In-Reply-To: <20120517231251.GH17852@atomide.com> (Tony Lindgren's message of
+ "Thu, 17 May 2012 16:12:52 -0700")
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+ <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
+ <87y5oqtpnw.fsf@ti.com> <20120517231251.GH17852@atomide.com>
+Message-ID: <87mx56s6nz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2012 11:14:00 +0200, Linus Walleij <linus.walleij@stericsson.com> wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This is basically an update and sync of Nomadik and ux500 GPIO
-> development.
-> 
-> If you wonder why I introduce a deviant pin configuration path
-> not using the pin config subsystem it is because I want to build
-> atop of this work which I know works. It will be switched over
-> to pinctrl in later patch sets on top of this.
-> 
-> This is *almost* orthogonal to other ux500 development, but
-> there *might* be conflicts with Lee Jones' Device Tree work,
-> so I will try to create a separate orthogonal ux500 GPIO branch
-> for this stuff.
-> 
-> Linus Walleij (4):
->   gpio/nomadik: use typesafe __io_address()
->   plat-nomadik: new sleep mode pincfg macros
->   ARM: ux500: remove a bunch of internal pull-ups
->   ARM: ux500: update pin handling
-> 
-> Rabin Vincent (5):
->   gpio/nomadik: don't set SLPM to 1 for non-wakeup pins
->   gpio/nomadik: cache [rf]w?imsc
->   gpio/nomadik: fix spurious interrupts with SKE
->   gpio/nomadik: support low EMI mode
->   ARM: ux500: implement pin API
+Tony Lindgren <tony@atomide.com> writes:
 
-for the whole series:
+> * Kevin Hilman <khilman@ti.com> [120517 15:29]:
+>> 
+>> I just noticed that this patch has caused some strange problems, notably
+>> with the GPIO IRQ used by smsc911x NIC (Overo, Zoom3, 2430SDP, etc. etc.)
+>> 
+>> The patch itself is OK, but it has exposed a bug in other parts of the
+>> context restore path that was previously hidden.
+>> 
+>> We seem to have been finding lots of GPIO bugs by just testing the
+>> network chips with GPIO IRQs.  Can I suggest that a platform with a GPIO
+>> IRQ NIC be added to the test platforms you're using? 
+>
+> Yes considering the breakage it's pretty obvious the original series was
+> never properly tested on omaps.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Agreed.
 
-g.
+> Regarding this fix, using gpio/next + this patch fixes nfsroot for 2430sdp,
+> and gets zoom3 nfsroot booting going a bit better.
+>
+> However, at least on zoom3 nfsroot now takes several _minutes_ to get to
+> login: with gpio/next + this patch. The system is totally unusable.
+>
+> It seems that the GPIO interrupt wake-up events are not properly working
+> now?
+>
+> Reverting the "gpio/omap: fix missing check in *_runtime_suspend()"
+> patch seems to fix the issue.
 
-> 
->  arch/arm/mach-ux500/Makefile                      |    2 +-
->  arch/arm/mach-ux500/board-mop500-pins.c           |  394 ++++++++++++++++-----
->  arch/arm/mach-ux500/board-mop500.h                |    4 +
->  arch/arm/mach-ux500/pins-db8500.h                 |   72 ++--
->  arch/arm/mach-ux500/pins.c                        |   88 +++++
->  arch/arm/mach-ux500/pins.h                        |   46 +++
->  arch/arm/plat-nomadik/include/plat/gpio-nomadik.h |    1 +
->  arch/arm/plat-nomadik/include/plat/pincfg.h       |   19 +
->  drivers/gpio/gpio-nomadik.c                       |  129 +++++--
->  9 files changed, 591 insertions(+), 164 deletions(-)
->  create mode 100644 arch/arm/mach-ux500/pins.c
->  create mode 100644 arch/arm/mach-ux500/pins.h
-> 
-> -- 
-> 1.7.9.2
-> 
+Argh, then $SUBJECT patch here has caused brokeness in multiple ways.
+It managed to break both runtime suspend and runtime resume at the same
+time. :(
 
+The change added by this patch to runtime_suspend effectively disables
+the fix I did in 68942edb09 (gpio/omap: fix wakeups on level-triggered GPIOs)
+causing the sluggish network problems to reappear, since that GPIO IRQ
+is no longer causing wakeups.
+
+Simple fix is below, which just moves the check added in $SUBJECT patch
+below the workaround for the edge/level fix.  Can you confirm it works
+on Zoom3 (applies on gpio/next + my previous fix.)
+
+I didn't notice the same problem on Overo, but I guess it's because
+Overo had some enabled non-wakeup GPIOs in the same bank, so it didn't
+bypass the level-triggered IRQ fix.
+
+>> Subject: [PATCH] gpio/omap: fix broken context restore for non-OFF mode
+>>  transitions
+>> 
+>> The fix in commit 1b12870 (gpio/omap: fix missing check in
+>> *_runtime_suspend()) exposed another bug in the context restore path.
+>
+> Kevin, looks like commit 1b12870 does not exist in gpio/next?
+
+Will update the changelog.
+
+Because of this new problem, I have to add the patch below too, so
+I'll get them both queued up for Grant
+
+In the mean time, they're availble in my for_3.5/fixes/gpio-2 branch.
+
+Kevin
+
+[1]
+>From afb4f0836dc3c432aa999fc98a80bf75e1481e04 Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@ti.com>
+Date: Thu, 17 May 2012 16:42:16 -0700
+Subject: [PATCH] gpio/omap: (re)fix wakeups on level-triggered GPIOs
+
+commit 1b1287032 (gpio/omap: fix missing check in *_runtime_suspend())
+broke wakeups on level-triggered GPIOs by adding the enabled
+non-wakeup GPIO check before the workaround that enables wakeups
+on level-triggered IRQs, effectively disabling that workaround.
+
+To fix, move the enabled non-wakeup GPIO check after the
+level-triggered IRQ workaround.
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ drivers/gpio/gpio-omap.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index b570a6a..c4ed172 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1157,9 +1157,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 
+-	if (!bank->enabled_non_wakeup_gpios)
+-		goto update_gpio_context_count;
+-
+ 	/*
+ 	 * Only edges can generate a wakeup event to the PRCM.
+ 	 *
+@@ -1180,6 +1177,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+ 		__raw_writel(wake_hi | bank->context.risingdetect,
+ 			     bank->base + bank->regs->risingdetect);
+ 
++	if (!bank->enabled_non_wakeup_gpios)
++		goto update_gpio_context_count;
++
+ 	if (bank->power_mode != OFF_MODE) {
+ 		bank->power_mode = 0;
+ 		goto update_gpio_context_count;
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+1.7.9.2
