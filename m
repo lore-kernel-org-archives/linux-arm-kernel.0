@@ -1,99 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 May 2012 15:21:14 -0600
-Subject: [PATCH V2 3/3] ARM: tegra: paz00: enable WiFi rfkill when booting
- from device tree
-In-Reply-To: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
-References: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1337289674-18581-3-git-send-email-swarren@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 May 2012 21:22:05 +0000
+Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
+ when DT is enabled
+In-Reply-To: <1337262323-27692-13-git-send-email-lee.jones@linaro.org>
+References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
+ <1337262323-27692-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <201205172122.05611.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thursday 17 May 2012, Lee Jones wrote:
+> @@ -601,7 +601,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>  
+>  static struct platform_device *snowball_of_platform_devs[] __initdata = {
+>         &snowball_key_dev,
+> -       &ab8500_device,
+>  };
+>  
+>  static void __init mop500_init_machine(void)
+> @@ -767,6 +766,9 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+>  static const struct of_device_id u8500_local_bus_nodes[] = {
+>         /* only create devices below soc node */
+>         { .compatible = "stericsson,db8500", },
+> +       { .compatible = "stericsson,db8500-prcmu", },
+> +       { .compatible = "stericsson,ab8500", },
+> +       { .compatible = "stericsson,ab8500-regulator", },
+>         { .compatible = "simple-bus"},
+>         { },
+>  };
 
-There currently aren't bindings for a WiFi rfkill button, and defining
-a good binding is non-trivial. Manually register this "device" when
-booting from device tree, in order to bring DT support to the same
-feature level as board files, which will in turn allow board files to be
-deprecated.
+You remove the ab8500_device registration from snowball but add the prcmu and ab8500
+in a place that is common to all three machines, so they will show up twice
+on mop500 and hrefv60. If those two are not broken before this patch, I think
+they are after it.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-dt-tegra20.c |   10 ++++++++++
- arch/arm/mach-tegra/board-paz00.c      |    7 ++++++-
- arch/arm/mach-tegra/board.h            |    2 ++
- 3 files changed, 18 insertions(+), 1 deletions(-)
+I think the two options you have here are to either remove the ab8500 device from
+mop500_platform_devs[] too (essentially registering mop500_gpio_keys_device
+and ab8500_device separately when you need them, instead of doing the loop),
+or to split u8500_local_bus_nodes so you use a different table for snowball
+from the one you use for the other boards.
 
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 7771386..8b4e6e1 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -126,6 +126,13 @@ static void __init harmony_init(void)
- }
- #endif
- 
-+#ifdef CONFIG_MACH_PAZ00
-+static void __init paz00_init(void)
-+{
-+	tegra_paz00_wifikill_init();
-+}
-+#endif
-+
- static struct {
- 	char *machine;
- 	void (*init)(void);
-@@ -136,6 +143,9 @@ static struct {
- #ifdef CONFIG_MACH_HARMONY
- 	{ "nvidia,harmony", harmony_init },
- #endif
-+#ifdef CONFIG_MACH_PAZ00
-+	{ "compal,paz00", paz00_init },
-+#endif
- };
- 
- static void __init tegra_dt_init_late(void)
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index bbc1907..4b64af5 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -148,7 +148,6 @@ static struct platform_device *paz00_devices[] __initdata = {
- 	&debug_uart,
- 	&tegra_sdhci_device4,
- 	&tegra_sdhci_device1,
--	&wifi_rfkill_device,
- 	&leds_gpio,
- 	&gpio_keys_device,
- };
-@@ -201,6 +200,11 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
- 	.is_8bit	= 1,
- };
- 
-+void __init tegra_paz00_wifikill_init(void)
-+{
-+	platform_device_register(&wifi_rfkill_device);
-+}
-+
- static void __init tegra_paz00_init(void)
- {
- 	tegra_clk_init_from_table(paz00_clk_init_table);
-@@ -211,6 +215,7 @@ static void __init tegra_paz00_init(void)
- 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
- 
- 	platform_add_devices(paz00_devices, ARRAY_SIZE(paz00_devices));
-+	tegra_paz00_wifikill_init();
- 
- 	paz00_i2c_init();
- 	paz00_usb_init();
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 097e0e1..f88e514 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -53,5 +53,7 @@ int __init harmony_pcie_init(void);
- static inline int harmony_pcie_init(void) { return 0; }
- #endif
- 
-+void __init tegra_paz00_wifikill_init(void);
-+
- extern struct sys_timer tegra_timer;
- #endif
--- 
-1.7.0.4
+	Arnd
