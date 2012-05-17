@@ -1,44 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 May 2012 14:22:23 +0100
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205161942.20296.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FB3D294.4020505@wwwdotorg.org>
- <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
- <201205161942.20296.arnd@arndb.de>
-Message-ID: <20120517132223.GB9650@n2100.arm.linux.org.uk>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 17 May 2012 19:09:25 +0530
+Subject: [PATCH v2 0/2] regulator: Add initial suport for max77686
+Message-ID: <1337261967-26004-1-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 07:42:20PM +0000, Arnd Bergmann wrote:
-> On Wednesday 16 May 2012, Jassi Brar wrote:
-> >  The assumed model of the DMAC, in this binding, has P peripheral
-> > interfaces (P request signals) that could request a data transfer
-> > and C physical channels that actually do the data transfers, hence,
-> > at most C out of P peripherals could be served by the DMAC at any
-> > point of time. Usually C := P, but not always. Usually, any of the
-> > physical channels could be employed by the DMAC driver to serve any
-> > client.
-> >  The DMAC driver identifies a client by its i/f number, 'peri_id'
-> > on the given DMAC. For example, TX for SPI has 7th while RX_TX
-> > (half-duplex) for MMC has 10th peripheral interface (request-signal)
-> > on a given DMAC. Usually, any of the physical channels could be
-> > employed by the DMAC driver to serve a client.
-> 
-> I'm still anything but convinced by this model. Basically it's the
-> exact opposite of what we do for every other subsystem (irq, pinctrl,
-> regulator, gpio, ...), where the device using some infrastructure
-> contains the information about who provides it, whereas here you
-> move all the information into the device that provides the functionality,
-> and have no handle in the device using it by which the driver can
-> identify it.
+This patch series adds support for max77686 which is a multifunction device which
+includes regulator (pmic), rtc and charger sub-blocks within it. The support for
+mfd driver and regulator driver are added by this patch series. This patch series
+also includes device tree and irqdomain support for mfd and regulator portions.
 
-I think the biggest difference between DMA and other subsystems is that
-other systems have only one provider.
+Implemented the required modification, stated in the recieved review comments.
+changes since V1:
+-added regmap support.
+-implemented .get_voltage_sel, .set_voltage_sel and .set_voltage_time_sel after
+ removing .get_voltage and .set_voltage in regulator driver.
+-used of_regulator_match() for parsing DT.
+-added Documentation for Devive Tree binding.
 
-DMA on the other hand seems to have cases where you can make a choice
-between two or more providers of the service.  The impression that I'm
-getting from this thread is that it's difficult to describe that kind
-of relationship in DT - DT is good at describing "A provides X to C"
-but not "A _or_ B provides X to C and you can chose either A or B
-depending on <something> to satisfy X".
+This patch series is based on mark_regulator/for-next and has been tested on
+GAIA board.
+
+Yadwinder Singh Brar (2):
+  mfd: Add support for MAX77686.
+  regulator: Add support for MAX77686.
+
+ Documentation/devicetree/bindings/mfd/max77686.txt |   63 +++
+ drivers/mfd/Kconfig                                |   21 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/max77686-irq.c                         |  255 ++++++++++
+ drivers/mfd/max77686.c                             |  322 ++++++++++++
+ drivers/regulator/Kconfig                          |    9 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/max77686.c                       |  512 ++++++++++++++++++++
+ include/linux/mfd/max77686-private.h               |  282 +++++++++++
+ include/linux/mfd/max77686.h                       |  100 ++++
+ 10 files changed, 1566 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77686.txt
+ create mode 100644 drivers/mfd/max77686-irq.c
+ create mode 100644 drivers/mfd/max77686.c
+ create mode 100644 drivers/regulator/max77686.c
+ create mode 100644 include/linux/mfd/max77686-private.h
+ create mode 100644 include/linux/mfd/max77686.h
