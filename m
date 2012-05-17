@@ -1,61 +1,46 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 May 2012 13:24:10 -0600
-Subject: [PATCH] pinctrl: mxs: add gpio range support
-In-Reply-To: <1337061374-24823-1-git-send-email-shawn.guo@linaro.org>
-References: <1337061374-24823-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4FB5505A.7010004@wwwdotorg.org>
+Date: Thu, 17 May 2012 13:32:18 -0600
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FB3D294.4020505@wwwdotorg.org>
+ <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
+ <201205161942.20296.arnd@arndb.de>
+ <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
+Message-ID: <4FB55242.2080501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2012 11:56 PM, Shawn Guo wrote:
-> The mxs pins are organized in banks and each bank contains 32 pins.
-> i.MX23 has 4 banks in total, and every pin in the first 3 banks has
-> gpio function available.  i.MX28 has 7 banks and the first 5 banks
-> are capable of gpio mode.
-> 
-> As the gpio base is runtime determined for each port when booting
-> from device tree, the .base of struct pinctrl_gpio_range can only be
-> initialized with a offset local to the port, and have to plus gpio base
-> of the port at runtime.
+On 05/16/2012 03:16 PM, Jassi Brar wrote:
+> On 17 May 2012 01:12, Arnd Bergmann <arnd@arndb.de> wrote:
+...
+>> More importantly, you make it very hard to add devices in a board file
+>> to a dma controller that already has descriptions for some channels,
+>> because you cannot easily extend the chan-map unless you rewrite all of it.
+>>
+> I am not sure I understand the point.
 
-> diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
+Ah yes, Arnd has a good point.
 
-> +static struct pinctrl_gpio_range imx23_gpio_ranges[] = {
-> +	{ .name = "gpio", .id = 0, .base = 0, .pin_base = 0,  .npins = 32, },
-> +	{ .name = "gpio", .id = 1, .base = 0, .pin_base = 32, .npins = 31, },
+If the DMA request routing information is in each client node, then it's
+trivial to add DMA clients to board files; you just put the
+board-specific nodes and properties in the board file, and there's no
+possibility of conflicts; you aren't having to add to or override any
+existing property in the base SoC file.
 
-Is that last number meant to be 31 or 32?
+(As background, most ARM device trees are separated out into 1 file
+defining all the SoC devices e.g. soc.dtsi, and a separate file for each
+board e.g. board.dts, which includes the SoC file.)
 
-> +	{ .name = "gpio", .id = 2, .base = 0, .pin_base = 64, .npins = 32, },
-
-> diff --git a/drivers/pinctrl/pinctrl-mxs.c b/drivers/pinctrl/pinctrl-mxs.c
-
-> @@ -500,6 +532,26 @@ int __devinit mxs_pinctrl_probe(struct platform_device *pdev,
->  	mxs_pinctrl_desc.npins = d->soc->npins;
->  	mxs_pinctrl_desc.name = dev_name(&pdev->dev);
->  
-> +	for_each_child_of_node(np, child) {
-> +		if (!of_device_is_compatible(child, "fsl,mxs-gpio"))
-> +			continue;
-> +
-> +		id = of_alias_get_id(child, "gpio");
-
-Hmmm. I'm not sure if using /aliases is the correct approach here.
-Rather, shouldn't the pin controller node have an explicit list of GPIO
-phandles in the order they're needed.
-
-In other words, rather than:
-
-	aliases {
-		gpio0 = "/some/path/gpio at 0";
-		gpio1 = "/some/path/gpio at 1";
-		...
-	};
-
-Instead have the following property in the pin controller's own node:
-
-gpio-controllers = <&imx_gpio0 &imx_gpio1 ...>;
-
-That seems a little more direct/explicit; relying on /aliases seems
-slightly fragile - what if someone wants to change those aliases and
-doesn't realize the implications?
+Now, the DMA node for an on-SoC DMAC would be in soc.dtsi. Typically,
+the DMAC is connected to many on-SoC devices, and hence soc.dtsi would
+need to specify the routing information for all those devices to avoid
+duplicating it in every board.dts. Now, if you have some DMA requests
+that go off-SoC, the board.dts file might want to add to the routing
+table to indicate what clients connect to those DMA requests. However,
+there's no way in the device tree compiler right now to add to a
+property; you can only completely replace it. That would entail
+duplicating the entire routing information from soc.dtsi into each
+board.dts that wanted to add to it - a bad situation. Splitting the
+routing information into chunks in the client nodes avoids this issue
+entirely.
