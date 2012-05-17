@@ -1,43 +1,71 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 16 May 2012 11:26:49 +0530
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <CAJOA=zNe0yP5e75=fLTFAZMVZ=DsFF5xxkuear2C7sLD_XrGtA@mail.gmail.com>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
- <4FB07D2B.6010409@st.com>
- <CAJOA=zNe0yP5e75=fLTFAZMVZ=DsFF5xxkuear2C7sLD_XrGtA@mail.gmail.com>
-Message-ID: <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
+From: joramar76@yahoo.es (=?UTF-8?B?Sm9yZ2UgQW1vcsOzcyBBcmdvcw==?=)
+Date: Thu, 17 May 2012 19:24:13 +0200
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <201205161557.45362.arnd@arndb.de>
+ <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+Message-ID: <4FB5343D.5090509@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 16, 2012 10:32 AM, "Turquette, Mike" <mturquette@ti.com> wrote:
+Hi Alexey and co,
+
+I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the 
+only missing module was ADSL.
+
+Anyway, compiling was successful but I can't tell if it was functional.
+
+Mainly 2 big issues:
+
+  * No knowledge how to build the image (I wanted to have a self-lzma
+    image in order to save room)
+  * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
+    easily upload firmware into flash. It took me hours to make 1 trial.
+
+
+I'll be glad to share the code with whoever need it and maybe we can 
+take those old routers back to a better world.
+
+Regards,
+Jorge
+
+El 17/05/2012 17:29, Alexey Zaytsev escribi?:
+> On Wed, May 16, 2012 at 6:57 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>> On Wednesday 16 May 2012, Alexey Zaytsev wrote:
+>>> Hey.
+>>>
+>>> With all the ARM tree rework, I'm wondering, what would be a good (and
+>>> simple) sub-architecture on which to base new ports. The target is a
+>>> somewhat dated chip used in ADSL routers, so no DT, or multiplatform.
+>>> I'm looking at ixp4xx, because I'm somewhat familiar with the
+>>> platform, but is it a good reference?
+> Thanks for the reply.
 >
-> On Sun, May 13, 2012 at 8:34 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> > On 5/11/2012 2:11 PM, Stefan Roese wrote:
-> >> diff --git a/drivers/clk/spear/spear6xx_clock.c
-b/drivers/clk/spear/spear6xx_clock.c
-> >> index f9a20b3..bf33c1d 100644
-> >> --- a/drivers/clk/spear/spear6xx_clock.c
-> >> +++ b/drivers/clk/spear/spear6xx_clock.c
-> >> @@ -298,7 +298,7 @@ void __init spear6xx_clk_init(void)
-> >>
-> >>       clk = clk_register_gate(NULL, "gmac_clk", "ahb_clk", 0,
-PERIP1_CLK_ENB,
-> >>                       GMAC_CLK_ENB, 0, &_lock);
-> >> -     clk_register_clkdev(clk, NULL, "gmac");
-> >> +     clk_register_clkdev(clk, NULL, "e0800000.ethernet");
-> >>
-> >>       clk = clk_register_gate(NULL, "i2c_clk", "ahb_clk", 0,
-PERIP1_CLK_ENB,
-> >>                       I2C_CLK_ENB, 0, &_lock);
-> >
-> > Acked-by: Viresh Kumar <viresh.kumar@st.com>
+>> For a new subarchitecture, using DT is required, but it should not make
+>> your work harder. spear3xx/6xx is a good example of an older platform
+>> that was recently converted (take the arm-soc tree as a base, it contains
+>> the latest version).
+> Will do. Thanks for the arm-soc pointer.
 >
-> Do you want me to take this?  Spear didn't originally go through me
-> but I can take it if that is the intent.
+>> Another good one would be highbank, but that contains a lot of stuff you
+>> don't need.
+>>
+>> ixp4xx is not very actively maintained, so I would not use that as
+>> a base.
+>>
+>> What platform are you talking about? I know of a few people that are
+>> working on getting older platforms ported to Linux, so maybe someone
+>> is already working on a port.
+> It's a 'Solos' soc from Connexant. They released kernel code for
+> 2.6.11, and I'm up-porting it to the current kernel. I know at least
+> two other people interested in the port, adding them to CC. If you
+> know anyone else, it would be great to share the effort.
 >
 
-Sure. Go ahead.
+-- 
+Jorge Amor?s Argos
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120516/178decb8/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120517/da3d3ed1/attachment-0001.html>
