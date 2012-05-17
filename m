@@ -1,43 +1,29 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 17 May 2012 12:34:31 +0530
-Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <87d363928g.fsf@ti.com>
+Date: Thu, 17 May 2012 12:35:51 +0530
+Subject: [PATCHv2 05/19] ARM: OMAP4: PM: save/restore all CM1/2 settings
+ in OFF mode
+In-Reply-To: <87zk977ne4.fsf@ti.com>
 References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
-Message-ID: <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
+ <1336990730-26892-6-git-send-email-t-kristo@ti.com> <87zk977ne4.fsf@ti.com>
+Message-ID: <CAMQu2gwFafCPUwGjexUrsV5TAFBwc6ZgwSSx_uPYuDU42rkG8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Thu, May 17, 2012 at 4:18 AM, Kevin Hilman <khilman@ti.com> wrote:
 > Tero Kristo <t-kristo@ti.com> writes:
 >
 >> From: Rajendra Nayak <rnayak@ti.com>
 >>
->> SAR/ROM code restores only CORE DPLL to its original state
->> post wakeup from OFF mode.
->> The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
->> are saved and restored here during an OFF transition.
->>
->> [nm at ti.com: minor cleanups]
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> Restore all CM1/2 module registers as they are lost in OFF mode.
 >
-> Some general comments:
+> Save and restore?
 >
-> - the register dump/print doesn't belong here. ?If needed, should be a
-> ?debug feature if needed.
+> Also, as in the previous patch. ?Can this be done using cluster PM
+> notifier as well? ? ?(I realize that this series was probably done
+> before the PM notifiers were upstream, but now that we have them, we
+> should use them.)
 >
-> - Rather than hooking into omap4_enter_lowpower(), should use
-> ?the cluster PM enter/exit notifier chain.
->
-This is again specific to device OFF only and not related to CPU
-cluster state as such. So I don't think notifiers should be used here.
-
-O.w even when we attempt just MPU OSWR C-state, all these functions will
-get called in notifier chain.
+Device OFF specific and not related to CPU cluster state as such.
 
 Regards
 Santosh
