@@ -1,60 +1,74 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 18 May 2012 13:21:01 +0200
-Subject: Issues when running DT enabled kernel on iMX28 from linux-next
-In-Reply-To: <20120518010138.GA5427@S2101-09.ap.freescale.net>
-References: <4FB583CF.2080801@grid-net.com>
- <20120518010138.GA5427@S2101-09.ap.freescale.net>
-Message-ID: <201205181321.01434.marek.vasut@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 18 May 2012 14:21:04 +0300
+Subject: Clock register in early init
+In-Reply-To: <1337316517.22560.19.camel@pgaikwad-dt2>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com>
+ <1337316517.22560.19.camel@pgaikwad-dt2>
+Message-ID: <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Thu, May 17, 2012 at 04:03:43PM -0700, Subodh Nijsure wrote:
-> > Should one be able to run top of the linux-next on MX28 EVK hardware
-> > with DT support enabled?
+On Fri, May 18, 2012 at 06:48:37AM +0200, Prashant Gaikwad wrote:
+> Thanks for the reply Mike!!
 > 
-> Yes, I'm running it well with next-20120516.
-> 
-> > I have attached boot log I see when I try to do that.
-> 
-> One thing from the boot log worth checking is
-> 
->   [    0.820000] stmp_reset_block(f5010000): module reset timeout
-> 
-> My wild guess is stmp_reset_block call on mmc0 failed on your end.
-> 
-> > Further if one enables, CONFIG_MTD_NAND_GPMI_NAND=y
-> > CONFIG_MTD_NAND_PLATFORM=y code in
-> > drivers/mtd/nand/gpmi-nand/gpmi-nand.c doesn't compile because of
+> On Thu, 2012-05-17 at 11:51 +0530, Mike Turquette wrote:
+> > On 20120517-09:41, Prashant Gaikwad wrote:
+> > > Hi Mike,
+> > > 
+> > > While porting Tegra to common clock framework I observed that if we try
+> > > to allocate struct clk dynamically in early init, kernel panics since
+> > > memory is not initialized yet.
+> > > 
+> > > In your clk-next for omap you are registering clocks in early init and
+> > > clk_register allocates struct clk dynamically.
+> > > 
+> > > So, am I missing something here?
+> > > 
 > > 
-> > this code:
-> >         pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> >         if (IS_ERR(pinctrl)) {
-> >         
-> >                 ret = PTR_ERR(pinctrl);
-> >                 goto exit_pin;
-> >         
-> >         }
+> > You have the same problem as my platform (OMAP).  Please check out
+> > include/linux/clk-private.h.  That is a really nasty terrible hack that
+> > exists for statically initializing all data.  It exposes the definition
+> > of struct clk (which is bad and violates the design philosophy that
+> > struct clk should be an opaque cookie).
+> > 
+> > Please review Documentat/clk.txt to understand the rules around
+> > clk-private.h.  Namely that you MUST separate your data from your clock
+> > function definitions (the clk_ops should never know the definition of
+> > struct clk).
+> > 
 > 
-> Thanks for reporting it.  It's my bad.  I thought I had mxs_defconfig
-> build testing cover the change.  Actually, the gpmi is not enabled in
-> mxs_defconfig yet.  I will send the following fix to Arnd and Olof soon.
+> Yes, currently I am also doing same for Tegra and it works well. clk_ops
+> and clk initialization data are in separate files. clk_ops does not
+> include clk-private.h so it does not know the definition of struct clk.
 > 
-> @@ -486,7 +486,7 @@ static int __devinit acquire_resources(struct
-> gpmi_nand_data *this) if (ret)
->                 goto exit_dma_channels;
+> Will send patches for shortly.
 > 
-> -       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +       pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
->         if (IS_ERR(pinctrl)) {
->                 ret = PTR_ERR(pinctrl);
->                 goto exit_pin;
+> > Finally, I really want to kill off clk-private.h.  Currently OMAP does
+> > clock registration during early init and that is why this crap exists.
+> > However we are going to move our clock initialization to be initcall
+> > based at some point in the future.  No other platform (until now) was
+> > using these macros in clk-private.h, so I had planned on removing them
+> > after OMAP migrated.
+> > 
+> > What are the plans for Tegra?  I really don't want to have to support
+> > this stuff.  Can you migrate your clock initialization to be initcall
+> > based at some point in the future?
+> > 
+> 
+> We had initcall based implementation in old kernel versions. It was
+> moved to early init since some clocks were required for delay
+> calibrations. It may be possible to migrate it be initcall based in
+> future.
 
-Rebase your uboot on top of git://git.denx.de/u-boot-arm.git -master . u-boot-
-imx is missing a patch and won't be updated for next 3 weeks (maintainer is on 
-vacation). u-boot-arm has a bugfix for this issue
+I don't think we can do it all dynamic. We need to have the clockfrequency
+of the local timer at least, which depends on the PLLX frequency and
+ultimately on HFOSC input frequency which is measured by the clock code at
+boottime. I haven't figured out what else we need, but I wouldn't be surprised
+to find some more gotchas. It might be possible to split the clocks into
+'early init clocks' and normal clocks, but I would rather not go there.
+Which advantages do you see in dynamically allocating all this?
 
+Cheers,
 
-Best regards,
-Marek Vasut
+Peter.
