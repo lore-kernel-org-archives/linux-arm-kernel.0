@@ -1,139 +1,136 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 09:39:05 +0100
-Subject: [PATCH 06/16] ARM: ux500: Apply db8500-prcmu regulator information to
- db8500 Device Tree
+Date: Fri, 18 May 2012 09:39:06 +0100
+Subject: [PATCH 07/16] regulator: Enable Device Tree for the db8500-prcmu
+ regulator driver
 In-Reply-To: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337330355-17747-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337330355-17747-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we inform Device Tree of which regulators are provided by the db8500-
-prcmu. This way we can reference some of their consumers directly from the
-Device Tree e.g. SMSC911x Ethernet chip and the Nomadik I2C controller.
+Here we use the previous regulator register code separated from probe to
+register each of the regulators mentioned in Device Tree.
 
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |  107 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 107 insertions(+)
+ drivers/regulator/db8500-prcmu.c |   76 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 69 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 076831c..5e78899 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -197,6 +197,113 @@
- 				reg = <0x80157450 0xC>;
- 			};
+diff --git a/drivers/regulator/db8500-prcmu.c b/drivers/regulator/db8500-prcmu.c
+index d6b4d4c..968f97f 100644
+--- a/drivers/regulator/db8500-prcmu.c
++++ b/drivers/regulator/db8500-prcmu.c
+@@ -17,6 +17,8 @@
+ #include <linux/regulator/driver.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/db8500-prcmu.h>
++#include <linux/regulator/of_regulator.h>
++#include <linux/of.h>
+ #include <linux/module.h>
+ #include "dbx500-prcmu.h"
  
-+			db8500-prcmu-regulators {
-+				compatible = "stericsson,db8500-prcmu-regulator";
+@@ -449,23 +451,77 @@ static __devinit int db8500_regulator_register(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++static struct of_regulator_match db8500_regulator_matches[] = {
++	{ .name	= "db8500-vape",          .driver_data = (void *) DB8500_REGULATOR_VAPE, },
++	{ .name	= "db8500-varm",          .driver_data = (void *) DB8500_REGULATOR_VARM, },
++	{ .name	= "db8500-vmodem",        .driver_data = (void *) DB8500_REGULATOR_VMODEM, },
++	{ .name	= "db8500-vpll",          .driver_data = (void *) DB8500_REGULATOR_VPLL, },
++	{ .name	= "db8500-vsmps1",        .driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
++	{ .name	= "db8500-vsmps2",        .driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
++	{ .name	= "db8500-vsmps3",        .driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
++	{ .name	= "db8500-vrf1",          .driver_data = (void *) DB8500_REGULATOR_VRF1, },
++	{ .name	= "db8500-sva-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
++	{ .name	= "db8500-sva-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
++	{ .name	= "db8500-sva-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
++	{ .name	= "db8500-sia-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
++	{ .name	= "db8500-sia-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
++	{ .name	= "db8500-sia-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
++	{ .name	= "db8500-sga",           .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
++	{ .name	= "db8500-b2r2-mcde",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
++	{ .name	= "db8500-esram12",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
++	{ .name	= "db8500-esram12-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
++	{ .name	= "db8500-esram34",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
++	{ .name	= "db8500-esram34-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
++};
 +
-+				// DB8500_REGULATOR_VAPE
-+				db8500_vape_reg: db8500_vape {
-+					regulator-name = "db8500-vape";
-+					regulator-always-on;
-+				};
++static __devinit int
++db8500_regulator_of_probe(struct platform_device *pdev,
++			struct device_node *np)
++{
++	int i, err;
 +
-+				// DB8500_REGULATOR_VARM
-+				db8500_varm_reg: db8500_varm {
-+					regulator-name = "db8500-varm";
-+				};
++	for (i = 0; i < ARRAY_SIZE(dbx500_regulator_info); i++) {
++		err = db8500_regulator_register(
++			pdev, db8500_regulator_matches[i].init_data,
++			i, db8500_regulator_matches[i].of_node);
++		if (err)
++			return err;
++	}
 +
-+				// DB8500_REGULATOR_VMODEM
-+				db8500_vmodem_reg: db8500_vmodem {
-+					regulator-name = "db8500-vmodem";
-+				};
++	return 0;
++}
 +
-+				// DB8500_REGULATOR_VPLL
-+				db8500_vpll_reg: db8500_vpll {
-+					regulator-name = "db8500-vpll";
-+				};
+ static int __devinit db8500_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct regulator_init_data *db8500_init_data =
+ 					dev_get_platdata(&pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
+ 	int i, err;
+ 
+ 	/* register all regulators */
+-	for (i = 0; i < ARRAY_SIZE(dbx500_regulator_info); i++) {
+-		err = db8500_regulator_register(pdev,
+-						&db8500_init_data[i],
+-						i, NULL);
+-		if (err)
++	if (np) {
++		err = of_regulator_match(&pdev->dev, np,
++					db8500_regulator_matches,
++					ARRAY_SIZE(db8500_regulator_matches));
++		if (err < 0) {
++			dev_err(&pdev->dev,
++				"Error parsing regulator init data: %d\n", err);
+ 			return err;
++		}
+ 
+-		dev_dbg(rdev_get_dev(info->rdev),
+-			"regulator-%s-probed\n", info->desc.name);
++		err = db8500_regulator_of_probe(pdev, np);
++		if (err)
++			return err;
++	} else {
++		for (i = 0; i < ARRAY_SIZE(dbx500_regulator_info); i++) {
++			err = db8500_regulator_register(pdev,
++							&db8500_init_data[i],
++							i, NULL);
++			if (err)
++				return err;
++		}
+ 	}
 +
-+				// DB8500_REGULATOR_VSMPS1
-+				db8500_vsmps1_reg: db8500_vsmps1 {
-+					regulator-name = "db8500-vsmps1";
-+				};
+ 	err = ux500_regulator_debug_init(pdev,
+ 					 dbx500_regulator_info,
+ 					 ARRAY_SIZE(dbx500_regulator_info));
+@@ -491,10 +547,16 @@ static int __exit db8500_regulator_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id db8500_prcmu_regulator_match[] = {
++        { .compatible = "stericsson,db8500-prcmu-regulator", },
++        {}
++};
 +
-+				// DB8500_REGULATOR_VSMPS2
-+				db8500_vsmps2_reg: db8500_vsmps2 {
-+					regulator-name = "db8500-vsmps2";
-+				};
-+
-+				// DB8500_REGULATOR_VSMPS3
-+				db8500_vsmps3_reg: db8500_vsmps3 {
-+					regulator-name = "db8500-vsmps3";
-+				};
-+
-+				// DB8500_REGULATOR_VRF1
-+				db8500_vrf1_reg: db8500_vrf1 {
-+					regulator-name = "db8500-vrf1";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SVAMMDSP
-+				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
-+					regulator-name = "db8500-sva-mmdsp";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SVAMMDSPRET
-+				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
-+					regulator-name = "db8500-sva-mmdsp-ret";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SVAPIPE
-+				db8500_sva_pipe_reg: db8500_sva_pipe {
-+					regulator-name = "db8500_sva_pipe";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SIAMMDSP
-+				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
-+					regulator-name = "db8500_sia_mmdsp";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SIAMMDSPRET
-+				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
-+					regulator-name = "db8500-sia-mmdsp-ret";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SIAPIPE
-+				db8500_sia_pipe_reg: db8500_sia_pipe {
-+					regulator-name = "db8500-sia-pipe";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_SGA
-+				db8500_sga_reg: db8500_sga {
-+					regulator-name = "db8500-sga";
-+					vin-supply = <&db8500_vape_reg>;
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_B2R2_MCDE
-+				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
-+					regulator-name = "db8500-b2r2-mcde";
-+					vin-supply = <&db8500_vape_reg>;
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_ESRAM12
-+				db8500_esram12_reg: db8500_esram12 {
-+					regulator-name = "db8500-esram12";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_ESRAM12RET
-+				db8500_esram12_ret_reg: db8500_esram12_ret {
-+					regulator-name = "db8500-esram12-ret";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_ESRAM34
-+				db8500_esram34_reg: db8500_esram34 {
-+					regulator-name = "db8500-esram34";
-+				};
-+
-+				// DB8500_REGULATOR_SWITCH_ESRAM34RET
-+				db8500_esram34_ret_reg: db8500_esram34_ret {
-+					regulator-name = "db8500-esram34-ret";
-+				};
-+			};
-+
- 			ab8500 at 5 {
- 				compatible = "stericsson,ab8500";
- 				reg = <5>; /* mailbox 5 is i2c */
+ static struct platform_driver db8500_regulator_driver = {
+ 	.driver = {
+ 		.name = "db8500-prcmu-regulators",
+ 		.owner = THIS_MODULE,
++		.of_match_table = db8500_prcmu_regulator_match,
+ 	},
+ 	.probe = db8500_regulator_probe,
+ 	.remove = __exit_p(db8500_regulator_remove),
 -- 
 1.7.9.5
