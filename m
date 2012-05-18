@@ -1,42 +1,53 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 18 May 2012 21:03:55 +0200
-Subject: [PATCHv3 0/4] coupled cpuidle state support
-In-Reply-To: <4FB62611.7080908@ti.com>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
- <4FB62611.7080908@ti.com>
-Message-ID: <201205182103.56301.rjw@sisk.pl>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 19 May 2012 00:32:44 +0530
+Subject: Why DMA PL330 peripheral transfer does not support burst request?
+In-Reply-To: <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
+References: <CAGe5uTBouMxJqX9yqizFNYkrNhb4jF=5=Y0NGV=tMDH+MqY25w@mail.gmail.com>
+ <CAGe5uTCZXRMDcwHZPGMirwD3gjeOYGuAgHbYD7K3gCgyOEOvYQ@mail.gmail.com>
+ <CABb+yY13K4Y3-Da0v8Af+j-7MKWU3ho9Ho4_qFtwZ0XUgWnYQw@mail.gmail.com>
+ <CAGe5uTByHp6BeN+sKNE8AySph_f9ZK6dEveGdt83+kw47p7Bag@mail.gmail.com>
+ <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
+Message-ID: <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 18, 2012, Santosh Shilimkar wrote:
-> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
-> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
-> > cpus cannot be independently powered down, either due to
-> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
-> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
-> > will corrupt the gic state unless the other cpu runs a work
-> > around).  Each cpu has a power state that it can enter without
-> > coordinating with the other cpu (usually Wait For Interrupt, or
-> > WFI), and one or more "coupled" power states that affect blocks
-> > shared between the cpus (L2 cache, interrupt controller, and
-> > sometimes the whole SoC).  Entering a coupled power state must
-> > be tightly controlled on both cpus.
-> > 
-> 
-> [...]
-> 
-> > This series has been tested and reviewed by Santosh and Kevin
-> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
-> > and Exynos5 patches are in progress.  I think this is ready to
-> > go in.  Lean, are you maintaining a cpuidle tree for linux-next?
-> > If not, I can publish a tree for linux-next, or this could go in
-> > through Arnd's tree.
-> 
-> I haven't seen any response so far on who is lining up this
-> series for 3.5 ? Not sure if it made it to linux-next either.
+On Fri, May 18, 2012 at 7:48 AM, Lee Booi Lim <lee.booi.lim@gmail.com> wrote:
+> Appreciate if you could share with me on what is the weird behaviour
+> seen. Is it because of DMA PL330 hardware bug? We have seen a problem
+> on DMA PL330 that happens in DMA burst mode. If a DMA channel is
+> programmed to wait for a burst from the peripheral (let's takes an
+> example of RX path), somehow transfer error happened in the middle due
+> to the peripheral is not able to trigger a burst as it does not have
+> enough data. In this case, the DMA channel will be killed if the
+> driver / application detects timeout on the transfer. However, the DMA
+> PL330 is not able to resume to normal even with DMAKILL and DMAFLUSHP,
+> that particular DMA channel will remain in waiting for burst mode. If
+> the DMA transfer is restarted with single transfer, the request will
+> be ignored. The waiting for burst state can only be reset if a cold
+> reset to the DMA PL330 controller happen or a burst is actually
+> happen.
+>
+> May I know whether the similar behaviour is observed in 6440? If not,
+> could you please share with me on the behaviour you have observed so
+> that I can try to reproduce it.
+>
+It's been almost 3yrs now, I don't remember exactly. IIRC it was evt0
+of 6440 and the problem was random skips in sine wave playback over
+I2S, while it worked just fine over an evt1. Please note the *IIRC*, I
+have suffered those audio issues for many reasons.
 
-That should be Len, but he's been silent recently.
+Apparently you have changed the micro-code in the driver. So I can't
+say much about what you observe. I might be able to suggest something
+useful if I know what your SoC and code looks like and if the original
+driver didn't work for you.
 
-How urgent is it?
-
-Rafael
+> As you have mentioned that the bottleneck is always at the
+> peripherals, may I know is this a fair assumption? Please correct me
+> if I get you wrong, you meant that the peripheral is always slower in
+> pulling out the data from DMAC or putting data into DMAC, right? You
+> are not saying that the peripheral cannot support burst mode, right?
+>
+I meant peripherals produce/consume data at a rate slower than the dma
+could provide even at single burst.
+Though thinking about it again, I shouldn't have generalized for every
+peripheral-dmac combination. Which is yours?
