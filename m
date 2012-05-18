@@ -1,105 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 18 May 2012 13:18:41 -0500
-Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
-In-Reply-To: <[PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
-References: <[PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
-Message-ID: <1337365122-702-1-git-send-email-nm@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 18 May 2012 21:03:55 +0200
+Subject: [PATCHv3 0/4] coupled cpuidle state support
+In-Reply-To: <4FB62611.7080908@ti.com>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+ <4FB62611.7080908@ti.com>
+Message-ID: <201205182103.56301.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenbiao Wang <wwang@ti.com>
+On Friday, May 18, 2012, Santosh Shilimkar wrote:
+> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
+> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> > cpus cannot be independently powered down, either due to
+> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> > will corrupt the gic state unless the other cpu runs a work
+> > around).  Each cpu has a power state that it can enter without
+> > coordinating with the other cpu (usually Wait For Interrupt, or
+> > WFI), and one or more "coupled" power states that affect blocks
+> > shared between the cpus (L2 cache, interrupt controller, and
+> > sometimes the whole SoC).  Entering a coupled power state must
+> > be tightly controlled on both cpus.
+> > 
+> 
+> [...]
+> 
+> > This series has been tested and reviewed by Santosh and Kevin
+> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
+> > and Exynos5 patches are in progress.  I think this is ready to
+> > go in.  Lean, are you maintaining a cpuidle tree for linux-next?
+> > If not, I can publish a tree for linux-next, or this could go in
+> > through Arnd's tree.
+> 
+> I haven't seen any response so far on who is lining up this
+> series for 3.5 ? Not sure if it made it to linux-next either.
 
-Voltage Processor state machine transition to disable need to
-occur from IDLE state. When we transition OPP in a functioning
-system, the call sequence for an OPP transition is as follows:
-omap_sr_disable
-      -> sr class 3 disable
-           -> vp disable
-           -> sr disable
-forceupdate to voltage/frequency scale depending on which OPP
-we are transitioning to.
+That should be Len, but he's been silent recently.
 
-If we hit a critical timing window where SR had commanded VP
-for a voltage transition and VP is in the middle of operating
-on that command, it needs to go through a few states before
-going to update state(where it actually sends the command to
-VC). Initial view of h/w owners is that the state disable of VP
-is expected to be sampled for the next transition.
+How urgent is it?
 
-Instead, to be on a safer side, we ensure that the valid states
-of the VP state machine is diligently followed by software. This
-can be done by waiting for VP to be in idle  prior to disabling
-VP. Existing prints have been updated to ensure context is
-available on error messages.
-
-As part of this change, increase timeout for VP idle check to
-improbable 500uSec to be certain that system is indeed unable
-to continue before crashing out with error(worst case expectancy
-remains the same 3-100uSec depending on when we caught VP).
-
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-
-[nm at ti.com: port from android]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Wenbiao Wang <wwang@ti.com>
----
-V2: fix commit message - picked up redundant info from get_maintainer.pl
-Apologies on the spam
-
-V1: http://marc.info/?l=linux-omap&m=133736493721977&w=2
-
- arch/arm/mach-omap2/vp.c |   15 +++++++++++++--
- arch/arm/mach-omap2/vp.h |    2 +-
- 2 files changed, 14 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index f95c1ba..925d869 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -262,6 +262,17 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 		return;
- 	}
- 
-+	/*
-+	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
-+	 * Depending on if we catch VP in the middle of an SR operation.
-+	 */
-+	omap_test_timeout((voltdm->read(vp->vstatus)),
-+			  VP_IDLE_TIMEOUT, timeout);
-+
-+	if (timeout >= VP_IDLE_TIMEOUT)
-+		pr_warning("%s: vdd_%s idle timedout before disable\n",
-+			   __func__, voltdm->name);
-+
- 	/* Disable VP */
- 	vpconfig = voltdm->read(vp->vpconfig);
- 	vpconfig &= ~vp->common->vpconfig_vpenable;
-@@ -274,8 +285,8 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 			  VP_IDLE_TIMEOUT, timeout);
- 
- 	if (timeout >= VP_IDLE_TIMEOUT)
--		pr_warning("%s: vdd_%s idle timedout\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: vdd_%s idle timedout after disable\n",
-+			   __func__, voltdm->name);
- 
- 	vp->enabled = false;
- 
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 7c155d2..0abf895 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -31,7 +31,7 @@ struct voltagedomain;
- #define OMAP4_VP_VDD_MPU_ID 2
- 
- /* XXX document */
--#define VP_IDLE_TIMEOUT		200
-+#define VP_IDLE_TIMEOUT		500
- #define VP_TRANXDONE_TIMEOUT	300
- 
- /**
--- 
-1.7.9.5
+Rafael
