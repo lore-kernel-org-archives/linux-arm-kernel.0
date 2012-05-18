@@ -1,59 +1,45 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 18 May 2012 19:47:59 +0800
-Subject: [PATCH] ARM: OMAP2+: fix gpmc request_irq
-In-Reply-To: <CAMQu2gwzZ7dGW9xMNvTXqB8k3cfJuVF+a2cCVXLn4q92+W3aGQ@mail.gmail.com>
-References: <1337316183-1203-1-git-send-email-ming.lei@canonical.com>
- <CAMQu2gxQVFRk7FvmOzOkW8LYFYg5f4B_rJ0bsU4yJwN4i6X8_Q@mail.gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E98DCBD@DBDE01.ent.ti.com>
- <CAMQu2gzhG4fm-B8mhCkrUjMEkkKR4yDZokvnkChLux8voLUnbw@mail.gmail.com>
- <CACVXFVMm5iasFAaBcFhfZskHFwMXEoO2_riP1renR8a0tP_PNg@mail.gmail.com>
- <CAMQu2gz9SGDwE3p1oREb8h+1RUpd1h6yOEJCRJ52PCSY1w0=yQ@mail.gmail.com>
- <CACVXFVOA=EDJR6HqBRRegr13nTnNdjGSvQUwek2jbu41C5euWA@mail.gmail.com>
- <CAMQu2gwzZ7dGW9xMNvTXqB8k3cfJuVF+a2cCVXLn4q92+W3aGQ@mail.gmail.com>
-Message-ID: <CACVXFVN_0mkVEJkC8iQLF87UVNRkxSUB3+6DeBBHB5dkt5ddrA@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 18 May 2012 14:54:23 +0300
+Subject: [PATCH v7 3/3] MTD: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <20120517125544.GJ9571@n2100.arm.linux.org.uk>
+References: <1337093256-19117-1-git-send-email-josh.wu@atmel.com>
+ <1337093256-19117-4-git-send-email-josh.wu@atmel.com>
+ <1337160353.24809.26.camel@sauron.fi.intel.com>
+ <20403.29677.517067.528042@ipc1.ka-ro>
+ <1337161217.24809.38.camel@sauron.fi.intel.com>
+ <4FB49C60.5030002@atmel.com> <1337255011.2564.2.camel@koala>
+ <20120517125544.GJ9571@n2100.arm.linux.org.uk>
+Message-ID: <1337342063.2483.37.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2012-05-17 at 13:55 +0100, Russell King - ARM Linux wrote:
+> > You can just remove the backslashes. I think your lines splitting is
+> > fine otherwise.
+> 
+> It's also preferred _not_ to wrap error messages as that makes them
+> harder to grep for.  Linus has mentioned this several times on LKML
+> and has corrected error messages that he encounters that he can't
+> find via grep.
 
-On Fri, May 18, 2012 at 6:13 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> Generally IRQF_SHARED means, the interrupt line is only one but
-> multiple devices can generate the interrupts. If you connect
-> different devices on GMPC using chip selects like Ethernet controller,
-> Nand, NOR contoller, all of they can generate events which can be
-> reported by the GPMC. That's the reason I shared the line
-> is shared.
+OK, thanks for the info.
 
-IMO, it depends on if the event handlers of other chips(ethernet, nand, nor..)
-share the same irq number(GPMC_IRQ). If so, it should be IRQF_SHARED.
-If they are handled in its own irq number(it may convert to irq dispatching),
-that shouldn't be IRQF_SHARED.
+One could argue that it probably only makes sense to avoid splitting up
+to the first %d or another printk placeholder. Beyond the placeholder
+grepping is not more difficult.
 
-On Fri, May 18, 2012 at 6:51 PM, Mohammed, Afzal <afzal@ti.com> wrote:
-> Hi Ming,
->
-> Requesting irq is called by driver of IP, while whether it is shared or
-> not depends on SoC where IP lives, so ideally it seems platform should
-> inform the driver whether it is shared & driver should do what platform
-> tells. Or else to be safe, it should be made shared always ?
+Well, anyway, I would not like to force people to split or not split
+strings. I'd also say that it is more important to follow the style of
+the driver/subsystem and be consistent.
 
-Shared or not(IRQF_SHARED) may be determined by hardware and
-software handling.
-
-If the same interrupt line is shared by several peripherals and all interrupt
-handlers are requested to same interrupt number for handling IRQs from
-these peripherals, it should be IRQF_SHARED.
-
->
-> This may not make much sense now w.r.t gpmc, but would be applicable
-> once gpmc becomes a driver (undergoing conversion), but may not be that
-> important as there are no SoCs presently sharing gpmc interrupt (afaik)
-
-Looks the fix isn't needed if so.
-
-Anyway, thanks your guys for exposing much info about GPMC irq handling.
-
-Thanks,
---
-Ming Lei
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120518/3d47ab6c/attachment.sig>
