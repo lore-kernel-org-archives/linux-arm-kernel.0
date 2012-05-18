@@ -1,42 +1,62 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 18 May 2012 22:42:52 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FB55242.2080501@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <4FB3D294.4020505@wwwdotorg.org>
- <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
- <201205161942.20296.arnd@arndb.de>
- <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
- <4FB55242.2080501@wwwdotorg.org>
-Message-ID: <CAJe_ZherKototBYoc3d47JJbYjYxAMJbQ5RmjupoMyqNjdQYEQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 18 May 2012 12:26:19 -0500
+Subject: [PATCH] ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after
+ bad one
+Message-ID: <1337361979-19052-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2012 01:02, Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> Now, the DMA node for an on-SoC DMAC would be in soc.dtsi. Typically,
-> the DMAC is connected to many on-SoC devices, and hence soc.dtsi would
-> need to specify the routing information for all those devices to avoid
-> duplicating it in every board.dts. Now, if you have some DMA requests
-> that go off-SoC, the board.dts file might want to add to the routing
-> table to indicate what clients connect to those DMA requests. However,
-> there's no way in the device tree compiler right now to add to a
-> property; you can only completely replace it. That would entail
-> duplicating the entire routing information from soc.dtsi into each
-> board.dts that wanted to add to it - a bad situation. Splitting the
-> routing information into chunks in the client nodes avoids this issue
-> entirely.
->
- As already noted by Russell, the dma setup is different than irq or
-gpio which deliberately lend to off-SoC attachments. Without fpga'ing,
-I find it hard to imagine request-signals going off-SoC.
+Commit 9fa2df6b90786301b175e264f5fa9846aba81a65
+(ARM: OMAP2+: OPP: allow OPP enumeration to continue if device is not present)
+makes the logic:
+for (i = 0; i < opp_def_size; i++) {
+	<snip>
+	if (!oh || !oh->od) {
+		<snip>
+		continue;
+	}
+<snip>
+opp_def++;
+}
 
-I only see the issue of different boards sporting a different sub-sets
-of clients i.e, a map entry may or may exist for a board but it would
-be same for two boards that have it.
- Maybe we could somehow separate out the chan-map and private-data
-into board.dts ?
-Even if it has to stay in soc.dts, we still have the benefit of having
-dmac agnostic client nodes.
+In short, the moment we hit a "Bad OPP", we end up looping the list
+comparing against the bad opp definition pointer for the rest of the
+iteration count. Instead, increment opp_def in the for loop itself
+and allow continue to be used in code without much thought so that
+we check the next set of OPP definition pointers :)
 
-cheers!
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Steve Sakoman <steve@sakoman.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+
+ arch/arm/mach-omap2/opp.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+index de6d464..d8f6dbf 100644
+--- a/arch/arm/mach-omap2/opp.c
++++ b/arch/arm/mach-omap2/opp.c
+@@ -53,7 +53,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 	omap_table_init = 1;
+ 
+ 	/* Lets now register with OPP library */
+-	for (i = 0; i < opp_def_size; i++) {
++	for (i = 0; i < opp_def_size; i++, opp_def++) {
+ 		struct omap_hwmod *oh;
+ 		struct device *dev;
+ 
+@@ -86,7 +86,6 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 					__func__, opp_def->freq,
+ 					opp_def->hwmod_name, i, r);
+ 		}
+-		opp_def++;
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.9.5
