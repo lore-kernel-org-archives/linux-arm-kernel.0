@@ -1,33 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 May 2012 10:59:22 +0200
-Subject: Booting mx31 on linux-next-20120517
-In-Reply-To: <CAOMZO5BUBAcx9ESLau9b4osE3jQNnh1CXW7FgkmbQ1aS57bOCg@mail.gmail.com>
-References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
- <CAOMZO5BUBAcx9ESLau9b4osE3jQNnh1CXW7FgkmbQ1aS57bOCg@mail.gmail.com>
-Message-ID: <20120518085922.GQ30400@pengutronix.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 18 May 2012 11:09:54 +0200
+Subject: [PATCH V2] mfd: anatop: make register accessor more flexible and
+ rename meaningfully
+In-Reply-To: <1336871882-6796-1-git-send-email-richard.zhao@freescale.com>
+References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
+ <1336871882-6796-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120518090954.GC12015@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 01:07:07AM -0300, Fabio Estevam wrote:
-> On Fri, May 18, 2012 at 12:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi Sascha,
-> >
-> > Are you able to boot any mx31 system on linux-next-20120517?
-> >
-> > Just wanted to check with you first before start debugging this issue.
-> 
-> Adding earlyprintk shows me the following:
+Hi Richard,
 
-Looks familiar. Check the pinctrl support. The i.MX UART driver (and
-also the FEC driver) do a devm_pinctrl_get_select_default which does
-not seem to be complete. Either the pinctrl dummy providers did not make
-it to -next yet or they are simply not activated.
+On Sun, May 13, 2012 at 09:18:02AM +0800, Richard Zhao wrote:
+>  - rename to anatop_read_reg and anatop_write_reg
+>  - anatop_read_reg directly return reg value
+>  - anatop_write_reg write reg with mask
+Patch applied, thanks.
 
-
-Sascha
+Cheers,
+Samuel.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Intel Open Source Technology Centre
+http://oss.intel.com/
