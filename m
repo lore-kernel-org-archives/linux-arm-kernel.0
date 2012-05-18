@@ -1,50 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 May 2012 19:31:46 -0400
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <201205151423.31044.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <EE71107DF0D1F24FA2D95041E64AB9E801A56A998C6C@IL-MB01.marvell.com>
- <20120515131935.GI6820@lunn.ch> <201205151423.31044.arnd@arndb.de>
-Message-ID: <20120517233146.GG16338@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 May 2012 09:01:42 +0800
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <4FB583CF.2080801@grid-net.com>
+References: <4FB583CF.2080801@grid-net.com>
+Message-ID: <20120518010138.GA5427@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2012 at 02:23:30PM +0000, Arnd Bergmann wrote:
-> On Tuesday 15 May 2012, Andrew Lunn wrote:
-> > > > I would strongly advise on using "mrvl,mv78230" as the binding name. It isn't
-> > > > as if you can't have multiple names associated with one binding.
-> > > > 
-> > > > Also, given how close they are, do we really need separate machine support
-> > > > files?
-> > > The problem with 78230 is that it's only one flavor of the AXP
-> > > family which includes 78230, 78260 and 78460 resulting different
-> > > core count, L2 size, DRAM bandwidth, etc.
-> > 
-> > Can you explain the naming scheme and mapping to device numbers?
-> > Please don't limit it to these new devices, but also include the
-> > existing supported devices. From that we might be able to figure out
-> > and appropriate naming scheme.
+On Thu, May 17, 2012 at 04:03:43PM -0700, Subodh Nijsure wrote:
 > 
-> The names and numbers are already extremely confusing in the code we have.
-> Maybe we can use the addition of the new code as an excuse to clean up
-> what we have ;-)
+> Should one be able to run top of the linux-next on MX28 EVK hardware
+> with DT support enabled?
 
-Agreed.
+Yes, I'm running it well with next-20120516.
 
-> I agree that "armada" is a rather bad choice, because chips under that name
-> include both the pxa/mmp family and the orion/kirkwood/mv78xx0/dove family
-> which AFAICT don't have much in common at all besides the CPU cores.
+> I have attached boot log I see when I try to do that.
 > 
-> One option would be to move all DT-enabled board files under plat-orion
-> once they are fully done, and leave just the non-DT board files in the
-> individual directories until they have all been converted. We can start
-> with the platform code that's being discussed here and move over the
-> kirkwood and orion5x board-dt.c files once they don't depend on anything
-> else in those directories any more.
+One thing from the boot log worth checking is 
 
-I wish we had thought of this a few months ago... ;-)
+  [    0.820000] stmp_reset_block(f5010000): module reset timeout
 
-thx,
+My wild guess is stmp_reset_block call on mmc0 failed on your end.
 
-Jason.
+> Further if one enables, CONFIG_MTD_NAND_GPMI_NAND=y
+> CONFIG_MTD_NAND_PLATFORM=y code in
+> drivers/mtd/nand/gpmi-nand/gpmi-nand.c doesn't compile because of
+> this code:
+> 
+>         pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>         if (IS_ERR(pinctrl)) {
+>                 ret = PTR_ERR(pinctrl);
+>                 goto exit_pin;
+>         }
+> 
+Thanks for reporting it.  It's my bad.  I thought I had mxs_defconfig
+build testing cover the change.  Actually, the gpmi is not enabled in
+mxs_defconfig yet.  I will send the following fix to Arnd and Olof soon.
+
+@@ -486,7 +486,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+        if (ret)
+                goto exit_dma_channels;
+
+-       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++       pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
+        if (IS_ERR(pinctrl)) {
+                ret = PTR_ERR(pinctrl);
+                goto exit_pin;
+
+-- 
+Regards,
+Shawn
