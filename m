@@ -1,22 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 May 2012 20:38:26 +0000
-Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
- when DT is enabled
-In-Reply-To: <4FB64266.6040301@linaro.org>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <201205181112.17254.arnd@arndb.de> <4FB64266.6040301@linaro.org>
-Message-ID: <201205182038.26512.arnd@arndb.de>
+Date: Fri, 18 May 2012 20:44:26 +0000
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120518191832.GC24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+Message-ID: <201205182044.26409.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 May 2012, Lee Jones wrote:
-> This is nice. Can I leave it for a now and submit this with the rest of 
-> my clean-ups? I have a nice TODO list now that this would fit nicely 
-> into. The way I see it, as long as this is submitted before we add a 
-> mop500.dts then it's not going to cause anyone issues.
+On Friday 18 May 2012, Jason Cooper wrote:
+> > 
+> > In this case, we have wildly different names referring to the same chip 
+> > family, and "orion" is far from hinting that it also constitute the 
+> > support for Kirkwood, Dove or (some not all) Armadas, unless you are 
+> > familiar with some legacy Marvell products.  This is why in this case I 
+> > think that a directory name change might be appropriate, especially if 
+> > we're going to cause churn by moving things around already.
+> > 
+> > I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
+> > mvebu_*.  Unless someone has another logical identifier to suggest which 
+> > would capture all that family of SOCs that came out of EBU in Marvell of 
+> > course.
+> 
+> I prefer mvebu_* ...  nice and concise.
+> 
 
-Yes, fine with me. I was thinking you'd fold it into the patch we
-are commenting on, but if that's problematic, just add it to the
-end of your queue.
+On a related topic, any preferences on where we will put all the board
+files? I think it would be helpful to put them into a separate place from
+the main platform files, so e.g. have all *-setup.c files go to
+arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
+
+The reasons I think this would help are that the directory is getting a
+bit crowded when we move five or more of the current platforms in there,
+and that I hope we can start ignoring them for most practical purposes
+as some point in the future when all boards have been made to work with
+DT, and at an even later point we can just delete that directory.
+The main disadvantage that this approach would bring is that it's not
+consistent with what any of the other platforms do.
 
 	Arnd
