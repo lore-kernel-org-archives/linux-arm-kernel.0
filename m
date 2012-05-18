@@ -1,27 +1,35 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 18 May 2012 12:13:54 +0530
-Subject: [PATCH] gpiolib: Add of_get_gpio_chip_by_phandle() helper
-In-Reply-To: <CACxGe6s=TNuYd+L-5DyvUZZbZ-h4qXOouxWfSg8Wr2+kG5tLOw@mail.gmail.com>
-References: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
- <4FA15267.4090306@wwwdotorg.org>
- <CAOh2x=nrNDrtNjOroWOm6HkYkc3f2qfaWrtN97d1M3rWv1qmsQ@mail.gmail.com>
- <CACRpkda2jBmjPCgt=5rfqdCQH9Lipq4aejeQq-Qbw0_Nk6o-yg@mail.gmail.com>
- <CAOh2x=nizQYXWFu3deQPXr93Nqv77Pnj5DNhYZw_vYyY2go3vA@mail.gmail.com>
- <CACRpkdZGAQpt1bqhTFmxcC7OKb4uds6ru-aNs-aT+M+H4TKuJg@mail.gmail.com>
- <20120518000800.B9F333E062C@localhost> <4FB5C56E.8070705@st.com>
- <CACxGe6s=TNuYd+L-5DyvUZZbZ-h4qXOouxWfSg8Wr2+kG5tLOw@mail.gmail.com>
-Message-ID: <4FB5EFAA.1060900@st.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 18 May 2012 12:33:16 +0530
+Subject: [PATCH] ARM: OMAP2+: fix gpmc request_irq
+In-Reply-To: <1337316183-1203-1-git-send-email-ming.lei@canonical.com>
+References: <1337316183-1203-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <CAMQu2gxQVFRk7FvmOzOkW8LYFYg5f4B_rJ0bsU4yJwN4i6X8_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/18/2012 11:16 AM, Grant Likely wrote:
-> Ugh; that seems a little messy.  With dynamic allocation of gpio
-> numbers, there is no guarantee that all the gpio_chips will have
-> contiguous gpio_bases.  It would require internal knowledge of each
-> gpio controller's binding.  How do you intend to use that API?
++ Afzal who has been doing quite a bit of GMPC work recently.
 
-I need gpio_chip base in my pinctrl driver to convert from gpio number
-to pin number. That's it. Please suggest how should i fix this up. :)
+On Fri, May 18, 2012 at 10:13 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> The IRQ52 on OMAP2+ is not a shared interrupt line. If IRQF_SHARED
+> is passed to request_irq and dev_id is set as NULL, request_irq will
+> return -EINVAL.
+>
+GPMC IRQ line can shared between the multiple devices you
+connect on it.
 
--- 
-viresh
+> This patch just removes the flag of IRQF_SHARED to make the irq
+> registration successful.
+>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+> ?arch/arm/mach-omap2/gpmc.c | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+Are you sure it fails ?
+I just tried booting OMAP4 with 3.4-rc4 and don't see the irq
+failure error message. What I am missing ?
+
+Regards
+Santosh
