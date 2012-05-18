@@ -1,76 +1,130 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 18 May 2012 10:18:37 +0530
-Subject: Clock register in early init
-In-Reply-To: <20120517062131.GA9305@gmail.com>
-References: <1337227884.2066.9.camel@pgaikwad-dt2>
- <20120517062131.GA9305@gmail.com>
-Message-ID: <1337316517.22560.19.camel@pgaikwad-dt2>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 18 May 2012 10:18:29 +0530
+Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
+In-Reply-To: <87mx56s6nz.fsf@ti.com>
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+ <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
+ <87y5oqtpnw.fsf@ti.com> <20120517231251.GH17852@atomide.com>
+ <87mx56s6nz.fsf@ti.com>
+Message-ID: <CAC83ZvKgHz00rP7JMkV5OP1_0w3S-ZDmGLR5CJOSgFpv78--+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the reply Mike!!
+On Fri, May 18, 2012 at 5:26 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tony Lindgren <tony@atomide.com> writes:
+>
+>> * Kevin Hilman <khilman@ti.com> [120517 15:29]:
+>>>
+>>> I just noticed that this patch has caused some strange problems, notably
+>>> with the GPIO IRQ used by smsc911x NIC (Overo, Zoom3, 2430SDP, etc. etc.)
+>>>
+>>> The patch itself is OK, but it has exposed a bug in other parts of the
+>>> context restore path that was previously hidden.
+>>>
+>>> We seem to have been finding lots of GPIO bugs by just testing the
+>>> network chips with GPIO IRQs. ?Can I suggest that a platform with a GPIO
+>>> IRQ NIC be added to the test platforms you're using?
+>>
+>> Yes considering the breakage it's pretty obvious the original series was
+>> never properly tested on omaps.
+>
+> Agreed.
+>
+>> Regarding this fix, using gpio/next + this patch fixes nfsroot for 2430sdp,
+>> and gets zoom3 nfsroot booting going a bit better.
+>>
+>> However, at least on zoom3 nfsroot now takes several _minutes_ to get to
+>> login: with gpio/next + this patch. The system is totally unusable.
+>>
+>> It seems that the GPIO interrupt wake-up events are not properly working
+>> now?
+>>
+>> Reverting the "gpio/omap: fix missing check in *_runtime_suspend()"
+>> patch seems to fix the issue.
+>
+> Argh, then $SUBJECT patch here has caused brokeness in multiple ways.
+> It managed to break both runtime suspend and runtime resume at the same
+> time. :(
+>
+> The change added by this patch to runtime_suspend effectively disables
+> the fix I did in 68942edb09 (gpio/omap: fix wakeups on level-triggered GPIOs)
+> causing the sluggish network problems to reappear, since that GPIO IRQ
+> is no longer causing wakeups.
+>
+> Simple fix is below, which just moves the check added in $SUBJECT patch
+> below the workaround for the edge/level fix. ?Can you confirm it works
+> on Zoom3 (applies on gpio/next + my previous fix.)
+>
+> I didn't notice the same problem on Overo, but I guess it's because
+> Overo had some enabled non-wakeup GPIOs in the same bank, so it didn't
+> bypass the level-triggered IRQ fix.
+>
+>>> Subject: [PATCH] gpio/omap: fix broken context restore for non-OFF mode
+>>> ?transitions
+>>>
+>>> The fix in commit 1b12870 (gpio/omap: fix missing check in
+>>> *_runtime_suspend()) exposed another bug in the context restore path.
+>>
+>> Kevin, looks like commit 1b12870 does not exist in gpio/next?
+>
+> Will update the changelog.
+>
+> Because of this new problem, I have to add the patch below too, so
+> I'll get them both queued up for Grant
+>
+> In the mean time, they're availble in my for_3.5/fixes/gpio-2 branch.
+>
+> Kevin
+>
+> [1]
+> From afb4f0836dc3c432aa999fc98a80bf75e1481e04 Mon Sep 17 00:00:00 2001
+> From: Kevin Hilman <khilman@ti.com>
+> Date: Thu, 17 May 2012 16:42:16 -0700
+> Subject: [PATCH] gpio/omap: (re)fix wakeups on level-triggered GPIOs
+>
+> commit 1b1287032 (gpio/omap: fix missing check in *_runtime_suspend())
+> broke wakeups on level-triggered GPIOs by adding the enabled
+> non-wakeup GPIO check before the workaround that enables wakeups
+> on level-triggered IRQs, effectively disabling that workaround.
+>
+> To fix, move the enabled non-wakeup GPIO check after the
+> level-triggered IRQ workaround.
+>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-On Thu, 2012-05-17 at 11:51 +0530, Mike Turquette wrote:
-> On 20120517-09:41, Prashant Gaikwad wrote:
-> > Hi Mike,
-> > 
-> > While porting Tegra to common clock framework I observed that if we try
-> > to allocate struct clk dynamically in early init, kernel panics since
-> > memory is not initialized yet.
-> > 
-> > In your clk-next for omap you are registering clocks in early init and
-> > clk_register allocates struct clk dynamically.
-> > 
-> > So, am I missing something here?
-> > 
-> 
-> You have the same problem as my platform (OMAP).  Please check out
-> include/linux/clk-private.h.  That is a really nasty terrible hack that
-> exists for statically initializing all data.  It exposes the definition
-> of struct clk (which is bad and violates the design philosophy that
-> struct clk should be an opaque cookie).
-> 
-> Please review Documentat/clk.txt to understand the rules around
-> clk-private.h.  Namely that you MUST separate your data from your clock
-> function definitions (the clk_ops should never know the definition of
-> struct clk).
-> 
+Acked-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-Yes, currently I am also doing same for Tegra and it works well. clk_ops
-and clk initialization data are in separate files. clk_ops does not
-include clk-private.h so it does not know the definition of struct clk.
-
-Will send patches for shortly.
-
-> Finally, I really want to kill off clk-private.h.  Currently OMAP does
-> clock registration during early init and that is why this crap exists.
-> However we are going to move our clock initialization to be initcall
-> based at some point in the future.  No other platform (until now) was
-> using these macros in clk-private.h, so I had planned on removing them
-> after OMAP migrated.
-> 
-> What are the plans for Tegra?  I really don't want to have to support
-> this stuff.  Can you migrate your clock initialization to be initcall
-> based at some point in the future?
-> 
-
-We had initcall based implementation in old kernel versions. It was
-moved to early init since some clocks were required for delay
-calibrations. It may be possible to migrate it be initcall based in
-future.
-
-> Regards,
-> Mike
-> 
-> p.s: best to have these kinds of discussions on the list, out in the
-> open.  If you want to continue our discussion can you loop in LAKML?
-> 
-
-Added LAKML in loop.
-
-> > Same is observed if we try to allocate parent list dynamically.
-> > 
-> > Thanks & regards,
-> > Prashant G
-
-Prashant G
+> ---
+> ?drivers/gpio/gpio-omap.c | ? ?6 +++---
+> ?1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index b570a6a..c4ed172 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1157,9 +1157,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+>
+> ? ? ? ?spin_lock_irqsave(&bank->lock, flags);
+>
+> - ? ? ? if (!bank->enabled_non_wakeup_gpios)
+> - ? ? ? ? ? ? ? goto update_gpio_context_count;
+> -
+> ? ? ? ?/*
+> ? ? ? ? * Only edges can generate a wakeup event to the PRCM.
+> ? ? ? ? *
+> @@ -1180,6 +1177,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+> ? ? ? ? ? ? ? ?__raw_writel(wake_hi | bank->context.risingdetect,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->risingdetect);
+>
+> + ? ? ? if (!bank->enabled_non_wakeup_gpios)
+> + ? ? ? ? ? ? ? goto update_gpio_context_count;
+> +
+> ? ? ? ?if (bank->power_mode != OFF_MODE) {
+> ? ? ? ? ? ? ? ?bank->power_mode = 0;
+> ? ? ? ? ? ? ? ?goto update_gpio_context_count;
+> --
+> 1.7.9.2
+>
