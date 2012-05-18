@@ -1,53 +1,69 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 19 May 2012 00:32:44 +0530
-Subject: Why DMA PL330 peripheral transfer does not support burst request?
-In-Reply-To: <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
-References: <CAGe5uTBouMxJqX9yqizFNYkrNhb4jF=5=Y0NGV=tMDH+MqY25w@mail.gmail.com>
- <CAGe5uTCZXRMDcwHZPGMirwD3gjeOYGuAgHbYD7K3gCgyOEOvYQ@mail.gmail.com>
- <CABb+yY13K4Y3-Da0v8Af+j-7MKWU3ho9Ho4_qFtwZ0XUgWnYQw@mail.gmail.com>
- <CAGe5uTByHp6BeN+sKNE8AySph_f9ZK6dEveGdt83+kw47p7Bag@mail.gmail.com>
- <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
-Message-ID: <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 May 2012 15:18:32 -0400
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201205161528.27318.arnd@arndb.de>
+ <alpine.LFD.2.02.1205161246080.1640@xanadu.home>
+ <201205161946.34179.arnd@arndb.de>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+Message-ID: <20120518191832.GC24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 7:48 AM, Lee Booi Lim <lee.booi.lim@gmail.com> wrote:
-> Appreciate if you could share with me on what is the weird behaviour
-> seen. Is it because of DMA PL330 hardware bug? We have seen a problem
-> on DMA PL330 that happens in DMA burst mode. If a DMA channel is
-> programmed to wait for a burst from the peripheral (let's takes an
-> example of RX path), somehow transfer error happened in the middle due
-> to the peripheral is not able to trigger a burst as it does not have
-> enough data. In this case, the DMA channel will be killed if the
-> driver / application detects timeout on the transfer. However, the DMA
-> PL330 is not able to resume to normal even with DMAKILL and DMAFLUSHP,
-> that particular DMA channel will remain in waiting for burst mode. If
-> the DMA transfer is restarted with single transfer, the request will
-> be ignored. The waiting for burst state can only be reset if a cold
-> reset to the DMA PL330 controller happen or a burst is actually
-> happen.
->
-> May I know whether the similar behaviour is observed in 6440? If not,
-> could you please share with me on the behaviour you have observed so
-> that I can try to reproduce it.
->
-It's been almost 3yrs now, I don't remember exactly. IIRC it was evt0
-of 6440 and the problem was random skips in sine wave playback over
-I2S, while it worked just fine over an evt1. Please note the *IIRC*, I
-have suffered those audio issues for many reasons.
+On Wed, May 16, 2012 at 04:20:36PM -0400, Nicolas Pitre wrote:
+> On Wed, 16 May 2012, Arnd Bergmann wrote:
+> 
+> > On Wednesday 16 May 2012, Nicolas Pitre wrote:
+> > > > 
+> > > > AFAICT, those are shared between most of those socs, and I would not want
+> > > > to change the code in them to the new name.
+> > > 
+> > > Why not?  Module aliases can be used if that is a concern.
+> > > 
+> > > > If we change the directory
+> > > > name to something completely different, it no longer matches the driver
+> > > > names.
+> > > 
+> > > I wouldn't consider this as a major concern.  For example, the ethernet 
+> > > driver that all those SOCs use is not called "orion".
+> > 
+> > It's not a big thing, I just feel that leaving the drivers alone makes
+> > it a bit easier to port patches between kernel versions.
+> 
+> Sure.  My point is that we can rename the SOC directory and leave 
+> drivers alone if we wish to minimize churn.  Drivers can be renamed at a 
+> later time if that is seen as useful.
+> 
+> > Another argument
+> > for orion is that it's nicer to read as a function name prefix than
+> > mrvl_ebu_* as you suggested. The main counterargument to keeping orion_
+> > as I understand it is that it's actually only the name for the oldest
+> > members of this family, right? This is a good point, but we also have
+> > a lot of other cases in the kernel where code is named after the first
+> > thing that used it, e.g. arch/x86 was called arch/i386 for a long time
+> > and we still have tons of references to that.
+> 
+> Indeed.  "sa1100" is another example of that and I didn't want to rename 
+> it to sa11x0 at the time.
+> 
+> But in the sa1100 or i386 cases, the alternatives are close enough not 
+> to cause too much confusion.
+> 
+> In this case, we have wildly different names referring to the same chip 
+> family, and "orion" is far from hinting that it also constitute the 
+> support for Kirkwood, Dove or (some not all) Armadas, unless you are 
+> familiar with some legacy Marvell products.  This is why in this case I 
+> think that a directory name change might be appropriate, _especially_ if 
+> we're going to cause churn by moving things around already.
+> 
+> I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
+> mvebu_*.  Unless someone has another logical identifier to suggest which 
+> would capture all that family of SOCs that came out of EBU in Marvell of 
+> course.
 
-Apparently you have changed the micro-code in the driver. So I can't
-say much about what you observe. I might be able to suggest something
-useful if I know what your SoC and code looks like and if the original
-driver didn't work for you.
+I prefer mvebu_* ...  nice and concise.
 
-> As you have mentioned that the bottleneck is always at the
-> peripherals, may I know is this a fair assumption? Please correct me
-> if I get you wrong, you meant that the peripheral is always slower in
-> pulling out the data from DMAC or putting data into DMAC, right? You
-> are not saying that the peripheral cannot support burst mode, right?
->
-I meant peripherals produce/consume data at a rate slower than the dma
-could provide even at single burst.
-Though thinking about it again, I shouldn't have generalized for every
-peripheral-dmac combination. Which is yours?
+thx,
+
+Jason.
