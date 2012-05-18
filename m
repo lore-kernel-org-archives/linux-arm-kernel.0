@@ -1,24 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 May 2012 18:57:48 -0500
-Subject: [PATCH v2 0/9] support dt for mmp2
-In-Reply-To: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <4FB5907C.9080105@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 May 2012 09:58:07 +0800
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <CAOMZO5D679an+-iaUBXZy+PmHB2tAHhYHUAFWY+4rxSOYiBkyw@mail.gmail.com>
+References: <4FB583CF.2080801@grid-net.com>
+ <20120518010138.GA5427@S2101-09.ap.freescale.net>
+ <CAOMZO5D679an+-iaUBXZy+PmHB2tAHhYHUAFWY+4rxSOYiBkyw@mail.gmail.com>
+Message-ID: <CAAQ0ZWRB1=pFqtL_2y-D-f4_VM21o9U1G9F3PMwNgM4ewKmkWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2012 07:30 AM, Haojian Zhuang wrote:
-> v2:
-> 1. remove MACH_MMP_LEGACY & MACH_MMP2_LEGACY
-> 2. use irq.c to replace irq-pxa168.c & irq-mmp2.c
-> 3. Avoid to use CONFIG_OF in entry-macro.S
-> 
+On 18 May 2012 09:50, Fabio Estevam <festevam@gmail.com> wrote:
+> Could you please confirm next-20120517 also boots?
+>
+> I am not getting nothing on console.
+>
+> This is my U-boot setup:
+>
+> run netargs; tftpboot 42000000 uImage; tftpboot 42800000
+> imx28-evk.dtb; bootm 0x4000000 - 0x42000000
+>
+The addresses in bootm mismatch the ones in tftpboot?
 
-I think you should combine all the DT board files in this series into 1
-DT board file. The only diff I can see between the files is auxdata and
-board strings. You don't have any platform_data for the auxdata, so I'm
-guessing you are using it for clkdev lookup. You can instead simply add
-addition clkdev lookup names for the DT device names. Any other reason
-for needing the old device name is pretty much wrong.
-
-Rob
+Regards,
+Shawn
