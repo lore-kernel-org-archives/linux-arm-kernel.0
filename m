@@ -1,28 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 May 2012 22:35:57 -0600
-Subject: [PATCH] gpiolib: Add of_get_gpio_chip_by_phandle() helper
-In-Reply-To: <20120518000800.B9F333E062C@localhost>
-References: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
- <4FA15267.4090306@wwwdotorg.org>
- <CAOh2x=nrNDrtNjOroWOm6HkYkc3f2qfaWrtN97d1M3rWv1qmsQ@mail.gmail.com>
- <CACRpkda2jBmjPCgt=5rfqdCQH9Lipq4aejeQq-Qbw0_Nk6o-yg@mail.gmail.com>
- <CAOh2x=nizQYXWFu3deQPXr93Nqv77Pnj5DNhYZw_vYyY2go3vA@mail.gmail.com>
- <CACRpkdZGAQpt1bqhTFmxcC7OKb4uds6ru-aNs-aT+M+H4TKuJg@mail.gmail.com>
- <20120518000800.B9F333E062C@localhost>
-Message-ID: <4FB5D1AD.3060304@wwwdotorg.org>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 18 May 2012 12:43:03 +0800
+Subject: [PATCH] ARM: OMAP2+: fix gpmc request_irq
+Message-ID: <1337316183-1203-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2012 06:08 PM, Grant Likely wrote:
-...
-> however, there is a bigger issue now.  I'm changing the xlate
-> mechanism to allow multiple gpio_chips to refer to the same device
-> tree node which will break the assumption that this patch uses.  The
-> reason for this is to make it easier to support banked gpio
-> controllers where a separate gpio_chip is used for each bank, but it
-> is still described by a single device tree node.  To properly resolve
-> this will require a full gpio specifier reference instead of just the
-> phandle.  Will that work for your use-case?
+The IRQ52 on OMAP2+ is not a shared interrupt line. If IRQF_SHARED
+is passed to request_irq and dev_id is set as NULL, request_irq will
+return -EINVAL.
 
-Is a full GPIO specifier necessary? Perhaps a phandle plus bank index
-would suffice?
+This patch just removes the flag of IRQF_SHARED to make the irq
+registration successful.
+
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ arch/arm/mach-omap2/gpmc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 2286410..e45d31b 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -769,7 +769,7 @@ static int __init gpmc_init(void)
+ 		irq++;
+ 	}
+ 
+-	ret = request_irq(gpmc_irq, gpmc_handle_irq, IRQF_SHARED, "gpmc", NULL);
++	ret = request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
+ 	if (ret)
+ 		pr_err("gpmc: irq-%d could not claim: err %d\n",
+ 						gpmc_irq, ret);
+-- 
+1.7.9.5
