@@ -1,86 +1,169 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Fri, 18 May 2012 01:41:15 -0700
-Subject: common clock framework
-In-Reply-To: <53612FE6B944314AAADB181E45A45B6413D3FF9F37@sc-vexch3.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
- <20120504082110.GB16535@pengutronix.de>
- <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
- <CAG9bXv=T7v_MBUOmCsp4n0SNmYY_DOEkhQXAp0rTGpdi6KkXNA@mail.gmail.com>
- <20120506234958.GA14559@gmail.com>
- <AAD1C6EB06EE3649B35B7E026785068D1A74B2C256@SC-VEXCH2.marvell.com>
- <A63A0DC671D719488CD1A6CD8BDC16CF1A0F044EB4@SC-VEXCH4.marvell.com>
- <53612FE6B944314AAADB181E45A45B6413D3FF9F37@sc-vexch3.marvell.com>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1A74B2C270@SC-VEXCH2.marvell.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 18 May 2012 14:16:18 +0530
+Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
+In-Reply-To: <87y5oqtpnw.fsf@ti.com>
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+ <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
+ <87y5oqtpnw.fsf@ti.com>
+Message-ID: <CAC83Zv+Vh60WTEqG4cES=XERMhxiJYOp3z5r-2+c9vqLpnwP+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-Since the issues are not described very clearly, so I want to clarify it.
-Issue 1. clock with mux, divisor and trigger
-The clock A will have a single register that some bits control the mux, some bits control the divisor, and a bit is a trigger. It means that setting mux and divisor bits will only take effect when trigger bit is set.
-There are 2 models that we can abstract this kind of clock.
-a. make three clocks.
-clock A <= clock div <= clock mux
-clock mux control the mux bits while clock div control the divisor bits, while clock a control trigger bit.
-For example mux has two inputs 312MHZ and 1066MHZ, while divisor can be 1 or 2. At beginning clock mux is from 312M and clock div is 1. Clock A can only have clock as 312MHZ and 533MHZ.
-so when invoke clk_set_rate(A, 512MHZ), it will try to upstream and find the "top" clock that can satisfy the 512MHZ. the "top" clock is clock mux. After find the "top" clock, the current code will have the following flows.
+On Fri, May 18, 2012 at 3:51 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun, Santosh,
+>
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> We do checking for bank->enabled_non_wakeup_gpios in order
+>> to skip redundant operations. Somehow, the check got missed
+>> while doing the cleanup series.
+>>
+>> Just to make sure that we do context restore correctly in
+>> *_runtime_resume(), the bank->workaround_enabled check is
+>> moved after context restore. Otherwise, it would prevent
+>> context restore when bank->enabled_non_wakeup_gpios is 0.
+>>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Cousson, Benoit <b-cousson@ti.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>
+> I just noticed that this patch has caused some strange problems, notably
+> with the GPIO IRQ used by smsc911x NIC (Overo, Zoom3, 2430SDP, etc. etc.)
+>
+> The patch itself is OK, but it has exposed a bug in other parts of the
+> context restore path that was previously hidden.
+>
+> We seem to have been finding lots of GPIO bugs by just testing the
+> network chips with GPIO IRQs. ?Can I suggest that a platform with a GPIO
+> IRQ NIC be added to the test platforms you're using?
 
-clk_notify(PRE_RATE_CHANGE)
-    ==> clk_change_rate(mux)
-        ==> mux->setrate: it will set mux bits
-        ==> polling all children, and for each one, invoke clk_change_rate
-           ==> clk_change_rate(div)
-              ==> div->setrate: it will set div bits
-              ==> polling all children, and for each one, invoke clk_change_rate
-                  ==>A->setrate: it will set trigger bit
->From above that the function looks well, but there will be some problem.
-Clock mux change the mux bits will not finally switch the input from 312MHZ to 533MHZ. The switch is controlled by "trigger" bit. So clock mux should have .setrate implementation as you suggest as
-      1. enable new parent
-      2. set mux bits
-      3. __clk_reparent
-      4. disable old parent
-The clock mux implementation looks like omap dpll implementation. 
-But there are two bugs.
-   a) "Disable old parent" is only SW setting, we depends on trigger to do it. So if for clock mux and clock div we all have trigger set when set mux bits and div bits. It will import a temporary clock 1066MHZ(input = 1066, div = 1), it will harm the device. In fact, there is why there is a trigger bit here. It will forbid there is no temporary clock.
-   b) if clk_change_rate(A) will invoke cpu_notify(POST_RATE_CHANGE), while __clk_reparent will invoke __clk_recalc_rates, and in __clk_recalc_rates, it will polling every children, and for each one will invoke __clk_recalc_rates too. For __clk_recalc_rates, it will invoke cpu_notify(POST_RATE_CHANGE), and it means that the notification of POST_RATE_CHANGE will be invoke twice. I think the omap dpll implementation will have this bug too.
+Able to reproduce the problem. Tested on Zoom3 by enabling NFS.
+Verified the time difference for the filesystem to boot. Without your
+fixes it takes
+around 60 seconds while with the fix it takes less than 7 seconds.
 
-b. make a special clock a that includes all bits setting.
-Then we come back that we need patch " [PATCH V2] clk: give clock chance to change parent at setrate stage" in maillist
+Tested-by:  Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-Issue 2: clock with dependency
-As we know that each vendor may have some version of SOCs, and these SOC may share some same components.
-For example, device a need function clock A while device B need function clock B, there share some bus, and there a clock for the bus clock gating. It means that if we want device B working, we need enable clock B and clock bus.
-In fact, we can not consider that clock bus is the parent of clock A/B, because clock A/B has inputs from PLLs.
-So how do we control these clocks? If leaving the dependency in clock tree, we need additional patch for it. If leaving it to device driver, it will make the device driver to know more details about clock framework, and for different SOCs share same device driver, the clock framework may not same. So it will make the device driver to be SOCs depended, and will need more detailed platform data.
-
-
-
-
------Original Message-----
-From: Mike Turquette [mailto:mturquette at ti.com] 
-Sent: Monday, May 07, 2012 7:50 AM
-To: Raul Xiong
-Cc: Sascha Hauer; linux-arm-kernel at lists.infradead.org; Chao Xie
-Subject: Re: common clock framework
-
-On 20120505-13:33, Raul Xiong wrote:
-> 2012/5/5 Turquette, Mike <mturquette@ti.com>
-> > Bad news: lockdep gets cranky about possible deadlocks due to holding
-> > prepare_lock and then trying to hold it again in a rate-change
-> > notifier handler (from OMAP's regulator code).  Specifically
-> >
-> 
-> Glad to see common clock framework will support DVFS. Can we use different
-> spinlock for different clocks with different lockdep lock classes to avoid
-> the dead lock and lockdep warnings?
-
-I understand that different lockdep classes could allow for nested
-locking, but I don't have a good idea of how that would actually be
-implemented.  Could you elaborate a bit more?
-
-In the mean time I'm looking at some different locking semantics that
-don't involve lockdep class mangling, just a more fine-grained approach
-to locking exactly what we want.
-
-Regards,
-Mike
+>
+>> ---
+>> ?drivers/gpio/gpio-omap.c | ? 13 ++++++++-----
+>> ?1 files changed, 8 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index d238f84..59a4af1 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1160,6 +1160,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+>>
+>> ? ? ? spin_lock_irqsave(&bank->lock, flags);
+>>
+>> + ? ? if (!bank->enabled_non_wakeup_gpios)
+>> + ? ? ? ? ? ? goto update_gpio_context_count;
+>> +
+>> ? ? ? /*
+>> ? ? ? ?* Only edges can generate a wakeup event to the PRCM.
+>> ? ? ? ?*
+>> @@ -1235,11 +1238,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>> ? ? ? __raw_writel(bank->context.risingdetect,
+>> ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->risingdetect);
+>>
+>> - ? ? if (!bank->workaround_enabled) {
+>> - ? ? ? ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
+>> - ? ? ? ? ? ? return 0;
+>> - ? ? }
+>> -
+>
+> My moving this below, you exposed some buggy code that can now get
+> executed in non-OFF mode, wherease before $SUBJECT patch, it would never
+> be exectued in non-OFF mode.
+>
+>> ? ? ? if (bank->get_context_loss_count) {
+>> ? ? ? ? ? ? ? context_lost_cnt_after =
+>> ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
+>
+> ...right below this line, we have:
+>
+> ? ? ? ? ? ? ? ?if (context_lost_cnt_after != bank->context_loss_count ||
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?!context_lost_cnt_after) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_gpio_restore_context(bank);
+>
+> While we've never hit off-mode, context_lost_cnt_after will always be
+> zero. ?However, becasue of the !context_lost_cnt_after check there, we
+> will *always* restore the bank context, even though context has never
+> been lost.
+>
+> I have no idea why that !context_lost_cnt_after check is there, but
+> clearly it is wrong. ?Now that you moved the 'workraound_enabled' check
+> below this section, as long as off-mode is disabled, the some GPIO
+> context will be restored here on *every* runtime PM transition.
+>
+> The patch below fixes the problem.
+>
+> Grant, after Tarun/Santosh have a chance to review/ack this, can you
+> still get this in for 3.5? ?If not, getting it into -rc should be fine.
+>
+> Kevin
+>
+>
+> From 83874df8e0dd78a3609f5ba81d608df7217fd212 Mon Sep 17 00:00:00 2001
+> From: Kevin Hilman <khilman@ti.com>
+> Date: Thu, 17 May 2012 14:52:56 -0700
+> Subject: [PATCH] gpio/omap: fix broken context restore for non-OFF mode
+> ?transitions
+>
+> The fix in commit 1b12870 (gpio/omap: fix missing check in
+> *_runtime_suspend()) exposed another bug in the context restore path.
+>
+> Currently, the per-bank context restore happens whenever the context
+> loss count is different in runtime suspend and runtime resume *and*
+> whenever the per-bank contex_loss_count == 0:
+>
+> ? ? ? ?if (context_lost_cnt_after != bank->context_loss_count ||
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?!context_lost_cnt_after) {
+> ? ? ? ? ? ? ? ?omap_gpio_restore_context(bank);
+>
+> Restoring context when the context_lost_cnt_after == 0 is clearly
+> wrong, since this will be true until the first off-mode transition
+> (which could be never, if off-mode is never enabled.) ?This check
+> causes the context to be restored on *every* runtime PM transition.
+>
+> Before commit 1b12870 (gpio/omap: fix missing check in
+> *_runtime_suspend()), this code was never executed in non-OFF mode, so
+> there were never spurious context restores happening. ?After that
+> change though, spurious context restores could happen.
+>
+> To fix, simply remove the !context_lost_cnt_after check. It is not
+> needed.
+>
+> This bug was found when noticing that the smc911x NIC on 3530/Overo
+> was not working, and git bisect tracked it down to this patch. ?It
+> seems that the spurious context restore was causing the smsc911x to
+> not be properly probed on this platform.
+>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> ?drivers/gpio/gpio-omap.c | ? ?3 +--
+> ?1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 9b71f04..b570a6a 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1238,8 +1238,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+> ? ? ? ?if (bank->get_context_loss_count) {
+> ? ? ? ? ? ? ? ?context_lost_cnt_after =
+> ? ? ? ? ? ? ? ? ? ? ? ?bank->get_context_loss_count(bank->dev);
+> - ? ? ? ? ? ? ? if (context_lost_cnt_after != bank->context_loss_count ||
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? !context_lost_cnt_after) {
+> + ? ? ? ? ? ? ? if (context_lost_cnt_after != bank->context_loss_count) {
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_gpio_restore_context(bank);
+> ? ? ? ? ? ? ? ?} else {
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&bank->lock, flags);
+> --
+> 1.7.9.2
+>
