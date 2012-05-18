@@ -1,107 +1,61 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 18 May 2012 14:33:21 -0500
-Subject: [PATCH 3/3] ARM: OMAP3+: PM: VP: check only the VPINIDLE status bit
-In-Reply-To: <1337369601-14915-1-git-send-email-nm@ti.com>
-References: <[PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
- <1337369601-14915-1-git-send-email-nm@ti.com>
-Message-ID: <1337369601-14915-4-git-send-email-nm@ti.com>
+Date: Fri, 18 May 2012 14:37:18 -0500
+Subject: [PATCH] ARM: OMAP3+: dpll: optimize noncore dpll locking logic
+Message-ID: <1337369838-15185-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we check against the entire 32 bits of the status register
-Where, bits 1-31 are marked as reserved and mentioned in TRM as read
-returns undefined values. Hence, check against purely the vpinidle
-status bit.
+From: Vikram Pandita <vikram.pandita@ti.com>
+
+If the dpll is already locked, code can be optimized
+to return much earlier than doing redundent set of lock mode
+and wait on idlest.
 
 Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
+Cc: Jon Hunter <jon-hunter@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Mike Turquette <mturquette@ti.com>
 Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 
-Reported-by: Vinay Amancha <vinaykumar@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
 ---
- arch/arm/mach-omap2/vp.c          |   15 +++++++++------
- arch/arm/mach-omap2/vp.h          |    1 +
- arch/arm/mach-omap2/vp3xxx_data.c |    1 +
- arch/arm/mach-omap2/vp44xx_data.c |    1 +
- 4 files changed, 12 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/dpll3xxx.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index 985091b..cdcac16 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -128,8 +128,9 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 	 * This is an additional allowance to ensure we are in proper state
- 	 * to enter into forceupdate state transition.
- 	 */
--	omap_test_timeout((voltdm->read(vp->vstatus)),
--			  VP_IDLE_TIMEOUT, timeout);
-+	omap_test_timeout((voltdm->read(vp->vstatus) &
-+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-+			  timeout);
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index fc56745..3cfd7c4 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -135,11 +135,20 @@ static u16 _omap3_dpll_compute_freqsel(struct clk *clk, u8 n)
+  */
+ static int _omap3_noncore_dpll_lock(struct clk *clk)
+ {
++	const struct dpll_data *dd;
+ 	u8 ai;
+-	int r;
++	u8 state = 1;
++	int r = 0;
  
- 	if (timeout >= VP_IDLE_TIMEOUT)
- 		pr_warning("%s: vdd_%s idle timedout forceupdate(v=%ld)\n",
-@@ -278,8 +279,9 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
- 	 * Depending on if we catch VP in the middle of an SR operation.
- 	 */
--	omap_test_timeout((voltdm->read(vp->vstatus)),
--			  VP_IDLE_TIMEOUT, timeout);
-+	omap_test_timeout((voltdm->read(vp->vstatus) &
-+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-+			  timeout);
+ 	pr_debug("clock: locking DPLL %s\n", clk->name);
  
- 	if (timeout >= VP_IDLE_TIMEOUT)
- 		pr_warning("%s: vdd_%s idle timedout before disable\n",
-@@ -293,8 +295,9 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 	/*
- 	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
- 	 */
--	omap_test_timeout((voltdm->read(vp->vstatus)),
--			  VP_IDLE_TIMEOUT, timeout);
-+	omap_test_timeout((voltdm->read(vp->vstatus) &
-+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-+			  timeout);
++	dd = clk->dpll_data;
++	state <<= __ffs(dd->idlest_mask);
++
++	/* Check if already locked */
++	if ((__raw_readl(dd->idlest_reg) & dd->idlest_mask) == state)
++		goto done;
++
+ 	ai = omap3_dpll_autoidle_read(clk);
  
- 	if (timeout >= VP_IDLE_TIMEOUT)
- 		pr_warning("%s: vdd_%s idle timedout after disable\n",
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 0abf895..876b5ab 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -73,6 +73,7 @@ struct omap_vp_common {
- 	u8 vpconfig_initvdd;
- 	u8 vpconfig_forceupdate;
- 	u8 vpconfig_vpenable;
-+	u8 vstatus_vpidle;
- 	u8 vstepmin_stepmin_shift;
- 	u8 vstepmin_smpswaittimemin_shift;
- 	u8 vstepmax_stepmax_shift;
-diff --git a/arch/arm/mach-omap2/vp3xxx_data.c b/arch/arm/mach-omap2/vp3xxx_data.c
-index bd89f80..a65909b 100644
---- a/arch/arm/mach-omap2/vp3xxx_data.c
-+++ b/arch/arm/mach-omap2/vp3xxx_data.c
-@@ -44,6 +44,7 @@ static const struct omap_vp_common omap3_vp_common = {
- 	.vpconfig_initvdd = OMAP3430_INITVDD_MASK,
- 	.vpconfig_forceupdate = OMAP3430_FORCEUPDATE_MASK,
- 	.vpconfig_vpenable = OMAP3430_VPENABLE_MASK,
-+	.vstatus_vpidle = OMAP3430_VPINIDLE_MASK,
- 	.vstepmin_smpswaittimemin_shift = OMAP3430_SMPSWAITTIMEMIN_SHIFT,
- 	.vstepmax_smpswaittimemax_shift = OMAP3430_SMPSWAITTIMEMAX_SHIFT,
- 	.vstepmin_stepmin_shift = OMAP3430_VSTEPMIN_SHIFT,
-diff --git a/arch/arm/mach-omap2/vp44xx_data.c b/arch/arm/mach-omap2/vp44xx_data.c
-index 8c031d1..9d14881 100644
---- a/arch/arm/mach-omap2/vp44xx_data.c
-+++ b/arch/arm/mach-omap2/vp44xx_data.c
-@@ -44,6 +44,7 @@ static const struct omap_vp_common omap4_vp_common = {
- 	.vpconfig_initvdd = OMAP4430_INITVDD_MASK,
- 	.vpconfig_forceupdate = OMAP4430_FORCEUPDATE_MASK,
- 	.vpconfig_vpenable = OMAP4430_VPENABLE_MASK,
-+	.vstatus_vpidle = OMAP4430_VPINIDLE_MASK,
- 	.vstepmin_smpswaittimemin_shift = OMAP4430_SMPSWAITTIMEMIN_SHIFT,
- 	.vstepmax_smpswaittimemax_shift = OMAP4430_SMPSWAITTIMEMAX_SHIFT,
- 	.vstepmin_stepmin_shift = OMAP4430_VSTEPMIN_SHIFT,
+ 	omap3_dpll_deny_idle(clk);
+@@ -151,6 +160,7 @@ static int _omap3_noncore_dpll_lock(struct clk *clk)
+ 	if (ai)
+ 		omap3_dpll_allow_idle(clk);
+ 
++done:
+ 	return r;
+ }
+ 
 -- 
 1.7.9.5
