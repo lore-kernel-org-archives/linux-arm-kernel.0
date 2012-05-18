@@ -1,44 +1,22 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 18 May 2012 13:18:35 -0700
-Subject: [PATCHv3 0/4] coupled cpuidle state support
-In-Reply-To: <201205182103.56301.rjw@sisk.pl>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
- <4FB62611.7080908@ti.com> <201205182103.56301.rjw@sisk.pl>
-Message-ID: <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 May 2012 20:38:26 +0000
+Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
+ when DT is enabled
+In-Reply-To: <4FB64266.6040301@linaro.org>
+References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
+ <201205181112.17254.arnd@arndb.de> <4FB64266.6040301@linaro.org>
+Message-ID: <201205182038.26512.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 12:03 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Friday, May 18, 2012, Santosh Shilimkar wrote:
->> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
->> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
->> > cpus cannot be independently powered down, either due to
->> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
->> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
->> > will corrupt the gic state unless the other cpu runs a work
->> > around). ?Each cpu has a power state that it can enter without
->> > coordinating with the other cpu (usually Wait For Interrupt, or
->> > WFI), and one or more "coupled" power states that affect blocks
->> > shared between the cpus (L2 cache, interrupt controller, and
->> > sometimes the whole SoC). ?Entering a coupled power state must
->> > be tightly controlled on both cpus.
->> >
->>
->> [...]
->>
->> > This series has been tested and reviewed by Santosh and Kevin
->> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
->> > and Exynos5 patches are in progress. ?I think this is ready to
->> > go in. ?Lean, are you maintaining a cpuidle tree for linux-next?
->> > If not, I can publish a tree for linux-next, or this could go in
->> > through Arnd's tree.
->>
->> I haven't seen any response so far on who is lining up this
->> series for 3.5 ? Not sure if it made it to linux-next either.
->
-> That should be Len, but he's been silent recently.
->
-> How urgent is it?
+On Friday 18 May 2012, Lee Jones wrote:
+> This is nice. Can I leave it for a now and submit this with the rest of 
+> my clean-ups? I have a nice TODO list now that this would fit nicely 
+> into. The way I see it, as long as this is submitted before we add a 
+> mop500.dts then it's not going to cause anyone issues.
 
-Len silently picked up the last version.  I just posted two fixes to
-it, hopefully he'll pick up those too.
+Yes, fine with me. I was thinking you'd fold it into the patch we
+are commenting on, but if that's problematic, just add it to the
+end of your queue.
+
+	Arnd
