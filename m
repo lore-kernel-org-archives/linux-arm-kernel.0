@@ -1,38 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 18 May 2012 16:50:00 -0600 (MDT)
-Subject: [PATCH 0/3] OMAP: control: bootaddr and bootmod APIs
-In-Reply-To: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-References: <1336011113-31502-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <alpine.DEB.2.00.1205181649410.24735@utopia.booyaka.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 18 May 2012 18:51:22 -0400 (EDT)
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <201205182044.26409.arnd@arndb.de>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Omar,
+On Fri, 18 May 2012, Arnd Bergmann wrote:
 
-On Wed, 2 May 2012, Omar Ramirez Luna wrote:
+> On Friday 18 May 2012, Jason Cooper wrote:
+> > > 
+> > > In this case, we have wildly different names referring to the same chip 
+> > > family, and "orion" is far from hinting that it also constitute the 
+> > > support for Kirkwood, Dove or (some not all) Armadas, unless you are 
+> > > familiar with some legacy Marvell products.  This is why in this case I 
+> > > think that a directory name change might be appropriate, especially if 
+> > > we're going to cause churn by moving things around already.
+> > > 
+> > > I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
+> > > mvebu_*.  Unless someone has another logical identifier to suggest which 
+> > > would capture all that family of SOCs that came out of EBU in Marvell of 
+> > > course.
+> > 
+> > I prefer mvebu_* ...  nice and concise.
+> > 
+> 
+> On a related topic, any preferences on where we will put all the board
+> files? I think it would be helpful to put them into a separate place from
+> the main platform files, so e.g. have all *-setup.c files go to
+> arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
+> 
+> The reasons I think this would help are that the directory is getting a
+> bit crowded when we move five or more of the current platforms in there,
+> and that I hope we can start ignoring them for most practical purposes
+> as some point in the future when all boards have been made to work with
+> DT, and at an even later point we can just delete that directory.
+> The main disadvantage that this approach would bring is that it's not
+> consistent with what any of the other platforms do.
 
-> Recently a patch went in for tidspbridge code, to ioremap
-> SCM registers and solve a build break[1]. However it has
-> been pointed out before that this is a layer violation
-> given that control module should handle its own registers, this
-> series is an attempt to create APIs for the users of these
-> registers.
-> 
-> With some adaptations this patch might also make use of it:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg66491.html
-> 
-> Patch: staging: tidspbridge: use scm functions to set boot address and mode,
-> will be sent separately to staging tree.
-> 
-> Tested on OMAP3 Beagleboard.
-> 
-> [1] http://www.mail-archive.com/devel at linuxdriverproject.org/msg18762.html
-> 
-> Omar Ramirez Luna (3):
->   OMAP2+: control: new APIs to configure boot address and mode
->   OMAP: dsp: interface to control module functions
->   staging: tidspbridge: use scm functions to set boot address and mode
+Board files in mach-mvebu and the rest in plat-mvebu.  That would match 
+the spirit of the current split between mach-* and plat-*.
 
-Thanks, queued for 3.6.
-
-- Paul
+Nicolas
