@@ -1,38 +1,84 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 17 May 2012 23:46:15 -0600
-Subject: [PATCH] gpiolib: Add of_get_gpio_chip_by_phandle() helper
-In-Reply-To: <4FB5C56E.8070705@st.com>
-References: <cdf5352edf6b32e2505e1c7ba9997613150094c1.1335949228.git.viresh.kumar@st.com>
- <4FA15267.4090306@wwwdotorg.org>
- <CAOh2x=nrNDrtNjOroWOm6HkYkc3f2qfaWrtN97d1M3rWv1qmsQ@mail.gmail.com>
- <CACRpkda2jBmjPCgt=5rfqdCQH9Lipq4aejeQq-Qbw0_Nk6o-yg@mail.gmail.com>
- <CAOh2x=nizQYXWFu3deQPXr93Nqv77Pnj5DNhYZw_vYyY2go3vA@mail.gmail.com>
- <CACRpkdZGAQpt1bqhTFmxcC7OKb4uds6ru-aNs-aT+M+H4TKuJg@mail.gmail.com>
- <20120518000800.B9F333E062C@localhost> <4FB5C56E.8070705@st.com>
-Message-ID: <CACxGe6s=TNuYd+L-5DyvUZZbZ-h4qXOouxWfSg8Wr2+kG5tLOw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 18 May 2012 11:23:45 +0530
+Subject: [PATCHv2 06/19] ARM: OMAP4: PM: Add SAR backup support towards
+ device OFF
+In-Reply-To: <87aa1621yv.fsf@ti.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-7-git-send-email-t-kristo@ti.com> <87aa177my3.fsf@ti.com>
+ <CAMQu2gznJ0q-Eqevh9dWn+vw69to91kfFG6hYDvTbGj3zwT0FQ@mail.gmail.com>
+ <87aa1621yv.fsf@ti.com>
+Message-ID: <CAMQu2gwgfsxZ67OeDMK4_Z0phPxuiSMA9oiJ63cz1nPiOBA+jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 9:43 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 5/18/2012 5:38 AM, Grant Likely wrote:
->> however, there is a bigger issue now. ?I'm changing the xlate
->> mechanism to allow multiple gpio_chips to refer to the same device
->> tree node which will break the assumption that this patch uses. ?The
->> reason for this is to make it easier to support banked gpio
->> controllers where a separate gpio_chip is used for each bank, but it
->> is still described by a single device tree node. ?To properly resolve
->> this will require a full gpio specifier reference instead of just the
->> phandle. ?Will that work for your use-case?
+On Thu, May 17, 2012 at 10:12 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 >
-> What about the other routine i suggested yesterday
+>> On Thu, May 17, 2012 at 4:28 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>> Tero Kristo <t-kristo@ti.com> writes:
+>>>
+>>>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>
+>>>> The SAR RAM is maintained during Device OFF mode.
+>>>
+>>> so why is this patch bothering to save and restore it?
+>>>
+>> SAR RAM is maintained(not powered down) but somebody needs to
+>> feel the contents which will be preserved :-)
+>>
+>>> -ECONFUSED
+>>>
+>>>> The register layout
+>>>> is fixed in SAR ROM. SAR is split into 4 banks with different
+>>>> privilege accesses based on device type
+>>>>
+>>>> ?---------------------------------------------------------------
+>>>> ?Access mode ? ? ? ? ?Bank ? ?Address Range
+>>>> ?---------------------------------------------------------------
+>>>> ?HS/GP : Public ? ? ? ? ? ? ? 1 ? ? ? 0x4A32_6000 - 0x4A32_6FFF (4kB)
+>>>> ?HS/GP : Public ? ? ? ? ? ? ? 2 ? ? ? 0x4A32_7000 - 0x4A32_73FF (1kB)
+>>>>
+>>>> ?HS/EMU : Secured
+>>>> ?GP : Public ? ? ? ? ?3 ? ? ? 0x4A32_8000 - 0x4A32_87FF (2kB)
+>>>>
+>>>> ?HS/GP :Secure
+>>>> ?write once. ? ? ? ? ?4 ? ? ? 0x4A32_9000 - 0x4A32_93FF (1kB)
+>>>> ?---------------------------------------------------------------
+>>>>
+>>>> The save process is done entirely by software and restore is done by
+>>>> hardware using the auto-restore feature. The restore feature is enabled
+>>>> by default and cannot be disabled. The software must save the data
+>>>> to be restored in a dedicated location in SAR RAM.
+>>>
+>>> Some general comments:
+>>>
+>>> - can the cluster PM notifier be used for the save path?
+>>>
+>> Nope. This is for device OFF only case. CPU Cluster state as such
+>> has no dependency.
 >
-> of_get_gpio_chip_base_by_phandle()?
+> Yeah, I see now. ?I like your idea of a device-off notifier chain
+> modeled on the CPU PM notifier chain.
 >
-> This would work with your updates too and will work for me as well.
+>>> - This patch adds lots of data that is immediately removed by the next
+>>> ?patch. ?Probably the two just need to be combined.
+>>>
+>> iormap() hunk from this patch can be completely dropped since
+>> it is getting fixed in next patch. Other infrastructure is maintained.
+>
+> Look again at how much stuff is deleted in the next patch that is added
+> in this patch, and think about how a reviewer is supposed to follow that
+> easily.
+>
+OK. With me. Actually with proposed split of further patch, things can
+be sorted out in different patches quite well.
 
-Ugh; that seems a little messy.  With dynamic allocation of gpio
-numbers, there is no guarantee that all the gpio_chips will have
-contiguous gpio_bases.  It would require internal knowledge of each
-gpio controller's binding.  How do you intend to use that API?
-
-g.
+>>> - BUG_ON() should not be used unless there is absolutely no recovery
+>>> ?path, since it casues a full kernel panic. ? Instead, some error
+>>> ?recovery should be added.
+>>>
+>> WARN_ON should suffice.
+>
+> Not really. ?Error recovery should be added.
+>
+Agree
