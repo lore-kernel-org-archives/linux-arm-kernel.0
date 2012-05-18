@@ -1,39 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 May 2012 13:31:07 +0000
-Subject: A good sub-architecture to base new ports on?
-In-Reply-To: <4FB5343D.5090509@yahoo.es>
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
- <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
- <4FB5343D.5090509@yahoo.es>
-Message-ID: <201205181331.07566.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 May 2012 21:51:07 +0800
+Subject: [PATCH 1/2] gpio/generic: initialize basic_mmio_gpio shadow
+ variables properly
+In-Reply-To: <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
+References: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
+ <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120518135104.GC5427@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 May 2012, Jorge Amor?s Argos wrote:
-> Hi Alexey and co,
+Hi Grant, Linus,
+
+Can we manage to get it in with the upcoming merge window, as it fixes
+a bug that we may not want to live with for another cycle?
+
+Regards,
+Shawn
+
+On Thu, May 17, 2012 at 03:35:02PM +0800, Shawn Guo wrote:
+> It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
+> missing initialization of basic_mmio_gpio shadow variables) manged to
+> fix in gpio-mxc driver, so that other platform specific drivers do not
+> suffer from the same problem over and over again.
 > 
-> I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the 
-> only missing module was ADSL.
-
-Ah, very good!
-
-> Anyway, compiling was successful but I can't tell if it was functional.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpio/gpio-generic.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> Mainly 2 big issues:
+> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
+> index e38dd0c..cfc9439 100644
+> --- a/drivers/gpio/gpio-generic.c
+> +++ b/drivers/gpio/gpio-generic.c
+> @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
+>  		return ret;
+>  
+>  	bgc->data = bgc->read_reg(bgc->reg_dat);
+> +	if (bgc->gc.set == bgpio_set_set)
+> +		bgc->data = bgc->read_reg(bgc->reg_set);
+> +	if (bgc->reg_dir)
+> +		bgc->dir = bgc->read_reg(bgc->reg_dir);
+>  
+>  	return ret;
+>  }
+> -- 
+> 1.7.5.4
 > 
->   * No knowledge how to build the image (I wanted to have a self-lzma
->     image in order to save room)
-
-LZMA support was added to arm linux in 2.6.35, and XZ support some time
-after that.
-
->   * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
->     easily upload firmware into flash. It took me hours to make 1 trial.
-> 
-> 
-> I'll be glad to share the code with whoever need it and maybe we can 
-> take those old routers back to a better world.
-
-I think that would be helpful.
-
-	Arnd
