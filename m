@@ -1,25 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 08:52:48 +0100
-Subject: [PATCH 11/18] regulator: Enable the ab8500 for Device Tree
-In-Reply-To: <20120518073648.GD4073@opensource.wolfsonmicro.com>
+Date: Fri, 18 May 2012 08:53:05 +0100
+Subject: [PATCH 09/18] regulator: ab8500: Split up probe() into manageable
+ pieces
+In-Reply-To: <20120518073603.GC4073@opensource.wolfsonmicro.com>
 References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <1337262323-27692-12-git-send-email-lee.jones@linaro.org>
- <20120518073648.GD4073@opensource.wolfsonmicro.com>
-Message-ID: <4FB5FFD0.4050708@linaro.org>
+ <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
+ <20120518073603.GC4073@opensource.wolfsonmicro.com>
+Message-ID: <4FB5FFE1.9030204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 18/05/12 08:36, Mark Brown wrote:
-> On Thu, May 17, 2012 at 02:45:16PM +0100, Lee Jones wrote:
->> Here we setup the ab8500 regulator driver for DT. We first do
->> this in the normal way, by providing a match structure during
->> initialisation, but then we provide information so that
->> whilst probing we can use existing data structures to do DT
->> look-ups.
+> On Thu, May 17, 2012 at 02:45:14PM +0100, Lee Jones wrote:
+>> ab8500's probe() function is becoming quite large, so in the lead
+>> up to Device Tree enablement which will fork the thread of execution
+>> this patch splits it into 3 main areas; basic error checking will
+>> remain in probe(), but regulator register initialisation and regulator
+>> registration have been moved to their own functions which will
+>> be called in sequence by probe() and the DT equivalent.
 >
-> Applied, thanks.  This and your previous patch look really good now!
+> Applied, thanks.
 
-Cheers Mark. Much obliged.
+Thank you.
 
 -- 
 Lee Jones
