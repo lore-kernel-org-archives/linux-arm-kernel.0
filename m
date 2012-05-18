@@ -1,65 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 09:39:14 +0100
-Subject: [PATCH 15/16] ARM: ux500: Add regulator support for nomadik-i2c into
- the db8500 Device Tree
+Date: Fri, 18 May 2012 09:39:15 +0100
+Subject: [PATCH 16/16] ARM: ux500: Re-enable SMSC911x platform code
+ registration during non-DT boots
 In-Reply-To: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337330355-17747-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we have full ab8500 and db8500-prcmu regulator support within DT
-we can easily reference them from within each of the consumer's nodes.
-Here we reference the ones used by each of the Nomadic I2C controllers.
+The patch to disable SMSC911x registration was applied twice in the upstream
+kernel by mistake. Git interpreted this as 'take the same entry from a
+similar struct' which was close by. This was the wrong thing to do. This patch
+rectifies this error and re-enables SMSC911x registration when Device Tree is
+not enabled.
 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-ux500/board-mop500.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index dcc5099..f1e0fb4 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -434,6 +434,7 @@
- 			interrupts = <0 21 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			v-i2c-supply = <&db8500_vape_reg>;
- 		};
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 33d47e1..2ddbb87 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -596,6 +596,7 @@ static void __init mop500_uart_init(struct device *parent)
+ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&snowball_led_dev,
+ 	&snowball_key_dev,
++	&snowball_sbnet_dev,
+ 	&ab8500_device,
+ };
  
- 		i2c at 80122000 {
-@@ -442,6 +443,7 @@
- 			interrupts = <0 22 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			v-i2c-supply = <&db8500_vape_reg>;
- 		};
- 
- 		i2c at 80128000 {
-@@ -450,6 +452,7 @@
- 			interrupts = <0 55 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			v-i2c-supply = <&db8500_vape_reg>;
- 		};
- 
- 		i2c at 80110000 {
-@@ -458,6 +461,7 @@
- 			interrupts = <0 12 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			v-i2c-supply = <&db8500_vape_reg>;
- 		};
- 
- 		i2c at 8012a000 {
-@@ -466,6 +470,7 @@
- 			interrupts = <0 51 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			v-i2c-supply = <&db8500_vape_reg>;
- 		};
- 
- 		ssp at 80002000 {
 -- 
 1.7.9.5
