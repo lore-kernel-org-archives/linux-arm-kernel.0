@@ -1,196 +1,39 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 18 May 2012 21:12:35 +0800
-Subject: [PATCH RFC v2 2/2] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <1337346755-8761-1-git-send-email-b29396@freescale.com>
-References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
-Message-ID: <1337346755-8761-2-git-send-email-b29396@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 May 2012 13:31:07 +0000
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <4FB5343D.5090509@yahoo.es>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+ <4FB5343D.5090509@yahoo.es>
+Message-ID: <201205181331.07566.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Thursday 17 May 2012, Jorge Amor?s Argos wrote:
+> Hi Alexey and co,
+> 
+> I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the 
+> only missing module was ADSL.
 
-The gpio ranges standard dt binding format is
-<&gpio $gpio_offset $pin_offset $npin>
+Ah, very good!
 
-The core will parse and register the pinctrl gpio ranges
-from device tree.
+> Anyway, compiling was successful but I can't tell if it was functional.
+> 
+> Mainly 2 big issues:
+> 
+>   * No knowledge how to build the image (I wanted to have a self-lzma
+>     image in order to save room)
 
-TODO: add binding doc.
+LZMA support was added to arm linux in 2.6.35, and XZ support some time
+after that.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>   * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
+>     easily upload firmware into flash. It took me hours to make 1 trial.
+> 
+> 
+> I'll be glad to share the code with whoever need it and maybe we can 
+> take those old routers back to a better world.
 
----
-ChangeLog v1->v2:
-* introduce standard binding for gpio range.
----
- drivers/pinctrl/devicetree.c    |   95 +++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/devicetree.h    |    3 -
- include/linux/pinctrl/pinctrl.h |   22 +++++++++
- 3 files changed, 117 insertions(+), 3 deletions(-)
+I think that would be helpful.
 
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index fcb1de4..c1b87e6 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
-@@ -17,7 +17,9 @@
-  */
- 
- #include <linux/device.h>
-+#include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/slab.h>
- 
-@@ -247,3 +249,96 @@ err:
- 	pinctrl_dt_free_maps(p);
- 	return ret;
- }
-+
-+/*
-+ * pinctrl_dt_add_gpio_range() - parse and register GPIO ranges from device tree
-+ * @pctldev: pin controller device to add the range to
-+ * @np: the device node contains the property @propname
-+ * @propname: a list of phandles of gpios and corresponding data.
-+ *  The format is: <&gpio0 $gpio_offset $pin_offset $count>
-+ */
-+int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np,
-+				const char *propname)
-+{
-+	struct pinctrl_gpio_range *ranges;
-+	unsigned int gpio_offset, pin_offset, npins;
-+	struct device_node *np_gpio;
-+	struct property *prop;
-+	const __be32 *list;
-+	phandle phandle;
-+	int nranges;
-+	int size;
-+	int i;
-+
-+	if (!np || !propname) {
-+		dev_err(pctldev->dev, "no device node or gpios propname\n");
-+		return -EINVAL;
-+	}
-+
-+	prop = of_find_property(np, propname, &size);
-+	if (!prop)
-+		return -ENODEV;
-+
-+	list = prop->value;
-+	size /= sizeof(*list);
-+	if (size % 4) {
-+		dev_err(pctldev->dev, "wrong gpio range table format\n");
-+		return -EINVAL;
-+	}
-+
-+	nranges = size /4;
-+	ranges = devm_kzalloc(pctldev->dev, nranges * sizeof(*ranges),
-+				GFP_KERNEL);
-+	for (i = 0; i < nranges; i++) {
-+			phandle = be32_to_cpup(list++);
-+			np_gpio = of_find_node_by_phandle(phandle);
-+			if (!np_gpio) {
-+				dev_err(pctldev->dev,
-+					"failed to find gpio node(%s)\n",
-+					np_gpio->name);
-+				return -ENODEV;
-+			}
-+
-+			ranges[i].gc = of_node_to_gpiochip(np_gpio);
-+			if (!ranges[i].gc) {
-+				dev_err(pctldev->dev,
-+					"can not find gpio chip of node(%s)\n",
-+					np->name);
-+				of_node_put(np_gpio);
-+				return -ENODEV;
-+			}
-+
-+			gpio_offset = be32_to_cpu(*list++);
-+			pin_offset = be32_to_cpu(*list++);
-+			npins = be32_to_cpu(*list++);
-+
-+			if (gpio_offset < 0 ||
-+			    gpio_offset > ranges[i].gc->ngpio ||
-+			    pin_offset < 0 || npins < 0) {
-+				dev_err(pctldev->dev,
-+					"wrong data in the gpio range table\n");
-+				of_node_put(np_gpio);
-+				return -ENODEV;
-+			}
-+
-+			ranges[i].name = dev_name(pctldev->dev);
-+			ranges[i].base = ranges[i].gc->base + gpio_offset;
-+			ranges[i].pin_base = pin_offset;
-+			ranges[i].npins = npins;
-+			of_node_put(np_gpio);
-+	}
-+
-+	pinctrl_add_gpio_ranges(pctldev, ranges, nranges);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_dt_add_gpio_ranges);
-+
-+void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
-+				   struct pinctrl_gpio_range *ranges,
-+				   unsigned nranges)
-+{
-+	pinctrl_remove_gpio_ranges(pctldev, ranges, nranges);
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_dt_remove_gpio_ranges);
-diff --git a/drivers/pinctrl/devicetree.h b/drivers/pinctrl/devicetree.h
-index 760bc49..9f79657 100644
---- a/drivers/pinctrl/devicetree.h
-+++ b/drivers/pinctrl/devicetree.h
-@@ -20,9 +20,7 @@
- 
- void pinctrl_dt_free_maps(struct pinctrl *p);
- int pinctrl_dt_to_map(struct pinctrl *p);
--
- #else
--
- static inline int pinctrl_dt_to_map(struct pinctrl *p)
- {
- 	return 0;
-@@ -31,5 +29,4 @@ static inline int pinctrl_dt_to_map(struct pinctrl *p)
- static inline void pinctrl_dt_free_maps(struct pinctrl *p)
- {
- }
--
- #endif
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 6a29965..98d77b4 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -141,6 +141,28 @@ extern void pinctrl_remove_gpio_ranges(struct pinctrl_dev *pctldev,
- 				unsigned nranges);
- extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
- extern void *pinctrl_dev_get_drvdata(struct pinctrl_dev *pctldev);
-+
-+#ifdef CONFIG_OF
-+extern int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np,
-+				const char *propname);
-+extern void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
-+				   struct pinctrl_gpio_range *ranges,
-+				   unsigned nranges);
-+#else
-+static inline int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np,
-+				const char *propname)
-+{
-+	return 0;
-+}
-+static void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
-+				   struct pinctrl_gpio_range *ranges,
-+				   unsigned nranges)
-+{
-+}
-+#endif	/* !CONFIG_OF */
-+
- #else
- 
- struct pinctrl_dev;
--- 
-1.7.0.4
+	Arnd
