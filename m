@@ -1,38 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 May 2012 13:03:28 +0000
-Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20 dtsi
- files
-In-Reply-To: <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
-References: <4FB3B1F3.6080102@atmel.com> <20120517150601.GA28104@kroah.com>
- <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
-Message-ID: <201205181303.28535.arnd@arndb.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 18 May 2012 21:12:34 +0800
+Subject: [PATCH RFC v2 1/2] pinctrl: add pinctrl_add_gpio_ranges function
+Message-ID: <1337346755-8761-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 May 2012, Stephen Rothwell wrote:
-> On Thu, 17 May 2012 08:06:01 -0700 Greg KH <gregkh@linuxfoundation.org> wrote:
-> >
-> > On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 16 May 2012, Nicolas Ferre wrote:
-> > > > Now that the bulk of at91sam9g20-related nodes are located in at91sam9260.dtsi,
-> > > > we have to re-create the path to this ADC node for SoC specific parts.
-> > > > 
-> > > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > 
-> > > Should we apply this patch in arm-soc so that Greg can drop the hunk that
-> > > no longer applies?
-> > 
-> > It's not a "no longer applies", it's a "this does not merge".  The patch
-> > is in my tree, unless you want me to revert it, it's going to stay there
-> > until it goes to Linus.
-> 
-> Just apply the patch to the arm-soc tree - then the merge resolution
-> becomes "use the arm-soc version".   There is no need for Greg to revert
-> the other patch.
-> 
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Yes, good point.
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ drivers/pinctrl/core.c          |   22 ++++++++++++++++++++++
+ include/linux/pinctrl/pinctrl.h |    6 ++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
-I've applied the patch on the at91/dt branch now.
-
-	Arnd
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index c3b331b..916ed49 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -346,6 +346,28 @@ void pinctrl_remove_gpio_range(struct pinctrl_dev *pctldev,
+ }
+ EXPORT_SYMBOL_GPL(pinctrl_remove_gpio_range);
+ 
++void pinctrl_add_gpio_ranges(struct pinctrl_dev *pctldev,
++			     struct pinctrl_gpio_range *ranges,
++			     unsigned nranges)
++{
++	int i;
++
++	for (i = 0; i < nranges; i++)
++		pinctrl_add_gpio_range(pctldev, &ranges[i]);
++}
++EXPORT_SYMBOL_GPL(pinctrl_add_gpio_ranges);
++
++void pinctrl_remove_gpio_ranges(struct pinctrl_dev *pctldev,
++				struct pinctrl_gpio_range *ranges,
++				unsigned nranges)
++{
++	int i;
++
++	for (i = 0; i < nranges; i++)
++		pinctrl_remove_gpio_range(pctldev, &ranges[i]);
++}
++EXPORT_SYMBOL_GPL(pinctrl_remove_gpio_ranges);
++
+ /**
+  * pinctrl_get_group_selector() - returns the group selector for a group
+  * @pctldev: the pin controller handling the group
+diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+index 3b894a6..6a29965 100644
+--- a/include/linux/pinctrl/pinctrl.h
++++ b/include/linux/pinctrl/pinctrl.h
+@@ -133,6 +133,12 @@ extern void pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+ 				struct pinctrl_gpio_range *range);
+ extern void pinctrl_remove_gpio_range(struct pinctrl_dev *pctldev,
+ 				struct pinctrl_gpio_range *range);
++extern void pinctrl_add_gpio_ranges(struct pinctrl_dev *pctldev,
++			     struct pinctrl_gpio_range *ranges,
++			     unsigned nranges);
++extern void pinctrl_remove_gpio_ranges(struct pinctrl_dev *pctldev,
++				struct pinctrl_gpio_range *ranges,
++				unsigned nranges);
+ extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
+ extern void *pinctrl_dev_get_drvdata(struct pinctrl_dev *pctldev);
+ #else
+-- 
+1.7.0.4
