@@ -1,42 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 09:39:10 +0100
-Subject: [PATCH 11/16] mfd: Enable Device Tree support in the ab8500-sysctrl
- driver
+Date: Fri, 18 May 2012 09:39:13 +0100
+Subject: [PATCH 14/16] ARM: ux500: Add a ab8500-usb Device Tree node for
+ db8500 based devices
 In-Reply-To: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337330355-17747-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337330355-17747-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ensures probing of the ab8500-sysctrl driver during a DT
-enabled boot, so long as the associated nodes are present in the
-Device Tree binary.
+Here we specify each of the ab8500 USB driver's seven IRQs, which the
+driver references by name. We also apply regulator support for the
+three used by the device.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-sysctrl.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/db8500.dtsi |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index c28d4eb..5a3e51c 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -61,10 +61,16 @@ static int __devexit ab8500_sysctrl_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 37dcc13..dcc5099 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -322,6 +322,27 @@
+ 					vddadc-supply = <&ab8500_ldo_tvout_reg>;
+ 				};
  
-+static const struct of_device_id ab8500_sysctrl_match[] = {
-+	{ .compatible = "stericsson,ab8500-sysctrl", },
-+	{}
-+};
++				ab8500-usb {
++					compatible = "stericsson,ab8500-usb";
++					interrupts = < 0 90 0x4
++						       0 96 0x4
++						       0 14 0x4
++						       0 15 0x4
++						       0 79 0x4
++						       0 74 0x4
++						       0 75 0x4>;
++					interrupt-names = "ID_WAKEUP_R",
++							  "ID_WAKEUP_F",
++							  "VBUS_DET_F",
++							  "VBUS_DET_R",
++							  "USB_LINK_STATUS",
++							  "USB_ADP_PROBE_PLUG",
++							  "USB_ADP_PROBE_UNPLUG";
++					vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
++					v-ape-supply = <&db8500_vape_reg>;
++					musb_1v8-supply = <&db8500_vsmps2_reg>;
++				};
 +
- static struct platform_driver ab8500_sysctrl_driver = {
- 	.driver = {
- 		.name = "ab8500-sysctrl",
- 		.owner = THIS_MODULE,
-+		.of_match_table = ab8500_sysctrl_match,
- 	},
- 	.probe = ab8500_sysctrl_probe,
- 	.remove = __devexit_p(ab8500_sysctrl_remove),
+ 				ab8500-ponkey {
+ 					compatible = "stericsson,ab8500-ponkey";
+ 					interrupts = <0 6 0x4
 -- 
 1.7.9.5
