@@ -1,59 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 18 May 2012 07:13:08 -0700
-Subject: [PATCHv5 3/8] ARM: OMAP4460: Workaround for ROM bug because of
- CA9 r2pX gic control register change
-In-Reply-To: <CAMQu2gyqhxVP1M7ftxJ5qqmZ8Bp0ZmHd=7EjJZ7G1Y=Md=vT=g@mail.gmail.com>
- (Santosh Shilimkar's message of "Fri, 18 May 2012 11:35:36 +0530")
-References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
- <1336989796-26594-4-git-send-email-t-kristo@ti.com>
- <87zk99ce5q.fsf@ti.com> <4FB3707B.2080200@ti.com>
- <4FB39C5A.5080404@ti.com> <87mx586pci.fsf@ti.com>
- <CAMQu2gxKmeEnZr8PHZjuC_PUUzjbn7gDkG5NDKM6h2kuS+aJVQ@mail.gmail.com>
- <87txzeybhu.fsf@ti.com>
- <CAMQu2gyqhxVP1M7ftxJ5qqmZ8Bp0ZmHd=7EjJZ7G1Y=Md=vT=g@mail.gmail.com>
-Message-ID: <87likpo9vv.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 18 May 2012 16:58:03 +0200
+Subject: [PATCH] ARM: imx: only call l2x0_init if it's available
+Message-ID: <1337353083-23019-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+This fixes a build failure with CONFIG_CACHE_L2X0=n:
 
-> On Thu, May 17, 2012 at 10:45 PM, Kevin Hilman <khilman@ti.com> wrote:
+	arch/arm/mach-imx/built-in.o: In function `imx3_init_l2x0':
+	imx53-dt.c:(.init.text+0x190): undefined reference to `l2x0_init'
+	make[2]: *** [.tmp_vmlinux1] Error 1
+	make[1]: *** [sub-make] Error 2
+	make: *** [all] Error 2
 
-[...]
+When the l2 cache isn't enabled the quirk introduced in
+9524705 (MX35: Fix bogus L2 cache settings) doesn't need to be done
+either.
 
->> What's not at all clear is what the ROM code does *after* this. ?Does it
->> clear both bits? ?or just bit 0? ?Since it's r1pX based, I would expect
->> that it doesn't touch anything other than bit 0.
->>
-> Actually since the condition of control register == 1 is not satisfied,
-> It re-inits entire GIC thinking it's not configured at all. So everything
-> will be cleared and including non-secure GIC dist. enable bit.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/mm-imx3.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Aha, that's the missing piece of the puzzle: The ROM code is clearing
-bits that are unused on r1pX (but used on r2pX).  That is the root of
-this bug and needs more description.
-
-Thanks for clarifying.
-
-[...]
-
->> Santosh, I do understand what is happening here. ?But I play dumb so
->> that it will be described in great detail in the changelog so that when
->> I forget (and you forget) we can go back to this and get a quick
->> understanding of both the bug and the workaround.
->>
->> Since you are very deeply familiar with this bug, it's understandably
->> hard to write this changelog since most things probably seem obvious to
->> you. ?A suggestion would be to have a few colleagues that are not
->> familiar with this bug read the changelog and try and describe it back
->> to you.
->>
-> I agree with you. This is side effect of knowing some BUGs too much.
-> I will work with Tero so that change log captures more details.
-
-Thanks.
-
-Maybe Jon Hunter can help review the changelog too.  IMO, he is the
-reigning champion of thorough, descriptive and detailed changelogs.  :)
-
-Kevin
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 7412738..6a80496 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -81,6 +81,7 @@ static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
+ 
+ void __init imx3_init_l2x0(void)
+ {
++#ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *l2x0_base;
+ 	void __iomem *clkctl_base;
+ 
+@@ -110,6 +111,7 @@ void __init imx3_init_l2x0(void)
+ 	}
+ 
+ 	l2x0_init(l2x0_base, 0x00030024, 0x00000000);
++#endif
+ }
+ 
+ #ifdef CONFIG_SOC_IMX31
+-- 
+1.7.10
