@@ -1,288 +1,231 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 18 May 2012 11:24:07 +0900
-Subject: [PATCH v2 1/6] mmc: dw_mmc: convert copy of struct device in
- struct dw_mci to a reference
-In-Reply-To: <1337267411-28226-2-git-send-email-thomas.abraham@linaro.org>
-References: <1337267411-28226-1-git-send-email-thomas.abraham@linaro.org>
- <1337267411-28226-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4FB5B2C7.6010700@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 May 2012 10:33:21 +0800
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <CAOMZO5Aj0cfpJwMEQwOvM9cM52=W5Rtr5kKxqgw1JG_5AQ5t+g@mail.gmail.com>
+References: <4FB583CF.2080801@grid-net.com>
+ <20120518010138.GA5427@S2101-09.ap.freescale.net>
+ <CAOMZO5D679an+-iaUBXZy+PmHB2tAHhYHUAFWY+4rxSOYiBkyw@mail.gmail.com>
+ <CAAQ0ZWRB1=pFqtL_2y-D-f4_VM21o9U1G9F3PMwNgM4ewKmkWQ@mail.gmail.com>
+ <CAOMZO5Aj0cfpJwMEQwOvM9cM52=W5Rtr5kKxqgw1JG_5AQ5t+g@mail.gmail.com>
+Message-ID: <20120518023318.GB5427@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-I think that also need to consider for using dw_mci-pci.c.
-
-Best Regards,
-Jaehoon chung
-
-On 05/18/2012 12:10 AM, Thomas Abraham wrote:
-
-> The 'struct dw_mci' maintains a copy of the pdev->dev instance instead of
-> maintaining a reference to that 'struct device' instance. Any resource
-> allocated using the device resource management kernel API with the instance
-> of 'struct device' in 'struct dw_mci' is then incorrect. Fix this by
-> converting the copy of 'struct device' in 'struct dw_mci' to a reference.
+On Thu, May 17, 2012 at 11:00:07PM -0300, Fabio Estevam wrote:
+> On Thu, May 17, 2012 at 10:58 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On 18 May 2012 09:50, Fabio Estevam <festevam@gmail.com> wrote:
+> >> Could you please confirm next-20120517 also boots?
+> >>
+> >> I am not getting nothing on console.
+> >>
+> >> This is my U-boot setup:
+> >>
+> >> run netargs; tftpboot 42000000 uImage; tftpboot 42800000
+> >> imx28-evk.dtb; bootm 0x4000000 - 0x42000000
+> >>
+> > The addresses in bootm mismatch the ones in tftpboot?
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/mmc/host/dw_mmc-pltfm.c |    2 +-
->  drivers/mmc/host/dw_mmc.c       |   54 +++++++++++++++++++-------------------
->  include/linux/mmc/dw_mmc.h      |    2 +-
->  3 files changed, 29 insertions(+), 29 deletions(-)
+> Sorry, my typo. The line I use is:
 > 
-> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-> index 92ec3eb..9a63299 100644
-> --- a/drivers/mmc/host/dw_mmc-pltfm.c
-> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
-> @@ -43,7 +43,7 @@ static int dw_mci_pltfm_probe(struct platform_device *pdev)
->  		goto err_free;
->  	}
->  
-> -	host->dev = pdev->dev;
-> +	host->dev = &pdev->dev;
->  	host->irq_flags = 0;
->  	host->pdata = pdev->dev.platform_data;
->  	ret = -ENOMEM;
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 1532357..01d870a 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -266,7 +266,7 @@ static void dw_mci_start_command(struct dw_mci *host,
->  				 struct mmc_command *cmd, u32 cmd_flags)
->  {
->  	host->cmd = cmd;
-> -	dev_vdbg(&host->dev,
-> +	dev_vdbg(host->dev,
->  		 "start command: ARGR=0x%08x CMDR=0x%08x\n",
->  		 cmd->arg, cmd_flags);
->  
-> @@ -308,7 +308,7 @@ static void dw_mci_dma_cleanup(struct dw_mci *host)
->  
->  	if (data)
->  		if (!data->host_cookie)
-> -			dma_unmap_sg(&host->dev,
-> +			dma_unmap_sg(host->dev,
->  				     data->sg,
->  				     data->sg_len,
->  				     dw_mci_get_dma_dir(data));
-> @@ -334,7 +334,7 @@ static void dw_mci_idmac_complete_dma(struct dw_mci *host)
->  {
->  	struct mmc_data *data = host->data;
->  
-> -	dev_vdbg(&host->dev, "DMA complete\n");
-> +	dev_vdbg(host->dev, "DMA complete\n");
->  
->  	host->dma_ops->cleanup(host);
->  
-> @@ -462,7 +462,7 @@ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
->  			return -EINVAL;
->  	}
->  
-> -	sg_len = dma_map_sg(&host->dev,
-> +	sg_len = dma_map_sg(host->dev,
->  			    data->sg,
->  			    data->sg_len,
->  			    dw_mci_get_dma_dir(data));
-> @@ -505,7 +505,7 @@ static void dw_mci_post_req(struct mmc_host *mmc,
->  		return;
->  
->  	if (data->host_cookie)
-> -		dma_unmap_sg(&slot->host->dev,
-> +		dma_unmap_sg(slot->host->dev,
->  			     data->sg,
->  			     data->sg_len,
->  			     dw_mci_get_dma_dir(data));
-> @@ -531,7 +531,7 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
->  
->  	host->using_dma = 1;
->  
-> -	dev_vdbg(&host->dev,
-> +	dev_vdbg(host->dev,
->  		 "sd sg_cpu: %#lx sg_dma: %#lx sg_len: %d\n",
->  		 (unsigned long)host->sg_cpu, (unsigned long)host->sg_dma,
->  		 sg_len);
-> @@ -889,12 +889,12 @@ static void dw_mci_request_end(struct dw_mci *host, struct mmc_request *mrq)
->  		slot = list_entry(host->queue.next,
->  				  struct dw_mci_slot, queue_node);
->  		list_del(&slot->queue_node);
-> -		dev_vdbg(&host->dev, "list not empty: %s is next\n",
-> +		dev_vdbg(host->dev, "list not empty: %s is next\n",
->  			 mmc_hostname(slot->mmc));
->  		host->state = STATE_SENDING_CMD;
->  		dw_mci_start_request(host, slot);
->  	} else {
-> -		dev_vdbg(&host->dev, "list empty\n");
-> +		dev_vdbg(host->dev, "list empty\n");
->  		host->state = STATE_IDLE;
->  	}
->  
-> @@ -1033,7 +1033,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
->  					data->bytes_xfered = 0;
->  					data->error = -ETIMEDOUT;
->  				} else {
-> -					dev_err(&host->dev,
-> +					dev_err(host->dev,
->  						"data FIFO error "
->  						"(status=%08x)\n",
->  						status);
-> @@ -1750,7 +1750,7 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	struct mmc_host *mmc;
->  	struct dw_mci_slot *slot;
->  
-> -	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), &host->dev);
-> +	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
->  	if (!mmc)
->  		return -ENOMEM;
->  
-> @@ -1862,10 +1862,10 @@ static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
->  static void dw_mci_init_dma(struct dw_mci *host)
->  {
->  	/* Alloc memory for sg translation */
-> -	host->sg_cpu = dma_alloc_coherent(&host->dev, PAGE_SIZE,
-> +	host->sg_cpu = dma_alloc_coherent(host->dev, PAGE_SIZE,
->  					  &host->sg_dma, GFP_KERNEL);
->  	if (!host->sg_cpu) {
-> -		dev_err(&host->dev, "%s: could not alloc DMA memory\n",
-> +		dev_err(host->dev, "%s: could not alloc DMA memory\n",
->  			__func__);
->  		goto no_dma;
->  	}
-> @@ -1873,7 +1873,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
->  	/* Determine which DMA interface to use */
->  #ifdef CONFIG_MMC_DW_IDMAC
->  	host->dma_ops = &dw_mci_idmac_ops;
-> -	dev_info(&host->dev, "Using internal DMA controller.\n");
-> +	dev_info(host->dev, "Using internal DMA controller.\n");
->  #endif
->  
->  	if (!host->dma_ops)
-> @@ -1882,12 +1882,12 @@ static void dw_mci_init_dma(struct dw_mci *host)
->  	if (host->dma_ops->init && host->dma_ops->start &&
->  	    host->dma_ops->stop && host->dma_ops->cleanup) {
->  		if (host->dma_ops->init(host)) {
-> -			dev_err(&host->dev, "%s: Unable to initialize "
-> +			dev_err(host->dev, "%s: Unable to initialize "
->  				"DMA Controller.\n", __func__);
->  			goto no_dma;
->  		}
->  	} else {
-> -		dev_err(&host->dev, "DMA initialization not found.\n");
-> +		dev_err(host->dev, "DMA initialization not found.\n");
->  		goto no_dma;
->  	}
->  
-> @@ -1895,7 +1895,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
->  	return;
->  
->  no_dma:
-> -	dev_info(&host->dev, "Using PIO mode.\n");
-> +	dev_info(host->dev, "Using PIO mode.\n");
->  	host->use_dma = 0;
->  	return;
->  }
-> @@ -1927,19 +1927,19 @@ int dw_mci_probe(struct dw_mci *host)
->  	u32 fifo_size;
->  
->  	if (!host->pdata || !host->pdata->init) {
-> -		dev_err(&host->dev,
-> +		dev_err(host->dev,
->  			"Platform data must supply init function\n");
->  		return -ENODEV;
->  	}
->  
->  	if (!host->pdata->select_slot && host->pdata->num_slots > 1) {
-> -		dev_err(&host->dev,
-> +		dev_err(host->dev,
->  			"Platform data must supply select_slot function\n");
->  		return -ENODEV;
->  	}
->  
->  	if (!host->pdata->bus_hz) {
-> -		dev_err(&host->dev,
-> +		dev_err(host->dev,
->  			"Platform data must supply bus speed\n");
->  		return -ENODEV;
->  	}
-> @@ -1981,7 +1981,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	}
->  
->  	/* Reset all blocks */
-> -	if (!mci_wait_reset(&host->dev, host)) {
-> +	if (!mci_wait_reset(host->dev, host)) {
->  		ret = -ENODEV;
->  		goto err_dmaunmap;
->  	}
-> @@ -2047,7 +2047,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	 * Need to check the version-id and set data-offset for DATA register.
->  	 */
->  	host->verid = SDMMC_GET_VERID(mci_readl(host, VERID));
-> -	dev_info(&host->dev, "Version ID is %04x\n", host->verid);
-> +	dev_info(host->dev, "Version ID is %04x\n", host->verid);
->  
->  	if (host->verid < DW_MMC_240A)
->  		host->data_offset = DATA_OFFSET;
-> @@ -2064,12 +2064,12 @@ int dw_mci_probe(struct dw_mci *host)
->  		   DW_MCI_ERROR_FLAGS | SDMMC_INT_CD);
->  	mci_writel(host, CTRL, SDMMC_CTRL_INT_ENABLE); /* Enable mci interrupt */
->  
-> -	dev_info(&host->dev, "DW MMC controller at irq %d, "
-> +	dev_info(host->dev, "DW MMC controller at irq %d, "
->  		 "%d bit host data width, "
->  		 "%u deep fifo\n",
->  		 host->irq, width, fifo_size);
->  	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
-> -		dev_info(&host->dev, "Internal DMAC interrupt fix enabled.\n");
-> +		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
->  
->  	return 0;
->  
-> @@ -2088,7 +2088,7 @@ err_workqueue:
->  err_dmaunmap:
->  	if (host->use_dma && host->dma_ops->exit)
->  		host->dma_ops->exit(host);
-> -	dma_free_coherent(&host->dev, PAGE_SIZE,
-> +	dma_free_coherent(host->dev, PAGE_SIZE,
->  			  host->sg_cpu, host->sg_dma);
->  
->  	if (host->vmmc) {
-> @@ -2107,7 +2107,7 @@ void dw_mci_remove(struct dw_mci *host)
->  	mci_writel(host, INTMASK, 0); /* disable all mmc interrupt first */
->  
->  	for (i = 0; i < host->num_slots; i++) {
-> -		dev_dbg(&host->dev, "remove slot %d\n", i);
-> +		dev_dbg(host->dev, "remove slot %d\n", i);
->  		if (host->slot[i])
->  			dw_mci_cleanup_slot(host->slot[i], i);
->  	}
-> @@ -2118,7 +2118,7 @@ void dw_mci_remove(struct dw_mci *host)
->  
->  	free_irq(host->irq, host);
->  	destroy_workqueue(host->card_workqueue);
-> -	dma_free_coherent(&host->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> +	dma_free_coherent(host->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
->  
->  	if (host->use_dma && host->dma_ops->exit)
->  		host->dma_ops->exit(host);
-> @@ -2173,7 +2173,7 @@ int dw_mci_resume(struct dw_mci *host)
->  	if (host->dma_ops->init)
->  		host->dma_ops->init(host);
->  
-> -	if (!mci_wait_reset(&host->dev, host)) {
-> +	if (!mci_wait_reset(host->dev, host)) {
->  		ret = -ENODEV;
->  		return ret;
->  	}
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 7a7ebd3..a37a573 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -156,7 +156,7 @@ struct dw_mci {
->  	u32			fifoth_val;
->  	u16			verid;
->  	u16			data_offset;
-> -	struct device		dev;
-> +	struct device		*dev;
->  	struct dw_mci_board	*pdata;
->  	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
->  
+> run netargs; tftpboot 42000000 uImage; tftpboot 42800000
+> imx28-evk.dtb; bootm 0x42000000 - 0x42800000
+> 
+> This is what I see:
+> 
+The next-20120517 seems working for me too.
+
+You can turn on low-level debug option to see where it goes wrong
+at your end.
+
+Regards,
+Shawn
+
+U-Boot 2011.12-00225-g8753994-dirty (Jan 28 2012 - 22:22:20)
+
+Freescale i.MX28 family
+DRAM:  128 MiB
+WARNING: Caches not enabled
+MMC:   MXS MMC: 0
+In:    serial
+Out:   serial
+Err:   serial
+Net:   FEC0, FEC1
+Warning: failed to set MAC address
+
+Hit any key to stop autoboot:  0
+MX28EVK U-Boot > set bootargs console=ttyAMA0,115200 root=/dev/mmcblk0p2 rw root
+wait ip=:::::eth0:dhcp
+MX28EVK U-Boot > boot
+Using FEC0 device
+TFTP from server 192.168.1.3; our IP address is 192.168.1.7
+Filename 'uImage'.
+Load address: 0x42000000
+Loading: #################################################################
+         #################################################################
+         ##########################
+done
+Bytes transferred = 2283144 (22d688 hex)
+Using FEC0 device
+TFTP from server 192.168.1.3; our IP address is 192.168.1.7
+Filename 'imx28-evk.dtb'.
+Load address: 0x42800000
+Loading: #
+done
+Bytes transferred = 9340 (247c hex)
+## Booting kernel from Legacy Image at 42000000 ...
+   Image Name:   Linux-3.4.0-rc7-next-20120517-di
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2283080 Bytes = 2.2 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+## Flattened Device Tree blob at 42800000
+   Booting using the fdt blob at 0x42800000
+   Loading Kernel Image ... OK
+OK
+   Loading Device Tree to 47b92000, end 47b9747b ... OK
+
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0
+[    0.000000] Linux version 3.4.0-rc7-next-20120517-dirty (r65073 at S2101-09) (gc
+c version 4.6.1 (Ubuntu/Linaro 4.6.1-9ubuntu3) ) #10 Fri May 18 10:22:22 CST 201
+2
+[    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: Freescale i.MX28 (Device Tree), model: Freescale i.MX28
+Evaluation Kit
+[    0.000000] Memory policy: ECC disabled, Data cache writeback
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pag
+es: 32512
+[    0.000000] Kernel command line: console=ttyAMA0,115200 root=/dev/mmcblk0p2 r
+w rootwait ip=:::::eth0:dhcp
+[    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+[    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+[    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+[    0.000000] Memory: 128MB = 128MB total
+[    0.000000] Memory: 119908k/119908k available, 11164k reserved, 0K highmem
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc040d800   (4118 kB)
+[    0.000000]       .init : 0xc040e000 - 0xc042e000   ( 128 kB)
+[    0.000000]       .data : 0xc042e000 - 0xc046b4b8   ( 246 kB)
+[    0.000000]        .bss : 0xc046b4dc - 0xc09b77a0   (5425 kB)
+[    0.000000] SLUB: Genslabs=13, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, N
+odes=1
+[    0.000000] NR_IRQS:304
+[    0.000000] sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps ever
+y 4294967286ms
+[    0.000000] Console: colour dummy device 80x30
+[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo
+ Molnar
+[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
+[    0.000000] ... MAX_LOCK_DEPTH:          48
+[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
+[    0.000000] ... CLASSHASH_SIZE:          4096
+[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
+[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
+[    0.000000] ... CHAINHASH_SIZE:          16384
+[    0.000000]  memory used by lock dependency info: 3695 kB
+[    0.000000]  per task-struct memory footprint: 1152 bytes
+[    0.070000] Calibrating delay loop... 226.09 BogoMIPS (lpj=1130496)
+[    0.070000] pid_max: default: 32768 minimum: 301
+[    0.070000] Mount-cache hash table entries: 512
+[    0.080000] CPU: Testing write buffer coherency: ok
+[    0.080000] Setting up static identity map for 0x402e7b10 - 0x402e7b68
+[    0.090000] devtmpfs: initialized
+[    0.100000] initlevel:0=early, 4 registered initcalls
+[    0.100000] initlevel:1=core, 19 registered initcalls
+[    0.100000] pinctrl core: initialized pinctrl subsystem
+[    0.100000] dummy:
+[    0.110000] NET: Registered protocol family 16
+[    0.110000] initlevel:2=postcore, 12 registered initcalls
+[    0.110000] initlevel:3=arch, 8 registered initcalls
+[    0.120000] gpiochip_add: registered GPIOs 0 to 31 on device: gpio.0
+[    0.120000] gpiochip_add: registered GPIOs 32 to 63 on device: gpio.1
+[    0.120000] gpiochip_add: registered GPIOs 64 to 95 on device: gpio.2
+[    0.120000] gpiochip_add: registered GPIOs 96 to 127 on device: gpio.3
+[    0.130000] gpiochip_add: registered GPIOs 128 to 159 on device: gpio.4
+[    0.140000] Serial: AMBA PL011 UART driver
+[    0.140000] 80074000.serial: ttyAMA0 at MMIO 0x80074000 (irq = 47) is a PL011
+ rev2
+[    0.350000] console [ttyAMA0] enabled
+[    0.360000] initlevel:4=subsys, 27 registered initcalls
+[    0.380000] bio: create slab <bio-0> at 0
+[    0.400000] mxs-dma 80004000.dma-apbh: initialized
+[    0.410000] mxs-dma 80024000.dma-apbx: initialized
+[    0.410000] 3P3V: 3300 mV
+[    0.420000] Advanced Linux Sound Architecture Driver Version 1.0.25.
+[    0.430000] initlevel:5=fs, 18 registered initcalls
+[    0.440000] Switching to clocksource mxs_timer
+[    0.590000] NET: Registered protocol family 2
+[    0.600000] IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.610000] TCP established hash table entries: 4096 (order: 3, 32768 bytes)
+[    0.620000] TCP bind hash table entries: 4096 (order: 5, 147456 bytes)
+[    0.630000] TCP: Hash tables configured (established 4096 bind 4096)
+[    0.640000] TCP: reno registered
+[    0.640000] UDP hash table entries: 64 (order: 0, 5120 bytes)
+[    0.640000] UDP-Lite hash table entries: 64 (order: 0, 5120 bytes)
+[    0.650000] NET: Registered protocol family 1
+[    0.660000] RPC: Registered named UNIX socket transport module.
+[    0.670000] RPC: Registered udp transport module.
+[    0.670000] RPC: Registered tcp transport module.
+[    0.680000] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.680000] initlevel:6=device, 100 registered initcalls
+[    0.690000] NetWinder Floating Point Emulator V0.97 (double precision)
+[    0.750000] NFS: Registering the id_resolver key type
+[    0.760000] Key type id_resolver registered
+[    0.770000] msgmni has been set to 234
+[    0.780000] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 2
+53)
+[    0.780000] io scheduler noop registered (default)
+[    0.790000] uart-pl011 80074000.serial: no DMA platform data
+[    0.800000] GPMI NAND driver registered. (IMX)
+[    0.820000] fec_enet_mii_bus: probed
+[    0.830000] mousedev: PS/2 mouse device common for all mice
+[    0.840000] i2c /dev entries driver
+[    0.890000] mxs-mmc 80010000.ssp: initialized
+[    0.910000] sgtl5000 0-000a: Failed to get supply 'VDDD': -517
+[    0.920000] 0-000a: 1200 mV normal
+[    0.930000] sgtl5000 0-000a: Using internal LDO instead of VDDD
+[    0.940000] sgtl5000 0-000a: sgtl5000 revision 0x11
+[    0.960000] asoc: sgtl5000 <-> 80042000.saif mapping ok
+[    0.970000] asoc: sgtl5000 <-> 80046000.saif mapping ok
+[    0.990000] TCP: cubic registered
+[    0.990000] NET: Registered protocol family 17
+[    1.000000] Key type dns_resolver registered
+[    1.000000] initlevel:7=late, 20 registered initcalls
+[    1.010000] registered taskstats version 1
+[    1.020000] /home/r65073/repos/shawnguo/linux-2.6/drivers/rtc/hctosys.c: unab
+le to open rtc device (rtc0)
+[    1.030000] mmc0: new high speed SDHC card at address e624
+[    1.040000] eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=80
+0f0000.etherne:00, irq=-1)
+[    1.050000] mmcblk0: mmc0:e624 SD08G 7.40 GiB
+[    1.070000]  mmcblk0: p1 p2
+[    3.040000] PHY: 800f0000.etherne:00 - Link is Up - 100/Full
+[    5.200000] Sending DHCP requests ., OK
+[    5.200000] IP-Config: Got DHCP answer from 0.0.0.0, my address is 192.168.1.
+7
+[    5.210000] IP-Config: Complete:
+[    5.210000]      device=eth0, addr=192.168.1.7, mask=255.255.255.0, gw=192.16
+8.1.1
+[    5.220000]      host=192.168.1.7, domain=, nis-domain=(none)
+[    5.220000]      bootserver=0.0.0.0, rootserver=0.0.0.0, rootpath=
+[    5.230000] ALSA device list:
+[    5.230000]   #0: mxs_sgtl5000
+[    6.260000] kjournald starting.  Commit interval 5 seconds
+[    6.270000] EXT3-fs (mmcblk0p2): warning: maximal mount count reached, runnin
+g e2fsck is recommended
+[    6.280000] EXT3-fs (mmcblk0p2): using internal journal
+[    6.290000] EXT3-fs (mmcblk0p2): recovery complete
+[    6.300000] EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
+[    6.300000] VFS: Mounted root (ext3 filesystem) on device 179:2.
+[    6.310000] Freeing init memory: 128K
+init started: BusyBox v1.15.0 ()
+...
