@@ -1,46 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 18 May 2012 16:58:03 +0200
-Subject: [PATCH] ARM: imx: only call l2x0_init if it's available
-Message-ID: <1337353083-23019-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 May 2012 17:13:16 +0200
+Subject: [PATCH 2/2] pcm038 lcdc support
+In-Reply-To: <1337349834.29229.15.camel@atropine>
+References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
+ <1337344032-25431-3-git-send-email-s.hauer@pengutronix.de>
+ <1337349834.29229.15.camel@atropine>
+Message-ID: <20120518151316.GU30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a build failure with CONFIG_CACHE_L2X0=n:
+On Fri, May 18, 2012 at 10:03:54AM -0400, Adam Jackson wrote:
+> On Fri, 2012-05-18 at 14:27 +0200, Sascha Hauer wrote:
+> 
+> > +			edid = [00 ff ff ff ff ff ff 00 4c 2d 6c 03 36 32 49 4b
+> > +				0f 13 01 03 80 37 22 a0 2a fe 21 a8 53 37 ae 24
+> > +				11 50 54
+> > +
+> > +				/* est timings */
+> > +				00 00 00
+> > +
+> > +				/* std timings */
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +				00 00
+> > +
+> > +				/* detailed timings */
+> > +				05 0D 20 A0 30 58 1C 20 28 20 14 00 26 57 21 00 00 1E
+> > +				00 00 00 fd 00 32 4b 1b	51 11 00 0a 20 20 20 20 20 20
+> > +				00 00 00 fc 00 53 79 6e 63 4d 61 73 74 65 72 0a 20 20
+> > +				00 00 00 ff 00 48 39 58 53 34 30 30 34 34 32 0a 20 20
+> > +				00 20];
+> 
+> This EDID block claims to be a Samsung SyncMaster, which isn't really
+> the right thing to do.  The question is what to call it instead.  Red
+> Hat has a PNP ID we can use for virtual EDID blocks like this if we
+> want, I'd want to set up a little database to keep track of them but
+> that's pretty trivial.
 
-	arch/arm/mach-imx/built-in.o: In function `imx3_init_l2x0':
-	imx53-dt.c:(.init.text+0x190): undefined reference to `l2x0_init'
-	make[2]: *** [.tmp_vmlinux1] Error 1
-	make[1]: *** [sub-make] Error 2
-	make: *** [all] Error 2
+Sorry, should have mentioned this in the commit log. This in fact is a
+hacked version of my office monitor. This patch is more meant as a usage
+example and not for upstream. I don't know yet if it's even acceptable
+to put edid data into the devicetree. I saw some discussion about it,
+but also about some generic display description, which I would prefer.
 
-When the l2 cache isn't enabled the quirk introduced in
-9524705 (MX35: Fix bogus L2 cache settings) doesn't need to be done
-either.
+BTW is there a more convenient tool than a hex editor around to generate
+edid data? I only found some windows tools
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/mm-imx3.c |    2 ++
- 1 file changed, 2 insertions(+)
+> 
+> Also, empty standard timing fields are 01 01, not 00 00.
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 7412738..6a80496 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -81,6 +81,7 @@ static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
- 
- void __init imx3_init_l2x0(void)
- {
-+#ifdef CONFIG_CACHE_L2X0
- 	void __iomem *l2x0_base;
- 	void __iomem *clkctl_base;
- 
-@@ -110,6 +111,7 @@ void __init imx3_init_l2x0(void)
- 	}
- 
- 	l2x0_init(l2x0_base, 0x00030024, 0x00000000);
-+#endif
- }
- 
- #ifdef CONFIG_SOC_IMX31
+Good to know
+
+Thanks
+ Sascha
+
 -- 
-1.7.10
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
