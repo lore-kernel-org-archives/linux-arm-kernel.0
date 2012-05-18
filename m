@@ -1,58 +1,105 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 18 May 2012 11:05:24 -0700
-Subject: [PATCH 2/2] cpuidle: coupled: fix decrementing ready count
-In-Reply-To: <1337364324-12171-1-git-send-email-ccross@android.com>
-References: <1337364324-12171-1-git-send-email-ccross@android.com>
-Message-ID: <1337364324-12171-3-git-send-email-ccross@android.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 18 May 2012 13:18:41 -0500
+Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+In-Reply-To: <[PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
+References: <[PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
+Message-ID: <1337365122-702-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpuidle_coupled_set_not_ready sometimes refuses to decrement the
-ready count in order to prevent a race condition.  This makes it
-unsuitable for use when finished with idle.  Add a new function
-cpuidle_coupled_set_done that decrements both the ready count and
-waiting count, and call it after idle is complete.
+From: Wenbiao Wang <wwang@ti.com>
 
-Signed-off-by: Colin Cross <ccross@android.com>
+Voltage Processor state machine transition to disable need to
+occur from IDLE state. When we transition OPP in a functioning
+system, the call sequence for an OPP transition is as follows:
+omap_sr_disable
+      -> sr class 3 disable
+           -> vp disable
+           -> sr disable
+forceupdate to voltage/frequency scale depending on which OPP
+we are transitioning to.
+
+If we hit a critical timing window where SR had commanded VP
+for a voltage transition and VP is in the middle of operating
+on that command, it needs to go through a few states before
+going to update state(where it actually sends the command to
+VC). Initial view of h/w owners is that the state disable of VP
+is expected to be sampled for the next transition.
+
+Instead, to be on a safer side, we ensure that the valid states
+of the VP state machine is diligently followed by software. This
+can be done by waiting for VP to be in idle  prior to disabling
+VP. Existing prints have been updated to ensure context is
+available on error messages.
+
+As part of this change, increase timeout for VP idle check to
+improbable 500uSec to be certain that system is indeed unable
+to continue before crashing out with error(worst case expectancy
+remains the same 3-100uSec depending on when we caught VP).
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+
+[nm at ti.com: port from android]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Wenbiao Wang <wwang@ti.com>
 ---
- drivers/cpuidle/coupled.c |   18 ++++++++++++++++--
- 1 files changed, 16 insertions(+), 2 deletions(-)
+V2: fix commit message - picked up redundant info from get_maintainer.pl
+Apologies on the spam
 
-diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
-index b02810a..fc427fa 100644
---- a/drivers/cpuidle/coupled.c
-+++ b/drivers/cpuidle/coupled.c
-@@ -388,6 +388,21 @@ static void cpuidle_coupled_set_not_waiting(int cpu,
- }
+V1: http://marc.info/?l=linux-omap&m=133736493721977&w=2
+
+ arch/arm/mach-omap2/vp.c |   15 +++++++++++++--
+ arch/arm/mach-omap2/vp.h |    2 +-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+index f95c1ba..925d869 100644
+--- a/arch/arm/mach-omap2/vp.c
++++ b/arch/arm/mach-omap2/vp.c
+@@ -262,6 +262,17 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 		return;
+ 	}
+ 
++	/*
++	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
++	 * Depending on if we catch VP in the middle of an SR operation.
++	 */
++	omap_test_timeout((voltdm->read(vp->vstatus)),
++			  VP_IDLE_TIMEOUT, timeout);
++
++	if (timeout >= VP_IDLE_TIMEOUT)
++		pr_warning("%s: vdd_%s idle timedout before disable\n",
++			   __func__, voltdm->name);
++
+ 	/* Disable VP */
+ 	vpconfig = voltdm->read(vp->vpconfig);
+ 	vpconfig &= ~vp->common->vpconfig_vpenable;
+@@ -274,8 +285,8 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 			  VP_IDLE_TIMEOUT, timeout);
+ 
+ 	if (timeout >= VP_IDLE_TIMEOUT)
+-		pr_warning("%s: vdd_%s idle timedout\n",
+-			__func__, voltdm->name);
++		pr_warning("%s: vdd_%s idle timedout after disable\n",
++			   __func__, voltdm->name);
+ 
+ 	vp->enabled = false;
+ 
+diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+index 7c155d2..0abf895 100644
+--- a/arch/arm/mach-omap2/vp.h
++++ b/arch/arm/mach-omap2/vp.h
+@@ -31,7 +31,7 @@ struct voltagedomain;
+ #define OMAP4_VP_VDD_MPU_ID 2
+ 
+ /* XXX document */
+-#define VP_IDLE_TIMEOUT		200
++#define VP_IDLE_TIMEOUT		500
+ #define VP_TRANXDONE_TIMEOUT	300
  
  /**
-+ * cpuidle_coupled_set_done - mark this cpu as leaving the ready loop
-+ * @cpu: the current cpu
-+ * @coupled: the struct coupled that contains the current cpu
-+ *
-+ * Marks this cpu as no longer in the ready and waiting loops.  Decrements
-+ * the waiting count first to prevent another cpu looping back in and seeing
-+ * this cpu as waiting just before it exits idle.
-+ */
-+static void cpuidle_coupled_set_done(int cpu, struct cpuidle_coupled *coupled)
-+{
-+	cpuidle_coupled_set_not_waiting(cpu, coupled);
-+	atomic_sub(MAX_WAITING_CPUS, &coupled->ready_waiting_counts);
-+}
-+
-+/**
-  * cpuidle_coupled_clear_pokes - spin until the poke interrupt is processed
-  * @cpu - this cpu
-  *
-@@ -501,8 +516,7 @@ int cpuidle_enter_state_coupled(struct cpuidle_device *dev,
- 
- 	entered_state = cpuidle_enter_state(dev, drv, next_state);
- 
--	cpuidle_coupled_set_not_waiting(dev->cpu, coupled);
--	cpuidle_coupled_set_not_ready(coupled);
-+	cpuidle_coupled_set_done(dev->cpu, coupled);
- 
- out:
- 	/*
 -- 
-1.7.7.3
+1.7.9.5
