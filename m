@@ -1,68 +1,38 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 18 May 2012 20:43:07 +0800
-Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
- consolidate LED driver in ARM
-In-Reply-To: <CAOesGMgy4QkLuB10q19e67n_kQw4++gDYbWNELN-ASayVYkjbA@mail.gmail.com>
-References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
- <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
- <CAK5ve-L4rcAx-=n5u7G0AQzvUG3ir_jzF_ibaSf-EntXAzFUCw@mail.gmail.com>
- <201205121453.45242.arnd.bergmann@linaro.org>
- <CAOesGMgy4QkLuB10q19e67n_kQw4++gDYbWNELN-ASayVYkjbA@mail.gmail.com>
-Message-ID: <CAK5ve-Jc=g+E=fmK8HgMKAHPNBYkQdAKw=S0bLqEPYfPEbyabw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 May 2012 13:03:28 +0000
+Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20 dtsi
+ files
+In-Reply-To: <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
+References: <4FB3B1F3.6080102@atmel.com> <20120517150601.GA28104@kroah.com>
+ <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
+Message-ID: <201205181303.28535.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2012 at 3:06 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Sat, May 12, 2012 at 7:53 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
->> On Friday 11 May 2012, Bryan Wu wrote:
->>> OK, I rebased my patch back on 3.4.0-rc6, please find it here:
->>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds
->>>
->>> linux-next branch can be also found here:
->>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds-next
->>>
->>> Arnd, could you please help me to merge? if got any issue, please
->>> point to me to fix.
->>>
->>
->> Hi Bryan,
->>
->> I've merged it into a new next/leds branch. I got conflicts with the clps711x
->> and at91 cleanups that are already in the next/cleanup branch but I think
->> I resolved them all correctly. ?It would be nice if you and/or the maintainers
->> of those platforms could confirm that.
->
-> At the end of my pass of merging branches tonight, I tried building
-> all defconfigs on ARM and got several new build errors due to LED
-> changes. The ones that have hit it so far are:
-> * assabet_defconfig
-> * at91rm9200_defconfig
-> * ebsa100_defconfig
-> * footbridge_defconfig
->
-> Bryan, please sort these out as soon as possible. Should be easy to
-> reproduce to debug. Meanwhile I've dropped the leds branch from
-> arm-soc's for-next branch so that we can bring in an updated
-> (bisectable without breakage) branch from you.
->
->
+On Thursday 17 May 2012, Stephen Rothwell wrote:
+> On Thu, 17 May 2012 08:06:01 -0700 Greg KH <gregkh@linuxfoundation.org> wrote:
+> >
+> > On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
+> > > On Wednesday 16 May 2012, Nicolas Ferre wrote:
+> > > > Now that the bulk of at91sam9g20-related nodes are located in at91sam9260.dtsi,
+> > > > we have to re-create the path to this ADC node for SoC specific parts.
+> > > > 
+> > > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > 
+> > > Should we apply this patch in arm-soc so that Greg can drop the hunk that
+> > > no longer applies?
+> > 
+> > It's not a "no longer applies", it's a "this does not merge".  The patch
+> > is in my tree, unless you want me to revert it, it's going to stay there
+> > until it goes to Linus.
+> 
+> Just apply the patch to the arm-soc tree - then the merge resolution
+> becomes "use the arm-soc version".   There is no need for Greg to revert
+> the other patch.
+> 
 
-So sorry, Arnd and Olof.
+Yes, good point.
 
-I was travelling back from US to home recently and missed this email thread.
-I've already push all changes:
-git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
-for-arm-soc
-It is based on y next branch in arm-soc git tree. I tried building and
-fixed some errors.
+I've applied the patch on the at91/dt branch now.
 
-Hope it's not very late.
-
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.186-168-78255 Mobile
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+	Arnd
