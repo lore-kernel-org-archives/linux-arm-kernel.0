@@ -1,97 +1,44 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 18 May 2012 13:17:34 -0700
-Subject: Clock register in early init
-In-Reply-To: <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
-References: <1337227884.2066.9.camel@pgaikwad-dt2>
- <20120517062131.GA9305@gmail.com>
- <1337316517.22560.19.camel@pgaikwad-dt2>
- <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 18 May 2012 13:18:35 -0700
+Subject: [PATCHv3 0/4] coupled cpuidle state support
+In-Reply-To: <201205182103.56301.rjw@sisk.pl>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+ <4FB62611.7080908@ti.com> <201205182103.56301.rjw@sisk.pl>
+Message-ID: <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 4:21 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Fri, May 18, 2012 at 06:48:37AM +0200, Prashant Gaikwad wrote:
->> Thanks for the reply Mike!!
->>
->> On Thu, 2012-05-17 at 11:51 +0530, Mike Turquette wrote:
->> > On 20120517-09:41, Prashant Gaikwad wrote:
->> > > Hi Mike,
->> > >
->> > > While porting Tegra to common clock framework I observed that if we try
->> > > to allocate struct clk dynamically in early init, kernel panics since
->> > > memory is not initialized yet.
->> > >
->> > > In your clk-next for omap you are registering clocks in early init and
->> > > clk_register allocates struct clk dynamically.
->> > >
->> > > So, am I missing something here?
->> > >
->> >
->> > You have the same problem as my platform (OMAP). ?Please check out
->> > include/linux/clk-private.h. ?That is a really nasty terrible hack that
->> > exists for statically initializing all data. ?It exposes the definition
->> > of struct clk (which is bad and violates the design philosophy that
->> > struct clk should be an opaque cookie).
->> >
->> > Please review Documentat/clk.txt to understand the rules around
->> > clk-private.h. ?Namely that you MUST separate your data from your clock
->> > function definitions (the clk_ops should never know the definition of
->> > struct clk).
+On Fri, May 18, 2012 at 12:03 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Friday, May 18, 2012, Santosh Shilimkar wrote:
+>> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
+>> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+>> > cpus cannot be independently powered down, either due to
+>> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+>> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
+>> > will corrupt the gic state unless the other cpu runs a work
+>> > around). ?Each cpu has a power state that it can enter without
+>> > coordinating with the other cpu (usually Wait For Interrupt, or
+>> > WFI), and one or more "coupled" power states that affect blocks
+>> > shared between the cpus (L2 cache, interrupt controller, and
+>> > sometimes the whole SoC). ?Entering a coupled power state must
+>> > be tightly controlled on both cpus.
 >> >
 >>
->> Yes, currently I am also doing same for Tegra and it works well. clk_ops
->> and clk initialization data are in separate files. clk_ops does not
->> include clk-private.h so it does not know the definition of struct clk.
+>> [...]
 >>
->> Will send patches for shortly.
+>> > This series has been tested and reviewed by Santosh and Kevin
+>> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
+>> > and Exynos5 patches are in progress. ?I think this is ready to
+>> > go in. ?Lean, are you maintaining a cpuidle tree for linux-next?
+>> > If not, I can publish a tree for linux-next, or this could go in
+>> > through Arnd's tree.
 >>
->> > Finally, I really want to kill off clk-private.h. ?Currently OMAP does
->> > clock registration during early init and that is why this crap exists.
->> > However we are going to move our clock initialization to be initcall
->> > based at some point in the future. ?No other platform (until now) was
->> > using these macros in clk-private.h, so I had planned on removing them
->> > after OMAP migrated.
->> >
->> > What are the plans for Tegra? ?I really don't want to have to support
->> > this stuff. ?Can you migrate your clock initialization to be initcall
->> > based at some point in the future?
->> >
->>
->> We had initcall based implementation in old kernel versions. It was
->> moved to early init since some clocks were required for delay
->> calibrations. It may be possible to migrate it be initcall based in
->> future.
+>> I haven't seen any response so far on who is lining up this
+>> series for 3.5 ? Not sure if it made it to linux-next either.
 >
-> I don't think we can do it all dynamic. We need to have the clockfrequency
-> of the local timer at least, which depends on the PLLX frequency and
-> ultimately on HFOSC input frequency which is measured by the clock code at
-> boottime. I haven't figured out what else we need, but I wouldn't be surprised
-> to find some more gotchas. It might be possible to split the clocks into
-> 'early init clocks' and normal clocks, but I would rather not go there.
-
-On OMAP I think the only "gotcha" is setting up the timer.  One
-solution is to open code the register reads and the rate calculation
-in the timer code.  That is ugly... but it works.
-
-> Which advantages do you see in dynamically allocating all this?
+> That should be Len, but he's been silent recently.
 >
+> How urgent is it?
 
-There are many but I'll name a couple.  The most significant point is
-that we can avoid exposing the definition of struct clk if we
-dynamically allocate stuff.  One can use struct clk_hw_init to
-statically initialize data, or instead rely on direct calls to
-clk_register with a bunch of parameters.
-
-Another point is that copying the data at registration-time makes
-__initdata possible.  I haven't done the math yet to see if this
-really makes a difference.  However if we start doing single zImage's
-with multiple different ARM SoCs then this could recover some pages.
-
-Regards,
-Mike
-
-> Cheers,
->
-> Peter.
+Len silently picked up the last version.  I just posted two fixes to
+it, hopefully he'll pick up those too.
