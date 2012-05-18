@@ -1,55 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 18 May 2012 09:48:23 -0600
-Subject: [PATCH RFC 1/1] pinctrl: improve gpio support for dt
-In-Reply-To: <20120518072613.GJ10347@shlinux2.ap.freescale.net>
-References: <1337090839-21224-1-git-send-email-b29396@freescale.com>
- <4FB55A35.1010902@wwwdotorg.org>
- <20120518072613.GJ10347@shlinux2.ap.freescale.net>
-Message-ID: <4FB66F47.8010306@wwwdotorg.org>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 18 May 2012 22:42:52 +0530
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FB55242.2080501@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FB3D294.4020505@wwwdotorg.org>
+ <CAJe_Zhe6uT7u-+0VEx2XCieuynmK5nOO=4DSpDDS_Q=N8-QtPA@mail.gmail.com>
+ <201205161942.20296.arnd@arndb.de>
+ <CAJe_ZhebPfmLS8ur8FAnmdj37ye25HrE2QF-Qk5PVDnzmpAniQ@mail.gmail.com>
+ <4FB55242.2080501@wwwdotorg.org>
+Message-ID: <CAJe_ZherKototBYoc3d47JJbYjYxAMJbQ5RmjupoMyqNjdQYEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2012 01:26 AM, Dong Aisheng wrote:
-> On Fri, May 18, 2012 at 04:06:13AM +0800, Stephen Warren wrote:
->> On 05/15/2012 08:07 AM, Dong Aisheng wrote:
->>> For dt, the gpio base may be dynamically allocated, thus the original
->>> implementation of gpio support based on static gpio number and pin id
-...
->> For example, Tegra might have:
->>
->> gpio-controllers = <&tegra_gpio>; // there's just 1
->>
->> i.MX23 might have:
->>
->> gpio-controllers = <&gpio0 &gpio1 &gpio2 &gpio3>; // it has 4 banks
->>
->> whereas pinctrl-simple/pinctrl-generic might want to put the entire
->> range table in this property, so might do something like:
->>
->> gpio-ranges =	<&gpio0 $gpio_offset $pin_offset $count>
->> 		<&gpio1 $gpio_offset $pin_offset $count> ...;
->>
->> and hence set cellskip to 3. the pinctrl-simple/pinctrl-generic code
->> would need to parse the other 3 cells itself.
+On 18 May 2012 01:02, Stephen Warren <swarren@wwwdotorg.org> wrote:
 >
-> I like this way. :-)
-> You made me come up a few more thoughts on it.
-> Why shouldn't we use this format as a standard binding way for gpio ranges
-> in pinctrl core and let core handle it totally for creating the range table?
+> Now, the DMA node for an on-SoC DMAC would be in soc.dtsi. Typically,
+> the DMAC is connected to many on-SoC devices, and hence soc.dtsi would
+> need to specify the routing information for all those devices to avoid
+> duplicating it in every board.dts. Now, if you have some DMA requests
+> that go off-SoC, the board.dts file might want to add to the routing
+> table to indicate what clients connect to those DMA requests. However,
+> there's no way in the device tree compiler right now to add to a
+> property; you can only completely replace it. That would entail
+> duplicating the entire routing information from soc.dtsi into each
+> board.dts that wanted to add to it - a bad situation. Splitting the
+> routing information into chunks in the client nodes avoids this issue
+> entirely.
+>
+ As already noted by Russell, the dma setup is different than irq or
+gpio which deliberately lend to off-SoC attachments. Without fpga'ing,
+I find it hard to imagine request-signals going off-SoC.
 
-Yes, that's probably reasonable.
+I only see the issue of different boards sporting a different sub-sets
+of clients i.e, a map entry may or may exist for a board but it would
+be same for two boards that have it.
+ Maybe we could somehow separate out the chan-map and private-data
+into board.dts ?
+Even if it has to stay in soc.dts, we still have the benefit of having
+dmac agnostic client nodes.
 
-Typically I'd argue that since the pinctrl driver probably knows this
-information, and it's static, it should be in the driver not DT.
-However, since the data is very small, and half of it needs to be in DT
-anyway to provide the ability to look up the gpio_chip, it seems
-reasonable to just put the whole thing in DT..
-
-> The only concern is i'm not sure if any other SoC needs more cells for
-> this format since we want this to be a standard bind format.
-> But for now i did not see any need, people may raise it if any.
-
-There's still the open question re: how to look up the gpio_chip from
-the DT node, since there may be multiple gpio_chips for a single DT node
-(banked controllers). Still, I hope that's just an implementation detail
-rather than anything that conceptually breaks this idea.
+cheers!
