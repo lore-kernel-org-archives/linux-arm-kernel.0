@@ -1,57 +1,97 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 18 May 2012 11:05:23 -0700
-Subject: [PATCH 1/2] cpuidle: coupled: fix count of online cpus
-In-Reply-To: <1337364324-12171-1-git-send-email-ccross@android.com>
-References: <1337364324-12171-1-git-send-email-ccross@android.com>
-Message-ID: <1337364324-12171-2-git-send-email-ccross@android.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 18 May 2012 13:12:55 -0500
+Subject: [PATCH] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+Message-ID: <1337364775-29597-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-online_count was never incremented on boot, and was also counting
-cpus that were not part of the coupled set.  Fix both issues by
-introducting a new function that counts online coupled cpus, and
-call it from register as well as the hotplug notifier.
+From: Wenbiao Wang <wwang@ti.com>
 
-Signed-off-by: Colin Cross <ccross@android.com>
+Voltage Processor state machine transition to disable need to
+occur from IDLE state. When we transition OPP in a functioning
+system, the call sequence for an OPP transition is as follows:
+omap_sr_disable
+      -> sr class 3 disable
+           -> vp disable
+           -> sr disable
+forceupdate to voltage/frequency scale depending on which OPP
+we are transitioning to.
+
+If we hit a critical timing window where SR had commanded VP
+for a voltage transition and VP is in the middle of operating
+on that command, it needs to go through a few states before
+going to update state(where it actually sends the command to
+VC). Initial view of h/w owners is that the state disable of VP
+is expected to be sampled for the next transition.
+
+Instead, to be on a safer side, we ensure that the valid states
+of the VP state machine is diligently followed by software. This
+can be done by waiting for VP to be in idle  prior to disabling
+VP.
+
+As part of this change, increase timeout for VP idle check to
+improbable 500uSec to be certain that system is indeed unable
+to continue before crashing out with error(worst case expectancy
+remains the same 3-100uSec depending on when we caught VP).
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: linux-omap at vger.kernel.org (open list:OMAP SUPPORT)
+Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM PORT)
+
+[nm at ti.com: port from android]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Wenbiao Wang <wwang@ti.com>
 ---
- drivers/cpuidle/coupled.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/vp.c |   15 +++++++++++++--
+ arch/arm/mach-omap2/vp.h |    2 +-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
-index 3e65de1..b02810a 100644
---- a/drivers/cpuidle/coupled.c
-+++ b/drivers/cpuidle/coupled.c
-@@ -532,6 +532,13 @@ int cpuidle_enter_state_coupled(struct cpuidle_device *dev,
- 	return entered_state;
- }
+diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+index f95c1ba..925d869 100644
+--- a/arch/arm/mach-omap2/vp.c
++++ b/arch/arm/mach-omap2/vp.c
+@@ -262,6 +262,17 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 		return;
+ 	}
  
-+static void cpuidle_coupled_update_online_cpus(struct cpuidle_coupled *coupled)
-+{
-+	cpumask_t cpus;
-+	cpumask_and(&cpus, cpu_online_mask, &coupled->coupled_cpus);
-+	coupled->online_count = cpumask_weight(&cpus);
-+}
++	/*
++	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
++	 * Depending on if we catch VP in the middle of an SR operation.
++	 */
++	omap_test_timeout((voltdm->read(vp->vstatus)),
++			  VP_IDLE_TIMEOUT, timeout);
 +
++	if (timeout >= VP_IDLE_TIMEOUT)
++		pr_warning("%s: vdd_%s idle timedout before disable\n",
++			   __func__, voltdm->name);
++
+ 	/* Disable VP */
+ 	vpconfig = voltdm->read(vp->vpconfig);
+ 	vpconfig &= ~vp->common->vpconfig_vpenable;
+@@ -274,8 +285,8 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 			  VP_IDLE_TIMEOUT, timeout);
+ 
+ 	if (timeout >= VP_IDLE_TIMEOUT)
+-		pr_warning("%s: vdd_%s idle timedout\n",
+-			__func__, voltdm->name);
++		pr_warning("%s: vdd_%s idle timedout after disable\n",
++			   __func__, voltdm->name);
+ 
+ 	vp->enabled = false;
+ 
+diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+index 7c155d2..0abf895 100644
+--- a/arch/arm/mach-omap2/vp.h
++++ b/arch/arm/mach-omap2/vp.h
+@@ -31,7 +31,7 @@ struct voltagedomain;
+ #define OMAP4_VP_VDD_MPU_ID 2
+ 
+ /* XXX document */
+-#define VP_IDLE_TIMEOUT		200
++#define VP_IDLE_TIMEOUT		500
+ #define VP_TRANXDONE_TIMEOUT	300
+ 
  /**
-  * cpuidle_coupled_register_device - register a coupled cpuidle device
-  * @dev: struct cpuidle_device for the current cpu
-@@ -570,6 +577,8 @@ int cpuidle_coupled_register_device(struct cpuidle_device *dev)
- 	if (WARN_ON(!cpumask_equal(&dev->coupled_cpus, &coupled->coupled_cpus)))
- 		coupled->prevent++;
- 
-+	cpuidle_coupled_update_online_cpus(coupled);
-+
- 	coupled->refcnt++;
- 
- 	csd = &per_cpu(cpuidle_coupled_poke_cb, dev->cpu);
-@@ -668,7 +677,7 @@ static int cpuidle_coupled_cpu_notify(struct notifier_block *nb,
- 		break;
- 	case CPU_ONLINE:
- 	case CPU_DEAD:
--		dev->coupled->online_count = num_online_cpus();
-+		cpuidle_coupled_update_online_cpus(dev->coupled);
- 		/* Fall through */
- 	case CPU_UP_CANCELED:
- 	case CPU_DOWN_FAILED:
 -- 
-1.7.7.3
+1.7.9.5
