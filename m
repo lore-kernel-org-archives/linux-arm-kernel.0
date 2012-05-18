@@ -1,38 +1,105 @@
-From: dirk.behme@googlemail.com (Dirk Behme)
-Date: Fri, 18 May 2012 08:16:19 +0200
-Subject: Booting mx31 on linux-next-20120517
-In-Reply-To: <20120518060056.GB3710@pengutronix.de>
-References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
- <CAOMZO5BUBAcx9ESLau9b4osE3jQNnh1CXW7FgkmbQ1aS57bOCg@mail.gmail.com>
- <20120518060056.GB3710@pengutronix.de>
-Message-ID: <4FB5E933.6060001@googlemail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 18 May 2012 11:52:13 +0530
+Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
+In-Reply-To: <87mx56s6nz.fsf@ti.com>
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+ <1335536018-16004-9-git-send-email-tarun.kanti@ti.com> <87y5oqtpnw.fsf@ti.com>
+ <20120517231251.GH17852@atomide.com> <87mx56s6nz.fsf@ti.com>
+Message-ID: <CAMQu2gys=yXMoz5g5X+7Tf+VQ5D9J8ZkpWgdm-87rSOZ6w7BXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.05.2012 08:00, Uwe Kleine-K?nig wrote:
-> On Fri, May 18, 2012 at 01:07:07AM -0300, Fabio Estevam wrote:
->> initlevel:7=late, 20 registered initcalls
->> VFP support v0.3: implementor 41 architecture 1 part 20 variant b rev 2
->> turn off boot console earlycon
+On Fri, May 18, 2012 at 5:26 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tony Lindgren <tony@atomide.com> writes:
+>
+>> * Kevin Hilman <khilman@ti.com> [120517 15:29]:
+>>>
+>>> I just noticed that this patch has caused some strange problems, notably
+>>> with the GPIO IRQ used by smsc911x NIC (Overo, Zoom3, 2430SDP, etc. etc.)
+>>>
+>>> The patch itself is OK, but it has exposed a bug in other parts of the
+>>> context restore path that was previously hidden.
+>>>
+>>> We seem to have been finding lots of GPIO bugs by just testing the
+>>> network chips with GPIO IRQs. ?Can I suggest that a platform with a GPIO
+>>> IRQ NIC be added to the test platforms you're using?
 >>
->> How can we prevent the "turn off boot console earlycon" to happen?
-> pass
+>> Yes considering the breakage it's pretty obvious the original series was
+>> never properly tested on omaps.
 >
-> 	keep_bootcon
+> Agreed.
 >
-> as kernel parameter.
+Actually OMAP4 network interface as well uses the GPIO as a interrupt line but
+that didn't show the issue. But I agree more and more test scenario's are needed
+for infrastructure components like GPIO/DMA/TImer because of their multiple
+types of usages.
 
-And you might want to check if console=ttymxc0 is correct. At least 
-some days back while I had a similar issue on i.MX6 it was just a 
-wrong console given at the command line.
+>> Regarding this fix, using gpio/next + this patch fixes nfsroot for 2430sdp,
+>> and gets zoom3 nfsroot booting going a bit better.
+>>
+>> However, at least on zoom3 nfsroot now takes several _minutes_ to get to
+>> login: with gpio/next + this patch. The system is totally unusable.
+>>
+>> It seems that the GPIO interrupt wake-up events are not properly working
+>> now?
+>>
+>> Reverting the "gpio/omap: fix missing check in *_runtime_suspend()"
+>> patch seems to fix the issue.
+>
+> Argh, then $SUBJECT patch here has caused brokeness in multiple ways.
+> It managed to break both runtime suspend and runtime resume at the same
+> time. :(
+>
+> The change added by this patch to runtime_suspend effectively disables
+> the fix I did in 68942edb09 (gpio/omap: fix wakeups on level-triggered GPIOs)
+> causing the sluggish network problems to reappear, since that GPIO IRQ
+> is no longer causing wakeups.
+>
+That's pretty bad.
 
-The boot log you sent has
-
-Serial: IMX driver
-
-but unfortunately doesn't tell us which UART port is used (if there 
-are several at all like with i.MX6).
-
-Best regards
-
-Dirk
+> Simple fix is below, which just moves the check added in $SUBJECT patch
+> below the workaround for the edge/level fix. ?Can you confirm it works
+> on Zoom3 (applies on gpio/next + my previous fix.)
+>
+> I didn't notice the same problem on Overo, but I guess it's because
+> Overo had some enabled non-wakeup GPIOs in the same bank, so it didn't
+> bypass the level-triggered IRQ fix.
+>
+>>> Subject: [PATCH] gpio/omap: fix broken context restore for non-OFF mode
+>>> ?transitions
+>>>
+>>> The fix in commit 1b12870 (gpio/omap: fix missing check in
+>>> *_runtime_suspend()) exposed another bug in the context restore path.
+>>
+>> Kevin, looks like commit 1b12870 does not exist in gpio/next?
+>
+> Will update the changelog.
+>
+> Because of this new problem, I have to add the patch below too, so
+> I'll get them both queued up for Grant
+>
+> In the mean time, they're availble in my for_3.5/fixes/gpio-2 branch.
+>
+> Kevin
+>
+> [1]
+> From afb4f0836dc3c432aa999fc98a80bf75e1481e04 Mon Sep 17 00:00:00 2001
+> From: Kevin Hilman <khilman@ti.com>
+> Date: Thu, 17 May 2012 16:42:16 -0700
+> Subject: [PATCH] gpio/omap: (re)fix wakeups on level-triggered GPIOs
+>
+> commit 1b1287032 (gpio/omap: fix missing check in *_runtime_suspend())
+> broke wakeups on level-triggered GPIOs by adding the enabled
+> non-wakeup GPIO check before the workaround that enables wakeups
+> on level-triggered IRQs, effectively disabling that workaround.
+>
+> To fix, move the enabled non-wakeup GPIO check after the
+> level-triggered IRQ workaround.
+>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+Thanks for the Fix Kevin.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
