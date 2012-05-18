@@ -1,62 +1,52 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 18 May 2012 12:26:19 -0500
-Subject: [PATCH] ARM: OMAP2+: OPP: Fix to ensure check of right oppdef after
- bad one
-Message-ID: <1337361979-19052-1-git-send-email-nm@ti.com>
+Date: Fri, 18 May 2012 12:56:39 -0500
+Subject: [PATCH] ARM: OMAP: PM: Lock clocks list while generating summary
+Message-ID: <1337363799-22085-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9fa2df6b90786301b175e264f5fa9846aba81a65
-(ARM: OMAP2+: OPP: allow OPP enumeration to continue if device is not present)
-makes the logic:
-for (i = 0; i < opp_def_size; i++) {
-	<snip>
-	if (!oh || !oh->od) {
-		<snip>
-		continue;
-	}
-<snip>
-opp_def++;
-}
+From: Todd Poynor <toddpoynor@google.com>
 
-In short, the moment we hit a "Bad OPP", we end up looping the list
-comparing against the bad opp definition pointer for the rest of the
-iteration count. Instead, increment opp_def in the for loop itself
-and allow continue to be used in code without much thought so that
-we check the next set of OPP definition pointers :)
+commit a53025724052b2b1edbc982a4a248784638f563d
+(OMAP: Add debugfs node to show the summary of all clocks)
 
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Steve Sakoman <steve@sakoman.com>
+Introduced clock summary, however, we are interested in seeing
+snapshot of the clock state, not in dynamically changing clock
+configurations as the data provided by clock summary will then be
+useless for debugging configuration issues. So, hold the common lock
+when dumping the clock summary.
+
+Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 
+[nm at ti.com: added commit message]
 Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Todd Poynor <toddpoynor@google.com>
 ---
+ arch/arm/plat-omap/clock.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/mach-omap2/opp.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
-index de6d464..d8f6dbf 100644
---- a/arch/arm/mach-omap2/opp.c
-+++ b/arch/arm/mach-omap2/opp.c
-@@ -53,7 +53,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
- 	omap_table_init = 1;
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 62ec5c4..706b7e2 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -461,6 +461,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
+ 	struct clk *c;
+ 	struct clk *pa;
  
- 	/* Lets now register with OPP library */
--	for (i = 0; i < opp_def_size; i++) {
-+	for (i = 0; i < opp_def_size; i++, opp_def++) {
- 		struct omap_hwmod *oh;
- 		struct device *dev;
++	mutex_lock(&clocks_mutex);
+ 	seq_printf(s, "%-30s %-30s %-10s %s\n",
+ 		"clock-name", "parent-name", "rate", "use-count");
  
-@@ -86,7 +86,6 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
- 					__func__, opp_def->freq,
- 					opp_def->hwmod_name, i, r);
- 		}
--		opp_def++;
+@@ -469,6 +470,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
+ 		seq_printf(s, "%-30s %-30s %-10lu %d\n",
+ 			c->name, pa ? pa->name : "none", c->rate, c->usecount);
  	}
++	mutex_unlock(&clocks_mutex);
  
  	return 0;
+ }
 -- 
 1.7.9.5
