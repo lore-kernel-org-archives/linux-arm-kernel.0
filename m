@@ -1,88 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 13:36:54 +0100
-Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
- when DT is enabled
-In-Reply-To: <201205181112.17254.arnd@arndb.de>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <201205181038.36949.arnd@arndb.de> <4FB62BE5.7030003@linaro.org>
- <201205181112.17254.arnd@arndb.de>
-Message-ID: <4FB64266.6040301@linaro.org>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 18 May 2012 20:43:07 +0800
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAOesGMgy4QkLuB10q19e67n_kQw4++gDYbWNELN-ASayVYkjbA@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
+ <CAK5ve-L4rcAx-=n5u7G0AQzvUG3ir_jzF_ibaSf-EntXAzFUCw@mail.gmail.com>
+ <201205121453.45242.arnd.bergmann@linaro.org>
+ <CAOesGMgy4QkLuB10q19e67n_kQw4++gDYbWNELN-ASayVYkjbA@mail.gmail.com>
+Message-ID: <CAK5ve-Jc=g+E=fmK8HgMKAHPNBYkQdAKw=S0bLqEPYfPEbyabw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/12 12:12, Arnd Bergmann wrote:
-> On Friday 18 May 2012, Lee Jones wrote:
->>> Well, as far as I can tell, you duplicated a lot of functions or
->>> data structures so you can remove the parts one by one, but when you
->>> duplicated snowball_platform_devs[] you did not also duplicate
->>> mop500_platform_devs[].
+On Sun, May 13, 2012 at 3:06 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Sat, May 12, 2012 at 7:53 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+>> On Friday 11 May 2012, Bryan Wu wrote:
+>>> OK, I rebased my patch back on 3.4.0-rc6, please find it here:
+>>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds
+>>>
+>>> linux-next branch can be also found here:
+>>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds-next
+>>>
+>>> Arnd, could you please help me to merge? if got any issue, please
+>>> point to me to fix.
+>>>
 >>
->> That's true, but why would I have done? I would think that whoever
->> writes the DT for that platform would do that?
+>> Hi Bryan,
+>>
+>> I've merged it into a new next/leds branch. I got conflicts with the clps711x
+>> and at91 cleanups that are already in the next/cleanup branch but I think
+>> I resolved them all correctly. ?It would be nice if you and/or the maintainers
+>> of those platforms could confirm that.
 >
-> In order to not break them when you add the nodes to their device tree? ;-)
+> At the end of my pass of merging branches tonight, I tried building
+> all defconfigs on ARM and got several new build errors due to LED
+> changes. The ones that have hit it so far are:
+> * assabet_defconfig
+> * at91rm9200_defconfig
+> * ebsa100_defconfig
+> * footbridge_defconfig
 >
->> So I see four ways round this: 1) disable all the nodes in db8500.dtsi
->> and force snowball.dts and mop500.dts et. al to re-enable them as
->> appropriate. 2) duplicate mop500_platform_devs[] for DT booting and
->> strip out the ab8500 entry, essentially only leaving in only
->> mop500_gpio_keys_device, 3) DT gpio-keys for the mop500 and do away with
->> platform_add()ing mop500_platform_devs[] in u8500_init_machine()
->> altogether. Or my personal favorite 4) as there is no DT or compatible
->> entry for st-ericsson,mop500 or st-ericsson,hrefv60+ yet, don't worry
->> about it and let whoever enables DT for those platforms (me?) to deal
->> with at a later date.
+> Bryan, please sort these out as soon as possible. Should be easy to
+> reproduce to debug. Meanwhile I've dropped the leds branch from
+> arm-soc's for-next branch so that we can bring in an updated
+> (bisectable without breakage) branch from you.
 >
-> Well, you've got a point there that no device tree has been written
-> yet for those boards. I think my preference would be 2), since you can
-> do that in a way that actually removes code (see below), but it's also
-> fine if you want to leave it as is for now.
 >
-> 	Arnd
->
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index 182dc4e..4ca56615 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -806,8 +806,7 @@ static void __init u8500_init_machine(void)
->
->   	parent = u8500_init_devices();
->
-> -	for (i = 0; i<  ARRAY_SIZE(mop500_platform_devs); i++)
-> -		mop500_platform_devs[i]->dev.parent = parent;
-> +	mop500_gpio_keys_device.parent = parent;
->   	for (i = 0; i<  ARRAY_SIZE(snowball_platform_devs); i++)
->   		snowball_platform_devs[i]->dev.parent = parent;
->
-> @@ -816,9 +815,7 @@ static void __init u8500_init_machine(void)
->
->   	if (of_machine_is_compatible("st-ericsson,mop500")) {
->   		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
-> -
-> -		platform_add_devices(mop500_platform_devs,
-> -				ARRAY_SIZE(mop500_platform_devs));
-> +		platform_device_register(&mop500_gpio_keys_device);
->
->   		mop500_sdi_init(parent);
->
-> @@ -839,8 +836,7 @@ static void __init u8500_init_machine(void)
->   		 * instead.
->   		 */
->   		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
-> -		platform_add_devices(mop500_platform_devs,
-> -				ARRAY_SIZE(mop500_platform_devs));
-> +		platform_device_register(&mop500_gpio_keys_device);
->
->   		hrefv60_sdi_init(parent);
 
-This is nice. Can I leave it for a now and submit this with the rest of 
-my clean-ups? I have a nice TODO list now that this would fit nicely 
-into. The way I see it, as long as this is submitted before we add a 
-mop500.dts then it's not going to cause anyone issues.
+So sorry, Arnd and Olof.
 
+I was travelling back from US to home recently and missed this email thread.
+I've already push all changes:
+git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+for-arm-soc
+It is based on y next branch in arm-soc git tree. I tried building and
+fixed some errors.
+
+Hope it's not very late.
+
+Thanks,
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.186-168-78255 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
