@@ -1,120 +1,139 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 09:39:04 +0100
-Subject: [PATCH 05/16] regulator: db8500-prcmu: Separate regulator
- registration from probe
+Date: Fri, 18 May 2012 09:39:05 +0100
+Subject: [PATCH 06/16] ARM: ux500: Apply db8500-prcmu regulator information to
+ db8500 Device Tree
 In-Reply-To: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1337330355-17747-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1337330355-17747-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will provide us with a convenient way to register regulators when
-booting with Device Tree both enabled & disabled and will save us a
-great deal of code duplication in time.
+Here we inform Device Tree of which regulators are provided by the db8500-
+prcmu. This way we can reference some of their consumers directly from the
+Device Tree e.g. SMSC911x Ethernet chip and the Nomadik I2C controller.
 
-Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/db8500-prcmu.c |   71 +++++++++++++++++++++++---------------
- 1 file changed, 44 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi |  107 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
 
-diff --git a/drivers/regulator/db8500-prcmu.c b/drivers/regulator/db8500-prcmu.c
-index 87b2e83..d6b4d4c 100644
---- a/drivers/regulator/db8500-prcmu.c
-+++ b/drivers/regulator/db8500-prcmu.c
-@@ -410,40 +410,58 @@ dbx500_regulator_info[DB8500_NUM_REGULATORS] = {
- 	},
- };
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 076831c..5e78899 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -197,6 +197,113 @@
+ 				reg = <0x80157450 0xC>;
+ 			};
  
-+static __devinit int db8500_regulator_register(struct platform_device *pdev,
-+					struct regulator_init_data *init_data,
-+					int id,
-+					struct device_node *np)
-+{
-+	struct dbx500_regulator_info *info;
-+	struct regulator_config config = { };
-+	int err;
++			db8500-prcmu-regulators {
++				compatible = "stericsson,db8500-prcmu-regulator";
 +
-+	/* assign per-regulator data */
-+	info = &dbx500_regulator_info[id];
-+	info->dev = &pdev->dev;
++				// DB8500_REGULATOR_VAPE
++				db8500_vape_reg: db8500_vape {
++					regulator-name = "db8500-vape";
++					regulator-always-on;
++				};
 +
-+	config.dev = &pdev->dev;
-+	config.init_data = init_data;
-+	config.driver_data = info;
-+	config.of_node = np;
++				// DB8500_REGULATOR_VARM
++				db8500_varm_reg: db8500_varm {
++					regulator-name = "db8500-varm";
++				};
 +
-+	/* register with the regulator framework */
-+	info->rdev = regulator_register(&info->desc, &config);
-+	if (IS_ERR(info->rdev)) {
-+		err = PTR_ERR(info->rdev);
-+		dev_err(&pdev->dev, "failed to register %s: err %i\n",
-+			info->desc.name, err);
++				// DB8500_REGULATOR_VMODEM
++				db8500_vmodem_reg: db8500_vmodem {
++					regulator-name = "db8500-vmodem";
++				};
 +
-+		/* if failing, unregister all earlier regulators */
-+		while (--id >= 0) {
-+			info = &dbx500_regulator_info[id];
-+			regulator_unregister(info->rdev);
-+		}
-+		return err;
-+	}
++				// DB8500_REGULATOR_VPLL
++				db8500_vpll_reg: db8500_vpll {
++					regulator-name = "db8500-vpll";
++				};
 +
-+	dev_dbg(rdev_get_dev(info->rdev),
-+		"regulator-%s-probed\n", info->desc.name);
++				// DB8500_REGULATOR_VSMPS1
++				db8500_vsmps1_reg: db8500_vsmps1 {
++					regulator-name = "db8500-vsmps1";
++				};
 +
-+	return 0;
-+}
++				// DB8500_REGULATOR_VSMPS2
++				db8500_vsmps2_reg: db8500_vsmps2 {
++					regulator-name = "db8500-vsmps2";
++				};
 +
- static int __devinit db8500_regulator_probe(struct platform_device *pdev)
- {
- 	struct regulator_init_data *db8500_init_data =
- 					dev_get_platdata(&pdev->dev);
--	struct regulator_config config = { };
- 	int i, err;
- 
- 	/* register all regulators */
- 	for (i = 0; i < ARRAY_SIZE(dbx500_regulator_info); i++) {
--		struct dbx500_regulator_info *info;
--		struct regulator_init_data *init_data = &db8500_init_data[i];
--
--		/* assign per-regulator data */
--		info = &dbx500_regulator_info[i];
--		info->dev = &pdev->dev;
--
--		config.dev = &pdev->dev;
--		config.init_data = init_data;
--		config.driver_data = info;
--
--		/* register with the regulator framework */
--		info->rdev = regulator_register(&info->desc, &config);
--		if (IS_ERR(info->rdev)) {
--			err = PTR_ERR(info->rdev);
--			dev_err(&pdev->dev, "failed to register %s: err %i\n",
--				info->desc.name, err);
--
--			/* if failing, unregister all earlier regulators */
--			while (--i >= 0) {
--				info = &dbx500_regulator_info[i];
--				regulator_unregister(info->rdev);
--			}
-+		err = db8500_regulator_register(pdev,
-+						&db8500_init_data[i],
-+						i, NULL);
-+		if (err)
- 			return err;
--		}
- 
- 		dev_dbg(rdev_get_dev(info->rdev),
- 			"regulator-%s-probed\n", info->desc.name);
-@@ -451,8 +469,7 @@ static int __devinit db8500_regulator_probe(struct platform_device *pdev)
- 	err = ux500_regulator_debug_init(pdev,
- 					 dbx500_regulator_info,
- 					 ARRAY_SIZE(dbx500_regulator_info));
--
--	return err;
-+	return 0;
- }
- 
- static int __exit db8500_regulator_remove(struct platform_device *pdev)
++				// DB8500_REGULATOR_VSMPS3
++				db8500_vsmps3_reg: db8500_vsmps3 {
++					regulator-name = "db8500-vsmps3";
++				};
++
++				// DB8500_REGULATOR_VRF1
++				db8500_vrf1_reg: db8500_vrf1 {
++					regulator-name = "db8500-vrf1";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSP
++				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
++					regulator-name = "db8500-sva-mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSPRET
++				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
++					regulator-name = "db8500-sva-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAPIPE
++				db8500_sva_pipe_reg: db8500_sva_pipe {
++					regulator-name = "db8500_sva_pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSP
++				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
++					regulator-name = "db8500_sia_mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSPRET
++				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
++					regulator-name = "db8500-sia-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAPIPE
++				db8500_sia_pipe_reg: db8500_sia_pipe {
++					regulator-name = "db8500-sia-pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SGA
++				db8500_sga_reg: db8500_sga {
++					regulator-name = "db8500-sga";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_B2R2_MCDE
++				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
++					regulator-name = "db8500-b2r2-mcde";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12
++				db8500_esram12_reg: db8500_esram12 {
++					regulator-name = "db8500-esram12";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12RET
++				db8500_esram12_ret_reg: db8500_esram12_ret {
++					regulator-name = "db8500-esram12-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34
++				db8500_esram34_reg: db8500_esram34 {
++					regulator-name = "db8500-esram34";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34RET
++				db8500_esram34_ret_reg: db8500_esram34_ret {
++					regulator-name = "db8500-esram34-ret";
++				};
++			};
++
+ 			ab8500 at 5 {
+ 				compatible = "stericsson,ab8500";
+ 				reg = <5>; /* mailbox 5 is i2c */
 -- 
 1.7.9.5
