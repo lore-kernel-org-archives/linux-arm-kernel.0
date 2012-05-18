@@ -1,29 +1,22 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 18 May 2012 10:24:40 +0200
-Subject: [PATCH 1/2] ARM: EXYYNOS: Use EXYNOS4210_GPEx instead of
- EXYNOS4_GPEx
-In-Reply-To: <4FB5B9A1.2030606@samsung.com>
-References: <1337307497-15777-1-git-send-email-jy0922.shim@samsung.com>
- <4FB5B9A1.2030606@samsung.com>
-Message-ID: <4FB60748.4040307@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 May 2012 09:38:59 +0100
+Subject: [PATCH 00/16] The last large installment of DT for Snowball
+Message-ID: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2012 04:53 AM, Joonyoung Shim wrote:
-> Add to cc Grant Likely and Linus Walleij
-> 
-> On 05/18/2012 11:18 AM, Joonyoung Shim wrote:
->> Also use EXYNOS4210_GPIO_Ex instead of EXYNOS4_GPIO_Ex. The GPEx gpios
->> exist only on Exynos4210 and there are no on Exynos4x12. Redefine them
->> to exact SoC name.
->>
->> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
->> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+Everything to follow will be small, mostly unrelated changes and
+enablement of the odd left-over driver.
 
-Nit: there is a typo in the patch summary line:
-
-s/EXYYNOS/EXYNOS
-
---
-Regards,
-Sylwester
+ arch/arm/boot/dts/db8500.dtsi          |  143 +++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/snowball.dts         |   14 ++++
+ arch/arm/configs/u8500_defconfig       |    1 +
+ arch/arm/mach-ux500/board-mop500-uib.c |    4 +-
+ arch/arm/mach-ux500/board-mop500.c     |   12 ++-
+ arch/arm/mach-ux500/board-mop500.h     |    1 +
+ drivers/input/misc/ab8500-ponkey.c     |    6 ++
+ drivers/mfd/ab8500-sysctrl.c           |    6 ++
+ drivers/mfd/db8500-prcmu.c             |    1 +
+ drivers/misc/ab8500-pwm.c              |    6 ++
+ drivers/regulator/db8500-prcmu.c       |  137 +++++++++++++++++++++++-------
+ 11 files changed, 297 insertions(+), 34 deletions(-)
