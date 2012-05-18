@@ -1,66 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 May 2012 17:13:16 +0200
-Subject: [PATCH 2/2] pcm038 lcdc support
-In-Reply-To: <1337349834.29229.15.camel@atropine>
-References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
- <1337344032-25431-3-git-send-email-s.hauer@pengutronix.de>
- <1337349834.29229.15.camel@atropine>
-Message-ID: <20120518151316.GU30400@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 May 2012 08:31:04 -0700
+Subject: [PATCH v9 00/19] Introduce a led trigger for CPU activity and
+ consolidate LED driver in ARM
+In-Reply-To: <CAK5ve-Jc=g+E=fmK8HgMKAHPNBYkQdAKw=S0bLqEPYfPEbyabw@mail.gmail.com>
+References: <1335884506-15370-1-git-send-email-bryan.wu@canonical.com>
+ <alpine.LFD.2.02.1205101351380.21030@xanadu.home>
+ <CAK5ve-L4rcAx-=n5u7G0AQzvUG3ir_jzF_ibaSf-EntXAzFUCw@mail.gmail.com>
+ <201205121453.45242.arnd.bergmann@linaro.org>
+ <CAOesGMgy4QkLuB10q19e67n_kQw4++gDYbWNELN-ASayVYkjbA@mail.gmail.com>
+ <CAK5ve-Jc=g+E=fmK8HgMKAHPNBYkQdAKw=S0bLqEPYfPEbyabw@mail.gmail.com>
+Message-ID: <CAOesGMg=UxB1E10r7WpqKc=FFSws6TN5jGahx7rpm1+E9uSkog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 10:03:54AM -0400, Adam Jackson wrote:
-> On Fri, 2012-05-18 at 14:27 +0200, Sascha Hauer wrote:
-> 
-> > +			edid = [00 ff ff ff ff ff ff 00 4c 2d 6c 03 36 32 49 4b
-> > +				0f 13 01 03 80 37 22 a0 2a fe 21 a8 53 37 ae 24
-> > +				11 50 54
-> > +
-> > +				/* est timings */
-> > +				00 00 00
-> > +
-> > +				/* std timings */
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +				00 00
-> > +
-> > +				/* detailed timings */
-> > +				05 0D 20 A0 30 58 1C 20 28 20 14 00 26 57 21 00 00 1E
-> > +				00 00 00 fd 00 32 4b 1b	51 11 00 0a 20 20 20 20 20 20
-> > +				00 00 00 fc 00 53 79 6e 63 4d 61 73 74 65 72 0a 20 20
-> > +				00 00 00 ff 00 48 39 58 53 34 30 30 34 34 32 0a 20 20
-> > +				00 20];
-> 
-> This EDID block claims to be a Samsung SyncMaster, which isn't really
-> the right thing to do.  The question is what to call it instead.  Red
-> Hat has a PNP ID we can use for virtual EDID blocks like this if we
-> want, I'd want to set up a little database to keep track of them but
-> that's pretty trivial.
+Hi Bryan,
 
-Sorry, should have mentioned this in the commit log. This in fact is a
-hacked version of my office monitor. This patch is more meant as a usage
-example and not for upstream. I don't know yet if it's even acceptable
-to put edid data into the devicetree. I saw some discussion about it,
-but also about some generic display description, which I would prefer.
+On Fri, May 18, 2012 at 5:43 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> On Sun, May 13, 2012 at 3:06 PM, Olof Johansson <olof@lixom.net> wrote:
+>> Hi,
+>>
+>> On Sat, May 12, 2012 at 7:53 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+>>> On Friday 11 May 2012, Bryan Wu wrote:
+>>>> OK, I rebased my patch back on 3.4.0-rc6, please find it here:
+>>>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds
+>>>>
+>>>> linux-next branch can be also found here:
+>>>> git://kernel.ubuntu.com/roc/linux-2.6/.git leds-next
+>>>>
+>>>> Arnd, could you please help me to merge? if got any issue, please
+>>>> point to me to fix.
+>>>>
+>>>
+>>> Hi Bryan,
+>>>
+>>> I've merged it into a new next/leds branch. I got conflicts with the clps711x
+>>> and at91 cleanups that are already in the next/cleanup branch but I think
+>>> I resolved them all correctly. ?It would be nice if you and/or the maintainers
+>>> of those platforms could confirm that.
+>>
+>> At the end of my pass of merging branches tonight, I tried building
+>> all defconfigs on ARM and got several new build errors due to LED
+>> changes. The ones that have hit it so far are:
+>> * assabet_defconfig
+>> * at91rm9200_defconfig
+>> * ebsa100_defconfig
+>> * footbridge_defconfig
+>>
+>> Bryan, please sort these out as soon as possible. Should be easy to
+>> reproduce to debug. Meanwhile I've dropped the leds branch from
+>> arm-soc's for-next branch so that we can bring in an updated
+>> (bisectable without breakage) branch from you.
+>>
+>>
+>
+> So sorry, Arnd and Olof.
+>
+> I was travelling back from US to home recently and missed this email thread.
+> I've already push all changes:
+> git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+> for-arm-soc
+> It is based on y next branch in arm-soc git tree. I tried building and
+> fixed some errors.
+>
+> Hope it's not very late.
 
-BTW is there a more convenient tool than a hex editor around to generate
-edid data? I only found some windows tools
+Timing on this is unfortunate. Given that it's had a bit of problems
+already I would like to see more bake and test time before this goes
+into the tree. The merge window for 3.5 is too close for that.
 
-> 
-> Also, empty standard timing fields are 01 01, not 00 00.
+We could pick it up as a staging/ branch, but given everybody's mad
+dash at getting things in for 3.5 now, it's probably better to hold
+off and pick it up i next/ branch as soon as -rc1 is out.
 
-Good to know
+So, please send a fresh pull right after 3.5-rc1. Hope that's ok.
 
-Thanks
- Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+-Olof
