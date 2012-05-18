@@ -1,98 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2012 10:44:26 +0900
-Subject: [PATCH 00/08] mach-shmobile: Emma Mobile EV2 support V3
-In-Reply-To: <20120516064449.32286.77941.sendpatchset@w520>
-References: <20120516064449.32286.77941.sendpatchset@w520>
-Message-ID: <20120518014424.GL19000@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 May 2012 22:50:00 -0300
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <20120518010138.GA5427@S2101-09.ap.freescale.net>
+References: <4FB583CF.2080801@grid-net.com>
+ <20120518010138.GA5427@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5D679an+-iaUBXZy+PmHB2tAHhYHUAFWY+4rxSOYiBkyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hi Shawn,
 
-I have tested these patches on top of the soc-new branch of
-rafael's renesas tree, revision 5658c94, which is based on
-v3.4-rc6.
+On Thu, May 17, 2012 at 10:01 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, May 17, 2012 at 04:03:43PM -0700, Subodh Nijsure wrote:
+>>
+>> Should one be able to run top of the linux-next on MX28 EVK hardware
+>> with DT support enabled?
+>
+> Yes, I'm running it well with next-20120516.
 
-I also have the cherry picked following patches before applying your patches.
+Could you please confirm next-20120517 also boots?
 
-serial8250-em: clk_get() IS_ERR() error handling fix
-serial8250-em: Emma Mobile UART driver V2
-serial8250: Introduce serial8250_register_8250_port()
-serial8250: Clean up default map and dl code
-serial8250: Use dl_read()/dl_write() on RM9K
-serial8250: Use dl_read()/dl_write() on Alchemy
-serial8250: Add dl_read()/dl_write() callbacks
-8250.c: less than 2400 baud fix.
-serial/8250_pci: Clear FIFOs for Intel ME Serial Over Lan device on BI
-tegra, serial8250: add ->handle_break() uart_port op
-clocksource: em_sti: Add DT support
-clocksource: em_sti: Emma Mobile STI driver V2
-clockevents: Make clockevents_config() a global symbol
+I am not getting nothing on console.
 
-I have added the follwing patch of yours
+This is my U-boot setup:
 
-gpio: Emma Mobile GPIO driver V2
+run netargs; tftpboot 42000000 uImage; tftpboot 42800000
+imx28-evk.dtb; bootm 0x4000000 - 0x42000000
 
-And one of my own, which just fixes a build problem
-in rafael's tree.
+Regards,
 
-ARM: mach-types: Manually add KZM-A9-GT
-
-On Wed, May 16, 2012 at 03:44:49PM +0900, Magnus Damm wrote:
-> mach-shmobile: Emma Mobile EV2 support V3
-> 
-> [PATCH 01/08] mach-shmobile: Emma Mobile EV2 SoC base support V3
-
-Tested-by: Simon Horman <horms@verge.net.au>
-
-> [PATCH 02/08] ARM: Undelete KZM9D mach-type V3
-
-I did not need this patch with the base I am using,
-so I did not test it.
-
-Reviewed-by: Simon Horman <horms@verge.net.au>
-
-> [PATCH 03/08] mach-shmobile: KZM9D board support V3
-
-Tested-by: Simon Horman <horms@verge.net.au>
-
-> [PATCH 04/08] mach-shmobile: Emma Mobile EV2 SMP support V3
-
-Tested-by: Simon Horman <horms@verge.net.au>
-
-> [PATCH 05/08] mach-shmobile: Emma Mobile EV2 GPIO support V3
-
-I am only seeing interripts for em_gio.0, is there a
-way to exercise em_gio.1 .. 4 ?
-
-Duplicate names for interrupts, that is
-each of em_gio.0..4 have two entries in /proc/interripts.
-Is this intentional?
-
- 99:         32          0       GIC  em_gio.0
- 100:          0          0       GIC  em_gio.0
- 101:          0          0       GIC  em_gio.1
- 102:          0          0       GIC  em_gio.1
- 103:          0          0       GIC  em_gio.2
- 104:          0          0       GIC  em_gio.2
- 105:          0          0       GIC  em_gio.3
- 106:          0          0       GIC  em_gio.3
- 107:          0          0       GIC  em_gio.4
- 108:          0          0       GIC  em_gio.4
- 157:      35952          0       GIC  em_sti.0
-
-> [PATCH 06/08] mach-shmobile: KZM9D board Ethernet support V3
-
-Tested-by: Simon Horman <horms@verge.net.au>
-
-> [PATCH 07/08] mach-shmobile: Emma Mobile EV2 DT support V3
-
-I applied this and the resulting kernel booted.
-
-> [PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
-
-I applied this and the resulting kernel did not boot.
-I saw nothing after the uboot prompt..
-
-
-Lastly, could you consider suppling a patch which provides a defconfig?
+Fabio Estevam
