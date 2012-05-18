@@ -1,35 +1,41 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 18 May 2012 23:44:59 +0200
-Subject: [GIT PULL] Renesas sh73a0 fix for v3.5
-Message-ID: <201205182344.59703.rjw@sisk.pl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 May 2012 21:43:54 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FB6BA29.6070400@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205182050.00095.arnd@arndb.de> <4FB6BA29.6070400@wwwdotorg.org>
+Message-ID: <201205182143.55140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 18 May 2012, Stephen Warren wrote:
+> > The driver can still request the dma line by name "tx" and the subsystem
+> > would pick one out of those with the same name.
+> > 
+> > For the majority of cases, we would only need a single dma request line
+> 
+> Hmm. Many devices have multiple different FIFOs, and hence multiple DMA
+> request signals (e.g. Tegra I2S has separate RX and TX FIFO, Tegra
+> S/PDIF has 2 FIFOs in each direction). That would require the driver to
+> always use get_by_name() to differentiate between 2/4 options for the
+> same DMA req or 2/4 different DMA requests. Most other bindings allow
+> use of get_by_id() or get_by_name() interchangeably.
 
-Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
+Ok, good point. So we could make the common case that they are numbered
+but not named and require all drivers to use named properties when
+there is the possibility that the device might be connected to multiple
+controllers, but that seems tricky because a driver can start being
+used on a platform that has only one controller and have no dma-name
+property in the device tree but then get used on a different soc
+that actually has multiple controllers.
+So if we do that, we might want to make the dma-names property mandatory
+for every device, and document what the names are.
 
-    Linux 3.4-rc6
+Another option would be to encode the direction in the property in
+a generic way and provide an API that lets you ask specifically
+for a read, write or readwrite channel out of the ones that are
+available, rather than assuming there is only one kind. Consequently,
+any device that uses more than one read channel or more than one
+write channel would still have to use names to identify them.
 
-with top-most commit 4da773193414788b52ae14bc246543390faca5ce
-
-    ARM: mach-shmobile: sh73a0: fixup PINT/IRQ16-IRQ31 irq number conflict
-
-from the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git soc-core
-
-to receive an sh73a0 fix related to the allocation of IRQs for v3.5.
-
-This is based on material that has been merged into the arm-soc tree already.
-
-Thanks!
-
-
- arch/arm/mach-shmobile/include/mach/sh73a0.h |   34 +++++++++++++++++++++++--
- 1 files changed, 31 insertions(+), 3 deletions(-)
-
----------------
-
-Kuninori Morimoto (1):
-      ARM: mach-shmobile: sh73a0: fixup PINT/IRQ16-IRQ31 irq number conflict
+	Arnd
