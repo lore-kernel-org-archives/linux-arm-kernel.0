@@ -1,48 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 18 May 2012 21:51:07 +0800
-Subject: [PATCH 1/2] gpio/generic: initialize basic_mmio_gpio shadow
- variables properly
-In-Reply-To: <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
-References: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
- <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120518135104.GC5427@S2101-09.ap.freescale.net>
+From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
+Date: Fri, 18 May 2012 16:02:09 +0200
+Subject: Booting mx31 on linux-next-20120517
+In-Reply-To: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
+References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
+Message-ID: <4091807.RyPhQZZ7JC@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Linus,
+Le vendredi 18 mai 2012 00:48:35 Fabio Estevam a ?crit :
+> Hi Sascha,
+> 
+> Are you able to boot any mx31 system on linux-next-20120517?
 
-Can we manage to get it in with the upcoming merge window, as it fixes
-a bug that we may not want to live with for another cycle?
+I'm not able to boot it, it does hang/crash in the device initcall:
+(...)
+[    0.274656] initlevel:6=device, 135 registered initcalls
+[    0.286256] msgmni has been set to 227
+[    0.289522] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 
+252)
+[    0.289548] io scheduler noop registered
+[    0.289570] io scheduler cfq registered (default)
+[    0.413953] mx3_sdc_fb mx3_sdc_fb: registered, using mode Epson-VGA
+[    0.544110] Console: switching to colour frame buffer device 60x40
+[    0.555321] imx-sdma imx31-sdma: loaded firmware 1.0
+[    0.588970] imx-sdma imx31-sdma: initialized
+[    0.590912] Serial: IMX driver
+[    0.591139] imx21-uart.0: ttymxc0 at MMIO 0x43f90000 (irq = 45) is a IMX
+[    1.260201] console [ttymxc0] enabled
+[    1.278640] spi_imx imx31-cspi.1: master is unqueued, this is deprecated
+
+But I don't need to enable earlyprintk to get serial output.
+BTW, this is not limited to mx31pdk_3ds, but it also do it on mx31moboard.
+
+It looks like it's related to the mc13783 PMIC, because the board *poweroff* 
+itself. 
+
+Maybe it's a bug in the regmap work of the mc13783 ?
 
 Regards,
-Shawn
 
-On Thu, May 17, 2012 at 03:35:02PM +0800, Shawn Guo wrote:
-> It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
-> missing initialization of basic_mmio_gpio shadow variables) manged to
-> fix in gpio-mxc driver, so that other platform specific drivers do not
-> suffer from the same problem over and over again.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/gpio/gpio-generic.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-> index e38dd0c..cfc9439 100644
-> --- a/drivers/gpio/gpio-generic.c
-> +++ b/drivers/gpio/gpio-generic.c
-> @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
->  		return ret;
->  
->  	bgc->data = bgc->read_reg(bgc->reg_dat);
-> +	if (bgc->gc.set == bgpio_set_set)
-> +		bgc->data = bgc->read_reg(bgc->reg_set);
-> +	if (bgc->reg_dir)
-> +		bgc->dir = bgc->read_reg(bgc->reg_dir);
->  
->  	return ret;
->  }
-> -- 
-> 1.7.5.4
-> 
+Philippe
