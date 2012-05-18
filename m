@@ -1,42 +1,26 @@
-From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
-Date: Fri, 18 May 2012 16:02:09 +0200
-Subject: Booting mx31 on linux-next-20120517
-In-Reply-To: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
-References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
-Message-ID: <4091807.RyPhQZZ7JC@laptop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 18 May 2012 07:03:18 -0700
+Subject: [PATCH 8/8] gpio/omap: fix missing check in *_runtime_suspend()
+In-Reply-To: <20120517232755.EF4383E062C@localhost> (Grant Likely's message of
+ "Thu, 17 May 2012 17:27:55 -0600")
+References: <1335536018-16004-1-git-send-email-tarun.kanti@ti.com>
+ <1335536018-16004-9-git-send-email-tarun.kanti@ti.com>
+ <87y5oqtpnw.fsf@ti.com> <20120517232755.EF4383E062C@localhost>
+Message-ID: <87d361powp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 18 mai 2012 00:48:35 Fabio Estevam a ?crit :
-> Hi Sascha,
-> 
-> Are you able to boot any mx31 system on linux-next-20120517?
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-I'm not able to boot it, it does hang/crash in the device initcall:
-(...)
-[    0.274656] initlevel:6=device, 135 registered initcalls
-[    0.286256] msgmni has been set to 227
-[    0.289522] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 
-252)
-[    0.289548] io scheduler noop registered
-[    0.289570] io scheduler cfq registered (default)
-[    0.413953] mx3_sdc_fb mx3_sdc_fb: registered, using mode Epson-VGA
-[    0.544110] Console: switching to colour frame buffer device 60x40
-[    0.555321] imx-sdma imx31-sdma: loaded firmware 1.0
-[    0.588970] imx-sdma imx31-sdma: initialized
-[    0.590912] Serial: IMX driver
-[    0.591139] imx21-uart.0: ttymxc0 at MMIO 0x43f90000 (irq = 45) is a IMX
-[    1.260201] console [ttymxc0] enabled
-[    1.278640] spi_imx imx31-cspi.1: master is unqueued, this is deprecated
+>> Grant, after Tarun/Santosh have a chance to review/ack this, can you
+>> still get this in for 3.5?  If not, getting it into -rc should be fine.
+>
+> Yes.  Do you have any other omap patches?  Do you want to send me a
+> pull req?
 
-But I don't need to enable earlyprintk to get serial output.
-BTW, this is not limited to mx31pdk_3ds, but it also do it on mx31moboard.
+We just found one more fix needed.
 
-It looks like it's related to the mc13783 PMIC, because the board *poweroff* 
-itself. 
+I'm collecting the acks/tested-bys and will have a branch for you
+shortly.
 
-Maybe it's a bug in the regmap work of the mc13783 ?
-
-Regards,
-
-Philippe
+Kevin
