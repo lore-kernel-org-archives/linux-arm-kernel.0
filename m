@@ -1,37 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 18 May 2012 16:06:01 +0530
-Subject: [PATCHv3 0/4] coupled cpuidle state support
-In-Reply-To: <1336438662-10484-1-git-send-email-ccross@android.com>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
-Message-ID: <4FB62611.7080908@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 May 2012 10:38:36 +0000
+Subject: [PATCH 12/18] ARM: ux500: Disable platform setup of the ab8500
+ when DT is enabled
+In-Reply-To: <4FB57482.5060609@linaro.org>
+References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
+ <201205172122.05611.arnd@arndb.de> <4FB57482.5060609@linaro.org>
+Message-ID: <201205181038.36949.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
-> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
-> cpus cannot be independently powered down, either due to
-> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
-> power down), or due to HW bugs (on OMAP4460, a cpu powering up
-> will corrupt the gic state unless the other cpu runs a work
-> around).  Each cpu has a power state that it can enter without
-> coordinating with the other cpu (usually Wait For Interrupt, or
-> WFI), and one or more "coupled" power states that affect blocks
-> shared between the cpus (L2 cache, interrupt controller, and
-> sometimes the whole SoC).  Entering a coupled power state must
-> be tightly controlled on both cpus.
+On Thursday 17 May 2012, Lee Jones wrote:
+> > I think the two options you have here are to either remove the ab8500 device from
+> > mop500_platform_devs[] too (essentially registering mop500_gpio_keys_device
+> > and ab8500_device separately when you need them, instead of doing the loop),
+> > or to split u8500_local_bus_nodes so you use a different table for snowball
+> > from the one you use for the other boards.
 > 
+> It's late here, so if I have the wrong end of the stick, just tell me ..
+> 
+> I figure that at the same time as enabling the other machines we'll be 
+> stripping out the platform registrations in the same way as be have done 
+> with Snowball. This will prevent two of anything from being registered 
+> at any time.
+> 
+> Or am I mistaken?
 
-[...]
+Well, as far as I can tell, you duplicated a lot of functions or
+data structures so you can remove the parts one by one, but when you
+duplicated snowball_platform_devs[] you did not also duplicate
+mop500_platform_devs[].
 
-> This series has been tested and reviewed by Santosh and Kevin
-> for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
-> and Exynos5 patches are in progress.  I think this is ready to
-> go in.  Lean, are you maintaining a cpuidle tree for linux-next?
-> If not, I can publish a tree for linux-next, or this could go in
-> through Arnd's tree.
-
-I haven't seen any response so far on who is lining up this
-series for 3.5 ? Not sure if it made it to linux-next either.
-
-Regards
-santosh
+	Arnd
