@@ -1,31 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 May 2012 08:53:05 +0100
-Subject: [PATCH 09/18] regulator: ab8500: Split up probe() into manageable
- pieces
-In-Reply-To: <20120518073603.GC4073@opensource.wolfsonmicro.com>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
- <20120518073603.GC4073@opensource.wolfsonmicro.com>
-Message-ID: <4FB5FFE1.9030204@linaro.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 18 May 2012 10:03:22 +0200
+Subject: [PATCH RESEND v9 1/2] gpio: Adjust of_xlate API to support
+ multiple GPIO chips
+In-Reply-To: <20120517203706.6B8223E0621@localhost>
+References: <1337200832-26630-1-git-send-email-stigge@antcom.de>
+ <20120517203706.6B8223E0621@localhost>
+Message-ID: <4FB6024A.5010002@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/12 08:36, Mark Brown wrote:
-> On Thu, May 17, 2012 at 02:45:14PM +0100, Lee Jones wrote:
->> ab8500's probe() function is becoming quite large, so in the lead
->> up to Device Tree enablement which will fork the thread of execution
->> this patch splits it into 3 main areas; basic error checking will
->> remain in probe(), but regulator register initialisation and regulator
->> registration have been moved to their own functions which will
->> be called in sequence by probe() and the DT equivalent.
->
-> Applied, thanks.
+Hi Grant,
 
-Thank you.
+On 05/17/2012 10:37 PM, Grant Likely wrote:
+> On Wed, 16 May 2012 22:40:31 +0200, Roland Stigge <stigge@antcom.de> wrote:
+>> This patch changes the of_xlate API to make it possible to manipulate the
+>> actual used gc. This way, multiple GPIO banks can be supported with the same DT
+>> registered GPIO controller.
+>>
+>> The issue was discussed upon the integration of LPC32xx's DT support for its
+>> GPIO (see separate patch).
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> I still wasn't happy with this approach, so I bugged Arnd and we
+> discussed some options.  So, I think I've got a better solution that
+> doesn't change the signature of of_xlate.  Instead it allows of_xlate
+> to return an error code and still have multiple banks referring to the
+> same gpio_chip.
+> 
+> I've just posted the series.  Can you try it out and make sure it
+> works for you?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Works fine, just consider the little compile error bugfix, see next mail.
+
+Thanks,
+
+Roland
