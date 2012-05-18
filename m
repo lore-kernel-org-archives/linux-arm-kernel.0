@@ -1,22 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2012 12:30:42 +0900
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 18 May 2012 12:40:21 +0900
 Subject: [PATCH 00/08] mach-shmobile: Emma Mobile EV2 support V3
 In-Reply-To: <20120518014424.GL19000@verge.net.au>
 References: <20120516064449.32286.77941.sendpatchset@w520>
  <20120518014424.GL19000@verge.net.au>
-Message-ID: <20120518033041.GA15280@verge.net.au>
+Message-ID: <CANqRtoRh0=ASdV4i+tMHw2B2+YCs6XwESre-v-H4MQ2Fy845dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 10:44:26AM +0900, Simon Horman wrote:
+Hi Simon,
+
+On Fri, May 18, 2012 at 10:44 AM, Simon Horman <horms@verge.net.au> wrote:
 > Hi Magnus,
-> 
+>
 > I have tested these patches on top of the soc-new branch of
 > rafael's renesas tree, revision 5658c94, which is based on
 > v3.4-rc6.
-> 
+
+Excellent!
+
 > I also have the cherry picked following patches before applying your patches.
-> 
+>
 > serial8250-em: clk_get() IS_ERR() error handling fix
 > serial8250-em: Emma Mobile UART driver V2
 > serial8250: Introduce serial8250_register_8250_port()
@@ -30,74 +34,82 @@ On Fri, May 18, 2012 at 10:44:26AM +0900, Simon Horman wrote:
 > clocksource: em_sti: Add DT support
 > clocksource: em_sti: Emma Mobile STI driver V2
 > clockevents: Make clockevents_config() a global symbol
-> 
+
+Thanks, those are indeed needed for runtime UART and STI support, but
+there shouldn't be any build time dependencies.
+
 > I have added the follwing patch of yours
-> 
+>
 > gpio: Emma Mobile GPIO driver V2
-> 
+>
 > And one of my own, which just fixes a build problem
 > in rafael's tree.
-> 
+>
 > ARM: mach-types: Manually add KZM-A9-GT
-> 
+
+Right, that's a bit of a mess.
+
 > On Wed, May 16, 2012 at 03:44:49PM +0900, Magnus Damm wrote:
-> > mach-shmobile: Emma Mobile EV2 support V3
-> > 
-> > [PATCH 01/08] mach-shmobile: Emma Mobile EV2 SoC base support V3
-> 
+>> mach-shmobile: Emma Mobile EV2 support V3
+>>
+>> [PATCH 01/08] mach-shmobile: Emma Mobile EV2 SoC base support V3
+>
 > Tested-by: Simon Horman <horms@verge.net.au>
-> 
-> > [PATCH 02/08] ARM: Undelete KZM9D mach-type V3
-> 
+>
+>> [PATCH 02/08] ARM: Undelete KZM9D mach-type V3
+>
 > I did not need this patch with the base I am using,
 > so I did not test it.
-> 
+
+Ok!
+
 > Reviewed-by: Simon Horman <horms@verge.net.au>
-> 
-> > [PATCH 03/08] mach-shmobile: KZM9D board support V3
-> 
+>
+>> [PATCH 03/08] mach-shmobile: KZM9D board support V3
+>
 > Tested-by: Simon Horman <horms@verge.net.au>
-> 
-> > [PATCH 04/08] mach-shmobile: Emma Mobile EV2 SMP support V3
-> 
+>
+>> [PATCH 04/08] mach-shmobile: Emma Mobile EV2 SMP support V3
+>
 > Tested-by: Simon Horman <horms@verge.net.au>
-> 
-> > [PATCH 05/08] mach-shmobile: Emma Mobile EV2 GPIO support V3
-> 
+>
+>> [PATCH 05/08] mach-shmobile: Emma Mobile EV2 GPIO support V3
+>
 > I am only seeing interripts for em_gio.0, is there a
 > way to exercise em_gio.1 .. 4 ?
-> 
+
+When we start using other GPIO pins with interrupts then that will
+happen. Right now there is no code.
+
 > Duplicate names for interrupts, that is
 > each of em_gio.0..4 have two entries in /proc/interripts.
 > Is this intentional?
-> 
->  99:         32          0       GIC  em_gio.0
->  100:          0          0       GIC  em_gio.0
->  101:          0          0       GIC  em_gio.1
->  102:          0          0       GIC  em_gio.1
->  103:          0          0       GIC  em_gio.2
->  104:          0          0       GIC  em_gio.2
->  105:          0          0       GIC  em_gio.3
->  106:          0          0       GIC  em_gio.3
->  107:          0          0       GIC  em_gio.4
->  108:          0          0       GIC  em_gio.4
->  157:      35952          0       GIC  em_sti.0
-> 
-> > [PATCH 06/08] mach-shmobile: KZM9D board Ethernet support V3
-> 
+
+Yes, it is intentional. There are two interrupt sources per 32 GPIO pins.
+
+>> [PATCH 06/08] mach-shmobile: KZM9D board Ethernet support V3
+>
 > Tested-by: Simon Horman <horms@verge.net.au>
-> 
-> > [PATCH 07/08] mach-shmobile: Emma Mobile EV2 DT support V3
-> 
+>
+>> [PATCH 07/08] mach-shmobile: Emma Mobile EV2 DT support V3
+>
 > I applied this and the resulting kernel booted.
-> 
-> > [PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
-> 
+
+That's good! Thanks for testing!
+
+>> [PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
+>
 > I applied this and the resulting kernel did not boot.
 > I saw nothing after the uboot prompt..
 
-Thanks for walking me through how to manually adding the dtb to the zImage.
-
-Tested-by: Simon Horman <horms@verge.net.au>
+Yeah, you need to select CONFIG_ARM_APPENDED_DTB=y and append the DTB
+to the zImage, then convert that to uImage.
 
 > Lastly, could you consider suppling a patch which provides a defconfig?
+
+I've been asked to provide a defconfig that we can share between
+multiple platforms. So it's on my TODO.
+
+Thank you!
+
+/ magnus
