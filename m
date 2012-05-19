@@ -1,27 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 May 2012 17:32:32 +0000
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120519112431.GH24238@titan.lakedaemon.net>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
- <20120519112431.GH24238@titan.lakedaemon.net>
-Message-ID: <201205191732.32384.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 20 May 2012 02:35:05 +0900
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle - declare the states with the
+ new api
+In-Reply-To: <20120517122802.GG26337@opensource.wolfsonmicro.com>
+References: <1337004377-17732-1-git-send-email-daniel.lezcano@linaro.org>
+ <1337004377-17732-2-git-send-email-daniel.lezcano@linaro.org>
+ <20120517122802.GG26337@opensource.wolfsonmicro.com>
+Message-ID: <4FB7D9C9.1020004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 May 2012, Jason Cooper wrote:
-> > Board files in mach-mvebu and the rest in plat-mvebu.  That would match 
-> > the spirit of the current split between mach-* and plat-*.
-> 
-> Took the words right out of my mouth.  Once DT conversions are complete,
-> mach-*/ would either go away, or hold legacy non-DT boards.
-> 
-> On a side note, I also like this because it would make converting old
-> board files like sheevaplug and guruplug to DT easier.  The legacy
-> implementation would be in mach-mvebu/ and the DT implementation would
-> be in plat-mvebu/.  Newcomers to the code would see a clearly defined
-> separation.
+On 05/17/12 21:28, Mark Brown wrote:
+> On Mon, May 14, 2012 at 04:06:16PM +0200, Daniel Lezcano wrote:
+>> The states are now part of the cpuidle_driver structure, so we can
+>> declare the states in this structure directly. That saves us an extra
+>> variable declaration and a memcpy.
+>
+> Tested-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
 
-With that layout, where do the mach/* headers go?
+Thanks for testing, applied this series.
 
-	Arnd
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
