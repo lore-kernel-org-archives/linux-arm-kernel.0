@@ -1,47 +1,43 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 18 May 2012 23:45:11 -0600
-Subject: [PATCH 1/2] gpio/generic: initialize basic_mmio_gpio shadow
- variables properly
-In-Reply-To: <20120519054403.A0A233E046E@localhost>
-References: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
- <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
- <20120519054403.A0A233E046E@localhost>
-Message-ID: <CACxGe6tbK3R9FgsjSbDQEtFavt9_3NWR3=kBgZtK3av3X41kaQ@mail.gmail.com>
+Date: Fri, 18 May 2012 23:49:48 -0600
+Subject: [PATCH v4] plat-versatile: modernize FPGA IRQ controller
+In-Reply-To: <4F9714BD.4060103@gmail.com>
+References: <1334690647-12346-1-git-send-email-linus.walleij@linaro.org>
+ <4F9714BD.4060103@gmail.com>
+Message-ID: <20120519054948.B978B3E046E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 11:44 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Thu, 17 May 2012 15:35:02 +0800, Shawn Guo <shawn.guo@linaro.org> wrote:
->> It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
->> missing initialization of basic_mmio_gpio shadow variables) manged to
->> fix in gpio-mxc driver, so that other platform specific drivers do not
->> suffer from the same problem over and over again.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> ?drivers/gpio/gpio-generic.c | ? ?4 ++++
->> ?1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
->> index e38dd0c..cfc9439 100644
->> --- a/drivers/gpio/gpio-generic.c
->> +++ b/drivers/gpio/gpio-generic.c
->> @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
->> ? ? ? ? ? ? ? return ret;
->>
->> ? ? ? bgc->data = bgc->read_reg(bgc->reg_dat);
->> + ? ? if (bgc->gc.set == bgpio_set_set)
->> + ? ? ? ? ? ? bgc->data = bgc->read_reg(bgc->reg_set);
->> + ? ? if (bgc->reg_dir)
->> + ? ? ? ? ? ? bgc->dir = bgc->read_reg(bgc->reg_dir);
->
-> This assumes that the set and dir registers are actually readable
-> which isn't the case on some hardware. ?There needs to be a mechanism
-> for drivers using bgpio_init to control how data & dir are initialized
-> (possibly with some flags; maybe replace the big_endian arg with a
-> flags arg).
+On Tue, 24 Apr 2012 16:01:49 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/17/2012 02:24 PM, Linus Walleij wrote:
+> > This does two things to the FPGA IRQ controller in the versatile
+> > family:
+> > 
+> > - Convert to MULTI_IRQ_HANDLER so we can drop the entry macro
+> >   from the Integrator. The C IRQ handler was inspired from
+> >   arch/arm/common/vic.c, recent bug discovered in this handler was
+> >   accounted for.
+> > - Convert to using IRQ domains so we can get rid of the NO_IRQ
+> >   mess and proceed with device tree and such stuff.
+> > 
+> > As part of the exercise, bump all the low IRQ numbers on the
+> > Integrator PIC to start from 1 rather than 0, since IRQ 0 is
+> > now NO_IRQ. The Linux IRQ numbers are thus entirely decoupled
+> > from the hardware IRQ numbers in this controller.
+> > 
+> > I was unable to split this patch. The main reason is the half-done
+> > conversion to device tree in Versatile.
+> > 
+> > Tested on Integrator/AP and Integrator/CP.
+> > 
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Looks good.
+> 
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-If you can turn it around quickly, I'll still try to get it in for v3.5
+Ditto.
 
-g.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
