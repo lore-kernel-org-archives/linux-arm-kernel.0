@@ -1,67 +1,96 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Sat, 19 May 2012 12:52:37 +0300
-Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
-In-Reply-To: <1337365122-702-1-git-send-email-nm@ti.com>
-References: <1337365122-702-1-git-send-email-nm@ti.com>
-Message-ID: <20120519095237.GA26761@besouro>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 19 May 2012 12:28:53 +0200
+Subject: [PATCH] ARM: LPC32xx: Adjust dts files to gpio dt binding
+Message-ID: <1337423333-24356-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The GPIO devicetree binding in 3.5 doesn't register the various LPC32xx GPIO
+banks via DT subnodes but always all at once, and changes the gpio referencing
+to 3 cells (bank, gpio, flags). This patch adjusts the DTS files to this
+binding that was just accepted to the gpio subsystem.
 
-Minor suggestion.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-On Fri, May 18, 2012 at 01:18:41PM -0500, ext Nishanth Menon wrote:
-> From: Wenbiao Wang <wwang@ti.com>
-> 
-> Voltage Processor state machine transition to disable need to
-> occur from IDLE state. When we transition OPP in a functioning
-> system, the call sequence for an OPP transition is as follows:
-> omap_sr_disable
->       -> sr class 3 disable
->            -> vp disable
->            -> sr disable
-> forceupdate to voltage/frequency scale depending on which OPP
-> we are transitioning to.
-> 
-> If we hit a critical timing window where SR had commanded VP
-> for a voltage transition and VP is in the middle of operating
-> on that command, it needs to go through a few states before
-> going to update state(where it actually sends the command to
-> VC). Initial view of h/w owners is that the state disable of VP
-> is expected to be sampled for the next transition.
-> 
-> Instead, to be on a safer side, we ensure that the valid states
-> of the VP state machine is diligently followed by software. This
-> can be done by waiting for VP to be in idle  prior to disabling
-> VP. Existing prints have been updated to ensure context is
-> available on error messages.
-> 
-> As part of this change, increase timeout for VP idle check to
-> improbable 500uSec to be certain that system is indeed unable
-> to continue before crashing out with error(worst case expectancy
-> remains the same 3-100uSec depending on when we caught VP).
-> 
+---
 
+Applies to branch next/dt of arm-soc.git
 
-<cut>
+You can also pull from
 
->  
->  /* XXX document */
-> -#define VP_IDLE_TIMEOUT		200
-> +#define VP_IDLE_TIMEOUT		500
+git://git.antcom.de/linux-2.6.git lpc32xx/dt
 
-I guess it is time to properly document this increasing busy loop delay..
-As it is getting closer to ms scale..
+(where just this single commit is new)
 
->  #define VP_TRANXDONE_TIMEOUT	300
->  
->  /**
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/boot/dts/lpc32xx.dtsi |   41 ++---------------------------------------
+ arch/arm/boot/dts/phy3250.dts  |    4 ++--
+ 2 files changed, 4 insertions(+), 41 deletions(-)
+
+--- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -215,45 +215,8 @@
+ 			gpio: gpio at 40028000 {
+ 				compatible = "nxp,lpc3220-gpio";
+ 				reg = <0x40028000 0x1000>;
+-				/* create a private address space for enumeration */
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				gpio_p0: gpio-bank at 0 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <0>;
+-				};
+-
+-				gpio_p1: gpio-bank at 1 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <1>;
+-				};
+-
+-				gpio_p2: gpio-bank at 2 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <2>;
+-				};
+-
+-				gpio_p3: gpio-bank at 3 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <3>;
+-				};
+-
+-				gpi_p3: gpio-bank at 4 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <4>;
+-				};
+-
+-				gpo_p3: gpio-bank at 5 {
+-					gpio-controller;
+-					#gpio-cells = <2>;
+-					reg = <5>;
+-				};
++				gpio-controller;
++				#gpio-cells = <3>; /* bank, pin, flags */
+ 			};
+ 
+ 			watchdog at 4003C000 {
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -131,13 +131,13 @@
+ 		compatible = "gpio-leds";
+ 
+ 		led0 {
+-			gpios = <&gpo_p3 1 1>; /* GPO_P3 1, GPIO 80, active low */
++			gpios = <&gpio 5 1 1>; /* GPO_P3 1, GPIO 80, active low */
+ 			linux,default-trigger = "heartbeat";
+ 			default-state = "off";
+ 		};
+ 
+ 		led1 {
+-			gpios = <&gpo_p3 14 1>; /* GPO_P3 14, GPIO 93, active low */
++			gpios = <&gpio 5 14 1>; /* GPO_P3 14, GPIO 93, active low */
+ 			linux,default-trigger = "timer";
+ 			default-state = "off";
+ 		};
