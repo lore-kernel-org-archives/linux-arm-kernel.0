@@ -1,38 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 19 May 2012 10:56:35 +0800
-Subject: Duplicate labels in dts files
-In-Reply-To: <4FB6B896.3090904@wwwdotorg.org>
-References: <4FB6B896.3090904@wwwdotorg.org>
-Message-ID: <20120519025632.GD5427@S2101-09.ap.freescale.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 18 May 2012 23:44:03 -0600
+Subject: [PATCH 1/2] gpio/generic: initialize basic_mmio_gpio shadow
+ variables properly
+In-Reply-To: <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
+References: <1337240103-4756-1-git-send-email-shawn.guo@linaro.org>
+ <1337240103-4756-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120519054403.A0A233E046E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 03:01:10PM -0600, Stephen Warren wrote:
-> The following arch/arm/boot/dts/*.dts all have duplicate label
-> definitions, albeit all duplicates pointing at the same node. Is this
-> expected?
-
-At least for IMX, I would say, yes.
-
-For example, when I have the following node in imx53.dtsi and need to
-have it in imx53-ard.dts, the first line of the node definition will
-be naturally copied into imx53-ard.dts.  As the result, the label
-"uart1" will be "duplicated".
-
-	uart1: serial at 53fbc000 {
-		...
-	};
-
-> This does work OK with the in-kernel dtc and latest mainline
-> dtc, but triggered some error-checks in a dtc patch that I have locally,
-> which allows node/property deletion. I think the duplicate labels should
-> probably be removed - do you agree?
+On Thu, 17 May 2012 15:35:02 +0800, Shawn Guo <shawn.guo@linaro.org> wrote:
+> It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
+> missing initialization of basic_mmio_gpio shadow variables) manged to
+> fix in gpio-mxc driver, so that other platform specific drivers do not
+> suffer from the same problem over and over again.
 > 
-I hardly think so.  You probably would agree that we shouldn't say
-the node is duplicated, since the node will still be one in dtb.
-Then, as long as the label points to the same node, we should not say
-the label is duplicated either.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpio/gpio-generic.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
+> index e38dd0c..cfc9439 100644
+> --- a/drivers/gpio/gpio-generic.c
+> +++ b/drivers/gpio/gpio-generic.c
+> @@ -394,6 +394,10 @@ int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
+>  		return ret;
+>  
+>  	bgc->data = bgc->read_reg(bgc->reg_dat);
+> +	if (bgc->gc.set == bgpio_set_set)
+> +		bgc->data = bgc->read_reg(bgc->reg_set);
+> +	if (bgc->reg_dir)
+> +		bgc->dir = bgc->read_reg(bgc->reg_dir);
 
--- 
-Regards,
-Shawn
+This assumes that the set and dir registers are actually readable
+which isn't the case on some hardware.  There needs to be a mechanism
+for drivers using bgpio_init to control how data & dir are initialized
+(possibly with some flags; maybe replace the big_endian arg with a
+flags arg).
+
+g.
