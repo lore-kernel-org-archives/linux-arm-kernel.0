@@ -1,29 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 May 2012 20:34:24 +0800
-Subject: Issues when running DT enabled kernel on iMX28 from linux-next
-In-Reply-To: <201205190323.18058.marek.vasut@gmail.com>
-References: <4FB583CF.2080801@grid-net.com>
- <20120518010138.GA5427@S2101-09.ap.freescale.net>
- <4FB6D2A2.1090400@grid-net.com>
- <201205190323.18058.marek.vasut@gmail.com>
-Message-ID: <20120519123423.GA5676@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 19 May 2012 21:06:13 +0800
+Subject: [PATCH] mtd: nand: gpmi: fix compile error caused by pinctrl call
+Message-ID: <1337432773-24000-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 03:23:17AM +0200, Marek Vasut wrote:
-> Hm actually ... does anyone have dts file for mx28 with enabled GPMI nand? Looks 
-> like that thing from example doesn't work (had to replace gpmi-nand with gpmi), 
-> then it stopped complaining about clock.
-> But now it dies on ecc.strength not 
-> being set.
+Fix following compile error caused by commit 39febc0 (mtd: nand: gpmi:
+adopt pinctrl support).
 
-Huang Shijie (Cc-ed) might be interested in knowing and fixing those,
-but probably during v3.5-rc.
+  CC      drivers/mtd/nand/gpmi-nand/gpmi-nand.o
+drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function ?acquire_resources?:
+drivers/mtd/nand/gpmi-nand/gpmi-nand.c:499:45: error: ?pdev? undeclared (first use in this function)
 
-> MMC doesn't probe either etc.
-> 
-Are you using next-20120516 or later?
+Reported-by: Subodh Nijsure <snijsure@grid-net.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Hi Arnd, Olof,
 
--- 
+Can you please apply the patch on top of arm-soc/imx/pinctrl branch or
+amend commit 39febc0 (mtd: nand: gpmi: adopt pinctrl support) with the
+fixing?  Sorry for this mistake.
+
 Regards,
 Shawn
+
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 8478fd9..b68e043 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -496,7 +496,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto exit_dma_channels;
+ 
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
+ 	if (IS_ERR(pinctrl)) {
+ 		ret = PTR_ERR(pinctrl);
+ 		goto exit_pin;
+-- 
+1.7.5.4
