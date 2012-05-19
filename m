@@ -1,48 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sat, 19 May 2012 09:13:47 +0100
-Subject: db8500.dtsi: ab8500@5 reg property invalid length
-In-Reply-To: <4FB6B522.4050301@wwwdotorg.org>
-References: <4FB6B522.4050301@wwwdotorg.org>
-Message-ID: <4FB7563B.4020708@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 19 May 2012 08:44:03 +0000
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FB6CB27.8020500@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205182143.55140.arnd@arndb.de> <4FB6CB27.8020500@wwwdotorg.org>
+Message-ID: <201205190844.03654.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Friday 18 May 2012, Stephen Warren wrote:
+> On 05/18/2012 03:43 PM, Arnd Bergmann wrote:
 
-Thanks for reporting this.
+> > So if we do that, we might want to make the dma-names property mandatory
+> > for every device, and document what the names are.
+> 
+> We could do that, but one more proposal: Add the client's ID/index into
+> the dmas property, so:
+> 
+> simple 1 req:
+> 
+> dmas = <0 &dmac1 xxx>;
+> 
+> simple 2 req:
+> 
+> dmas = <0 &dmac1 xxx 1 &dmac1 yyy>;
+> 
+> multiple dmacs:
+> 
+> dmas = <0 &dmac1 xxx 0 &dmac2 zzz 1 &dmac1 yyy>;
+> 
+> (i.e. dmas = [client_dma_req_id phandle dma-specifier]*)
+> 
+> (where 0==TX_FIFO, 1=RX_FIFO for example, but could also have
+> 2=TX_FIFO_B, 3=RX_FIFO_B, ...)
+> 
+> Then dma-names would map name to ID, but you'd still need to search all
+> through the dmas property to find the ID match.
 
-> In commit 3de3d74 "ARM: ux500: Configure the PRCMU Timer for db8500
-> based devices in DT", you changed DT node prcmu at 80157000's #size-cells
-> from 0 to 1, but didn't adjust the reg property for existing sub-node
-> ab8500 at 5.
- >
- > Warning (reg_format): "reg" property in
- > /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
- > (#address-cells == 1, #size-cells == 1)
->
-> This makes dtc fail to compile snowball.dts:
+Again, this would probably work, but it adds complexity and inconsistency
+for the common case, as nothing else requires these. I think it's much
+better than putting the information into the dma controller node, but
+not ideal.
 
-Not quite. I didn't notice this warning before, but that's all it is. It 
-doesn't prevent snowball.dts from being compiled or seem to affect the 
-parsing of the DT as far as I can tell.
+> > Another option would be to encode the direction in the property in
+> > a generic way and provide an API that lets you ask specifically
+> > for a read, write or readwrite channel out of the ones that are
+> > available, rather than assuming there is only one kind. Consequently,
+> > any device that uses more than one read channel or more than one
+> > write channel would still have to use names to identify them.
+> 
+> I'm not sure that just direction cuts it; Tegra's SPDIF has 2 TX DMAs
+> ("PCM" data and control data) and same for RX. The format above is
+> roughly the same as what you proposed, but with an explicit ID rather
+> than direction in the dmas property.
 
-I will fix the warning though.
+The point with the direction was that it covers most cases and makes
+them rather simple, while for the rare case where you need more than
+two channels, you just use the otherwise optional named interface
+rather than the numbered one. My feeling is that this also makes a
+lot of sense at the driver API level: most dirvers just ask for the
+read and write channels using a very simple interface, and those drivers
+that have more than two will want to name them anyway.
 
- > Also, the indentation of the new subnode
- > prcmu-timer-4 at 80157450 looks wrong.
-
-Yes it is. There is a patch on the MLs at the moment which does some 
-format correction and pandas to a new way of representing IRQs for this 
-node.
-
-Thanks again Stephen.
-
-Kind regards.
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
