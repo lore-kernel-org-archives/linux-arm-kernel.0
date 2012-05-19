@@ -1,96 +1,61 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 19 May 2012 12:28:53 +0200
-Subject: [PATCH] ARM: LPC32xx: Adjust dts files to gpio dt binding
-Message-ID: <1337423333-24356-1-git-send-email-stigge@antcom.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 19 May 2012 07:24:31 -0400
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de>
+ <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
+Message-ID: <20120519112431.GH24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO devicetree binding in 3.5 doesn't register the various LPC32xx GPIO
-banks via DT subnodes but always all at once, and changes the gpio referencing
-to 3 cells (bank, gpio, flags). This patch adjusts the DTS files to this
-binding that was just accepted to the gpio subsystem.
+On Fri, May 18, 2012 at 06:51:22PM -0400, Nicolas Pitre wrote:
+> On Fri, 18 May 2012, Arnd Bergmann wrote:
+> 
+> > On Friday 18 May 2012, Jason Cooper wrote:
+> > > > 
+> > > > In this case, we have wildly different names referring to the same chip 
+> > > > family, and "orion" is far from hinting that it also constitute the 
+> > > > support for Kirkwood, Dove or (some not all) Armadas, unless you are 
+> > > > familiar with some legacy Marvell products.  This is why in this case I 
+> > > > think that a directory name change might be appropriate, especially if 
+> > > > we're going to cause churn by moving things around already.
+> > > > 
+> > > > I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
+> > > > mvebu_*.  Unless someone has another logical identifier to suggest which 
+> > > > would capture all that family of SOCs that came out of EBU in Marvell of 
+> > > > course.
+> > > 
+> > > I prefer mvebu_* ...  nice and concise.
+> > > 
+> > 
+> > On a related topic, any preferences on where we will put all the board
+> > files? I think it would be helpful to put them into a separate place from
+> > the main platform files, so e.g. have all *-setup.c files go to
+> > arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
+> > 
+> > The reasons I think this would help are that the directory is getting a
+> > bit crowded when we move five or more of the current platforms in there,
+> > and that I hope we can start ignoring them for most practical purposes
+> > as some point in the future when all boards have been made to work with
+> > DT, and at an even later point we can just delete that directory.
+> > The main disadvantage that this approach would bring is that it's not
+> > consistent with what any of the other platforms do.
+> 
+> Board files in mach-mvebu and the rest in plat-mvebu.  That would match 
+> the spirit of the current split between mach-* and plat-*.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Took the words right out of my mouth.  Once DT conversions are complete,
+mach-*/ would either go away, or hold legacy non-DT boards.
 
----
+On a side note, I also like this because it would make converting old
+board files like sheevaplug and guruplug to DT easier.  The legacy
+implementation would be in mach-mvebu/ and the DT implementation would
+be in plat-mvebu/.  Newcomers to the code would see a clearly defined
+separation.
 
-Applies to branch next/dt of arm-soc.git
+thx,
 
-You can also pull from
-
-git://git.antcom.de/linux-2.6.git lpc32xx/dt
-
-(where just this single commit is new)
-
- arch/arm/boot/dts/lpc32xx.dtsi |   41 ++---------------------------------------
- arch/arm/boot/dts/phy3250.dts  |    4 ++--
- 2 files changed, 4 insertions(+), 41 deletions(-)
-
---- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
-+++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -215,45 +215,8 @@
- 			gpio: gpio at 40028000 {
- 				compatible = "nxp,lpc3220-gpio";
- 				reg = <0x40028000 0x1000>;
--				/* create a private address space for enumeration */
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				gpio_p0: gpio-bank at 0 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <0>;
--				};
--
--				gpio_p1: gpio-bank at 1 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <1>;
--				};
--
--				gpio_p2: gpio-bank at 2 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <2>;
--				};
--
--				gpio_p3: gpio-bank at 3 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <3>;
--				};
--
--				gpi_p3: gpio-bank at 4 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <4>;
--				};
--
--				gpo_p3: gpio-bank at 5 {
--					gpio-controller;
--					#gpio-cells = <2>;
--					reg = <5>;
--				};
-+				gpio-controller;
-+				#gpio-cells = <3>; /* bank, pin, flags */
- 			};
- 
- 			watchdog at 4003C000 {
---- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
-+++ linux-2.6/arch/arm/boot/dts/phy3250.dts
-@@ -131,13 +131,13 @@
- 		compatible = "gpio-leds";
- 
- 		led0 {
--			gpios = <&gpo_p3 1 1>; /* GPO_P3 1, GPIO 80, active low */
-+			gpios = <&gpio 5 1 1>; /* GPO_P3 1, GPIO 80, active low */
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
- 
- 		led1 {
--			gpios = <&gpo_p3 14 1>; /* GPO_P3 14, GPIO 93, active low */
-+			gpios = <&gpio 5 14 1>; /* GPO_P3 14, GPIO 93, active low */
- 			linux,default-trigger = "timer";
- 			default-state = "off";
- 		};
+Jason.
