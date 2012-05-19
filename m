@@ -1,37 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 May 2012 08:11:30 -0700
-Subject: [PATCH] mtd: nand: gpmi: fix compile error caused by pinctrl call
-In-Reply-To: <1337432773-24000-1-git-send-email-shawn.guo@linaro.org>
-References: <1337432773-24000-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOesGMhfByBhx9Kn1PhYMoaKfbD8NeOrYHCG5sTkRLDwmPW-MA@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Sat, 19 May 2012 17:25:56 +0200
+Subject: [PATCH 00/18] DT enablement for Snowball
+In-Reply-To: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
+References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120519152556.GP12015@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 6:06 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Fix following compile error caused by commit 39febc0 (mtd: nand: gpmi:
-> adopt pinctrl support).
->
-> ?CC ? ? ?drivers/mtd/nand/gpmi-nand/gpmi-nand.o
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function ?acquire_resources?:
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:499:45: error: ?pdev? undeclared (first use in this function)
->
-> Reported-by: Subodh Nijsure <snijsure@grid-net.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> Hi Arnd, Olof,
->
-> Can you please apply the patch on top of arm-soc/imx/pinctrl branch or
-> amend commit 39febc0 (mtd: nand: gpmi: adopt pinctrl support) with the
-> fixing? ?Sorry for this mistake.
+Hi Lee,
 
-Applied to imx/pinctrl (and next/pinctrl).
+On Thu, May 17, 2012 at 02:45:05PM +0100, Lee Jones wrote:
+> Hopefully the penultimate large patch-stack for Snowball
+> enablement. After that only bits and bobs will remain.
+> 
+>  arch/arm/boot/dts/db8500.dtsi      |   92 +++++++++++++++-
+>  arch/arm/boot/dts/snowball.dts     |    3 +
+>  arch/arm/configs/u8500_defconfig   |    3 +
+>  arch/arm/mach-ux500/Kconfig        |    1 +
+>  arch/arm/mach-ux500/board-mop500.c |   55 +++-------
+>  drivers/i2c/busses/i2c-nomadik.c   |   43 +++++++-
+>  drivers/mfd/Makefile               |    5 +-
+>  drivers/mfd/ab8500-core.c          |  176 ++++++++++++++++++++++++++-----
+>  drivers/mfd/ab8500-debugfs.c       |    6 ++
+>  drivers/mfd/ab8500-gpadc.c         |    8 +-
+>  drivers/mfd/ab8500-i2c.c           |  160 ----------------------------
+>  drivers/regulator/ab8500.c         |  204 +++++++++++++++++++++++++-----------
+>  12 files changed, 457 insertions(+), 299 deletions(-)
+All mfd patches (6, 8, 14, 15 and 17) applied, thanks.
 
-Given that the mxs defconfig doesn't expose this error, would you mind
-adding the driver to the platforms where it makes sense so we get
-build coverage in linux next and for those who use defconfigs to
-provide it?
+Cheers,
+Samuel.
 
-
-Thanks!
-
--Olof
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
