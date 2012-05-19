@@ -1,38 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 May 2012 23:47:44 -0700
-Subject: [GIT PULL][for 3.5] pull request of board-specific branch in
- arch-pxa
-In-Reply-To: <CAN1soZyM-YQ9EX66EY_fTwPncokra9NpB6QEZ2ExCGizKk9MAA@mail.gmail.com>
-References: <CAN1soZyM-YQ9EX66EY_fTwPncokra9NpB6QEZ2ExCGizKk9MAA@mail.gmail.com>
-Message-ID: <CAOesGMj-ZTj3BE7WWjBM9BZYUV+a7PRMMN8B5+Xk0f2KiF4DtA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 19 May 2012 12:34:07 +0530
+Subject: [PATCHv3 0/4] coupled cpuidle state support
+In-Reply-To: <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
+References: <1336438662-10484-1-git-send-email-ccross@android.com>
+ <4FB62611.7080908@ti.com> <201205182103.56301.rjw@sisk.pl>
+ <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
+Message-ID: <CAMQu2gxxmmZvMFjx-VZuLcvBgm6fxu72n+fufzx7ib6trqNg6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
-
-On Sun, May 13, 2012 at 6:42 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> Hi Arnd & Olof,
+On Sat, May 19, 2012 at 1:48 AM, Colin Cross <ccross@android.com> wrote:
+> On Fri, May 18, 2012 at 12:03 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>> On Friday, May 18, 2012, Santosh Shilimkar wrote:
+>>> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
+>>> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+>>> > cpus cannot be independently powered down, either due to
+>>> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+>>> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
+>>> > will corrupt the gic state unless the other cpu runs a work
+>>> > around). ?Each cpu has a power state that it can enter without
+>>> > coordinating with the other cpu (usually Wait For Interrupt, or
+>>> > WFI), and one or more "coupled" power states that affect blocks
+>>> > shared between the cpus (L2 cache, interrupt controller, and
+>>> > sometimes the whole SoC). ?Entering a coupled power state must
+>>> > be tightly controlled on both cpus.
+>>> >
+>>>
+>>> [...]
+>>>
+>>> > This series has been tested and reviewed by Santosh and Kevin
+>>> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
+>>> > and Exynos5 patches are in progress. ?I think this is ready to
+>>> > go in. ?Lean, are you maintaining a cpuidle tree for linux-next?
+>>> > If not, I can publish a tree for linux-next, or this could go in
+>>> > through Arnd's tree.
+>>>
+>>> I haven't seen any response so far on who is lining up this
+>>> series for 3.5 ? Not sure if it made it to linux-next either.
+>>
+>> That should be Len, but he's been silent recently.
+>>
+>> How urgent is it?
 >
-> Please help to merge board-specific branch in arch-pxa git tree.
->
-> The following changes since commit 36be50515fe2aef61533b516fa2576a2c7fe7664:
->
-> ?Linux 3.4-rc7 (2012-05-12 18:37:47 -0700)
->
-> are available in the git repository at:
-> ?git://github.com/hzhuang1/linux.git board-specific
+> Len silently picked up the last version. ?I just posted two fixes to
+> it, hopefully he'll pick up those too.
+Great !!
+I will pull Len's tree and rebase OMAP patches against it.
 
-Hmm. We already pulled a branch with that name before, but it doesn't
-seem to contain the same contents as this one. That's OK, but it would
-have been fine to just apply these two more patches on top of the
-previous branch, and ask us to pull it again (sending the diffstat for
-the delta between previous pull and now).
-
-Or create a new branch with a different name for independent patches.
-But in this case, a re-pull request would have been fine.
-
-Anyway, I've pulled this in to next/boards (and pxa/boards2) now. Thanks.
-
-
--Olof
+Regards
+Santosh
