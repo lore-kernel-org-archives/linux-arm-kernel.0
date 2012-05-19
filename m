@@ -1,231 +1,123 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 19 May 2012 00:16:28 -0600
-Subject: [PATCH v3 1/7] ARM: davinci,
- intc: Add OF support for TI interrupt controller
-In-Reply-To: <1330945804-3379-2-git-send-email-hs@denx.de>
-References: <1330945804-3379-1-git-send-email-hs@denx.de>
- <1330945804-3379-2-git-send-email-hs@denx.de>
-Message-ID: <20120519061628.663F53E046E@localhost>
+Date: Sat, 19 May 2012 00:21:34 -0600
+Subject: [PATCH 2/8] arm: mach-armada: add source files
+In-Reply-To: <4FB225DC.6090805@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4FB225DC.6090805@codethink.co.uk>
+Message-ID: <20120519062134.4AEB03E046E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Mar 2012 12:09:58 +0100, Heiko Schocher <hs@denx.de> wrote:
-> Add a function to initialize the Common Platform Interrupt Controller
-> (cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
+On Tue, 15 May 2012 10:46:04 +0100, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 15/05/12 09:54, Thomas Petazzoni wrote:
+> > This patch adds basic source files for Marvell Armada SoCs.
+> >
+> > Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
+> > Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> > Signed-off-by: Lior Amsalem<alior@marvell.com>
+> > ---
+> >   arch/arm/boot/dts/a370.dtsi        |   23 ++++
+> >   arch/arm/boot/dts/armada.dtsi      |   67 ++++++++++
+> >   arch/arm/boot/dts/axp.dtsi         |   43 +++++++
+> >   arch/arm/mach-armada/Kconfig       |    5 +
+> >   arch/arm/mach-armada/Makefile      |    2 +
+> >   arch/arm/mach-armada/Makefile.boot |    1 +
+> >   arch/arm/mach-armada/common.c      |   56 +++++++++
+> >   arch/arm/mach-armada/common.h      |   27 ++++
+> >   arch/arm/mach-armada/irq.c         |  116 +++++++++++++++++
+> >   arch/arm/mach-armada/time.c        |  243 ++++++++++++++++++++++++++++++++++++
+> >   10 files changed, 583 insertions(+)
+> >   create mode 100644 arch/arm/boot/dts/a370.dtsi
+> >   create mode 100644 arch/arm/boot/dts/armada.dtsi
+> >   create mode 100644 arch/arm/boot/dts/axp.dtsi
+> >   create mode 100644 arch/arm/mach-armada/Kconfig
+> >   create mode 100644 arch/arm/mach-armada/Makefile
+> >   create mode 100644 arch/arm/mach-armada/Makefile.boot
+> >   create mode 100644 arch/arm/mach-armada/common.c
+> >   create mode 100644 arch/arm/mach-armada/common.h
+> >   create mode 100644 arch/arm/mach-armada/irq.c
+> >   create mode 100644 arch/arm/mach-armada/time.c
+> >
+> > diff --git a/arch/arm/boot/dts/a370.dtsi b/arch/arm/boot/dts/a370.dtsi
+> > new file mode 100644
+> > index 0000000..f11e56a
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/a370.dtsi
+> > @@ -0,0 +1,23 @@
+> > +/*
+> > + * Device Tree Include file for Marvell Armada 370 family SoC
+> > + *
+> > + * Copyright (C) 2012 Marvell
+> > + *
+> > + * Lior Amsalem<alior@marvell.com>
+> > + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+> > + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + *
+> > + * Contains definitions specific to the Armada 370 SoC that are not
+> > + * common to all Armada SoCs.
+> > + */
+> > +
+> > +/include/ "armada.dtsi"
 > 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+> I would use armada_xp.dtsi at the least, we've no way of knowing what
+> further Armada devices are going to be produced and whether they will be
+> compatible with.
 > 
-> ---
-> - changes for v2:
-> - add comment from Grant Likely:
->   - migrate the whole interrupt controller to natively use an
->     irq_domain. Rebased complete patchserie to:
->     git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+> > +/ {
+> > +	model = "Marvell Armada 370 family SoC";
+> > +	compatible = "marvell,armada370", "marvell,armada";
+> > + };
 > 
->     commit 3a806bfcde2cc3e4853f2807b2e3c94e7ccaf450
->     Author: Grant Likely <grant.likely@secretlab.ca>
->     Date:   Fri Jan 27 06:44:34 2012 -0700
+> Firstly, it is mrvl, not marvell everywhere else in the kernel (see
+> MIPS and device tree documentation).
 > 
->     irq_domain: mostly eliminate slow-path revmap lookups
-> - changes for v3:
->   - add comments from Sergei Shtylyov:
->     - rename compatible" prop to "ti,cp_intc"
->     - cp_intc_init() is now also for the of case
->       the name of the init function (it calls the
->       "new" __cp_intc_init() function, which was
->       the "old" cp_intc_init()). Through this
->       rework the changes for OF is better visible.
->       As the OF case uses the irq_domain rework from
->       Grant Likely, maybe the none OF case can use
->       this also, but this should be tested on a hw ...
->   - rebased to:
->     git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+> Secondly, I would strongly advise against using the generic marketing
+> name for these devices in the compatible list, "marvell,armada" as we
+> have no way of knowing what new devices will come along in the future
+> and if they'll be compatible.
 > 
->     commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
->     Author: Grant Likely <grant.likely@secretlab.ca>
->     Date:   Fri Feb 24 14:58:54 2012 -0700
+> > diff --git a/arch/arm/boot/dts/armada.dtsi b/arch/arm/boot/dts/armada.dtsi
+> > new file mode 100644
+> > index 0000000..3c99c30
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/armada.dtsi
+> > @@ -0,0 +1,67 @@
+> > +/*
+> > + * Device Tree Include file for Marvell Armada family SoC
+> > + *
+> > + * Copyright (C) 2012 Marvell
+> > + *
+> > + * Lior Amsalem<alior@marvell.com>
+> > + * Gregory CLEMENT<gregory.clement@free-electrons.com>
+> > + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + *
+> > + * This file contains the definitions that are common to the Armada
+> > + * 370 and Armada XP SoC.
 > 
->     mfd: twl-core: Add IRQ_DOMAIN dependency
+> I really do not want to see these files in the kernel, we where suppose
+> to remove any specific manchine dependency by moving to device tree and
+> not push the problem from a board.c to a .dts file.
 > 
->  .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++++++
->  arch/arm/mach-davinci/cp_intc.c                    |   87 +++++++++++++++++--
->  2 files changed, 104 insertions(+), 10 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
+> Given these really should be part of the bootloader, I am not sure if a
+> GPLv2 compliant license is really appropriate for these files. At best
+> some form of dual-licensing to allow them to be moved out into a devtree
+> repository elsewhere would be useful.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt b/Documentation/devicetree/bindings/arm/davinci/intc.txt
-> new file mode 100644
-> index 0000000..dfd6a560
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
-> @@ -0,0 +1,27 @@
-> +* TI Common Platform Interrupt Controller
-> +
-> +Common Platform Interrupt Controller (cp_intc) is used on
-> +OMAP-L1x SoCs and can support several configurable number
-> +of interrupts.
-> +
-> +Main node required properties:
-> +
-> +- compatible : should be:
-> +	"ti,cp_intc"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The type shall be a <u32> and the value shall be 1.
-> +
-> +  The cell contains the interrupt number in the range [0-128].
-> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
-> +- reg: physical base address and size of the intc registers map.
-> +
-> +Example:
-> +
-> +	intc: interrupt-controller at 1 {
-> +		compatible = "ti,cp_intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		ti,intc-size = <101>;
-> +		reg = <0xfffee000 0x2000>;
-> +	};
-> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-> index f83152d..585114a 100644
-> --- a/arch/arm/mach-davinci/cp_intc.c
-> +++ b/arch/arm/mach-davinci/cp_intc.c
-> @@ -9,9 +9,14 @@
->   * kind, whether express or implied.
->   */
->  
-> +#include <linux/export.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->  
->  #include <mach/common.h>
->  #include <mach/cp_intc.h>
-> @@ -99,18 +104,45 @@ static struct irq_chip cp_intc_irq_chip = {
->  	.irq_set_wake	= cp_intc_set_wake,
->  };
->  
-> -void __init cp_intc_init(void)
-> +static struct irq_domain *cp_intc_domain;
-> +
-> +static int cp_intc_host_map(struct irq_domain *h, unsigned int virq,
-> +			  irq_hw_number_t hw)
->  {
-> -	unsigned long num_irq	= davinci_soc_info.intc_irq_num;
-> +	pr_debug("cp_intc_host_map(%d, 0x%lx)\n", virq, hw);
-> +
-> +	irq_set_chip(virq, &cp_intc_irq_chip);
-> +	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> +	irq_set_handler(virq, handle_edge_irq);
-> +	return 0;
-> +}
-> +
-> +static const struct irq_domain_ops cp_intc_host_ops = {
-> +	.map = cp_intc_host_map,
-> +	.xlate = irq_domain_xlate_onetwocell,
-> +};
-> +
-> +int __init __cp_intc_init(struct device_node *node,
-> +		struct device_node *parent)
-> +{
-> +	u32 num_irq		= davinci_soc_info.intc_irq_num;
->  	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
->  	u32 *host_map		= davinci_soc_info.intc_host_map;
->  	unsigned num_reg	= BITS_TO_LONGS(num_irq);
-> -	int i;
-> +	int i, irq_base;
->  
->  	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
-> -	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
-> +	if (node) {
-> +		davinci_intc_base = of_iomap(node, 0);
-> +		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
-> +			pr_warn("unable to get intc-size, default to %d\n",
-> +				num_irq);
-> +	} else {
-> +		davinci_intc_base = ioremap(davinci_soc_info.intc_base,
-> +					SZ_8K);
-> +	}
->  	if (WARN_ON(!davinci_intc_base))
-> -		return;
-> +		return -EINVAL;
->  
->  	cp_intc_write(0, CP_INTC_GLOBAL_ENABLE);
->  
-> @@ -165,13 +197,48 @@ void __init cp_intc_init(void)
->  		for (i = 0; host_map[i] != -1; i++)
->  			cp_intc_write(host_map[i], CP_INTC_HOST_MAP(i));
->  
-> -	/* Set up genirq dispatching for cp_intc */
-> -	for (i = 0; i < num_irq; i++) {
-> -		irq_set_chip(i, &cp_intc_irq_chip);
-> -		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> -		irq_set_handler(i, handle_edge_irq);
-> +	if (node) {
-> +		irq_base = irq_alloc_descs(-1, 0, num_irq, 0);
-> +		if (irq_base < 0) {
-> +			pr_warn("Couldn't allocate IRQ numbers\n");
-> +			irq_base = 0;
-> +		}
-> +
-> +		/* create a legacy host */
-> +		cp_intc_domain = irq_domain_add_legacy(node, num_irq,
-> +					irq_base, 0, &cp_intc_host_ops, NULL);
-> +		if (cp_intc_domain == NULL) {
-> +			pr_err("CP INTC: failed to allocate irq host!\n");
-> +			return -EINVAL;
-> +		}
-> +	} else {
-> +		/* Set up genirq dispatching for cp_intc */
-> +		for (i = 0; i < num_irq; i++) {
-> +			irq_set_chip(i, &cp_intc_irq_chip);
-> +			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> +			irq_set_handler(i, handle_edge_irq);
-> +		}
+> (Feedback from Grant here would be useful)
 
-No need for the if/else clause here.  irq_domain should be used for
-both DT and non-DT.  It makes the code a lot simpler that way.  The
-only difference I would suggest is to call irq_domain_add_linear() in
-the DT case instead of irq_domain_add_legacy()...  and this is
-temporary too until I fix up the irq_domain code to better handle both
-static and dynamic mapping.
-
->  	}
->  
->  	/* Enable global interrupt */
->  	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static struct of_device_id irq_match[] __initdata = {
-> +	{ .compatible = "ti,cp_intc", .data = __cp_intc_init, },
-> +	{ }
-> +};
-> +
-> +void __init cp_intc_init(void)
-> +{
-> +	of_irq_init(irq_match);
-> +}
-> +#else
-> +void __init cp_intc_init(void)
-> +{
-> +	__cp_intc_init(NULL, NULL);
->  }
-> +#endif
-
-This is broken.  Turning on CONFIG_OF must not disable non-DT users.
-It needs to be reworked to be conditional at runtime.
+Without another repository the kernel tree is the correct place to
+put these files.  I certainly don't want them considered as part of
+the boot loader either since there needs to be the base expectation
+that this data may need to change.  Please do keep them in
+arch/arm/boot/dts for now.
 
 g.
