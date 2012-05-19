@@ -1,123 +1,101 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 19 May 2012 00:21:34 -0600
-Subject: [PATCH 2/8] arm: mach-armada: add source files
-In-Reply-To: <4FB225DC.6090805@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB225DC.6090805@codethink.co.uk>
-Message-ID: <20120519062134.4AEB03E046E@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 May 2012 23:23:43 -0700
+Subject: [PATCH 19/20] ARM: Exynos5: Add combiner, wakeup interrupt
+ controller and ethernet nodes
+In-Reply-To: <20120519061129.BEE9D3E046E@localhost>
+References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
+ <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
+ <CAOesGMhxn6L+Pcp-v2v6z7srGd=8kGwqff7Tt6ok8pHMVXp3ZQ@mail.gmail.com>
+ <20120519061129.BEE9D3E046E@localhost>
+Message-ID: <CAOesGMjrDL2-cS7XFUYnJdL5i6=YFzf6yRUO3eLX4a4GVB4x_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 May 2012 10:46:04 +0100, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 15/05/12 09:54, Thomas Petazzoni wrote:
-> > This patch adds basic source files for Marvell Armada SoCs.
-> >
-> > Signed-off-by: Gregory CLEMENT<gregory.clement@free-electrons.com>
-> > Signed-off-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> > Signed-off-by: Lior Amsalem<alior@marvell.com>
-> > ---
-> >   arch/arm/boot/dts/a370.dtsi        |   23 ++++
-> >   arch/arm/boot/dts/armada.dtsi      |   67 ++++++++++
-> >   arch/arm/boot/dts/axp.dtsi         |   43 +++++++
-> >   arch/arm/mach-armada/Kconfig       |    5 +
-> >   arch/arm/mach-armada/Makefile      |    2 +
-> >   arch/arm/mach-armada/Makefile.boot |    1 +
-> >   arch/arm/mach-armada/common.c      |   56 +++++++++
-> >   arch/arm/mach-armada/common.h      |   27 ++++
-> >   arch/arm/mach-armada/irq.c         |  116 +++++++++++++++++
-> >   arch/arm/mach-armada/time.c        |  243 ++++++++++++++++++++++++++++++++++++
-> >   10 files changed, 583 insertions(+)
-> >   create mode 100644 arch/arm/boot/dts/a370.dtsi
-> >   create mode 100644 arch/arm/boot/dts/armada.dtsi
-> >   create mode 100644 arch/arm/boot/dts/axp.dtsi
-> >   create mode 100644 arch/arm/mach-armada/Kconfig
-> >   create mode 100644 arch/arm/mach-armada/Makefile
-> >   create mode 100644 arch/arm/mach-armada/Makefile.boot
-> >   create mode 100644 arch/arm/mach-armada/common.c
-> >   create mode 100644 arch/arm/mach-armada/common.h
-> >   create mode 100644 arch/arm/mach-armada/irq.c
-> >   create mode 100644 arch/arm/mach-armada/time.c
-> >
-> > diff --git a/arch/arm/boot/dts/a370.dtsi b/arch/arm/boot/dts/a370.dtsi
-> > new file mode 100644
-> > index 0000000..f11e56a
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/a370.dtsi
-> > @@ -0,0 +1,23 @@
-> > +/*
-> > + * Device Tree Include file for Marvell Armada 370 family SoC
-> > + *
-> > + * Copyright (C) 2012 Marvell
-> > + *
-> > + * Lior Amsalem<alior@marvell.com>
-> > + * Gregory CLEMENT<gregory.clement@free-electrons.com>
-> > + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + *
-> > + * Contains definitions specific to the Armada 370 SoC that are not
-> > + * common to all Armada SoCs.
-> > + */
-> > +
-> > +/include/ "armada.dtsi"
-> 
-> I would use armada_xp.dtsi at the least, we've no way of knowing what
-> further Armada devices are going to be produced and whether they will be
-> compatible with.
-> 
-> > +/ {
-> > +	model = "Marvell Armada 370 family SoC";
-> > +	compatible = "marvell,armada370", "marvell,armada";
-> > + };
-> 
-> Firstly, it is mrvl, not marvell everywhere else in the kernel (see
-> MIPS and device tree documentation).
-> 
-> Secondly, I would strongly advise against using the generic marketing
-> name for these devices in the compatible list, "marvell,armada" as we
-> have no way of knowing what new devices will come along in the future
-> and if they'll be compatible.
-> 
-> > diff --git a/arch/arm/boot/dts/armada.dtsi b/arch/arm/boot/dts/armada.dtsi
-> > new file mode 100644
-> > index 0000000..3c99c30
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/armada.dtsi
-> > @@ -0,0 +1,67 @@
-> > +/*
-> > + * Device Tree Include file for Marvell Armada family SoC
-> > + *
-> > + * Copyright (C) 2012 Marvell
-> > + *
-> > + * Lior Amsalem<alior@marvell.com>
-> > + * Gregory CLEMENT<gregory.clement@free-electrons.com>
-> > + * Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + *
-> > + * This file contains the definitions that are common to the Armada
-> > + * 370 and Armada XP SoC.
-> 
-> I really do not want to see these files in the kernel, we where suppose
-> to remove any specific manchine dependency by moving to device tree and
-> not push the problem from a board.c to a .dts file.
-> 
-> Given these really should be part of the bootloader, I am not sure if a
-> GPLv2 compliant license is really appropriate for these files. At best
-> some form of dual-licensing to allow them to be moved out into a devtree
-> repository elsewhere would be useful.
-> 
-> (Feedback from Grant here would be useful)
+On Fri, May 18, 2012 at 11:11 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Wed, 2 May 2012 10:57:11 -0700, Olof Johansson <olof@lixom.net> wrote:
+>> Hi,
+>>
+>> [adding devicetree-discuss]
+>>
+>> On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
+>> <thomas.abraham@linaro.org> wrote:
+>> > And interrupt combiner, external interrupt wakeup interrupt controller
+>> > and smsc9215 lan controller nodes.
+>> >
+>> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> > ---
+>> > ?arch/arm/boot/dts/exynos5250-smdk5250.dts | ? 11 ++++++
+>> > ?arch/arm/boot/dts/exynos5250.dtsi ? ? ? ? | ? 55 +++++++++++++++++++++++++++++
+>> > ?2 files changed, 66 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> > index bcc4b89..dbc4bdb 100644
+>> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> > @@ -24,6 +24,17 @@
+>> > ? ? ? ? ? ? ? ?bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+>> > ? ? ? ?};
+>> >
+>> > + ? ? ? lan9215 at 0x05000000 {
+>> > + ? ? ? ? ? ? ? compatible = "smsc,lan9215", "smsc,lan9115";
+>> > + ? ? ? ? ? ? ? reg = <0x05000000 0x20000>;
+>> > + ? ? ? ? ? ? ? interrupts = <5 0>;
+>> > + ? ? ? ? ? ? ? interrupt-parent = <&wakeup_eint>;
+>> > + ? ? ? ? ? ? ? phy-mode = "mii";
+>> > + ? ? ? ? ? ? ? smsc,irq-push-pull;
+>> > + ? ? ? ? ? ? ? smsc,force-internal-phy;
+>> > + ? ? ? ? ? ? ? local-mac-address = [00 80 00 23 45 67];
+>> > + ? ? ? };
+>> > +
+>>
+>> since the 911x sits on a chipselect bus, you should instead add that
+>> bus to the dtsi and define this on that bus.
+>>
+>> Something like this in the dtsi:
+>>
+>> ? ? ? ?sromc-bus {
+>> ? ? ? ? ? ? ? ?#address-cells = <2>;
+>> ? ? ? ? ? ? ? ?#size-cells = <1>;
+>> ? ? ? ? ? ? ? ?ranges = < 0 0 0x04000000 0x20000
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? 1 0 0x05000000 0x20000
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? 2 0 0x06000000 0x20000
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? 3 0 0x07000000 0x20000>;
+>> ? ? ? ?};
+>>
+>> and in the dts:
+>>
+>> ? ? ? ?sromc-bus {
+>> ? ? ? ? ? ? ? ?lan9215 at 1,0 {
+>> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "smsc,lan9215", "smsc,lan9115";
+>> ? ? ? ? ? ? ? ? ? ? ? ?reg = <1 0 0x20000>;
+>> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <5 0>;
+>> ? ? ? ? ? ? ? ? ? ? ? ?interrupt-parent = <&wakeup_eint>;
+>> ? ? ? ? ? ? ? ? ? ? ? ?phy-mode = "mii";
+>> ? ? ? ? ? ? ? ? ? ? ? ?smsc,irq-push-pull;
+>> ? ? ? ? ? ? ? ? ? ? ? ?smsc,force-internal-phy;
+>> ? ? ? ? ? ? ? ? ? ? ? ?local-mac-address = [00 80 00 23 45 67];
+>> ? ? ? ? ? ? ? ?};
+>> ? ? ? ? };
+>>
+>>
+>> (You might be able to do just fine with one address cell, I'm not 100%
+>> sure why Grant's example uses two, but I used the same above for
+>> consistency).
+>
+> Because otherwise there is no way to describe an offset from the base
+> of the chipselect base value, and the core code will try to apply the
+> size to the cs part of the address specifier. (so in the example
+> above the address range described by:
+>
+> ? ? ? ?reg = <1 0x20000>;
+>
+> would mean cs values 1 to 0x20001; which is definitely wrong.
 
-Without another repository the kernel tree is the correct place to
-put these files.  I certainly don't want them considered as part of
-the boot loader either since there needs to be the base expectation
-that this data may need to change.  Please do keep them in
-arch/arm/boot/dts for now.
+Ah yes, that makes perfect sense. I can't seem to create an account to
+update the 'Device_Tree_Usage' page on the devicetree.org wiki, but
+it'd probably not be a bad idea to include the above for explanation
+there.
 
-g.
+
+-Olof
