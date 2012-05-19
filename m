@@ -1,51 +1,48 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 19 May 2012 12:34:07 +0530
-Subject: [PATCHv3 0/4] coupled cpuidle state support
-In-Reply-To: <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
-References: <1336438662-10484-1-git-send-email-ccross@android.com>
- <4FB62611.7080908@ti.com> <201205182103.56301.rjw@sisk.pl>
- <CAMbhsRTvhP5+ow8koUsS8zbvJwyE_JMGHGasYvP58HudG8wJMA@mail.gmail.com>
-Message-ID: <CAMQu2gxxmmZvMFjx-VZuLcvBgm6fxu72n+fufzx7ib6trqNg6g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 19 May 2012 09:13:47 +0100
+Subject: db8500.dtsi: ab8500@5 reg property invalid length
+In-Reply-To: <4FB6B522.4050301@wwwdotorg.org>
+References: <4FB6B522.4050301@wwwdotorg.org>
+Message-ID: <4FB7563B.4020708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 1:48 AM, Colin Cross <ccross@android.com> wrote:
-> On Fri, May 18, 2012 at 12:03 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
->> On Friday, May 18, 2012, Santosh Shilimkar wrote:
->>> On Tuesday 08 May 2012 06:27 AM, Colin Cross wrote:
->>> > On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
->>> > cpus cannot be independently powered down, either due to
->>> > sequencing restrictions (on Tegra 2, cpu 0 must be the last to
->>> > power down), or due to HW bugs (on OMAP4460, a cpu powering up
->>> > will corrupt the gic state unless the other cpu runs a work
->>> > around). ?Each cpu has a power state that it can enter without
->>> > coordinating with the other cpu (usually Wait For Interrupt, or
->>> > WFI), and one or more "coupled" power states that affect blocks
->>> > shared between the cpus (L2 cache, interrupt controller, and
->>> > sometimes the whole SoC). ?Entering a coupled power state must
->>> > be tightly controlled on both cpus.
->>> >
->>>
->>> [...]
->>>
->>> > This series has been tested and reviewed by Santosh and Kevin
->>> > for OMAP4, which has a cpuidle series ready for 3.5, and Tegra
->>> > and Exynos5 patches are in progress. ?I think this is ready to
->>> > go in. ?Lean, are you maintaining a cpuidle tree for linux-next?
->>> > If not, I can publish a tree for linux-next, or this could go in
->>> > through Arnd's tree.
->>>
->>> I haven't seen any response so far on who is lining up this
->>> series for 3.5 ? Not sure if it made it to linux-next either.
->>
->> That should be Len, but he's been silent recently.
->>
->> How urgent is it?
->
-> Len silently picked up the last version. ?I just posted two fixes to
-> it, hopefully he'll pick up those too.
-Great !!
-I will pull Len's tree and rebase OMAP patches against it.
+Hi Stephen,
 
-Regards
-Santosh
+Thanks for reporting this.
+
+> In commit 3de3d74 "ARM: ux500: Configure the PRCMU Timer for db8500
+> based devices in DT", you changed DT node prcmu at 80157000's #size-cells
+> from 0 to 1, but didn't adjust the reg property for existing sub-node
+> ab8500 at 5.
+ >
+ > Warning (reg_format): "reg" property in
+ > /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes)
+ > (#address-cells == 1, #size-cells == 1)
+>
+> This makes dtc fail to compile snowball.dts:
+
+Not quite. I didn't notice this warning before, but that's all it is. It 
+doesn't prevent snowball.dts from being compiled or seem to affect the 
+parsing of the DT as far as I can tell.
+
+I will fix the warning though.
+
+ > Also, the indentation of the new subnode
+ > prcmu-timer-4 at 80157450 looks wrong.
+
+Yes it is. There is a patch on the MLs at the moment which does some 
+format correction and pandas to a new way of representing IRQs for this 
+node.
+
+Thanks again Stephen.
+
+Kind regards.
+Lee
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
