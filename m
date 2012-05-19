@@ -1,55 +1,38 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 19 May 2012 03:23:17 +0200
-Subject: Issues when running DT enabled kernel on iMX28 from linux-next
-In-Reply-To: <4FB6D2A2.1090400@grid-net.com>
-References: <4FB583CF.2080801@grid-net.com>
- <20120518010138.GA5427@S2101-09.ap.freescale.net>
- <4FB6D2A2.1090400@grid-net.com>
-Message-ID: <201205190323.18058.marek.vasut@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 19 May 2012 10:56:35 +0800
+Subject: Duplicate labels in dts files
+In-Reply-To: <4FB6B896.3090904@wwwdotorg.org>
+References: <4FB6B896.3090904@wwwdotorg.org>
+Message-ID: <20120519025632.GD5427@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+On Fri, May 18, 2012 at 03:01:10PM -0600, Stephen Warren wrote:
+> The following arch/arm/boot/dts/*.dts all have duplicate label
+> definitions, albeit all duplicates pointing at the same node. Is this
+> expected?
 
-> On 05/17/2012 06:01 PM, Shawn Guo wrote:
-> > On Thu, May 17, 2012 at 04:03:43PM -0700, Subodh Nijsure wrote:
-> >> Should one be able to run top of the linux-next on MX28 EVK hardware
-> >> with DT support enabled?
-> > 
-> > Yes, I'm running it well with next-20120516.
-> 
-> I followed the subsequent discussion on this, looks like most of you are
-> booting your kernels with uBoot.
-> We are using linux_prep bootlets from freescale to boot linux kernel.
+At least for IMX, I would say, yes.
 
-They're crap ... very sorry crap :-(
+For example, when I have the following node in imx53.dtsi and need to
+have it in imx53-ard.dts, the first line of the node definition will
+be naturally copied into imx53-ard.dts.  As the result, the label
+"uart1" will be "duplicated".
 
-> 
-> I have following options turned on in my setup
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> 
-> I am building imx28-evk.dtb and appending it to zImage as in:
-> 
-> make  imx28-evk.dtb
-> cat zImage imx28-evk.dtb > zImage_w_dtb
-> 
-> We will investigate this further and let you know what I find, would be
-> glad to hear if anybody else is using MXS platform with appended device
-> tree.
+	uart1: serial at 53fbc000 {
+		...
+	};
 
-Hm actually ... does anyone have dts file for mx28 with enabled GPMI nand? Looks 
-like that thing from example doesn't work (had to replace gpmi-nand with gpmi), 
-then it stopped complaining about clock. But now it dies on ecc.strength not 
-being set. MMC doesn't probe either etc.
-
+> This does work OK with the in-kernel dtc and latest mainline
+> dtc, but triggered some error-checks in a dtc patch that I have locally,
+> which allows node/property deletion. I think the duplicate labels should
+> probably be removed - do you agree?
 > 
-> -Subodh
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I hardly think so.  You probably would agree that we shouldn't say
+the node is duplicated, since the node will still be one in dtb.
+Then, as long as the label points to the same node, we should not say
+the label is duplicated either.
 
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
