@@ -1,101 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 May 2012 23:23:43 -0700
-Subject: [PATCH 19/20] ARM: Exynos5: Add combiner, wakeup interrupt
- controller and ethernet nodes
-In-Reply-To: <20120519061129.BEE9D3E046E@localhost>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
- <CAOesGMhxn6L+Pcp-v2v6z7srGd=8kGwqff7Tt6ok8pHMVXp3ZQ@mail.gmail.com>
- <20120519061129.BEE9D3E046E@localhost>
-Message-ID: <CAOesGMjrDL2-cS7XFUYnJdL5i6=YFzf6yRUO3eLX4a4GVB4x_w@mail.gmail.com>
+Date: Fri, 18 May 2012 23:33:07 -0700
+Subject: [GIT PULL] Renesas sh73a0 fix for v3.5
+In-Reply-To: <201205182344.59703.rjw@sisk.pl>
+References: <201205182344.59703.rjw@sisk.pl>
+Message-ID: <CAOesGMgOz-qpJdysUb3MebPtVXkXLv90QKH2VU2WOufj3W1-EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 11:11 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Wed, 2 May 2012 10:57:11 -0700, Olof Johansson <olof@lixom.net> wrote:
->> Hi,
->>
->> [adding devicetree-discuss]
->>
->> On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
->> <thomas.abraham@linaro.org> wrote:
->> > And interrupt combiner, external interrupt wakeup interrupt controller
->> > and smsc9215 lan controller nodes.
->> >
->> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> > ---
->> > ?arch/arm/boot/dts/exynos5250-smdk5250.dts | ? 11 ++++++
->> > ?arch/arm/boot/dts/exynos5250.dtsi ? ? ? ? | ? 55 +++++++++++++++++++++++++++++
->> > ?2 files changed, 66 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> > index bcc4b89..dbc4bdb 100644
->> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> > @@ -24,6 +24,17 @@
->> > ? ? ? ? ? ? ? ?bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
->> > ? ? ? ?};
->> >
->> > + ? ? ? lan9215 at 0x05000000 {
->> > + ? ? ? ? ? ? ? compatible = "smsc,lan9215", "smsc,lan9115";
->> > + ? ? ? ? ? ? ? reg = <0x05000000 0x20000>;
->> > + ? ? ? ? ? ? ? interrupts = <5 0>;
->> > + ? ? ? ? ? ? ? interrupt-parent = <&wakeup_eint>;
->> > + ? ? ? ? ? ? ? phy-mode = "mii";
->> > + ? ? ? ? ? ? ? smsc,irq-push-pull;
->> > + ? ? ? ? ? ? ? smsc,force-internal-phy;
->> > + ? ? ? ? ? ? ? local-mac-address = [00 80 00 23 45 67];
->> > + ? ? ? };
->> > +
->>
->> since the 911x sits on a chipselect bus, you should instead add that
->> bus to the dtsi and define this on that bus.
->>
->> Something like this in the dtsi:
->>
->> ? ? ? ?sromc-bus {
->> ? ? ? ? ? ? ? ?#address-cells = <2>;
->> ? ? ? ? ? ? ? ?#size-cells = <1>;
->> ? ? ? ? ? ? ? ?ranges = < 0 0 0x04000000 0x20000
->> ? ? ? ? ? ? ? ? ? ? ? ? ? 1 0 0x05000000 0x20000
->> ? ? ? ? ? ? ? ? ? ? ? ? ? 2 0 0x06000000 0x20000
->> ? ? ? ? ? ? ? ? ? ? ? ? ? 3 0 0x07000000 0x20000>;
->> ? ? ? ?};
->>
->> and in the dts:
->>
->> ? ? ? ?sromc-bus {
->> ? ? ? ? ? ? ? ?lan9215 at 1,0 {
->> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "smsc,lan9215", "smsc,lan9115";
->> ? ? ? ? ? ? ? ? ? ? ? ?reg = <1 0 0x20000>;
->> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <5 0>;
->> ? ? ? ? ? ? ? ? ? ? ? ?interrupt-parent = <&wakeup_eint>;
->> ? ? ? ? ? ? ? ? ? ? ? ?phy-mode = "mii";
->> ? ? ? ? ? ? ? ? ? ? ? ?smsc,irq-push-pull;
->> ? ? ? ? ? ? ? ? ? ? ? ?smsc,force-internal-phy;
->> ? ? ? ? ? ? ? ? ? ? ? ?local-mac-address = [00 80 00 23 45 67];
->> ? ? ? ? ? ? ? ?};
->> ? ? ? ? };
->>
->>
->> (You might be able to do just fine with one address cell, I'm not 100%
->> sure why Grant's example uses two, but I used the same above for
->> consistency).
+On Fri, May 18, 2012 at 2:44 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> Hi,
 >
-> Because otherwise there is no way to describe an offset from the base
-> of the chipselect base value, and the core code will try to apply the
-> size to the cs part of the address specifier. (so in the example
-> above the address range described by:
+> Please pull changes since commit d48b97b403d23f6df0b990cee652bdf9a52337a3
 >
-> ? ? ? ?reg = <1 0x20000>;
+> ? ?Linux 3.4-rc6
 >
-> would mean cs values 1 to 0x20001; which is definitely wrong.
+> with top-most commit 4da773193414788b52ae14bc246543390faca5ce
+>
+> ? ?ARM: mach-shmobile: sh73a0: fixup PINT/IRQ16-IRQ31 irq number conflict
+>
+> from the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git soc-core
 
-Ah yes, that makes perfect sense. I can't seem to create an account to
-update the 'Device_Tree_Usage' page on the devicetree.org wiki, but
-it'd probably not be a bad idea to include the above for explanation
-there.
+Thanks, pulled.
 
 
 -Olof
