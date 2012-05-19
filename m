@@ -1,43 +1,96 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 18 May 2012 23:49:48 -0600
-Subject: [PATCH v4] plat-versatile: modernize FPGA IRQ controller
-In-Reply-To: <4F9714BD.4060103@gmail.com>
-References: <1334690647-12346-1-git-send-email-linus.walleij@linaro.org>
- <4F9714BD.4060103@gmail.com>
-Message-ID: <20120519054948.B978B3E046E@localhost>
+Date: Sat, 19 May 2012 00:11:29 -0600
+Subject: [PATCH 19/20] ARM: Exynos5: Add combiner,
+ wakeup interrupt controller and ethernet nodes
+In-Reply-To: <CAOesGMhxn6L+Pcp-v2v6z7srGd=8kGwqff7Tt6ok8pHMVXp3ZQ@mail.gmail.com>
+References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
+ <1335813270-13083-20-git-send-email-thomas.abraham@linaro.org>
+ <CAOesGMhxn6L+Pcp-v2v6z7srGd=8kGwqff7Tt6ok8pHMVXp3ZQ@mail.gmail.com>
+Message-ID: <20120519061129.BEE9D3E046E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Apr 2012 16:01:49 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/17/2012 02:24 PM, Linus Walleij wrote:
-> > This does two things to the FPGA IRQ controller in the versatile
-> > family:
-> > 
-> > - Convert to MULTI_IRQ_HANDLER so we can drop the entry macro
-> >   from the Integrator. The C IRQ handler was inspired from
-> >   arch/arm/common/vic.c, recent bug discovered in this handler was
-> >   accounted for.
-> > - Convert to using IRQ domains so we can get rid of the NO_IRQ
-> >   mess and proceed with device tree and such stuff.
-> > 
-> > As part of the exercise, bump all the low IRQ numbers on the
-> > Integrator PIC to start from 1 rather than 0, since IRQ 0 is
-> > now NO_IRQ. The Linux IRQ numbers are thus entirely decoupled
-> > from the hardware IRQ numbers in this controller.
-> > 
-> > I was unable to split this patch. The main reason is the half-done
-> > conversion to device tree in Versatile.
-> > 
-> > Tested on Integrator/AP and Integrator/CP.
-> > 
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, 2 May 2012 10:57:11 -0700, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
 > 
-> Looks good.
+> [adding devicetree-discuss]
 > 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> On Mon, Apr 30, 2012 at 12:14 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+> > And interrupt combiner, external interrupt wakeup interrupt controller
+> > and smsc9215 lan controller nodes.
+> >
+> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > ---
+> > ??arch/arm/boot/dts/exynos5250-smdk5250.dts | ?? 11 ++++++
+> > ??arch/arm/boot/dts/exynos5250.dtsi ?? ?? ?? ?? | ?? 55 +++++++++++++++++++++++++++++
+> > ??2 files changed, 66 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > index bcc4b89..dbc4bdb 100644
+> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > @@ -24,6 +24,17 @@
+> > ?? ?? ?? ?? ?? ?? ?? ??bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+> > ?? ?? ?? ??};
+> >
+> > + ?? ?? ?? lan9215 at 0x05000000 {
+> > + ?? ?? ?? ?? ?? ?? ?? compatible = "smsc,lan9215", "smsc,lan9115";
+> > + ?? ?? ?? ?? ?? ?? ?? reg = <0x05000000 0x20000>;
+> > + ?? ?? ?? ?? ?? ?? ?? interrupts = <5 0>;
+> > + ?? ?? ?? ?? ?? ?? ?? interrupt-parent = <&wakeup_eint>;
+> > + ?? ?? ?? ?? ?? ?? ?? phy-mode = "mii";
+> > + ?? ?? ?? ?? ?? ?? ?? smsc,irq-push-pull;
+> > + ?? ?? ?? ?? ?? ?? ?? smsc,force-internal-phy;
+> > + ?? ?? ?? ?? ?? ?? ?? local-mac-address = [00 80 00 23 45 67];
+> > + ?? ?? ?? };
+> > +
+> 
+> since the 911x sits on a chipselect bus, you should instead add that
+> bus to the dtsi and define this on that bus.
+> 
+> Something like this in the dtsi:
+> 
+>        sromc-bus {
+>                #address-cells = <2>;
+>                #size-cells = <1>;
+>                ranges = < 0 0 0x04000000 0x20000
+>                           1 0 0x05000000 0x20000
+>                           2 0 0x06000000 0x20000
+>                           3 0 0x07000000 0x20000>;
+>        };
+> 
+> and in the dts:
+> 
+>        sromc-bus {
+>                lan9215 at 1,0 {
+>                        compatible = "smsc,lan9215", "smsc,lan9115";
+>                        reg = <1 0 0x20000>;
+>                        interrupts = <5 0>;
+>                        interrupt-parent = <&wakeup_eint>;
+>                        phy-mode = "mii";
+>                        smsc,irq-push-pull;
+>                        smsc,force-internal-phy;
+>                        local-mac-address = [00 80 00 23 45 67];
+>                };
+>         };
+> 
+> 
+> (You might be able to do just fine with one address cell, I'm not 100%
+> sure why Grant's example uses two, but I used the same above for
+> consistency).
 
-Ditto.
+Because otherwise there is no way to describe an offset from the base
+of the chipselect base value, and the core code will try to apply the
+size to the cs part of the address specifier. (so in the example
+above the address range described by:
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+	reg = <1 0x20000>;
+
+would mean cs values 1 to 0x20001; which is definitely wrong.
+
+> Also, I don't think it's a good idea to hardcode the mac address in
+> the dts like this; have u-boot fill it in from the environment
+> variable there instead, if needed.
+
+Very bad practice indeed.
