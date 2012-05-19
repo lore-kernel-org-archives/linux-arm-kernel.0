@@ -1,31 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 20 May 2012 01:05:05 +0900
-Subject: [PATCH] ARM: S3C24XX: add support for second irq set of S3C2416
-In-Reply-To: <201203032219.45813.heiko@sntech.de>
-References: <201203032219.45813.heiko@sntech.de>
-Message-ID: <4FB7C4B1.7050805@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 19 May 2012 17:32:32 +0000
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120519112431.GH24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
+ <20120519112431.GH24238@titan.lakedaemon.net>
+Message-ID: <201205191732.32384.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/12 06:19, Heiko St?bner wrote:
-> The S3C2416 has a separate second interrupt register-set to support
-> additional irqs. This patch adds the necessary constants and registers
-> the irq handlers for it.
->
-> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
-> ---
-> Patch should go on top of the current s3c24xx consolidation
->
->   arch/arm/mach-s3c24xx/include/mach/irqs.h    |   15 ++++-
->   arch/arm/mach-s3c24xx/irq-s3c2416.c          |   98 ++++++++++++++++++++++++++
->   arch/arm/mach-s3c24xx/s3c2416.c              |    1 +
->   arch/arm/plat-samsung/include/plat/s3c2416.h |    3 +
->   4 files changed, 116 insertions(+), 1 deletions(-)
->
-Applied, thanks.
+On Saturday 19 May 2012, Jason Cooper wrote:
+> > Board files in mach-mvebu and the rest in plat-mvebu.  That would match 
+> > the spirit of the current split between mach-* and plat-*.
+> 
+> Took the words right out of my mouth.  Once DT conversions are complete,
+> mach-*/ would either go away, or hold legacy non-DT boards.
+> 
+> On a side note, I also like this because it would make converting old
+> board files like sheevaplug and guruplug to DT easier.  The legacy
+> implementation would be in mach-mvebu/ and the DT implementation would
+> be in plat-mvebu/.  Newcomers to the code would see a clearly defined
+> separation.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+With that layout, where do the mach/* headers go?
+
+	Arnd
