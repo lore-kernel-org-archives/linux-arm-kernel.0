@@ -1,31 +1,31 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 19 May 2012 18:02:56 +0200
-Subject: Issues when running DT enabled kernel on iMX28 from linux-next
-In-Reply-To: <20120519123423.GA5676@S2100-06.ap.freescale.net>
-References: <4FB583CF.2080801@grid-net.com>
- <201205190323.18058.marek.vasut@gmail.com>
- <20120519123423.GA5676@S2100-06.ap.freescale.net>
-Message-ID: <201205191802.56342.marek.vasut@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 20 May 2012 01:05:05 +0900
+Subject: [PATCH] ARM: S3C24XX: add support for second irq set of S3C2416
+In-Reply-To: <201203032219.45813.heiko@sntech.de>
+References: <201203032219.45813.heiko@sntech.de>
+Message-ID: <4FB7C4B1.7050805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Sat, May 19, 2012 at 03:23:17AM +0200, Marek Vasut wrote:
-> > Hm actually ... does anyone have dts file for mx28 with enabled GPMI
-> > nand? Looks like that thing from example doesn't work (had to replace
-> > gpmi-nand with gpmi), then it stopped complaining about clock.
-> > But now it dies on ecc.strength not
-> > being set.
-> 
-> Huang Shijie (Cc-ed) might be interested in knowing and fixing those,
-> but probably during v3.5-rc.
-> 
-> > MMC doesn't probe either etc.
-> 
-> Are you using next-20120516 or later?
-
-yes
+On 03/04/12 06:19, Heiko St?bner wrote:
+> The S3C2416 has a separate second interrupt register-set to support
+> additional irqs. This patch adds the necessary constants and registers
+> the irq handlers for it.
+>
+> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+> ---
+> Patch should go on top of the current s3c24xx consolidation
+>
+>   arch/arm/mach-s3c24xx/include/mach/irqs.h    |   15 ++++-
+>   arch/arm/mach-s3c24xx/irq-s3c2416.c          |   98 ++++++++++++++++++++++++++
+>   arch/arm/mach-s3c24xx/s3c2416.c              |    1 +
+>   arch/arm/plat-samsung/include/plat/s3c2416.h |    3 +
+>   4 files changed, 116 insertions(+), 1 deletions(-)
+>
+Applied, thanks.
 
 Best regards,
-Marek Vasut
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
