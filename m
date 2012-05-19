@@ -1,61 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 19 May 2012 07:24:31 -0400
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <20120518191832.GC24238@titan.lakedaemon.net>
- <201205182044.26409.arnd@arndb.de>
- <alpine.LFD.2.02.1205181846360.11526@xanadu.home>
-Message-ID: <20120519112431.GH24238@titan.lakedaemon.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 19 May 2012 20:34:24 +0800
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <201205190323.18058.marek.vasut@gmail.com>
+References: <4FB583CF.2080801@grid-net.com>
+ <20120518010138.GA5427@S2101-09.ap.freescale.net>
+ <4FB6D2A2.1090400@grid-net.com>
+ <201205190323.18058.marek.vasut@gmail.com>
+Message-ID: <20120519123423.GA5676@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 06:51:22PM -0400, Nicolas Pitre wrote:
-> On Fri, 18 May 2012, Arnd Bergmann wrote:
+On Sat, May 19, 2012 at 03:23:17AM +0200, Marek Vasut wrote:
+> Hm actually ... does anyone have dts file for mx28 with enabled GPMI nand? Looks 
+> like that thing from example doesn't work (had to replace gpmi-nand with gpmi), 
+> then it stopped complaining about clock.
+> But now it dies on ecc.strength not 
+> being set.
+
+Huang Shijie (Cc-ed) might be interested in knowing and fixing those,
+but probably during v3.5-rc.
+
+> MMC doesn't probe either etc.
 > 
-> > On Friday 18 May 2012, Jason Cooper wrote:
-> > > > 
-> > > > In this case, we have wildly different names referring to the same chip 
-> > > > family, and "orion" is far from hinting that it also constitute the 
-> > > > support for Kirkwood, Dove or (some not all) Armadas, unless you are 
-> > > > familiar with some legacy Marvell products.  This is why in this case I 
-> > > > think that a directory name change might be appropriate, especially if 
-> > > > we're going to cause churn by moving things around already.
-> > > > 
-> > > > I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or 
-> > > > mvebu_*.  Unless someone has another logical identifier to suggest which 
-> > > > would capture all that family of SOCs that came out of EBU in Marvell of 
-> > > > course.
-> > > 
-> > > I prefer mvebu_* ...  nice and concise.
-> > > 
-> > 
-> > On a related topic, any preferences on where we will put all the board
-> > files? I think it would be helpful to put them into a separate place from
-> > the main platform files, so e.g. have all *-setup.c files go to
-> > arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
-> > 
-> > The reasons I think this would help are that the directory is getting a
-> > bit crowded when we move five or more of the current platforms in there,
-> > and that I hope we can start ignoring them for most practical purposes
-> > as some point in the future when all boards have been made to work with
-> > DT, and at an even later point we can just delete that directory.
-> > The main disadvantage that this approach would bring is that it's not
-> > consistent with what any of the other platforms do.
-> 
-> Board files in mach-mvebu and the rest in plat-mvebu.  That would match 
-> the spirit of the current split between mach-* and plat-*.
+Are you using next-20120516 or later?
 
-Took the words right out of my mouth.  Once DT conversions are complete,
-mach-*/ would either go away, or hold legacy non-DT boards.
-
-On a side note, I also like this because it would make converting old
-board files like sheevaplug and guruplug to DT easier.  The legacy
-implementation would be in mach-mvebu/ and the DT implementation would
-be in plat-mvebu/.  Newcomers to the code would see a clearly defined
-separation.
-
-thx,
-
-Jason.
+-- 
+Regards,
+Shawn
