@@ -1,32 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 18 May 2012 17:51:08 -0600
-Subject: [PATCH 0/4] Add device tree support for gpio-mxs
-In-Reply-To: <CACRpkda_auTko+ik-efW4_f_fEAa2NOSCqZxN5GV=8LrC6P_OQ@mail.gmail.com>
-References: <1336146329-3821-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkda_auTko+ik-efW4_f_fEAa2NOSCqZxN5GV=8LrC6P_OQ@mail.gmail.com>
-Message-ID: <20120518235108.6CED53E07C8@localhost>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 19 May 2012 03:23:17 +0200
+Subject: Issues when running DT enabled kernel on iMX28 from linux-next
+In-Reply-To: <4FB6D2A2.1090400@grid-net.com>
+References: <4FB583CF.2080801@grid-net.com>
+ <20120518010138.GA5427@S2101-09.ap.freescale.net>
+ <4FB6D2A2.1090400@grid-net.com>
+Message-ID: <201205190323.18058.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 May 2012 14:21:34 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 4, 2012 at 5:45 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+Dear Subodh Nijsure,
+
+> On 05/17/2012 06:01 PM, Shawn Guo wrote:
+> > On Thu, May 17, 2012 at 04:03:43PM -0700, Subodh Nijsure wrote:
+> >> Should one be able to run top of the linux-next on MX28 EVK hardware
+> >> with DT support enabled?
+> > 
+> > Yes, I'm running it well with next-20120516.
 > 
-> > This patch series cleans up gpio-mxs a bit, and then adds device tree
-> > support for the driver. ??Currently, the irqdomain for gpio is still
-> > added in platform code, and should be moved into driver later with the
-> > help from the generic-irq-chip irqdomain support.
-> >
-> > It's based on mxs device tree branch, and might be easier to go
-> > via arm-soc tree.
+> I followed the subsequent discussion on this, looks like most of you are
+> booting your kernels with uBoot.
+> We are using linux_prep bootlets from freescale to boot linux kernel.
+
+They're crap ... very sorry crap :-(
+
 > 
-> This all looks good to me.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> I have following options turned on in my setup
+> CONFIG_ARM_APPENDED_DTB=y
+> CONFIG_ARM_ATAG_DTB_COMPAT=y
+> 
+> I am building imx28-evk.dtb and appending it to zImage as in:
+> 
+> make  imx28-evk.dtb
+> cat zImage imx28-evk.dtb > zImage_w_dtb
+> 
+> We will investigate this further and let you know what I find, would be
+> glad to hear if anybody else is using MXS platform with appended device
+> tree.
 
-Same here.
+Hm actually ... does anyone have dts file for mx28 with enabled GPMI nand? Looks 
+like that thing from example doesn't work (had to replace gpmi-nand with gpmi), 
+then it stopped complaining about clock. But now it dies on ecc.strength not 
+being set. MMC doesn't probe either etc.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
+> -Subodh
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-For all 4 patches and for the pinmux one you posted later.  Feel free
-to merge them via arm-soc.
-
-g.
+Best regards,
+Marek Vasut
