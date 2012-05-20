@@ -1,299 +1,89 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 20 May 2012 15:00:28 +0300
-Subject: [PATCH] remoteproc: allocate vrings on demand, free when not needed
-Message-ID: <1337515228-31910-1-git-send-email-ohad@wizery.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Sun, 20 May 2012 14:05:54 +0100 (BST)
+Subject: kirkwood, nand, clocks and device-tree
+In-Reply-To: <20120520095110.GC12741@lunn.ch>
+References: <87fwaxes25.fsf@lebrac.rtp-net.org>
+ <20120520095110.GC12741@lunn.ch>
+Message-ID: <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamically allocate the vrings' DMA when the remote processor
-is about to be powered on (i.e. when ->find_vqs() is invoked),
-and release them as soon as it is powered off (i.e. when ->del_vqs()
-is invoked).
+On Sun, 20 May 2012, Andrew Lunn wrote:
 
-The obvious and immediate benefit is better memory utilization, since
-memory for the vrings is now only allocated when the relevant remote
-processor is being used.
+> On Fri, May 18, 2012 at 11:50:42AM +0200, Arnaud Patard wrote:
+>> Hi,
+>>
+>> I wanted to convert iconnect to use the new nand DT support on kirkwood
+>> but my system was freezing hard during boot. So, I've debugged it a
+>> little bit and have several questions.
+>>
+>> The first one is about were is defined the nand. It's defined as a leaf
+>> of the "ocp" bus. I would have expected to see it at the same level but
+>> I've seen nothing proving if it's wrong or right when comparing with
+>> hardware. Can anyone give me some information about that ?
+>>
+>> Now, the real questions about my problem. It's hanging because the nand
+>> platform device created throught DT is called f4000000.nand and not
+>> orion_nand. This means that the clock gets disabled by
+>> clk_disable_unused() so first access to the nand fails badly.
+>> To workaround, I've added into mach-kirkwood/common.c:
+>>
+>> +       orion_clkdev_add(NULL, "f4000000.nand", runit);
+>
+> Although this works, its the wrong way to do it. Jamie Lentin figured
+> out the right way to do this. Jamie, care to explain please...
 
-Additionally, this approach also makes recovery of a (crashing)
-remote processor easier: one just needs to remove the relevant
-vdevs, and the entire vrings cleanup takes place automagically.
+board-dt.c should have an auxdata struct, to fix the name of 
+"f4000000.nand" to orion_nand:-
 
-Tested-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- drivers/remoteproc/remoteproc_core.c     |  109 +++++++++++++++---------------
- drivers/remoteproc/remoteproc_internal.h |    2 +
- drivers/remoteproc/remoteproc_virtio.c   |   13 +++-
- 3 files changed, 67 insertions(+), 57 deletions(-)
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 3cef3c7..6d45a07 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -24,6 +24,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+  	{ }
+  };
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index e756a0d..40e2b2d 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -279,34 +279,17 @@ rproc_load_segments(struct rproc *rproc, const u8 *elf_data, size_t len)
- 	return ret;
- }
- 
--static int
--__rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
-+int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
- {
- 	struct rproc *rproc = rvdev->rproc;
- 	struct device *dev = rproc->dev;
--	struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
-+	struct rproc_vring *rvring = &rvdev->vring[i];
- 	dma_addr_t dma;
- 	void *va;
- 	int ret, size, notifyid;
- 
--	dev_dbg(dev, "vdev rsc: vring%d: da %x, qsz %d, align %d\n",
--				i, vring->da, vring->num, vring->align);
--
--	/* make sure reserved bytes are zeroes */
--	if (vring->reserved) {
--		dev_err(dev, "vring rsc has non zero reserved bytes\n");
--		return -EINVAL;
--	}
--
--	/* verify queue size and vring alignment are sane */
--	if (!vring->num || !vring->align) {
--		dev_err(dev, "invalid qsz (%d) or alignment (%d)\n",
--						vring->num, vring->align);
--		return -EINVAL;
--	}
--
- 	/* actual size of vring (in bytes) */
--	size = PAGE_ALIGN(vring_size(vring->num, vring->align));
-+	size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
- 
- 	if (!idr_pre_get(&rproc->notifyids, GFP_KERNEL)) {
- 		dev_err(dev, "idr_pre_get failed\n");
-@@ -316,6 +299,7 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
- 	/*
- 	 * Allocate non-cacheable memory for the vring. In the future
- 	 * this call will also configure the IOMMU for us
-+	 * TODO: let the rproc know the da of this vring
- 	 */
- 	va = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
- 	if (!va) {
-@@ -323,44 +307,67 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
- 		return -EINVAL;
- 	}
- 
--	/* assign an rproc-wide unique index for this vring */
--	/* TODO: assign a notifyid for rvdev updates as well */
--	ret = idr_get_new(&rproc->notifyids, &rvdev->vring[i], &notifyid);
-+	/*
-+	 * Assign an rproc-wide unique index for this vring
-+	 * TODO: assign a notifyid for rvdev updates as well
-+	 * TODO: let the rproc know the notifyid of this vring
-+	 * TODO: support predefined notifyids (via resource table)
-+	 */
-+	ret = idr_get_new(&rproc->notifyids, rvring, &notifyid);
- 	if (ret) {
- 		dev_err(dev, "idr_get_new failed: %d\n", ret);
- 		dma_free_coherent(dev, size, va, dma);
- 		return ret;
- 	}
- 
--	/* let the rproc know the da and notifyid of this vring */
--	/* TODO: expose this to remote processor */
--	vring->da = dma;
--	vring->notifyid = notifyid;
--
- 	dev_dbg(dev, "vring%d: va %p dma %x size %x idr %d\n", i, va,
- 					dma, size, notifyid);
- 
--	rvdev->vring[i].len = vring->num;
--	rvdev->vring[i].align = vring->align;
--	rvdev->vring[i].va = va;
--	rvdev->vring[i].dma = dma;
--	rvdev->vring[i].notifyid = notifyid;
--	rvdev->vring[i].rvdev = rvdev;
-+	rvring->va = va;
-+	rvring->dma = dma;
-+	rvring->notifyid = notifyid;
- 
- 	return 0;
- }
- 
--static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
-+static int
-+rproc_parse_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
- {
- 	struct rproc *rproc = rvdev->rproc;
-+	struct device *dev = rproc->dev;
-+	struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
-+	struct rproc_vring *rvring = &rvdev->vring[i];
- 
--	for (i--; i >= 0; i--) {
--		struct rproc_vring *rvring = &rvdev->vring[i];
--		int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
-+	dev_dbg(dev, "vdev rsc: vring%d: da %x, qsz %d, align %d\n",
-+				i, vring->da, vring->num, vring->align);
++struct of_dev_auxdata kirkwood_dt_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("mrvl,orion-nand", KIRKWOOD_NAND_MEM_PHYS_BASE, "orion_nand", NULL),
++	{ }
++};
 +
-+	/* make sure reserved bytes are zeroes */
-+	if (vring->reserved) {
-+		dev_err(dev, "vring rsc has non zero reserved bytes\n");
-+		return -EINVAL;
-+	}
- 
--		dma_free_coherent(rproc->dev, size, rvring->va, rvring->dma);
--		idr_remove(&rproc->notifyids, rvring->notifyid);
-+	/* verify queue size and vring alignment are sane */
-+	if (!vring->num || !vring->align) {
-+		dev_err(dev, "invalid qsz (%d) or alignment (%d)\n",
-+						vring->num, vring->align);
-+		return -EINVAL;
- 	}
-+
-+	rvring->len = vring->num;
-+	rvring->align = vring->align;
-+	rvring->rvdev = rvdev;
-+
-+	return 0;
-+}
-+
-+void rproc_free_vring(struct rproc_vring *rvring)
-+{
-+	int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
-+	struct rproc *rproc = rvring->rvdev->rproc;
-+
-+	dma_free_coherent(rproc->dev, size, rvring->va, rvring->dma);
-+	idr_remove(&rproc->notifyids, rvring->notifyid);
- }
- 
- /**
-@@ -425,11 +432,11 @@ static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
- 
- 	rvdev->rproc = rproc;
- 
--	/* allocate the vrings */
-+	/* parse the vrings */
- 	for (i = 0; i < rsc->num_of_vrings; i++) {
--		ret = __rproc_handle_vring(rvdev, rsc, i);
-+		ret = rproc_parse_vring(rvdev, rsc, i);
- 		if (ret)
--			goto free_vrings;
-+			goto free_rvdev;
- 	}
- 
- 	/* remember the device features */
-@@ -440,12 +447,11 @@ static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
- 	/* it is now safe to add the virtio device */
- 	ret = rproc_add_virtio_dev(rvdev, rsc->id);
- 	if (ret)
--		goto free_vrings;
-+		goto free_rvdev;
- 
- 	return 0;
- 
--free_vrings:
--	__rproc_free_vrings(rvdev, i);
-+free_rvdev:
- 	kfree(rvdev);
- 	return ret;
- }
-@@ -1265,18 +1271,11 @@ EXPORT_SYMBOL(rproc_shutdown);
- void rproc_release(struct kref *kref)
- {
- 	struct rproc *rproc = container_of(kref, struct rproc, refcount);
--	struct rproc_vdev *rvdev, *rvtmp;
- 
- 	dev_info(rproc->dev, "removing %s\n", rproc->name);
- 
- 	rproc_delete_debug_dir(rproc);
- 
--	/* clean up remote vdev entries */
--	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node) {
--		__rproc_free_vrings(rvdev, RVDEV_NUM_VRINGS);
--		list_del(&rvdev->node);
--	}
--
- 	/*
- 	 * At this point no one holds a reference to rproc anymore,
- 	 * so we can directly unroll rproc_alloc()
-@@ -1547,7 +1546,7 @@ EXPORT_SYMBOL(rproc_free);
-  */
- int rproc_unregister(struct rproc *rproc)
- {
--	struct rproc_vdev *rvdev;
-+	struct rproc_vdev *rvdev, *tmp;
- 
- 	if (!rproc)
- 		return -EINVAL;
-@@ -1556,7 +1555,7 @@ int rproc_unregister(struct rproc *rproc)
- 	wait_for_completion(&rproc->firmware_loading_complete);
- 
- 	/* clean up remote vdev entries */
--	list_for_each_entry(rvdev, &rproc->rvdevs, node)
-+	list_for_each_entry_safe(rvdev, tmp, &rproc->rvdevs, node)
- 		rproc_remove_virtio_dev(rvdev);
- 
- 	/* the rproc is downref'ed as soon as it's removed from the klist */
-diff --git a/drivers/remoteproc/remoteproc_internal.h b/drivers/remoteproc/remoteproc_internal.h
-index 9f336d6..f4957cf 100644
---- a/drivers/remoteproc/remoteproc_internal.h
-+++ b/drivers/remoteproc/remoteproc_internal.h
-@@ -41,4 +41,6 @@ void rproc_create_debug_dir(struct rproc *rproc);
- void rproc_init_debugfs(void);
- void rproc_exit_debugfs(void);
- 
-+void rproc_free_vring(struct rproc_vring *rvring);
-+int rproc_alloc_vring(struct rproc_vdev *rvdev, int i);
- #endif /* REMOTEPROC_INTERNAL_H */
-diff --git a/drivers/remoteproc/remoteproc_virtio.c b/drivers/remoteproc/remoteproc_virtio.c
-index ecf6121..26a7144 100644
---- a/drivers/remoteproc/remoteproc_virtio.c
-+++ b/drivers/remoteproc/remoteproc_virtio.c
-@@ -77,14 +77,17 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
- 	struct rproc_vring *rvring;
- 	struct virtqueue *vq;
- 	void *addr;
--	int len, size;
-+	int len, size, ret;
- 
- 	/* we're temporarily limited to two virtqueues per rvdev */
- 	if (id >= ARRAY_SIZE(rvdev->vring))
- 		return ERR_PTR(-EINVAL);
- 
--	rvring = &rvdev->vring[id];
-+	ret = rproc_alloc_vring(rvdev, id);
-+	if (ret)
-+		return ERR_PTR(ret);
- 
-+	rvring = &rvdev->vring[id];
- 	addr = rvring->va;
- 	len = rvring->len;
- 
-@@ -103,6 +106,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
- 					rproc_virtio_notify, callback, name);
- 	if (!vq) {
- 		dev_err(rproc->dev, "vring_new_virtqueue %s failed\n", name);
-+		rproc_free_vring(rvring);
- 		return ERR_PTR(-ENOMEM);
- 	}
- 
-@@ -125,6 +129,7 @@ static void rproc_virtio_del_vqs(struct virtio_device *vdev)
- 		rvring = vq->priv;
- 		rvring->vq = NULL;
- 		vring_del_virtqueue(vq);
-+		rproc_free_vring(rvring);
- 	}
- }
- 
-@@ -228,8 +233,12 @@ static struct virtio_config_ops rproc_virtio_config_ops = {
- static void rproc_vdev_release(struct device *dev)
- {
- 	struct virtio_device *vdev = dev_to_virtio(dev);
-+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
- 	struct rproc *rproc = vdev_to_rproc(vdev);
- 
-+	list_del(&rvdev->node);
-+	kfree(rvdev);
-+
- 	kref_put(&rproc->refcount, rproc_release);
- }
- 
+  static void __init kirkwood_dt_init(void)
+  {
+  	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+@@ -61,7 +66,8 @@ static void __init kirkwood_dt_init(void)
+  	if (of_machine_is_compatible("dlink,dns-kirkwood"))
+  		dnskw_init();
+
+-	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
++	of_platform_populate(NULL, kirkwood_dt_match_table,
++			kirkwood_dt_auxdata_lookup, NULL);
+  }
+
+  static const char *kirkwood_dt_board_compat[] = {
+
+I should really submit this :) What should it be based on? A new revision 
+of my previous patches, or should I assume that my work and Andrew's clk 
+work have already been merged? (apologies if this is a dumb question)
+
+>> The bonus question is that while debugging this issue, I've disabled
+>> all nand declarations in kirkwood.dtsi and my localy modified
+>> kirkwood-iconnect.dts but I was still getting a hard freeze. I think
+>> that means that the "runit" clock is doing more than NAND and SPI but
+>> I've found no details in the 6281 manual about what's using this
+>> clock.
+>
+> Yes, i found the same. I tried extending the SPI driver so that it
+> turned the clock off between transfers. Hard crash like you. I suspect
+> i might have to mark this clock as not to be turned off when unused.
+
++1 --- I found this also when the last patchset temporarily removed all 
+NAND support (and thus RUNIT was being disabled during startup).
+
+>
+>  Andrew
+>
+
 -- 
-1.7.5.4
+Jamie Lentin
