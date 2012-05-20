@@ -1,7 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 20 May 2012 14:08:56 -0300
-Subject: [PATCH] AMR: mx31: Add pinctrl_provide_dummies()
-Message-ID: <1337533736-7857-1-git-send-email-festevam@gmail.com>
+Date: Sun, 20 May 2012 14:11:24 -0300
+Subject: [PATCH v2] ARM: mx31: Add pinctrl_provide_dummies()
+Message-ID: <1337533884-7897-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,6 +12,9 @@ pinctrl_provide_dummies() for mx31.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
+Changes since v1:
+- Fixed typo in Subject (AMR -> ARM)
+
  arch/arm/mach-imx/mm-imx3.c |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
