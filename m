@@ -1,26 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 20 May 2012 09:38:23 +0800
-Subject: [PATCH] mtd: nand: gpmi: fix compile error caused by pinctrl call
-In-Reply-To: <CAOesGMhfByBhx9Kn1PhYMoaKfbD8NeOrYHCG5sTkRLDwmPW-MA@mail.gmail.com>
-References: <1337432773-24000-1-git-send-email-shawn.guo@linaro.org>
- <CAOesGMhfByBhx9Kn1PhYMoaKfbD8NeOrYHCG5sTkRLDwmPW-MA@mail.gmail.com>
-Message-ID: <20120520013821.GI5427@S2101-09.ap.freescale.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 20 May 2012 10:10:11 +0800
+Subject: [PATCH v2] gpio/generic: initialize basic_mmio_gpio shadow
+ variables properly
+In-Reply-To: <20120519181242.B87193E03B8@localhost>
+References: <1337417751-24848-1-git-send-email-shawn.guo@linaro.org>
+ <20120519181242.B87193E03B8@localhost>
+Message-ID: <20120520021009.GA5810@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 08:11:30AM -0700, Olof Johansson wrote:
-> Applied to imx/pinctrl (and next/pinctrl).
+On Sat, May 19, 2012 at 12:12:42PM -0600, Grant Likely wrote:
+> On Sat, 19 May 2012 16:55:51 +0800, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
+> > missing initialization of basic_mmio_gpio shadow variables) manged to
+> > fix in gpio-mxc driver, so that other platform specific drivers do not
+> > suffer from the same problem over and over again.
+> > 
+> > Changes since v1:
+> > * Turn the last parameter "bool big_endian" into "unsigned long flags"
+> >   and give those really quirky hardwares a chance to tell that reg_set
+> >   and reg_dir are unreadable.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-Thanks.
+> Applied, thanks.
+> 
+Grant,
 
-> Given that the mxs defconfig doesn't expose this error, would you mind
-> adding the driver to the platforms where it makes sense so we get
-> build coverage in linux next and for those who use defconfigs to
-> provide it?
-> 
-Yes.  I'm poking my colleague to testing device tree support for the
-driver.  If everything works fine, we will enable the driver in
-mxs_defconfig, but that will probably be next cycle.
+Can you please pick up the RESEND version of the patch, which had
+bgpio_pdev_probe adapt bgpio_init parameter change too?
 
 -- 
 Regards,
