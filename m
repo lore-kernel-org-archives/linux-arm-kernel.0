@@ -1,8 +1,8 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 20 May 2012 22:28:31 +0200
-Subject: [PATCH] RFC: ARM: cache-l2x0: update workaround for PL310 errata
+Date: Sun, 20 May 2012 22:41:45 +0200
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310 errata
  727915
-Message-ID: <1337545711-13389-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,10 +26,13 @@ Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 I found this thing in the Android tree, it looks like it could
 be pretty serious so I'm mailing it out. If it is correct I
 guess it should even be tagged for -stable?
+
+v2: what about actually git commit --amend in the rebase changes
+for -rc7? Sorry for the screwup...
 ---
  arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++
- arch/arm/mm/cache-l2x0.c                   |   65 +++++++++++++++++++++++-----
- 2 files changed, 57 insertions(+), 11 deletions(-)
+ arch/arm/mm/cache-l2x0.c                   |   68 ++++++++++++++++++++++------
+ 2 files changed, 58 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
 index c4c87bc..bd2c6a5 100644
@@ -53,7 +56,7 @@ index c4c87bc..bd2c6a5 100644
  extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 2a8e380..db75e3e 100644
+index 2a8e380..5868618 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
 @@ -32,6 +32,9 @@ static void __iomem *l2x0_base;
@@ -170,7 +173,7 @@ index 2a8e380..db75e3e 100644
  		type = "L310";
  #ifdef CONFIG_PL310_ERRATA_753970
  		/* Unmapped register. */
-@@ -337,7 +378,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -337,24 +378,25 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  		outer_cache.set_debug = pl310_set_debug;
  		break;
  	case L2X0_CACHE_ID_PART_L210:
@@ -179,7 +182,10 @@ index 2a8e380..db75e3e 100644
  		type = "L210";
  		break;
  	default:
-@@ -347,13 +388,15 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		/* Assume unknown chips have 8 ways */
+-		ways = 8;
++		l2x0_ways = 8;
+ 		type = "L2x0 series";
  		break;
  	}
  
@@ -191,13 +197,14 @@ index 2a8e380..db75e3e 100644
  	 */
  	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
 -	way_size = 1 << (way_size + 3);
+-	l2x0_size = ways * way_size * SZ_1K;
 +	way_size = SZ_1K << (way_size + 3);
 +	l2x0_size = l2x0_ways * way_size;
 +	l2x0_sets = way_size / CACHE_LINE_SIZE;
- 	l2x0_size = ways * way_size * SZ_1K;
  
  	/*
-@@ -363,7 +406,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	 * Check if l2x0 controller is already enabled.
+@@ -363,7 +405,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  	 */
  	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
  		/* Make sure that I&D is not locked down when starting */
@@ -206,7 +213,7 @@ index 2a8e380..db75e3e 100644
  
  		/* l2x0 controller is disabled */
  		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
-@@ -386,7 +429,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -386,7 +428,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  
  	printk(KERN_INFO "%s cache controller enabled\n", type);
  	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
