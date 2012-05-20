@@ -1,38 +1,110 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 20 May 2012 00:00:02 -0600
-Subject: [PATCH v2] gpio/generic: initialize basic_mmio_gpio shadow
- variables properly
-In-Reply-To: <20120520021009.GA5810@S2100-06.ap.freescale.net>
-References: <1337417751-24848-1-git-send-email-shawn.guo@linaro.org>
- <20120519181242.B87193E03B8@localhost>
- <20120520021009.GA5810@S2100-06.ap.freescale.net>
-Message-ID: <CACxGe6v4omSoBJKePr4MgYvuQ3bQkYt2EcLF1BZBzMSewbkNyg@mail.gmail.com>
+From: ki0351.kim@samsung.com (Kyoungil Kim)
+Date: Sun, 20 May 2012 17:45:54 +0900
+Subject: [PATCH 1/2] serial: samsung: Remove NULL checking for baud clock
+Message-ID: <000001cd3664$f7f43a60$e7dcaf20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 8:10 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Sat, May 19, 2012 at 12:12:42PM -0600, Grant Likely wrote:
->> On Sat, 19 May 2012 16:55:51 +0800, Shawn Guo <shawn.guo@linaro.org> wrote:
->> > It fixes the issue in gpio-generic that commit fb14921 (gpio/mxc: add
->> > missing initialization of basic_mmio_gpio shadow variables) manged to
->> > fix in gpio-mxc driver, so that other platform specific drivers do not
->> > suffer from the same problem over and over again.
->> >
->> > Changes since v1:
->> > * Turn the last parameter "bool big_endian" into "unsigned long flags"
->> > ? and give those really quirky hardwares a chance to tell that reg_set
->> > ? and reg_dir are unreadable.
->> >
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> Applied, thanks.
->>
-> Grant,
->
-> Can you please pick up the RESEND version of the patch, which had
-> bgpio_pdev_probe adapt bgpio_init parameter change too?
+Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
+---
+ drivers/tty/serial/samsung.c |   21 ++++++++++++---------
+ 1 files changed, 12 insertions(+), 9 deletions(-)
 
-I did even though I replied to the original..  You can check my
-gpio/next branch to be sure.
-
-g.
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index d8b0aee..5668538 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -529,7 +529,7 @@ static void s3c24xx_serial_pm(struct uart_port *port, unsigned int level,
+ 
+ 	switch (level) {
+ 	case 3:
+-		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
++		if (!IS_ERR(ourport->baudclk))
+ 			clk_disable(ourport->baudclk);
+ 
+ 		clk_disable(ourport->clk);
+@@ -538,7 +538,7 @@ static void s3c24xx_serial_pm(struct uart_port *port, unsigned int level,
+ 	case 0:
+ 		clk_enable(ourport->clk);
+ 
+-		if (!IS_ERR(ourport->baudclk) && ourport->baudclk != NULL)
++		if (!IS_ERR(ourport->baudclk))
+ 			clk_enable(ourport->baudclk);
+ 
+ 		break;
+@@ -604,7 +604,6 @@ static unsigned int s3c24xx_serial_getclk(struct s3c24xx_uart_port *ourport,
+ 	char clkname[MAX_CLK_NAME_LENGTH];
+ 	int calc_deviation, deviation = (1 << 30) - 1;
+ 
+-	*best_clk = NULL;
+ 	clk_sel = (ourport->cfg->clk_sel) ? ourport->cfg->clk_sel :
+ 			ourport->info->def_clk_sel;
+ 	for (cnt = 0; cnt < info->num_clks; cnt++) {
+@@ -613,7 +612,7 @@ static unsigned int s3c24xx_serial_getclk(struct s3c24xx_uart_port *ourport,
+ 
+ 		sprintf(clkname, "clk_uart_baud%d", cnt);
+ 		clk = clk_get(ourport->port.dev, clkname);
+-		if (IS_ERR_OR_NULL(clk))
++		if (IS_ERR(clk))
+ 			continue;
+ 
+ 		rate = clk_get_rate(clk);
+@@ -684,7 +683,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ {
+ 	struct s3c2410_uartcfg *cfg = s3c24xx_port_to_cfg(port);
+ 	struct s3c24xx_uart_port *ourport = to_ourport(port);
+-	struct clk *clk = NULL;
++	struct clk *clk = ERR_PTR(-EINVAL);
+ 	unsigned long flags;
+ 	unsigned int baud, quot, clk_sel = 0;
+ 	unsigned int ulcon;
+@@ -705,7 +704,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ 	quot = s3c24xx_serial_getclk(ourport, baud, &clk, &clk_sel);
+ 	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
+ 		quot = port->custom_divisor;
+-	if (!clk)
++	if (IS_ERR(clk))
+ 		return;
+ 
+ 	/* check to see if we need  to change clock source */
+@@ -713,9 +712,9 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
+ 	if (ourport->baudclk != clk) {
+ 		s3c24xx_serial_setsource(port, clk_sel);
+ 
+-		if (ourport->baudclk != NULL && !IS_ERR(ourport->baudclk)) {
++		if (!IS_ERR(ourport->baudclk)) {
+ 			clk_disable(ourport->baudclk);
+-			ourport->baudclk  = NULL;
++			ourport->baudclk = ERR_PTR(-EINVAL);
+ 		}
+ 
+ 		clk_enable(clk);
+@@ -1160,6 +1159,9 @@ static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
+ 	struct uart_port *port = s3c24xx_dev_to_port(dev);
+ 	struct s3c24xx_uart_port *ourport = to_ourport(port);
+ 
++	if (IS_ERR(ourport->baudclk))
++		return -EINVAL;
++
+ 	return snprintf(buf, PAGE_SIZE, "* %s\n", ourport->baudclk->name);
+ }
+ 
+@@ -1200,6 +1202,7 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	ourport->baudclk = ERR_PTR(-EINVAL);
+ 	ourport->info = ourport->drv_data->info;
+ 	ourport->cfg = (pdev->dev.platform_data) ?
+ 			(struct s3c2410_uartcfg *)pdev->dev.platform_data :
+@@ -1387,7 +1390,7 @@ s3c24xx_serial_get_options(struct uart_port *port, int *baud,
+ 		sprintf(clk_name, "clk_uart_baud%d", clk_sel);
+ 
+ 		clk = clk_get(port->dev, clk_name);
+-		if (!IS_ERR(clk) && clk != NULL)
++		if (!IS_ERR(clk))
+ 			rate = clk_get_rate(clk);
+ 		else
+ 			rate = 1;
+-- 
+1.7.1
