@@ -1,37 +1,36 @@
-From: ki0351.kim@samsung.com (Kyoungil Kim)
-Date: Sun, 20 May 2012 17:49:31 +0900
-Subject: [PATCH 2/2] serial: samsung: Fixed wrong comparison for baudclk_rate
-Message-ID: <000101cd3665$7943b690$6bcb23b0$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 20 May 2012 10:21:13 +0100
+Subject: [PATCH v2 4/6] ARM: Samsung: Modify
+ s3c64xx_spi{0|1|2}_set_platdata function
+In-Reply-To: <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
+References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
+ <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120520092113.GA20652@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-port->baudclk_rate should be compared to the rate of port->baudclk,
-because port->baudclk_rate was assigned as the rate of port->baudclk previously.
-So to check that the current baudclk rate is same as previous rate,
-the target of comparison sholud be the rate of port->baudclk.
+On Fri, May 18, 2012 at 03:03:31PM +0530, Thomas Abraham wrote:
 
-Signed-off-by: Jun-Ho, Yoon <junho78.yoon@samsung.com>
-Signed-off-by: Kyoungil Kim <ki0351.kim@samsung.com>
----
- drivers/tty/serial/samsung.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> -	s3c64xx_spi0_set_platdata(&s3c64xx_spi0_pdata, 0, 1);
+> +	s3c64xx_spi0_set_platdata("s3c6410-spi", NULL, 0, 1);
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 5668538..cefdd2d 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1013,10 +1013,10 @@ static int s3c24xx_serial_cpufreq_transition(struct notifier_block *nb,
- 	 * a disturbance in the clock-rate over the change.
- 	 */
- 
--	if (IS_ERR(port->clk))
-+	if (IS_ERR(port->baudclk))
- 		goto exit;
- 
--	if (port->baudclk_rate == clk_get_rate(port->clk))
-+	if (port->baudclk_rate == clk_get_rate(port->baudclk))
- 		goto exit;
- 
- 	if (val == CPUFREQ_PRECHANGE) {
--- 
-1.7.1
+...
+
+> +	pd.src_clk_nr = src_clk_nr;
+> +	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
+> +	s3c64xx_device_spi0.name = dev_name;
+
+This looks *really* strange.  Why do we need to pass in a name to set in
+s3c64xx_device_spi0's name, why would we want to use a different name?
+This dev_name also isn't equivalent to dev_name() which makes matters
+more confusing than they need to be.
+
+There was similar code for the I2C controllers which caused some really
+hard to debug brittleness.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120520/aead2f08/attachment.sig>
