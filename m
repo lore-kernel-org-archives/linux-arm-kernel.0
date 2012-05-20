@@ -1,40 +1,85 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 19 May 2012 22:43:54 -0600
-Subject: [PATCH 05/10] ARM: Samsung: Update the device names for spi clock
- lookup
-In-Reply-To: <20120513145134.GA6381@opensource.wolfsonmicro.com>
+Date: Sat, 19 May 2012 22:45:21 -0600
+Subject: [PATCH 07/10] spi: s3c64xx: Remove the 'set_level' callback from
+ controller data
+In-Reply-To: <1336514694-22393-8-git-send-email-thomas.abraham@linaro.org>
 References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
- <1336514694-22393-6-git-send-email-thomas.abraham@linaro.org>
- <20120509085249.GA28702@sirena.org.uk>
- <CAJuYYwQ+Wn11puF7AdPD41Jntbuj7oZHqNfzQA2T8V=2cigQnw@mail.gmail.com>
- <20120509142836.GT3955@opensource.wolfsonmicro.com>
- <CAJuYYwSTJoNRuN87GoTZMgF-qahbu02kJ9SUd7omQ5WD0VjTww@mail.gmail.com>
- <20120513145134.GA6381@opensource.wolfsonmicro.com>
-Message-ID: <20120520044354.C5DBE3E03B8@localhost>
+ <1336514694-22393-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20120520044521.88CE13E03B8@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 May 2012 15:51:35 +0100, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, May 10, 2012 at 01:17:32AM +0800, Thomas Abraham wrote:
-> > On 9 May 2012 22:28, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On Wed, 09 May 2012 03:34:51 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> The set_level callback in the controller data, which is used to configure
+> the slave select line, cannot be supported when migrating the driver to
+> device tree based discovery. Since all the platforms currently use gpio
+> as the slave select line, this callback can be removed from the
+> controller data and replaced with call to gpio_set_value in the driver.
 > 
-> > > This means that bisection will be broken - anything with only one tree
-> > > won't be able to load the SPI driver successfully until it's merged
-> > > with the other which isn't ideal.
+> Cc: Jaswinder Singh <jaswinder.singh@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+> ---
+>  arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 --
+>  drivers/spi/spi-s3c64xx.c                        |    8 ++++----
+>  2 files changed, 4 insertions(+), 6 deletions(-)
 > 
-> > Yes, we would have that problem until the two trees are merged. But I
-> > still prefer not to squash the two patches which already contain huge
-> > diff.
+> diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> index a733ce9..48a6495 100644
+> --- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> +++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+> @@ -18,7 +18,6 @@ struct platform_device;
+>   * @fb_delay: Slave specific feedback delay.
+>   *            Refer to FB_CLK_SEL register definition in SPI chapter.
+>   * @line: Custom 'identity' of the CS line.
+> - * @set_level: CS line control.
+>   *
+>   * This is per SPI-Slave Chipselect information.
+>   * Allocate and initialize one in machine init code and make the
+> @@ -27,7 +26,6 @@ struct platform_device;
+>  struct s3c64xx_spi_csinfo {
+>  	u8 fb_delay;
+>  	unsigned line;
+> -	void (*set_level)(unsigned line_id, int lvl);
+>  };
+>  
+>  /**
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index f6bc0e3..d84ce7f 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -406,14 +406,14 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+>  		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+>  			/* Deselect the last toggled device */
+>  			cs = sdd->tgl_spi->controller_data;
+> -			cs->set_level(cs->line,
+> -					spi->mode & SPI_CS_HIGH ? 0 : 1);
+> +			gpio_set_value(cs->line,
+> +				spi->mode & SPI_CS_HIGH ? 0 : 1);
+>  		}
+>  		sdd->tgl_spi = NULL;
+>  	}
+>  
+>  	cs = spi->controller_data;
+> -	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+> +	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+>  }
+>  
+>  static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+> @@ -499,7 +499,7 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+>  	if (sdd->tgl_spi == spi)
+>  		sdd->tgl_spi = NULL;
+>  
+> -	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+> +	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+>  }
+>  
+>  static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+> -- 
+> 1.6.6.rc2
 > 
-> I'd not say the diff is *that* big (and most of what's there is simple
-> and repetitive), and bisection is a very useful tool.  I know I
-> frequently find it enormously painful trying to figure out breakage when
-> large chunks of the history don't work usefully.
-
-I agree.  Squash them!
-
-g.
-
 
 -- 
 Grant Likely, B.Sc, P.Eng.
