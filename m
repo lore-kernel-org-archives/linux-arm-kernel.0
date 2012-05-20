@@ -1,26 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 20 May 2012 15:22:14 +0200
-Subject: kirkwood, nand, clocks and device-tree
-In-Reply-To: <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
-References: <87fwaxes25.fsf@lebrac.rtp-net.org>
- <20120520095110.GC12741@lunn.ch>
- <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
-Message-ID: <20120520132214.GD12741@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 20 May 2012 14:08:56 -0300
+Subject: [PATCH] AMR: mx31: Add pinctrl_provide_dummies()
+Message-ID: <1337533736-7857-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I should really submit this :) What should it be based on? A new
-> revision of my previous patches, or should I assume that my work and
-> Andrew's clk work have already been merged? (apologies if this is a
-> dumb question)
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Yes, you can assume both are in. arm-soc has them, so the 3.5-rc1
-should have them.
+commit a2aa65a (ARM: imx: enable pinctrl dummy states) missed to add
+pinctrl_provide_dummies() for mx31.
 
-For the next cycle we need to improve working together on DT porting.
-There is a lot of work going on here, in kirkwood, orion5x, dove, and
-the two new Armada SoCs, all needing/porting drivers to DT.  I think
-we need a tree where patches are quickly added once they are stable,
-so that others can profit from the work.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mm-imx3.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-       Andrew
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 967ed5b..0b211f6 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -179,6 +179,8 @@ void __init imx31_soc_init(void)
+ 	mxc_register_gpio("imx31-gpio", 1, MX31_GPIO2_BASE_ADDR, SZ_16K, MX31_INT_GPIO2, 0);
+ 	mxc_register_gpio("imx31-gpio", 2, MX31_GPIO3_BASE_ADDR, SZ_16K, MX31_INT_GPIO3, 0);
+ 
++	pinctrl_provide_dummies();
++
+ 	if (to_version == 1) {
+ 		strncpy(imx31_sdma_pdata.fw_name, "sdma-imx31-to1.bin",
+ 			strlen(imx31_sdma_pdata.fw_name));
+-- 
+1.7.1
