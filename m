@@ -1,31 +1,36 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 19 May 2012 23:10:26 -0600
-Subject: [PATCH v2 6/6] spi: s3c64xx: add device tree support
-In-Reply-To: <1337333613-6216-7-git-send-email-thomas.abraham@linaro.org>
-References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
- <1337333613-6216-7-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120520051026.77D0C3E03B8@localhost>
+Date: Sat, 19 May 2012 23:17:47 -0600
+Subject: [PATCH] SPI: PRIMA2: use the newest APIs of PINCTRL to fix
+ compiling errors
+In-Reply-To: <CACRpkdYPQW4cTh_j1y4u0wFKkQmgP3oR8E2SJXNSn68jt9pq7g@mail.gmail.com>
+References: <1337048460-30329-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdYPQW4cTh_j1y4u0wFKkQmgP3oR8E2SJXNSn68jt9pq7g@mail.gmail.com>
+Message-ID: <20120520051747.7744B3E03B8@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 May 2012 15:03:33 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> Add support for device based discovery.
+On Tue, 15 May 2012 10:02:01 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, May 15, 2012 at 4:21 AM, Barry Song <Barry.Song@csr.com> wrote:
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
+> > From: Barry Song <Baohua.Song@csr.com>
+> >
+> > Fix the compiling errors:
+> > drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_probe':
+> > drivers/spi/spi-sirf.c:563: error: implicit declaration of function 'pinmux_get'
+> > drivers/spi/spi-sirf.c:563: warning: assignment makes pointer from integer without a cast
+> > drivers/spi/spi-sirf.c:568: error: implicit declaration of function 'pinmux_enable'
+> > drivers/spi/spi-sirf.c:602: error: implicit declaration of function 'pinmux_disable'
+> > drivers/spi/spi-sirf.c:603: error: implicit declaration of function 'pinmux_put'
+> > make[3]: *** [drivers/spi/spi-sirf.o] Error 1
+> >
+> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Counting on Grant to pick this up...
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-... but one nitpick below...
-
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id s3c64xx_spi_dt_match[] = {
-> +	{ .compatible = "samsung,exynos4210-spi",
-> +			.data = (void *)EXYNOS4_SPI_PORT_CONFIG,
-
-This looks completely backwards.  EXYNOS4_SPI_PORT_CONFIG casts a
-pointer to a kernel_ulong_t, and this casts it right back to a
-pointer.  The cast should be removed entirely from the macro, and the
-platform_device_id table should have the cast from pointer to ulong.
+Applied, thanks.
 
 g.
