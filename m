@@ -1,43 +1,125 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 May 2012 19:27:34 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120521153922.GO24238@titan.lakedaemon.net>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <20120518191832.GC24238@titan.lakedaemon.net>
- <201205182044.26409.arnd@arndb.de>
- <4FBA030F.4050101@codethink.co.uk> <20120521091615.GD14362@lunn.ch>
- <4FBA0A83.1030201@codethink.co.uk> <20120521094052.GA22191@lunn.ch>
- <20120521153922.GO24238@titan.lakedaemon.net>
-Message-ID: <20120521172734.GG12741@lunn.ch>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 21 May 2012 19:29:37 +0200
+Subject: [PATCH 1/8] ARM: PCI: remove unused sys->hw
+In-Reply-To: <20120521145711.GB24270@n2100.arm.linux.org.uk>
+References: <20120426101626.GE24211@n2100.arm.linux.org.uk>
+ <E1SNLkt-00080g-R0@rmk-PC.arm.linux.org.uk>
+ <20120521143504.GD21513@avionic-0098.mockup.avionic-design.de>
+ <20120521145711.GB24270@n2100.arm.linux.org.uk>
+Message-ID: <20120521172937.GA11824@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 11:39:22AM -0400, Jason Cooper wrote:
-> On Mon, May 21, 2012 at 11:40:52AM +0200, Andrew Lunn wrote:
-> > > Personally, my view is leave it alone and just add a new machine
-> > > directory.
-> 
-> I agree, see my response to Russell.
-> 
-> > > Pushing items around doesn't really help the amount of code in the
-> > > kernel, the organisation does not add more than a line or two to the
-> > > Makefiles.
+* Russell King - ARM Linux wrote:
+> On Mon, May 21, 2012 at 04:35:04PM +0200, Thierry Reding wrote:
+> > I have some patches which convert the Tegra PCIe code to a platform driver. I
+> > used to use the sys->hw field to obtain a pointer to my driver-private struct
+> > which had the struct hw_pci embedded.
 > > 
-> > It does however make it easier to see where the same code has been
-> > cut/paste. There is some stuff in the various Orion mach- directories
-> > which is repeated 4 times. The Armada XP port wanted to add a 5th
-> > copy. All this repeated code needs to be put into plat-orion.
+> > Something like this:
+> > 
+> > 	struct tegra_pcie_info {
+> > 		...
+> > 		struct hw_pci hw;
+> > 		...
+> > 	};
 > 
-> Does my suggested layout/migration path cover your concerns?
+> The hw_pci struct is not supposed to be embedded into anything - it's
+> supposed to be a short-term struct used just to initialize things -
+> it's certainly not required after pci_common_init() returns.
 
-I actually like Arnd patch of putting everything into one
-directory. I've been building on that patch removing duplicate code,
-modifying the address map to make it as similar as possible, removing
-defines which are the same on all SoCs etc. I think actually having
-everything spread out is what has contributed to the X copies and
-needless incompatibilities.
+Okay, understood.
 
-My vote is to commit Arnd patch as is.
+> > From ed0421bb87e3fa1484fd54fa504e828e017c3221 Mon Sep 17 00:00:00 2001
+> > From: Thierry Reding <thierry.reding@avionic-design.de>
+> > Date: Mon, 21 May 2012 16:25:58 +0200
+> > Subject: [PATCH] HACK: ARM: PCI: Allow passing driver-private data
+> > 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> >  arch/arm/include/asm/mach/pci.h |    2 +-
+> >  arch/arm/kernel/bios32.c        |   16 +++++++++-------
+> >  2 files changed, 10 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> > index 26c511f..5508dc8 100644
+> > --- a/arch/arm/include/asm/mach/pci.h
+> > +++ b/arch/arm/include/asm/mach/pci.h
+> > @@ -52,7 +52,7 @@ struct pci_sys_data {
+> >  /*
+> >   * Call this with your hw_pci struct to initialise the PCI system.
+> >   */
+> > -void pci_common_init(struct hw_pci *);
+> > +void pci_common_init(struct hw_pci *, void *);
+> >  
+> >  /*
+> >   * PCI controllers
+> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> > index 9c0c9a0..45d8171 100644
+> > --- a/arch/arm/kernel/bios32.c
+> > +++ b/arch/arm/kernel/bios32.c
+> > @@ -423,7 +423,8 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> >  	return irq;
+> >  }
+> >  
+> > -static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+> > +static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head,
+> > +			    void *private)
+> >  {
+> >  	struct pci_sys_data *sys = NULL;
+> >  	int ret;
+> > @@ -435,11 +436,12 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+> >  			panic("PCI: unable to allocate sys data!");
+> >  
+> >  #ifdef CONFIG_PCI_DOMAINS
+> > -		sys->domain  = hw->domain;
+> > +		sys->domain       = hw->domain;
+> >  #endif
+> > -		sys->busnr   = busnr;
+> > -		sys->swizzle = hw->swizzle;
+> > -		sys->map_irq = hw->map_irq;
+> > +		sys->busnr        = busnr;
+> > +		sys->swizzle      = hw->swizzle;
+> > +		sys->map_irq      = hw->map_irq;
+> > +		sys->private_data = private;
+> 
+> This is inappropriate, because if you look at pcibios_init_hw() you'll
+> notice that it loops over N buses, and they typically want differing
+> private data.
 
-   Andrew
+In this particular case, each bus gets the same struct tegra_pcie_info.
+
+> If we want to do this, we need to restructure this code.  However...
+
+Maybe an array of pointers for each controller can be added to hw_pci
+instead. I'd rather not add a global variable to store this information (like
+other PCIe controller drivers do) because it goes completely against the
+concept of rewriting this code as a platform driver.
+
+I know that there will likely only ever be a single instance of the driver,
+but that doesn't mean it shouldn't be done properly.
+
+> I'm not sure coupling a platform driver into this code is the best
+> approach - the platform driver will have to live outside of arch/arm,
+> yet would depend totally on code within arch/arm.  That sounds like the
+> wrong approach.  What if some other arch wants to reuse your platform
+> driver?
+
+The driver isn't used by any other platform. It is a driver for the Tegra
+PCIe controller. When I posted it the first time there was some discussion
+that it should move out of arch/arm, but it was argued that it won't be
+usable on anything else but Tegra anyway and therefore would better be
+located in arch/arm/mach-tegra.
+
+One of the reasons for rewriting the code as a platform driver is so that it
+can be probed via DT. It's in fact one of the remaining issues to fix before
+board files can be removed for Tegra (along with clock tables I think).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/8c5dbad6/attachment-0001.sig>
