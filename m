@@ -1,32 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 03:02:18 +0200
-Subject: [PATCH 2/4] GPMI-NAND: Fixup compile issue
-In-Reply-To: <1337562140-5739-1-git-send-email-marex@denx.de>
-References: <1337562140-5739-1-git-send-email-marex@denx.de>
-Message-ID: <1337562140-5739-2-git-send-email-marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 20 May 2012 21:08:55 -0400
+Subject: kirkwood, nand, clocks and device-tree
+In-Reply-To: <20120520132214.GD12741@lunn.ch>
+References: <87fwaxes25.fsf@lebrac.rtp-net.org>
+ <20120520095110.GC12741@lunn.ch>
+ <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
+ <20120520132214.GD12741@lunn.ch>
+Message-ID: <20120521010855.GJ24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Huang Shijie <b32955@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Sun, May 20, 2012 at 03:22:14PM +0200, Andrew Lunn wrote:
+> > I should really submit this :) What should it be based on? A new
+> > revision of my previous patches, or should I assume that my work and
+> > Andrew's clk work have already been merged? (apologies if this is a
+> > dumb question)
+> 
+> Yes, you can assume both are in. arm-soc has them, so the 3.5-rc1
+> should have them.
+> 
+> For the next cycle we need to improve working together on DT porting.
+> There is a lot of work going on here, in kirkwood, orion5x, dove, and
+> the two new Armada SoCs, all needing/porting drivers to DT.  I think
+> we need a tree where patches are quickly added once they are stable,
+> so that others can profit from the work.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index f5f3d761..33111a9 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -486,7 +486,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
- 	if (ret)
- 		goto exit_dma_channels;
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
- 	if (IS_ERR(pinctrl)) {
- 		ret = PTR_ERR(pinctrl);
- 		goto exit_pin;
--- 
-1.7.10
+I'm setting up a branch scheme that should handle this:
+
+# main branch for pull-requests to Arnd/Olof
+
+for-arm-soc
+
+# branches that are ready to merge into for-arm-soc
+
+board/<boardname>
+
+	# branches which can be merged as depends
+
+	driver/<driver>
+	dt/<binding>
+
+# branches which can be changed/rebased/etc
+
+staging/*
+
+
+Does that cover everthing?  Or is there something I missed?
+
+thx,
+
+Jason.
