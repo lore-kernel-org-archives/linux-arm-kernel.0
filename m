@@ -1,54 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 22:07:34 +0200
-Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <4FBA9BE4.7020303@grid-net.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <201205212141.52171.marex@denx.de> <4FBA9BE4.7020303@grid-net.com>
-Message-ID: <201205212207.34978.marex@denx.de>
+From: alexey.zaytsev@gmail.com (Alexey Zaytsev)
+Date: Mon, 21 May 2012 23:19:13 +0300
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <201205181331.07566.arnd@arndb.de>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+ <4FB5343D.5090509@yahoo.es> <201205181331.07566.arnd@arndb.de>
+Message-ID: <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Subodh Nijsure,
+On Fri, May 18, 2012 at 4:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 17 May 2012, Jorge Amor?s Argos wrote:
+>> Hi Alexey and co,
+>>
+>> I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the
+>> only missing module was ADSL.
 
-> On 05/21/2012 12:41 PM, Marek Vasut wrote:
-> > Dear Fabio Estevam,
-> > 
-> >> Hi Richard,
-> >> 
-> >> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
-> >> 
-> >> <richard.zhao@freescale.com>  wrote:
-> >>> The work is based on  ci13xxx rework done by Alexander Shishkin.
-> >>> 
-> >>> Status:
-> >>>   - this version only support host
-> >>>   - usbotg controler works at host role
-> >>> 
-> >>> Changes since V1:
-> >>>   - Merge the work of Marek
-> >>>   - re-implement connect change notify
-> >>>   - imx6q: move part of code to clk
-> >>>   - imx6q: add config-on-boot gpios
-> >> 
-> >> Can you please also add the driver into the defconfig files?
-> >> 
-> >> What about the existing USB host drivers for mx27/mx31/mx35/mx25/mx35?
-> >> 
-> >> Is the idea to switch to drivers/usb/chipidea/host.c too?
-> > 
-> > I think the core is the same, it's just the ci13xxx-imx driver that'd
-> > need to be written differently for these
-> 
-> So that means driver that you did are not going to be up streamed for
-> mx28/mxs? And those interested should be tracking this patch set?
+That's really nice. Did you get the wi-fi module working as well?
 
-This here is definitelly going to support mx28 and I'm slowly working through 
-the DT stuff to test this, all right?
+>
+> Ah, very good!
 
-We were talking about imx.{xz|x,y is [0-9a-z]} \ imx.{23,28,6q}
+I've got it working for 2.6.31, but that needs a lot of cleanup.
 
-> 
-> -Subodh
+>
+>> Anyway, compiling was successful but I can't tell if it was functional.
+>>
+>> Mainly 2 big issues:
+>>
+>> ? * No knowledge how to build the image (I wanted to have a self-lzma
+>> ? ? image in order to save room)
+>
+> LZMA support was added to arm linux in 2.6.35, and XZ support some time
+> after that.
+>
+>> ? * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
+>> ? ? easily upload firmware into flash. It took me hours to make 1 trial.
+>>
+>>
+>> I'll be glad to share the code with whoever need it and maybe we can
+>> take those old routers back to a better world.
+>
+> I think that would be helpful.
 
-Best regards,
-Marek Vasut
+Yeah. I'll put my work somewhere publicly as well soon.
