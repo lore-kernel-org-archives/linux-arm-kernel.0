@@ -1,125 +1,78 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 21 May 2012 19:29:37 +0200
-Subject: [PATCH 1/8] ARM: PCI: remove unused sys->hw
-In-Reply-To: <20120521145711.GB24270@n2100.arm.linux.org.uk>
-References: <20120426101626.GE24211@n2100.arm.linux.org.uk>
- <E1SNLkt-00080g-R0@rmk-PC.arm.linux.org.uk>
- <20120521143504.GD21513@avionic-0098.mockup.avionic-design.de>
- <20120521145711.GB24270@n2100.arm.linux.org.uk>
-Message-ID: <20120521172937.GA11824@avionic-0098.mockup.avionic-design.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 May 2012 11:33:52 -0600
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201205190844.03654.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205182143.55140.arnd@arndb.de> <4FB6CB27.8020500@wwwdotorg.org>
+ <201205190844.03654.arnd@arndb.de>
+Message-ID: <4FBA7C80.4080801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux wrote:
-> On Mon, May 21, 2012 at 04:35:04PM +0200, Thierry Reding wrote:
-> > I have some patches which convert the Tegra PCIe code to a platform driver. I
-> > used to use the sys->hw field to obtain a pointer to my driver-private struct
-> > which had the struct hw_pci embedded.
-> > 
-> > Something like this:
-> > 
-> > 	struct tegra_pcie_info {
-> > 		...
-> > 		struct hw_pci hw;
-> > 		...
-> > 	};
+On 05/19/2012 02:44 AM, Arnd Bergmann wrote:
+> On Friday 18 May 2012, Stephen Warren wrote:
+>> On 05/18/2012 03:43 PM, Arnd Bergmann wrote:
 > 
-> The hw_pci struct is not supposed to be embedded into anything - it's
-> supposed to be a short-term struct used just to initialize things -
-> it's certainly not required after pci_common_init() returns.
-
-Okay, understood.
-
-> > From ed0421bb87e3fa1484fd54fa504e828e017c3221 Mon Sep 17 00:00:00 2001
-> > From: Thierry Reding <thierry.reding@avionic-design.de>
-> > Date: Mon, 21 May 2012 16:25:58 +0200
-> > Subject: [PATCH] HACK: ARM: PCI: Allow passing driver-private data
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> >  arch/arm/include/asm/mach/pci.h |    2 +-
-> >  arch/arm/kernel/bios32.c        |   16 +++++++++-------
-> >  2 files changed, 10 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> > index 26c511f..5508dc8 100644
-> > --- a/arch/arm/include/asm/mach/pci.h
-> > +++ b/arch/arm/include/asm/mach/pci.h
-> > @@ -52,7 +52,7 @@ struct pci_sys_data {
-> >  /*
-> >   * Call this with your hw_pci struct to initialise the PCI system.
-> >   */
-> > -void pci_common_init(struct hw_pci *);
-> > +void pci_common_init(struct hw_pci *, void *);
-> >  
-> >  /*
-> >   * PCI controllers
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> > index 9c0c9a0..45d8171 100644
-> > --- a/arch/arm/kernel/bios32.c
-> > +++ b/arch/arm/kernel/bios32.c
-> > @@ -423,7 +423,8 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> >  	return irq;
-> >  }
-> >  
-> > -static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
-> > +static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head,
-> > +			    void *private)
-> >  {
-> >  	struct pci_sys_data *sys = NULL;
-> >  	int ret;
-> > @@ -435,11 +436,12 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
-> >  			panic("PCI: unable to allocate sys data!");
-> >  
-> >  #ifdef CONFIG_PCI_DOMAINS
-> > -		sys->domain  = hw->domain;
-> > +		sys->domain       = hw->domain;
-> >  #endif
-> > -		sys->busnr   = busnr;
-> > -		sys->swizzle = hw->swizzle;
-> > -		sys->map_irq = hw->map_irq;
-> > +		sys->busnr        = busnr;
-> > +		sys->swizzle      = hw->swizzle;
-> > +		sys->map_irq      = hw->map_irq;
-> > +		sys->private_data = private;
+>>> So if we do that, we might want to make the dma-names property mandatory
+>>> for every device, and document what the names are.
+>>
+>> We could do that, but one more proposal: Add the client's ID/index into
+>> the dmas property, so:
+>>
+>> simple 1 req:
+>>
+>> dmas = <0 &dmac1 xxx>;
+>>
+>> simple 2 req:
+>>
+>> dmas = <0 &dmac1 xxx 1 &dmac1 yyy>;
+>>
+>> multiple dmacs:
+>>
+>> dmas = <0 &dmac1 xxx 0 &dmac2 zzz 1 &dmac1 yyy>;
+>>
+>> (i.e. dmas = [client_dma_req_id phandle dma-specifier]*)
+>>
+>> (where 0==TX_FIFO, 1=RX_FIFO for example, but could also have
+>> 2=TX_FIFO_B, 3=RX_FIFO_B, ...)
+>>
+>> Then dma-names would map name to ID, but you'd still need to search all
+>> through the dmas property to find the ID match.
 > 
-> This is inappropriate, because if you look at pcibios_init_hw() you'll
-> notice that it loops over N buses, and they typically want differing
-> private data.
+> Again, this would probably work, but it adds complexity and inconsistency
+> for the common case, as nothing else requires these. I think it's much
+> better than putting the information into the dma controller node, but
+> not ideal.
+> 
+>>> Another option would be to encode the direction in the property in
+>>> a generic way and provide an API that lets you ask specifically
+>>> for a read, write or readwrite channel out of the ones that are
+>>> available, rather than assuming there is only one kind. Consequently,
+>>> any device that uses more than one read channel or more than one
+>>> write channel would still have to use names to identify them.
+>>
+>> I'm not sure that just direction cuts it; Tegra's SPDIF has 2 TX DMAs
+>> ("PCM" data and control data) and same for RX. The format above is
+>> roughly the same as what you proposed, but with an explicit ID rather
+>> than direction in the dmas property.
+> 
+> The point with the direction was that it covers most cases and makes
+> them rather simple, while for the rare case where you need more than
+> two channels, you just use the otherwise optional named interface
+> rather than the numbered one. My feeling is that this also makes a
+> lot of sense at the driver API level: most dirvers just ask for the
+> read and write channels using a very simple interface, and those drivers
+> that have more than two will want to name them anyway.
 
-In this particular case, each bus gets the same struct tegra_pcie_info.
+How are you thinking of representing the direction in DT - as part of
+the DMA request specifier, so in a DMAC-specific way?
 
-> If we want to do this, we need to restructure this code.  However...
+If so, that seems a little odd; you have to request a DMA channel for
+"TX", but then end up having the common code check all the entries in
+the dmas property since it can't know which are TX, and then have the
+wrong ones almost accidentally fail, since the DMAC will then determine
+that it can't support TX on the RX DMA request IDs.
 
-Maybe an array of pointers for each controller can be added to hw_pci
-instead. I'd rather not add a global variable to store this information (like
-other PCIe controller drivers do) because it goes completely against the
-concept of rewriting this code as a platform driver.
-
-I know that there will likely only ever be a single instance of the driver,
-but that doesn't mean it shouldn't be done properly.
-
-> I'm not sure coupling a platform driver into this code is the best
-> approach - the platform driver will have to live outside of arch/arm,
-> yet would depend totally on code within arch/arm.  That sounds like the
-> wrong approach.  What if some other arch wants to reuse your platform
-> driver?
-
-The driver isn't used by any other platform. It is a driver for the Tegra
-PCIe controller. When I posted it the first time there was some discussion
-that it should move out of arch/arm, but it was argued that it won't be
-usable on anything else but Tegra anyway and therefore would better be
-located in arch/arm/mach-tegra.
-
-One of the reasons for rewriting the code as a platform driver is so that it
-can be probed via DT. It's in fact one of the remaining issues to fix before
-board files can be removed for Tegra (along with clock tables I think).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/8c5dbad6/attachment-0001.sig>
+If not, then presumably there's going to be a cell for "direction", so
+it may as well just be a cell for "outgoing DMA request ID" - the two
+are equivalent in the simple case.
