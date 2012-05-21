@@ -1,47 +1,56 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 May 2012 13:02:36 +0530
-Subject: [PATCH v2 1/4] ARM: OMAP: timer: allow gp timer clock-event to be
- used on both cpus
-In-Reply-To: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1337585559-20250-2-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 21 May 2012 13:02:35 +0530
+Subject: [PATCH v2 0/4] OMAP4: CPUidle: Add coupled idle support
+Message-ID: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For coupled cpuidle to work when both cpus are active, it needs a global timer
-that can handle events for both cpus.  This timer is used as the broadcast
-clock-event when the per-cpu timer hardware stop in low power states.
-Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
-set the irq to allow the clockevent core to determine the affinity of the
-timer.
+Kevin,
 
-Signed-off-by: Colin Cross <ccross@android.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/timer.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+Now Colin's v3 [1] is apearing in Len Brown's next branch, I have rebased
+OMAP4 support against it. I need to pick up couple of fixes [2] posted on
+top of v3 [1] version and arm-soc 'omap/cpuidle-cleanup' branch lined up
+for 3.5.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index c512bac..4212f2f 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -135,6 +135,7 @@ static struct clock_event_device clockevent_gpt = {
- 	.name		= "gp timer",
- 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
- 	.shift		= 32,
-+	.rating		= 300,
- 	.set_next_event	= omap2_gp_timer_set_next_event,
- 	.set_mode	= omap2_gp_timer_set_mode,
- };
-@@ -226,7 +227,8 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
- 		clockevent_delta2ns(3, &clockevent_gpt);
- 		/* Timer internal resynch latency. */
- 
--	clockevent_gpt.cpumask = cpumask_of(0);
-+	clockevent_gpt.cpumask = cpu_possible_mask;
-+	clockevent_gpt.irq = omap_dm_timer_get_irq(&clkev);
- 	clockevents_register_device(&clockevent_gpt);
- 
- 	pr_info("OMAP clockevent source: GPTIMER%d at %lu Hz\n",
+This series adds the coupled cpuidle support for OMAP4 and also removes
+the hard dependency of off-lining CPU1 to trigger deeper CPU C-states.
+It has been build tested for all OMAP builds and functionally tested
+on OMAP4430 SDP.
+
+I have put together a branch with:
+1) Len Brown's 'next'
+	: git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux 
+2) ARM-SOC 'omap/cpuidle-cleanup'
+	: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+3) Two couple_idle_fixes picked up from [2]
+
+And same is available:
+
+git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+for_3.5/omap4_couple_idle
+
+Kevin Hilman (1):
+  ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+
+Santosh Shilimkar (3):
+  ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
+  ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP
+    cpuidle.
+  ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+
+ arch/arm/mach-omap2/Kconfig       |    1 +
+ arch/arm/mach-omap2/cpuidle44xx.c |  141 +++++++++++++++++++++++++------------
+ arch/arm/mach-omap2/timer.c       |    4 +-
+ 3 files changed, 101 insertions(+), 45 deletions(-)
+
+Regards
+Santosh
+
+[1] [PATCHv3 0/4] coupled cpuidle state support
+ https://lkml.org/lkml/2012/5/19/24
+
+[2] [PATCH 0/2] bug fixes for coupled cpuidle
+ https://lkml.org/lkml/2012/5/18/379
+
 -- 
 1.7.5.4
