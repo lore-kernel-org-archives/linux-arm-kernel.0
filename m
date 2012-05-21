@@ -1,34 +1,235 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 21 May 2012 17:50:25 -0500
-Subject: [PATCH v5 2/7] ARM: imx: Add comments to tzic_enable_waker()
+Date: Mon, 21 May 2012 17:50:26 -0500
+Subject: [PATCH v5 3/7] ARM: imx: clean and consolidate imx5 suspend and idle
+ code
 In-Reply-To: <1337640630-29176-1-git-send-email-rob.lee@linaro.org>
 References: <1337640630-29176-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1337640630-29176-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337640630-29176-4-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add additional comments to the tzic_enable_wake() funciton to
-clarify its intended usage.
+The imx5 idle code that existed in mm-imx5.c is moved to pm-imx5.c.
+The imx5_pm_init call is now exported and called during the
+MACHINE_START late_init in supported imx5 platforms.
+
+Remove various enabling/disabling of the gpc_dvfs clock and
+enable it once during initialization.  This is a very low
+power clock that must be enabled during low power operations.
+
+There are only two "suspend_state_t" imx5 low power modes ever
+used.  STOP_POWER_OFF for suspend to mem and
+WAIT_UNCLOCKED_POWER_OFF for idle and suspend to standby.  The
+latter mode only requires 500 nanoseconds of extra hardware
+exit time beyond a basic WFI operation (WAIT_CLOCKED mode) so
+no other idle mode is necessary.  Given this information, it
+is more efficient to keep the registers in the often used
+WAIT_UNCLOCKED_POWER_OFF state and only to and from the
+STOP_POWER_OFF register state as needed when suspend to
+mem is required.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/plat-mxc/tzic.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-imx/mm-imx5.c             |   21 +---------
+ arch/arm/mach-imx/pm-imx5.c             |   67 +++++++++++++++++++------------
+ arch/arm/plat-mxc/include/mach/common.h |    3 +-
+ 3 files changed, 44 insertions(+), 47 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 98308ec..a45dbea 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -190,6 +190,10 @@ void __init tzic_init_irq(void __iomem *irqbase)
-  * tzic_enable_wake() - enable wakeup interrupt
-  *
-  * @return			0 if successful; non-zero otherwise
-+ *
-+ * This function provides an interrupt synchronization point that is required
-+ * by tzic enabled platforms before entering imx specific low power modes (ie,
-+ * those low power modes beyond the WAIT_CLOCKED basic ARM WFI only mode).
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 3fb4d56..ff7fa61 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -15,7 +15,6 @@
+ #include <linux/init.h>
+ #include <linux/clk.h>
+ 
+-#include <asm/system_misc.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/hardware.h>
+@@ -23,24 +22,6 @@
+ #include <mach/devices-common.h>
+ #include <mach/iomux-v3.h>
+ 
+-static struct clk *gpc_dvfs_clk;
+-
+-static void imx5_idle(void)
+-{
+-	/* gpc clock is needed for SRPG */
+-	if (gpc_dvfs_clk == NULL) {
+-		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+-		if (IS_ERR(gpc_dvfs_clk))
+-			return;
+-		clk_prepare(gpc_dvfs_clk);
+-	}
+-	clk_enable(gpc_dvfs_clk);
+-	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+-	if (!tzic_enable_wake())
+-		cpu_do_idle();
+-	clk_disable(gpc_dvfs_clk);
+-}
+-
+ /*
+  * Define the MX50 memory map.
   */
- int tzic_enable_wake(void)
+@@ -104,7 +85,6 @@ void __init imx51_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
+ 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+-	arm_pm_idle = imx5_idle;
+ }
+ 
+ void __init imx53_init_early(void)
+@@ -239,4 +219,5 @@ void __init imx53_soc_init(void)
+ void __init imx51_init_late(void)
  {
+ 	mx51_neon_fixup();
++	imx51_pm_init();
+ }
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index e26a9cb..baf9321 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -13,18 +13,27 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <asm/cacheflush.h>
++#include <asm/system_misc.h>
+ #include <asm/tlbflush.h>
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include "crm-regs-imx5.h"
+ 
+-static struct clk *gpc_dvfs_clk;
++/*
++ * The WAIT_UNCLOCKED_POWER_OFF state only requires <= 500ns to exit.
++ * This is also the lowest power state possible without affecting
++ * non-cpu parts of the system.  For these reasons, imx5 should default
++ * to always using this state for cpu idling.  The PM_SUSPEND_STANDBY also
++ * uses this state and needs to take no action when registers remain confgiured
++ * for this state.
++ */
++#define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+ 
+ /*
+  * set cpu low power mode before WFI instruction. This function is called
+  * mx5 because it can be used for mx50, mx51, and mx53.
+  */
+-void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
++static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+ {
+ 	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
+ 	u32 empgc0, empgc1;
+@@ -87,11 +96,6 @@ void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+ 	}
+ }
+ 
+-static int mx5_suspend_prepare(void)
+-{
+-	return clk_prepare_enable(gpc_dvfs_clk);
+-}
+-
+ static int mx5_suspend_enter(suspend_state_t state)
+ {
+ 	switch (state) {
+@@ -99,7 +103,7 @@ static int mx5_suspend_enter(suspend_state_t state)
+ 		mx5_cpu_lp_set(STOP_POWER_OFF);
+ 		break;
+ 	case PM_SUSPEND_STANDBY:
+-		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++		/* DEFAULT_IDLE_STATE already configured */
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -114,12 +118,10 @@ static int mx5_suspend_enter(suspend_state_t state)
+ 		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
+ 	}
+ 	cpu_do_idle();
+-	return 0;
+-}
+ 
+-static void mx5_suspend_finish(void)
+-{
+-	clk_disable_unprepare(gpc_dvfs_clk);
++	/* return registers to default idle state */
++	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
++	return 0;
+ }
+ 
+ static int mx5_pm_valid(suspend_state_t state)
+@@ -129,25 +131,38 @@ static int mx5_pm_valid(suspend_state_t state)
+ 
+ static const struct platform_suspend_ops mx5_suspend_ops = {
+ 	.valid = mx5_pm_valid,
+-	.prepare = mx5_suspend_prepare,
+ 	.enter = mx5_suspend_enter,
+-	.finish = mx5_suspend_finish,
+ };
+ 
+-static int __init mx5_pm_init(void)
++static void imx5_pm_idle(void)
+ {
+-	if (!cpu_is_mx51() && !cpu_is_mx53())
+-		return 0;
++	if (likely(!tzic_enable_wake()))
++		cpu_do_idle();
++}
++
++static int __init imx5_pm_common_init(void)
++{
++	int ret;
++	struct clk *gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
++
++	if (IS_ERR(gpc_dvfs_clk))
++		return PTR_ERR(gpc_dvfs_clk);
+ 
+-	if (gpc_dvfs_clk == NULL)
+-		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
++	ret = clk_prepare_enable(gpc_dvfs_clk);
++	if (ret)
++		return ret;
+ 
+-	if (!IS_ERR(gpc_dvfs_clk)) {
+-		if (cpu_is_mx51())
+-			suspend_set_ops(&mx5_suspend_ops);
+-	} else
+-		return -EPERM;
++	arm_pm_idle = imx5_pm_idle;
++
++	/* Set the registers to the default cpu idle state. */
++	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+ 
+ 	return 0;
+ }
+-device_initcall(mx5_pm_init);
++
++void __init imx51_pm_init(void)
++{
++	int ret = imx5_pm_common_init();
++	if (!ret)
++		suspend_set_ops(&mx5_suspend_ops);
++}
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index cf663d8..f65d068 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -95,7 +95,6 @@ enum mx3_cpu_pwr_mode {
+ };
+ 
+ extern void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
+-extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+ extern void imx_print_silicon_rev(const char *cpu, int srev);
+ 
+ void avic_handle_irq(struct pt_regs *);
+@@ -146,8 +145,10 @@ extern void imx6q_clock_map_io(void);
+ 
+ #ifdef CONFIG_PM
+ extern void imx6q_pm_init(void);
++extern void imx51_pm_init(void);
+ #else
+ static inline void imx6q_pm_init(void) {}
++static inline void imx51_pm_init(void) {}
+ #endif
+ 
+ #ifdef CONFIG_NEON
 -- 
 1.7.10
