@@ -1,39 +1,36 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 05:36:29 +0200
-Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
-In-Reply-To: <877gw6kykb.fsf@laptop.org>
+Date: Mon, 21 May 2012 05:39:04 +0200
+Subject: [PATCH 1/4] GPMI-NAND: Define ecc.strength
+In-Reply-To: <20120521034543.GD5810@S2100-06.ap.freescale.net>
 References: <1337562140-5739-1-git-send-email-marex@denx.de>
- <CAAQ0ZWRxe0+xuJ0tWMX-kum0NPLpEQCkCdYD2zrOE_z6Mjpung@mail.gmail.com>
- <877gw6kykb.fsf@laptop.org>
-Message-ID: <201205210536.29959.marex@denx.de>
+ <201205210440.09310.marex@denx.de>
+ <20120521034543.GD5810@S2100-06.ap.freescale.net>
+Message-ID: <201205210539.04277.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Ball,
+Dear Shawn Guo,
 
-> Hi,
-> 
-> On Sun, May 20 2012, Shawn Guo wrote:
-> > On 21 May 2012 10:38, Marek Vasut <marex@denx.de> wrote:
-> >>> The subject prefix can better be "mmc: mxs-mmc: ".
-> >> 
-> >> Want me to resend it ?
+> On Mon, May 21, 2012 at 04:40:09AM +0200, Marek Vasut wrote:
+> > > So you are saying the issue is introduced by gpmi-nand DT conversion?
 > > 
-> > It's Chris' call.
+> > I doubt so ...
 > 
-> Yes, please -- actually not just because of the subject prefix, which I
-> wouldn't mind fixing myself, but because I like having patches posted to
-> linux-mmc@ before they're applied.
-
-Fixed now
-
+> I can be very sure that you haven't looked at the gpmi-nand DT
+> conversion patches at all.
 > 
-> Thanks!
-
-You're welcome :)
-
+> The bug has been there since day one.  The commit cfbc855b (mtd: nand:
+> add sanity check of ecc strength to nand_scan_tail()) added a BUG() to
+> catch it recently.
 > 
-> - Chris.
+> So please at least spend some time to know the real cause before
+> pointing your figure to DT conversion.
+
+Well ... since noone was really able to test the patch, noone figured out it's 
+broken. We can agree on that, right.
+
+And btw. by "I doubt so ..." I means exactly that I doubt the bug was caused by 
+the DT conversion.
 
 Best regards,
 Marek Vasut
