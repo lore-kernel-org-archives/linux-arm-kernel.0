@@ -1,51 +1,52 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 20 May 2012 21:08:55 -0400
+Date: Sun, 20 May 2012 21:12:09 -0400
 Subject: kirkwood, nand, clocks and device-tree
-In-Reply-To: <20120520132214.GD12741@lunn.ch>
+In-Reply-To: <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
 References: <87fwaxes25.fsf@lebrac.rtp-net.org>
  <20120520095110.GC12741@lunn.ch>
  <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
- <20120520132214.GD12741@lunn.ch>
-Message-ID: <20120521010855.GJ24238@titan.lakedaemon.net>
+Message-ID: <20120521011209.GK24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2012 at 03:22:14PM +0200, Andrew Lunn wrote:
-> > I should really submit this :) What should it be based on? A new
-> > revision of my previous patches, or should I assume that my work and
-> > Andrew's clk work have already been merged? (apologies if this is a
-> > dumb question)
+On Sun, May 20, 2012 at 02:05:54PM +0100, Jamie Lentin wrote:
+> board-dt.c should have an auxdata struct, to fix the name of
+> "f4000000.nand" to orion_nand:-
 > 
-> Yes, you can assume both are in. arm-soc has them, so the 3.5-rc1
-> should have them.
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 3cef3c7..6d45a07 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -24,6 +24,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+>  	{ }
+>  };
 > 
-> For the next cycle we need to improve working together on DT porting.
-> There is a lot of work going on here, in kirkwood, orion5x, dove, and
-> the two new Armada SoCs, all needing/porting drivers to DT.  I think
-> we need a tree where patches are quickly added once they are stable,
-> so that others can profit from the work.
+> +struct of_dev_auxdata kirkwood_dt_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("mrvl,orion-nand", KIRKWOOD_NAND_MEM_PHYS_BASE, "orion_nand", NULL),
+> +	{ }
+> +};
+> +
+>  static void __init kirkwood_dt_init(void)
+>  {
+>  	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+> @@ -61,7 +66,8 @@ static void __init kirkwood_dt_init(void)
+>  	if (of_machine_is_compatible("dlink,dns-kirkwood"))
+>  		dnskw_init();
+> 
+> -	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, kirkwood_dt_match_table,
+> +			kirkwood_dt_auxdata_lookup, NULL);
+>  }
+> 
+>  static const char *kirkwood_dt_board_compat[] = {
+> 
+> I should really submit this :) What should it be based on? A new
 
-I'm setting up a branch scheme that should handle this:
+Yes, please do.  It's a good thing I haven't run across a nand-based
+dreamplug yet. ;-)
 
-# main branch for pull-requests to Arnd/Olof
-
-for-arm-soc
-
-# branches that are ready to merge into for-arm-soc
-
-board/<boardname>
-
-	# branches which can be merged as depends
-
-	driver/<driver>
-	dt/<binding>
-
-# branches which can be changed/rebased/etc
-
-staging/*
-
-
-Does that cover everthing?  Or is there something I missed?
+As Andrew mentioned, until v3.5-rc1 comes out, please base on and
+up-to-date arm-soc.
 
 thx,
 
