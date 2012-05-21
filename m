@@ -1,57 +1,69 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 May 2012 12:26:36 +0300
-Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
-In-Reply-To: <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120521092635.GL8633@arwen.pp.htv.fi>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 21 May 2012 12:29:57 +0300
+Subject: [PATCHv2 12/19] ARM: OMAP4: PM: update ROM return address for
+ OSWR and OFF
+In-Reply-To: <87zk974s1o.fsf@ti.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-13-git-send-email-t-kristo@ti.com>
+ <87zk974s1o.fsf@ti.com>
+Message-ID: <1337592597.28274.12.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
-> This let usb phy driver has a chance to change hw settings when connect
-> status change.
+On Wed, 2012-05-16 at 16:36 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  include/linux/usb/otg.h |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
+> > From: Carlos Leija <cileija@ti.com>
+> >
+> > At wakeup from OFF/OSWR CPU1 will call secure HAL service through a local
+> > secure dispatcher with MMU off, 
 > 
-> diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-> index 38ab3f4..385641d 100644
-> --- a/include/linux/usb/otg.h
-> +++ b/include/linux/usb/otg.h
-> @@ -117,6 +117,10 @@ struct usb_phy {
->  	int	(*set_suspend)(struct usb_phy *x,
->  				int suspend);
->  
-> +	/* notify phy connect status change */
-> +	int	(*notify_connect_change)(struct usb_phy *x,
-> +					 int port,
-> +					 int connected);
->  };
->  
->  
-> @@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
->  }
->  
->  static inline int
-> +usb_phy_notify_connect_change(struct usb_phy *x, int port, int connected)
-> +{
-> +	if (x->notify_connect_change != NULL)
+> Reviewers who are uninitaited in this level of detail need some more
+> help here  (even those who are deeply familiar will need more help in a
+> few months when they forget the details.)
+> 
+> So, some more detail about where this is in the code would be helpful
+> here.
+> 
+> > thus ROM will save a PA return address.
+> > Later in the wakeup, when SMC driver calls an RPC through
+> > omap4_secure_dispatcher (MMU is on now), 
+> 
+> Again, pointer to where is this in the code would be helpful.
 
-you don't need this != NULL. See that no other wrapper has it. Keep
-consistency.
+I believe this refers to any of the SMC calls done in the ASM files.
+Most notably the one in omap-headsmp.S, which is added (rather)
+illogically after this patch in the set though.
 
-Also, this is the kind of stuff that I have been queueing for Greg so I
-should be in Cc.
+> 
+> Also, it's not obvious why RPC use used here. Is that referring to the
+> fact that the secure calls on CPU1 are dispatched to CPU0?  Whatever it
+> means, it should be summarized in the changelog.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/8b2dba91/attachment-0001.sig>
+Not sure about this, maybe security guys can comment on this.
+
+> 
+> > ROM code won't log the new return
+> > address as RPCs are handled different. Thus ROM will attempt to return to
+> > a PA address when the MMU is on and the system will hang.
+> >
+> > We need to do this for OSWR state and OFF state of mpu power domain,
+> > not just for device off(mpu pd OFF).
+> 
+> The code suggests that affects *all* OMAP4 revisions?  Is that correct?
+
+I think thats right.
+
+> 
+> And once again, can this be implmented using cluster PM notifiers, where
+> the notifier is registered only on affected revisions?
+
+Should be okay to do that. I guess this should move to omap-secure.c.
+
+> 
+> (Sheesh, the number of ROM code workaounds in this series is rather
+> disconcerting.)
+> 
+> Kevin
+> 
+> 
