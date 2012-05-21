@@ -1,47 +1,22 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 May 2012 11:16:15 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <4FBA030F.4050101@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <20120518191832.GC24238@titan.lakedaemon.net>
- <201205182044.26409.arnd@arndb.de>
- <4FBA030F.4050101@codethink.co.uk>
-Message-ID: <20120521091615.GD14362@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 May 2012 11:20:54 +0200
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+Message-ID: <CACRpkda9bmxW1BWeM=zLztghncKX0uYgAVgbV9KcB0gZwBzysA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 09:55:43AM +0100, Ben Dooks wrote:
-> On 18/05/12 21:44, Arnd Bergmann wrote:
-> >On Friday 18 May 2012, Jason Cooper wrote:
-> >>>
-> >>>In this case, we have wildly different names referring to the same chip
-> >>>family, and "orion" is far from hinting that it also constitute the
-> >>>support for Kirkwood, Dove or (some not all) Armadas, unless you are
-> >>>familiar with some legacy Marvell products.  This is why in this case I
-> >>>think that a directory name change might be appropriate, especially if
-> >>>we're going to cause churn by moving things around already.
-> >>>
-> >>>I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
-> >>>mvebu_*.  Unless someone has another logical identifier to suggest which
-> >>>would capture all that family of SOCs that came out of EBU in Marvell of
-> >>>course.
-> >>
-> >>I prefer mvebu_* ...  nice and concise.
-> >>
-> >
-> >On a related topic, any preferences on where we will put all the board
-> >files? I think it would be helpful to put them into a separate place from
-> >the main platform files, so e.g. have all *-setup.c files go to
-> >arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
-> 
-> What board files?
-> 
-> As I see it there are no current users and all additional kernel support
-> should simply use devicetree.
+On Mon, May 21, 2012 at 8:04 AM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
 
-There are currently 14 kirkwood boards, 21 orion5x, 2 dove and 5
-mv78xx0 boards. All would end up in the same directory as part of this
-rename/merge.
+> This was observed on OMAP4460 devices. Though the errata
+> document doesn't support it, the issue seen with l2 clean was
+> indeed fixed $subject fix.
 
-	Andrewy
+Is that an Acked-by for OMAP4? :-)
+
+Yours,
+Linus Walleij
