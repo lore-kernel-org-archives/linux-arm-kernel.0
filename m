@@ -1,44 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 21 May 2012 09:55:43 +0100
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <201205182044.26409.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <20120518191832.GC24238@titan.lakedaemon.net>
- <201205182044.26409.arnd@arndb.de>
-Message-ID: <4FBA030F.4050101@codethink.co.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 21 May 2012 11:58:31 +0300
+Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings
+ in OFF mode
+In-Reply-To: <87d363928g.fsf@ti.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
+Message-ID: <1337590711.2149.387.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/12 21:44, Arnd Bergmann wrote:
-> On Friday 18 May 2012, Jason Cooper wrote:
->>>
->>> In this case, we have wildly different names referring to the same chip
->>> family, and "orion" is far from hinting that it also constitute the
->>> support for Kirkwood, Dove or (some not all) Armadas, unless you are
->>> familiar with some legacy Marvell products.  This is why in this case I
->>> think that a directory name change might be appropriate, especially if
->>> we're going to cause churn by moving things around already.
->>>
->>> I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
->>> mvebu_*.  Unless someone has another logical identifier to suggest which
->>> would capture all that family of SOCs that came out of EBU in Marvell of
->>> course.
->>
->> I prefer mvebu_* ...  nice and concise.
->>
->
-> On a related topic, any preferences on where we will put all the board
-> files? I think it would be helpful to put them into a separate place from
-> the main platform files, so e.g. have all *-setup.c files go to
-> arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
+On Wed, 2012-05-16 at 15:42 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
+> 
+> > From: Rajendra Nayak <rnayak@ti.com>
+> >
+> > SAR/ROM code restores only CORE DPLL to its original state
+> > post wakeup from OFF mode.
+> > The rest of the DPLL's in OMAP4 platform (MPU/IVA/ABE/USB/PER)
+> > are saved and restored here during an OFF transition.
+> >
+> > [nm at ti.com: minor cleanups]
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> 
+> Some general comments:
+> 
+> - the register dump/print doesn't belong here.  If needed, should be a
+>   debug feature if needed.
 
-What board files?
+Okay, I'll just drop it out.
 
-As I see it there are no current users and all additional kernel support
-should simply use devicetree.
+> 
+> - Rather than hooking into omap4_enter_lowpower(), should use
+>   the cluster PM enter/exit notifier chain.
 
+Yes can do that.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+-Tero
