@@ -1,61 +1,189 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 21 May 2012 16:10:10 +0530
-Subject: [PATCHv2 17/19] ARM: OMAP4: put cpu1 back to sleep if no wake
- request
-In-Reply-To: <1337595695.28274.32.camel@sokoban>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-18-git-send-email-t-kristo@ti.com> <87396z3axv.fsf@ti.com>
- <1337595695.28274.32.camel@sokoban>
-Message-ID: <CAMQu2gy0Lwga0gDhT7+iOFM6ZLPnW4Q0qo_r4=cW6L4s5fbLZw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 May 2012 13:48:32 +0200
+Subject: =?UTF-8?q?=5BGIT=20PULL=5D=20pin=20control=20changes=20for=20v3=2E5?=
+Message-ID: <1337600912-6077-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero,
 
-On Mon, May 21, 2012 at 3:51 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> On Wed, 2012-05-16 at 17:31 -0700, Kevin Hilman wrote:
->> Tero Kristo <t-kristo@ti.com> writes:
->>
->> > If AUX_CORE_BOOT0 does not indicate wakeup request for cpu1, put it back
->> > to off.
->>
->> Why is it waking up then? ?(I know the answer, but will forget. ?The
->> changelog serves as my long-term memory.)
->
-> Will add comment. (Both cpus will wake-up after device-off reset.)
->
->>
->> > This is needed during wakeup from device off to prevent cpu1
->> > from being stuck indefinitely in the wakeup loop
->>
->> Why does it get stuck?
->
-> Related to the above, if the AUX_CORE_BOOT0 is not set, the code will
-> wait for it indefinitely in busy loop.
->
->>
->> > and also to prevent wakeup problem on GP chips with device off mode.
->>
->> What wakeup problem?
->
-> This is apparently related to the GIC restore issue addressed with patch
-> 3/8 of the core-ret set (workaround for the ROM bug because of CA9 r2pX
-> gic register change), the interrupts get disabled. Maybe Santosh has
-> some comments on this one.
->>
-Not sure what you mean wakeup issue on GP device.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-IIUC, the issue is:
-Wakeup from device OFF, hardware releases the reset for both CPUs,
-This is special case and applicable only for device OFF. The reason
-CPU1 needs to be hold back, because the security SW is affined with
-CPU0 which needs to be up and running for any of the ROM code APIs
-to work. Like setting up SMP bit, AUX control etc. Without CPU0 booted,
-CPU1 won't be able to execute those ROM functions and hence won't be
-able to boot properly.
+Hi Linus,
 
-I think the limitation is applicable to all OMAP4 devices as well as OMAP5
-devices.
+these are the accumulated pin control patches for the v3.5 merge window.
 
-Regards
-Santosh
+Highlights:
+- - Generic Device Tree bindings and hooks for drivers so we can
+  move modern drivers to using this.
+- - Device Tree bindings for Tegra SoCs.
+- - Funneling some devicetree helper code for the drivers/of
+ subsystem.
+- - New pin control drivers for:
+ - Freescale MXS
+ - Freescale i.MX51
+ - Freescale i.MX53
+ - All of these use Device Tree bindings.
+- - Dummy pinctrl handles for stepwise migration to pinctrl, akin
+ to dummy regulators.
+- - Minor non-urgent fixes and improvments.
+
+This is not all: additional pin control migrations will come in from
+the ARM SoC tree as SPEAr and ux500 migrate, and I think we have a
+MIPS driver coming from a platform tree as well.
+
+As you can see I have pushed a signed tag base on v3.4-rc3.
+Please pull it in, thanks.
+
+Linus Walleij
+
+
+The following changes since commit e816b57a337ea3b755de72bec38c10c864f23015:
+
+  Linux 3.4-rc3 (2012-04-15 18:28:29 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git pinctrl-for-v3.5
+
+Dong Aisheng (18):
+      pinctrl: fix compile error if not select PINMUX support
+      pinctrl: fix pinmux_check_ops error checking
+      pinctrl: add some error checking for user interfaces
+      pinctrl: a minor fix of pin config debug information
+      pinctrl: show pin name when request pins
+      pinctrl: show pin name for pingroups in sysfs
+      pinctrl: add pinctrl_provide_dummies interface for platforms to use
+      pinctrl: support gpio request deferred probing
+      dt: add of_get_child_count helper function
+      pinctrl: pinctrl-imx: add imx pinctrl core driver
+      pinctrl: pinctrl-imx: add imx6q pinctrl driver
+      pinctrl: a minor error checking improvement for pinconf
+      pinctrl: make pinmux disable function optional
+      pinctrl: pinctrl-imx: remove empty pinmux disable function
+      pinctrl: pinctrl-mxs: remove empty pinmux disable function
+      pinctrl: pinctrl-pxa3xx: remove empty pinmux disable function
+      pinctrl: pinctrl-imx: add imx53 pinctrl driver
+      pinctrl: pinctrl-imx: add imx51 pinctrl driver
+
+Guennadi Liakhovetski (1):
+      pinctrl: (cosmetic) fix two entries in DocBook comments
+
+John Crispin (2):
+      pinctrl: fix signed vs unsigned conditionals inside pinmux_map_to_setting
+      pinctrl: enhance reporting of errors when loading from DT
+
+Linus Walleij (3):
+      pinctrl: implement pinctrl deferred probing
+      pinctrl: mark non-EXPERIMENTAL
+      pinctrl: fix dangling comment
+
+Shawn Guo (3):
+      pinctrl: add pinctrl-mxs support
+      pinctrl: mxs: create group for pin config node
+      pinctrl: mxs: skip gpio nodes for group creation
+
+Stephen Warren (15):
+      pinctrl: include <linux/bug.h> to prevent compile errors
+      pinctrl: implement pinctrl_check_ops
+      pinctrl: core device tree mapping table parsing support
+      pinctrl: fix build when CONFIG_OF && !CONFIG_PINCTRL
+      dt: add property iteration helpers
+      dt: pinctrl: Document device tree binding
+      dt: Move Tegra20 pin mux binding into new pinctrl directory
+      dt: Document Tegra20/30 pinctrl binding
+      pinctrl: tegra: Add complete device tree support
+      pinctrl: ifdef CONFIG_DEBUG_FS cleanup
+      pinctrl: allow pctldevs to decode pin config in debugfs
+      pinctrl: implement devm_pinctrl_get()/put()
+      pinctrl: propagate map validation errors
+      pinctrl: add kerneldoc for pinctrl_ops device tree functions
+      pinctrl: add more info to error msgs in pin_request
+
+Uwe Kleine-K?nig (1):
+      pinctrl: mark const init data with __initconst instead of __initdata
+
+Viresh Kumar (3):
+      Documentation: pinctrl: add missing spi0_0 grp in example
+      pinctrl: replace list_*() with get_*_count()
+      pinctrl: pinconf: fix compilation error if PINCONF is not selected
+
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |   95 +
+ .../bindings/pinctrl/fsl,imx51-pinctrl.txt         |  787 +++++++
+ .../bindings/pinctrl/fsl,imx53-pinctrl.txt         | 1202 ++++++++++
+ .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         | 1628 ++++++++++++++
+ .../bindings/pinctrl/fsl,mxs-pinctrl.txt           |  918 ++++++++
+ .../bindings/pinctrl/nvidia,tegra20-pinmux.txt     |  132 ++
+ .../bindings/pinctrl/nvidia,tegra30-pinmux.txt     |  132 ++
+ .../bindings/pinctrl/pinctrl-bindings.txt          |  128 ++
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |    5 -
+ Documentation/driver-model/devres.txt              |    4 +
+ Documentation/pinctrl.txt                          |   94 +-
+ drivers/of/base.c                                  |   41 +
+ drivers/pinctrl/Kconfig                            |   45 +-
+ drivers/pinctrl/Makefile                           |   10 +
+ drivers/pinctrl/core.c                             |  263 ++-
+ drivers/pinctrl/core.h                             |   12 +-
+ drivers/pinctrl/devicetree.c                       |  249 +++
+ drivers/pinctrl/devicetree.h                       |   35 +
+ drivers/pinctrl/pinconf.c                          |   56 +-
+ drivers/pinctrl/pinconf.h                          |   17 +-
+ drivers/pinctrl/pinctrl-coh901.c                   |    4 +-
+ drivers/pinctrl/pinctrl-imx.c                      |  620 ++++++
+ drivers/pinctrl/pinctrl-imx.h                      |  106 +
+ drivers/pinctrl/pinctrl-imx23.c                    |  305 +++
+ drivers/pinctrl/pinctrl-imx28.c                    |  421 ++++
+ drivers/pinctrl/pinctrl-imx51.c                    | 1322 +++++++++++
+ drivers/pinctrl/pinctrl-imx53.c                    | 1649 ++++++++++++++
+ drivers/pinctrl/pinctrl-imx6q.c                    | 2331 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-mxs.c                      |  528 +++++
+ drivers/pinctrl/pinctrl-mxs.h                      |   91 +
+ drivers/pinctrl/pinctrl-pxa3xx.c                   |   30 +-
+ drivers/pinctrl/pinctrl-sirf.c                     |   20 +-
+ drivers/pinctrl/pinctrl-tegra.c                    |  245 ++-
+ drivers/pinctrl/pinctrl-u300.c                     |   20 +-
+ drivers/pinctrl/pinmux.c                           |   97 +-
+ drivers/pinctrl/pinmux.h                           |   18 +-
+ include/linux/of.h                                 |   51 +
+ include/linux/pinctrl/consumer.h                   |   44 +
+ include/linux/pinctrl/machine.h                    |   11 +-
+ include/linux/pinctrl/pinconf.h                    |    6 +-
+ include/linux/pinctrl/pinctrl.h                    |   22 +-
+ include/linux/pinctrl/pinmux.h                     |    9 +-
+ 42 files changed, 13555 insertions(+), 248 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx51-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx53-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,mxs-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra30-pinmux.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+ delete mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+ create mode 100644 drivers/pinctrl/devicetree.c
+ create mode 100644 drivers/pinctrl/devicetree.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx23.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx28.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx51.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx53.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx6q.c
+ create mode 100644 drivers/pinctrl/pinctrl-mxs.c
+ create mode 100644 drivers/pinctrl/pinctrl-mxs.h
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJPuiiUAAoJEEEQszewGV1zGVAP/iKIJX3LcPW1GRIBUZ6eE/EF
+OeqeQmf0WXFtGg4Saun4HzmUy/X35VHbKKzELW2WncUsF24Wc7DSf9F9zU6Jfr40
+YI/FcK0oFlaKjhqZW6TpO9A1I/TbRYjmgETwxHt+/xO8YLfdP2Y5erUHJ2yDHfK4
+LZmOYtPSqQcfvAEg82o/9QpGhZquVzMjt7SZkiJUis/7JGY30lmiVMh36gtD74pB
+eLCQeJwVWPga5ban96v/KGibf+ZkbVViufGMUIt6ZVjvej2hNWnAF5jgp/h4Oi/f
+U6YbgBZk8CKJVKLuRzu+/qhBY5yZoZ8j5y24m9/pK1O0/FPFgSNz/XqfflfUd/py
+UJ7eHgnHZjigktG99TQuOATa22joULFMbYBrQjGjDvnIA9X7H69g1Gc2VW8iAts0
+gF+64zuoKwURumueo1r6TKxA4PI/IZzeYV9AaKVdtbN4DQAudS4XVFizRKdqagjX
+/AfKJs4iHMlmGm2xgPGZrwdrpdqvzpqPlMUyEp2O0LJPye41iVRMD6eWsIUhGxI0
+dnPK+gw8ylnV2/SlRUpX8NUKhPgeam9VeQhJxh2Tkou69hUiqa70XKK1CXwee24l
+DP9ZxQXrKHTEnOHNjFAjrg0Bf1/j/UrMSoA8TiHeEG+DWnYY1ywiy+M2UwZRmfZT
+ycvsMxvi8QyAy4FlbACL
+=uuUU
+-----END PGP SIGNATURE-----
