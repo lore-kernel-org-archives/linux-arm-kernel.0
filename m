@@ -1,33 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 21 May 2012 17:39:39 +0800
-Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
-In-Reply-To: <4FBA0A9A.8040901@linaro.org>
-References: <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
- <20120514035137.GB20367@S2100-06.ap.freescale.net>
- <20120514080835.GB31985@opensource.wolfsonmicro.com>
- <4FB0C9D4.2060409@linaro.org>
- <20120514094357.GF20367@S2100-06.ap.freescale.net>
- <4FB10821.4000004@linaro.org>
- <20120514135035.GC29393@b20223-02.ap.freescale.net>
- <20120518095932.GI30755@b20223-02.ap.freescale.net>
- <20120521041355.GF5810@S2100-06.ap.freescale.net>
- <4FBA0A9A.8040901@linaro.org>
-Message-ID: <20120521093937.GM30755@b20223-02.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 21 May 2012 15:09:38 +0530
+Subject: [PATCHv2 14/19] ARM: OMAP4: wakeupgen: enable clocks for
+ save_secure_all
+In-Reply-To: <1337592906.28274.16.camel@sokoban>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-15-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1205161809230.2921@utopia.booyaka.com>
+ <1337592906.28274.16.camel@sokoban>
+Message-ID: <CAMQu2gx7NL0Hv9GVtX=WDJY8sB8NoX4oN390NurQ0gvRa=WPYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:27:54PM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> (2012?05?21? 12:13), Shawn Guo wrote:
-> > On Fri, May 18, 2012 at 05:59:32PM +0800, Richard Zhao wrote:
-> >> Guys, we need to draw conclusion.
-> >> I think current patch keep some how compatible with multi-anatop.
-> >> It's ok.
-> >>
-> > I'm fine with that.
-> > 
-> Yes. It is good for me.
-> 
-So, Sameo, could you pick the patch.
+On Mon, May 21, 2012 at 3:05 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> On Wed, 2012-05-16 at 18:17 -0600, Paul Walmsley wrote:
+>> Hi Tero
+>>
+>> On Mon, 14 May 2012, Tero Kristo wrote:
+>>
+>> > save_secure_all needs l3_main_3_ick and l4_secure_clkdm enabled,
+>> > otherwise the secure ROM code will crash.
+>>
+>> Do we know why the l3_main_3 interconnect has to be enabled? ?Is this
+>> needed to access some L3 or instrumentation registers?
+>
+> Not sure, ROM code is doing something here which requires it, and the
+> ROM code definitely crashes without this. Your guess sounds plausible.
+>
+ROM code accesses L3 firewall registers mostly apart from L2 INSTR firewall
+registers here and without that clock, those accesses will abort.
 
-Thanks
-Richard
+Regards
+santosh
