@@ -1,36 +1,56 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 05:39:04 +0200
+Date: Mon, 21 May 2012 05:43:45 +0200
 Subject: [PATCH 1/4] GPMI-NAND: Define ecc.strength
-In-Reply-To: <20120521034543.GD5810@S2100-06.ap.freescale.net>
+In-Reply-To: <4FB9AC27.2050207@freescale.com>
 References: <1337562140-5739-1-git-send-email-marex@denx.de>
- <201205210440.09310.marex@denx.de>
- <20120521034543.GD5810@S2100-06.ap.freescale.net>
-Message-ID: <201205210539.04277.marex@denx.de>
+ <20120521014121.GO5427@S2101-09.ap.freescale.net>
+ <4FB9AC27.2050207@freescale.com>
+Message-ID: <201205210543.45682.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Dear Huang Shijie,
 
-> On Mon, May 21, 2012 at 04:40:09AM +0200, Marek Vasut wrote:
-> > > So you are saying the issue is introduced by gpmi-nand DT conversion?
+> Hi Marek:
+> > On Mon, May 21, 2012 at 03:36:41AM +0200, Marek Vasut wrote:
+> >> Dear Shawn Guo,
+> >> 
+> >>> So non-DT probe has the same issue?  Or this is a DT probe only issue?
+> >> 
+> >> I started using DT, so I'm now fixing everything to work like it used
+> >> to. Damn this DT conversion broke about everything.
 > > 
-> > I doubt so ...
+> > So you are saying the issue is introduced by gpmi-nand DT conversion?
 > 
-> I can be very sure that you haven't looked at the gpmi-nand DT
-> conversion patches at all.
-> 
-> The bug has been there since day one.  The commit cfbc855b (mtd: nand:
-> add sanity check of ecc strength to nand_scan_tail()) added a BUG() to
-> catch it recently.
-> 
-> So please at least spend some time to know the real cause before
-> pointing your figure to DT conversion.
+> thanks for your work. :)
+> But the gpmi nand driver should not work right now.
 
-Well ... since noone was really able to test the patch, noone figured out it's 
-broken. We can agree on that, right.
+Why not? I tested, I could at least read stuff from it.
 
-And btw. by "I doubt so ..." I means exactly that I doubt the bug was caused by 
-the DT conversion.
+> The DT for gpmi-nand is in Artem's l2-mtd tree.
+> And the device node item in DTS for gpmi is not added now.( I ever
+> submitted, but not accepted.)
+
+Well I crafted one myself, I need different pinmux settings anyway so I added my 
+own pinmux configuration.
+
+> Also the pinctrl item for gpmi is also not added not.
+> 
+> So I suggest you test it again when the next merge window opens, and all
+> the code is merged to kernel.
+
+Please ... Shawn explained that this bug will still be there. So why not get it 
+in early to fix bug asap. I'll resend to artem now.
+
+> If the bug still exits, please submit a fix patch then.
+> 
+> By the way, I really did not meet your error when I test the DT patches
+> for gpmi.
+
+Can you post your snippet?
+
+> thanks
+> Huang Shijie
 
 Best regards,
 Marek Vasut
