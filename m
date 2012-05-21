@@ -1,579 +1,195 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 21 May 2012 16:05:45 +0200
-Subject: [PATCHv2 03/19] ARM: OMAP4: PM: Add device-off support
-In-Reply-To: <1337590125.2149.386.camel@sokoban>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-4-git-send-email-t-kristo@ti.com>
- <87obpn92jy.fsf@ti.com> <1337590125.2149.386.camel@sokoban>
-Message-ID: <CAORVsuWrDW-JAHWDNGMGshYxUUqZNURotreO7qW96=6+oKjyAQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 21 May 2012 19:55:26 +0530
+Subject: [PATCH 2/6] ARM: OMAP2+: PM: introduce power domains functional
+ states
+In-Reply-To: <CAORVsuWgn5Zuf9T1eVBjJJhTGL5jrY=hirTaZp8E2HprzbvHng@mail.gmail.com>
+References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
+ <1334752782-28804-3-git-send-email-j-pihet@ti.com>
+ <alpine.DEB.2.00.1205070043230.9984@utopia.booyaka.com>
+ <CAORVsuXUbz_f54x=hoFLEQpfAGTDcZGnTQ-fBgY_j415LC0TiQ@mail.gmail.com>
+ <4FB4CD45.4050807@ti.com>
+ <CAORVsuWgn5Zuf9T1eVBjJJhTGL5jrY=hirTaZp8E2HprzbvHng@mail.gmail.com>
+Message-ID: <CAMQu2gwBYUmBLV+wByVxto_ETu6-YjHycGWnhVn-Tb9pJUngDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero, Kevin, Santosh,
+Jean,
 
-On Mon, May 21, 2012 at 10:48 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> On Wed, 2012-05-16 at 15:36 -0700, Kevin Hilman wrote:
->> +Jean for functional power states
->>
->> Tero Kristo <t-kristo@ti.com> writes:
->>
->> > This patch adds device off support to OMAP4 device type.
->>
->> Description is rather thin for a patch that is doing so much.
->>
->> > OFF mode is disabled by default,
->>
->> why?
+On Mon, May 21, 2012 at 7:23 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Hi Santosh,
 >
-> Good question. For historical reference I guess. The device off works
-> pretty nicely with the current kernel already, so it should be possible
-> to enable it by default and blame the people who break it.
-Agree. The next problem is 'who will fix the breakage?'.
+> On Thu, May 17, 2012 at 12:04 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Jean,
+>> On Tuesday 08 May 2012 02:10 PM, Jean Pihet wrote:
+>>> Paul,
+>>>
+>>> On Mon, May 7, 2012 at 11:28 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>>>> Hi
+>>>>
+>>>> On Wed, 18 Apr 2012, jean.pihet at newoldbits.com wrote:
+>>>>
+>>>>> From: Jean Pihet <j-pihet@ti.com>
+>>>>>
+>>>>> Introduce functional (or logical) states for power domains and the
+>>>>> API functions to read the power domains settings and to convert
+>>>>> between the functional (i.e. logical) and the internal (or registers)
+>>>>> values.
+>>>>>
+>>>>> OMAP2, OMAP3 and OMAP4 platforms are defining a conversion routine.
+>>>>>
+>>>>> In the new API the function omap_set_pwrdm_state takes the functional
+>>>>> states as parameter; while at it the function is moved to the power
+>>>>> domains code.
+>>>>>
+>>>>> The memory and logic states are not using the functional states, this
+>>>>> comes as a subsequent patch.
+>>>>>
+>>>>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>>>>
+>>>> This patch results in several checkpatch warnings; please resolve them.
+>>> Oops. Will check and update.
+>>>
+>>>>
+>>>>> ---
+>>>>> ?arch/arm/mach-omap2/pm.c ? ? ? ? ? ? ? ? ? | ? 66 -----------
+>>>>> ?arch/arm/mach-omap2/powerdomain-common.c ? | ? 61 ++++++++++
+>>>>> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ?| ?175 ++++++++++++++++++++++++++++
+>>>>> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ?| ? 21 ++++
+>>>>> ?arch/arm/mach-omap2/powerdomain2xxx_3xxx.c | ? ?5 +
+>>>>> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ?| ? ?2 +
+>>>>> ?6 files changed, 264 insertions(+), 66 deletions(-)
+>>>>>
+>>> ...
+>>>
+>>>>> +/*
+>>>>> + * Functional (i.e. logical) to internal (i.e. registers)
+>>>>> + * values for the power domains states
+>>>>> + */
+>>>>
+>>>> Please use kerneldoc-style function comments.
+>>> Ok
+>>>
+>>>>
+>>>>> +int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
+>>>>> +{
+>>>>> + ? ? int ret;
+>>>>> +
+>>>>> + ? ? switch (func_pwrst) {
+>>>>> + ? ? case PWRDM_FUNC_PWRST_ON:
+>>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_ON;
+>>>>> + ? ? ? ? ? ? break;
+>>>>> + ? ? case PWRDM_FUNC_PWRST_INACTIVE:
+>>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_INACTIVE;
+>>>>> + ? ? ? ? ? ? break;
+>>>>> + ? ? case PWRDM_FUNC_PWRST_CSWR:
+>>>>> + ? ? case PWRDM_FUNC_PWRST_OSWR:
+>>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
+>>>>> + ? ? ? ? ? ? break;
+>>>>> + ? ? case PWRDM_FUNC_PWRST_OFF:
+>>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_OFF;
+>>>>> + ? ? ? ? ? ? break;
+>>>>> + ? ? default:
+>>>>> + ? ? ? ? ? ? ret = -1;
+>>>>> + ? ? }
+>>>>> +
+>>>>> + ? ? return ret;
+>>>>> +}
+>>>>
+>>>> At a quick glance, I don't think that this function is appropriate for all
+>>>> OMAP2+ chips. ?For example, off-mode is not supported in our OMAP2xxx
+>>>> kernels. ?And OMAP2xxx/3xxx do not support the INACTIVE powerstate. ?So
+>>>> probably this function should differ by chip, and be located in the
+>>>> powerdomain[2-4]*xx*.c files.
+>>> I hope to make this function as generic as possible, hence the
+>>> location (powerdomain-common.c). Some states are not programmed by the
+>>> pwrdm_* functions since there forbidden by the contents of the
+>>> pwrdm->pwrst field.
+>>> Now if the need arises some platform specific function can be defined
+>>> for conversion functions since the pwrdm->ops function pointers are
+>>> used. I do not think it is needed now but it can easily be changed.
+>>>
+>>>> Also, what about the logic and memory bank power states? ?Shouldn't this
+>>>> function pass those back as well?
+>>> Cf. in the description "The memory and logic states are not using the
+>>> functional states, this comes as a subsequent patch."
+>>>
+>> I don't see much difference between the functional power states to
+>> actual power states with some cases here and there.
+>>
+>> + ? ? case PWRDM_FUNC_PWRST_CSWR:
+>> + ? ? case PWRDM_FUNC_PWRST_OSWR:
+>> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
+> The whole patch series takes the logic state into account in the
+> functional power state.
+> Cf. in the description "The memory and logic states are not using the
+> functional states, this comes as a subsequent patch."
+>
+Yeah. i understood that from comments.
 
->> > however, there are two ways to enable OFF mode:
->> > a) In the board file, call omap4_pm_off_mode_enable(1)
->> > b) Enable OFF mode using the debugfs entry
->> > echo "1">/sys/kernel/debug/pm_debug/enable_off_mode
->> > (conversely echo '0' will disable it as well).
->>
->> This part needs to be a separate patch.
->>
->> But, as stated in the core retention series, I'd like to move away from
->> these global flags all together.
->>
->> The way we manage the disabling of certain states (like off) is already
->> clumsy for OMAP3, and it's getting worse with OMAP4. ?Basically, I think
->> this feature needs to be supported by using constraints on functional
->> power states. ? Having checks all over the place is getting unwieldy and
->> not attractive to maintain.
->>
->> The combination of constraints and functional power states should make
->> this much more manageable. ? Until we have that, I'd prefer to keep
->> the debugfs enable/disable stuff as separate patches at the end of the
->> series used only for testing.
+>> This is not true and even if you add logic/memmort etc support,
+>> I still think, we are just duplicating stuff between functional
+>> vs actual power state.
+> The idea is to provide a single function to program the power domains
+> state, including the logic state.
+> There is no duplication of code, just a simplification in the API. IMO
+> there are too much calls to set and get the power domain states (power
+> state, logical etc.) and most of the calls do not take the logical
+> state into account.
+> If you look the the code in pmxxxx.c and cpuidlexxxx.c you will notice
+> that the code is simplified.
 >
-> Okay, this sounds like a good plan.
->
->>
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > [t-kristo at ti.com: largely re-structured the code]
->>
->> then the sign-off above from Santosh probably doesn't apply anymore.
->> You should change that to a Cc and just mention tht this is based upon
->> some original work from Santosh.
->
-> Yeah... I am not quite sure where the line goes here as I am modifying
-> the patches quite heavily but try to keep credits to the original
-> authors... will change this like so.
->
->>
->> First, ?some general comments:
->>
->> There is a lot going on in this patch, so it is hard to follow what all
->> is related, and why. ?Just a quick glance suggests it needs to be broken
->> up into at least a few parts:
->
-> What is the merge plan for the func power state stuff? I don't want to
-> create new dependencies if unnecessary. Otherwise the split should be
-> okay.
-That is something I am interested in too ;p
-I did port and test Tero's patches on top of the functional power
-states, which is the logical approach to me. Now given the reviews
-status on both this patch series and the func power states series I am
-not sure which one needs to be ported on top of the other ;-|
-[1] https://gitorious.org/jpihet/linux-omap/commits/omap4_dev_off
+I noticed that but thought that simplification is not substantial.
 
-Using the functional power states for the OMAP4 core and device off
-has some advantages in simplifying the code, especially in the
-previous/current/next states checking and programming.
+>> If the idea is to have one single interface to program the power
+>> domain states, so that Generic frameworks, or PM code movement to
+>> driver/* directories is easier, we may want think about alternative
+>> which is scalable.
+>>
+>> Just a wild thought...
+>>
+>> May be we can abstract all the necessary/used power domain programming
+>> entities inside a structure and export that. That should contain, power
+>> state, logic state, mem state, special quirk flags like SAR etc.
+>> being structure is always expandable and an API taking structure as
+>> a parameter need not change.
+> That is the goal. This patch series uses the date from the platform
+> specific power domain structs and abstracts those in the API.
+>
+Good to know that we are on same page.
 
+> So in summary I would say that the power domain code callers do
+> benefit from the API simplification and the abstraction of thr power
+> domains parameters:
+I agree. I am just worried about this 1 API because we have many used
+programmable nobs. For example the API assumes all the power domain
+same and while programming the powerdomain deeper state, does
+clockdomain wakeup and sleep transition sequence. Such a process
+is not needed for domain like CPU/MPU PD's because they are
+powerdown them self.
+
+> - cpuidle: the logic state field is removed from the structs; the
+> power domain state checks are simplified,
+> - per-device PM QoS: the latency parameters are specified for every
+> functional power state,
+> - pmxxxx.c: the suspend/resume code is simplified; the power domain
+> state checks are simplified.
 >
->>
->> - low-level PRM support: new APIs for various off-mode features)
->> ? (should probably be done on top of functional power states)
->> - powerdomain core support or "achievable" states
->> ? (should probably be done on top of functional power states)
->> - IRQ/GIC context save/restore
->> - secure RAM save/restore (this has been tightly coupled to the GIC
->> ? but it's not obvious why)
->
-> This is tightly coupled to GIC because the ROM code has following API
-> calls:
->
-> - save gic
-> - save secure RAM
-> - save secure all (gic + RAM + some other mysterious stuff)
->
-> It is difficult/impossible to separate these without adding redundant
-> code execution (e.g. doing a GIC save from the GIC code + then doing a
-> second GIC save with save secure all from core PM code.)
->
->> - PM debug support to enable/disable off-mode
->> ? (for testing only, not for merge)
->>
->> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> > ---
->> > ?arch/arm/mach-omap2/omap-mpuss-lowpower.c | ? 10 ++++-
->> > ?arch/arm/mach-omap2/omap-wakeupgen.c ? ? ?| ? 47 +++++++++++++++++++-
->> > ?arch/arm/mach-omap2/pm-debug.c ? ? ? ? ? ?| ? 17 +++++--
->> > ?arch/arm/mach-omap2/pm.h ? ? ? ? ? ? ? ? ?| ? 20 +++++++++
->> > ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ?| ? 45 +++++++++++++++++++
->> > ?arch/arm/mach-omap2/prm44xx.c ? ? ? ? ? ? | ? 66 +++++++++++++++++++++++++++++
->> > ?6 files changed, 197 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> > index e02c082..7418e7c 100644
->> > --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> > +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> > @@ -60,6 +60,7 @@
->> > ?#include "prcm44xx.h"
->> > ?#include "prm44xx.h"
->> > ?#include "prm-regbits-44xx.h"
->> > +#include "cm44xx.h"
->> >
->> > ?#ifdef CONFIG_SMP
->> >
->> > @@ -263,9 +264,13 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->> > ? ? ?* In MPUSS OSWR or device OFF, interrupt controller ?contest is lost.
->> > ? ? ?*/
->> > ? ? mpuss_clear_prev_logic_pwrst();
->> > - ? if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
->> > + ? if (omap4_device_next_state_off())
->> > + ? ? ? ? ? save_state = 3;
->>
->> Why?
->>
->> I don't see why this check is needed in addition to the mpuss_pd check
->> added just below?
->
-> mpuss_pd does not go to off, thats why. It goes to OSWR state during
-> standard device-off. It is possible for it to go to OFF mode, but it is
-> not recommended.
->
->>
->> > + ? else if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
->> > ? ? ? ? ? ? (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
->> > ? ? ? ? ? ? save_state = 2;
->> > + ? else if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF)
->> > + ? ? ? ? ? save_state = 3;
->> > ? ? cpu_clear_prev_logic_pwrst(cpu);
->> > ? ? set_cpu_next_pwrst(cpu, power_state);
->> > @@ -288,6 +293,9 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->> > ? ? wakeup_cpu = smp_processor_id();
->> > ? ? set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
->> >
->> > + ? if (omap4_device_prev_state_off())
->> > + ? ? ? ? ? omap4_device_clear_prev_off_state();
->> > +
->>
->> The 'clear prev off state' is subsequently removed in the last patch
->> "ARM: OMAP4: powerdomain: update mpu / core off counters during device
->> off." ? Why is it needed here?
->
-> That patch is moving the clear part to the lost_context_rff func, it is
-> probably not that clear. Should be easier to follow the logic once I
-> re-structure the code a bit more (separate the prm support funcs out to
-> their own set etc.)
->
->>
->> > ? ? pwrdm_post_transition();
->> >
->> > ? ? return 0;
->> > diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
->> > index 42cd7fb..805d08d 100644
->> > --- a/arch/arm/mach-omap2/omap-wakeupgen.c
->> > +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
->> > @@ -32,6 +32,7 @@
->> >
->> > ?#include "omap4-sar-layout.h"
->> > ?#include "common.h"
->> > +#include "pm.h"
->> >
->> > ?#define NR_REG_BANKS ? ? ? ? ? ? ? 4
->> > ?#define MAX_IRQS ? ? ? ? ? 128
->> > @@ -46,6 +47,8 @@ static void __iomem *sar_base;
->> > ?static DEFINE_SPINLOCK(wakeupgen_lock);
->> > ?static unsigned int irq_target_cpu[NR_IRQS];
->> >
->> > +static struct powerdomain *mpuss_pd;
->> > +
->> > ?/*
->> > ? * Static helper functions.
->> > ? */
->> > @@ -259,7 +262,7 @@ static void irq_save_context(void)
->> > ?/*
->> > ? * Clear WakeupGen SAR backup status.
->> > ? */
->> > -void irq_sar_clear(void)
->> > +static void irq_sar_clear(void)
->> > ?{
->> > ? ? u32 val;
->> > ? ? val = __raw_readl(sar_base + SAR_BACKUP_STATUS_OFFSET);
->> > @@ -271,7 +274,7 @@ void irq_sar_clear(void)
->> > ? * Save GIC and Wakeupgen interrupt context using secure API
->> > ? * for HS/EMU devices.
->> > ? */
->> > -static void irq_save_secure_context(void)
->> > +static void irq_save_secure_gic(void)
->> > ?{
->> > ? ? u32 ret;
->> > ? ? ret = omap_secure_dispatcher(OMAP4_HAL_SAVEGIC_INDEX,
->> > @@ -282,6 +285,40 @@ static void irq_save_secure_context(void)
->> > ?}
->> > ?#endif
->> >
->> > +static void save_secure_ram(void)
->> > +{
->> > + ? u32 ret;
->>
->> CodingStyle nit: blank line needed here (and in multiple other places)
->
-> Okay.
->
->>
->> > + ? ret = omap_secure_dispatcher(OMAP4_HAL_SAVESECURERAM_INDEX,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? FLAG_START_CRITICAL,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 1, omap_secure_ram_mempool_base(),
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 0, 0, 0);
->> > + ? if (ret != API_HAL_RET_VALUE_OK)
->> > + ? ? ? ? ? pr_err("Secure ram context save failed\n");
->> > +}
->> > +
->> > +static void save_secure_all(void)
->> > +{
->> > + ? u32 ret;
->> > + ? ret = omap_secure_dispatcher(OMAP4_HAL_SAVEALL_INDEX,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? FLAG_START_CRITICAL,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 1, omap_secure_ram_mempool_base(),
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 0, 0, 0);
->> > + ? if (ret != API_HAL_RET_VALUE_OK)
->> > + ? ? ? ? ? pr_err("Secure all context save failed\n");
->> > +}
->>
->> This secure mode save/restore seems misplaced in the wakeupgen driver.
->> Seems to me like it belongs in omap-secure.c.
->
-> Can't really move it there, as described above. Unless we want to save
-> GIC context twice.
->
->>
->> > +
->> > +static void irq_save_secure_context(void)
->> > +{
->> > + ? if (omap4_device_next_state_off()) {
->> > + ? ? ? ? ? save_secure_all();
->> > + ? } else if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
->>
->> Why is this check needed? ?This is called from the CPU_CLUSTER_PM_ENTER
->> notifier, which AFAICT, is only called when the cluster is going off.
->
-> This is checking against the different MPU PD states we can go into. If:
-> - MPU OSWR => GIC save needed only
-> - MPU OFF => GIC + secure RAM save needed (not recommended to be used
-> though)
-> - MPU OSWR / OFF + device-off => save all needed
->
->>
->> > + ? ? ? ? ? irq_save_secure_gic();
->> > + ? ? ? ? ? save_secure_ram();
->> > + ? } else {
->> > + ? ? ? ? ? irq_save_secure_gic();
->> > + ? }
->> > +}
->> > +
->> > ?#ifdef CONFIG_HOTPLUG_CPU
->> > ?static int __cpuinit irq_cpu_hotplug_notify(struct notifier_block *self,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long action, void *hcpu)
->> > @@ -388,5 +425,11 @@ int __init omap_wakeupgen_init(void)
->> > ? ? irq_hotplug_init();
->> > ? ? irq_pm_init();
->> >
->> > + ? mpuss_pd = pwrdm_lookup("mpu_pwrdm");
->> > + ? if (!mpuss_pd) {
->> > + ? ? ? ? ? pr_err("wakeupgen: unable to get mpu_pwrdm\n");
->> > + ? ? ? ? ? return -EINVAL;
->> > + ? }
->> > +
->> > ? ? return 0;
->> > ?}
->> > diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
->> > index d9a8e42..d8cf5e5 100644
->> > --- a/arch/arm/mach-omap2/pm-debug.c
->> > +++ b/arch/arm/mach-omap2/pm-debug.c
->> > @@ -40,6 +40,7 @@
->> >
->> > ?u32 enable_off_mode;
->> > ?static u32 enable_oswr_mode;
->> > +static void (*off_mode_enable_func) (int);
->> >
->> > ?#ifdef CONFIG_DEBUG_FS
->> > ?#include <linux/debugfs.h>
->> > @@ -249,7 +250,8 @@ static int option_set(void *data, u64 val)
->> > ? ? ? ? ? ? else
->> > ? ? ? ? ? ? ? ? ? ? omap_pm_disable_off_mode();
->> >
->> > - ? ? ? ? ? omap3_pm_off_mode_enable(val);
->> > + ? ? ? ? ? if (off_mode_enable_func)
->> > + ? ? ? ? ? ? ? ? ? off_mode_enable_func(val);
->> > ? ? }
->> >
->> > ? ? if (option == &enable_oswr_mode)
->> > @@ -278,16 +280,21 @@ static int __init pm_dbg_init(void)
->> >
->> > ? ? pwrdm_for_each(pwrdms_setup, (void *)d);
->> >
->> > - ? if (cpu_is_omap34xx())
->> > - ? ? ? ? ? (void) debugfs_create_file("enable_off_mode",
->> > - ? ? ? ? ? ? ? ? ? S_IRUGO | S_IWUSR, d, &enable_off_mode,
->> > - ? ? ? ? ? ? ? ? ? &pm_dbg_option_fops);
->> > + ? (void) debugfs_create_file("enable_off_mode",
->> > + ? ? ? ? ? S_IRUGO | S_IWUSR, d, &enable_off_mode,
->> > + ? ? ? ? ? &pm_dbg_option_fops);
->> >
->> > ? ? if (cpu_is_omap44xx())
->> > ? ? ? ? ? ? (void) debugfs_create_file("enable_oswr_mode",
->> > ? ? ? ? ? ? ? ? ? ? S_IRUGO | S_IWUSR, d, &enable_oswr_mode,
->> > ? ? ? ? ? ? ? ? ? ? &pm_dbg_option_fops);
->> >
->> > + ? if (cpu_is_omap34xx())
->> > + ? ? ? ? ? off_mode_enable_func = omap3_pm_off_mode_enable;
->> > +
->> > + ? if (cpu_is_omap44xx())
->> > + ? ? ? ? ? off_mode_enable_func = omap4_pm_off_mode_enable;
->> > +
->> > ? ? pm_dbg_init_done = 1;
->> >
->> > ? ? return 0;
->> > diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
->> > index c36ab63..d95f8c5 100644
->> > --- a/arch/arm/mach-omap2/pm.h
->> > +++ b/arch/arm/mach-omap2/pm.h
->> > @@ -18,6 +18,7 @@
->> > ?extern void *omap3_secure_ram_storage;
->> > ?extern void omap3_pm_off_mode_enable(int);
->> > ?extern void omap4_pm_oswr_mode_enable(int);
->> > +extern void omap4_pm_off_mode_enable(int);
->> > ?extern void omap_sram_idle(void);
->> > ?extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
->> > ?extern int omap3_idle_init(void);
->> > @@ -25,6 +26,25 @@ extern int omap4_idle_init(void);
->> > ?extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
->> > ?extern int (*omap_pm_suspend)(void);
->> >
->> > +#ifdef CONFIG_PM
->> > +extern void omap4_device_set_state_off(u8 enable);
->> > +extern bool omap4_device_prev_state_off(void);
->> > +extern bool omap4_device_next_state_off(void);
->> > +extern void omap4_device_clear_prev_off_state(void);
->> > +#else
->> > +static inline void omap4_device_set_state_off(u8 enable)
->> > +{
->> > +}
->> > +static inline bool omap4_device_prev_state_off(void)
->> > +{
->> > + ? return false;
->> > +}
->> > +static inline bool omap4_device_next_state_off(void)
->> > +{
->> > + ? return false;
->> > +}
->> > +#endif
->> > +
->> > ?#if defined(CONFIG_PM_OPP)
->> > ?extern int omap3_opp_init(void);
->> > ?extern int omap4_opp_init(void);
->> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->> > index 07ac0d3..8f0ec56 100644
->> > --- a/arch/arm/mach-omap2/pm44xx.c
->> > +++ b/arch/arm/mach-omap2/pm44xx.c
->> > @@ -87,6 +87,27 @@ static int omap4_pm_suspend(void)
->> > ?}
->> > ?#endif /* CONFIG_SUSPEND */
->> >
->> > +/**
->> > + * get_achievable_state() - Provide achievable state
->> > + * @available_states: ? ? ?what states are available
->> > + * @req_min_state: what state is the minimum we'd like to hit
->> > + *
->> > + * Power domains have varied capabilities. When attempting a low power
->> > + * state such as OFF/RET, a specific min requested state may not be
->> > + * supported on the power domain, in which case, the next higher power
->> > + * state which is supported is returned. This is because a combination
->> > + * of system power states where the parent PD's state is not in line
->> > + * with expectation can result in system instabilities.
->> > + */
->> > +static inline u8 get_achievable_state(u8 available_states, u8 req_min_state)
->> > +{
->> > + ? u16 mask = 0xFF << req_min_state;
->> > +
->> > + ? if (available_states & mask)
->> > + ? ? ? ? ? return __ffs(available_states & mask);
->> > + ? return PWRDM_POWER_ON;
->> > +}
->>
->> This feature needs to be generalized (preferably on top of functional
->> power states) because we have the same need on various AM3xxx SoCs which
->> don't support RET/OFF. ?Mark Greer has started on this, but I think it
->> needs to be part of the functional power states work.
->>
->> It also needs to be part of the powerdomain layer, IMO.
->
-> So, are you saying this whole set should be re-based on top of the
-> functional power states stuff? If yes, that can be done (Jean actually
-> already did some work on this and got it working I think.)
-Indeed, cf. [1]. It has been done and works on OMAP3&4 with cpuidle
-and suspend/resume.
+QOS does need functional power state especially since CSWR and OSWR
+has such a huge difference in terms of latency.
 
 >>
->> > ?static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->> > ?{
->> > ? ? struct power_state *pwrst;
->> > @@ -115,6 +136,30 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->> > ? ? return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
->> > ?}
->> >
->> > +void omap4_pm_off_mode_enable(int enable)
->> > +{
->> > + ? u32 next_state = PWRDM_POWER_RET;
->> > + ? u32 next_logic_state = PWRDM_POWER_ON;
->> > + ? struct power_state *pwrst;
->> > +
->> > + ? if (enable) {
->> > + ? ? ? ? ? next_state = PWRDM_POWER_OFF;
->> > + ? ? ? ? ? next_logic_state = PWRDM_POWER_OFF;
->> > + ? }
->> > +
->> > + ? omap4_device_set_state_off(enable);
->> > +
->> > + ? list_for_each_entry(pwrst, &pwrst_list, node) {
->> > + ? ? ? ? ? pwrst->next_state =
->> > + ? ? ? ? ? ? ? ? ? get_achievable_state(pwrst->pwrdm->pwrsts, next_state);
->> > + ? ? ? ? ? pwrst->next_logic_state =
->> > + ? ? ? ? ? ? ? ? ? get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? next_logic_state);
->> > + ? ? ? ? ? omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
->> > + ? ? ? ? ? pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
->> > + ? }
->> > +}
->> > +
->> > ?void omap4_pm_oswr_mode_enable(int enable)
->> > ?{
->> > ? ? u32 next_logic_state;
->> > diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
->> > index 09d84de..86c6c6b 100644
->> > --- a/arch/arm/mach-omap2/prm44xx.c
->> > +++ b/arch/arm/mach-omap2/prm44xx.c
->> > @@ -289,6 +289,72 @@ static void __init omap44xx_prm_enable_io_wakeup(void)
->> > ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_IO_PMCTRL_OFFSET);
->> > ?}
->> >
->> > +/**
->> > + * omap4_device_set_state_off() - setup device off state
->> > + * @enable: ? ? ? ?set to off or not.
->> > + *
->> > + * When Device OFF is enabled, Device is allowed to perform
->> > + * transition to off mode as soon as all power domains in MPU, IVA
->> > + * and CORE voltage are in OFF or OSWR state (open switch retention)
->> > + */
->> > +void omap4_device_set_state_off(u8 enable)
->> > +{
->> > + ? if (enable)
->> > + ? ? ? ? ? omap4_prminst_write_inst_reg(0x1 <<
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_PARTITION,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
->> > + ? else
->> > + ? ? ? ? ? omap4_prminst_write_inst_reg(0x0 <<
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_PARTITION,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
->> > +}
->>
->> minor: a more compact, and more readable (so it's obvious at first
->> glance that the same register is being written) would be:
->>
->> void omap4_device_set_state_off(u8 enable)
->> {
->> ? ? ? ? u8 val = enable ? 0x1 : 0x0;
->>
->> ? ? ? omap4_prminst_write_inst_reg(val <<
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_PARTITION,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
->> }
->
-> True.
->
->>
->> > +/**
->> > + * omap4_device_prev_state_off:
->> > + * returns true if the device hit OFF mode
->> > + * This is API to check whether OMAP is waking up from device OFF mode.
->> > + * There is no other status bit available for SW to read whether last state
->> > + * entered was device OFF. To work around this, CORE PD, RFF context state
->> > + * is used which is lost only when we hit device OFF state
->> > + */
->> > +bool omap4_device_prev_state_off(void)
->> > +{
->> > + ? u32 reg;
->>
->> minor: reg makes me think the result of the read is a register address,
->> not a value. ?How about s/reg/val/.
->
-> Yea, good point.
->
->>
->> > + ? reg = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_CORE_INST,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET)
->> > + ? ? ? ? ? & OMAP4430_LOSTCONTEXT_RFF_MASK;
->> > +
->> > + ? return reg ? true : false;
->> > +}
->> > +
->> > +void omap4_device_clear_prev_off_state(void)
->> > +{
->> > + ? omap4_prminst_write_inst_reg(OMAP4430_LOSTCONTEXT_RFF_MASK |
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_LOSTCONTEXT_DFF_MASK,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_PARTITION,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_CORE_INST,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET);
->> > +}
->> > +
->> > +/**
->> > + * omap4_device_next_state_off:
->> > + * returns true if the device next state is OFF
->> > + * This is API to check whether OMAP is programmed for device OFF
->> > + */
->> > +bool omap4_device_next_state_off(void)
->> > +{
->> > + ? return omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
->> > + ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
->> > + ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET)
->> > + ? ? ? ? ? ? ? ? ? & OMAP4430_DEVICE_OFF_ENABLE_MASK ? true : false;
->>
->> minor: when using these long register read helpers, IMO readability
->> improves if this is of the form:
->>
->> ? ? ? ?val = <read register>;
->> ? ? ? ?val &= <mask>;
->> ? ? ? ?return val ? true : false;
->
-> True.
->
->>
->> > +}
->> > +
->> > ?static int __init omap4xxx_prcm_init(void)
->> > ?{
->> > ? ? if (cpu_is_omap44xx()) {
->>
->> Kevin
+>> Regards
+>> Santosh
 >>
 >
+> What do you think?
 >
+I like the idea as mentioned. I just think the series should already
+take care of memory state, logic state and quirk flags to see how
+it looks overall. Will have one more fresh look at the series but if
+you have subsequent WIP patches which can handle the other
+parameters, please send that link.
 
-Jean
+Regards
+Santosh
