@@ -1,34 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 May 2012 13:48:44 +0800
-Subject: [PATCH] ARM: mxs: Let GPMI driver be built by default
-In-Reply-To: <201205210739.46619.marex@denx.de>
-References: <1337570413-31407-1-git-send-email-festevam@gmail.com>
- <201205210648.10838.marex@denx.de>
- <CAAQ0ZWQimyVfCfDyzMAnXJa2EGcZZ2hXnWK4117G4ubbFX9kUw@mail.gmail.com>
- <201205210739.46619.marex@denx.de>
-Message-ID: <20120521054842.GD8140@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 21 May 2012 11:34:21 +0530
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 07:39:46AM +0200, Marek Vasut wrote:
-> Dear Shawn Guo,
-> 
-> > On 21 May 2012 12:48, Marek Vasut <marex@denx.de> wrote:
-> > > Heh, if we get such trivial things in so late, the imx28 will be dead
-> > > platform by the time it's supported mainline :-)
-> > 
-> > It's late for v3.5 merge window.
-> 
-> Well back in -around .30- it was still ok to add minor stuffs even if it was 
-> around rc1, they didn't break anything afterall. And this doesn't break anything 
-> (well, the gpmi driver is broken, so fix it ... if you get more people to use 
-> it, you'll have the fixes pouring your direction ... isn't that your objective, 
-> to make linux kernel even better than it is?)
-> 
-The -rc should mostly be for bugfix.  I also hope we can enable the
-driver in defconfig as soon as possible, but I won't do it until the
-driver is actually working with all known bugs fixed. 
+On Mon, May 21, 2012 at 2:11 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Colin Cross <ccross@android.com>
+>
+> ARM errata 727915 for PL310 has been updated to include a new
+> workaround required for PL310 r2p0 for l2x0_flush_all, which also
+> affects l2x0_clean_all in my testing. For r2p0, clean or flush
+> each set/way individually. For r3p0 or greater, use the debug
+> register for cleaning and flushing.
+>
+> Requires exporting the cache_id, sets and ways detected in the
+> init function for later use.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Per Fransson <per.fransson.ml@gmail.com>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I found this thing in the Android tree, it looks like it could
+> be pretty serious so I'm mailing it out. If it is correct I
+> guess it should even be tagged for -stable?
+>
+> v2: what about actually git commit --amend in the rebase changes
+> for -rc7? Sorry for the screwup...
+> ---
+This was observed on OMAP4460 devices. Though the errata
+document doesn't support it, the issue seen with l2 clean was
+indeed fixed $subject fix.
 
--- 
-Regards,
-Shawn
+Regards
+Santosh
