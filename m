@@ -1,195 +1,160 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 21 May 2012 19:55:26 +0530
-Subject: [PATCH 2/6] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <CAORVsuWgn5Zuf9T1eVBjJJhTGL5jrY=hirTaZp8E2HprzbvHng@mail.gmail.com>
-References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
- <1334752782-28804-3-git-send-email-j-pihet@ti.com>
- <alpine.DEB.2.00.1205070043230.9984@utopia.booyaka.com>
- <CAORVsuXUbz_f54x=hoFLEQpfAGTDcZGnTQ-fBgY_j415LC0TiQ@mail.gmail.com>
- <4FB4CD45.4050807@ti.com>
- <CAORVsuWgn5Zuf9T1eVBjJJhTGL5jrY=hirTaZp8E2HprzbvHng@mail.gmail.com>
-Message-ID: <CAMQu2gwBYUmBLV+wByVxto_ETu6-YjHycGWnhVn-Tb9pJUngDw@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 21 May 2012 16:35:04 +0200
+Subject: [PATCH 1/8] ARM: PCI: remove unused sys->hw
+In-Reply-To: <E1SNLkt-00080g-R0@rmk-PC.arm.linux.org.uk>
+References: <20120426101626.GE24211@n2100.arm.linux.org.uk>
+ <E1SNLkt-00080g-R0@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120521143504.GD21513@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean,
+* Russell King wrote:
+> Some platforms mark their hw_pci structure as __initdata, which means
+> it will be discarded after init time.  Storing pointers to __initdata
+> in long lived data structures is a potential source of problems, and
+> in this case, sys->hw is unused apart from its initialization.
+> 
+> So, lets remove this member and its initializer.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/mach/pci.h |    1 -
+>  arch/arm/kernel/bios32.c        |    1 -
+>  2 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index d943b7d..0fc8548 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -45,7 +45,6 @@ struct pci_sys_data {
+>  	u8		(*swizzle)(struct pci_dev *, u8 *);
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+> -	struct hw_pci	*hw;
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+>  
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index ede5f77..e17dd25 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -424,7 +424,6 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
+>  #ifdef CONFIG_PCI_DOMAINS
+>  		sys->domain  = hw->domain;
+>  #endif
+> -		sys->hw      = hw;
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> -- 
+> 1.7.4.4
 
-On Mon, May 21, 2012 at 7:23 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> Hi Santosh,
->
-> On Thu, May 17, 2012 at 12:04 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> Jean,
->> On Tuesday 08 May 2012 02:10 PM, Jean Pihet wrote:
->>> Paul,
->>>
->>> On Mon, May 7, 2012 at 11:28 AM, Paul Walmsley <paul@pwsan.com> wrote:
->>>> Hi
->>>>
->>>> On Wed, 18 Apr 2012, jean.pihet at newoldbits.com wrote:
->>>>
->>>>> From: Jean Pihet <j-pihet@ti.com>
->>>>>
->>>>> Introduce functional (or logical) states for power domains and the
->>>>> API functions to read the power domains settings and to convert
->>>>> between the functional (i.e. logical) and the internal (or registers)
->>>>> values.
->>>>>
->>>>> OMAP2, OMAP3 and OMAP4 platforms are defining a conversion routine.
->>>>>
->>>>> In the new API the function omap_set_pwrdm_state takes the functional
->>>>> states as parameter; while at it the function is moved to the power
->>>>> domains code.
->>>>>
->>>>> The memory and logic states are not using the functional states, this
->>>>> comes as a subsequent patch.
->>>>>
->>>>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->>>>
->>>> This patch results in several checkpatch warnings; please resolve them.
->>> Oops. Will check and update.
->>>
->>>>
->>>>> ---
->>>>> ?arch/arm/mach-omap2/pm.c ? ? ? ? ? ? ? ? ? | ? 66 -----------
->>>>> ?arch/arm/mach-omap2/powerdomain-common.c ? | ? 61 ++++++++++
->>>>> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ?| ?175 ++++++++++++++++++++++++++++
->>>>> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ?| ? 21 ++++
->>>>> ?arch/arm/mach-omap2/powerdomain2xxx_3xxx.c | ? ?5 +
->>>>> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ?| ? ?2 +
->>>>> ?6 files changed, 264 insertions(+), 66 deletions(-)
->>>>>
->>> ...
->>>
->>>>> +/*
->>>>> + * Functional (i.e. logical) to internal (i.e. registers)
->>>>> + * values for the power domains states
->>>>> + */
->>>>
->>>> Please use kerneldoc-style function comments.
->>> Ok
->>>
->>>>
->>>>> +int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
->>>>> +{
->>>>> + ? ? int ret;
->>>>> +
->>>>> + ? ? switch (func_pwrst) {
->>>>> + ? ? case PWRDM_FUNC_PWRST_ON:
->>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_ON;
->>>>> + ? ? ? ? ? ? break;
->>>>> + ? ? case PWRDM_FUNC_PWRST_INACTIVE:
->>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_INACTIVE;
->>>>> + ? ? ? ? ? ? break;
->>>>> + ? ? case PWRDM_FUNC_PWRST_CSWR:
->>>>> + ? ? case PWRDM_FUNC_PWRST_OSWR:
->>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
->>>>> + ? ? ? ? ? ? break;
->>>>> + ? ? case PWRDM_FUNC_PWRST_OFF:
->>>>> + ? ? ? ? ? ? ret = PWRDM_POWER_OFF;
->>>>> + ? ? ? ? ? ? break;
->>>>> + ? ? default:
->>>>> + ? ? ? ? ? ? ret = -1;
->>>>> + ? ? }
->>>>> +
->>>>> + ? ? return ret;
->>>>> +}
->>>>
->>>> At a quick glance, I don't think that this function is appropriate for all
->>>> OMAP2+ chips. ?For example, off-mode is not supported in our OMAP2xxx
->>>> kernels. ?And OMAP2xxx/3xxx do not support the INACTIVE powerstate. ?So
->>>> probably this function should differ by chip, and be located in the
->>>> powerdomain[2-4]*xx*.c files.
->>> I hope to make this function as generic as possible, hence the
->>> location (powerdomain-common.c). Some states are not programmed by the
->>> pwrdm_* functions since there forbidden by the contents of the
->>> pwrdm->pwrst field.
->>> Now if the need arises some platform specific function can be defined
->>> for conversion functions since the pwrdm->ops function pointers are
->>> used. I do not think it is needed now but it can easily be changed.
->>>
->>>> Also, what about the logic and memory bank power states? ?Shouldn't this
->>>> function pass those back as well?
->>> Cf. in the description "The memory and logic states are not using the
->>> functional states, this comes as a subsequent patch."
->>>
->> I don't see much difference between the functional power states to
->> actual power states with some cases here and there.
->>
->> + ? ? case PWRDM_FUNC_PWRST_CSWR:
->> + ? ? case PWRDM_FUNC_PWRST_OSWR:
->> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
-> The whole patch series takes the logic state into account in the
-> functional power state.
-> Cf. in the description "The memory and logic states are not using the
-> functional states, this comes as a subsequent patch."
->
-Yeah. i understood that from comments.
+I have some patches which convert the Tegra PCIe code to a platform driver. I
+used to use the sys->hw field to obtain a pointer to my driver-private struct
+which had the struct hw_pci embedded.
 
->> This is not true and even if you add logic/memmort etc support,
->> I still think, we are just duplicating stuff between functional
->> vs actual power state.
-> The idea is to provide a single function to program the power domains
-> state, including the logic state.
-> There is no duplication of code, just a simplification in the API. IMO
-> there are too much calls to set and get the power domain states (power
-> state, logical etc.) and most of the calls do not take the logical
-> state into account.
-> If you look the the code in pmxxxx.c and cpuidlexxxx.c you will notice
-> that the code is simplified.
->
-I noticed that but thought that simplification is not substantial.
+Something like this:
 
->> If the idea is to have one single interface to program the power
->> domain states, so that Generic frameworks, or PM code movement to
->> driver/* directories is easier, we may want think about alternative
->> which is scalable.
->>
->> Just a wild thought...
->>
->> May be we can abstract all the necessary/used power domain programming
->> entities inside a structure and export that. That should contain, power
->> state, logic state, mem state, special quirk flags like SAR etc.
->> being structure is always expandable and an API taking structure as
->> a parameter need not change.
-> That is the goal. This patch series uses the date from the platform
-> specific power domain structs and abstracts those in the API.
->
-Good to know that we are on same page.
+	struct tegra_pcie_info {
+		...
+		struct hw_pci hw;
+		...
+	};
 
-> So in summary I would say that the power domain code callers do
-> benefit from the API simplification and the abstraction of thr power
-> domains parameters:
-I agree. I am just worried about this 1 API because we have many used
-programmable nobs. For example the API assumes all the power domain
-same and while programming the powerdomain deeper state, does
-clockdomain wakeup and sleep transition sequence. Such a process
-is not needed for domain like CPU/MPU PD's because they are
-powerdown them self.
+And then uses the following function to obtain the driver-private data in the
+various callbacks (.setup, ...):
 
-> - cpuidle: the logic state field is removed from the structs; the
-> power domain state checks are simplified,
-> - per-device PM QoS: the latency parameters are specified for every
-> functional power state,
-> - pmxxxx.c: the suspend/resume code is simplified; the power domain
-> state checks are simplified.
->
-QOS does need functional power state especially since CSWR and OSWR
-has such a huge difference in terms of latency.
+	static inline struct tegra_pcie_info *sys_to_pcie(struct pci_sys_data *sys)
+	{
+		return container_of(sys->hw, struct tegra_pcie_info, hw);
+	}
 
->>
->> Regards
->> Santosh
->>
->
-> What do you think?
->
-I like the idea as mentioned. I just think the series should already
-take care of memory state, logic state and quirk flags to see how
-it looks overall. Will have one more fresh look at the series but if
-you have subsequent WIP patches which can handle the other
-parameters, please send that link.
+With the removal of the sys->hw field, this obviously no longer works. So
+I've come up with the attached hack. I don't know if this is anywhere near
+acceptable. If it isn't do you have any other suggestions?
 
-Regards
-Santosh
+Thierry
+-------------- next part --------------
+>From ed0421bb87e3fa1484fd54fa504e828e017c3221 Mon Sep 17 00:00:00 2001
+From: Thierry Reding <thierry.reding@avionic-design.de>
+Date: Mon, 21 May 2012 16:25:58 +0200
+Subject: [PATCH] HACK: ARM: PCI: Allow passing driver-private data
+
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+---
+ arch/arm/include/asm/mach/pci.h |    2 +-
+ arch/arm/kernel/bios32.c        |   16 +++++++++-------
+ 2 files changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 26c511f..5508dc8 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -52,7 +52,7 @@ struct pci_sys_data {
+ /*
+  * Call this with your hw_pci struct to initialise the PCI system.
+  */
+-void pci_common_init(struct hw_pci *);
++void pci_common_init(struct hw_pci *, void *);
+ 
+ /*
+  * PCI controllers
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 9c0c9a0..45d8171 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -423,7 +423,8 @@ static int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ 	return irq;
+ }
+ 
+-static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
++static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head,
++			    void *private)
+ {
+ 	struct pci_sys_data *sys = NULL;
+ 	int ret;
+@@ -435,11 +436,12 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 			panic("PCI: unable to allocate sys data!");
+ 
+ #ifdef CONFIG_PCI_DOMAINS
+-		sys->domain  = hw->domain;
++		sys->domain       = hw->domain;
+ #endif
+-		sys->busnr   = busnr;
+-		sys->swizzle = hw->swizzle;
+-		sys->map_irq = hw->map_irq;
++		sys->busnr        = busnr;
++		sys->swizzle      = hw->swizzle;
++		sys->map_irq      = hw->map_irq;
++		sys->private_data = private;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+ 		ret = hw->setup(nr, sys);
+@@ -472,7 +474,7 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 	}
+ }
+ 
+-void pci_common_init(struct hw_pci *hw)
++void pci_common_init(struct hw_pci *hw, void *private)
+ {
+ 	struct pci_sys_data *sys;
+ 	LIST_HEAD(head);
+@@ -480,7 +482,7 @@ void pci_common_init(struct hw_pci *hw)
+ 	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+ 	if (hw->preinit)
+ 		hw->preinit();
+-	pcibios_init_hw(hw, &head);
++	pcibios_init_hw(hw, &head, private);
+ 	if (hw->postinit)
+ 		hw->postinit();
+ 
+-- 
+1.7.10.2
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/90bc22d0/attachment.sig>
