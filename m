@@ -1,30 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 May 2012 09:06:54 +0200
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <20120518154725.GA10583@quad.lixom.net>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
- <20120516111744.GB9571@n2100.arm.linux.org.uk>
- <CACRpkdazMG1D6L6nWo330EWTZ_Fn6K0F5cjZSfMRGmk9OsaVXw@mail.gmail.com>
- <20120517104249.GI9571@n2100.arm.linux.org.uk>
- <20120518154725.GA10583@quad.lixom.net>
-Message-ID: <CACRpkdbuCougOZML+egcmkTW4mkY4sJGLFJ2LX7_=hjZ9v_PMw@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 21 May 2012 17:09:52 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
+Message-ID: <20120521170952.7cd6e01690000b93db80b2b9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 5:47 PM, Olof Johansson <olof@lixom.net> wrote:
+Hi all,
 
-> From cda9fbb62852a1b1fc0b1e77eec8b916d0f4d762 Mon Sep 17 00:00:00 2001
-> From: Olof Johansson <olof@lixom.net>
-> Date: Fri, 18 May 2012 08:43:39 -0700
-> Subject: [PATCH] ARM: spear3xx: remove some zero initalizers
->
-> Removing some unnecessary 0 initializers from platform pl08x platform
-> data structures.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/gpio/gpio-mxs.c between commit 3e11f7b840b4 ("gpio/generic:
+initialize basic_mmio_gpio shadow variables properly") from the gpio tree
+and commit 164387d2b4ae ("gpio/mxs: get rid of the use of cpu_is_xxx")
+from the arm-soc tree.
 
-Oh Olof beats Viresh to the show, thanks!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I fixed it up (see below) and can carry the fix as necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Yours,
-Linus Walleij
+diff --cc drivers/gpio/gpio-mxs.c
+index b413650,429228b..0000000
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@@ -242,11 -283,11 +283,11 @@@ static int __devinit mxs_gpio_probe(str
+  	irq_set_handler_data(port->irq, port);
+  
+  	err = bgpio_init(&port->bgc, &pdev->dev, 4,
+- 			 port->base + PINCTRL_DIN(port->id),
+- 			 port->base + PINCTRL_DOUT(port->id), NULL,
+- 			 port->base + PINCTRL_DOE(port->id), NULL, 0);
++ 			 port->base + PINCTRL_DIN(port),
++ 			 port->base + PINCTRL_DOUT(port), NULL,
+ -			 port->base + PINCTRL_DOE(port), NULL, false);
+++			 port->base + PINCTRL_DOE(port), NULL, 0);
+  	if (err)
+- 		goto out_iounmap;
++ 		return err;
+  
+  	port->bgc.gc.to_irq = mxs_gpio_to_irq;
+  	port->bgc.gc.base = port->id * 32;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/58883331/attachment.sig>
