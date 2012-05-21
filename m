@@ -1,48 +1,39 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 21 May 2012 17:09:52 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
-Message-ID: <20120521170952.7cd6e01690000b93db80b2b9@canb.auug.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 May 2012 09:12:21 +0200
+Subject: [RFC] pl08x: don't use dma_slave_config direction argument
+In-Reply-To: <20120517143035.GA19548@n2100.arm.linux.org.uk>
+References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
+ <20120517143035.GA19548@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaM+EDDMh=i+i6a2zBGRN+3BQmkk94hNNHVJkTRK9cfXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, May 17, 2012 at 4:30 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/gpio/gpio-mxs.c between commit 3e11f7b840b4 ("gpio/generic:
-initialize basic_mmio_gpio shadow variables properly") from the gpio tree
-and commit 164387d2b4ae ("gpio/mxs: get rid of the use of cpu_is_xxx")
-from the arm-soc tree.
+> Is there any reason you can see not to do this?
 
-I fixed it up (see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Nope, I like the patches for Versatile and RealView, and should have
+worked on them myself if I could have free:ed up some time. They
+are much needed in-tree since I hear there are more PL08x-based platforms
+out there that need signal muxing and the reference designs should provide a
+good example of how to do that.
 
-diff --cc drivers/gpio/gpio-mxs.c
-index b413650,429228b..0000000
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@@ -242,11 -283,11 +283,11 @@@ static int __devinit mxs_gpio_probe(str
-  	irq_set_handler_data(port->irq, port);
-  
-  	err = bgpio_init(&port->bgc, &pdev->dev, 4,
-- 			 port->base + PINCTRL_DIN(port->id),
-- 			 port->base + PINCTRL_DOUT(port->id), NULL,
-- 			 port->base + PINCTRL_DOE(port->id), NULL, 0);
-+ 			 port->base + PINCTRL_DIN(port),
-+ 			 port->base + PINCTRL_DOUT(port), NULL,
- -			 port->base + PINCTRL_DOE(port), NULL, false);
-++			 port->base + PINCTRL_DOE(port), NULL, 0);
-  	if (err)
-- 		goto out_iounmap;
-+ 		return err;
-  
-  	port->bgc.gc.to_irq = mxs_gpio_to_irq;
-  	port->bgc.gc.base = port->id * 32;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/58883331/attachment.sig>
+It also provides me a good reason to go and actually test this on the
+PB11MPcore as it lands in the next kernel.
+
+> I ultimately need to kill off the passing of struct pl08x_dma_chan to
+> these functions, because that's preventing me moving the struct into
+> drivers/dma - which I need to in order to convert amba-pl08x.c to use
+> virt-dma.c.
+
+OK, no big deal.
+
+> The only use of pl08x_dma_chan in the functions below is for the debug
+> prints, which I suggest we just kill off - or we could change them to
+> be cd->bus_id, which is the same thing anyway.
+
+Any way is fine with me.
+
+Yours,
+Linus Walleij
