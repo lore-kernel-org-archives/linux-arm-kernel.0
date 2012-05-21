@@ -1,34 +1,41 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 20 May 2012 23:45:08 -0400
-Subject: [PATCH] mmc: mxs-mmc: Add wp-inverted property
-In-Reply-To: <1337571366-7779-1-git-send-email-marex@denx.de> (Marek Vasut's
- message of "Mon, 21 May 2012 05:36:06 +0200")
-References: <1337571366-7779-1-git-send-email-marex@denx.de>
-Message-ID: <87396ukxiz.fsf@laptop.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 May 2012 05:48:00 +0200
+Subject: [PATCH 1/4] GPMI-NAND: Define ecc.strength
+In-Reply-To: <4FB9B19B.2080309@freescale.com>
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+ <201205210440.09310.marex@denx.de> <4FB9B19B.2080309@freescale.com>
+Message-ID: <201205210548.00536.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Dear Huang Shijie,
 
-On Sun, May 20 2012, Marek Vasut wrote:
-> The write-protect GPIO is inverted on some boards. Handle such case.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: Chris Ball <cjb@laptop.org>
-> ---
->  Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
->  drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
->
-> V2: Adjust the subject, Cc linux-mmc
+> ? 2012?05?21? 10:40, Marek Vasut ??:
+> > I doubt so ... but noone ever could test it without DT bindings as you
+> > NAKed/stalled every single attempt to add the platform binding code. So
+> > this code was rotting in the tree, who knows how many bugs are still in
+> > it. Now I guess it's about time to start squashing the bugs.
+> 
+> I checked the latest l2-mtd code. The bug does exit if the gpmi-nand
+> driver can works(actually it can not).
 
-Thanks, looks good.  Since this depends on patches that are going via
-arm-soc, I'm going to wait until that's in Linus master before merging.
+There's also the bug where you need to put gpmi at 8000c000 into the DTS file 
+instead of gpmi-nand at 8000c000 ... maybe you should fix it?
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Also, there's still the bug with subpage write size, "GPMI-NAND: Wrong ECC size 
+in driver" thread in linux-mtd. That thread kind of died, but gpmi-nand is still 
+broken in that way, it's depending on loose end of the mtd stack there. Won't 
+hurt fixing that too, there was even a fix proposed.
+
+> 
+> I will test your patch.
+> Anyway, this patch should be sent to Artem, not the arm-soc.
+
+Resent, fixed, sorry for the inconvenience.
+
+> 
+> thanks
+> Huang Shijie
+
+Best regards,
+Marek Vasut
