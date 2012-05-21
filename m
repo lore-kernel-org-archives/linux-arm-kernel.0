@@ -1,27 +1,57 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Mon, 21 May 2012 17:27:54 +0800
-Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
-In-Reply-To: <20120521041355.GF5810@S2100-06.ap.freescale.net>
-References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
- <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
- <20120514035137.GB20367@S2100-06.ap.freescale.net>
- <20120514080835.GB31985@opensource.wolfsonmicro.com>
- <4FB0C9D4.2060409@linaro.org>
- <20120514094357.GF20367@S2100-06.ap.freescale.net>
- <4FB10821.4000004@linaro.org>
- <20120514135035.GC29393@b20223-02.ap.freescale.net>
- <20120518095932.GI30755@b20223-02.ap.freescale.net>
- <20120521041355.GF5810@S2100-06.ap.freescale.net>
-Message-ID: <4FBA0A9A.8040901@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 May 2012 12:26:36 +0300
+Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
+In-Reply-To: <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120521092635.GL8633@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2012?05?21? 12:13), Shawn Guo wrote:
-> On Fri, May 18, 2012 at 05:59:32PM +0800, Richard Zhao wrote:
->> Guys, we need to draw conclusion.
->> I think current patch keep some how compatible with multi-anatop.
->> It's ok.
->>
-> I'm fine with that.
+On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
+> This let usb phy driver has a chance to change hw settings when connect
+> status change.
 > 
-Yes. It is good for me.
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  include/linux/usb/otg.h |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
+> index 38ab3f4..385641d 100644
+> --- a/include/linux/usb/otg.h
+> +++ b/include/linux/usb/otg.h
+> @@ -117,6 +117,10 @@ struct usb_phy {
+>  	int	(*set_suspend)(struct usb_phy *x,
+>  				int suspend);
+>  
+> +	/* notify phy connect status change */
+> +	int	(*notify_connect_change)(struct usb_phy *x,
+> +					 int port,
+> +					 int connected);
+>  };
+>  
+>  
+> @@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+>  }
+>  
+>  static inline int
+> +usb_phy_notify_connect_change(struct usb_phy *x, int port, int connected)
+> +{
+> +	if (x->notify_connect_change != NULL)
+
+you don't need this != NULL. See that no other wrapper has it. Keep
+consistency.
+
+Also, this is the kind of stuff that I have been queueing for Greg so I
+should be in Cc.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/8b2dba91/attachment-0001.sig>
