@@ -1,28 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 20 May 2012 23:15:07 +0200
-Subject: [PATCH 09/18] regulator: ab8500: Split up probe() into manageable
- pieces
-In-Reply-To: <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <1337262323-27692-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbrL3WY2X-sbKk5cZ=mLCuYA=SBQ294ceaZ2PdA2Q4-Ag@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 May 2012 03:02:20 +0200
+Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
+In-Reply-To: <1337562140-5739-1-git-send-email-marex@denx.de>
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+Message-ID: <1337562140-5739-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 3:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+The write-protect GPIO is inverted on some boards. Handle such case.
 
-> ab8500's probe() function is becoming quite large, so in the lead
-> up to Device Tree enablement which will fork the thread of execution
-> this patch splits it into 3 main areas; basic error checking will
-> remain in probe(), but regulator register initialisation and regulator
-> registration have been moved to their own functions which will
-> be called in sequence by probe() and the DT equivalent.
->
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
+ drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks to Mark for review and merge,
-
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+index 14d870a..0a7d2cd 100644
+--- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+@@ -13,6 +13,7 @@ Required properties:
+ 
+ Optional properties:
+ - wp-gpios: Specify GPIOs for write protection
++- wp-inverted: Set if the write protection GPIO is inverted
+ 
+ Examples:
+ 
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 277161d..119beb9 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -164,16 +164,23 @@ struct mxs_mmc_host {
+ 	spinlock_t			lock;
+ 	int				sdio_irq_en;
+ 	int				wp_gpio;
++	int				wp_inverted:1;
+ };
+ 
+ static int mxs_mmc_get_ro(struct mmc_host *mmc)
+ {
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
++	int ret;
+ 
+ 	if (!gpio_is_valid(host->wp_gpio))
+ 		return -EINVAL;
+ 
+-	return gpio_get_value(host->wp_gpio);
++	ret = gpio_get_value(host->wp_gpio);
++
++	if (host->wp_inverted)
++		ret = !ret;
++
++	return ret;
+ }
+ 
+ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+@@ -786,6 +793,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 		else if (bus_width == 8)
+ 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+ 		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
++		if (of_find_property(np, "wp-inverted", NULL))
++			host->wp_inverted = 1;
+ 	} else {
+ 		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+ 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+-- 
+1.7.10
