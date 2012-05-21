@@ -1,65 +1,129 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 21 May 2012 17:23:54 +0800
-Subject: [PATCH v2 09/12] ARM: imx6q: disable usb charger detector
+Date: Mon, 21 May 2012 17:23:55 +0800
+Subject: [PATCH v2 10/12] ARM: dts: imx6q-sabrelite: add usb devices
 In-Reply-To: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
 References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337592237-5090-10-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337592237-5090-11-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external charger detector needs to be disabled,
-or the signal at DP will be poor
-
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx6q.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts |   18 ++++++++++++-
+ arch/arm/boot/dts/imx6q.dtsi          |   44 +++++++++++++++++++++++++++++++-
+ 2 files changed, 59 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 577cf19..0bfd8c7 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -25,6 +25,7 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/phy.h>
- #include <linux/micrel_phy.h>
-+#include <linux/mfd/anatop.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
-@@ -141,9 +142,33 @@ static void __init imx6q_config_on_boot(void)
- 	of_node_put(np);
- }
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index 1dd2261..1d28957 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -48,10 +48,26 @@
+ 					status = "okay";
+ 				};
+ 			};
+-
++			iomuxc at 020e0000 {
++				gpios {
++					pinctrl_gpio_hog: gpiohog {
++						fsl,pins = <1044 0x80000000
++							   144  0x80000000>;	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
++					};
++				};
++			};
+ 		};
  
-+static void __init imx6q_usb_init(void)
-+{
-+#define HW_ANADIG_USB1_CHRG_DETECT		0x000001b0
-+#define HW_ANADIG_USB2_CHRG_DETECT		0x00000210
+ 		aips-bus at 02100000 { /* AIPS2 */
++			usb at 02184000 { /* USB OTG */
++				fsl,vbus-power-gpios = <&gpio3 22 0>;
++				status = "okay";
++			};
 +
-+#define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x00100000
-+#define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x00080000
++			usb at 02184200 { /* USB1 */
++				status = "okay";
++			};
 +
-+	/*
-+	 * The external charger detector needs to be disabled,
-+	 * or the signal at DP will be poor
-+	 */
-+
-+	anatop_write_reg(NULL, HW_ANADIG_USB1_CHRG_DETECT,
-+			BM_ANADIG_USB_CHRG_DETECT_EN_B
-+			| BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
-+			~0);
-+	anatop_write_reg(NULL, HW_ANADIG_USB2_CHRG_DETECT,
-+			BM_ANADIG_USB_CHRG_DETECT_EN_B |
-+			BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
-+			~0);
-+}
-+
- static void __init imx6q_post_populate(void)
- {
- 	imx6q_config_on_boot();
-+	imx6q_usb_init();
- }
+ 			ethernet at 02188000 {
+ 				phy-mode = "rgmii";
+ 				phy-reset-gpios = <&gpio3 23 0>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 8c90cba..f67048e 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -444,12 +444,14 @@
+ 				};
+ 			};
  
- static void __init imx6q_init_machine(void)
+-			usbphy at 020c9000 { /* USBPHY1 */
++			usbphy1: usbphy at 020c9000 {
++				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 			};
+ 
+-			usbphy at 020ca000 { /* USBPHY2 */
++			usbphy2: usbphy at 020ca000 {
++				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 			};
+@@ -485,6 +487,9 @@
+ 				compatible = "fsl,imx6q-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_gpio_hog>;
++
+ 				/* shared pinctrl settings */
+ 				audmux {
+ 					pinctrl_audmux_1: audmux-1 {
+@@ -495,6 +500,11 @@
+ 					};
+ 				};
+ 
++				gpios {
++					pinctrl_gpio_hog: gpiohog {
++					};
++				};
++
+ 				i2c1 {
+ 					pinctrl_i2c1_1: i2c1grp-1 {
+ 						fsl,pins = <137 0x4001b8b1	/* MX6Q_PAD_EIM_D21__I2C1_SCL */
+@@ -573,6 +583,36 @@
+ 				reg = <0x0217c000 0x4000>;
+ 			};
+ 
++			usb at 02184000 { /* USB OTG */
++				compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
++				reg = <0x02184000 0x200>;
++				interrupts = <0 43 0x04>;
++				fsl,usbphy = <&usbphy1>;
++				status = "disabled";
++			};
++
++			usb at 02184200 { /* USB1 */
++				compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
++				reg = <0x02184200 0x200>;
++				interrupts = <0 40 0x04>;
++				fsl,usbphy = <&usbphy2>;
++				status = "disabled";
++			};
++
++			usb at 02184400 { /* USB2 */
++				compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
++				reg = <0x02184400 0x200>;
++				interrupts = <0 41 0x04>;
++				status = "disabled";
++			};
++
++			usb at 02184600 { /* USB3 */
++				compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
++				reg = <0x02184600 0x200>;
++				interrupts = <0 42 0x04>;
++				status = "disabled";
++			};
++
+ 			ethernet at 02188000 {
+ 				compatible = "fsl,imx6q-fec";
+ 				reg = <0x02188000 0x4000>;
 -- 
 1.7.5.4
