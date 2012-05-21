@@ -1,79 +1,47 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 21 May 2012 12:12:34 +0300
-Subject: [PATCHv2 18/19] ARM: OMAP4460: wakeupgen: set GIC_CPU0 backup
- status flag always
-In-Reply-To: <87sjez1wa2.fsf@ti.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-19-git-send-email-t-kristo@ti.com>
- <87sjez1wa2.fsf@ti.com>
-Message-ID: <1337591554.28274.6.camel@sokoban>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 May 2012 11:16:15 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FBA030F.4050101@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de>
+ <4FBA030F.4050101@codethink.co.uk>
+Message-ID: <20120521091615.GD14362@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-16 at 17:33 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > Without this, CPU0 will crash in the ROM code during wakeup from
-> > device off. This patch also clears the GIC save area, to prevent
-> > ROM code from writing garbage to the GIC registers during wakeup.
-> > The actual GIC restore is done by kernel.
+On Mon, May 21, 2012 at 09:55:43AM +0100, Ben Dooks wrote:
+> On 18/05/12 21:44, Arnd Bergmann wrote:
+> >On Friday 18 May 2012, Jason Cooper wrote:
+> >>>
+> >>>In this case, we have wildly different names referring to the same chip
+> >>>family, and "orion" is far from hinting that it also constitute the
+> >>>support for Kirkwood, Dove or (some not all) Armadas, unless you are
+> >>>familiar with some legacy Marvell products.  This is why in this case I
+> >>>think that a directory name change might be appropriate, especially if
+> >>>we're going to cause churn by moving things around already.
+> >>>
+> >>>I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
+> >>>mvebu_*.  Unless someone has another logical identifier to suggest which
+> >>>would capture all that family of SOCs that came out of EBU in Marvell of
+> >>>course.
+> >>
+> >>I prefer mvebu_* ...  nice and concise.
+> >>
 > >
-> > This bug fix applies only to OMAP4460, it is fixed on OMAP4470.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >On a related topic, any preferences on where we will put all the board
+> >files? I think it would be helpful to put them into a separate place from
+> >the main platform files, so e.g. have all *-setup.c files go to
+> >arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
 > 
-> Please create/use PM_ERRATUM flag.
-
-Okay.
-
--Tero
-
+> What board files?
 > 
-> Kevin
-> 
-> > ---
-> >  arch/arm/mach-omap2/omap-wakeupgen.c   |   14 ++++++++++++++
-> >  arch/arm/mach-omap2/omap4-sar-layout.h |    1 +
-> >  2 files changed, 15 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-> > index c7c4db4..30da299 100644
-> > --- a/arch/arm/mach-omap2/omap-wakeupgen.c
-> > +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-> > @@ -447,10 +447,24 @@ int __init omap_wakeupgen_init(void)
-> >  
-> >  	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
-> >  		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
-> > +		/* Clean GIC SAR area */
-> > +		for (i = SAR_BACKUP_STATUS_OFFSET; i < WAKEUPGENENB_OFFSET_CPU0;
-> > +			i += 4)
-> > +			sar_writel(0, i, 0);
-> > +
-> >  		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU0_OFFSET, 0);
-> >  		sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU1_OFFSET, 0);
-> >  		for (i = 0; i < max_spi_reg; i++)
-> >  			sar_writel(GIC_ISR_NON_SECURE, ICDISR_SPI_OFFSET, i);
-> > +
-> > +		/*
-> > +		 * Set CPU0 GIC backup flag permanently for omap4460,
-> > +		 * this is needed because of the ROM code bug that breaks
-> > +		 * GIC during wakeup from device off
-> > +		 */
-> > +		if (cpu_is_omap446x())
-> > +			__raw_writel(SAR_BACKUP_STATUS_GIC_CPU0,
-> > +				     sar_base + SAR_BACKUP_STATUS_OFFSET);
-> >  		iounmap(sar_base);
-> >  		sar_base = NULL;
-> >  	} else {
-> > diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-> > index 0056667..e621c51 100644
-> > --- a/arch/arm/mach-omap2/omap4-sar-layout.h
-> > +++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-> > @@ -88,6 +88,7 @@
-> >  #define ICDISR_CPU0_OFFSET			(SAR_BANK3_OFFSET + 0x50c)
-> >  #define ICDISR_CPU1_OFFSET			(SAR_BANK3_OFFSET + 0x510)
-> >  #define ICDISR_SPI_OFFSET			(SAR_BANK3_OFFSET + 0x514)
-> > +#define SAR_BACKUP_STATUS_GIC_CPU0		0x1
-> >  
-> >  /* WakeUpGen save restore offset from OMAP44XX_SAR_RAM_BASE */
-> >  #define WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x684)
+> As I see it there are no current users and all additional kernel support
+> should simply use devicetree.
+
+There are currently 14 kirkwood boards, 21 orion5x, 2 dove and 5
+mv78xx0 boards. All would end up in the same directory as part of this
+rename/merge.
+
+	Andrewy
