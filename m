@@ -1,55 +1,49 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Mon, 21 May 2012 13:27:26 +0530
-Subject: [PATCH v2 2/2] regulator: Add support for MAX77686.
-In-Reply-To: <20120520100015.GC20652@opensource.wolfsonmicro.com>
-References: <1337261967-26004-1-git-send-email-yadi.brar@samsung.com>
- <1337261967-26004-3-git-send-email-yadi.brar@samsung.com>
- <20120520100015.GC20652@opensource.wolfsonmicro.com>
-Message-ID: <CAKew6eUqqC-jSRoY1e4Q=JnLekuA_geGcCjQr4=6g86nf3LfDA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 May 2012 07:58:14 +0000
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521013050.GL24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120520111025.GC25344@n2100.arm.linux.org.uk>
+ <20120521013050.GL24238@titan.lakedaemon.net>
+Message-ID: <201205210758.14500.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Monday 21 May 2012, Jason Cooper wrote:
+> > > * all *.c files that are used for multiple boards go to plat-mvebu
+> > > * all *-setup.c files go to mach-mvebu
+> > > * only headers that are used outside of {mach,plat}-mvebug go to
+> > >   plat-mvebu/include/mach
+> 
+> plat-mvebu/include/plat ?
 
-On Sun, May 20, 2012 at 3:30 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, May 17, 2012 at 07:09:27PM +0530, Yadwinder Singh Brar wrote:
->
-> Looks mostly good. ?A couple of fairly small things:
->
->> +static int max77686_get_voltage_sel(struct regulator_dev *rdev)
->> +{
->
-> This looks like it should be regulator_get_voltage_sel_regmap().
->
->> +static int max77686_set_voltage_sel(struct regulator_dev *rdev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned sel)
->> +{
->
-> This looks like it should be regulator_set_voltage_sel_regmap().
->
+Doesn't work because of the handful of places that #include <mach/*>
+with a common name, like irqs.h or debug-macro.S.
 
-Yes, We can use  regulator_set_voltage_sel_regmap(), I will replace it.
+> > > * headers used to inteface between the first two go to
+> > >   plat-mvebu/include/plat (?)
+> 
+> plat-mvebu/include ?
 
->> + ? ? max77686->ramp_delay = pdata->ramp_delay - 1;
->> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
->> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
->> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1,
->> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
->> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK4CTRL1,
->> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
->
-> This code is unclear because RAMP_VALUE looks like a constant that has
-> nothing to do with ramp_delay when in fact it's actually this:
->
->> +#define RAMP_VALUE (max77686->ramp_delay << 6)
->
-> which isn't constant - this is why I queried this last time. ?Just
-> remove the define and write this out directly. ?The way the code is
-> written at the minute it looks like ramp_delay is just stored and not
-> referred to unless you go searching around the rest of the driver.
+That would still put them into a globally visible location since we
+do gcc -I arch/arm/plat-${PLAT}/include.
 
-Ok, I will remove it.
+> > That sounds reasonable.  The only eyebrow raising thing is having an
+> > include/mach inside a plat-* directory... that seems an odd way to do
+> > things as mach/ includes normally come from the mach-* directory.
+> > 
+> > So I wonder whether Nicolas' idea of "dt-only stuff in arch/arm/plat-*"
+> > is the right idea.  It just makes plat-* the same as a mach-* but with
+> > a different name, whereas it is supposed to be for stuff shared
+> > between a bunch of mach-* directories.
+> 
+> In an ideal (dt) world, plat-*/ would hold all the dt source files, and
+> arch/arm/boot/dts/ would become the new mach-*/.  mach-*/ is kept around
+> for the few legacy, unconverted boards.
+> 
+> Or, am I barking up the wrong tree?
 
-Thanks,
-Yadwinder.
+I think we're not likely to get there any time soon. Most platforms in fact
+only have a mach-* directory at the moment and no plat-* directory.
+
+	Arnd
