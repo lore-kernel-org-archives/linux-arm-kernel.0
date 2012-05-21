@@ -1,43 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 21 May 2012 15:45:44 +0100
-Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
-In-Reply-To: <20120521125930.GC6206@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <20120521125930.GC6206@b20223-02.ap.freescale.net>
-Message-ID: <20120521144543.GA4063@opensource.wolfsonmicro.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Mon, 21 May 2012 17:51:57 +0300
+Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+In-Reply-To: <CAOMWX4f2N1dS8RcwYAyUpmWVKPkEHGuhMGGZ3__D-DwipsjzFQ@mail.gmail.com>
+References: <1337365122-702-1-git-send-email-nm@ti.com>
+ <20120519095237.GA26761@besouro>
+ <CAOMWX4f2N1dS8RcwYAyUpmWVKPkEHGuhMGGZ3__D-DwipsjzFQ@mail.gmail.com>
+Message-ID: <20120521145157.GA7923@besouro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 08:59:31PM +0800, Richard Zhao wrote:
+Hello,
 
-> >   ASoC: imx-audmux: add pinctrl support
-> >   ASoC: fsl_ssi: convert to use devm_clk_get
+On Mon, May 21, 2012 at 08:36:35AM -0500, ext Nishanth Menon wrote:
+>  Sat, May 19, 2012 at 4:52 AM, Eduardo Valentin <eduardo.valentin@ti.com>
+> wrote:
+> >
+> >
+> > I guess it is time to properly document this increasing busy loop delay..
+> > As it is getting closer to ms scale..
+> Does the following sound good?
+> /* Maximum time for Voltage Processor to enter or exit idle */
 
-> Linus has sent out pull request for pinctrl. So is that ok for you
-> to pick up the above two patch?
+Sounds way better :-). If you have an estimation of how long it takes
+in the average case, it might help. But I am OK already with the above,
+in case you don't have the estimation.
 
-No, apart from anything else the second patch depends on clkdev which is
-nothing to do with pinctrl!  For the first patch it wasn't clear if the
-changes in pinctrl were the actual dependencies or if there were more
-things needed from the ARM tree, and in any case until those patches are
-actually in the ASoC tree we'll break the build if they get applied.
+> 
+> Regards,
+> Nishanth Menon
 
-Guys, you really need to think about how you're organising what you're
-doing more.  You need to split your work out into focused lines of
-development rather than just having a single branch.  
+Cheers,
 
-This patch series contains a whole bunch of different changes (the
-devm_clk_get() change is as far as I can tell completely unrelated to
-the rest for example) with unclear dependencies on multiple external
-trees.  You should be splitting unrelated changes out, trying to
-minimise interdependencies, and clearly identifying the dependencies
-that are there we can get things applied in a timely fashion.
-
-Please resend these patches *after* their dependencies are in mainline.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/5be3e67e/attachment.sig>
+--
+Eduardo Valentin
