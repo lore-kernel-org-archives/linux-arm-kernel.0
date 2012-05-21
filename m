@@ -1,337 +1,61 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Mon, 21 May 2012 11:49:10 -0500
-Subject: [PATCH] remoteproc: allocate vrings on demand,
- free when not needed
-In-Reply-To: <1337515228-31910-1-git-send-email-ohad@wizery.com>
-References: <1337515228-31910-1-git-send-email-ohad@wizery.com>
-Message-ID: <CACY--9FBeNHDVMtLC09OtMm=t3ZFw2Gtipn+8ojAEqHAJebSnQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 21 May 2012 12:58:00 -0400
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521161131.GC24270@n2100.arm.linux.org.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205192042140.13185@xanadu.home>
+ <20120520095502.GB25344@n2100.arm.linux.org.uk>
+ <201205201058.38144.arnd@arndb.de>
+ <20120520111025.GC25344@n2100.arm.linux.org.uk>
+ <20120521013050.GL24238@titan.lakedaemon.net>
+ <20120521093042.GE25344@n2100.arm.linux.org.uk>
+ <20120521153559.GN24238@titan.lakedaemon.net>
+ <20120521161131.GC24270@n2100.arm.linux.org.uk>
+Message-ID: <20120521165800.GR24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me.
+On Mon, May 21, 2012 at 05:11:31PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 21, 2012 at 11:35:59AM -0400, Jason Cooper wrote:
+> > mach-mvebu/'s directory tree structure could be:
+> > 	include/	# no headers
+> > 	include/mach/	# headers used by drivers, etc
+> > 	include/board/	# common headers used by legacy board files
+> > 	board/		# common source code for legacy board files
+> > 
+> > The end goal being to empty and remove the board/'s and remove the other
+> > mach-*/ directories.
+> 
+> Looking at what's in dove, kirkwood, mv78xx0 and orion5x directories,
+> I don't see many board specific files.  The only two I can see are
+> leds-*.h, which are shared with platform drivers in drivers/leds.
+> 
+> We have a place for this already - include/linux/platform_data.
+> 
+> So I don't think we need include/board/ at all.
 
- Tested-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
+Fair enough, we can move that.
 
-Regards,
-Fernando.
+> I'd also suggest going against our current setup of not having "board/"
+> subdirectories in mach-*.  Just name them board-foo.c.
 
+This is what we are currently doing for boards in the midst of DT
+conversion.  In mach-kirkwood/ there is board-dt.c, and
+board-dreamplug.c.  board-dt.c is the DT code, while board-dreamplug.c
+is board specific init code that hasn't been converted to DT yet.  Once
+converted, board-dreamplug.c will disappear.  This follows what tegra is
+doing.
 
-On Sun, May 20, 2012 at 7:00 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->
-> Dynamically allocate the vrings' DMA when the remote processor
-> is about to be powered on (i.e. when ->find_vqs() is invoked),
-> and release them as soon as it is powered off (i.e. when ->del_vqs()
-> is invoked).
->
-> The obvious and immediate benefit is better memory utilization, since
-> memory for the vrings is now only allocated when the relevant remote
-> processor is being used.
->
-> Additionally, this approach also makes recovery of a (crashing)
-> remote processor easier: one just needs to remove the relevant
-> vdevs, and the entire vrings cleanup takes place automagically.
->
-> Tested-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
-> ?drivers/remoteproc/remoteproc_core.c ? ? | ?109
-> +++++++++++++++---------------
-> ?drivers/remoteproc/remoteproc_internal.h | ? ?2 +
-> ?drivers/remoteproc/remoteproc_virtio.c ? | ? 13 +++-
-> ?3 files changed, 67 insertions(+), 57 deletions(-)
->
-> diff --git a/drivers/remoteproc/remoteproc_core.c
-> b/drivers/remoteproc/remoteproc_core.c
-> index e756a0d..40e2b2d 100644
-> --- a/drivers/remoteproc/remoteproc_core.c
-> +++ b/drivers/remoteproc/remoteproc_core.c
-> @@ -279,34 +279,17 @@ rproc_load_segments(struct rproc *rproc, const u8
-> *elf_data, size_t len)
-> ? ? ? ?return ret;
-> ?}
->
-> -static int
-> -__rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc,
-> int i)
-> +int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
-> ?{
-> ? ? ? ?struct rproc *rproc = rvdev->rproc;
-> ? ? ? ?struct device *dev = rproc->dev;
-> - ? ? ? struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
-> + ? ? ? struct rproc_vring *rvring = &rvdev->vring[i];
-> ? ? ? ?dma_addr_t dma;
-> ? ? ? ?void *va;
-> ? ? ? ?int ret, size, notifyid;
->
-> - ? ? ? dev_dbg(dev, "vdev rsc: vring%d: da %x, qsz %d, align %d\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i, vring->da, vring->num, vring->align);
-> -
-> - ? ? ? /* make sure reserved bytes are zeroes */
-> - ? ? ? if (vring->reserved) {
-> - ? ? ? ? ? ? ? dev_err(dev, "vring rsc has non zero reserved bytes\n");
-> - ? ? ? ? ? ? ? return -EINVAL;
-> - ? ? ? }
-> -
-> - ? ? ? /* verify queue size and vring alignment are sane */
-> - ? ? ? if (!vring->num || !vring->align) {
-> - ? ? ? ? ? ? ? dev_err(dev, "invalid qsz (%d) or alignment (%d)\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? vring->num, vring->align);
-> - ? ? ? ? ? ? ? return -EINVAL;
-> - ? ? ? }
-> -
-> ? ? ? ?/* actual size of vring (in bytes) */
-> - ? ? ? size = PAGE_ALIGN(vring_size(vring->num, vring->align));
-> + ? ? ? size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
->
-> ? ? ? ?if (!idr_pre_get(&rproc->notifyids, GFP_KERNEL)) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "idr_pre_get failed\n");
-> @@ -316,6 +299,7 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct
-> fw_rsc_vdev *rsc, int i)
-> ? ? ? ?/*
-> ? ? ? ? * Allocate non-cacheable memory for the vring. In the future
-> ? ? ? ? * this call will also configure the IOMMU for us
-> + ? ? ? ?* TODO: let the rproc know the da of this vring
-> ? ? ? ? */
-> ? ? ? ?va = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
-> ? ? ? ?if (!va) {
-> @@ -323,44 +307,67 @@ __rproc_handle_vring(struct rproc_vdev *rvdev,
-> struct fw_rsc_vdev *rsc, int i)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
->
-> - ? ? ? /* assign an rproc-wide unique index for this vring */
-> - ? ? ? /* TODO: assign a notifyid for rvdev updates as well */
-> - ? ? ? ret = idr_get_new(&rproc->notifyids, &rvdev->vring[i], &notifyid);
-> + ? ? ? /*
-> + ? ? ? ?* Assign an rproc-wide unique index for this vring
-> + ? ? ? ?* TODO: assign a notifyid for rvdev updates as well
-> + ? ? ? ?* TODO: let the rproc know the notifyid of this vring
-> + ? ? ? ?* TODO: support predefined notifyids (via resource table)
-> + ? ? ? ?*/
-> + ? ? ? ret = idr_get_new(&rproc->notifyids, rvring, &notifyid);
-> ? ? ? ?if (ret) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "idr_get_new failed: %d\n", ret);
-> ? ? ? ? ? ? ? ?dma_free_coherent(dev, size, va, dma);
-> ? ? ? ? ? ? ? ?return ret;
-> ? ? ? ?}
->
-> - ? ? ? /* let the rproc know the da and notifyid of this vring */
-> - ? ? ? /* TODO: expose this to remote processor */
-> - ? ? ? vring->da = dma;
-> - ? ? ? vring->notifyid = notifyid;
-> -
-> ? ? ? ?dev_dbg(dev, "vring%d: va %p dma %x size %x idr %d\n", i, va,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma, size, notifyid);
->
-> - ? ? ? rvdev->vring[i].len = vring->num;
-> - ? ? ? rvdev->vring[i].align = vring->align;
-> - ? ? ? rvdev->vring[i].va = va;
-> - ? ? ? rvdev->vring[i].dma = dma;
-> - ? ? ? rvdev->vring[i].notifyid = notifyid;
-> - ? ? ? rvdev->vring[i].rvdev = rvdev;
-> + ? ? ? rvring->va = va;
-> + ? ? ? rvring->dma = dma;
-> + ? ? ? rvring->notifyid = notifyid;
->
-> ? ? ? ?return 0;
-> ?}
->
-> -static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
-> +static int
-> +rproc_parse_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int
-> i)
-> ?{
-> ? ? ? ?struct rproc *rproc = rvdev->rproc;
-> + ? ? ? struct device *dev = rproc->dev;
-> + ? ? ? struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
-> + ? ? ? struct rproc_vring *rvring = &rvdev->vring[i];
->
-> - ? ? ? for (i--; i >= 0; i--) {
-> - ? ? ? ? ? ? ? struct rproc_vring *rvring = &rvdev->vring[i];
-> - ? ? ? ? ? ? ? int size = PAGE_ALIGN(vring_size(rvring->len,
-> rvring->align));
-> + ? ? ? dev_dbg(dev, "vdev rsc: vring%d: da %x, qsz %d, align %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i, vring->da, vring->num, vring->align);
-> +
-> + ? ? ? /* make sure reserved bytes are zeroes */
-> + ? ? ? if (vring->reserved) {
-> + ? ? ? ? ? ? ? dev_err(dev, "vring rsc has non zero reserved bytes\n");
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
->
-> - ? ? ? ? ? ? ? dma_free_coherent(rproc->dev, size, rvring->va,
-> rvring->dma);
-> - ? ? ? ? ? ? ? idr_remove(&rproc->notifyids, rvring->notifyid);
-> + ? ? ? /* verify queue size and vring alignment are sane */
-> + ? ? ? if (!vring->num || !vring->align) {
-> + ? ? ? ? ? ? ? dev_err(dev, "invalid qsz (%d) or alignment (%d)\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? vring->num, vring->align);
-> + ? ? ? ? ? ? ? return -EINVAL;
-> ? ? ? ?}
-> +
-> + ? ? ? rvring->len = vring->num;
-> + ? ? ? rvring->align = vring->align;
-> + ? ? ? rvring->rvdev = rvdev;
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +void rproc_free_vring(struct rproc_vring *rvring)
-> +{
-> + ? ? ? int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
-> + ? ? ? struct rproc *rproc = rvring->rvdev->rproc;
-> +
-> + ? ? ? dma_free_coherent(rproc->dev, size, rvring->va, rvring->dma);
-> + ? ? ? idr_remove(&rproc->notifyids, rvring->notifyid);
-> ?}
->
-> ?/**
-> @@ -425,11 +432,11 @@ static int rproc_handle_vdev(struct rproc *rproc,
-> struct fw_rsc_vdev *rsc,
->
-> ? ? ? ?rvdev->rproc = rproc;
->
-> - ? ? ? /* allocate the vrings */
-> + ? ? ? /* parse the vrings */
-> ? ? ? ?for (i = 0; i < rsc->num_of_vrings; i++) {
-> - ? ? ? ? ? ? ? ret = __rproc_handle_vring(rvdev, rsc, i);
-> + ? ? ? ? ? ? ? ret = rproc_parse_vring(rvdev, rsc, i);
-> ? ? ? ? ? ? ? ?if (ret)
-> - ? ? ? ? ? ? ? ? ? ? ? goto free_vrings;
-> + ? ? ? ? ? ? ? ? ? ? ? goto free_rvdev;
-> ? ? ? ?}
->
-> ? ? ? ?/* remember the device features */
-> @@ -440,12 +447,11 @@ static int rproc_handle_vdev(struct rproc *rproc,
-> struct fw_rsc_vdev *rsc,
-> ? ? ? ?/* it is now safe to add the virtio device */
-> ? ? ? ?ret = rproc_add_virtio_dev(rvdev, rsc->id);
-> ? ? ? ?if (ret)
-> - ? ? ? ? ? ? ? goto free_vrings;
-> + ? ? ? ? ? ? ? goto free_rvdev;
->
-> ? ? ? ?return 0;
->
-> -free_vrings:
-> - ? ? ? __rproc_free_vrings(rvdev, i);
-> +free_rvdev:
-> ? ? ? ?kfree(rvdev);
-> ? ? ? ?return ret;
-> ?}
-> @@ -1265,18 +1271,11 @@ EXPORT_SYMBOL(rproc_shutdown);
-> ?void rproc_release(struct kref *kref)
-> ?{
-> ? ? ? ?struct rproc *rproc = container_of(kref, struct rproc, refcount);
-> - ? ? ? struct rproc_vdev *rvdev, *rvtmp;
->
-> ? ? ? ?dev_info(rproc->dev, "removing %s\n", rproc->name);
->
-> ? ? ? ?rproc_delete_debug_dir(rproc);
->
-> - ? ? ? /* clean up remote vdev entries */
-> - ? ? ? list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node) {
-> - ? ? ? ? ? ? ? __rproc_free_vrings(rvdev, RVDEV_NUM_VRINGS);
-> - ? ? ? ? ? ? ? list_del(&rvdev->node);
-> - ? ? ? }
-> -
-> ? ? ? ?/*
-> ? ? ? ? * At this point no one holds a reference to rproc anymore,
-> ? ? ? ? * so we can directly unroll rproc_alloc()
-> @@ -1547,7 +1546,7 @@ EXPORT_SYMBOL(rproc_free);
-> ?*/
-> ?int rproc_unregister(struct rproc *rproc)
-> ?{
-> - ? ? ? struct rproc_vdev *rvdev;
-> + ? ? ? struct rproc_vdev *rvdev, *tmp;
->
-> ? ? ? ?if (!rproc)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -1556,7 +1555,7 @@ int rproc_unregister(struct rproc *rproc)
-> ? ? ? ?wait_for_completion(&rproc->firmware_loading_complete);
->
-> ? ? ? ?/* clean up remote vdev entries */
-> - ? ? ? list_for_each_entry(rvdev, &rproc->rvdevs, node)
-> + ? ? ? list_for_each_entry_safe(rvdev, tmp, &rproc->rvdevs, node)
-> ? ? ? ? ? ? ? ?rproc_remove_virtio_dev(rvdev);
->
-> ? ? ? ?/* the rproc is downref'ed as soon as it's removed from the klist
-> */
-> diff --git a/drivers/remoteproc/remoteproc_internal.h
-> b/drivers/remoteproc/remoteproc_internal.h
-> index 9f336d6..f4957cf 100644
-> --- a/drivers/remoteproc/remoteproc_internal.h
-> +++ b/drivers/remoteproc/remoteproc_internal.h
-> @@ -41,4 +41,6 @@ void rproc_create_debug_dir(struct rproc *rproc);
-> ?void rproc_init_debugfs(void);
-> ?void rproc_exit_debugfs(void);
->
-> +void rproc_free_vring(struct rproc_vring *rvring);
-> +int rproc_alloc_vring(struct rproc_vdev *rvdev, int i);
-> ?#endif /* REMOTEPROC_INTERNAL_H */
-> diff --git a/drivers/remoteproc/remoteproc_virtio.c
-> b/drivers/remoteproc/remoteproc_virtio.c
-> index ecf6121..26a7144 100644
-> --- a/drivers/remoteproc/remoteproc_virtio.c
-> +++ b/drivers/remoteproc/remoteproc_virtio.c
-> @@ -77,14 +77,17 @@ static struct virtqueue *rp_find_vq(struct
-> virtio_device *vdev,
-> ? ? ? ?struct rproc_vring *rvring;
-> ? ? ? ?struct virtqueue *vq;
-> ? ? ? ?void *addr;
-> - ? ? ? int len, size;
-> + ? ? ? int len, size, ret;
->
-> ? ? ? ?/* we're temporarily limited to two virtqueues per rvdev */
-> ? ? ? ?if (id >= ARRAY_SIZE(rvdev->vring))
-> ? ? ? ? ? ? ? ?return ERR_PTR(-EINVAL);
->
-> - ? ? ? rvring = &rvdev->vring[id];
-> + ? ? ? ret = rproc_alloc_vring(rvdev, id);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? return ERR_PTR(ret);
->
-> + ? ? ? rvring = &rvdev->vring[id];
-> ? ? ? ?addr = rvring->va;
-> ? ? ? ?len = rvring->len;
->
-> @@ -103,6 +106,7 @@ static struct virtqueue *rp_find_vq(struct
-> virtio_device *vdev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?rproc_virtio_notify, callback,
-> name);
-> ? ? ? ?if (!vq) {
-> ? ? ? ? ? ? ? ?dev_err(rproc->dev, "vring_new_virtqueue %s failed\n",
-> name);
-> + ? ? ? ? ? ? ? rproc_free_vring(rvring);
-> ? ? ? ? ? ? ? ?return ERR_PTR(-ENOMEM);
-> ? ? ? ?}
->
-> @@ -125,6 +129,7 @@ static void rproc_virtio_del_vqs(struct virtio_device
-> *vdev)
-> ? ? ? ? ? ? ? ?rvring = vq->priv;
-> ? ? ? ? ? ? ? ?rvring->vq = NULL;
-> ? ? ? ? ? ? ? ?vring_del_virtqueue(vq);
-> + ? ? ? ? ? ? ? rproc_free_vring(rvring);
-> ? ? ? ?}
-> ?}
->
-> @@ -228,8 +233,12 @@ static struct virtio_config_ops
-> rproc_virtio_config_ops = {
-> ?static void rproc_vdev_release(struct device *dev)
-> ?{
-> ? ? ? ?struct virtio_device *vdev = dev_to_virtio(dev);
-> + ? ? ? struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
-> ? ? ? ?struct rproc *rproc = vdev_to_rproc(vdev);
->
-> + ? ? ? list_del(&rvdev->node);
-> + ? ? ? kfree(rvdev);
-> +
-> ? ? ? ?kref_put(&rproc->refcount, rproc_release);
-> ?}
->
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+We can leave the legacy, unconverted boards where they are
+(mach-kirkwood/guruplug-setup.c), but what about the common code they
+depend on (mpp.c, pcie.c, etc)?  That's what I was suggesting putting in
+mach-mvebu/board/...
+
+Of course, we could leave everything alone (keep plat-orion/ as is), and
+create mach-mvebu/ for all devicetree boards under the mvebu umbrella.
+As boards are converted/moved to mach-mvebu/, they are deleted from
+their original mach-*/  All new boards would also go into mach-mvebu/
+
+thx,
+
+Jason.
