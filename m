@@ -1,169 +1,68 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 21 May 2012 15:53:18 +0200
-Subject: [PATCH 2/6] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <4FB4CD45.4050807@ti.com>
-References: <1334752782-28804-1-git-send-email-j-pihet@ti.com>
- <1334752782-28804-3-git-send-email-j-pihet@ti.com>
- <alpine.DEB.2.00.1205070043230.9984@utopia.booyaka.com>
- <CAORVsuXUbz_f54x=hoFLEQpfAGTDcZGnTQ-fBgY_j415LC0TiQ@mail.gmail.com>
- <4FB4CD45.4050807@ti.com>
-Message-ID: <CAORVsuWgn5Zuf9T1eVBjJJhTGL5jrY=hirTaZp8E2HprzbvHng@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 21 May 2012 17:00:40 +0300
+Subject: [PATCH 1/7] remoteproc: resource table overhaul
+In-Reply-To: <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
+References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
+ <1330589497-4139-2-git-send-email-ohad@wizery.com>
+ <4F6354E4.8030704@monstr.eu>
+ <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
+ <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
+ <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
+Message-ID: <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Hi Michal,
 
-On Thu, May 17, 2012 at 12:04 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Jean,
-> On Tuesday 08 May 2012 02:10 PM, Jean Pihet wrote:
->> Paul,
->>
->> On Mon, May 7, 2012 at 11:28 AM, Paul Walmsley <paul@pwsan.com> wrote:
->>> Hi
->>>
->>> On Wed, 18 Apr 2012, jean.pihet at newoldbits.com wrote:
->>>
->>>> From: Jean Pihet <j-pihet@ti.com>
->>>>
->>>> Introduce functional (or logical) states for power domains and the
->>>> API functions to read the power domains settings and to convert
->>>> between the functional (i.e. logical) and the internal (or registers)
->>>> values.
->>>>
->>>> OMAP2, OMAP3 and OMAP4 platforms are defining a conversion routine.
->>>>
->>>> In the new API the function omap_set_pwrdm_state takes the functional
->>>> states as parameter; while at it the function is moved to the power
->>>> domains code.
->>>>
->>>> The memory and logic states are not using the functional states, this
->>>> comes as a subsequent patch.
->>>>
->>>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->>>
->>> This patch results in several checkpatch warnings; please resolve them.
->> Oops. Will check and update.
->>
->>>
->>>> ---
->>>> ?arch/arm/mach-omap2/pm.c ? ? ? ? ? ? ? ? ? | ? 66 -----------
->>>> ?arch/arm/mach-omap2/powerdomain-common.c ? | ? 61 ++++++++++
->>>> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ?| ?175 ++++++++++++++++++++++++++++
->>>> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ?| ? 21 ++++
->>>> ?arch/arm/mach-omap2/powerdomain2xxx_3xxx.c | ? ?5 +
->>>> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ?| ? ?2 +
->>>> ?6 files changed, 264 insertions(+), 66 deletions(-)
->>>>
->> ...
->>
->>>> +/*
->>>> + * Functional (i.e. logical) to internal (i.e. registers)
->>>> + * values for the power domains states
->>>> + */
->>>
->>> Please use kerneldoc-style function comments.
->> Ok
->>
->>>
->>>> +int omap2_pwrdm_func_to_pwrst(struct powerdomain *pwrdm, u8 func_pwrst)
->>>> +{
->>>> + ? ? int ret;
->>>> +
->>>> + ? ? switch (func_pwrst) {
->>>> + ? ? case PWRDM_FUNC_PWRST_ON:
->>>> + ? ? ? ? ? ? ret = PWRDM_POWER_ON;
->>>> + ? ? ? ? ? ? break;
->>>> + ? ? case PWRDM_FUNC_PWRST_INACTIVE:
->>>> + ? ? ? ? ? ? ret = PWRDM_POWER_INACTIVE;
->>>> + ? ? ? ? ? ? break;
->>>> + ? ? case PWRDM_FUNC_PWRST_CSWR:
->>>> + ? ? case PWRDM_FUNC_PWRST_OSWR:
->>>> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
->>>> + ? ? ? ? ? ? break;
->>>> + ? ? case PWRDM_FUNC_PWRST_OFF:
->>>> + ? ? ? ? ? ? ret = PWRDM_POWER_OFF;
->>>> + ? ? ? ? ? ? break;
->>>> + ? ? default:
->>>> + ? ? ? ? ? ? ret = -1;
->>>> + ? ? }
->>>> +
->>>> + ? ? return ret;
->>>> +}
->>>
->>> At a quick glance, I don't think that this function is appropriate for all
->>> OMAP2+ chips. ?For example, off-mode is not supported in our OMAP2xxx
->>> kernels. ?And OMAP2xxx/3xxx do not support the INACTIVE powerstate. ?So
->>> probably this function should differ by chip, and be located in the
->>> powerdomain[2-4]*xx*.c files.
->> I hope to make this function as generic as possible, hence the
->> location (powerdomain-common.c). Some states are not programmed by the
->> pwrdm_* functions since there forbidden by the contents of the
->> pwrdm->pwrst field.
->> Now if the need arises some platform specific function can be defined
->> for conversion functions since the pwrdm->ops function pointers are
->> used. I do not think it is needed now but it can easily be changed.
->>
->>> Also, what about the logic and memory bank power states? ?Shouldn't this
->>> function pass those back as well?
->> Cf. in the description "The memory and logic states are not using the
->> functional states, this comes as a subsequent patch."
->>
-> I don't see much difference between the functional power states to
-> actual power states with some cases here and there.
->
-> + ? ? case PWRDM_FUNC_PWRST_CSWR:
-> + ? ? case PWRDM_FUNC_PWRST_OSWR:
-> + ? ? ? ? ? ? ret = PWRDM_POWER_RET;
-The whole patch series takes the logic state into account in the
-functional power state.
-Cf. in the description "The memory and logic states are not using the
-functional states, this comes as a subsequent patch."
+On Mon, May 21, 2012 at 4:02 PM, Michal Simek <monstr@monstr.eu> wrote:
+> I have looked at it and tested on latest and greatest and the problem is
+> still there.
 
-> This is not true and even if you add logic/memmort etc support,
-> I still think, we are just duplicating stuff between functional
-> vs actual power state.
-The idea is to provide a single function to program the power domains
-state, including the logic state.
-There is no duplication of code, just a simplification in the API. IMO
-there are too much calls to set and get the power domain states (power
-state, logical etc.) and most of the calls do not take the logical
-state into account.
-If you look the the code in pmxxxx.c and cpuidlexxxx.c you will notice
-that the code is simplified.
+Ok, I see why this is happening.
 
-> If the idea is to have one single interface to program the power
-> domain states, so that Generic frameworks, or PM code movement to
-> driver/* directories is easier, we may want think about alternative
-> which is scalable.
->
-> Just a wild thought...
->
-> May be we can abstract all the necessary/used power domain programming
-> entities inside a structure and export that. That should contain, power
-> state, logic state, mem state, special quirk flags like SAR etc.
-> being structure is always expandable and an API taking structure as
-> a parameter need not change.
-That is the goal. This patch series uses the date from the platform
-specific power domain structs and abstracts those in the API.
+We're now allocating the vrings' DMA in ->find_vqs() just before we
+boot the remote processor, and we release it on ->del_vqs(). These are
+the virtio handlers for setting up and tearing down the vrings, so it
+makes sense to do so, but as a result, we still don't get the early
+carveout allocation you wanted.
 
-So in summary I would say that the power domain code callers do
-benefit from the API simplification and the abstraction of thr power
-domains parameters:
-- cpuidle: the logic state field is removed from the structs; the
-power domain state checks are simplified,
-- per-device PM QoS: the latency parameters are specified for every
-functional power state,
-- pmxxxx.c: the suspend/resume code is simplified; the power domain
-state checks are simplified.
+> I have looked at the code and path is
+> rproc_fw_config_virtio -> rproc_handliefirtion_rsc -> rproc_handle_vdev
 
->
-> Regards
-> Santosh
->
+Please note that rproc_handle_vdev doesn't allocate any DMA at this
+point, and the allocation path is now quite different - it begins with
+virtio_rpmsg_bus probing and then calling into the ->find_vqs()
+handler.
 
-What do you think?
+> For me it is necessary to ensure that dma_alloc_coherent in
+> rproc_alloc_vring is called after carveout allocation
+> just because dma_alloc_cohorent takes mermory from preallocated pool which
+> starts at 0x0.
+
+ok.
+
+> I also don't have
+> any other advance mechanism how to ensure mapping for the second arm core.
+
+Probably the best way to ensure this (without it breaking unexpectedly
+again as remoteproc evolves) is to have separate sub-devices for
+different kind of memories, which remoteproc could then look up using
+something like device_find_child().
+
+Ludovic is exploring this direction too, because STE also needs to
+bind specific memory regions with predefined purposes, without
+depending on the order of DMA allocations.
+
+I think Ludovic already has a preliminary patch which he may be able
+to share with you.
+
+> Here is log which I need to get. Look at attached patch which exactly show
+> you what I need to do which I have tested.
+
+Yes, I see. Another temporary approach might be moving the vrings'
+allocations to the rproc_handle_rsc table (in the RSC_VDEV slot), but
+I'm not sure we want to merge this as well because this solution too
+is only hiding the real issue and not solving it permanently.
 
 Thanks,
-Jean
+Ohad.
