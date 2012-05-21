@@ -1,80 +1,99 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 19:36:40 +0200
-Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
-In-Reply-To: <20120521130556.GB18926@kroah.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
- <20120521130556.GB18926@kroah.com>
-Message-ID: <201205211936.40359.marex@denx.de>
+Date: Mon, 21 May 2012 19:38:27 +0200
+Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
+In-Reply-To: <20409.60714.663812.681159@ipc1.ka-ro>
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+ <1337562140-5739-4-git-send-email-marex@denx.de>
+ <20409.60714.663812.681159@ipc1.ka-ro>
+Message-ID: <201205211938.27993.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Greg KH,
+Dear Lothar Wa?mann,
 
-> On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
-> > This let usb phy driver has a chance to change hw settings when connect
-> > status change.
+> Hi,
+> 
+> Marek Vasut writes:
+> > The write-protect GPIO is inverted on some boards. Handle such case.
 > > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
 > > ---
 > > 
-> >  include/linux/usb/otg.h |   13 +++++++++++++
-> >  1 files changed, 13 insertions(+), 0 deletions(-)
+> >  Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
+> >  drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
 > > 
-> > diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-> > index 38ab3f4..385641d 100644
-> > --- a/include/linux/usb/otg.h
-> > +++ b/include/linux/usb/otg.h
-> > @@ -117,6 +117,10 @@ struct usb_phy {
+> > diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+> > b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt index
+> > 14d870a..0a7d2cd 100644
+> > --- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
 > > 
-> >  	int	(*set_suspend)(struct usb_phy *x,
-> >  	
-> >  				int suspend);
+> > @@ -13,6 +13,7 @@ Required properties:
+> >  Optional properties:
+> >  - wp-gpios: Specify GPIOs for write protection
 > > 
-> > +	/* notify phy connect status change */
-> > +	int	(*notify_connect_change)(struct usb_phy *x,
-> > +					 int port,
-> > +					 int connected);
+> > +- wp-inverted: Set if the write protection GPIO is inverted
+> > 
+> >  Examples:
+> > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> > index 277161d..119beb9 100644
+> > --- a/drivers/mmc/host/mxs-mmc.c
+> > +++ b/drivers/mmc/host/mxs-mmc.c
+> > @@ -164,16 +164,23 @@ struct mxs_mmc_host {
+> > 
+> >  	spinlock_t			lock;
+> >  	int				sdio_irq_en;
+> >  	int				wp_gpio;
+> > 
+> > +	int				wp_inverted:1;
 > > 
 > >  };
-> 
-> No, please make this two different callbacks.  As you see in your code
-> when you implemented this, you really have:
-> 	if (connected) {
-> 		do this...
-> 	} else {
-> 		do that...
-> 	}
-> 
-> So you there is no consolidation in the driver, so just make it 2
-> callbacks, especially as someone wanted to make connected -1 just for a
-> tristate, which would be impossible to document properly...
-
-Or he could make connected an enum maybe ?
-
-> 
-> greg k-h
-> 
-> > @@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+> >  
+> >  static int mxs_mmc_get_ro(struct mmc_host *mmc)
+> >  {
+> >  
+> >  	struct mxs_mmc_host *host = mmc_priv(mmc);
+> > 
+> > +	int ret;
+> > 
+> >  	if (!gpio_is_valid(host->wp_gpio))
+> >  	
+> >  		return -EINVAL;
+> > 
+> > -	return gpio_get_value(host->wp_gpio);
+> > +	ret = gpio_get_value(host->wp_gpio);
+> > +
+> > +	if (host->wp_inverted)
+> > +		ret = !ret;
+> > +
+> > +	return ret;
 > > 
 > >  }
 > >  
-> >  static inline int
+> >  static int mxs_mmc_get_cd(struct mmc_host *mmc)
 > > 
-> > +usb_phy_notify_connect_change(struct usb_phy *x, int port, int
-> > connected) +{
-> > +	if (x->notify_connect_change != NULL)
-> > +		return x->notify_connect_change(x, port, connected);
-> > +	else
-> > +		return 0;
-> > +}
-> > +
-> > +static inline int
+> > @@ -786,6 +793,8 @@ static int mxs_mmc_probe(struct platform_device
+> > *pdev)
 > > 
-> >  otg_start_srp(struct usb_otg *otg)
-> >  {
-> >  
-> >  	if (otg && otg->start_srp)
+> >  		else if (bus_width == 8)
+> >  		
+> >  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+> >  		
+> >  		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
+> > 
+> > +		if (of_find_property(np, "wp-inverted", NULL))
+> > +			host->wp_inverted = 1;
+> 
+> Why not simply specify the GPIO in question as being active-low in the
+> GPIO definition and use of_get_named_gpio_flags()?
+
+Just followed the cd-inverted pattern. Thanks for the hint, will poke into it.
+
+> 
+> Lothar Wa?mann
 
 Best regards,
 Marek Vasut
