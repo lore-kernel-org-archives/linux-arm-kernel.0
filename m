@@ -1,51 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 21 May 2012 12:19:49 +0200
-Subject: [PATCH 2/2] mmc: at91-mci: this driver is now deprecated
-In-Reply-To: <87pqa21wow.fsf@laptop.org>
-References: <1337183519-25459-1-git-send-email-ludovic.desroches@atmel.com>
- <1337183519-25459-3-git-send-email-ludovic.desroches@atmel.com>
- <87k40b3ris.fsf@laptop.org> <4FB54366.80409@atmel.com>
- <87pqa21wow.fsf@laptop.org>
-Message-ID: <4FBA16C5.30206@atmel.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 21 May 2012 18:19:59 +0800
+Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
+In-Reply-To: <20120521093840.GM8633@arwen.pp.htv.fi>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
+ <20120521092635.GL8633@arwen.pp.htv.fi>
+ <20120521093614.GL30755@b20223-02.ap.freescale.net>
+ <20120521093840.GM8633@arwen.pp.htv.fi>
+Message-ID: <20120521101958.GN30755@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2012 08:36 PM, Chris Ball :
-> Hi,
+On Mon, May 21, 2012 at 12:38:41PM +0300, Felipe Balbi wrote:
+> On Mon, May 21, 2012 at 05:36:16PM +0800, Richard Zhao wrote:
+> > On Mon, May 21, 2012 at 12:26:36PM +0300, Felipe Balbi wrote:
+> > > On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
+> > > > This let usb phy driver has a chance to change hw settings when connect
+> > > > status change.
+> > > > 
+> > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > > ---
+> > > >  include/linux/usb/otg.h |   13 +++++++++++++
+> > > >  1 files changed, 13 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
+> > > > index 38ab3f4..385641d 100644
+> > > > --- a/include/linux/usb/otg.h
+> > > > +++ b/include/linux/usb/otg.h
+> > > > @@ -117,6 +117,10 @@ struct usb_phy {
+> > > >  	int	(*set_suspend)(struct usb_phy *x,
+> > > >  				int suspend);
+> > > >  
+> > > > +	/* notify phy connect status change */
+> > > > +	int	(*notify_connect_change)(struct usb_phy *x,
+> > > > +					 int port,
+> > > > +					 int connected);
+> > > >  };
+> > > >  
+> > > >  
+> > > > @@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+> > > >  }
+> > > >  
+> > > >  static inline int
+> > > > +usb_phy_notify_connect_change(struct usb_phy *x, int port, int connected)
+> > > > +{
+> > > > +	if (x->notify_connect_change != NULL)
+> > > 
+> > > you don't need this != NULL. See that no other wrapper has it. Keep
+> > > consistency.
+> > notify_connect_change callback is not a must. I just let the phy driver
+> > have a chance to do whatever it needs to do.
 > 
-> On Thu, May 17 2012, ludovic.desroches wrote:
->>>> +	  remove soon (for more information have a look to
->>>            ^ removed
->>>> +	  Documentation/feature-removal-schedule.txt). Please use
->>>> +	  MMC_ATMEL_MCI.
->>>>
->>>>   	  If unsure, say N.
->>
->> Sorry for the typo, do you want a new patch or is ok?
+> what I meant was:
 > 
-> It's okay, I've fixed it up here.
+> -	if (x->notify_connect_change != NULL)
+> +	if (x->notify_connect_change)
+Ah, Sure.
+
+Thanks
+Richard
 > 
->>> Seems like I should take this patch 2/2, and then someone else should
->>> merge 1/2?
->>
->> Yes, Nicolas would probably take patch 2/2.
+> > > Also, this is the kind of stuff that I have been queueing for Greg so I
+> > > should be in Cc.
+> > Ah, I'm really sorry. I just find out I used the result of get_maintainer
+> > for v1 patchset.
 > 
-> I think you must mean that Nicolas takes 1/2 (the arch/arm/ patches).
-> Assuming you do, that's fine and I've pushed 2/2 to mmc-next for 3.5 now.
-
-Ludovic and Chris,
-
-Sure, I will take 1/2 patch of this series through arm-soc.
-Unfortunately, it seems to be a bit late for 3.5...
-
-Anyway, I will talk with Arnd and Olof about the possibility to include
-it in a "late" or "staging" branch: that will allow this platform data
-addition to have some exposure in linux-next.
-We can also imagine that having a better support for atmel-mci driver in
-AT91 boards will help people gain a more stable system and avoid using a
-now "deprecated" driver that will be removed in 3.7. So I am personally
-in favor for an inclusion as soon as possible...
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+> hmm... ok, looks like I should patch MAINTAINERS file for that :-p
+> 
+> Greg, is it ok ?
+> 
+> -- 
+> balbi
