@@ -1,27 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 May 2012 11:40:52 +0200
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <4FBA0A83.1030201@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <20120518191832.GC24238@titan.lakedaemon.net>
- <201205182044.26409.arnd@arndb.de>
- <4FBA030F.4050101@codethink.co.uk> <20120521091615.GD14362@lunn.ch>
- <4FBA0A83.1030201@codethink.co.uk>
-Message-ID: <20120521094052.GA22191@lunn.ch>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 21 May 2012 15:13:17 +0530
+Subject: [PATCHv2 14/19] ARM: OMAP4: wakeupgen: enable clocks for
+ save_secure_all
+In-Reply-To: <1337593097.28274.19.camel@sokoban>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-15-git-send-email-t-kristo@ti.com> <871umj4qnl.fsf@ti.com>
+ <1337593097.28274.19.camel@sokoban>
+Message-ID: <CAMQu2gw4XwO_pAHnHNzwY_xQ4_tHS7a3iAFMxLL1ddV8xHwPvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Personally, my view is leave it alone and just add a new machine
-> directory.
-> 
-> Pushing items around doesn't really help the amount of code in the
-> kernel, the organisation does not add more than a line or two to the
-> Makefiles.
+On Mon, May 21, 2012 at 3:08 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> On Wed, 2012-05-16 at 17:06 -0700, Kevin Hilman wrote:
+>> +Benoit
+>>
+>> Tero Kristo <t-kristo@ti.com> writes:
+>>
+>> > save_secure_all needs l3_main_3_ick and l4_secure_clkdm enabled,
+>> > otherwise the secure ROM code will crash.
+>> >
+>> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>
+>> I think I mentioned this already (I'm already lost in what I've said for
+>> thisseries), but I don't think the secure RAM stuff belongs in the
+>> wakeupgen driver.
+>
+> As mentioned, save_secure_all saves:
+> - secure RAM
+> - GIC registers
+> - some other mysterious stuff
+(mysterious:  Entire firewall registers )
 
-It does however make it easier to see where the same code has been
-cut/paste. There is some stuff in the various Orion mach- directories
-which is repeated 4 times. The Armada XP port wanted to add a 5th
-copy. All this repeated code needs to be put into plat-orion.
-
-      Andrew
+Regards
+Santosh
