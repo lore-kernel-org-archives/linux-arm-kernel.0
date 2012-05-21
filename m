@@ -1,73 +1,39 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 05:36:06 +0200
-Subject: [PATCH] mmc: mxs-mmc: Add wp-inverted property
-Message-ID: <1337571366-7779-1-git-send-email-marex@denx.de>
+Date: Mon, 21 May 2012 05:36:29 +0200
+Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
+In-Reply-To: <877gw6kykb.fsf@laptop.org>
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+ <CAAQ0ZWRxe0+xuJ0tWMX-kum0NPLpEQCkCdYD2zrOE_z6Mjpung@mail.gmail.com>
+ <877gw6kykb.fsf@laptop.org>
+Message-ID: <201205210536.29959.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The write-protect GPIO is inverted on some boards. Handle such case.
+Dear Chris Ball,
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: Chris Ball <cjb@laptop.org>
----
- Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
- drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+> Hi,
+> 
+> On Sun, May 20 2012, Shawn Guo wrote:
+> > On 21 May 2012 10:38, Marek Vasut <marex@denx.de> wrote:
+> >>> The subject prefix can better be "mmc: mxs-mmc: ".
+> >> 
+> >> Want me to resend it ?
+> > 
+> > It's Chris' call.
+> 
+> Yes, please -- actually not just because of the subject prefix, which I
+> wouldn't mind fixing myself, but because I like having patches posted to
+> linux-mmc@ before they're applied.
 
-V2: Adjust the subject, Cc linux-mmc
+Fixed now
 
-diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-index 14d870a..0a7d2cd 100644
---- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-@@ -13,6 +13,7 @@ Required properties:
- 
- Optional properties:
- - wp-gpios: Specify GPIOs for write protection
-+- wp-inverted: Set if the write protection GPIO is inverted
- 
- Examples:
- 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 277161d..119beb9 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -164,16 +164,23 @@ struct mxs_mmc_host {
- 	spinlock_t			lock;
- 	int				sdio_irq_en;
- 	int				wp_gpio;
-+	int				wp_inverted:1;
- };
- 
- static int mxs_mmc_get_ro(struct mmc_host *mmc)
- {
- 	struct mxs_mmc_host *host = mmc_priv(mmc);
-+	int ret;
- 
- 	if (!gpio_is_valid(host->wp_gpio))
- 		return -EINVAL;
- 
--	return gpio_get_value(host->wp_gpio);
-+	ret = gpio_get_value(host->wp_gpio);
-+
-+	if (host->wp_inverted)
-+		ret = !ret;
-+
-+	return ret;
- }
- 
- static int mxs_mmc_get_cd(struct mmc_host *mmc)
-@@ -786,6 +793,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 		else if (bus_width == 8)
- 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
- 		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
-+		if (of_find_property(np, "wp-inverted", NULL))
-+			host->wp_inverted = 1;
- 	} else {
- 		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
- 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
--- 
-1.7.10
+> 
+> Thanks!
+
+You're welcome :)
+
+> 
+> - Chris.
+
+Best regards,
+Marek Vasut
