@@ -1,74 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 May 2012 12:38:41 +0300
-Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
-In-Reply-To: <20120521093614.GL30755@b20223-02.ap.freescale.net>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
- <20120521092635.GL8633@arwen.pp.htv.fi>
- <20120521093614.GL30755@b20223-02.ap.freescale.net>
-Message-ID: <20120521093840.GM8633@arwen.pp.htv.fi>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 May 2012 11:40:52 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <4FBA0A83.1030201@codethink.co.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de>
+ <4FBA030F.4050101@codethink.co.uk> <20120521091615.GD14362@lunn.ch>
+ <4FBA0A83.1030201@codethink.co.uk>
+Message-ID: <20120521094052.GA22191@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:36:16PM +0800, Richard Zhao wrote:
-> On Mon, May 21, 2012 at 12:26:36PM +0300, Felipe Balbi wrote:
-> > On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
-> > > This let usb phy driver has a chance to change hw settings when connect
-> > > status change.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > > ---
-> > >  include/linux/usb/otg.h |   13 +++++++++++++
-> > >  1 files changed, 13 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-> > > index 38ab3f4..385641d 100644
-> > > --- a/include/linux/usb/otg.h
-> > > +++ b/include/linux/usb/otg.h
-> > > @@ -117,6 +117,10 @@ struct usb_phy {
-> > >  	int	(*set_suspend)(struct usb_phy *x,
-> > >  				int suspend);
-> > >  
-> > > +	/* notify phy connect status change */
-> > > +	int	(*notify_connect_change)(struct usb_phy *x,
-> > > +					 int port,
-> > > +					 int connected);
-> > >  };
-> > >  
-> > >  
-> > > @@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
-> > >  }
-> > >  
-> > >  static inline int
-> > > +usb_phy_notify_connect_change(struct usb_phy *x, int port, int connected)
-> > > +{
-> > > +	if (x->notify_connect_change != NULL)
-> > 
-> > you don't need this != NULL. See that no other wrapper has it. Keep
-> > consistency.
-> notify_connect_change callback is not a must. I just let the phy driver
-> have a chance to do whatever it needs to do.
+> Personally, my view is leave it alone and just add a new machine
+> directory.
+> 
+> Pushing items around doesn't really help the amount of code in the
+> kernel, the organisation does not add more than a line or two to the
+> Makefiles.
 
-what I meant was:
+It does however make it easier to see where the same code has been
+cut/paste. There is some stuff in the various Orion mach- directories
+which is repeated 4 times. The Armada XP port wanted to add a 5th
+copy. All this repeated code needs to be put into plat-orion.
 
--	if (x->notify_connect_change != NULL)
-+	if (x->notify_connect_change)
-
-> > Also, this is the kind of stuff that I have been queueing for Greg so I
-> > should be in Cc.
-> Ah, I'm really sorry. I just find out I used the result of get_maintainer
-> for v1 patchset.
-
-hmm... ok, looks like I should patch MAINTAINERS file for that :-p
-
-Greg, is it ok ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/52db93ea/attachment.sig>
+      Andrew
