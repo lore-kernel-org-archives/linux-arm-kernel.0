@@ -1,111 +1,52 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 22 May 2012 09:19:25 +1000
-Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20
- dtsi files
-In-Reply-To: <4FBA1483.4010008@atmel.com>
-References: <4FB3B1F3.6080102@atmel.com>
- <1337182626-13033-1-git-send-email-nicolas.ferre@atmel.com>
- <201205161850.54765.arnd@arndb.de>
- <20120517150601.GA28104@kroah.com>
- <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
- <4FBA1483.4010008@atmel.com>
-Message-ID: <20120522091925.a77c21afb66e52749157b86e@canb.auug.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 May 2012 07:26:18 +0800
+Subject: [GIT PULL] DT clk binding support
+In-Reply-To: <4FBA89E3.7010106@gmail.com>
+References: <4FB80F32.5090309@gmail.com>
+ <20120520030653.GB5810@S2100-06.ap.freescale.net>
+ <4FB9A5E7.2070000@gmail.com>
+ <20120521064901.GE8140@S2101-09.ap.freescale.net>
+ <4FBA89E3.7010106@gmail.com>
+Message-ID: <20120521232616.GF8140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Mon, 21 May 2012 12:10:11 +0200 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->
-> After checking the current status of
-> arch/arm/boot/dts/at91sam9g20.dtsi in linux-next, it seems the merge
-> resolution has not produced a good result:
+On Mon, May 21, 2012 at 01:30:59PM -0500, Rob Herring wrote:
+> > With the bindings here, I need something like below in device tree to
+> > replace the clk lookup registration that is currently done in imx6q
+> > sabrelite specific setup code.  However the problem here is I have cko
+> > defined in clock driver, and thus I can not give phandle to cko in
+> > device tree.  What I suggest is for such cases, we could require
+> > clock-names = "cko" than clocks = <&cko>, and of_clk_get() should also
+> > be able to find the clock with looking for the clk name.
+> > 
+> > imx6q-sabrelite.dts:
+> > 
+> > 	codec: sgtl5000 at 0a {
+> > 		compatible = "fsl,sgtl5000";
+> > 		reg = <0x0a>;
+> > 		clocks = <&cko>;
+> > 	};
+> > 
+> > mach-imx6q.c, imx6q_sabrelite_cko1_setup(): 
+> > 
+> >         cko1 = clk_get_sys(NULL, "cko1");
+> >         clk_register_clkdev(cko1, NULL, "0-000a");
+> > 
 > 
-> The "adc0" node, should only look like:
+> What!? This is a terrible abuse/hack of the clock binding and is in no
+> way what was intended. You cannot use half of the clock binding. You
+> have to have a provider. The primary binding is a phandle reference.
+> clock-names is just auxiliary data.
 > 
-> ahb {
->         apb {
->                 adc0: adc at fffe0000 {
->                         atmel,adc-startup-time = <40>;
->                 };
->         };
-> };
-> 
-> without the redundant code carried by the staging git tree. In short,
-> the arm-soc version is the proper one.
+Well, on conversation [1], it seems people agreed that for those huge
+clock tree, only leaf clocks should be exposed in device tree.  Then
+please help me understand how we could do that with the current binding
+design, considering those leaf clocks are consumers of their parent
+clocks while being provider to the leaf clock the parent clock is not
+exposed in device tree.
 
-Rats!  That was an automatic merge resolution and I didn't even notice,
-sorry.  I will fix it up today in linux-next, but someone needs to
-remember to tell Linus when the second if these two trees is merged.
+Regards,
+Shawn
 
-I will apply the following as a merge fixup patch after merging the
-arm-soc tree (which comes later in my sequence):
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Tue, 22 May 2012 09:17:31 +1000
-Subject: [PATCH] ARM:at91: merge fixup for dtsi file
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/boot/dts/at91sam9g20.dtsi |   35 -----------------------------------
- 1 file changed, 35 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 06ca15b..2a1d1ca 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -21,41 +21,6 @@
- 			adc0: adc at fffe0000 {
- 				atmel,adc-startup-time = <40>;
- 			};
--
--			adc0: adc at fffe0000 {
--				compatible = "atmel,at91sam9260-adc";
--				reg = <0xfffe0000 0x100>;
--				interrupts = <5 4>;
--				atmel,adc-use-external-triggers;
--				atmel,adc-channels-used = <0xf>;
--				atmel,adc-vref = <3300>;
--				atmel,adc-num-channels = <4>;
--				atmel,adc-startup-time = <10>;
--				atmel,adc-channel-base = <0x30>;
--				atmel,adc-drdy-mask = <0x10000>;
--				atmel,adc-status-register = <0x1c>;
--				atmel,adc-trigger-register = <0x04>;
--
--				trigger at 0 {
--					trigger-name = "timer-counter-0";
--					trigger-value = <0x1>;
--				};
--				trigger at 1 {
--					trigger-name = "timer-counter-1";
--					trigger-value = <0x3>;
--				};
--
--				trigger at 2 {
--					trigger-name = "timer-counter-2";
--					trigger-value = <0x5>;
--				};
--
--				trigger at 3 {
--					trigger-name = "external";
--					trigger-value = <0x13>;
--					trigger-external;
--				};
--			};
- 		};
- 	};
- };
--- 
-1.7.10.280.gaa39
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/23e7fd0b/attachment.sig>
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/139414/focus=1216423
