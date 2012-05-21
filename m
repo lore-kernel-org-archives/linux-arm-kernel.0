@@ -1,26 +1,50 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 May 2012 14:53:26 +0530
-Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
- errata 727915
-In-Reply-To: <CACRpkda9bmxW1BWeM=zLztghncKX0uYgAVgbV9KcB0gZwBzysA@mail.gmail.com>
-References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
- <CACRpkda9bmxW1BWeM=zLztghncKX0uYgAVgbV9KcB0gZwBzysA@mail.gmail.com>
-Message-ID: <4FBA098E.1080407@ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 21 May 2012 17:23:46 +0800
+Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
+In-Reply-To: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337592237-5090-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 May 2012 02:50 PM, Linus Walleij wrote:
-> On Mon, May 21, 2012 at 8:04 AM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
-> 
->> This was observed on OMAP4460 devices. Though the errata
->> document doesn't support it, the issue seen with l2 clean was
->> indeed fixed $subject fix.
-> 
-> Is that an Acked-by for OMAP4? :-)
-> 
-Yes.
+This let usb phy driver has a chance to change hw settings when connect
+status change.
 
-Regards
-Santosh
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ include/linux/usb/otg.h |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
+index 38ab3f4..385641d 100644
+--- a/include/linux/usb/otg.h
++++ b/include/linux/usb/otg.h
+@@ -117,6 +117,10 @@ struct usb_phy {
+ 	int	(*set_suspend)(struct usb_phy *x,
+ 				int suspend);
+ 
++	/* notify phy connect status change */
++	int	(*notify_connect_change)(struct usb_phy *x,
++					 int port,
++					 int connected);
+ };
+ 
+ 
+@@ -252,6 +256,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+ }
+ 
+ static inline int
++usb_phy_notify_connect_change(struct usb_phy *x, int port, int connected)
++{
++	if (x->notify_connect_change != NULL)
++		return x->notify_connect_change(x, port, connected);
++	else
++		return 0;
++}
++
++static inline int
+ otg_start_srp(struct usb_otg *otg)
+ {
+ 	if (otg && otg->start_srp)
+-- 
+1.7.5.4
