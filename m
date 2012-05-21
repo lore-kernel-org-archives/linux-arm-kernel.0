@@ -1,133 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 21 May 2012 20:20:05 +0300
-Subject: [PATCH] iommu/core: pass a user-provided token to fault handlers
-Message-ID: <1337620805-30217-1-git-send-email-ohad@wizery.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 May 2012 19:27:34 +0200
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521153922.GO24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de>
+ <4FBA030F.4050101@codethink.co.uk> <20120521091615.GD14362@lunn.ch>
+ <4FBA0A83.1030201@codethink.co.uk> <20120521094052.GA22191@lunn.ch>
+ <20120521153922.GO24238@titan.lakedaemon.net>
+Message-ID: <20120521172734.GG12741@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes a single IOMMU user may have to deal with several
-different IOMMU devices (e.g. remoteproc).
+On Mon, May 21, 2012 at 11:39:22AM -0400, Jason Cooper wrote:
+> On Mon, May 21, 2012 at 11:40:52AM +0200, Andrew Lunn wrote:
+> > > Personally, my view is leave it alone and just add a new machine
+> > > directory.
+> 
+> I agree, see my response to Russell.
+> 
+> > > Pushing items around doesn't really help the amount of code in the
+> > > kernel, the organisation does not add more than a line or two to the
+> > > Makefiles.
+> > 
+> > It does however make it easier to see where the same code has been
+> > cut/paste. There is some stuff in the various Orion mach- directories
+> > which is repeated 4 times. The Armada XP port wanted to add a 5th
+> > copy. All this repeated code needs to be put into plat-orion.
+> 
+> Does my suggested layout/migration path cover your concerns?
 
-When an IOMMU fault happens, such users have to regain their
-context in order to deal with the fault.
+I actually like Arnd patch of putting everything into one
+directory. I've been building on that patch removing duplicate code,
+modifying the address map to make it as similar as possible, removing
+defines which are the same on all SoCs etc. I think actually having
+everything spread out is what has contributed to the X copies and
+needless incompatibilities.
 
-Users can't use the private fields of neither the iommu_domain nor
-the IOMMU device, because those are already used by the IOMMU core
-and low level driver (respectively).
+My vote is to commit Arnd patch as is.
 
-This patch just simply allows users to pass a private token (most
-notably their own context pointer) to iommu_set_fault_handler(),
-and then makes sure it is provided back to the users whenever
-an IOMMU fault happens.
-
-The patch also adopts remoteproc to the new fault handling
-interface, but the real functionality using this (recovery of
-remote processors) will only be added later in a subsequent patch
-set.
-
-Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- drivers/iommu/iommu.c                |    5 ++++-
- drivers/remoteproc/remoteproc_core.c |    4 ++--
- include/linux/iommu.h                |   10 ++++++----
- 3 files changed, 12 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 2198b2d..8b9ded8 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -119,6 +119,7 @@ EXPORT_SYMBOL_GPL(iommu_present);
-  * iommu_set_fault_handler() - set a fault handler for an iommu domain
-  * @domain: iommu domain
-  * @handler: fault handler
-+ * @token: user data, will be passed back to the fault handler
-  *
-  * This function should be used by IOMMU users which want to be notified
-  * whenever an IOMMU fault happens.
-@@ -127,11 +128,13 @@ EXPORT_SYMBOL_GPL(iommu_present);
-  * error code otherwise.
-  */
- void iommu_set_fault_handler(struct iommu_domain *domain,
--					iommu_fault_handler_t handler)
-+					iommu_fault_handler_t handler,
-+					void *token)
- {
- 	BUG_ON(!domain);
- 
- 	domain->handler = handler;
-+	domain->handler_token = token;
- }
- EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
- 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index ee15c68..f71d07e 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -78,7 +78,7 @@ typedef int (*rproc_handle_resource_t)(struct rproc *rproc, void *, int avail);
-  * the recovery of the remote processor.
-  */
- static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
--		unsigned long iova, int flags)
-+		unsigned long iova, int flags, void *token)
- {
- 	dev_err(dev, "iommu fault: da 0x%lx flags 0x%x\n", iova, flags);
- 
-@@ -117,7 +117,7 @@ static int rproc_enable_iommu(struct rproc *rproc)
- 		return -ENOMEM;
- 	}
- 
--	iommu_set_fault_handler(domain, rproc_iommu_fault);
-+	iommu_set_fault_handler(domain, rproc_iommu_fault, rproc);
- 
- 	ret = iommu_attach_device(domain, dev);
- 	if (ret) {
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index d937580..450293f 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -35,12 +35,13 @@ struct iommu_domain;
- #define IOMMU_FAULT_WRITE	0x1
- 
- typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
--				struct device *, unsigned long, int);
-+			struct device *, unsigned long, int, void *);
- 
- struct iommu_domain {
- 	struct iommu_ops *ops;
- 	void *priv;
- 	iommu_fault_handler_t handler;
-+	void *handler_token;
- };
- 
- #define IOMMU_CAP_CACHE_COHERENCY	0x1
-@@ -95,7 +96,7 @@ extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
- extern int iommu_domain_has_cap(struct iommu_domain *domain,
- 				unsigned long cap);
- extern void iommu_set_fault_handler(struct iommu_domain *domain,
--					iommu_fault_handler_t handler);
-+			iommu_fault_handler_t handler, void *token);
- extern int iommu_device_group(struct device *dev, unsigned int *groupid);
- 
- /**
-@@ -132,7 +133,8 @@ static inline int report_iommu_fault(struct iommu_domain *domain,
- 	 * invoke it.
- 	 */
- 	if (domain->handler)
--		ret = domain->handler(domain, dev, iova, flags);
-+		ret = domain->handler(domain, dev, iova, flags,
-+						domain->handler_token);
- 
- 	return ret;
- }
-@@ -191,7 +193,7 @@ static inline int domain_has_cap(struct iommu_domain *domain,
- }
- 
- static inline void iommu_set_fault_handler(struct iommu_domain *domain,
--					iommu_fault_handler_t handler)
-+				iommu_fault_handler_t handler, void *token)
- {
- }
- 
--- 
-1.7.5.4
+   Andrew
