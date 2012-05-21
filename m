@@ -1,44 +1,33 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 21 May 2012 11:28:45 +0300
-Subject: [PATCHv2 02/19] ARM: OMAP4: Add SAR ROM base address
-In-Reply-To: <87zk98dlq6.fsf@ti.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-3-git-send-email-t-kristo@ti.com> <87zk98dlq6.fsf@ti.com>
-Message-ID: <1337588925.2149.371.camel@sokoban>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 21 May 2012 11:34:30 +0300
+Subject: [PATCH] GPMI-NAND: Define ecc.strength
+In-Reply-To: <4FB9FCDE.9070803@freescale.com>
+References: <1337571865-8016-1-git-send-email-marex@denx.de>
+ <1337587991.2483.65.camel@sauron.fi.intel.com>
+ <4FB9FCDE.9070803@freescale.com>
+Message-ID: <1337589270.2483.66.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-16 at 11:28 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > Added in preparation for device off mode. SAR ROM contains the mapping
-> > from SAR RAM to IO registers, and this will eventually be parsed during
-> > init time to do the reverse before device off.
+On Mon, 2012-05-21 at 16:29 +0800, Huang Shijie wrote:
+> ? 2012?05?21? 16:13, Artem Bityutskiy ??:
+> > On Mon, 2012-05-21 at 05:44 +0200, Marek Vasut wrote:
+> >> The ecc.strength wasn't set, resulting in the following crash:
+> > How about ccing -stable? Can you find out which commit broke the driver?
 > >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> 
-> This should be combined with the patch that uses the #define.
+> The commit cfbc855b (mtd: nand:add sanity check of ecc strength to 
+> nand_scan_tail()
 
-Okay sounds good.
+OK, it is not merged upstream yet, so it does not need the -stable tag.
+Thanks!
 
--Tero
-
-> 
-> Kevin
-> 
-> > ---
-> >  arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-> > index c0d478e..1a45700 100644
-> > --- a/arch/arm/plat-omap/include/plat/omap44xx.h
-> > +++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-> > @@ -46,6 +46,7 @@
-> >  #define OMAP44XX_MCPDM_BASE		0x40132000
-> >  #define OMAP44XX_MCPDM_L3_BASE		0x49032000
-> >  #define OMAP44XX_SAR_RAM_BASE		0x4a326000
-> > +#define OMAP44XX_SAR_ROM_BASE		0x4a05e000
-> >  
-> >  #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
-> >  #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120521/1b2f72c8/attachment-0001.sig>
