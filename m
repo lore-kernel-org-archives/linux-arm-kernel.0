@@ -1,53 +1,60 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 06:48:10 +0200
-Subject: [PATCH] ARM: mxs: Let GPMI driver be built by default
-In-Reply-To: <20120521041907.GC8140@S2101-09.ap.freescale.net>
-References: <1337570413-31407-1-git-send-email-festevam@gmail.com>
- <20120521041907.GC8140@S2101-09.ap.freescale.net>
-Message-ID: <201205210648.10838.marex@denx.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 May 2012 07:23:22 +0200
+Subject: kirkwood, nand, clocks and device-tree
+In-Reply-To: <20120521010855.GJ24238@titan.lakedaemon.net>
+References: <87fwaxes25.fsf@lebrac.rtp-net.org>
+ <20120520095110.GC12741@lunn.ch>
+ <alpine.DEB.2.00.1205201352090.23719@marmot.wormnet.eu>
+ <20120520132214.GD12741@lunn.ch>
+ <20120521010855.GJ24238@titan.lakedaemon.net>
+Message-ID: <20120521052322.GE12741@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Mon, May 21, 2012 at 12:20:13AM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Let GPMI driver be built by default.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > For the next cycle we need to improve working together on DT porting.
+> > There is a lot of work going on here, in kirkwood, orion5x, dove, and
+> > the two new Armada SoCs, all needing/porting drivers to DT.  I think
+> > we need a tree where patches are quickly added once they are stable,
+> > so that others can profit from the work.
 > 
-> Queued for 3.6.  Thanks.
-
-Heh, if we get such trivial things in so late, the imx28 will be dead platform 
-by the time it's supported mainline :-)
-
+> I'm setting up a branch scheme that should handle this:
 > 
-> Regards,
-> Shawn
+> # main branch for pull-requests to Arnd/Olof
 > 
-> > ---
-> > 
-> >  arch/arm/configs/mxs_defconfig |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/configs/mxs_defconfig
-> > b/arch/arm/configs/mxs_defconfig index 5406c23..6b86df7 100644
-> > --- a/arch/arm/configs/mxs_defconfig
-> > +++ b/arch/arm/configs/mxs_defconfig
-> > @@ -58,6 +58,9 @@ CONFIG_CAN_FLEXCAN=m
-> > 
-> >  CONFIG_DEVTMPFS=y
-> >  # CONFIG_FIRMWARE_IN_KERNEL is not set
-> >  # CONFIG_BLK_DEV is not set
-> > 
-> > +CONFIG_MTD=y
-> > +CONFIG_MTD_NAND=y
-> > +CONFIG_MTD_NAND_GPMI_NAND=y
-> > 
-> >  CONFIG_NETDEVICES=y
-> >  CONFIG_NET_ETHERNET=y
-> >  CONFIG_ENC28J60=y
+> for-arm-soc
 
-Best regards,
-Marek Vasut
+I would say that this branch needs to be stable, i.e. no rebasing.  We
+need to encourage everybody to use it as the basis for their work,
+since it will have everything applied that can be shared. No rebasing
+means that if something is broken, a patch is applied on top. Then
+just before the merge window you can squash the patch into the
+original work so we have a clean patchset going upwards.
+
+> # branches that are ready to merge into for-arm-soc
+> 
+> board/<boardname>
+> 
+> 	# branches which can be merged as depends
+
+Do you mean old style, none DT, boards?
+
+> 	driver/<driver>
+> 	dt/<binding>
+
+You need to explain that a bit more. Since dt/bindings means changes
+to drivers, don't you have the danger of merge conflicts?
+
+Overall, maybe you are over engineering? We need comments from Arnd &
+Olof, since they run a system like this, and know if the complexity is
+needed for just one platform.
+
+Also, my guess is, the next cycle is going to be extraordinary. We
+have major cleanup going on after merging into one/two directories. We
+have probably most of the DT support going in, two new SoC types
+getting supported, and hopefully Dove and Orion5x catching up with
+their DT support. So, many people will be working on core
+infrastructure, not individual board files. It is only after that is
+done, will the work return to everybody in there own corner working on
+just single boards.
+
+       Andrew
