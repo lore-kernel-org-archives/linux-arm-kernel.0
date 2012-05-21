@@ -1,90 +1,58 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 21 May 2012 17:23:57 +0800
-Subject: [PATCH v2 12/12] ARM: dts: imx28-evk: add usb devices
-In-Reply-To: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337592237-5090-13-git-send-email-richard.zhao@freescale.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 21 May 2012 10:27:31 +0100
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521091615.GD14362@lunn.ch>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <20120518191832.GC24238@titan.lakedaemon.net>
+ <201205182044.26409.arnd@arndb.de> <4FBA030F.4050101@codethink.co.uk>
+ <20120521091615.GD14362@lunn.ch>
+Message-ID: <4FBA0A83.1030201@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |   18 ++++++++++++++++++
- arch/arm/boot/dts/imx28.dtsi    |   12 ++++++++++--
- 2 files changed, 28 insertions(+), 2 deletions(-)
+On 21/05/12 10:16, Andrew Lunn wrote:
+> On Mon, May 21, 2012 at 09:55:43AM +0100, Ben Dooks wrote:
+>> On 18/05/12 21:44, Arnd Bergmann wrote:
+>>> On Friday 18 May 2012, Jason Cooper wrote:
+>>>>>
+>>>>> In this case, we have wildly different names referring to the same chip
+>>>>> family, and "orion" is far from hinting that it also constitute the
+>>>>> support for Kirkwood, Dove or (some not all) Armadas, unless you are
+>>>>> familiar with some legacy Marvell products.  This is why in this case I
+>>>>> think that a directory name change might be appropriate, especially if
+>>>>> we're going to cause churn by moving things around already.
+>>>>>
+>>>>> I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
+>>>>> mvebu_*.  Unless someone has another logical identifier to suggest which
+>>>>> would capture all that family of SOCs that came out of EBU in Marvell of
+>>>>> course.
+>>>>
+>>>> I prefer mvebu_* ...  nice and concise.
+>>>>
+>>>
+>>> On a related topic, any preferences on where we will put all the board
+>>> files? I think it would be helpful to put them into a separate place from
+>>> the main platform files, so e.g. have all *-setup.c files go to
+>>> arch/arm/mach-mvebu/board/*.c instead of arch/arm/mach-mvebu/*-setup.c
+>>
+>> What board files?
+>>
+>> As I see it there are no current users and all additional kernel support
+>> should simply use devicetree.
+>
+> There are currently 14 kirkwood boards, 21 orion5x, 2 dove and 5
+> mv78xx0 boards. All would end up in the same directory as part of this
+> rename/merge.
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index ee520a5..ca6fe30 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -73,10 +73,28 @@
- 				pinctrl-0 = <&duart_pins_a>;
- 				status = "okay";
- 			};
-+
-+			usbphy0: usbphy at 8007c000 {
-+				status = "okay";
-+			};
-+
-+			usbphy1: usbphy at 8007e000 {
-+				status = "okay";
-+			};
- 		};
- 	};
- 
- 	ahb at 80080000 {
-+		usb0: usb at 80080000 {
-+			fsl,vbus-power = <&gpio3 9 0>;
-+			status = "okay";
-+		};
-+
-+		usb1: usb at 80090000 {
-+			fsl,vbus-power = <&gpio3 8 0>;
-+			status = "okay";
-+		};
-+
- 		mac0: ethernet at 800f0000 {
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 4634cb8..502ad05 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -441,11 +441,13 @@
- 			};
- 
- 			usbphy0: usbphy at 8007c000 {
-+				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x8007c000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			usbphy1: usbphy at 8007e000 {
-+				compatible = "fsl,imx28-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x8007e000 0x2000>;
- 				status = "disabled";
- 			};
-@@ -459,13 +461,19 @@
- 		reg = <0x80080000 0x80000>;
- 		ranges;
- 
--		usbctrl0: usbctrl at 80080000 {
-+		usb0: usb at 80080000 {
-+			compatible = "fsl,imx28-usb", "fsl,imx31-usb";
- 			reg = <0x80080000 0x10000>;
-+			interrupts = <93>;
-+			fsl,usbphy = <&usbphy0>;
- 			status = "disabled";
- 		};
- 
--		usbctrl1: usbctrl at 80090000 {
-+		usb1: usb at 80090000 {
-+			compatible = "fsl,imx28-usb", "fsl,imx31-usb";
- 			reg = <0x80090000 0x10000>;
-+			interrupts = <92>;
-+			fsl,usbphy = <&usbphy1>;
- 			status = "disabled";
- 		};
- 
+Personally, my view is leave it alone and just add a new machine
+directory.
+
+Pushing items around doesn't really help the amount of code in the
+kernel, the organisation does not add more than a line or two to the
+Makefiles.
+
+
 -- 
-1.7.5.4
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
