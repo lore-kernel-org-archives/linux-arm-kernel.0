@@ -1,30 +1,73 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 May 2012 11:45:45 +0800
-Subject: [PATCH 1/4] GPMI-NAND: Define ecc.strength
-In-Reply-To: <201205210440.09310.marex@denx.de>
-References: <1337562140-5739-1-git-send-email-marex@denx.de>
- <201205210336.41860.marex@denx.de>
- <20120521014121.GO5427@S2101-09.ap.freescale.net>
- <201205210440.09310.marex@denx.de>
-Message-ID: <20120521034543.GD5810@S2100-06.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 May 2012 05:36:06 +0200
+Subject: [PATCH] mmc: mxs-mmc: Add wp-inverted property
+Message-ID: <1337571366-7779-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 04:40:09AM +0200, Marek Vasut wrote:
-> > So you are saying the issue is introduced by gpmi-nand DT conversion?
-> 
-> I doubt so ...
+The write-protect GPIO is inverted on some boards. Handle such case.
 
-I can be very sure that you haven't looked at the gpmi-nand DT
-conversion patches at all.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: linux-mmc at vger.kernel.org
+Cc: Chris Ball <cjb@laptop.org>
+---
+ Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
+ drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-The bug has been there since day one.  The commit cfbc855b (mtd: nand:
-add sanity check of ecc strength to nand_scan_tail()) added a BUG() to
-catch it recently.
+V2: Adjust the subject, Cc linux-mmc
 
-So please at least spend some time to know the real cause before
-pointing your figure to DT conversion.
-
+diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+index 14d870a..0a7d2cd 100644
+--- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+@@ -13,6 +13,7 @@ Required properties:
+ 
+ Optional properties:
+ - wp-gpios: Specify GPIOs for write protection
++- wp-inverted: Set if the write protection GPIO is inverted
+ 
+ Examples:
+ 
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 277161d..119beb9 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -164,16 +164,23 @@ struct mxs_mmc_host {
+ 	spinlock_t			lock;
+ 	int				sdio_irq_en;
+ 	int				wp_gpio;
++	int				wp_inverted:1;
+ };
+ 
+ static int mxs_mmc_get_ro(struct mmc_host *mmc)
+ {
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
++	int ret;
+ 
+ 	if (!gpio_is_valid(host->wp_gpio))
+ 		return -EINVAL;
+ 
+-	return gpio_get_value(host->wp_gpio);
++	ret = gpio_get_value(host->wp_gpio);
++
++	if (host->wp_inverted)
++		ret = !ret;
++
++	return ret;
+ }
+ 
+ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+@@ -786,6 +793,8 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 		else if (bus_width == 8)
+ 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+ 		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
++		if (of_find_property(np, "wp-inverted", NULL))
++			host->wp_inverted = 1;
+ 	} else {
+ 		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+ 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
 -- 
-Regards,
-Shawn
+1.7.10
