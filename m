@@ -1,40 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 May 2012 09:16:00 +0800
-Subject: [PATCH 2/4] GPMI-NAND: Fixup compile issue
-In-Reply-To: <1337562140-5739-2-git-send-email-marex@denx.de>
-References: <1337562140-5739-1-git-send-email-marex@denx.de>
- <1337562140-5739-2-git-send-email-marex@denx.de>
-Message-ID: <20120521011558.GM5427@S2101-09.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 20 May 2012 21:30:50 -0400
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120520111025.GC25344@n2100.arm.linux.org.uk>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205192042140.13185@xanadu.home>
+ <20120520095502.GB25344@n2100.arm.linux.org.uk>
+ <201205201058.38144.arnd@arndb.de>
+ <20120520111025.GC25344@n2100.arm.linux.org.uk>
+Message-ID: <20120521013050.GL24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This one has been fixed on arm-soc.
+On Sun, May 20, 2012 at 12:10:25PM +0100, Russell King - ARM Linux wrote:
+> On Sun, May 20, 2012 at 10:58:37AM +0000, Arnd Bergmann wrote:
+> > On Sunday 20 May 2012, Russell King - ARM Linux wrote:
+> > > And try to avoid putting anything in the include/mach/ directory which
+> > > isn't needed by any code outside of arch/arm/{plat,mach}-* directory.
+> > > 
+> > > In other words, headers needed only for code in arch/arm/plat-mvvebu/
+> > > should be in that very same directory.
+> > 
+> > Ok, so let me make sure I got it all right:
+> > 
+> > * all *.c files that are used for multiple boards go to plat-mvebu
+> > * all *-setup.c files go to mach-mvebu
+> > * only headers that are used outside of {mach,plat}-mvebug go to
+> >   plat-mvebu/include/mach
 
-Regards,
-Shawn
+plat-mvebu/include/plat ?
 
-On Mon, May 21, 2012 at 03:02:18AM +0200, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Huang Shijie <b32955@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> > * headers used to inteface between the first two go to
+> >   plat-mvebu/include/plat (?)
+
+plat-mvebu/include ?
+
 > 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index f5f3d761..33111a9 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -486,7 +486,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
->  	if (ret)
->  		goto exit_dma_channels;
->  
-> -	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
->  	if (IS_ERR(pinctrl)) {
->  		ret = PTR_ERR(pinctrl);
->  		goto exit_pin;
-> -- 
-> 1.7.10
+> That sounds reasonable.  The only eyebrow raising thing is having an
+> include/mach inside a plat-* directory... that seems an odd way to do
+> things as mach/ includes normally come from the mach-* directory.
 > 
+> So I wonder whether Nicolas' idea of "dt-only stuff in arch/arm/plat-*"
+> is the right idea.  It just makes plat-* the same as a mach-* but with
+> a different name, whereas it is _supposed_ to be for stuff shared
+> between a bunch of mach-* directories.
+
+In an ideal (dt) world, plat-*/ would hold all the dt source files, and
+arch/arm/boot/dts/ would become the new mach-*/.  mach-*/ is kept around
+for the few legacy, unconverted boards.
+
+Or, am I barking up the wrong tree?
+
+thx,
+
+Jason.
