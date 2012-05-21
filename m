@@ -1,75 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 21 May 2012 12:10:11 +0200
-Subject: [PATCH] ARM: at91: Add ADC driver to at91sam9260/at91sam9g20
- dtsi files
-In-Reply-To: <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
-References: <4FB3B1F3.6080102@atmel.com>
- <1337182626-13033-1-git-send-email-nicolas.ferre@atmel.com>
- <201205161850.54765.arnd@arndb.de> <20120517150601.GA28104@kroah.com>
- <20120518084446.a7b229074ea215fd7bcd1eb8@canb.auug.org.au>
-Message-ID: <4FBA1483.4010008@atmel.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Mon, 21 May 2012 10:12:45 +0000
+Subject: usb, davinci: usb 2.0 problem on an am1808 based board
+In-Reply-To: <4FB6322D.5070602@mvista.com>
+References: <4EBC9DF1.90604@denx.de>
+ <20111111091912.GB19090@legolas.emea.dhcp.ti.com>
+ <4EBEB29E.50705@mvista.com>	<4EC0F87B.4010104@denx.de>
+ <4FA3AB27.7060205@denx.de> <4FB49CA3.2080906@denx.de>
+ <A73F36158E33644199EB82C5EC81C7BC3E97C9C1@DBDE01.ent.ti.com>
+ <4FB6322D.5070602@mvista.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3E97D249@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Sergei,
 
-On 05/18/2012 12:44 AM, Stephen Rothwell :
-> Hi all,
+On Fri, May 18, 2012 at 16:57:41, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Thu, 17 May 2012 08:06:01 -0700 Greg KH
-> <gregkh@linuxfoundation.org> wrote:
->> 
->> On Wed, May 16, 2012 at 06:50:54PM +0000, Arnd Bergmann wrote:
->>> On Wednesday 16 May 2012, Nicolas Ferre wrote:
->>>> Now that the bulk of at91sam9g20-related nodes are located in
->>>> at91sam9260.dtsi, we have to re-create the path to this ADC
->>>> node for SoC specific parts.
->>>> 
->>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> 
->>> Should we apply this patch in arm-soc so that Greg can drop the
->>> hunk that no longer applies?
->> 
->> It's not a "no longer applies", it's a "this does not merge".
->> The patch is in my tree, unless you want me to revert it, it's
->> going to stay there until it goes to Linus.
+> On 18-05-2012 14:07, Manjunathappa, Prakash wrote:
 > 
-> Just apply the patch to the arm-soc tree - then the merge
-> resolution becomes "use the arm-soc version".   There is no need
-> for Greg to revert the other patch.
+> > I do not know how putting delay helped MSC device detection.
+> > Can you please check if MUSB is coming up in "b_idle" state(by
+> > $cat /sys/devices/platform/musb-da8xx/musb-hdrc/mode)?
+> > State should move to b_peripheral on connecting gadget cable.
+> > If you connect MSC device via mini-A connector, state should change to "a_host".
+> > OTG timer is responsible for above state changes, can you please check if below
+> > changes are present?
+> > diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c index 4da7492..a1a692e 100644
+> > --- a/drivers/usb/musb/da8xx.c
+> > +++ b/drivers/usb/musb/da8xx.c
+> > @@ -76,6 +76,7 @@
+> >   #define DA8XX_INTR_TX_SHIFT    0
+> >   #define DA8XX_INTR_TX_MASK     (DA8XX_USB_TX_EP_MASK<<  DA8XX_INTR_TX_SHIFT)
+> >
+> > +#define A_WAIT_BCON_TIMEOUT     1100            /* in ms */
+> >   #define DA8XX_MENTOR_CORE_OFFSET 0x400
+> >
+> >   #define CFGCHIP2       IO_ADDRESS(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG)
+> > @@ -443,6 +444,7 @@ static int da8xx_musb_init(struct musb *musb)
+> >                   rev, __raw_readl(CFGCHIP2),
+> >                   musb_readb(reg_base, DA8XX_USB_CTRL_REG));
+> >
+> > +       musb->a_wait_bcon = A_WAIT_BCON_TIMEOUT;
+> >          musb->isr = da8xx_musb_interrupt;
+> >          return 0;
+> >   fail:
+> 
+>     This change shouldn't be needed as musb->a_wait_bcon is set in 
+> musb_core.c::allocate_instance().
+> 
 
-Hi Stephen,
+Yes, It worked even without above change.
 
-After checking the current status of
-arch/arm/boot/dts/at91sam9g20.dtsi in linux-next, it seems the merge
-resolution has not produced a good result:
-
-The "adc0" node, should only look like:
-
-ahb {
-        apb {
-                adc0: adc at fffe0000 {
-                        atmel,adc-startup-time = <40>;
-                };
-        };
-};
-
-without the redundant code carried by the staging git tree. In short,
-the arm-soc version is the proper one.
-
-Thanks for your help, best regards,
-- -- 
-Nicolas Ferre
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iQEcBAEBAgAGBQJPuhR7AAoJEAf03oE53VmQW4wH/0lqpqrTujJ/dQ0z5Ku7Xde3
-EKKJm51AIlIadOXiteYH6cw34ISm68cXZWpkbKh3UKiCcJGSJi4VjCrkcJ//CwUL
-B4bZD3A6Y8zLQ+TaQbjMnfzKq2dOBRQ1M1dNoQXwPe83vjV85T4hoKco7LBhGhUI
-l//0aWrcefH9sQynAYRhNE0M6hlfr/Edlia0zHlkVYqE2K5ALxaH6lki2EUzxvJC
-l8qydZ9lum37ebnot09WB2qhIlkRApb50sYbQG4nMwlC3jSblXrPelQvChWLo/yi
-JOPOF7Lcj9fnJmeVGlQknobilgWmRnuVQUbqBG4NjDx71k5WiEywF6ymBa8TJnA=
-=rnQu
------END PGP SIGNATURE-----
+Thanks,
+Prakash
