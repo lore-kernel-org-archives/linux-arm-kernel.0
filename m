@@ -1,51 +1,102 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 21 May 2012 20:31:34 +0800
-Subject: [PATCH 1/1] dma: imx-sdma: buf_tail should be initialize in prepare
- function
-Message-ID: <1337603494-27464-1-git-send-email-richard.zhao@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 May 2012 13:33:21 +0100
+Subject: [PATCH 2/2] ARM: SMP: use per cpu state to replace
+In-Reply-To: <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
+References: <1337593531-16191-1-git-send-email-jason77.wang@gmail.com>
+ <1337593531-16191-2-git-send-email-jason77.wang@gmail.com>
+ <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20120521123321.GA24270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fix audio underrun issue. When SNDRV_PCM_TRIGGER_STOP
-and SNDRV_PCM_TRIGGER_START, it calls prepare again. buf_tail
-should be reset to zero.
-So move buf_tail initialization into prepare function.
+On Mon, May 21, 2012 at 05:45:31PM +0800, Hui Wang wrote:
+> CPU hotplug will bring following call trace in the RT kernel:
+> BUG: sleeping function called from invalid context at linux/kernel/rtmutex.c:707
+> pcnt: 1 0 in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
+> [<800413a0>] (unwind_backtrace+0x0/0xe4) from [<804ff214>] (rt_spin_lock+0x30/0x5c)
+> [<804ff214>] (rt_spin_lock+0x30/0x5c) from [<8005a848>] (complete+0x1c/0x54)
+> [<8005a848>] (complete+0x1c/0x54) from [<804f59f8>] (cpu_die+0x34/0x70)
+> [<804f59f8>] (cpu_die+0x34/0x70) from [<8003b840>] (cpu_idle+0x54/0xd8)
+> [<8003b840>] (cpu_idle+0x54/0xd8) from [<104f9ecc>] (0x104f9ecc)
+> 
+> To avoid this call trace, we use per cpu variable to replace
+> completion, and it is safe for this modification since all reference
+> of per cpu_state variable is in the preempt disabled context.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/dma/imx-sdma.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+This is silly.  Why is RT preventing things that work perfectly well in
+the standard kernel from being used in the RT kernel?
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index a472a29..def08f7 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -814,8 +814,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
- 
- 	init_completion(&sdmac->done);
- 
--	sdmac->buf_tail = 0;
--
- 	return 0;
- out:
- 
-@@ -924,6 +922,8 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 
- 	sdmac->flags = 0;
- 
-+	sdmac->buf_tail = 0;
-+
- 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
- 			sg_len, channel);
- 
-@@ -1024,6 +1024,8 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 
- 	sdmac->status = DMA_IN_PROGRESS;
- 
-+	sdmac->buf_tail = 0;
-+
- 	sdmac->flags |= IMX_DMA_SG_LOOP;
- 	sdmac->direction = direction;
- 	ret = sdma_load_context(sdmac);
--- 
-1.7.5.4
+Being able to call complete() from atomic contexts is one of the
+fundamentals that RT seems to be breaking here.
+
+> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> ---
+>  arch/arm/kernel/smp.c |   23 ++++++++++++++++++-----
+>  1 files changed, 18 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 05fed61..c63e2ff 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -122,6 +122,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
+>  }
+>  
+>  #ifdef CONFIG_HOTPLUG_CPU
+> +/* State of each CPU during hotplug phases */
+> +DEFINE_PER_CPU(int, cpu_state) = { 0 };
+> +
+>  static void percpu_timer_stop(void);
+>  
+>  /*
+> @@ -171,6 +174,7 @@ static DECLARE_COMPLETION(cpu_died);
+>  void __cpu_die(unsigned int cpu)
+>  {
+>  	struct task_struct *p;
+> +	unsigned long timeout;
+>  
+>  	read_lock(&tasklist_lock);
+>  	for_each_process(p) {
+> @@ -179,10 +183,16 @@ void __cpu_die(unsigned int cpu)
+>  	}
+>  	read_unlock(&tasklist_lock);
+>  
+> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+> -		pr_err("CPU%u: cpu didn't die\n", cpu);
+> -		return;
+> -	}
+> +	timeout = jiffies + msecs_to_jiffies(5000);
+> +
+> +	while (per_cpu(cpu_state, cpu) != CPU_DEAD) {
+> +		if (time_after(jiffies, timeout)) {
+> +			pr_err("CPU%u: cpu didn't die\n", cpu);
+> +			return;
+> +		}
+> +		cpu_relax();
+> + 	}
+> +
+>  	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+>  
+>  	if (!platform_cpu_kill(cpu))
+> @@ -207,7 +217,7 @@ void __ref cpu_die(void)
+>  	mb();
+>  
+>  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> -	complete(&cpu_died);
+> +	per_cpu(cpu_state, cpu) = CPU_DEAD;
+>  
+>  	/*
+>  	 * actual CPU shutdown procedure is at least platform (if not
+> @@ -285,6 +295,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+>  	 * the CPU migration code to notice that the CPU is online
+>  	 * before we continue - which happens after __cpu_up returns.
+>  	 */
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	per_cpu(cpu_state, cpu) = CPU_ONLINE;
+> +#endif
+>  	set_cpu_online(cpu, true);
+>  	complete(&cpu_running);
+>  
+> -- 
+> 1.7.6
+> 
+> 
