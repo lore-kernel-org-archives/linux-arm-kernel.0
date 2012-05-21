@@ -1,34 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 21 May 2012 16:34:15 -0300
-Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <CAOMZO5AcP2cAAkuFPJn3Xp5NuR+JG4hDO7Ehq5H-V6PCy4DwNA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 May 2012 19:40:25 +0000
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521165800.GR24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120521161131.GC24270@n2100.arm.linux.org.uk>
+ <20120521165800.GR24238@titan.lakedaemon.net>
+Message-ID: <201205211940.25488.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Monday 21 May 2012, Jason Cooper wrote:
+> On Mon, May 21, 2012 at 05:11:31PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, May 21, 2012 at 11:35:59AM -0400, Jason Cooper wrote:
 
-On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
-<richard.zhao@freescale.com> wrote:
-> The work is based on ?ci13xxx rework done by Alexander Shishkin.
->
-> Status:
-> ?- this version only support host
-> ?- usbotg controler works at host role
->
-> Changes since V1:
-> ?- Merge the work of Marek
-> ?- re-implement connect change notify
-> ?- imx6q: move part of code to clk
-> ?- imx6q: add config-on-boot gpios
+> > I'd also suggest going against our current setup of not having "board/"
+> > subdirectories in mach-*.  Just name them board-foo.c.
+> 
+> This is what we are currently doing for boards in the midst of DT
+> conversion.  In mach-kirkwood/ there is board-dt.c, and
+> board-dreamplug.c.  board-dt.c is the DT code, while board-dreamplug.c
+> is board specific init code that hasn't been converted to DT yet.  Once
+> converted, board-dreamplug.c will disappear.  This follows what tegra is
+> doing.
+> 
+> We can leave the legacy, unconverted boards where they are
+> (mach-kirkwood/guruplug-setup.c), but what about the common code they
+> depend on (mpp.c, pcie.c, etc)?  That's what I was suggesting putting in
+> mach-mvebu/board/...
 
-Can you please also add the driver into the defconfig files?
+I like the idea of leaving the *-setup.c board files where they are,
+while moving all the other files (headers and the platform-wide .c
+files) to mach-mvebu.
 
-What about the existing USB host drivers for mx27/mx31/mx35/mx25/mx35?
+However, given that we still don't have consensus on where things
+should really be and the merge window is already open, I would suggest
+don't try to do it all now for v3.5 but rather plan it for v3.6 once
+we agreed on one approach, and then do some of the next consolidation
+steps as well.
 
-Is the idea to switch to drivers/usb/chipidea/host.c too?
-
-Regards,
-
-Fabio Estevam
+	Arnd
