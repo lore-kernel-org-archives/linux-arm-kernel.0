@@ -1,99 +1,70 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 19:38:27 +0200
-Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
-In-Reply-To: <20409.60714.663812.681159@ipc1.ka-ro>
-References: <1337562140-5739-1-git-send-email-marex@denx.de>
- <1337562140-5739-4-git-send-email-marex@denx.de>
- <20409.60714.663812.681159@ipc1.ka-ro>
-Message-ID: <201205211938.27993.marex@denx.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 21 May 2012 23:08:37 +0530
+Subject: [PATCH] ARM: davinci: turn off DDR PHY when entering deep sleep
+In-Reply-To: <1336672352-23191-1-git-send-email-marcus.folkesson@gmail.com>
+References: <marcus.folkesson@gmail.com>
+ <1336672352-23191-1-git-send-email-marcus.folkesson@gmail.com>
+Message-ID: <4FBA7D9D.6060202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lothar Wa?mann,
+Hi Marcus,
 
-> Hi,
+Thanks for the patch.
+
+On 5/10/2012 11:22 PM, Marcus Folkesson wrote:
+> Deepsleep is the most power saving state on the davinci-platform.
+> The DDR PHY consumes about 25mW and should be turned off in this low
+> power state.
 > 
-> Marek Vasut writes:
-> > The write-protect GPIO is inverted on some boards. Handle such case.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/mmc/mxs-mmc.txt |    1 +
-> >  drivers/mmc/host/mxs-mmc.c                        |   11 ++++++++++-
-> >  2 files changed, 11 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-> > b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt index
-> > 14d870a..0a7d2cd 100644
-> > --- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-> > 
-> > @@ -13,6 +13,7 @@ Required properties:
-> >  Optional properties:
-> >  - wp-gpios: Specify GPIOs for write protection
-> > 
-> > +- wp-inverted: Set if the write protection GPIO is inverted
-> > 
-> >  Examples:
-> > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> > index 277161d..119beb9 100644
-> > --- a/drivers/mmc/host/mxs-mmc.c
-> > +++ b/drivers/mmc/host/mxs-mmc.c
-> > @@ -164,16 +164,23 @@ struct mxs_mmc_host {
-> > 
-> >  	spinlock_t			lock;
-> >  	int				sdio_irq_en;
-> >  	int				wp_gpio;
-> > 
-> > +	int				wp_inverted:1;
-> > 
-> >  };
-> >  
-> >  static int mxs_mmc_get_ro(struct mmc_host *mmc)
-> >  {
-> >  
-> >  	struct mxs_mmc_host *host = mmc_priv(mmc);
-> > 
-> > +	int ret;
-> > 
-> >  	if (!gpio_is_valid(host->wp_gpio))
-> >  	
-> >  		return -EINVAL;
-> > 
-> > -	return gpio_get_value(host->wp_gpio);
-> > +	ret = gpio_get_value(host->wp_gpio);
-> > +
-> > +	if (host->wp_inverted)
-> > +		ret = !ret;
-> > +
-> > +	return ret;
-> > 
-> >  }
-> >  
-> >  static int mxs_mmc_get_cd(struct mmc_host *mmc)
-> > 
-> > @@ -786,6 +793,8 @@ static int mxs_mmc_probe(struct platform_device
-> > *pdev)
-> > 
-> >  		else if (bus_width == 8)
-> >  		
-> >  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
-> >  		
-> >  		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
-> > 
-> > +		if (of_find_property(np, "wp-inverted", NULL))
-> > +			host->wp_inverted = 1;
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+> ---
+>  arch/arm/mach-davinci/include/mach/memory.h |    2 ++
+>  arch/arm/mach-davinci/sleep.S               |   10 ++++++++++
+>  2 files changed, 12 insertions(+), 0 deletions(-)
 > 
-> Why not simply specify the GPIO in question as being active-low in the
-> GPIO definition and use of_get_named_gpio_flags()?
+> diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
+> index 7873194..1b1b8ac 100644
+> --- a/arch/arm/mach-davinci/include/mach/memory.h
+> +++ b/arch/arm/mach-davinci/include/mach/memory.h
 
-Just followed the cd-inverted pattern. Thanks for the hint, will poke into it.
+This is moved to arch/arm/mach-davinci/include/mach/ddr2.h in current
+kernel.
 
-> 
-> Lothar Wa?mann
+> @@ -36,6 +36,8 @@
+>  #define DDR2_MCLKSTOPEN_BIT	BIT(30)
+>  #define DDR2_LPMODEN_BIT	BIT(31)
+>  
+> +#define DDR2_DRPHYC1R_OFFSET 	0xe4
+> +#define DDR_PWRDNEN_BIT 		BIT(6)
+>  /*
+>   * Increase size of DMA-consistent memory region
+>   */
+> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+> index 5f1e045..30713b2 100644
+> --- a/arch/arm/mach-davinci/sleep.S
+> +++ b/arch/arm/mach-davinci/sleep.S
+> @@ -57,6 +57,11 @@ ENTRY(davinci_cpu_suspend)
+>  
+>  	ldmia	r0, {r0-r4}
+>  
+> +	/* Turn PHY off */
+> +	ldr	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
+> +	orr	ip, ip, #DDR_PWRDNEN_BIT 	
+> +	str	ip, [r0, #DDR2_DRPHYC1R_OFFSET]
 
-Best regards,
-Marek Vasut
+Current TRM (section 14.2.13.1) specifies that this bit be set during
+DDR initialization sequence itself (done in UBL or U-Boot/SPL). I am
+checking with folks from the TI design team on whether it can be done
+later on as part of the DeepSleep sequence.
+
+It looks like IOPWRDN bit in VTPIO_CTL also needs to be set for this
+configuration take effect. You probably did not have to do it because
+the bootloader you are using already has this set?
+
+How much testing has this patch undergone? Have you tested it across
+multiple suspend-resume cycles? How much does the power consumed by DDR
+PHY go down by (and which type of DDR)?
+
+Thanks,
+Sekhar
