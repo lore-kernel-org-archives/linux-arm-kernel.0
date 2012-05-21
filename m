@@ -1,27 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 May 2012 12:13:56 +0800
-Subject: [PATCH 2/2] mfd: anatop: permit adata be NULL when access register
-In-Reply-To: <20120518095932.GI30755@b20223-02.ap.freescale.net>
-References: <1336870794-6351-1-git-send-email-richard.zhao@freescale.com>
- <1336870794-6351-2-git-send-email-richard.zhao@freescale.com>
- <20120514035137.GB20367@S2100-06.ap.freescale.net>
- <20120514080835.GB31985@opensource.wolfsonmicro.com>
- <4FB0C9D4.2060409@linaro.org>
- <20120514094357.GF20367@S2100-06.ap.freescale.net>
- <4FB10821.4000004@linaro.org>
- <20120514135035.GC29393@b20223-02.ap.freescale.net>
- <20120518095932.GI30755@b20223-02.ap.freescale.net>
-Message-ID: <20120521041355.GF5810@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 21 May 2012 12:12:40 +0800
+Subject: [PATCH] ARM: mx51: Add pinctrl_provide_dummies()
+In-Reply-To: <1337534469-26559-1-git-send-email-festevam@gmail.com>
+References: <1337534469-26559-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120521041237.GA8140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 05:59:32PM +0800, Richard Zhao wrote:
-> Guys, we need to draw conclusion.
-> I think current patch keep some how compatible with multi-anatop.
-> It's ok.
+On Sun, May 20, 2012 at 02:21:09PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-I'm fine with that.
+> commit a2aa65a (ARM: imx: enable pinctrl dummy states) missed to add
+> pinctrl_provide_dummies() for mx51.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
--- 
+Queued for 3.5-rc.  Thanks.
+
 Regards,
 Shawn
+
+> ---
+>  arch/arm/mach-imx/mm-imx5.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+> index feeee17..1d00305 100644
+> --- a/arch/arm/mach-imx/mm-imx5.c
+> +++ b/arch/arm/mach-imx/mm-imx5.c
+> @@ -202,6 +202,8 @@ void __init imx51_soc_init(void)
+>  	mxc_register_gpio("imx31-gpio", 2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_INT_GPIO3_LOW, MX51_INT_GPIO3_HIGH);
+>  	mxc_register_gpio("imx31-gpio", 3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_INT_GPIO4_LOW, MX51_INT_GPIO4_HIGH);
+>  
+> +	pinctrl_provide_dummies();
+> +
+>  	/* i.mx51 has the i.mx35 type sdma */
+>  	imx_add_imx_sdma("imx35-sdma", MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
+>  
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
