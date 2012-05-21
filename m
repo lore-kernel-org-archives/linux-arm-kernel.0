@@ -1,48 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 May 2012 08:52:26 +0100
-Subject: [PATCH 06/18] mfd: ab8500: Remove confusing ab8500-i2c file and
- merge into ab8500-core
-In-Reply-To: <CACRpkdZWVpuZAmXV4fKTEvV7ke=NDGsej2iTSKdVy_e7gC9QQA@mail.gmail.com>
-References: <1337262323-27692-1-git-send-email-lee.jones@linaro.org>
- <1337262323-27692-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdZWVpuZAmXV4fKTEvV7ke=NDGsej2iTSKdVy_e7gC9QQA@mail.gmail.com>
-Message-ID: <4FB9F43A.1040300@linaro.org>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Mon, 21 May 2012 13:27:26 +0530
+Subject: [PATCH v2 2/2] regulator: Add support for MAX77686.
+In-Reply-To: <20120520100015.GC20652@opensource.wolfsonmicro.com>
+References: <1337261967-26004-1-git-send-email-yadi.brar@samsung.com>
+ <1337261967-26004-3-git-send-email-yadi.brar@samsung.com>
+ <20120520100015.GC20652@opensource.wolfsonmicro.com>
+Message-ID: <CAKew6eUqqC-jSRoY1e4Q=JnLekuA_geGcCjQr4=6g86nf3LfDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/12 21:58, Linus Walleij wrote:
-> On Thu, May 17, 2012 at 3:45 PM, Lee Jones<lee.jones@linaro.org>  wrote:
-> 
->> ab8500-i2c is used as core code to register the ab8500 device.
->> After allocating ab8500 memory, it immediately calls into
->> ab8500-core where the real initialisation takes place. This
->> patch moves all core registration and memory allocation into
->> the true ab8500-core file and removes ab8500-i2c completely.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->> ---
-> (...)
->> +static int ab8500_i2c_write(struct ab8500 *ab8500, u16 addr, u8 data)
-> 
-> So what happened to the promised (optional as add-on) patch also
-> renaming these functions to ab8500_prcmu_write() etc?
-> 
-> The reason I insist on not ACK:in on a "promise to fix later, really
-> sure"-basis is exactly that these things tends to be forgotten ;-)
+Hi Mark,
 
-I have not forgotten. It's the 2nd and 3rd entry on my TODO list:
+On Sun, May 20, 2012 at 3:30 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, May 17, 2012 at 07:09:27PM +0530, Yadwinder Singh Brar wrote:
+>
+> Looks mostly good. ?A couple of fairly small things:
+>
+>> +static int max77686_get_voltage_sel(struct regulator_dev *rdev)
+>> +{
+>
+> This looks like it should be regulator_get_voltage_sel_regmap().
+>
+>> +static int max77686_set_voltage_sel(struct regulator_dev *rdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned sel)
+>> +{
+>
+> This looks like it should be regulator_set_voltage_sel_regmap().
+>
 
-- TODO
-<snip>
-  - Clean-up (simplify) ab8500-core
-  - Change i2c_[read|write] to prcmu_[read|write] - COMMENTS in [PATCH 06/15]
-</snip>
+Yes, We can use  regulator_set_voltage_sel_regmap(), I will replace it.
 
-Everything on my TODO gets done. :)
+>> + ? ? max77686->ramp_delay = pdata->ramp_delay - 1;
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
+>> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1,
+>> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK4CTRL1,
+>> + ? ? ? ? ? ? RAMP_VALUE, RAMP_MASK);
+>
+> This code is unclear because RAMP_VALUE looks like a constant that has
+> nothing to do with ramp_delay when in fact it's actually this:
+>
+>> +#define RAMP_VALUE (max77686->ramp_delay << 6)
+>
+> which isn't constant - this is why I queried this last time. ?Just
+> remove the define and write this out directly. ?The way the code is
+> written at the minute it looks like ramp_delay is just stored and not
+> referred to unless you go searching around the rest of the driver.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515 
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ok, I will remove it.
+
+Thanks,
+Yadwinder.
