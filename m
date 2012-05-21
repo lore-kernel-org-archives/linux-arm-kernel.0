@@ -1,34 +1,26 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 21 May 2012 10:59:02 +0800
-Subject: [PATCH] pinctrl: sirf: mark of_device_id match table as __devinitconst
-Message-ID: <1337569142-18756-1-git-send-email-Barry.Song@csr.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 21 May 2012 11:08:11 +0800
+Subject: [PATCH 1/4] GPMI-NAND: Define ecc.strength
+In-Reply-To: <201205210440.09310.marex@denx.de>
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+ <201205210336.41860.marex@denx.de>
+ <20120521014121.GO5427@S2101-09.ap.freescale.net>
+ <201205210440.09310.marex@denx.de>
+Message-ID: <4FB9B19B.2080309@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+? 2012?05?21? 10:40, Marek Vasut ??:
+> I doubt so ... but noone ever could test it without DT bindings as you
+> NAKed/stalled every single attempt to add the platform binding code. So this
+> code was rotting in the tree, who knows how many bugs are still in it. Now I
+> guess it's about time to start squashing the bugs.
+>
+I checked the latest l2-mtd code. The bug does exit if the gpmi-nand 
+driver can works(actually it can not).
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/pinctrl-sirf.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I will test your patch.
+Anyway, this patch should be sent to Artem, not the arm-soc.
 
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 6b3534c..5816cc3 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1192,7 +1192,7 @@ out_no_gpio_remap:
- 	return ret;
- }
- 
--static const struct of_device_id pinmux_ids[]  = {
-+static const struct of_device_id pinmux_ids[] __devinitconst = {
- 	{ .compatible = "sirf,prima2-gpio-pinmux" },
- 	{}
- };
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+thanks
+Huang Shijie
