@@ -1,32 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 21 May 2012 00:20:13 -0300
-Subject: [PATCH] ARM: mxs: Let GPMI driver be built by default
-Message-ID: <1337570413-31407-1-git-send-email-festevam@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 20 May 2012 23:22:44 -0400
+Subject: [PATCH 4/4] MXS-MMC: Add wp-inverted property
+In-Reply-To: <CAAQ0ZWRxe0+xuJ0tWMX-kum0NPLpEQCkCdYD2zrOE_z6Mjpung@mail.gmail.com>
+ (Shawn Guo's message of "Mon, 21 May 2012 10:48:15 +0800")
+References: <1337562140-5739-1-git-send-email-marex@denx.de>
+ <1337562140-5739-4-git-send-email-marex@denx.de>
+ <20120521013915.GN5427@S2101-09.ap.freescale.net>
+ <201205210438.20794.marex@denx.de>
+ <CAAQ0ZWRxe0+xuJ0tWMX-kum0NPLpEQCkCdYD2zrOE_z6Mjpung@mail.gmail.com>
+Message-ID: <877gw6kykb.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-Let GPMI driver be built by default.
+On Sun, May 20 2012, Shawn Guo wrote:
+> On 21 May 2012 10:38, Marek Vasut <marex@denx.de> wrote:
+>>> The subject prefix can better be "mmc: mxs-mmc: ".
+>>
+>> Want me to resend it ?
+>>
+> It's Chris' call.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Yes, please -- actually not just because of the subject prefix, which I
+wouldn't mind fixing myself, but because I like having patches posted to
+linux-mmc@ before they're applied.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 5406c23..6b86df7 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -58,6 +58,9 @@ CONFIG_CAN_FLEXCAN=m
- CONFIG_DEVTMPFS=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- # CONFIG_BLK_DEV is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_ENC28J60=y
+Thanks!
+
+- Chris.
 -- 
-1.7.1
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
