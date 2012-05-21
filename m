@@ -1,102 +1,146 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 May 2012 13:33:21 +0100
-Subject: [PATCH 2/2] ARM: SMP: use per cpu state to replace
-In-Reply-To: <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
-References: <1337593531-16191-1-git-send-email-jason77.wang@gmail.com>
- <1337593531-16191-2-git-send-email-jason77.wang@gmail.com>
- <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20120521123321.GA24270@n2100.arm.linux.org.uk>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Mon, 21 May 2012 20:39:30 +0800
+Subject: [PATCH RFC v2 2/2] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <4FB6AB9A.4080006@wwwdotorg.org>
+References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
+ <1337346755-8761-2-git-send-email-b29396@freescale.com>
+ <4FB6AB9A.4080006@wwwdotorg.org>
+Message-ID: <20120521123929.GA27055@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:45:31PM +0800, Hui Wang wrote:
-> CPU hotplug will bring following call trace in the RT kernel:
-> BUG: sleeping function called from invalid context at linux/kernel/rtmutex.c:707
-> pcnt: 1 0 in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
-> [<800413a0>] (unwind_backtrace+0x0/0xe4) from [<804ff214>] (rt_spin_lock+0x30/0x5c)
-> [<804ff214>] (rt_spin_lock+0x30/0x5c) from [<8005a848>] (complete+0x1c/0x54)
-> [<8005a848>] (complete+0x1c/0x54) from [<804f59f8>] (cpu_die+0x34/0x70)
-> [<804f59f8>] (cpu_die+0x34/0x70) from [<8003b840>] (cpu_idle+0x54/0xd8)
-> [<8003b840>] (cpu_idle+0x54/0xd8) from [<104f9ecc>] (0x104f9ecc)
+On Sat, May 19, 2012 at 04:05:46AM +0800, Stephen Warren wrote:
+> On 05/18/2012 07:12 AM, Dong Aisheng wrote:
+> > The gpio ranges standard dt binding format is
+> > <&gpio $gpio_offset $pin_offset $npin>
+> > 
+> > The core will parse and register the pinctrl gpio ranges
+> > from device tree.
 > 
-> To avoid this call trace, we use per cpu variable to replace
-> completion, and it is safe for this modification since all reference
-> of per cpu_state variable is in the preempt disabled context.
+> Overall this conceptually makes sense, and looks good. Some comments though:
+> 
+Great, thanks Stephen.
 
-This is silly.  Why is RT preventing things that work perfectly well in
-the standard kernel from being used in the RT kernel?
+> > +/*
+> > + * pinctrl_dt_add_gpio_range() - parse and register GPIO ranges from device tree
+> > + * @pctldev: pin controller device to add the range to
+> > + * @np: the device node contains the property @propname
+> > + * @propname: a list of phandles of gpios and corresponding data.
+> > + *  The format is: <&gpio0 $gpio_offset $pin_offset $count>
+> > + */
+> > +int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
+> > +				struct device_node *np,
+> > +				const char *propname)
+> 
+> If this will be fully standardized, perhaps we should just choose a
+> standard property name, rather than allowing different drivers to do
+> different things.
+> 
+> Perhaps "gpio-map"?
+> 
+Well, correct, this name is ok to me.
 
-Being able to call complete() from atomic contexts is one of the
-fundamentals that RT seems to be breaking here.
+> > +	nranges = size /4;
+> 
+> Add a space after the /
+> 
+> > +	ranges = devm_kzalloc(pctldev->dev, nranges * sizeof(*ranges),
+> > +				GFP_KERNEL);
+> > +	for (i = 0; i < nranges; i++) {
+> > +			phandle = be32_to_cpup(list++);
+> 
+> Looks like double indentation througout this block?
+> 
+Correct, will fix them in a formal patch.
 
-> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
-> ---
->  arch/arm/kernel/smp.c |   23 ++++++++++++++++++-----
->  1 files changed, 18 insertions(+), 5 deletions(-)
+> > +			np_gpio = of_find_node_by_phandle(phandle);
+> > +			if (!np_gpio) {
+> > +				dev_err(pctldev->dev,
+> > +					"failed to find gpio node(%s)\n",
+> > +					np_gpio->name);
 > 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 05fed61..c63e2ff 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -122,6 +122,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
->  }
->  
->  #ifdef CONFIG_HOTPLUG_CPU
-> +/* State of each CPU during hotplug phases */
-> +DEFINE_PER_CPU(int, cpu_state) = { 0 };
-> +
->  static void percpu_timer_stop(void);
->  
->  /*
-> @@ -171,6 +174,7 @@ static DECLARE_COMPLETION(cpu_died);
->  void __cpu_die(unsigned int cpu)
->  {
->  	struct task_struct *p;
-> +	unsigned long timeout;
->  
->  	read_lock(&tasklist_lock);
->  	for_each_process(p) {
-> @@ -179,10 +183,16 @@ void __cpu_die(unsigned int cpu)
->  	}
->  	read_unlock(&tasklist_lock);
->  
-> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> -		pr_err("CPU%u: cpu didn't die\n", cpu);
-> -		return;
-> -	}
-> +	timeout = jiffies + msecs_to_jiffies(5000);
-> +
-> +	while (per_cpu(cpu_state, cpu) != CPU_DEAD) {
-> +		if (time_after(jiffies, timeout)) {
-> +			pr_err("CPU%u: cpu didn't die\n", cpu);
-> +			return;
-> +		}
-> +		cpu_relax();
-> + 	}
-> +
->  	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
->  
->  	if (!platform_cpu_kill(cpu))
-> @@ -207,7 +217,7 @@ void __ref cpu_die(void)
->  	mb();
->  
->  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> -	complete(&cpu_died);
-> +	per_cpu(cpu_state, cpu) = CPU_DEAD;
->  
->  	/*
->  	 * actual CPU shutdown procedure is at least platform (if not
-> @@ -285,6 +295,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  	 * the CPU migration code to notice that the CPU is online
->  	 * before we continue - which happens after __cpu_up returns.
->  	 */
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	per_cpu(cpu_state, cpu) = CPU_ONLINE;
-> +#endif
->  	set_cpu_online(cpu, true);
->  	complete(&cpu_running);
->  
-> -- 
-> 1.7.6
+> Perhaps devm_kfree(ranges) here so that if this is called multiple times
+> due to deferred probe, the allocations from the failed attempts don't
+> accumulate. Same for other error paths.
 > 
+Correct.
+Will add it.
+
+> > +				return -ENODEV;
+> > +			}
+> > +
+> > +			ranges[i].gc = of_node_to_gpiochip(np_gpio);
 > 
+> Of course, there is the outstanding question of whether this API will
+> exist and how it will work.
+> 
+> I think you can of_node_put(np_gpio) here, before the error-check for
+> ranges[i].gc, to avoid having to do it in all the error paths below.
+> 
+Good idea. Will do it.
+
+> Do you need to xxx_get(ranges[i].gc) to prevent it going away, and put()
+> it when removing the ranges?
+> 
+How would you suggest to implement xxx_get(ranges[i].gc)?
+Since the parameter is a struct gpiochip, my first sense is that it may be
+provided by gpio subsystem, but i did not find such a function.
+Looking at gpio subsystem, i also can't see it should provide such function.
+
+I wonder if we need to implement it, if gpiochip is gone way,
+the error will be detected in the higher gpio layer and will not pass
+down to pinctrl.
+
+> > +			if (gpio_offset < 0 ||
+> > +			    gpio_offset > ranges[i].gc->ngpio ||
+> > +			    pin_offset < 0 || npins < 0) {
+> 
+> These are all unsigned, so most of those conditions can never be true.
+> 
+Correct, will remove negative value checking.
+
+> Perhaps replace the remaining check with:
+> 
+> 	gpio_offset + npins > ranges[i].gc->ngpio
+> 
+Good idea, will replace above checking with this one.
+
+> to make sure the range isn't too long either
+> 
+> > +	pinctrl_add_gpio_ranges(pctldev, ranges, nranges);
+> 
+> I think we should also store ranges somewhere separate in pctldev ...
+> 
+Hmm, i'm not quite understand,
+What do you mean separate in pctldev?
+We already save the ranges in pctldev's gpio_ranges list.
+
+> > +void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
+> > +				   struct pinctrl_gpio_range *ranges,
+> > +				   unsigned nranges)
+> 
+> ... so that this function doesn't need ranges/nranges passed to it; it
+> can just get them out of pctldec.
+> 
+For remove ranges/nranges, maybe we can use list_for_each_entry_safe
+plus list_del like:
+list_for_each_entry_safe(range, tmp, &pctldev->gpio_ranges, node)
+    list_del(range->node);
+
+I just follow the original way here and if change we may need another
+patch.
+
+> Or better yet, what if pinctrl_unregister automatically removed any
+> ranges registered by pinctrl_dt_add_gpio_ranges, so this function
+> doesn't even need to exist?
+> 
+Yes, it seems this can also work for non-dt registered gpio ranges added by
+pinctrl_add_gpio_ranges, e.g, remove need pinctrl_remove_gpio_range too,
+It seems it should be in a separate patch which is not related to gpio ranges
+binding.
+
+Do you want me to work on that patch first for this series to rebase or
+we can do it later?
+
+Regards
+Dong Aisheng
