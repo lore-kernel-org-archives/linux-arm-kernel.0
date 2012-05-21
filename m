@@ -1,44 +1,46 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 21 May 2012 09:38:44 +0100
-Subject: [GIT PULL] Veratile Express DT updates for v3.5
-Message-ID: <1337589524.2262.4.camel@hornet>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 21 May 2012 11:46:42 +0300
+Subject: Clock register in early init
+In-Reply-To: <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com>
+ <1337316517.22560.19.camel@pgaikwad-dt2>
+ <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+Message-ID: <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Ofof,
+> 
+> On OMAP I think the only "gotcha" is setting up the timer.  One
+> solution is to open code the register reads and the rate calculation
+> in the timer code.  That is ugly... but it works.
+> 
+> > Which advantages do you see in dynamically allocating all this?
+> >
+> 
+> There are many but I'll name a couple.  The most significant point is
+> that we can avoid exposing the definition of struct clk if we
+> dynamically allocate stuff.  One can use struct clk_hw_init to
+> statically initialize data, or instead rely on direct calls to
+> clk_register with a bunch of parameters.
+> 
 
-Could you, please, pull this micro-updated for Versatile Express?
-These are mostly DT changes related to A!5's architected timers and
-VGIC. I have dropped the earlyprintk/uncompress patch for now because
-Russell didn't like it.
+Which means if you make a mistake in specifying parents for example, it will
+only fail at runtime, possibly before any console is active. With static
+initialization, this will fail at compiletime. Much easier to debug.
 
-Much more to come for 3.6 :-)
+> Another point is that copying the data at registration-time makes
+> __initdata possible.  I haven't done the math yet to see if this
+> really makes a difference.  However if we start doing single zImage's
+> with multiple different ARM SoCs then this could recover some pages.
+> 
 
-Thanks and apologies about short notice!
+On the other hand most clock structures are small, so there will be internal
+fragmentation. Also the arrays of parent clock pointers can be shared between
+different clocks. We have about 70 muxes in Tegra30 and 12 different parent
+arrays.
 
-Pawel
+Cheers,
 
-The following changes since commit 76e10d158efb6d4516018846f60c2ab5501900bc:
-
-  Linux 3.4 (2012-05-20 15:29:13 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-v3.4
-
-for you to fetch changes up to c533f32e1ac440b8840159f89ece8c9cca2422b5:
-
-  ARM: vexpress: Remove twice included header files (2012-05-21 09:30:42 +0100)
-
-----------------------------------------------------------------
-Pawel Moll (1):
-      ARM: vexpress: Device Tree updates
-
-Thomas Weber (1):
-      ARM: vexpress: Remove twice included header files
-
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 ++++++++++++-
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++----
- arch/arm/boot/dts/vexpress-v2p-ca9.dts      |    9 +++++++--
- arch/arm/mach-vexpress/v2m.c                |    2 --
- 4 files changed, 28 insertions(+), 9 deletions(-)
+Peter.
