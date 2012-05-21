@@ -1,50 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 May 2012 14:32:10 -0600
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <201205211818.45646.arnd@arndb.de>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201205190844.03654.arnd@arndb.de> <4FBA7C80.4080801@wwwdotorg.org>
- <201205211818.45646.arnd@arndb.de>
-Message-ID: <4FBAA64A.200@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 May 2012 22:59:27 +0200
+Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
+Message-ID: <1337633967-8387-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2012 12:18 PM, Arnd Bergmann wrote:
-> On Monday 21 May 2012, Stephen Warren wrote:
->>>
->>> The point with the direction was that it covers most cases and makes
->>> them rather simple, while for the rare case where you need more than
->>> two channels, you just use the otherwise optional named interface
->>> rather than the numbered one. My feeling is that this also makes a
->>> lot of sense at the driver API level: most dirvers just ask for the
->>> read and write channels using a very simple interface, and those drivers
->>> that have more than two will want to name them anyway.
->>
->> How are you thinking of representing the direction in DT - as part of
->> the DMA request specifier, so in a DMAC-specific way?
->>
->> If so, that seems a little odd; you have to request a DMA channel for
->> "TX", but then end up having the common code check all the entries in
->> the dmas property since it can't know which are TX, and then have the
->> wrong ones almost accidentally fail, since the DMAC will then determine
->> that it can't support TX on the RX DMA request IDs.
-> 
-> I think the direction must be encoded in a way that does not depend on
-> the binding for the specific controller. There are two ways I can see
-> how we might do it:
-> 
-> 1. have separate property names for tx and rx channels, and probably
->    one for combined rx/tx channels
+The ecc.strength wasn't set, resulting in the following crash:
+[    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
+[    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
+[    2.550000] Modules linked in:
+[    2.550000] CPU: 0    Not tainted  (3.4.0-rc7-next-20120518-dirty #1211)
+[    2.550000] PC is at nand_scan_tail+0x328/0x650
+[    2.550000] LR is at nand_scan_tail+0x328/0x650
+[    2.550000] pc : [<c020841c>]    lr : [<c020841c>]    psr: 20000013
+[    2.550000] sp : c7443ea8  ip : c7448000  fp : c043dc70
+[    2.550000] r10: 00000000  r9 : c059dd20  r8 : c7526300
+[    2.550000] r7 : 00000001  r6 : c7479c08  r5 : c7526300  r4 : c7526098
+[    2.550000] r3 : c7448000  r2 : 00000000  r1 : 00000001  r0 : 00000034
+[    2.550000] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    2.550000] Control: 0005317f  Table: 40004000  DAC: 00000017
+[    2.550000] Process swapper (pid: 1, stack limit = 0xc7442270)
+[    2.550000] Stack: (0xc7443ea8 to 0xc7444000)
+[    2.550000] 3ea0:                   c7526000 00000000 c7479c08 c02f68e0 c03d50ec c7526000
+[    2.550000] 3ec0: c747c6e0 00000000 c0ae7720 00000004 00000000 00000000 c7479c08 c0ae7720
+[    2.550000] 3ee0: c7479c3c c0593e20 c7572200 c01f6618 c01f6604 c01f55b0 c7479c08 c0593e20
+[    2.550000] 3f00: c7479c3c c059dd20 c7572200 c01f57cc 00000000 c0593e20 c01f5738 c01f3d40
+[    2.550000] 3f20: c74038a8 c74767d0 c0593e20 c04475ec c05901b8 c01f4e18 c03d50e0 c019d438
+[    2.550000] 3f40: c7403800 c0593e20 c04475ec 00000000 c059dd20 c04475f8 c7442000 c01f5a70
+[    2.550000] 3f60: 00000000 c044e98c c04475ec 00000000 c059dd20 c04475f8 c7442000 c043dc7c
+[    2.550000] 3f80: c044e98c c0008824 c03d6c30 c040c4e4 00000006 00000006 c03b0ce4 c0bf54e0
+[    2.550000] 3fa0: c044e98c c04475ec 00000006 c04475f8 0000004c c042a21c 00000000 c042a8b8
+[    2.550000] 3fc0: 00000006 00000006 c042a21c 00000000 00000000 00000000 00000000 c042a7bc
+[    2.550000] 3fe0: c000fab4 00000013 00000000 00000000 00000000 c000fab4 efbbfaa5 eaeafefe
+[    2.550000] [<c020841c>] (nand_scan_tail+0x328/0x650) from [<c02f68e0>] (gpmi_nand_probe+0x43c/0x5a4)
+[    2.550000] [<c02f68e0>] (gpmi_nand_probe+0x43c/0x5a4) from [<c01f6618>] (platform_drv_probe+0x14/0x18)
+[    2.550000] [<c01f6618>] (platform_drv_probe+0x14/0x18) from [<c01f55b0>] (driver_probe_device+0x74/0x1fc)
+[    2.550000] [<c01f55b0>] (driver_probe_device+0x74/0x1fc) from [<c01f57cc>] (__driver_attach+0x94/0x98)
+[    2.550000] [<c01f57cc>] (__driver_attach+0x94/0x98) from [<c01f3d40>] (bus_for_each_dev+0x50/0x80)
+[    2.550000] [<c01f3d40>] (bus_for_each_dev+0x50/0x80) from [<c01f4e18>] (bus_add_driver+0x188/0x25c)
+[    2.550000] [<c01f4e18>] (bus_add_driver+0x188/0x25c) from [<c01f5a70>] (driver_register+0x78/0x138)
+[    2.550000] [<c01f5a70>] (driver_register+0x78/0x138) from [<c043dc7c>] (gpmi_nand_init+0xc/0x30)
+[    2.550000] [<c043dc7c>] (gpmi_nand_init+0xc/0x30) from [<c0008824>] (do_one_initcall+0x108/0x17c)
+[    2.550000] [<c0008824>] (do_one_initcall+0x108/0x17c) from [<c042a8b8>] (kernel_init+0xfc/0x1bc)
+[    2.550000] [<c042a8b8>] (kernel_init+0xfc/0x1bc) from [<c000fab4>] (kernel_thread_exit+0x0/0x8)
+[    2.550000] Code: e3530000 1affff76 e59f02d0 eb03c16a (e7f001f2)
+[    2.830000] ---[ end trace 3f05d4c0039432f1 ]---
+[    2.840000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-> 2. define the second cell in each channel specifier to be the direction
->    in a predefined format, followed by the other (controller specific)
->    attributes, if any.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Huang Shijie <b32955@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: linux-mtd at lists.infradead.org
+Cc: Artem Bityutskiy <dedekind1@gmail.com>
 
-In this option, lets say bit 0 is 0==TX, 1==RX (or perhaps 2 bits if
-combined TX/RX is needed)
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Then, we could reserve say bits 7:1 as client DMA request ID.
+V2: Also configure mtd.ecc_strength
 
-And then have bits 31:8 as DMAC specific data.
-
-Wouldn't that allow us to have our cake and eat it?
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 303e9848..d5e9f8b 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1436,6 +1436,10 @@ static int gpmi_pre_bbt_scan(struct gpmi_nand_data  *this)
+ 	if (ret)
+ 		return ret;
+ 
++	/* Adjust the ECC strength according to the chip. */
++	this->nand.ecc.strength = this->bch_geometry.ecc_strength;
++	this->mtd.ecc_strength = this->bch_geometry.ecc_strength;
++
+ 	/* NAND boot init, depends on the gpmi_set_geometry(). */
+ 	return nand_boot_init(this);
+ }
+@@ -1494,6 +1498,7 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+ 	chip->options		|= NAND_NO_SUBPAGE_WRITE;
+ 	chip->ecc.mode		= NAND_ECC_HW;
+ 	chip->ecc.size		= 1;
++	chip->ecc.strength	= 8;
+ 	chip->ecc.layout	= &gpmi_hw_ecclayout;
+ 
+ 	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
+-- 
+1.7.10
