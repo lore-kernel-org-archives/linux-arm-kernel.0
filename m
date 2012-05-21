@@ -1,42 +1,40 @@
-From: snijsure@grid-net.com (Subodh Nijsure)
-Date: Mon, 21 May 2012 12:47:48 -0700
-Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <201205212141.52171.marex@denx.de>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5AcP2cAAkuFPJn3Xp5NuR+JG4hDO7Ehq5H-V6PCy4DwNA@mail.gmail.com>
- <201205212141.52171.marex@denx.de>
-Message-ID: <4FBA9BE4.7020303@grid-net.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 21 May 2012 21:54:06 +0200
+Subject: [PATCH] ARM: cache-l2x0: add a const qualifier
+In-Reply-To: <1335171381-24869-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1335171381-24869-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1337630046-9279-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2012 12:41 PM, Marek Vasut wrote:
-> Dear Fabio Estevam,
->
->> Hi Richard,
->>
->> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
->>
->> <richard.zhao@freescale.com>  wrote:
->>> The work is based on  ci13xxx rework done by Alexander Shishkin.
->>>
->>> Status:
->>>   - this version only support host
->>>   - usbotg controler works at host role
->>>
->>> Changes since V1:
->>>   - Merge the work of Marek
->>>   - re-implement connect change notify
->>>   - imx6q: move part of code to clk
->>>   - imx6q: add config-on-boot gpios
->> Can you please also add the driver into the defconfig files?
->>
->> What about the existing USB host drivers for mx27/mx31/mx35/mx25/mx35?
->>
->> Is the idea to switch to drivers/usb/chipidea/host.c too?
-> I think the core is the same, it's just the ci13xxx-imx driver that'd need to be
-> written differently for these
+This is only cosmetic for now. In case that
 
-So that means driver that you did are not going to be up streamed for 
-mx28/mxs? And those interested should be tracking this patch set?
+	http://mid.gmane.org/1335171381-24869-1-git-send-email-u.kleine-koenig at pengutronix.de
 
--Subodh
+will be applied, it fixes a warning
+
+	arch/arm/mm/cache-l2x0.c: In function 'l2x0_of_init':
+	arch/arm/mm/cache-l2x0.c:573:7: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+
+though.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mm/cache-l2x0.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 2a8e380..577baf7 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -554,7 +554,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ {
+ 	struct device_node *np;
+-	struct l2x0_of_data *data;
++	const struct l2x0_of_data *data;
+ 	struct resource res;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+-- 
+1.7.10
