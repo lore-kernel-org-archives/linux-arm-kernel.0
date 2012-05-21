@@ -1,32 +1,32 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 May 2012 03:02:19 +0200
-Subject: [PATCH 3/4] MXS-MMC: Move of_match_table out of CONFIG_PM
+Date: Mon, 21 May 2012 03:02:18 +0200
+Subject: [PATCH 2/4] GPMI-NAND: Fixup compile issue
 In-Reply-To: <1337562140-5739-1-git-send-email-marex@denx.de>
 References: <1337562140-5739-1-git-send-email-marex@denx.de>
-Message-ID: <1337562140-5739-3-git-send-email-marex@denx.de>
+Message-ID: <1337562140-5739-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Huang Shijie <b32955@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/mmc/host/mxs-mmc.c |    2 +-
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 34a9026..277161d 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -894,8 +894,8 @@ static struct platform_driver mxs_mmc_driver = {
- 		.owner	= THIS_MODULE,
- #ifdef CONFIG_PM
- 		.pm	= &mxs_mmc_pm_ops,
--		.of_match_table = mxs_mmc_dt_ids,
- #endif
-+		.of_match_table = mxs_mmc_dt_ids,
- 	},
- };
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index f5f3d761..33111a9 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -486,7 +486,7 @@ static int __devinit acquire_resources(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto exit_dma_channels;
  
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	pinctrl = devm_pinctrl_get_select_default(&this->pdev->dev);
+ 	if (IS_ERR(pinctrl)) {
+ 		ret = PTR_ERR(pinctrl);
+ 		goto exit_pin;
 -- 
 1.7.10
