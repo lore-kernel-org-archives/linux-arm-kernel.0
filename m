@@ -1,33 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 May 2012 09:31:58 +0200
-Subject: [RFC] pl08x: don't use dma_slave_config direction argument
-In-Reply-To: <20120517170329.GB19548@n2100.arm.linux.org.uk>
-References: <20120516110451.GA9571@n2100.arm.linux.org.uk>
- <20120517170329.GB19548@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYRX-ouR5wmLkZGPBWvLtkS=SCEJZ-OeQk48=WSPHY-0g@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 May 2012 13:02:36 +0530
+Subject: [PATCH v2 1/4] ARM: OMAP: timer: allow gp timer clock-event to be
+ used on both cpus
+In-Reply-To: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1337585559-20250-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 7:03 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+For coupled cpuidle to work when both cpus are active, it needs a global timer
+that can handle events for both cpus.  This timer is used as the broadcast
+clock-event when the per-cpu timer hardware stop in low power states.
+Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
+set the irq to allow the clockevent core to determine the affinity of the
+timer.
 
-> I've just been testing this on the Versatile PB926 with my only working
-> peripheral (PL011) and the runtime PM support which was added to the PL08x
-> driver is totally breaking this setup.
+Signed-off-by: Colin Cross <ccross@android.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-Ouch! That was a nasty bug.
-
-> So, the only solution I can see is to strip out all the runtime PM stuff
-> from PL08x, which is buggy anyway.
-
-I'd just kill it FTM, maybe the patch can simply be reverted?
-
-What worries me is that this is such a straight-forward use of the runtime PM
-API, the semantic difficulties with this API has caused me a lot of headache
-recently. It just looks simple but isn't.
-
-*_get_sync() should never be called in interrupt context, OK, but this is even
-nastier, no calling under any spinlock ... how can we ever guarantee that?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index c512bac..4212f2f 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -135,6 +135,7 @@ static struct clock_event_device clockevent_gpt = {
+ 	.name		= "gp timer",
+ 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+ 	.shift		= 32,
++	.rating		= 300,
+ 	.set_next_event	= omap2_gp_timer_set_next_event,
+ 	.set_mode	= omap2_gp_timer_set_mode,
+ };
+@@ -226,7 +227,8 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
+ 		clockevent_delta2ns(3, &clockevent_gpt);
+ 		/* Timer internal resynch latency. */
+ 
+-	clockevent_gpt.cpumask = cpumask_of(0);
++	clockevent_gpt.cpumask = cpu_possible_mask;
++	clockevent_gpt.irq = omap_dm_timer_get_irq(&clkev);
+ 	clockevents_register_device(&clockevent_gpt);
+ 
+ 	pr_info("OMAP clockevent source: GPTIMER%d at %lu Hz\n",
+-- 
+1.7.5.4
