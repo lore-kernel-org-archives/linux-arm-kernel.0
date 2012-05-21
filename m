@@ -1,105 +1,104 @@
-From: rattanni@gmail.com (Rich Rattanni)
-Date: Mon, 21 May 2012 17:11:44 -0400
-Subject: MMC driver hangs when reading faulty card
-Message-ID: <CA+kQo=M8fOgOBj91xYQhnxtmrCo2H6Q7-6MYJS6kgSdMd3pgWg@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 21 May 2012 23:17:38 +0200 (CEST)
+Subject: [PATCH] mmc: mxs-mmc: Add wp-inverted property
+In-Reply-To: <1337634071-8531-1-git-send-email-marex@denx.de>
+References: <1337634071-8531-1-git-send-email-marex@denx.de>
+Message-ID: <Pine.LNX.4.64.1205212314070.5421@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have had an issue logging data to SD cards on my PXA based system.
-Periodically an SD card appears to fail that causes the system to hang
-indefinitely while mounting the SD card.  It became enough of a
-problem that I finally decided to debug the issue.
+On Mon, 21 May 2012, Marek Vasut wrote:
 
-Processor: PXA270
-MMC driver: Linux 3.4rc7
+> The write-protect GPIO is inverted on some boards. Handle such case.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Lothar Wa?mann <LW@karo-electronics.de>
+> ---
+>  drivers/mmc/host/mxs-mmc.c |   15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index 277161d..9bfd08e 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -164,16 +164,23 @@ struct mxs_mmc_host {
+>  	spinlock_t			lock;
+>  	int				sdio_irq_en;
+>  	int				wp_gpio;
+> +	int				wp_inverted:1;
 
-In my application I have eight development boards scattered around my
-house doing sensor monitoring.  I write about 200MB of data per day to
-the SD card.  Occasionally a board will stop responding and I find out
-the system reset (watchdog) and hung attempting to mount the SD card.
-If I replace the SD card then system runs fine (for the record I am
-running EXT3 on top of the SD card).  I am tired of running to Generic
-Office Supply Store for SD cards, so I decided to dig into the issue.
-A week ago I had a card begin to show the aforementioned problems so I
-began to investigate.  Here is what I found:
+I think, many mmc drivers could use such a flag, so, I proposed this
 
-On card insert the kernel reports the following (via dmesg):
---- dmesg output ---
-mmc0: host does not support reading read-only switch. assuming write-enable.
-mmc0: new SDHC card at address b368
-mmcblk0: mmc0:b368 USD   3.75 GiB
- mmcblk0: p1
----------------------------
-When the card is mounted (mount /dev/mmcblk0p1 /media/card), the mount
-never returns and cannot be stopped or killed.  dmesg shows the
-following:
---- dmesg output ---
-EXT3-fs: barriers not enabled
-attempt to access beyond end of device
-mmcblk0p1: rw=0, want=2584260648, limit=7874560
-attempt to access beyond end of device
-mmcblk0p1: rw=0, want=2573879920, limit=78745
-attempt to access beyond end of device
-mmcblk0p1: rw=0, want=2293235720, limit=7874560
-attempt to access beyond end of device
-mmcblk0p1: rw=0, want=2416179208, limit=7874560
-journal_bmap: journal block not found at offset 20 on mmcblk0p1
-JBD: bad block at offset 20
---------------
-Running top shows mmcqd sitting at 50% CPU.  The system is noticeably
-less responsive.  Several printk's and kernel rebuilds later I found
-out the mmc driver is stuck in the following while loop:
+http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg14018.html
 
-File: ./linux-3.4-rc7/drivers/mmc/card/block.c Line: 1003
--- BEGIN CODE --
-static int mmc_blk_err_check(struct mmc_card *card,
-              struct mmc_async_req *areq)
-{
-....snip...
-/*
-    * Everything else is either success, or a data error of some
-    * kind.  If it was a write, we may have transitioned to
-    * program mode, which we have to wait for it to complete.
-    */
-   if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
-      u32 status;
-      do {
-         int err = get_card_status(card, &status, 5);
-         if (err) {
-            pr_err("%s: error %d requesting status\n",
-                   req->rq_disk->disk_name, err);
-            return MMC_BLK_CMD_ERR;
-         }
-         /*
-          * Some cards mishandle the status bits,
-          * so make sure to check both the busy
-          * indication and the card state.
-          */
-      } while (!(status & R1_READY_FOR_DATA) ||
-          (R1_CURRENT_STATE(status) == R1_STATE_PRG));
-   }
+and I'm planning to respin that entire patch-series, taking reviews into 
+account. However, that specific patch doesn't depend on anything, so, it 
+can be taken directly. Then drivers would just use the new CAP2 flag, 
+instead of adding similar flags to their private data. Another advantage 
+of having that flag centrally is, that it will enable its use from the 
+slot function helper module
 
-....snip...
-}
--- END CODE --
+http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg14031.html
 
-My initial thoughts are hanging here indefinitely is not the best
-solution.  I have a single threaded user space process that handles
-writing information to the card then transmitting a status via
-wireless to a master node, so when cards go bad and the board
-watchdogs and reboots the device is temporarily bricked.  If I did
-pass this work off to another thread/process then I still have a power
-issue.  The SD card draws  ~14mA of current while spinning in the
-request status loop instead of 1mA.  In addition to the power wasted
-from mmcqd busy waiting.
+which I'll also respin soon.
 
-I am trying to think about possible solutions, but I have no
-experience with the MMC driver architecture so that is why I am
-reaching out for help.  I could kick myself for throwing out a dozen
-or so cards before finally deciding to investigate this issue.  As it
-stands I only have one card that causes this symptom.  Any help on the
-matter would be appreciated, in the mean time I shall attempt to learn
-and experiment further.
+Thanks
+Guennadi
 
---
-Rich
+>  };
+>  
+>  static int mxs_mmc_get_ro(struct mmc_host *mmc)
+>  {
+>  	struct mxs_mmc_host *host = mmc_priv(mmc);
+> +	int ret;
+>  
+>  	if (!gpio_is_valid(host->wp_gpio))
+>  		return -EINVAL;
+>  
+> -	return gpio_get_value(host->wp_gpio);
+> +	ret = gpio_get_value(host->wp_gpio);
+> +
+> +	if (host->wp_inverted)
+> +		ret = !ret;
+> +
+> +	return ret;
+>  }
+>  
+>  static int mxs_mmc_get_cd(struct mmc_host *mmc)
+> @@ -707,6 +714,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	struct pinctrl *pinctrl;
+>  	int ret = 0, irq_err, irq_dma;
+>  	dma_cap_mask_t mask;
+> +	enum of_gpio_flags flags;
+>  
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> @@ -785,7 +793,10 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA;
+>  		else if (bus_width == 8)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+> -		host->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
+> +		host->wp_gpio = of_get_named_gpio_flags(np, "wp-gpios", 0,
+> +							&flags);
+> +		if (flags & OF_GPIO_ACTIVE_LOW)
+> +			host->wp_inverted = 1;
+>  	} else {
+>  		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+> -- 
+> 1.7.10
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
