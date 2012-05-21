@@ -1,24 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 May 2012 14:26:29 +0800
-Subject: [PATCH] ARM: mxs: Let GPMI driver be built by default
-In-Reply-To: <201205210822.40659.marex@denx.de>
-References: <1337570413-31407-1-git-send-email-festevam@gmail.com>
- <201205210739.46619.marex@denx.de>
- <20120521054842.GD8140@S2101-09.ap.freescale.net>
- <201205210822.40659.marex@denx.de>
-Message-ID: <CAAQ0ZWQN-JuTzu1i-88cWpubPP1G4bMncg2hU3H2L7=pd0Lj-A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 May 2012 12:14:49 +0530
+Subject: [PATCH 0/2] bug fixes for coupled cpuidle
+In-Reply-To: <1337364324-12171-1-git-send-email-ccross@android.com>
+References: <1337364324-12171-1-git-send-email-ccross@android.com>
+Message-ID: <4FB9E461.9060405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 May 2012 14:22, Marek Vasut <marex@denx.de> wrote:
-> You've chosen the wrong approach then. There's always one remaining bug. But the
-> more eyes on the code, the faster the bugs will be fixed.
->
-There's always one remaining bug which is to be found, not the bugs
-that we have known.
+On Friday 18 May 2012 11:35 PM, Colin Cross wrote:
+> The last modifications made to the coupled cpuidle patches introduced
+> two bugs that I missed during testing.  The online count was never
+> initialized, causing coupled idle to always wait and never enter the
+> ready loop.  That hid the second bug, the ready count could never be
+> decremented after exiting idle.
+> 
+> Len, these two patches could be squashed into patch 3 of the original
+> set.  If you do squash them, you could also add Rafael's tags to the
+> set (Reviewed-by on 1 and 2, acked-by on 3).  Or I can reupload the
+> whole stack as v5 if you prefer.
 
-Anyway, as I've said it's not a bug fix.  Thus it's not a candidate
-for v3.5-rc.  It's simple as it is.
+I confirm that these two fixes are needed to get couple idle
+v4 series working.
 
-Regards,
-Shawn
+Regards
+Santosh
