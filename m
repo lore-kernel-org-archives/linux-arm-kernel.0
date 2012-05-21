@@ -1,233 +1,166 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Mon, 21 May 2012 17:50:26 -0500
-Subject: [PATCH v5 3/7] ARM: imx: clean and consolidate imx5 suspend and idle
- code
+Date: Mon, 21 May 2012 17:50:27 -0500
+Subject: [PATCH v5 4/7] ARM: imx: Enable imx53 low power idle
 In-Reply-To: <1337640630-29176-1-git-send-email-rob.lee@linaro.org>
 References: <1337640630-29176-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1337640630-29176-4-git-send-email-rob.lee@linaro.org>
+Message-ID: <1337640630-29176-5-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx5 idle code that existed in mm-imx5.c is moved to pm-imx5.c.
-The imx5_pm_init call is now exported and called during the
-MACHINE_START late_init in supported imx5 platforms.
-
-Remove various enabling/disabling of the gpc_dvfs clock and
-enable it once during initialization.  This is a very low
-power clock that must be enabled during low power operations.
-
-There are only two "suspend_state_t" imx5 low power modes ever
-used.  STOP_POWER_OFF for suspend to mem and
-WAIT_UNCLOCKED_POWER_OFF for idle and suspend to standby.  The
-latter mode only requires 500 nanoseconds of extra hardware
-exit time beyond a basic WFI operation (WAIT_CLOCKED mode) so
-no other idle mode is necessary.  Given this information, it
-is more efficient to keep the registers in the often used
-WAIT_UNCLOCKED_POWER_OFF state and only to and from the
-STOP_POWER_OFF register state as needed when suspend to
-mem is required.
+Add various functionality needed to enable a imx53 low power idle
+state.  This includes adding the imx53 gpc_dvfs clock and making a
+common imx5_late_init function and initializing all imx53
+ MACHINE_STATE late_init calls to imx5_late_init.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-imx/mm-imx5.c             |   21 +---------
- arch/arm/mach-imx/pm-imx5.c             |   67 +++++++++++++++++++------------
- arch/arm/plat-mxc/include/mach/common.h |    3 +-
- 3 files changed, 44 insertions(+), 47 deletions(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c     |    2 +-
+ arch/arm/mach-imx/clock-mx51-mx53.c     |    1 +
+ arch/arm/mach-imx/imx53-dt.c            |    1 +
+ arch/arm/mach-imx/mach-mx53_ard.c       |    1 +
+ arch/arm/mach-imx/mach-mx53_evk.c       |    1 +
+ arch/arm/mach-imx/mach-mx53_loco.c      |    1 +
+ arch/arm/mach-imx/mach-mx53_smd.c       |    1 +
+ arch/arm/mach-imx/mm-imx5.c             |    5 +++++
+ arch/arm/mach-imx/pm-imx5.c             |    5 +++++
+ arch/arm/plat-mxc/include/mach/common.h |    3 +++
+ 10 files changed, 20 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 66633d5..834a87d 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -245,6 +245,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk_register_clkdev(clk[dummy], NULL, "imx-keypad");
+ 	clk_register_clkdev(clk[tve_gate], NULL, "imx-tve.0");
+ 	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx-tve.0");
++	clk_register_clkdev(clk[gpc_dvfs], "gpc_dvfs", NULL);
+ 
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(clk[esdhc_a_sel], clk[pll2_sw]);
+@@ -302,7 +303,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
+-	clk_register_clkdev(clk[gpc_dvfs], "gpc_dvfs", NULL);
+ 	clk_register_clkdev(clk[ipu_gate], "bus", "imx51-ipu");
+ 	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx51-ipu");
+ 	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx51-ipu");
+diff --git a/arch/arm/mach-imx/clock-mx51-mx53.c b/arch/arm/mach-imx/clock-mx51-mx53.c
+index 0847050..decedc6 100644
+--- a/arch/arm/mach-imx/clock-mx51-mx53.c
++++ b/arch/arm/mach-imx/clock-mx51-mx53.c
+@@ -1529,6 +1529,7 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+ 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+ 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
++	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+ 	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
+ 	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
+ 	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
+diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
+index 4172279..c502619 100644
+--- a/arch/arm/mach-imx/imx53-dt.c
++++ b/arch/arm/mach-imx/imx53-dt.c
+@@ -125,6 +125,7 @@ DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
+ 	.handle_irq	= imx53_handle_irq,
+ 	.timer		= &imx53_timer,
+ 	.init_machine	= imx53_dt_init,
++	.init_late	= imx53_init_late,
+ 	.dt_compat	= imx53_dt_board_compat,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-mx53_ard.c b/arch/arm/mach-imx/mach-mx53_ard.c
+index 0564198..f1e83d6 100644
+--- a/arch/arm/mach-imx/mach-mx53_ard.c
++++ b/arch/arm/mach-imx/mach-mx53_ard.c
+@@ -266,5 +266,6 @@ MACHINE_START(MX53_ARD, "Freescale MX53 ARD Board")
+ 	.handle_irq = imx53_handle_irq,
+ 	.timer = &mx53_ard_timer,
+ 	.init_machine = mx53_ard_board_init,
++	.init_late	= imx53_init_late,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-mx53_evk.c b/arch/arm/mach-imx/mach-mx53_evk.c
+index 5a72188..8387496 100644
+--- a/arch/arm/mach-imx/mach-mx53_evk.c
++++ b/arch/arm/mach-imx/mach-mx53_evk.c
+@@ -174,5 +174,6 @@ MACHINE_START(MX53_EVK, "Freescale MX53 EVK Board")
+ 	.handle_irq = imx53_handle_irq,
+ 	.timer = &mx53_evk_timer,
+ 	.init_machine = mx53_evk_board_init,
++	.init_late	= imx53_init_late,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-mx53_loco.c b/arch/arm/mach-imx/mach-mx53_loco.c
+index 37f67ca..e266f3f 100644
+--- a/arch/arm/mach-imx/mach-mx53_loco.c
++++ b/arch/arm/mach-imx/mach-mx53_loco.c
+@@ -316,5 +316,6 @@ MACHINE_START(MX53_LOCO, "Freescale MX53 LOCO Board")
+ 	.handle_irq = imx53_handle_irq,
+ 	.timer = &mx53_loco_timer,
+ 	.init_machine = mx53_loco_board_init,
++	.init_late	= imx53_init_late,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-mx53_smd.c b/arch/arm/mach-imx/mach-mx53_smd.c
+index 8e972c5..4f4c1b9 100644
+--- a/arch/arm/mach-imx/mach-mx53_smd.c
++++ b/arch/arm/mach-imx/mach-mx53_smd.c
+@@ -163,5 +163,6 @@ MACHINE_START(MX53_SMD, "Freescale MX53 SMD Board")
+ 	.handle_irq = imx53_handle_irq,
+ 	.timer = &mx53_smd_timer,
+ 	.init_machine = mx53_smd_board_init,
++	.init_late	= imx53_init_late,
+ 	.restart	= mxc_restart,
+ MACHINE_END
 diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 3fb4d56..ff7fa61 100644
+index ff7fa61..85bc52a 100644
 --- a/arch/arm/mach-imx/mm-imx5.c
 +++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -15,7 +15,6 @@
- #include <linux/init.h>
- #include <linux/clk.h>
- 
--#include <asm/system_misc.h>
- #include <asm/mach/map.h>
- 
- #include <mach/hardware.h>
-@@ -23,24 +22,6 @@
- #include <mach/devices-common.h>
- #include <mach/iomux-v3.h>
- 
--static struct clk *gpc_dvfs_clk;
--
--static void imx5_idle(void)
--{
--	/* gpc clock is needed for SRPG */
--	if (gpc_dvfs_clk == NULL) {
--		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
--		if (IS_ERR(gpc_dvfs_clk))
--			return;
--		clk_prepare(gpc_dvfs_clk);
--	}
--	clk_enable(gpc_dvfs_clk);
--	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
--	if (!tzic_enable_wake())
--		cpu_do_idle();
--	clk_disable(gpc_dvfs_clk);
--}
--
- /*
-  * Define the MX50 memory map.
-  */
-@@ -104,7 +85,6 @@ void __init imx51_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
--	arm_pm_idle = imx5_idle;
- }
- 
- void __init imx53_init_early(void)
-@@ -239,4 +219,5 @@ void __init imx53_soc_init(void)
- void __init imx51_init_late(void)
- {
+@@ -221,3 +221,8 @@ void __init imx51_init_late(void)
  	mx51_neon_fixup();
-+	imx51_pm_init();
+ 	imx51_pm_init();
  }
++
++void __init imx53_init_late(void)
++{
++	imx53_pm_init();
++}
 diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-index e26a9cb..baf9321 100644
+index baf9321..b3dcd8e 100644
 --- a/arch/arm/mach-imx/pm-imx5.c
 +++ b/arch/arm/mach-imx/pm-imx5.c
-@@ -13,18 +13,27 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
- #include <asm/tlbflush.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include "crm-regs-imx5.h"
- 
--static struct clk *gpc_dvfs_clk;
-+/*
-+ * The WAIT_UNCLOCKED_POWER_OFF state only requires <= 500ns to exit.
-+ * This is also the lowest power state possible without affecting
-+ * non-cpu parts of the system.  For these reasons, imx5 should default
-+ * to always using this state for cpu idling.  The PM_SUSPEND_STANDBY also
-+ * uses this state and needs to take no action when registers remain confgiured
-+ * for this state.
-+ */
-+#define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
- 
- /*
-  * set cpu low power mode before WFI instruction. This function is called
-  * mx5 because it can be used for mx50, mx51, and mx53.
-  */
--void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
-+static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
- {
- 	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
- 	u32 empgc0, empgc1;
-@@ -87,11 +96,6 @@ void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
- 	}
+@@ -166,3 +166,8 @@ void __init imx51_pm_init(void)
+ 	if (!ret)
+ 		suspend_set_ops(&mx5_suspend_ops);
  }
- 
--static int mx5_suspend_prepare(void)
--{
--	return clk_prepare_enable(gpc_dvfs_clk);
--}
--
- static int mx5_suspend_enter(suspend_state_t state)
- {
- 	switch (state) {
-@@ -99,7 +103,7 @@ static int mx5_suspend_enter(suspend_state_t state)
- 		mx5_cpu_lp_set(STOP_POWER_OFF);
- 		break;
- 	case PM_SUSPEND_STANDBY:
--		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+		/* DEFAULT_IDLE_STATE already configured */
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -114,12 +118,10 @@ static int mx5_suspend_enter(suspend_state_t state)
- 		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
- 	}
- 	cpu_do_idle();
--	return 0;
--}
- 
--static void mx5_suspend_finish(void)
--{
--	clk_disable_unprepare(gpc_dvfs_clk);
-+	/* return registers to default idle state */
-+	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
-+	return 0;
- }
- 
- static int mx5_pm_valid(suspend_state_t state)
-@@ -129,25 +131,38 @@ static int mx5_pm_valid(suspend_state_t state)
- 
- static const struct platform_suspend_ops mx5_suspend_ops = {
- 	.valid = mx5_pm_valid,
--	.prepare = mx5_suspend_prepare,
- 	.enter = mx5_suspend_enter,
--	.finish = mx5_suspend_finish,
- };
- 
--static int __init mx5_pm_init(void)
-+static void imx5_pm_idle(void)
- {
--	if (!cpu_is_mx51() && !cpu_is_mx53())
--		return 0;
-+	if (likely(!tzic_enable_wake()))
-+		cpu_do_idle();
-+}
 +
-+static int __init imx5_pm_common_init(void)
++void __init imx53_pm_init(void)
 +{
-+	int ret;
-+	struct clk *gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
-+
-+	if (IS_ERR(gpc_dvfs_clk))
-+		return PTR_ERR(gpc_dvfs_clk);
- 
--	if (gpc_dvfs_clk == NULL)
--		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
-+	ret = clk_prepare_enable(gpc_dvfs_clk);
-+	if (ret)
-+		return ret;
- 
--	if (!IS_ERR(gpc_dvfs_clk)) {
--		if (cpu_is_mx51())
--			suspend_set_ops(&mx5_suspend_ops);
--	} else
--		return -EPERM;
-+	arm_pm_idle = imx5_pm_idle;
-+
-+	/* Set the registers to the default cpu idle state. */
-+	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
- 
- 	return 0;
- }
--device_initcall(mx5_pm_init);
-+
-+void __init imx51_pm_init(void)
-+{
-+	int ret = imx5_pm_common_init();
-+	if (!ret)
-+		suspend_set_ops(&mx5_suspend_ops);
++	imx5_pm_common_init();
 +}
 diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index cf663d8..f65d068 100644
+index f65d068..3314e69 100644
 --- a/arch/arm/plat-mxc/include/mach/common.h
 +++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -95,7 +95,6 @@ enum mx3_cpu_pwr_mode {
- };
- 
- extern void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
--extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
- extern void imx_print_silicon_rev(const char *cpu, int srev);
- 
- void avic_handle_irq(struct pt_regs *);
-@@ -146,8 +145,10 @@ extern void imx6q_clock_map_io(void);
- 
+@@ -54,6 +54,7 @@ extern void imx50_soc_init(void);
+ extern void imx51_soc_init(void);
+ extern void imx53_soc_init(void);
+ extern void imx51_init_late(void);
++extern void imx53_init_late(void);
+ extern void epit_timer_init(struct clk *timer_clk, void __iomem *base, int irq);
+ extern void mxc_timer_init(struct clk *timer_clk, void __iomem *, int);
+ extern int mx1_clocks_init(unsigned long fref);
+@@ -146,9 +147,11 @@ extern void imx6q_clock_map_io(void);
  #ifdef CONFIG_PM
  extern void imx6q_pm_init(void);
-+extern void imx51_pm_init(void);
+ extern void imx51_pm_init(void);
++extern void imx53_pm_init(void);
  #else
  static inline void imx6q_pm_init(void) {}
-+static inline void imx51_pm_init(void) {}
+ static inline void imx51_pm_init(void) {}
++static inline void imx53_pm_init(void) {}
  #endif
  
  #ifdef CONFIG_NEON
