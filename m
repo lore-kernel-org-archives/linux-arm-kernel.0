@@ -1,28 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 May 2012 23:46:08 +0200
-Subject: [PATCH 16/16] ARM: ux500: Re-enable SMSC911x platform code
- registration during non-DT boots
-In-Reply-To: <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
-References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Mon, 21 May 2012 22:55:10 +0100
+Subject: [PATCH] ARM: kirkwood: Force nand platform device name
+In-Reply-To: <20120521011209.GK24238@titan.lakedaemon.net>
+References: <20120521011209.GK24238@titan.lakedaemon.net>
+Message-ID: <1337637311-24388-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 10:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+The clk framework relies on device names to be constant. Pre-dt, the
+NAND platform device was called "orion_nand" which is what the framework
+expects. The following auxdata block forces the name to "orion_nand",
+so the clk framework finds it and keeps required clocks enabled.
 
-> The patch to disable SMSC911x registration was applied twice in the upstream
-> kernel by mistake. Git interpreted this as 'take the same entry from a
-> similar struct' which was close by. This was the wrong thing to do. This patch
-> rectifies this error and re-enables SMSC911x registration when Device Tree is
-> not enabled.
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+ arch/arm/mach-kirkwood/board-dt.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-This patch needs to go first, and into the -rc series.
-
-Thanks,
-Linus Walleij
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index edc3f8a..dbf7fe3 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -25,6 +25,12 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+ 	{ }
+ };
+ 
++struct of_dev_auxdata kirkwood_dt_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("mrvl,orion-nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
++		       "orion_nand", NULL),
++	{ }
++};
++
+ static void __init kirkwood_dt_init(void)
+ {
+ 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+@@ -68,7 +74,8 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
+ 		ib62x0_init();
+ 
+-	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
++	of_platform_populate(NULL, kirkwood_dt_match_table,
++			kirkwood_dt_auxdata_lookup, NULL);
+ }
+ 
+ static const char *kirkwood_dt_board_compat[] = {
+-- 
+1.7.10
