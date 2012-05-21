@@ -1,69 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 21 May 2012 12:29:57 +0300
-Subject: [PATCHv2 12/19] ARM: OMAP4: PM: update ROM return address for
- OSWR and OFF
-In-Reply-To: <87zk974s1o.fsf@ti.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-13-git-send-email-t-kristo@ti.com>
- <87zk974s1o.fsf@ti.com>
-Message-ID: <1337592597.28274.12.camel@sokoban>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 May 2012 10:30:42 +0100
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120521013050.GL24238@titan.lakedaemon.net>
+References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <alpine.LFD.2.02.1205192042140.13185@xanadu.home>
+ <20120520095502.GB25344@n2100.arm.linux.org.uk>
+ <201205201058.38144.arnd@arndb.de>
+ <20120520111025.GC25344@n2100.arm.linux.org.uk>
+ <20120521013050.GL24238@titan.lakedaemon.net>
+Message-ID: <20120521093042.GE25344@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-16 at 16:36 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
+On Sun, May 20, 2012 at 09:30:50PM -0400, Jason Cooper wrote:
+> On Sun, May 20, 2012 at 12:10:25PM +0100, Russell King - ARM Linux wrote:
+> > On Sun, May 20, 2012 at 10:58:37AM +0000, Arnd Bergmann wrote:
+> > > On Sunday 20 May 2012, Russell King - ARM Linux wrote:
+> > > > And try to avoid putting anything in the include/mach/ directory which
+> > > > isn't needed by any code outside of arch/arm/{plat,mach}-* directory.
+> > > > 
+> > > > In other words, headers needed only for code in arch/arm/plat-mvvebu/
+> > > > should be in that very same directory.
+> > > 
+> > > Ok, so let me make sure I got it all right:
+> > > 
+> > > * all *.c files that are used for multiple boards go to plat-mvebu
+> > > * all *-setup.c files go to mach-mvebu
+> > > * only headers that are used outside of {mach,plat}-mvebug go to
+> > >   plat-mvebu/include/mach
 > 
-> > From: Carlos Leija <cileija@ti.com>
-> >
-> > At wakeup from OFF/OSWR CPU1 will call secure HAL service through a local
-> > secure dispatcher with MMU off, 
-> 
-> Reviewers who are uninitaited in this level of detail need some more
-> help here  (even those who are deeply familiar will need more help in a
-> few months when they forget the details.)
-> 
-> So, some more detail about where this is in the code would be helpful
-> here.
-> 
-> > thus ROM will save a PA return address.
-> > Later in the wakeup, when SMC driver calls an RPC through
-> > omap4_secure_dispatcher (MMU is on now), 
-> 
-> Again, pointer to where is this in the code would be helpful.
+> plat-mvebu/include/plat ?
 
-I believe this refers to any of the SMC calls done in the ASM files.
-Most notably the one in omap-headsmp.S, which is added (rather)
-illogically after this patch in the set though.
+Better.
 
+> > > * headers used to inteface between the first two go to
+> > >   plat-mvebu/include/plat (?)
 > 
-> Also, it's not obvious why RPC use used here. Is that referring to the
-> fact that the secure calls on CPU1 are dispatched to CPU0?  Whatever it
-> means, it should be summarized in the changelog.
+> plat-mvebu/include ?
 
-Not sure about this, maybe security guys can comment on this.
+No, we don't put include files in that directory, always a subdirectory.
+But note - any header file used _only_ by files in plat-mvebu should be
+in plat-mvebu itself and not some subdirectory.  Locality of reference
+is the key idea there.
 
+> > That sounds reasonable.  The only eyebrow raising thing is having an
+> > include/mach inside a plat-* directory... that seems an odd way to do
+> > things as mach/ includes normally come from the mach-* directory.
+> > 
+> > So I wonder whether Nicolas' idea of "dt-only stuff in arch/arm/plat-*"
+> > is the right idea.  It just makes plat-* the same as a mach-* but with
+> > a different name, whereas it is _supposed_ to be for stuff shared
+> > between a bunch of mach-* directories.
 > 
-> > ROM code won't log the new return
-> > address as RPCs are handled different. Thus ROM will attempt to return to
-> > a PA address when the MMU is on and the system will hang.
-> >
-> > We need to do this for OSWR state and OFF state of mpu power domain,
-> > not just for device off(mpu pd OFF).
-> 
-> The code suggests that affects *all* OMAP4 revisions?  Is that correct?
+> In an ideal (dt) world, plat-*/ would hold all the dt source files, and
+> arch/arm/boot/dts/ would become the new mach-*/.  mach-*/ is kept around
+> for the few legacy, unconverted boards.
 
-I think thats right.
+At that point I'd suggest the plat-* is renamed to mach-* ;)
 
-> 
-> And once again, can this be implmented using cluster PM notifiers, where
-> the notifier is registered only on affected revisions?
-
-Should be okay to do that. I guess this should move to omap-secure.c.
-
-> 
-> (Sheesh, the number of ROM code workaounds in this series is rather
-> disconcerting.)
-> 
-> Kevin
-> 
-> 
+plat-* was only invented to allow SoC folk to have some place to put
+common code shared between a set of mach-*, and nothing more.
