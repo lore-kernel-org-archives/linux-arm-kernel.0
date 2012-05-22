@@ -1,212 +1,79 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 May 2012 16:08:45 +0200
-Subject: [PATCH v3 1/3] mmc: atmel-mci: add device tree support
-In-Reply-To: <1337681352-18521-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
- <1337681352-18521-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120522140845.GA3377@game.jcrosoft.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 22 May 2012 16:06:41 +0200
+Subject: 
+In-Reply-To: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
+References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4FBB9D71.5040906@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:09 Tue 22 May     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 05/18/2012 02:27 PM, Sascha Hauer wrote:
+> Hi All,
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  .../devicetree/bindings/mmc/atmel-hsmci.txt        |   67 +++++++++++++++
->  drivers/mmc/host/atmel-mci.c                       |   89 +++++++++++++++++++-
->  2 files changed, 154 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> The following adds a drm/kms driver for the Freescale i.MX LCDC
+> controller. Most notable change to the last SDRM based version is that
+> the SDRM layer has been removed and the driver now is purely i.MX
+> specific. I hope that this is more acceptable now.
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
-> new file mode 100644
-> index 0000000..81c20cc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
-> @@ -0,0 +1,67 @@
-> +* Atmel High Speed MultiMedia Card Interface
-> +
-> +This controller on atmel products provides an interface for MMC, SD and SDIO
-> +types of memory cards.
-> +
-> +1) MCI node
-> +
-> +Required properties:
-> +- compatible: no blank "atmel,hsmci"
-> +- reg: should contain HSMCI registers location and length
-> +- interrupts: should contain HSMCI interrupt number
-> +- #address-cells: should be one. The cell is the slot id.
-> +- #size-cells: should be zero.
-> +- at least one slot node
-> +
-> +The node contains child nodes for each slot that the platform uses
-> +
-> +Example MCI node:
-> +
-> +mmc0: mmc at f0008000 {
-> +	compatible = "atmel,hsmci";
-> +	reg = <0xf0008000 0x600>;
-> +	interrupts = <12 4>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	[ child node definitions...]
-> +};
-> +
-> +2) slot nodes
-> +
-> +Required properties:
-> +- reg: should contain the slot id.
-> +- bus-width: number of data lines connected to the controller
-> +
-> +Optional properties:
-> +- cd-gpios: specify GPIOs for card detection
-> +- cd-inverted: invert the value of external card detect gpio line
-why this
+> Another change is that the probe is now devicetree based. For now I
+> took the easy way out and only put an edid blob into the devicetree.
+> I haven't documented the binding yet, I would add that when the rest
+> is considered ok.
+> 
+> Comments very welcome.
+> 
 
-no need you can use the third field and OF_GPIO_ACTIVE_LOW
-as done on ohci-at91.c
+Hi,
 
-> +- wp-gpios: specify GPIOs for write protection
-> +
-> +Example slot node:
-> +
-> +slot at 0 {
-> +	reg = <0>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pioD 15 0>
-> +	cd-inverted;
-> +};
-> +
-> +Example full MCI node:
-> +mmc0: mmc at f0008000 {
-> +	compatible = "atmel,hsmci";
-> +	reg = <0xf0008000 0x600>;
-> +	interrupts = <12 4>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	slot at 0 {
-> +		reg = <0>;
-> +		bus-width = <4>;
-> +		cd-gpios = <&pioD 15 0>
-> +		cd-inverted;
-> +	};
-> +	slot at 1 {
-> +		reg = <1>;
-> +		bus-width = <4>;
-> +	};
-> +};
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 556d384..43f98fc 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -19,6 +19,9 @@
->  #include <linux/interrupt.h>
->  #include <linux/ioport.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/scatterlist.h>
->  #include <linux/seq_file.h>
-> @@ -493,6 +496,74 @@ err:
->  	dev_err(&mmc->class_dev, "failed to initialize debugfs for slot\n");
->  }
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id atmci_dt_ids[] = {
-> +	{ .compatible = "atmel,hsmci" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, atmci_dt_ids);
-> +
-> +static struct mci_platform_data __devinit*
-> +atmci_of_init(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *cnp;
-> +	struct mci_platform_data *pdata;
-> +	unsigned int slot_id;
-> +	const __be32 *reg;
-> +
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "device node not found\n");
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata) {
-> +		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	for_each_child_of_node(np, cnp) {
-> +		reg = of_get_property(cnp, "reg", NULL);
-> +		if (!reg) {
-> +			dev_warn(&pdev->dev, "reg property is missing for %s\n",
-> +				 cnp->full_name);
-> +			continue;
-> +		}
-> +
-> +		slot_id = be32_to_cpu(reg[0]);
-read_u32
-> +
-> +		if (slot_id > (ATMCI_MAX_NR_SLOTS-1)) {
-> +			dev_warn(&pdev->dev, "can't have more than %d slots\n",
-> +			         ATMCI_MAX_NR_SLOTS);
-> +			break;
-> +		}
-> +
-> +		if (of_property_read_u32(cnp, "bus-width",
-> +		                         &pdata->slot[slot_id].bus_width))
-> +			pdata->slot[slot_id].bus_width = 1;
-> +
-> +		pdata->slot[slot_id].detect_pin =
-> +			of_get_named_gpio(cnp, "cd-gpios", 0);
-> +
-> +		if (of_find_property(cnp, "cd-inverted", NULL))
-> +			pdata->slot[slot_id].detect_is_active_high = true;
-> +
-> +		pdata->slot[slot_id].wp_pin =
-> +			of_get_named_gpio(cnp, "wp-gpios", 0);
-> +	}
-> +
-> +	return pdata;
-> +}
-> +#else /* CONFIG_OF */
-> +static inline struct mci_platform_data*
-> +atmci_of_init(struct platform_device *dev)
-> +{
-> +	return ERR_PTR(-EINVAL);
-> +}
-> +#endif
-> +
->  static inline unsigned int atmci_get_version(struct atmel_mci *host)
->  {
->  	return atmci_readl(host, ATMCI_VERSION) & 0x00000fff;
-> @@ -2038,6 +2109,13 @@ static int __init atmci_init_slot(struct atmel_mci *host,
->  	slot->sdc_reg = sdc_reg;
->  	slot->sdio_irq = sdio_irq;
->  
-> +	dev_dbg(&mmc->class_dev,
-> +	        "slot[%u]: bus_width=%u, detect_pin=%d, "
-> +		"detect_is_active_high=%s, wp_pin=%d\n",
-> +		id, slot_data->bus_width, slot_data->detect_pin,
-> +		slot_data->detect_is_active_high ? "true" : "false",
-> +		slot_data->wp_pin);
-> +
->  	mmc->ops = &atmci_ops;
->  	mmc->f_min = DIV_ROUND_UP(host->bus_hz, 512);
->  	mmc->f_max = host->bus_hz / 2;
-> @@ -2258,8 +2336,14 @@ static int __init atmci_probe(struct platform_device *pdev)
->  	if (!regs)
->  		return -ENXIO;
->  	pdata = pdev->dev.platform_data;
-> -	if (!pdata)
-> -		return -ENXIO;
-check the node and then check the return
+I really liked the sdrm layer. At least some bits of it. I've been working
+on a "simple" DRM driver as well. The hardware has no fancy acceleration
+features, just a simple buffer and some scanout logic. I'm basically using
+the same gem buffer structure and the buffer is also allocated using
+dma_alloc_writecombine, which means we can probably share all of the GEM
+handling code and probably also most of the fbdev code. I also started with
+the Exynos GEM code as a template, but reworked it later to be more like the
+UDL code, which made it a bit more compact. I think it would be a good idea
+to put at least the GEM handling in some common code as I expect that we'll
+see more similar "simple" DRM drivers pop up.
 
-Best Regards,
-J.
+The code in question can be found at
+https://github.com/lclausen-adi/linux-2.6/commit/87a8fd6b98eeee317c7a486846cc8405d0bd68d8
+
+Btw. the imx-drm.h is missing in your patch.
+
+- Lars
+
+> Thanks
+>  Sascha
+> 
+> ----------------------------------------------------------------
+> Sascha Hauer (2):
+>       DRM: add Freescale i.MX LCDC driver
+>       pcm038 lcdc support
+> 
+>  arch/arm/boot/dts/imx27-phytec-phycore.dts |   39 ++
+>  arch/arm/boot/dts/imx27.dtsi               |    7 +
+>  arch/arm/mach-imx/clock-imx27.c            |    1 +
+>  drivers/gpu/drm/Kconfig                    |    2 +
+>  drivers/gpu/drm/Makefile                   |    1 +
+>  drivers/gpu/drm/imx/Kconfig                |   18 +
+>  drivers/gpu/drm/imx/Makefile               |    8 +
+>  drivers/gpu/drm/imx/imx-drm-core.c         |  745 ++++++++++++++++++++++++++++
+>  drivers/gpu/drm/imx/imx-fb.c               |  179 +++++++
+>  drivers/gpu/drm/imx/imx-fbdev.c            |  275 ++++++++++
+>  drivers/gpu/drm/imx/imx-gem.c              |  343 +++++++++++++
+>  drivers/gpu/drm/imx/imx-lcdc-crtc.c        |  517 +++++++++++++++++++
+>  drivers/gpu/drm/imx/imx-parallel-display.c |  228 +++++++++
+>  13 files changed, 2363 insertions(+)
+>  create mode 100644 drivers/gpu/drm/imx/Kconfig
+>  create mode 100644 drivers/gpu/drm/imx/Makefile
+>  create mode 100644 drivers/gpu/drm/imx/imx-drm-core.c
+>  create mode 100644 drivers/gpu/drm/imx/imx-fb.c
+>  create mode 100644 drivers/gpu/drm/imx/imx-fbdev.c
+>  create mode 100644 drivers/gpu/drm/imx/imx-gem.c
+>  create mode 100644 drivers/gpu/drm/imx/imx-lcdc-crtc.c
+>  create mode 100644 drivers/gpu/drm/imx/imx-parallel-display.c
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
