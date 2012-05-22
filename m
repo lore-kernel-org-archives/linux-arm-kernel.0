@@ -1,56 +1,33 @@
 From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Tue, 22 May 2012 22:54:02 +0300
-Subject: [PATCH 0/2] OMAPDSS: write-through caching support for omapfb
-Message-ID: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
+Date: Tue, 22 May 2012 22:54:03 +0300
+Subject: [PATCH 1/2] ARM: pgtable: add pgprot_writethrough() macro
+In-Reply-To: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
+References: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
+Message-ID: <1337716444-30139-2-git-send-email-siarhei.siamashka@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a very simple few-liner patchset, which allows to optionally
-enable write-through caching for OMAP DSS framebuffer. The problem with
-the current writecombine cacheability attribute is that it only speeds
-up writes. Uncached reads are slow, even though the use of NEON mitigates
-this problem a bit.
+Needed for remapping pages with write-through cacheable
+attribute. May be useful for framebuffers.
 
-Traditionally, xf86-video-fbdev DDX is using shadow framebuffer in the
-system memory. Which contains a copy of the framebuffer data for the
-purpose of providing fast read access to it when needed. Framebuffer
-read access is required not so often, but it still gets used for
-scrolling and moving windows around in Xorg server. And the users
-perceive their linux desktop as rather sluggish when these operations
-are not fast enough.
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+---
+ arch/arm/include/asm/pgtable.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-In the case of ARM hardware, framebuffer is typically physically
-located in the main memory. And the processors still support
-write-through cacheability attribute. According to ARM ARM, the writes
-done to write-through cached memory inside the level of cache are
-visible to all observers outside the level of cache without the need
-of explicit cache maintenance (same rule as for non-cached memory).
-So write-through cache is a perfect choice when only CPU is allowed
-to modify the data in the framebuffer and everyone else (screen
-refresh DMA) is only reading it. That is, assuming that write-through
-cached memory provides good performance and there are no quirks.
-As the framebuffer reads become fast, the need for shadow framebuffer
-disappears.
-
-And at least for ARM11 and Cortex-A8 processors, the performance of
-write-through cache is really good. Cortex-A9 is another story, because
-all pages marked as Write-Through are supposedly treated as Non-Cacheable:
-    http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388h/CBBFDIJD.html
-So OMAP4 is out of luck. But OMAP3 based hardware can have a nice
-graphics performance boost. And OMAP3 actually needs it a lot more.
-
-PS. The xf86-video-omapfb-0.1.1 driver does not even use shadow
-    framebuffer (ouch!). So its users, if any, should see an immediate
-    speedup.
-
-Siarhei Siamashka (2):
-  ARM: pgtable: add pgprot_writethrough() macro
-  OMAPDSS: Optionally enable write-through cache for the framebuffer
-
- Documentation/arm/OMAP/DSS               |   10 ++++++++++
- arch/arm/include/asm/pgtable.h           |    3 +++
- drivers/video/omap2/omapfb/omapfb-main.c |    7 ++++++-
- 3 files changed, 19 insertions(+), 1 deletions(-)
-
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index f66626d..04297fa 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -103,6 +103,9 @@ extern pgprot_t		pgprot_kernel;
+ #define pgprot_stronglyordered(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED)
+ 
++#define pgprot_writethrough(prot) \
++	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_WRITETHROUGH)
++
+ #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_BUFFERABLE | L_PTE_XN)
 -- 
 1.7.3.4
