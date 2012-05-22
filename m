@@ -1,54 +1,66 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 22 May 2012 09:39:21 +0800
-Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
-In-Reply-To: <20120521144543.GA4063@opensource.wolfsonmicro.com>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <20120521125930.GC6206@b20223-02.ap.freescale.net>
- <20120521144543.GA4063@opensource.wolfsonmicro.com>
-Message-ID: <20120522013920.GE6206@b20223-02.ap.freescale.net>
+Date: Tue, 22 May 2012 09:41:59 +0800
+Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803BB2B2F@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <201205212141.52171.marex@denx.de> <4FBA9BE4.7020303@grid-net.com>
+ <201205212207.34978.marex@denx.de>
+ <F281D0F91ED19E4D8E63A7504E8A649803BB2B2F@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <20120522014158.GF6206@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 03:45:44PM +0100, Mark Brown wrote:
-> On Mon, May 21, 2012 at 08:59:31PM +0800, Richard Zhao wrote:
-> 
-> > >   ASoC: imx-audmux: add pinctrl support
-> > >   ASoC: fsl_ssi: convert to use devm_clk_get
-> 
-> > Linus has sent out pull request for pinctrl. So is that ok for you
-> > to pick up the above two patch?
-> 
-> No, apart from anything else the second patch depends on clkdev which is
-> nothing to do with pinctrl!
-All right, It's my fault to mix a clean up patch. It may hold until the
-merge window is closed.
->  For the first patch it wasn't clear if the
-> changes in pinctrl were the actual dependencies or if there were more
-> things needed from the ARM tree,
-I remembered someone already explained the dependencies. It depends
-on imx pinctrl work and dummy pinctrl enabled in ARM platform code. It
-is why Shawn suggest it goes to ARM SoC.
-> and in any case until those patches are
-> actually in the ASoC tree we'll break the build if they get applied.
-All righ, It's ok, if you think, I have to wait for one more cycle to
-see the patch on mainline.
-> 
-> Guys, you really need to think about how you're organising what you're
-> doing more.  You need to split your work out into focused lines of
-> development rather than just having a single branch.  
-Except the clean up patch, others are all related to enable audio. Do
-you mean I supposed to split them in advance?
-> 
-> This patch series contains a whole bunch of different changes (the
-> devm_clk_get() change is as far as I can tell completely unrelated to
-> the rest for example) with unclear dependencies on multiple external
-> trees.  You should be splitting unrelated changes out, trying to
-> minimise interdependencies, and clearly identifying the dependencies
-> that are there we can get things applied in a timely fashion.
-hmm.. I should write more about dependencies in commit message.
-> 
-> Please resend these patches *after* their dependencies are in mainline.
-OK.
+On Tue, May 22, 2012 at 09:38:33AM +0800, Chen Peter-B29397 wrote:
+>  
+> > > >
+> > > >> Hi Richard,
+> > > >>
+> > > >> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
+> > > >>
+> > > >> <richard.zhao@freescale.com>  wrote:
+> > > >>> The work is based on  ci13xxx rework done by Alexander Shishkin.
+> > > >>>
+> > > >>> Status:
+> > > >>>   - this version only support host
+> > > >>>   - usbotg controler works at host role
+> > > >>>
+> > > >>> Changes since V1:
+> > > >>>   - Merge the work of Marek
+> > > >>>   - re-implement connect change notify
+> > > >>>   - imx6q: move part of code to clk
+> > > >>>   - imx6q: add config-on-boot gpios
+> > > >>
+> > > >> Can you please also add the driver into the defconfig files?
+> > > >>
+> > > >> What about the existing USB host drivers for
+> > mx27/mx31/mx35/mx25/mx35?
+> > > >>
+> > > >> Is the idea to switch to drivers/usb/chipidea/host.c too?
+> > > >
+> > > > I think the core is the same, it's just the ci13xxx-imx driver that'd
+> > > > need to be written differently for these
+> > >
+> > > So that means driver that you did are not going to be up streamed for
+> > > mx28/mxs? And those interested should be tracking this patch set?
+> > 
+> > This here is definitelly going to support mx28 and I'm slowly working
+> > through
+> > the DT stuff to test this, all right?
+> > 
+> > We were talking about imx.{xz|x,y is [0-9a-z]} \ imx.{23,28,6q}
+> >
+> This driver needs to work on both DT and non-DT support.
+> Let's do it after next version when we need to add it for old mxc platform.
+I don't think so. We only need to go right direction and don't do
+extra work for what is going to be abandoned.
 
 Thanks
 Richard
+> 
+>  
+> > >
+> > > -Subodh
+> > 
+> > Best regards,
+> > Marek Vasut
+> 
