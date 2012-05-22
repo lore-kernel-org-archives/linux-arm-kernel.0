@@ -1,60 +1,173 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 22 May 2012 12:09:11 +0200
-Subject: [PATCH v3 2/3] ARM: at91: add clocks for DT entries
+Date: Tue, 22 May 2012 12:09:12 +0200
+Subject: [PATCH v3 3/3] ARM: dts: add nodes for atmel hsmci controllers for
+ atmel platforms
 In-Reply-To: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337681352-18521-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Add clocks to clock lookup table for DT entries.
+Add nodes for mci controllers.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |    1 +
- arch/arm/mach-at91/at91sam9g45.c |    2 ++
- arch/arm/mach-at91/at91sam9x5.c  |    2 ++
- 3 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/at91sam9g20.dtsi     |   12 ++++++++++++
+ arch/arm/boot/dts/at91sam9g25ek.dts    |   16 ++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi     |   24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   17 +++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi      |   24 ++++++++++++++++++++++++
+ 5 files changed, 93 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 46f7742..c356471 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -218,6 +218,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
- 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index d222f83..0a2c662 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -235,6 +235,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
- 	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fff80000.mmc", &mmc0_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fffd0000.mmc", &mmc1_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 13c8cae..39cbef3 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -225,6 +225,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc0_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "f000c000.mmc", &mmc1_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
- 	CLKDEV_CON_ID("pioC", &pioCD_clk),
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 773ef48..6a28bfe 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -197,6 +197,18 @@
+ 				interrupts = <10 4>;
+ 				status = "disabled";
+ 			};
++
++			mmc0: mmc at fffa800 {
++				compatible = "atmel,hsmci";
++				reg = <0xfffa800 0x600>;
++				interrupts = <9 4>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				slot at 0 {
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index 7829a4d..dd94f4b 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -32,6 +32,22 @@
+ 				phy-mode = "rmii";
+ 				status = "okay";
+ 			};
++
++			mmc0: mmc at f0008000 {
++				status = "okay";
++				slot at 0 {
++					bus-width = <4>;
++					cd-gpios = <&pioD 15 0>;
++				};
++			};
++
++			mmc1: mmc at f000c000 {
++				status = "okay";
++				slot at 0 {
++					bus-width = <4>;
++					cd-gpios = <&pioD 14 0>;
++				};
++			};
+ 		};
+ 
+ 		usb0: ohci at 00600000 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index c804214..2922648 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -199,6 +199,30 @@
+ 				interrupts = <25 4>;
+ 				status = "disabled";
+ 			};
++
++			mmc0: mmc at fff80000 {
++				compatible = "atmel,hsmci";
++				reg = <0xfff80000 0x600>;
++				interrupts = <11 4>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				slot at 0 {
++					reg = <0>;
++				};
++			};
++
++			mmc1: mmc at fffd0000 {
++				compatible = "atmel,hsmci";
++				reg = <0xfffd0000 0x600>;
++				interrupts = <29 4>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				slot at 0 {
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index a3633bd..bc4cb3c 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -46,6 +46,23 @@
+ 				phy-mode = "rmii";
+ 				status = "okay";
+ 			};
++
++			mmc0: mmc at fff80000 {
++				status = "okay";
++				slot at 0 {
++					bus-width = <4>;
++					cd-gpios = <&pioD 10 0>;
++				};
++			};
++
++			mmc1: mmc at fffd0000 {
++				status = "okay";
++				slot at 0 {
++					bus-width = <4>;
++					cd-gpios = <&pioD 11 0>;
++					wp-gpios = <&pioD 29 0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index dd4ed74..d5999b2 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -190,6 +190,30 @@
+ 				interrupts = <27 4>;
+ 				status = "disabled";
+ 			};
++
++			mmc0: mmc at f0008000 {
++				compatible = "atmel,hsmci";
++				reg = <0xf0008000 0x600>;
++				interrupts = <12 4>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				slot at 0 {
++					reg = <0>;
++				};
++			};
++
++			mmc1: mmc at f000c000 {
++				compatible = "atmel,hsmci";
++				reg = <0xf000c000 0x600>;
++				interrupts = <26 4>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				slot at 0 {
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
 1.7.5.4
