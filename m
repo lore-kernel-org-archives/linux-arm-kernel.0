@@ -1,7 +1,7 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 22 May 2012 07:51:52 +0200
+Date: Tue, 22 May 2012 10:18:22 +0200
 Subject: [PATCH 1/7] remoteproc: resource table overhaul
-In-Reply-To: <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
+In-Reply-To: <CAK=WgbYSrzTKW-QME4-r6XhVAQL0b6iWyus632KZOpfpTPgwWg@mail.gmail.com>
 References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
  <1330589497-4139-2-git-send-email-ohad@wizery.com>
  <4F6354E4.8030704@monstr.eu>
@@ -9,133 +9,73 @@ References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
  <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
  <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
  <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
-Message-ID: <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
+ <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
+ <CAK=WgbYSrzTKW-QME4-r6XhVAQL0b6iWyus632KZOpfpTPgwWg@mail.gmail.com>
+Message-ID: <CAHTX3dKKr5bjUKQVsaHhy41yjz8V-yyAWAbit73WgGEWFv4e2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad and Ludovic,
+Hi Ohad,
 
-2012/5/21 Ohad Ben-Cohen <ohad@wizery.com>
+2012/5/22 Ohad Ben-Cohen <ohad@wizery.com>
 
 > Hi Michal,
 >
-> On Mon, May 21, 2012 at 4:02 PM, Michal Simek <monstr@monstr.eu> wrote:
-> > I have looked at it and tested on latest and greatest and the problem is
-> > still there.
+> On Tue, May 22, 2012 at 8:51 AM, Michal Simek <monstr@monstr.eu> wrote:
+> > Simple enabling RSC_VDEV in rproc_handle_rsc doesn't work.
 >
-> Ok, I see why this is happening.
+> Sure - you'll need to actually plug the vrings allocation code there,
+> too (i.e. this requires some coding, it's not a 1-liner).
 >
-> We're now allocating the vrings' DMA in ->find_vqs() just before we
-> boot the remote processor, and we release it on ->del_vqs(). These are
-> the virtio handlers for setting up and tearing down the vrings, so it
-> makes sense to do so, but as a result, we still don't get the early
-> carveout allocation you wanted.
+> > BTW: I am using kernel modules and there is no dependency for
+> > virtio_rpmsg_bus in remoteproc module
+> > in sense if you load remoteproc module you also need to load
+> > virtio_rpmsg_bus to get firmware to work.
 >
-> > I have looked at the code and path is
-> > rproc_fw_config_virtio -> rproc_handliefirtion_rsc -> rproc_handle_vdev
+> This is expected: remoteproc only provides means for booting and
+> controlling remote processors and it doesn't boot them upfront.
 >
-> Please note that rproc_handle_vdev doesn't allocate any DMA at this
-> point, and the allocation path is now quite different - it begins with
-> virtio_rpmsg_bus probing and then calling into the ->find_vqs()
-> handler.
+> To actually boot a remote processor, and do something useful with it,
+> one needs to load a module which utilizes remoteproc's API (e.g.
+> virtio_rpmsg_bus, but YMMV).
 >
-
-> > For me it is necessary to ensure that dma_alloc_coherent in
-> > rproc_alloc_vring is called after carveout allocation
-> > just because dma_alloc_cohorent takes mermory from preallocated pool
-> which
-> > starts at 0x0.
+> > ~ # lsmod
+> > ~ # modprobe zynq_remoteproc
+> > zynq_remoteproc: Unknown symbol rproc_register (err 0)
+> > zynq_remoteproc: Unknown symbol rproc_alloc (err 0)
+> > zynq_remoteproc: Unknown symbol rproc_vq_interrupt (err 0)
+> > zynq_remoteproc: Unknown symbol rproc_free (err 0)
+> > zynq_remoteproc: Unknown symbol rproc_unregister (err 0)
 >
-> ok.
->
-> > I also don't have
-> > any other advance mechanism how to ensure mapping for the second arm
-> core.
->
-> Probably the best way to ensure this (without it breaking unexpectedly
-> again as remoteproc evolves) is to have separate sub-devices for
-> different kind of memories, which remoteproc could then look up using
-> something like device_find_child().
->
-> Ludovic is exploring this direction too, because STE also needs to
-> bind specific memory regions with predefined purposes, without
-> depending on the order of DMA allocations.
+> We don't have these errors - have you tried looking into them ?
 >
 
-It is good that someone else has similar requirements.
+It is probably any problem with modules. If I load them in sequence
+there is no error.
 
 
 >
-> I think Ludovic already has a preliminary patch which he may be able
-> to share with you.
+> Btw do you plan on submitting the code for zynq_remoteproc ?
 >
 
-Ludovic: Can you share your patch with us? I would like to try it.
+It is still under developing and there are some core changes in ARM low
+level code
+which need to be applied to mainline before this driver. I haven't sent
+these patches
+to mainline for review but I expect they won't be accepted but maybe I am
+wrong.
 
 
 >
-> > Here is log which I need to get. Look at attached patch which exactly
-> show
-> > you what I need to do which I have tested.
+> > Can you see the same behavior on omap?
 >
-> Yes, I see. Another temporary approach might be moving the vrings'
-> allocations to the rproc_handle_rsc table (in the RSC_VDEV slot), but
-> I'm not sure we want to merge this as well because this solution too
-> is only hiding the real issue and not solving it permanently.
+> Except the "Unknown symbol" errors, everything else looks good.
 >
->
-Simple enabling RSC_VDEV in rproc_handle_rsc doesn't work.
 
-BTW: I am using kernel modules and there is no dependency for
-virtio_rpmsg_bus in remoteproc module
-in sense if you load remoteproc module you also need to load
-virtio_rpmsg_bus to get firmware to work.
-
-I think that will be good to create that dependency automatically because
-you need to load virtio_rpmsg_bus
-when you problem remoteproc module.
-
-~ # lsmod
-~ # modprobe zynq_remoteproc
-zynq_remoteproc: Unknown symbol rproc_register (err 0)
-zynq_remoteproc: Unknown symbol rproc_alloc (err 0)
-zynq_remoteproc: Unknown symbol rproc_vq_interrupt (err 0)
-zynq_remoteproc: Unknown symbol rproc_free (err 0)
-zynq_remoteproc: Unknown symbol rproc_unregister (err 0)
-CPU1: shutdown
-zynq_remoteproc 0.remoteproc-test: 0.remoteproc-test is available
-zynq_remoteproc 0.remoteproc-test: Note: remoteproc is still under
-development and considered experimental.
-zynq_remoteproc 0.remoteproc-test: THE BINARY FORMAT IS NOT YET FINALIZED,
-and backward compatibility isn't yet guaranteed.
-~ # zynq_remoteproc 0.remoteproc-test: registered virtio0 (type 7)
-
-~ # lsmod
-zynq_remoteproc 4346 0 - Live 0xbf01f000
-remoteproc 13831 1 zynq_remoteproc, Live 0xbf018000
-virtio 2840 1 remoteproc, Live 0xbf008000
-virtio_ring 4965 1 remoteproc, Live 0xbf013000
-~ #
-~ # modprobe virtio_rpmsg_bus
-zynq_remoteproc 0.remoteproc-test: powering up 0.remoteproc-test
-zynq_remoteproc 0.remoteproc-test: Booting fw image test, size 2351790
-zynq_remoteproc 0.remoteproc-test: remote processor 0.remoteproc-test is
-now up
-virtio_rpmsg_bus virtio0: rpmsg host is online
-virtio_rpmsg_bus virtio0: creating channel rpmsg-timer-statistic addr 0x50
-~ #
-~ # lsmod
-virtio_rpmsg_bus 7575 0 - Live 0xbf024000
-zynq_remoteproc 4346 1 - Live 0xbf01f000
-remoteproc 13831 1 zynq_remoteproc, Live 0xbf018000
-virtio 2840 2 virtio_rpmsg_bus,remoteproc, Live 0xbf008000
-virtio_ring 4965 2 virtio_rpmsg_bus,remoteproc, Live 0xbf013000
-~ #
-
-Can you see the same behavior on omap?
+Ok. Good.
 
 Thanks,
 Michal
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/0fa99866/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/e343ba88/attachment-0001.html>
