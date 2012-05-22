@@ -1,93 +1,95 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 22 May 2012 08:27:59 +0800
-Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
-In-Reply-To: <201205212127.51020.marex@denx.de>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <201205212032.21757.marex@denx.de>
- <20120521184014.GA21692@kroah.com>
- <201205212127.51020.marex@denx.de>
-Message-ID: <20120522002759.GD6206@b20223-02.ap.freescale.net>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 22 May 2012 09:00:40 +0800
+Subject: [PATCH RFC v2 2/2] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <4FBA76C6.9030201@wwwdotorg.org>
+References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
+ <1337346755-8761-2-git-send-email-b29396@freescale.com>
+ <4FB6AB9A.4080006@wwwdotorg.org>
+ <20120521123929.GA27055@shlinux2.ap.freescale.net>
+ <4FBA76C6.9030201@wwwdotorg.org>
+Message-ID: <CAA+hA=RzX9EsFbPWqgoAm-4-Rv-0tQ1s2rQ0+DtSE3Mxu36ShA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 09:27:50PM +0200, Marek Vasut wrote:
-> Dear Greg KH,
-> 
-> > On Mon, May 21, 2012 at 08:32:21PM +0200, Marek Vasut wrote:
-> > > Dear Greg KH,
-> > > 
-> > > > On Mon, May 21, 2012 at 07:36:40PM +0200, Marek Vasut wrote:
-> > > > > Dear Greg KH,
-> > > > > 
-> > > > > > On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
-> > > > > > > This let usb phy driver has a chance to change hw settings when
-> > > > > > > connect status change.
-> > > > > > > 
-> > > > > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > > > > > > ---
-> > > > > > > 
-> > > > > > >  include/linux/usb/otg.h |   13 +++++++++++++
-> > > > > > >  1 files changed, 13 insertions(+), 0 deletions(-)
-> > > > > > > 
-> > > > > > > diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-> > > > > > > index 38ab3f4..385641d 100644
-> > > > > > > --- a/include/linux/usb/otg.h
-> > > > > > > +++ b/include/linux/usb/otg.h
-> > > > > > > @@ -117,6 +117,10 @@ struct usb_phy {
-> > > > > > > 
-> > > > > > >  	int	(*set_suspend)(struct usb_phy *x,
-> > > > > > >  	
-> > > > > > >  				int suspend);
-> > > > > > > 
-> > > > > > > +	/* notify phy connect status change */
-> > > > > > > +	int	(*notify_connect_change)(struct usb_phy *x,
-> > > > > > > +					 int port,
-> > > > > > > +					 int connected);
-> > > > > > > 
-> > > > > > >  };
-> > > > > > 
-> > > > > > No, please make this two different callbacks.  As you see in your
-> > > > > > code
-> > > > > > 
-> > > > > > when you implemented this, you really have:
-> > > > > > 	if (connected) {
-> > > > > > 	
-> > > > > > 		do this...
-> > > > > > 	
-> > > > > > 	} else {
-> > > > > > 	
-> > > > > > 		do that...
-> > > > > > 	
-> > > > > > 	}
-> > > > > > 
-> > > > > > So you there is no consolidation in the driver, so just make it 2
-> > > > > > callbacks, especially as someone wanted to make connected -1 just
-> > > > > > for a tristate, which would be impossible to document properly...
-> > > > > 
-> > > > > Or he could make connected an enum maybe ?
-> > > > 
-> > > > No, again, that will make nothing easier on the driver end at all.
-> > > > 
-> > > > What's the problem with different functions that people keep resisting?
-> > > 
-> > > The structure grows a few bytes ... so the kernel eats a bit more ram.
-> > 
-> > The time it took you to write this email just made up for that extra
-> > ram, sorry :)
-> 
-> Heh :-) But is this email constantly allocated in your kernel space?
-> 
-> > It doesn't matter, have people leaned nothing from our past mistakes?
-> 
-> All right, I won't argue with you. Richard, let's obey.
-Sure. I'll change it. I think Greq's point here is maintenance. And
-4-byte ram consume don't cost to be noticed.
+On Tue, May 22, 2012 at 1:09 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/21/2012 06:39 AM, Dong Aisheng wrote:
+>> On Sat, May 19, 2012 at 04:05:46AM +0800, Stephen Warren wrote:
+>>> On 05/18/2012 07:12 AM, Dong Aisheng wrote:
+>>>> The gpio ranges standard dt binding format is
+>>>> <&gpio $gpio_offset $pin_offset $npin>
+>>>>
+>>>> The core will parse and register the pinctrl gpio ranges
+>>>> from device tree.
+> ...
+>>>> + ? pinctrl_add_gpio_ranges(pctldev, ranges, nranges);
+>>>
+>>> I think we should also store ranges somewhere separate in pctldev ...
+>>
+>> Hmm, i'm not quite understand,
+>> What do you mean separate in pctldev?
+>> We already save the ranges in pctldev's gpio_ranges list.
+>>
+>>>> +void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pinctrl_gpio_range *ranges,
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned nranges)
+>>>
+>>> ... so that this function doesn't need ranges/nranges passed to it; it
+>>> can just get them out of pctldec.
+>>
+>> For remove ranges/nranges, maybe we can use list_for_each_entry_safe
+>> plus list_del like:
+>> list_for_each_entry_safe(range, tmp, &pctldev->gpio_ranges, node)
+>> ? ? list_del(range->node);
+>
+> If some GPIO ranges are added using pinctrl_dt_add_gpio_ranges() and
+> some are added using pinctrl_add_gpio_range(), how will
+> pinctrl_dt_remove_gpio_ranges() know which ones to remove, unless
+>
+Yes, you're right.
 
-Thanks
-Richard
-> 
-> > greg k-h
-> 
-> Best regards,
-> Marek Vasut
-> 
+> a) The list of ranges is passed to pinctrl_dt_remove_gpio_ranges() as
+> above (but then where does the caller find the list to pass in)
+>
+> or:
+>
+> b) The list of ranges added by pinctrl_dt_add_gpio_ranges() is stored
+> separately from the overall gpio_ranges list, so the code knows which
+> were added by that API.
+>
+> Perhaps the simplest way to implement this is to add a new Boolean field
+> to struct gpio_range that says whether pinctrl_dt_add_gpio_ranges()
+> added it, and set it to true/false in ?pinctrl_dt_add_gpio_ranges() and
+> ?pinctrl_add_gpio_ranges().
+>
+Maybe we should not allow people to use pinctrl_add_gpio_ranges for dt
+and i can not see it helps too much.
+Then we do not have two case.
+
+>> I just follow the original way here and if change we may need another
+>> patch.
+>>
+>>> Or better yet, what if pinctrl_unregister automatically removed any
+>>> ranges registered by pinctrl_dt_add_gpio_ranges, so this function
+>>> doesn't even need to exist?
+>>
+>> Yes, it seems this can also work for non-dt registered gpio ranges added by
+>> pinctrl_add_gpio_ranges, e.g, remove need pinctrl_remove_gpio_range too,
+>> It seems it should be in a separate patch which is not related to gpio ranges
+>> binding.
+>>
+>> Do you want me to work on that patch first for this series to rebase or
+>> we can do it later?
+>
+> Maybe we should just delete the functions pinctrl_remove_gpio_range()
+> and pinctrl_dt_remove_gpio_range() completely. They only remove the gpio
+> range from the list in the pctldev, and since the pctldev is being
+> unregistered anyway, that doesn't seem very useful. The ranges don't
+> need to be free()'d since pinctrl_dt_add_gpio_ranges() allocates them
+> using devm_kzalloc() anyway, and in the non-DT case, if they need
+> free-ing, the driver already had to do that itself.
+>
+Yes, i agree with this one.
+I will re-order the patch series to remove pinctrl_remove_gpio_range first.
+
+Regards
+Dong Aisheng
