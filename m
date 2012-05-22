@@ -1,36 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 May 2012 11:25:40 +0200
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 May 2012 10:34:10 +0100
 Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
  errata 727915
-In-Reply-To: <20120522092107.GB7286@mudshark.cambridge.arm.com>
+In-Reply-To: <4FBB5AE8.4000801@ti.com>
 References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <20120522092107.GB7286@mudshark.cambridge.arm.com>
-Message-ID: <CACRpkdbnCHQQMHqMufmBQtuBhnRJWh_O30--eyqYuHn3Xzr3gg@mail.gmail.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+Message-ID: <20120522093410.GC7286@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 11:21 AM, Will Deacon <will.deacon@arm.com> wrote:
+On Tue, May 22, 2012 at 10:22:48AM +0100, Santosh Shilimkar wrote:
+> On Tuesday 22 May 2012 02:22 PM, Will Deacon wrote:
+> > I'm not sure I follow. Which version of the PL310 is in OMAP4460? Are you
+> > saying that the current workaround didn't work but the one in this patch
+> > did? Do you have a testcase?
+> > 
+> It's r3p1.
+> IIRC, the errata fix I did(debug register) was only for flush
+> (clean & inv) but Colin found in his testing that it's needed
+> for clean_all as well.
 
->> +#ifdef CONFIG_PL310_ERRATA_727915
->> + ? ? if (is_pl310_rev(REV_PL310_R2P0)) {
->> + ? ? ? ? ? ? l2x0_for_each_set_way(l2x0_base + L2X0_CLEAN_INV_LINE_IDX);
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +#endif
->
-> If we're adding code like this to flush_all, maybe we'd be better off just
-> assigning a different function to outer_cache.flush_all if we detect that
-> the current outer cache is an affected PL310 variant. However, note that
-> __l2x0_flush_all is called on the disable path. Do we need to intercept that
-> too?
+Ok, interesting.
 
-No idea. I was mainly forwarding the patch after findng it in the
-Android tree. I'm hoping Colin and Santosh can help us hash this out...
+> I don't have testcase. Colin might be able to suggest one.
 
-The thing is that since this is in the Android tree and vendors tend to
-use that as a base for development rather than using kernel.org,
-we will see this code deployed in a large number of systems, so I
-wanted to expose it to the kernel community.
+That would be ideal. Then I can take it up with the hardware guys since I'd
+like to confirm we're not just hiding a different bug with those writes.
 
-Yours,
-Linus Walleij
+Cheers,
+
+Will
