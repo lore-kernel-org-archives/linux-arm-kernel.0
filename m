@@ -1,42 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 May 2012 09:00:02 +0100
-Subject: [PATCH 15/16] ARM: ux500: Add regulator support for nomadik-i2c
- into the db8500 Device Tree
-In-Reply-To: <CACRpkdanT17H4VV1AzaYN0wnsFKJTVhw0ZT+o3nP9v=gpKdyAQ@mail.gmail.com>
+Date: Tue, 22 May 2012 09:01:20 +0100
+Subject: [PATCH 16/16] ARM: ux500: Re-enable SMSC911x platform code
+ registration during non-DT boots
+In-Reply-To: <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-16-git-send-email-lee.jones@linaro.org>
- <CACRpkdanT17H4VV1AzaYN0wnsFKJTVhw0ZT+o3nP9v=gpKdyAQ@mail.gmail.com>
-Message-ID: <4FBB4782.9090101@linaro.org>
+ <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
+ <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
+Message-ID: <4FBB47D0.9020109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/12 22:45, Linus Walleij wrote:
+On 21/05/12 22:46, Linus Walleij wrote:
 > On Fri, May 18, 2012 at 10:39 AM, Lee Jones<lee.jones@linaro.org>  wrote:
 >
->> Now we have full ab8500 and db8500-prcmu regulator support within DT
->> we can easily reference them from within each of the consumer's nodes.
->> Here we reference the ones used by each of the Nomadic I2C controllers.
+>> The patch to disable SMSC911x registration was applied twice in the upstream
+>> kernel by mistake. Git interpreted this as 'take the same entry from a
+>> similar struct' which was close by. This was the wrong thing to do. This patch
+>> rectifies this error and re-enables SMSC911x registration when Device Tree is
+>> not enabled.
 >>
+>> Acked-by: Linus Walleij<linus.walleij@linaro.org>
 >> Signed-off-by: Lee Jones<lee.jones@linaro.org>
 >
-> I'm hesitant about this. It seems to be going about things the wrong way
-> to have the platform device take a voltage domain regulator.
+> Acked-by: Linus Walleij<linus.walleij@linaro.org>
+>
+> This patch needs to go first, and into the -rc series.
 
-This doesn't change the behavior of the current system, only DT:s it.
+Do you want to take it?
 
-It's just that:
-
-> struct regulator_consumer_supply db8500_vape_consumers[] = {
->         REGULATOR_SUPPLY("v-i2c", "nmk-i2c.0")
-
-In drivers/mfd/db8500-prcmu.c is replaced by:
-
-> v-i2c-supply = <&db8500_vape_reg>;
-
-In the Device Tree.
-
-If we want to start re-working things, can we do it after the DT 
-enablement please?
+If not, how would you like me to take it forward?
 
 -- 
 Lee Jones
