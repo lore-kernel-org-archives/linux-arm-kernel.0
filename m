@@ -1,112 +1,197 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Tue, 22 May 2012 18:05:20 +0530
-Subject: [PATCH 00/10] spi: s3c64xx: add support for device tree
-In-Reply-To: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
-References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAAgF-BeU9_dgmNyjZBx5QARbv=qU==2qBCfD3ggabE608fRG7A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 May 2012 22:35:07 -0700
+Subject: =?UTF-8?q?=5BGIT=20PULL=207/8=5D=20arm-soc=3A=20power=20management=20changes?=
+In-Reply-To: <1337664908-17478-1-git-send-email-olof@lixom.net>
+References: <1337664908-17478-1-git-send-email-olof@lixom.net>
+Message-ID: <1337664908-17478-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Power management changes here are mostly for the omap platform, but also
+include cpuidle changes for ux500 and suspend/resume code for mmp.
 
-On Wed, May 9, 2012 at 3:34 AM, Thomas Abraham <thomas.abraham@linaro.org>
-wrote:
-> This patch series adds device tree based discovery support for Samsung's
-> s3c64xx compatible spi controller. This is mainly tested for Exynos4210
-> and Exynos5250 with onboard spi nor flash device.
->
-> This patch series is based on Linux 3.4-rc5 with the following two
-> patch series applied.
->
-> [1]
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg10494.html
->    [PATCH 00/20] ARM: Samsung: Add support for Exynos5250 Rev1.0
->
-> [2]
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg09640.html
->    [PATCH 0/6] S3C24XX: Add support for HSSPI on S3C2416/S3C2443
->
-> Thomas Abraham (10):
->  spi: s3c64xx: remove unused S3C64XX_SPI_ST_TRLCNTZ macro
->  spi: s3c64xx: move controller information into driver data
->  ARM: Samsung: Remove spi hardware controller information from platform
-data
->  ARM: Samsung: Remove pdev pointer paremeter from spi gpio setup functions
->  ARM: Samsung: Update the device names for spi clock lookup
->  ARM: Samsung: Modify s3c64xx_spi{0|1|2}_set_platdata function
->  spi: s3c64xx: Remove the 'set_level' callback from controller data
->  ARM: Exynos4: Fix the incorrect hierarchy of spi controller bus clock
->  ARM: Exynos5: Add spi clock support
->  spi: s3c64xx: add device tree support
->
-> .../devicetree/bindings/spi/spi-samsung.txt        |  113 +++++
->  arch/arm/mach-exynos/clock-exynos4.c               |   66 ++-
->  arch/arm/mach-exynos/clock-exynos5.c               |   98 ++++
->  arch/arm/mach-exynos/include/mach/regs-clock.h     |    4 +
->  arch/arm/mach-exynos/setup-spi.c                   |   33 +--
->  arch/arm/mach-s3c24xx/clock-s3c2416.c              |    2 +-
->  arch/arm/mach-s3c24xx/clock-s3c2443.c              |    2 +-
->  arch/arm/mach-s3c24xx/common-s3c2443.c             |    4 +-
->  arch/arm/mach-s3c24xx/setup-spi.c                  |   10 +-
->  arch/arm/mach-s3c64xx/clock.c                      |   20 +-
->  arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
->  arch/arm/mach-s3c64xx/setup-spi.c                  |   19 +-
->  arch/arm/mach-s5p64x0/clock-s5p6440.c              |   12 +-
->  arch/arm/mach-s5p64x0/clock-s5p6450.c              |   12 +-
->  arch/arm/mach-s5p64x0/setup-spi.c                  |   21 +-
->  arch/arm/mach-s5pc100/clock.c                      |   30 +-
->  arch/arm/mach-s5pc100/setup-spi.c                  |   30 +--
->  arch/arm/mach-s5pv210/clock.c                      |   14 +-
->  arch/arm/mach-s5pv210/setup-spi.c                  |   21 +-
->  arch/arm/plat-samsung/devs.c                       |   50 +--
->  arch/arm/plat-samsung/include/plat/s3c64xx-spi.h   |   31 +-
->  drivers/spi/spi-s3c64xx.c                          |  467
-+++++++++++++++++---
->  22 files changed, 753 insertions(+), 308 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-samsung.txt
->
->
-After applying this patchset, there is a build warning in the boot log.
-Below is the warning..
+----------------------------------------------------------------
 
-------------[ cut here ]------------
-WARNING: at drivers/base/dd.c:257 driver_probe_device+0x1ac/0x218()
-Modules linked in:
-[<c00159fc>] (unwind_backtrace+0x0/0xfc) from [<c0023e5c>]
-(warn_slowpath_common+0x54/0x64)
-[<c0023e5c>] (warn_slowpath_common+0x54/0x64) from [<c0023e88>]
-(warn_slowpath_null+0x1c/0x24)
-[<c0023e88>] (warn_slowpath_null+0x1c/0x24) from [<c02b6670>]
-(driver_probe_device+0x1ac/0x218)
-[<c02b6670>] (driver_probe_device+0x1ac/0x218) from [<c02b6768>]
-(__driver_attach+0x8c/0x90)
-[<c02b6768>] (__driver_attach+0x8c/0x90) from [<c02b4ddc>]
-(bus_for_each_dev+0x54/0x80)
-[<c02b4ddc>] (bus_for_each_dev+0x54/0x80) from [<c02b564c>]
-(bus_add_driver+0x1f4/0x2c0)
-[<c02b564c>] (bus_add_driver+0x1f4/0x2c0) from [<c02b6d5c>]
-(driver_register+0x78/0x180)
-[<c02b6d5c>] (driver_register+0x78/0x180) from [<c00085f8>]
-(do_one_initcall+0x34/0x180)
-[<c00085f8>] (do_one_initcall+0x34/0x180) from [<c069139c>]
-(kernel_init+0x114/0x1c0)
-[<c069139c>] (kernel_init+0x114/0x1c0) from [<c000ffec>]
-(kernel_thread_exit+0x0/0x8)
----[ end trace 6227d56b6a736442 ]---
-m25p80 spi1.0: found w25q80, expected w25x80
-m25p80 spi1.0: w25q80 (1024 Kbytes)
-2 ofpart partitions found on MTD device spi1.0
-Creating 2 MTD partitions on "spi1.0":
-0x000000000000-0x000000040000 : "U-Boot"
-0x000000040000-0x000000100000 : "Kernel"
+The following changes since commit 99d764e237ce06a95dfa718db3baa3dc6b350310:
 
-Thanks&Regards
-Padma
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/3337f002/attachment-0001.html>
+  Merge tag 'pinctrl' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/pm
+
+for you to fetch changes up to ada2e35defe6c6f0a986ec8147e47726fbd0e7b1:
+
+  Merge branch 'next/cpuidle' into next/pm
+
+----------------------------------------------------------------
+
+Arnd Bergmann (4):
+      Merge branch 'ux500-cpuidle-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/cpuidle
+      Merge branch 'mmp/dt' into next/pm
+      Merge branch 'power' of git://github.com/hzhuang1/linux into next/pm
+      Merge branch 'next/cpuidle' into next/pm
+
+Beno?t Cousson (6):
+      ARM: OMAP4: hwmod data: add GPMC
+      ARM: OMAP4: hwmod data: add the Slimbus IP blocks
+      ARM: OMAP4: hwmod data: add McASP
+      ARM: OMAP4: hwmod data: add remaining USB-related IP blocks
+      ARM: OMAP4: hwmod data: add the OCP-WP IP block
+      ARM: OMAP4: hwmod data: add DEBUGSS skeleton
+
+Chao Xie (6):
+      ARM: mmp: move XX_REG definition to addr-map.h
+      ARM: mmp: add PM support for mmp2
+      ARM: mm: proc-mohawk: add suspend resume for mohawk
+      ARM: cache: tauros2: add disable and resume callback
+      ARM: mmp: ttc_dkb: add PMIC support
+      ARM: mmp: add pm support for pxa910
+
+Daniel Lezcano (1):
+      ARM: ux500: add the cpuidle driver for WFI and ARM retention
+
+Kevin Hilman (7):
+      ARM: OMAP2+: voltage: ensure voltage used is exact voltage from OPP table
+      Merge tag 'topic/twl' into for_3.4/pm/smps-regulator
+      Merge branch 'pm-wip/smps-regulator' into for_3.4/pm/smps-regulator
+      ARM: OMAP3: clock data: replace 3503/3517 flag with AM35x flag for UART4
+      ARM: OMAP3: clock data: treat all AM35x devices the same
+      ARM: OMAP: clock: convert AM3517/3505 detection/flags to AM35xx
+      ARM: OMAP2+: WDTIMER integration: fix !PM boot crash, disarm timer after hwmod reset
+
+Mark A. Greer (1):
+      arm: omap3: clockdomain data: Remove superfluous commas from gfx_sgx_3xxx_wkdeps[]
+
+Ming Lei (1):
+      ARM: OMAP4: hwmod data: introduce fdif(face detect module) hwmod
+
+Olof Johansson (4):
+      Merge tag 'omap-pm-regulator-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge tag 'omap-devel-hwmod-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge tag 'omap-devel-prcm-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge tag 'omap-devel-hwmod-data-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+
+Paul Walmsley (14):
+      ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common
+      ARM: OMAP4: hwmod data: add HDQ/1-wire
+      ARM: OMAP4: hwmod data: add EMIF1 and 2
+      ARM: OMAP4: hwmod data: add GPU
+      ARM: OMAP4: hwmod data: add some interconnect-related IP blocks
+      ARM: OMAP4: hwmod data: add OCM RAM IP block
+      ARM: OMAP4: hwmod data: add System Control Module
+      ARM: OMAP4: hwmod data: add PRCM and related IP blocks
+      ARM: OMAP3: clock data: add clockdomain for HDQ functional clock
+      Merge branches 'clock_am35xx_cleanup_3.5', 'prm_cm_devel_a_3.5', 'clock_devel_a_3.5' and 'pwrdm_clkdm_cleanup_3.5' into prcm_devel_a_3.5
+      ARM: OMAP2+: HDQ1W: add custom reset function
+      ARM: OMAP2+: hwmod data: add HDQ/1-wire hwmod shared data
+      ARM: OMAP3: hwmod data: add HDQ/1-wire hwmod
+      ARM: OMAP2xxx: hwmod data: add HDQ/1-wire hwmod
+
+Peter Ujfalusi (2):
+      ARM: OMAP3: hwmod_data: Rename the common irq for McBSP ports
+      ARM: OMAP4: hwmod_data: Name the common irq for McBSP ports
+
+R Sricharan (1):
+      ARM: OMAP4+: Add prm and cm base init function.
+
+Rajendra Nayak (1):
+      ARM: OMAP3: Fix CM register bit masks
+
+Santosh Shilimkar (1):
+      ARM: OMAP2+: powerdomain: Get rid off duplicate pwrdm_clkdm_state_switch() API
+
+Shubhrajyoti D (1):
+      ARM: OMAP4: hwmod data: I2C: add flag for context restore
+
+Tarun Kanti DebBarma (1):
+      ARM: OMAP2+: dmtimer: cleanup iclk usage
+
+Tero Kristo (4):
+      arm: omap3: voltage: fix channel configuration
+      arm: omap3: add common twl configurations for vdd1 and vdd2
+      arm: omap3: twl: add external controllers for core voltage regulators
+      arm: omap4: add common twl configurations for vdd1, vdd2 and vdd3
+
+Tony Lindgren (5):
+      Merge tag 'omap-devel-a-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-hwmod
+      Merge branch 'for_3.4/pm/smps-regulator' of git://git.kernel.org/.../khilman/linux-omap-pm into pm-regulator
+      Merge tag 'omap-devel-b-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-prcm
+      ARM: OMAP2420: hwmod data: Add MMC hwmod data for 2420
+      Merge tag 'omap-devel-c-for-3.5' of git://git.kernel.org/.../pjw/omap-pending into devel-hwmod-data
+
+Vaibhav Bedia (1):
+      ARM: OMAP3+: dpll: Configure autoidle mode only if it's supported
+
+Vaibhav Hiremath (2):
+      ARM: OMAP2/3: Add idle_st bits for ST_32KSYNC timer to prcm-common header
+      ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod database
+
+
+ arch/arm/Kconfig                                |    2 +-
+ arch/arm/mach-mmp/Makefile                      |    5 +
+ arch/arm/mach-mmp/include/mach/addr-map.h       |   12 +
+ arch/arm/mach-mmp/include/mach/pm-mmp2.h        |   61 +
+ arch/arm/mach-mmp/include/mach/pm-pxa910.h      |   77 +
+ arch/arm/mach-mmp/include/mach/regs-apbc.h      |    3 -
+ arch/arm/mach-mmp/include/mach/regs-apmu.h      |    3 -
+ arch/arm/mach-mmp/irq.c                         |   13 +
+ arch/arm/mach-mmp/pm-mmp2.c                     |  264 +++
+ arch/arm/mach-mmp/pm-pxa910.c                   |  285 ++++
+ arch/arm/mach-mmp/ttc_dkb.c                     |   11 +
+ arch/arm/mach-omap2/Makefile                    |   13 +-
+ arch/arm/mach-omap2/clock.c                     |    2 +-
+ arch/arm/mach-omap2/clock3xxx_data.c            |   25 +-
+ arch/arm/mach-omap2/clock44xx_data.c            |   11 -
+ arch/arm/mach-omap2/clockdomain.c               |    7 +-
+ arch/arm/mach-omap2/clockdomain44xx.c           |    6 +
+ .../arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10 -
+ arch/arm/mach-omap2/clockdomains3xxx_data.c     |    6 +-
+ arch/arm/mach-omap2/clockdomains44xx_data.c     |    2 +
+ arch/arm/mach-omap2/clockdomains_common_data.c  |   24 +
+ arch/arm/mach-omap2/cm-regbits-34xx.h           |    4 +-
+ arch/arm/mach-omap2/cminst44xx.c                |   28 +-
+ arch/arm/mach-omap2/common.c                    |    1 +
+ arch/arm/mach-omap2/common.h                    |    1 +
+ arch/arm/mach-omap2/dpll3xxx.c                  |   23 +-
+ arch/arm/mach-omap2/hdq1w.c                     |   72 +
+ arch/arm/mach-omap2/io.c                        |   18 -
+ arch/arm/mach-omap2/msdi.c                      |   88 +
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c      |  112 ++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c      |   47 +
+ .../omap_hwmod_2xxx_3xxx_interconnect_data.c    |    9 +
+ .../omap_hwmod_2xxx_3xxx_ipblock_data.c         |   22 +
+ .../mach-omap2/omap_hwmod_2xxx_ipblock_data.c   |   23 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c      |   94 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c      | 1516 +++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_common_data.h    |    5 +
+ arch/arm/mach-omap2/powerdomain.c               |   10 -
+ arch/arm/mach-omap2/powerdomain.h               |    1 -
+ arch/arm/mach-omap2/prcm-common.h               |   17 +
+ arch/arm/mach-omap2/prcm.c                      |    8 +
+ arch/arm/mach-omap2/prminst44xx.c               |   27 +-
+ arch/arm/mach-omap2/timer.c                     |    7 -
+ arch/arm/mach-omap2/twl-common.c                |  147 ++
+ arch/arm/mach-omap2/vc3xxx_data.c               |    1 +
+ arch/arm/mach-omap2/voltage.c                   |   21 +-
+ arch/arm/mach-omap2/wd_timer.c                  |   45 +
+ arch/arm/mach-omap2/wd_timer.h                  |    1 +
+ arch/arm/mach-ux500/Makefile                    |    1 +
+ arch/arm/mach-ux500/cpuidle.c                   |  171 ++
+ arch/arm/mm/cache-tauros2.c                     |   24 +
+ arch/arm/mm/proc-mohawk.S                       |   35 +
+ arch/arm/plat-omap/include/plat/clkdev_omap.h   |    4 +-
+ arch/arm/plat-omap/include/plat/dmtimer.h       |    2 +-
+ arch/arm/plat-omap/include/plat/hdq1w.h         |   36 +
+ arch/arm/plat-omap/include/plat/mmc.h           |    4 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h    |    1 +
+ 57 files changed, 3248 insertions(+), 220 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/include/mach/pm-mmp2.h
+ create mode 100644 arch/arm/mach-mmp/include/mach/pm-pxa910.h
+ create mode 100644 arch/arm/mach-mmp/pm-mmp2.c
+ create mode 100644 arch/arm/mach-mmp/pm-pxa910.c
+ create mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
+ create mode 100644 arch/arm/mach-omap2/hdq1w.c
+ create mode 100644 arch/arm/mach-omap2/msdi.c
+ create mode 100644 arch/arm/mach-ux500/cpuidle.c
+ create mode 100644 arch/arm/plat-omap/include/plat/hdq1w.h
