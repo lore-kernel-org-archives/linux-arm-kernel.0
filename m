@@ -1,246 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 22 May 2012 10:45:55 +0100
-Subject: [PATCH v2 2/2] clk: add highbank clock support
-In-Reply-To: <1337220137-31666-3-git-send-email-robherring2@gmail.com>
-References: <1337220137-31666-1-git-send-email-robherring2@gmail.com>
- <1337220137-31666-3-git-send-email-robherring2@gmail.com>
-Message-ID: <4FBB6053.9030908@codethink.co.uk>
+From: lee.booi.lim@gmail.com (Lee Booi Lim)
+Date: Tue, 22 May 2012 17:51:01 +0800
+Subject: Why DMA PL330 peripheral transfer does not support burst request?
+In-Reply-To: <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
+References: <CAGe5uTBouMxJqX9yqizFNYkrNhb4jF=5=Y0NGV=tMDH+MqY25w@mail.gmail.com>
+ <CAGe5uTCZXRMDcwHZPGMirwD3gjeOYGuAgHbYD7K3gCgyOEOvYQ@mail.gmail.com>
+ <CABb+yY13K4Y3-Da0v8Af+j-7MKWU3ho9Ho4_qFtwZ0XUgWnYQw@mail.gmail.com>
+ <CAGe5uTByHp6BeN+sKNE8AySph_f9ZK6dEveGdt83+kw47p7Bag@mail.gmail.com>
+ <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
+ <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
+Message-ID: <CAGe5uTB6DoAar5BvxRXRMnaiPNJf464ij8JmGnGEnGsb-3AjzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/12 03:02, Rob Herring wrote:
-> From: Rob Herring<rob.herring@calxeda.com>
+On Sat, May 19, 2012 at 3:02 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, May 18, 2012 at 7:48 AM, Lee Booi Lim <lee.booi.lim@gmail.com> wrote:
+>> Appreciate if you could share with me on what is the weird behaviour
+>> seen. Is it because of DMA PL330 hardware bug? We have seen a problem
+>> on DMA PL330 that happens in DMA burst mode. If a DMA channel is
+>> programmed to wait for a burst from the peripheral (let's takes an
+>> example of RX path), somehow transfer error happened in the middle due
+>> to the peripheral is not able to trigger a burst as it does not have
+>> enough data. In this case, the DMA channel will be killed if the
+>> driver / application detects timeout on the transfer. However, the DMA
+>> PL330 is not able to resume to normal even with DMAKILL and DMAFLUSHP,
+>> that particular DMA channel will remain in waiting for burst mode. If
+>> the DMA transfer is restarted with single transfer, the request will
+>> be ignored. The waiting for burst state can only be reset if a cold
+>> reset to the DMA PL330 controller happen or a burst is actually
+>> happen.
+>>
+>> May I know whether the similar behaviour is observed in 6440? If not,
+>> could you please share with me on the behaviour you have observed so
+>> that I can try to reproduce it.
+>>
+> It's been almost 3yrs now, I don't remember exactly. IIRC it was evt0
+> of 6440 and the problem was random skips in sine wave playback over
+> I2S, while it worked just fine over an evt1. Please note the *IIRC*, I
+> have suffered those audio issues for many reasons.
 >
-> This adds real clock support to Calxeda Highbank SOC using the common
-> clock infrastructure.
->
-> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> Apparently you have changed the micro-code in the driver. So I can't
+> say much about what you observe. I might be able to suggest something
+> useful if I know what your SoC and code looks like and if the original
+> driver didn't work for you.
 
-> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> index 83e7229..2e1cfa0 100644
-> --- a/arch/arm/boot/dts/highbank.dts
-> +++ b/arch/arm/boot/dts/highbank.dts
-> @@ -1,5 +1,5 @@
->   /*
-> - * Copyright 2011 Calxeda, Inc.
-> + * Copyright 2011-2012 Calxeda, Inc.
->    *
->    * This program is free software; you can redistribute it and/or modify it
->    * under the terms and conditions of the GNU General Public License,
-> @@ -24,6 +24,7 @@
->   	compatible = "calxeda,highbank";
->   	#address-cells =<1>;
->   	#size-cells =<1>;
-> +	clock-ranges;
->
->   	cpus {
->   		#address-cells =<1>;
-> @@ -33,24 +34,32 @@
->   			compatible = "arm,cortex-a9";
->   			reg =<0>;
->   			next-level-cache =<&L2>;
-> +			clocks =<&a9pll>;
-> +			clock-names = "cpu";
->   		};
->
->   		cpu at 1 {
->   			compatible = "arm,cortex-a9";
->   			reg =<1>;
->   			next-level-cache =<&L2>;
-> +			clocks =<&a9pll>;
-> +			clock-names = "cpu";
->   		};
->
->   		cpu at 2 {
->   			compatible = "arm,cortex-a9";
->   			reg =<2>;
->   			next-level-cache =<&L2>;
-> +			clocks =<&a9pll>;
-> +			clock-names = "cpu";
->   		};
->
->   		cpu at 3 {
->   			compatible = "arm,cortex-a9";
->   			reg =<3>;
->   			next-level-cache =<&L2>;
-> +			clocks =<&a9pll>;
-> +			clock-names = "cpu";
->   		};
->   	};
->
-> @@ -75,12 +84,14 @@
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg =<0xfff10600 0x20>;
->   			interrupts =<1 13 0xf01>;
-> +			clocks =<&a9periphclk>;
->   		};
->
->   		watchdog at fff10620 {
->   			compatible = "arm,cortex-a9-twd-wdt";
->   			reg =<0xfff10620 0x20>;
->   			interrupts =<1 14 0xf01>;
-> +			clocks =<&a9periphclk>;
->   		};
->
->   		intc: interrupt-controller at fff11000 {
-> @@ -116,12 +127,15 @@
->   			compatible = "calxeda,hb-sdhci";
->   			reg =<0xffe0e000 0x1000>;
->   			interrupts =<0 90 4>;
-> +			clocks =<&eclk>;
->   		};
->
->   		ipc at fff20000 {
->   			compatible = "arm,pl320", "arm,primecell";
->   			reg =<0xfff20000 0x1000>;
->   			interrupts =<0 7 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		gpioe: gpio at fff30000 {
-> @@ -130,6 +144,8 @@
->   			gpio-controller;
->   			reg =<0xfff30000 0x1000>;
->   			interrupts =<0 14 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		gpiof: gpio at fff31000 {
-> @@ -138,6 +154,8 @@
->   			gpio-controller;
->   			reg =<0xfff31000 0x1000>;
->   			interrupts =<0 15 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		gpiog: gpio at fff32000 {
-> @@ -146,6 +164,8 @@
->   			gpio-controller;
->   			reg =<0xfff32000 0x1000>;
->   			interrupts =<0 16 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		gpioh: gpio at fff33000 {
-> @@ -154,24 +174,32 @@
->   			gpio-controller;
->   			reg =<0xfff33000 0x1000>;
->   			interrupts =<0 17 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		timer {
->   			compatible = "arm,sp804", "arm,primecell";
->   			reg =<0xfff34000 0x1000>;
->   			interrupts =<0 18 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		rtc at fff35000 {
->   			compatible = "arm,pl031", "arm,primecell";
->   			reg =<0xfff35000 0x1000>;
->   			interrupts =<0 19 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		serial at fff36000 {
->   			compatible = "arm,pl011", "arm,primecell";
->   			reg =<0xfff36000 0x1000>;
->   			interrupts =<0 20 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		smic at fff3a000 {
-> @@ -186,12 +214,73 @@
->   		sregs at fff3c000 {
->   			compatible = "calxeda,hb-sregs";
->   			reg =<0xfff3c000 0x1000>;
-> +
-> +			clocks {
-> +				#address-cells =<1>;
-> +				#size-cells =<0>;
-> +
-> +				osc: oscillator {
-> +					#clock-cells =<0>;
-> +					compatible = "fixed-clock";
-> +					clock-frequency =<33333000>;
-> +				};
-> +
-> +				ddrpll: ddrpll {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-pll-clock";
-> +					clocks =<&osc>;
-> +					reg =<0x108>;
-> +				};
-> +
-> +				a9pll: a9pll {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-pll-clock";
-> +					clocks =<&osc>;
-> +					reg =<0x100>;
-> +				};
-> +
-> +				a9periphclk: a9periphclk {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-a9periph-clock";
-> +					clocks =<&a9pll>;
-> +					reg =<0x104>;
-> +				};
-> +
-> +				a9bclk: a9bclk {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-a9bus-clock";
-> +					clocks =<&a9pll>;
-> +					reg =<0x104>;
-> +				};
-> +
-> +				emmcpll: emmcpll {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-pll-clock";
-> +					clocks =<&osc>;
-> +					reg =<0x10C>;
-> +				};
-> +
-> +				eclk: eclk {
-> +					#clock-cells =<0>;
-> +					compatible = "calxeda,hb-emmc-clock";
-> +					clocks =<&emmcpll>;
-> +					reg =<0x114>;
-> +				};
-> +
-> +				pclk: pclk {
-> +					#clock-cells =<0>;
-> +					compatible = "fixed-clock";
-> +					clock-frequency =<150000000>;
-> +				};
-> +			};
->   		};
->
->   		dma at fff3d000 {
->   			compatible = "arm,pl330", "arm,primecell";
->   			reg =<0xfff3d000 0x1000>;
->   			interrupts =<0 92 4>;
-> +			clocks =<&pclk>;
-> +			clock-names = "apb_pclk";
->   		};
->
->   		ethernet at fff50000 {
-> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-> index f8437dd..6ca6afa 100644
+I have not make changes to the driver to support burst yet. The PL330
+hardware problem was found by my friend on the use case test (not
+running Linux) for the PL330 but not using Linux driver. That's why I
+thought that you have disabled the burst support due to this PL330
+bug. ARM has acknowledged the scenario I described above as a PL330
+controller hardware bug.  So seems that we saw a different problem.
+The above scenario only happens if burst mode is supported in the
+driver. Evt0 and evt1 refer to event in DMA channel?
 
-I don't think the right solution is to push this stuff into the
-device-tree like this. It is only going to end up with this
-information being replicated through every machine with clock
-support.
+>
+>> As you have mentioned that the bottleneck is always at the
+>> peripherals, may I know is this a fair assumption? Please correct me
+>> if I get you wrong, you meant that the peripheral is always slower in
+>> pulling out the data from DMAC or putting data into DMAC, right? You
+>> are not saying that the peripheral cannot support burst mode, right?
+>>
+> I meant peripherals produce/consume data at a rate slower than the dma
+> could provide even at single burst.
+> Though thinking about it again, I shouldn't have generalized for every
+> peripheral-dmac combination. Which is yours?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+We are thinking to include the support burst mode since the
+peripherals IP that we are using supports burst mode (e.g. Designware
+SPI).
