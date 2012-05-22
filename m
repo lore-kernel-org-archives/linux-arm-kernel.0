@@ -1,89 +1,56 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 22 May 2012 10:12:22 +0800
-Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
-In-Reply-To: <1337633967-8387-1-git-send-email-marex@denx.de>
-References: <1337633967-8387-1-git-send-email-marex@denx.de>
-Message-ID: <4FBAF606.2040405@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 May 2012 10:15:37 +0800
+Subject: [GIT PULL] DT clk binding support
+In-Reply-To: <4FBAD545.7060803@gmail.com>
+References: <4FB80F32.5090309@gmail.com>
+ <20120520030653.GB5810@S2100-06.ap.freescale.net>
+ <4FB9A5E7.2070000@gmail.com>
+ <20120521064901.GE8140@S2101-09.ap.freescale.net>
+ <4FBA89E3.7010106@gmail.com>
+ <20120521232616.GF8140@S2101-09.ap.freescale.net>
+ <4FBAD545.7060803@gmail.com>
+Message-ID: <20120522021535.GG8140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?05?22? 04:59, Marek Vasut ??:
-> The ecc.strength wasn't set, resulting in the following crash:
-> [    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
-> [    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
-> [    2.550000] Modules linked in:
-> [    2.550000] CPU: 0    Not tainted  (3.4.0-rc7-next-20120518-dirty #1211)
-> [    2.550000] PC is at nand_scan_tail+0x328/0x650
-> [    2.550000] LR is at nand_scan_tail+0x328/0x650
-> [    2.550000] pc : [<c020841c>]    lr : [<c020841c>]    psr: 20000013
-> [    2.550000] sp : c7443ea8  ip : c7448000  fp : c043dc70
-> [    2.550000] r10: 00000000  r9 : c059dd20  r8 : c7526300
-> [    2.550000] r7 : 00000001  r6 : c7479c08  r5 : c7526300  r4 : c7526098
-> [    2.550000] r3 : c7448000  r2 : 00000000  r1 : 00000001  r0 : 00000034
-> [    2.550000] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [    2.550000] Control: 0005317f  Table: 40004000  DAC: 00000017
-> [    2.550000] Process swapper (pid: 1, stack limit = 0xc7442270)
-> [    2.550000] Stack: (0xc7443ea8 to 0xc7444000)
-> [    2.550000] 3ea0:                   c7526000 00000000 c7479c08 c02f68e0 c03d50ec c7526000
-> [    2.550000] 3ec0: c747c6e0 00000000 c0ae7720 00000004 00000000 00000000 c7479c08 c0ae7720
-> [    2.550000] 3ee0: c7479c3c c0593e20 c7572200 c01f6618 c01f6604 c01f55b0 c7479c08 c0593e20
-> [    2.550000] 3f00: c7479c3c c059dd20 c7572200 c01f57cc 00000000 c0593e20 c01f5738 c01f3d40
-> [    2.550000] 3f20: c74038a8 c74767d0 c0593e20 c04475ec c05901b8 c01f4e18 c03d50e0 c019d438
-> [    2.550000] 3f40: c7403800 c0593e20 c04475ec 00000000 c059dd20 c04475f8 c7442000 c01f5a70
-> [    2.550000] 3f60: 00000000 c044e98c c04475ec 00000000 c059dd20 c04475f8 c7442000 c043dc7c
-> [    2.550000] 3f80: c044e98c c0008824 c03d6c30 c040c4e4 00000006 00000006 c03b0ce4 c0bf54e0
-> [    2.550000] 3fa0: c044e98c c04475ec 00000006 c04475f8 0000004c c042a21c 00000000 c042a8b8
-> [    2.550000] 3fc0: 00000006 00000006 c042a21c 00000000 00000000 00000000 00000000 c042a7bc
-> [    2.550000] 3fe0: c000fab4 00000013 00000000 00000000 00000000 c000fab4 efbbfaa5 eaeafefe
-> [    2.550000] [<c020841c>] (nand_scan_tail+0x328/0x650) from [<c02f68e0>] (gpmi_nand_probe+0x43c/0x5a4)
-> [    2.550000] [<c02f68e0>] (gpmi_nand_probe+0x43c/0x5a4) from [<c01f6618>] (platform_drv_probe+0x14/0x18)
-> [    2.550000] [<c01f6618>] (platform_drv_probe+0x14/0x18) from [<c01f55b0>] (driver_probe_device+0x74/0x1fc)
-> [    2.550000] [<c01f55b0>] (driver_probe_device+0x74/0x1fc) from [<c01f57cc>] (__driver_attach+0x94/0x98)
-> [    2.550000] [<c01f57cc>] (__driver_attach+0x94/0x98) from [<c01f3d40>] (bus_for_each_dev+0x50/0x80)
-> [    2.550000] [<c01f3d40>] (bus_for_each_dev+0x50/0x80) from [<c01f4e18>] (bus_add_driver+0x188/0x25c)
-> [    2.550000] [<c01f4e18>] (bus_add_driver+0x188/0x25c) from [<c01f5a70>] (driver_register+0x78/0x138)
-> [    2.550000] [<c01f5a70>] (driver_register+0x78/0x138) from [<c043dc7c>] (gpmi_nand_init+0xc/0x30)
-> [    2.550000] [<c043dc7c>] (gpmi_nand_init+0xc/0x30) from [<c0008824>] (do_one_initcall+0x108/0x17c)
-> [    2.550000] [<c0008824>] (do_one_initcall+0x108/0x17c) from [<c042a8b8>] (kernel_init+0xfc/0x1bc)
-> [    2.550000] [<c042a8b8>] (kernel_init+0xfc/0x1bc) from [<c000fab4>] (kernel_thread_exit+0x0/0x8)
-> [    2.550000] Code: e3530000 1affff76 e59f02d0 eb03c16a (e7f001f2)
-> [    2.830000] ---[ end trace 3f05d4c0039432f1 ]---
-> [    2.840000] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+On Mon, May 21, 2012 at 06:52:37PM -0500, Rob Herring wrote:
+> As Grant states: "This proposed binding is only about one thing:
+> attaching clock providers to clock consumers." This means you have to
+> have at least a single provider and a single consumer defined in the DT.
+> 
+I just read through Grant's comments over again.  I agree with the
+statement which implicitly requires the clk provider defined in DT.
+However, for some case, this provider in DT is just a skeleton which
+is backed by clock driver where the provider is actually defined.
+
+Looking at Grant's comment below, the second option is also to match
+the clock in driver just using name.  The only difference to my
+proposal is the name here is given by the argument of phandle pointing
+to that skeleton provider node.
+
+I'm fine with that.  So go ahead with your bindings.
+
+Regards,
+Shawn
+
+On Wed, Nov 16, 2011 at 03:12:50PM -0700, Grant Likely wrote:
+> I'm really not convinced that it is a good idea to break out the
+> entire clock tree into one node per struct clk.  To begin with, that
+> looks to be very centric around the current 'struct clk' Linux
+> abstraction, which is potentially in flux.  Also, looking at Sascha's
+> initial RFC for describing the clock tree, I see cases where it looks
+> like a clock nexus node really makes sense.  For instance, the
+> 'divider-ipg <at> 0x53fd4014' node which has a list of child nodes
+> which merely provide a register offset and shift value
+> (reg=0x53fd4068..0x53fd4084, shift=0x0..0xf).  It would be natural to
+> instead encode that as part of the clock reference, or map it directly
+> from the clock reference (ie, assign names to each of the clocks, and
+> let the clock provider driver match up the name to the reg offset &
+> shift values).
 >
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Huang Shijie <b32955@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: linux-mtd at lists.infradead.org
-> Cc: Artem Bityutskiy <dedekind1@gmail.com>
->
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    5 +++++
->  1 file changed, 5 insertions(+)
->
-> V2: Also configure mtd.ecc_strength
->
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 303e9848..d5e9f8b 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -1436,6 +1436,10 @@ static int gpmi_pre_bbt_scan(struct gpmi_nand_data  *this)
->  	if (ret)
->  		return ret;
->  
-> +	/* Adjust the ECC strength according to the chip. */
-> +	this->nand.ecc.strength = this->bch_geometry.ecc_strength;
-> +	this->mtd.ecc_strength = this->bch_geometry.ecc_strength;
-> +
->  	/* NAND boot init, depends on the gpmi_set_geometry(). */
->  	return nand_boot_init(this);
->  }
-> @@ -1494,6 +1498,7 @@ static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
->  	chip->options		|= NAND_NO_SUBPAGE_WRITE;
->  	chip->ecc.mode		= NAND_ECC_HW;
->  	chip->ecc.size		= 1;
-> +	chip->ecc.strength	= 8;
->  	chip->ecc.layout	= &gpmi_hw_ecclayout;
->  
->  	/* Allocate a temporary DMA buffer for reading ID in the nand_scan() */
-Acked-by: Huang Shijie <b32955@freescale.com>
+> I had originally thought that it would be better to use names directly
+> for references to clocks (ie. clock = <phandle>,"name") , but after
+> actually playing with it and looking at the existing DT conventions,
+> I've reverted to cell values for the arguments and a separate set of
+> clock-{input,output}-name properties for attaching meaningful names,
+> just like we decided to do for assigning names to 'reg' properties.
