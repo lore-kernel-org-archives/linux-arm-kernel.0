@@ -1,74 +1,48 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Tue, 22 May 2012 16:07:45 +0900
-Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas
- used by dma-mapping framework
-In-Reply-To: <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4FBB3B41.8010102@kernel.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 22 May 2012 10:06:45 +0300
+Subject: [PATCH 1/4] ARM: OMAP3: There is no FS USB controller on omap3
+In-Reply-To: <20120521190102.927.86158.stgit@muffinssi.local>
+References: <20120521185323.927.88012.stgit@muffinssi.local>
+ <20120521190102.927.86158.stgit@muffinssi.local>
+Message-ID: <20120522070644.GA30559@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2012 07:54 PM, Marek Szyprowski wrote:
-
-> Add new type of vm_area intented to be used for consisten mappings
-> created by dma-mapping framework.
+On Mon, May 21, 2012 at 12:01:02PM -0700, Tony Lindgren wrote:
+> We should not select ARCH_OMAP_OTG as the hardware does not
+> have the legacy FS (Full Speed) USB interface.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Felipe Balbi <balbi@ti.com>
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  include/linux/vmalloc.h |    1 +
->  mm/vmalloc.c            |    3 +++
->  2 files changed, 4 insertions(+)
+>  arch/arm/mach-omap2/Kconfig |    1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
-> index 6071e91..8a9555a 100644
-> --- a/include/linux/vmalloc.h
-> +++ b/include/linux/vmalloc.h
-> @@ -14,6 +14,7 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
->  #define VM_USERMAP	0x00000008	/* suitable for remap_vmalloc_range */
->  #define VM_VPAGES	0x00000010	/* buffer for pages was vmalloc'ed */
->  #define VM_UNLIST	0x00000020	/* vm_struct is not listed in vmlist */
-> +#define VM_DMA		0x00000040	/* used by dma-mapping framework */
->  /* bits [20..32] reserved for arch specific ioremap internals */
-
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 4cf5142..0e4dd67 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -76,7 +76,6 @@ config SOC_OMAP3430
+>  	bool "OMAP3430 support"
+>  	depends on ARCH_OMAP3
+>  	default y
+> -	select ARCH_OMAP_OTG
 >  
-
->  /*
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 8cb7f22..9c13bab 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -2582,6 +2582,9 @@ static int s_show(struct seq_file *m, void *p)
->  	if (v->flags & VM_IOREMAP)
->  		seq_printf(m, " ioremap");
->  
-> +	if (v->flags & VM_DMA)
-> +		seq_printf(m, " dma");
-> +
-
-
-Hmm, VM_DMA would become generic flag?
-AFAIU, maybe VM_DMA would be used only on ARM arch.
-Of course, it isn't performance sensitive part but there in no reason to check it, either
-in other architecture except ARM.
-
-I suggest following as
-
-#ifdef CONFIG_ARM
-#define VM_DMA	0x00000040
-#else
-#define VM_DMA	0x0
-#end
-
-Maybe it could remove check code at compile time.
-
->  	if (v->flags & VM_ALLOC)
->  		seq_printf(m, " vmalloc");
->  
-
-
+>  config SOC_TI81XX
+>  	bool "TI81XX support"
+> 
 
 -- 
-Kind regards,
-Minchan Kim
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/bbf79609/attachment.sig>
