@@ -1,108 +1,145 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 May 2012 22:35:03 -0700
-Subject: =?UTF-8?q?=5BGIT=20PULL=203/8=5D=20arm-soc=3A=20non-critical=20bug=20fixes?=
+Date: Mon, 21 May 2012 22:35:05 -0700
+Subject: [GIT PULL 5/8] arm-soc: support for new SoCs
 In-Reply-To: <1337664908-17478-1-git-send-email-olof@lixom.net>
 References: <1337664908-17478-1-git-send-email-olof@lixom.net>
-Message-ID: <1337664908-17478-4-git-send-email-olof@lixom.net>
+Message-ID: <1337664908-17478-6-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These bug fixes were not important enough to have them included in the
-v3.4 release, mostly because they cover harmless warnings or unrealistic
-configurations. Instead we queue them up to be picked up in the next
-merge window.
+Three new system-on-chip models are supported: the st-ericsson u9540
+in ux500, the sam9n12 in at91 and the emma ev2 in shmobile.
 
-This branch will result in one conflict when merged in: panda_dvi_init()
-is modified on one side and removed on the other. The correct resolution
-is to remove it during merge.
+Emma is a little bit special because it is completely unrelated to
+the classic shmobile models, but the new Renesas rmobile SoCs are a
+combination of things from both Emma and shmobile, so it was decided to
+have them all live in one directory.
+
+This also contains updates to existing shmobile soc code as well as some
+related board changes due to dependencies.
 
 ----------------------------------------------------------------
 
-The following changes since commit c5407b32071ef1bb5ea85b6fbc901ff890e6e321:
+The following changes since commit 0144ea8a4789f9049e993b12aad6334f1788fc74:
 
-  Merge tag 'cleanup' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
+  Merge tag 'dt' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc
 
-for you to fetch changes up to 74c437532b8b5db53509963ec38e8424c56ff6f4:
+for you to fetch changes up to 0804dcb2afdcf014947ee98264041765f580d43f:
 
-  ARM: spear6xx: remove board selection options
+  Merge branch 'emev2' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas into next/soc
 
 ----------------------------------------------------------------
 
-Akinobu Mita (1):
-      arm: davinci: use for_each_set_bit_from
+Arnd Bergmann (3):
+      Merge tag 'at91-for-next-soc' of git://github.com/at91linux/linux-at91 into next/newsoc
+      Merge branch 'ux500-u9540-for-arm-soc' of git://git.kernel.org/.../linusw/linux-stericsson into next/newsoc
+      Merge branch 'ux500/delete-u5500' into next/soc
 
-Arnd Bergmann (1):
-      ARM: spear6xx: remove board selection options
+Hong Xu (3):
+      ARM: at91: Add machine header file for AT91SAM9N12 SoC
+      ARM: at91: Add machine files for AT91SAM9N12 SoC
+      ARM: at91: Add DT description files for AT91SAM9N12-EK
 
-Artem Bityutskiy (1):
-      ARM: OMAP1: fix compilation issue in board-sx1.c
+Kuninori Morimoto (9):
+      ARM: mach-shmobile: sh7372: Add FSI DMAEngine support
+      ARM: mach-shmobile: r8a7740: add gpio_irq support
+      ARM: mach-shmobile: r8a7740: cleanup I2C workaround method
+      ARM: mach-shmobile: clock-r8a7740: add FSI clock
+      ARM: mach-shmobile: clock-r8a7740: add USB clock
+      ARM: mach-shmobile: clock-r8a7740: add SDHI clock
+      ARM: mach-shmobile: clock-r8a7740: add MMCIF clock
+      ARM: mach-shmobile: clock-r8a7740: use followparent_recalc on usb24s
+      ARM: mach-shmobile: sh73a0: fixup PINT/IRQ16-IRQ31 irq number conflict
 
-Balaji T K (1):
-      ARM: OMAP4: hsmmc: check for null pointer
+Linus Walleij (1):
+      ARM: ux500: core U9540 support
 
-Chris Lalancette (1):
-      ARM: OMAP4: Adding ID for OMAP4460 ES1.1
+Magnus Damm (9):
+      ARM / mach-shmobile: Use preset_lpj with calibrate_delay()
+      gpio: Emma Mobile GPIO driver V2
+      mach-shmobile: Emma Mobile EV2 SoC base support V3
+      mach-shmobile: KZM9D board support V3
+      mach-shmobile: Emma Mobile EV2 SMP support V3
+      mach-shmobile: Emma Mobile EV2 GPIO support V3
+      mach-shmobile: KZM9D board Ethernet support V3
+      mach-shmobile: Emma Mobile EV2 DT support V3
+      mach-shmobile: Use DT_MACHINE for KZM9D V3
 
-Felipe Contreras (1):
-      ARM: OMAP: fix trivial warnings for dspbridge
-
-Grazvydas Ignotas (1):
-      ARM: OMAP2+: remove incorrect irq_chip ack field
-
-Kevin Hilman (1):
-      ARM: OMAP2+: INTC: fix Kconfig option for TI81XX
-
-Laurent Pinchart (1):
-      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
-
-Murali Karicheri (1):
-      ARM: davinci: fix incorrect pdctl next bit position
+Michel Jaouen (1):
+      ARM: ux500: ioremap differences for DB9540
 
 Olof Johansson (3):
-      Merge branch 'for-3.5/fixes' of git://git.kernel.org/.../swarren/linux-tegra into next/fixes
-      Merge tag 'v3.5-fixes-and-cleanups' of git://gitorious.org/linux-davinci/linux-davinci into next/fixes
-      Merge tag 'omap-fixes-non-critical-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes
+      Merge branch 'soc-core' of git://git.kernel.org/.../rafael/renesas into next/soc
+      Merge branch 'soc-core' of git://git.kernel.org/.../rafael/renesas into next/soc
+      Merge branch 'emev2' of git://git.kernel.org/.../rafael/renesas into next/soc
 
-Stephen Warren (2):
-      ARM: tegra: add pll_x freq table entry for 750MHz
-      ARM: disable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
-
-Tomi Valkeinen (1):
-      ARM: OMAP4: panda: add statics to remove warnings
-
-Tony Lindgren (1):
-      ARM: OMAP2+: Incorrect Register Offsets in OMAP Mailbox
-
-Uwe Kleine-K?nig (2):
-      ARM: davinci: mark spi_board_info arguments as const
-      ARM: davinci: da850-evm: fix section mismatch
+Rafael J. Wysocki (1):
+      Merge branch 'renesas-dt' into renesas-soc-core
 
 
- arch/arm/Kconfig                           |  2 +-
- arch/arm/mach-davinci/board-da850-evm.c    |  2 +-
- arch/arm/mach-davinci/davinci.h            |  4 +-
- arch/arm/mach-davinci/devices-da8xx.c      |  2 +-
- arch/arm/mach-davinci/dm355.c              |  2 +-
- arch/arm/mach-davinci/dm365.c              |  2 +-
- arch/arm/mach-davinci/dma.c                |  6 +--
- arch/arm/mach-davinci/include/mach/da8xx.h |  3 +-
- arch/arm/mach-davinci/include/mach/psc.h   |  2 +-
- arch/arm/mach-omap1/Kconfig                |  1 +
- arch/arm/mach-omap2/board-4430sdp.c        | 44 -------------------
- arch/arm/mach-omap2/board-igep0020.c       | 10 ++---
- arch/arm/mach-omap2/board-omap4panda.c     | 49 ---------------------
- arch/arm/mach-omap2/common.h               |  3 ++
- arch/arm/mach-omap2/dsp.c                  |  5 ++-
- arch/arm/mach-omap2/id.c                   |  5 ++-
- arch/arm/mach-omap2/irq.c                  |  3 +-
- arch/arm/mach-omap2/mailbox.c              |  6 +--
- arch/arm/mach-omap2/omap4-common.c         | 58 +++++++++++++++++++++++++
- arch/arm/mach-spear6xx/Kconfig             | 18 ++------
- arch/arm/mach-tegra/tegra2_clocks.c        |  6 +++
- arch/arm/plat-omap/devices.c               |  4 +-
- arch/arm/plat-omap/include/plat/cpu.h      |  1 +
- 23 files changed, 103 insertions(+), 135 deletions(-)
+ arch/arm/boot/dts/at91sam9n12.dtsi              | 221 +++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts             |  84 ++++
+ arch/arm/boot/dts/emev2-kzm9d.dts               |  26 ++
+ arch/arm/boot/dts/emev2.dtsi                    |  63 +++
+ arch/arm/mach-at91/Kconfig                      |   8 +
+ arch/arm/mach-at91/Makefile                     |   1 +
+ arch/arm/mach-at91/Makefile.boot                |   2 +
+ arch/arm/mach-at91/at91sam9n12.c                | 233 ++++++++++
+ arch/arm/mach-at91/clock.c                      |  15 +-
+ arch/arm/mach-at91/include/mach/at91sam9n12.h   |  60 +++
+ .../mach-at91/include/mach/at91sam9n12_matrix.h |  53 +++
+ arch/arm/mach-at91/include/mach/cpu.h           |  10 +
+ arch/arm/mach-at91/include/mach/hardware.h      |   1 +
+ arch/arm/mach-at91/setup.c                      |   6 +
+ arch/arm/mach-at91/soc.h                        |   5 +
+ arch/arm/mach-shmobile/Kconfig                  |  11 +
+ arch/arm/mach-shmobile/Makefile                 |   3 +
+ arch/arm/mach-shmobile/board-kzm9d.c            |  85 ++++
+ arch/arm/mach-shmobile/clock-emev2.c            | 249 ++++++++++
+ arch/arm/mach-shmobile/clock-r8a7740.c          | 125 ++++-
+ arch/arm/mach-shmobile/include/mach/emev2.h     |  19 +
+ arch/arm/mach-shmobile/include/mach/sh7372.h    |   2 +
+ arch/arm/mach-shmobile/include/mach/sh73a0.h    |  34 +-
+ arch/arm/mach-shmobile/pfc-r8a7740.c            |  39 ++
+ arch/arm/mach-shmobile/platsmp.c                |  18 +
+ arch/arm/mach-shmobile/setup-emev2.c            | 452 +++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7740.c          |  12 +-
+ arch/arm/mach-shmobile/setup-sh7372.c           |  10 +
+ arch/arm/mach-shmobile/smp-emev2.c              |  97 ++++
+ arch/arm/mach-shmobile/timer.c                  |   3 +-
+ arch/arm/mach-ux500/board-mop500-uib.c          |   2 +-
+ arch/arm/mach-ux500/cache-l2x0.c                |  16 +-
+ arch/arm/mach-ux500/clock.c                     |   2 +-
+ arch/arm/mach-ux500/cpu-db8500.c                |  24 +-
+ arch/arm/mach-ux500/cpu.c                       |   4 +-
+ arch/arm/mach-ux500/id.c                        |   9 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h  |   6 +
+ arch/arm/mach-ux500/include/mach/hardware.h     |   3 +
+ arch/arm/mach-ux500/include/mach/id.h           |  17 +-
+ arch/arm/mach-ux500/include/mach/irqs.h         |   2 +-
+ arch/arm/mach-ux500/platsmp.c                   |   4 +-
+ arch/arm/mach-ux500/timer.c                     |   2 +-
+ drivers/cpufreq/db8500-cpufreq.c                |   2 +-
+ drivers/gpio/Kconfig                            |   6 +
+ drivers/gpio/Makefile                           |   1 +
+ drivers/gpio/gpio-em.c                          | 418 +++++++++++++++++
+ include/linux/platform_data/gpio-em.h           |  10 +
+ 47 files changed, 2439 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9n12.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9n12ek.dts
+ create mode 100644 arch/arm/boot/dts/emev2-kzm9d.dts
+ create mode 100644 arch/arm/boot/dts/emev2.dtsi
+ create mode 100644 arch/arm/mach-at91/at91sam9n12.c
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
+ create mode 100644 arch/arm/mach-shmobile/board-kzm9d.c
+ create mode 100644 arch/arm/mach-shmobile/clock-emev2.c
+ create mode 100644 arch/arm/mach-shmobile/include/mach/emev2.h
+ create mode 100644 arch/arm/mach-shmobile/setup-emev2.c
+ create mode 100644 arch/arm/mach-shmobile/smp-emev2.c
+ create mode 100644 drivers/gpio/gpio-em.c
+ create mode 100644 include/linux/platform_data/gpio-em.h
