@@ -1,52 +1,110 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 May 2012 16:13:48 +0200
-Subject: [PATCH v3 3/3] ARM: dts: add nodes for atmel hsmci controllers
- for atmel platforms
-In-Reply-To: <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
- <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120522141348.GC3377@game.jcrosoft.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 22 May 2012 17:20:32 +0300
+Subject: [PATCHv4 4/8] ARM: OMAP4: hwmod: flag hwmods/modules
+ supporting module level context status
+In-Reply-To: <4FB33EF2.90705@ti.com>
+References: <1334913591-26312-1-git-send-email-t-kristo@ti.com>
+ <1334913591-26312-5-git-send-email-t-kristo@ti.com>
+ <4F957ACD.2040103@ti.com> <1335278815.2149.93.camel@sokoban>
+ <4F96DF8C.6040400@ti.com> <87pqa5axuo.fsf@ti.com> <4FB33A29.4030404@ti.com>
+ <4FB33EF2.90705@ti.com>
+Message-ID: <1337696432.20948.44.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:09 Tue 22 May     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wed, 2012-05-16 at 11:15 +0530, Rajendra Nayak wrote:
+> On Wednesday 16 May 2012 10:54 AM, Rajendra Nayak wrote:
+> > On Wednesday 16 May 2012 03:52 AM, Kevin Hilman wrote:
+> >> "Cousson, Benoit"<b-cousson@ti.com> writes:
+> >>
+> >>> On 4/24/2012 4:46 PM, Tero Kristo wrote:
+> >>>> On Mon, 2012-04-23 at 10:52 -0500, Jon Hunter wrote:
+> >>>>> Hi Tero,
+> >>>>>
+> >>>>> On 04/20/2012 04:19 AM, Tero Kristo wrote:
+> >>>>>> From: Rajendra Nayak<rnayak@ti.com>
+> >>>>>>
+> >>>>>> On OMAP4 most modules/hwmods support module level context status. On
+> >>>>>> OMAP3 and earlier, we relyed on the power domain level context
+> >>>>>> status.
+> >>>>>> Identify all such modules using a 'HWMOD_CONTEXT_REG' flag, all such
+> >>>>>> hwmods already have a valid 'context_offs' populated in .prcm
+> >>>>>> structure.
+> >>>>>
+> >>>>> Is it necessary to add another flag? Can't we just check if
+> >>>>> context_offs
+> >>>>> is non-zero? Would save adding a lot more lines to an already large
+> >>>>> file
+> >>>>> :-)
+> >>>>
+> >>>> Actually one of the older versions of this patch was just checking
+> >>>> against a non-zero value, but it was decided to be changed as
+> >>>> potentially the context_offs can be zero even if it is a valid offset.
+> >>
+> >> Potentially? Is that the case on OMAP4/5 today? I don't see any for
+> >> OMAP4 in mainline.
+> >
+> > No, we don;t have any such cases today in either OMAP4 or OMAP5.
+> >
+> >>
+> >> If zero really is a valid offset somewhere (where?), then we could use
+> >> -1 (or USHRT_MAX in this case.)
+> >
+> > This makes sense for OMAP4 and beyond (and same with having a flag
+> > to indicate the *lack* of having the feature) as it will mean just
+> > adding a few entries in hwmod data files to indicate IP blocks (very
+> > few) which do not support this feature.
+> >
+> > However since none of OMAP2/3 varients (except I guess the AMxxxx
+> > family) support this, it would also mean we mark
+> > *most* blocks in OMAP2/3 to indicate they *lack* this feature, which
+> > would mean bloating the OMAP2/3 data files, but your
+> > comment below about doing it for all IPs during hwmod registration
+> > makes sense at least for OMAP2 since *all* blocks can be marked at
+> > registration. OMAP3 would probably need more data files to be updated
+> > to indicate which ones support and which ones don't.
+> >
+> > Having said that I also see 'context_reg' being defined inside
+> > omap_hwmod_omap4_prcm would need to be fixed if we have to
+> > support this for SoCs which fall as OMAP3 varients.
 > 
-> Add nodes for mci controllers.
+> I just went back and looked at Vaibhavs patch which adds am33xx
+> hwmod data and I think none of what I said above is a problem.
+> I think we can safely mark the few blocks on OMAP4 which do
+> not have a valid context_reg with -1 or USHRT_MAX as you suggested
+> and mark all OMAP2/3 blocks with this at registration.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  arch/arm/boot/dts/at91sam9g20.dtsi     |   12 ++++++++++++
->  arch/arm/boot/dts/at91sam9g25ek.dts    |   16 ++++++++++++++++
->  arch/arm/boot/dts/at91sam9g45.dtsi     |   24 ++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts |   17 +++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5.dtsi      |   24 ++++++++++++++++++++++++
->  5 files changed, 93 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 773ef48..6a28bfe 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -197,6 +197,18 @@
->  				interrupts = <10 4>;
->  				status = "disabled";
->  			};
-> +
-> +			mmc0: mmc at fffa800 {
-> +				compatible = "atmel,hsmci";
-> +				reg = <0xfffa800 0x600>;
-> +				interrupts = <9 4>;
-> +				status = "disabled";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				slot at 0 {
-> +					reg = <0>;
-> +				};
-> +			};
-this need to be in 9260.dtsi
+> Benoit/Paul, does that sound good?
 
-if you add the board too plese add all of them
-or seperate the commits
+Any comments to this? This is blocking v6 for this set. Also, who is
+going to generate the hwmod data?
 
-Best Regards,
-J.
+-Tero
+
+> 
+> >
+> >>
+> >>> Yeah, but still, every OMAP4 IPs are supporting that except two of
+> >>> them I guess, so it is a pity to add that to every IPs.
+> >>>
+> >>> We'd better add a HWMOD_NO_CONTEXT_REG to the few IPs that are not
+> >>> supporting that. Since OMAP 2& 3 does not have this feature at all,
+> >>> we can check on the cpu revision.
+> >>>
+> >>> I think the issue raised by Rajendra was about AM35xx that looks like
+> >>> an OMAP3 variant but does have these registers like an OMAP4
+> >>> variant:-(
+> >>
+> >> If AM335x is missing it for *all* IPs, that's easy enough to solve
+> >> without bloating the data file: just set .context_offs field (or flag)
+> >> to the magic value for all IPs during hwmod registration.
+> >>
+> >> Paul/Benoit should make the call whether to use a special value in the
+> >> .context_offs field (0 or -1) or add a new flag. If a flag is chosen, I
+> >> agree with Benoit that it should indicate the *lack* of the feature,
+> >> since having the feature is the norm.
+> >>
+> >> Kevin
+> >>
+> >
+> 
