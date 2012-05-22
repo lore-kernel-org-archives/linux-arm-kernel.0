@@ -1,73 +1,93 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 21 May 2012 18:52:37 -0500
-Subject: [GIT PULL] DT clk binding support
-In-Reply-To: <20120521232616.GF8140@S2101-09.ap.freescale.net>
-References: <4FB80F32.5090309@gmail.com>
- <20120520030653.GB5810@S2100-06.ap.freescale.net>
- <4FB9A5E7.2070000@gmail.com>
- <20120521064901.GE8140@S2101-09.ap.freescale.net>
- <4FBA89E3.7010106@gmail.com>
- <20120521232616.GF8140@S2101-09.ap.freescale.net>
-Message-ID: <4FBAD545.7060803@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 22 May 2012 08:27:59 +0800
+Subject: [PATCH v2 01/12] usb: otg: add notify_connect_change callback
+In-Reply-To: <201205212127.51020.marex@denx.de>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <201205212032.21757.marex@denx.de>
+ <20120521184014.GA21692@kroah.com>
+ <201205212127.51020.marex@denx.de>
+Message-ID: <20120522002759.GD6206@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2012 06:26 PM, Shawn Guo wrote:
-> On Mon, May 21, 2012 at 01:30:59PM -0500, Rob Herring wrote:
->>> With the bindings here, I need something like below in device tree to
->>> replace the clk lookup registration that is currently done in imx6q
->>> sabrelite specific setup code.  However the problem here is I have cko
->>> defined in clock driver, and thus I can not give phandle to cko in
->>> device tree.  What I suggest is for such cases, we could require
->>> clock-names = "cko" than clocks = <&cko>, and of_clk_get() should also
->>> be able to find the clock with looking for the clk name.
->>>
->>> imx6q-sabrelite.dts:
->>>
->>> 	codec: sgtl5000 at 0a {
->>> 		compatible = "fsl,sgtl5000";
->>> 		reg = <0x0a>;
->>> 		clocks = <&cko>;
->>> 	};
->>>
->>> mach-imx6q.c, imx6q_sabrelite_cko1_setup(): 
->>>
->>>         cko1 = clk_get_sys(NULL, "cko1");
->>>         clk_register_clkdev(cko1, NULL, "0-000a");
->>>
->>
->> What!? This is a terrible abuse/hack of the clock binding and is in no
->> way what was intended. You cannot use half of the clock binding. You
->> have to have a provider. The primary binding is a phandle reference.
->> clock-names is just auxiliary data.
->>
-> Well, on conversation [1], it seems people agreed that for those huge
-> clock tree, only leaf clocks should be exposed in device tree.  Then
-> please help me understand how we could do that with the current binding
-> design, considering those leaf clocks are consumers of their parent
-> clocks while being provider to the leaf clock the parent clock is not
-> exposed in device tree.
-
-You are mis-interpreting things.
-
-As Grant states: "This proposed binding is only about one thing:
-attaching clock providers to clock consumers." This means you have to
-have at least a single provider and a single consumer defined in the DT.
-
-By only exposing leaf nodes of the clocks, that means only exposing a
-single DT node for the SOC clocks with a whole bunch of outputs (i.e.
-the leaf clocks). In the imx case, this would be a single node for the
-CCM with the dozens clocks the CCM outputs. In this case you would not
-expose all the individual muxes, gates, and dividers of the CCM in the
-DT. You still have to describe the connection between the CCM and a h/w
-block. I'm not sure what you want here. Based on our prior
-conversations, I thought you wanted to break out every single clock as a
-separate DT node and have generic divider, mux, and gate bindings. Now
-you are arguing for the opposite.
-
-Rob
-
-> Regards,
-> Shawn
+On Mon, May 21, 2012 at 09:27:50PM +0200, Marek Vasut wrote:
+> Dear Greg KH,
 > 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/139414/focus=1216423
+> > On Mon, May 21, 2012 at 08:32:21PM +0200, Marek Vasut wrote:
+> > > Dear Greg KH,
+> > > 
+> > > > On Mon, May 21, 2012 at 07:36:40PM +0200, Marek Vasut wrote:
+> > > > > Dear Greg KH,
+> > > > > 
+> > > > > > On Mon, May 21, 2012 at 05:23:46PM +0800, Richard Zhao wrote:
+> > > > > > > This let usb phy driver has a chance to change hw settings when
+> > > > > > > connect status change.
+> > > > > > > 
+> > > > > > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > > > > > ---
+> > > > > > > 
+> > > > > > >  include/linux/usb/otg.h |   13 +++++++++++++
+> > > > > > >  1 files changed, 13 insertions(+), 0 deletions(-)
+> > > > > > > 
+> > > > > > > diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
+> > > > > > > index 38ab3f4..385641d 100644
+> > > > > > > --- a/include/linux/usb/otg.h
+> > > > > > > +++ b/include/linux/usb/otg.h
+> > > > > > > @@ -117,6 +117,10 @@ struct usb_phy {
+> > > > > > > 
+> > > > > > >  	int	(*set_suspend)(struct usb_phy *x,
+> > > > > > >  	
+> > > > > > >  				int suspend);
+> > > > > > > 
+> > > > > > > +	/* notify phy connect status change */
+> > > > > > > +	int	(*notify_connect_change)(struct usb_phy *x,
+> > > > > > > +					 int port,
+> > > > > > > +					 int connected);
+> > > > > > > 
+> > > > > > >  };
+> > > > > > 
+> > > > > > No, please make this two different callbacks.  As you see in your
+> > > > > > code
+> > > > > > 
+> > > > > > when you implemented this, you really have:
+> > > > > > 	if (connected) {
+> > > > > > 	
+> > > > > > 		do this...
+> > > > > > 	
+> > > > > > 	} else {
+> > > > > > 	
+> > > > > > 		do that...
+> > > > > > 	
+> > > > > > 	}
+> > > > > > 
+> > > > > > So you there is no consolidation in the driver, so just make it 2
+> > > > > > callbacks, especially as someone wanted to make connected -1 just
+> > > > > > for a tristate, which would be impossible to document properly...
+> > > > > 
+> > > > > Or he could make connected an enum maybe ?
+> > > > 
+> > > > No, again, that will make nothing easier on the driver end at all.
+> > > > 
+> > > > What's the problem with different functions that people keep resisting?
+> > > 
+> > > The structure grows a few bytes ... so the kernel eats a bit more ram.
+> > 
+> > The time it took you to write this email just made up for that extra
+> > ram, sorry :)
+> 
+> Heh :-) But is this email constantly allocated in your kernel space?
+> 
+> > It doesn't matter, have people leaned nothing from our past mistakes?
+> 
+> All right, I won't argue with you. Richard, let's obey.
+Sure. I'll change it. I think Greq's point here is maintenance. And
+4-byte ram consume don't cost to be noticed.
+
+Thanks
+Richard
+> 
+> > greg k-h
+> 
+> Best regards,
+> Marek Vasut
+> 
