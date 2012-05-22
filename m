@@ -1,69 +1,55 @@
-From: lee.booi.lim@gmail.com (Lee Booi Lim)
-Date: Tue, 22 May 2012 17:51:01 +0800
-Subject: Why DMA PL330 peripheral transfer does not support burst request?
-In-Reply-To: <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
-References: <CAGe5uTBouMxJqX9yqizFNYkrNhb4jF=5=Y0NGV=tMDH+MqY25w@mail.gmail.com>
- <CAGe5uTCZXRMDcwHZPGMirwD3gjeOYGuAgHbYD7K3gCgyOEOvYQ@mail.gmail.com>
- <CABb+yY13K4Y3-Da0v8Af+j-7MKWU3ho9Ho4_qFtwZ0XUgWnYQw@mail.gmail.com>
- <CAGe5uTByHp6BeN+sKNE8AySph_f9ZK6dEveGdt83+kw47p7Bag@mail.gmail.com>
- <CAGe5uTCDA8PxjNYwyqz3HsGdbMetWtSN9DFivWamvnrPXDEU2Q@mail.gmail.com>
- <CABb+yY0NtS+vU98CtZvS_Raj_Yuuobqyn8NPCCE+awYqmxhiVQ@mail.gmail.com>
-Message-ID: <CAGe5uTB6DoAar5BvxRXRMnaiPNJf464ij8JmGnGEnGsb-3AjzA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 22 May 2012 10:56:35 +0100
+Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
+In-Reply-To: <20120522013920.GE6206@b20223-02.ap.freescale.net>
+References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
+ <20120521125930.GC6206@b20223-02.ap.freescale.net>
+ <20120521144543.GA4063@opensource.wolfsonmicro.com>
+ <20120522013920.GE6206@b20223-02.ap.freescale.net>
+Message-ID: <20120522095635.GD21999@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2012 at 3:02 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, May 18, 2012 at 7:48 AM, Lee Booi Lim <lee.booi.lim@gmail.com> wrote:
->> Appreciate if you could share with me on what is the weird behaviour
->> seen. Is it because of DMA PL330 hardware bug? We have seen a problem
->> on DMA PL330 that happens in DMA burst mode. If a DMA channel is
->> programmed to wait for a burst from the peripheral (let's takes an
->> example of RX path), somehow transfer error happened in the middle due
->> to the peripheral is not able to trigger a burst as it does not have
->> enough data. In this case, the DMA channel will be killed if the
->> driver / application detects timeout on the transfer. However, the DMA
->> PL330 is not able to resume to normal even with DMAKILL and DMAFLUSHP,
->> that particular DMA channel will remain in waiting for burst mode. If
->> the DMA transfer is restarted with single transfer, the request will
->> be ignored. The waiting for burst state can only be reset if a cold
->> reset to the DMA PL330 controller happen or a burst is actually
->> happen.
->>
->> May I know whether the similar behaviour is observed in 6440? If not,
->> could you please share with me on the behaviour you have observed so
->> that I can try to reproduce it.
->>
-> It's been almost 3yrs now, I don't remember exactly. IIRC it was evt0
-> of 6440 and the problem was random skips in sine wave playback over
-> I2S, while it worked just fine over an evt1. Please note the *IIRC*, I
-> have suffered those audio issues for many reasons.
->
-> Apparently you have changed the micro-code in the driver. So I can't
-> say much about what you observe. I might be able to suggest something
-> useful if I know what your SoC and code looks like and if the original
-> driver didn't work for you.
+On Tue, May 22, 2012 at 09:39:21AM +0800, Richard Zhao wrote:
+> On Mon, May 21, 2012 at 03:45:44PM +0100, Mark Brown wrote:
 
-I have not make changes to the driver to support burst yet. The PL330
-hardware problem was found by my friend on the use case test (not
-running Linux) for the PL330 but not using Linux driver. That's why I
-thought that you have disabled the burst support due to this PL330
-bug. ARM has acknowledged the scenario I described above as a PL330
-controller hardware bug.  So seems that we saw a different problem.
-The above scenario only happens if burst mode is supported in the
-driver. Evt0 and evt1 refer to event in DMA channel?
+> >  For the first patch it wasn't clear if the
+> > changes in pinctrl were the actual dependencies or if there were more
+> > things needed from the ARM tree,
 
->
->> As you have mentioned that the bottleneck is always at the
->> peripherals, may I know is this a fair assumption? Please correct me
->> if I get you wrong, you meant that the peripheral is always slower in
->> pulling out the data from DMAC or putting data into DMAC, right? You
->> are not saying that the peripheral cannot support burst mode, right?
->>
-> I meant peripherals produce/consume data at a rate slower than the dma
-> could provide even at single burst.
-> Though thinking about it again, I shouldn't have generalized for every
-> peripheral-dmac combination. Which is yours?
+> I remembered someone already explained the dependencies. It depends
+> on imx pinctrl work and dummy pinctrl enabled in ARM platform code. It
+> is why Shawn suggest it goes to ARM SoC.
 
-We are thinking to include the support burst mode since the
-peripherals IP that we are using supports burst mode (e.g. Designware
-SPI).
+There was mention of some changes but only a vauge description of them,
+I've no idea where they are or anything, initially people had mentioned
+an already cross-merged point in Linus' tree but apparently that wasn't
+sufficient due to these arch specific bits and I don't know where those
+are.
+
+We should really have got this resolved in -next...
+
+> > Guys, you really need to think about how you're organising what you're
+> > doing more.  You need to split your work out into focused lines of
+> > development rather than just having a single branch.  
+
+> Except the clean up patch, others are all related to enable audio. Do
+> you mean I supposed to split them in advance?
+
+Well, a lot of the time there's no actual dependency (eg, you add a
+driver and add registration of that device so there's no need for them
+to go in together since both are perfectly fine without the other) then
+it is best to merge things separately.  If there are dependencies then
+that needs to be handled differently but it needs communication and
+ideally the dependencies would be on focused things that can just be
+pulled in.  
+
+In the case of things like the devm_clk_get() cleanup if there's any
+complexity at all then it's usually best just to punt for a release.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/0eb08ec0/attachment.sig>
