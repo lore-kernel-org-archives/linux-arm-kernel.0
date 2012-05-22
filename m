@@ -1,40 +1,26 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 22 May 2012 14:19:49 +0800
-Subject: [PATCH v2 10/12] ARM: dts: imx6q-sabrelite: add usb devices
-In-Reply-To: <20120522060828.GP8140@S2101-09.ap.freescale.net>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-11-git-send-email-richard.zhao@freescale.com>
- <20120522051005.GN8140@S2101-09.ap.freescale.net>
- <20120522055901.GR6206@b20223-02.ap.freescale.net>
- <20120522060828.GP8140@S2101-09.ap.freescale.net>
-Message-ID: <20120522061947.GU6206@b20223-02.ap.freescale.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 22 May 2012 09:33:03 +0300
+Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
+In-Reply-To: <1337633967-8387-1-git-send-email-marex@denx.de>
+References: <1337633967-8387-1-git-send-email-marex@denx.de>
+Message-ID: <1337668383.2483.87.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 02:08:31PM +0800, Shawn Guo wrote:
-> On Tue, May 22, 2012 at 01:59:02PM +0800, Richard Zhao wrote:
-> > Yes, but we don't have now. If I add dependency which don't even hit
-> > next tree, I experienced people refuse pick my patch.
-> > Of course, If you're ok to pick other patches, I can leave the code
-> > locally for test.
-> 
-> I'm fine for now.
-> 
-> > > > +				gpios {
-> > > > +					pinctrl_gpio_hog: gpiohog {
-> > > > +					};
-> > > > +				};
-> > > > +
-> > > Why the empty nodes?
-> > It's place holder that let use know to add gpio hog-on-boot in board dts.
-> > 
-> It's meaningless.  Please remove it.
-Ok.
+On Mon, 2012-05-21 at 22:59 +0200, Marek Vasut wrote:
+> The ecc.strength wasn't set, resulting in the following crash:
+> [    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
+> [    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
 
-Thanks
-Richard
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+Pushed to l2-mtd.git, thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/03e8cb1d/attachment.sig>
