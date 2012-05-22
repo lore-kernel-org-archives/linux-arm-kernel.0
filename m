@@ -1,27 +1,59 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 22 May 2012 12:22:05 +0300
-Subject: [PATCH 1/7] remoteproc: resource table overhaul
-In-Reply-To: <4FBB5908.4010505@stericsson.com>
-References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
- <1330589497-4139-2-git-send-email-ohad@wizery.com>
- <4F6354E4.8030704@monstr.eu>
- <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
- <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
- <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
- <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
- <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
- <4FBB5908.4010505@stericsson.com>
-Message-ID: <CAK=WgbYKMh8oifeC-A9LYq8GV_Nb7L8wc198YZujGEsp9mmvsw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 May 2012 14:52:48 +0530
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <20120522085256.GA7286@mudshark.cambridge.arm.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+Message-ID: <4FBB5AE8.4000801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On Tuesday 22 May 2012 02:22 PM, Will Deacon wrote:
+> Hi Santosh,
+> 
+> On Mon, May 21, 2012 at 07:04:21AM +0100, Shilimkar, Santosh wrote:
+>> On Mon, May 21, 2012 at 2:11 AM, Linus Walleij
+>> <linus.walleij@stericsson.com> wrote:
+>>> From: Colin Cross <ccross@android.com>
+>>>
+>>> ARM errata 727915 for PL310 has been updated to include a new
+>>> workaround required for PL310 r2p0 for l2x0_flush_all, which also
+>>> affects l2x0_clean_all in my testing. For r2p0, clean or flush
+>>> each set/way individually. For r3p0 or greater, use the debug
+>>> register for cleaning and flushing.
+>>>
+>>> Requires exporting the cache_id, sets and ways detected in the
+>>> init function for later use.
+>>>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Per Fransson <per.fransson.ml@gmail.com>
+>>> Signed-off-by: Colin Cross <ccross@android.com>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> I found this thing in the Android tree, it looks like it could
+>>> be pretty serious so I'm mailing it out. If it is correct I
+>>> guess it should even be tagged for -stable?
+>>>
+>>> v2: what about actually git commit --amend in the rebase changes
+>>> for -rc7? Sorry for the screwup...
+>>> ---
+>> This was observed on OMAP4460 devices. Though the errata
+>> document doesn't support it, the issue seen with l2 clean was
+>> indeed fixed $subject fix.
+> 
+> I'm not sure I follow. Which version of the PL310 is in OMAP4460? Are you
+> saying that the current workaround didn't work but the one in this patch
+> did? Do you have a testcase?
+> 
+It's r3p1.
+IIRC, the errata fix I did(debug register) was only for flush
+(clean & inv) but Colin found in his testing that it's needed
+for clean_all as well.
 
-On Tue, May 22, 2012 at 12:14 PM, frq09524 <ludovic.barre@stericsson.com> wrote:
-> Ohad, for alignment I can take the latest branch of kernel.org (remoteproc)
-> branch for-next?
+I don't have testcase. Colin might be able to suggest one.
 
-Sure, it's pretty much updated sans a few simple changes.
-
-Thanks,
-Ohad.
+Regards
+santosh
