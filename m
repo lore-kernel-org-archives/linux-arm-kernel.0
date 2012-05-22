@@ -1,32 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 May 2012 12:52:43 +0800
-Subject: [PATCH v2 12/12] ARM: dts: imx28-evk: add usb devices
-In-Reply-To: <1337592237-5090-13-git-send-email-richard.zhao@freescale.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 22 May 2012 12:56:11 +0800
+Subject: [PATCH v2 06/12] ARM: imx6q: correct device name of usbphy and
+ usb controller clock export
+In-Reply-To: <201205220631.28739.marex@denx.de>
 References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-13-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120522045240.GM8140@S2101-09.ap.freescale.net>
+ <1337592237-5090-7-git-send-email-richard.zhao@freescale.com>
+ <201205220631.28739.marex@denx.de>
+Message-ID: <20120522045610.GM6206@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:23:57PM +0800, Richard Zhao wrote:
->  	ahb at 80080000 {
-> +		usb0: usb at 80080000 {
-> +			fsl,vbus-power = <&gpio3 9 0>;
+On Tue, May 22, 2012 at 06:31:28AM +0200, Marek Vasut wrote:
+> Dear Richard Zhao,
+> 
+> We will need similar patch for mx28 I think?
+It has mx28 clk patch. hmm..., something is wrong. I'll fix the name.
 
-fsl,vbus-power-gpios
-
-> +			status = "okay";
-> +		};
-> +
-> +		usb1: usb at 80090000 {
-> +			fsl,vbus-power = <&gpio3 8 0>;
-
-Ditto
-
-> +			status = "okay";
-> +		};
-> +
-
--- 
-Regards,
-Shawn
+Thanks
+Richard
+> 
+> Otherwise
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c |    5 ++++-
+> >  1 files changed, 4 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 96e9edd..f99509a 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -391,7 +391,10 @@ int __init mx6q_clocks_init(void)
+> >  	clk_register_clkdev(clk[gpt_ipg], "ipg", "imx-gpt.0");
+> >  	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+> >  	clk_register_clkdev(clk[twd], NULL, "smp_twd");
+> > -	clk_register_clkdev(clk[usboh3], NULL, "usboh3");
+> > +	clk_register_clkdev(clk[usboh3], NULL, "2184000.usb");
+> > +	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
+> > +	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
+> > +	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
+> >  	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+> >  	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+> >  	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
+> 
+> Best regards,
+> Marek Vasut
+> 
