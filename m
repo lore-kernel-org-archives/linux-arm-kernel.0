@@ -1,59 +1,41 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Tue, 22 May 2012 11:02:37 +0100
-Subject: [PATCH 2/2] pcm038 lcdc support
-In-Reply-To: <20120518151316.GU30400@pengutronix.de>
-References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
- <1337344032-25431-3-git-send-email-s.hauer@pengutronix.de>
- <1337349834.29229.15.camel@atropine>
- <20120518151316.GU30400@pengutronix.de>
-Message-ID: <CAPM=9twNorVNJ4Jxd-hiW8jjMzqxzgyrjgwH=raFWuen5Na1ag@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 22 May 2012 13:06:26 +0300
+Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
+In-Reply-To: <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
+ <201205220630.57007.marex@denx.de>
+ <20120522045120.GL6206@b20223-02.ap.freescale.net>
+ <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120522100624.GP30559@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2012 at 4:13 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, May 18, 2012 at 10:03:54AM -0400, Adam Jackson wrote:
->> On Fri, 2012-05-18 at 14:27 +0200, Sascha Hauer wrote:
->>
->> > + ? ? ? ? ? ? ? ? ? edid = [00 ff ff ff ff ff ff 00 4c 2d 6c 03 36 32 49 4b
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 0f 13 01 03 80 37 22 a0 2a fe 21 a8 53 37 ae 24
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 11 50 54
->> > +
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? /* est timings */
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00 00
->> > +
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? /* std timings */
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00
->> > +
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? /* detailed timings */
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 05 0D 20 A0 30 58 1C 20 28 20 14 00 26 57 21 00 00 1E
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00 00 fd 00 32 4b 1b 51 11 00 0a 20 20 20 20 20 20
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00 00 fc 00 53 79 6e 63 4d 61 73 74 65 72 0a 20 20
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 00 00 ff 00 48 39 58 53 34 30 30 34 34 32 0a 20 20
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? 00 20];
->>
->> This EDID block claims to be a Samsung SyncMaster, which isn't really
->> the right thing to do. ?The question is what to call it instead. ?Red
->> Hat has a PNP ID we can use for virtual EDID blocks like this if we
->> want, I'd want to set up a little database to keep track of them but
->> that's pretty trivial.
->
-> Sorry, should have mentioned this in the commit log. This in fact is a
-> hacked version of my office monitor. This patch is more meant as a usage
-> example and not for upstream. I don't know yet if it's even acceptable
-> to put edid data into the devicetree. I saw some discussion about it,
-> but also about some generic display description, which I would prefer.
->
-> BTW is there a more convenient tool than a hex editor around to generate
-> edid data? I only found some windows tools
+Hi,
 
-Some basic stuff in Documentation/EDID/ but yeah don't know of
-anything graphical for Linux.
+On Tue, May 22, 2012 at 12:56:52PM +0300, Alexander Shishkin wrote:
+> > Do you think it's a good idea to let user select binding driver directly
+> > and the binding driver config depends on chipidea config?
+> 
+> I don't have a strong opinion on this, although I prefer it the way it
+> is now, because, imo:
+> 
+>   * in case of =m (and that's the only sane way of compiling it anyway),
+>     these all are compiled as modules, which you simply don't install if
+>     you don't want them;
+>   * all of them get compile-tested every time you change something in
+>     the driver, which is a good thing;
 
-Dave.
+only true for $(ARCH) builds. I would like to see these drivers being
+compile tested on linux-next on all arches. Thus the patches I just
+sent.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/d1046287/attachment.sig>
