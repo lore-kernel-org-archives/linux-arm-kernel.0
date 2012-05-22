@@ -1,49 +1,52 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 22 May 2012 14:15:32 +0300
-Subject: Clock register in early init
-In-Reply-To: <CAJOA=zNoj1nZ+zVURfhziqFem4F7_Y_B8s=Gp1Aptr0hgfj6Xw@mail.gmail.com>
-References: <1337227884.2066.9.camel@pgaikwad-dt2>
- <20120517062131.GA9305@gmail.com>
- <1337316517.22560.19.camel@pgaikwad-dt2>
- <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
- <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zNoj1nZ+zVURfhziqFem4F7_Y_B8s=Gp1Aptr0hgfj6Xw@mail.gmail.com>
-Message-ID: <20120522111532.GH8730@tbergstrom-lnx.Nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 22 May 2012 14:51:12 +0300
+Subject: [PATCH] remoteproc: block premature rproc booting
+Message-ID: <1337687472-23009-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 08:05:57PM +0200, Turquette, Mike wrote:
-> On Mon, May 21, 2012 at 1:46 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> >>
-> >> On OMAP I think the only "gotcha" is setting up the timer. ?One
-> >> solution is to open code the register reads and the rate calculation
-> >> in the timer code. ?That is ugly... but it works.
-> >>
-> >> > Which advantages do you see in dynamically allocating all this?
-> >> >
-> >>
-> >> There are many but I'll name a couple. ?The most significant point is
-> >> that we can avoid exposing the definition of struct clk if we
-> >> dynamically allocate stuff. ?One can use struct clk_hw_init to
-> >> statically initialize data, or instead rely on direct calls to
-> >> clk_register with a bunch of parameters.
-> >>
-> >
-> > Which means if you make a mistake in specifying parents for example, it will
-> > only fail at runtime, possibly before any console is active. With static
-> > initialization, this will fail at compiletime. Much easier to debug.
-> >
-> 
-> Is this really a problem?  Once you have good data it does not change.
->  Debugging bad data when introducing a new chip is just a fact of
-> life.  Static versus dynamic is irrelevant here.
-> 
+When an rproc instance is registered, remoteproc asynchronously
+loads its firmware in order to tell which vdevs it supports.
 
-I think it is a problem yes, especially when the tree becomes more
-complicated.
+Later on those vdevs are registered, and when probed, their drivers
+usually trigger powering on of the remote processor.
 
-Cheers,
+OTOH, non-standard scenarios might involve early invocation of
+rproc_boot even before the asynchronous fw loading has completed.
 
-Peter.
+We're not sure we really want to support those scenarios, but right
+now we do (e.g. via rproc_get_by_name), so let's simply fix this race
+by blocking those premature rproc_boot() flows until the async fw
+loading is completed.
+
+Reported-and-tested-by: Sjur Brandeland <sjur.brandeland@stericsson.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/remoteproc/remoteproc_core.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index 40e2b2d..464ea4f 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -1141,6 +1141,18 @@ int rproc_boot(struct rproc *rproc)
+ 
+ 	dev = rproc->dev;
+ 
++	/*
++	 * if asynchronoush fw loading is underway, wait up to 65 secs
++	 * (just a bit more than the firmware request's timeout)
++	 */
++	ret = wait_for_completion_interruptible_timeout(
++					&rproc->firmware_loading_complete,
++					msecs_to_jiffies(65000));
++	if (ret <= 0) {
++		dev_err(dev, "async fw loading isn't complete: %d\n", ret);
++		return ret ? ret : -ETIMEDOUT;
++	}
++
+ 	ret = mutex_lock_interruptible(&rproc->lock);
+ 	if (ret) {
+ 		dev_err(dev, "can't lock rproc %s: %d\n", rproc->name, ret);
+-- 
+1.7.5.4
