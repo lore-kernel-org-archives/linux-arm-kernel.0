@@ -1,34 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 May 2012 10:34:10 +0100
-Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
- errata 727915
-In-Reply-To: <4FBB5AE8.4000801@ti.com>
-References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
- <20120522085256.GA7286@mudshark.cambridge.arm.com>
- <4FBB5AE8.4000801@ti.com>
-Message-ID: <20120522093410.GC7286@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 22 May 2012 10:38:00 +0100
+Subject: [PATCH v3 0/2] regulator: Add initial suport for max77686
+In-Reply-To: <CAH9JG2Xq-4J9Vn6d6cxcMNsZ5Y2LLJG9vrVQWEyPHhNd08ek9g@mail.gmail.com>
+References: <4fbb2ac4.63de440a.589d.78cc@mx.google.com>
+ <CAH9JG2Xq-4J9Vn6d6cxcMNsZ5Y2LLJG9vrVQWEyPHhNd08ek9g@mail.gmail.com>
+Message-ID: <20120522093800.GC21999@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 10:22:48AM +0100, Santosh Shilimkar wrote:
-> On Tuesday 22 May 2012 02:22 PM, Will Deacon wrote:
-> > I'm not sure I follow. Which version of the PL310 is in OMAP4460? Are you
-> > saying that the current workaround didn't work but the one in this patch
-> > did? Do you have a testcase?
-> > 
-> It's r3p1.
-> IIRC, the errata fix I did(debug register) was only for flush
-> (clean & inv) but Colin found in his testing that it's needed
-> for clean_all as well.
+On Tue, May 22, 2012 at 03:53:11PM +0900, Kyungmin Park wrote:
 
-Ok, interesting.
+> BTW, do you know that you're reviewing the same device driver patch
+> from different person?
+> One from Mr. Lee and another from Yadwinder.
 
-> I don't have testcase. Colin might be able to suggest one.
+> I wonder how to handle it finally. which one is choose?
 
-That would be ideal. Then I can take it up with the hardware guys since I'd
-like to confirm we're not just hiding a different bug with those writes.
-
-Cheers,
-
-Will
+Yes, I realise there's two different versions of it floating around -
+personally I'd hope that you guys could come to some agreement about a
+common set of code that works for everyone.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/51e128cc/attachment.sig>
