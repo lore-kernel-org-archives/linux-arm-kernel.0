@@ -1,161 +1,60 @@
-From: ludovic.barre@stericsson.com (frq09524)
-Date: Tue, 22 May 2012 11:14:48 +0200
-Subject: [PATCH 1/7] remoteproc: resource table overhaul
-In-Reply-To: <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
-References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
- <1330589497-4139-2-git-send-email-ohad@wizery.com>
- <4F6354E4.8030704@monstr.eu>
- <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
- <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
- <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
- <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
- <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
-Message-ID: <4FBB5908.4010505@stericsson.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 22 May 2012 10:20:50 +0100
+Subject: Clock register in early init
+In-Reply-To: <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com> <1337316517.22560.19.camel@pgaikwad-dt2>
+ <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+ <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FBB5A72.2080101@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad and Michal
+On 21/05/12 09:46, Peter De Schrijver wrote:
+>>
+>> On OMAP I think the only "gotcha" is setting up the timer.  One
+>> solution is to open code the register reads and the rate calculation
+>> in the timer code.  That is ugly... but it works.
+>>
+>>> Which advantages do you see in dynamically allocating all this?
+>>>
+>>
+>> There are many but I'll name a couple.  The most significant point is
+>> that we can avoid exposing the definition of struct clk if we
+>> dynamically allocate stuff.  One can use struct clk_hw_init to
+>> statically initialize data, or instead rely on direct calls to
+>> clk_register with a bunch of parameters.
+>>
+>
+> Which means if you make a mistake in specifying parents for example, it will
+> only fail at runtime, possibly before any console is active. With static
+> initialization, this will fail at compiletime. Much easier to debug.
+>
+>> Another point is that copying the data at registration-time makes
+>> __initdata possible.  I haven't done the math yet to see if this
+>> really makes a difference.  However if we start doing single zImage's
+>> with multiple different ARM SoCs then this could recover some pages.
+>>
+>
+> On the other hand most clock structures are small, so there will be internal
+> fragmentation. Also the arrays of parent clock pointers can be shared between
+> different clocks. We have about 70 muxes in Tegra30 and 12 different parent
+> arrays.
 
-yes I can share my patch, remoteproc has evolved and my patch is not 
-aligned on latest version of remote proc (especially since remoteproc: 
-remove the single rpmsg vdev limitation).
+We had at-least that on the older Samsung parts and they where still
+growing. I would suggest that in a multi-kernel image situation the
+more data that can be discarded after init-time the better.
 
-Ohad, for alignment I can take the latest branch of kernel.org 
-(remoteproc) branch for-next?
+Also, __initdata gets gathered into one place so there's no possibility
+of page fragmentation there. If you mean fragmentation of the memory
+map, then allocate the size of all the clocks you know of at init time
+in one go.
 
-/BR
-Ludovic Barr?
+It would possible even be useful to have construction code that took
+some brief details of the clocks and constructed the list/tree of clocks
+at start time.
 
-On 05/22/2012 07:51 AM, Michal Simek wrote:
-> Hi Ohad and Ludovic,
->
-> 2012/5/21 Ohad Ben-Cohen <ohad at wizery.com <mailto:ohad@wizery.com>>
->
->     Hi Michal,
->
->     On Mon, May 21, 2012 at 4:02 PM, Michal Simek <monstr@monstr.eu
->     <mailto:monstr@monstr.eu>> wrote:
->      > I have looked at it and tested on latest and greatest and the
->     problem is
->      > still there.
->
->     Ok, I see why this is happening.
->
->     We're now allocating the vrings' DMA in ->find_vqs() just before we
->     boot the remote processor, and we release it on ->del_vqs(). These are
->     the virtio handlers for setting up and tearing down the vrings, so it
->     makes sense to do so, but as a result, we still don't get the early
->     carveout allocation you wanted.
->
->      > I have looked at the code and path is
->      > rproc_fw_config_virtio -> rproc_handliefirtion_rsc ->
->     rproc_handle_vdev
->
->     Please note that rproc_handle_vdev doesn't allocate any DMA at this
->     point, and the allocation path is now quite different - it begins with
->     virtio_rpmsg_bus probing and then calling into the ->find_vqs()
->     handler.
->
->
->      > For me it is necessary to ensure that dma_alloc_coherent in
->      > rproc_alloc_vring is called after carveout allocation
->      > just because dma_alloc_cohorent takes mermory from preallocated
->     pool which
->      > starts at 0x0.
->
->     ok.
->
->      > I also don't have
->      > any other advance mechanism how to ensure mapping for the second
->     arm core.
->
->     Probably the best way to ensure this (without it breaking unexpectedly
->     again as remoteproc evolves) is to have separate sub-devices for
->     different kind of memories, which remoteproc could then look up using
->     something like device_find_child().
->
->     Ludovic is exploring this direction too, because STE also needs to
->     bind specific memory regions with predefined purposes, without
->     depending on the order of DMA allocations.
->
->
-> It is good that someone else has similar requirements.
->
->
->     I think Ludovic already has a preliminary patch which he may be able
->     to share with you.
->
->
-> Ludovic: Can you share your patch with us? I would like to try it.
->
->
->      > Here is log which I need to get. Look at attached patch which
->     exactly show
->      > you what I need to do which I have tested.
->
->     Yes, I see. Another temporary approach might be moving the vrings'
->     allocations to the rproc_handle_rsc table (in the RSC_VDEV slot), but
->     I'm not sure we want to merge this as well because this solution too
->     is only hiding the real issue and not solving it permanently.
->
->
-> Simple enabling RSC_VDEV in rproc_handle_rsc doesn't work.
->
-> BTW: I am using kernel modules and there is no dependency for
-> virtio_rpmsg_bus in remoteproc module
-> in sense if you load remoteproc module you also need to load
-> virtio_rpmsg_bus to get firmware to work.
->
-> I think that will be good to create that dependency automatically
-> because you need to load virtio_rpmsg_bus
-> when you problem remoteproc module.
->
-> ~ # lsmod
-> ~ # modprobe zynq_remoteproc
-> zynq_remoteproc: Unknown symbol rproc_register (err 0)
-> zynq_remoteproc: Unknown symbol rproc_alloc (err 0)
-> zynq_remoteproc: Unknown symbol rproc_vq_interrupt (err 0)
-> zynq_remoteproc: Unknown symbol rproc_free (err 0)
-> zynq_remoteproc: Unknown symbol rproc_unregister (err 0)
-> CPU1: shutdown
-> zynq_remoteproc 0.remoteproc-test: 0.remoteproc-test is available
-> zynq_remoteproc 0.remoteproc-test: Note: remoteproc is still under
-> development and considered experimental.
-> zynq_remoteproc 0.remoteproc-test: THE BINARY FORMAT IS NOT YET
-> FINALIZED, and backward compatibility isn't yet guaranteed.
-> ~ # zynq_remoteproc 0.remoteproc-test: registered virtio0 (type 7)
->
-> ~ # lsmod
-> zynq_remoteproc 4346 0 - Live 0xbf01f000
-> remoteproc 13831 1 zynq_remoteproc, Live 0xbf018000
-> virtio 2840 1 remoteproc, Live 0xbf008000
-> virtio_ring 4965 1 remoteproc, Live 0xbf013000
-> ~ #
-> ~ # modprobe virtio_rpmsg_bus
-> zynq_remoteproc 0.remoteproc-test: powering up 0.remoteproc-test
-> zynq_remoteproc 0.remoteproc-test: Booting fw image test, size 2351790
-> zynq_remoteproc 0.remoteproc-test: remote processor 0.remoteproc-test is
-> now up
-> virtio_rpmsg_bus virtio0: rpmsg host is online
-> virtio_rpmsg_bus virtio0: creating channel rpmsg-timer-statistic addr 0x50
-> ~ #
-> ~ # lsmod
-> virtio_rpmsg_bus 7575 0 - Live 0xbf024000
-> zynq_remoteproc 4346 1 - Live 0xbf01f000
-> remoteproc 13831 1 zynq_remoteproc, Live 0xbf018000
-> virtio 2840 2 virtio_rpmsg_bus,remoteproc, Live 0xbf008000
-> virtio_ring 4965 2 virtio_rpmsg_bus,remoteproc, Live 0xbf013000
-> ~ #
->
-> Can you see the same behavior on omap?
->
-> Thanks,
-> Michal
->
->
->
->
->
->
->
->
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
