@@ -1,39 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 May 2012 11:48:11 +0800
-Subject: [PATCH v2 09/12] ARM: imx6q: disable usb charger detector
-In-Reply-To: <1337592237-5090-10-git-send-email-richard.zhao@freescale.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-10-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120522034809.GI8140@S2101-09.ap.freescale.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 21 May 2012 21:17:17 -0700
+Subject: [GIT PULL] DT clk binding support
+In-Reply-To: <20120522021535.GG8140@S2101-09.ap.freescale.net>
+References: <4FB80F32.5090309@gmail.com>
+ <20120520030653.GB5810@S2100-06.ap.freescale.net>
+ <4FB9A5E7.2070000@gmail.com>
+ <20120521064901.GE8140@S2101-09.ap.freescale.net>
+ <4FBA89E3.7010106@gmail.com>
+ <20120521232616.GF8140@S2101-09.ap.freescale.net>
+ <4FBAD545.7060803@gmail.com>
+ <20120522021535.GG8140@S2101-09.ap.freescale.net>
+Message-ID: <4FBB134D.6050409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 05:23:54PM +0800, Richard Zhao wrote:
-> +static void __init imx6q_usb_init(void)
-> +{
-> +#define HW_ANADIG_USB1_CHRG_DETECT		0x000001b0
-> +#define HW_ANADIG_USB2_CHRG_DETECT		0x00000210
-> +
-> +#define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x00100000
-> +#define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x00080000
-> +
-> +	/*
-> +	 * The external charger detector needs to be disabled,
-> +	 * or the signal at DP will be poor
-> +	 */
-> +
-Nit: drop this unnecessary new line.
+On 05/21/12 19:15, Shawn Guo wrote:
+> On Mon, May 21, 2012 at 06:52:37PM -0500, Rob Herring wrote:
+>> As Grant states: "This proposed binding is only about one thing:
+>> attaching clock providers to clock consumers." This means you have to
+>> have at least a single provider and a single consumer defined in the DT.
+>>
+> I just read through Grant's comments over again.  I agree with the
+> statement which implicitly requires the clk provider defined in DT.
+> However, for some case, this provider in DT is just a skeleton which
+> is backed by clock driver where the provider is actually defined.
+>
+> Looking at Grant's comment below, the second option is also to match
+> the clock in driver just using name.  The only difference to my
+> proposal is the name here is given by the argument of phandle pointing
+> to that skeleton provider node.
+>
+> I'm fine with that.  So go ahead with your bindings.
+>
 
-Regards,
-Shawn
+Can we do what the regulator framework has done and have a common
+binding of <connection_name>-clk = <&phandle>? Something like:
 
-> +	anatop_write_reg(NULL, HW_ANADIG_USB1_CHRG_DETECT,
-> +			BM_ANADIG_USB_CHRG_DETECT_EN_B
-> +			| BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
-> +			~0);
-> +	anatop_write_reg(NULL, HW_ANADIG_USB2_CHRG_DETECT,
-> +			BM_ANADIG_USB_CHRG_DETECT_EN_B |
-> +			BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B,
-> +			~0);
-> +}
-> +
+    core-clk = <&uart3_clk>
+
+and then have clk_get() use the of node of the device passed in to find
+a property named %s-clk and find the clock with the matching phandle.
+
+This looks like it's trying to cover both the end consumers (uart uses
+uart3_clk) and the internal clock tree consumers (a crystal oscillator
+connects to a PLL or a mux has multiple parents). We can certainly use
+these bindings for muxes and internal parent-child relationships but I
+would prefer we use different bindings for consumer bindings that match
+what regulators do today.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
