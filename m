@@ -1,234 +1,38 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 22 May 2012 15:55:17 +0200
-Subject: [PATCH v4 4/7] ARM: davinci: net: davinci_emac: add OF support
-In-Reply-To: <1337694920-8925-1-git-send-email-hs@denx.de>
-References: <1337694920-8925-1-git-send-email-hs@denx.de>
-Message-ID: <1337694920-8925-5-git-send-email-hs@denx.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 22 May 2012 16:55:29 +0300
+Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
+In-Reply-To: <20120522135257.GQ8140@S2101-09.ap.freescale.net>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
+ <201205220630.57007.marex@denx.de>
+ <20120522045120.GL6206@b20223-02.ap.freescale.net>
+ <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120522100624.GP30559@arwen.pp.htv.fi>
+ <20120522103139.GD32035@b20223-02.ap.freescale.net>
+ <20120522103516.GR30559@arwen.pp.htv.fi>
+ <20120522135257.GQ8140@S2101-09.ap.freescale.net>
+Message-ID: <20120522135527.GD27874@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add of support for the davinci_emac driver.
+On Tue, May 22, 2012 at 09:52:59PM +0800, Shawn Guo wrote:
+> On Tue, May 22, 2012 at 01:35:17PM +0300, Felipe Balbi wrote:
+> > My suggestion to Alex is to remove all dependencies for at least a
+> > couple of merge windows and only add dependencies for stuff which
+> > actually matters; like only building the PCI glue layer when CONFIG_PCI
+> > is defined instead of when ARCH_X86 is defined and so on.
+> > 
+> As ci13xxx_imx is a DT only driver, it needs to depend on CONFIG_OF.
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: netdev at vger.kernel.org
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Wolfgang Denk <wd@denx.de>
-Cc: Anatoly Sivov <mm05@mail.ru>
+yes, and I have said that it should depend on CONFIG_OF, rather then
+ARCH_IMX... that's fine.
 
----
-- changes for v2:
-  - add comment from Anatoly Sivov
-    - fix typo in davinci_emac.txt
-  - add comment from Grant Likely:
-    - add prefix "ti,davinci-" to davinci specific property names
-    - remove version property
-    - use compatible name "ti,davinci-dm6460-emac"
-    - use devm_kzalloc()
-    - use of_match_ptr()
-    - document all new properties
-    - remove of_address_to_resource() and do not overwrite
-      resource table
-    - whitespace fixes
-    - remove hw_ram_addr as it is not used in current
-      board code
-- no changes for v3
-- changes for v4:
-  add comments from Nori Sekhar:
-  - move devictree documentation to:
-    Documentation/devicetree/bindings/net/davinci_emac.txt
-  - fix typo in it
-  - rename compatible property to "ti,davinci-dm6467-emac"
-  - remove pinmux-handle
-  - set version directly in pdata->version
----
- .../devicetree/bindings/net/davinci_emac.txt       |   41 +++++++++
- drivers/net/ethernet/ti/davinci_emac.c             |   87 +++++++++++++++++++-
- 2 files changed, 127 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/davinci_emac.txt
-
-diff --git a/Documentation/devicetree/bindings/net/davinci_emac.txt b/Documentation/devicetree/bindings/net/davinci_emac.txt
-new file mode 100644
-index 0000000..48b259e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/davinci_emac.txt
-@@ -0,0 +1,41 @@
-+* Texas Instruments Davinci EMAC
-+
-+This file provides information, what the device node
-+for the davinci_emac interface contains.
-+
-+Required properties:
-+- compatible: "ti,davinci-dm6467-emac";
-+- reg: Offset and length of the register set for the device
-+- ti,davinci-ctrl-reg-offset: offset to control register
-+- ti,davinci-ctrl-mod-reg-offset: offset to control module register
-+- ti,davinci-ctrl-ram-offset: offset to control module ram
-+- ti,davinci-ctrl-ram-size: size of control module ram
-+- ti,davinci-rmii-en: use RMII
-+- ti,davinci-no-bd-ram: has the emac controller BD RAM
-+- phy-handle: Contains a phandle to an Ethernet PHY.
-+              if not, davinci_emac driver defaults to 100/FULL
-+- interrupts: interrupt mapping for the davinci emac interrupts sources:
-+              4 sources: <Receive Threshold Interrupt
-+			  Receive Interrupt
-+			  Transmit Interrupt
-+			  Miscellaneous Interrupt>
-+
-+Optional properties:
-+- local-mac-address : 6 bytes, mac address
-+
-+Example (enbw_cmc board):
-+	eth0: emac at 1e20000 {
-+		compatible = "ti,davinci-dm6467-emac";
-+		reg = <0x220000 0x4000>;
-+		ti,davinci-ctrl-reg-offset = <0x3000>;
-+		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
-+		ti,davinci-ctrl-ram-offset = <0>;
-+		ti,davinci-ctrl-ram-size = <0x2000>;
-+		local-mac-address = [ 00 00 00 00 00 00 ];
-+		interrupts = <33
-+				34
-+				35
-+				36
-+				>;
-+		interrupt-parent = <&intc>;
-+	};
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index 4da93a5..645618d 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -58,6 +58,12 @@
- #include <linux/io.h>
- #include <linux/uaccess.h>
- #include <linux/davinci_emac.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_net.h>
-+
-+#include <mach/mux.h>
- 
- #include <asm/irq.h>
- #include <asm/page.h>
-@@ -339,6 +345,9 @@ struct emac_priv {
- 	u32 rx_addr_type;
- 	atomic_t cur_tx;
- 	const char *phy_id;
-+#ifdef CONFIG_OF
-+	struct device_node *phy_node;
-+#endif
- 	struct phy_device *phydev;
- 	spinlock_t lock;
- 	/*platform specific members*/
-@@ -1762,6 +1771,75 @@ static const struct net_device_ops emac_netdev_ops = {
- #endif
- };
- 
-+#ifdef CONFIG_OF
-+static struct emac_platform_data
-+	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-+	struct emac_priv *priv)
-+{
-+	struct device_node *np;
-+	struct emac_platform_data *pdata = NULL;
-+	const u8 *mac_addr;
-+	u32 data;
-+	int ret;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata)
-+			goto nodata;
-+	}
-+
-+	np = pdev->dev.of_node;
-+	if (!np)
-+		goto nodata;
-+	else
-+		pdata->version = EMAC_VERSION_2;
-+
-+	mac_addr = of_get_mac_address(np);
-+	if (mac_addr)
-+		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
-+	if (!ret)
-+		pdata->ctrl_reg_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
-+		&data);
-+	if (!ret)
-+		pdata->ctrl_mod_reg_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
-+	if (!ret)
-+		pdata->ctrl_ram_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
-+	if (!ret)
-+		pdata->ctrl_ram_size = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
-+	if (!ret)
-+		pdata->rmii_en = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
-+	if (!ret)
-+		pdata->no_bd_ram = data;
-+
-+	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
-+	if (!priv->phy_node)
-+		pdata->phy_id = "";
-+
-+	pdev->dev.platform_data = pdata;
-+nodata:
-+	return  pdata;
-+}
-+#else
-+static struct emac_platform_data
-+	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-+	struct emac_priv *priv)
-+{
-+	return  pdev->dev.platform_data;
-+}
-+#endif
- /**
-  * davinci_emac_probe: EMAC device probe
-  * @pdev: The DaVinci EMAC device that we are removing
-@@ -1804,7 +1882,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&priv->lock);
- 
--	pdata = pdev->dev.platform_data;
-+	pdata = davinci_emac_of_get_pdata(pdev, priv);
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "no platform data\n");
- 		rc = -ENODEV;
-@@ -2015,6 +2093,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
- 	.resume		= davinci_emac_resume,
- };
- 
-+static const struct of_device_id davinci_emac_of_match[] = {
-+	{.compatible = "ti,davinci-dm6467-emac", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, davinci_emac_of_match);
-+
- /**
-  * davinci_emac_driver: EMAC platform driver structure
-  */
-@@ -2023,6 +2107,7 @@ static struct platform_driver davinci_emac_driver = {
- 		.name	 = "davinci_emac",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &davinci_emac_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_emac_of_match),
- 	},
- 	.probe = davinci_emac_probe,
- 	.remove = __devexit_p(davinci_emac_remove),
 -- 
-1.7.7.6
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/9be189fa/attachment-0001.sig>
