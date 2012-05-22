@@ -1,38 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 May 2012 09:01:20 +0100
-Subject: [PATCH 16/16] ARM: ux500: Re-enable SMSC911x platform code
- registration during non-DT boots
-In-Reply-To: <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
-References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
- <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
-Message-ID: <4FBB47D0.9020109@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 22 May 2012 11:02:14 +0300
+Subject: [PATCH 1/7] remoteproc: resource table overhaul
+In-Reply-To: <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
+References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
+ <1330589497-4139-2-git-send-email-ohad@wizery.com>
+ <4F6354E4.8030704@monstr.eu>
+ <CAK=Wgbbbi4GnuHedSh6cR1LhkZr8c9q6i=_TLSL252LpPB8Xsw@mail.gmail.com>
+ <CAK=WgbYeQr5ZwTSBo+ZJUzN7fQ--0QbC8HSjrGT-Geycs4SKcg@mail.gmail.com>
+ <CAHTX3d+=QTZo994jct6+pPqsCniG0B2a_9q6fLdGjvcbZ7qj_A@mail.gmail.com>
+ <CAK=WgbahzGHmvszw6HBgihN4NcPA8ceaQCNSOk_FC61bToxBXQ@mail.gmail.com>
+ <CAHTX3dK8rDomYqWvBX1ay200AmM1dBCYD3nJ2UYbzC_SSFankw@mail.gmail.com>
+Message-ID: <CAK=WgbYSrzTKW-QME4-r6XhVAQL0b6iWyus632KZOpfpTPgwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/12 22:46, Linus Walleij wrote:
-> On Fri, May 18, 2012 at 10:39 AM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> The patch to disable SMSC911x registration was applied twice in the upstream
->> kernel by mistake. Git interpreted this as 'take the same entry from a
->> similar struct' which was close by. This was the wrong thing to do. This patch
->> rectifies this error and re-enables SMSC911x registration when Device Tree is
->> not enabled.
->>
->> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->
-> This patch needs to go first, and into the -rc series.
+Hi Michal,
 
-Do you want to take it?
+On Tue, May 22, 2012 at 8:51 AM, Michal Simek <monstr@monstr.eu> wrote:
+> Simple enabling RSC_VDEV in rproc_handle_rsc doesn't work.
 
-If not, how would you like me to take it forward?
+Sure - you'll need to actually plug the vrings allocation code there,
+too (i.e. this requires some coding, it's not a 1-liner).
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> BTW: I am using kernel modules and there is no dependency for
+> virtio_rpmsg_bus in remoteproc module
+> in sense if you load remoteproc module you also need to load
+> virtio_rpmsg_bus to get firmware to work.
+
+This is expected: remoteproc only provides means for booting and
+controlling remote processors and it doesn't boot them upfront.
+
+To actually boot a remote processor, and do something useful with it,
+one needs to load a module which utilizes remoteproc's API (e.g.
+virtio_rpmsg_bus, but YMMV).
+
+> ~ # lsmod
+> ~ # modprobe zynq_remoteproc
+> zynq_remoteproc: Unknown symbol rproc_register (err 0)
+> zynq_remoteproc: Unknown symbol rproc_alloc (err 0)
+> zynq_remoteproc: Unknown symbol rproc_vq_interrupt (err 0)
+> zynq_remoteproc: Unknown symbol rproc_free (err 0)
+> zynq_remoteproc: Unknown symbol rproc_unregister (err 0)
+
+We don't have these errors - have you tried looking into them ?
+
+Btw do you plan on submitting the code for zynq_remoteproc ?
+
+> Can you see the same behavior on omap?
+
+Except the "Unknown symbol" errors, everything else looks good.
+
+Thanks,
+Ohad.
