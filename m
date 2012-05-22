@@ -1,45 +1,43 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 22 May 2012 13:00:23 +0100
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <4FB5AFF4.7060900@gmail.com>
+Date: Tue, 22 May 2012 13:03:33 +0100
+Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
+In-Reply-To: <20120518192011.GD24238@titan.lakedaemon.net>
 References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1337072084-21967-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FB228AD.5000507@codethink.co.uk> <4FB25A9A.3070306@gmail.com>
- <20120517233512.GH16338@titan.lakedaemon.net> <4FB5AFF4.7060900@gmail.com>
-Message-ID: <4FBB7FD7.4060604@codethink.co.uk>
+ <201205161946.34179.arnd@arndb.de>
+ <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
+ <201205162034.49392.arnd@arndb.de>
+ <20120518192011.GD24238@titan.lakedaemon.net>
+Message-ID: <4FBB8095.4070402@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/12 03:12, Rob Herring wrote:
-> On 05/17/2012 06:35 PM, Jason Cooper wrote:
->> On Tue, May 15, 2012 at 08:31:06AM -0500, Rob Herring wrote:
->>> marvell is the documented vendor string, not mrvl.
+On 18/05/12 20:20, Jason Cooper wrote:
+> On Wed, May 16, 2012 at 08:34:49PM +0000, Arnd Bergmann wrote:
+>> On Wednesday 16 May 2012, Nicolas Pitre wrote:
+>>> In this case, we have wildly different names referring to the same chip
+>>> family, and "orion" is far from hinting that it also constitute the
+>>> support for Kirkwood, Dove or (some not all) Armadas, unless you are
+>>> familiar with some legacy Marvell products.  This is why in this case I
+>>> think that a directory name change might be appropriate, especially if
+>>> we're going to cause churn by moving things around already.
+>>>
+>>> I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
+>>> mvebu_*.  Unless someone has another logical identifier to suggest which
+>>> would capture all that family of SOCs that came out of EBU in Marvell of
+>>> course.
+>>>
+>>> Since this is code not marketing, we don't have to have something flashy
+>>> either, as long as it doesn't create more confusion than "orion" does.
+>>> The various Kconfig help texts are good places to put all the marketing
+>>> names du jour.
 >>
->> When Arnd and I were adding the initial kirkwood support for devicetree,
->> the common wisdom was to use the stock ticker symbol when available.
->> Hence, mrvl, iom, and dlink (only on taiwanese exchange, which uses
->> numbers)...
+>> mvebu sounds reasonable to me, it's definitely unique and it's almost a
+>> word ;-)
 >
-> Yes, that's true. But consistency is more important. If we have cases of
-> both, then one needs to be deprecated.
+> mvebuntu? *ducks*
 
-I'd go for "should" instead of "needs". I would say it would be nice
-to settle on marvell.
+you, sir, are clearly quackers.
 
-There are already instances of "mrvl" in the kernel, see
-
-	drivers/i2c/busses/i2c-pxa.c
-	drivers/tty/serial/pxa.c
-	drivers/rtc/rtc-mv.c
-	drivers/rtc/rtc-sa1100.c
-
-Do people mind if the original compatibilities are left in to avoid
-having to rename .dts file contents, or are we happy to go with just
-"marvell"?
-
-Also, it seems that some of the marvell bluetooth firmware is defined
-to be mrvl prefixed.
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
