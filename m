@@ -1,75 +1,44 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 22 May 2012 11:06:45 -0700
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <4FB29E7C.7010606@codeaurora.org>
- <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 22 May 2012 11:36:23 -0700
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <20120522093410.GC7286@mudshark.cambridge.arm.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+ <20120522093410.GC7286@mudshark.cambridge.arm.com>
+Message-ID: <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 6:58 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
->> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
->> > Without this patch, the following race conditions are possible.
+On Tue, May 22, 2012 at 2:34 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 22, 2012 at 10:22:48AM +0100, Santosh Shilimkar wrote:
+>> On Tuesday 22 May 2012 02:22 PM, Will Deacon wrote:
+>> > I'm not sure I follow. Which version of the PL310 is in OMAP4460? Are you
+>> > saying that the current workaround didn't work but the one in this patch
+>> > did? Do you have a testcase?
 >> >
->> > Race condition 1:
->> > * clk-A has two parents - clk-X and clk-Y.
->> > * All three are disabled and clk-X is current parent.
->> > * Thread A: clk_set_parent(clk-A, clk-Y).
->> > * Thread A:<snip execution flow>
->> > * Thread A: Grabs enable lock.
->> > * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
->> > * Thread A: Releases enable lock.
->> > * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
->> > * Thread A: Switches clk-A's parent to clk-Y in hardware.
->> >
->> > clk-A is now enabled in software, but not clocking in hardware.
->> >
->> > Race condition 2:
->> > * clk-A has two parents - clk-X and clk-Y.
->> > * All three are disabled and clk-X is current parent.
->> > * Thread A: clk_set_parent(clk-A, clk-Y).
->> > * Thread A:<snip execution flow>
->> > * Thread A: Switches parent in hardware to clk-Y.
->> > * Thread A: Grabs enable lock.
->> > * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
->> > * Thread A: Releases enable lock.
->> > * Thread B: Calls clk_enable(clk-A)
->> > * Thread B: Software state still says parent is clk-X.
->> > * Thread B: So, enables clk-X and then itself.
->> > * Thread A: Updates parent in software state to clk-Y.
->> >
+>> It's r3p1.
+>> IIRC, the errata fix I did(debug register) was only for flush
+>> (clean & inv) but Colin found in his testing that it's needed
+>> for clean_all as well.
 >
-> This looks correct to me. Is there any usecase where enabling/disabling a
-> clock would require sleeping but changing the parent would not?
+> Ok, interesting.
 >
-
-clk_enable & clk_disable must never sleep.  clk_prepare and
-clk_unprepare may sleep.
-
-This patch would require the WM831x clock driver to set
-CLK_SET_PARENT_GATE for the clkout mux.  The latest version of this
-driver sent out by Mark does not do this and I imagine that is because
-the hardware has no requirement for the mux clock to gate while
-switching parents.  Holding the spinlock across the .set_parent
-callback breaks this driver since .set_parent results in an i2c
-transaction.
-
-Mark, do you have an opinion on the requirements that this patch
-imposes on your driver?
-
-Regards,
-Mike
-
-> Cheers,
+>> I don't have testcase. Colin might be able to suggest one.
 >
-> Peter.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> That would be ideal. Then I can take it up with the hardware guys since I'd
+> like to confirm we're not just hiding a different bug with those writes.
+
+I was using an omap 4430, triggering l2x0_clean_all from a GPU ioctl
+by calling outer_clean_range(0, ULONG_MAX).  The problem was very
+reproducible at the time, and using the persistent_trace code I posted
+a while back I was able to narrow it down to hanging the cpu (not an
+infinite loop) inside cache_wait_way.  It was 100% reproducible just
+booting a development version of Android, but not if I called
+l2x0_clean_all during boot, so it may depend on cache state or load.
+
+outer_clean_range() will often get called on a 1080p frame, which is
+8MB of data.  Even the set/way clean all is likely to be faster than
+cleaning 8MB by MVA in a 1MB L2.
