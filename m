@@ -1,44 +1,51 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 22 May 2012 11:36:23 -0700
-Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
- errata 727915
-In-Reply-To: <20120522093410.GC7286@mudshark.cambridge.arm.com>
-References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
- <20120522085256.GA7286@mudshark.cambridge.arm.com>
- <4FBB5AE8.4000801@ti.com>
- <20120522093410.GC7286@mudshark.cambridge.arm.com>
-Message-ID: <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 22 May 2012 11:57:17 -0700
+Subject: common clock framework
+In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A74B2C270@SC-VEXCH2.marvell.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A74A94270@SC-VEXCH2.marvell.com>
+ <20120504082110.GB16535@pengutronix.de>
+ <CAJOA=zOs8FLTRUh=LOd2f=YxFz7Sdxgp2JJurpQkdDFALcCiVw@mail.gmail.com>
+ <CAG9bXv=T7v_MBUOmCsp4n0SNmYY_DOEkhQXAp0rTGpdi6KkXNA@mail.gmail.com>
+ <20120506234958.GA14559@gmail.com>
+ <AAD1C6EB06EE3649B35B7E026785068D1A74B2C256@SC-VEXCH2.marvell.com>
+ <A63A0DC671D719488CD1A6CD8BDC16CF1A0F044EB4@SC-VEXCH4.marvell.com>
+ <53612FE6B944314AAADB181E45A45B6413D3FF9F37@sc-vexch3.marvell.com>
+ <AAD1C6EB06EE3649B35B7E026785068D1A74B2C270@SC-VEXCH2.marvell.com>
+Message-ID: <20120522185717.GA4386@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 2:34 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, May 22, 2012 at 10:22:48AM +0100, Santosh Shilimkar wrote:
->> On Tuesday 22 May 2012 02:22 PM, Will Deacon wrote:
->> > I'm not sure I follow. Which version of the PL310 is in OMAP4460? Are you
->> > saying that the current workaround didn't work but the one in this patch
->> > did? Do you have a testcase?
->> >
->> It's r3p1.
->> IIRC, the errata fix I did(debug register) was only for flush
->> (clean & inv) but Colin found in his testing that it's needed
->> for clean_all as well.
->
-> Ok, interesting.
->
->> I don't have testcase. Colin might be able to suggest one.
->
-> That would be ideal. Then I can take it up with the hardware guys since I'd
-> like to confirm we're not just hiding a different bug with those writes.
+On 20120518-01:41, Chao Xie wrote:
+> Issue 2: clock with dependency As we know that each vendor may have
+> some version of SOCs, and these SOC may share some same components.
+> For example, device a need function clock A while device B need
+> function clock B, there share some bus, and there a clock for the bus
+> clock gating. It means that if we want device B working, we need
+> enable clock B and clock bus.  In fact, we can not consider that clock
+> bus is the parent of clock A/B, because clock A/B has inputs from
+> PLLs.  So how do we control these clocks? If leaving the dependency in
+> clock tree, we need additional patch for it. If leaving it to device
+> driver, it will make the device driver to know more details about
+> clock framework, and for different SOCs share same device driver, the
+> clock framework may not same. So it will make the device driver to be
+> SOCs depended, and will need more detailed platform data.
 
-I was using an omap 4430, triggering l2x0_clean_all from a GPU ioctl
-by calling outer_clean_range(0, ULONG_MAX).  The problem was very
-reproducible at the time, and using the persistent_trace code I posted
-a while back I was able to narrow it down to hanging the cpu (not an
-infinite loop) inside cache_wait_way.  It was 100% reproducible just
-booting a development version of Android, but not if I called
-l2x0_clean_all during boot, so it may depend on cache state or load.
+This has been discussed in this thread already.  Functional dependencies
+are outside the scope of the clock framework.
 
-outer_clean_range() will often get called on a 1080p frame, which is
-8MB of data.  Even the set/way clean all is likely to be faster than
-cleaning 8MB by MVA in a 1MB L2.
+The brute force solution is to put a clk_prepare_enable() call for both
+the functional clock and the bus clock in your driver.  A better
+approach (and one employed in the OMAP platform code) is to abstract
+away these details from the drivers.  OMAP uses the pm_runtime
+framework which makes life easier for drivers by simply calling
+pm_runtime_get/pm_runtime_put, which takes care of functional clocks as
+well as bus clocks (and other stuff).
+
+The details of the callbacks used by the pm_runtime framework can be
+different for each SoC, which addresses your concerns above.
+
+I agree that the details of bus clocks should be abstracted away
+somewhere, but the clock framework is not the place for that.
+
+Regards,
+Mike
