@@ -1,17 +1,17 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 22 May 2012 09:00:40 +0800
+Date: Tue, 22 May 2012 09:12:35 +0800
 Subject: [PATCH RFC v2 2/2] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <4FBA76C6.9030201@wwwdotorg.org>
+In-Reply-To: <4FBA773D.4050200@wwwdotorg.org>
 References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
  <1337346755-8761-2-git-send-email-b29396@freescale.com>
  <4FB6AB9A.4080006@wwwdotorg.org>
  <20120521123929.GA27055@shlinux2.ap.freescale.net>
- <4FBA76C6.9030201@wwwdotorg.org>
-Message-ID: <CAA+hA=RzX9EsFbPWqgoAm-4-Rv-0tQ1s2rQ0+DtSE3Mxu36ShA@mail.gmail.com>
+ <4FBA773D.4050200@wwwdotorg.org>
+Message-ID: <CAA+hA=RzZYCHO6mgJFWqPg9Dg+u6GfeMEcaPyTpi0YzBMuY73g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 1:09 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Tue, May 22, 2012 at 1:11 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > On 05/21/2012 06:39 AM, Dong Aisheng wrote:
 >> On Sat, May 19, 2012 at 04:05:46AM +0800, Stephen Warren wrote:
 >>> On 05/18/2012 07:12 AM, Dong Aisheng wrote:
@@ -21,75 +21,27 @@ On Tue, May 22, 2012 at 1:09 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 >>>> The core will parse and register the pinctrl gpio ranges
 >>>> from device tree.
 > ...
->>>> + ? pinctrl_add_gpio_ranges(pctldev, ranges, nranges);
->>>
->>> I think we should also store ranges somewhere separate in pctldev ...
+>>> Do you need to xxx_get(ranges[i].gc) to prevent it going away, and put()
+>>> it when removing the ranges?
 >>
->> Hmm, i'm not quite understand,
->> What do you mean separate in pctldev?
->> We already save the ranges in pctldev's gpio_ranges list.
+>> How would you suggest to implement xxx_get(ranges[i].gc)?
+>> Since the parameter is a struct gpiochip, my first sense is that it may be
+>> provided by gpio subsystem, but i did not find such a function.
+>> Looking at gpio subsystem, i also can't see it should provide such function.
 >>
->>>> +void pinctrl_dt_remove_gpio_ranges(struct pinctrl_dev *pctldev,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pinctrl_gpio_range *ranges,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned nranges)
->>>
->>> ... so that this function doesn't need ranges/nranges passed to it; it
->>> can just get them out of pctldec.
->>
->> For remove ranges/nranges, maybe we can use list_for_each_entry_safe
->> plus list_del like:
->> list_for_each_entry_safe(range, tmp, &pctldev->gpio_ranges, node)
->> ? ? list_del(range->node);
+>> I wonder if we need to implement it, if gpiochip is gone way,
+>> the error will be detected in the higher gpio layer and will not pass
+>> down to pinctrl.
 >
-> If some GPIO ranges are added using pinctrl_dt_add_gpio_ranges() and
-> some are added using pinctrl_add_gpio_range(), how will
-> pinctrl_dt_remove_gpio_ranges() know which ones to remove, unless
->
-Yes, you're right.
-
-> a) The list of ranges is passed to pinctrl_dt_remove_gpio_ranges() as
-> above (but then where does the caller find the list to pass in)
->
-> or:
->
-> b) The list of ranges added by pinctrl_dt_add_gpio_ranges() is stored
-> separately from the overall gpio_ranges list, so the code knows which
-> were added by that API.
->
-> Perhaps the simplest way to implement this is to add a new Boolean field
-> to struct gpio_range that says whether pinctrl_dt_add_gpio_ranges()
-> added it, and set it to true/false in ?pinctrl_dt_add_gpio_ranges() and
-> ?pinctrl_add_gpio_ranges().
->
-Maybe we should not allow people to use pinctrl_add_gpio_ranges for dt
-and i can not see it helps too much.
-Then we do not have two case.
-
->> I just follow the original way here and if change we may need another
->> patch.
->>
->>> Or better yet, what if pinctrl_unregister automatically removed any
->>> ranges registered by pinctrl_dt_add_gpio_ranges, so this function
->>> doesn't even need to exist?
->>
->> Yes, it seems this can also work for non-dt registered gpio ranges added by
->> pinctrl_add_gpio_ranges, e.g, remove need pinctrl_remove_gpio_range too,
->> It seems it should be in a separate patch which is not related to gpio ranges
->> binding.
->>
->> Do you want me to work on that patch first for this series to rebase or
->> we can do it later?
->
-> Maybe we should just delete the functions pinctrl_remove_gpio_range()
-> and pinctrl_dt_remove_gpio_range() completely. They only remove the gpio
-> range from the list in the pctldev, and since the pctldev is being
-> unregistered anyway, that doesn't seem very useful. The ranges don't
-> need to be free()'d since pinctrl_dt_add_gpio_ranges() allocates them
-> using devm_kzalloc() anyway, and in the non-DT case, if they need
-> free-ing, the driver already had to do that itself.
->
-Yes, i agree with this one.
-I will re-order the patch series to remove pinctrl_remove_gpio_range first.
+> Yes, it looks like we should add new APIs for this; we need to
+> try_module_get() on the module containing the GPIO chip so it doesn't
+> disappear, similar to what gpio_request() does.
+yes, i checked the gpio request code.
+It looks to me try_module_get is just ok like:
+if (!try_module_get(ranges[i].gc.owner))
+    goto done;
+Will add it.
+Thanks for the info.
 
 Regards
 Dong Aisheng
