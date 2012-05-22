@@ -1,66 +1,52 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Tue, 22 May 2012 16:01:14 +0900
-Subject: [PATCHv2 2/4] mm: vmalloc: export find_vm_area() function
-In-Reply-To: <1337252085-22039-3-git-send-email-m.szyprowski@samsung.com>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4FBB39BA.3000601@kernel.org>
+From: eduardo.valentin@ti.com (Valentin, Eduardo)
+Date: Tue, 22 May 2012 10:02:55 +0300
+Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+In-Reply-To: <CAOMWX4cN3kYnpe16_zVDVdA8dtthwAo5RvvSCkVdLvyPpguA2w@mail.gmail.com>
+References: <1337365122-702-1-git-send-email-nm@ti.com>
+ <20120519095237.GA26761@besouro>
+ <CAOMWX4f2N1dS8RcwYAyUpmWVKPkEHGuhMGGZ3__D-DwipsjzFQ@mail.gmail.com>
+ <20120521145157.GA7923@besouro>
+ <CAOMWX4cN3kYnpe16_zVDVdA8dtthwAo5RvvSCkVdLvyPpguA2w@mail.gmail.com>
+Message-ID: <CAGF5oy9STCs8wvQqmWaPjoOLGTo6-e-JieoywPrKd-HCi=mA1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2012 07:54 PM, Marek Szyprowski wrote:
+Hello,
 
-> find_vm_area() function is usefull for other core subsystems (like
-> dma-mapping) to get access to vm_area internals.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Mon, May 21, 2012 at 6:14 PM, Menon, Nishanth <nm@ti.com> wrote:
+> On Mon, May 21, 2012 at 9:51 AM, Eduardo Valentin
+> <eduardo.valentin@ti.com> wrote:
+>>
+>>
+>> On Mon, May 21, 2012 at 08:36:35AM -0500, ext Nishanth Menon wrote:
+>>> ?Sat, May 19, 2012 at 4:52 AM, Eduardo Valentin <eduardo.valentin@ti.com>
+>>> wrote:
+>>> >
+>>> >
+>>> > I guess it is time to properly document this increasing busy loop delay..
+>>> > As it is getting closer to ms scale..
+>>> Does the following sound good?
+>>> /* Maximum time for Voltage Processor to enter or exit idle */
+>>
+>> Sounds way better :-). If you have an estimation of how long it takes
+>> in the average case, it might help. But I am OK already with the above,
+>> in case you don't have the estimation.
+> /*
+> ?* Maximum time for Voltage Processor to enter or exit idle
+> ?* worst case is around 100uSec depending on when we intercepted VP
+> ?* we use 5 times worst case value to be sure that the system flags
+> ?* invalid condition
+> ?*/
+> better?
 
+Yes! Thanks.
 
-We can't know how you want to use this function.
-It would be better to fold this patch into [4/4].
-
-> ---
->  include/linux/vmalloc.h |    1 +
->  mm/vmalloc.c            |   10 +++++++++-
->  2 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
-> index 2e28f4d..6071e91 100644
-> --- a/include/linux/vmalloc.h
-> +++ b/include/linux/vmalloc.h
-> @@ -93,6 +93,7 @@ extern struct vm_struct *__get_vm_area_caller(unsigned long size,
->  					unsigned long start, unsigned long end,
->  					const void *caller);
->  extern struct vm_struct *remove_vm_area(const void *addr);
-> +extern struct vm_struct *find_vm_area(const void *addr);
->  
->  extern int map_vm_area(struct vm_struct *area, pgprot_t prot,
->  			struct page ***pages);
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 8bc7f3ef..8cb7f22 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -1402,7 +1402,15 @@ struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
->  						-1, GFP_KERNEL, caller);
->  }
->  
-> -static struct vm_struct *find_vm_area(const void *addr)
-> +/**
-> + *	find_vm_area  -  find a continuous kernel virtual area
-> + *	@addr:		base address
-> + *
-> + *	Search for the kernel VM area starting at @addr, and return it.
-> + *	It is up to the caller to do all required locking to keep the returned
-> + *	pointer valid.
-> + */
-> +struct vm_struct *find_vm_area(const void *addr)
->  {
->  	struct vmap_area *va;
->  
+>
+> Regards,
+> Nishanth Menon
 
 
 
 -- 
-Kind regards,
-Minchan Kim
+
+Eduardo Valentin
