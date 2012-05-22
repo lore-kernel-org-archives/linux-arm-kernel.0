@@ -1,62 +1,33 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 22 May 2012 11:17:04 +0100
-Subject: [PATCH V2 1/3] ARM: tegra: trimslice: enable PCIe when booting
- from device tree
-In-Reply-To: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
-References: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <4FBB67A0.9010606@codethink.co.uk>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 22 May 2012 13:21:44 +0300
+Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
+In-Reply-To: <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <87bolgbjnr.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/12 22:21, Stephen Warren wrote:
-> From: Stephen Warren<swarren@nvidia.com>
->
-> There currently aren't bindings for the Tegra PCIe controller. Work on
-> this is in progress, but not yet complete. Manually initialize PCIe when
-> booting from device tree, in order to bring DT support to the same
-> feature level as board files, which will in turn allow board files to be
-> deprecated.
->
-> PCIe hosts the wired Ethernet controller on TrimSlice.
->
-> To support this, add infra-structure to board-dt-tegra20.c for board-
-> specific initialization code. Once device tree support for the relevant
-> features is in place, this code will be removed.
->
-> Signed-off-by: Stephen Warren<swarren@nvidia.com>
-> ---
-> v2: Use .init_late hook in DT_MACHINE_START instead of an explicit late
-> initcall.
-> ---
->   arch/arm/mach-tegra/board-dt-tegra20.c |   36 +++++++++++++++++++++++++++++++-
->   1 files changed, 35 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-> index eb7249d..9537f20 100644
-> --- a/arch/arm/mach-tegra/board-dt-tegra20.c
-> +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-> @@ -98,6 +98,40 @@ static void __init tegra_dt_init(void)
->   				tegra20_auxdata_lookup, NULL);
->   }
->
-> +#ifdef CONFIG_MACH_TRIMSLICE
-> +static void __init trimslice_init(void)
-> +{
-> +	int ret;
+Richard Zhao <richard.zhao@freescale.com> writes:
+
+> +#include "ci.h"
 > +
-> +	ret = tegra_pcie_init(true, true);
-> +	if (ret)
-> +		pr_err("tegra_pci_init() failed: %d\n", ret);
-> +}
-> +#endif
+> +#define PORT0_STATUS	0x184
 
-Given the size of some of these functions, is it worth even
-bothering with an #ifdef around them, especially as they are
-marked init.
+This doesn't seem to be used anywhere.
 
-How about having some sort of standard pcie binding for the pcie
-part?
+[snip]
+> +	ci13xxx_imx_udc_driver.phy = data->phy;
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+See my comment to the other patch about phy pointer being a per-device
+thing rather then per-platform driver. Now, (at the risk of being
+flamed) I think it could work if you allocated the
+ci13xxx_imx_udc_driver dynamically in every probe, but that's not what
+you want to do for the actual platform data. So, I suggest we come up
+with a better way of passing phy to the driver. I also think that it's
+really about time we renamed "struct ci13xxx_udc_driver" to something
+that emphasizes the "platform" in it. What do you think?
+
+Regards,
+--
+Alex
