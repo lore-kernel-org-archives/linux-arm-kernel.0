@@ -1,55 +1,103 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 22 May 2012 10:56:35 +0100
-Subject: [PATCH V2 00/11] enable imx6q_sabrelite sgtl5000 audio support
-In-Reply-To: <20120522013920.GE6206@b20223-02.ap.freescale.net>
-References: <1336563190-19974-1-git-send-email-richard.zhao@freescale.com>
- <20120521125930.GC6206@b20223-02.ap.freescale.net>
- <20120521144543.GA4063@opensource.wolfsonmicro.com>
- <20120522013920.GE6206@b20223-02.ap.freescale.net>
-Message-ID: <20120522095635.GD21999@opensource.wolfsonmicro.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 22 May 2012 12:56:52 +0300
+Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
+In-Reply-To: <20120522045120.GL6206@b20223-02.ap.freescale.net>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
+ <201205220630.57007.marex@denx.de>
+ <20120522045120.GL6206@b20223-02.ap.freescale.net>
+Message-ID: <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 09:39:21AM +0800, Richard Zhao wrote:
-> On Mon, May 21, 2012 at 03:45:44PM +0100, Mark Brown wrote:
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-> >  For the first patch it wasn't clear if the
-> > changes in pinctrl were the actual dependencies or if there were more
-> > things needed from the ARM tree,
+> On Tue, May 22, 2012 at 06:30:56AM +0200, Marek Vasut wrote:
+>> Dear Richard Zhao,
+>> 
+>> > Just add host support.
+>> 
+>> Maybe rephrase it to something like "This patch supports only the host-mode 
+>> functionality so far."
+> Thanks.
+>> 
+>> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> > Signed-off-by: Marek Vasut <marex@denx.de>
+>> > Cc: Peter Chen <peter.chen@freescale.com>
+>> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+>> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> > ---
+>> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   20 ++
+>> >  drivers/usb/chipidea/Makefile                      |    8 +
+>> >  drivers/usb/chipidea/ci13xxx_imx.c                 |  191
+>> > ++++++++++++++++++++ 3 files changed, 219 insertions(+), 0 deletions(-)
+>> >  create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> >  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+>> > 
+>> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> > b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt new file mode
+>> > 100644
+>> > index 0000000..beb75d6
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> > @@ -0,0 +1,20 @@
+>> > +* Freescale i.MX ci13xxx usb controllers
+>> > +
+>> > +Required properties:
+>> > +- compatible: Should be "fsl,imx31-usb"
+>> > +- reg: Should contain registers location and length
+>> > +- interrupts: Should contain controller interrupt
+>> > +
+>> > +Optional properties:
+>> > +- fsl,usbphy: phandler of usb phy that connects to the only one port
+>> > +- fsl,hub-reset-gpios: gpio used to reset on-board usb hub
+>> > +- fsl,vbus-power-gpios: gpio used to set vbus power of the only one port
+>> > +
+>> > +Examples:
+>> > +usb at 02184000 { /* USB OTG */
+>> > +	compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
+>> > +	reg = <0x02184000 0x200>;
+>> > +	interrupts = <0 43 0x04>;
+>> > +	fsl,usbphy = <&usbphy1>;
+>> > +	fsl,vbus-power-gpios = <&gpio3 22 0>;
+>> > +};
+>> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+>> > index cc34937..ffa2f63 100644
+>> > --- a/drivers/usb/chipidea/Makefile
+>> > +++ b/drivers/usb/chipidea/Makefile
+>> > @@ -12,3 +12,11 @@ endif
+>> >  ifneq ($(CONFIG_ARCH_MSM),)
+>> >  	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
+>> >  endif
+>> > +
+>> > +ifneq ($(CONFIG_ARCH_MXC),)
+>> > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+>> > +else
+>> > +  ifneq ($(CONFIG_ARCH_MXS),)
+>> > +	  obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
+>> > +  endif
+>> > +endif
+>> 
+>> I think someone commented on these patches (my previous set of patches 
+>> actually), that this should be fixed in a way that you can actually select which 
+>> bindings you want to compile in (and not limit it via Makefile like it's now).
+> Yes. I think you're right.
+>
+> Alexander,
+>
+> Do you think it's a good idea to let user select binding driver directly
+> and the binding driver config depends on chipidea config?
 
-> I remembered someone already explained the dependencies. It depends
-> on imx pinctrl work and dummy pinctrl enabled in ARM platform code. It
-> is why Shawn suggest it goes to ARM SoC.
+I don't have a strong opinion on this, although I prefer it the way it
+is now, because, imo:
 
-There was mention of some changes but only a vauge description of them,
-I've no idea where they are or anything, initially people had mentioned
-an already cross-merged point in Linus' tree but apparently that wasn't
-sufficient due to these arch specific bits and I don't know where those
-are.
+  * in case of =m (and that's the only sane way of compiling it anyway),
+    these all are compiled as modules, which you simply don't install if
+    you don't want them;
+  * all of them get compile-tested every time you change something in
+    the driver, which is a good thing;
+  * the fewer kconfig options the better.
 
-We should really have got this resolved in -next...
-
-> > Guys, you really need to think about how you're organising what you're
-> > doing more.  You need to split your work out into focused lines of
-> > development rather than just having a single branch.  
-
-> Except the clean up patch, others are all related to enable audio. Do
-> you mean I supposed to split them in advance?
-
-Well, a lot of the time there's no actual dependency (eg, you add a
-driver and add registration of that device so there's no need for them
-to go in together since both are perfectly fine without the other) then
-it is best to merge things separately.  If there are dependencies then
-that needs to be handled differently but it needs communication and
-ideally the dependencies would be on focused things that can just be
-pulled in.  
-
-In the case of things like the devm_clk_get() cleanup if there's any
-complexity at all then it's usually best just to punt for a release.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/0eb08ec0/attachment.sig>
+Regards,
+--
+Alex
