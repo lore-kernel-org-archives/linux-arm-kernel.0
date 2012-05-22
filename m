@@ -1,67 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 22 May 2012 12:16:07 -0400
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <4FBBB974.1060107@codethink.co.uk>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120521161131.GC24270@n2100.arm.linux.org.uk>
- <20120521165800.GR24238@titan.lakedaemon.net>
- <201205211940.25488.arnd@arndb.de>
- <alpine.LFD.2.02.1205221023050.13185@xanadu.home>
- <20120522160316.GY24238@titan.lakedaemon.net>
- <4FBBB974.1060107@codethink.co.uk>
-Message-ID: <20120522161607.GZ24238@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 May 2012 10:18:25 -0600
+Subject: [PATCH V2 1/3] ARM: tegra: trimslice: enable PCIe when booting
+ from device tree
+In-Reply-To: <4FBB67A0.9010606@codethink.co.uk>
+References: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
+ <4FBB67A0.9010606@codethink.co.uk>
+Message-ID: <4FBBBC51.1080800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 05:06:12PM +0100, Ben Dooks wrote:
-> On 22/05/12 17:03, Jason Cooper wrote:
-> >On Tue, May 22, 2012 at 10:25:28AM -0400, Nicolas Pitre wrote:
-> >>On Mon, 21 May 2012, Arnd Bergmann wrote:
-> >>
-> >>>On Monday 21 May 2012, Jason Cooper wrote:
-> >>>>On Mon, May 21, 2012 at 05:11:31PM +0100, Russell King - ARM Linux wrote:
-> >>>>>On Mon, May 21, 2012 at 11:35:59AM -0400, Jason Cooper wrote:
-> >>>
-> >>>>>I'd also suggest going against our current setup of not having "board/"
-> >>>>>subdirectories in mach-*.  Just name them board-foo.c.
-> >>>>
-> >>>>This is what we are currently doing for boards in the midst of DT
-> >>>>conversion.  In mach-kirkwood/ there is board-dt.c, and
-> >>>>board-dreamplug.c.  board-dt.c is the DT code, while board-dreamplug.c
-> >>>>is board specific init code that hasn't been converted to DT yet.  Once
-> >>>>converted, board-dreamplug.c will disappear.  This follows what tegra is
-> >>>>doing.
-> >>>>
-> >>>>We can leave the legacy, unconverted boards where they are
-> >>>>(mach-kirkwood/guruplug-setup.c), but what about the common code they
-> >>>>depend on (mpp.c, pcie.c, etc)?  That's what I was suggesting putting in
-> >>>>mach-mvebu/board/...
-> >>>
-> >>>I like the idea of leaving the *-setup.c board files where they are,
-> >>>while moving all the other files (headers and the platform-wide .c
-> >>>files) to mach-mvebu.
-> >>>
-> >>>However, given that we still don't have consensus on where things
-> >>>should really be and the merge window is already open, I would suggest
-> >>>don't try to do it all now for v3.5 but rather plan it for v3.6 once
-> >>>we agreed on one approach, and then do some of the next consolidation
-> >>>steps as well.
-> >>
-> >>I'd suggest that mach-mvebu be created earlier for the new EBU ARmada
-> >>SOC support though.
-> >
-> >I'd like to second that, and suggest moving mach-kirkwood/board-*.c to
-> >it.  Basically, make it the one location for marvell SoC dt boards.
-> >
-> >I'm looking at the scope of it now.
+On 05/22/2012 04:17 AM, Ben Dooks wrote:
+> On 17/05/12 22:21, Stephen Warren wrote:
+>> From: Stephen Warren<swarren@nvidia.com>
+>>
+>> There currently aren't bindings for the Tegra PCIe controller. Work on
+>> this is in progress, but not yet complete. Manually initialize PCIe when
+>> booting from device tree, in order to bring DT support to the same
+>> feature level as board files, which will in turn allow board files to be
+>> deprecated.
+>>
+>> PCIe hosts the wired Ethernet controller on TrimSlice.
+>>
+>> To support this, add infra-structure to board-dt-tegra20.c for board-
+>> specific initialization code. Once device tree support for the relevant
+>> features is in place, this code will be removed.
+>>
+>> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+
+>> +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+
+>> +#ifdef CONFIG_MACH_TRIMSLICE
+>> +static void __init trimslice_init(void)
+>> +{
+>> +    int ret;
+>> +
+>> +    ret = tegra_pcie_init(true, true);
+>> +    if (ret)
+>> +        pr_err("tegra_pci_init() failed: %d\n", ret);
+>> +}
+>> +#endif
 > 
-> I'm going to say let's leave these alone for the moment. The kernel
-> per-version diff is large enough as it is and moving stuff around for
-> the sake of it is just going to make it larger and thus draw more
-> unwanted attention to arch/arm.
+> Given the size of some of these functions, is it worth even
+> bothering with an #ifdef around them, especially as they are
+> marked init.
 
-Fair enough.
+The TrimSlice init function doesn't pull in anything beyond the raw
+driver itself, but the Harmony and Paz00 functions do. I made everything
+ifdef'd for consistency.
 
-thx,
+> How about having some sort of standard pcie binding for the pcie
+> part?
 
-Jason.
+Thierry Redding is working on a standardized binding and converting the
+driver to a platform driver. As soon as that's complete and checked in,
+we can remove some of these custom init functions.
