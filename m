@@ -1,47 +1,58 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 22 May 2012 09:12:35 +0800
-Subject: [PATCH RFC v2 2/2] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <4FBA773D.4050200@wwwdotorg.org>
-References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
- <1337346755-8761-2-git-send-email-b29396@freescale.com>
- <4FB6AB9A.4080006@wwwdotorg.org>
- <20120521123929.GA27055@shlinux2.ap.freescale.net>
- <4FBA773D.4050200@wwwdotorg.org>
-Message-ID: <CAA+hA=RzZYCHO6mgJFWqPg9Dg+u6GfeMEcaPyTpi0YzBMuY73g@mail.gmail.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Tue, 22 May 2012 01:38:33 +0000
+Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <201205212207.34978.marex@denx.de>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <201205212141.52171.marex@denx.de> <4FBA9BE4.7020303@grid-net.com>
+ <201205212207.34978.marex@denx.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BB2B2F@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 1:11 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/21/2012 06:39 AM, Dong Aisheng wrote:
->> On Sat, May 19, 2012 at 04:05:46AM +0800, Stephen Warren wrote:
->>> On 05/18/2012 07:12 AM, Dong Aisheng wrote:
->>>> The gpio ranges standard dt binding format is
->>>> <&gpio $gpio_offset $pin_offset $npin>
->>>>
->>>> The core will parse and register the pinctrl gpio ranges
->>>> from device tree.
-> ...
->>> Do you need to xxx_get(ranges[i].gc) to prevent it going away, and put()
->>> it when removing the ranges?
->>
->> How would you suggest to implement xxx_get(ranges[i].gc)?
->> Since the parameter is a struct gpiochip, my first sense is that it may be
->> provided by gpio subsystem, but i did not find such a function.
->> Looking at gpio subsystem, i also can't see it should provide such function.
->>
->> I wonder if we need to implement it, if gpiochip is gone way,
->> the error will be detected in the higher gpio layer and will not pass
->> down to pinctrl.
+ 
+> > >
+> > >> Hi Richard,
+> > >>
+> > >> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
+> > >>
+> > >> <richard.zhao@freescale.com>  wrote:
+> > >>> The work is based on  ci13xxx rework done by Alexander Shishkin.
+> > >>>
+> > >>> Status:
+> > >>>   - this version only support host
+> > >>>   - usbotg controler works at host role
+> > >>>
+> > >>> Changes since V1:
+> > >>>   - Merge the work of Marek
+> > >>>   - re-implement connect change notify
+> > >>>   - imx6q: move part of code to clk
+> > >>>   - imx6q: add config-on-boot gpios
+> > >>
+> > >> Can you please also add the driver into the defconfig files?
+> > >>
+> > >> What about the existing USB host drivers for
+> mx27/mx31/mx35/mx25/mx35?
+> > >>
+> > >> Is the idea to switch to drivers/usb/chipidea/host.c too?
+> > >
+> > > I think the core is the same, it's just the ci13xxx-imx driver that'd
+> > > need to be written differently for these
+> >
+> > So that means driver that you did are not going to be up streamed for
+> > mx28/mxs? And those interested should be tracking this patch set?
+> 
+> This here is definitelly going to support mx28 and I'm slowly working
+> through
+> the DT stuff to test this, all right?
+> 
+> We were talking about imx.{xz|x,y is [0-9a-z]} \ imx.{23,28,6q}
 >
-> Yes, it looks like we should add new APIs for this; we need to
-> try_module_get() on the module containing the GPIO chip so it doesn't
-> disappear, similar to what gpio_request() does.
-yes, i checked the gpio request code.
-It looks to me try_module_get is just ok like:
-if (!try_module_get(ranges[i].gc.owner))
-    goto done;
-Will add it.
-Thanks for the info.
+This driver needs to work on both DT and non-DT support.
+Let's do it after next version when we need to add it for old mxc platform.
 
-Regards
-Dong Aisheng
+ 
+> >
+> > -Subodh
+> 
+> Best regards,
+> Marek Vasut
