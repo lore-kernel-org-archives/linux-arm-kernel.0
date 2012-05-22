@@ -1,96 +1,35 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Tue, 22 May 2012 23:25:26 +0300
-Subject: [PATCH 0/2] OMAPDSS: write-through caching support for omapfb
-In-Reply-To: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
-References: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
-Message-ID: <CACY+gR15Q+wEVnkWqWmTy4+R72zP91t-KCHvZS-vAO1Ls0Ef-A@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 22 May 2012 13:26:57 -0700
+Subject: [PATCH 1/2] clk: Add support for power of two type dividers
+In-Reply-To: <1337250134-29206-2-git-send-email-rnayak@ti.com>
+References: <1337250134-29206-1-git-send-email-rnayak@ti.com>
+ <1337250134-29206-2-git-send-email-rnayak@ti.com>
+Message-ID: <20120522202657.GC4386@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 10:54 PM, Siarhei Siamashka
-<siarhei.siamashka@gmail.com> wrote:
-> And at least for ARM11 and Cortex-A8 processors, the performance of
-> write-through cache is really good. Cortex-A9 is another story, because
-> all pages marked as Write-Through are supposedly treated as Non-Cacheable:
-> ? ?http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388h/CBBFDIJD.html
-> So OMAP4 is out of luck.
+On 20120517-15:52, Rajendra Nayak wrote:
+> Quite often dividers and the value programmed in the
+> register have a relation of 'power of two', something like
+> value	div
+> 0	1
+> 1	2
+> 2	4
+> 3	8...
+> 
+> Add support for such dividers as part of clk-divider.
+> 
+> The clk-divider flag 'CLK_DIVIDER_POWER_OF_TWO' should be used
+> to define such clocks.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-I don't have Pandaboard ES, but still tried to experiment changing the
-following line in the kernel sources to benchmark different types of
-caching for the framebuffer on Origen board (Exynos 4210):
-    https://github.com/torvalds/linux/blob/v3.4/drivers/media/video/videobuf2-memops.c#L158
+Hi Rajendra,
 
-It was not a totally clean experiment, because 500x500 16bpp pixel
-buffer is much smaller than 1MiB L2 cache and the performance numbers
-may be a bit odd. Also I have not checked whether the same buffer may
-be mapped with different cacheability attributes anywhere else (which
-would be bad). But still it was interesting to see whether
-write-through cache is of any use and whether it could serve as a
-replacement for shadowfb.
+This patch looks good to me.  I'll take it into my clk-next branch
+towards 3.6 since I'm done pulling stuff for 3.5.
 
-Origen board, Exynos 4210, Cortex-A9 1.2GHz, 1920x1080 screen
-resolution, 16bpp desktop color depth (I did not find any obvious way
-how to change it to 32bpp yet):
+It's good to see CLK_DIVIDER_POWER_OF_TWO finally get used :-)
 
-$ x11perf -scroll500 -copywinwin500 -copypixpix500 \
-          -copypixwin500 -copywinpix500
-
--- pgprot_noncached + shadowfb
- 100000 trep @  0.2708 msec ( 3690.0/sec): Scroll 500x500 pixels
-  40000 trep @  0.7307 msec ( 1370.0/sec): Copy 500x500 from window to window
-  60000 trep @  0.5471 msec ( 1830.0/sec): Copy 500x500 from pixmap to window
-  60000 trep @  0.5822 msec ( 1720.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6584 msec ( 1520.0/sec): Copy 500x500 from pixmap to pixmap
-
--- pgprot_writecombine + shadowfb
- 100000 trep @  0.2612 msec ( 3830.0/sec): Scroll 500x500 pixels
-  40000 trep @  0.7058 msec ( 1420.0/sec): Copy 500x500 from window to window
-  60000 trep @  0.5262 msec ( 1900.0/sec): Copy 500x500 from pixmap to window
-  60000 trep @  0.5797 msec ( 1730.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6554 msec ( 1530.0/sec): Copy 500x500 from pixmap to pixmap
-
--- pgprot_writethrough + shadowfb
- 100000 trep @  0.2609 msec ( 3830.0/sec): Scroll 500x500 pixels
-  40000 trep @  0.7018 msec ( 1420.0/sec): Copy 500x500 from window to window
-  60000 trep @  0.5260 msec ( 1900.0/sec): Copy 500x500 from pixmap to window
-  60000 trep @  0.5758 msec ( 1740.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6569 msec ( 1520.0/sec): Copy 500x500 from pixmap to pixmap
-
--- pgprot_noncached
-   3500 trep @  7.5972 msec (  132.0/sec): Scroll 500x500 pixels
-   1800 trep @ 14.7146 msec (   68.0/sec): Copy 500x500 from window to window
-   6000 trep @  4.6501 msec (  215.0/sec): Copy 500x500 from pixmap to window
-   8000 trep @  3.3500 msec (  299.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6546 msec ( 1530.0/sec): Copy 500x500 from pixmap to pixmap
-
--- pgprot_writecombine
-  10000 trep @  2.9439 msec (  340.0/sec): Scroll 500x500 pixels
-   6000 trep @  5.7246 msec (  175.0/sec): Copy 500x500 from window to window
-  60000 trep @  0.4213 msec ( 2370.0/sec): Copy 500x500 from pixmap to window
-  12000 trep @  2.2423 msec (  446.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6648 msec ( 1500.0/sec): Copy 500x500 from pixmap to pixmap
-
--- pgprot_writethrough
-  40000 trep @  0.7103 msec ( 1410.0/sec): Scroll 500x500 pixels
-  20000 trep @  1.3024 msec (  768.0/sec): Copy 500x500 from window to window
-  80000 trep @  0.3933 msec ( 2540.0/sec): Copy 500x500 from pixmap to window
-  18000 trep @  1.3967 msec (  716.0/sec): Copy 500x500 from window to pixmap
-  40000 trep @  0.6548 msec ( 1530.0/sec): Copy 500x500 from pixmap to pixmap
-
-Without shadowfb, the performance of "writecombine" looks to be better
-than "noncached". And "writethrough" is clearly the fastest. Still
-even "writethrough" is no match for shadowfb on Cortex-A9 (unlike
-ARM11 and Cortex-A8).
-
-So is Cortex-A9 a lost cause? Maybe experimenting with page table
-entries and tweaking inner/outer cacheability attributes could provide
-something? From the first glance, it looks like read performance for
-write-through cached memory is rather bad on Cortex-A9. But still
-there is some speedup, so it does not seem to be treated as totally
-non-cached. And at least PL310 L2 cache controller has some support
-for "Cacheable write-through, allocate on read":
-    http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246f/ch02s03s01.html
-
--- 
-Best regards,
-Siarhei Siamashka
+Regards,
+Mike
