@@ -1,75 +1,112 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 22 May 2012 15:13:36 +0200
-Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <20120522050831.GQ6206@b20223-02.ap.freescale.net>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <CAOMZO5AcP2cAAkuFPJn3Xp5NuR+JG4hDO7Ehq5H-V6PCy4DwNA@mail.gmail.com>
- <20120522050831.GQ6206@b20223-02.ap.freescale.net>
-Message-ID: <4FBB9100.8070502@de.bosch.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 May 2012 08:31:44 -0500
+Subject: [PATCH V3 1/3] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+In-Reply-To: <[PATCH 1/3] ARM: OMAP3+: PM: VP: ensure VP is idle before
+ disable>
+References: <[PATCH 1/3] ARM: OMAP3+: PM: VP: ensure VP is idle before disable>
+Message-ID: <1337693504-4442-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2012 07:08, Richard Zhao wrote:
-> On Mon, May 21, 2012 at 04:34:15PM -0300, Fabio Estevam wrote:
->> Hi Richard,
->>
->> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
->> <richard.zhao@freescale.com> wrote:
->>> The work is based on  ci13xxx rework done by Alexander Shishkin.
->>>
->>> Status:
->>>  - this version only support host
->>>  - usbotg controler works at host role
->>>
->>> Changes since V1:
->>>  - Merge the work of Marek
->>>  - re-implement connect change notify
->>>  - imx6q: move part of code to clk
->>>  - imx6q: add config-on-boot gpios
->> Can you please also add the driver into the defconfig files?
-> Thanks for you reminder.
+From: Wenbiao Wang <wwang@ti.com>
 
-For i.MX6 I use something like [1].
+Voltage Processor state machine transition to disable need to
+occur from IDLE state. When we transition OPP in a functioning
+system, the call sequence for an OPP transition is as follows:
+omap_sr_disable
+      -> sr class 3 disable
+           -> vp disable
+           -> sr disable
+forceupdate to voltage/frequency scale depending on which OPP
+we are transitioning to.
 
-Best regards
+If we hit a critical timing window where SR had commanded VP
+for a voltage transition and VP is in the middle of operating
+on that command, it needs to go through a few states before
+going to update state(where it actually sends the command to
+VC). Initial view of h/w owners is that the state disable of VP
+is expected to be sampled for the next transition.
 
-Dirk
+Instead, to be on a safer side, we ensure that the valid states
+of the VP state machine is diligently followed by software. This
+can be done by waiting for VP to be in idle  prior to disabling
+VP. Existing prints have been updated to ensure context is
+available on error messages.
 
-[1]
+As part of this change, increase timeout for VP idle check to
+improbable 500uSec to be certain that system is indeed unable
+to continue before crashing out with error(worst case expectancy
+remains the same 3-100uSec depending on when we caught VP). Update
+macro documentation as well
 
-From: Dirk Behme <dirk.behme@de.bosch.com>
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable chipidea USB host driver
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+[nm at ti.com: port from android]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Wenbiao Wang <wwang@ti.com>
 ---
-  arch/arm/configs/imx_v6_v7_defconfig |    8 ++++++--
-  1 files changed, 6 insertions(+), 2 deletions(-)
+V3: updated documenation for VP_IDLE_TIMEOUT macro
+V2: http://marc.info/?t=133736542500001&r=1&w=2
+ arch/arm/mach-omap2/vp.c |   15 +++++++++++++--
+ arch/arm/mach-omap2/vp.h |    9 +++++++--
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig 
-b/arch/arm/configs/imx_v6_v7_defconfig
-index c3a828e..45001ef 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,7 @@ CONFIG_GPIO_SYSFS=y
-  CONFIG_WATCHDOG=y
-  CONFIG_IMX2_WDT=y
-  CONFIG_MFD_MC13XXX=y
-+CONFIG_MFD_ANATOP=y
-  CONFIG_REGULATOR=y
-  CONFIG_REGULATOR_FIXED_VOLTAGE=y
-  CONFIG_REGULATOR_MC13783=y
-@@ -166,9 +167,12 @@ CONFIG_LOGO_LINUX_MONO=y
-  CONFIG_LOGO_LINUX_VGA16=y
-  CONFIG_LOGO_LINUX_CLUT224=y
-  CONFIG_USB=y
--CONFIG_USB_EHCI_HCD=y
--CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_CHIPIDEA_DEBUG=y
-  CONFIG_USB_STORAGE=y
-+CONFIG_USB_MXS_PHY=y
-  CONFIG_MMC=y
-  CONFIG_MMC_SDHCI=y
-  CONFIG_MMC_SDHCI_PLTFM=y
+diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+index f95c1ba..925d869 100644
+--- a/arch/arm/mach-omap2/vp.c
++++ b/arch/arm/mach-omap2/vp.c
+@@ -262,6 +262,17 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 		return;
+ 	}
+ 
++	/*
++	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
++	 * Depending on if we catch VP in the middle of an SR operation.
++	 */
++	omap_test_timeout((voltdm->read(vp->vstatus)),
++			  VP_IDLE_TIMEOUT, timeout);
++
++	if (timeout >= VP_IDLE_TIMEOUT)
++		pr_warning("%s: vdd_%s idle timedout before disable\n",
++			   __func__, voltdm->name);
++
+ 	/* Disable VP */
+ 	vpconfig = voltdm->read(vp->vpconfig);
+ 	vpconfig &= ~vp->common->vpconfig_vpenable;
+@@ -274,8 +285,8 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 			  VP_IDLE_TIMEOUT, timeout);
+ 
+ 	if (timeout >= VP_IDLE_TIMEOUT)
+-		pr_warning("%s: vdd_%s idle timedout\n",
+-			__func__, voltdm->name);
++		pr_warning("%s: vdd_%s idle timedout after disable\n",
++			   __func__, voltdm->name);
+ 
+ 	vp->enabled = false;
+ 
+diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+index 7c155d2..79b159f 100644
+--- a/arch/arm/mach-omap2/vp.h
++++ b/arch/arm/mach-omap2/vp.h
+@@ -30,8 +30,13 @@ struct voltagedomain;
+ #define OMAP4_VP_VDD_IVA_ID 1
+ #define OMAP4_VP_VDD_MPU_ID 2
+ 
+-/* XXX document */
+-#define VP_IDLE_TIMEOUT		200
++/*
++ * Maximum time for Voltage Processor to enter or exit idle
++ * worst case is around 100uSec depending on when we intercepted VP
++ * we use 5 times worst case value to be sure that the system flags
++ * invalid condition
++ */
++#define VP_IDLE_TIMEOUT		500
+ #define VP_TRANXDONE_TIMEOUT	300
+ 
+ /**
+-- 
+1.7.9.5
