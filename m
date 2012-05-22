@@ -1,166 +1,234 @@
 From: hs@denx.de (Heiko Schocher)
-Date: Tue, 22 May 2012 15:55:18 +0200
-Subject: [PATCH v4 5/7] ARM: davinci: i2c: add OF support
+Date: Tue, 22 May 2012 15:55:17 +0200
+Subject: [PATCH v4 4/7] ARM: davinci: net: davinci_emac: add OF support
 In-Reply-To: <1337694920-8925-1-git-send-email-hs@denx.de>
 References: <1337694920-8925-1-git-send-email-hs@denx.de>
-Message-ID: <1337694920-8925-6-git-send-email-hs@denx.de>
+Message-ID: <1337694920-8925-5-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add of support for the davinci i2c driver.
+add of support for the davinci_emac driver.
 
 Signed-off-by: Heiko Schocher <hs@denx.de>
 Cc: davinci-linux-open-source at linux.davincidsp.com
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-i2c at vger.kernel.org
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: netdev at vger.kernel.org
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Wolfgang Denk <wd@denx.de>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Anatoly Sivov <mm05@mail.ru>
 
 ---
 - changes for v2:
-- add comments from Sylwester Nawrocki <s.nawrocki@samsung.com>:
-  - use "cell-index" instead "id"
-  - OF_DEV_AUXDATA in the machine code, instead pre-define platform
-    device name
-- add comment from Grant Likely:
-  - removed "id" resp. "cell-index" completely
-  - fixed documentation
-  - use of_match_ptr()
-  - use devm_kzalloc() for allocating plattform data mem
-  - fixed a whitespace issue
+  - add comment from Anatoly Sivov
+    - fix typo in davinci_emac.txt
+  - add comment from Grant Likely:
+    - add prefix "ti,davinci-" to davinci specific property names
+    - remove version property
+    - use compatible name "ti,davinci-dm6460-emac"
+    - use devm_kzalloc()
+    - use of_match_ptr()
+    - document all new properties
+    - remove of_address_to_resource() and do not overwrite
+      resource table
+    - whitespace fixes
+    - remove hw_ram_addr as it is not used in current
+      board code
 - no changes for v3
-- changes for v4
-  remove "pinmux-handle" property as discussed here:
-  http://www.spinics.net/lists/arm-kernel/msg175701.html
-  with Nori Sekhar
+- changes for v4:
+  add comments from Nori Sekhar:
+  - move devictree documentation to:
+    Documentation/devicetree/bindings/net/davinci_emac.txt
+  - fix typo in it
+  - rename compatible property to "ti,davinci-dm6467-emac"
+  - remove pinmux-handle
+  - set version directly in pdata->version
 ---
- .../devicetree/bindings/arm/davinci/i2c.txt        |   31 +++++++++++++++++++
- drivers/i2c/busses/i2c-davinci.c                   |   32 ++++++++++++++++++++
- 2 files changed, 63 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+ .../devicetree/bindings/net/davinci_emac.txt       |   41 +++++++++
+ drivers/net/ethernet/ti/davinci_emac.c             |   87 +++++++++++++++++++-
+ 2 files changed, 127 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/davinci_emac.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+diff --git a/Documentation/devicetree/bindings/net/davinci_emac.txt b/Documentation/devicetree/bindings/net/davinci_emac.txt
 new file mode 100644
-index 0000000..e98a025
+index 0000000..48b259e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
-@@ -0,0 +1,31 @@
-+* Texas Instruments Davinci I2C
++++ b/Documentation/devicetree/bindings/net/davinci_emac.txt
+@@ -0,0 +1,41 @@
++* Texas Instruments Davinci EMAC
 +
-+This file provides information, what the device node for the
-+davinci i2c interface contain.
++This file provides information, what the device node
++for the davinci_emac interface contains.
 +
 +Required properties:
-+- compatible: "ti,davinci-i2c";
-+- reg : Offset and length of the register set for the device
-+
-+Recommended properties :
-+- interrupts : <a> standard interrupt property.
-+- clock-frequency : desired I2C bus clock frequency in Hz.
++- compatible: "ti,davinci-dm6467-emac";
++- reg: Offset and length of the register set for the device
++- ti,davinci-ctrl-reg-offset: offset to control register
++- ti,davinci-ctrl-mod-reg-offset: offset to control module register
++- ti,davinci-ctrl-ram-offset: offset to control module ram
++- ti,davinci-ctrl-ram-size: size of control module ram
++- ti,davinci-rmii-en: use RMII
++- ti,davinci-no-bd-ram: has the emac controller BD RAM
++- phy-handle: Contains a phandle to an Ethernet PHY.
++              if not, davinci_emac driver defaults to 100/FULL
++- interrupts: interrupt mapping for the davinci emac interrupts sources:
++              4 sources: <Receive Threshold Interrupt
++			  Receive Interrupt
++			  Transmit Interrupt
++			  Miscellaneous Interrupt>
 +
 +Optional properties:
-+- bus-delay: bus delay in usec
++- local-mac-address : 6 bytes, mac address
 +
 +Example (enbw_cmc board):
-+	i2c at 1c22000 {
-+		compatible = "ti,davinci-i2c";
-+		reg = <0x22000 0x1000>;
-+		clock-frequency = <100000>;
-+		interrupts = <15>;
++	eth0: emac at 1e20000 {
++		compatible = "ti,davinci-dm6467-emac";
++		reg = <0x220000 0x4000>;
++		ti,davinci-ctrl-reg-offset = <0x3000>;
++		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
++		ti,davinci-ctrl-ram-offset = <0>;
++		ti,davinci-ctrl-ram-size = <0x2000>;
++		local-mac-address = [ 00 00 00 00 00 00 ];
++		interrupts = <33
++				34
++				35
++				36
++				>;
 +		interrupt-parent = <&intc>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dtt at 48 {
-+				compatible = "national,lm75";
-+				reg = <0x48>;
-+			};
 +	};
-diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index a76d85f..c1783bb 100644
---- a/drivers/i2c/busses/i2c-davinci.c
-+++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -38,9 +38,12 @@
- #include <linux/slab.h>
- #include <linux/cpufreq.h>
- #include <linux/gpio.h>
-+#include <linux/of_i2c.h>
-+#include <linux/of_device.h>
- 
- #include <mach/hardware.h>
- #include <mach/i2c.h>
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 4da93a5..645618d 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -58,6 +58,12 @@
+ #include <linux/io.h>
+ #include <linux/uaccess.h>
+ #include <linux/davinci_emac.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_net.h>
++
 +#include <mach/mux.h>
  
- /* ----- global defines ----------------------------------------------- */
- 
-@@ -635,6 +638,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
- 	.functionality	= i2c_davinci_func,
+ #include <asm/irq.h>
+ #include <asm/page.h>
+@@ -339,6 +345,9 @@ struct emac_priv {
+ 	u32 rx_addr_type;
+ 	atomic_t cur_tx;
+ 	const char *phy_id;
++#ifdef CONFIG_OF
++	struct device_node *phy_node;
++#endif
+ 	struct phy_device *phydev;
+ 	spinlock_t lock;
+ 	/*platform specific members*/
+@@ -1762,6 +1771,75 @@ static const struct net_device_ops emac_netdev_ops = {
+ #endif
  };
  
-+static const struct of_device_id davinci_i2c_of_match[] = {
-+	{.compatible = "ti,davinci-i2c", },
++#ifdef CONFIG_OF
++static struct emac_platform_data
++	*davinci_emac_of_get_pdata(struct platform_device *pdev,
++	struct emac_priv *priv)
++{
++	struct device_node *np;
++	struct emac_platform_data *pdata = NULL;
++	const u8 *mac_addr;
++	u32 data;
++	int ret;
++
++	pdata = pdev->dev.platform_data;
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			goto nodata;
++	}
++
++	np = pdev->dev.of_node;
++	if (!np)
++		goto nodata;
++	else
++		pdata->version = EMAC_VERSION_2;
++
++	mac_addr = of_get_mac_address(np);
++	if (mac_addr)
++		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
++	if (!ret)
++		pdata->ctrl_reg_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
++		&data);
++	if (!ret)
++		pdata->ctrl_mod_reg_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
++	if (!ret)
++		pdata->ctrl_ram_offset = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
++	if (!ret)
++		pdata->ctrl_ram_size = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
++	if (!ret)
++		pdata->rmii_en = data;
++
++	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
++	if (!ret)
++		pdata->no_bd_ram = data;
++
++	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
++	if (!priv->phy_node)
++		pdata->phy_id = "";
++
++	pdev->dev.platform_data = pdata;
++nodata:
++	return  pdata;
++}
++#else
++static struct emac_platform_data
++	*davinci_emac_of_get_pdata(struct platform_device *pdev,
++	struct emac_priv *priv)
++{
++	return  pdev->dev.platform_data;
++}
++#endif
+ /**
+  * davinci_emac_probe: EMAC device probe
+  * @pdev: The DaVinci EMAC device that we are removing
+@@ -1804,7 +1882,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&priv->lock);
+ 
+-	pdata = pdev->dev.platform_data;
++	pdata = davinci_emac_of_get_pdata(pdev, priv);
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "no platform data\n");
+ 		rc = -ENODEV;
+@@ -2015,6 +2093,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
+ 	.resume		= davinci_emac_resume,
+ };
+ 
++static const struct of_device_id davinci_emac_of_match[] = {
++	{.compatible = "ti,davinci-dm6467-emac", },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
++MODULE_DEVICE_TABLE(of, davinci_emac_of_match);
 +
- static int davinci_i2c_probe(struct platform_device *pdev)
- {
- 	struct davinci_i2c_dev *dev;
-@@ -676,6 +685,26 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	dev->irq = irq->start;
- 	platform_set_drvdata(pdev, dev);
- 
-+	if ((dev->dev->platform_data == NULL) &&
-+		(pdev->dev.of_node)) {
-+		struct davinci_i2c_platform_data *pdata;
-+		u32 prop;
-+
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			r = -ENOMEM;
-+			goto err_free_mem;
-+		}
-+		memcpy(pdata, &davinci_i2c_platform_data_default,
-+			sizeof(*pdata));
-+		dev->dev->platform_data = pdata;
-+		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-+			&prop))
-+			pdata->bus_freq = prop / 1000;
-+		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
-+			&prop))
-+			pdata->bus_delay = prop;
-+	}
- 	dev->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(dev->clk)) {
- 		r = -ENODEV;
-@@ -711,6 +740,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 	adap->algo = &i2c_davinci_algo;
- 	adap->dev.parent = &pdev->dev;
- 	adap->timeout = DAVINCI_I2C_TIMEOUT;
-+	adap->dev.of_node = pdev->dev.of_node;
- 
- 	adap->nr = pdev->id;
- 	r = i2c_add_numbered_adapter(adap);
-@@ -718,6 +748,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failure adding adapter\n");
- 		goto err_free_irq;
- 	}
-+	of_i2c_register_devices(adap);
- 
- 	return 0;
- 
-@@ -809,6 +840,7 @@ static struct platform_driver davinci_i2c_driver = {
- 		.name	= "i2c_davinci",
- 		.owner	= THIS_MODULE,
- 		.pm	= davinci_i2c_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_i2c_of_match),
+ /**
+  * davinci_emac_driver: EMAC platform driver structure
+  */
+@@ -2023,6 +2107,7 @@ static struct platform_driver davinci_emac_driver = {
+ 		.name	 = "davinci_emac",
+ 		.owner	 = THIS_MODULE,
+ 		.pm	 = &davinci_emac_pm_ops,
++		.of_match_table = of_match_ptr(davinci_emac_of_match),
  	},
- };
- 
+ 	.probe = davinci_emac_probe,
+ 	.remove = __devexit_p(davinci_emac_remove),
 -- 
 1.7.7.6
