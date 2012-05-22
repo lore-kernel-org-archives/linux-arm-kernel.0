@@ -1,56 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 May 2012 10:15:37 +0800
-Subject: [GIT PULL] DT clk binding support
-In-Reply-To: <4FBAD545.7060803@gmail.com>
-References: <4FB80F32.5090309@gmail.com>
- <20120520030653.GB5810@S2100-06.ap.freescale.net>
- <4FB9A5E7.2070000@gmail.com>
- <20120521064901.GE8140@S2101-09.ap.freescale.net>
- <4FBA89E3.7010106@gmail.com>
- <20120521232616.GF8140@S2101-09.ap.freescale.net>
- <4FBAD545.7060803@gmail.com>
-Message-ID: <20120522021535.GG8140@S2101-09.ap.freescale.net>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Tue, 22 May 2012 10:16:34 +0800
+Subject: [PATCH 2/2] ARM: SMP: use per cpu state to replace
+In-Reply-To: <alpine.LFD.2.02.1205211524040.3231@ionos>
+References: <1337593531-16191-1-git-send-email-jason77.wang@gmail.com>
+ <1337593531-16191-2-git-send-email-jason77.wang@gmail.com>
+ <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
+ <20120521123321.GA24270@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1205211524040.3231@ionos>
+Message-ID: <4FBAF702.8020900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 06:52:37PM -0500, Rob Herring wrote:
-> As Grant states: "This proposed binding is only about one thing:
-> attaching clock providers to clock consumers." This means you have to
-> have at least a single provider and a single consumer defined in the DT.
-> 
-I just read through Grant's comments over again.  I agree with the
-statement which implicitly requires the clk provider defined in DT.
-However, for some case, this provider in DT is just a skeleton which
-is backed by clock driver where the provider is actually defined.
+Thanks for review and glad to know this will be fixed from the root cause.
 
-Looking at Grant's comment below, the second option is also to match
-the clock in driver just using name.  The only difference to my
-proposal is the name here is given by the argument of phandle pointing
-to that skeleton provider node.
+Hi Russell,
 
-I'm fine with that.  So go ahead with your bindings.
+What about my first patch, the tasklist_lock is not easy changed to the 
+raw lock in the RT kernel since this lock is used by various subsystems, 
+and change this lock to raw lock will affect RT performance.
 
 Regards,
-Shawn
+Hui.
 
-On Wed, Nov 16, 2011 at 03:12:50PM -0700, Grant Likely wrote:
-> I'm really not convinced that it is a good idea to break out the
-> entire clock tree into one node per struct clk.  To begin with, that
-> looks to be very centric around the current 'struct clk' Linux
-> abstraction, which is potentially in flux.  Also, looking at Sascha's
-> initial RFC for describing the clock tree, I see cases where it looks
-> like a clock nexus node really makes sense.  For instance, the
-> 'divider-ipg <at> 0x53fd4014' node which has a list of child nodes
-> which merely provide a register offset and shift value
-> (reg=0x53fd4068..0x53fd4084, shift=0x0..0xf).  It would be natural to
-> instead encode that as part of the clock reference, or map it directly
-> from the clock reference (ie, assign names to each of the clocks, and
-> let the clock provider driver match up the name to the reg offset &
-> shift values).
+Thomas Gleixner wrote:
+> On Mon, 21 May 2012, Russell King - ARM Linux wrote:
 >
-> I had originally thought that it would be better to use names directly
-> for references to clocks (ie. clock = <phandle>,"name") , but after
-> actually playing with it and looking at the existing DT conventions,
-> I've reverted to cell values for the arguments and a separate set of
-> clock-{input,output}-name properties for attaching meaningful names,
-> just like we decided to do for assigning names to 'reg' properties.
+>   
+>> On Mon, May 21, 2012 at 05:45:31PM +0800, Hui Wang wrote:
+>>     
+>>> CPU hotplug will bring following call trace in the RT kernel:
+>>> BUG: sleeping function called from invalid context at linux/kernel/rtmutex.c:707
+>>> pcnt: 1 0 in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
+>>> [<800413a0>] (unwind_backtrace+0x0/0xe4) from [<804ff214>] (rt_spin_lock+0x30/0x5c)
+>>> [<804ff214>] (rt_spin_lock+0x30/0x5c) from [<8005a848>] (complete+0x1c/0x54)
+>>> [<8005a848>] (complete+0x1c/0x54) from [<804f59f8>] (cpu_die+0x34/0x70)
+>>> [<804f59f8>] (cpu_die+0x34/0x70) from [<8003b840>] (cpu_idle+0x54/0xd8)
+>>> [<8003b840>] (cpu_idle+0x54/0xd8) from [<104f9ecc>] (0x104f9ecc)
+>>>
+>>> To avoid this call trace, we use per cpu variable to replace
+>>> completion, and it is safe for this modification since all reference
+>>> of per cpu_state variable is in the preempt disabled context.
+>>>       
+>> This is silly.  Why is RT preventing things that work perfectly well in
+>> the standard kernel from being used in the RT kernel?
+>>     
+>
+> The silliness is in some of the users of waitqueues. waitqueues are
+> protected by a spinlock, which we cannot convert to a raw spinlock on
+> rt because some of the wq users run insane callbacks from the wakeup
+> context with interrupts disabled.....
+>  
+>   
+>> Being able to call complete() from atomic contexts is one of the
+>> fundamentals that RT seems to be breaking here.
+>>     
+>
+> Yeah, I have a simpler waitqueue variant (no callbacks) which I want
+> to use for completions.
+>
+> Thanks,
+>
+> 	tglx
+>
+>   
