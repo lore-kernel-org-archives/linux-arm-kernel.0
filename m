@@ -1,43 +1,42 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 22 May 2012 13:03:46 +0800
-Subject: [PATCH v2 12/12] ARM: dts: imx28-evk: add usb devices
-In-Reply-To: <20120522045240.GM8140@S2101-09.ap.freescale.net>
+Date: Tue, 22 May 2012 13:08:31 +0800
+Subject: [PATCH v2 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <CAOMZO5AcP2cAAkuFPJn3Xp5NuR+JG4hDO7Ehq5H-V6PCy4DwNA@mail.gmail.com>
 References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-13-git-send-email-richard.zhao@freescale.com>
- <20120522045240.GM8140@S2101-09.ap.freescale.net>
-Message-ID: <20120522050345.GP6206@b20223-02.ap.freescale.net>
+ <CAOMZO5AcP2cAAkuFPJn3Xp5NuR+JG4hDO7Ehq5H-V6PCy4DwNA@mail.gmail.com>
+Message-ID: <20120522050831.GQ6206@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 12:52:43PM +0800, Shawn Guo wrote:
-> On Mon, May 21, 2012 at 05:23:57PM +0800, Richard Zhao wrote:
-> >  	ahb at 80080000 {
-> > +		usb0: usb at 80080000 {
-> > +			fsl,vbus-power = <&gpio3 9 0>;
+On Mon, May 21, 2012 at 04:34:15PM -0300, Fabio Estevam wrote:
+> Hi Richard,
 > 
-> fsl,vbus-power-gpios
-Yes.
+> On Mon, May 21, 2012 at 6:23 AM, Richard Zhao
+> <richard.zhao@freescale.com> wrote:
+> > The work is based on ?ci13xxx rework done by Alexander Shishkin.
+> >
+> > Status:
+> > ?- this version only support host
+> > ?- usbotg controler works at host role
+> >
+> > Changes since V1:
+> > ?- Merge the work of Marek
+> > ?- re-implement connect change notify
+> > ?- imx6q: move part of code to clk
+> > ?- imx6q: add config-on-boot gpios
 > 
-> > +			status = "okay";
-> > +		};
-> > +
-> > +		usb1: usb at 80090000 {
-> > +			fsl,vbus-power = <&gpio3 8 0>;
+> Can you please also add the driver into the defconfig files?
+Thanks for you reminder.
 > 
-> Ditto
-Yes.
-
-I'll test mx28 too next time before send out patch.
-Maybe need your help :)
+> What about the existing USB host drivers for mx27/mx31/mx35/mx25/mx35?
+> 
+> Is the idea to switch to drivers/usb/chipidea/host.c too?
+Yes. but I'm now just focusing on imx6q and imx28.
 
 Thanks
 Richard
 > 
-> > +			status = "okay";
-> > +		};
-> > +
-> 
-> -- 
 > Regards,
-> Shawn
+> 
+> Fabio Estevam
 > 
