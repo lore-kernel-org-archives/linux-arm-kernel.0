@@ -1,65 +1,136 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Tue, 22 May 2012 10:16:34 +0800
-Subject: [PATCH 2/2] ARM: SMP: use per cpu state to replace
-In-Reply-To: <alpine.LFD.2.02.1205211524040.3231@ionos>
-References: <1337593531-16191-1-git-send-email-jason77.wang@gmail.com>
- <1337593531-16191-2-git-send-email-jason77.wang@gmail.com>
- <1337593531-16191-3-git-send-email-jason77.wang@gmail.com>
- <20120521123321.GA24270@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1205211524040.3231@ionos>
-Message-ID: <4FBAF702.8020900@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 May 2012 11:17:12 +0800
+Subject: [PATCH v2 07/12] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <1337592237-5090-8-git-send-email-richard.zhao@freescale.com>
+References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
+ <1337592237-5090-8-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120522031709.GH8140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for review and glad to know this will be fixed from the root cause.
+Apart from my comments below, we really need to know Rob and Grant's
+opinion on this.
 
-Hi Russell,
+On Mon, May 21, 2012 at 05:23:52PM +0800, Richard Zhao wrote:
+> Sometimes, boards have gpios that don't own by any driver or owner
+> by a generic driver that don't like hacks. Such gpios is normally
+> output and need setup once on boot. So I introduce the config-on-boot
+> gpios.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |    7 ++++++
+>  arch/arm/mach-imx/mach-imx6q.c        |   35 +++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index e0ec929..1dd2261 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -17,6 +17,13 @@
+>  	model = "Freescale i.MX6 Quad SABRE Lite Board";
+>  	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+>  
+> +	config-on-boot {
+> +		output-gpios = <
+> +				&gpio3 22 0>;	/* vbus reset */
+> +		output-gpio-values = <
+> +				1>;		/* vbus reset */
+> +	};
+> +
 
-What about my first patch, the tasklist_lock is not easy changed to the 
-raw lock in the RT kernel since this lock is used by various subsystems, 
-and change this lock to raw lock will affect RT performance.
+So it looks like something not specific to imx board but generic to
+other boards.  If so, we may need to come up with a generic binding
+document for this.
+
+Is this only used to configure output pin?  Will there be any pin that
+needs to be configured as input but not owned by any driver?  Hopefully
+not.
+
+>  	memory {
+>  		reg = <0x10000000 0x40000000>;
+>  	};
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index b47e98b..577cf19 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/pinctrl/machine.h>
+> @@ -113,6 +114,38 @@ static void __init imx6q_sabrelite_init(void)
+>  	imx6q_sabrelite_cko1_setup();
+>  }
+>  
+> +static void __init imx6q_config_on_boot(void)
+
+Do you intend to make this function non-gpio-config only.  Otherwise,
+we may need to have "gpio" in the function name, as well as the
+"config-on-boot" node name.
+
+Also, if we define the binding as generic one, we may need to find a
+common place to implement the function.
+
+> +{
+> +	struct device_node *np;
+> +	struct property *pp;
+> +	int cnt, len, i;
+> +	int gpio;
+> +
+> +	np = of_find_node_by_path("/config-on-boot");
+> +	if (!np)
+> +		return;
+> +	cnt = of_gpio_named_count(np, "output-gpios");
+> +	pp = of_find_property(np, "output-gpio-values", &len);
+> +	if (!pp || cnt != len / sizeof(u32)) {
+> +		pr_err("Invalid config-on-boot gpios!\n");
+> +		of_node_put(np);
+> +		return;
+> +	}
+> +	for (i = 0; i < cnt; i++) {
+> +		gpio = of_get_named_gpio(np, "output-gpios", i);
+> +		if (gpio_is_valid(gpio))
+> +			gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH,
+> +					"config-on-boot");
+
+So all the gpios will use the same name.
+
+And doesn't the reset generally need a pulse or edge signal, e.g. pull
+down for a msec and pull up?
 
 Regards,
-Hui.
+Shawn
 
-Thomas Gleixner wrote:
-> On Mon, 21 May 2012, Russell King - ARM Linux wrote:
->
->   
->> On Mon, May 21, 2012 at 05:45:31PM +0800, Hui Wang wrote:
->>     
->>> CPU hotplug will bring following call trace in the RT kernel:
->>> BUG: sleeping function called from invalid context at linux/kernel/rtmutex.c:707
->>> pcnt: 1 0 in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
->>> [<800413a0>] (unwind_backtrace+0x0/0xe4) from [<804ff214>] (rt_spin_lock+0x30/0x5c)
->>> [<804ff214>] (rt_spin_lock+0x30/0x5c) from [<8005a848>] (complete+0x1c/0x54)
->>> [<8005a848>] (complete+0x1c/0x54) from [<804f59f8>] (cpu_die+0x34/0x70)
->>> [<804f59f8>] (cpu_die+0x34/0x70) from [<8003b840>] (cpu_idle+0x54/0xd8)
->>> [<8003b840>] (cpu_idle+0x54/0xd8) from [<104f9ecc>] (0x104f9ecc)
->>>
->>> To avoid this call trace, we use per cpu variable to replace
->>> completion, and it is safe for this modification since all reference
->>> of per cpu_state variable is in the preempt disabled context.
->>>       
->> This is silly.  Why is RT preventing things that work perfectly well in
->> the standard kernel from being used in the RT kernel?
->>     
->
-> The silliness is in some of the users of waitqueues. waitqueues are
-> protected by a spinlock, which we cannot convert to a raw spinlock on
-> rt because some of the wq users run insane callbacks from the wakeup
-> context with interrupts disabled.....
+> +	}
+> +
+> +	of_node_put(np);
+> +}
+> +
+> +static void __init imx6q_post_populate(void)
+> +{
+> +	imx6q_config_on_boot();
+> +}
+> +
+>  static void __init imx6q_init_machine(void)
+>  {
+>  	/*
+> @@ -126,6 +159,8 @@ static void __init imx6q_init_machine(void)
 >  
->   
->> Being able to call complete() from atomic contexts is one of the
->> fundamentals that RT seems to be breaking here.
->>     
->
-> Yeah, I have a simpler waitqueue variant (no callbacks) which I want
-> to use for completions.
->
-> Thanks,
->
-> 	tglx
->
->   
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  
+> +	imx6q_post_populate();
+> +
+>  	imx6q_pm_init();
+>  }
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
