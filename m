@@ -1,287 +1,532 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 22 May 2012 10:09:16 +0300
-Subject: [PATCH 4/4] USB: Remove omap2 support from omap_udc.c
-In-Reply-To: <20120521190111.927.38546.stgit@muffinssi.local>
-References: <20120521185323.927.88012.stgit@muffinssi.local>
- <20120521190111.927.38546.stgit@muffinssi.local>
-Message-ID: <20120522070914.GD30559@arwen.pp.htv.fi>
+From: Barry.Song@csr.com (Barry Song)
+Date: Tue, 22 May 2012 15:14:05 +0800
+Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending on
+ pinmux APIs
+Message-ID: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2012 at 12:01:11PM -0700, Tony Lindgren wrote:
-> There are no active users of this code for omap2 as
-> the boards in use have either TUSB or MUSB controller.
-> 
-> While at it, also fix warnings related to uninitialized
-> dc_clk and hhc_clk.
-> 
-> Cc: linux-usb at vger.kernel.org
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+From: Barry Song <Baohua.Song@csr.com>
 
-This one doesn't depend on the rest of the series, I can take it myself
-to v3.6 or you can take it with your series:
+In SiRFprimaII, Each GPIO pin can be configured as input or output
+independently. If a GPIO is configured as input, it can also be
+enabled as an interrupt source (either edge or level triggered).
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+These pins must be either MUXed as GPIO or other function pads. So
+this drivers depend on pinctrl_request_gpio() API pinctrl-sirf.c
+implements.
 
-> ---
->  drivers/usb/gadget/omap_udc.c |  113 ++++++++---------------------------------
->  1 file changed, 23 insertions(+), 90 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
-> index 2acf06c..913587f 100644
-> --- a/drivers/usb/gadget/omap_udc.c
-> +++ b/drivers/usb/gadget/omap_udc.c
-> @@ -62,9 +62,6 @@
->  
->  #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
->  
-> -#define OMAP2_DMA_CH(ch)	(((ch) - 1) << 1)
-> -#define OMAP24XX_DMA(name, ch)	(OMAP24XX_DMA_##name + OMAP2_DMA_CH(ch))
-> -
->  /*
->   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
->   * D+ pullup to allow enumeration.  That's too early for the gadget
-> @@ -537,12 +534,8 @@ static void next_in_dma(struct omap_ep *ep, struct omap_req *req)
->  				: OMAP_DMA_SYNC_ELEMENT;
->  	int		dma_trigger = 0;
->  
-> -	if (cpu_is_omap24xx())
-> -		dma_trigger = OMAP24XX_DMA(USB_W2FC_TX0, ep->dma_channel);
-> -
->  	/* measure length in either bytes or packets */
->  	if ((cpu_is_omap16xx() && length <= UDC_TXN_TSC)
-> -			|| (cpu_is_omap24xx() && length < ep->maxpacket)
->  			|| (cpu_is_omap15xx() && length < ep->maxpacket)) {
->  		txdma_ctrl = UDC_TXN_EOT | length;
->  		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S8,
-> @@ -601,28 +594,14 @@ static void next_out_dma(struct omap_ep *ep, struct omap_req *req)
->  	int dma_trigger = 0;
->  	u16 w;
->  
-> -	if (cpu_is_omap24xx())
-> -		dma_trigger = OMAP24XX_DMA(USB_W2FC_RX0, ep->dma_channel);
-> -
-> -	/* NOTE:  we filtered out "short reads" before, so we know
-> -	 * the buffer has only whole numbers of packets.
-> -	 * except MODE SELECT(6) sent the 24 bytes data in OMAP24XX DMA mode
-> -	 */
-> -	if (cpu_is_omap24xx() && packets < ep->maxpacket) {
-> -		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S8,
-> -				packets, 1, OMAP_DMA_SYNC_ELEMENT,
-> -				dma_trigger, 0);
-> -		req->dma_bytes = packets;
-> -	} else {
-> -		/* set up this DMA transfer, enable the fifo, start */
-> -		packets /= ep->ep.maxpacket;
-> -		packets = min(packets, (unsigned)UDC_RXN_TC + 1);
-> -		req->dma_bytes = packets * ep->ep.maxpacket;
-> -		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S16,
-> -				ep->ep.maxpacket >> 1, packets,
-> -				OMAP_DMA_SYNC_ELEMENT,
-> -				dma_trigger, 0);
-> -	}
-> +	/* set up this DMA transfer, enable the fifo, start */
-> +	packets /= ep->ep.maxpacket;
-> +	packets = min(packets, (unsigned)UDC_RXN_TC + 1);
-> +	req->dma_bytes = packets * ep->ep.maxpacket;
-> +	omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S16,
-> +			ep->ep.maxpacket >> 1, packets,
-> +			OMAP_DMA_SYNC_ELEMENT,
-> +			dma_trigger, 0);
->  	omap_set_dma_dest_params(ep->lch, OMAP_DMA_PORT_EMIFF,
->  		OMAP_DMA_AMODE_POST_INC, req->req.dma + req->req.actual,
->  		0, 0);
-> @@ -761,10 +740,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
->  	ep->dma_channel = channel;
->  
->  	if (is_in) {
-> -		if (cpu_is_omap24xx())
-> -			dma_channel = OMAP24XX_DMA(USB_W2FC_TX0, channel);
-> -		else
-> -			dma_channel = OMAP_DMA_USB_W2FC_TX0 - 1 + channel;
-> +		dma_channel = OMAP_DMA_USB_W2FC_TX0 - 1 + channel;
->  		status = omap_request_dma(dma_channel,
->  			ep->ep.name, dma_error, ep, &ep->lch);
->  		if (status == 0) {
-> @@ -781,11 +757,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
->  				0, 0);
->  		}
->  	} else {
-> -		if (cpu_is_omap24xx())
-> -			dma_channel = OMAP24XX_DMA(USB_W2FC_RX0, channel);
-> -		else
-> -			dma_channel = OMAP_DMA_USB_W2FC_RX0 - 1 + channel;
-> -
-> +		dma_channel = OMAP_DMA_USB_W2FC_RX0 - 1 + channel;
->  		status = omap_request_dma(dma_channel,
->  			ep->ep.name, dma_error, ep, &ep->lch);
->  		if (status == 0) {
-> @@ -809,7 +781,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
->  		omap_disable_dma_irq(ep->lch, OMAP_DMA_BLOCK_IRQ);
->  
->  		/* channel type P: hw synch (fifo) */
-> -		if (cpu_class_is_omap1() && !cpu_is_omap15xx())
-> +		if (!cpu_is_omap15xx())
->  			omap_set_dma_channel_mode(ep->lch, OMAP_DMA_LCH_P);
->  	}
->  
-> @@ -929,13 +901,11 @@ omap_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
->  
->  	/* this isn't bogus, but OMAP DMA isn't the only hardware to
->  	 * have a hard time with partial packet reads...  reject it.
-> -	 * Except OMAP2 can handle the small packets.
->  	 */
->  	if (use_dma
->  			&& ep->has_dma
->  			&& ep->bEndpointAddress != 0
->  			&& (ep->bEndpointAddress & USB_DIR_IN) == 0
-> -			&& !cpu_class_is_omap2()
->  			&& (req->req.length % ep->ep.maxpacket) != 0) {
->  		DBG("%s, no partial packet OUT reads\n", __func__);
->  		return -EMSGSIZE;
-> @@ -2091,10 +2061,6 @@ static inline int machine_without_vbus_sense(void)
->  {
->  	return (machine_is_omap_innovator()
->  		|| machine_is_omap_osk()
-> -		|| machine_is_omap_apollon()
-> -#ifndef CONFIG_MACH_OMAP_H4_OTG
-> -		|| machine_is_omap_h4()
-> -#endif
->  		|| machine_is_sx1()
->  		|| cpu_is_omap7xx() /* No known omap7xx boards with vbus sense */
->  		);
-> @@ -2308,12 +2274,9 @@ static int proc_otg_show(struct seq_file *s)
->  	u32		trans = 0;
->  	char		*ctrl_name = "(UNKNOWN)";
->  
-> -	/* XXX This needs major revision for OMAP2+ */
->  	tmp = omap_readl(OTG_REV);
-> -	if (cpu_class_is_omap1()) {
-> -		ctrl_name = "tranceiver_ctrl";
-> -		trans = omap_readw(USB_TRANSCEIVER_CTRL);
-> -	}
-> +	ctrl_name = "tranceiver_ctrl";
-> +	trans = omap_readw(USB_TRANSCEIVER_CTRL);
->  	seq_printf(s, "\nOTG rev %d.%d, %s %05x\n",
->  		tmp >> 4, tmp & 0xf, ctrl_name, trans);
->  	tmp = omap_readw(OTG_SYSCON_1);
-> @@ -2400,14 +2363,12 @@ static int proc_udc_show(struct seq_file *s, void *_)
->  		HMC,
->  		udc->transceiver
->  			? udc->transceiver->label
-> -			: ((cpu_is_omap1710() || cpu_is_omap24xx())
-> +			: (cpu_is_omap1710() 
->  				? "external" : "(none)"));
-> -	if (cpu_class_is_omap1()) {
-> -		seq_printf(s, "ULPD control %04x req %04x status %04x\n",
-> -			omap_readw(ULPD_CLOCK_CTRL),
-> -			omap_readw(ULPD_SOFT_REQ),
-> -			omap_readw(ULPD_STATUS_REQ));
-> -	}
-> +	seq_printf(s, "ULPD control %04x req %04x status %04x\n",
-> +		omap_readw(ULPD_CLOCK_CTRL),
-> +		omap_readw(ULPD_SOFT_REQ),
-> +		omap_readw(ULPD_STATUS_REQ));
->  
->  	/* OTG controller registers */
->  	if (!cpu_is_omap15xx())
-> @@ -2592,7 +2553,7 @@ omap_ep_setup(char *name, u8 addr, u8 type,
->  		 * and ignored for PIO-IN on newer chips
->  		 * (for more reliable behavior)
->  		 */
-> -		if (!use_dma || cpu_is_omap15xx() || cpu_is_omap24xx())
-> +		if (!use_dma || cpu_is_omap15xx())
->  			dbuf = 0;
->  
->  		switch (maxp) {
-> @@ -2796,8 +2757,8 @@ static int __init omap_udc_probe(struct platform_device *pdev)
->  	struct usb_phy		*xceiv = NULL;
->  	const char		*type = NULL;
->  	struct omap_usb_config	*config = pdev->dev.platform_data;
-> -	struct clk		*dc_clk;
-> -	struct clk		*hhc_clk;
-> +	struct clk		*dc_clk = NULL;
-> +	struct clk		*hhc_clk = NULL;
->  
->  	/* NOTE:  "knows" the order of the resources! */
->  	if (!request_mem_region(pdev->resource[0].start,
-> @@ -2817,16 +2778,6 @@ static int __init omap_udc_probe(struct platform_device *pdev)
->  		udelay(100);
->  	}
->  
-> -	if (cpu_is_omap24xx()) {
-> -		dc_clk = clk_get(&pdev->dev, "usb_fck");
-> -		hhc_clk = clk_get(&pdev->dev, "usb_l4_ick");
-> -		BUG_ON(IS_ERR(dc_clk) || IS_ERR(hhc_clk));
-> -		/* can't use omap_udc_enable_clock yet */
-> -		clk_enable(dc_clk);
-> -		clk_enable(hhc_clk);
-> -		udelay(100);
-> -	}
-> -
->  	if (cpu_is_omap7xx()) {
->  		dc_clk = clk_get(&pdev->dev, "usb_dc_ck");
->  		hhc_clk = clk_get(&pdev->dev, "l3_ocpi_ck");
-> @@ -2876,14 +2827,6 @@ static int __init omap_udc_probe(struct platform_device *pdev)
->  
->  		hmc = HMC_1610;
->  
-> -		if (cpu_is_omap24xx()) {
-> -			/* this could be transceiverless in one of the
-> -			 * "we don't need to know" modes.
-> -			 */
-> -			type = "external";
-> -			goto known;
-> -		}
-> -
->  		switch (hmc) {
->  		case 0:			/* POWERUP DEFAULT == 0 */
->  		case 4:
-> @@ -2922,7 +2865,7 @@ bad_on_1710:
->  			goto cleanup0;
->  		}
->  	}
-> -known:
-> +
->  	INFO("hmc mode %d, %s transceiver\n", hmc, type);
->  
->  	/* a "gadget" abstracts/virtualizes the controller */
-> @@ -2976,16 +2919,6 @@ known:
->  		clk_disable(dc_clk);
->  	}
->  
-> -	if (cpu_is_omap24xx()) {
-> -		udc->dc_clk = dc_clk;
-> -		udc->hhc_clk = hhc_clk;
-> -		/* FIXME OMAP2 don't release hhc & dc clock */
-> -#if 0
-> -		clk_disable(hhc_clk);
-> -		clk_disable(dc_clk);
-> -#endif
-> -	}
-> -
->  	create_proc_file();
->  	status = device_add(&udc->gadget.dev);
->  	if (status)
-> @@ -3014,7 +2947,7 @@ cleanup0:
->  	if (xceiv)
->  		usb_put_transceiver(xceiv);
->  
-> -	if (cpu_is_omap16xx() || cpu_is_omap24xx() || cpu_is_omap7xx()) {
-> +	if (cpu_is_omap16xx() || cpu_is_omap7xx()) {
->  		clk_disable(hhc_clk);
->  		clk_disable(dc_clk);
->  		clk_put(hhc_clk);
-> 
+Signed-off-by: Yuping Luo <yuping.luo@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/prima2-cb.dts          |    1 +
+ arch/arm/mach-prima2/include/mach/gpio.h |    1 +
+ drivers/pinctrl/Makefile                 |    2 +-
+ drivers/pinctrl/gpio-sirf.c              |  458 ++++++++++++++++++++++++++++++
+ 4 files changed, 461 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/include/mach/gpio.h
+ create mode 100644 drivers/pinctrl/gpio-sirf.c
 
+diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
+index 34ae3a6..4245306 100644
+--- a/arch/arm/boot/dts/prima2-cb.dts
++++ b/arch/arm/boot/dts/prima2-cb.dts
+@@ -284,6 +284,7 @@
+ 				#interrupt-cells = <2>;
+ 				compatible = "sirf,prima2-gpio-pinmux";
+ 				reg = <0xb0120000 0x10000>;
++				interrupts = <43 44 45 46 47>;
+ 				gpio-controller;
+ 				interrupt-controller;
+ 			};
+diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
+new file mode 100644
+index 0000000..40a8c17
+--- /dev/null
++++ b/arch/arm/mach-prima2/include/mach/gpio.h
+@@ -0,0 +1 @@
++/* empty */
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 515e32f..90b699b 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -20,7 +20,7 @@ obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
+ obj-$(CONFIG_PINCTRL_IMX28)	+= pinctrl-imx28.o
+ obj-$(CONFIG_PINCTRL_PXA168)	+= pinctrl-pxa168.o
+ obj-$(CONFIG_PINCTRL_PXA910)	+= pinctrl-pxa910.o
+-obj-$(CONFIG_PINCTRL_SIRF)	+= pinctrl-sirf.o
++obj-$(CONFIG_PINCTRL_SIRF)	+= pinctrl-sirf.o gpio-sirf.o
+ obj-$(CONFIG_PINCTRL_TEGRA)	+= pinctrl-tegra.o
+ obj-$(CONFIG_PINCTRL_TEGRA20)	+= pinctrl-tegra20.o
+ obj-$(CONFIG_PINCTRL_TEGRA30)	+= pinctrl-tegra30.o
+diff --git a/drivers/pinctrl/gpio-sirf.c b/drivers/pinctrl/gpio-sirf.c
+new file mode 100644
+index 0000000..3cc696d
+--- /dev/null
++++ b/drivers/pinctrl/gpio-sirf.c
+@@ -0,0 +1,458 @@
++/*
++ * GPIO controller driver for CSR SiRFprimaII
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++
++#define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
++
++#define SIRFSOC_GPIO_NO_OF_BANKS        5
++#define SIRFSOC_GPIO_BANK_SIZE          32
++
++#define SIRFSOC_GPIO_CTRL(g, i)			((g)*0x100 + (i)*4)
++#define SIRFSOC_GPIO_DSP_EN0			(0x80)
++#define SIRFSOC_GPIO_PAD_EN(g)			((g)*0x100 + 0x84)
++#define SIRFSOC_GPIO_INT_STATUS(g)		((g)*0x100 + 0x8C)
++
++#define SIRFSOC_GPIO_CTL_INTR_LOW_MASK		0x1
++#define SIRFSOC_GPIO_CTL_INTR_HIGH_MASK		0x2
++#define SIRFSOC_GPIO_CTL_INTR_TYPE_MASK		0x4
++#define SIRFSOC_GPIO_CTL_INTR_EN_MASK		0x8
++#define SIRFSOC_GPIO_CTL_INTR_STS_MASK		0x10
++#define SIRFSOC_GPIO_CTL_OUT_EN_MASK		0x20
++#define SIRFSOC_GPIO_CTL_DATAOUT_MASK		0x40
++#define SIRFSOC_GPIO_CTL_DATAIN_MASK		0x80
++#define SIRFSOC_GPIO_CTL_PULL_MASK		0x100
++#define SIRFSOC_GPIO_CTL_PULL_HIGH		0x200
++#define SIRFSOC_GPIO_CTL_DSP_INT		0x400
++
++#define SIRFSOC_GPIO_NUM(bank, index)	(((bank)*(32)) + (index))
++
++struct sirfsoc_gpio_bank {
++	struct of_mm_gpio_chip chip;
++	int id;
++	int irq;
++	spinlock_t lock;
++};
++
++static struct sirfsoc_gpio_bank sgpio_bank[SIRFSOC_GPIO_NO_OF_BANKS];
++
++static DEFINE_SPINLOCK(sgpio_lock);
++
++static inline struct sirfsoc_gpio_bank *sirfsoc_irq_to_bank(unsigned int irq)
++{
++	return &sgpio_bank[(irq - SIRFSOC_GPIO_IRQ_START) / SIRFSOC_GPIO_BANK_SIZE];
++}
++
++static inline int sirfsoc_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	return SIRFSOC_GPIO_IRQ_START + (chip->base + offset);
++}
++
++static inline int sirfsoc_irq_to_offset(unsigned int irq)
++{
++	return (irq - SIRFSOC_GPIO_IRQ_START) % SIRFSOC_GPIO_BANK_SIZE;
++}
++
++static inline int sirfsoc_gpio_to_offset(unsigned int gpio)
++{
++	return gpio % SIRFSOC_GPIO_BANK_SIZE;
++}
++
++static inline struct sirfsoc_gpio_bank *sirfsoc_irqchip_to_bank(struct gpio_chip *chip)
++{
++	return container_of(to_of_mm_gpio_chip(chip), struct sirfsoc_gpio_bank, chip);
++}
++
++static void sirfsoc_gpio_irq_ack(struct irq_data *d)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int idx = sirfsoc_irq_to_offset(d->irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&sgpio_lock, flags);
++
++	status = readl(bank->chip.regs + offset);
++
++	writel(status, bank->chip.regs + offset);
++
++	spin_unlock_irqrestore(&sgpio_lock, flags);
++}
++
++static void __sirfsoc_gpio_irq_mask(unsigned int irq)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irq_to_bank(irq);
++	int idx = sirfsoc_irq_to_offset(irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&sgpio_lock, flags);
++
++	status = readl(bank->chip.regs + offset);
++	status &= ~SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++	status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++	writel(status, bank->chip.regs + offset);
++
++	spin_unlock_irqrestore(&sgpio_lock, flags);
++}
++
++static void sirfsoc_gpio_irq_mask(struct irq_data *d)
++{
++	__sirfsoc_gpio_irq_mask(d->irq);
++}
++
++static void sirfsoc_gpio_irq_unmask(struct irq_data *d)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int idx = sirfsoc_irq_to_offset(d->irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&sgpio_lock, flags);
++
++	status = readl(bank->chip.regs + offset);
++	status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++	status |= SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++	writel(status, bank->chip.regs + offset);
++
++	spin_unlock_irqrestore(&sgpio_lock, flags);
++}
++
++static int sirfsoc_gpio_irq_type(struct irq_data *d, unsigned type)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int idx = sirfsoc_irq_to_offset(d->irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&sgpio_lock, flags);
++
++	status = readl(bank->chip.regs + offset);
++	status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++
++	switch (type) {
++	case IRQ_TYPE_NONE:
++		break;
++	case IRQ_TYPE_EDGE_RISING:
++		status |= (SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		status &= ~SIRFSOC_GPIO_CTL_INTR_LOW_MASK;
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		status &= ~SIRFSOC_GPIO_CTL_INTR_HIGH_MASK;
++		status |= (SIRFSOC_GPIO_CTL_INTR_LOW_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		status |=
++			(SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_LOW_MASK |
++			 SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		status &= ~(SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		status |= SIRFSOC_GPIO_CTL_INTR_LOW_MASK;
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		status |= SIRFSOC_GPIO_CTL_INTR_HIGH_MASK;
++		status &= ~(SIRFSOC_GPIO_CTL_INTR_LOW_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
++	}
++
++	writel(status, bank->chip.regs + offset);
++
++	spin_unlock_irqrestore(&sgpio_lock, flags);
++
++	return 0;
++}
++
++static struct irq_chip sirfsoc_irq_chip = {
++	.name = "SiRF SoC GPIO IRQ",
++	.irq_ack = sirfsoc_gpio_irq_ack,
++	.irq_mask = sirfsoc_gpio_irq_mask,
++	.irq_unmask = sirfsoc_gpio_irq_unmask,
++	.irq_set_type = sirfsoc_gpio_irq_type,
++};
++
++static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
++{
++	struct sirfsoc_gpio_bank *bank = NULL;
++	u32 status, ctrl;
++	int i, idx = 0;
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		if (sgpio_bank[i].irq == irq) {
++			bank = &sgpio_bank[i];
++			break;
++		}
++	}
++
++	status = readl(bank->chip.regs + SIRFSOC_GPIO_INT_STATUS(bank->id));
++	if (!status) {
++		printk(KERN_WARNING
++			"%s: gpio id %d status %#x no interrupt is flaged\n",
++			__func__, bank->id, status);
++		handle_bad_irq(irq, desc);
++		return;
++	}
++
++	while (status) {
++		ctrl = readl(bank->chip.regs + SIRFSOC_GPIO_CTRL(bank->id, idx));
++
++		/*
++		 * Here we must check whether the corresponding GPIO's interrupt
++		 * has been enabled, otherwise just skip it
++		 */
++		if ((status & 0x1) && (ctrl & SIRFSOC_GPIO_CTL_INTR_EN_MASK)) {
++			pr_debug("%s: gpio id %d idx %d happens\n",
++				__func__, bank->id, idx);
++			irq =
++				(SIRFSOC_GPIO_IRQ_START +
++				 (bank->id * SIRFSOC_GPIO_BANK_SIZE)) + idx;
++			generic_handle_irq(irq);
++		}
++
++		idx++;
++		status = status >> 1;
++	}
++}
++
++static inline void sirfsoc_gpio_set_input(struct sirfsoc_gpio_bank *bank, unsigned ctrl_offset)
++{
++	u32 status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	status = readl(bank->chip.regs + ctrl_offset);
++	status &= ~SIRFSOC_GPIO_CTL_OUT_EN_MASK;
++	writel(status, bank->chip.regs + ctrl_offset);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static int sirfsoc_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	unsigned long flags;
++
++	if (pinctrl_request_gpio(chip->base + offset))
++		return -ENODEV;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	/*
++	 * default status:
++	 * set direction as input and mask irq
++	 */
++	sirfsoc_gpio_set_input(bank, SIRFSOC_GPIO_CTRL(bank->id, offset));
++	__sirfsoc_gpio_irq_mask(sirfsoc_gpio_to_irq(chip, offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return 0;
++}
++
++static void sirfsoc_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	__sirfsoc_gpio_irq_mask(sirfsoc_gpio_to_irq(chip, offset));
++	sirfsoc_gpio_set_input(bank, SIRFSOC_GPIO_CTRL(bank->id, offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	pinctrl_free_gpio(chip->base + offset);
++}
++
++static int sirfsoc_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	int idx = sirfsoc_gpio_to_offset(gpio);
++	unsigned long flags;
++	unsigned offset;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	sirfsoc_gpio_set_input(bank, offset);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return 0;
++}
++
++static inline void sirfsoc_gpio_set_output(struct sirfsoc_gpio_bank *bank, unsigned offset,
++	int value)
++{
++	u32 status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	status = readl(bank->chip.regs + offset);
++	if (value)
++		status |= SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	else
++		status &= ~SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++
++	status &= ~SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++	status |= SIRFSOC_GPIO_CTL_OUT_EN_MASK;
++	writel(status, bank->chip.regs + offset);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static int sirfsoc_gpio_direction_output(struct gpio_chip *chip, unsigned gpio, int value)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	int idx = sirfsoc_gpio_to_offset(gpio);
++	u32 offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->id, idx);
++
++	spin_lock_irqsave(&sgpio_lock, flags);
++
++	sirfsoc_gpio_set_output(bank, offset, value);
++
++	spin_unlock_irqrestore(&sgpio_lock, flags);
++
++	return 0;
++}
++
++static int sirfsoc_gpio_get_value(struct gpio_chip *chip, unsigned offset)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	u32 status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	status = readl(bank->chip.regs + SIRFSOC_GPIO_CTRL(bank->id, offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++
++	return !!(status & SIRFSOC_GPIO_CTL_DATAIN_MASK);
++}
++
++static void sirfsoc_gpio_set_value(struct gpio_chip *chip, unsigned offset,
++	int value)
++{
++	struct sirfsoc_gpio_bank *bank = sirfsoc_irqchip_to_bank(chip);
++	u32 status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	status = readl(bank->chip.regs + SIRFSOC_GPIO_CTRL(bank->id, offset));
++	if (value)
++		status |= SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	else
++		status &= ~SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	writel(status, bank->chip.regs + SIRFSOC_GPIO_CTRL(bank->id, offset));
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++}
++
++static int __devinit sirfsoc_gpio_probe(struct device_node *np)
++{
++	int i, err = 0;
++	struct sirfsoc_gpio_bank *bank;
++	void *regs;
++	struct platform_device *pdev;
++
++	pdev = of_find_device_by_node(np);
++	if (!pdev)
++		return -ENODEV;
++
++	regs = of_iomap(np, 0);
++	if (!regs)
++		return -ENOMEM;
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		bank = &sgpio_bank[i];
++		spin_lock_init(&bank->lock);
++		bank->chip.gc.request = sirfsoc_gpio_request;
++		bank->chip.gc.free = sirfsoc_gpio_free;
++		bank->chip.gc.direction_input = sirfsoc_gpio_direction_input;
++		bank->chip.gc.get = sirfsoc_gpio_get_value;
++		bank->chip.gc.direction_output = sirfsoc_gpio_direction_output;
++		bank->chip.gc.set = sirfsoc_gpio_set_value;
++		bank->chip.gc.to_irq = sirfsoc_gpio_to_irq;
++		bank->chip.gc.base = i * SIRFSOC_GPIO_BANK_SIZE;
++		bank->chip.gc.ngpio = SIRFSOC_GPIO_BANK_SIZE;
++		bank->chip.gc.label = kstrdup(np->full_name, GFP_KERNEL);
++		bank->chip.gc.of_node = np;
++		bank->chip.regs = regs;
++		bank->id = i;
++		bank->irq = platform_get_irq(pdev, i);
++		if (bank->irq < 0) {
++			err = bank->irq;
++			goto out;
++		}
++
++		/* Call the OF gpio helper to setup and register the GPIO device */
++		err = gpiochip_add(&bank->chip.gc);
++		if (err) {
++			pr_err("%s: error in probe function with status %d\n",
++				np->full_name, err);
++			goto out;
++		}
++
++		irq_set_chained_handler(bank->irq, sirfsoc_gpio_handle_irq);
++		irq_set_chip(bank->irq, &sirfsoc_irq_chip);
++		irq_set_handler(bank->irq, handle_level_irq);
++		set_irq_flags(bank->irq, IRQF_VALID | IRQF_PROBE);
++	}
++
++out:
++	iounmap(regs);
++	return err;
++}
++
++static const struct of_device_id sgpio_of_match[] __devinitconst = {
++	{.compatible = "sirf,prima2-gpio-pinmux", },
++	{},
++};
++
++static int __init sirfsoc_gpio_init(void)
++{
++
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, sgpio_of_match);
++
++	if (!np)
++		return -ENODEV;
++
++	return sirfsoc_gpio_probe(np);
++}
++subsys_initcall(sirfsoc_gpio_init);
++
++MODULE_DESCRIPTION("SiRFSoC GPIO driver");
++MODULE_AUTHOR("Yuping Luo <yuping.luo@csr.com>, Barry Song <baohua.song@csr.com>");
++MODULE_LICENSE("GPL v2");
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/ceb8fbc2/attachment.sig>
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
