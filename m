@@ -1,52 +1,108 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 May 2012 22:35:01 -0700
-Subject: [GIT PULL 1/8] arm-soc: updates for MAINTAINERS file
+Date: Mon, 21 May 2012 22:35:03 -0700
+Subject: =?UTF-8?q?=5BGIT=20PULL=203/8=5D=20arm-soc=3A=20non-critical=20bug=20fixes?=
 In-Reply-To: <1337664908-17478-1-git-send-email-olof@lixom.net>
 References: <1337664908-17478-1-git-send-email-olof@lixom.net>
-Message-ID: <1337664908-17478-2-git-send-email-olof@lixom.net>
+Message-ID: <1337664908-17478-4-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a collection of updates to the MAINTAINERS file, separated out
-mostly to give an overview of what has changed regarding who does what.
+These bug fixes were not important enough to have them included in the
+v3.4 release, mostly because they cover harmless warnings or unrealistic
+configurations. Instead we queue them up to be picked up in the next
+merge window.
 
-In particular, at91, orion and prima2 platforms and drivers are updated
-in this batch.
+This branch will result in one conflict when merged in: panda_dvi_init()
+is modified on one side and removed on the other. The correct resolution
+is to remove it during merge.
 
 ----------------------------------------------------------------
 
-The following changes since commit 471368557a734c6c486ee757952c902b36e7fd01:
+The following changes since commit c5407b32071ef1bb5ea85b6fbc901ff890e6e321:
 
-  Merge branch 'irq-core-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+  Merge tag 'cleanup' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/maintainers
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
 
-for you to fetch changes up to 47ac3e44cfd253a227734ed375435566ffddc173:
+for you to fetch changes up to 74c437532b8b5db53509963ec38e8424c56ff6f4:
 
-  MAINTAINER: add some drivers upstreamed in CSR SIRFPRIMA2
+  ARM: spear6xx: remove board selection options
 
 ----------------------------------------------------------------
 
+Akinobu Mita (1):
+      arm: davinci: use for_each_set_bit_from
+
 Arnd Bergmann (1):
-      Merge tag 'at91-3.5-maintainers' of git://github.com/at91linux/linux-at91 into next/maintainers
+      ARM: spear6xx: remove board selection options
 
-Barry Song (1):
-      MAINTAINER: add some drivers upstreamed in CSR SIRFPRIMA2
+Artem Bityutskiy (1):
+      ARM: OMAP1: fix compilation issue in board-sx1.c
 
-Josh Wu (2):
-      MAINTAINERS: add entry for Atmel isi driver
-      MAINTAINERS: add entry for Atmel touch screen ADC controller driver
+Balaji T K (1):
+      ARM: OMAP4: hsmmc: check for null pointer
 
-Nicolas Ferre (3):
-      MAINTAINERS: add entry for Atmel DMA driver
-      MAINTAINERS: add entry for Atmel timer counter (TC)
-      MAINTAINERS: remove non-responding web link for atmel_usba driver
+Chris Lalancette (1):
+      ARM: OMAP4: Adding ID for OMAP4460 ES1.1
 
-Nicolas Pitre (1):
-      maintainership update for the Marvell Orion family of SOCs
+Felipe Contreras (1):
+      ARM: OMAP: fix trivial warnings for dspbridge
+
+Grazvydas Ignotas (1):
+      ARM: OMAP2+: remove incorrect irq_chip ack field
+
+Kevin Hilman (1):
+      ARM: OMAP2+: INTC: fix Kconfig option for TI81XX
+
+Laurent Pinchart (1):
+      ARM: OMAP: igep0020: Specify the VPLL2 regulator unconditionally
+
+Murali Karicheri (1):
+      ARM: davinci: fix incorrect pdctl next bit position
+
+Olof Johansson (3):
+      Merge branch 'for-3.5/fixes' of git://git.kernel.org/.../swarren/linux-tegra into next/fixes
+      Merge tag 'v3.5-fixes-and-cleanups' of git://gitorious.org/linux-davinci/linux-davinci into next/fixes
+      Merge tag 'omap-fixes-non-critical-for-v3.5' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes
+
+Stephen Warren (2):
+      ARM: tegra: add pll_x freq table entry for 750MHz
+      ARM: disable SUSPEND/ARCH_SUSPEND_POSSIBLE for ARCH_TEGRA
+
+Tomi Valkeinen (1):
+      ARM: OMAP4: panda: add statics to remove warnings
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Incorrect Register Offsets in OMAP Mailbox
+
+Uwe Kleine-K?nig (2):
+      ARM: davinci: mark spi_board_info arguments as const
+      ARM: davinci: da850-evm: fix section mismatch
 
 
- MAINTAINERS | 43 +++++++++++++++++++++++++++++++++++++------
- 1 file changed, 37 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig                           |  2 +-
+ arch/arm/mach-davinci/board-da850-evm.c    |  2 +-
+ arch/arm/mach-davinci/davinci.h            |  4 +-
+ arch/arm/mach-davinci/devices-da8xx.c      |  2 +-
+ arch/arm/mach-davinci/dm355.c              |  2 +-
+ arch/arm/mach-davinci/dm365.c              |  2 +-
+ arch/arm/mach-davinci/dma.c                |  6 +--
+ arch/arm/mach-davinci/include/mach/da8xx.h |  3 +-
+ arch/arm/mach-davinci/include/mach/psc.h   |  2 +-
+ arch/arm/mach-omap1/Kconfig                |  1 +
+ arch/arm/mach-omap2/board-4430sdp.c        | 44 -------------------
+ arch/arm/mach-omap2/board-igep0020.c       | 10 ++---
+ arch/arm/mach-omap2/board-omap4panda.c     | 49 ---------------------
+ arch/arm/mach-omap2/common.h               |  3 ++
+ arch/arm/mach-omap2/dsp.c                  |  5 ++-
+ arch/arm/mach-omap2/id.c                   |  5 ++-
+ arch/arm/mach-omap2/irq.c                  |  3 +-
+ arch/arm/mach-omap2/mailbox.c              |  6 +--
+ arch/arm/mach-omap2/omap4-common.c         | 58 +++++++++++++++++++++++++
+ arch/arm/mach-spear6xx/Kconfig             | 18 ++------
+ arch/arm/mach-tegra/tegra2_clocks.c        |  6 +++
+ arch/arm/plat-omap/devices.c               |  4 +-
+ arch/arm/plat-omap/include/plat/cpu.h      |  1 +
+ 23 files changed, 103 insertions(+), 135 deletions(-)
