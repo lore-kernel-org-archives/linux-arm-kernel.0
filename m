@@ -1,75 +1,39 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 22 May 2012 13:59:02 +0800
-Subject: [PATCH v2 10/12] ARM: dts: imx6q-sabrelite: add usb devices
-In-Reply-To: <20120522051005.GN8140@S2101-09.ap.freescale.net>
+Date: Tue, 22 May 2012 14:07:14 +0800
+Subject: [PATCH v2 07/12] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <201205220727.30910.marex@denx.de>
 References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-11-git-send-email-richard.zhao@freescale.com>
- <20120522051005.GN8140@S2101-09.ap.freescale.net>
-Message-ID: <20120522055901.GR6206@b20223-02.ap.freescale.net>
+ <201205220722.00653.marex@denx.de>
+ <CAAQ0ZWSS3ONsF=MLQOJ2u1h3mGErfZ4W2QoSNk4+MQHTC830MQ@mail.gmail.com>
+ <201205220727.30910.marex@denx.de>
+Message-ID: <20120522060713.GS6206@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 01:10:08PM +0800, Shawn Guo wrote:
-> On Mon, May 21, 2012 at 05:23:55PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts |   18 ++++++++++++-
-> >  arch/arm/boot/dts/imx6q.dtsi          |   44 +++++++++++++++++++++++++++++++-
-> >  2 files changed, 59 insertions(+), 3 deletions(-)
+On Tue, May 22, 2012 at 07:27:30AM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
+> 
+> > On 22 May 2012 13:22, Marek Vasut <marex@denx.de> wrote:
+> > > Something like that ... but didn't Linus complain that we have too many
+> > > files in arch/arm/ ?
 > > 
-> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > index 1dd2261..1d28957 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -48,10 +48,26 @@
-> >  					status = "okay";
-> >  				};
-> >  			};
-> > -
-> > +			iomuxc at 020e0000 {
-> > +				gpios {
-> > +					pinctrl_gpio_hog: gpiohog {
+> > So what do you exactly mean by per-board driver?
 > 
-> This isn't really welcomed, and should really be removed after we have
-> gpio_request() be able to call pinctrl to set the mux.
-Yes, but we don't have now. If I add dependency which don't even hit
-next tree, I experienced people refuse pick my patch.
-Of course, If you're ok to pick other patches, I can leave the code
-locally for test.
-> 
-> > +						fsl,pins = <1044 0x80000000
-> > +							   144  0x80000000>;	/* MX6Q_PAD_GPIO_17__GPIO_7_12 */
-> 
-> Here are what I get from fsl,imx6q-pinctrl.txt.  The comment was put on
-> the wrong line?
-> 
-> MX6Q_PAD_EIM_D22__GPIO_3_22                     144
-> MX6Q_PAD_GPIO_17__GPIO_7_12                     1044 
-Good catch.
-> 
-> > +					};
-> > +				};
-> > +			};
-> >  		};
-> >  
-> ...
-> 
-> > @@ -495,6 +500,11 @@
-> >  					};
-> >  				};
-> >  
-> > +				gpios {
-> > +					pinctrl_gpio_hog: gpiohog {
-> > +					};
-> > +				};
-> > +
-> Why the empty nodes?
-It's place holder that let use know to add gpio hog-on-boot in board dts.
+> Exactly such fixup as there's for mx6q-sabrelite. But then, if you have too 
+> broken bootloader, you'll need such a fixup for every such board. Or do you want 
+> to let mach-imx6q.c grow in size with each broken board?
+As Shawn said, this patch is trying to abstract common things.
+We don't need to repeat the code that interpret output-gpios.
+
+Generally discuss often draw no conclusion. So let's talk about
+code.
 
 Thanks
 Richard
 > 
-> -- 
-> Regards,
-> Shawn
+> > Regards,
+> > Shawn
+> 
+> Best regards,
+> Marek Vasut
 > 
