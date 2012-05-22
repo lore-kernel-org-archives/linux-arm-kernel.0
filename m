@@ -1,44 +1,30 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 22 May 2012 13:03:33 +0100
-Subject: [PATCH] arm: Add basic support for new Marvell Armada SoC family
-In-Reply-To: <20120518192011.GD24238@titan.lakedaemon.net>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201205161946.34179.arnd@arndb.de>
- <alpine.LFD.2.02.1205161552490.1640@xanadu.home>
- <201205162034.49392.arnd@arndb.de>
- <20120518192011.GD24238@titan.lakedaemon.net>
-Message-ID: <4FBB8095.4070402@codethink.co.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 22 May 2012 15:08:52 +0300
+Subject: Clock register in early init
+In-Reply-To: <4FBB5A72.2080101@codethink.co.uk>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com>
+ <1337316517.22560.19.camel@pgaikwad-dt2>
+ <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+ <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
+ <4FBB5A72.2080101@codethink.co.uk>
+Message-ID: <20120522120851.GI8730@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/12 20:20, Jason Cooper wrote:
-> On Wed, May 16, 2012 at 08:34:49PM +0000, Arnd Bergmann wrote:
->> On Wednesday 16 May 2012, Nicolas Pitre wrote:
->>> In this case, we have wildly different names referring to the same chip
->>> family, and "orion" is far from hinting that it also constitute the
->>> support for Kirkwood, Dove or (some not all) Armadas, unless you are
->>> familiar with some legacy Marvell products.  This is why in this case I
->>> think that a directory name change might be appropriate, especially if
->>> we're going to cause churn by moving things around already.
->>>
->>> I agree that mrvl_ebu_* is not pretty.  This could be mv_ebu_* or
->>> mvebu_*.  Unless someone has another logical identifier to suggest which
->>> would capture all that family of SOCs that came out of EBU in Marvell of
->>> course.
->>>
->>> Since this is code not marketing, we don't have to have something flashy
->>> either, as long as it doesn't create more confusion than "orion" does.
->>> The various Kconfig help texts are good places to put all the marketing
->>> names du jour.
->>
->> mvebu sounds reasonable to me, it's definitely unique and it's almost a
->> word ;-)
->
-> mvebuntu? *ducks*
+> We had at-least that on the older Samsung parts and they where still
+> growing. I would suggest that in a multi-kernel image situation the
+> more data that can be discarded after init-time the better.
+> 
+> Also, __initdata gets gathered into one place so there's no possibility
+> of page fragmentation there. If you mean fragmentation of the memory
+> map, then allocate the size of all the clocks you know of at init time
+> in one go.
+> 
 
-you, sir, are clearly quackers.
+That would work, except that clocks are needed before kmalloc is available.
 
+Cheers,
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Peter.
