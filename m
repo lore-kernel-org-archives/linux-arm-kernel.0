@@ -1,173 +1,62 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 22 May 2012 12:09:12 +0200
-Subject: [PATCH v3 3/3] ARM: dts: add nodes for atmel hsmci controllers for
- atmel platforms
-In-Reply-To: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 22 May 2012 11:17:04 +0100
+Subject: [PATCH V2 1/3] ARM: tegra: trimslice: enable PCIe when booting
+ from device tree
+In-Reply-To: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
+References: <1337289674-18581-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <4FBB67A0.9010606@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 17/05/12 22:21, Stephen Warren wrote:
+> From: Stephen Warren<swarren@nvidia.com>
+>
+> There currently aren't bindings for the Tegra PCIe controller. Work on
+> this is in progress, but not yet complete. Manually initialize PCIe when
+> booting from device tree, in order to bring DT support to the same
+> feature level as board files, which will in turn allow board files to be
+> deprecated.
+>
+> PCIe hosts the wired Ethernet controller on TrimSlice.
+>
+> To support this, add infra-structure to board-dt-tegra20.c for board-
+> specific initialization code. Once device tree support for the relevant
+> features is in place, this code will be removed.
+>
+> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+> ---
+> v2: Use .init_late hook in DT_MACHINE_START instead of an explicit late
+> initcall.
+> ---
+>   arch/arm/mach-tegra/board-dt-tegra20.c |   36 +++++++++++++++++++++++++++++++-
+>   1 files changed, 35 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+> index eb7249d..9537f20 100644
+> --- a/arch/arm/mach-tegra/board-dt-tegra20.c
+> +++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+> @@ -98,6 +98,40 @@ static void __init tegra_dt_init(void)
+>   				tegra20_auxdata_lookup, NULL);
+>   }
+>
+> +#ifdef CONFIG_MACH_TRIMSLICE
+> +static void __init trimslice_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = tegra_pcie_init(true, true);
+> +	if (ret)
+> +		pr_err("tegra_pci_init() failed: %d\n", ret);
+> +}
+> +#endif
 
-Add nodes for mci controllers.
+Given the size of some of these functions, is it worth even
+bothering with an #ifdef around them, especially as they are
+marked init.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/at91sam9g20.dtsi     |   12 ++++++++++++
- arch/arm/boot/dts/at91sam9g25ek.dts    |   16 ++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi     |   24 ++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |   17 +++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi      |   24 ++++++++++++++++++++++++
- 5 files changed, 93 insertions(+), 0 deletions(-)
+How about having some sort of standard pcie binding for the pcie
+part?
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 773ef48..6a28bfe 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -197,6 +197,18 @@
- 				interrupts = <10 4>;
- 				status = "disabled";
- 			};
-+
-+			mmc0: mmc at fffa800 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfffa800 0x600>;
-+				interrupts = <9 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				slot at 0 {
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 7829a4d..dd94f4b 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,22 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				status = "okay";
-+				slot at 0 {
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 15 0>;
-+				};
-+			};
-+
-+			mmc1: mmc at f000c000 {
-+				status = "okay";
-+				slot at 0 {
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 14 0>;
-+				};
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index c804214..2922648 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -199,6 +199,30 @@
- 				interrupts = <25 4>;
- 				status = "disabled";
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfff80000 0x600>;
-+				interrupts = <11 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				slot at 0 {
-+					reg = <0>;
-+				};
-+			};
-+
-+			mmc1: mmc at fffd0000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfffd0000 0x600>;
-+				interrupts = <29 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				slot at 0 {
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..bc4cb3c 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,23 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				status = "okay";
-+				slot at 0 {
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 10 0>;
-+				};
-+			};
-+
-+			mmc1: mmc at fffd0000 {
-+				status = "okay";
-+				slot at 0 {
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 11 0>;
-+					wp-gpios = <&pioD 29 0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index dd4ed74..d5999b2 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -190,6 +190,30 @@
- 				interrupts = <27 4>;
- 				status = "disabled";
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf0008000 0x600>;
-+				interrupts = <12 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				slot at 0 {
-+					reg = <0>;
-+				};
-+			};
-+
-+			mmc1: mmc at f000c000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf000c000 0x600>;
-+				interrupts = <26 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				slot at 0 {
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
 -- 
-1.7.5.4
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
