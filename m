@@ -1,60 +1,93 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 22 May 2012 10:20:50 +0100
-Subject: Clock register in early init
-In-Reply-To: <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
-References: <1337227884.2066.9.camel@pgaikwad-dt2>
- <20120517062131.GA9305@gmail.com> <1337316517.22560.19.camel@pgaikwad-dt2>
- <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
- <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
-Message-ID: <4FBB5A72.2080101@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 May 2012 10:21:07 +0100
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120522092107.GB7286@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/12 09:46, Peter De Schrijver wrote:
->>
->> On OMAP I think the only "gotcha" is setting up the timer.  One
->> solution is to open code the register reads and the rate calculation
->> in the timer code.  That is ugly... but it works.
->>
->>> Which advantages do you see in dynamically allocating all this?
->>>
->>
->> There are many but I'll name a couple.  The most significant point is
->> that we can avoid exposing the definition of struct clk if we
->> dynamically allocate stuff.  One can use struct clk_hw_init to
->> statically initialize data, or instead rely on direct calls to
->> clk_register with a bunch of parameters.
->>
->
-> Which means if you make a mistake in specifying parents for example, it will
-> only fail at runtime, possibly before any console is active. With static
-> initialization, this will fail at compiletime. Much easier to debug.
->
->> Another point is that copying the data at registration-time makes
->> __initdata possible.  I haven't done the math yet to see if this
->> really makes a difference.  However if we start doing single zImage's
->> with multiple different ARM SoCs then this could recover some pages.
->>
->
-> On the other hand most clock structures are small, so there will be internal
-> fragmentation. Also the arrays of parent clock pointers can be shared between
-> different clocks. We have about 70 muxes in Tegra30 and 12 different parent
-> arrays.
+Hi Linus,
 
-We had at-least that on the older Samsung parts and they where still
-growing. I would suggest that in a multi-kernel image situation the
-more data that can be discarded after init-time the better.
+On Sun, May 20, 2012 at 09:41:45PM +0100, Linus Walleij wrote:
+> From: Colin Cross <ccross@android.com>
+> 
+> ARM errata 727915 for PL310 has been updated to include a new
+> workaround required for PL310 r2p0 for l2x0_flush_all, which also
+> affects l2x0_clean_all in my testing. For r2p0, clean or flush
+> each set/way individually. For r3p0 or greater, use the debug
+> register for cleaning and flushing.
+> 
+> Requires exporting the cache_id, sets and ways detected in the
+> init function for later use.
 
-Also, __initdata gets gathered into one place so there's no possibility
-of page fragmentation there. If you mean fragmentation of the memory
-map, then allocate the size of all the clocks you know of at init time
-in one go.
+[...]
 
-It would possible even be useful to have construction code that took
-some brief details of the clocks and constructed the list/tree of clocks
-at start time.
+> +#ifdef CONFIG_PL310_ERRATA_727915
+> +static void l2x0_for_each_set_way(void __iomem *reg)
+> +{
+> +	int set;
+> +	int way;
+> +	unsigned long flags;
+> +
+> +	for (way = 0; way < l2x0_ways; way++) {
+> +		raw_spin_lock_irqsave(&l2x0_lock, flags);
+> +		for (set = 0; set < l2x0_sets; set++)
+> +			writel_relaxed((way << 28) | (set << 5), reg);
+> +		cache_sync();
+> +		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> +	}
+> +}
+> +#endif
+> +
+>  static void __l2x0_flush_all(void)
+>  {
+>  	debug_writel(0x03);
+> @@ -143,6 +170,13 @@ static void l2x0_flush_all(void)
+>  {
+>  	unsigned long flags;
+>  
+> +#ifdef CONFIG_PL310_ERRATA_727915
+> +	if (is_pl310_rev(REV_PL310_R2P0)) {
+> +		l2x0_for_each_set_way(l2x0_base + L2X0_CLEAN_INV_LINE_IDX);
+> +		return;
+> +	}
+> +#endif
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+If we're adding code like this to flush_all, maybe we'd be better off just
+assigning a different function to outer_cache.flush_all if we detect that
+the current outer cache is an affected PL310 variant. However, note that
+__l2x0_flush_all is called on the disable path. Do we need to intercept that
+too?
+
+> @@ -153,11 +187,20 @@ static void l2x0_clean_all(void)
+>  {
+>  	unsigned long flags;
+>  
+> +#ifdef CONFIG_PL310_ERRATA_727915
+> +	if (is_pl310_rev(REV_PL310_R2P0)) {
+> +		l2x0_for_each_set_way(l2x0_base + L2X0_CLEAN_LINE_IDX);
+> +		return;
+> +	}
+> +#endif
+
+clean_all is only called as an optimisation when cleaning a large range.
+Since the workaround resorts back to cleaning each set and way, it's
+questionable whether the optimisation pays off. I'd be inclined just to
+predicate the optimisation on the erratum not being set.
+
+>  	/* clean all ways */
+>  	raw_spin_lock_irqsave(&l2x0_lock, flags);
+> +	debug_writel(0x03);
+>  	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+>  	cache_wait_way(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
+>  	cache_sync();
+> +	debug_writel(0x00);
+>  	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+>  }
+
+What are these new debug writes for? I thought only clean and invalidate was
+affected?
+
+Will
