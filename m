@@ -1,33 +1,35 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 22 May 2012 15:25:25 -0700
-Subject: [PATCH] ARM: BCMRING: fix IO mem static mapping
-In-Reply-To: <4FA962D6.3030807@broadcom.com>
-References: <4FA82414.7070407@broadcom.com>
- <201205072044.38612.arnd@arndb.de> <4FA962D6.3030807@broadcom.com>
-Message-ID: <4FBC1255.7030200@broadcom.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 22 May 2012 19:46:22 -0400
+Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+Message-ID: <20120522234621.GA3610@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> The other question is about the multiplatform kernel I've recently worked
-> on. bcmring is the only subarchitecture in Linux that puts header files
-> in its own directory outside of the mach/*.h hierarchy, which gets in the
-> way and is rather inconsistent. I've prepared a git branch to clean that
-> up, see the "testing/bcmring" branch of
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for this.
-> I've also added a patch to clean up some API abuse for MMIO accesses
-> that might otherwise cause problems. Can you test this branch and see
-> if everything still works for you?
+Hi Viresh,
 
-I verified that the changes work fine after I applied the IO mem mapping 
-and UART patches. I also briefly looked into the changes and they seems 
-good to me. Let me know if you want me to do a review.
+The above listed commit, in linux-next as:
 
-Will these changes go to v3.5?
+commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
 
-Regards,
-JD
+    "clk: add non CONFIG_HAVE_CLK routines"
 
->
-> 	Arnd
->
+shows up as failures in the netx_defconfig, since there
+are duplicate stub functions between your changes and the
+file below:
+
+  arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
+  include/linux/clk.h:299:51: note: previous definition of 'clk_disable' was here
+  arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
+  include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate' was here
+  arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
+  include/linux/clk.h:294:50: note: previous definition of 'clk_enable' was here
+  arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
+  include/linux/clk.h:280:58: note: previous definition of 'clk_get' was here
+  arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
+  include/linux/clk.h:290:51: note: previous definition of 'clk_put' was here
+  make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
+
+Can you have a look please, and delete the overlap?
+
+Thanks,
+Paul.
