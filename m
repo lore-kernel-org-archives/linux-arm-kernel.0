@@ -1,38 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 22 May 2012 16:55:29 +0300
-Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
-In-Reply-To: <20120522135257.GQ8140@S2101-09.ap.freescale.net>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
- <201205220630.57007.marex@denx.de>
- <20120522045120.GL6206@b20223-02.ap.freescale.net>
- <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
- <20120522100624.GP30559@arwen.pp.htv.fi>
- <20120522103139.GD32035@b20223-02.ap.freescale.net>
- <20120522103516.GR30559@arwen.pp.htv.fi>
- <20120522135257.GQ8140@S2101-09.ap.freescale.net>
-Message-ID: <20120522135527.GD27874@arwen.pp.htv.fi>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 22 May 2012 16:58:13 +0300
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <4FB29E7C.7010606@codeaurora.org>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <4FB29E7C.7010606@codeaurora.org>
+Message-ID: <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 09:52:59PM +0800, Shawn Guo wrote:
-> On Tue, May 22, 2012 at 01:35:17PM +0300, Felipe Balbi wrote:
-> > My suggestion to Alex is to remove all dependencies for at least a
-> > couple of merge windows and only add dependencies for stuff which
-> > actually matters; like only building the PCI glue layer when CONFIG_PCI
-> > is defined instead of when ARCH_X86 is defined and so on.
-> > 
-> As ci13xxx_imx is a DT only driver, it needs to depend on CONFIG_OF.
+On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
+> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
+> > Without this patch, the following race conditions are possible.
+> >
+> > Race condition 1:
+> > * clk-A has two parents - clk-X and clk-Y.
+> > * All three are disabled and clk-X is current parent.
+> > * Thread A: clk_set_parent(clk-A, clk-Y).
+> > * Thread A:<snip execution flow>
+> > * Thread A: Grabs enable lock.
+> > * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+> > * Thread A: Releases enable lock.
+> > * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
+> > * Thread A: Switches clk-A's parent to clk-Y in hardware.
+> >
+> > clk-A is now enabled in software, but not clocking in hardware.
+> >
+> > Race condition 2:
+> > * clk-A has two parents - clk-X and clk-Y.
+> > * All three are disabled and clk-X is current parent.
+> > * Thread A: clk_set_parent(clk-A, clk-Y).
+> > * Thread A:<snip execution flow>
+> > * Thread A: Switches parent in hardware to clk-Y.
+> > * Thread A: Grabs enable lock.
+> > * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
+> > * Thread A: Releases enable lock.
+> > * Thread B: Calls clk_enable(clk-A)
+> > * Thread B: Software state still says parent is clk-X.
+> > * Thread B: So, enables clk-X and then itself.
+> > * Thread A: Updates parent in software state to clk-Y.
+> >
 
-yes, and I have said that it should depend on CONFIG_OF, rather then
-ARCH_IMX... that's fine.
+This looks correct to me. Is there any usecase where enabling/disabling a
+clock would require sleeping but changing the parent would not?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/9be189fa/attachment-0001.sig>
+Cheers,
+
+Peter.
