@@ -1,36 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 May 2012 22:35:00 -0700
-Subject: [GIT PULL 0/8] First batch of arm-soc branches for 3.5
-Message-ID: <1337664908-17478-1-git-send-email-olof@lixom.net>
+From: yadi.brar01@gmail.com (yadi.brar01 at gmail.com)
+Date: Tue, 22 May 2012 11:26:58 +0530
+Subject: [PATCH v3 0/2] regulator: Add initial suport for max77686
+In-Reply-To: <y>
+References: <y>
+Message-ID: <4fbb2ac4.63de440a.589d.78cc@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+From: Yadwinder Singh Brar <yadi.brar@samsung.com>
 
-These are the first 8 pull requests for arm-soc for the 3.5 merge window,
-containing roughly half of our queued up changes.
+This patch series adds support for max77686 which is a multifunction device
+which includes regulator (pmic), rtc and charger sub-blocks within it. The
+support for mfd driver and regulator driver are added by this patch series. This
+patch series also includes device tree and irqdomain support for mfd and
+regulator portions.
 
-Descriptions of each branch are in the corresponding request.
+Implemented the required modification, stated in the recieved review comments.
+changes since v1:
+-added regmap support.
+-implemented .get_voltage_sel, .set_voltage_sel and .set_voltage_time_sel after
+ removing .get_voltage and .set_voltage in regulator driver.
+-used of_regulator_match() for parsing DT.
+-added Documentation for Devive Tree binding.
 
-A few things to note:
+changes since v2:
+-converted to use regulator_get_voltage_sel_regmap,
+ regulator_set_voltage_sel_regmap, regulator_enable_regmap,
+ regulator_disable_regmap, regulator_is_enabled_regmap.
 
-* For reference I have pushed a merge-resolved branch against 47136855
-  for every tag, to be found at resolved/<tagname>.
+This patch series is based on mark_regulator/for-next and has been tested on
+GAIA board.
 
-* There will be a conflict with the staging tree in two of the at91
-  device tree files (at91sam9260.dtsi and at91sam9g20.dtsi). The
-  version in arm-soc is the correct one (see
-  http://marc.info/?l=linux-arm-kernel&m=133734654114734&w=2 for history).
+Yadwinder Singh Brar (2):
+  mfd: Add support for MAX77686.
+  regulator: Add support for MAX77686.
 
-* If you pull the staging tree before the 4th branch (device tree
-  conversions), please also be aware of an automatic merge resolution error
-  discovered in -next (see pull request for details, same thread as above).
-
-* The 4th branch (device tree conversions) contains 4 patches that is
-  also going through the embedded i2c tree. Wolfram agreed earlier that
-  we could merge these through arm-soc so they are included here.
-
-
-Thanks!
-
--Olof
+ Documentation/devicetree/bindings/mfd/max77686.txt |   61 +++
+ drivers/mfd/Kconfig                                |   21 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/max77686-irq.c                         |  255 +++++++++++++
+ drivers/mfd/max77686.c                             |  322 ++++++++++++++++
+ drivers/regulator/Kconfig                          |    9 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/max77686.c                       |  389 ++++++++++++++++++++
+ include/linux/mfd/max77686-private.h               |  282 ++++++++++++++
+ include/linux/mfd/max77686.h                       |  100 +++++
+ 10 files changed, 1441 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77686.txt
+ create mode 100644 drivers/mfd/max77686-irq.c
+ create mode 100644 drivers/mfd/max77686.c
+ create mode 100644 drivers/regulator/max77686.c
+ create mode 100644 include/linux/mfd/max77686-private.h
+ create mode 100644 include/linux/mfd/max77686.h
