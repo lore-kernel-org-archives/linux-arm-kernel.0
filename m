@@ -1,38 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 May 2012 12:42:26 +0800
-Subject: [PATCH v2 07/12] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <201205220620.17109.marex@denx.de>
+Date: Tue, 22 May 2012 12:45:18 +0800
+Subject: [PATCH v2 08/12] ARM: imx6q: add usbphy clocks
+In-Reply-To: <201205220632.13896.marex@denx.de>
 References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <201205220525.39660.marex@denx.de>
- <CAAQ0ZWSiD170Yb5CQdGEZw066ULvSOr4AFcBtYFiLw3P9L-VuA@mail.gmail.com>
- <201205220620.17109.marex@denx.de>
-Message-ID: <20120522044223.GJ8140@S2101-09.ap.freescale.net>
+ <1337592237-5090-9-git-send-email-richard.zhao@freescale.com>
+ <201205220632.13896.marex@denx.de>
+Message-ID: <20120522044515.GK8140@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 06:20:16AM +0200, Marek Vasut wrote:
-> Dear Shawn Guo,
+On Tue, May 22, 2012 at 06:32:13AM +0200, Marek Vasut wrote:
+> Dear Richard Zhao,
 > 
-> > On 22 May 2012 11:25, Marek Vasut <marex@denx.de> wrote:
-> > > Dear Shawn Guo,
-> > > 
-> > >> Apart from my comments below, we really need to know Rob and Grant's
-> > >> opinion on this.
-> > > 
-> > > Hm ... so why don't you actually write per-board driver ? :-) That'd
-> > > handle every single board very well, you'd configure the GPIOs there,
-> > > every single additional necessary thing that has to be configured would
-> > > sink there too etc.
-> > 
-> > I'm not completely sure about how the per-board driver looks like
-> > exactly.  Can you have some code demonstrating it?
+> Maybe reorder this so it's in before the PHY driver?
 > 
-> Well such per-board driver would handle the board-specific init, like 
-> configuring the hub GPIO (as Richard has to do so on mx6q) or flick some other 
-> GPIOs, configure registers etc.
-> 
-So when you say driver, you just meant a C file like imx6q-sabrelite.c
-containing a number of init functions to be called by mach-imx6q.c?
+It should not matter, as I suppose all those "usb: ..." patches will
+go via usb tree, while all those "ARM: ..." will go via arm-soc tree.
 
 -- 
 Regards,
