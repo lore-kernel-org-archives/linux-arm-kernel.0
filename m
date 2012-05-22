@@ -1,52 +1,74 @@
-From: eduardo.valentin@ti.com (Valentin, Eduardo)
-Date: Tue, 22 May 2012 10:02:55 +0300
-Subject: [PATCH V2] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
-In-Reply-To: <CAOMWX4cN3kYnpe16_zVDVdA8dtthwAo5RvvSCkVdLvyPpguA2w@mail.gmail.com>
-References: <1337365122-702-1-git-send-email-nm@ti.com>
- <20120519095237.GA26761@besouro>
- <CAOMWX4f2N1dS8RcwYAyUpmWVKPkEHGuhMGGZ3__D-DwipsjzFQ@mail.gmail.com>
- <20120521145157.GA7923@besouro>
- <CAOMWX4cN3kYnpe16_zVDVdA8dtthwAo5RvvSCkVdLvyPpguA2w@mail.gmail.com>
-Message-ID: <CAGF5oy9STCs8wvQqmWaPjoOLGTo6-e-JieoywPrKd-HCi=mA1g@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Tue, 22 May 2012 16:07:45 +0900
+Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas
+ used by dma-mapping framework
+In-Reply-To: <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
+References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+ <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4FBB3B41.8010102@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 05/17/2012 07:54 PM, Marek Szyprowski wrote:
 
-On Mon, May 21, 2012 at 6:14 PM, Menon, Nishanth <nm@ti.com> wrote:
-> On Mon, May 21, 2012 at 9:51 AM, Eduardo Valentin
-> <eduardo.valentin@ti.com> wrote:
->>
->>
->> On Mon, May 21, 2012 at 08:36:35AM -0500, ext Nishanth Menon wrote:
->>> ?Sat, May 19, 2012 at 4:52 AM, Eduardo Valentin <eduardo.valentin@ti.com>
->>> wrote:
->>> >
->>> >
->>> > I guess it is time to properly document this increasing busy loop delay..
->>> > As it is getting closer to ms scale..
->>> Does the following sound good?
->>> /* Maximum time for Voltage Processor to enter or exit idle */
->>
->> Sounds way better :-). If you have an estimation of how long it takes
->> in the average case, it might help. But I am OK already with the above,
->> in case you don't have the estimation.
-> /*
-> ?* Maximum time for Voltage Processor to enter or exit idle
-> ?* worst case is around 100uSec depending on when we intercepted VP
-> ?* we use 5 times worst case value to be sure that the system flags
-> ?* invalid condition
-> ?*/
-> better?
+> Add new type of vm_area intented to be used for consisten mappings
+> created by dma-mapping framework.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  include/linux/vmalloc.h |    1 +
+>  mm/vmalloc.c            |    3 +++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+> index 6071e91..8a9555a 100644
+> --- a/include/linux/vmalloc.h
+> +++ b/include/linux/vmalloc.h
+> @@ -14,6 +14,7 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
+>  #define VM_USERMAP	0x00000008	/* suitable for remap_vmalloc_range */
+>  #define VM_VPAGES	0x00000010	/* buffer for pages was vmalloc'ed */
+>  #define VM_UNLIST	0x00000020	/* vm_struct is not listed in vmlist */
+> +#define VM_DMA		0x00000040	/* used by dma-mapping framework */
+>  /* bits [20..32] reserved for arch specific ioremap internals */
 
-Yes! Thanks.
+>  
 
->
-> Regards,
-> Nishanth Menon
+>  /*
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index 8cb7f22..9c13bab 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -2582,6 +2582,9 @@ static int s_show(struct seq_file *m, void *p)
+>  	if (v->flags & VM_IOREMAP)
+>  		seq_printf(m, " ioremap");
+>  
+> +	if (v->flags & VM_DMA)
+> +		seq_printf(m, " dma");
+> +
+
+
+Hmm, VM_DMA would become generic flag?
+AFAIU, maybe VM_DMA would be used only on ARM arch.
+Of course, it isn't performance sensitive part but there in no reason to check it, either
+in other architecture except ARM.
+
+I suggest following as
+
+#ifdef CONFIG_ARM
+#define VM_DMA	0x00000040
+#else
+#define VM_DMA	0x0
+#end
+
+Maybe it could remove check code at compile time.
+
+>  	if (v->flags & VM_ALLOC)
+>  		seq_printf(m, " vmalloc");
+>  
 
 
 
 -- 
-
-Eduardo Valentin
+Kind regards,
+Minchan Kim
