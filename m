@@ -1,41 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 22 May 2012 13:06:26 +0300
-Subject: [PATCH v2 05/12] usb: chipidea: add imx driver binding
-In-Reply-To: <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1337592237-5090-1-git-send-email-richard.zhao@freescale.com>
- <1337592237-5090-6-git-send-email-richard.zhao@freescale.com>
- <201205220630.57007.marex@denx.de>
- <20120522045120.GL6206@b20223-02.ap.freescale.net>
- <87fwasbkt7.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120522100624.GP30559@arwen.pp.htv.fi>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Tue, 22 May 2012 12:09:09 +0200
+Subject: [PATCH v3 0/3] atmel-mci device tree support 
+Message-ID: <1337681352-18521-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, May 22, 2012 at 12:56:52PM +0300, Alexander Shishkin wrote:
-> > Do you think it's a good idea to let user select binding driver directly
-> > and the binding driver config depends on chipidea config?
-> 
-> I don't have a strong opinion on this, although I prefer it the way it
-> is now, because, imo:
-> 
->   * in case of =m (and that's the only sane way of compiling it anyway),
->     these all are compiled as modules, which you simply don't install if
->     you don't want them;
->   * all of them get compile-tested every time you change something in
->     the driver, which is a good thing;
+This patch-set adds device tree support for atmel-mci.
 
-only true for $(ARCH) builds. I would like to see these drivers being
-compile tested on linux-next on all arches. Thus the patches I just
-sent.
+Regards
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120522/d1046287/attachment.sig>
+Ludovic
+
+v3:
+- use cd-inverted instead of cd-invert to follow mmc common binding.
+- don't assign a pointer to pdev->dev.platform.
+- add mci controller nodes to other chips and boards.
+- put all dts file changes together.
+
+v2:
+- squash patch v1 2/4 and 3/4.
+- change atmci_get_of_slots to atmci_of_init and manage pdata allocation into
+it.
+- correct potential issue (e.g. having only one slot which is not slot0 into
+the dt) about slots by adding a reg property corresponding to the slot id.
