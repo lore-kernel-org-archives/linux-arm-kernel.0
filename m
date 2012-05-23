@@ -1,35 +1,43 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 22 May 2012 19:46:22 -0400
-Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
-Message-ID: <20120522234621.GA3610@windriver.com>
+Date: Tue, 22 May 2012 20:03:46 -0400
+Subject: Bad ux500 merge fix leads to linux-next failure
+Message-ID: <20120523000346.GB3610@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Olof,
 
-The above listed commit, in linux-next as:
+This change:
 
-commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
+-                                  id.o usb.o timer.o
++                                  id.o pins.o usb.o timer.o
 
-    "clk: add non CONFIG_HAVE_CLK routines"
+breaks the u8500_defconfig as follows:
 
-shows up as failures in the netx_defconfig, since there
-are duplicate stub functions between your changes and the
-file below:
+make[2]: *** No rule to make target `arch/arm/mach-ux500/pins.o', needed
+by `arch/arm/mach-ux500/built-in.o'.  Stop.
+make[1]: *** [arch/arm/mach-ux500/] Error 2
+make: *** [sub-make] Error 2
 
-  arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
-  include/linux/clk.h:299:51: note: previous definition of 'clk_disable' was here
-  arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
-  include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate' was here
-  arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
-  include/linux/clk.h:294:50: note: previous definition of 'clk_enable' was here
-  arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
-  include/linux/clk.h:280:58: note: previous definition of 'clk_get' was here
-  arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
-  include/linux/clk.h:290:51: note: previous definition of 'clk_put' was here
-  make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
+A bisect shows the following:
+  
+cda6f4d8cae969e08e6662573b538db73191873b is the first bad commit
+commit cda6f4d8cae969e08e6662573b538db73191873b
+Author: Olof Johansson <olof@lixom.net>
+Date:   Wed May 16 14:47:24 2012 -0700
 
-Can you have a look please, and delete the overlap?
+    ARM: ux500: fix mismerge in for-next
+
+    Signed-off-by: Olof Johansson <olof@lixom.net>
+
+:040000 040000 abc42227f7daa6a7ff6153e0908add25ffb38a54
+45d2618822e6075aea188089191791091c2e5c38 M      arch
+bisect run success
+
+The linux-next fail is here:
+	http://kisskb.ellerman.id.au/kisskb/buildresult/6348609/
+
+Can you have a look please?
 
 Thanks,
 Paul.
