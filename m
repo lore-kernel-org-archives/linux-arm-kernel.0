@@ -1,54 +1,39 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 23 May 2012 09:20:46 -0700
-Subject: Clock register in early init
-In-Reply-To: <20120523091954.GA8730@tbergstrom-lnx.Nvidia.com>
-References: <1337227884.2066.9.camel@pgaikwad-dt2>
- <20120517062131.GA9305@gmail.com>
- <1337316517.22560.19.camel@pgaikwad-dt2>
- <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
- <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
- <4FBB5A72.2080101@codethink.co.uk>
- <20120522120851.GI8730@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zNic19Eyq-RJpj_pM94wpqY7co0dtKu1O+27B-wZMm=MA@mail.gmail.com>
- <20120523091954.GA8730@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAJOA=zPf8L7D5Sbi6R_gWU8HxKy7C-FiyUuUTvv-kvquf8q+_A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 May 2012 11:00:06 -0600
+Subject: perf_event_v7.c compilation failure in next-20120523
+Message-ID: <4FBD1796.4030309@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 2:19 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Tue, May 22, 2012 at 07:37:15PM +0200, Turquette, Mike wrote:
->> On Tue, May 22, 2012 at 5:08 AM, Peter De Schrijver
->> <pdeschrijver@nvidia.com> wrote:
->> >> We had at-least that on the older Samsung parts and they where still
->> >> growing. I would suggest that in a multi-kernel image situation the
->> >> more data that can be discarded after init-time the better.
->> >>
->> >> Also, __initdata gets gathered into one place so there's no possibility
->> >> of page fragmentation there. If you mean fragmentation of the memory
->> >> map, then allocate the size of all the clocks you know of at init time
->> >> in one go.
->> >>
->> >
->> > That would work, except that clocks are needed before kmalloc is available.
->> >
->>
->> Is static initialization the only way to solve this problem? ?What
->> about using the bootmem allocator for early init clocks?
->>
->
-> If it can be handled inside the framework somehow. I would want to avoid
-> having several places where clocks inside the same SoC are initialized.
->
+Will,
 
-I'll look into the bootmem thing.  Paul mentioned that a long time
-ago.  Hopefully it can be done in such a way as to expose the same
-interfaces as the dynamic allocation routines.  I'll keep you Cc'd.
+In next-20120523, the following two commits of yours collided:
 
-Regards,
-Mike
+d33c88c ARM: 7315/1: perf: add support for the Cortex-A7 PMU
+(adds new entry to perf_event_v7.c)
 
-> Cheers,
->
-> Peter.
+b3426c5 ARM: perf: remove arm_perf_pmu_ids global enumeration
+(removes a field from entries in perf_event_v7.c)
+
+This causes:
+
+> In file included from arch/arm/kernel/perf_event.c:610:0:
+> arch/arm/kernel/perf_event_v7.c: In function 'armv7_a7_pmu_init':
+> arch/arm/kernel/perf_event_v7.c:1294:10: error: 'struct arm_pmu' has no member named 'id'
+> arch/arm/kernel/perf_event_v7.c:1294:17: error: 'ARM_PERF_PMU_ID_CA7' undeclared (first use in this function)
+
+The following fixes the compilation error, although I put no thought
+into whether it actually works at run-time:
+
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index 46228f0..f04070b 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -1291,7 +1291,6 @@ static struct arm_pmu *__init armv7_a15_pmu_init(void)
+>  
+>  static struct arm_pmu *__init armv7_a7_pmu_init(void)
+>  {
+> -	armv7pmu.id		= ARM_PERF_PMU_ID_CA7;
+>  	armv7pmu.name		= "ARMv7 Cortex-A7";
+>  	armv7pmu.map_event	= armv7_a7_map_event;
+>  	armv7pmu.num_events	= armv7_read_num_pmnc_events();
