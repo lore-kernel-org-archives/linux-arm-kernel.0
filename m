@@ -1,187 +1,59 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 23 May 2012 21:22:42 +0800
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 23 May 2012 21:30:27 +0800
 Subject: [PATCH RFC v3 3/3] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <1337779362-31259-1-git-send-email-b29396@freescale.com>
+In-Reply-To: <1337779362-31259-3-git-send-email-b29396@freescale.com>
 References: <1337779362-31259-1-git-send-email-b29396@freescale.com>
-Message-ID: <1337779362-31259-3-git-send-email-b29396@freescale.com>
+ <1337779362-31259-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120523133026.GC27055@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+Hi Stephen,
 
-This patch implements a standard common binding for pinctrl gpio ranges.
-Each SoC can add gpio ranges through device tree by adding a gpio-maps property
-under their pinctrl devices node with the format:
-<&gpio $gpio_offset $pin_offset $npin>.
+On Wed, May 23, 2012 at 09:22:42PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> This patch implements a standard common binding for pinctrl gpio ranges.
+> Each SoC can add gpio ranges through device tree by adding a gpio-maps property
+> under their pinctrl devices node with the format:
+> <&gpio $gpio_offset $pin_offset $npin>.
+> 
+> Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
+> to parse and register the gpio ranges from device tree.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> * standardise the gpio ranges node name to 'gpio-maps'. Each SoC should use this
+>   node name to define gpio ranges.
+> * defer probe if can not get gpiochip from node in case gpio driver is still
+>   not loaded.
+> * some other minor fixes suggested by Stephen Warren.
+> 
+I still did not use try_module_get for gpio ranges to prevent gpio modules from going
+away after a bit more thinking.
 
-Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
-to parse and register the gpio ranges from device tree.
+A few reasons:
+1) gpio ranges are only raw data which does not depend on gpio module
+2) if the gpio chip is going away, the gpio request will fail without touch pinctrl
+stuff. So it seems doesn't matter if gpio module is going away for pinctrl.
+3) For non-dt, the gpiochip parameter of gpio ranges is also optional and does not
+require gpio chip to be exist. It looks reasonable to me to be like that.
+So i'm wondering if we really need to add this checking.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
-ChangeLog v2->v3:
-* standardise the gpio ranges node name to 'gpio-maps'. Each SoC should use this
-  node name to define gpio ranges.
-* defer probe if can not get gpiochip from node in case gpio driver is still
-  not loaded.
-* some other minor fixes suggested by Stephen Warren.
+Even if we need to do that, the right place may be pinctrl_add_gpio_range which not
+related to this series like:
+int pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+                            struct pinctrl_gpio_range *range)
+{
+...
+        if (range->gc) {
+                if (!try_module_get(range->gc->owner))
+                        return -ENODEV;
+        }
+...
+}
+So i sent this series first and let that issue to be discussed later.
 
-ChangeLog v1->v2:
-* introduce standard binding for gpio range.
----
- .../bindings/pinctrl/pinctrl-bindings.txt          |   20 +++++
- drivers/pinctrl/devicetree.c                       |   83 ++++++++++++++++++++
- include/linux/pinctrl/pinctrl.h                    |   11 +++
- 3 files changed, 114 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index c95ea82..113c11e 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -126,3 +126,23 @@ device; they may be grandchildren, for example. Whether this is legal, and
- whether there is any interaction between the child and intermediate parent
- nodes, is again defined entirely by the binding for the individual pin
- controller device.
-+
-+=== pinctrl gpio ranges ===
-+Some pins in pinctrl device can also be multiplexed as gpio. With a gpio range
-+map, user can know which pin in the range can be used as gpio.
-+
-+Required properties:
-+gpio-maps: 4 integers array, each entry in the array represents a gpio
-+range with the format: <&gpio $gpio_offset $pin_offset $count>
-+- gpio: phandle pointing at gpio device node
-+- gpio_offset: integer, the local offset of $gpio
-+- pin_offset: integer, the pin offset or pin id
-+- npins: integer, the gpio ranges starting from pin_offset
-+
-+For example:
-+pincontroller {
-+	gpio-maps = <&gpio1 0 0 32
-+		     &gpio2 0 0 30
-+		     &gpio3 1 100 1
-+		     ....>;
-+};
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index fcb1de4..7979ec1 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
-@@ -17,7 +17,9 @@
-  */
- 
- #include <linux/device.h>
-+#include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/slab.h>
- 
-@@ -247,3 +249,84 @@ err:
- 	pinctrl_dt_free_maps(p);
- 	return ret;
- }
-+
-+/*
-+ * pinctrl_dt_add_gpio_range() - parse and register GPIO ranges from device tree
-+ * @pctldev: pin controller device to add the range to
-+ * @np: the device node contains the gpio-maps node
-+ *  The format of gpio-maps should be:
-+ *  <&gpio0 $gpio_offset $pin_offset $count>
-+ */
-+int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np)
-+{
-+	struct pinctrl_gpio_range *ranges;
-+	unsigned int gpio_offset, pin_offset, npins;
-+	struct device_node *np_gpio;
-+	struct property *prop;
-+	const __be32 *list;
-+	phandle phandle;
-+	int nranges;
-+	int size;
-+	int i;
-+
-+	if (!np) {
-+		dev_err(pctldev->dev, "no device node\n");
-+		return -EINVAL;
-+	}
-+
-+	prop = of_find_property(np, "gpio-maps", &size);
-+	if (!prop)
-+		return -ENODEV;
-+
-+	list = prop->value;
-+	size /= sizeof(*list);
-+	if (size % 4) {
-+		dev_err(pctldev->dev, "wrong gpio range table format\n");
-+		return -EINVAL;
-+	}
-+
-+	nranges = size / 4;
-+	ranges = devm_kzalloc(pctldev->dev, nranges * sizeof(*ranges),
-+				GFP_KERNEL);
-+	for (i = 0; i < nranges; i++) {
-+		phandle = be32_to_cpup(list++);
-+		np_gpio = of_find_node_by_phandle(phandle);
-+		if (!np_gpio) {
-+			dev_err(pctldev->dev,
-+				"failed to find gpio node(%s)\n",
-+				np_gpio->name);
-+			return -ENODEV;
-+		}
-+
-+		ranges[i].gc = of_node_to_gpiochip(np_gpio);
-+		if (!ranges[i].gc) {
-+			dev_err(pctldev->dev,
-+				"can not find gpio chip of node(%s)\n",
-+				np_gpio->name);
-+			of_node_put(np_gpio);
-+			return -EPROBE_DEFER;
-+		}
-+
-+		of_node_put(np_gpio);
-+
-+		gpio_offset = be32_to_cpu(*list++);
-+		pin_offset = be32_to_cpu(*list++);
-+		npins = be32_to_cpu(*list++);
-+
-+		if (gpio_offset + npins > ranges[i].gc->ngpio) {
-+			dev_err(pctldev->dev, "exceed the gpio range\n");
-+			return -ENODEV;
-+		}
-+
-+		ranges[i].name = dev_name(pctldev->dev);
-+		ranges[i].base = ranges[i].gc->base + gpio_offset;
-+		ranges[i].pin_base = pin_offset;
-+		ranges[i].npins = npins;
-+	}
-+
-+	pinctrl_add_gpio_ranges(pctldev, ranges, nranges);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_dt_add_gpio_ranges);
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 69393a6..07c7763 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -136,6 +136,17 @@ extern void pinctrl_add_gpio_ranges(struct pinctrl_dev *pctldev,
- 				unsigned nranges);
- extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
- extern void *pinctrl_dev_get_drvdata(struct pinctrl_dev *pctldev);
-+#ifdef CONFIG_OF
-+extern int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np);
-+#else
-+static inline int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
-+				struct device_node *np);
-+{
-+	return 0;
-+}
-+#endif	/* !CONFIG_OF */
-+
- #else
- 
- struct pinctrl_dev;
--- 
-1.7.0.4
+Regards
+Dong Aisheng
