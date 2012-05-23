@@ -1,85 +1,106 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 23 May 2012 10:02:24 +0800
-Subject: [PATCH 6/8] arm: mach-armada: add support for Armada XP board
- with device tree
-In-Reply-To: <201205221706.27991.arnd@arndb.de>
-References: <1337072084-21967-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4FBB7FD7.4060604@codethink.co.uk>
- <20120522133417.GX24238@titan.lakedaemon.net>
- <201205221706.27991.arnd@arndb.de>
-Message-ID: <CAN1soZwbqzYb6qdnxZFtR0nxL9CR24tRJD70urRgcHOXuCM51w@mail.gmail.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Wed, 23 May 2012 09:46:19 +0530
+Subject: [PATCH v3 2/2] regulator: Add support for MAX77686.
+In-Reply-To: <4FBC3FF0.5080408@samsung.com>
+References: <y@samsung.com> <4fbb2ada.63de440a.589d.78e2@mx.google.com>
+ <4FBC3FF0.5080408@samsung.com>
+Message-ID: <CAKew6eW2eGrBnzSGsr3N_dXSixXv-bkBo7xkbC-o9DNnwBhcuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 1:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 22 May 2012, Jason Cooper wrote:
->> $ git grep -l [^@]mrvl,
+(adding Kyungmin Park and Samuel Ortiz)
+
+Hi,
+
+Yes, It happened unintentionally. I didn't know about your patch
+before submitting
+the initial version of my patches. I agree with you, I will review
+your patches and
+will try to incorporate extra features from your patches.
+
+On Wed, May 23, 2012 at 7:10 AM,  <jonghwa3.lee@samsung.com> wrote:
+> Hi, Yadwinder,
+> As you know, both of us, recently, had competition for one driver
+> whether you intend or not. And now, i think it is time to stop this and
+> to find appropriate goal. From now on, i won't update this driver no
+> more. I recommend you to review my patch and apply feature that you can
+> apply. And also check comments that i wrote below.
+>
+> On 2012? 05? 22? 14:57, yadi.brar01 at gmail.com wrote:
+>
+>> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
 >>
->> ? ? ? ? Documentation/devicetree/bindings/arm/mrvl.txt
->> ? ? ? ? Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
->> ? ? ? ? Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
->> ? ? ? ? Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
->> ? ? ? ? Documentation/devicetree/bindings/serial/mrvl-serial.txt
->> ? ? ? ? arch/arm/boot/dts/kirkwood-dreamplug.dts
->> ? ? ? ? arch/arm/boot/dts/kirkwood.dtsi
->> ? ? ? ? arch/arm/boot/dts/pxa168-aspenite.dts
->> ? ? ? ? arch/arm/boot/dts/pxa168.dtsi
->> ? ? ? ? arch/arm/mach-mmp/mmp-dt.c
->> ? ? ? ? drivers/i2c/busses/i2c-pxa.c
->> ? ? ? ? drivers/rtc/rtc-mv.c
->> ? ? ? ? drivers/rtc/rtc-sa1100.c
->> ? ? ? ? drivers/tty/serial/pxa.c
->>
->> So, basically, the powerpc folks have been using "marvell", and now
->> we're trying to change it to "mrvl".
->>
->> I can't think of a technical reason to prefer one over the other. ?So,
->> based purely on compatibility and uniformity, I'd say stick with
->> "marvell". ?Grant, Arnd, is there something we're missing?
->>
+>> Add support for PMIC/regulator portion of MAX77686 multifunction device.
+>> MAX77686 provides LDOs[1-26] and BUCKs[1-9]. This is initial release of driv
+>> which supports setting and getting the voltage of a regulator with I2C
+>> interface.
+
+>> + ? ? return DIV_ROUND_UP(rdev->desc->uV_step *
+>> + ? ? ? ? ? ? ? ? ? ? ? ? abs(new_sel - old_sel),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? 100);
+>> +}
+>> +
 >
-> A few are now getting merged into v3.5:
 >
-> $ git grep -l [^@]mrvl,
-> Documentation/devicetree/bindings/arm/mrvl/intc.txt
-> Documentation/devicetree/bindings/arm/mrvl/mrvl.txt
-> Documentation/devicetree/bindings/arm/mrvl/timer.txt
-> Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-> Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> Documentation/devicetree/bindings/mtd/orion-nand.txt
-> Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
-> Documentation/devicetree/bindings/serial/mrvl-serial.txt
-> arch/arm/boot/dts/kirkwood-dns320.dts
-> arch/arm/boot/dts/kirkwood-dns325.dts
-> arch/arm/boot/dts/kirkwood-dreamplug.dts
-> arch/arm/boot/dts/kirkwood-ib62x0.dts
-> arch/arm/boot/dts/kirkwood-iconnect.dts
-> arch/arm/boot/dts/kirkwood.dtsi
-> arch/arm/boot/dts/mmp2-brownstone.dts
-> arch/arm/boot/dts/mmp2.dtsi
-> arch/arm/boot/dts/pxa168-aspenite.dts
-> arch/arm/boot/dts/pxa168.dtsi
-> arch/arm/boot/dts/pxa910-dkb.dts
-> arch/arm/boot/dts/pxa910.dtsi
-> arch/arm/mach-mmp/irq.c
-> arch/arm/mach-mmp/mmp-dt.c
-> arch/arm/mach-mmp/mmp2-dt.c
-> arch/arm/mach-mmp/time.c
-> drivers/gpio/gpio-pxa.c
-> drivers/i2c/busses/i2c-pxa.c
-> drivers/mtd/nand/orion_nand.c
-> drivers/rtc/rtc-mv.c
-> drivers/rtc/rtc-sa1100.c
-> drivers/tty/serial/pxa.c
->
-> I'm fine with changing all of them from mrvl to marvell, if one
-> of you makes a patch, I think we can send that after all the other stuff
-> is merged.
->
-> This also needs an Ack from Haojian Zhuang, who has submitted the
-> pxa/mmp related patches adding more "mrvl," prefixes.
->
-> ? ? ? ?Arnd
+> Does LDO also need waiting for voltage change? I afraid it's not.
 >
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Yes, according to technical reference manual which I have, ramp rate for
+LDOs is also 100mV/us.
+
+>> +
+>> + ? ? if (pdata->ramp_delay < MAX77686_RAMP_RATE_13MV ||
+>> + ? ? ? ? ? ? pdata->ramp_delay > MAX77686_RAMP_RATE_100MV)
+>> + ? ? ? ? ? ? pdata->ramp_delay = MAX77686_RAMP_RATE_27MV; ? ?/* default */
+
+If pdata doesn't have proper ramp_delay, it will get value
+MAX77686_RAMP_RATE_27MV.
+
+>> +
+>> + ? ? max77686->ramp_delay = pdata->ramp_delay - 1;
+>
+>
+> I think it is better to check pdata->ramp_delay is available.
+> If pdata doesn't have ramp_delay member it might be error.
+>
+
+Yes, we have taken care of this case above before setting value of
+max77686->ramp_delay.
+
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
+>> + ? ? ? ? ? ? max77686->ramp_delay << 6, RAMP_MASK);
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1,
+>> + ? ? ? ? ? ? max77686->ramp_delay << 6, RAMP_MASK);
+>> + ? ? max77686_update_reg(i2c, MAX77686_REG_BUCK4CTRL1,
+>> + ? ? ? ? ? ? max77686->ramp_delay << 6, RAMP_MASK);
+>> +
+>
+>
+> Why do you use i2c client still? If you registered regmap you can use
+> its API. I recommend you to use regmap_update_bits() directly.
+>
+>
+
+Yes, we are using regmap_update_bits().  max77686_update_reg() is just
+a wrapper over it.
+
+>> + ? ? platform_set_drvdata(pdev, max77686);
+>> +
+
+>
+> MAX77686 has crystal oscillator in it. And original version of this
+> driver which was written by Chiwoon Byun, registers it as a regulator.
+> As Mark says, we have to change it to use generic clock API. Where do
+> you think should we put them into? In my opinion, it is proper that just
+> leave them in regulator driver because this driver is almost core of
+> PMIC. I already applied generic API in my local repository but i
+> couldn't test yet. Because it crashed with SOC's private clock API.
+> Anyway if you register 32khz clock with generic API ,DEFINE_CLK_GATE()
+> will help you out which defined in linux/clk-private.h.
+>
+
+Yes, I was also thinking about where to put it. I am not sure whether this
+is a proper place to put them. Anyway I will again think about it.
+
+Thanks,
+Yadwinder.
