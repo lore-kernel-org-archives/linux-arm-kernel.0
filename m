@@ -1,29 +1,34 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 23 May 2012 10:48:03 -0700
-Subject: [PATCH v5 1/4] regulator: helper routine to extract
- regulator_init_data
-In-Reply-To: <1321615040-13257-2-git-send-email-rnayak@ti.com>
-References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
- <1321615040-13257-2-git-send-email-rnayak@ti.com>
-Message-ID: <20120523174803.GA18609@codeaurora.org>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Wed, 23 May 2012 13:18:29 -0500
+Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
+In-Reply-To: <20120523172703.GI21608@burratino>
+References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
+ <20120523172703.GI21608@burratino>
+Message-ID: <20120523181829.GK21608@burratino>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 04:47:17PM +0530, Rajendra Nayak wrote:
+Jonathan Nieder wrote:
 
-> +	xyzreg: regulator at 0 {
-> +		regulator-min-microvolt = <1000000>;
-> +		regulator-max-microvolt = <2500000>;
-> +		regulator-always-on;
-> +		vin-supply = <&vin>;
-> +	};
+> 	The problem was introduced with commit eb9ae7f2a381 ("gpio: fix build
+> 	error in include/asm-generic/gpio.h").
+[...]
+> Richard Cochran wrote:
 
-Just noticed this, but the '@0' shouldn't be on the name, since there
-isn't a reg attribute on this node.  Perhaps it should be
-"regulator-xyz"?
+>> This fix should also go for 3.1, 3.2, 3.3, and 3.4.
+>
+> If 3.1.y were still maintained, do I understand correctly that it
+> would not need this because it lacks eb9ae7f2a381?
 
-David
+Quick correction: looks like[*] 3.1 is also affected due to
+58c244009ef6 ("Input: ads7846 - cleanup GPIO initialization").  Sorry
+I missed that before.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+drivers/input/touchscreen/ads7846.c: In function 'ads7846_setup_pendown':
+drivers/input/touchscreen/ads7846.c:970: error: implicit declaration of
+function 'gpio_request_one'
+
+Hope that helps,
+Jonathan
+
+[*] http://thread.gmane.org/gmane.linux.kernel/1250585/focus=1250984
