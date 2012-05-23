@@ -1,54 +1,66 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 23 May 2012 11:09:38 +0200
-Subject: [PATCH 1/2] DRM: add Freescale i.MX LCDC driver
-In-Reply-To: <4FBCA1E6.9050604@metafoo.de>
-References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
- <1337344032-25431-2-git-send-email-s.hauer@pengutronix.de>
- <CAF6AEGuhyRpMo+bsFDwq7A0YOD5BstUtA-z7dRWwwxPK9ru6bg@mail.gmail.com>
- <20120523074710.GP30400@pengutronix.de>
- <4FBCA1E6.9050604@metafoo.de>
-Message-ID: <20120523090938.GH5062@phenom.ffwll.local>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 23 May 2012 12:16:17 +0300
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <4FB29E7C.7010606@codeaurora.org>
+ <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
+Message-ID: <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 10:37:58AM +0200, Lars-Peter Clausen wrote:
-> [...]
-> >>> +
-> >>> +static int imx_drm_gem_mmap_buffer(struct file *filp,
-> >>> +               struct vm_area_struct *vma)
-> >>> +{
-> >>> +       struct drm_gem_object *obj = filp->private_data;
-> >>> +       struct imx_drm_gem_obj *imx_drm_gem_obj = to_imx_drm_gem_obj(obj);
-> >>> +       struct imx_drm_buf_entry *entry;
-> >>> +       unsigned long pfn, vm_size;
-> >>> +
-> >>> +       vma->vm_flags |= VM_IO | VM_RESERVED;
-> >>> +
-> >>> +       vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> >>
-> >> pgprot_writecombine()?
-> > 
-> > copied from the exynos driver. The exynos driver recently gained support
-> > for different cache attribute flags and I could do the same. I would
-> > prefer not to even have to think about it by using some generic code
-> > here instead of duplicating other peoples bugs.
-> > 
-> > Do you think it's possible to share this code as suggested by Lars?
-> > Every SoC not having a IOMMU could share the same code here, it's just
-> > not clear to me how we can put this in a form that is acceptable
-> > upstream.
+On Tue, May 22, 2012 at 08:06:45PM +0200, Turquette, Mike wrote:
+> On Tue, May 22, 2012 at 6:58 AM, Peter De Schrijver
+> <pdeschrijver@nvidia.com> wrote:
+> > On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
+> >> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
+> >> > Without this patch, the following race conditions are possible.
+> >> >
+> >> > Race condition 1:
+> >> > * clk-A has two parents - clk-X and clk-Y.
+> >> > * All three are disabled and clk-X is current parent.
+> >> > * Thread A: clk_set_parent(clk-A, clk-Y).
+> >> > * Thread A:<snip execution flow>
+> >> > * Thread A: Grabs enable lock.
+> >> > * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+> >> > * Thread A: Releases enable lock.
+> >> > * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
+> >> > * Thread A: Switches clk-A's parent to clk-Y in hardware.
+> >> >
+> >> > clk-A is now enabled in software, but not clocking in hardware.
+> >> >
+> >> > Race condition 2:
+> >> > * clk-A has two parents - clk-X and clk-Y.
+> >> > * All three are disabled and clk-X is current parent.
+> >> > * Thread A: clk_set_parent(clk-A, clk-Y).
+> >> > * Thread A:<snip execution flow>
+> >> > * Thread A: Switches parent in hardware to clk-Y.
+> >> > * Thread A: Grabs enable lock.
+> >> > * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
+> >> > * Thread A: Releases enable lock.
+> >> > * Thread B: Calls clk_enable(clk-A)
+> >> > * Thread B: Software state still says parent is clk-X.
+> >> > * Thread B: So, enables clk-X and then itself.
+> >> > * Thread A: Updates parent in software state to clk-Y.
+> >> >
+> >
+> > This looks correct to me. Is there any usecase where enabling/disabling a
+> > clock would require sleeping but changing the parent would not?
+> >
 > 
-> I may have missed this in the previous discussion. But why can't we put the
-> gem handling code in the toplevel drm folder, give it a config symbol and
-> let drivers which want to use the code select the config symbol? I think the
-> main concern was about introducing a new intermediate layer, but the
-> "simple" gem support would really just a set of helper functions.
+> clk_enable & clk_disable must never sleep.  clk_prepare and
+> clk_unprepare may sleep.
+> 
 
-Same for the kms stuff. Me&Dave shot at sdrm because it introduces an
-intermediate layer, not because adding some common code for simple drm/kms
-drivers is pointless. That is very much welcome ;-)
--Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+In that case the clock is actually enabled in clk_prepare and disabled in
+clk_unprepare I guess (and clk_enable/clk_disable are dummy functions)?
+
+What I'm trying to say is that I don't think there are clocks which can be
+enabled/disabled using non blocking operations, but where a parent change
+would require a blocking operation.
+
+Cheers,
+
+Peter.
