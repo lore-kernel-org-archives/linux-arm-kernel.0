@@ -1,37 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 May 2012 06:44:46 +0000
-Subject: [PATCH 09/16] ARM: ux500: Provide regulator support for SMSC911x
- via Device Tree
-In-Reply-To: <CACRpkdZKDEcntKqTzowCZku+Nwm3Js53Z71iPRWCnY5kXVi0Dg@mail.gmail.com>
-References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdZKDEcntKqTzowCZku+Nwm3Js53Z71iPRWCnY5kXVi0Dg@mail.gmail.com>
-Message-ID: <201205220644.46876.arnd@arndb.de>
+From: nm@ti.com (Menon, Nishanth)
+Date: Wed, 23 May 2012 08:27:06 -0500
+Subject: [linux-pm] [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage
+ Scaling)
+In-Reply-To: <87pqadgqd5.fsf@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <20120426191159.GA9415@sirena.org.uk>
+ <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
+ <20120427175657.GP18260@opensource.wolfsonmicro.com> <87397o3n4y.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
+ <87mx5jy2li.fsf@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
+ <87lil2jp2z.fsf@ti.com>
+ <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
+ <87pqadgqd5.fsf@ti.com>
+Message-ID: <CAOMWX4cjzLYuPmA-k=Z_pc5uw=CCViPjRYqs4VTyLX6T8HhtcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 May 2012, Linus Walleij wrote:
-> On Fri, May 18, 2012 at 10:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > This patch adds a fixed regulator for use by the SMSC911x Ethernet
-> > chip driver into the db8500 Device Tree. It also references other
-> > regulators required by the same device.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >  arch/arm/boot/dts/snowball.dts   |   13 +++++++++++++
-> >  arch/arm/configs/u8500_defconfig |    1 +
-> >  drivers/mfd/db8500-prcmu.c       |    1 +
-> 
-> We usually don't mix code and defconfig changes in the same patch.
+On Wed, May 9, 2012 at 1:29 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Woodruff, Richard" <r-woodruff2@ti.com> writes:
+>
+>>> From: Hilman, Kevin
+>>> Sent: Tuesday, May 08, 2012 5:17 PM
+>>
+>>> A basic OMAP AVS driver has been in mainline for a long time, yet we
+>>> have not seen support submitted for all of these features.
+>>
+>> 1.5/3.5 is a feature.
+>
+> And I'm still waiting for it to be submitted upstream.
+>
+>> ABB is requirement for a production useable driver. Higher speed rated
+>> OMAP4 and all OMAP5 added these to be useable.
+>
+> ditto
+>
+>> Yes this is effort. Point of mentioning is to raise awareness of need.
+>
+> I'm well aware of the need.
+>
+>> Yet to be added feature has different meaning than functional gap.
+>
+> And both need to be submitted upstream.
 
-I think it would be good if we did more often ;-)
+SR 1.5: http://marc.info/?l=linux-omap&m=129933897910785&w=2
+ABB: http://marc.info/?l=linux-omap&m=130939399209099&w=2
 
-> Why can't the snowball Kconfig select the fixed regulator instead,
-> so you get rid of the defconfig change?
+I am not sure what you mean "need to be submitted upstream"?
 
-Is it a build dependency or a run-time dependency? I'd say if the
-kernel fails to build without enabling the fixed regulator, it
-needs to be selected in Kconfig, otherwise I'd prefer to have it
-enabled in the defconfig file.
+Just tired of seeing things perpetually change without considering
+even how to handle features that are mandatory for SoC even with code
+posted upstream to show exactly what it takes.. I think you do mean
+merged upstream in this context.
 
-	Arnd
+
+Regards,
+Nishanth Menon
