@@ -1,40 +1,40 @@
-From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
-Date: Wed, 23 May 2012 13:40:13 +0900
-Subject: [PATCH v3 2/2] regulator: Add support for MAX77686.
-In-Reply-To: <CAKew6eW2eGrBnzSGsr3N_dXSixXv-bkBo7xkbC-o9DNnwBhcuw@mail.gmail.com>
-References: <y@samsung.com> <4fbb2ada.63de440a.589d.78e2@mx.google.com>
- <4FBC3FF0.5080408@samsung.com>
- <CAKew6eW2eGrBnzSGsr3N_dXSixXv-bkBo7xkbC-o9DNnwBhcuw@mail.gmail.com>
-Message-ID: <4FBC6A2D.6040408@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 23 May 2012 10:15:29 +0530
+Subject: [PATCH 1/2] clk: Add support for power of two type dividers
+In-Reply-To: <20120522202657.GC4386@gmail.com>
+References: <1337250134-29206-1-git-send-email-rnayak@ti.com>
+ <1337250134-29206-2-git-send-email-rnayak@ti.com>
+ <20120522202657.GC4386@gmail.com>
+Message-ID: <4FBC6B69.4090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012? 05? 23? 13:16, Yadwinder Singh Brar wrote:
-
->>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
->>> +             max77686->ramp_delay << 6, RAMP_MASK);
->>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1,
->>> +             max77686->ramp_delay << 6, RAMP_MASK);
->>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK4CTRL1,
->>> +             max77686->ramp_delay << 6, RAMP_MASK);
->>> +
+On Wednesday 23 May 2012 01:56 AM, Mike Turquette wrote:
+> On 20120517-15:52, Rajendra Nayak wrote:
+>> Quite often dividers and the value programmed in the
+>> register have a relation of 'power of two', something like
+>> value	div
+>> 0	1
+>> 1	2
+>> 2	4
+>> 3	8...
 >>
+>> Add support for such dividers as part of clk-divider.
 >>
->> Why do you use i2c client still? If you registered regmap you can use
->> its API. I recommend you to use regmap_update_bits() directly.
+>> The clk-divider flag 'CLK_DIVIDER_POWER_OF_TWO' should be used
+>> to define such clocks.
 >>
->>
-> 
-> Yes, we are using regmap_update_bits().  max77686_update_reg() is just
-> a wrapper over it.
-> 
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>
+> Hi Rajendra,
+>
+> This patch looks good to me.  I'll take it into my clk-next branch
+> towards 3.6 since I'm done pulling stuff for 3.5.
+>
+> It's good to see CLK_DIVIDER_POWER_OF_TWO finally get used :-)
 
+great, thanks Mike.
 
-Yes, i know what you mean. However it doesn't need max77686_update_reg()
-any more since it uses regmap API. Why don't you just pass iodev->regmap
-to regmap_update_bits(). It is clear that there is no reason for using
-i2c client as a medium. Please check regulator and mfd driver of my
-previous patch.
-
-
-Thanks.
+>
+> Regards,
+> Mike
