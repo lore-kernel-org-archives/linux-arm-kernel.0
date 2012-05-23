@@ -1,43 +1,40 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Wed, 23 May 2012 09:47:28 +0530
+From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
+Date: Wed, 23 May 2012 13:40:13 +0900
 Subject: [PATCH v3 2/2] regulator: Add support for MAX77686.
-In-Reply-To: <4FBC4255.4040307@samsung.com>
+In-Reply-To: <CAKew6eW2eGrBnzSGsr3N_dXSixXv-bkBo7xkbC-o9DNnwBhcuw@mail.gmail.com>
 References: <y@samsung.com> <4fbb2ada.63de440a.589d.78e2@mx.google.com>
- <4FBC4255.4040307@samsung.com>
-Message-ID: <CAKew6eVXhg9RscZFM1_go3bjvvn_99zqaDRQ1ZjG_BUWCYR0YQ@mail.gmail.com>
+ <4FBC3FF0.5080408@samsung.com>
+ <CAKew6eW2eGrBnzSGsr3N_dXSixXv-bkBo7xkbC-o9DNnwBhcuw@mail.gmail.com>
+Message-ID: <4FBC6A2D.6040408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2012? 05? 23? 13:16, Yadwinder Singh Brar wrote:
 
-On Wed, May 23, 2012 at 7:20 AM,  <jonghwa3.lee@samsung.com> wrote:
-> Hi, again.
-> On 2012? 05? 22? 14:57, yadi.brar01 at gmail.com wrote:
->
->
->> +static __devinit int max77686_pmic_probe(struct platform_device *pdev)
->> +{
->
->> +
->> + ? ? for (i = 0; i < pdata->num_regulators; i++) {
->> + ? ? ? ? ? ? config.dev = max77686->dev;
->> + ? ? ? ? ? ? config.init_data = pdata->regulators[i].init_data;
->> + ? ? ? ? ? ? config.driver_data = max77686;
->> + ? ? ? ? ? ? config.regmap = iodev->regmap;
->> +
->> + ? ? ? ? ? ? rdev[i] = regulator_register(&regulators[i], &config);
->
->
-> I'm sorry that i missed one. You have to register all regulators
-> unconditionally. Mark brown commented about this to my former patch.
->
-> 'No, you should unconditionally register all regulators the device
-> physically has. ?This is useful for debug and simplifies the code.'
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?- from Mark Brown
->
+>>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1,
+>>> +             max77686->ramp_delay << 6, RAMP_MASK);
+>>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1,
+>>> +             max77686->ramp_delay << 6, RAMP_MASK);
+>>> +     max77686_update_reg(i2c, MAX77686_REG_BUCK4CTRL1,
+>>> +             max77686->ramp_delay << 6, RAMP_MASK);
+>>> +
+>>
+>>
+>> Why do you use i2c client still? If you registered regmap you can use
+>> its API. I recommend you to use regmap_update_bits() directly.
+>>
+>>
+> 
+> Yes, we are using regmap_update_bits().  max77686_update_reg() is just
+> a wrapper over it.
+> 
 
-Yes, we are registering all regulators here.
-As pdata->num_regulators will be equal to ARRAY_SIZE(regulators)
 
-Thanks,
-Yadwinder.
+Yes, i know what you mean. However it doesn't need max77686_update_reg()
+any more since it uses regmap API. Why don't you just pass iodev->regmap
+to regmap_update_bits(). It is clear that there is no reason for using
+i2c client as a medium. Please check regulator and mfd driver of my
+previous patch.
+
+
+Thanks.
