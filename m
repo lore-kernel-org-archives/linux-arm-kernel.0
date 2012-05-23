@@ -1,65 +1,42 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 23 May 2012 12:16:17 +0300
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <4FB29E7C.7010606@codeaurora.org>
- <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
-Message-ID: <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
+Date: Wed, 23 May 2012 12:19:54 +0300
+Subject: Clock register in early init
+In-Reply-To: <CAJOA=zNic19Eyq-RJpj_pM94wpqY7co0dtKu1O+27B-wZMm=MA@mail.gmail.com>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com>
+ <1337316517.22560.19.camel@pgaikwad-dt2>
+ <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+ <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
+ <4FBB5A72.2080101@codethink.co.uk>
+ <20120522120851.GI8730@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zNic19Eyq-RJpj_pM94wpqY7co0dtKu1O+27B-wZMm=MA@mail.gmail.com>
+Message-ID: <20120523091954.GA8730@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 08:06:45PM +0200, Turquette, Mike wrote:
-> On Tue, May 22, 2012 at 6:58 AM, Peter De Schrijver
+On Tue, May 22, 2012 at 07:37:15PM +0200, Turquette, Mike wrote:
+> On Tue, May 22, 2012 at 5:08 AM, Peter De Schrijver
 > <pdeschrijver@nvidia.com> wrote:
-> > On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
-> >> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
-> >> > Without this patch, the following race conditions are possible.
-> >> >
-> >> > Race condition 1:
-> >> > * clk-A has two parents - clk-X and clk-Y.
-> >> > * All three are disabled and clk-X is current parent.
-> >> > * Thread A: clk_set_parent(clk-A, clk-Y).
-> >> > * Thread A:<snip execution flow>
-> >> > * Thread A: Grabs enable lock.
-> >> > * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
-> >> > * Thread A: Releases enable lock.
-> >> > * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
-> >> > * Thread A: Switches clk-A's parent to clk-Y in hardware.
-> >> >
-> >> > clk-A is now enabled in software, but not clocking in hardware.
-> >> >
-> >> > Race condition 2:
-> >> > * clk-A has two parents - clk-X and clk-Y.
-> >> > * All three are disabled and clk-X is current parent.
-> >> > * Thread A: clk_set_parent(clk-A, clk-Y).
-> >> > * Thread A:<snip execution flow>
-> >> > * Thread A: Switches parent in hardware to clk-Y.
-> >> > * Thread A: Grabs enable lock.
-> >> > * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
-> >> > * Thread A: Releases enable lock.
-> >> > * Thread B: Calls clk_enable(clk-A)
-> >> > * Thread B: Software state still says parent is clk-X.
-> >> > * Thread B: So, enables clk-X and then itself.
-> >> > * Thread A: Updates parent in software state to clk-Y.
-> >> >
+> >> We had at-least that on the older Samsung parts and they where still
+> >> growing. I would suggest that in a multi-kernel image situation the
+> >> more data that can be discarded after init-time the better.
+> >>
+> >> Also, __initdata gets gathered into one place so there's no possibility
+> >> of page fragmentation there. If you mean fragmentation of the memory
+> >> map, then allocate the size of all the clocks you know of at init time
+> >> in one go.
+> >>
 > >
-> > This looks correct to me. Is there any usecase where enabling/disabling a
-> > clock would require sleeping but changing the parent would not?
+> > That would work, except that clocks are needed before kmalloc is available.
 > >
 > 
-> clk_enable & clk_disable must never sleep.  clk_prepare and
-> clk_unprepare may sleep.
+> Is static initialization the only way to solve this problem?  What
+> about using the bootmem allocator for early init clocks?
 > 
 
-In that case the clock is actually enabled in clk_prepare and disabled in
-clk_unprepare I guess (and clk_enable/clk_disable are dummy functions)?
-
-What I'm trying to say is that I don't think there are clocks which can be
-enabled/disabled using non blocking operations, but where a parent change
-would require a blocking operation.
+If it can be handled inside the framework somehow. I would want to avoid
+having several places where clocks inside the same SoC are initialized.
 
 Cheers,
 
