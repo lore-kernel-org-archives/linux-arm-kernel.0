@@ -1,43 +1,73 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 23 May 2012 15:47:51 +0800
-Subject: [PATCH v8 0/3] Add PMECC support for at91 nand flash driver
-Message-ID: <1337759274-9921-1-git-send-email-josh.wu@atmel.com>
+Date: Wed, 23 May 2012 15:47:53 +0800
+Subject: [PATCH v8 2/3] MTD: add dt parameters for PMECC
+In-Reply-To: <1337759274-9921-1-git-send-email-josh.wu@atmel.com>
+References: <1337759274-9921-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1337759274-9921-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code is based on 3.4-rc2
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ .../devicetree/bindings/mtd/atmel-nand.txt         |    7 +++++++
+ drivers/mtd/nand/atmel_nand.c                      |   20 ++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-Changes since v7,
-	add time out for PMECC status reading.
-	modify the oobfree[0].offset to 2.
-	fix coding style.
-
-Changes since v6,
-	split into 3 patches.
-	remove of_flat_dt_is_compatible() function. use additional dt parameter "has-pmecc".
-	refine the error handling code.
-	refine original atmel_nand_init_params() function.
-
-Changes since v5,
-	add has_pmecc field to replace cpu_has_pmecc() function. Use compatible check in when proble.
-	simplify the pmecc_get_ecc_bytes() function.
-
-Changes since v4,
-	fix typo and checkpatch warnings.
-	fix according to JC's suggestion. replace cpu_is_xxx() with DT
-	modify dt binding atmel nand document to add pmecc support.
-	tested in sam9263 without break hw ecc.
-	add ecc.strength.
-
-Josh Wu (3):
-  MTD: at91: extract hw ecc initialization to one function
-  MTD: add dt parameters for PMECC
-  MTD: atmel_nand: Update driver to support Programmable Multibit ECC controller
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |    7 +
- drivers/mtd/nand/atmel_nand.c                      |  885 ++++++++++++++++++--
- drivers/mtd/nand/atmel_nand_ecc.h                  |  123 ++-
- 3 files changed, 946 insertions(+), 69 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index a200695..895d72b 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -16,6 +16,12 @@ Optional properties:
+ - nand-ecc-mode : String, operation mode of the NAND ecc mode, soft by default.
+   Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+   "soft_bch".
++- atmel,has-pmecc : boolean to enable Programmable Multibit ECC hardware.
++  Only supported by at91sam9x5 or later sam9 product.
++- atmel,pmecc-cap : error correct capability for Programmable Multibit ECC
++  Controller. Supported values are: 2, 4, 8, 12, 24.
++- atmel,sector-size : sector size for ECC computation. Supported values are:
++  512, 1024.
+ - nand-bus-width : 8 or 16 bus width if not present 8
+ - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+ 
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 52ca295..937b080 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -88,6 +88,10 @@ struct atmel_nand_host {
+ 
+ 	struct completion	comp;
+ 	struct dma_chan		*dma_chan;
++
++	bool			has_pmecc;
++	u8			correction_cap;
++	u16			sector_size;
+ };
+ 
+ static int cpu_has_dma(void)
+@@ -508,6 +512,22 @@ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+ 	board->enable_pin = of_get_gpio(np, 1);
+ 	board->det_pin = of_get_gpio(np, 2);
+ 
++	host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
++
++	if ((board->ecc_mode == NAND_ECC_HW) && host->has_pmecc) {
++		if (of_property_read_u32(np, "atmel,pmecc-cap", &val) != 0) {
++			dev_err(host->dev, "Cannot decide PMECC Capability\n");
++			return -EINVAL;
++		}
++		host->correction_cap = (u8)val;
++
++		if (of_property_read_u32(np, "atmel,sector-size", &val) != 0) {
++			dev_err(host->dev, "Cannot decide PMECC Sector Size\n");
++			return -EINVAL;
++		}
++		host->sector_size = (u16)val;
++	}
++
+ 	return 0;
+ }
+ #else
 -- 
 1.7.10
