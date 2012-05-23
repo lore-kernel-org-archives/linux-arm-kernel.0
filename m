@@ -1,56 +1,94 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 May 2012 17:10:10 -0700
-Subject: Bad ux500 merge fix leads to linux-next failure
-In-Reply-To: <20120523000346.GB3610@windriver.com>
-References: <20120523000346.GB3610@windriver.com>
-Message-ID: <CAOesGMgSGZqMtcCGv0f8oyoPmDFiGbPm0=1KxkNsZVG0LZPO9w@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 22 May 2012 18:34:14 -0700
+Subject: [PATCH] kernel: Shrink embedded kernel, remove WARN strings when
+ !CONFIG_PRINTK
+Message-ID: <1337736854.13111.13.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+WARN strings are currently always saved in text.
+When printk is not enabled, this wastes space.
 
-Yeah, there was some confusion earlier, and I noticed that when
-staging the branches for Linus last night. I'll rebuild for-next
-tonight and take care of it then, thanks for the reminder!
+Don't call or compile slowpath_warn_<foo> when !CONFIG_PRINTK.
 
+This makes an embedded image without printk support ~1% smaller.
 
--Olof
+x86-32 allnoconfig/embedded:
 
-On Tue, May 22, 2012 at 5:03 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> Hi Olof,
->
-> This change:
->
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?id.o usb.o timer.o
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?id.o pins.o usb.o timer.o
->
-> breaks the u8500_defconfig as follows:
->
-> make[2]: *** No rule to make target `arch/arm/mach-ux500/pins.o', needed
-> by `arch/arm/mach-ux500/built-in.o'. ?Stop.
-> make[1]: *** [arch/arm/mach-ux500/] Error 2
-> make: *** [sub-make] Error 2
->
-> A bisect shows the following:
->
-> cda6f4d8cae969e08e6662573b538db73191873b is the first bad commit
-> commit cda6f4d8cae969e08e6662573b538db73191873b
-> Author: Olof Johansson <olof@lixom.net>
-> Date: ? Wed May 16 14:47:24 2012 -0700
->
-> ? ?ARM: ux500: fix mismerge in for-next
->
-> ? ?Signed-off-by: Olof Johansson <olof@lixom.net>
->
-> :040000 040000 abc42227f7daa6a7ff6153e0908add25ffb38a54
-> 45d2618822e6075aea188089191791091c2e5c38 M ? ? ?arch
-> bisect run success
->
-> The linux-next fail is here:
-> ? ? ? ?http://kisskb.ellerman.id.au/kisskb/buildresult/6348609/
->
-> Can you have a look please?
->
-> Thanks,
-> Paul.
+$ size vmlinux.new vmlinux.old
+   text	   data	    bss	    dec	    hex	filename
+1180807	 182720	1269372	2632899	 282cc3	vmlinux.new
+1198760	 182720	1267948	2649428	 286d54	vmlinux.old
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ include/asm-generic/bug.h |   18 +++++++++++++++++-
+ kernel/panic.c            |    3 +++
+ 2 files changed, 20 insertions(+), 1 deletions(-)
+
+diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
+index 2520a6e..a16101a 100644
+--- a/include/asm-generic/bug.h
++++ b/include/asm-generic/bug.h
+@@ -59,7 +59,8 @@ struct bug_entry {
+  * appear at runtime.  Use the versions with printk format strings
+  * to provide better diagnostics.
+  */
+-#ifndef __WARN_TAINT
++#if !defined(__WARN_TAINT)
++
+ #ifndef __ASSEMBLY__
+ extern __printf(3, 4)
+ void warn_slowpath_fmt(const char *file, const int line,
+@@ -70,15 +71,30 @@ void warn_slowpath_fmt_taint(const char *file, const int line, unsigned taint,
+ extern void warn_slowpath_null(const char *file, const int line);
+ #define WANT_WARN_ON_SLOWPATH
+ #endif
++
++#ifdef CONFIG_PRINTK
+ #define __WARN()		warn_slowpath_null(__FILE__, __LINE__)
+ #define __WARN_printf(arg...)	warn_slowpath_fmt(__FILE__, __LINE__, arg)
+ #define __WARN_printf_taint(taint, arg...)				\
+ 	warn_slowpath_fmt_taint(__FILE__, __LINE__, taint, arg)
+ #else
++#define __WARN()		do {} while (0)
++#define __WARN_printf(fmt, ...)			\
++do {						\
++	if (0)					\
++		printk(fmt, ##__VA_ARGS__);	\
++} while (0)
++#define __WARN_printf_taint(taint, fmt, ...)	\
++	__WARN_printf(fmt, ##__VA_ARGS__)
++#endif
++
++#else
++
+ #define __WARN()		__WARN_TAINT(TAINT_WARN)
+ #define __WARN_printf(arg...)	do { printk(arg); __WARN(); } while (0)
+ #define __WARN_printf_taint(taint, arg...)				\
+ 	do { printk(arg); __WARN_TAINT(taint); } while (0)
++
+ #endif
+ 
+ #ifndef WARN_ON
+diff --git a/kernel/panic.c b/kernel/panic.c
+index 8ed89a1..bc57785 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -396,6 +396,7 @@ struct slowpath_args {
+ 	va_list args;
+ };
+ 
++#ifdef CONFIG_PRINTK
+ static void warn_slowpath_common(const char *file, int line, void *caller,
+ 				 unsigned taint, struct slowpath_args *args)
+ {
+@@ -449,6 +450,8 @@ void warn_slowpath_null(const char *file, int line)
+ EXPORT_SYMBOL(warn_slowpath_null);
+ #endif
+ 
++#endif
++
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ 
+ /*
