@@ -1,89 +1,52 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 23 May 2012 21:38:51 +0200
-Subject: [PATCH v4 2/3] ARM: at91: add clocks for DT entries
-In-Reply-To: <1337681352-18521-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1337681352-18521-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337801931-13823-1-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 May 2012 19:39:49 +0000
+Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
+In-Reply-To: <87396qbtrx.fsf@lebrac.rtp-net.org>
+References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
+ <201205231743.50262.arnd@arndb.de> <87396qbtrx.fsf@lebrac.rtp-net.org>
+Message-ID: <201205231939.49681.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wednesday 23 May 2012, Arnaud Patard wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Wednesday 23 May 2012, Richard Cochran wrote:
+> >> Once again, ixp4xx no longer even compiles. This patch fixes the issue
+> >> by converting over to gpiolib. This patch was first made by Imre and
+> >> posted by Marc, and I added in Russell's suggestion to empty the gpio
+> >> header file.
+> >> 
+> >> This fix should also go for 3.1, 3.2, 3.3, and 3.4.
+> >> 
+> >> Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+> >> Cc: <stable@vger.kernel.org>
+> >
+> > So has every kernel since 3.1 been broken, or is it just broken now
+> > but a good idea to backport anyway?
+> 
+> every kernel since 3.1 (even 3.1-rc-something). Would be nice to see
+> this issue fixed as similar patches have been sent from time to time but
+> never been merged.
 
-Add clocks to clock lookup table for DT entries.
+Ok, thanks for the info. I'm sorry that it has come so far. I think Olof
+and I are generally doing a good job at picking up all the pull requests,
+but we sometimes miss single patches, especially when it's not clear that
+they are expected to go into the arm-soc tree.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
-v4: add new chips
+I have to admit that I didn't even remember who maintains ixp4xx, since
+there hasn't been a single ixp4xx patch from Imre or Krzysztof that I've put
+into the kernel over this time frame.
 
- arch/arm/mach-at91/at91sam9260.c |    1 +
- arch/arm/mach-at91/at91sam9263.c |    2 ++
- arch/arm/mach-at91/at91sam9g45.c |    2 ++
- arch/arm/mach-at91/at91sam9n12.c |    1 +
- arch/arm/mach-at91/at91sam9x5.c  |    2 ++
- 5 files changed, 8 insertions(+), 0 deletions(-)
+I've put the patch into the fixes branch now, it should be part of 
+the next round of submissions.
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 2b1e438..ddba004 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -226,6 +226,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
- 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 0eb20f9..f165b25 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -211,6 +211,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("hclk", "a00000.ohci", &ohci_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fff80000.mmc", &mmc0_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fff84000.mmc", &mmc1_clk),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 4792682..aa24e82 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -242,6 +242,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
- 	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fff80000.mmc", &mmc0_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fffd0000.mmc", &mmc1_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 0849466..cce4e0f 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -168,6 +168,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &usart3_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 1b144b4..de86e37 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -231,6 +231,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc0_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "f000c000.mmc", &mmc1_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
- 	CLKDEV_CON_ID("pioC", &pioCD_clk),
--- 
-1.7.5.4
+What is the plan for ixp4xx going forward? Is one of you planning to
+maintain a git tree and collect patches for inclusion in arm-soc?
+I would be more comfortable just knowing where to pull from than
+having to watch the mailing list and making sure the maintainers
+Ack all the patches.
+If there is no tree, should we downgrade ixp4xx in the MAINTAINERS
+file from "Maintained" to "Odd fixes"?
+
+	Arnd
