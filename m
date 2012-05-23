@@ -1,56 +1,53 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 23 May 2012 16:11:46 -0700
-Subject: [PATCH v3] OMAP2+: UART: Add mechanism to probe uart pins and
- configure rx wakeup
-In-Reply-To: <1336729242-16168-1-git-send-email-govindraj.raja@ti.com>
- (Govindraj R.'s message of "Fri, 11 May 2012 15:10:42 +0530")
-References: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
- <1336729242-16168-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <87likize4t.fsf@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 24 May 2012 05:17:34 +0530
+Subject: [PATCH 0/3] pinctrl: add support for samsung pinctrl driver
+Message-ID: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+This patch series adds a common pinctrl driver for all Samsung platforms and
+enables the pinctrl driver support for Exynos4210 based device tree enabled
+platforms. The scope of this driver is limited to only device tree enabled
+platforms.
 
-> From: "Govindraj.R" <govindraj.raja@ti.com>
->
-> The commit (bce492c0  ARM: OMAP2+: UART: Fix incorrect population of
-> default uart pads) removed default uart pads that where getting populated
-> and which was making rx pin wakeup capable. If uart pads were used in
-> different mode by any other module then it would fail since the default
-> pads took over all the uart pins forcefully. With removal of default pads
-> the rx_pad wakeup for console uart while waking up from off mode is broken.
->
-> Utilise the mux api available to probe the availability of mux pins
-> in uart mode and probe for availability of uart pin in mux mode0
-> if uart is available as uart pin itself then configure rx pin
-> as wakeup capable.
->
-> This patch itself doesn't cater to all boards. Boards using uart rx wakeup
-> mechanism should ensure the usage of omap_serial_init_port by configuring
-> required uart ports and pass necessary mux data, till then this probing of
-> uart pins can cater to enabling of rx pad wakeup to most of the boards.
->
-> This patch can also throw some boot warning from _omap_mux_get_by_name
-> if pin is requested for availability is not present while dynamically probing
-> the uart pins availability such boot warnings can be addressed only when board
-> files are patched with omap_serial_init_port calls passing the right pads
-> needed for a given port.
->
-> Discussion Threads for reference:
-> http://www.spinics.net/lists/linux-omap/msg69859.html
-> http://www.spinics.net/lists/linux-omap/msg68659.html
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Russ Dill <russ.dill@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Ameya Palande <ameya.palande@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+The intention of this driver is to replace the existing gpiolib driver and
+provide pinctrl subsystem interface to configure the pins/mux instead
+of existing platform callbacks. At this point, the pinmux and pinconfig
+functionality is fully supported. Additional work is required to add gpio
+interrupts and wakeup interrupts support but that should not stop device
+drivers from switching over to use the pinctrl subsystem to configure
+the io-pads.
 
-Tony, it's up to you if you're OK with this mux interface, but I can at
-least confirm that this gets runtime PM + UART wakeups working again on
-the boards I tried: 3530/Overo, 3430/n900, 3530/OMAP3EVM.
+Note that, the Samsung pinctrl driver is usable only on device tree enabled
+Samsung platforms. Legacy platforms would still continue to use the older
+gpiolib driver and hence updates to device drivers to use the pinctrl api
+should ensure that support for legacy platforms is maintained.
 
-Kevin
+The first patch adds a new pinctrl driver for Samsung. It provides interfaces
+to the pinctrl and gpiolib subsystems. This driver provides a common framework
+for all Samsung SoC's to enable the pinctrl and gpiolib support. The driver
+accepts the information about pins, groups and functions from the device tree
+and the information about gpio banks is supplied using driver data.
+
+The second patch adds the driver data required to operate the pinctrl driver
+on Exynos4210 based platforms. The third patch modifies the existing gpiolib
+driver to skip the gpio pin registrations if pinctrl driver support is found
+to be enabled.
+
+Thomas Abraham (3):
+  pinctrl: add samsung pinctrl and gpiolib driver
+  pinctrl: add exynos4210 specific driver data for samsung pinctrl driver
+  gpio: exynos4: skip gpiolib registration if pinctrl driver is used
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  111 +++
+ drivers/gpio/gpio-samsung.c                        |   21 +
+ drivers/pinctrl/Kconfig                            |   11 +
+ drivers/pinctrl/Makefile                           |    2 +
+ drivers/pinctrl/pinctrl-exynos4.c                  |  211 +++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  881 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.h                  |  170 ++++
+ 7 files changed, 1407 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-exynos4.c
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.c
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.h
