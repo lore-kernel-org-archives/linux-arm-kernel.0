@@ -1,50 +1,208 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 May 2012 12:59:50 -0300
-Subject: Booting mx31 on linux-next-20120517
-In-Reply-To: <20120523154909.GA17621@S2101-09.ap.freescale.net>
-References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
- <20120518085922.GQ30400@pengutronix.de>
- <CAOMZO5DNSRCknE2Z-rmUjBsJWaiZdRb=8hrNw2N=u4OsqyX1AQ@mail.gmail.com>
- <3280708.6NjLuBzCWZ@laptop>
- <CAOMZO5DHNXkc9wAMapQgtfPujSEcMvFvuSSZfJPb2nM5fm3sUg@mail.gmail.com>
- <20120523154909.GA17621@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5C9OLagUx+89YYBFBO03vUKir-Ao4BPyhdsKqZSpiavMA@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 May 2012 18:19:51 +0200
+Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
+Message-ID: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+Once again, ixp4xx no longer even compiles. This patch fixes the issue
+by converting over to gpiolib. This patch was first made by Imre and
+posted by Marc, and I added in Russell's suggestion to empty the gpio
+header file.
 
-On Wed, May 23, 2012 at 12:49 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+This fix should also go for 3.1, 3.2, 3.3, and 3.4.
 
-> My imx51 babbage stops booting for the same cause. ?And I tracked it
-> down a little bit and it goes to regmap patch below.
->
-> commit 91b5e741184ea9836cd7d7509e4f9b6eefa27df2
-> Author: Marc Reilly <marc@cpdesign.com.au>
-> Date: ? Sun Apr 1 16:41:37 2012 +1000
->
-> ? ?mfd: Use regmap for the mc13xxx-core register access
->
-> ? ?This change converts the mc13xxx core to use regmap rather than direct
-> ? ?spi r/w.
-> ? ?The spidev member of mc13xxx struct becomes redundant and is removed.
-> ? ?Extra debugging aids are added to mc13xxx_reg_rmw.
-> ? ?Mutex init is moved to before regmap init.
->
-> Marc,
->
-> Have you tested the patch with spi access? ?It seems not to me.
+Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+Cc: <stable@vger.kernel.org>
+---
+ arch/arm/Kconfig                         |    2 +-
+ arch/arm/mach-ixp4xx/common.c            |   48 +++++++++++++++++-
+ arch/arm/mach-ixp4xx/include/mach/gpio.h |   79 +-----------------------------
+ 3 files changed, 48 insertions(+), 81 deletions(-)
 
-The original issue from this thread was solved by this patch:
-http://www.spinics.net/lists/arm-kernel/msg176093.html
-
-For the mc13xxx hang, I started another thread:
-http://marc.info/?l=linux-kernel&m=133778717002997&w=2
-
-Please check the details there and any help is appreciatted.
-
-Marc told us that he has no hardware to test mc13xxx via SPI.
-
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 36586dba..7a8660a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -556,7 +556,7 @@ config ARCH_IXP4XX
+ 	select ARCH_HAS_DMA_SET_COHERENT_MASK
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+-	select GENERIC_GPIO
++	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+ 	select NEED_MACH_IO_H
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index ebbd7fc..a9f8094 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -28,6 +28,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/io.h>
+ #include <linux/export.h>
++#include <linux/gpio.h>
+ 
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+@@ -107,7 +108,7 @@ static signed char irq2gpio[32] = {
+ 	 7,  8,  9, 10, 11, 12, -1, -1,
+ };
+ 
+-int gpio_to_irq(int gpio)
++static int ixp4xx_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
+ {
+ 	int irq;
+ 
+@@ -117,7 +118,6 @@ int gpio_to_irq(int gpio)
+ 	}
+ 	return -EINVAL;
+ }
+-EXPORT_SYMBOL(gpio_to_irq);
+ 
+ int irq_to_gpio(unsigned int irq)
+ {
+@@ -383,12 +383,56 @@ static struct platform_device *ixp46x_devices[] __initdata = {
+ unsigned long ixp4xx_exp_bus_size;
+ EXPORT_SYMBOL(ixp4xx_exp_bus_size);
+ 
++static int ixp4xx_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	gpio_line_config(gpio, IXP4XX_GPIO_IN);
++
++	return 0;
++}
++
++static int ixp4xx_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
++					int level)
++{
++	gpio_line_set(gpio, level);
++	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
++
++	return 0;
++}
++
++static int ixp4xx_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
++{
++	int value;
++
++	gpio_line_get(gpio, &value);
++
++	return value;
++}
++
++static void ixp4xx_gpio_set_value(struct gpio_chip *chip, unsigned gpio,
++				  int value)
++{
++	gpio_line_set(gpio, value);
++}
++
++static struct gpio_chip ixp4xx_gpio_chip = {
++	.label			= "IXP4XX_GPIO_CHIP",
++	.direction_input	= ixp4xx_gpio_direction_input,
++	.direction_output	= ixp4xx_gpio_direction_output,
++	.get			= ixp4xx_gpio_get_value,
++	.set			= ixp4xx_gpio_set_value,
++	.to_irq			= ixp4xx_gpio_to_irq,
++	.base			= 0,
++	.ngpio			= 16,
++};
++
+ void __init ixp4xx_sys_init(void)
+ {
+ 	ixp4xx_exp_bus_size = SZ_16M;
+ 
+ 	platform_add_devices(ixp4xx_devices, ARRAY_SIZE(ixp4xx_devices));
+ 
++	gpiochip_add(&ixp4xx_gpio_chip);
++
+ 	if (cpu_is_ixp46x()) {
+ 		int region;
+ 
+diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+index 83d6b4e..ef37f26 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
++++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+@@ -1,79 +1,2 @@
+-/*
+- * arch/arm/mach-ixp4xx/include/mach/gpio.h
+- *
+- * IXP4XX GPIO wrappers for arch-neutral GPIO calls
+- *
+- * Written by Milan Svoboda <msvoboda@ra.rockwell.com>
+- * Based on PXA implementation by Philipp Zabel <philipp.zabel@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+- *
+- */
+-
+-#ifndef __ASM_ARCH_IXP4XX_GPIO_H
+-#define __ASM_ARCH_IXP4XX_GPIO_H
+-
+-#include <linux/kernel.h>
+-#include <mach/hardware.h>
+-
+-#define __ARM_GPIOLIB_COMPLEX
+-
+-static inline int gpio_request(unsigned gpio, const char *label)
+-{
+-	return 0;
+-}
+-
+-static inline void gpio_free(unsigned gpio)
+-{
+-	might_sleep();
+-
+-	return;
+-}
+-
+-static inline int gpio_direction_input(unsigned gpio)
+-{
+-	gpio_line_config(gpio, IXP4XX_GPIO_IN);
+-	return 0;
+-}
+-
+-static inline int gpio_direction_output(unsigned gpio, int level)
+-{
+-	gpio_line_set(gpio, level);
+-	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
+-	return 0;
+-}
+-
+-static inline int gpio_get_value(unsigned gpio)
+-{
+-	int value;
+-
+-	gpio_line_get(gpio, &value);
+-
+-	return value;
+-}
+-
+-static inline void gpio_set_value(unsigned gpio, int value)
+-{
+-	gpio_line_set(gpio, value);
+-}
+-
+-#include <asm-generic/gpio.h>			/* cansleep wrappers */
+-
+-extern int gpio_to_irq(int gpio);
+-#define gpio_to_irq gpio_to_irq
+-extern int irq_to_gpio(unsigned int irq);
+-
+-#endif
++/* empty */
+ 
+-- 
+1.7.2.5
