@@ -1,53 +1,87 @@
-From: joramar76@yahoo.es (=?UTF-8?B?Sm9yZ2UgQW1vcsOzcyBBcmdvcw==?=)
-Date: Wed, 23 May 2012 22:41:39 +0200
-Subject: A good sub-architecture to base new ports on?
-In-Reply-To: <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
- <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
- <4FB5343D.5090509@yahoo.es> <201205181331.07566.arnd@arndb.de>
- <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
-Message-ID: <4FBD4B83.5010102@yahoo.es>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 May 2012 14:44:03 -0600
+Subject: [PATCH RFC v3 3/3] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <1337779362-31259-3-git-send-email-b29396@freescale.com>
+References: <1337779362-31259-1-git-send-email-b29396@freescale.com>
+ <1337779362-31259-3-git-send-email-b29396@freescale.com>
+Message-ID: <4FBD4C13.8080209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No wi-fi. I just wanted to have the basis working and then build up the 
-rest.
+On 05/23/2012 07:22 AM, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> This patch implements a standard common binding for pinctrl gpio ranges.
+> Each SoC can add gpio ranges through device tree by adding a gpio-maps property
+> under their pinctrl devices node with the format:
+> <&gpio $gpio_offset $pin_offset $npin>.
+> 
+> Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
+> to parse and register the gpio ranges from device tree.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-How should we proceed now? Where can we share the code?
+This is mostly good. Just a few comments:
 
-Regards,
-Jorge
+> +gpio-maps: 4 integers array, each entry in the array represents a gpio
+> +range with the format: <&gpio $gpio_offset $pin_offset $count>
+> +- gpio: phandle pointing at gpio device node
+> +- gpio_offset: integer, the local offset of $gpio
+> +- pin_offset: integer, the pin offset or pin id
+> +- npins: integer, the gpio ranges starting from pin_offset
 
-El 21/05/2012 22:19, Alexey Zaytsev escribi?:
-> On Fri, May 18, 2012 at 4:31 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
->> On Thursday 17 May 2012, Jorge Amor?s Argos wrote:
->>> Hi Alexey and co,
->>>
->>> I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the
->>> only missing module was ADSL.
-> That's really nice. Did you get the wi-fi module working as well?
->
->> Ah, very good!
-> I've got it working for 2.6.31, but that needs a lot of cleanup.
->
->>> Anyway, compiling was successful but I can't tell if it was functional.
->>>
->>> Mainly 2 big issues:
->>>
->>>    * No knowledge how to build the image (I wanted to have a self-lzma
->>>      image in order to save room)
->> LZMA support was added to arm linux in 2.6.35, and XZ support some time
->> after that.
->>
->>>    * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
->>>      easily upload firmware into flash. It took me hours to make 1 trial.
->>>
->>>
->>> I'll be glad to share the code with whoever need it and maybe we can
->>> take those old routers back to a better world.
->> I think that would be helpful.
-> Yeah. I'll put my work somewhere publicly as well soon.
->
+This uses a single cell to represent a GPIO ID within a GPIO controller.
+The standard GPIO bindings use #gpio-cells, where that's a property in
+the GPIO controller's node. I wonder if we shouldn't do the same here,
+and call into the GPIO driver to parse #gpio-cells and give back the
+Linux GPIO ID, just like of_get_named_gpio_flags() does. This would also
+make this code able to cope with the GPIO of_xlate function returning a
+different GPIO chip, which Grant put in place for banked GPIO controllers.
 
--- 
-Jorge Amor?s Argos
+> diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+
+> +int pinctrl_dt_add_gpio_ranges(struct pinctrl_dev *pctldev,
+
+The locking I was talking about before is between the following line:
+
+> +		ranges[i].gc = of_node_to_gpiochip(np_gpio);
+
+and this code:
+
+> +		ranges[i].name = dev_name(pctldev->dev);
+> +		ranges[i].base = ranges[i].gc->base + gpio_offset;
+> +		ranges[i].pin_base = pin_offset;
+> +		ranges[i].npins = npins;
+
+If of_node_to_gpiochip() doesn't mark the GPIO chip as "in use", then
+the module that provides that device could be unloaded between the two
+blocks of code above.
+
+Re: your locking comments in your other email: ranges[i].gc doesn't
+appear to be used anywhere else in pinctrl, so I think it's OK not to
+lock the GPIO chip for any more time than between the above two blocks
+of code.
+
+Finally, just a minor nit:
+
+> +		ranges[i].gc = of_node_to_gpiochip(np_gpio);
+> +		if (!ranges[i].gc) {
+> +			dev_err(pctldev->dev,
+> +				"can not find gpio chip of node(%s)\n",
+> +				np_gpio->name);
+> +			of_node_put(np_gpio);
+> +			return -EPROBE_DEFER;
+> +		}
+> +
+> +		of_node_put(np_gpio);
+
+could be slightly simpler:
+
++		ranges[i].gc = of_node_to_gpiochip(np_gpio);
++		of_node_put(np_gpio); <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
++		if (!ranges[i].gc) {
++			dev_err(pctldev->dev,
++				"can not find gpio chip of node(%s)\n",
++				np_gpio->name);
++			return -EPROBE_DEFER;
++		}
