@@ -1,18 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 May 2012 14:29:40 -0600
-Subject: [PATCH RFC v3 1/3] pinctrl: remove pinctrl_remove_gpio_range
-In-Reply-To: <1337779362-31259-1-git-send-email-b29396@freescale.com>
-References: <1337779362-31259-1-git-send-email-b29396@freescale.com>
-Message-ID: <4FBD48B4.80806@wwwdotorg.org>
+From: joramar76@yahoo.es (=?UTF-8?B?Sm9yZ2UgQW1vcsOzcyBBcmdvcw==?=)
+Date: Wed, 23 May 2012 22:41:39 +0200
+Subject: A good sub-architecture to base new ports on?
+In-Reply-To: <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+ <4FB5343D.5090509@yahoo.es> <201205181331.07566.arnd@arndb.de>
+ <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
+Message-ID: <4FBD4B83.5010102@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2012 07:22 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> The gpio ranges will be automatically removed when the pinctrl
-> driver is unregistered.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+No wi-fi. I just wanted to have the basis working and then build up the 
+rest.
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+How should we proceed now? Where can we share the code?
+
+Regards,
+Jorge
+
+El 21/05/2012 22:19, Alexey Zaytsev escribi?:
+> On Fri, May 18, 2012 at 4:31 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>> On Thursday 17 May 2012, Jorge Amor?s Argos wrote:
+>>> Hi Alexey and co,
+>>>
+>>> I up-ported Solos open code to Openwrt with Linux 2.6.30. I think the
+>>> only missing module was ADSL.
+> That's really nice. Did you get the wi-fi module working as well?
+>
+>> Ah, very good!
+> I've got it working for 2.6.31, but that needs a lot of cleanup.
+>
+>>> Anyway, compiling was successful but I can't tell if it was functional.
+>>>
+>>> Mainly 2 big issues:
+>>>
+>>>    * No knowledge how to build the image (I wanted to have a self-lzma
+>>>      image in order to save room)
+>> LZMA support was added to arm linux in 2.6.35, and XZ support some time
+>> after that.
+>>
+>>>    * My Solos based router, Xavi 7968, is a bitchy one. I found no way to
+>>>      easily upload firmware into flash. It took me hours to make 1 trial.
+>>>
+>>>
+>>> I'll be glad to share the code with whoever need it and maybe we can
+>>> take those old routers back to a better world.
+>> I think that would be helpful.
+> Yeah. I'll put my work somewhere publicly as well soon.
+>
+
+-- 
+Jorge Amor?s Argos
