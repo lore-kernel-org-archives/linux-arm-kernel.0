@@ -1,186 +1,128 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Wed, 23 May 2012 15:20:17 +0530
-Subject: [PATCH 6/6] ARM: dts: Add nodes for spi controllers for Samsung
- Exynos5 platforms
-In-Reply-To: <1337334392-6441-7-git-send-email-thomas.abraham@linaro.org>
-References: <1337334392-6441-1-git-send-email-thomas.abraham@linaro.org>
- <1337334392-6441-7-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAAgF-BfftSDEFrskY2X6G76hETJfh=0hynmVnz2my+b9phf_5Q@mail.gmail.com>
+From: rui.p.m.sousa@gmail.com (Rui Sousa)
+Date: Wed, 23 May 2012 23:02:25 +0200
+Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
+Message-ID: <201205232302.26191.rui.p.m.sousa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 2009-11-24 16:22, Russell King - ARM Linux wrote:
 
-On Fri, May 18, 2012 at 3:16 PM, Thomas Abraham
-<thomas.abraham@linaro.org>wrote:
+Hi,
 
-> Add device nodes for the three instances of spi controllers in Exynos5
-> platforms and enable instance spi 1 for smdk5250 board.
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |   47
-> ++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/exynos5250.dtsi         |   46
-> ++++++++++++++++++++++++++++
->  2 files changed, 92 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 49945cc..dca572d 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -16,12 +16,18 @@
->        model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
->        compatible = "samsung,smdk5250", "samsung,exynos5250";
->
-> +       aliases {
-> +               spi0 = &spi_0;
-> +               spi1 = &spi_1;
-> +               spi2 = &spi_2;
-> +       };
-> +
->        memory {
->                reg = <0x40000000 0x80000000>;
->        };
->
->        chosen {
-> -               bootargs = "root=/dev/ram0 rw ramdisk=8192
-> console=ttySAC1,115200";
-> +               bootargs ="root=/dev/ram0 rw ramdisk=8192
-> initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
->        };
->
->        i2c at 12C60000 {
-> @@ -48,6 +54,45 @@
->                };
->        };
->
-> +
-> +       spi_1: spi at 12d30000 {
-> +               gpios = <&gpa2 4 2 3 0>,
-> +                       <&gpa2 6 2 3 0>,
-> +                       <&gpa2 7 2 3 0>;
-> +
-> +               w25q80bw at 0 {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       compatible = "w25x80";
-> +                       reg = <0>;
-> +                       spi-max-frequency = <10000>;
-> +
-> +                       controller-data {
-> +                               cs-gpio = <&gpa2 5 1 0 3>;
-> +                               samsung,spi-feedback-delay = <0>;
-> +                       };
-> +
-> +                       partition at 0 {
-> +                               label = "U-Boot";
-> +                               reg = <0x0 0x40000>;
-> +                               read-only;
-> +                       };
-> +
-> +                       partition at 40000 {
-> +                               label = "Kernel";
-> +                               reg = <0x40000 0xc0000>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       spi_0: spi at 12d20000 {
-> +               status = "disabled";
-> +       };
-> +
-> +       spi_2: spi at 12d40000 {
-> +               status = "disabled";
-> +       };
-> +
->        i2c at 12C80000 {
->                status = "disabled";
->        };
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index 5ca0cdb..9d7add0 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -30,6 +30,22 @@
->                reg = <0x10481000 0x1000>, <0x10482000 0x2000>;
->        };
->
-> +       combiner:interrupt-controller at 10440000 {
-> +               compatible = "samsung,exynos4210-combiner";
-> +               #interrupt-cells = <2>;
-> +               interrupt-controller;
-> +               samsung,combiner-nr = <32>;
-> +               reg = <0x10440000 0x1000>;
-> +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> +                            <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
-> +                            <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
-> +                            <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
-> +                            <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
-> +       };
-> +
->
-The combiner interrupt controller support is already present in the
-following patch.
-         ARM: Exynos5: Add combiner, wakeup interrupt controller and
-ethernet nodes
-This code can be removed from this patch.
-Thanks&Regards
-Padma
+I read this old thread but never saw any comments on the performance
+regression for the DMA_FROM_DEVICE case. Looking at a "recent" 3.2.x kernel
+I see there is still a double invalidate of the DMA range, once on dma map,
+once on dma unmap.
 
->        watchdog {
->                compatible = "samsung,s3c2410-wdt";
->                reg = <0x101D0000 0x100>;
-> @@ -130,6 +146,36 @@
->                #size-cells = <0>;
->        };
->
-> +       spi_0: spi at 12d20000 {
-> +               compatible = "samsung,exynos4210-spi";
-> +               reg = <0x12d20000 0x100>;
-> +               interrupts = <0 66 0>;
-> +               tx-dma-channel = <&pdma0 5>;
-> +               rx-dma-channel = <&pdma0 4>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +       };
-> +
-> +       spi_1: spi at 12d30000 {
-> +               compatible = "samsung,exynos4210-spi";
-> +               reg = <0x12d30000 0x100>;
-> +               interrupts = <0 67 0>;
-> +               tx-dma-channel = <&pdma1 5>;
-> +               rx-dma-channel = <&pdma1 4>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +       };
-> +
-> +       spi_2: spi at 12d40000 {
-> +               compatible = "samsung,exynos4210-spi";
-> +               reg = <0x12d40000 0x100>;
-> +               interrupts = <0 68 0>;
-> +               tx-dma-channel = <&pdma0 7>;
-> +               rx-dma-channel = <&pdma0 6>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +       };
-> +
->        amba {
->                #address-cells = <1>;
->                #size-cells = <1>;
-> --
-> 1.6.6.rc2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120523/bacf21af/attachment-0001.html>
+My test case, dual A9, forwarding ethernet packets between two gemac 
+interfaces, at a rate of around 30kpps shows a CPU utilization of about
+20% (using oprofile) just in the inner+outer cache invalidate functions,
+so I would be very interested in eliminating the extra invalidate and recover
+10% of CPU performance.
+
+My other comment/question, is that I believe, at least on the A9, speculative
+fetches can be completely disable using bit 2 (L1 prefetch disable) of CP15
+auxiliary control register (I'm looking at section 4.3.10 of Cortex-A9 
+Technical Reference Manual). Is this not true?
+If it's true, and in general if speculative fetches can be disabled for 
+some/all armv7 CPU's, I think it would be a good idea to introduce a compile
+time flag and make the dual invalidate optional. Comments?
+
+Br,
+Rui
+
+> On Tue, Nov 24, 2009 at 05:46:02PM +0200, saeed bishara wrote:
+> > On Mon, Nov 23, 2009 at 7:27 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Mon, Nov 23, 2009 at 05:25:06PM +0200, saeed bishara wrote:
+> > >> > +       if (dir == DMA_FROM_DEVICE) {
+> > >> > +               outer_inv_range(paddr, paddr + size);
+> > >> > +               dmac_inv_range(kaddr, kaddr + size);
+> > >> it's not clear why outer cache invalidated before inner cache, and, I
+> > >> think that it may be incorrect, how can you be sure that a dirty line
+> > >> that is in inner cache can't be moved down to outer cache?
+> > >
+> > > I think you have a point, but also see Catalin's point.  When we are
+> > > invalidating, we have to invalidate the outer caches before the inner
+> > > caches, otherwise there is a danger that the inner caches could
+> > > prefetch from the outer between the two operations.
+> > >
+> > > I think that the only thing we can do is as my previous version did,
+> > > and always clean the caches at this point - first the inner and then
+> > > the outer caches.
+> >
+> > this makes sense, if  a specific CPU needs the outer cache to be
+> > invalidated before the inner one, then that better be done in a
+> > separate patch as this is a different issue and has nothing to do with
+> > the speculative prefetch
+> 
+> That will mean redoing most of the patch series, which won't be pretty.
+> 
+> > > Yes, but we need to do this for bidirectional mappings as well (which
+> > > would've only been cleaned.)
+> > >
+> > > What would be useful is if someone could run some tests on the 
+performance
+> > > impact of this (eg, measuring the DMA performance of a SATA hard drive)
+> > > and comparing the resulting performance.
+> > >
+> > > I _could_ do that, but it would mean taking down my network and running
+> > > the tests on a fairly old machine.
+> >
+> > I want to help with that testing, is there any git tree where I can
+> > pull the code from?
+> 
+> There isn't, because apparantly under git rules, as soon as I publish it
+> in git form it must be fixed.  So I'm keeping the stuff private and only
+> issuing patches on this mailing list.
+> 
+> > > If it does turn out to be a problem, we can change the 'inv_range' and
+> > > 'clean_range' functions to be 'dev_to_cpu' and 'cpu_to_dev' functions,
+> > > and push the decisions about what to do at each point down into the
+> > > per-CPU assembly.
+> >
+> > the thing is that the inv_range or dev_to_cpu is called before and
+> > after the DMA operation.
+> > and for the systems that doesn't have speculative prefetch, we don't
+> > that function to be called at all after the DMA operation.
+> 
+> Well, the numbers based on trivial looping tests on Versatile/PB926
+> (in other words, it's not a real test) are:
+> 
+> --- original ---
+> Test: Null Function: 108.000ns
+> Test: Map 4K DMA_FROM_DEVICE: 10393.000ns
+> Test: Unmap 4K DMA_FROM_DEVICE: 107.000ns 
+> Test: Map+Unmap 4K DMA_FROM_DEVICE: 10388.999ns
+> Test: Map 4K DMA_TO_DEVICE: 10374.000ns
+> Test: Unmap 4K DMA_TO_DEVICE: 106.000ns  
+> Test: Map+Unmap 4K DMA_TO_DEVICE: 10374.000ns
+> Test: Map 32K DMA_FROM_DEVICE: 78653.998ns
+> Test: Unmap 32K DMA_FROM_DEVICE: 106.000ns
+> Test: Map+Unmap 32K DMA_FROM_DEVICE: 78654.003ns
+> Test: Map 32K DMA_TO_DEVICE: 78639.984ns
+> Test: Unmap 32K DMA_TO_DEVICE: 107.000ns
+> Test: Map+Unmap 32K DMA_TO_DEVICE: 78640.041ns
+> 
+> --- replacement ---
+> Test: Null Function: 109.000ns
+> Test: Map 4K DMA_FROM_DEVICE: 10196.000ns
+> Test: Unmap 4K DMA_FROM_DEVICE: 10185.999ns
+> Test: Map+Unmap 4K DMA_FROM_DEVICE: 20290.999ns
+> Test: Map 4K DMA_TO_DEVICE: 10164.000ns
+> Test: Unmap 4K DMA_TO_DEVICE: 327.000ns
+> Test: Map+Unmap 4K DMA_TO_DEVICE: 10454.000ns
+> Test: Map 32K DMA_FROM_DEVICE: 78457.995ns
+> Test: Unmap 32K DMA_FROM_DEVICE: 78473.016ns  
+> Test: Map+Unmap 32K DMA_FROM_DEVICE: 156819.917ns
+> Test: Map 32K DMA_TO_DEVICE: 78454.342ns
+> Test: Unmap 32K DMA_TO_DEVICE: 325.995ns
+> Test: Map+Unmap 32K DMA_TO_DEVICE: 78715.267ns
+> 
+> which shows minimal impact for the DMA_TO_DEVICE case, but a major impact
+> on the DMA_FROM_DEVICE case, which I don't think we can live with.
+> 
+> So I think it's time to re-think this.
+> 
+> 
+> 
