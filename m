@@ -1,91 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 23 May 2012 09:08:27 -0600 (MDT)
-Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA31E77@DBDE01.ent.ti.com>
-References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
- <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
- <4F97B891.1020601@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
- <4F97E243.6000500@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
- <4F97EF11.4020300@ti.com>
- <79CD15C6BA57404B839C016229A409A83E9FDAE7@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1204250755020.29696@utopia.booyaka.com>
- <4F9816D1.3000102@ti.com>
- <alpine.DEB.2.00.1204250934130.29696@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA31E77@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1205230854430.3085@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 May 2012 23:49:15 +0800
+Subject: Booting mx31 on linux-next-20120517
+In-Reply-To: <CAOMZO5DHNXkc9wAMapQgtfPujSEcMvFvuSSZfJPb2nM5fm3sUg@mail.gmail.com>
+References: <CAOMZO5C2vf-emmk=aALy7VESnBkVAQ23YXkHP31MMK7JQzd3Ag@mail.gmail.com>
+ <20120518085922.GQ30400@pengutronix.de>
+ <CAOMZO5DNSRCknE2Z-rmUjBsJWaiZdRb=8hrNw2N=u4OsqyX1AQ@mail.gmail.com>
+ <3280708.6NjLuBzCWZ@laptop>
+ <CAOMZO5DHNXkc9wAMapQgtfPujSEcMvFvuSSZfJPb2nM5fm3sUg@mail.gmail.com>
+Message-ID: <20120523154909.GA17621@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav
-
-On Wed, 23 May 2012, Hiremath, Vaibhav wrote:
-
-> I used your cleaned version of clocktree data, where you have removed all 
-> leaf-nodes and merged multiple clocks nodes into one; but it did not work. I 
-> attempted to review the cleanup and tried to debug, but found it bit hard to 
-> come back to working clocktree from stripped version. So moved back to my 
-> submitted clocktree and started stripping the clock leaf-nodes, same way you 
-> had done it. Now I reached to the stage where I have working clocktree 
-> without peripheral leaf-nodes and booting on BeagleBone.
-
-Okay great, please post that to the list so we can diff it against the 
-version that I did, and also so we can queue it for merging in 3.6?
-
-> Just FYI (may need your help), I got into some issues (still open) during 
-> this cleanup -
+On Mon, May 21, 2012 at 10:35:42AM -0300, Fabio Estevam wrote:
+> On Mon, May 21, 2012 at 10:33 AM, Philippe R?tornaz
+> <philippe.retornaz@epfl.ch> wrote:
 > 
-> 1. In cases where we have clock selection option for node-leafs, like, 
->    Timers, I removed enable_reg entry from the node, which results into a 
->    kernel error message from function omap2_dflt_clk_disable()
+> > Try to disable the MC13783 Pmic. On mx31moboard I have the same hang and I can
+> > clearly see that the board switchoff itself.
+> > It looks like somebody is writing in the wrong register (regmap code?).
 > 
-> clock: clk_disable called on independent clock %s which has no enable_reg
-
-Shouldn't those clocks use clkops_null then?
-
-> 2. clkdm_name entry: 
->    The issue is, two entries available for clockdomain associated for 
->    module/clock 
->         - hwmod_data.main_clk and 
->         - clk.clkdm_name
+> You are right. If I disable the mc13783 driver then the boots proceed.
 > 
->    They must match, right? The parent/root clocks flows from one domain to 
->    another domain, so I have to keep the nodes just for sake of matching 
->    clockdomain entry present in associated main_clk data.
+> I will take a look at the mc13783 driver. If you also spot anything
+> wrong there, please let us know.
 > 
->    I am still reviewing the code from Rajendra, but one of Rajendra's patch 
->    actually will help here, made it to use hwmod_data.clkdm (if available) 
->    always, instead of directly using clk.clkdm.
+My imx51 babbage stops booting for the same cause.  And I tracked it
+down a little bit and it goes to regmap patch below. 
 
-Well because of this CLKDIV32K snafu, we'll need to keep the clock 
-framework-based clockdomain control for AM33xx, at the very least for 
-the CLKDIV32K clock.
+commit 91b5e741184ea9836cd7d7509e4f9b6eefa27df2
+Author: Marc Reilly <marc@cpdesign.com.au>
+Date:   Sun Apr 1 16:41:37 2012 +1000
 
-I'd suggest starting with specifying a clockdomain name for each clock.  
-If nothing else, this should help think through the power management 
-behavior for each clock.  Then those can be easily removed later with a 
-simple grep.
+    mfd: Use regmap for the mc13xxx-core register access
 
-> 3. If I understand correctly, hwmod_data.main_clk is functional clock and    
->    hwmod_ocp_if.clk is interface clock, right?
+    This change converts the mc13xxx core to use regmap rather than direct
+    spi r/w.
+    The spidev member of mc13xxx struct becomes redundant and is removed.
+    Extra debugging aids are added to mc13xxx_reg_rmw.
+    Mutex init is moved to before regmap init.
 
-Basically, yes.  To be more precise, in cases where 
-modules have multiple functional clocks, hwmod_data.main_clk is the 
-functional clock that is needed in order for register reads and writes to 
-the IP block to succeed.
+Marc,
 
->    So currently, I have mentioned same entry in both the places (especially 
->    for Peripherals/modules).
->    I am planning to remove ocp_if/clk entry data for all modules..
+Have you tested the patch with spi access?  It seems not to me.
 
-Hmmm, could you explain this further?
-
-Every ocp_if structure that you create should have an interface clock 
-specified.  And almost all of your hwmods should have a main_clk 
-specified.
-
-
-- Paul
+-- 
+Regards,
+Shawn
