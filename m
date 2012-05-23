@@ -1,34 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 May 2012 00:02:54 +0100
-Subject: [PATCH v2 06/17] ARM: dma-mapping: fix for speculative accesses
-In-Reply-To: <201205232302.26191.rui.p.m.sousa@gmail.com>
-References: <201205232302.26191.rui.p.m.sousa@gmail.com>
-Message-ID: <20120523230254.GD6908@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 23 May 2012 16:11:46 -0700
+Subject: [PATCH v3] OMAP2+: UART: Add mechanism to probe uart pins and
+ configure rx wakeup
+In-Reply-To: <1336729242-16168-1-git-send-email-govindraj.raja@ti.com>
+ (Govindraj R.'s message of "Fri, 11 May 2012 15:10:42 +0530")
+References: <1336655139-8908-1-git-send-email-govindraj.raja@ti.com>
+ <1336729242-16168-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87likize4t.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 11:02:25PM +0200, Rui Sousa wrote:
-> I read this old thread but never saw any comments on the performance
-> regression for the DMA_FROM_DEVICE case. Looking at a "recent" 3.2.x kernel
-> I see there is still a double invalidate of the DMA range, once on dma map,
-> once on dma unmap.
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-That's because you can't realistically avoid it.  You need both to ensure
-data correctness.
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> The commit (bce492c0  ARM: OMAP2+: UART: Fix incorrect population of
+> default uart pads) removed default uart pads that where getting populated
+> and which was making rx pin wakeup capable. If uart pads were used in
+> different mode by any other module then it would fail since the default
+> pads took over all the uart pins forcefully. With removal of default pads
+> the rx_pad wakeup for console uart while waking up from off mode is broken.
+>
+> Utilise the mux api available to probe the availability of mux pins
+> in uart mode and probe for availability of uart pin in mux mode0
+> if uart is available as uart pin itself then configure rx pin
+> as wakeup capable.
+>
+> This patch itself doesn't cater to all boards. Boards using uart rx wakeup
+> mechanism should ensure the usage of omap_serial_init_port by configuring
+> required uart ports and pass necessary mux data, till then this probing of
+> uart pins can cater to enabling of rx pad wakeup to most of the boards.
+>
+> This patch can also throw some boot warning from _omap_mux_get_by_name
+> if pin is requested for availability is not present while dynamically probing
+> the uart pins availability such boot warnings can be addressed only when board
+> files are patched with omap_serial_init_port calls passing the right pads
+> needed for a given port.
+>
+> Discussion Threads for reference:
+> http://www.spinics.net/lists/linux-omap/msg69859.html
+> http://www.spinics.net/lists/linux-omap/msg68659.html
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Russ Dill <russ.dill@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Ameya Palande <ameya.palande@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
-The first one kills off any dirty cache lines which _may_ be written back
-over the top of your DMA'd data.
+Tony, it's up to you if you're OK with this mux interface, but I can at
+least confirm that this gets runtime PM + UART wakeups working again on
+the boards I tried: 3530/Overo, 3430/n900, 3530/OMAP3EVM.
 
-The second one kills off any speculative prefetched cache lines which may
-have been read before your DMA'd data was written to RAM.
-
-> If it's true, and in general if speculative fetches can be disabled for 
-> some/all armv7 CPU's, I think it would be a good idea to introduce a compile
-> time flag and make the dual invalidate optional. Comments?
-
-It would be a good idea to get some performance comparisons between the
-two approaches.  At the moment you've given one side which is insufficient
-information to base any judgement what so ever on this.
-
-What you may find is that turning off the speculative prefetch hurts you
-in other ways, but we don't know that until you measure it.
+Kevin
