@@ -1,7 +1,7 @@
 From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Thu, 24 May 2012 19:40:51 +0000
+Date: Thu, 24 May 2012 19:50:24 +0000
 Subject: [PATCH] [ARM] Unconditional call to smp_cross_call on UP crashes
-Message-ID: <1337888451-10340-1-git-send-email-panto@antoniou-consulting.com>
+Message-ID: <1337889024-10416-1-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -52,6 +52,7 @@ Code: bad PC value
 ---[ end trace f5035e8726d1f51b ]---
 
 Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+Cc: stable at vger.kernel.org
 ---
  arch/arm/kernel/smp.c |    4 ++++
  1 files changed, 4 insertions(+), 0 deletions(-)
