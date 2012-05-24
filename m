@@ -1,11 +1,11 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 May 2012 17:35:34 +0900
-Subject: [PATCH 1/2] ARM: EXYYNOS: Use EXYNOS4210_GPEx instead of
- EXYNOS4_GPEx
-In-Reply-To: <4FB5B9A1.2030606@samsung.com>
+Date: Thu, 24 May 2012 17:36:29 +0900
+Subject: [PATCH 2/2] gpio/exynos: Add support for Exynos4x12 SoC
+In-Reply-To: <4FB5B9CA.6060705@samsung.com>
 References: <1337307497-15777-1-git-send-email-jy0922.shim@samsung.com>
- <4FB5B9A1.2030606@samsung.com>
-Message-ID: <008101cd3988$2fb26b90$8f1742b0$%kim@samsung.com>
+ <1337307497-15777-2-git-send-email-jy0922.shim@samsung.com>
+ <4FB5B9CA.6060705@samsung.com>
+Message-ID: <008201cd3988$50731ff0$f1595fd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,191 +14,70 @@ Joonyoung Shim wrote:
 > Add to cc Grant Likely and Linus Walleij
 > 
 > On 05/18/2012 11:18 AM, Joonyoung Shim wrote:
-> > Also use EXYNOS4210_GPIO_Ex instead of EXYNOS4_GPIO_Ex. The GPEx gpios
-> > exist only on Exynos4210 and there are no on Exynos4x12. Redefine them
-> > to exact SoC name.
+> > Exynos4x12 GPIO part1 and part2 layouts are different with that of
+> > Exynos4210. So, it needs to support gpios for Exynos4x12 SoC. This
+> > doesn't support GPVx Exynos4x12 GPIO part4 yet.
+> >
+> > In the Exynos4x12 GPIO part1 and part2, the interval of base register
+> > offset is 0x20 but GPF0, GPJ0, GPK0 and GPM0 ignore the 0x20 interval
+> > and have new value. The interrupt reg offset also is about GPF0 and GPK0
+> > too. Refer the below layout.
+> >
+> > - Exynos4x12 GPIO Part1
+> > GPIO    Base offset     Interrupt reg offset
+> > GPA0    0x000           0x00
+> > GPA1    0x020           0x04
+> > GPB     0x040           0x08
+> > GPC0    0x060           0x0C
+> > GPC1    0x080           0x10
+> > GPD0    0x0A0           0x14
+> > GPD1    0x0C0           0x18
+> >          ...
+> > GPF0    0x180           0x30
+> > GPF1    0x1A0           0x34
+> > GPF2    0x1C0           0x38
+> > GPF3    0x1E0           0x3C
+> >          ...
+> > GPJ0    0x240           0x40
+> > GPJ1    0x260           0x44
+> >
+> > - Exynos4x12 GPIO Part2
+> >          ...
+> > GPK0    0x040           0x08
+> > GPK1    0x060           0x0C
+> > GPK2    0x080           0x10
+> > GPK3    0x0A0           0x14
+> > GPL0    0x0C0           0x18
+> > GPL1    0x0E0           0x1C
+> > GPL2    0x100           0x20
+> > GPY0    0x120           x
+> > GPY1    0x140           x
+> > GPY2    0x160           x
+> > GPY3    0x180           x
+> > GPY4    0x1A0           x
+> > GPY5    0x1C0           x
+> > GPY6    0x1E0           x
+> >          ...
+> > GPM0    0x260           0x24
+> > GPM1    0x280           0x28
+> > GPM2    0x2A0           0x2C
+> > GPM3    0x2C0           0x30
+> > GPM4    0x2E0           0x34
+> > GPX0    0xC00           x
+> > GPX1    0xC20           x
+> > GPX2    0xC40           x
+> > GPX3    0xC60           x
 > >
 > > Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
 > > Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
 > > ---
-> >   arch/arm/mach-exynos/include/mach/gpio.h   |   32
-++++++++++++++--------
-> ------
-> >   arch/arm/mach-exynos/mach-nuri.c           |   16 +++++++-------
-> >   arch/arm/mach-exynos/mach-origen.c         |    6 ++--
-> >   arch/arm/mach-exynos/mach-universal_c210.c |   32
-++++++++++++++-------
-> -------
-> >   arch/arm/mach-exynos/setup-fimc.c          |    4 +-
-> >   drivers/gpio/gpio-samsung.c                |   20 ++++++++--------
-> >   6 files changed, 55 insertions(+), 55 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-
-> exynos/include/mach/gpio.h
-> > index eb24f1e..21c9bf1 100644
-> > --- a/arch/arm/mach-exynos/include/mach/gpio.h
-> > +++ b/arch/arm/mach-exynos/include/mach/gpio.h
-> > @@ -26,11 +26,11 @@
-> >   #define EXYNOS4_GPIO_C1_NR	(5)
-> >   #define EXYNOS4_GPIO_D0_NR	(4)
-> >   #define EXYNOS4_GPIO_D1_NR	(4)
-> > -#define EXYNOS4_GPIO_E0_NR	(5)
-> > -#define EXYNOS4_GPIO_E1_NR	(8)
-> > -#define EXYNOS4_GPIO_E2_NR	(6)
-> > -#define EXYNOS4_GPIO_E3_NR	(8)
-> > -#define EXYNOS4_GPIO_E4_NR	(8)
-> > +#define EXYNOS4210_GPIO_E0_NR	(5)
-> > +#define EXYNOS4210_GPIO_E1_NR	(8)
-> > +#define EXYNOS4210_GPIO_E2_NR	(6)
-> > +#define EXYNOS4210_GPIO_E3_NR	(8)
-> > +#define EXYNOS4210_GPIO_E4_NR	(8)
+> >   arch/arm/mach-exynos/include/mach/gpio.h |   28 +++-
+> >   arch/arm/mach-exynos/include/mach/irqs.h |    6 -
+> >   drivers/gpio/gpio-samsung.c              |  334
+> +++++++++++++++++++++++++++---
+> >   3 files changed, 327 insertions(+), 41 deletions(-)
 
-I think, splitting the gpios like following(common exynos4 and exynos4210 or
-exynos4x12). So please just put the definitions for EXYNOS4210 GPIO after
-EXYNOS4_GPIO_XXX.
-
-diff --git a/arch/arm/mach-exynos/include/mach/gpio.h
-b/arch/arm/mach-exynos/include/mach/gpio.h
-index eb24f1e..910b611 100644
---- a/arch/arm/mach-exynos/include/mach/gpio.h
-+++ b/arch/arm/mach-exynos/include/mach/gpio.h
-@@ -26,17 +26,10 @@
- #define EXYNOS4_GPIO_C1_NR	(5)
- #define EXYNOS4_GPIO_D0_NR	(4)
- #define EXYNOS4_GPIO_D1_NR	(4)
--#define EXYNOS4_GPIO_E0_NR	(5)
--#define EXYNOS4_GPIO_E1_NR	(8)
--#define EXYNOS4_GPIO_E2_NR	(6)
--#define EXYNOS4_GPIO_E3_NR	(8)
--#define EXYNOS4_GPIO_E4_NR	(8)
- #define EXYNOS4_GPIO_F0_NR	(8)
- #define EXYNOS4_GPIO_F1_NR	(8)
- #define EXYNOS4_GPIO_F2_NR	(8)
- #define EXYNOS4_GPIO_F3_NR	(6)
--#define EXYNOS4_GPIO_J0_NR	(8)
--#define EXYNOS4_GPIO_J1_NR	(5)
- #define EXYNOS4_GPIO_K0_NR	(7)
- #define EXYNOS4_GPIO_K1_NR	(7)
- #define EXYNOS4_GPIO_K2_NR	(7)
-@@ -57,6 +50,31 @@
- #define EXYNOS4_GPIO_Y6_NR	(8)
- #define EXYNOS4_GPIO_Z_NR	(7)
- 
-+/* For EXYNOS4210 GPIO bank sizes */
-+
-+#define EXYNOS4210_GPIO_E0_NR	(5)
-+#define EXYNOS4210_GPIO_E1_NR	(8)
-+#define EXYNOS4210_GPIO_E2_NR	(6)
-+#define EXYNOS4210_GPIO_E3_NR	(8)
-+#define EXYNOS4210_GPIO_E4_NR	(8)
-+#define EXYNOS4210_GPIO_J0_NR	(8)
-+#define EXYNOS4210_GPIO_J1_NR	(5)
-
-[...]
-
-And we can add EXYNOS4X12 GPIO like following in other patch.
-
-+/* For EXYNOS4X12 GPIO bank sizes */
-+
-+#define EXYNOS4X12_GPIO_J0_NR	(8)
-+#define EXYNOS4X12_GPIO_J1_NR	(5)
-+#define EXYNOS4X12_GPIO_M0_NR	(8)
-+#define EXYNOS4X12_GPIO_M1_NR	(7)
-+#define EXYNOS4X12_GPIO_M2_NR	(5)
-+#define EXYNOS4X12_GPIO_M3_NR	(8)
-+#define EXYNOS4X12_GPIO_M4_NR	(8)
-+#define EXYNOS4X12_GPIO_V0_NR	(8)
-+#define EXYNOS4X12_GPIO_V1_NR	(8)
-+#define EXYNOS4X12_GPIO_V2_NR	(8)
-+#define EXYNOS4X12_GPIO_V3_NR	(8)
-+#define EXYNOS4X12_GPIO_V4_NR	(2)
-
-> >   #define EXYNOS4_GPIO_F0_NR	(8)
-> >   #define EXYNOS4_GPIO_F1_NR	(8)
-> >   #define EXYNOS4_GPIO_F2_NR	(8)
-> > @@ -67,12 +67,12 @@ enum exynos4_gpio_number {
-> >   	EXYNOS4_GPIO_C1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C0),
-> >   	EXYNOS4_GPIO_D0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C1),
-> >   	EXYNOS4_GPIO_D1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D0),
-> > -	EXYNOS4_GPIO_E0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D1),
-> > -	EXYNOS4_GPIO_E1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E0),
-> > -	EXYNOS4_GPIO_E2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E1),
-> > -	EXYNOS4_GPIO_E3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E2),
-> > -	EXYNOS4_GPIO_E4_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E3),
-> > -	EXYNOS4_GPIO_F0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E4),
-> > +	EXYNOS4210_GPIO_E0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D1),
-> > +	EXYNOS4210_GPIO_E1_START	=
-EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E0),
-> > +	EXYNOS4210_GPIO_E2_START	=
-EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E1),
-> > +	EXYNOS4210_GPIO_E3_START	=
-EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E2),
-> > +	EXYNOS4210_GPIO_E4_START	=
-EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E3),
-> > +	EXYNOS4_GPIO_F0_START	= EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E4),
-> >   	EXYNOS4_GPIO_F1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F0),
-> >   	EXYNOS4_GPIO_F2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F1),
-> >   	EXYNOS4_GPIO_F3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F2),
-
-Same as above.
-
-@@ -99,6 +117,31 @@ enum exynos4_gpio_number {
- 	EXYNOS4_GPIO_Z_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y6),
- };
- 
-+enum exynos4210_gpio_number {
-+	EXYNOS4210_GPIO_E0_START	= EXYNOS4_GPIO_NEXT(EXYNOS4_GPIO_Z),
-+	EXYNOS4210_GPIO_E1_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_E0),
-+	EXYNOS4210_GPIO_E2_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_E1),
-+	EXYNOS4210_GPIO_E3_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_E2),
-+	EXYNOS4210_GPIO_E4_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_E3),
-+	EXYNOS4210_GPIO_J0_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_E4),
-+	EXYNOS4210_GPIO_J1_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4210_GPIO_J0),
-+};
-
-[...]
-
-And following is possible for EXYNOS4X12...
-
-+enum exynos4x12_gpio_number {
-+	EXYNOS4X12_GPIO_J0_START	= EXYNOS4_GPIO_NEXT(EXYNOS4_GPIO_Z),
-+	EXYNOS4X12_GPIO_J1_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_J0),
-+	EXYNOS4X12_GPIO_M0_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_J1),
-+	EXYNOS4X12_GPIO_M1_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_M0),
-+	EXYNOS4X12_GPIO_M2_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_M1),
-+	EXYNOS4X12_GPIO_M3_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_M2),
-+	EXYNOS4X12_GPIO_M4_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_M3),
-+	EXYNOS4X12_GPIO_V0_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_M4),
-+	EXYNOS4X12_GPIO_V1_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_V0),
-+	EXYNOS4X12_GPIO_V2_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_V1),
-+	EXYNOS4X12_GPIO_V3_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_V2),
-+	EXYNOS4X12_GPIO_V4_START	=
-EXYNOS4_GPIO_NEXT(EXYNOS4X12_GPIO_V3),
-+};
-+
- /* EXYNOS4 GPIO number definitions */
- 
- #define EXYNOS4_GPA0(_nr)	(EXYNOS4_GPIO_A0_START + (_nr))
-
-[...]
-
-Of course, need to update other regarding gpio part accordingly.
+See my comments on 1/2 patch.
 
 Thanks.
 
