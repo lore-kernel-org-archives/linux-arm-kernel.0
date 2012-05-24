@@ -1,42 +1,62 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 24 May 2012 12:32:21 +0200
-Subject: Linux Kernel boot up stops after message "Uncompressing
- Linux....done, booting the kernel"
-In-Reply-To: <CACZ0kf9yHJOAVEBx4e5dc_eCRT5dScrZHzbkx3_7P2QkzaHChQ@mail.gmail.com>
-References: <CACZ0kf88Ac8hne9RtLObi624okPw8Nkiv7++Uw8npPLW108mhw@mail.gmail.com>
- <CACZ0kf9yHJOAVEBx4e5dc_eCRT5dScrZHzbkx3_7P2QkzaHChQ@mail.gmail.com>
-Message-ID: <20120524103221.GA1889@glitch>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 24 May 2012 18:45:38 +0800
+Subject: [PATCH] ARM: mx28: add gpmi-nand dt support
+Message-ID: <1337856338-24723-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 10:52:46AM +0530, K K wrote:
-> Hi,
+add gpmi-nand device tree support.
+Also enable the gpmi support for mx28-evk board.
 
-Hi,
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx28-evk.dts |    4 ++++
+ arch/arm/boot/dts/imx28.dtsi    |   18 +++++++++---------
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
-> We have a lpc-3180 based board and it is up and running fine with 2.6.10
-> kernel version. We planned to port our board changes into 2.6.32 kernel
-> version.
-
-2.6.32, really?
-
-> kernel build successfully. When we booting the board with the new 2.6.32
-> kernel we are getting following messages and its stops.
-
-Two cases:
-
-  1. earlyprintk is configured and enabled but points to the
-     wrong console and your platform hangs on it because it's not
-     initialized/ready. the correct console seems ok, the uncompressor
-     is able to use it. check debug-macro.S to be sure it uses the
-     correct address.
-
-  2. earlyprintk is not enabled (or configured) and your kernel is
-     not finding the console (any console= on the cmdline? driver
-     issue?) or dies before finding it. try enabling earlyprintk (and
-     check debug-macro.S as well).
-
-cheers,
-Domenico
-
-ps: post also the kernel configuration
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index ee520a5..5fff6c9 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -22,6 +22,10 @@
+ 
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
++			gpmi-nand at 8000c000 {
++				status = "okay";
++			};
++
+ 			ssp0: ssp at 80010000 {
+ 				compatible = "fsl,imx28-mmc";
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 4634cb8..2358089 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -68,15 +68,15 @@
+ 				status = "disabled";
+ 			};
+ 
+-			bch at 8000a000 {
+-				reg = <0x8000a000 2000>;
+-				interrupts = <41>;
+-				status = "disabled";
+-			};
+-
+-			gpmi at 8000c000 {
+-				reg = <0x8000c000 2000>;
+-				interrupts = <42 88>;
++			gpmi-nand at 8000c000 {
++				compatible = "fsl,imx28-gpmi-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x8000c000 2000>, <0x8000a000 2000>;
++				reg-names = "gpmi-nand", "bch";
++				interrupts = <88>, <41>;
++				interrupt-names = "gpmi-dma", "bch";
++				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.7.0.4
