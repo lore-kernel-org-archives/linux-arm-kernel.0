@@ -1,63 +1,18 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 24 May 2012 10:24:15 -0700
-Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
-In-Reply-To: <CAJ6a13YLogA7M=rzSJAW6fHZOujFY0Crfdz9Sc5qL0mt8kX9CA@mail.gmail.com>
- (KEERTHY J.'s message of "Wed, 23 May 2012 10:21:19 +0530")
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <87397by2h9.fsf@ti.com>
- <CAJ6a13aJwesHw0frCV+EfvYaep09cZGcu_PopuHzye1HS2tgvg@mail.gmail.com>
- <CAJ6a13YLogA7M=rzSJAW6fHZOujFY0Crfdz9Sc5qL0mt8kX9CA@mail.gmail.com>
-Message-ID: <87obpdv6f4.fsf@ti.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 24 May 2012 10:26:11 -0700
+Subject: [PATCH] lib/decompress_unxz.c: removing all memory helper
+ functions
+In-Reply-To: <1337875436-27640-1-git-send-email-tmac@hp.com>
+References: <1337875436-27640-1-git-send-email-tmac@hp.com>
+Message-ID: <1337880371.5070.24.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"J, KEERTHY" <j-keerthy@ti.com> writes:
+On Thu, 2012-05-24 at 10:03 -0600, T Makphaibulchoke wrote:
+> The patch cleans up the file lib/decompress_unxz.c by removing all memory
+> helper functions, e.g., memmove.  By doing so, any architecture's preboot
+> environment supporting the XZ decompression needs to define its own copy of
+> any of the missing memory helper functions.
 
-> On Tue, May 15, 2012 at 11:16 AM, J, KEERTHY <j-keerthy@ti.com> wrote:
->> On Tue, May 8, 2012 at 5:21 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> Rafael,
->>>
->>> Keerthy <j-keerthy@ti.com> writes:
->>>
->>>> From: J Keerthy <j-keerthy@ti.com>
->>>>
->>>> AVS(Adaptive Voltage Scaling) is a power management technique which
->>>> controls the operating voltage of a device in order to optimize (i.e. reduce)
->>>> its power consumption. The voltage is adapted depending on static factors
->>>> (chip manufacturing process) and dynamic factors (temperature
->>>> depending performance).
->>>> The TI AVS solution is named Smartreflex.
->>>>
->>>> To that end, create the AVS driver in drivers/power/avs and
->>>> move the OMAP SmartReflex code to the new directory. The
->>>> class driver is still retained in the mach-omap2 directory.
->>>
->>> How should we handle this for upstream?
->>>
->>> It does a bunch of cleanup under arch/arm then does the move to
->>> drivers/power the end. ?To avoid conflicts with other OMAP core changes,
->>> I would suggest we take this through the OMAP tree.
->>>
->>> With your ack, I'd be glad to take it.
->>
->> Hello Rafael,
->>
->> A gentle ping on this series.
->
-> Hi Greg,
->
-> This series has Kevin's comments incorporated.
->
-> Kevin,
->
-> Can i have your Ack for this series?
->
-
-Well, as mentioned above, I'm waiting for Rafael's ack, then I will
-merge it.
-
-Because of all the arch/arm/mach-omap2/* changes, I would like to merge
-this via the OMAP tree to avoid conflicts with other stuff we have
-changing in arch/arm/mach-omap2/*
-
-Kevin
+Perhaps a silly question, but why not use
+the __builtin variants?
