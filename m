@@ -1,62 +1,58 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 May 2012 18:45:38 +0800
-Subject: [PATCH] ARM: mx28: add gpmi-nand dt support
-Message-ID: <1337856338-24723-1-git-send-email-b32955@freescale.com>
+Date: Thu, 24 May 2012 18:50:58 +0800
+Subject: [PATCH 4/5] ARM: imx6q: add DT node for gpmi-nand
+In-Reply-To: <1337856659-24812-1-git-send-email-b32955@freescale.com>
+References: <1337856659-24812-1-git-send-email-b32955@freescale.com>
+Message-ID: <1337856659-24812-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add gpmi-nand device tree support.
-Also enable the gpmi support for mx28-evk board.
+Add DT node for gpmi-nand.
+Also enable the gpmi-nand for mx6q-arm2 board.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/boot/dts/imx28-evk.dts |    4 ++++
- arch/arm/boot/dts/imx28.dtsi    |   18 +++++++++---------
- 2 files changed, 13 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts |    4 ++++
+ arch/arm/boot/dts/imx6q.dtsi     |   12 ++++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index ee520a5..5fff6c9 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index db4c609..15f9e0b 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
 @@ -22,6 +22,10 @@
+ 	};
  
- 	apb at 80000000 {
- 		apbh at 80000000 {
-+			gpmi-nand at 8000c000 {
-+				status = "okay";
-+			};
+ 	soc {
++		gpmi-nand at 00112000 {
++			status = "okay";
++		};
 +
- 			ssp0: ssp at 80010000 {
- 				compatible = "fsl,imx28-mmc";
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 4634cb8..2358089 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -68,15 +68,15 @@
- 				status = "disabled";
- 			};
+ 		aips-bus at 02100000 { /* AIPS2 */
+ 			ethernet at 02188000 {
+ 				phy-mode = "rgmii";
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index cccac33..979d9f9 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -92,6 +92,18 @@
+ 			reg = <0x00110000 0x2000>;
+ 		};
  
--			bch at 8000a000 {
--				reg = <0x8000a000 2000>;
--				interrupts = <41>;
--				status = "disabled";
--			};
--
--			gpmi at 8000c000 {
--				reg = <0x8000c000 2000>;
--				interrupts = <42 88>;
-+			gpmi-nand at 8000c000 {
-+				compatible = "fsl,imx28-gpmi-nand";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x8000c000 2000>, <0x8000a000 2000>;
-+				reg-names = "gpmi-nand", "bch";
-+				interrupts = <88>, <41>;
-+				interrupt-names = "gpmi-dma", "bch";
-+				fsl,gpmi-dma-channel = <4>;
- 				status = "disabled";
- 			};
- 
++		gpmi-nand at 00112000 {
++			compatible = "fsl,imx6q-gpmi-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x00112000 0x2000>, <0x00114000 0x2000>;
++			reg-names = "gpmi-nand", "bch";
++			interrupts = <0 13 0x04>, <0 15 0x04>;
++			interrupt-names = "gpmi-dma", "bch";
++			fsl,gpmi-dma-channel = <0>;
++			status = "disabled";
++		};
++
+ 		timer at 00a00600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x00a00600 0x20>;
 -- 
 1.7.0.4
