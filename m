@@ -1,37 +1,33 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 24 May 2012 09:07:38 +0200
-Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
-In-Reply-To: <201205231939.49681.arnd@arndb.de>
-References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
- <201205231743.50262.arnd@arndb.de>
- <87396qbtrx.fsf@lebrac.rtp-net.org>
- <201205231939.49681.arnd@arndb.de>
-Message-ID: <20120524070737.GC2180@netboy.at.omicron.at>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Thu, 24 May 2012 09:10:54 +0200
+Subject: ARM: ETH PHY Micrel: KSZ8051MNL Driver?
+In-Reply-To: <20120524033848.GA9851@sapphire.tkos.co.il> (Baruch Siach's
+ message of "Thu, 24 May 2012 06:38:48 +0300")
+References: <1337720919.493.YahooMailClassic@web45209.mail.sp1.yahoo.com>
+ <87obpepscr.fsf@macbook.be.48ers.dk>
+ <20120524033848.GA9851@sapphire.tkos.co.il>
+Message-ID: <878vgioxz5.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 07:39:49PM +0000, Arnd Bergmann wrote:
-> 
-> Ok, thanks for the info. I'm sorry that it has come so far. I think Olof
-> and I are generally doing a good job at picking up all the pull requests,
-> but we sometimes miss single patches, especially when it's not clear that
-> they are expected to go into the arm-soc tree.
-> 
-> I have to admit that I didn't even remember who maintains ixp4xx, since
-> there hasn't been a single ixp4xx patch from Imre or Krzysztof that I've put
-> into the kernel over this time frame.
+>>>>> "Baruch" == Baruch Siach <baruch@tkos.co.il> writes:
 
-It seems like the maintainers are not very responsive.
+Hi,
 
-> What is the plan for ixp4xx going forward? Is one of you planning to
-> maintain a git tree and collect patches for inclusion in arm-soc?
-> I would be more comfortable just knowing where to pull from than
-> having to watch the mailing list and making sure the maintainers
-> Ack all the patches.
-> If there is no tree, should we downgrade ixp4xx in the MAINTAINERS
-> file from "Maintained" to "Odd fixes"?
+ >> I can give the micrel driver a try if you want though.
 
-Yes, there should be some kind of plan.
+ Baruch> In one project that were using the KSZ8051MNL PHY, we needed
+ Baruch> the micrel phy driver to set 50MHz RMII clock. This PHY
+ Baruch> defaults to 25MHz MII, and there is no way to change that with
+ Baruch> pull-up resistors. See commit d606ef3f (phy/micrel: add ability
+ Baruch> to support 50MHz RMII clock on KZS8051RNL).
 
-Thanks,
-Richard
+Yes, that's indeed quite unfortunate. For this project I write the phy
+register in the bootloader as we need it there anyway, but for another
+(am335x based) project it means we cannot used the ROM support for
+network boot.
+
+Is 50MHz is needed, the 8021/8031 are probably a better choice.
+
+-- 
+Bye, Peter Korsgaard
