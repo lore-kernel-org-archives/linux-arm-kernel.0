@@ -1,52 +1,74 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 24 May 2012 05:17:37 +0530
-Subject: [PATCH 3/3] gpio: exynos4: skip gpiolib registration if pinctrl
- driver is used
-In-Reply-To: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
-References: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1337816857-14694-4-git-send-email-thomas.abraham@linaro.org>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Wed, 23 May 2012 17:34:13 -0700
+Subject: [PATCH] Consolidate stack size information into THREAD_SIZE_ORDER
+Message-ID: <4FBD8205.3010904@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinctrl driver, when enabled, registers all the gpio pins and hence the
-registration of gpio pins by this driver can be skipped.
+This reduces the number of magic values in the code, as well as
+makes it easier to experiment with larger or smaller stack sizes.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Tim Bird <tim.bird@am.sony.com>
+PATCH FOLLOWS
 ---
- drivers/gpio/gpio-samsung.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/thread_info.h |    2 +-
+ arch/arm/kernel/entry-header.S     |    8 ++++----
+ arch/arm/mm/proc-macros.S          |    4 ++--
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 19d6fc0..34a9638 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2788,6 +2788,27 @@ static __init int samsung_gpiolib_init(void)
- #ifdef CONFIG_CPU_EXYNOS4210
- 		void __iomem *gpx_base;
- 
-+#ifdef CONFIG_OF
-+		/*
-+		 * This gpio driver includes support for device tree support and
-+		 * there are platforms using it. In order to maintain
-+		 * compatibility with those platforms, and to allow non-dt
-+		 * Exynos4210 platforms to use this gpiolib support, a check
-+		 * is added to find out if there is a active pin-controller
-+		 * driver support available. If it is available, this gpiolib
-+		 * support is ignored and the gpiolib support available in
-+		 * pin-controller driver is used. This is a temporary check and
-+		 * will go away when all of the Exynos4210 platforms have
-+		 * switched to using device tree and the pin-ctrl driver.
-+		 */
-+		struct device_node *pctrl_np;
-+		const char *pctrl_compat = "samsung,pinctrl-exynos4210";
-+		pctrl_np = of_find_compatible_node(NULL, NULL, pctrl_compat);
-+		if (pctrl_np)
-+			if (of_device_is_available(pctrl_np))
-+				return -ENODEV;
-+#endif
-+
- 		/* gpio part1 */
- 		gpio_base1 = ioremap(EXYNOS4_PA_GPIO1, SZ_4K);
- 		if (gpio_base1 == NULL) {
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index 0f04d84..5172c36 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -16,7 +16,7 @@
+ #include <asm/fpstate.h>
+
+ #define THREAD_SIZE_ORDER	1
+-#define THREAD_SIZE		8192
++#define THREAD_SIZE		(4096 << THREAD_SIZE_ORDER)
+ #define THREAD_START_SP		(THREAD_SIZE - 8)
+
+ #ifndef __ASSEMBLY__
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 9a8531e..f94216b 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -109,8 +109,8 @@
+ 	.endm
+
+ 	.macro	get_thread_info, rd
+-	mov	\rd, sp, lsr #13
+-	mov	\rd, \rd, lsl #13
++	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
++	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
+ 	.endm
+
+ 	@
+@@ -150,8 +150,8 @@
+
+ 	.macro	get_thread_info, rd
+ 	mov	\rd, sp
+-	lsr	\rd, \rd, #13
+-	mov	\rd, \rd, lsl #13
++	lsr	\rd, \rd, #12 + THREAD_SIZE_ORDER
++	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
+ 	.endm
+
+ 	@
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 2d8ff3a..7006c88 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -30,8 +30,8 @@
+  * act_mm - get current->active_mm
+  */
+ 	.macro	act_mm, rd
+-	bic	\rd, sp, #8128
+-	bic	\rd, \rd, #63
++	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
++	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
+ 	ldr	\rd, [\rd, #TI_TASK]
+ 	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
+ 	.endm
 -- 
-1.6.6.rc2
+1.7.9.5
