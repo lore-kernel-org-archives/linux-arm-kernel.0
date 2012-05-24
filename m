@@ -1,83 +1,85 @@
-From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Thu, 24 May 2012 13:46:49 +0200
-Subject: [PATCH] ARM: davinci: turn off DDR PHY when entering deep sleep
-In-Reply-To: <4FBA7D9D.6060202@ti.com>
-References: <marcus.folkesson@gmail.com>
- <1336672352-23191-1-git-send-email-marcus.folkesson@gmail.com>
- <4FBA7D9D.6060202@ti.com>
-Message-ID: <CAM8FrKJijXr1nJFhJZDSufHmfRQXL1RPwUA7OsSTVAiGPhECuA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 24 May 2012 14:26:12 +0200
+Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas used
+ by dma-mapping framework
+In-Reply-To: <4FBB3B41.8010102@kernel.org>
+References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+ <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
+ <4FBB3B41.8010102@kernel.org>
+Message-ID: <01e501cd39a8$67f34ea0$37d9ebe0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi Minchan,
 
-2012/5/21 Sekhar Nori <nsekhar@ti.com>:
-> Hi Marcus,
->
-> Thanks for the patch.
->
-> On 5/10/2012 11:22 PM, Marcus Folkesson wrote:
->> Deepsleep is the most power saving state on the davinci-platform.
->> The DDR PHY consumes about 25mW and should be turned off in this low
->> power state.
->>
->> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
->> ---
->> ?arch/arm/mach-davinci/include/mach/memory.h | ? ?2 ++
->> ?arch/arm/mach-davinci/sleep.S ? ? ? ? ? ? ? | ? 10 ++++++++++
->> ?2 files changed, 12 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
->> index 7873194..1b1b8ac 100644
->> --- a/arch/arm/mach-davinci/include/mach/memory.h
->> +++ b/arch/arm/mach-davinci/include/mach/memory.h
->
-> This is moved to arch/arm/mach-davinci/include/mach/ddr2.h in current
-> kernel.
->
->> @@ -36,6 +36,8 @@
->> ?#define DDR2_MCLKSTOPEN_BIT ?BIT(30)
->> ?#define DDR2_LPMODEN_BIT ? ? BIT(31)
->>
->> +#define DDR2_DRPHYC1R_OFFSET ? ? ? ? 0xe4
->> +#define DDR_PWRDNEN_BIT ? ? ? ? ? ? ?BIT(6)
->> ?/*
->> ? * Increase size of DMA-consistent memory region
->> ? */
->> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
->> index 5f1e045..30713b2 100644
->> --- a/arch/arm/mach-davinci/sleep.S
->> +++ b/arch/arm/mach-davinci/sleep.S
->> @@ -57,6 +57,11 @@ ENTRY(davinci_cpu_suspend)
->>
->> ? ? ? ldmia ? r0, {r0-r4}
->>
->> + ? ? /* Turn PHY off */
->> + ? ? ldr ? ? ip, [r0, #DDR2_DRPHYC1R_OFFSET]
->> + ? ? orr ? ? ip, ip, #DDR_PWRDNEN_BIT
->> + ? ? str ? ? ip, [r0, #DDR2_DRPHYC1R_OFFSET]
->
-> Current TRM (section 14.2.13.1) specifies that this bit be set during
-> DDR initialization sequence itself (done in UBL or U-Boot/SPL). I am
-> checking with folks from the TI design team on whether it can be done
-> later on as part of the DeepSleep sequence.
->
-> It looks like IOPWRDN bit in VTPIO_CTL also needs to be set for this
-> configuration take effect. You probably did not have to do it because
-> the bootloader you are using already has this set?
->
-> How much testing has this patch undergone? Have you tested it across
-> multiple suspend-resume cycles? How much does the power consumed by DDR
-> PHY go down by (and which type of DDR)?
+On Tuesday, May 22, 2012 9:08 AM Minchan Kim wrote:
 
-You are right.
+> On 05/17/2012 07:54 PM, Marek Szyprowski wrote:
+> 
+> > Add new type of vm_area intented to be used for consisten mappings
+> > created by dma-mapping framework.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  include/linux/vmalloc.h |    1 +
+> >  mm/vmalloc.c            |    3 +++
+> >  2 files changed, 4 insertions(+)
+> >
+> > diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+> > index 6071e91..8a9555a 100644
+> > --- a/include/linux/vmalloc.h
+> > +++ b/include/linux/vmalloc.h
+> > @@ -14,6 +14,7 @@ struct vm_area_struct;		/* vma defining user mapping in
+> mm_types.h */
+> >  #define VM_USERMAP	0x00000008	/* suitable for remap_vmalloc_range */
+> >  #define VM_VPAGES	0x00000010	/* buffer for pages was vmalloc'ed */
+> >  #define VM_UNLIST	0x00000020	/* vm_struct is not listed in vmlist */
+> > +#define VM_DMA		0x00000040	/* used by dma-mapping framework */
+> >  /* bits [20..32] reserved for arch specific ioremap internals */
+> 
+> >
+> 
+> >  /*
+> > diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> > index 8cb7f22..9c13bab 100644
+> > --- a/mm/vmalloc.c
+> > +++ b/mm/vmalloc.c
+> > @@ -2582,6 +2582,9 @@ static int s_show(struct seq_file *m, void *p)
+> >  	if (v->flags & VM_IOREMAP)
+> >  		seq_printf(m, " ioremap");
+> >
+> > +	if (v->flags & VM_DMA)
+> > +		seq_printf(m, " dma");
+> > +
+>
+> Hmm, VM_DMA would become generic flag?
+> AFAIU, maybe VM_DMA would be used only on ARM arch.
 
-I now see that it is possible to set all those bits in the bootloader
-and let the PHY automatically go down in idle.
-This patch is therefore unnecessary.
+Right now yes, it will be used only on ARM architecture, but maybe other architecture will
+start using it once it is available.
 
-Thank you all for the attention!
+> Of course, it isn't performance sensitive part but there in no reason to check it, either
+> in other architecture except ARM.
+> 
+> I suggest following as
+> 
+> #ifdef CONFIG_ARM
+> #define VM_DMA	0x00000040
+> #else
+> #define VM_DMA	0x0
+> #end
+> 
+> Maybe it could remove check code at compile time.
 
+I've been told to avoid such #ifdef construction if there is no really good reason for it.
+The only justification was significant impact on the performance, otherwise it would be 
+just a good example of typical over-engineering.
+
+> >  	if (v->flags & VM_ALLOC)
+> >  		seq_printf(m, " vmalloc");
 
 Best regards
-Marcus Folkesson
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
