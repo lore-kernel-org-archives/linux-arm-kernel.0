@@ -1,29 +1,71 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 24 May 2012 08:46:35 -0700
-Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
-In-Reply-To: <201205220834.25981.marex@denx.de>
-References: <1337633967-8387-1-git-send-email-marex@denx.de>
- <1337668383.2483.87.camel@sauron.fi.intel.com>
- <201205220834.25981.marex@denx.de>
-Message-ID: <4FBE57DB.400@newsguy.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 24 May 2012 17:47:30 +0200
+Subject: [PATCH 2/2] arm/dts: OMAP2+: Add mailbox nodes
+In-Reply-To: <1335894460-19941-3-git-send-email-omar.luna@linaro.org>
+References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
+ <1335894460-19941-3-git-send-email-omar.luna@linaro.org>
+Message-ID: <4FBE5812.8020806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2012 11:34 PM, Marek Vasut wrote:
-> Dear Artem Bityutskiy,
-> 
->> On Mon, 2012-05-21 at 22:59 +0200, Marek Vasut wrote:
->>> The ecc.strength wasn't set, resulting in the following crash:
->>> [    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
->>> [    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
->>
->> Pushed to l2-mtd.git, thanks!
-> 
-> Thank you!
+On 5/1/2012 7:47 PM, Omar Ramirez Luna wrote:
+> Add nodes for mailbox DT, to interface with hwmods.
+>
+> Signed-off-by: Omar Ramirez Luna<omar.luna@linaro.org>
 
+Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-Yes, thanks much Marek.  I must have missed this one while doing the EUCLEAN
-patches (maybe because it's in its own directory).  Sorry to everyone for the
-confusion it caused.
-
-Mike
+> ---
+>   arch/arm/boot/dts/omap2.dtsi |    5 +++++
+>   arch/arm/boot/dts/omap3.dtsi |    5 +++++
+>   arch/arm/boot/dts/omap4.dtsi |    5 +++++
+>   3 files changed, 15 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+> index f2ab4ea..2175cc3 100644
+> --- a/arch/arm/boot/dts/omap2.dtsi
+> +++ b/arch/arm/boot/dts/omap2.dtsi
+> @@ -46,6 +46,11 @@
+>   			#interrupt-cells =<1>;
+>   		};
+>
+> +		mailbox: mailbox at 48094000 {
+> +			compatible = "ti,omap2-mailbox";
+> +			ti,hwmods = "mailbox";
+> +		};
+> +
+>   		uart1: serial at 4806a000 {
+>   			compatible = "ti,omap2-uart";
+>   			ti,hwmods = "uart1";
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index c612135..540f6d6 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -69,6 +69,11 @@
+>   			reg =<0x48200000 0x1000>;
+>   		};
+>
+> +		mailbox: mailbox at 48094000 {
+> +			compatible = "ti,omap3-mailbox";
+> +			ti,hwmods = "mailbox";
+> +		};
+> +
+>   		uart1: serial at 4806a000 {
+>   			compatible = "ti,omap3-uart";
+>   			ti,hwmods = "uart1";
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 3d35559..84f27dd 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -104,6 +104,11 @@
+>   			<0x48240100 0x0100>;
+>   		};
+>
+> +		mailbox: mailbox at 4a0f4000 {
+> +			compatible = "ti,omap4-mailbox";
+> +			ti,hwmods = "mailbox";
+> +		};
+> +
+>   		uart1: serial at 4806a000 {
+>   			compatible = "ti,omap4-uart";
+>   			ti,hwmods = "uart1";
