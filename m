@@ -1,23 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 May 2012 16:55:43 +0200
-Subject: [PATCH RFC v2 1/2] pinctrl: add pinctrl_add_gpio_ranges function
-In-Reply-To: <CACRpkdaavBanSrQXoqNMCLFFG6N1fi-MHbAD0=3QuPcX67NtcA@mail.gmail.com>
-References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
- <CACRpkdaavBanSrQXoqNMCLFFG6N1fi-MHbAD0=3QuPcX67NtcA@mail.gmail.com>
-Message-ID: <CACRpkdYsiCcMjS2zSONrDqJGmt7Vw3ehyjrzJiVGiBTHpmCN1A@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 24 May 2012 08:57:45 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP3+: dpll: optimize noncore dpll locking logic
+In-Reply-To: <CAOMWX4c7T+8TcnjvcMonEQwAbpBFJXRhiBu_cu4i36W81AgLWg@mail.gmail.com>
+References: <1337369838-15185-1-git-send-email-nm@ti.com>
+ <alpine.DEB.2.00.1205240147510.2572@utopia.booyaka.com>
+ <CAOMWX4c7T+8TcnjvcMonEQwAbpBFJXRhiBu_cu4i36W81AgLWg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1205240856140.2572@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 4:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 18, 2012 at 3:12 PM, Dong Aisheng <b29396@freescale.com> wrote:
->
->> From: Dong Aisheng <dong.aisheng@linaro.org>
->>
->> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->
-> Applied with Stephens ACK and a blurb telling what it's good for :-)
+On Thu, 24 May 2012, Menon, Nishanth wrote:
 
-Oh. there was a later version, forget this, I'll look at v2/v3.
+> On Thu, May 24, 2012 at 2:49 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Fri, 18 May 2012, Nishanth Menon wrote:
+> >
+> >> From: Vikram Pandita <vikram.pandita@ti.com>
+> >>
+> >> If the dpll is already locked, code can be optimized
+> >> to return much earlier than doing redundent set of lock mode
+> >> and wait on idlest.
+> >>
+> >> Cc: Tony Lindgren <tony@atomide.com>
+> >> Cc: Jon Hunter <jon-hunter@ti.com>
+> >> Cc: Paul Walmsley <paul@pwsan.com>
+> >> Cc: Mike Turquette <mturquette@ti.com>
+> >> Cc: linux-omap at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >>
+> >> Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+> >
+> > Did you intend to add your Signed-off-by: to this patch?
+> 
+> Other than forwarding the patch over(since it seems to have slipped
+> through the fingers of folks monitoring the product trees), I have had
+> no other contributions to the patch.
 
-Yours,
-Linus Walleij
+Okay.  As I understand it, the maintainers above me would like 
+Signed-off-by:s from the entire submission patch, even if there are no 
+contributions to the patch itself.  So please let me know if it's okay for 
+me to add your S-o-b.
+
+
+- Paul
