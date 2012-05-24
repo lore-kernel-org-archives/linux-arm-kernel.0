@@ -1,48 +1,172 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 24 May 2012 11:31:41 +0200
-Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
-In-Reply-To: <201205231939.49681.arnd@arndb.de>
-References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
- <201205231743.50262.arnd@arndb.de> <87396qbtrx.fsf@lebrac.rtp-net.org>
- <201205231939.49681.arnd@arndb.de>
-Message-ID: <op.wes3e3w72s3iss@ecaz>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 24 May 2012 11:43:04 +0200
+Subject: [PATCH v4 1/3] mmc: atmel-mci: add device tree support
+In-Reply-To: <1337757830-19361-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1337681352-18521-2-git-send-email-ludovic.desroches@atmel.com>
+ <1337757830-19361-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20120524094304.GH3377@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 May 2012 21:39:49 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+On 09:23 Wed 23 May     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  .../devicetree/bindings/mmc/atmel-hsmci.txt        |   67 +++++++++++++++
+>  drivers/mmc/host/atmel-mci.c                       |   87 +++++++++++++++++++-
+>  2 files changed, 152 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> new file mode 100644
+> index 0000000..81c20cc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> @@ -0,0 +1,67 @@
+> +* Atmel High Speed MultiMedia Card Interface
+> +
+> +This controller on atmel products provides an interface for MMC, SD and SDIO
+> +types of memory cards.
+> +
+> +1) MCI node
+> +
+> +Required properties:
+> +- compatible: no blank "atmel,hsmci"
+> +- reg: should contain HSMCI registers location and length
+> +- interrupts: should contain HSMCI interrupt number
+> +- #address-cells: should be one. The cell is the slot id.
+> +- #size-cells: should be zero.
+> +- at least one slot node
+> +
+> +The node contains child nodes for each slot that the platform uses
+> +
+> +Example MCI node:
+> +
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	[ child node definitions...]
+> +};
+> +
+> +2) slot nodes
+> +
+> +Required properties:
+> +- reg: should contain the slot id.
+> +- bus-width: number of data lines connected to the controller
+> +
+> +Optional properties:
+> +- cd-gpios: specify GPIOs for card detection
+> +- cd-inverted: invert the value of external card detect gpio line
+> +- wp-gpios: specify GPIOs for write protection
+> +
+> +Example slot node:
+> +
+> +slot at 0 {
+> +	reg = <0>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pioD 15 0>
+> +	cd-inverted;
+> +};
+> +
+> +Example full MCI node:
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	slot at 0 {
+> +		reg = <0>;
+> +		bus-width = <4>;
+> +		cd-gpios = <&pioD 15 0>
+> +		cd-inverted;
+> +	};
+> +	slot at 1 {
+> +		reg = <1>;
+> +		bus-width = <4>;
+> +	};
+> +};
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 556d384..1842dc7 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -19,6 +19,9 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/seq_file.h>
+> @@ -493,6 +496,72 @@ err:
+>  	dev_err(&mmc->class_dev, "failed to initialize debugfs for slot\n");
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmci_dt_ids[] = {
+> +	{ .compatible = "atmel,hsmci" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmci_dt_ids);
+> +
+> +static struct mci_platform_data __devinit*
+> +atmci_of_init(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *cnp;
+> +	struct mci_platform_data *pdata;
+> +	u32 slot_id;
+> +	int ret;
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "device node not found\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	for_each_child_of_node(np, cnp) {
+> +		ret = of_property_read_u32(cnp, "reg", &slot_id);
+> +		if (ret) {
+really need ret = ?
+> +			dev_warn(&pdev->dev, "reg property is missing for %s\n",
+> +				 cnp->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (slot_id > (ATMCI_MAX_NR_SLOTS-1)) {
+missing spase arround '-'
+if (slot_id >= ATMCI_MAX_NR_SLOTS)
+will do the same
+> +			dev_warn(&pdev->dev, "can't have more than %d slots\n",
+> +			         ATMCI_MAX_NR_SLOTS);
+> +			break;
+> +		}
+> +
+> +		if (of_property_read_u32(cnp, "bus-width",
+> +		                         &pdata->slot[slot_id].bus_width))
+> +			pdata->slot[slot_id].bus_width = 1;
+> +
+> +		pdata->slot[slot_id].detect_pin =
+> +			of_get_named_gpio(cnp, "cd-gpios", 0);
+> +
+> +		pdata->slot[slot_id].detect_is_active_high =
+> +			of_property_read_bool(cnp, "cd-inverted");
+I really this this is redondant with gpio binding
 
-<snip>
+Chris??
 
-> Ok, thanks for the info. I'm sorry that it has come so far. I think Olof
-> and I are generally doing a good job at picking up all the pull requests,
-> but we sometimes miss single patches, especially when it's not clear that
-> they are expected to go into the arm-soc tree.
->
-> I have to admit that I didn't even remember who maintains ixp4xx, since
-> there hasn't been a single ixp4xx patch from Imre or Krzysztof that I've  
-> put
-> into the kernel over this time frame.
-
-The gpiolib patch originated from me as well.
-
-> I've put the patch into the fixes branch now, it should be part of
-> the next round of submissions.
-
-Thanks.
-
-> What is the plan for ixp4xx going forward? Is one of you planning to
-> maintain a git tree and collect patches for inclusion in arm-soc?
-> I would be more comfortable just knowing where to pull from than
-> having to watch the mailing list and making sure the maintainers
-> Ack all the patches.
->
-> If there is no tree, should we downgrade ixp4xx in the MAINTAINERS
-> file from "Maintained" to "Odd fixes"?
-
-Quite some patches are still in the OpenWrt repo only. When I'll have  
-time, I'll revisit those as well as migrate ixp4xx to DT. I'm overloaded  
-with work, so I'll need a few more weeks and I guess the same is true for  
-Krzysztof as well..
-
-
-Imre
+BestRegards,
+J.
