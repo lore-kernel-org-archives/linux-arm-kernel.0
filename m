@@ -1,40 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 24 May 2012 17:44:15 +0200
-Subject: [PATCH 0/2] OMAP: mailbox initial device tree support
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EA68F6D@DBDE01.ent.ti.com>
-References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
- <B5906170F1614E41A8A28DE3B8D121433EA68F6D@DBDE01.ent.ti.com>
-Message-ID: <4FBE574F.6070408@ti.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 24 May 2012 08:46:35 -0700
+Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
+In-Reply-To: <201205220834.25981.marex@denx.de>
+References: <1337633967-8387-1-git-send-email-marex@denx.de>
+ <1337668383.2483.87.camel@sauron.fi.intel.com>
+ <201205220834.25981.marex@denx.de>
+Message-ID: <4FBE57DB.400@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/2/2012 7:42 AM, Bedia, Vaibhav wrote:
-> Hi Omar,
->
-> On Tue, May 01, 2012 at 23:17:38, Omar Ramirez Luna wrote:
->> To allow mailbox driver to function with device tree.
+On 05/21/2012 11:34 PM, Marek Vasut wrote:
+> Dear Artem Bityutskiy,
+> 
+>> On Mon, 2012-05-21 at 22:59 +0200, Marek Vasut wrote:
+>>> The ecc.strength wasn't set, resulting in the following crash:
+>>> [    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
+>>> [    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
 >>
->> Tested in OMAP4 and OMAP3. OMAP2 untested.
->
-> I think the mailbox code needs a cleanup similar to what you
-> had proposed earlier [1] before the device tree support is added.
->
-> We probably need to decide whether the number of mailbox sub-modules
-> should be part of hwmod attribute or come from device tree. IMO the
-> static allocation of the mailboxes is better suited in the device-tree
-> data.
-
-Ideally yes, but that assumes we are supporting only DT boot method, 
-which is still not the case today.
-
-That being said, the driver might still be able to leverage DT if 
-available already.
+>> Pushed to l2-mtd.git, thanks!
+> 
+> Thank you!
 
 
-This can be done later as well.
+Yes, thanks much Marek.  I must have missed this one while doing the EUCLEAN
+patches (maybe because it's in its own directory).  Sorry to everyone for the
+confusion it caused.
 
-Omar,
-That's up to you.
-
-Regards,
-Benoit
+Mike
