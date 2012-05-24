@@ -1,39 +1,46 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 24 May 2012 18:40:26 +0200
-Subject: [PATCH] Drop superfluous setting of i2c_board_info.type
-In-Reply-To: <20120524162230.GU3710@pengutronix.de>
-References: <1337870303.22505.20.camel@x61.thuisdomein>
- <20120524162230.GU3710@pengutronix.de>
-Message-ID: <1337877626.22505.30.camel@x61.thuisdomein>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Thu, 24 May 2012 19:55:56 +0300
+Subject: [PATCH] [ARM] Unconditional call to smp_cross_call on UP crashes
+In-Reply-To: <20120524161733.GF6908@n2100.arm.linux.org.uk>
+References: <1337889024-10416-1-git-send-email-panto@antoniou-consulting.com>
+ <20120524161733.GF6908@n2100.arm.linux.org.uk>
+Message-ID: <F138E222-D587-4264-8B80-E041D44BF770@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-05-24 at 18:22 +0200, Uwe Kleine-K?nig wrote:
-> On Thu, May 24, 2012 at 04:38:23PM +0200, Paul Bolle wrote:
-> > 1) This is apparently legal. Doesn't gcc issue a warning for this?
-> I wondered about that too, gcc doesn't even warn when the two values are
-> different. See for example commit
-> bd9e310dca15c9987256f67af19f9f42426e7493.
+Hi Russell,
 
-In that case it were two strings ("rtc-pcf8563" versus "pcf8563"). Why
-should gcc care? Or is there something going on behind the scenes which
-somehow depends on the contents of the string?
+On May 24, 2012, at 7:17 PM, Russell King - ARM Linux wrote:
+
+> On Thu, May 24, 2012 at 07:50:24PM +0000, Pantelis Antoniou wrote:
+>> omap2plus_defconfig builds with SMP & SMP_ON_UP set.
+>> On beagle (which is UP) is_smp() returns false and we don't call
+>> smp_init_cpus which in turn does not initialize smp_cross_call which
+>> remains NULL.
+>> 
+>> When issuing a reboot we OOPS with a NULL dereference on stop smp_call.
+> 
+> I've been wondering whether we should make smp_cross_call() a no-op instead
+> by default, rather than a NULL pointer.
+> 
+> Alternatively, if may be well worth changing this to do:
+> 
+> 	if (!cpumask_empty(&mask))
+> 		smp_cross_call(&mask, IPI_CPU_STOP);
+> 
+> instead, so we avoid calling smp_cross_call() when we're on a SMP system
+> with only one CPU online.  I like this approach better because it removes
+> a potential call into platform code which is inappropriate.
+
+Both of these can work, and in fact have been tried.
+
+I am partial on both to be honest. Have a default no-op function for smp_cross_call()
+and guard with cpumask_empty().
+
+Which do you want me to make a patch for?
+
+Regards
+
+-- Pantelis
+
  
-> >  arch/arm/mach-imx/mach-cpuimx35.c     |    1 -
-> >  arch/arm/mach-imx/mach-cpuimx51sd.c   |    1 -
-> I already submitted a patch for the imx bits with Message id
-> 1335989287-10094-1-git-send-email-u.kleine-koenig at pengutronix.de.
-> (e.g.
-> http://mid.gmane.org/1335989287-10094-1-git-send-email-u.kleine-koenig at pengutronix.de)
-
-Thanks. I missed that one, obviously. Should I just drop that part of
-the patch and resend?
-
-By the way, together with my previous patch (Message-ID
-1337869829.22505.15.camel at x61.thuisdomein , probably not yet archived on
-the web) we have found all instances of this issue, haven't we?
-
-> Don't know if Sascha took it already. If he did, he didn't tell me.
-
-
-Paul Bolle
