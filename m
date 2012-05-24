@@ -1,71 +1,47 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 24 May 2012 17:47:30 +0200
-Subject: [PATCH 2/2] arm/dts: OMAP2+: Add mailbox nodes
-In-Reply-To: <1335894460-19941-3-git-send-email-omar.luna@linaro.org>
-References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
- <1335894460-19941-3-git-send-email-omar.luna@linaro.org>
-Message-ID: <4FBE5812.8020806@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 24 May 2012 08:51:03 -0700
+Subject: Clock register in early init
+In-Reply-To: <20120524010237.GC11860@linux-sh.org>
+References: <1337227884.2066.9.camel@pgaikwad-dt2>
+ <20120517062131.GA9305@gmail.com>
+ <1337316517.22560.19.camel@pgaikwad-dt2>
+ <20120518112104.GL20304@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zM_o1Nqw55xxFvw6KssM50Q+7yyo41rUSH2Aoo1neTMjg@mail.gmail.com>
+ <20120521084642.GV20304@tbergstrom-lnx.Nvidia.com>
+ <4FBB5A72.2080101@codethink.co.uk>
+ <20120522120851.GI8730@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zNic19Eyq-RJpj_pM94wpqY7co0dtKu1O+27B-wZMm=MA@mail.gmail.com>
+ <20120524010237.GC11860@linux-sh.org>
+Message-ID: <CAJOA=zM1KsUKg=xcuF+Md=1UN9EsmB4vAWSK3gch2PKXK=zweQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/1/2012 7:47 PM, Omar Ramirez Luna wrote:
-> Add nodes for mailbox DT, to interface with hwmods.
->
-> Signed-off-by: Omar Ramirez Luna<omar.luna@linaro.org>
+On Wed, May 23, 2012 at 6:02 PM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Tue, May 22, 2012 at 10:37:15AM -0700, Turquette, Mike wrote:
+>> On Tue, May 22, 2012 at 5:08 AM, Peter De Schrijver
+>> <pdeschrijver@nvidia.com> wrote:
+>> >> We had at-least that on the older Samsung parts and they where still
+>> >> growing. I would suggest that in a multi-kernel image situation the
+>> >> more data that can be discarded after init-time the better.
+>> >>
+>> >> Also, __initdata gets gathered into one place so there's no possibility
+>> >> of page fragmentation there. If you mean fragmentation of the memory
+>> >> map, then allocate the size of all the clocks you know of at init time
+>> >> in one go.
+>> >>
+>> >
+>> > That would work, except that clocks are needed before kmalloc is available.
+>> >
+>>
+>> Is static initialization the only way to solve this problem? ?What
+>> about using the bootmem allocator for early init clocks?
+>>
+> This is what sh does for its asm/clkdev.h __clkdev_alloc(), which is
+> really the only difference over the ARM version. It always seemed a bit
+> silly to me to make early allocation an arch-specific property.
 
-Acked-by: Benoit Cousson <b-cousson@ti.com>
+Good point.  clkdev will probably need to be bootmem-able as well as
+the common clk stuff.
 
-> ---
->   arch/arm/boot/dts/omap2.dtsi |    5 +++++
->   arch/arm/boot/dts/omap3.dtsi |    5 +++++
->   arch/arm/boot/dts/omap4.dtsi |    5 +++++
->   3 files changed, 15 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-> index f2ab4ea..2175cc3 100644
-> --- a/arch/arm/boot/dts/omap2.dtsi
-> +++ b/arch/arm/boot/dts/omap2.dtsi
-> @@ -46,6 +46,11 @@
->   			#interrupt-cells =<1>;
->   		};
->
-> +		mailbox: mailbox at 48094000 {
-> +			compatible = "ti,omap2-mailbox";
-> +			ti,hwmods = "mailbox";
-> +		};
-> +
->   		uart1: serial at 4806a000 {
->   			compatible = "ti,omap2-uart";
->   			ti,hwmods = "uart1";
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index c612135..540f6d6 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -69,6 +69,11 @@
->   			reg =<0x48200000 0x1000>;
->   		};
->
-> +		mailbox: mailbox at 48094000 {
-> +			compatible = "ti,omap3-mailbox";
-> +			ti,hwmods = "mailbox";
-> +		};
-> +
->   		uart1: serial at 4806a000 {
->   			compatible = "ti,omap3-uart";
->   			ti,hwmods = "uart1";
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 3d35559..84f27dd 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -104,6 +104,11 @@
->   			<0x48240100 0x0100>;
->   		};
->
-> +		mailbox: mailbox at 4a0f4000 {
-> +			compatible = "ti,omap4-mailbox";
-> +			ti,hwmods = "mailbox";
-> +		};
-> +
->   		uart1: serial at 4806a000 {
->   			compatible = "ti,omap4-uart";
->   			ti,hwmods = "uart1";
+Regards,
+Mike
