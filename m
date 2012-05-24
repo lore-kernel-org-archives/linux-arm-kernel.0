@@ -1,82 +1,96 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 May 2012 16:43:27 +0900
-Subject: [PATCH 5/6] ARM: dts: Add nodes for spi controllers for Samsung
- Exynos4 platforms
-In-Reply-To: <1337334392-6441-6-git-send-email-thomas.abraham@linaro.org>
-References: <1337334392-6441-1-git-send-email-thomas.abraham@linaro.org>
- <1337334392-6441-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <006c01cd3980$e814b240$b83e16c0$%kim@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 May 2012 10:43:37 +0300
+Subject: [PATCH 0/2] OMAPDSS: write-through caching support for omapfb
+In-Reply-To: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
+References: <1337716444-30139-1-git-send-email-siarhei.siamashka@gmail.com>
+Message-ID: <1337845417.2909.31.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On Tue, 2012-05-22 at 22:54 +0300, Siarhei Siamashka wrote:
+> This is a very simple few-liner patchset, which allows to optionally
+> enable write-through caching for OMAP DSS framebuffer. The problem with
+> the current writecombine cacheability attribute is that it only speeds
+> up writes. Uncached reads are slow, even though the use of NEON mitigates
+> this problem a bit.
 > 
-> Add device nodes for the three instances of spi controllers in Exynos4
-> platforms. Enable instance spi 2 for smdkv310 board and disable all
-> spi instances for origen board.
+> Traditionally, xf86-video-fbdev DDX is using shadow framebuffer in the
+> system memory. Which contains a copy of the framebuffer data for the
+> purpose of providing fast read access to it when needed. Framebuffer
+> read access is required not so often, but it still gets used for
+> scrolling and moving windows around in Xorg server. And the users
+> perceive their linux desktop as rather sluggish when these operations
+> are not fast enough.
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos4210-origen.dts   |   12 ++++++++
->  arch/arm/boot/dts/exynos4210-smdkv310.dts |   44
-> +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi         |   30 +++++++++++++++++++
->  3 files changed, 86 insertions(+), 0 deletions(-)
+> In the case of ARM hardware, framebuffer is typically physically
+> located in the main memory. And the processors still support
+> write-through cacheability attribute. According to ARM ARM, the writes
+> done to write-through cached memory inside the level of cache are
+> visible to all observers outside the level of cache without the need
+> of explicit cache maintenance (same rule as for non-cached memory).
+> So write-through cache is a perfect choice when only CPU is allowed
+> to modify the data in the framebuffer and everyone else (screen
+> refresh DMA) is only reading it. That is, assuming that write-through
+> cached memory provides good performance and there are no quirks.
+> As the framebuffer reads become fast, the need for shadow framebuffer
+> disappears.
 
-[...]
+I ran my own fb perf test on omap3 overo board ("perf" test in
+https://gitorious.org/linux-omap-dss2/omapfb-tests) :
 
-> +	aliases {
-> +		spi0 = &spi_0;
-> +		spi1 = &spi_1;
-> +		spi2 = &spi_2;
-> +	};
-> +
+vram_cache=n:
 
-Do we need above aliases?
+sequential_horiz_singlepixel_read: 25198080 pix, 4955475 us, 5084897 pix/s
+sequential_horiz_singlepixel_write: 434634240 pix, 4081146 us, 106498086 pix/s
+sequential_vert_singlepixel_read: 20106240 pix, 4970611 us, 4045023 pix/s
+sequential_vert_singlepixel_write: 98572800 pix, 4985748 us, 19770915 pix/s
+sequential_line_read: 40734720 pix, 4977906 us, 8183103 pix/s
+sequential_line_write: 1058580480 pix, 5024628 us, 210678378 pix/s
+nonsequential_singlepixel_write: 17625600 pix, 4992828 us, 3530183 pix/s
+nonsequential_singlepixel_read: 9661440 pix, 4952973 us, 1950634 pix/s
 
-[...]
+vram_cache=y:
 
-> 
-> +	spi_2: spi at 13940000 {
-> +		gpios = <&gpc1 1 5 3 0>,
-> +			<&gpc1 3 5 3 0>,
-> +			<&gpc1 4 5 3 0>;
-> +
-> +		w25x80 at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			compatible = "w25x80";
-> +			reg = <0>;
-> +			spi-max-frequency = <10000>;
-> +
-> +			controller-data {
-> +				cs-gpio = <&gpc1 2 1 0 3>;
-> +				samsung,spi-feedback-delay = <0>;
-> +			};
-> +
-> +			partition at 0 {
-> +				label = "U-Boot";
-> +				reg = <0x0 0x40000>;
-> +				read-only;
-> +			};
-> +
-> +			partition at 40000 {
-> +				label = "Kernel";
-> +				reg = <0x40000 0xc0000>;
-> +			};
-> +		};
-> +	};
-> +
+sequential_horiz_singlepixel_read: 270389760 pix, 4994154 us, 54141253 pix/s
+sequential_horiz_singlepixel_write: 473149440 pix, 3932801 us, 120308512 pix/s
+sequential_vert_singlepixel_read: 18147840 pix, 4976226 us, 3646908 pix/s
+sequential_vert_singlepixel_write: 100661760 pix, 4993164 us, 20159914 pix/s
+sequential_line_read: 285143040 pix, 4917267 us, 57988114 pix/s
+sequential_line_write: 876710400 pix, 5012146 us, 174917171 pix/s
+nonsequential_singlepixel_write: 17625600 pix, 4977967 us, 3540722 pix/s
+nonsequential_singlepixel_read: 9661440 pix, 4944885 us, 1953825 pix/s
 
+These also show quite a bit of improvement in some read cases.
+Interestingly some of the write cases are also faster.
 
-Is there a serial flash(w25x80) is connected via SPI2 on smdkv310?
+Reading pixels vertically is slower with vram_cache. I guess this is
+because the cache causes some overhead, and we always miss the cache so
+the caching is just wasted time.
 
-[...]
+I would've also presumed the difference in sequential_line_write would
+be bigger. write-through is effectively no-cache for writes, right?
 
-Thanks.
+If the user of the fb just writes to the fb and vram_cache=y, it means
+that the cache is filled with pixel data that is never used, thus
+lowering the performance of all other programs?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I have to say I don't know much of the cpu caches, but the read speed
+improvements are very big, so I think this is definitely interesting
+patch. So if you get the first patch accepted I see no problem with
+adding this to omapfb as an optional feature.
+
+However, "vram_cache" is not a very good name for the option.
+"vram_writethrough", or something?
+
+Did you test this with VRFB (omap3) or TILER (omap4)? I wonder how those
+are affected.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120524/badcc553/attachment.sig>
