@@ -1,51 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 24 May 2012 08:31:27 +0200
-Subject: 
-In-Reply-To: <4FBB9D71.5040906@metafoo.de>
-References: <1337344032-25431-1-git-send-email-s.hauer@pengutronix.de>
- <4FBB9D71.5040906@metafoo.de>
-Message-ID: <20120524063127.GX30400@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 24 May 2012 09:07:38 +0200
+Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
+In-Reply-To: <201205231939.49681.arnd@arndb.de>
+References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
+ <201205231743.50262.arnd@arndb.de>
+ <87396qbtrx.fsf@lebrac.rtp-net.org>
+ <201205231939.49681.arnd@arndb.de>
+Message-ID: <20120524070737.GC2180@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 04:06:41PM +0200, Lars-Peter Clausen wrote:
-> On 05/18/2012 02:27 PM, Sascha Hauer wrote:
-> > Hi All,
-> > 
-> > The following adds a drm/kms driver for the Freescale i.MX LCDC
-> > controller. Most notable change to the last SDRM based version is that
-> > the SDRM layer has been removed and the driver now is purely i.MX
-> > specific. I hope that this is more acceptable now.
-> > 
-> > Another change is that the probe is now devicetree based. For now I
-> > took the easy way out and only put an edid blob into the devicetree.
-> > I haven't documented the binding yet, I would add that when the rest
-> > is considered ok.
-> > 
-> > Comments very welcome.
-> > 
+On Wed, May 23, 2012 at 07:39:49PM +0000, Arnd Bergmann wrote:
 > 
-> Hi,
+> Ok, thanks for the info. I'm sorry that it has come so far. I think Olof
+> and I are generally doing a good job at picking up all the pull requests,
+> but we sometimes miss single patches, especially when it's not clear that
+> they are expected to go into the arm-soc tree.
 > 
-> I really liked the sdrm layer. At least some bits of it. I've been working
-> on a "simple" DRM driver as well. The hardware has no fancy acceleration
-> features, just a simple buffer and some scanout logic. I'm basically using
-> the same gem buffer structure and the buffer is also allocated using
-> dma_alloc_writecombine, which means we can probably share all of the GEM
-> handling code and probably also most of the fbdev code. I also started with
-> the Exynos GEM code as a template, but reworked it later to be more like the
-> UDL code, which made it a bit more compact. I think it would be a good idea
-> to put at least the GEM handling in some common code as I expect that we'll
-> see more similar "simple" DRM drivers pop up.
+> I have to admit that I didn't even remember who maintains ixp4xx, since
+> there hasn't been a single ixp4xx patch from Imre or Krzysztof that I've put
+> into the kernel over this time frame.
 
-Ok, I'll try to put the GEM stuff into helper functions. Would you care
-to review/test it? I have something else to do right now but I hope I'll
-be there next week.
+It seems like the maintainers are not very responsive.
 
-Sascha
+> What is the plan for ixp4xx going forward? Is one of you planning to
+> maintain a git tree and collect patches for inclusion in arm-soc?
+> I would be more comfortable just knowing where to pull from than
+> having to watch the mailing list and making sure the maintainers
+> Ack all the patches.
+> If there is no tree, should we downgrade ixp4xx in the MAINTAINERS
+> file from "Maintained" to "Odd fixes"?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yes, there should be some kind of plan.
+
+Thanks,
+Richard
