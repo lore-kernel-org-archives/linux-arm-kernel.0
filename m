@@ -1,20 +1,19 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 24 May 2012 15:19:42 +0100
-Subject: [PATCH] Consolidate stack size information into THREAD_SIZE_ORDER
-In-Reply-To: <4FBD8205.3010904@am.sony.com>
-References: <4FBD8205.3010904@am.sony.com>
-Message-ID: <4FBE437E.1060100@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 May 2012 16:29:31 +0200
+Subject: [PATCH RFC v2 1/2] pinctrl: add pinctrl_add_gpio_ranges function
+In-Reply-To: <1337346755-8761-1-git-send-email-b29396@freescale.com>
+References: <1337346755-8761-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdaavBanSrQXoqNMCLFFG6N1fi-MHbAD0=3QuPcX67NtcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/12 01:34, Tim Bird wrote:
-> This reduces the number of magic values in the code, as well as
-> makes it easier to experiment with larger or smaller stack sizes.
+On Fri, May 18, 2012 at 3:12 PM, Dong Aisheng <b29396@freescale.com> wrote:
+
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 >
-> Signed-off-by: Tim Bird<tim.bird@am.sony.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Just ran my eyes over it, looks fine.
+Applied with Stephens ACK and a blurb telling what it's good for :-)
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thanks,
+Linus Walleij
