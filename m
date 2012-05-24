@@ -1,23 +1,35 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 24 May 2012 17:13:06 +0200
-Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
-In-Reply-To: <201205241312.13194.arnd@arndb.de>
-References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
- <201205231939.49681.arnd@arndb.de> <op.wes3e3w72s3iss@ecaz>
- <201205241312.13194.arnd@arndb.de>
-Message-ID: <20120524151306.GA24289@localhost.localdomain>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Thu, 24 May 2012 17:15:52 +0200
+Subject: [PATCH v5 0/4] atmel-mci device tree support 
+Message-ID: <1337872556-17667-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 01:12:12PM +0000, Arnd Bergmann wrote:
-> On Thursday 24 May 2012, Imre Kaloz wrote:
-> > The gpiolib patch originated from me as well.
-> 
-> I've changed the author tag in the changeset to you now, and
-> noted the fact that Richard submitted it.
+Hi,
 
-I don't mind Imre getting the credit for this, but I changed this
-patch so much that it really would need Imre's ack.
+This patch-set adds device tree support for atmel-mci.
 
-Thanks,
-Richard
+Regards
+
+Ludovic
+
+v5:
+- cleanup
+- split dts commit: one for SOCs, one for boards
+
+v4:
+- cleanup
+- add extra chips and boards for atmel-mci dt support
+
+v3:
+- use cd-inverted instead of cd-invert to follow mmc common binding.
+- don't assign a pointer to pdev->dev.platform.
+- add mci controller nodes to other chips and boards.
+- put all dts file changes together.
+
+v2:
+- squash patch v1 2/4 and 3/4.
+- change atmci_get_of_slots to atmci_of_init and manage pdata allocation into
+it.
+- correct potential issue (e.g. having only one slot which is not slot0 into
+the dt) about slots by adding a reg property corresponding to the slot id.
