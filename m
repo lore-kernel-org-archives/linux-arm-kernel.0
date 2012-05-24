@@ -1,61 +1,34 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 24 May 2012 16:38:23 +0200
-Subject: [PATCH] Drop superfluous setting of i2c_board_info.type
-Message-ID: <1337870303.22505.20.camel@x61.thuisdomein>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 24 May 2012 10:40:07 -0400
+Subject: [PATCH v4 1/3] mmc: atmel-mci: add device tree support
+In-Reply-To: <20120524094304.GH3377@game.jcrosoft.org> (Jean-Christophe
+ PLAGNIOL-VILLARD's message of "Thu, 24 May 2012 11:43:04 +0200")
+References: <1337681352-18521-2-git-send-email-ludovic.desroches@atmel.com>
+ <1337757830-19361-1-git-send-email-ludovic.desroches@atmel.com>
+ <20120524094304.GH3377@game.jcrosoft.org>
+Message-ID: <878vghfxrs.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Three instances of struct i2c_board_info have their "type" member set to
-"tsc2007" twice. First through the I2C_BOARD_INFO macro and then
-directly. Drop the superfluous second setting.
+Hi,
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Entirely untested. I'm unsure what toolchain(s) is (are) needed to
-compile this and I am certain that I don't have the hardware.
+On Thu, May 24 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> +
+>> +		pdata->slot[slot_id].detect_is_active_high =
+>> +			of_property_read_bool(cnp, "cd-inverted");
+> 
+> I really this this is redondant with gpio binding
+>
+> Chris??
 
-1) This is apparently legal. Doesn't gcc issue a warning for this?
+Hm, I think go ahead and add it for now -- I agree it's redundant, but
+we should go through and remove the redundancy from all drivers (and the
+binding document, which is in 3.5-rc1 now) at once later.  Since it's in
+the bindings doc, best to implement it until that changes.
 
- arch/arm/mach-imx/mach-cpuimx35.c     |    1 -
- arch/arm/mach-imx/mach-cpuimx51sd.c   |    1 -
- arch/arm/mach-shmobile/board-ap4evb.c |    1 -
- 3 files changed, 0 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
-index 8ecc872..b1a4796 100644
---- a/arch/arm/mach-imx/mach-cpuimx35.c
-+++ b/arch/arm/mach-imx/mach-cpuimx35.c
-@@ -70,7 +70,6 @@ static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
- 		I2C_BOARD_INFO("pcf8563", 0x51),
- 	}, {
- 		I2C_BOARD_INFO("tsc2007", 0x48),
--		.type		= "tsc2007",
- 		.platform_data	= &tsc2007_info,
- 		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
- 	},
-diff --git a/arch/arm/mach-imx/mach-cpuimx51sd.c b/arch/arm/mach-imx/mach-cpuimx51sd.c
-index 9fbe923..89eb93c 100644
---- a/arch/arm/mach-imx/mach-cpuimx51sd.c
-+++ b/arch/arm/mach-imx/mach-cpuimx51sd.c
-@@ -124,7 +124,6 @@ static struct i2c_board_info eukrea_cpuimx51sd_i2c_devices[] = {
- 		I2C_BOARD_INFO("pcf8563", 0x51),
- 	}, {
- 		I2C_BOARD_INFO("tsc2007", 0x49),
--		.type		= "tsc2007",
- 		.platform_data	= &tsc2007_info,
- 		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
- 	},
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index b56dde2..801de4b 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1168,7 +1168,6 @@ static struct tsc2007_platform_data tsc2007_info = {
- 
- static struct i2c_board_info tsc_device = {
- 	I2C_BOARD_INFO("tsc2007", 0x48),
--	.type		= "tsc2007",
- 	.platform_data	= &tsc2007_info,
- 	/*.irq is selected on ap4evb_init */
- };
+- Chris.
 -- 
-1.7.7.6
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
