@@ -1,85 +1,71 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 May 2012 16:30:04 +0900
-Subject: [PATCH 2/6] ARM: Exynos5: Add spi clock support
-In-Reply-To: <1337334392-6441-3-git-send-email-thomas.abraham@linaro.org>
-References: <1337334392-6441-1-git-send-email-thomas.abraham@linaro.org>
- <1337334392-6441-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <006b01cd397f$09784840$1c68d8c0$%kim@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 24 May 2012 01:31:11 -0600 (MDT)
+Subject: [PATCH-V3 3/3] ARM: OMAP3+: clock33xx: Add AM33XX clock tree data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA33611@DBDE01.ent.ti.com>
+References: <1333458578-23073-1-git-send-email-hvaibhav@ti.com>
+ <1333458578-23073-4-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1204241857260.24864@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD175@DBDE01.ent.ti.com>
+ <4F97B891.1020601@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FD707@DBDE01.ent.ti.com>
+ <4F97E243.6000500@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FDA47@DBDE01.ent.ti.com>
+ <4F97EF11.4020300@ti.com>
+ <79CD15C6BA57404B839C016229A409A83E9FDAE7@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1204250755020.29696@utopia.booyaka.com>
+ <4F9816D1.3000102@ti.com>
+ <alpine.DEB.2.00.1204250934130.29696@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA31E77@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1205230854430.3085@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA33611@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1205240120580.2572@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> Add support for clock instances for each spi controller.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c           |   98
-> ++++++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/regs-clock.h |    4 +
->  2 files changed, 102 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
-> exynos/clock-exynos5.c
-> index 5aa460b..ad6c959 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -82,6 +82,11 @@ static int exynos5_clksrc_mask_peric0_ctrl(struct clk
-> *clk, int enable)
->  	return s5p_gatectrl(EXYNOS5_CLKSRC_MASK_PERIC0, clk, enable);
->  }
-> 
-> +static int exynos5_clksrc_mask_peric1_ctrl(struct clk *clk, int enable)
-> +{
-> +	return s5p_gatectrl(EXYNOS5_CLKSRC_MASK_PERIC1, clk, enable);
-> +}
-> +
->  static int exynos5_clk_ip_acp_ctrl(struct clk *clk, int enable)
->  {
->  	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ACP, clk, enable);
-> @@ -692,6 +697,24 @@ static struct clk exynos5_init_clocks_off[] = {
->  		.enable		= exynos5_clk_ip_peric_ctrl,
->  		.ctrlbit	= (1 << 14),
->  	}, {
-> +		.name		= "spi",
-> +		.devname	= "exynos4210-spi.0",
-> +		.parent		= &exynos5_clk_aclk_66.clk,
-> +		.enable		= exynos5_clk_ip_peric_ctrl,
-> +		.ctrlbit	= (1 << 16),
-> +	}, {
-> +		.name		= "spi",
-> +		.devname	= "exynos4210-spi.1",
-> +		.parent		= &exynos5_clk_aclk_66.clk,
-> +		.enable		= exynos5_clk_ip_peric_ctrl,
-> +		.ctrlbit	= (1 << 17),
-> +	}, {
-> +		.name		= "spi",
-> +		.devname	= "exynos4210-spi.2",
-> +		.parent		= &exynos5_clk_aclk_66.clk,
-> +		.enable		= exynos5_clk_ip_peric_ctrl,
-> +		.ctrlbit	= (1 << 18),
-> +	}, {
->  		.name		= SYSMMU_CLOCK_NAME,
->  		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
->  		.enable		= &exynos5_clk_ip_mfc_ctrl,
-> @@ -985,6 +1008,72 @@ static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
->  	.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS2, .shift = 24, .size = 8 },
->  };
-> 
-> +static struct clksrc_clk exynos5_clk_mdout_spi0 = {
+Hi
 
-See the previous comments and below url.
+On Wed, 23 May 2012, Hiremath, Vaibhav wrote:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/083153.h
-tml
+> I believe register read/write to IP block is depends on only interface 
+> Clocks? Atleast in case of OMAP3, it was like that, right??
 
-[...]
+No, on OMAP3, most modules need both the interface clock enabled, and at 
+least one of their functional clocks.  For modules with multiple 
+functional clocks like the OMAP3 USBHOST, we had to use trial 
+and error to determine which functional clock was the main clock, since it 
+wasn't documented.  If we got it wrong, then register accesses to the 
+module would result in an abort.
 
-Thanks.
+The AM33xx/OMAP4 behavior should be a little easier in this regard, 
+though, since the MODULEMODE bits should just control everything for a 
+given module, and that should be handled by the hwmod code.  Nevertheless 
+it is still good to specify a main_clk so we know how fast the module's 
+registers are clocked and to locate the module in the power management 
+hierarchy.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Another issues is, 
+> 
+> I came across situation where, two modules fall into different clock 
+> domains but their functional clock is happened to be coming from same 
+> source/dpll-divider. So in order to satisfy clkdm match between them, I 
+> have kept nodes without enable_regs.
+
+Could you please provide an example?
+
+> > >    So currently, I have mentioned same entry in both the places (especially 
+> > >    for Peripherals/modules).
+> > >    I am planning to remove ocp_if/clk entry data for all modules..
+> > 
+> > Hmmm, could you explain this further?
+> 
+> what if, module only has interface clock? Should it be present as 
+> main_clk or ocp_if.clk or both?? Example would be, TPCC, TPTC, 
+> smartreflex, etc...
+
+Well it definitely should be present as the ocp_if.clk.  I personally 
+think it would be good to list the same clock as the hwmod's main_clk too, 
+but it's currently not strictly necessary.  There are some examples in the 
+omap_hwmod_44xx_data.c file, like omap44xx_mailbox_hwmod.
+
+
+- Paul
