@@ -1,80 +1,102 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 May 2012 01:49:21 -0600 (MDT)
-Subject: [PATCH] ARM: OMAP3+: dpll: optimize noncore dpll locking logic
-In-Reply-To: <1337369838-15185-1-git-send-email-nm@ti.com>
-References: <1337369838-15185-1-git-send-email-nm@ti.com>
-Message-ID: <alpine.DEB.2.00.1205240147510.2572@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 24 May 2012 16:49:44 +0900
+Subject: [PATCH 6/6] ARM: dts: Add nodes for spi controllers for Samsung
+ Exynos5 platforms
+In-Reply-To: <1337334392-6441-7-git-send-email-thomas.abraham@linaro.org>
+References: <1337334392-6441-1-git-send-email-thomas.abraham@linaro.org>
+ <1337334392-6441-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <006d01cd3981$c8b0d950$5a128bf0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth
-
-On Fri, 18 May 2012, Nishanth Menon wrote:
-
-> From: Vikram Pandita <vikram.pandita@ti.com>
+Thomas Abraham wrote:
 > 
-> If the dpll is already locked, code can be optimized
-> to return much earlier than doing redundent set of lock mode
-> and wait on idlest.
+> Add device nodes for the three instances of spi controllers in Exynos5
+> platforms and enable instance spi 1 for smdk5250 board.
 > 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Mike Turquette <mturquette@ti.com>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> 
-> Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-
-Did you intend to add your Signed-off-by: to this patch?
-
-Also, just FYI, no need to add the Cc: lines for the mailing lists in the 
-bottom of the patch description.
-
-- Paul
-
-
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
->  arch/arm/mach-omap2/dpll3xxx.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts |   47
+> ++++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/exynos5250.dtsi         |   46
+> ++++++++++++++++++++++++++++
+>  2 files changed, 92 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index fc56745..3cfd7c4 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -135,11 +135,20 @@ static u16 _omap3_dpll_compute_freqsel(struct clk *clk, u8 n)
->   */
->  static int _omap3_noncore_dpll_lock(struct clk *clk)
->  {
-> +	const struct dpll_data *dd;
->  	u8 ai;
-> -	int r;
-> +	u8 state = 1;
-> +	int r = 0;
->  
->  	pr_debug("clock: locking DPLL %s\n", clk->name);
->  
-> +	dd = clk->dpll_data;
-> +	state <<= __ffs(dd->idlest_mask);
-> +
-> +	/* Check if already locked */
-> +	if ((__raw_readl(dd->idlest_reg) & dd->idlest_mask) == state)
-> +		goto done;
-> +
->  	ai = omap3_dpll_autoidle_read(clk);
->  
->  	omap3_dpll_deny_idle(clk);
-> @@ -151,6 +160,7 @@ static int _omap3_noncore_dpll_lock(struct clk *clk)
->  	if (ai)
->  		omap3_dpll_allow_idle(clk);
->  
-> +done:
->  	return r;
->  }
->  
-> -- 
-> 1.7.9.5
-> 
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 49945cc..dca572d 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
 
+[...]
 
-- Paul
+> -		bootargs = "root=/dev/ram0 rw ramdisk=8192
+> console=ttySAC1,115200";
+> +		bootargs ="root=/dev/ram0 rw ramdisk=8192
+> initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+
+Yes, we need above. But it should be separated patch from here.
+
+[...]
+
+> +	spi_1: spi at 12d30000 {
+> +		gpios = <&gpa2 4 2 3 0>,
+> +			<&gpa2 6 2 3 0>,
+> +			<&gpa2 7 2 3 0>;
+> +
+> +		w25q80bw at 0 {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			compatible = "w25x80";
+> +			reg = <0>;
+> +			spi-max-frequency = <10000>;
+> +
+> +			controller-data {
+> +				cs-gpio = <&gpa2 5 1 0 3>;
+> +				samsung,spi-feedback-delay = <0>;
+> +			};
+> +
+> +			partition at 0 {
+> +				label = "U-Boot";
+> +				reg = <0x0 0x40000>;
+> +				read-only;
+> +			};
+> +
+> +			partition at 40000 {
+> +				label = "Kernel";
+> +				reg = <0x40000 0xc0000>;
+> +			};
+> +		};
+> +	};
+
+See my previous comments on 5/6.
+
+[...]
+
+> +	combiner:interrupt-controller at 10440000 {
+> +		compatible = "samsung,exynos4210-combiner";
+> +		#interrupt-cells = <2>;
+> +		interrupt-controller;
+> +		samsung,combiner-nr = <32>;
+> +		reg = <0x10440000 0x1000>;
+> +		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> +			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+> +			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> +			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+> +			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+> +			     <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+> +			     <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+> +			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
+> +	};
+
+Already merged above in my tree.
+
+[...]
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
