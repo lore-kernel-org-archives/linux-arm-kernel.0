@@ -1,35 +1,44 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 24 May 2012 23:27:31 +0200
-Subject: [PATCH V2] GPMI-NAND: Define ecc.strength
-In-Reply-To: <4FBE57DB.400@newsguy.com>
-References: <1337633967-8387-1-git-send-email-marex@denx.de>
- <201205220834.25981.marex@denx.de> <4FBE57DB.400@newsguy.com>
-Message-ID: <201205242327.31910.marex@denx.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 24 May 2012 15:12:31 -0700
+Subject: mm: fix faulty initialization in vmalloc_init()
+In-Reply-To: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
+References: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
+Message-ID: <20120524151231.e3a18ac5.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+On Thu, 24 May 2012 17:32:56 +0900
+KyongHo <pullip.cho@samsung.com> wrote:
 
-> On 05/21/2012 11:34 PM, Marek Vasut wrote:
-> > Dear Artem Bityutskiy,
-> > 
-> >> On Mon, 2012-05-21 at 22:59 +0200, Marek Vasut wrote:
-> >>> The ecc.strength wasn't set, resulting in the following crash:
-> >>> [    2.550000] kernel BUG at drivers/mtd/nand/nand_base.c:3347!
-> >>> [    2.550000] Internal error: Oops - BUG: 0 [#1] ARM
-> >> 
-> >> Pushed to l2-mtd.git, thanks!
-> > 
-> > Thank you!
+> vmalloc_init() adds 'vmap_area's for early 'vm_struct's.
+> This patch fixes vmalloc_init() to correctly initialize
+> vmap_area for the given vm_struct.
 > 
-> Yes, thanks much Marek.  I must have missed this one while doing the
-> EUCLEAN patches (maybe because it's in its own directory).  Sorry to
-> everyone for the confusion it caused.
 
-Mike, nice to see you became more involved with the MTD :-) How's the DoCG3/G4 
-thing turned out btw?
+<daily message>
+Insufficient information.  When fixing a bug please always always
+always describe the user-visible effects of the bug.  Does the kernel
+instantly crash?  Is it a comestic cleanliness thing which has no
+effect?  Something in between?  I have simply no idea, and am dependent
+upon you to tell me.
 
-> Mike
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -1185,9 +1185,10 @@ void __init vmalloc_init(void)
+>  	/* Import existing vmlist entries. */
+>  	for (tmp = vmlist; tmp; tmp = tmp->next) {
+>  		va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
+> -		va->flags = tmp->flags | VM_VM_AREA;
+> +		va->flags = VM_VM_AREA;
 
-Best regards,
-Marek Vasut
+This change is a mystery.  Why do we no longer transfer ->flags?
+
+>  		va->va_start = (unsigned long)tmp->addr;
+>  		va->va_end = va->va_start + tmp->size;
+> +		va->vm = tmp;
+
+OK, I can see how this might be important.  But why did you find it
+necessary?  Why was this change actually needed?
+
+>  		__insert_vmap_area(va);
+>  	}
