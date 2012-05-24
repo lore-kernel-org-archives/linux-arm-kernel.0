@@ -1,44 +1,45 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 24 May 2012 14:34:31 +0530
-Subject: [PATCH 2/6] ARM: Exynos5: Add spi clock support
-In-Reply-To: <006b01cd397f$09784840$1c68d8c0$%kim@samsung.com>
-References: <1337334392-6441-1-git-send-email-thomas.abraham@linaro.org>
- <1337334392-6441-3-git-send-email-thomas.abraham@linaro.org>
- <006b01cd397f$09784840$1c68d8c0$%kim@samsung.com>
-Message-ID: <CAJuYYwRThKda0E7ruDbW=X5_6RVran6NA+rBRdRNG1A=-Uny3Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 May 2012 10:04:49 +0100
+Subject: [PATCH] Fix OMAP4 boot regression
+Message-ID: <20120524090449.GA24486@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2012 13:00, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Thomas Abraham wrote:
->>
->> Add support for clock instances for each spi controller.
->>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
->> ---
->>
->> +static struct clksrc_clk exynos5_clk_mdout_spi0 = {
->
-> See the previous comments and below url.
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/083153.h
-> tml
+Fix a boot regression in existing kernels causing:
 
-Exynos5 is only device tree based now. And there are changes in the
-platform data also now.
+genirq: Threaded irq requested with handler=NULL and !ONESHOT for irq XXX
 
-Thanks,
-Thomas.
+caused by 1c6c6952 (genirq: Reject bogus threaded irq requests).
 
->
-> [...]
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+--
+ drivers/mmc/host/omap_hsmmc.c |    2 +-
+ drivers/rtc/rtc-twl.c         |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index d76fc82..84016cb 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1962,7 +1962,7 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+ 		ret = request_threaded_irq(mmc_slot(host).card_detect_irq,
+ 					   NULL,
+ 					   omap_hsmmc_detect,
+-					   IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
++					   IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+ 					   mmc_hostname(mmc), host);
+ 		if (ret) {
+ 			dev_dbg(mmc_dev(host->mmc),
+diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+index 258abea..c5d06fe 100644
+--- a/drivers/rtc/rtc-twl.c
++++ b/drivers/rtc/rtc-twl.c
+@@ -510,7 +510,7 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = request_threaded_irq(irq, NULL, twl_rtc_interrupt,
+-				   IRQF_TRIGGER_RISING,
++				   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+ 				   dev_name(&rtc->dev), rtc);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "IRQ is not free.\n");
