@@ -1,33 +1,25 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 24 May 2012 09:10:54 +0200
-Subject: ARM: ETH PHY Micrel: KSZ8051MNL Driver?
-In-Reply-To: <20120524033848.GA9851@sapphire.tkos.co.il> (Baruch Siach's
- message of "Thu, 24 May 2012 06:38:48 +0300")
-References: <1337720919.493.YahooMailClassic@web45209.mail.sp1.yahoo.com>
- <87obpepscr.fsf@macbook.be.48ers.dk>
- <20120524033848.GA9851@sapphire.tkos.co.il>
-Message-ID: <878vgioxz5.fsf@macbook.be.48ers.dk>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 24 May 2012 09:10:47 +0200
+Subject: [PATCH] ixp4xx: fix compilation by adding gpiolib support
+In-Reply-To: <20120523181829.GK21608@burratino>
+References: <1337789991-5283-1-git-send-email-richardcochran@gmail.com>
+ <20120523172703.GI21608@burratino>
+ <20120523181829.GK21608@burratino>
+Message-ID: <20120524071046.GD2180@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Baruch" == Baruch Siach <baruch@tkos.co.il> writes:
+On Wed, May 23, 2012 at 01:18:29PM -0500, Jonathan Nieder wrote:
+> Quick correction: looks like[*] 3.1 is also affected due to
+> 58c244009ef6 ("Input: ads7846 - cleanup GPIO initialization").  Sorry
+> I missed that before.
 
-Hi,
+...
 
- >> I can give the micrel driver a try if you want though.
+> Hope that helps,
 
- Baruch> In one project that were using the KSZ8051MNL PHY, we needed
- Baruch> the micrel phy driver to set 50MHz RMII clock. This PHY
- Baruch> defaults to 25MHz MII, and there is no way to change that with
- Baruch> pull-up resistors. See commit d606ef3f (phy/micrel: add ability
- Baruch> to support 50MHz RMII clock on KZS8051RNL).
+Yes, it does. I appreciate your effort in testing this on the older
+versions.
 
-Yes, that's indeed quite unfortunate. For this project I write the phy
-register in the bootloader as we need it there anyway, but for another
-(am335x based) project it means we cannot used the ROM support for
-network boot.
-
-Is 50MHz is needed, the 8021/8031 are probably a better choice.
-
--- 
-Bye, Peter Korsgaard
+Thanks,
+Richard
