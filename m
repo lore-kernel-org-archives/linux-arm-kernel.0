@@ -1,303 +1,75 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 23 May 2012 21:42:45 +0200
-Subject: [PATCH v4 3/3] ARM: dts: add nodes for atmel hsmci controllers for
- atmel platforms
-In-Reply-To: <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1337681352-18521-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1337802165-13866-1-git-send-email-ludovic.desroches@atmel.com>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Thu, 24 May 2012 19:40:51 +0000
+Subject: [PATCH] [ARM] Unconditional call to smp_cross_call on UP crashes
+Message-ID: <1337888451-10340-1-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+omap2plus_defconfig builds with SMP & SMP_ON_UP set.
+On beagle (which is UP) is_smp() returns false and we don't call
+smp_init_cpus which in turn does not initialize smp_cross_call which
+remains NULL.
 
-Add nodes for mci controllers.
+When issuing a reboot we OOPS with a NULL dereference on stop smp_call.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixed by checking is_smp in smp_send_stop()
+
+Restarting system.
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = dda50000
+[00000000] *pgd=9e723831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 80000007 [#1] SMP ARM
+Modules linked in:
+CPU: 0    Not tainted  (3.4.0-00001-gb15b046 #30)
+PC is at 0x0
+LR is at smp_send_stop+0x4c/0xe8
+pc : [<00000000>]    lr : [<c00188cc>]    psr: 60000013
+sp : de7b5e70  ip : 00000000  fp : 00000001
+r10: 00000000  r9 : de7b4000  r8 : c07263d0
+r7 : 00000000  r6 : c06e1294  r5 : 000f4240  r4 : de7b5e74
+r3 : 00000000  r2 : 00000000  r1 : 00000006  r0 : de7b5e74
+Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 10c5387d  Table: 9da50019  DAC: 00000015
+Process reboot (pid: 2229, stack limit = 0xde7b42f8)
+Stack: (0xde7b5e70 to 0xde7b6000)
+5e60:                                     00000000 00000000 00000000 01234567
+5e80: de7b4000 c001475c 4321fedc c0052570 0000003e 00000000 c081db78 0000003e
+5ea0: 00000001 00000002 00000002 c00891f0 00000002 dd5ba0ac 00000002 00000000
+5ec0: dd5ba0ac de7b4000 c009eef4 de7b4000 c00f44dc de7b4000 c00f44dc 00000000
+5ee0: c0c94d24 de7b4000 00000000 00000000 00000002 00000002 00000000 c00891f0
+5f00: 00000002 00000000 00000000 c011286c 00000000 dd5ba060 60000013 00000000
+5f20: dd688d8c 00000000 de7b4000 c06e20f8 dec14760 dec14750 de7b4000 c06e20f8
+5f40: 00011f10 c01128a0 00000002 00000000 c011286c c00fa014 dd8c3180 de7b4000
+5f60: c0013380 de508bc0 00000001 60000010 00000001 ef000000 00000001 c0089bfc
+5f80: 00000000 00000001 00000004 00000058 00000000 00000001 00000004 00000058
+5fa0: c0013428 c0013260 00000000 00000001 fee1dead 28121969 01234567 00000000
+5fc0: 00000000 00000001 00000004 00000058 00000001 00000001 00000000 00000001
+5fe0: b6e76200 beba4c90 00009210 b6e76218 60000010 fee1dead 00000000 00000000
+[<c00188cc>] (smp_send_stop+0x4c/0xe8) from [<c001475c>] (machine_restart+0xc/0x54)
+[<c001475c>] (machine_restart+0xc/0x54) from [<c0052570>] (sys_reboot+0x140/0x204)
+[<c0052570>] (sys_reboot+0x140/0x204) from [<c0013260>] (ret_fast_syscall+0x0/0x3c)
+Code: bad PC value
+---[ end trace f5035e8726d1f51b ]---
+
+Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
 ---
-v4: add new chips and boards
+ arch/arm/kernel/smp.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/at91sam9260.dtsi          |    9 +++++++++
- arch/arm/boot/dts/at91sam9263.dtsi          |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9263ek.dts         |   10 ++++++++++
- arch/arm/boot/dts/at91sam9g20ek_2mmc.dts    |   12 ++++++++++++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    9 +++++++++
- arch/arm/boot/dts/at91sam9g25ek.dts         |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi          |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   19 +++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi          |    9 +++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |    9 +++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi           |   18 ++++++++++++++++++
- 11 files changed, 149 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index f449efc..ae54bf3 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -198,6 +198,15 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8f46446..2a61335 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -588,6 +588,10 @@ void smp_send_stop(void)
+ 	unsigned long timeout;
+ 	struct cpumask mask;
  
-+			mmc0: mmc at fffa8000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfffa800 0x600>;
-+				interrupts = <9 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
++	/* make sure we don't bother if not SMP */
++	if (!is_smp())
++		return;
 +
- 			adc0: adc at fffe0000 {
- 				compatible = "atmel,at91sam9260-adc";
- 				reg = <0xfffe0000 0x100>;
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 0209913..a327ebe 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -179,6 +179,24 @@
- 				interrupts = <24 4>;
- 				status = "disabled";
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfff80000 0x600>;
-+				interrupts = <10 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mmc1: mmc at fff84000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfff84000 0x600>;
-+				interrupts = <11 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index f86ac4b..05028ed 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -50,6 +50,16 @@
- 				atmel,vbus-gpio = <&pioA 25 0>;
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioE 18 0>;
-+					wp-gpios = <&pioE 19 0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-index f1b2e14..684b229 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-+++ b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-@@ -12,6 +12,18 @@
- 	model = "Atmel at91sam9g20ek 2 mmc";
- 	compatible = "atmel,at91sam9g20ek_2mmc", "atmel,at91sam9g20", "atmel,at91sam9";
- 
-+	ahb {
-+		apb{
-+			mmc0: mmc at fffa8000 {
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioC 2 0>;
-+				};
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index b06c0db..7da326a 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -51,6 +51,15 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at fffa8000 {
-+				status = "okay";
-+				slot at 1 {
-+					reg = <1>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioC 9 0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 7829a4d..422a9fb 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,24 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 15 0>;
-+				};
-+			};
-+
-+			mmc1: mmc at f000c000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 14 0>;
-+				};
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 7dbccaf..0360bf8 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -236,6 +236,24 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfff80000 0x600>;
-+				interrupts = <11 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mmc1: mmc at fffd0000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xfffd0000 0x600>;
-+				interrupts = <29 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..7a7b571 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,25 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at fff80000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 10 0>;
-+				};
-+			};
-+
-+			mmc1: mmc at fffd0000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioD 11 0>;
-+					wp-gpios = <&pioD 29 0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index cb84de7..f3e03fb 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -82,6 +82,15 @@
- 				reg = <0xfffffe10 0x10>;
- 			};
- 
-+			mmc0: mmc at f0008000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf0008000 0x600>;
-+				interrupts = <12 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
- 			tcb0: timer at f8008000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index f4e43e3..44b42d9 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -37,6 +37,15 @@
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioA 7 0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 6b3ef43..4e8125b 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -228,6 +228,24 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
-+
-+			mmc0: mmc at f0008000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf0008000 0x600>;
-+				interrupts = <12 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mmc1: mmc at f000c000 {
-+				compatible = "atmel,hsmci";
-+				reg = <0xf000c000 0x600>;
-+				interrupts = <26 4>;
-+				status = "disabled";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
+ 	cpumask_copy(&mask, cpu_online_mask);
+ 	cpumask_clear_cpu(smp_processor_id(), &mask);
+ 	smp_cross_call(&mask, IPI_CPU_STOP);
 -- 
-1.7.5.4
+1.7.1
