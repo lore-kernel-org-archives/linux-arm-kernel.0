@@ -1,55 +1,46 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Fri, 25 May 2012 15:07:15 +0530
-Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
-In-Reply-To: <20120522234621.GA3610@windriver.com>
-References: <20120522234621.GA3610@windriver.com>
-Message-ID: <CAOh2x==2pFz_37Xjrb9wpeG8HMrMUf72+-iT30d14paQntr+7A@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 25 May 2012 20:12:40 +0900
+Subject: mm: fix faulty initialization in vmalloc_init()
+In-Reply-To: <002c01cd3a0c$aef39530$0cdabf90$@codeaurora.org>
+References: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
+ <20120524151231.e3a18ac5.akpm@linux-foundation.org>
+ <002c01cd3a0c$aef39530$0cdabf90$@codeaurora.org>
+Message-ID: <CAHQjnOP_n1ahLRYUmp+BE4+8tQ3KqvJK7Lyj41Qbz59qqzqYfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 23, 2012 5:18 AM, "Paul Gortmaker" <paul.gortmaker@windriver.com>
-wrote:
+On Fri, May 25, 2012 at 9:24 AM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+>> -----Original Message-----
+>> On Thu, 24 May 2012 17:32:56 +0900
+>> KyongHo <pullip.cho@samsung.com> wrote:
+>>
+>> > --- a/mm/vmalloc.c
+>> > +++ b/mm/vmalloc.c
+>> > @@ -1185,9 +1185,10 @@ void __init vmalloc_init(void)
+>> >     /* Import existing vmlist entries. */
+>> >     for (tmp = vmlist; tmp; tmp = tmp->next) {
+>> >             va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
+>  > -            va->flags = tmp->flags | VM_VM_AREA;
+>> > +           va->flags = VM_VM_AREA;
+>>
+>> This change is a mystery.  Why do we no longer transfer ->flags?
 >
-> Hi Viresh,
+> I was actually debugging the same exact issue today. This transfer of
+flags
+> actually causes some of the static mapping virtual addresses to be
+> prematurely freed (before the mapping is removed) because VM_LAZY_FREE
+gets
+> "set" if tmp->flags has VM_IOREMAP set. This might cause subsequent
+> vmalloc/ioremap calls to fail because it might allocate one of the freed
+> virtual address ranges that aren't unmapped.
 >
-> The above listed commit, in linux-next as:
->
-> commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
->
->    "clk: add non CONFIG_HAVE_CLK routines"
->
-> shows up as failures in the netx_defconfig, since there
-> are duplicate stub functions between your changes and the
-> file below:
->
->  arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
->  include/linux/clk.h:299:51: note: previous definition of 'clk_disable'
-was here
->  arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
->  include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate'
-was here
->  arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
->  include/linux/clk.h:294:50: note: previous definition of 'clk_enable'
-was here
->  arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
->  include/linux/clk.h:280:58: note: previous definition of 'clk_get' was
-here
->  arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
->  include/linux/clk.h:290:51: note: previous definition of 'clk_put' was
-here
->  make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
->
+Thanks for description.
 
-Hi Paul,
+va->flags has different types of flags from tmp->flags.
+If a region with VM_IOREMAP set is registered with vm_area_add_early(),
+it will be removed by __purge_vmap_area_lazy().
 
-I don't have access to any Linux machine for now as i am on leave.
-
-Actually i have left ST and will join the next company in few weeks.
-
-If you can provide a patch for this, i can review it.
-
---
-Viresh
+ Cho KyongHo.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/80f39cb7/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/ce9087e9/attachment-0001.html>
