@@ -1,95 +1,52 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 16:40:47 -0700
-Subject: [PATCHv9 00/10] I2C fixes
-In-Reply-To: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Wed, 2 May 2012 20:02:05 +0530")
-References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87obpbhls0.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 May 2012 00:43:45 +0100
+Subject: [PATCH 13/20] arm: Do not call try_to_freeze() in do_signal()
+In-Reply-To: <1337983476-22081-13-git-send-email-richard@nod.at>
+References: <1337983476-22081-1-git-send-email-richard@nod.at>
+ <1337983476-22081-13-git-send-email-richard@nod.at>
+Message-ID: <20120525234345.GA32000@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Neil Brown
+On Sat, May 26, 2012 at 12:04:29AM +0200, Richard Weinberger wrote:
+> get_signal_to_deliver() already calls try_to_freeze(), there is no
+> need to call it directly.
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+NAK.  Please check linux-next (okay, viro's patches haven't appeared
+there yet) but a lot of this stuff is covered by a truckload of work
+that Al's done.
 
-> The patch series does the following
->
-> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
-> - In case of i2c remove register access was done without any
->  get_sync fix the same.
-> - Folds a patch from Tasslehoff to prevent any merge conflicts.
-> - Prevents the XDUF flag to be set if the underflow condition is not met.
-> - As per discussion in [1] .Adds a patch to rename the 1p153 errata and
->  use the unique id instead as the section number in the recent errata
->  docs has changed.
->
+Please don't work across Al.
 
-Shubhrajyoti,
+commit d9be5ea6f9b6a51535ccdd9881ffb3be2dbd48e9
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Fri Apr 27 01:18:52 2012 -0400
 
-Can you add one more patch to this series.
+    arm: don't call try_to_freeze() from do_signal()
+    
+    get_signal_to_deliver() will handle it itself
+    
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 
-The patch below from Neil Brown has been circulating for awhile, and
-I've been using it locally for awhile now too.  It would help if it got
-into this series and got some broader testing.
-
-Thanks,
-
-Kevin
-
-
->From 0c6effd8356e6273c294490a576551ef37ae6799 Mon Sep 17 00:00:00 2001
-From: NeilBrown <neilb@suse.de>
-Date: Fri, 30 Dec 2011 12:40:30 +1100
-Subject: [PATCH] OMAP/I2C - Fix timeout problem during suspend.
-
-On a board with OMAP3 processor and TWL4030 Power management,
-we need to talk to the TWL4030 during late suspend but cannot
-because the I2C interrupt is disabled (as late suspend disables
-interrupt).
-
-e.g. I get messages like:
-
-[   62.161102] musb-omap2430 musb-omap2430: LATE power domain suspend
-[   63.167205] omap_i2c omap_i2c.1: controller timed out
-[   63.183044] twl: i2c_read failed to transfer all messages
-[   64.182861] omap_i2c omap_i2c.1: controller timed out
-[   64.198455] twl: i2c_write failed to transfer all messages
-[   65.198455] omap_i2c omap_i2c.1: controller timed out
-[   65.203765] twl: i2c_write failed to transfer all messages
-
-The stack shows omap2430_runtime_suspend calling twl4030_set_suspend
-which tries to power-down the USB PHY (twl4030_phy_suspend ->
-twl4030_phy_power -> __twl4030_phy_power which as a nice WARN_ON
-that helps).
-
-Then we get the same in resume:
-
-[   69.603912] musb-omap2430 musb-omap2430: EARLY power domain resume
-[   70.610473] omap_i2c omap_i2c.1: controller timed out
-[   70.626129] twl: i2c_write failed to transfer all messages
-etc.
-
-So don't disable interrupts for I2C.
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: NeilBrown <neilb@suse.de>
----
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 801df60..e024c50 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1092,7 +1092,7 @@ omap_i2c_probe(struct platform_device *pdev)
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index a6c4e78..3b37c14 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -642,9 +642,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
+                }
+        }
  
- 	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
- 								   omap_i2c_isr;
--	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
-+	r = request_irq(dev->irq, isr, IRQF_NO_SUSPEND, pdev->name, dev);
+-       if (try_to_freeze())
+-               goto no_signal;
+-
+        /*
+         * Get the signal to deliver.  When running under ptrace, at this
+         * point the debugger may change all our registers ...
+@@ -684,7 +681,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
+                return;
+        }
  
- 	if (r) {
- 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
--- 
-1.7.9.2
+- no_signal:
+        if (syscall) {
+                /*
+                 * Handle restarting a different system call.  As above,
