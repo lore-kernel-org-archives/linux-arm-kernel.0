@@ -1,75 +1,43 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Fri, 25 May 2012 13:09:46 +0800
-Subject: [PATCH RFC v3 3/3] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <4FBF11C3.3030207@wwwdotorg.org>
-References: <1337779362-31259-1-git-send-email-b29396@freescale.com>
- <1337779362-31259-3-git-send-email-b29396@freescale.com>
- <4FBD4C13.8080209@wwwdotorg.org>
- <CAA+hA=Rb1Qix67QBthPjo_4d5ATWjA7pePembZRwJkPMtQNpjg@mail.gmail.com>
- <4FBE5225.301@wwwdotorg.org>
- <20120525032250.GA13524@shlinux2.ap.freescale.net>
- <4FBF11C3.3030207@wwwdotorg.org>
-Message-ID: <20120525050946.GB13524@shlinux2.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 25 May 2012 14:26:09 +0800
+Subject: [PATCH] serial/amba-pl011: move custom pin control to driver
+In-Reply-To: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
+References: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120525062606.GF3332@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 12:59:47PM +0800, Stephen Warren wrote:
-> On 05/24/2012 09:22 PM, Dong Aisheng wrote:
-> > On Thu, May 24, 2012 at 11:22:13PM +0800, Stephen Warren wrote:
-> ...
-> >> The problem is this:
-> >>
-> >> Thread 1: Call of_node_to_gpiochip(), returns a gpio_chip.
-> >> Thread 2: Unregisters the same gpio_chip that was returned above.
-> >> Thread 1: Accesses the now unregistered (and possibly free'd) gpio_chip
-> >> -> at best, bad data, at worst, OOPS.
-> >>
-> > Correct. We did have this issue.
-> > Thanks for clarify.
-> > 
-> >> In order to prevent this, of_node_to_gpiochip() should take measures to
-> >> prevent another thread from unregistering the gpio_chip until thread 1
-> >> has completed its step above.
-> >>
-> >> The existing of_get_named_gpio_flags() is safe from this, since
-> >> gpiochip_find() acquires the GPIO lock, and all accesses to the fouond
-> >> gpio chip occur with that lock held, inside the match function. Perhaps
-> >> a similar approach could be used here.
-> >
-> > Why it looks to me of_get_named_gpio_flags has the same issue and also not safe?
-> > For of_node_to_gpiochip itself called in of_get_named_gpio_flags, it's safe.
+On Wed, May 23, 2012 at 09:18:46PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Uggh. Yes, I meant that of_node_to_gpiochip() itself doesn't have this
-> issue, but you're right, it looks like of_get_named_gpio_flags() does.
+> We had a boot regression in Ux500 in the merge window because
+> two orthogonal pin control schemes for the PL011 were merged
+> at the same time:
 > 
-> > But after that, i'm suspecting it has the same issue as you described above, right?
-> > 
-> > For example:
-> > int of_get_named_gpio_flags(struct device_node *np, const char *propname,
-> >                            int index, enum of_gpio_flags *flags)
-> > {
-> > ...
-> > 	gc = of_node_to_gpiochip(gpiospec.np);
-> > 	if (!gc) {
-> > 		pr_debug("%s: gpio controller %s isn't registered\n",
-> > 			 np->full_name, gpiospec.np->full_name);
-> > 		ret = -ENODEV;
-> > 		goto err1;
-> > 	}
-> > 
-> > 	===> the gc may be unregistered here by another thread and
-> > 	     even already have been freed, right?
-> > 
-> > 	ret = gc->of_xlate(gc, &gpiospec, flags);
-> > ...
-> > }
-> > 
-> > Maybe we need get the lock in of_node_to_gpiochip and release it by calling
-> > of_gpio_put(..) after using?
+> - One using the .init() and .exit() hooks into the platform
+>   for Ux500 putting the pins into default vs sleep state
+>   respectively as the port was started/stopped.
+>   commit a09806607fd20bed2f8c41fe22793386790a14aa
+>   "ARM: ux500: switch to using pinctrl for uart0"
 > 
-> Yes, something like that; it should take the module lock, not the gpio lock.
+> - One hogging the default setting at PL011 probe()
+>   commit 258e055111d3cde2607e0d04eb91da2f7a59b591
+>   "serial: amba-pl011: adopt pinctrl support"
 > 
-Okay, i will try to add it.
+> To get a solution that works for both let's scrap the stuff
+> in the platform callbacks, instead have the driver itself
+> select default and sleep states when the port is
+> started/stopped. Hopefully this works for all clients.
+> Platform callbacks are bad for device tree migration anyway,
+> so this rids us of another problem in Ux500.
+> 
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Reported-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Regards
-Dong Aisheng
+On imx28:
+
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
