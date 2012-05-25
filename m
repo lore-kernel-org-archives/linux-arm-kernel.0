@@ -1,37 +1,41 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Thu, 24 May 2012 17:24:01 -0700
-Subject: mm: fix faulty initialization in vmalloc_init()
-In-Reply-To: <20120524151231.e3a18ac5.akpm@linux-foundation.org>
-References: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
- <20120524151231.e3a18ac5.akpm@linux-foundation.org>
-Message-ID: <002c01cd3a0c$aef39530$0cdabf90$@codeaurora.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 25 May 2012 10:07:41 +0800
+Subject: [PATCH 2/5] ARM: imx6q: add clock for apbh-dma
+In-Reply-To: <20120524173028.GD16535@pengutronix.de>
+References: <1337856659-24812-1-git-send-email-b32955@freescale.com>
+ <1337856659-24812-2-git-send-email-b32955@freescale.com>
+ <20120524173028.GD16535@pengutronix.de>
+Message-ID: <4FBEE96D.7010509@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> On Thu, 24 May 2012 17:32:56 +0900
-> KyongHo <pullip.cho@samsung.com> wrote:
-> 
-> > --- a/mm/vmalloc.c
-> > +++ b/mm/vmalloc.c
-> > @@ -1185,9 +1185,10 @@ void __init vmalloc_init(void)
-> >  	/* Import existing vmlist entries. */
-> >  	for (tmp = vmlist; tmp; tmp = tmp->next) {
-> >  		va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
- > -		va->flags = tmp->flags | VM_VM_AREA;
-> > +		va->flags = VM_VM_AREA;
-> 
-> This change is a mystery.  Why do we no longer transfer ->flags?
+? 2012?05?25? 01:30, Sascha Hauer ??:
+> On Thu, May 24, 2012 at 06:50:56PM +0800, Huang Shijie wrote:
+>> add the clock for apbh-dma.
+>>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>>   arch/arm/mach-imx/clk-imx6q.c |    3 ++-
+>>   1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+>> index cab02d0..12d9040 100644
+>> --- a/arch/arm/mach-imx/clk-imx6q.c
+>> +++ b/arch/arm/mach-imx/clk-imx6q.c
+>> @@ -318,7 +318,7 @@ int __init mx6q_clocks_init(void)
+>>   	clk[ahb]               = imx_clk_busy_divider("ahb",               "periph",      base + 0x14, 10,  3,   base + 0x48, 1);
+>>
+>>   	/*                                name             parent_name          reg         shift */
+>> -	clk[apbh_dma]     = imx_clk_gate2("apbh_dma",      "ahb",               base + 0x68, 4);
+>> +	clk[apbh_dma]     = imx_clk_gate2("apbh_dma",      "usdhc3",            base + 0x68, 4);
+> This change looks strange. Is this correct?
+yes. it's correct.
 
-I was actually debugging the same exact issue today. This transfer of flags
-actually causes some of the static mapping virtual addresses to be
-prematurely freed (before the mapping is removed) because VM_LAZY_FREE gets
-"set" if tmp->flags has VM_IOREMAP set. This might cause subsequent
-vmalloc/ioremap calls to fail because it might allocate one of the freed
-virtual address ranges that aren't unmapped. 
+The datasheet about the clock tells us the parent of the apbh-dma is usdhc3.
 
---
-Olav Haugan
+Best Regards
+Huang Shijie
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Sascha
+>
+>
