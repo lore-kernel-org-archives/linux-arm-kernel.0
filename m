@@ -1,39 +1,51 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 15:06:04 -0700
-Subject: [PATCHv9 07/10] I2C: OMAP: Handle error check for pm runtime
-In-Reply-To: <1335969135-20858-8-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Wed, 2 May 2012 20:02:12 +0530")
+Date: Fri, 25 May 2012 15:09:23 -0700
+Subject: [PATCHv9 09/10] I2C: OMAP: Do not set the XUDF(Transmit
+ underflow) if the underflow is not reached
+In-Reply-To: <1335969135-20858-10-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Wed, 2 May 2012 20:02:14 +0530")
 References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
- <1335969135-20858-8-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87likfkjar.fsf@ti.com>
+ <1335969135-20858-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <878vgfkj58.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-> If PM runtime get_sync fails return with the error
-> so that no further reads/writes goes through the interface.
-> This will avoid possible abort. Add a error message in case
-> of failure with the cause of the failure.
+> Currently in the 1.153 errata handling while waiting for transmitter
+> underflow if NACK is got the XUDF(Transmit underflow) flag is also set.
+
+-EOVERFLOW
+
+This sentence needs a rewrite and some punctuation.  It does not read well.
+
+> The flag is set after wait for the condition is over.
 >
+> Cc: Alexander Shishkin <virtuoso@slind.org>
+> Acked-by: Moiz Sonasath <m-sonasath@ti.com>
 > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > ---
->  drivers/i2c/busses/i2c-omap.c |   14 +++++++++++---
->  1 files changed, 11 insertions(+), 3 deletions(-)
+>  drivers/i2c/busses/i2c-omap.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 >
 > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 44e8cfa..a72874e 100644
+> index 43b0efb..c0aa16b 100644
 > --- a/drivers/i2c/busses/i2c-omap.c
 > +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -585,7 +585,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  	int i;
->  	int r;
+> @@ -730,7 +730,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+>  		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+>  			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
+>  							OMAP_I2C_STAT_XDR));
+> -			*err |= OMAP_I2C_STAT_XUDF;
+>  			return -ETIMEDOUT;
+>  		}
 >  
-> -	pm_runtime_get_sync(dev->dev);
-> +	r = pm_runtime_get_sync(dev->dev);
-> +	if (r < 0)
-> +		return r;
-
-nit: please use IS_ERR_VALUE() 
+> @@ -743,6 +742,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+>  		return 0;
+>  	}
+>  
+> +	*err |= OMAP_I2C_STAT_XUDF;
+>  	return 0;
+>  }
 
 Kevin
