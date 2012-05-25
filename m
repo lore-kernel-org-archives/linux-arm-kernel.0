@@ -1,46 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 25 May 2012 08:47:53 +0200
-Subject: [PATCH 2/5] ARM: imx6q: add clock for apbh-dma
-In-Reply-To: <4FBEE96D.7010509@freescale.com>
-References: <1337856659-24812-1-git-send-email-b32955@freescale.com>
- <1337856659-24812-2-git-send-email-b32955@freescale.com>
- <20120524173028.GD16535@pengutronix.de>
- <4FBEE96D.7010509@freescale.com>
-Message-ID: <20120525064753.GI30400@pengutronix.de>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Fri, 25 May 2012 15:10:59 +0800
+Subject: [PATCH 0/4] mmp audio support
+Message-ID: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 10:07:41AM +0800, Huang Shijie wrote:
-> ? 2012?05?25? 01:30, Sascha Hauer ??:
-> >On Thu, May 24, 2012 at 06:50:56PM +0800, Huang Shijie wrote:
-> >>add the clock for apbh-dma.
-> >>
-> >>Signed-off-by: Huang Shijie<b32955@freescale.com>
-> >>---
-> >>  arch/arm/mach-imx/clk-imx6q.c |    3 ++-
-> >>  1 files changed, 2 insertions(+), 1 deletions(-)
-> >>
-> >>diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> >>index cab02d0..12d9040 100644
-> >>--- a/arch/arm/mach-imx/clk-imx6q.c
-> >>+++ b/arch/arm/mach-imx/clk-imx6q.c
-> >>@@ -318,7 +318,7 @@ int __init mx6q_clocks_init(void)
-> >>  	clk[ahb]               = imx_clk_busy_divider("ahb",               "periph",      base + 0x14, 10,  3,   base + 0x48, 1);
-> >>
-> >>  	/*                                name             parent_name          reg         shift */
-> >>-	clk[apbh_dma]     = imx_clk_gate2("apbh_dma",      "ahb",               base + 0x68, 4);
-> >>+	clk[apbh_dma]     = imx_clk_gate2("apbh_dma",      "usdhc3",            base + 0x68, 4);
-> >This change looks strange. Is this correct?
-> yes. it's correct.
-> 
-> The datasheet about the clock tells us the parent of the apbh-dma is usdhc3.
+These four patches provide mmp audio support under alsa via dmaengine
+Support platfrom pxa688 and pxa910
+mmp_tdma.c and mmp-pcm.c is shared for pxa688 and pxa910
+pxa688 (mmp2) use mmp2-sspa.c
+pxa910 directly use pxa-ssp.c
+mmp_tdma.c is under dmaengine framework
 
-Ok then, just wanted to make sure this is no patching accident.
+Verified on brownstone (pxa688) and ttc-dkb
 
-Sascha
+Zhangfei Gao (4):
+  dmaengine: mmp_tdma: add mmp tdma support
+  ASoC: mmp: add audio dma support
+  ASOC: mmp: add sspa support
+  ASoC: add mmp brownstone support
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ drivers/dma/Kconfig                     |   10 +
+ drivers/dma/Makefile                    |    1 +
+ drivers/dma/mmp_tdma.c                  |  677 +++++++++++++++++++++++++++++++
+ include/linux/platform_data/mmp_audio.h |   22 +
+ include/linux/platform_data/mmp_dma.h   |   20 +
+ sound/soc/pxa/Kconfig                   |   20 +
+ sound/soc/pxa/Makefile                  |    6 +
+ sound/soc/pxa/brownstone.c              |  303 ++++++++++++++
+ sound/soc/pxa/mmp-pcm.c                 |  448 ++++++++++++++++++++
+ sound/soc/pxa/mmp-sspa.c                |  536 ++++++++++++++++++++++++
+ sound/soc/pxa/mmp-sspa.h                |   92 +++++
+ 11 files changed, 2135 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/dma/mmp_tdma.c
+ create mode 100644 include/linux/platform_data/mmp_audio.h
+ create mode 100644 include/linux/platform_data/mmp_dma.h
+ create mode 100644 sound/soc/pxa/brownstone.c
+ create mode 100644 sound/soc/pxa/mmp-pcm.c
+ create mode 100644 sound/soc/pxa/mmp-sspa.c
+ create mode 100644 sound/soc/pxa/mmp-sspa.h
