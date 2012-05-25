@@ -1,99 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 24 May 2012 16:16:00 -0700
-Subject: [linux-pm] [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage
- Scaling)
-In-Reply-To: <CAOMWX4cjzLYuPmA-k=Z_pc5uw=CCViPjRYqs4VTyLX6T8HhtcA@mail.gmail.com>
- (Nishanth Menon's message of "Wed, 23 May 2012 08:27:06 -0500")
-References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
- <20120426191159.GA9415@sirena.org.uk>
- <CAJ6a13a6WN9h1QZynpEOf-R6RXwWBZ2eOPkTeNc15JX_YfAz_w@mail.gmail.com>
- <20120427175657.GP18260@opensource.wolfsonmicro.com>
- <87397o3n4y.fsf@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B1A67@DBDE01.ent.ti.com>
- <87mx5jy2li.fsf@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9B6681@DBDE01.ent.ti.com>
- <EF62F09C0797D947AD4180A1043C0DF73C40BCE1@DLEE10.ent.ti.com>
- <87lil2jp2z.fsf@ti.com>
- <EF62F09C0797D947AD4180A1043C0DF73C40C247@DLEE10.ent.ti.com>
- <87pqadgqd5.fsf@ti.com>
- <CAOMWX4cjzLYuPmA-k=Z_pc5uw=CCViPjRYqs4VTyLX6T8HhtcA@mail.gmail.com>
-Message-ID: <87aa0xqifj.fsf@ti.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Thu, 24 May 2012 17:24:01 -0700
+Subject: mm: fix faulty initialization in vmalloc_init()
+In-Reply-To: <20120524151231.e3a18ac5.akpm@linux-foundation.org>
+References: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
+ <20120524151231.e3a18ac5.akpm@linux-foundation.org>
+Message-ID: <002c01cd3a0c$aef39530$0cdabf90$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Menon, Nishanth" <nm@ti.com> writes:
+> -----Original Message-----
+> On Thu, 24 May 2012 17:32:56 +0900
+> KyongHo <pullip.cho@samsung.com> wrote:
+> 
+> > --- a/mm/vmalloc.c
+> > +++ b/mm/vmalloc.c
+> > @@ -1185,9 +1185,10 @@ void __init vmalloc_init(void)
+> >  	/* Import existing vmlist entries. */
+> >  	for (tmp = vmlist; tmp; tmp = tmp->next) {
+> >  		va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
+ > -		va->flags = tmp->flags | VM_VM_AREA;
+> > +		va->flags = VM_VM_AREA;
+> 
+> This change is a mystery.  Why do we no longer transfer ->flags?
 
-> On Wed, May 9, 2012 at 1:29 PM, Kevin Hilman <khilman@ti.com> wrote:
->> "Woodruff, Richard" <r-woodruff2@ti.com> writes:
->>
->>>> From: Hilman, Kevin
->>>> Sent: Tuesday, May 08, 2012 5:17 PM
->>>
->>>> A basic OMAP AVS driver has been in mainline for a long time, yet we
->>>> have not seen support submitted for all of these features.
->>>
->>> 1.5/3.5 is a feature.
->>
->> And I'm still waiting for it to be submitted upstream.
->>
->>> ABB is requirement for a production useable driver. Higher speed rated
->>> OMAP4 and all OMAP5 added these to be useable.
->>
->> ditto
->>
->>> Yes this is effort. Point of mentioning is to raise awareness of need.
->>
->> I'm well aware of the need.
->>
->>> Yet to be added feature has different meaning than functional gap.
->>
->> And both need to be submitted upstream.
->
-> SR 1.5: http://marc.info/?l=linux-omap&m=129933897910785&w=2
-> ABB: http://marc.info/?l=linux-omap&m=130939399209099&w=2
->
-> I am not sure what you mean "need to be submitted upstream"?
+I was actually debugging the same exact issue today. This transfer of flags
+actually causes some of the static mapping virtual addresses to be
+prematurely freed (before the mapping is removed) because VM_LAZY_FREE gets
+"set" if tmp->flags has VM_IOREMAP set. This might cause subsequent
+vmalloc/ioremap calls to fail because it might allocate one of the freed
+virtual address ranges that aren't unmapped. 
 
-You're right.  I should've said re-submitted and merged.  Both have been
-submitted (and reviewed) but no follow up submissions after review, and
-thus they're still out of tree.
+--
+Olav Haugan
 
-> Just tired of seeing things perpetually change without considering
-> even how to handle features that are mandatory for SoC even with code
-> posted upstream to show exactly what it takes.. 
-
-I'm sorry, but this is not perpetual change.  
-
-This driver has been upstream in its current (admittedly
-feature-limited) form for a long time, the only thing changing in
-$SUBJECT series is the location of the driver.  Why all the fuss about
-the missing features now?
-
-> I think you do mean merged upstream in this context.
-
-Correct.
-
-Frameworks always have limitations.  The way they get extended/expanded
-etc. is by the submission/review/merging of support for new
-features/requirements.  The process for that is the same as any feature
-in any part of the kernel.
-
-Evolution, not intelligent design[1].
-
-All of that being said, I'm not sure why this thread was hijacked for
-this debate in the first place.  The point of $SUBJECT series is simply
-to move and *existing* framework from arch/arm out to drivers.  The only
-changes done are cleanups to make this move possible.
-
-I for one would welcome extending this framework to ensure it supports
-all the SoC features.  I just don't want those features to be a
-prerequisite for this move from arch/arm to drivers.
-
-Please, let's get this moved to drivers, and then add support for the
-missing features.
-
-Thanks,
-
-Kevin
-
-[1] http://kerneltrap.org/Linux/Kernel_Evolution
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
