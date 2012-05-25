@@ -1,55 +1,154 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Fri, 25 May 2012 11:09:39 -0400
-Subject: [PATCH 1/5] ARM: imx6q: add DT node for apbh-dma
-In-Reply-To: <20120525023058.GB3332@S2101-09.ap.freescale.net>
-References: <1337856659-24812-1-git-send-email-b32955@freescale.com>
- <20120525023058.GB3332@S2101-09.ap.freescale.net>
-Message-ID: <CAMiH66E=16jekRTygKCrYk6Zz5BZQ7Vp2WV7XLq6b_rT5NE9Cw@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 25 May 2012 17:13:26 +0200
+Subject: [RFC PATCH 08/11] ARM: OMAP4+: Adding the temperature sensor
+ register set bit fields
+In-Reply-To: <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <4FBFA196.2030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 10:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, May 24, 2012 at 06:50:55PM +0800, Huang Shijie wrote:
->> add DT node for apbh-dma.
->>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
->> ---
->> ?arch/arm/boot/dts/imx6q.dtsi | ? ?5 +++++
->> ?1 files changed, 5 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
->> index 8c90cba..cccac33 100644
->> --- a/arch/arm/boot/dts/imx6q.dtsi
->> +++ b/arch/arm/boot/dts/imx6q.dtsi
->> @@ -87,6 +87,11 @@
->> ? ? ? ? ? ? ? interrupt-parent = <&intc>;
->> ? ? ? ? ? ? ? ranges;
->>
->> + ? ? ? ? ? ? dma-apbh at 00110000 {
->> + ? ? ? ? ? ? ? ? ? ? compatible = "fsl,imx6q-dma-apbh";
+On 5/25/2012 10:25 AM, Eduardo Valentin wrote:
+> OMAP4460 specific temperature sensor register bit fields are added.
+> Existing OMAP4 entries are renamed to OMAP4430.
 >
-> I guess imx6q-dma-apbh is compatible with imx28-dma-apbh. ?In that
-> case, you need something like below.
->
-> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "fsl,imx6q-dma-apbh", "imx28-dma-apbh";
->
-> Then you do not need to patch mxs-dma.c at all.
+> Signed-off-by: Keerthy<j-keerthy@ti.com>
+> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
+> ---
+>   arch/arm/mach-omap2/include/mach/control.h |  116 ++++++++++++++++++++++++++++
 
-thanks a lot.
+Now that we do have a dedicated driver for the bandgap, I guess it will 
+be better to put these defines inside the driver directly.
 
-Huang Shijie
+Benoit
+
+>   1 files changed, 116 insertions(+), 0 deletions(-)
 >
-> Regards,
-> Shawn
+> diff --git a/arch/arm/mach-omap2/include/mach/control.h b/arch/arm/mach-omap2/include/mach/control.h
+> index cf42764..171b504 100644
+> --- a/arch/arm/mach-omap2/include/mach/control.h
+> +++ b/arch/arm/mach-omap2/include/mach/control.h
+> @@ -230,6 +230,122 @@
+>   /* OMAP44xx control McBSP padconf */
+>   #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP	0x061c
 >
->> + ? ? ? ? ? ? ? ? ? ? reg = <0x00110000 0x2000>;
->> + ? ? ? ? ? ? };
->> +
->> ? ? ? ? ? ? ? timer at 00a00600 {
->> ? ? ? ? ? ? ? ? ? ? ? compatible = "arm,cortex-a9-twd-timer";
->> ? ? ? ? ? ? ? ? ? ? ? reg = <0x00a00600 0x20>;
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +/* TEMP_SENSOR OMAP4430 */
+> +#define OMAP4430_BGAP_TEMPSOFF_SHIFT			12
+> +#define OMAP4430_BGAP_TEMPSOFF_MASK			(1<<  12)
+> +#define OMAP4430_BGAP_TSHUT_SHIFT				11
+> +#define OMAP4430_BGAP_TSHUT_MASK				(1<<  11)
+> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_SHIFT		10
+> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_MASK		(1<<  10)
+> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_SHIFT		9
+> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_MASK			(1<<  9)
+> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_SHIFT		8
+> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  8)
+> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
+> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_MASK		(0xff<<  0)
+> +
+> +/* TEMP_SENSOR OMAP4460 */
+> +#define OMAP4460_BGAP_TEMPSOFF_SHIFT			13
+> +#define OMAP4460_BGAP_TEMPSOFF_MASK			(1<<  13)
+> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_SHIFT		11
+> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_MASK		(1<<  11)
+> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_SHIFT		10
+> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  10)
+> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
+> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_MASK		(0x3ff<<  0)
+> +
+> +/* BANDGAP_CTRL */
+> +#define OMAP4460_SINGLE_MODE_SHIFT			31
+> +#define OMAP4460_SINGLE_MODE_MASK			(1<<  31)
+> +#define OMAP4460_MASK_HOT_SHIFT				1
+> +#define OMAP4460_MASK_HOT_MASK				(1<<  1)
+> +#define OMAP4460_MASK_COLD_SHIFT			0
+> +#define OMAP4460_MASK_COLD_MASK				(1<<  0)
+> +
+> +/* BANDGAP_COUNTER */
+> +#define OMAP4460_COUNTER_SHIFT				0
+> +#define OMAP4460_COUNTER_MASK				(0xffffff<<  0)
+> +
+> +/* BANDGAP_THRESHOLD */
+> +#define OMAP4460_T_HOT_SHIFT				16
+> +#define OMAP4460_T_HOT_MASK				(0x3ff<<  16)
+> +#define OMAP4460_T_COLD_SHIFT				0
+> +#define OMAP4460_T_COLD_MASK				(0x3ff<<  0)
+> +
+> +/* TSHUT_THRESHOLD */
+> +#define OMAP4460_TSHUT_HOT_SHIFT			16
+> +#define OMAP4460_TSHUT_HOT_MASK				(0x3ff<<  16)
+> +#define OMAP4460_TSHUT_COLD_SHIFT			0
+> +#define OMAP4460_TSHUT_COLD_MASK			(0x3ff<<  0)
+> +
+> +/* BANDGAP_STATUS */
+> +#define OMAP4460_CLEAN_STOP_SHIFT			3
+> +#define OMAP4460_CLEAN_STOP_MASK			(1<<  3)
+> +#define OMAP4460_BGAP_ALERT_SHIFT			2
+> +#define OMAP4460_BGAP_ALERT_MASK			(1<<  2)
+> +#define OMAP4460_HOT_FLAG_SHIFT				1
+> +#define OMAP4460_HOT_FLAG_MASK				(1<<  1)
+> +#define OMAP4460_COLD_FLAG_SHIFT			0
+> +#define OMAP4460_COLD_FLAG_MASK				(1<<  0)
+> +
+> +/* TEMP_SENSOR OMAP5430 */
+> +#define OMAP5430_BGAP_TEMP_SENSOR_SOC_SHIFT		12
+> +#define OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK		(1<<  12)
+> +#define OMAP5430_BGAP_TEMPSOFF_SHIFT			11
+> +#define OMAP5430_BGAP_TEMPSOFF_MASK			(1<<  11)
+> +#define OMAP5430_BGAP_TEMP_SENSOR_EOCZ_SHIFT		10
+> +#define OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  10)
+> +#define OMAP5430_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
+> +#define OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK		(0x3ff<<  0)
+> +
+> +/* BANDGAP_CTRL */
+> +#define OMAP5430_MASK_HOT_CORE_SHIFT			5
+> +#define OMAP5430_MASK_HOT_CORE_MASK			(1<<  5)
+> +#define OMAP5430_MASK_COLD_CORE_SHIFT			4
+> +#define OMAP5430_MASK_COLD_CORE_MASK			(1<<  4)
+> +#define OMAP5430_MASK_HOT_MM_SHIFT			3
+> +#define OMAP5430_MASK_HOT_MM_MASK			(1<<  3)
+> +#define OMAP5430_MASK_COLD_MM_SHIFT			2
+> +#define OMAP5430_MASK_COLD_MM_MASK			(1<<  2)
+> +#define OMAP5430_MASK_HOT_MPU_SHIFT			1
+> +#define OMAP5430_MASK_HOT_MPU_MASK			(1<<  1)
+> +#define OMAP5430_MASK_COLD_MPU_SHIFT			0
+> +#define OMAP5430_MASK_COLD_MPU_MASK			(1<<  0)
+> +
+> +/* BANDGAP_COUNTER */
+> +#define OMAP5430_REPEAT_MODE_SHIFT			31
+> +#define OMAP5430_REPEAT_MODE_MASK			(1<<  31)
+> +#define OMAP5430_COUNTER_SHIFT				0
+> +#define OMAP5430_COUNTER_MASK				(0xffffff<<  0)
+> +
+> +/* BANDGAP_THRESHOLD */
+> +#define OMAP5430_T_HOT_SHIFT				16
+> +#define OMAP5430_T_HOT_MASK				(0x3ff<<  16)
+> +#define OMAP5430_T_COLD_SHIFT				0
+> +#define OMAP5430_T_COLD_MASK				(0x3ff<<  0)
+> +
+> +/* TSHUT_THRESHOLD */
+> +#define OMAP5430_TSHUT_HOT_SHIFT			16
+> +#define OMAP5430_TSHUT_HOT_MASK				(0x3ff<<  16)
+> +#define OMAP5430_TSHUT_COLD_SHIFT			0
+> +#define OMAP5430_TSHUT_COLD_MASK			(0x3ff<<  0)
+> +
+> +/* BANDGAP_STATUS */
+> +#define OMAP5430_BGAP_ALERT_SHIFT			31
+> +#define OMAP5430_BGAP_ALERT_MASK			(1<<  31)
+> +#define OMAP5430_HOT_CORE_FLAG_SHIFT			5
+> +#define OMAP5430_HOT_CORE_FLAG_MASK			(1<<  5)
+> +#define OMAP5430_COLD_CORE_FLAG_SHIFT			4
+> +#define OMAP5430_COLD_CORE_FLAG_MASK			(1<<  4)
+> +#define OMAP5430_HOT_MM_FLAG_SHIFT			3
+> +#define OMAP5430_HOT_MM_FLAG_MASK			(1<<  3)
+> +#define OMAP5430_COLD_MM_FLAG_SHIFT			2
+> +#define OMAP5430_COLD_MM_FLAG_MASK			(1<<  2)
+> +#define OMAP5430_HOT_MPU_FLAG_SHIFT			1
+> +#define OMAP5430_HOT_MPU_FLAG_MASK			(1<<  1)
+> +#define OMAP5430_COLD_MPU_FLAG_SHIFT			0
+> +#define OMAP5430_COLD_MPU_FLAG_MASK			(1<<  0)
+> +
+>   /* AM35XX only CONTROL_GENERAL register offsets */
+>   #define AM35XX_CONTROL_MSUSPENDMUX_6    (OMAP2_CONTROL_GENERAL + 0x0038)
+>   #define AM35XX_CONTROL_DEVCONF2         (OMAP2_CONTROL_GENERAL + 0x0310)
