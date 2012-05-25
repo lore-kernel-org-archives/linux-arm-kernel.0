@@ -1,51 +1,39 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Sat, 26 May 2012 00:04:29 +0200
-Subject: [PATCH 13/20] arm: Do not call try_to_freeze() in do_signal()
-In-Reply-To: <1337983476-22081-1-git-send-email-richard@nod.at>
-References: <1337983476-22081-1-git-send-email-richard@nod.at>
-Message-ID: <1337983476-22081-13-git-send-email-richard@nod.at>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 25 May 2012 15:06:04 -0700
+Subject: [PATCHv9 07/10] I2C: OMAP: Handle error check for pm runtime
+In-Reply-To: <1335969135-20858-8-git-send-email-shubhrajyoti@ti.com>
+ (Shubhrajyoti D.'s message of "Wed, 2 May 2012 20:02:12 +0530")
+References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+ <1335969135-20858-8-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87likfkjar.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_signal_to_deliver() already calls try_to_freeze(), there is no
-need to call it directly.
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Richard Weinberger <richard@nod.at>
----
- arch/arm/kernel/signal.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+> If PM runtime get_sync fails return with the error
+> so that no further reads/writes goes through the interface.
+> This will avoid possible abort. Add a error message in case
+> of failure with the cause of the failure.
+>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   14 +++++++++++---
+>  1 files changed, 11 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 44e8cfa..a72874e 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -585,7 +585,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  	int i;
+>  	int r;
+>  
+> -	pm_runtime_get_sync(dev->dev);
+> +	r = pm_runtime_get_sync(dev->dev);
+> +	if (r < 0)
+> +		return r;
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 434a1f3..aeebb46 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -10,7 +10,6 @@
- #include <linux/errno.h>
- #include <linux/signal.h>
- #include <linux/personality.h>
--#include <linux/freezer.h>
- #include <linux/uaccess.h>
- #include <linux/tracehook.h>
- #include <linux/irqflags.h>
-@@ -636,9 +635,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
- 		}
- 	}
- 
--	if (try_to_freeze())
--		goto no_signal;
--
- 	/*
- 	 * Get the signal to deliver.  When running under ptrace, at this
- 	 * point the debugger may change all our registers ...
-@@ -678,7 +674,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
- 		return;
- 	}
- 
-- no_signal:
- 	if (syscall) {
- 		/*
- 		 * Handle restarting a different system call.  As above,
--- 
-1.7.7.3
+nit: please use IS_ERR_VALUE() 
+
+Kevin
