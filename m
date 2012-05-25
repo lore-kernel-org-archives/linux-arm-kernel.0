@@ -1,77 +1,38 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 May 2012 18:01:27 -0600
-Subject: [PATCH v4 2/6] gpio: re-add of_node_to_gpiochip function
-In-Reply-To: <1337952980-14621-2-git-send-email-b29396@freescale.com>
+Date: Fri, 25 May 2012 17:57:15 -0600
+Subject: [PATCH v4 1/6] gpio: fix a typo of comment message
+In-Reply-To: <1337952980-14621-1-git-send-email-b29396@freescale.com>
 References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-2-git-send-email-b29396@freescale.com>
-Message-ID: <20120526000127.A53903E0D27@localhost>
+Message-ID: <20120525235715.CE8223E0C7F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 May 2012 21:36:16 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+On Fri, 25 May 2012 21:36:15 +0800, Dong Aisheng <b29396@freescale.com> wrote:
 > From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
 > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Nack.  Several problems here.  First and foremost there isn't any
-description of *why* this change is needed or when it was removed.
-Any patch beyond the most trivial change needs to have a commit
-message the describes it.
-
-Second, of_node_to_gpiochip() is no longer a valid API because gpiolib
-now allows multiple gpiochips to use the same device tree node.  See
-commit 3d0f7cf0f "gpio: Adjust of_xlate API to support multiple GPIO
-chips" to see a description of why this was changed.
+Applied, thanks.
 
 g.
 
 > ---
->  drivers/gpio/gpiolib-of.c |   11 +++++++++++
->  include/linux/of_gpio.h   |    5 +++++
->  2 files changed, 16 insertions(+), 0 deletions(-)
+>  drivers/gpio/gpiolib-of.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
 > diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-> index 8389d4a..b8010a9 100644
+> index d18068a..8389d4a 100644
 > --- a/drivers/gpio/gpiolib-of.c
 > +++ b/drivers/gpio/gpiolib-of.c
-> @@ -234,3 +234,14 @@ void of_gpiochip_remove(struct gpio_chip *chip)
->  	if (chip->of_node)
->  		of_node_put(chip->of_node);
->  }
-> +
-> +/* Private function for resolving node pointer to gpio_chip */
-> +static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
-> +{
-> +	return chip->of_node == data;
-> +}
-> +
-> +struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
-> +{
-> +	return gpiochip_find(np, of_gpiochip_is_match);
-> +}
-> diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
-> index c454f57..880783b 100644
-> --- a/include/linux/of_gpio.h
-> +++ b/include/linux/of_gpio.h
-> @@ -61,6 +61,7 @@ extern void of_gpiochip_remove(struct gpio_chip *gc);
->  extern int of_gpio_simple_xlate(struct gpio_chip *gc,
->  				const struct of_phandle_args *gpiospec,
->  				u32 *flags);
-> +extern struct gpio_chip *of_node_to_gpiochip(struct device_node *np);
+> @@ -21,7 +21,7 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/slab.h>
 >  
->  #else /* CONFIG_OF_GPIO */
->  
-> @@ -84,6 +85,10 @@ static inline int of_gpio_simple_xlate(struct gpio_chip *gc,
->  	return -ENOSYS;
->  }
->  
-> +static struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
-> +{
-> +	return NULL;
-> +}
->  static inline void of_gpiochip_add(struct gpio_chip *gc) { }
->  static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
->  
+> -/* Private data structure for of_gpiochip_is_match */
+> +/* Private data structure for of_gpiochip_find_and_xlate */
+>  struct gg_data {
+>  	enum of_gpio_flags *flags;
+>  	struct of_phandle_args gpiospec;
 > -- 
 > 1.7.0.4
 > 
