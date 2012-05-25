@@ -1,46 +1,31 @@
 From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Fri, 25 May 2012 18:42:32 +0800
-Subject: [PATCH 3/3] watchdog: omap_wdt: add device tree support
-In-Reply-To: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
-References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
-Message-ID: <1337942552-28218-4-git-send-email-jgq516@gmail.com>
+Date: Fri, 25 May 2012 18:42:29 +0800
+Subject: [PATCH 0/3] omap3/omap4: add device tree support for wdt
+Message-ID: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Xiao Jiang <jgq516@gmail.com>
 
-Add device table for omap_wdt to support dt.
+This series can be applied to dt branch of linux-omap tree.
 
-Signed-off-by: Xiao Jiang <jgq516@gmail.com>
----
- drivers/watchdog/omap_wdt.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Since omap24xx series has different wdt base addr (omap2420: 0x48022000 and
+omap2430: 0x49016000) per commit 2817142f31bfbf26c216bf4f9192540c81b2d071, so
+I don't add wdt node in omap2.dtsi just like omap3 and omap4, maybe different
+dts files are needed for omap2420 and omap2430.
 
-diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-index 8285d65..d98c615 100644
---- a/drivers/watchdog/omap_wdt.c
-+++ b/drivers/watchdog/omap_wdt.c
-@@ -430,6 +430,13 @@ static int omap_wdt_resume(struct platform_device *pdev)
- #define	omap_wdt_resume		NULL
- #endif
- 
-+static const struct of_device_id omap_wdt_of_match[] = {
-+	{ .compatible = "ti,omap3-wdt", },
-+	{ .compatible = "ti,omap4-wdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
-+
- static struct platform_driver omap_wdt_driver = {
- 	.probe		= omap_wdt_probe,
- 	.remove		= __devexit_p(omap_wdt_remove),
-@@ -439,6 +446,7 @@ static struct platform_driver omap_wdt_driver = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "omap_wdt",
-+		.of_match_table = omap_wdt_of_match,
- 	},
- };
- 
+Tested with omap4430 blaze board.
+
+Xiao Jiang (3):
+  arm/dts: add wdt node for omap3 and omap4
+  OMAP: wdt: add device tree support
+  watchdog: omap_wdt: add device tree support
+
+ arch/arm/boot/dts/omap3.dtsi  |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi  |    5 +++++
+ arch/arm/mach-omap2/devices.c |    2 +-
+ drivers/watchdog/omap_wdt.c   |    8 ++++++++
+ 4 files changed, 19 insertions(+), 1 deletions(-)
+
 -- 
 1.7.3
