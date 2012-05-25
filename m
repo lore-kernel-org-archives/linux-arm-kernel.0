@@ -1,259 +1,48 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 25 May 2012 10:24:18 +0800
-Subject: [PATCH v3 05/12] usb: chipidea: add imx platform driver
+Date: Fri, 25 May 2012 10:24:21 +0800
+Subject: [PATCH v3 08/12] ARM: imx6q: add usbphy clocks
 In-Reply-To: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
 References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337912665-16615-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337912665-16615-9-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports only the host-mode functionality so far.
-
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Peter Chen <peter.chen@freescale.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |   20 ++
- drivers/usb/chipidea/Makefile                      |    3 +
- drivers/usb/chipidea/ci13xxx_imx.c                 |  189 ++++++++++++++++++++
- 3 files changed, 212 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
- create mode 100644 drivers/usb/chipidea/ci13xxx_imx.c
+ arch/arm/mach-imx/clk-imx6q.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-new file mode 100644
-index 0000000..beb75d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-@@ -0,0 +1,20 @@
-+* Freescale i.MX ci13xxx usb controllers
-+
-+Required properties:
-+- compatible: Should be "fsl,imx31-usb"
-+- reg: Should contain registers location and length
-+- interrupts: Should contain controller interrupt
-+
-+Optional properties:
-+- fsl,usbphy: phandler of usb phy that connects to the only one port
-+- fsl,hub-reset-gpios: gpio used to reset on-board usb hub
-+- fsl,vbus-power-gpios: gpio used to set vbus power of the only one port
-+
-+Examples:
-+usb at 02184000 { /* USB OTG */
-+	compatible = "fsl,imx6q-usb", "fsl,imx31-usb";
-+	reg = <0x02184000 0x200>;
-+	interrupts = <0 43 0x04>;
-+	fsl,usbphy = <&usbphy1>;
-+	fsl,vbus-power-gpios = <&gpio3 22 0>;
-+};
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index b69900a..5c66d9c 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -14,3 +14,6 @@ ifneq ($(CONFIG_PCI),)
- 	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_pci.o
- endif
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f99509a..8c4166a 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -152,7 +152,7 @@ enum mx6q_clks {
+ 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
+ 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+ 	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
+-	ssi2_ipg, ssi3_ipg, clk_max
++	ssi2_ipg, ssi3_ipg, usbphy1, usbphy2, clk_max
+ };
  
-+ifneq ($(CONFIG_OF_DEVICE),)
-+	obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_imx.o
-+endif
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-new file mode 100644
-index 0000000..de570a2
---- /dev/null
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -0,0 +1,189 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-+ * on behalf of DENX Software Engineering GmbH
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+ static struct clk *clk[clk_max];
+@@ -197,6 +197,9 @@ int __init mx6q_clocks_init(void)
+ 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x2000,   0x3);
+ 	clk[pll8_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll8_enet",	"osc", base + 0xe0, 0x182000, 0x3);
+ 
++	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
++	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
 +
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/usb/chipidea.h>
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
-+
-+#include "ci.h"
-+
-+#define pdev_to_phy(pdev) \
-+	((struct usb_phy *)platform_get_drvdata(pdev))
-+
-+struct ci13xxx_imx_data {
-+	struct device_node *phy_np;
-+	struct usb_phy *phy;
-+	struct platform_device *ci_pdev;
-+	struct clk *clk;
-+	struct regulator *reg_vbus;
-+};
-+
-+static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
-+	.name			= "ci13xxx_imx",
-+	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
-+				  CI13XXX_PULLUP_ON_VBUS |
-+				  CI13XXX_DISABLE_STREAMING,
-+	.capoffset		= DEF_CAPOFFSET,
-+};
-+
-+static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
-+{
-+	struct ci13xxx_imx_data *data;
-+	struct platform_device *plat_ci, *phy_pdev;
-+	struct device_node *phy_np;
-+	struct resource *res;
-+	struct regulator *reg_vbus;
-+	int ret;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-+		return -ENOMEM;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Can't get device resources!\n");
-+		return -ENOENT;
-+	}
-+
-+	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "Failed to get clock!\n");
-+		return PTR_ERR(data->clk);
-+	}
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to prepare or enable clock!\n");
-+		return ret;
-+	}
-+
-+	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
-+	if (phy_np) {
-+		data->phy_np = phy_np;
-+		phy_pdev = of_find_device_by_node(phy_np);
-+		if (phy_pdev) {
-+			struct usb_phy *phy;
-+			phy = pdev_to_phy(phy_pdev);
-+			if (phy &&
-+			    try_module_get(phy_pdev->dev.driver->owner)) {
-+				usb_phy_init(phy);
-+				data->phy = phy;
-+			}
-+		}
-+	}
-+
-+	/* we only support host now, so enable vbus here */
-+	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-+	if (!IS_ERR(reg_vbus)) {
-+		ret = regulator_enable(reg_vbus);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable vbus regulator!\n");
-+			goto put_np;
-+		}
-+		data->reg_vbus = reg_vbus;
-+	} else
-+		reg_vbus = NULL;
-+
-+	ci13xxx_imx_platdata.phy = data->phy;
-+
-+	if (!pdev->dev.dma_mask) {
-+		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-+				      sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-+		if (!pdev->dev.dma_mask) {
-+			ret = -ENOMEM;
-+			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
-+			goto err;
-+		}
-+		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-+		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-+	}
-+	plat_ci = ci13xxx_add_device(&pdev->dev,
-+				pdev->resource, pdev->num_resources,
-+				&ci13xxx_imx_platdata);
-+	if (IS_ERR(plat_ci)) {
-+		dev_err(&pdev->dev, "Can't register ci_hdrc platform device\n");
-+		ret = PTR_ERR(plat_ci);
-+		goto err;
-+	}
-+
-+	data->ci_pdev = plat_ci;
-+	platform_set_drvdata(pdev, data);
-+
-+	pm_runtime_no_callbacks(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+
-+	return 0;
-+
-+err:
-+	if (reg_vbus)
-+		regulator_disable(reg_vbus);
-+put_np:
-+	if (phy_np)
-+		of_node_put(phy_np);
-+	return ret;
-+}
-+
-+static int __devexit ci13xxx_imx_remove(struct platform_device *pdev)
-+{
-+	struct ci13xxx_imx_data *data = platform_get_drvdata(pdev);
-+
-+	ci13xxx_remove_device(data->ci_pdev);
-+
-+	if (data->reg_vbus)
-+		regulator_disable(data->reg_vbus);
-+
-+	if (data->phy) {
-+		usb_phy_shutdown(data->phy);
-+		module_put(data->phy->dev->driver->owner);
-+	}
-+
-+	of_node_put(data->phy_np);
-+
-+	clk_disable_unprepare(data->clk);
-+
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ci13xxx_imx_dt_ids[] = {
-+	{ .compatible = "fsl,imx31-usb", },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver ci13xxx_imx_driver = {
-+	.probe = ci13xxx_imx_probe,
-+	.remove = __devexit_p(ci13xxx_imx_remove),
-+	.driver = {
-+		.name = "imx_usb",
-+		.owner = THIS_MODULE,
-+		.of_match_table = ci13xxx_imx_dt_ids,
-+	 },
-+};
-+
-+module_platform_driver(ci13xxx_imx_driver);
-+
-+MODULE_ALIAS("platform:imx-usb");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CI13xxx i.MX USB binding");
-+MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
-+MODULE_AUTHOR("Richard Zhao <richard.zhao@freescale.com>");
+ 	/*                                name              parent_name        reg       idx */
+ 	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
+ 	clk[pll2_pfd1_594m] = imx_clk_pfd("pll2_pfd1_594m", "pll2_bus",     base + 0x100, 1);
+@@ -395,6 +398,8 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
++	clk_register_clkdev(clk[usbphy1], NULL, "20c9000.usbphy");
++	clk_register_clkdev(clk[usbphy2], NULL, "20ca000.usbphy");
+ 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+ 	clk_register_clkdev(clk[uart_ipg], "ipg", "2020000.serial");
+ 	clk_register_clkdev(clk[uart_serial], "per", "21e8000.serial");
 -- 
 1.7.5.4
