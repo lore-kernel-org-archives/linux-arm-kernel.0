@@ -1,49 +1,38 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 15:13:36 -0700
-Subject: [PATCHv9 00/10] I2C fixes
-In-Reply-To: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Wed, 2 May 2012 20:02:05 +0530")
-References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87r4u7j4dr.fsf@ti.com>
+Date: Fri, 25 May 2012 15:38:56 -0700
+Subject: [linux-pm] [PATCH 0/2] bug fixes for coupled cpuidle
+In-Reply-To: <4FB9E461.9060405@ti.com> (Santosh Shilimkar's message of "Mon,
+ 21 May 2012 12:14:49 +0530")
+References: <1337364324-12171-1-git-send-email-ccross@android.com>
+ <4FB9E461.9060405@ti.com>
+Message-ID: <87fwanj37j.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Len,
 
-> The patch series does the following
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> On Friday 18 May 2012 11:35 PM, Colin Cross wrote:
+>> The last modifications made to the coupled cpuidle patches introduced
+>> two bugs that I missed during testing.  The online count was never
+>> initialized, causing coupled idle to always wait and never enter the
+>> ready loop.  That hid the second bug, the ready count could never be
+>> decremented after exiting idle.
+>> 
+>> Len, these two patches could be squashed into patch 3 of the original
+>> set.  If you do squash them, you could also add Rafael's tags to the
+>> set (Reviewed-by on 1 and 2, acked-by on 3).  Or I can reupload the
+>> whole stack as v5 if you prefer.
 >
-> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
-> - In case of i2c remove register access was done without any
->  get_sync fix the same.
-> - Folds a patch from Tasslehoff to prevent any merge conflicts.
-> - Prevents the XDUF flag to be set if the underflow condition is not met.
-> - As per discussion in [1] .Adds a patch to rename the 1p153 errata and
->  use the unique id instead as the section number in the recent errata
->  docs has changed.
->
-> v9:
-> Fix the comments from Wolfram Sang
->
-> [1] http://www.spinics.net/lists/linux-i2c/msg07607.html
->
-> Tested on omap4sdp and omap3sdp.
+> I confirm that these two fixes are needed to get couple idle
+> v4 series working.
 
-Can you also describe how it was tested?  
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-With the runtime PM changes, does it still hit full-chip retention in
-idle and suspend after these changes?
+Can you pick these up for v3.6?
 
-I had a few minor comments on this version, otherwise feel free add
-
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-That being said, before this is merged, I woudl like to see some more
-non-author Tested-bys.  We've been having lots of regressions of late
-from OMAP drivers that are not being sufficiently tested before
-merging.  We need to ensure proper testing before merge.
-
-Other testers should also report what platforms they tested on, and how
-it was tested.
+I don't currently see them in your next branch.
 
 Thanks,
 
