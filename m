@@ -1,69 +1,77 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 25 May 2012 21:39:29 +0900
-Subject: mm: fix faulty initialization in vmalloc_init()
-In-Reply-To: <20120524151231.e3a18ac5.akpm@linux-foundation.org>
-References: <001c01cd3987$d1a71a50$74f54ef0$%cho@samsung.com>
- <20120524151231.e3a18ac5.akpm@linux-foundation.org>
-Message-ID: <CAHQjnOMt112PkHPD1omBZ6ziPXk7E4crt3_Z5JhyxEMhccTsWQ@mail.gmail.com>
+From: try2share@gmail.com (K K)
+Date: Fri, 25 May 2012 18:20:28 +0530
+Subject: Linux Kernel boot up stops after message "Uncompressing
+ Linux....done, booting the kernel"
+In-Reply-To: <20120524103221.GA1889@glitch>
+References: <CACZ0kf88Ac8hne9RtLObi624okPw8Nkiv7++Uw8npPLW108mhw@mail.gmail.com>
+ <CACZ0kf9yHJOAVEBx4e5dc_eCRT5dScrZHzbkx3_7P2QkzaHChQ@mail.gmail.com>
+ <20120524103221.GA1889@glitch>
+Message-ID: <CACZ0kf-6Vr+TSr96Br8wsE3Y38_4Gev-dYvqw1OgMZp2ProCcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 7:12 AM, Andrew Morton <akpm@linux-foundation.org>
-wrote:
-> On Thu, 24 May 2012 17:32:56 +0900
-> KyongHo <pullip.cho@samsung.com> wrote:
->
->> vmalloc_init() adds 'vmap_area's for early 'vm_struct's.
->> This patch fixes vmalloc_init() to correctly initialize
->> vmap_area for the given vm_struct.
->>
->
-> <daily message>
-> Insufficient information.  When fixing a bug please always always
-> always describe the user-visible effects of the bug.  Does the kernel
-> instantly crash?  Is it a comestic cleanliness thing which has no
-> effect?  Something in between?  I have simply no idea, and am dependent
-> upon you to tell me.
+Hi,
 
-Sorry for unkind commit message :)
-Why this patch is needed is described by Olav
-in the previous replies.
+> 2.6.32, really?
 
->
->> --- a/mm/vmalloc.c
->> +++ b/mm/vmalloc.c
->> @@ -1185,9 +1185,10 @@ void __init vmalloc_init(void)
->>       /* Import existing vmlist entries. */
->>       for (tmp = vmlist; tmp; tmp = tmp->next) {
->>               va = kzalloc(sizeof(struct vmap_area), GFP_NOWAIT);
->> -             va->flags = tmp->flags | VM_VM_AREA;
->> +             va->flags = VM_VM_AREA;
->
-> This change is a mystery.  Why do we no longer transfer ->flags?
->
->>               va->va_start = (unsigned long)tmp->addr;
->>               va->va_end = va->va_start + tmp->size;
->> +             va->vm = tmp;
->
-> OK, I can see how this might be important.  But why did you find it
-> necessary?  Why was this change actually needed?
+Yes kernel is 2.6.32.
 
-If it is not set, find_vm_area() with the early vm regions will always fail.
+>Two cases:
 
-If the early vm regions must be neither found by find_vm_area()
-nor removed by remove_vm_area(), va->vm must be NULL.
+> 1. earlyprintk is configured and enabled but points to the
+>    wrong console and your platform hangs on it because it's not
+>    initialized/ready. the correct console seems ok, the uncompressor
+>     is able to use it. check debug-macro.S to be sure it uses the
+>    correct address.
 
-Please advise me what is right value for va->vm here :)
+> 2. earlyprintk is not enabled (or configured) and your kernel is
+>     not finding the console (any console= on the cmdline? driver
+>     issue?) or dies before finding it. try enabling earlyprintk (and
+>     check debug-macro.S as well).
 
+I have checked debug-macro.S , console was properly configured and enabled.
+Now i can able to see the debug messages on the console.
+
+Thanks..
+
+
+
+
+
+On Thu, May 24, 2012 at 4:02 PM, Domenico Andreoli <cavokz@gmail.com> wrote:
+
+> On Thu, May 24, 2012 at 10:52:46AM +0530, K K wrote:
+> > Hi,
 >
->>               __insert_vmap_area(va);
->>       }
+> Hi,
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > We have a lpc-3180 based board and it is up and running fine with 2.6.10
+> > kernel version. We planned to port our board changes into 2.6.32 kernel
+> > version.
+>
+> 2.6.32, really?
+>
+> > kernel build successfully. When we booting the board with the new 2.6.32
+> > kernel we are getting following messages and its stops.
+>
+> Two cases:
+>
+>  1. earlyprintk is configured and enabled but points to the
+>     wrong console and your platform hangs on it because it's not
+>     initialized/ready. the correct console seems ok, the uncompressor
+>     is able to use it. check debug-macro.S to be sure it uses the
+>     correct address.
+>
+>  2. earlyprintk is not enabled (or configured) and your kernel is
+>     not finding the console (any console= on the cmdline? driver
+>     issue?) or dies before finding it. try enabling earlyprintk (and
+>     check debug-macro.S as well).
+>
+> cheers,
+> Domenico
+>
+> ps: post also the kernel configuration
+>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/66f329c9/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/7b925653/attachment-0001.html>
