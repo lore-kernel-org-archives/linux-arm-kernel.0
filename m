@@ -1,59 +1,129 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 25 May 2012 10:24:14 +0800
-Subject: [PATCH v3 01/12] usb: otg: add notify_connect/notify_disconnect
- callback
+Date: Fri, 25 May 2012 10:24:15 +0800
+Subject: [PATCH v3 02/12] usb: chipidea: permit driver bindings pass phy
+ pointer
 In-Reply-To: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
 References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1337912665-16615-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This let usb phy driver has a chance to change hw settings when connect
-status change.
+Sometimes, the driver bindings may know what phy they use.
+For example, when using device tree, the usb controller may have a
+phandler pointing to usb phy.
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Reviewed-by: Marek Vasut <marex@denx.de>
 ---
- include/linux/usb/otg.h |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/ci.h    |    2 ++
+ drivers/usb/chipidea/core.c  |    4 ++++
+ drivers/usb/chipidea/host.c  |    1 +
+ drivers/usb/chipidea/udc.c   |   11 +++++++----
+ include/linux/usb/chipidea.h |    3 +++
+ 5 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index 38ab3f4..6dfdc8d 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -117,6 +117,9 @@ struct usb_phy {
- 	int	(*set_suspend)(struct usb_phy *x,
- 				int suspend);
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 9655e35..d738603 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -160,6 +160,8 @@ struct ci13xxx {
  
-+	/* notify phy connect status change */
-+	int	(*notify_connect)(struct usb_phy *x, int port);
-+	int	(*notify_disconnect)(struct usb_phy *x, int port);
+ 	struct ci13xxx_platform_data	*platdata;
+ 	int				vbus_active;
++	/* FIXME: some day, we'll not use global phy */
++	bool				global_phy;
+ 	struct usb_phy			*transceiver;
+ 	struct usb_hcd			*hcd;
  };
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index c14ce2b..21407e7 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -419,6 +419,10 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
  
- 
-@@ -252,6 +255,24 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
- }
- 
- static inline int
-+usb_phy_notify_connect(struct usb_phy *x, int port)
-+{
-+	if (x->notify_connect)
-+		return x->notify_connect(x, port);
+ 	ci->dev = dev;
+ 	ci->platdata = dev->platform_data;
++	if (ci->platdata->phy)
++		ci->transceiver = ci->platdata->phy;
 +	else
-+		return 0;
-+}
++		ci->global_phy = true;
+ 
+ 	ret = hw_device_init(ci, base);
+ 	if (ret < 0) {
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 4a4fdb8..4479f5a 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -121,6 +121,7 @@ static int host_start(struct ci13xxx *ci)
+ 	ehci = hcd_to_ehci(hcd);
+ 	ehci->caps = ci->hw_bank.cap;
+ 	ehci->has_hostpc = ci->hw_bank.lpm;
++	ehci->transceiver = ci->transceiver;
+ 
+ 	ret = usb_add_hcd(hcd, 0, 0);
+ 	if (ret)
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index ca9b387..b43b29c 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1684,7 +1684,8 @@ static int udc_start(struct ci13xxx *ci)
+ 
+ 	ci->gadget.ep0 = &ci->ep0in->ep;
+ 
+-	ci->transceiver = usb_get_transceiver();
++	if (ci->global_phy) {
++		ci->transceiver = usb_get_transceiver();
+ 
+ 	if (ci->platdata->flags & CI13XXX_REQUIRE_TRANSCEIVER) {
+ 		if (ci->transceiver == NULL) {
+@@ -1728,7 +1729,8 @@ static int udc_start(struct ci13xxx *ci)
+ remove_trans:
+ 	if (ci->transceiver) {
+ 		otg_set_peripheral(ci->transceiver->otg, &ci->gadget);
+-		usb_put_transceiver(ci->transceiver);
++		if (ci->global_phy)
++			usb_put_transceiver(ci->transceiver);
+ 	}
+ 
+ 	dev_err(dev, "error = %i\n", retval);
+@@ -1737,7 +1739,7 @@ remove_dbg:
+ unreg_device:
+ 	device_unregister(&ci->gadget.dev);
+ put_transceiver:
+-	if (ci->transceiver)
++	if (ci->transceiver && ci->global_phy)
+ 		usb_put_transceiver(ci->transceiver);
+ free_pools:
+ 	dma_pool_destroy(ci->td_pool);
+@@ -1771,7 +1773,8 @@ static void udc_stop(struct ci13xxx *ci)
+ 
+ 	if (ci->transceiver) {
+ 		otg_set_peripheral(ci->transceiver->otg, NULL);
+-		usb_put_transceiver(ci->transceiver);
++		if (ci->global_phy)
++			usb_put_transceiver(ci->transceiver);
+ 	}
+ 	dbg_remove_files(&ci->gadget.dev);
+ 	device_unregister(&ci->gadget.dev);
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index be078f0..544825d 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -5,12 +5,15 @@
+ #ifndef __LINUX_USB_CHIPIDEA_H
+ #define __LINUX_USB_CHIPIDEA_H
+ 
++#include <linux/usb/otg.h>
 +
-+static inline int
-+usb_phy_notify_disconnect(struct usb_phy *x, int port)
-+{
-+	if (x->notify_disconnect)
-+		return x->notify_disconnect(x, port);
-+	else
-+		return 0;
-+}
-+
-+static inline int
- otg_start_srp(struct usb_otg *otg)
- {
- 	if (otg && otg->start_srp)
+ struct ci13xxx;
+ struct ci13xxx_platform_data {
+ 	const char	*name;
+ 	/* offset of the capability registers */
+ 	uintptr_t	 capoffset;
+ 	unsigned	 power_budget;
++	struct usb_phy	*phy;
+ 	unsigned long	 flags;
+ #define CI13XXX_REGS_SHARED		BIT(0)
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
 -- 
 1.7.5.4
