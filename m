@@ -1,36 +1,103 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 25 May 2012 21:36:17 +0800
-Subject: [PATCH v4 3/6] of: release node fix for of_parse_phandle_with_args
+Date: Fri, 25 May 2012 21:36:18 +0800
+Subject: [PATCH v4 4/6] gpio: introduce lock mechanism for gpiochip_find
 In-Reply-To: <1337952980-14621-1-git-send-email-b29396@freescale.com>
 References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
-Message-ID: <1337952980-14621-3-git-send-email-b29396@freescale.com>
+Message-ID: <1337952980-14621-4-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Since this API requires user to call of_node_put for the node
-it returned via outargs, if no outargs provided, user have no
-chance to release it, so release it internally if no outargs
-provided.
+The module lock will be automatically claimed for gpiochip_find function
+in case the gpio module is removed during the using of gpiochip instance.
+Users are responsible to call gpiochip_put to release the lock after
+the using.
 
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- drivers/of/base.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/gpio/gpiolib-of.c  |    5 ++++-
+ drivers/gpio/gpiolib.c     |   17 +++++++++++++++++
+ include/asm-generic/gpio.h |    2 +-
+ 3 files changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index d9bfd49..91c1fb4 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -961,6 +961,8 @@ int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
- 				out_args->args_count = count;
- 				for (i = 0; i < count; i++)
- 					out_args->args[i] = be32_to_cpup(list++);
-+			} else {
-+				of_node_put(node);
- 			}
- 			return 0;
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index b8010a9..d521452 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -63,6 +63,7 @@ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
+                            int index, enum of_gpio_flags *flags)
+ {
+ 	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
++	struct gpio_chip *chip;
+ 	int ret;
+ 
+ 	/* .of_xlate might decide to not fill in the flags, so clear it. */
+@@ -76,7 +77,9 @@ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
+ 		return -EINVAL;
+ 	}
+ 
+-	gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
++	chip = gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
++	if (chip)
++		gpiochip_put(chip);
+ 
+ 	of_node_put(gg_data.gpiospec.np);
+ 	pr_debug("%s exited with status %d\n", __func__, ret);
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 120b2a0..6453d43 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1144,6 +1144,18 @@ int gpiochip_remove(struct gpio_chip *chip)
+ EXPORT_SYMBOL_GPL(gpiochip_remove);
+ 
+ /**
++ * gpiochip_put() - release a gpio_chip
++ * @chip: the chip to release
++ */
++inline void gpiochip_put(struct gpio_chip *chip)
++{
++	BUG_ON(!chip);
++
++	module_put(chip->owner);
++}
++EXPORT_SYMBOL_GPL(gpiochip_put);
++
++/**
+  * gpiochip_find() - iterator for locating a specific gpio_chip
+  * @data: data to pass to match function
+  * @callback: Callback function to check gpio_chip
+@@ -1153,6 +1165,9 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
+  * 0 if the device doesn't match and non-zero if it does.  If the callback is
+  * non-zero, this function will return to the caller and not iterate over any
+  * more gpio_chips.
++ *
++ * Note the gpio_chip is returned with the module locked, users are responsible
++ * to release the lock with gpiochip_put(chip) after using it.
+  */
+ struct gpio_chip *gpiochip_find(void *data,
+ 				int (*match)(struct gpio_chip *chip,
+@@ -1169,6 +1184,8 @@ struct gpio_chip *gpiochip_find(void *data,
+ 
+ 		if (match(gpio_desc[i].chip, data)) {
+ 			chip = gpio_desc[i].chip;
++			if (!try_module_get(chip->owner))
++				chip = NULL;
+ 			break;
  		}
+ 	}
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 365ea09..af372be 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -145,7 +145,7 @@ extern int __must_check gpiochip_remove(struct gpio_chip *chip);
+ extern struct gpio_chip *gpiochip_find(void *data,
+ 					int (*match)(struct gpio_chip *chip,
+ 						     void *data));
+-
++extern void gpiochip_put(struct gpio_chip *chip);
+ 
+ /* Always use the library code for GPIO management calls,
+  * or when sleeping may be involved.
 -- 
 1.7.0.4
