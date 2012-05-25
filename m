@@ -1,154 +1,79 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 25 May 2012 17:13:26 +0200
-Subject: [RFC PATCH 08/11] ARM: OMAP4+: Adding the temperature sensor
- register set bit fields
-In-Reply-To: <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <4FBFA196.2030503@ti.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Fri, 25 May 2012 17:47:48 +0200
+Subject: [PATCH 0/6] Bridging PCI to amba
+Message-ID: <cover.1337959750.git.rubini@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/25/2012 10:25 AM, Eduardo Valentin wrote:
-> OMAP4460 specific temperature sensor register bit fields are added.
-> Existing OMAP4 entries are renamed to OMAP4430.
->
-> Signed-off-by: Keerthy<j-keerthy@ti.com>
-> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
-> ---
->   arch/arm/mach-omap2/include/mach/control.h |  116 ++++++++++++++++++++++++++++
+This patch set introduces use of the pl011 AMBA serial port under a
+PCI bridge.  To compile AMBA under x86, though I need <asm/sizes.h>,
+which is moved to <linux/sizes.h> as suggested earlier.
 
-Now that we do have a dedicated driver for the bandgap, I guess it will 
-be better to put these defines inside the driver directly.
+I'm hereby volunteering to handle the moving of the various users
+of <asm/sizes.h> to <linux/sizes.h>; this set only moves the ARM core
+files and the ones that I need under x86.
 
-Benoit
+The whole patch set is sent to the same set of recipients:
+all relevant lists, Russell King (for arm), Greg-KH (for uart) and
+Arnd Bergmann (for generic include).
 
->   1 files changed, 116 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/include/mach/control.h b/arch/arm/mach-omap2/include/mach/control.h
-> index cf42764..171b504 100644
-> --- a/arch/arm/mach-omap2/include/mach/control.h
-> +++ b/arch/arm/mach-omap2/include/mach/control.h
-> @@ -230,6 +230,122 @@
->   /* OMAP44xx control McBSP padconf */
->   #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP	0x061c
->
-> +/* TEMP_SENSOR OMAP4430 */
-> +#define OMAP4430_BGAP_TEMPSOFF_SHIFT			12
-> +#define OMAP4430_BGAP_TEMPSOFF_MASK			(1<<  12)
-> +#define OMAP4430_BGAP_TSHUT_SHIFT				11
-> +#define OMAP4430_BGAP_TSHUT_MASK				(1<<  11)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_SHIFT		10
-> +#define OMAP4430_BGAP_TEMP_SENSOR_CONTCONV_MASK		(1<<  10)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_SHIFT		9
-> +#define OMAP4430_BGAP_TEMP_SENSOR_SOC_MASK			(1<<  9)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_SHIFT		8
-> +#define OMAP4430_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  8)
-> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
-> +#define OMAP4430_BGAP_TEMP_SENSOR_DTEMP_MASK		(0xff<<  0)
-> +
-> +/* TEMP_SENSOR OMAP4460 */
-> +#define OMAP4460_BGAP_TEMPSOFF_SHIFT			13
-> +#define OMAP4460_BGAP_TEMPSOFF_MASK			(1<<  13)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_SHIFT		11
-> +#define OMAP4460_BGAP_TEMP_SENSOR_SOC_MASK		(1<<  11)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_SHIFT		10
-> +#define OMAP4460_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  10)
-> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
-> +#define OMAP4460_BGAP_TEMP_SENSOR_DTEMP_MASK		(0x3ff<<  0)
-> +
-> +/* BANDGAP_CTRL */
-> +#define OMAP4460_SINGLE_MODE_SHIFT			31
-> +#define OMAP4460_SINGLE_MODE_MASK			(1<<  31)
-> +#define OMAP4460_MASK_HOT_SHIFT				1
-> +#define OMAP4460_MASK_HOT_MASK				(1<<  1)
-> +#define OMAP4460_MASK_COLD_SHIFT			0
-> +#define OMAP4460_MASK_COLD_MASK				(1<<  0)
-> +
-> +/* BANDGAP_COUNTER */
-> +#define OMAP4460_COUNTER_SHIFT				0
-> +#define OMAP4460_COUNTER_MASK				(0xffffff<<  0)
-> +
-> +/* BANDGAP_THRESHOLD */
-> +#define OMAP4460_T_HOT_SHIFT				16
-> +#define OMAP4460_T_HOT_MASK				(0x3ff<<  16)
-> +#define OMAP4460_T_COLD_SHIFT				0
-> +#define OMAP4460_T_COLD_MASK				(0x3ff<<  0)
-> +
-> +/* TSHUT_THRESHOLD */
-> +#define OMAP4460_TSHUT_HOT_SHIFT			16
-> +#define OMAP4460_TSHUT_HOT_MASK				(0x3ff<<  16)
-> +#define OMAP4460_TSHUT_COLD_SHIFT			0
-> +#define OMAP4460_TSHUT_COLD_MASK			(0x3ff<<  0)
-> +
-> +/* BANDGAP_STATUS */
-> +#define OMAP4460_CLEAN_STOP_SHIFT			3
-> +#define OMAP4460_CLEAN_STOP_MASK			(1<<  3)
-> +#define OMAP4460_BGAP_ALERT_SHIFT			2
-> +#define OMAP4460_BGAP_ALERT_MASK			(1<<  2)
-> +#define OMAP4460_HOT_FLAG_SHIFT				1
-> +#define OMAP4460_HOT_FLAG_MASK				(1<<  1)
-> +#define OMAP4460_COLD_FLAG_SHIFT			0
-> +#define OMAP4460_COLD_FLAG_MASK				(1<<  0)
-> +
-> +/* TEMP_SENSOR OMAP5430 */
-> +#define OMAP5430_BGAP_TEMP_SENSOR_SOC_SHIFT		12
-> +#define OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK		(1<<  12)
-> +#define OMAP5430_BGAP_TEMPSOFF_SHIFT			11
-> +#define OMAP5430_BGAP_TEMPSOFF_MASK			(1<<  11)
-> +#define OMAP5430_BGAP_TEMP_SENSOR_EOCZ_SHIFT		10
-> +#define OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK		(1<<  10)
-> +#define OMAP5430_BGAP_TEMP_SENSOR_DTEMP_SHIFT		0
-> +#define OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK		(0x3ff<<  0)
-> +
-> +/* BANDGAP_CTRL */
-> +#define OMAP5430_MASK_HOT_CORE_SHIFT			5
-> +#define OMAP5430_MASK_HOT_CORE_MASK			(1<<  5)
-> +#define OMAP5430_MASK_COLD_CORE_SHIFT			4
-> +#define OMAP5430_MASK_COLD_CORE_MASK			(1<<  4)
-> +#define OMAP5430_MASK_HOT_MM_SHIFT			3
-> +#define OMAP5430_MASK_HOT_MM_MASK			(1<<  3)
-> +#define OMAP5430_MASK_COLD_MM_SHIFT			2
-> +#define OMAP5430_MASK_COLD_MM_MASK			(1<<  2)
-> +#define OMAP5430_MASK_HOT_MPU_SHIFT			1
-> +#define OMAP5430_MASK_HOT_MPU_MASK			(1<<  1)
-> +#define OMAP5430_MASK_COLD_MPU_SHIFT			0
-> +#define OMAP5430_MASK_COLD_MPU_MASK			(1<<  0)
-> +
-> +/* BANDGAP_COUNTER */
-> +#define OMAP5430_REPEAT_MODE_SHIFT			31
-> +#define OMAP5430_REPEAT_MODE_MASK			(1<<  31)
-> +#define OMAP5430_COUNTER_SHIFT				0
-> +#define OMAP5430_COUNTER_MASK				(0xffffff<<  0)
-> +
-> +/* BANDGAP_THRESHOLD */
-> +#define OMAP5430_T_HOT_SHIFT				16
-> +#define OMAP5430_T_HOT_MASK				(0x3ff<<  16)
-> +#define OMAP5430_T_COLD_SHIFT				0
-> +#define OMAP5430_T_COLD_MASK				(0x3ff<<  0)
-> +
-> +/* TSHUT_THRESHOLD */
-> +#define OMAP5430_TSHUT_HOT_SHIFT			16
-> +#define OMAP5430_TSHUT_HOT_MASK				(0x3ff<<  16)
-> +#define OMAP5430_TSHUT_COLD_SHIFT			0
-> +#define OMAP5430_TSHUT_COLD_MASK			(0x3ff<<  0)
-> +
-> +/* BANDGAP_STATUS */
-> +#define OMAP5430_BGAP_ALERT_SHIFT			31
-> +#define OMAP5430_BGAP_ALERT_MASK			(1<<  31)
-> +#define OMAP5430_HOT_CORE_FLAG_SHIFT			5
-> +#define OMAP5430_HOT_CORE_FLAG_MASK			(1<<  5)
-> +#define OMAP5430_COLD_CORE_FLAG_SHIFT			4
-> +#define OMAP5430_COLD_CORE_FLAG_MASK			(1<<  4)
-> +#define OMAP5430_HOT_MM_FLAG_SHIFT			3
-> +#define OMAP5430_HOT_MM_FLAG_MASK			(1<<  3)
-> +#define OMAP5430_COLD_MM_FLAG_SHIFT			2
-> +#define OMAP5430_COLD_MM_FLAG_MASK			(1<<  2)
-> +#define OMAP5430_HOT_MPU_FLAG_SHIFT			1
-> +#define OMAP5430_HOT_MPU_FLAG_MASK			(1<<  1)
-> +#define OMAP5430_COLD_MPU_FLAG_SHIFT			0
-> +#define OMAP5430_COLD_MPU_FLAG_MASK			(1<<  0)
-> +
->   /* AM35XX only CONTROL_GENERAL register offsets */
->   #define AM35XX_CONTROL_MSUSPENDMUX_6    (OMAP2_CONTROL_GENERAL + 0x0038)
->   #define AM35XX_CONTROL_DEVCONF2         (OMAP2_CONTROL_GENERAL + 0x0310)
+With this set in place (plus a clok API not included here) I have
+4 serial ports working. We have a number of other devices that can
+use existing drivers, but we definitely need <linux/sizes.h> first.
+
+  spusa.root# uname -r
+  3.4.0-next-20120524-00014-gae0c129
+
+  spusa.root# dmesg | grep ttyA
+  pl011-pci-03:0005: ttyAMA0 at MMIO 0xcf400000 (irq = 46) is a PL011 rev3
+  pl011-pci-03:0006: ttyAMA1 at MMIO 0xcec00000 (irq = 47) is a PL011 rev3
+  pl011-pci-03:0007: ttyAMA2 at MMIO 0xce400000 (irq = 48) is a PL011 rev3
+  pl011-pci-04:0005: ttyAMA3 at MMIO 0xd3400000 (irq = 49) is a PL011 rev3
+
+  spusa.root# grep -C1 pl011 /proc/iomem
+          ce400000-ce7fffff : 0000:03:00.7
+            ce400000-ce400fff : pl011-pci-03:0007
+            ce400000-ce400fff : uart-pl011
+          ce800000-cebfffff : 0000:03:00.6
+          cec00000-ceffffff : 0000:03:00.6
+            cec00000-cec00fff : pl011-pci-03:0006
+            cec00000-cec00fff : uart-pl011
+          cf000000-cf3fffff : 0000:03:00.5
+          cf400000-cf7fffff : 0000:03:00.5
+            cf400000-cf400fff : pl011-pci-03:0005
+            cf400000-cf400fff : uart-pl011
+          cf800000-cfbfffff : 0000:03:00.4
+  --
+          d3400000-d37fffff : 0000:04:00.5
+            d3400000-d3400fff : pl011-pci-04:0005
+            d3400000-d3400fff : uart-pl011
+          d3800000-d3bfffff : 0000:04:00.4
+
+
+Alessandro Rubini (6):
+  sizes.h: move from asm-generic to <linux/sizes.h>
+  amba: use the new linux/sizes.h
+  ARM: use the new linux/sizes.h
+  serial: use the new linux/sizes.h
+  x86: add CONFIG_ARM_AMBA, selected by STA2X11
+  serial: add amba-pl011-pci
+
+ arch/arm/include/asm/memory.h       |    2 +-
+ arch/arm/mm/dma-mapping.c           |    2 +-
+ arch/arm/mm/init.c                  |    2 +-
+ arch/arm/mm/ioremap.c               |    2 +-
+ arch/arm/mm/mmu.c                   |    2 +-
+ arch/x86/Kconfig                    |    4 ++
+ drivers/amba/bus.c                  |    2 +-
+ drivers/tty/serial/Kconfig          |   10 +++-
+ drivers/tty/serial/Makefile         |    1 +
+ drivers/tty/serial/amba-pl011-pci.c |  101 +++++++++++++++++++++++++++++++++++
+ drivers/tty/serial/amba-pl011.c     |    2 +-
+ include/asm-generic/sizes.h         |   49 +----------------
+ include/linux/sizes.h               |   47 ++++++++++++++++
+ 13 files changed, 171 insertions(+), 55 deletions(-)
+ create mode 100644 drivers/tty/serial/amba-pl011-pci.c
+ create mode 100644 include/linux/sizes.h
+
+-- 
+1.7.7.2
