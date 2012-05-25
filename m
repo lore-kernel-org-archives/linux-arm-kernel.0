@@ -1,103 +1,92 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 25 May 2012 21:36:18 +0800
-Subject: [PATCH v4 4/6] gpio: introduce lock mechanism for gpiochip_find
+Date: Fri, 25 May 2012 21:36:19 +0800
+Subject: [PATCH v4 5/6] of: add of_parse_phandle_with_args_ext function
 In-Reply-To: <1337952980-14621-1-git-send-email-b29396@freescale.com>
 References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
-Message-ID: <1337952980-14621-4-git-send-email-b29396@freescale.com>
+Message-ID: <1337952980-14621-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-The module lock will be automatically claimed for gpiochip_find function
-in case the gpio module is removed during the using of gpiochip instance.
-Users are responsible to call gpiochip_put to release the lock after
-the using.
+The api is used when user wants to get some more extended args except ones
+indicated by the cells_name.
+For example, gpio cells is 2.
+list = <&gpio 1 2 3 4>;
+If users want to get extended args including 3, 4, he can call:
+of_parse_phandle_with_args_ext(np, "gpios", "#gpio-cells", index, 2, &outargs);
 
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- drivers/gpio/gpiolib-of.c  |    5 ++++-
- drivers/gpio/gpiolib.c     |   17 +++++++++++++++++
- include/asm-generic/gpio.h |    2 +-
- 3 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/of/base.c  |   25 ++++++++++++++++++++++++-
+ include/linux/of.h |    5 ++++-
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index b8010a9..d521452 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -63,6 +63,7 @@ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
-                            int index, enum of_gpio_flags *flags)
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 91c1fb4..e51ee5f 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -893,6 +893,28 @@ int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
+ 				const char *cells_name, int index,
+ 				struct of_phandle_args *out_args)
  {
- 	struct gg_data gg_data = { .flags = flags, .out_gpio = -ENODEV };
-+	struct gpio_chip *chip;
- 	int ret;
- 
- 	/* .of_xlate might decide to not fill in the flags, so clear it. */
-@@ -76,7 +77,9 @@ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
- 		return -EINVAL;
- 	}
- 
--	gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
-+	chip = gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
-+	if (chip)
-+		gpiochip_put(chip);
- 
- 	of_node_put(gg_data.gpiospec.np);
- 	pr_debug("%s exited with status %d\n", __func__, ret);
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 120b2a0..6453d43 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1144,6 +1144,18 @@ int gpiochip_remove(struct gpio_chip *chip)
- EXPORT_SYMBOL_GPL(gpiochip_remove);
++	return of_parse_phandle_with_args_ext(np, list_name, cells_name,
++					index, 0, out_args);
++}
++EXPORT_SYMBOL(of_parse_phandle_with_args);
++
++/*
++ * of_parse_phandle_with_args_ext() - Find a node pointed by phandle in a list
++ * with extended args.
++ * @np:		pointer to a device tree node containing a list
++ * @list_name:	property name that contains a list
++ * @cells_name:	property name that specifies phandles' arguments count
++ * @index:	index of a phandle to parse out
++ * @cells_ext:	property name that specifies the extended args count except
++ *		phandles' arguments count
++ * @out_args:	optional pointer to output arguments structure (will be filled)
++ */
++int of_parse_phandle_with_args_ext(struct device_node *np,
++				const char *list_name,
++				const char *cells_name, int index,
++				unsigned int cells_ext,
++				struct of_phandle_args *out_args)
++{
+ 	const __be32 *list, *list_end;
+ 	int size, cur_index = 0;
+ 	uint32_t count = 0;
+@@ -936,6 +958,7 @@ int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
+ 			 * Make sure that the arguments actually fit in the
+ 			 * remaining property data length
+ 			 */
++			count += cells_ext;
+ 			if (list + count > list_end) {
+ 				pr_err("%s: arguments longer than property\n",
+ 					 np->full_name);
+@@ -978,7 +1001,7 @@ int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
+ 		of_node_put(node);
+ 	return -EINVAL;
+ }
+-EXPORT_SYMBOL(of_parse_phandle_with_args);
++EXPORT_SYMBOL(of_parse_phandle_with_args_ext);
  
  /**
-+ * gpiochip_put() - release a gpio_chip
-+ * @chip: the chip to release
-+ */
-+inline void gpiochip_put(struct gpio_chip *chip)
-+{
-+	BUG_ON(!chip);
-+
-+	module_put(chip->owner);
-+}
-+EXPORT_SYMBOL_GPL(gpiochip_put);
-+
-+/**
-  * gpiochip_find() - iterator for locating a specific gpio_chip
-  * @data: data to pass to match function
-  * @callback: Callback function to check gpio_chip
-@@ -1153,6 +1165,9 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
-  * 0 if the device doesn't match and non-zero if it does.  If the callback is
-  * non-zero, this function will return to the caller and not iterate over any
-  * more gpio_chips.
-+ *
-+ * Note the gpio_chip is returned with the module locked, users are responsible
-+ * to release the lock with gpiochip_put(chip) after using it.
-  */
- struct gpio_chip *gpiochip_find(void *data,
- 				int (*match)(struct gpio_chip *chip,
-@@ -1169,6 +1184,8 @@ struct gpio_chip *gpiochip_find(void *data,
- 
- 		if (match(gpio_desc[i].chip, data)) {
- 			chip = gpio_desc[i].chip;
-+			if (!try_module_get(chip->owner))
-+				chip = NULL;
- 			break;
- 		}
- 	}
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 365ea09..af372be 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -145,7 +145,7 @@ extern int __must_check gpiochip_remove(struct gpio_chip *chip);
- extern struct gpio_chip *gpiochip_find(void *data,
- 					int (*match)(struct gpio_chip *chip,
- 						     void *data));
+  * prom_add_property - Add a property to a node
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 2ec1083..27b4d67 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -251,7 +251,10 @@ extern struct device_node *of_parse_phandle(struct device_node *np,
+ extern int of_parse_phandle_with_args(struct device_node *np,
+ 	const char *list_name, const char *cells_name, int index,
+ 	struct of_phandle_args *out_args);
 -
-+extern void gpiochip_put(struct gpio_chip *chip);
++extern int of_parse_phandle_with_args_ext(struct device_node *np,
++	const char *list_name, const char *cells_name, int index,
++	unsigned int cells_ext,
++	struct of_phandle_args *out_args);
+ extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
+ extern int of_alias_get_id(struct device_node *np, const char *stem);
  
- /* Always use the library code for GPIO management calls,
-  * or when sleeping may be involved.
 -- 
 1.7.0.4
