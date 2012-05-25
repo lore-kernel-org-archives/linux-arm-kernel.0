@@ -1,24 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 25 May 2012 10:50:43 -0600
-Subject: [PATCH v4 5/6] of: add of_parse_phandle_with_args_ext function
-In-Reply-To: <1337952980-14621-5-git-send-email-b29396@freescale.com>
-References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-5-git-send-email-b29396@freescale.com>
-Message-ID: <4FBFB863.7060601@wwwdotorg.org>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Fri, 25 May 2012 19:55:07 +0300
+Subject: [PATCH 2/2] mtd mxc_nand: move ecc strengh setup before
+ nand_scan_tail
+In-Reply-To: <1337955762-19157-2-git-send-email-s.hauer@pengutronix.de>
+References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
+ <1337955762-19157-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1337964907.30969.57.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2012 07:36 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+On Fri, 2012-05-25 at 16:22 +0200, Sascha Hauer wrote:
+> Since this commit:
 > 
-> The api is used when user wants to get some more extended args except ones
-> indicated by the cells_name.
-> For example, gpio cells is 2.
-> list = <&gpio 1 2 3 4>;
+>   commit 6a918bade9dab40aaef80559bd1169c69e8d69cb
+>   Author: Mike Dunn <mikedunn@newsguy.com>
+>   Date:   Sun Mar 11 14:21:11 2012 -0700
+> 
+>      mtd: flash drivers set ecc strength
+> 
+> The mxc_nand driver fails with:
+> 
+> Driver must set ecc.strength when using hardware ECC
+> 
+> This is because nand_scan_tail checks for correct ecc strength
+> settings, so we must set them up before nand_scan_tail.
 
-I assume either that property should be named "gpios", or ...
+Pushed this one to l2-mtd.git as well, thanks!
 
-> If users want to get extended args including 3, 4, he can call:
-> of_parse_phandle_with_args_ext(np, "gpios", "#gpio-cells", index, 2, &outargs);
-
-The second parameter above should be "list".
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/5227da8b/attachment-0001.sig>
