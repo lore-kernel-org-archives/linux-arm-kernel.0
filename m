@@ -1,53 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 May 2012 15:38:04 +0100
-Subject: [STABLE PATCH] ARM: 7409/1: Do not call flush_cache_user_range with
- mmap_sem held
-Message-ID: <1337956684-23569-1-git-send-email-will.deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 25 May 2012 16:51:02 +0200
+Subject: Booting mx27 on linux-next
+In-Reply-To: <CAOMZO5Bz44hrXRULui2GEjSL9y-S58P-_05aKsQB6jtgA7-hgg@mail.gmail.com>
+References: <CAOMZO5Bz44hrXRULui2GEjSL9y-S58P-_05aKsQB6jtgA7-hgg@mail.gmail.com>
+Message-ID: <20120525145102.GR30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
+Hi Fabio,
 
-commit 435a7ef52db7d86e67a009b36cac1457f8972391 upstream
+On Fri, May 25, 2012 at 10:56:07AM -0300, Fabio Estevam wrote:
+> Hi Sascha,
+> 
+> Just tried booting a mx27pdk on linux-next and it failed to boot.
+> 
+> Any patches I am missing?
+> 
+> Just wanted to check with you first prior to start debugging it.
 
-We can't be holding the mmap_sem while calling flush_cache_user_range
-because the flush can fault. If we fault on a user address, the
-page fault handler will try to take mmap_sem again. Since both places
-acquire the read lock, most of the time it succeeds. However, if another
-thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
-between the call to flush_cache_user_range and the fault, the down_read
-in do_page_fault will deadlock.
+Works for me, tested on next-20120524 on a pcm038 board. I just had
+to disable nand support, see the patches I just sent to the list.
 
-[will: removed drop of vma parameter as already queued by rmk (7365/1)]
+Sascha
 
-Cc: <stable@vger.kernel.org> # 2.6.32+: 4542b6a0: ARM: 7365/1
-Cc: <stable@vger.kernel.org> # 2.6.32+
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Dima Zavin <dima@android.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
 
-Greg: This patch is a candidate for -stable, but its dependency (listed
-      above) wasn't marked as such, hence this retrospective submission.
-
- arch/arm/kernel/traps.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 55b2f3d..63d402f 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -496,7 +496,9 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
- 		if (end > vma->vm_end)
- 			end = vma->vm_end;
- 
-+		up_read(&mm->mmap_sem);
- 		flush_cache_user_range(start, end);
-+		return;
- 	}
- 	up_read(&mm->mmap_sem);
- }
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
