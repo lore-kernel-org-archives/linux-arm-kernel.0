@@ -1,39 +1,33 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 15:38:56 -0700
-Subject: [linux-pm] [PATCH 0/2] bug fixes for coupled cpuidle
-In-Reply-To: <4FB9E461.9060405@ti.com> (Santosh Shilimkar's message of "Mon,
- 21 May 2012 12:14:49 +0530")
-References: <1337364324-12171-1-git-send-email-ccross@android.com>
- <4FB9E461.9060405@ti.com>
-Message-ID: <87fwanj37j.fsf@ti.com>
+Date: Fri, 25 May 2012 15:53:19 -0700
+Subject: [PATCH] MAINTAINERS: add OMAP CPUfreq driver to OMAP Power Management
+ section
+Message-ID: <1337986399-32607-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Len,
+Add the OMAP CPUFreq driver to the list of files in the OMAP Power
+Management section.
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+I've already been maintaining this driver, this just makes it
+official.
 
-> On Friday 18 May 2012 11:35 PM, Colin Cross wrote:
->> The last modifications made to the coupled cpuidle patches introduced
->> two bugs that I missed during testing.  The online count was never
->> initialized, causing coupled idle to always wait and never enter the
->> ready loop.  That hid the second bug, the ready count could never be
->> decremented after exiting idle.
->> 
->> Len, these two patches could be squashed into patch 3 of the original
->> set.  If you do squash them, you could also add Rafael's tags to the
->> set (Reviewed-by on 1 and 2, acked-by on 3).  Or I can reupload the
->> whole stack as v5 if you prefer.
->
-> I confirm that these two fixes are needed to get couple idle
-> v4 series working.
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ MAINTAINERS |    1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Kevin Hilman <khilman@ti.com>
-
-Can you pick these up for v3.6?
-
-I don't currently see them in your next branch.
-
-Thanks,
-
-Kevin
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b362709..60ff5d4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4791,6 +4791,7 @@ M:	Kevin Hilman <khilman@ti.com>
+ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	arch/arm/*omap*/*pm*
++F:	drivers/cpufreq/omap-cpufreq.c
+ 
+ OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
+ M:	Rajendra Nayak <rnayak@ti.com>
+-- 
+1.7.9.2
