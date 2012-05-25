@@ -1,74 +1,44 @@
-From: lasse.collin@tukaani.org (Lasse Collin)
-Date: Fri, 25 May 2012 22:35:37 +0300
-Subject: [PATCH] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <4FBFB3F3.1000606@hp.com>
-References: <1337875436-27640-1-git-send-email-tmac@hp.com>
- <20120525113432.3beea6ed@tukaani.org> <4FBFB3F3.1000606@hp.com>
-Message-ID: <20120525223537.3f537e26@tukaani.org>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 25 May 2012 13:04:22 -0700
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <20120525145603.GG13467@mudshark.cambridge.arm.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+ <20120522093410.GC7286@mudshark.cambridge.arm.com>
+ <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+ <20120525145603.GG13467@mudshark.cambridge.arm.com>
+Message-ID: <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-05-25 Thavatchai Makphaibulcboke wrote:
-> Yes, I agree that having a shared file would be the best solution.
-> Unfortunately with the current preboot architecture and infra
-> structure, it would not be a trivial task.
+On Fri, May 25, 2012 at 7:56 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 22, 2012 at 07:36:23PM +0100, Colin Cross wrote:
+>> I was using an omap 4430, triggering l2x0_clean_all from a GPU ioctl
+>> by calling outer_clean_range(0, ULONG_MAX). ?The problem was very
+>> reproducible at the time, and using the persistent_trace code I posted
+>> a while back I was able to narrow it down to hanging the cpu (not an
+>> infinite loop) inside cache_wait_way. ?It was 100% reproducible just
+>> booting a development version of Android, but not if I called
+>> l2x0_clean_all during boot, so it may depend on cache state or load.
+>
+> Right, ok. This is definitely a different problem though. Firstly, r3p1 is
+> not affected by the original erratum and secondly the symptoms do not
+> include deadlock. The clean during boot also sounds highly suspicious -- is
+> there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
+> disabled when entering the kernel [I think u8500 has it enabled]?
 
-I agree.
+In a previous thread, I wrote that the 4430 I was using had r2p0.  I
+can't verify the accuracy of that claim right now, but my patch was
+based on that assumption.  Where are you getting r3p1 from?
 
-> I believe defining these functions for each arch would give a better
-> code modularity compared to including them in the decompressor file.
+When I said I couldn't reproduce the issue with clean during boot, I
+meant that I couldn't trigger the issue during boot by calling clean
+repeatedly.  I could still reproduce the issue after boot even if the
+cache was cleaned during boot.
 
-I guess so. decompress_unxz.c certainly isn't the right place for those
-functions. The arch-specific files also allow arch-specific
-optimizations if someone finds them useful.
-
-> > These already have memcpy. It can save a few bytes if one reused
-> > memmove as memcpy when using XZ compression. I got a difference of
-> > 48 bytes on x86_64.
-> 
-> We could do that.  But according to the comment in the original
-> implementation, there seems to be a concern regarding its performance
-> speed. If you believe all archs' memcpy would give comparable
-> performance to the memmove. then I could do that.
-
-In a generic case, you can replace memcpy with memmove but not vice
-versa. memmove is generally slower than memcpy because memmove has to
-support overlapping buffers.
-
-I guess the current comment in decompress_unxz.c could be clearer. In
-short, memmove and memcpy speeds don't matter much *for kernel
-decompression* which is done in the single-call mode of the XZ
-decompressor on archs that currently support XZ. memcpy speed could
-matter if the kernel image contained a large amount of incompressible
-data, but even if it did, it shouldn't matter much.
-
-> > Adding memmove to string.c on x86 means that memmove is included in
-> > the kernel image even when memmove isn't needed. With gzip
-> > compression I got 128 bytes bigger image on x86_64 after adding the
-> > unneeded memmove to string.c.
-> > 
-> > I don't know if those size increases matter in practice.
-> 
-> For x86, I think I could move memmove to the misc.c file and put an
-> ifdef XZ_PREBOOT around it.  This way it should not impact other
-> decompressor.  I could also do this for s390 and sh.  But if we decide
-> to replace memmove with memcpy this would be necessart.
-
-Or you can use #ifdef CONFIG_KERNEL_XZ in string.c. XZ_PREBOOT is kind
-of internal define to the XZ code so it's not good to rely on it.
-
-If you add a static memmove function to misc.c, compiler can omit it
-when memmove isn't used. Since misc.h pulls <linux/string.h> via
-<linux/elf.h> and so there's a prototype of extern memmove already, one
-needs to call the static function e.g. my_memmove and #define memmove
-my_memmove. This way you don't need to #ifdef it to any particular
-decompressors.
-
-If memmove is used to implement memcpy, you probably cannot avoid
-decompressor-specific #ifdefs unless you use memmove for all
-decompressors. The question is how clean code you want vs. how much you
-care about saving 30-150 bytes in bzImage size.
-
--- 
-Lasse Collin  |  IRC: Larhzu @ IRCnet & Freenode
+The reference to 727915 came from discussions with TI, but given that
+it is a deadlock and not a memory corruption, you're probably right
+that it is not the same issue.
