@@ -1,33 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 15:53:19 -0700
-Subject: [PATCH] MAINTAINERS: add OMAP CPUfreq driver to OMAP Power Management
- section
-Message-ID: <1337986399-32607-1-git-send-email-khilman@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 25 May 2012 20:14:42 -0300
+Subject: [PATCH 01/15] ARM: mx5: Use clk_prepare_enable/clk_disable_unprepare
+Message-ID: <1337987696-31728-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the OMAP CPUFreq driver to the list of files in the OMAP Power
-Management section.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I've already been maintaining this driver, this just makes it
-official.
+Prepare the clock before enabling it.
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-imx/mm-imx5.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b362709..60ff5d4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4791,6 +4791,7 @@ M:	Kevin Hilman <khilman@ti.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	arch/arm/*omap*/*pm*
-+F:	drivers/cpufreq/omap-cpufreq.c
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index feeee17..fcad95c 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -35,11 +35,11 @@ static void imx5_idle(void)
+ 			return;
+ 		clk_prepare(gpc_dvfs_clk);
+ 	}
+-	clk_enable(gpc_dvfs_clk);
++	clk_prepare_enable(gpc_dvfs_clk);
+ 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+ 	if (!tzic_enable_wake())
+ 		cpu_do_idle();
+-	clk_disable(gpc_dvfs_clk);
++	clk_disable_unprepare(gpc_dvfs_clk);
+ }
  
- OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
- M:	Rajendra Nayak <rnayak@ti.com>
+ /*
 -- 
-1.7.9.2
+1.7.1
