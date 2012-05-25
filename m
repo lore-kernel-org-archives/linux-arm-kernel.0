@@ -1,262 +1,169 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Fri, 25 May 2012 11:25:57 +0300
-Subject: [RFC PATCH 07/11] mfd: omap: control: usb-phy: introduce the
- ctrl-module usb driver
+Date: Fri, 25 May 2012 11:26:00 +0300
+Subject: [RFC PATCH 10/11] omap4: thermal: add basic CPU thermal zone
 In-Reply-To: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
 References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1337934361-1606-8-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1337934361-1606-11-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Created a new platform driver for the platform device created by the
-control module mfd core, wrt usb. This driver has API's to power on/off
-the phy and the API's to write to musb mailbox.
+This patch exposes OMAP4 thermal sensor as a thermal zone
+named "cpu". Only thermal creation is done here.
 
-(p.s. the mailbox for musb in omap4 is present in system control
-module)
+TODO:
 
-[kishon at ti.com: wrote the original API's related to USB functions]
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+ - Add cooling bindings
+ - Add extrapolation rules
+
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- drivers/usb/otg/Kconfig           |   13 ++++
- drivers/usb/otg/Makefile          |    1 +
- drivers/usb/otg/omap4-usb-phy.c   |  130 +++++++++++++++++++++++++++++++++++++
- include/linux/usb/omap4_usb_phy.h |   53 +++++++++++++++
- 4 files changed, 197 insertions(+), 0 deletions(-)
- create mode 100644 drivers/usb/otg/omap4-usb-phy.c
- create mode 100644 include/linux/usb/omap4_usb_phy.h
+ drivers/thermal/Kconfig         |   12 ++++++
+ drivers/thermal/Makefile        |    1 +
+ drivers/thermal/omap-bandgap.c  |    1 +
+ drivers/thermal/omap-bandgap.h  |   12 ++++++
+ drivers/thermal/omap4-thermal.c |   72 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 98 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/thermal/omap4-thermal.c
 
-diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-index 5c87db0..e2840f1 100644
---- a/drivers/usb/otg/Kconfig
-+++ b/drivers/usb/otg/Kconfig
-@@ -78,6 +78,19 @@ config TWL6030_USB
- 	  are hooked to this driver through platform_data structure.
- 	  The definition of internal PHY APIs are in the mach-omap2 layer.
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index ffdd240..2e82797 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -39,3 +39,15 @@ config OMAP_BANDGAP
+ 	  This includes alert interrupts generation and also the TSHUT
+ 	  support.
  
-+config OMAP4_USB_PHY
-+	tristate "Texas Instruments OMAP4+ USB pin control driver"
-+	depends on MFD_OMAP_CONTROL
++config OMAP4_THERMAL
++	bool "Texas Instruments OMAP4 thermal support"
++	depends on OMAP_BANDGAP
++	depends on ARCH_OMAP4
 +	help
-+	  If you say yes here you get support for the Texas Instruments
-+	  OMAP4+ USB pin control driver. The register set is part of system
-+	  control module.
++	  If you say yes here you get thermal support for the Texas Instruments
++	  OMAP4 SoC family. The current chip supported are:
++	   - OMAP4460
 +
-+	  USB phy in OMAP configures control module register for powering on
-+	  the phy, configuring VBUSVALID, AVALID, IDDIG and SESSEND. For
-+	  performing the above mentioned configuration, API's are added in
-+	  by this children of the control module driver.
++	  This includes alert interrupts generation and also the TSHUT
++	  support.
 +
- config NOP_USB_XCEIV
- 	tristate "NOP USB Transceiver Driver"
- 	select USB_OTG_UTILS
-diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-index 41aa509..60c8c83 100644
---- a/drivers/usb/otg/Makefile
-+++ b/drivers/usb/otg/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_USB_GPIO_VBUS)	+= gpio_vbus.o
- obj-$(CONFIG_ISP1301_OMAP)	+= isp1301_omap.o
- obj-$(CONFIG_TWL4030_USB)	+= twl4030-usb.o
- obj-$(CONFIG_TWL6030_USB)	+= twl6030-usb.o
-+obj-$(CONFIG_OMAP4_USB_PHY)	+= omap4-usb-phy.o
- obj-$(CONFIG_NOP_USB_XCEIV)	+= nop-usb-xceiv.o
- obj-$(CONFIG_USB_ULPI)		+= ulpi.o
- obj-$(CONFIG_USB_ULPI_VIEWPORT)	+= ulpi_viewport.o
-diff --git a/drivers/usb/otg/omap4-usb-phy.c b/drivers/usb/otg/omap4-usb-phy.c
-new file mode 100644
-index 0000000..a29ea45
---- /dev/null
-+++ b/drivers/usb/otg/omap4-usb-phy.c
-@@ -0,0 +1,130 @@
-+/*
-+ * OMAP4 system control module driver, USB control children
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Contact:
-+ *    Kishon Vijay Abraham I <kishon@ti.com>
-+ *    Eduardo Valentin <eduardo.valentin@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/omap_control.h>
-+#include <linux/usb/omap4_usb_phy.h>
-+
-+/**
-+ * omap4_usb_phy_power - power on/off the phy using control module reg
-+ * @dev: struct device *
-+ * @on: 0 or 1, based on powering on or off the PHY
-+ *
-+ * omap_usb2 can call this API to power on or off the PHY.
-+ */
-+int omap4_usb_phy_power(struct device *dev, int on)
+diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+index 5ff1af1..6397678 100644
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_THERMAL)		+= thermal_sys.o
+ obj-$(CONFIG_SPEAR_THERMAL)		+= spear_thermal.o
+ obj-$(CONFIG_OMAP_BANDGAP)	+= omap-thermal.o
+ omap-thermal-y			:= omap-bandgap.o
++omap-thermal-$(CONFIG_OMAP4_THERMAL)	+= omap4-thermal.o
+diff --git a/drivers/thermal/omap-bandgap.c b/drivers/thermal/omap-bandgap.c
+index 3d5a12b..d53ffcf 100644
+--- a/drivers/thermal/omap-bandgap.c
++++ b/drivers/thermal/omap-bandgap.c
+@@ -1192,6 +1192,7 @@ static const struct omap_bandgap_data omap4460_data = {
+ 	.fclock_name = "bandgap_ts_fclk",
+ 	.div_ck_name = "div_ts_ck",
+ 	.conv_table = omap4460_adc_to_temp,
++	.expose_sensor = omap4_thermal_expose_sensor,
+ 	.sensors = {
+ 		{
+ 			.registers = &omap4460_mpu_temp_sensor_registers,
+diff --git a/drivers/thermal/omap-bandgap.h b/drivers/thermal/omap-bandgap.h
+index 12e0d6b..0f5b3e6 100644
+--- a/drivers/thermal/omap-bandgap.h
++++ b/drivers/thermal/omap-bandgap.h
+@@ -60,4 +60,16 @@ int omap_bandgap_write_update_interval(struct omap_bandgap *bg_ptr, int id,
+ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
+ 				  int *temperature);
+ 
++#ifdef CONFIG_OMAP4_THERMAL
++int omap4_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
++				char *domain);
++#else
++static inline int omap4_thermal_expose_sensor(struct omap_bandgap *bg_ptr,
++					      int id, char *domain)
 +{
-+	u32 val;
-+	int ret;
++	return 0;
++}
 +
-+	if (on) {
-+		ret = omap_control_readl(dev, CONTROL_DEV_CONF, &val);
-+		if (!ret && (val & PHY_PD)) {
-+			ret = omap_control_writel(dev, ~PHY_PD,
-+						  CONTROL_DEV_CONF);
-+			/* XXX: add proper documentation for this delay */
-+			mdelay(200);
-+		}
-+	} else {
-+		ret = omap_control_writel(dev, PHY_PD, CONTROL_DEV_CONF);
-+	}
++#endif
++
+ #endif
+diff --git a/drivers/thermal/omap4-thermal.c b/drivers/thermal/omap4-thermal.c
+new file mode 100644
+index 0000000..f83cf96
+--- /dev/null
++++ b/drivers/thermal/omap4-thermal.c
+@@ -0,0 +1,72 @@
++/*
++ * OMAP4 thermal driver.
++ *
++ * Copyright (C) 2011-2012 Texas Instruments Inc.
++ * Contact:
++ *	Eduardo Valentin <eduardo.valentin@ti.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/thermal.h>
++
++#include "omap-bandgap.h"
++
++struct omap4_thermal_data {
++	struct thermal_zone_device *omap4_thermal;
++	struct omap_bandgap *bg_ptr;
++	int sensor_id;
++};
++
++static inline int omap4_thermal_get_temp(struct thermal_zone_device *thermal,
++					 unsigned long *temp)
++{
++	struct omap4_thermal_data *data = thermal->devdata;
++	int ret, tmp;
++
++	ret = omap_bandgap_read_temperature(data->bg_ptr, data->sensor_id,
++					    &tmp);
++	if (!ret)
++		*temp = tmp;
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(omap4_usb_phy_power);
 +
-+/**
-+ * omap4_usb_phy_mailbox - write to usb otg mailbox
-+ * @dev: struct device *
-+ * @val: the value to be written to the mailbox
-+ *
-+ * On detection of a device (ID pin is grounded), the phy should call this API
-+ * to set AVALID, VBUSVALID and ID pin is grounded.
-+ *
-+ * When OMAP is connected to a host (OMAP in device mode), the phy should call
-+ * this API to set AVALID, VBUSVALID and ID pin in high impedance.
-+ *
-+ * The phy should call this API, if OMAP is disconnected from host or device.
-+ */
-+int omap4_usb_phy_mailbox(struct device *dev, u32 val)
++static struct thermal_zone_device_ops omap4_thermal_ops = {
++	.get_temp = omap4_thermal_get_temp,
++};
++
++int omap4_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
++				char *domain)
 +{
-+	return omap_control_writel(dev, val, CONTROL_USBOTGHS_CONTROL);
-+}
-+EXPORT_SYMBOL_GPL(omap4_usb_phy_mailbox);
++	struct omap4_thermal_data *data;
 +
-+static int __devinit omap_usb_phy_probe(struct platform_device *pdev)
-+{
-+	struct omap_control *omap_control;
-+
-+	omap_control = dev_get_drvdata(pdev->dev.parent);
-+
-+	if (!omap_control) {
-+		dev_err(&pdev->dev, "no omap_control in our parent\n");
-+		return -EINVAL;
++	data = devm_kzalloc(bg_ptr->dev, sizeof(*data), GFP_KERNEL);
++	if (!data) {
++		dev_err(bg_ptr->dev, "kzalloc fail\n");
++		return -ENOMEM;
++	}
++	data->sensor_id = id;
++	data->bg_ptr = bg_ptr;
++	data->omap4_thermal = thermal_zone_device_register(domain, 0,
++				data, &omap4_thermal_ops, 0, 0, 0, 0);
++	if (IS_ERR(data->omap4_thermal)) {
++		dev_err(bg_ptr->dev, "thermal zone device is NULL\n");
++		return PTR_ERR(data->omap4_thermal);
 +	}
 +
 +	return 0;
 +}
-+
-+static int __devexit omap_usb_phy_remove(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static const struct of_device_id of_omap_usb_phy_match[] = {
-+	{ .compatible = "ti,omap4-usb-phy", },
-+	{ },
-+};
-+
-+static struct platform_driver omap_usb_phy_driver = {
-+	.probe = omap_usb_phy_probe,
-+	.remove = __devexit_p(omap_usb_phy_remove),
-+	.driver = {
-+			.name	= "omap4-usb-phy",
-+			.owner	= THIS_MODULE,
-+			.of_match_table	= of_omap_usb_phy_match,
-+	},
-+};
-+
-+static int __init omap_usb_phy_init(void)
-+{
-+	return platform_driver_register(&omap_usb_phy_driver);
-+}
-+postcore_initcall(omap_usb_phy_init);
-+
-+static void __exit omap_usb_phy_exit(void)
-+{
-+	platform_driver_unregister(&omap_usb_phy_driver);
-+}
-+module_exit(omap_usb_phy_exit);
-+
-+MODULE_DESCRIPTION("OMAP4+ USB-phy driver");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform: omap4-usb-phy");
-+MODULE_AUTHOR("Texas Instrument Inc.");
-diff --git a/include/linux/usb/omap4_usb_phy.h b/include/linux/usb/omap4_usb_phy.h
-new file mode 100644
-index 0000000..b6a4701
---- /dev/null
-+++ b/include/linux/usb/omap4_usb_phy.h
-@@ -0,0 +1,53 @@
-+/*
-+ * OMAP4 USB-phy
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Contact:
-+ *    Kishon Vijay Abraham I <kishon@ti.com>
-+ *    Eduardo Valentin <eduardo.valentin@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ *
-+ */
-+
-+#ifndef __OMAP4_USB_PHY_H
-+#define __OMAP4_USB_PHY_H
-+
-+#define	PHY_PD				0x1
-+#define	AVALID				BIT(0)
-+#define	BVALID				BIT(1)
-+#define	VBUSVALID			BIT(2)
-+#define	SESSEND				BIT(3)
-+#define	IDDIG				BIT(4)
-+#define	CONTROL_DEV_CONF		0x00000300
-+#define	CONTROL_USBOTGHS_CONTROL	0x0000033C
-+
-+/* USB-PHY helpers */
-+#if (defined(CONFIG_OMAP4_USB_PHY)) || (defined(CONFIG_OMAP4_USB_PHY_MODULE))
-+extern int omap4_usb_phy_mailbox(struct device *dev, u32 val);
-+extern int omap4_usb_phy_power(struct device *dev, int on);
-+#else
-+static inline int omap4_usb_phy_mailbox(struct device *dev, u32 val)
-+{
-+	return 0;
-+}
-+static inline int omap4_usb_phy_power(struct device *dev, int on)
-+{
-+	return 0;
-+}
-+#endif
-+
-+#endif
 -- 
 1.7.7.1.488.ge8e1c
