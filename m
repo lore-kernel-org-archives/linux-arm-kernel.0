@@ -1,87 +1,55 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 25 May 2012 16:47:20 +0800
-Subject: [alsa-devel] [PATCH 2/4] ASoC: mmp: add audio dma support
-In-Reply-To: <20120525080500.GB24149@n2100.arm.linux.org.uk>
-References: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
- <1337929863-31885-3-git-send-email-zhangfei.gao@marvell.com>
- <1337932416.1580.2.camel@vkoul-udesk3>
- <20120525080500.GB24149@n2100.arm.linux.org.uk>
-Message-ID: <CAMj5Bkhc46zqY5AbJkc=-h02taP_esxrqpNu--aYtZZcVcPK6A@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Fri, 25 May 2012 15:07:15 +0530
+Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+In-Reply-To: <20120522234621.GA3610@windriver.com>
+References: <20120522234621.GA3610@windriver.com>
+Message-ID: <CAOh2x==2pFz_37Xjrb9wpeG8HMrMUf72+-iT30d14paQntr+7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Russell and Vinod.
+On May 23, 2012 5:18 AM, "Paul Gortmaker" <paul.gortmaker@windriver.com>
+wrote:
+>
+> Hi Viresh,
+>
+> The above listed commit, in linux-next as:
+>
+> commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
+>
+>    "clk: add non CONFIG_HAVE_CLK routines"
+>
+> shows up as failures in the netx_defconfig, since there
+> are duplicate stub functions between your changes and the
+> file below:
+>
+>  arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
+>  include/linux/clk.h:299:51: note: previous definition of 'clk_disable'
+was here
+>  arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
+>  include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate'
+was here
+>  arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
+>  include/linux/clk.h:294:50: note: previous definition of 'clk_enable'
+was here
+>  arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
+>  include/linux/clk.h:280:58: note: previous definition of 'clk_get' was
+here
+>  arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
+>  include/linux/clk.h:290:51: note: previous definition of 'clk_put' was
+here
+>  make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
+>
 
-On Fri, May 25, 2012 at 4:05 PM, Russell King - ARM Linux <
-linux@arm.linux.org.uk> wrote:
+Hi Paul,
 
-> On Fri, May 25, 2012 at 01:23:36PM +0530, Vinod Koul wrote:
-> > On Fri, 2012-05-25 at 15:11 +0800, Zhangfei Gao wrote:
-> > > mmp-pcm handle audio dma based on dmaengine
-> > > Support mmp and pxa910
-> > Looks like this is *not* using soc-dmaengine library, why?
->
-> Note also...
->
-Will look into soc-dmaengine.
+I don't have access to any Linux machine for now as i am on leave.
 
+Actually i have left ST and will join the next company in few weeks.
 
->
-> > > +   prtd->dma_chan = dma_request_channel(mask, filter, prtd);
-> > > +   if (!prtd->dma_chan)
-> > > +           return -EINVAL;
->
-> This should be done at probe time, so we know the struct device, so
-> that...
->
+If you can provide a patch for this, i can review it.
 
-Do you mean at open time, like snd_dmaengine_pcm_open.
-The channel resource is limited and better get dynamically.
-As a  result the pcm_new and preallocate already called before.
-
-
-> > > +static int mmp_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int
-> stream)
-> > > +{
-> > > +   struct snd_pcm_substream *substream =
-> pcm->streams[stream].substream;
-> > > +   struct snd_dma_buffer *buf = &substream->dma_buffer;
-> > > +   size_t size = mmp_pcm_hardware[stream].buffer_bytes_max;
-> > > +   struct gen_pool *gpool;
-> > > +
-> > > +   buf->dev.type = SNDRV_DMA_TYPE_DEV;
-> > > +   buf->dev.dev = pcm->card->dev;
->
-> ... this uses the right device, and...
->
-> > > +static u64 mmp_pcm_dmamask = DMA_BIT_MASK(64);
-> > > +
-> > > +int mmp_pcm_new(struct snd_soc_pcm_runtime *rtd)
-> > > +{
-> > > +   struct snd_card *card = rtd->card->snd_card;
-> > > +   struct snd_pcm *pcm = rtd->pcm;
-> > > +   int ret = 0;
-> > > +
-> > > +   if (!card->dev->dma_mask)
-> > > +           card->dev->dma_mask = &mmp_pcm_dmamask;
-> > > +
-> > > +   if (!card->dev->coherent_dma_mask)
-> > > +           card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
->
-> ... we don't need crap like this.
->
-> Because then we'll be allocating buffers against the _right_ struct device
-> which is the DMA engine struct device.
-> --
-> To unsubscribe from this list: send the line "unsubscribe alsa-devel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
->
+--
+Viresh
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/af4b4fa0/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/80f39cb7/attachment-0001.html>
