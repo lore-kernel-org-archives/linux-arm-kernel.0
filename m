@@ -1,52 +1,31 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Fri, 25 May 2012 17:58:22 +0300
-Subject: [PATCH 1/2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
-References: <1337955762-19157-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1337957902.30969.46.camel@sauron.fi.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 May 2012 15:56:04 +0100
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+ <20120522093410.GC7286@mudshark.cambridge.arm.com>
+ <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+Message-ID: <20120525145603.GG13467@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-25 at 16:22 +0200, Sascha Hauer wrote:
-> The following commit changes the function used to copy from/to
-> the hardware buffer to memcpy_[from|to]io. This does not work
-> since the hardware cannot handle the byte accesses used by these
-> functions. Instead of reverting this patch introduce 32bit
-> correspondents of these functions.
+On Tue, May 22, 2012 at 07:36:23PM +0100, Colin Cross wrote:
+> I was using an omap 4430, triggering l2x0_clean_all from a GPU ioctl
+> by calling outer_clean_range(0, ULONG_MAX).  The problem was very
+> reproducible at the time, and using the persistent_trace code I posted
+> a while back I was able to narrow it down to hanging the cpu (not an
+> infinite loop) inside cache_wait_way.  It was 100% reproducible just
+> booting a development version of Android, but not if I called
+> l2x0_clean_all during boot, so it may depend on cache state or load.
 
-Could you please take a look at the checkpatch.pl updates?
+Right, ok. This is definitely a different problem though. Firstly, r3p1 is
+not affected by the original erratum and secondly the symptoms do not
+include deadlock. The clean during boot also sounds highly suspicious -- is
+there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
+disabled when entering the kernel [I think u8500 has it enabled]?
 
-WARNING:LONG_LINE: line over 80 characters
-#103: FILE: drivers/mtd/nand/mxc_nand.c:276:
-+static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
-
-WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
-#103: FILE: drivers/mtd/nand/mxc_nand.c:276:
-+static void memcpy32_fromio(void *trg, const volatile void __iomem  *src, size_t size)
-
-WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
-#107: FILE: drivers/mtd/nand/mxc_nand.c:280:
-+       const volatile u32 *s = src;
-
-WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
-#113: FILE: drivers/mtd/nand/mxc_nand.c:286:
-+static void memcpy32_toio(volatile void __iomem *trg, const void *src, int size)
-
-WARNING:VOLATILE: Use of volatile is usually wrong: see Documentation/volatile-considered-harmful.txt
-#116: FILE: drivers/mtd/nand/mxc_nand.c:289:
-+       volatile u32 *t = trg;
-
-WARNING:LONG_LINE: line over 80 characters
-#170: FILE: drivers/mtd/nand/mxc_nand.c:1093:
-+               memcpy32_fromio(host->data_buf, host->main_area0, mtd->writesize);
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/e753d664/attachment.sig>
+Will
