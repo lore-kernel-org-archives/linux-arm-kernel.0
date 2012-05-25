@@ -1,56 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 May 2012 09:05:00 +0100
-Subject: [PATCH 2/4] ASoC: mmp: add audio dma support
-In-Reply-To: <1337932416.1580.2.camel@vkoul-udesk3>
-References: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
- <1337929863-31885-3-git-send-email-zhangfei.gao@marvell.com>
- <1337932416.1580.2.camel@vkoul-udesk3>
-Message-ID: <20120525080500.GB24149@n2100.arm.linux.org.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 25 May 2012 16:09:44 +0800
+Subject: [PATCH 1/1] dma: imx-sdma: buf_tail should be initialize in
+ prepare function
+In-Reply-To: <20120524033356.GC17621@S2101-09.ap.freescale.net>
+References: <1337603494-27464-1-git-send-email-richard.zhao@freescale.com>
+ <20120524032026.GB17621@S2101-09.ap.freescale.net>
+ <20120524032659.GA19682@b20223-02.ap.freescale.net>
+ <20120524033356.GC17621@S2101-09.ap.freescale.net>
+Message-ID: <20120525080943.GA18733@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 01:23:36PM +0530, Vinod Koul wrote:
-> On Fri, 2012-05-25 at 15:11 +0800, Zhangfei Gao wrote:
-> > mmp-pcm handle audio dma based on dmaengine
-> > Support mmp and pxa910
-> Looks like this is *not* using soc-dmaengine library, why?
+On Thu, May 24, 2012 at 11:33:58AM +0800, Shawn Guo wrote:
+> On Thu, May 24, 2012 at 11:27:00AM +0800, Richard Zhao wrote:
+> > > root at linaro-developer:~# aplay audio8k16S.wav
+> > > Playing WAVE 'audio8k16S.wav' : Signed 16 bit Little Endian, Rate 8000 Hz, Stere
+> > > o
+> > > ^Z
+> > > [1]+  Stopped                 aplay audio8k16S.wav
+> > > root at linaro-developer:~# fg
+> > > aplay audio8k16S.wav
+> > > underrun!!! (at least 2034.382 ms long)
+> > Does the audio playback recover? Without the patch, sometimes the
+> > playback will have distortion and play too fast.
+> > 
+> No, it does not recover.
+Maybe it's not the same issue. It do recover on imx6q sabrelite board.
+And from source code, it do be a bug.
 
-Note also...
-
-> > +	prtd->dma_chan = dma_request_channel(mask, filter, prtd);
-> > +	if (!prtd->dma_chan)
-> > +		return -EINVAL;
-
-This should be done at probe time, so we know the struct device, so
-that...
-
-> > +static int mmp_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
-> > +{
-> > +	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
-> > +	struct snd_dma_buffer *buf = &substream->dma_buffer;
-> > +	size_t size = mmp_pcm_hardware[stream].buffer_bytes_max;
-> > +	struct gen_pool *gpool;
-> > +
-> > +	buf->dev.type = SNDRV_DMA_TYPE_DEV;
-> > +	buf->dev.dev = pcm->card->dev;
-
-... this uses the right device, and...
-
-> > +static u64 mmp_pcm_dmamask = DMA_BIT_MASK(64);
-> > +
-> > +int mmp_pcm_new(struct snd_soc_pcm_runtime *rtd)
-> > +{
-> > +	struct snd_card *card = rtd->card->snd_card;
-> > +	struct snd_pcm *pcm = rtd->pcm;
-> > +	int ret = 0;
-> > +
-> > +	if (!card->dev->dma_mask)
-> > +		card->dev->dma_mask = &mmp_pcm_dmamask;
-> > +
-> > +	if (!card->dev->coherent_dma_mask)
-> > +		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
-
-... we don't need crap like this.
-
-Because then we'll be allocating buffers against the _right_ struct device
-which is the DMA engine struct device.
+Thanks
+Richard
+> 
+> -- 
+> Regards,
+> Shawn
+> 
