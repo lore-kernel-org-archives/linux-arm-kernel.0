@@ -1,44 +1,50 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 25 May 2012 13:04:22 -0700
-Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
- errata 727915
-In-Reply-To: <20120525145603.GG13467@mudshark.cambridge.arm.com>
-References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
- <20120522085256.GA7286@mudshark.cambridge.arm.com>
- <4FBB5AE8.4000801@ti.com>
- <20120522093410.GC7286@mudshark.cambridge.arm.com>
- <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
- <20120525145603.GG13467@mudshark.cambridge.arm.com>
-Message-ID: <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 25 May 2012 14:51:34 -0700
+Subject: [PATCHv9 06/10] I2C: OMAP: Fix the crash in i2c remove
+In-Reply-To: <20120512181019.GA28973@pengutronix.de> (Wolfram Sang's message
+ of "Sat, 12 May 2012 20:10:19 +0200")
+References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+ <1335969135-20858-7-git-send-email-shubhrajyoti@ti.com>
+ <20120512181019.GA28973@pengutronix.de>
+Message-ID: <878vggkjyx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 7:56 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, May 22, 2012 at 07:36:23PM +0100, Colin Cross wrote:
->> I was using an omap 4430, triggering l2x0_clean_all from a GPU ioctl
->> by calling outer_clean_range(0, ULONG_MAX). ?The problem was very
->> reproducible at the time, and using the persistent_trace code I posted
->> a while back I was able to narrow it down to hanging the cpu (not an
->> infinite loop) inside cache_wait_way. ?It was 100% reproducible just
->> booting a development version of Android, but not if I called
->> l2x0_clean_all during boot, so it may depend on cache state or load.
->
-> Right, ok. This is definitely a different problem though. Firstly, r3p1 is
-> not affected by the original erratum and secondly the symptoms do not
-> include deadlock. The clean during boot also sounds highly suspicious -- is
-> there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
-> disabled when entering the kernel [I think u8500 has it enabled]?
+Hi Wolfram,
 
-In a previous thread, I wrote that the 4430 I was using had r2p0.  I
-can't verify the accuracy of that claim right now, but my patch was
-based on that assumption.  Where are you getting r3p1 from?
+Wolfram Sang <w.sang@pengutronix.de> writes:
 
-When I said I couldn't reproduce the issue with clean during boot, I
-meant that I couldn't trigger the issue during boot by calling clean
-repeatedly.  I could still reproduce the issue after boot even if the
-cache was cleaned during boot.
+> On Wed, May 02, 2012 at 08:02:11PM +0530, Shubhrajyoti D wrote:
+>>     In omap_i2c_remove we are accessing the I2C_CON register without
+>>     enabling the clocks. Fix the same by enabling the clocks and disabling
+>>     it.
 
-The reference to 727915 came from discussions with TI, but given that
-it is a deadlock and not a memory corruption, you're probably right
-that it is not the same issue.
+[...]
+
+> I'd really like a comment from the PM experts if each and every driver
+> has to ensure that the clocks are enabled on remove like this?
+
+Yes, this is correct.
+
+In fact, this is the goal of runtime PM.  The driver itself tells the PM
+core (using runtime PM) when the device needs to be accessible and when
+it doesn't.
+
+Technically speaking, the it's up to the platform-specific runtime PM
+implementation to decide whether or not the clocks are actually disable
+or not  (e.g. due to wakeup latency requirements, it might decide not to
+cut clocks.)
+
+Because of that, the changelog should be reworded to say something like
+"ensure device is accessible" instead of "enable the clocks", because
+the runtime PM implementation does more than just manage clocks.
+
+Kevin
+
+P.S. It's great to see you helping out maintaining i2c drivers.  Thanks!
+
+P.P.S. Before you merge this, I would strongly recommend we wait for a
+       few more Tested-bys, and a bit more description about how this
+       was tested.  We've been having quite a few problems with
+       regressions introduced in OMAP drivers that have not been well
+       reviewed or tested.
