@@ -1,77 +1,55 @@
-From: try2share@gmail.com (K K)
-Date: Fri, 25 May 2012 18:20:28 +0530
-Subject: Linux Kernel boot up stops after message "Uncompressing
- Linux....done, booting the kernel"
-In-Reply-To: <20120524103221.GA1889@glitch>
-References: <CACZ0kf88Ac8hne9RtLObi624okPw8Nkiv7++Uw8npPLW108mhw@mail.gmail.com>
- <CACZ0kf9yHJOAVEBx4e5dc_eCRT5dScrZHzbkx3_7P2QkzaHChQ@mail.gmail.com>
- <20120524103221.GA1889@glitch>
-Message-ID: <CACZ0kf-6Vr+TSr96Br8wsE3Y38_4Gev-dYvqw1OgMZp2ProCcQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 26 May 2012 00:22:31 -0700
+Subject: [GIT PULL 1/8] arm-soc: defconfig updates
+In-Reply-To: <1338016958-7887-1-git-send-email-olof@lixom.net>
+References: <1338016958-7887-1-git-send-email-olof@lixom.net>
+Message-ID: <1338016958-7887-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For the first time, we have one branch that collects just updates to
+defconfig files, mostly for adapting to changes in other subsystems.
 
-> 2.6.32, really?
+----------------------------------------------------------------
 
-Yes kernel is 2.6.32.
+The following changes since commit 786f02b719f2285e2c0350b6a04dab4a1a0871a1:
 
->Two cases:
+  Merge tag 'x86-mce-merge' of git://git.kernel.org/pub/scm/linux/kernel/git/ras/ras
 
-> 1. earlyprintk is configured and enabled but points to the
->    wrong console and your platform hangs on it because it's not
->    initialized/ready. the correct console seems ok, the uncompressor
->     is able to use it. check debug-macro.S to be sure it uses the
->    correct address.
+are available in the git repository at:
 
-> 2. earlyprintk is not enabled (or configured) and your kernel is
->     not finding the console (any console= on the cmdline? driver
->     issue?) or dies before finding it. try enabling earlyprintk (and
->     check debug-macro.S as well).
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig
 
-I have checked debug-macro.S , console was properly configured and enabled.
-Now i can able to see the debug messages on the console.
+for you to fetch changes up to 4a230408e83698a3d7ff0a9988a58675c2c92cb9:
 
-Thanks..
+  ARM: PRIMA2: add prima2_defconfig for CSR SiRFprimaII
+
+----------------------------------------------------------------
+
+Arnd Bergmann (2):
+      Merge tag 'imx-defconfig' of git://git.pengutronix.de/git/imx/linux-2.6 into next/defconfig
+      Merge branch 'for-3.5/defconfig2' of git://git.kernel.org/.../swarren/linux-tegra into next/defconfig
+
+Barry Song (1):
+      ARM: PRIMA2: add prima2_defconfig for CSR SiRFprimaII
+
+Fabio Estevam (2):
+      ARM: imx_v4_v5_defconfig: Let CONFIG_MACH_IMX27_DT be built by default
+      ARM: imx_v6_v7_defconfig: Add SPI NOR support
+
+Laxman Dewangan (1):
+      ARM: tegra: update defconfig
+
+Olof Johansson (1):
+      Merge branch 'for-3.5/defconfig' of git://git.kernel.org/.../swarren/linux-tegra into next/defconfig
+
+Stephen Warren (1):
+      ARM: tegra: update defconfig
 
 
-
-
-
-On Thu, May 24, 2012 at 4:02 PM, Domenico Andreoli <cavokz@gmail.com> wrote:
-
-> On Thu, May 24, 2012 at 10:52:46AM +0530, K K wrote:
-> > Hi,
->
-> Hi,
->
-> > We have a lpc-3180 based board and it is up and running fine with 2.6.10
-> > kernel version. We planned to port our board changes into 2.6.32 kernel
-> > version.
->
-> 2.6.32, really?
->
-> > kernel build successfully. When we booting the board with the new 2.6.32
-> > kernel we are getting following messages and its stops.
->
-> Two cases:
->
->  1. earlyprintk is configured and enabled but points to the
->     wrong console and your platform hangs on it because it's not
->     initialized/ready. the correct console seems ok, the uncompressor
->     is able to use it. check debug-macro.S to be sure it uses the
->     correct address.
->
->  2. earlyprintk is not enabled (or configured) and your kernel is
->     not finding the console (any console= on the cmdline? driver
->     issue?) or dies before finding it. try enabling earlyprintk (and
->     check debug-macro.S as well).
->
-> cheers,
-> Domenico
->
-> ps: post also the kernel configuration
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120525/7b925653/attachment-0001.html>
+ arch/arm/configs/imx_v4_v5_defconfig |  1 +
+ arch/arm/configs/imx_v6_v7_defconfig |  6 +++
+ arch/arm/configs/prima2_defconfig    | 69 +++++++++++++++++++++++++++++++
+ arch/arm/configs/tegra_defconfig     | 11 ++++-
+ 4 files changed, 86 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/configs/prima2_defconfig
