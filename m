@@ -1,85 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 May 2012 09:43:28 +0100
-Subject: [PATCH 6/6] serial: add amba-pl011-pci
-In-Reply-To: <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
-References: <cover.1337959750.git.rubini@gnudd.com>
- <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
-Message-ID: <20120526084328.GE24149@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 26 May 2012 01:46:38 -0700
+Subject: [GIT PULL] Veratile Express DT updates for v3.5
+In-Reply-To: <1337589524.2262.4.camel@hornet>
+References: <1337589524.2262.4.camel@hornet>
+Message-ID: <CAOesGMiLYy=_a+=Km8pswoTbCuHsu-tVwP5mH2fd1oCXM_83cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 05:48:57PM +0200, Alessandro Rubini wrote:
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 070b442..e5e5ef6 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -39,14 +39,22 @@ config SERIAL_AMBA_PL010_CONSOLE
->  config SERIAL_AMBA_PL011
->  	tristate "ARM AMBA PL011 serial port support"
->  	depends on ARM_AMBA
-> +	default y if STA2X11
+Hi Pawel,
 
-I don't think we want to encourage an ever growing list of platforms
-here.  If we did this on ARM, this would be hellishly long.
+On Mon, May 21, 2012 at 1:38 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> Hi Arnd, Ofof,
+>
+> Could you, please, pull this micro-updated for Versatile Express?
+> These are mostly DT changes related to A!5's architected timers and
+> VGIC. I have dropped the earlyprintk/uncompress patch for now because
+> Russell didn't like it.
+>
+> Much more to come for 3.6 :-)
+>
+> Thanks and apologies about short notice!
 
-> +/* This is a template, copied every time a new pci device appears */
-> +static AMBA_APB_DEVICE(pl011_pci_template, "pl011-pci", 0,
-> +		       0 /* base */, {0} /* irqs */, NULL /* data */);
-> +
-> +static int __devinit pl011_pci_probe(struct pci_dev *pdev,
-> +				     const struct pci_device_id *id)
-> +{
-> +	struct amba_device *adev;
-> +	struct amba_pl011_data *data;
-> +	int ret;
-> +
-> +	/* Simply build an amba device and register it */
-> +	adev = kmemdup(&pl011_pci_template_device,
-> +			 sizeof(pl011_pci_template_device), GFP_KERNEL);
+Since this is the first time you're late with a pull request, and the
+branch is small, I'll cut you some slack. However, next time we get a
+pull request like this after the merge window is open, I will punt it
+until the next release.
 
-NAK.  We have interfaces in the AMBA code for dynamically allocating
-AMBA devices now - please use them instead of coding your own.  They
-avoid bugs.
+So, I'll queue this up in late/soc and send it up sometime next week.
+If the merge window closes early this means it _could_ miss it, but
+hopefully not.
 
-> +	/* change name */
-> +	adev->dev.init_name = kasprintf(GFP_ATOMIC, "pl011-pci-%02x:%04x",
-> +				       pdev->bus->number, pdev->devfn);
-> +
-> +	printk(KERN_INFO "%s %i\n", __func__, __LINE__);
 
-This looks like debugging.
+To avoid this from happening next time, please make sure the pull
+requests reach us by -rc6 or -rc7 time frame.
 
-> +	if ((ret = amba_device_register(adev, &pdev->resource[0])) < 0) {
-> +		kfree(adev);
-> +		return ret;
-> +	}
-> +	return 0;
-> +};
-> +
-> +static void __devexit pl011_pci_remove(struct pci_dev *pdev)
-> +{
-> +	struct amba_device *adev = pci_get_drvdata(pdev);
-> +	amba_device_unregister(adev);
-> +	kfree(adev->dev.platform_data);
-> +	kfree(adev);
 
-This comes nowhere close to being sane with the driver model.  This is
-an oops waiting to happen.  You can't guarantee that 'adev' will be
-unused by the time amba_device_unregister() (or in fact any such call
-into the driver model) returns.
+Thanks,
 
-This is because these suckers (and all devices) are refcounted.  If you
-use the correct interfaces, the devices will be freed for you automatically
-at the correct time.
-
-The only thing that won't be is adev->dev.platform_data - the correct way
-to do this is the following along with the correct allocation interfaces:
-
-	struct amba_device *adev = pci_get_drvdata(pdev);
-	void *priv = adev->dev.platform_data;
-
-	amba_device_unregister(adev);
-	kfree(priv);
-
-In other words, save off the platform data pointer, unregister the struct
-device, and then free the platform data (it will not be used at that point.)
+-Olof
