@@ -1,44 +1,109 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 26 May 2012 18:11:18 +0200
-Subject: [PATCH RFC] serial/8250: Adjusting FIFO parameters for LPC32xx
-Message-ID: <1338048678-23991-1-git-send-email-stigge@antcom.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sat, 26 May 2012 09:15:09 -0700
+Subject: [PATCH v4 2/6] gpio: re-add of_node_to_gpiochip function
+In-Reply-To: <20120526000127.A53903E0D27@localhost>
+References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
+ <1337952980-14621-2-git-send-email-b29396@freescale.com>
+ <20120526000127.A53903E0D27@localhost>
+Message-ID: <CAA+hA=SLSk9wMtiFiarVR0t+T6KHSTQkYwPk99Kj75RYFP205g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 26, 2012 at 8:01 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri, 25 May 2012 21:36:16 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>
+> Nack. ?Several problems here. ?First and foremost there isn't any
+> description of *why* this change is needed or when it was removed.
+Sorry i sent it too fast to eager to see people's comments on the main
+issue of patch 6.
+It should have description on what you pointed out.
+It's needed by the patch 6 in this series that it wants to find gpiochip from
+node then calculate the gpio number from device tree in a standard way.
 
-this is how the modified FIFO is handled in the repositories at
-git.lpclinux.com. Is there a better way for doing this (without ifdef)?  Looks
-like registering additional types (like PORT_16550A) isn't encouraged.  Maybe
-extending of_serial.c? The latter currently doesn't handle .fifosize and
-.tx_loadsz, though.
+> Any patch beyond the most trivial change needs to have a commit
+> message the describes it.
+>
+> Second, of_node_to_gpiochip() is no longer a valid API because gpiolib
+> now allows multiple gpiochips to use the same device tree node. ?See
+> commit 3d0f7cf0f "gpio: Adjust of_xlate API to support multiple GPIO
+> chips" to see a description of why this was changed.
+>
+I noticed that of_node_to_gpiochip() is removed by that patch.
+But i did not realized that this API was broken before.
+After looking a bit more on the sample code of an banked gpio,
+https://lkml.org/lkml/2012/5/18/51
+it seems besides the gpio node, we also depend on controller specific
+gpio .of_xlate function
+to find the correct gpiochip in the same bank for the same node.
+So it's correct that of_node_to_gpiochip() is broken now.
 
-Any suggestions appreciated.
+I may change it if we finally still find this API is needed.
 
-Thanks in advance,
+Thanks for the review.
 
-Roland
- 
----
- drivers/tty/serial/8250/8250.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Regards
+Dong Aisheng
 
---- linux-2.6.orig/drivers/tty/serial/8250/8250.c
-+++ linux-2.6/drivers/tty/serial/8250/8250.c
-@@ -158,9 +158,16 @@ static const struct serial8250_config ua
- 	},
- 	[PORT_16550A] = {
- 		.name		= "16550A",
-+#ifdef CONFIG_ARCH_LPC32XX
-+		.fifo_size	= 64,
-+		.tx_loadsz	= 32,
-+		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
-+				  UART_FCR_R_TRIG_00 | UART_FCR_T_TRIG_00,
-+#else
- 		.fifo_size	= 16,
- 		.tx_loadsz	= 16,
- 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
-+#endif
- 		.flags		= UART_CAP_FIFO,
- 	},
- 	[PORT_CIRRUS] = {
+>> ---
+>> ?drivers/gpio/gpiolib-of.c | ? 11 +++++++++++
+>> ?include/linux/of_gpio.h ? | ? ?5 +++++
+>> ?2 files changed, 16 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+>> index 8389d4a..b8010a9 100644
+>> --- a/drivers/gpio/gpiolib-of.c
+>> +++ b/drivers/gpio/gpiolib-of.c
+>> @@ -234,3 +234,14 @@ void of_gpiochip_remove(struct gpio_chip *chip)
+>> ? ? ? if (chip->of_node)
+>> ? ? ? ? ? ? ? of_node_put(chip->of_node);
+>> ?}
+>> +
+>> +/* Private function for resolving node pointer to gpio_chip */
+>> +static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
+>> +{
+>> + ? ? return chip->of_node == data;
+>> +}
+>> +
+>> +struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
+>> +{
+>> + ? ? return gpiochip_find(np, of_gpiochip_is_match);
+>> +}
+>> diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+>> index c454f57..880783b 100644
+>> --- a/include/linux/of_gpio.h
+>> +++ b/include/linux/of_gpio.h
+>> @@ -61,6 +61,7 @@ extern void of_gpiochip_remove(struct gpio_chip *gc);
+>> ?extern int of_gpio_simple_xlate(struct gpio_chip *gc,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct of_phandle_args *gpiospec,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u32 *flags);
+>> +extern struct gpio_chip *of_node_to_gpiochip(struct device_node *np);
+>>
+>> ?#else /* CONFIG_OF_GPIO */
+>>
+>> @@ -84,6 +85,10 @@ static inline int of_gpio_simple_xlate(struct gpio_chip *gc,
+>> ? ? ? return -ENOSYS;
+>> ?}
+>>
+>> +static struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
+>> +{
+>> + ? ? return NULL;
+>> +}
+>> ?static inline void of_gpiochip_add(struct gpio_chip *gc) { }
+>> ?static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
+>>
+>> --
+>> 1.7.0.4
+>>
+>>
+>
+> --
+> Grant Likely, B.Sc, P.Eng.
+> Secret Lab Technologies, Ltd.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
