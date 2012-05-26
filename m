@@ -1,44 +1,124 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 26 May 2012 13:52:08 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add sound support
-Message-ID: <1338051128-29816-1-git-send-email-festevam@gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sat, 26 May 2012 09:52:32 -0700
+Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <4FBFBB74.901@wwwdotorg.org>
+References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
+ <1337952980-14621-6-git-send-email-b29396@freescale.com>
+ <4FBFBB74.901@wwwdotorg.org>
+Message-ID: <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, May 25, 2012 at 10:03 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/25/2012 07:36 AM, Dong Aisheng wrote:
+>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>
+>> This patch implements a standard common binding for pinctrl gpio ranges.
+>> Each SoC can add gpio ranges through device tree by adding a gpio-maps property
+>> under their pinctrl devices node with the format:
+>> <&gpio $gpio-specifier $pin_offset $count>
+>> while the gpio phandle and gpio-specifier are the standard approach
+>> to represent a gpio in device tree.
+>> Then we can cooperate it with the gpio xlate function to get the gpio number
+>> from device tree to set up the gpio ranges map.
+>>
+>> Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
+>> to parse and register the gpio ranges from device tree.
+>>
+>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>> ---
+>> Personally i'm not very satisfied with current solution due to a few reasons:
+>> 1) i can not user standard gpio api to get gpio number
+>> 2) i need to reinvent a new api of_parse_phandles_with_args_ext which i'm not
+>> sure if it can be accepted by DT maintainer.
+>> If i did not invent that API, i need to rewrite a lot of duplicated code
+>> with slight differences with the exist functions like of_get_named_gpio_flags
+>> and of_parse_phandle_with_args for the special pinctrl gpio maps format.
+>>
+>> So i just sent it out first to see people's comment and if any better solution.
+>>
+>> One alternative solution is that that the gpio-maps into two parts:
+>> pinctrl-gpios = <&gpio_phandle gpio-specifier ..>
+>> pinctrl-gpio-maps = <pin_id count ..>
+>> Then we can reuse the standard gpio api altough it's not better than the
+>> original one.
+>
+> The problem I see with that is that it splits what is essentially a
+> single array with phandle+specifier+pin-id+count into two separate
+> arrays. Anyone reading/editing the DT needs to fully understand this,
+> and keep the entries in the two properties in the same order. Putting
+> everything into a single property makes this much more obvious to me. I
+Yes, i agree with you.
+That's why i insisted to send this format first.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> personally don't see any issue with the
+> of_parse_phandles_with_args_ext() function; it seems pretty clean to me.
+>
+Thanks, you gave me some confidence on it.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index b1d3675..59beb7a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -131,6 +131,8 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_MC13XXX=y
-+CONFIG_MFD_MC13XXX_SPI=y
-+CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13783=y
-@@ -166,6 +168,14 @@ CONFIG_LOGO=y
- CONFIG_LOGO_LINUX_MONO=y
- CONFIG_LOGO_LINUX_VGA16=y
- CONFIG_LOGO_LINUX_CLUT224=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_IMX_SOC=y
-+CONFIG_SND_SOC_PHYCORE_AC97=y
-+CONFIG_SND_SOC_EUKREA_TLV320=y
-+CONFIG_SND_SOC_IMX_SGTL5000=y
-+CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
--- 
-1.7.1
+>> diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+>
+>> + ? ? if (!nranges) {
+>> + ? ? ? ? ? ? dev_err(pctldev->dev, "no gpio ranges found\n");
+>> + ? ? ? ? ? ? return -ENODEV;
+>> + ? ? }
+>
+> In the case of a generic pinctrl IP block that can support an external
+> GPIO controller but happens not to be hooked up to one within a
+> particular SoC, that might not be an error. However, that situation is
+> pretty unlikely, so I think it's find to call dev_err() for now, and we
+> can change it later if we need.
+>
+>> + ? ? ? ? ? ? ranges[i].base = ranges[i].gc->of_xlate(ranges[i].gc, &gpiospec, NULL);
+>
+> I believe Grant wants to change the of_xlate prototype in order to be
+> able to return a different gc value, so this will probably need slight
+> rework work with that change, once they're both approved. Still, I think
+> this is fine for now.
+>
+I looked Grant's commit 3d0f7cf0f "gpio: Adjust of_xlate API to
+support multiple GPIO
+chips", it seemed i need make some changes here since
+of_node_to_gpiochip is broken now
+after support banked gpio. Thus the gc got here may not correct for
+some special gpio
+controllers.
+
+>> + ? ? ? ? ? ? if (ranges[i].base < 0) {
+>> + ? ? ? ? ? ? ? ? ? ? ret = -EINVAL;
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> + ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ranges[i].base += ranges[i].gc->base;
+>> + ? ? ? ? ? ? ranges[i].pin_base = gpiospec.args[gpiospec.args_count - 2];
+>> + ? ? ? ? ? ? ranges[i].npins = gpiospec.args[gpiospec.args_count - 1];
+>> +
+>> + ? ? ? ? ? ? gpiochip_put(ranges[i].gc);
+>
+> I wonder if this shouldn't happen until the pinctrl device is free'd,
+> and all the GPIO ranges are removed from it?
+>
+Hmm, that may bring some complexities since non-dt case also needs
+to be covered if we do that...
+
+> If we don't do that, I would argue that we shouldn't store ranges[i].gc,
+> since it might become invalid - I believe the only use of it is within
+> this function?
+>
+In my option, i think it's ok to store it since they're just some data
+to describe
+hw properties. The gpio function may become invalid but not data.
+Is it reasonable to you?
+
+>> + ? ? ? ? ? ? of_node_put(gpiospec.np);
+>> + ? ? }
+>
+> Aside from the comments I've made, this series all seems reasonable.
+> There certainly are alternative ways of doing some of it, but I don't
+> see any other approach having any particular advantage over this one.
+> So, the series,
+>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Thanks.
+
+Regards
+Dong Aisheng
