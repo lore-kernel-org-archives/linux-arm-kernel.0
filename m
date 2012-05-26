@@ -1,211 +1,215 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2012 00:22:36 -0700
-Subject: [GIT PULL 6/8] arm-soc: device tree conversions, part 2
+Date: Sat, 26 May 2012 00:22:37 -0700
+Subject: [GIT PULL 7/8] arm-soc: soc specific changes, part 2
 In-Reply-To: <1338016958-7887-1-git-send-email-olof@lixom.net>
 References: <1338016958-7887-1-git-send-email-olof@lixom.net>
-Message-ID: <1338016958-7887-7-git-send-email-olof@lixom.net>
+Message-ID: <1338016958-7887-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These continue the device tree work from part 1, this set is for the
-tegra, mxs and imx platforms, all of which have dependencies on clock
-or pinctrl changes submitted earlier.
+This adds support for the spear13xx platform, which has first been under
+review a long time ago and finally been completed after generic spear
+work has gone into the clock, dt and pinctrl branches.
+
+Also a number of updates for the samsung socs are part of this branch.
 
 ----------------------------------------------------------------
 
-The following changes since commit 672b9ea0bd2e9c8ac957b888cdb08d1f29d332e8:
+The following changes since commit 56e16c5e06b624d0ec7e958b212c368864a78504:
 
-  Merge tag 'stmp-dev' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
+  Merge tag 'dt2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc2
 
-for you to fetch changes up to deb88cc3c69975cbd9875ed9fac259b351f6b64d:
+for you to fetch changes up to 820f3dd7964f1889baaaaa0c2ba45d05bb619f66:
 
-  Merge branch 'drivers/mmc' into next/dt2
+  ARM: exynos: fix building with CONFIG_OF disabled
 
 ----------------------------------------------------------------
 
-Arnd Bergmann (4):
-      Merge branch 'imx/pinctrl' into imx/dt
-      Merge branch 'imx/dt/for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6.git into next/dt2
-      Merge branch 'for-3.5/dt2' of git://git.kernel.org/.../swarren/linux-tegra into for-next
-      Merge branch 'drivers/mmc' into next/dt2
+Arnd Bergmann (6):
+      Merge branch 'spear/13xx' into next/soc2
+      Merge branch 'exynos/iommu' into next/soc2
+      Merge branch 'next/devel-samsung' of git://git.kernel.org/.../kgene/linux-samsung into next/soc2
+      Merge branch 'samsung/cleanup-plat-s5p' into next/soc2
+      Merge branch 'next/devel-exynos5250-1' of git://git.kernel.org/.../kgene/linux-samsung into next/soc2
+      ARM: exynos: fix building with CONFIG_OF disabled
 
-Dirk Behme (1):
-      ARM: imx6: Add UART2 for low-level debug
+Boojin Kim (1):
+      ARM: EXYNOS: Support DMA for EXYNOS5250 SoC
 
-Dong Aisheng (6):
-      ARM: dts: imx6q-arm2: add pinctrl state for usdhc
-      ARM: mxs: add initial device tree support for imx28-evk board
-      dma: mxs-dma: use global stmp_device functionality
-      dma: mxs-dma: add device tree probe support
-      ARM: mxs: do not add dma device by default
-      ARM: mxs: add mxs-dma dt support
+Changhwan Youn (2):
+      ARM: EXYNOS: Modify the GIC physical address for static io-mapping
+      ARM: EXYNOS: Redefine IRQ_MCT_L0,1 definition
 
-Fabio Estevam (4):
-      ARM: dts: imx: Remove bootargs field
-      ARM: imx6q-arm2: Remove hardcoded mac address
-      ARM: dts: Add basic support for imx6q-sabresd
-      ARM: dts: imx6q-sabrelite: Add SPI NOR support
+Heiko Stuebner (6):
+      ARM: S3C24XX: Add forgotten clock lookup table to S3C2443
+      ARM: S3C24XX: claim spi channels for hsspi in dma-s3c2443
+      ARM: S3C24XX: Add map entries needed by the s3c64xx-spi devices
+      ARM: S3C24XX: Add clock-lookup entries required by s3c64xx-spi
+      ARM: S3C24XX: Add HSSPI setup callback for s3c64xx-spi driver
+      spi/s3c64xx: Allow usage for ARCH_S3C24XX
 
-Hiroshi DOYU (1):
-      ARM: dt: tegra: Add device tree support for AHB
+Inderpal Singh (1):
+      ARM: EXYNOS: Support Suspend/Resume for EXYNOS4412
 
-Laxman Dewangan (2):
-      ARM: dt: tegra: enable als and proximity sensor
-      ARM: dt: tegra: cardhu: register core regulator tps62361
+Kisoo Yu (1):
+      ARM: EXYNOS: Add pre-divider and fout mux clocks for bpll and mpll
 
-Olof Johansson (3):
-      ARM: dt: tegra seaboard: add i2c devices
-      Merge branch 'for-3.5/dt' of git://git.kernel.org/.../swarren/linux-tegra into next/dt2
-      Merge branch 'mxs/dt/for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/dt2
+Kukjin Kim (4):
+      Merge branch 'next/devel-samsung-iommu' into next/devel-samsung
+      Merge branch 'next/devel-s3c24xx-hsspi' into next/devel-samsung
+      Merge branch 'next/cleanup-plat-s5p' into next/devel-exynos5250-1
+      ARM: EXYNOS: update irqs for EXYNOS5250 SoC
 
-Richard Zhao (9):
-      ARM: imx6q: move imx6q_sabrelite specific code to a dedicated function
-      ARM: dts: imx6q-sabrelite: add ssi device
-      ARM: dts: imx6q-sabrelite: add audmux device
-      ARM: dts: imx6q-sabrelite: add i2c1 pinctrl support
-      ARM: dts: imx6q-sabrelite: add audmux pinctrl support
-      ARM: imx6q: add ssi1_ipg clk_lookup
-      ARM: imx6q_sabrelite: clk_register_clkdev cko1 for sgtl5000
-      ARM: dts: imx6q-sabrelite: add sound device imx6q-sabrelite-sgtl5000
-      ARM: dts: imx6q-sabrelite: add serial2 pinctrl support
+Kyoungil Kim (1):
+      ARM: EXYNOS: To use common config for EXYNOS4 and EXYNOS5 SPI
 
-Shawn Guo (29):
-      ARM: imx: rename uart and fec device tree nodes
-      ARM: imx6q: register phy fixup only when CONFIG_PHYLIB is enabled
-      ARM: imx: add more imx5 ssi clocks
-      ARM: imx: add audmux pad setting for imx51-babbage
-      ARM: imx: add audio codec clk lookup for imx53-qsb
-      ARM: dts: imx51-babbage: enable audio support
-      ARM: dts: imx53-qsb: enable audio support
-      Merge branches 'clk/mxs' and 'imx/pinctrl/for-3.5' into mxs/dt/for-3.5
-      ARM: mxs: add initial device tree support for imx23-evk board
-      ARM: mxs: always build in device tree support
-      dma: mxs-dma: let dma_is_apbh and apbh_is_old take parameter
-      dma: mxs-dma: make platform_device_id more generic
-      gpio/mxs: use devm_* helpers to make error handling simple
-      gpio/mxs: get rid of the use of cpu_is_xxx
-      gpio/mxs: add device tree probe
-      ARM: mxs: add gpio support for device tree boot
-      mmc: mxs-mmc: use global stmp_device functionality
-      mmc: mxs-mmc: let ssp_is_old take host as parameter
-      mmc: mxs-mmc: get rid of the use of cpu_is_xxx
-      mmc: mxs-mmc: move header from mach into linux folder
-      mmc: mxs-mmc: use devm_* helper to make cleanup simpler
-      mmc: mxs-mmc: have dma_channel than dma_res in mxs_mmc_host
-      mmc: mxs-mmc: copy wp_gpio in struct mxs_mmc_host
-      mmc: mxs-mmc: add device tree support
-      ARM: dts: enable mmc for imx23-evk
-      ARM: dts: enable mmc for imx28-evk
-      i2c: mxs: add device tree probe support
-      ARM: dts: enable i2c device for imx28-evk
-      ARM: dts: enable audio support for imx28-evk
+Marek Szyprowski (1):
+      ARM: EXYNOS: add platform device for core DRM subsystem
 
-Stephen Warren (17):
-      ARM: dt: tegra seaboard: fix I2C2 SCL rate
-      ARM: dt: tegra seaboard: configure I2C2 pinmux
-      ARM: dt: tegra trimslice: add RTC I2C device
-      ARM: dt: tegra trimslice: enable SDHCI1 controller
-      ARM: dt: tegra trimslice: add support for audio
-      Merge branch 'for-3.5/usb-ulpi' into for-3.5/dt2-new
-      Merge branch 'for-3.5/dt' into for-3.5/dt2-new
-      ARM: dt: tegra cardhu: fix typo in SDHCI node name
-      ARM: dt: tegra: whitespace cleanup
-      ARM: dt: tegra: remove unnecessary unit addresses
-      ARM: dt: tegra: gpio comment cleanup
-      ARM: dt: tegra: format regs properties consistently
-      ARM: dt: tegra: consistenly use lower-case for hex constants
-      ARM: dt: tegra: remove duplicate device_type property
-      ARM: dt: tegra: sort nodes based on bus order
-      ARM: dt: tegra: consistent basic property ordering
-      ARM: dt: tegra: invert status=disable vs status=okay
+Olof Johansson (1):
+      ARM: EXYNOS: add dts files to dtbs target
 
-Ying-Chun Liu (PaulLiu) (2):
-      ARM: dts: imx6q: add anatop regulators
-      ARM: dts: imx53-qsb: Add Dialog DA9053 PMIC support
+Sangsu Park (1):
+      ARM: EXYNOS: add GPC4 bank instance
 
-hdoyu at nvidia.com (4):
-      ARM: dt: tegra20.dtsi: Add Memory Controller(MC) nodes
-      ARM: dt: tegra30.dtsi: Add Memory Controller(MC) nodes
-      ARM: dt: tegra20.dtsi: Add GART node
-      ARM: dt: tegra30.dtsi: Add SMMU node
+Sylwester Nawrocki (1):
+      ARM: EXYNOS: Add platform resource definitions for FIMC-LITE
+
+Thomas Abraham (6):
+      ARM: EXYNOS: Add watchdog timer clock instance
+      ARM: EXYNOS: Remove a new bus_type instance for EXYNOS5
+      ARM: EXYNOS: Add irq_domain support for interrupt combiner
+      ARM: EXYNOS: Add device tree support for interrupt combiner
+      ARM: dts: Update device tree source files for EXYNOS5250
+      ARM: EXYNOS: Add AUXDATA for i2c controllers
+
+Viresh Kumar (10):
+      SPEAr13xx: Add header files
+      SPEAr13xx: Add source files
+      SPEAr13xx: Add common clock framework support
+      pinctrl: SPEAr: Create macro for declaring GPIO PINS
+      pinctrl: Add SPEAr13xx pinctrl drivers
+      SPEAr13xx: Add dts and dtsi files
+      SPEAr13xx: Add compilation support
+      SPEAr13xx: Add defconfig
+      SPEAr: Update MAINTAINERS and Documentation
+      pinctrl: SPEAr1310: Fix pin numbers for clcd_high_res
 
 
- Documentation/devicetree/bindings/arm/fsl.txt   |  12 +
- .../devicetree/bindings/dma/fsl-mxs-dma.txt     |  19 +
- .../devicetree/bindings/gpio/gpio-mxs.txt       |  87 ++++
- .../devicetree/bindings/i2c/i2c-mxs.txt         |  16 +
- .../devicetree/bindings/mmc/mxs-mmc.txt         |  25 +
- .../devicetree/bindings/net/fsl-fec.txt         |   2 +-
- .../bindings/tty/serial/fsl-imx-uart.txt        |   2 +-
- arch/arm/Kconfig                                |   1 +
- arch/arm/Kconfig.debug                          |   8 +
- arch/arm/boot/dts/imx23-evk.dts                 |  43 ++
- arch/arm/boot/dts/imx23.dtsi                    | 295 +++++++++++
- arch/arm/boot/dts/imx27-phytec-phycore.dts      |   8 +-
- arch/arm/boot/dts/imx27.dtsi                    |  14 +-
- arch/arm/boot/dts/imx28-evk.dts                 | 114 +++++
- arch/arm/boot/dts/imx28.dtsi                    | 497 +++++++++++++++++++
- arch/arm/boot/dts/imx51-babbage.dts             |  40 +-
- arch/arm/boot/dts/imx51.dtsi                    |  41 +-
- arch/arm/boot/dts/imx53-ard.dts                 |   6 +-
- arch/arm/boot/dts/imx53-evk.dts                 |   8 +-
- arch/arm/boot/dts/imx53-qsb.dts                 | 121 ++++-
- arch/arm/boot/dts/imx53-smd.dts                 |  12 +-
- arch/arm/boot/dts/imx53.dtsi                    |  45 +-
- arch/arm/boot/dts/imx6q-arm2.dts                |  13 +-
- arch/arm/boot/dts/imx6q-sabrelite.dts           |  50 +-
- arch/arm/boot/dts/imx6q-sabresd.dts             |  53 ++
- arch/arm/boot/dts/imx6q.dtsi                    | 171 ++++++-
- arch/arm/boot/dts/tegra-cardhu.dts              |  85 ++--
- arch/arm/boot/dts/tegra-harmony.dts             | 104 ++--
- arch/arm/boot/dts/tegra-paz00.dts               | 112 ++---
- arch/arm/boot/dts/tegra-seaboard.dts            | 213 ++++----
- arch/arm/boot/dts/tegra-trimslice.dts           |  83 ++--
- arch/arm/boot/dts/tegra-ventana.dts             | 102 ++--
- arch/arm/boot/dts/tegra20.dtsi                  | 275 +++++-----
- arch/arm/boot/dts/tegra30.dtsi                  | 292 ++++++-----
- arch/arm/configs/mxs_defconfig                  |   1 +
- arch/arm/mach-imx/Makefile.boot                 |   3 +-
- arch/arm/mach-imx/clk-imx51-imx53.c             |  40 ++
- arch/arm/mach-imx/clk-imx6q.c                   |  35 +-
- arch/arm/mach-imx/imx53-dt.c                    |  19 +
- arch/arm/mach-imx/lluart.c                      |   6 +
- arch/arm/mach-imx/mach-imx6q.c                  |  55 +-
- arch/arm/mach-imx/mach-mx51_babbage.c           |   6 +
- arch/arm/mach-mxs/Kconfig                       |  10 +
- arch/arm/mach-mxs/Makefile                      |   1 +
- arch/arm/mach-mxs/devices/Kconfig               |   1 -
- arch/arm/mach-mxs/devices/platform-dma.c        |  21 +-
- arch/arm/mach-mxs/devices/platform-gpio-mxs.c   |  24 +-
- arch/arm/mach-mxs/devices/platform-mxs-mmc.c    |  21 +-
- arch/arm/mach-mxs/include/mach/common.h         |   7 +-
- arch/arm/mach-mxs/include/mach/devices-common.h |   3 +-
- arch/arm/mach-mxs/mach-mxs.c                    | 121 +++++
- arch/arm/mach-mxs/mm.c                          |  16 +
- arch/arm/plat-mxc/include/mach/debug-macro.S    |   2 +
- arch/arm/plat-mxc/include/mach/mx6q.h           |   2 +
- drivers/clk/mxs/clk-imx23.c                     |   9 +-
- drivers/clk/mxs/clk-imx28.c                     |  13 +-
- drivers/dma/Kconfig                             |   1 +
- drivers/dma/mxs-dma.c                           | 188 ++++---
- drivers/gpio/gpio-mxs.c                         | 156 +++---
- drivers/i2c/busses/i2c-mxs.c                    |  13 +
- drivers/mmc/host/mxs-mmc.c                      | 197 ++++----
- include/linux/fsl/mxs-dma.h                     |  12 +-
- .../mach/mmc.h => include/linux/mmc/mxs-mmc.h   |   7 +-
- 63 files changed, 2972 insertions(+), 987 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mxs.txt
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mxs.txt
- create mode 100644 Documentation/devicetree/bindings/mmc/mxs-mmc.txt
- create mode 100644 arch/arm/boot/dts/imx23-evk.dts
- create mode 100644 arch/arm/boot/dts/imx23.dtsi
- create mode 100644 arch/arm/boot/dts/imx28-evk.dts
- create mode 100644 arch/arm/boot/dts/imx28.dtsi
- create mode 100644 arch/arm/boot/dts/imx6q-sabresd.dts
- create mode 100644 arch/arm/mach-mxs/mach-mxs.c
- rename arch/arm/mach-mxs/include/mach/mmc.h => include/linux/mmc/mxs-mmc.h (81%)
+ Documentation/arm/SPEAr/overview.txt            |   32 +-
+ .../bindings/arm/samsung/interrupt-combiner.txt |   52 +
+ Documentation/devicetree/bindings/arm/spear.txt |   14 +-
+ .../bindings/pinctrl/pinctrl_spear.txt          |   47 +
+ MAINTAINERS                                     |   13 +
+ arch/arm/Makefile                               |    2 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |   48 +
+ arch/arm/boot/dts/exynos5250.dtsi               |   60 +-
+ arch/arm/boot/dts/spear1310-evb.dts             |  292 +++
+ arch/arm/boot/dts/spear1310.dtsi                |  184 ++
+ arch/arm/boot/dts/spear1340-evb.dts             |  308 +++
+ arch/arm/boot/dts/spear1340.dtsi                |   56 +
+ arch/arm/boot/dts/spear13xx.dtsi                |  262 +++
+ arch/arm/configs/spear13xx_defconfig            |   95 +
+ arch/arm/mach-exynos/Kconfig                    |   14 +-
+ arch/arm/mach-exynos/Makefile                   |    7 +-
+ arch/arm/mach-exynos/Makefile.boot              |    3 +
+ arch/arm/mach-exynos/clock-exynos4212.c         |   10 +
+ arch/arm/mach-exynos/clock-exynos5.c            |   51 +-
+ arch/arm/mach-exynos/common.c                   |  182 +-
+ arch/arm/mach-exynos/dev-drm.c                  |   29 +
+ arch/arm/mach-exynos/dma.c                      |  141 +-
+ arch/arm/mach-exynos/include/mach/gpio.h        |    9 +-
+ arch/arm/mach-exynos/include/mach/irqs.h        |   40 +-
+ arch/arm/mach-exynos/include/mach/map.h         |    7 +-
+ arch/arm/mach-exynos/include/mach/regs-clock.h  |    2 +
+ arch/arm/mach-exynos/include/mach/regs-pmu.h    |   10 +-
+ arch/arm/mach-exynos/include/mach/spi-clocks.h  |    2 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c          |    4 +
+ arch/arm/mach-exynos/mct.c                      |   17 +-
+ arch/arm/mach-exynos/pm.c                       |    4 +-
+ arch/arm/mach-exynos/pmu.c                      |   24 +-
+ arch/arm/mach-s3c24xx/Kconfig                   |    5 +
+ arch/arm/mach-s3c24xx/Makefile                  |    1 +
+ arch/arm/mach-s3c24xx/clock-s3c2416.c           |    1 +
+ arch/arm/mach-s3c24xx/clock-s3c2443.c           |    6 +
+ arch/arm/mach-s3c24xx/common-s3c2443.c          |   15 +-
+ arch/arm/mach-s3c24xx/dma-s3c2443.c             |   16 +-
+ arch/arm/mach-s3c24xx/include/mach/dma.h        |    4 +
+ arch/arm/mach-s3c24xx/include/mach/map.h        |    5 +
+ arch/arm/mach-s3c24xx/setup-spi.c               |   39 +
+ arch/arm/mach-spear13xx/Kconfig                 |   20 +
+ arch/arm/mach-spear13xx/Makefile                |   10 +
+ arch/arm/mach-spear13xx/Makefile.boot           |    6 +
+ arch/arm/mach-spear13xx/headsmp.S               |   47 +
+ arch/arm/mach-spear13xx/hotplug.c               |  119 +
+ .../mach-spear13xx/include/mach/debug-macro.S   |   14 +
+ arch/arm/mach-spear13xx/include/mach/dma.h      |  128 +
+ arch/arm/mach-spear13xx/include/mach/generic.h  |   49 +
+ arch/arm/mach-spear13xx/include/mach/gpio.h     |   19 +
+ arch/arm/mach-spear13xx/include/mach/hardware.h |    1 +
+ arch/arm/mach-spear13xx/include/mach/irqs.h     |   20 +
+ arch/arm/mach-spear13xx/include/mach/spear.h    |   62 +
+ arch/arm/mach-spear13xx/include/mach/timex.h    |   19 +
+ .../mach-spear13xx/include/mach/uncompress.h    |   19 +
+ arch/arm/mach-spear13xx/platsmp.c               |  127 +
+ arch/arm/mach-spear13xx/spear1310.c             |   88 +
+ arch/arm/mach-spear13xx/spear1340.c             |  192 ++
+ arch/arm/mach-spear13xx/spear13xx.c             |  197 ++
+ arch/arm/plat-samsung/Kconfig                   |    2 +-
+ arch/arm/plat-samsung/include/plat/cpu.h        |    2 +-
+ arch/arm/plat-samsung/include/plat/devs.h       |    2 +
+ arch/arm/plat-samsung/include/plat/dma-pl330.h  |    1 +
+ arch/arm/plat-samsung/include/plat/s5p-clock.h  |    4 +
+ arch/arm/plat-samsung/s5p-clock.c               |   30 +
+ arch/arm/plat-spear/Kconfig                     |   12 +
+ arch/arm/plat-spear/Makefile                    |    5 +-
+ arch/arm/plat-spear/restart.c                   |    5 +
+ drivers/clk/spear/Makefile                      |    2 +
+ drivers/clk/spear/spear1310_clock.c             | 1106 +++++++++
+ drivers/clk/spear/spear1340_clock.c             |  964 ++++++++
+ drivers/gpio/gpio-samsung.c                     |   11 +-
+ drivers/pinctrl/spear/Kconfig                   |   10 +
+ drivers/pinctrl/spear/Makefile                  |    2 +
+ drivers/pinctrl/spear/pinctrl-spear.h           |  251 ++
+ drivers/pinctrl/spear/pinctrl-spear1310.c       | 2198 ++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear1340.c       | 1989 ++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear3xx.c        |  103 +-
+ drivers/spi/Kconfig                             |    2 +-
+ 79 files changed, 9648 insertions(+), 303 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
+ create mode 100644 arch/arm/boot/dts/spear1310-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear1310.dtsi
+ create mode 100644 arch/arm/boot/dts/spear1340-evb.dts
+ create mode 100644 arch/arm/boot/dts/spear1340.dtsi
+ create mode 100644 arch/arm/boot/dts/spear13xx.dtsi
+ create mode 100644 arch/arm/configs/spear13xx_defconfig
+ create mode 100644 arch/arm/mach-exynos/dev-drm.c
+ create mode 100644 arch/arm/mach-s3c24xx/setup-spi.c
+ create mode 100644 arch/arm/mach-spear13xx/Kconfig
+ create mode 100644 arch/arm/mach-spear13xx/Makefile
+ create mode 100644 arch/arm/mach-spear13xx/Makefile.boot
+ create mode 100644 arch/arm/mach-spear13xx/headsmp.S
+ create mode 100644 arch/arm/mach-spear13xx/hotplug.c
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/dma.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1310_misc_regs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1340_misc_regs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-spear13xx/platsmp.c
+ create mode 100644 arch/arm/mach-spear13xx/spear1310.c
+ create mode 100644 arch/arm/mach-spear13xx/spear1340.c
+ create mode 100644 arch/arm/mach-spear13xx/spear13xx.c
+ create mode 100644 drivers/clk/spear/spear1310_clock.c
+ create mode 100644 drivers/clk/spear/spear1340_clock.c
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear1310.c
+ create mode 100644 drivers/pinctrl/spear/pinctrl-spear1340.c
