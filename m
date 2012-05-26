@@ -1,28 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 May 2012 08:29:19 +0000
-Subject: [PATCH 6/6] serial: add amba-pl011-pci
-In-Reply-To: <20120526075855.GA1702@mail.gnudd.com>
-References: <201205260739.31653.arnd@arndb.de>
- <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
- <20120526075855.GA1702@mail.gnudd.com>
-Message-ID: <201205260829.19232.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 May 2012 09:33:56 +0100
+Subject: [PATCH 2/6] amba: use the new linux/sizes.h
+In-Reply-To: <0e1b40d651ffbc654616173f2c3bf89888db21a5.1337959750.git.rubini@gnudd.com>
+References: <cover.1337959750.git.rubini@gnudd.com>
+ <0e1b40d651ffbc654616173f2c3bf89888db21a5.1337959750.git.rubini@gnudd.com>
+Message-ID: <20120526083356.GD24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 May 2012, Alessandro Rubini wrote:
-> > Aside from the dma mask, this looks almost entirely generic. Would it
-> > be possible to make this a generic pci-amba driver that lives under
-> > drivers/amba/ and does not care about the type of device behind it?
+On Fri, May 25, 2012 at 05:48:12PM +0200, Alessandro Rubini wrote:
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  drivers/amba/bus.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Yes, it's possible. Actually, this was my longer-time plan: propose a
-> factorization when more of those were ready.  So I'll remove the
-> special name in the device and offer an implementation as generic
-> as possible.
-> 
-> BTW, are the prerequisite patches of with you?
-> 
+> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> index b7e7285..e29bfa7 100644
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/amba/bus.h>
+>  
+>  #include <asm/irq.h>
+> -#include <asm/sizes.h>
+> +#include <linux/sizes.h>
 
-Yes, they all look good to me, although patch 5 would have to change
-if you do patch 6 the way we discussed here.
-
-	Arnd
+Please move this up alongside the other linux/ includes.
