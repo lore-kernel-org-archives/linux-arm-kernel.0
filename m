@@ -1,40 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2012 01:46:38 -0700
-Subject: [GIT PULL] Veratile Express DT updates for v3.5
-In-Reply-To: <1337589524.2262.4.camel@hornet>
-References: <1337589524.2262.4.camel@hornet>
-Message-ID: <CAOesGMiLYy=_a+=Km8pswoTbCuHsu-tVwP5mH2fd1oCXM_83cQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 May 2012 09:48:19 +0100
+Subject: [PATCH 6/6] serial: add amba-pl011-pci
+In-Reply-To: <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
+References: <cover.1337959750.git.rubini@gnudd.com>
+ <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
+Message-ID: <20120526084819.GF24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+One other point.
 
-On Mon, May 21, 2012 at 1:38 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> Hi Arnd, Ofof,
->
-> Could you, please, pull this micro-updated for Versatile Express?
-> These are mostly DT changes related to A!5's architected timers and
-> VGIC. I have dropped the earlyprintk/uncompress patch for now because
-> Russell didn't like it.
->
-> Much more to come for 3.6 :-)
->
-> Thanks and apologies about short notice!
+On Fri, May 25, 2012 at 05:48:57PM +0200, Alessandro Rubini wrote:
+> +/* This is a template, copied every time a new pci device appears */
+> +static AMBA_APB_DEVICE(pl011_pci_template, "pl011-pci", 0,
+> +		       0 /* base */, {0} /* irqs */, NULL /* data */);
 
-Since this is the first time you're late with a pull request, and the
-branch is small, I'll cut you some slack. However, next time we get a
-pull request like this after the merge window is open, I will punt it
-until the next release.
+APB device.  It's a _peripheral_, it only has a _slave_ port which can't
+initiate DMA, so:
 
-So, I'll queue this up in late/soc and send it up sometime next week.
-If the merge window closes early this means it _could_ miss it, but
-hopefully not.
+> +	if (pdev->vendor == PCI_VENDOR_ID_STMICRO) {
+> +		/* Under sta2x11, DMA is there but limited to 512M */
+> +		adev->dma_mask = SZ_512M - 1;
+> +		adev->dev.coherent_dma_mask = SZ_512M - 1;
+> +	}
 
+This is pointless and unnecessary.  The PL011 driver itself doesn't use
+_this_ struct device for anything to do with DMA at all.  That's all
+handled by the DMA engine's struct device.
 
-To avoid this from happening next time, please make sure the pull
-requests reach us by -rc6 or -rc7 time frame.
-
-
-Thanks,
-
--Olof
+That's true of all APB devices.  Only AHB devices with a master port can
+initiate bus transactions, and hence cause accesses to other parts of the
+system.
