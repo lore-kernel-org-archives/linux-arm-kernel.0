@@ -1,111 +1,82 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 May 2012 18:29:49 -0600
-Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <1337952980-14621-6-git-send-email-b29396@freescale.com>
+Date: Fri, 25 May 2012 18:01:27 -0600
+Subject: [PATCH v4 2/6] gpio: re-add of_node_to_gpiochip function
+In-Reply-To: <1337952980-14621-2-git-send-email-b29396@freescale.com>
 References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-6-git-send-email-b29396@freescale.com>
-Message-ID: <20120526002950.062683E14F7@localhost>
+ <1337952980-14621-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120526000127.A53903E0D27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 May 2012 21:36:20 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+On Fri, 25 May 2012 21:36:16 +0800, Dong Aisheng <b29396@freescale.com> wrote:
 > From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> This patch implements a standard common binding for pinctrl gpio ranges.
-> Each SoC can add gpio ranges through device tree by adding a gpio-maps property
-> under their pinctrl devices node with the format:
-> <&gpio $gpio-specifier $pin_offset $count>
-> while the gpio phandle and gpio-specifier are the standard approach
-> to represent a gpio in device tree.
-> Then we can cooperate it with the gpio xlate function to get the gpio number
-> from device tree to set up the gpio ranges map.
-> 
-> Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
-> to parse and register the gpio ranges from device tree.
-> 
 > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
-> Personally i'm not very satisfied with current solution due to a few reasons:
-> 1) i can not user standard gpio api to get gpio number
-> 2) i need to reinvent a new api of_parse_phandles_with_args_ext which i'm not
-> sure if it can be accepted by DT maintainer.
 
-Right, as mentioned in my other email, doing it this way completely
-breaks the way the phandle-with-args pattern works.  That pattern
-depends on the phandle node to have a #-cells property telling it how
-many cells to process for the binding.  Adding additional data cells
-means the kernel is no longer able to parse multiple entries in the
-gpios property.
+Nack.  Several problems here.  First and foremost there isn't any
+description of *why* this change is needed or when it was removed.
+Any patch beyond the most trivial change needs to have a commit
+message the describes it.
 
-> If i did not invent that API, i need to rewrite a lot of duplicated code
-> with slight differences with the exist functions like of_get_named_gpio_flags
-> and of_parse_phandle_with_args for the special pinctrl gpio maps format.
-> 
-> So i just sent it out first to see people's comment and if any better solution.
-> 
-> One alternative solution is that that the gpio-maps into two parts:
-> pinctrl-gpios = <&gpio_phandle gpio-specifier ..>
-> pinctrl-gpio-maps = <pin_id count ..>
-> Then we can reuse the standard gpio api altough it's not better than the
-> original one.
-> 
-> Comments are welcome!
-> 
-> ChangeLog v3->v4:
-> * using standard gpio parsing approach to get the gpio number from device
->   tree. The gpio-maps becomes a little slightly different as before:
->   <&gpio $gpio_specifier $pin_offset $npin>.
->   The $gpio_specifier length is controller dependent which is specified by
->   '#gpio-cells' in in gpio controller node.
-> 
-> ChangeLog v2->v3:
-> * standardise the gpio ranges node name to 'gpio-maps'. Each SoC should use this
-> node name to define gpio ranges.
-> * defer probe if can not get gpiochip from node in case gpio driver is still
-> not loaded.
-> * some other minor fixes suggested by Stephen Warren.
-> 
-> ChangeLog v1->v2:
-> * introduce standard binding for gpio range.
-> ---
->  .../bindings/pinctrl/pinctrl-bindings.txt          |   22 +++++
->  drivers/pinctrl/devicetree.c                       |   95 ++++++++++++++++++++
->  include/linux/pinctrl/pinctrl.h                    |   11 +++
->  3 files changed, 128 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> index c95ea82..e999be5 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> @@ -126,3 +126,25 @@ device; they may be grandchildren, for example. Whether this is legal, and
->  whether there is any interaction between the child and intermediate parent
->  nodes, is again defined entirely by the binding for the individual pin
->  controller device.
-> +
-> +=== pinctrl gpio ranges ===
-> +Some pins in pinctrl device can also be multiplexed as gpio. With a gpio range
-> +map, user can know which pin in the range can be used as gpio.
-> +
-> +Required properties:
-> +gpio-maps: integers array, each entry in the array represents a gpio range
-> +with the format: <&gpio $gpio-specifier $pin_offset $count>
-> +- gpio: phandle pointing at gpio device node
-> +- gpio-specifier: array of #gpio-cells specifying specific gpio, the length is
-> +  controller specific. Usually it may be two cells for simple gpio.
-> +- pin_offset: integer, the pin offset or pin id
-> +- npins: integer, the gpio ranges starting from pin_offset
-> +
-> +For example:
-> +pincontroller {
-> +	/* gpio-specifier is two cells */
-> +	gpio-maps = <&gpio1 0 0 0 32
-> +		     &gpio2 0 0 0 30
-> +		     &gpio3 1 0 100 1
-> +		     ....>;
-
-Hmmm.... I need more information about this gpio-maps property.  How
-is it arranged?  What kind of data is in it.  Can you give some
-specific examples of how hardware would be described with a gpio-maps
-property?
+Second, of_node_to_gpiochip() is no longer a valid API because gpiolib
+now allows multiple gpiochips to use the same device tree node.  See
+commit 3d0f7cf0f "gpio: Adjust of_xlate API to support multiple GPIO
+chips" to see a description of why this was changed.
 
 g.
+
+> ---
+>  drivers/gpio/gpiolib-of.c |   11 +++++++++++
+>  include/linux/of_gpio.h   |    5 +++++
+>  2 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> index 8389d4a..b8010a9 100644
+> --- a/drivers/gpio/gpiolib-of.c
+> +++ b/drivers/gpio/gpiolib-of.c
+> @@ -234,3 +234,14 @@ void of_gpiochip_remove(struct gpio_chip *chip)
+>  	if (chip->of_node)
+>  		of_node_put(chip->of_node);
+>  }
+> +
+> +/* Private function for resolving node pointer to gpio_chip */
+> +static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
+> +{
+> +	return chip->of_node == data;
+> +}
+> +
+> +struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
+> +{
+> +	return gpiochip_find(np, of_gpiochip_is_match);
+> +}
+> diff --git a/include/linux/of_gpio.h b/include/linux/of_gpio.h
+> index c454f57..880783b 100644
+> --- a/include/linux/of_gpio.h
+> +++ b/include/linux/of_gpio.h
+> @@ -61,6 +61,7 @@ extern void of_gpiochip_remove(struct gpio_chip *gc);
+>  extern int of_gpio_simple_xlate(struct gpio_chip *gc,
+>  				const struct of_phandle_args *gpiospec,
+>  				u32 *flags);
+> +extern struct gpio_chip *of_node_to_gpiochip(struct device_node *np);
+>  
+>  #else /* CONFIG_OF_GPIO */
+>  
+> @@ -84,6 +85,10 @@ static inline int of_gpio_simple_xlate(struct gpio_chip *gc,
+>  	return -ENOSYS;
+>  }
+>  
+> +static struct gpio_chip *of_node_to_gpiochip(struct device_node *np)
+> +{
+> +	return NULL;
+> +}
+>  static inline void of_gpiochip_add(struct gpio_chip *gc) { }
+>  static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
