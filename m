@@ -1,367 +1,211 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 May 2012 00:22:34 -0700
-Subject: [GIT PULL 4/8] arm-soc: clock driver changes
+Date: Sat, 26 May 2012 00:22:36 -0700
+Subject: [GIT PULL 6/8] arm-soc: device tree conversions, part 2
 In-Reply-To: <1338016958-7887-1-git-send-email-olof@lixom.net>
 References: <1338016958-7887-1-git-send-email-olof@lixom.net>
-Message-ID: <1338016958-7887-5-git-send-email-olof@lixom.net>
+Message-ID: <1338016958-7887-7-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new clock subsystem was merged in linux-3.4 without any users, this
-now moves the first three platforms over to it: imx, mxs and spear.
-
-The series also contains the changes for the clock subsystem itself,
-since Mike preferred to have it together with the platforms that require
-these changes, in order to avoid interdependencies and conflicts.
+These continue the device tree work from part 1, this set is for the
+tegra, mxs and imx platforms, all of which have dependencies on clock
+or pinctrl changes submitted earlier.
 
 ----------------------------------------------------------------
 
-The following changes since commit d4a80a59ed34bd8c099099e8a8320f49a7e6dc7a:
+The following changes since commit 672b9ea0bd2e9c8ac957b888cdb08d1f29d332e8:
 
-  Merge tag 'cleanup2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
+  Merge tag 'stmp-dev' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/clock
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2
 
-for you to fetch changes up to 3c0dec5f58b3c7b3627715126d1bf9b030a076f0:
+for you to fetch changes up to deb88cc3c69975cbd9875ed9fac259b351f6b64d:
 
-  Merge branch 'clk-next' of git://git.linaro.org/people/mturquette/linux into next/clock
+  Merge branch 'drivers/mmc' into next/dt2
 
 ----------------------------------------------------------------
 
-Andrew Lunn (14):
-      ARM: Orion: Add clocks using the generic clk infrastructure.
-      ARM: Orion: SPI: Add clk/clkdev support.
-      ARM: Orion: Eth: Add clk/clkdev support.
-      ARM: Orion: WDT: Add clk/clkdev support
-      ARM: Orion: UART: Get the clock rate via clk_get_rate().
-      ARM: Orion: SATA: Add per channel clk/clkdev support.
-      ARM: Orion: EHCI: Add support for enabling clocks
-      ARM: Orion: NAND: Add support for clk, if there is one.
-      ARM: Orion: SDIO: Add support for clk.
-      ARM: Orion: CESA: Add support for clk
-      ARM: Orion: XOR: Add support for clk
-      ARM: Orion: PCIE: Add support for clk
-      ARM: Orion: Audio: Add clk/clkdev support
-      ARM: Kirkwood: Replace clock gating
+Arnd Bergmann (4):
+      Merge branch 'imx/pinctrl' into imx/dt
+      Merge branch 'imx/dt/for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6.git into next/dt2
+      Merge branch 'for-3.5/dt2' of git://git.kernel.org/.../swarren/linux-tegra into for-next
+      Merge branch 'drivers/mmc' into next/dt2
 
-Arnd Bergmann (10):
-      Merge branch 'depends/clk/clk-next' into next/clock
-      Merge branch 'depends/rmk/clkdev' into next/clock
-      Merge tag 'imx-common-clk' of git://git.pengutronix.de/git/imx/linux-2.6 into next/clock
-      Merge branch 'clk/mxs' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/clock
-      Merge branch 'spear/clock' into next/clock
-      Merge branch 'imx/pinctrl' into imx/clock
-      Merge branch 'spear/pinctrl' into spear/clock
-      Merge branch 'spear/dt' into spear/clock
-      Merge branches 'spear/clock' and 'imx/clock' into next/clock
-      Merge branch 'clk-next' of git://git.linaro.org/people/mturquette/linux into next/clock
+Dirk Behme (1):
+      ARM: imx6: Add UART2 for low-level debug
 
-Mark Brown (3):
-      clk: Remove comment for end of CONFIG_COMMON_CLK section
-      clk: Constify parent name arrays
-      clk: Provide dummy clk_unregister()
+Dong Aisheng (6):
+      ARM: dts: imx6q-arm2: add pinctrl state for usdhc
+      ARM: mxs: add initial device tree support for imx28-evk board
+      dma: mxs-dma: use global stmp_device functionality
+      dma: mxs-dma: add device tree probe support
+      ARM: mxs: do not add dma device by default
+      ARM: mxs: add mxs-dma dt support
 
-Mike Turquette (10):
-      clk: core: correct clk_set_rate kerneldoc
-      clk: core: remove dead code paths
-      clk: core: clk_calc_new_rates handles NULL parents
-      clk: core: enforce clk_ops consistency
-      clk: core: copy parent_names & return error codes
-      clk: basic: improve parent_names & return errors
-      MAINTAINERS: add entry for common clk framework
-      clk: prevent spurious parent rate propagation
-      clk: remove COMMON_CLK_DISABLE_UNUSED
-      clk: mux: assign init data
+Fabio Estevam (4):
+      ARM: dts: imx: Remove bootargs field
+      ARM: imx6q-arm2: Remove hardcoded mac address
+      ARM: dts: Add basic support for imx6q-sabresd
+      ARM: dts: imx6q-sabrelite: Add SPI NOR support
 
-Rajendra Nayak (2):
-      clk: Make clk_get_rate() return 0 on error
-      clk: constify parent name arrays in macros
+Hiroshi DOYU (1):
+      ARM: dt: tegra: Add device tree support for AHB
 
-Rob Herring (2):
-      clk: select CLKDEV_LOOKUP for COMMON_CLK
-      clk: remove trailing whitespace from clk.h
+Laxman Dewangan (2):
+      ARM: dt: tegra: enable als and proximity sensor
+      ARM: dt: tegra: cardhu: register core regulator tps62361
 
-Saravana Kannan (2):
-      clk: Use a separate struct for holding init data.
-      clk: Fix CLK_SET_RATE_GATE flag validation in clk_set_rate().
+Olof Johansson (3):
+      ARM: dt: tegra seaboard: add i2c devices
+      Merge branch 'for-3.5/dt' of git://git.kernel.org/.../swarren/linux-tegra into next/dt2
+      Merge branch 'mxs/dt/for-3.5' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/dt2
 
-Sascha Hauer (31):
-      dmaengine i.MX SDMA: do not depend on grouped clocks
-      spi i.MX: do not depend on grouped clocks
-      video imxfb: do not depend on grouped clocks
-      net fec: do not depend on grouped clocks
-      mmc mxcmmc: do not depend on grouped clocks
-      mmc sdhc i.MX: do not depend on grouped clocks
-      serial i.MX: do not depend on grouped clocks
-      mtd mxc_nand: prepare/unprepare clock
-      USB ehci mxc: prepare/unprepare clock
-      USB ehci mxc: sanitize clock handling
-      w1 i.MX: prepare/unprepare clock
-      watchdog imx2: prepare clk before enabling it
-      media mx3 camera: prepare clk before enabling it
-      dmaengine i.MX ipu: clk_prepare/unprepare clock
-      rtc: imx dryice: Add missing clk_prepare
-      ARM i.MX5: prepare gpc_dvfs_clk
-      ARM i.MX timer: request correct clock
-      ARM i.MX3: Make ccm base address a variable
-      ARM i.MX: prepare for common clock framework
-      ARM i.MX: Add common clock support for pllv1
-      ARM i.MX: Add common clock support for pllv2
-      ARM i.MX: Add common clock support for 2bit gate
-      ARM i.MX25: implement clocks using common clock framework
-      ARM i.MX1: implement clocks using common clock framework
-      ARM i.MX21: implement clocks using common clock framework
-      ARM i.MX27: implement clocks using common clock framework
-      ARM i.MX31: implement clocks using common clock framework
-      clk: add a fixed factor clock
-      ARM i.MX5: implement clocks using common clock framework
-      ARM i.MX35: implement clocks using common clock framework
-      ARM i.MX: remove now unused clock files
+Richard Zhao (9):
+      ARM: imx6q: move imx6q_sabrelite specific code to a dedicated function
+      ARM: dts: imx6q-sabrelite: add ssi device
+      ARM: dts: imx6q-sabrelite: add audmux device
+      ARM: dts: imx6q-sabrelite: add i2c1 pinctrl support
+      ARM: dts: imx6q-sabrelite: add audmux pinctrl support
+      ARM: imx6q: add ssi1_ipg clk_lookup
+      ARM: imx6q_sabrelite: clk_register_clkdev cko1 for sgtl5000
+      ARM: dts: imx6q-sabrelite: add sound device imx6q-sabrelite-sgtl5000
+      ARM: dts: imx6q-sabrelite: add serial2 pinctrl support
 
-Shawn Guo (19):
-      clk: use kzalloc in clk_register_mux
-      clk: remove unnecessary EXPORT_SYMBOL_GPL
-      clk: add "const" for clk_ops of basic clks
-      clk: declare clk_ops of basic clks in clk-provider.h
-      clk: always pass parent_rate into .round_rate
-      clk: pass parent_rate into .set_rate
-      clk: propagate round_rate for CLK_SET_RATE_PARENT case
-      ARM: imx: add common clock support for pllv3
-      ARM: imx: add common clock support for pfd
-      ARM: imx: add common clock support for clk busy
-      clk: mxs: add mxs specific clocks
-      clk: mxs: add clock support for imx23
-      clk: mxs: add clock support for imx28
-      ARM: mxs: request clock for timer
-      ARM: mxs: change the lookup name for fec phy clock
-      ARM: mxs: switch to common clk framework
-      ARM: mxs: remove old clock support
-      ARM: mxs: remove now unused timer_clk argument from mxs_timer_init
-      ARM: i.MX6: implement clocks using common clock framework
+Shawn Guo (29):
+      ARM: imx: rename uart and fec device tree nodes
+      ARM: imx6q: register phy fixup only when CONFIG_PHYLIB is enabled
+      ARM: imx: add more imx5 ssi clocks
+      ARM: imx: add audmux pad setting for imx51-babbage
+      ARM: imx: add audio codec clk lookup for imx53-qsb
+      ARM: dts: imx51-babbage: enable audio support
+      ARM: dts: imx53-qsb: enable audio support
+      Merge branches 'clk/mxs' and 'imx/pinctrl/for-3.5' into mxs/dt/for-3.5
+      ARM: mxs: add initial device tree support for imx23-evk board
+      ARM: mxs: always build in device tree support
+      dma: mxs-dma: let dma_is_apbh and apbh_is_old take parameter
+      dma: mxs-dma: make platform_device_id more generic
+      gpio/mxs: use devm_* helpers to make error handling simple
+      gpio/mxs: get rid of the use of cpu_is_xxx
+      gpio/mxs: add device tree probe
+      ARM: mxs: add gpio support for device tree boot
+      mmc: mxs-mmc: use global stmp_device functionality
+      mmc: mxs-mmc: let ssp_is_old take host as parameter
+      mmc: mxs-mmc: get rid of the use of cpu_is_xxx
+      mmc: mxs-mmc: move header from mach into linux folder
+      mmc: mxs-mmc: use devm_* helper to make cleanup simpler
+      mmc: mxs-mmc: have dma_channel than dma_res in mxs_mmc_host
+      mmc: mxs-mmc: copy wp_gpio in struct mxs_mmc_host
+      mmc: mxs-mmc: add device tree support
+      ARM: dts: enable mmc for imx23-evk
+      ARM: dts: enable mmc for imx28-evk
+      i2c: mxs: add device tree probe support
+      ARM: dts: enable i2c device for imx28-evk
+      ARM: dts: enable audio support for imx28-evk
 
-Viresh Kumar (14):
-      clk: Fix typo in comment
-      clk: clk-gate: Create clk_gate_endisable()
-      clk: clk-private: Add DEFINE_CLK macro
-      clk: Don't set clk->new_rate twice
-      clk: clk_set_rate() must fail if CLK_SET_RATE_GATE is set and clk is enabled
-      SPEAr: Add DT bindings for SPEAr's timer
-      SPEAr: clk: Add VCO-PLL Synthesizer clock
-      SPEAr: clk: Add Auxiliary Synthesizer clock
-      SPEAr: clk: Add Fractional Synthesizer clock
-      SPEAr: clk: Add General Purpose Timer Synthesizer clock
-      SPEAr: Call clk_prepare() before calling clk_enable
-      SPEAr: Switch to common clock framework
-      SPEAr: Add SMI NOR partition info in dts files
-      SPEAr: Update defconfigs
+Stephen Warren (17):
+      ARM: dt: tegra seaboard: fix I2C2 SCL rate
+      ARM: dt: tegra seaboard: configure I2C2 pinmux
+      ARM: dt: tegra trimslice: add RTC I2C device
+      ARM: dt: tegra trimslice: enable SDHCI1 controller
+      ARM: dt: tegra trimslice: add support for audio
+      Merge branch 'for-3.5/usb-ulpi' into for-3.5/dt2-new
+      Merge branch 'for-3.5/dt' into for-3.5/dt2-new
+      ARM: dt: tegra cardhu: fix typo in SDHCI node name
+      ARM: dt: tegra: whitespace cleanup
+      ARM: dt: tegra: remove unnecessary unit addresses
+      ARM: dt: tegra: gpio comment cleanup
+      ARM: dt: tegra: format regs properties consistently
+      ARM: dt: tegra: consistenly use lower-case for hex constants
+      ARM: dt: tegra: remove duplicate device_type property
+      ARM: dt: tegra: sort nodes based on bus order
+      ARM: dt: tegra: consistent basic property ordering
+      ARM: dt: tegra: invert status=disable vs status=okay
+
+Ying-Chun Liu (PaulLiu) (2):
+      ARM: dts: imx6q: add anatop regulators
+      ARM: dts: imx53-qsb: Add Dialog DA9053 PMIC support
+
+hdoyu at nvidia.com (4):
+      ARM: dt: tegra20.dtsi: Add Memory Controller(MC) nodes
+      ARM: dt: tegra30.dtsi: Add Memory Controller(MC) nodes
+      ARM: dt: tegra20.dtsi: Add GART node
+      ARM: dt: tegra30.dtsi: Add SMMU node
 
 
- .../devicetree/bindings/arm/spear-timer.txt     |   18 +
- MAINTAINERS                                     |   14 +-
- arch/arm/Kconfig                                |    3 +
- arch/arm/boot/dts/spear300-evb.dts              |   25 +
- arch/arm/boot/dts/spear310-evb.dts              |   20 +-
- arch/arm/boot/dts/spear320-evb.dts              |   25 +
- arch/arm/boot/dts/spear3xx.dtsi                 |    6 +
- arch/arm/boot/dts/spear600-evb.dts              |   29 +
- arch/arm/boot/dts/spear600.dtsi                 |    6 +
- arch/arm/configs/spear3xx_defconfig             |    4 +
- arch/arm/configs/spear6xx_defconfig             |    5 +-
- arch/arm/mach-dove/common.c                     |   39 +-
- arch/arm/mach-dove/dove-db-setup.c              |    1 -
- arch/arm/mach-imx/Kconfig                       |    8 +
- arch/arm/mach-imx/Makefile                      |   19 +-
- arch/arm/mach-imx/clk-busy.c                    |  189 ++
- arch/arm/mach-imx/clk-gate2.c                   |  118 +
- arch/arm/mach-imx/clk-imx1.c                    |  115 +
- arch/arm/mach-imx/clk-imx21.c                   |  186 ++
- arch/arm/mach-imx/clk-imx25.c                   |  248 ++
- arch/arm/mach-imx/clk-imx27.c                   |  290 +++
- arch/arm/mach-imx/clk-imx31.c                   |  182 ++
- arch/arm/mach-imx/clk-imx35.c                   |  278 +++
- arch/arm/mach-imx/clk-imx51-imx53.c             |  466 ++++
- arch/arm/mach-imx/clk-imx6q.c                   |  439 ++++
- arch/arm/mach-imx/clk-pfd.c                     |  147 ++
- arch/arm/mach-imx/clk-pllv1.c                   |   66 +
- arch/arm/mach-imx/clk-pllv2.c                   |  249 +++
- arch/arm/mach-imx/clk-pllv3.c                   |  419 ++++
- arch/arm/mach-imx/clk.h                         |   83 +
- arch/arm/mach-imx/clock-imx1.c                  |  636 ------
- arch/arm/mach-imx/clock-imx21.c                 | 1239 ----------
- arch/arm/mach-imx/clock-imx25.c                 |  346 ---
- arch/arm/mach-imx/clock-imx27.c                 |  785 -------
- arch/arm/mach-imx/clock-imx31.c                 |  630 ------
- arch/arm/mach-imx/clock-imx35.c                 |  536 -----
- arch/arm/mach-imx/clock-imx6q.c                 | 2111 ------------------
- arch/arm/mach-imx/clock-mx51-mx53.c             | 1675 --------------
- arch/arm/mach-imx/crmregs-imx3.h                |   79 +-
- arch/arm/mach-imx/mm-imx3.c                     |    6 +
- arch/arm/mach-imx/mm-imx5.c                     |    1 +
- arch/arm/mach-imx/pm-imx3.c                     |    4 +-
- arch/arm/mach-kirkwood/board-dreamplug.c        |    1 -
- arch/arm/mach-kirkwood/board-dt.c               |    3 +
- arch/arm/mach-kirkwood/common.c                 |  285 ++-
- arch/arm/mach-kirkwood/common.h                 |    1 +
- .../mach-kirkwood/include/mach/bridge-regs.h    |   16 +
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c  |    1 -
- arch/arm/mach-kirkwood/pcie.c                   |   25 +-
- arch/arm/mach-kirkwood/rd88f6192-nas-setup.c    |    1 -
- arch/arm/mach-kirkwood/t5325-setup.c            |    1 -
- arch/arm/mach-kirkwood/tsx1x-common.c           |    1 -
- arch/arm/mach-mv78xx0/common.c                  |   45 +-
- arch/arm/mach-mxs/Makefile                      |    5 +-
- arch/arm/mach-mxs/clock-mx23.c                  |  536 -----
- arch/arm/mach-mxs/clock-mx28.c                  |  803 -------
- arch/arm/mach-mxs/clock.c                       |  211 --
- arch/arm/mach-mxs/include/mach/clock.h          |   62 -
- arch/arm/mach-mxs/include/mach/common.h         |    6 +-
- arch/arm/mach-mxs/mach-mx28evk.c                |    2 +-
- arch/arm/mach-mxs/regs-clkctrl-mx23.h           |  331 ---
- arch/arm/mach-mxs/regs-clkctrl-mx28.h           |  486 ----
- arch/arm/mach-mxs/system.c                      |   16 -
- arch/arm/mach-mxs/timer.c                       |   11 +-
- arch/arm/mach-orion5x/common.c                  |   27 +-
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c    |    1 -
- arch/arm/mach-spear3xx/Makefile                 |    2 +-
- arch/arm/mach-spear3xx/clock.c                  |  892 --------
- arch/arm/mach-spear3xx/include/mach/generic.h   |   21 +-
- arch/arm/mach-spear3xx/include/mach/irqs.h      |    1 -
- arch/arm/mach-spear3xx/include/mach/misc_regs.h |    2 +
- arch/arm/mach-spear3xx/include/mach/spear.h     |   14 +-
- arch/arm/mach-spear3xx/spear300.c               |    1 -
- arch/arm/mach-spear3xx/spear310.c               |    1 -
- arch/arm/mach-spear3xx/spear320.c               |   12 +-
- arch/arm/mach-spear3xx/spear3xx.c               |    4 +-
- arch/arm/mach-spear6xx/Makefile                 |    2 +-
- arch/arm/mach-spear6xx/clock.c                  |  789 -------
- arch/arm/mach-spear6xx/include/mach/generic.h   |    2 +-
- arch/arm/mach-spear6xx/include/mach/irqs.h      |    3 -
- arch/arm/mach-spear6xx/include/mach/misc_regs.h |    2 +
- arch/arm/mach-spear6xx/include/mach/spear.h     |    1 -
- arch/arm/mach-spear6xx/spear6xx.c               |    7 +-
- arch/arm/plat-mxc/clock.c                       |   11 +
- arch/arm/plat-mxc/include/mach/clock.h          |    4 +
- arch/arm/plat-mxc/time.c                        |   14 +
- arch/arm/plat-orion/common.c                    |  104 +-
- arch/arm/plat-orion/include/plat/common.h       |   34 +-
- arch/arm/plat-orion/include/plat/orion_wdt.h    |   18 -
- arch/arm/plat-orion/pcie.c                      |    4 +-
- arch/arm/plat-spear/Makefile                    |    2 +-
- arch/arm/plat-spear/clock.c                     | 1005 ---------
- arch/arm/plat-spear/include/plat/clock.h        |  249 ---
- arch/arm/plat-spear/time.c                      |   39 +-
- drivers/ata/sata_mv.c                           |   40 +-
- drivers/clk/Kconfig                             |   12 +-
- drivers/clk/Makefile                            |    5 +-
- drivers/clk/clk-divider.c                       |   68 +-
- drivers/clk/clk-fixed-factor.c                  |   95 +
- drivers/clk/clk-fixed-rate.c                    |   49 +-
- drivers/clk/clk-gate.c                          |  104 +-
- drivers/clk/clk-mux.c                           |   27 +-
- drivers/clk/clk.c                               |  279 ++-
- drivers/clk/mxs/Makefile                        |    8 +
- drivers/clk/mxs/clk-div.c                       |  110 +
- drivers/clk/mxs/clk-frac.c                      |  139 ++
- drivers/clk/mxs/clk-imx23.c                     |  204 ++
- drivers/clk/mxs/clk-imx28.c                     |  337 +++
- drivers/clk/mxs/clk-pll.c                       |  116 +
- drivers/clk/mxs/clk-ref.c                       |  154 ++
- drivers/clk/mxs/clk.c                           |   28 +
- drivers/clk/mxs/clk.h                           |   66 +
- drivers/clk/spear/Makefile                      |    8 +
- drivers/clk/spear/clk-aux-synth.c               |  198 ++
- drivers/clk/spear/clk-frac-synth.c              |  165 ++
- drivers/clk/spear/clk-gpt-synth.c               |  154 ++
- drivers/clk/spear/clk-vco-pll.c                 |  363 +++
- drivers/clk/spear/clk.c                         |   36 +
- drivers/clk/spear/clk.h                         |  134 ++
- drivers/clk/spear/spear3xx_clock.c              |  612 +++++
- drivers/clk/spear/spear6xx_clock.c              |  342 +++
- drivers/crypto/mv_cesa.c                        |   14 +
- drivers/dma/imx-sdma.c                          |   40 +-
- drivers/dma/ipu/ipu_idmac.c                     |    6 +-
- drivers/dma/mv_xor.c                            |   15 +
- drivers/dma/mv_xor.h                            |    1 +
- drivers/media/video/mx3_camera.c                |    4 +-
- drivers/mmc/host/mvsdio.c                       |   14 +
- drivers/mmc/host/mxcmmc.c                       |   39 +-
- drivers/mmc/host/sdhci-esdhc-imx.c              |   42 +-
- drivers/mtd/nand/mxc_nand.c                     |    6 +-
- drivers/mtd/nand/orion_nand.c                   |   18 +
- drivers/net/ethernet/freescale/fec.c            |   35 +-
- drivers/net/ethernet/marvell/mv643xx_eth.c      |   42 +-
- drivers/rtc/rtc-imxdi.c                         |    6 +-
- drivers/spi/spi-imx.c                           |   30 +-
- drivers/spi/spi-orion.c                         |   30 +-
- drivers/tty/serial/imx.c                        |   38 +-
- drivers/usb/host/ehci-mxc.c                     |   62 +-
- drivers/usb/host/ehci-orion.c                   |   16 +
- drivers/video/imxfb.c                           |   50 +-
- drivers/w1/masters/mxc_w1.c                     |    4 +-
- drivers/watchdog/imx2_wdt.c                     |    2 +-
- drivers/watchdog/orion_wdt.c                    |   16 +-
- include/linux/clk-private.h                     |   99 +-
- include/linux/clk-provider.h                    |  120 +-
- include/linux/clk.h                             |    6 +-
- include/linux/mv643xx_eth.h                     |    1 -
- include/linux/spi/orion_spi.h                   |   17 -
- sound/soc/kirkwood/kirkwood-i2s.c               |   13 +
- sound/soc/kirkwood/kirkwood.h                   |    1 +
- 151 files changed, 8310 insertions(+), 14192 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spear-timer.txt
- create mode 100644 arch/arm/mach-imx/clk-busy.c
- create mode 100644 arch/arm/mach-imx/clk-gate2.c
- create mode 100644 arch/arm/mach-imx/clk-imx1.c
- create mode 100644 arch/arm/mach-imx/clk-imx21.c
- create mode 100644 arch/arm/mach-imx/clk-imx25.c
- create mode 100644 arch/arm/mach-imx/clk-imx27.c
- create mode 100644 arch/arm/mach-imx/clk-imx31.c
- create mode 100644 arch/arm/mach-imx/clk-imx35.c
- create mode 100644 arch/arm/mach-imx/clk-imx51-imx53.c
- create mode 100644 arch/arm/mach-imx/clk-imx6q.c
- create mode 100644 arch/arm/mach-imx/clk-pfd.c
- create mode 100644 arch/arm/mach-imx/clk-pllv1.c
- create mode 100644 arch/arm/mach-imx/clk-pllv2.c
- create mode 100644 arch/arm/mach-imx/clk-pllv3.c
- create mode 100644 arch/arm/mach-imx/clk.h
- delete mode 100644 arch/arm/mach-imx/clock-imx1.c
- delete mode 100644 arch/arm/mach-imx/clock-imx21.c
- delete mode 100644 arch/arm/mach-imx/clock-imx25.c
- delete mode 100644 arch/arm/mach-imx/clock-imx27.c
- delete mode 100644 arch/arm/mach-imx/clock-imx31.c
- delete mode 100644 arch/arm/mach-imx/clock-imx35.c
- delete mode 100644 arch/arm/mach-imx/clock-imx6q.c
- delete mode 100644 arch/arm/mach-imx/clock-mx51-mx53.c
- delete mode 100644 arch/arm/mach-mxs/clock-mx23.c
- delete mode 100644 arch/arm/mach-mxs/clock-mx28.c
- delete mode 100644 arch/arm/mach-mxs/clock.c
- delete mode 100644 arch/arm/mach-mxs/include/mach/clock.h
- delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx23.h
- delete mode 100644 arch/arm/mach-mxs/regs-clkctrl-mx28.h
- delete mode 100644 arch/arm/mach-spear3xx/clock.c
- delete mode 100644 arch/arm/mach-spear6xx/clock.c
- delete mode 100644 arch/arm/plat-orion/include/plat/orion_wdt.h
- delete mode 100644 arch/arm/plat-spear/clock.c
- delete mode 100644 arch/arm/plat-spear/include/plat/clock.h
- create mode 100644 drivers/clk/clk-fixed-factor.c
- create mode 100644 drivers/clk/mxs/Makefile
- create mode 100644 drivers/clk/mxs/clk-div.c
- create mode 100644 drivers/clk/mxs/clk-frac.c
- create mode 100644 drivers/clk/mxs/clk-imx23.c
- create mode 100644 drivers/clk/mxs/clk-imx28.c
- create mode 100644 drivers/clk/mxs/clk-pll.c
- create mode 100644 drivers/clk/mxs/clk-ref.c
- create mode 100644 drivers/clk/mxs/clk.c
- create mode 100644 drivers/clk/mxs/clk.h
- create mode 100644 drivers/clk/spear/Makefile
- create mode 100644 drivers/clk/spear/clk-aux-synth.c
- create mode 100644 drivers/clk/spear/clk-frac-synth.c
- create mode 100644 drivers/clk/spear/clk-gpt-synth.c
- create mode 100644 drivers/clk/spear/clk-vco-pll.c
- create mode 100644 drivers/clk/spear/clk.c
- create mode 100644 drivers/clk/spear/clk.h
- create mode 100644 drivers/clk/spear/spear3xx_clock.c
- create mode 100644 drivers/clk/spear/spear6xx_clock.c
- delete mode 100644 include/linux/spi/orion_spi.h
+ Documentation/devicetree/bindings/arm/fsl.txt   |  12 +
+ .../devicetree/bindings/dma/fsl-mxs-dma.txt     |  19 +
+ .../devicetree/bindings/gpio/gpio-mxs.txt       |  87 ++++
+ .../devicetree/bindings/i2c/i2c-mxs.txt         |  16 +
+ .../devicetree/bindings/mmc/mxs-mmc.txt         |  25 +
+ .../devicetree/bindings/net/fsl-fec.txt         |   2 +-
+ .../bindings/tty/serial/fsl-imx-uart.txt        |   2 +-
+ arch/arm/Kconfig                                |   1 +
+ arch/arm/Kconfig.debug                          |   8 +
+ arch/arm/boot/dts/imx23-evk.dts                 |  43 ++
+ arch/arm/boot/dts/imx23.dtsi                    | 295 +++++++++++
+ arch/arm/boot/dts/imx27-phytec-phycore.dts      |   8 +-
+ arch/arm/boot/dts/imx27.dtsi                    |  14 +-
+ arch/arm/boot/dts/imx28-evk.dts                 | 114 +++++
+ arch/arm/boot/dts/imx28.dtsi                    | 497 +++++++++++++++++++
+ arch/arm/boot/dts/imx51-babbage.dts             |  40 +-
+ arch/arm/boot/dts/imx51.dtsi                    |  41 +-
+ arch/arm/boot/dts/imx53-ard.dts                 |   6 +-
+ arch/arm/boot/dts/imx53-evk.dts                 |   8 +-
+ arch/arm/boot/dts/imx53-qsb.dts                 | 121 ++++-
+ arch/arm/boot/dts/imx53-smd.dts                 |  12 +-
+ arch/arm/boot/dts/imx53.dtsi                    |  45 +-
+ arch/arm/boot/dts/imx6q-arm2.dts                |  13 +-
+ arch/arm/boot/dts/imx6q-sabrelite.dts           |  50 +-
+ arch/arm/boot/dts/imx6q-sabresd.dts             |  53 ++
+ arch/arm/boot/dts/imx6q.dtsi                    | 171 ++++++-
+ arch/arm/boot/dts/tegra-cardhu.dts              |  85 ++--
+ arch/arm/boot/dts/tegra-harmony.dts             | 104 ++--
+ arch/arm/boot/dts/tegra-paz00.dts               | 112 ++---
+ arch/arm/boot/dts/tegra-seaboard.dts            | 213 ++++----
+ arch/arm/boot/dts/tegra-trimslice.dts           |  83 ++--
+ arch/arm/boot/dts/tegra-ventana.dts             | 102 ++--
+ arch/arm/boot/dts/tegra20.dtsi                  | 275 +++++-----
+ arch/arm/boot/dts/tegra30.dtsi                  | 292 ++++++-----
+ arch/arm/configs/mxs_defconfig                  |   1 +
+ arch/arm/mach-imx/Makefile.boot                 |   3 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c             |  40 ++
+ arch/arm/mach-imx/clk-imx6q.c                   |  35 +-
+ arch/arm/mach-imx/imx53-dt.c                    |  19 +
+ arch/arm/mach-imx/lluart.c                      |   6 +
+ arch/arm/mach-imx/mach-imx6q.c                  |  55 +-
+ arch/arm/mach-imx/mach-mx51_babbage.c           |   6 +
+ arch/arm/mach-mxs/Kconfig                       |  10 +
+ arch/arm/mach-mxs/Makefile                      |   1 +
+ arch/arm/mach-mxs/devices/Kconfig               |   1 -
+ arch/arm/mach-mxs/devices/platform-dma.c        |  21 +-
+ arch/arm/mach-mxs/devices/platform-gpio-mxs.c   |  24 +-
+ arch/arm/mach-mxs/devices/platform-mxs-mmc.c    |  21 +-
+ arch/arm/mach-mxs/include/mach/common.h         |   7 +-
+ arch/arm/mach-mxs/include/mach/devices-common.h |   3 +-
+ arch/arm/mach-mxs/mach-mxs.c                    | 121 +++++
+ arch/arm/mach-mxs/mm.c                          |  16 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S    |   2 +
+ arch/arm/plat-mxc/include/mach/mx6q.h           |   2 +
+ drivers/clk/mxs/clk-imx23.c                     |   9 +-
+ drivers/clk/mxs/clk-imx28.c                     |  13 +-
+ drivers/dma/Kconfig                             |   1 +
+ drivers/dma/mxs-dma.c                           | 188 ++++---
+ drivers/gpio/gpio-mxs.c                         | 156 +++---
+ drivers/i2c/busses/i2c-mxs.c                    |  13 +
+ drivers/mmc/host/mxs-mmc.c                      | 197 ++++----
+ include/linux/fsl/mxs-dma.h                     |  12 +-
+ .../mach/mmc.h => include/linux/mmc/mxs-mmc.h   |   7 +-
+ 63 files changed, 2972 insertions(+), 987 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mxs.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+ create mode 100644 Documentation/devicetree/bindings/mmc/mxs-mmc.txt
+ create mode 100644 arch/arm/boot/dts/imx23-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx23.dtsi
+ create mode 100644 arch/arm/boot/dts/imx28-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx28.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q-sabresd.dts
+ create mode 100644 arch/arm/mach-mxs/mach-mxs.c
+ rename arch/arm/mach-mxs/include/mach/mmc.h => include/linux/mmc/mxs-mmc.h (81%)
