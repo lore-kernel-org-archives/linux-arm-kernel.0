@@ -1,52 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 25 May 2012 17:08:29 -0700
-Subject: [PATCH v2 0/4] OMAP4: CPUidle: Add coupled idle support
-In-Reply-To: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Mon, 21 May 2012 13:02:35 +0530")
-References: <1337585559-20250-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <874nr3hkhu.fsf@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 26 May 2012 00:22:30 -0700
+Subject: [GIT PULL 0/8] Second batch of arm-soc branches for 3.5
+Message-ID: <1338016958-7887-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Hi Linus,
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+This is the second and last large set of arm-soc branches for the 3.5
+merge window. There will likely be a couple of small pull requests next
+week (and thereafter fixes).
 
-> Kevin,
->
-> Now Colin's v3 [1] is apearing in Len Brown's next branch, I have rebased
-> OMAP4 support against it. I need to pick up couple of fixes [2] posted on
-> top of v3 [1] version and arm-soc 'omap/cpuidle-cleanup' branch lined up
-> for 3.5.
+Descriptions of each branch are in the corresponding request.
 
-Great.
+Most of them have some trivial merge conflicts with earlier branches or
+other code that has gone in since they were staged. Notes below are for
+the slightly trickier cases. Just like with the last batch I've pushed
+up resolved/<tagname> branches with proposed resolutions if you want
+to compare.
 
-> This series adds the coupled cpuidle support for OMAP4 and also removes
-> the hard dependency of off-lining CPU1 to trigger deeper CPU C-states.
-> It has been build tested for all OMAP builds and functionally tested
-> on OMAP4430 SDP.
->
-> I have put together a branch with:
-> 1) Len Brown's 'next'
-> 	: git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux 
-> 2) ARM-SOC 'omap/cpuidle-cleanup'
-> 	: git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
-> 3) Two couple_idle_fixes picked up from [2]
->
-> And same is available:
->
-> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-> for_3.5/omap4_couple_idle
+cleanup2 branch:
+omap_init_clocksource_32k(): Keep the version from this branch but add
+in the register_persistent_clock() addition from bd0493e.
 
-Excellent, thanks for pulling this together with the dependencies.
+clock branch:
+An awkward add/remove conflict in mach-kirkwood/common.c. Code is removed
+here that was fixed in one of our earlier branches. The right thing to
+do is to still just remove the code.
 
-Linus has now merged the arm-soc/pm branch containing the OMAP CPUidle
-cleanup from Daniel.  Also, I just ping'd Len on the status of Colin's
-fixes.
+dt2 branch:
+gpio-mxs.c: Keep the (port) side but change false -> 0 on the last arg.
 
-As soon as all the depenencies are queued/merged I'll rebase this
-on the right mainline commit and get this queued up for v3.6.
+soc2 branch:
+gpio-samsung.c: Slightly awkward move/change conflict. Essentially
+re-apply the second hunk of f10590c9 in the moved function
+(exynos5_gpiolib_init()).
 
-Thanks for keeping on top of this,
+cleanup-initcall branch:
+Trivial conflict deltas and a deleted file conflict. The removed file
+should remain removed.
 
-Kevin
+
+Thanks!
+
+-Olof
