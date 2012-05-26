@@ -1,39 +1,48 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Sat, 26 May 2012 11:27:12 +0200
-Subject: [PATCH 6/6] serial: add amba-pl011-pci
-In-Reply-To: <20120526084328.GE24149@n2100.arm.linux.org.uk>
-References: <20120526084328.GE24149@n2100.arm.linux.org.uk>
- <cover.1337959750.git.rubini@gnudd.com>
- <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
-Message-ID: <20120526092712.GA4092@mail.gnudd.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 26 May 2012 13:28:24 +0200
+Subject: [PATCH 01/15] ARM: mx5: Use
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1337987696-31728-1-git-send-email-festevam@gmail.com>
+References: <1337987696-31728-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120526112824.GV30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +	default y if STA2X11
+On Fri, May 25, 2012 at 08:14:42PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> I don't think we want to encourage an ever growing list of platforms
-> here.  If we did this on ARM, this would be hellishly long.
-
-Ok.
-
-> NAK.  We have interfaces in the AMBA code for dynamically allocating
-> AMBA devices now - please use them instead of coding your own.  They
-> avoid bugs.
-
-Sure. Thanks for noting. Maybe it wasn't there when I coded this
-initially. Will do.
-
->> +	printk(KERN_INFO "%s %i\n", __func__, __LINE__);
+> Prepare the clock before enabling it.
 > 
-> This looks like debugging.
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/mm-imx5.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+> index feeee17..fcad95c 100644
+> --- a/arch/arm/mach-imx/mm-imx5.c
+> +++ b/arch/arm/mach-imx/mm-imx5.c
+> @@ -35,11 +35,11 @@ static void imx5_idle(void)
+>  			return;
+>  		clk_prepare(gpc_dvfs_clk);
+>  	}
+> -	clk_enable(gpc_dvfs_clk);
+> +	clk_prepare_enable(gpc_dvfs_clk);
+>  	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+>  	if (!tzic_enable_wake())
+>  		cpu_do_idle();
+> -	clk_disable(gpc_dvfs_clk);
+> +	clk_disable_unprepare(gpc_dvfs_clk);
+>  }
 
-Yes. After sending I noted this and another point. I apologize.
-Version 2 will be fixed in all respects.
+No, the clock already is prepared.
 
-> This comes nowhere close to being sane with the driver model. [...]
-> In other words, save off the platform data pointer, unregister the struct
-> device, and then free the platform data (it will not be used at that point.)
+Sascha
 
-Thanks a lot for this and also the comments on APB/AHB in the other message.
 
-/alessandro
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
