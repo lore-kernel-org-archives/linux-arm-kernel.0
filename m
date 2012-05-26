@@ -1,33 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 May 2012 09:48:19 +0100
-Subject: [PATCH 6/6] serial: add amba-pl011-pci
-In-Reply-To: <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
-References: <cover.1337959750.git.rubini@gnudd.com>
- <b166cb0fce2a67b24da5808604553b4196258f45.1337959750.git.rubini@gnudd.com>
-Message-ID: <20120526084819.GF24149@n2100.arm.linux.org.uk>
+From: richard@nod.at (Richard Weinberger)
+Date: Sat, 26 May 2012 10:55:09 +0200
+Subject: [PATCH 13/20] arm: Do not call try_to_freeze() in do_signal()
+In-Reply-To: <20120525234345.GA32000@n2100.arm.linux.org.uk>
+References: <1337983476-22081-1-git-send-email-richard@nod.at>
+ <1337983476-22081-13-git-send-email-richard@nod.at>
+ <20120525234345.GA32000@n2100.arm.linux.org.uk>
+Message-ID: <4FC09A6D.4060602@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One other point.
+Am 26.05.2012 01:43, schrieb Russell King - ARM Linux:
+> On Sat, May 26, 2012 at 12:04:29AM +0200, Richard Weinberger wrote:
+>> get_signal_to_deliver() already calls try_to_freeze(), there is no
+>> need to call it directly.
+> 
+> NAK.  Please check linux-next (okay, viro's patches haven't appeared
+> there yet) but a lot of this stuff is covered by a truckload of work
+> that Al's done.
+> 
 
-On Fri, May 25, 2012 at 05:48:57PM +0200, Alessandro Rubini wrote:
-> +/* This is a template, copied every time a new pci device appears */
-> +static AMBA_APB_DEVICE(pl011_pci_template, "pl011-pci", 0,
-> +		       0 /* base */, {0} /* irqs */, NULL /* data */);
+Okay.
+I've rebased my patches to Al's signal tree to avoid further conflicts.
 
-APB device.  It's a _peripheral_, it only has a _slave_ port which can't
-initiate DMA, so:
+Thanks,
+//richard
 
-> +	if (pdev->vendor == PCI_VENDOR_ID_STMICRO) {
-> +		/* Under sta2x11, DMA is there but limited to 512M */
-> +		adev->dma_mask = SZ_512M - 1;
-> +		adev->dev.coherent_dma_mask = SZ_512M - 1;
-> +	}
-
-This is pointless and unnecessary.  The PL011 driver itself doesn't use
-_this_ struct device for anything to do with DMA at all.  That's all
-handled by the DMA engine's struct device.
-
-That's true of all APB devices.  Only AHB devices with a master port can
-initiate bus transactions, and hence cause accesses to other parts of the
-system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120526/92975490/attachment.sig>
