@@ -1,28 +1,21 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 27 May 2012 13:39:52 +0100
-Subject: arm: Remaining issue with alignment of __log_buf in printk.c
-Message-ID: <4FC22098.3070803@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 27 May 2012 12:07:36 +0000
+Subject: [PATCH RFC] serial/8250: Adjusting FIFO parameters for LPC32xx
+In-Reply-To: <4FC21214.7060804@antcom.de>
+References: <1338048678-23991-1-git-send-email-stigge@antcom.de>
+ <201205271023.16742.arnd@arndb.de> <4FC21214.7060804@antcom.de>
+Message-ID: <201205271207.36770.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Sunday 27 May 2012, Roland Stigge wrote:
+> > Actually some of the other entries are wrong, too. The ns8250 entry should
+> > be i8250, and I guess the 16750 and 16850 were also not made by national.
+> 
+> But maybe we should keep the existing compatible strings because
+> existing boards/bootloaders are providing them already?
 
-My stargate 2 board refused to start and after bisection I ended
-up at the same patch that Stephen found an alignment issue in.
-Unfortunately Stephen's patch doesn't seem to have fixed the
-issue for me.
-https://lkml.org/lkml/2012/5/10/510 is the thread.  Patch from
-Stephen is : f8450fca6ecdea38b5a882fdf6cd097e3ec8651c
+Right, we should only add to the list. Any entry that's already used potentially
+needs to stay in there as you say.
 
-Increasing the alignement for 32 bit systems to 8 seems to do the
-job but I can't immediately think why...
-
-System is a pxa27x strong arm.
-
-Tree was effectively today's mainline.
-
-Saddly I have too many other bits to fit in today for futher
-investigation (hence this information free email!)
-
-
-Jonathan
+	Arnd
