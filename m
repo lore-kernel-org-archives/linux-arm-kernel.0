@@ -1,41 +1,31 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sun, 27 May 2012 15:50:53 +0300
-Subject: [PATCH v9 3/3] MTD: at91: atmel_nand: Update driver to support
- Programmable Multibit ECC controller
-In-Reply-To: <1338038677-6752-4-git-send-email-josh.wu@atmel.com>
-References: <1338038677-6752-1-git-send-email-josh.wu@atmel.com>
- <1338038677-6752-4-git-send-email-josh.wu@atmel.com>
-Message-ID: <1338123053.19389.9.camel@koala>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 27 May 2012 09:39:19 -0600
+Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
+References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
+ <1337952980-14621-6-git-send-email-b29396@freescale.com>
+ <4FBFBB74.901@wwwdotorg.org>
+ <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
+Message-ID: <4FC24AA7.9040100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-05-26 at 21:24 +0800, Josh Wu wrote:
-> +       while ((pmecc_readl_relaxed(host->ecc, SR) & PMECC_SR_BUSY)) {
-> +               if (unlikely(timeout_count++ > PMECC_MAX_TIMEOUT_COUNT)) {
-> +                       dev_err(host->dev, "PMECC: Timeout to get ECC value.\n");
-> +                       return; /* Time out */
+On 05/26/2012 10:52 AM, Dong Aisheng wrote:
+> On Fri, May 25, 2012 at 10:03 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 05/25/2012 07:36 AM, Dong Aisheng wrote:
+...
+>> If we don't do that, [lock ranges[i].gc] I would argue that we
+>> shouldn't store ranges[i].gc, since it might become invalid - I
+>> believe the only use of it is withinthis function?
+>>
+> In my option, i think it's ok to store it since they're just some data
+> to describe
+> hw properties. The gpio function may become invalid but not data.
+> Is it reasonable to you?
 
-How this error is communicated then up the the user?
-
-> +               }
-> +               cpu_relax();
-> +       }
-
-I see this pattern all over the place - why people consider it reliable?
-Is this code guaranteed to run on the same CPU?
-
-Why not to use loops_per_jiffie * msecs_to_jiffies(TIMOUT) instead to
-calculate how many iterations to do? Yes, due to HW register reading and
-cpu_relax() the real timeout will be larger, but this is about error
-anyway, so it does not hurt to iterate longer?
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120527/f05d8118/attachment.sig>
+The problem is that if someone tries to dereference the gc field, and
+it's no longer valid, which could cause an OOPS. Perhaps we can get away
+just with a comment in the struct definition indicating that this field
+should only be used by drivers that provided the gc field directly
+rather than having it set up by DT, but then why even store it when
+creating the ranges from DT in that case?
