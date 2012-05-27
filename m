@@ -1,40 +1,28 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 27 May 2012 13:37:56 +0200
-Subject: [PATCH RFC] serial/8250: Adjusting FIFO parameters for LPC32xx
-In-Reply-To: <201205271023.16742.arnd@arndb.de>
-References: <1338048678-23991-1-git-send-email-stigge@antcom.de>
- <201205270232.58253.arnd@arndb.de> <4FC1EEA7.2060109@antcom.de>
- <201205271023.16742.arnd@arndb.de>
-Message-ID: <4FC21214.7060804@antcom.de>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Sun, 27 May 2012 13:39:26 +0100
+Subject: arm: Remaining issue with alignment of __log_buf in printk.c
+Message-ID: <4FC2207E.1080403@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All,
 
-On 27/05/12 12:23, Arnd Bergmann wrote:
->> --- a/drivers/tty/serial/of_serial.c
->> +++ b/drivers/tty/serial/of_serial.c
->> @@ -179,6 +179,7 @@ static struct of_device_id __devinitdata of_platform_serial_table[] = {
->>         { .compatible = "ns16450",  .data = (void *)PORT_16450, },
->>         { .compatible = "ns16550a", .data = (void *)PORT_16550A, },
->>         { .compatible = "ns16550",  .data = (void *)PORT_16550, },
->> +       { .compatible = "ns16654",  .data = (void *)PORT_16654, },
->>         { .compatible = "ns16750",  .data = (void *)PORT_16750, },
->>         { .compatible = "ns16850",  .data = (void *)PORT_16850, },
->>         { .compatible = "nvidia,tegra20-uart", .data = (void *)PORT_TEGRA, },
->>
->> Wondering if it should rather be .compatible = "st16654"?
->> Will prepare a patch with adjustment of Documentation/.../of-serial.txt when
->> we agree on sth.
-> 
-> I think st16654 would be better than ns16654 here, yes.
+My stargate 2 board refused to start and after bisection I ended
+up at the same patch that Stephen found an alignment issue in.
+Unfortunately Stephen's patch doesn't seem to have fixed the
+issue for me.
+https://lkml.org/lkml/2012/5/10/510 is the thread.  Patch from
+Stephen is : f8450fca6ecdea38b5a882fdf6cd097e3ec8651c
 
-OK, will provide a patch accordingly.
+Increasing the alignement for 32 bit systems to 8 seems to do the
+job but I can't immediately think why...
 
-> Actually some of the other entries are wrong, too. The ns8250 entry should
-> be i8250, and I guess the 16750 and 16850 were also not made by national.
+System is a pxa27x strong arm.
 
-But maybe we should keep the existing compatible strings because
-existing boards/bootloaders are providing them already?
+Tree was effectively today's mainline.
 
-Roland
+Saddly I have too many other bits to fit in today for futher
+investigation (hence this information free email!)
+
+
+Jonathan
