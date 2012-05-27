@@ -1,7 +1,7 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Sun, 27 May 2012 13:39:26 +0100
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 27 May 2012 13:39:52 +0100
 Subject: arm: Remaining issue with alignment of __log_buf in printk.c
-Message-ID: <4FC2207E.1080403@cam.ac.uk>
+Message-ID: <4FC22098.3070803@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
