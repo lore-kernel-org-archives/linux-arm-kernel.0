@@ -1,30 +1,40 @@
-From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
-Date: Sun, 27 May 2012 08:35:23 -0400
-Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas used
- by dma-mapping framework
-In-Reply-To: <20120524122854.GD11860@linux-sh.org>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
- <4FBB3B41.8010102@kernel.org>
- <01e501cd39a8$67f34ea0$37d9ebe0$%szyprowski@samsung.com>
- <20120524122854.GD11860@linux-sh.org>
-Message-ID: <CAHGf_=qmBMFfV=UhXFtepO8styaQonfBA0E0+FO0qSi7RLfJFA@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 27 May 2012 15:44:28 +0300
+Subject: [PATCH v9 1/3] MTD: at91: extract hw ecc initialization to one
+ function and use relaxed read/write
+In-Reply-To: <1338038677-6752-2-git-send-email-josh.wu@atmel.com>
+References: <1338038677-6752-1-git-send-email-josh.wu@atmel.com>
+ <1338038677-6752-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1338122668.19389.4.camel@koala>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 8:28 AM, Paul Mundt <lethal@linux-sh.org> wrote:
-> On Thu, May 24, 2012 at 02:26:12PM +0200, Marek Szyprowski wrote:
->> On Tuesday, May 22, 2012 9:08 AM Minchan Kim wrote:
->> > Hmm, VM_DMA would become generic flag?
->> > AFAIU, maybe VM_DMA would be used only on ARM arch.
->>
->> Right now yes, it will be used only on ARM architecture, but maybe other architecture will
->> start using it once it is available.
->>
-> There's very little about the code in question that is ARM-specific to
-> begin with. I plan to adopt similar changes on SH once the work has
-> settled one way or the other, so we'll probably use the VMA flag there,
-> too.
+On Sat, 2012-05-26 at 21:24 +0800, Josh Wu wrote:
+> use _relaxed read/write in most place. And use writel in operations of Control Register since it needs memory barrier.
+> 
+> Signed-off-by: Hong Xu <hong.xu@atmel.com>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-I don't think VM_DMA is good idea because x86_64 has two dma zones. x86 unaware
-patches make no sense.
+This should be split on 2 or even 3 parts:
+
+1. You move definitions and things around.
+2. You separate out the init stuff into a function
+3. You start using _relaxed helpers.
+
+And you should provide better commit messages. You should explain why
+you do things - just cleanup? improvement? fix? preparation for
+something?
+
+I think this patch is too big, commit message is poor, patch does more
+things than documented in the commit message.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120527/5b38f766/attachment.sig>
