@@ -1,31 +1,50 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 27 May 2012 09:39:19 -0600
-Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
-References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-6-git-send-email-b29396@freescale.com>
- <4FBFBB74.901@wwwdotorg.org>
- <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
-Message-ID: <4FC24AA7.9040100@wwwdotorg.org>
+Date: Sun, 27 May 2012 10:03:20 -0600
+Subject: arm: Remaining issue with alignment of __log_buf in printk.c
+In-Reply-To: <4FC22098.3070803@kernel.org>
+References: <4FC22098.3070803@kernel.org>
+Message-ID: <4FC25048.109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2012 10:52 AM, Dong Aisheng wrote:
-> On Fri, May 25, 2012 at 10:03 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/25/2012 07:36 AM, Dong Aisheng wrote:
-...
->> If we don't do that, [lock ranges[i].gc] I would argue that we
->> shouldn't store ranges[i].gc, since it might become invalid - I
->> believe the only use of it is withinthis function?
->>
-> In my option, i think it's ok to store it since they're just some data
-> to describe
-> hw properties. The gpio function may become invalid but not data.
-> Is it reasonable to you?
+On 05/27/2012 06:39 AM, Jonathan Cameron wrote:
+> Hi All,
+> 
+> My stargate 2 board refused to start and after bisection I ended
+> up at the same patch that Stephen found an alignment issue in.
+> Unfortunately Stephen's patch doesn't seem to have fixed the
+> issue for me.
+> https://lkml.org/lkml/2012/5/10/510 is the thread.  Patch from
+> Stephen is : f8450fca6ecdea38b5a882fdf6cd097e3ec8651c
+> 
+> Increasing the alignement for 32 bit systems to 8 seems to do the
+> job but I can't immediately think why...
+> 
+> System is a pxa27x strong arm.
 
-The problem is that if someone tries to dereference the gc field, and
-it's no longer valid, which could cause an OOPS. Perhaps we can get away
-just with a comment in the struct definition indicating that this field
-should only be used by drivers that provided the gc field directly
-rather than having it set up by DT, but then why even store it when
-creating the ranges from DT in that case?
+The first element in the structure type that's actually stored in the
+__log_buf array is a u64; see struct log in kernel/printk.c. Depending
+on alignment rules, a u64 and a struct containing it might require a
+4-byte or 8-byte alignment. The following link implies this might have
+changed over time:
+
+http://wiki.debian.org/ArmEabiPort#Struct_packing_and_alignment
+
+(see "64-bit data type alignment" a little below that anchor). I'm not
+sure what ABI the kernel expects to use internally, or your compiler;
+perhaps you need the new EABI 8-byte alignment requirement for a u64 and
+hence the struct as a whole, but Tegra (or my toolchain?) is OK with the
+older 4-byte alignment for a u64 or struct?
+
+Further, I'm not sure if the following alignment selection logic:
+
+> #if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+> #define LOG_ALIGN 4
+> #else
+> #define LOG_ALIGN 8
+> #endif
+
+... uses the CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS for its intended
+purpose?
+
+Russell, can you please comment here. Thanks.
