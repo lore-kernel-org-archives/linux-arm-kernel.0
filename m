@@ -1,107 +1,171 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Sun, 27 May 2012 10:29:55 +0900
-Subject: [PATCH 05/20] ARM: EXYNOS: Redefine IRQ_MCT_L0,1 definition
-In-Reply-To: <1335813270-13083-6-git-send-email-thomas.abraham@linaro.org>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAH9JG2VwwXBWMvnK3ZYK37Gvsv9ORV7pqwM5rYtP-UEAxk_u-Q@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 27 May 2012 04:10:55 +0200
+Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
+Message-ID: <1338084656-11961-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch configures the I2C bus timing registers according
+to information passed via DT. Currently, 100kHz and 400kHz
+modes are supported.
 
-On Tue, May 1, 2012 at 4:14 AM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> From: Changhwan Youn <chaos.youn@samsung.com>
->
-> Redefine IRQ_MCT_L0,1 irq definition as it is changed in rev1 of EXYNOS5.
->
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?arch/arm/mach-exynos/include/mach/irqs.h | ? ?4 ++--
-> ?arch/arm/mach-exynos/mct.c ? ? ? ? ? ? ? | ? 17 +++++++++++------
-> ?2 files changed, 13 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-> index 591e7852..ef52f61 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -331,6 +331,8 @@
-> ?#define EXYNOS5_IRQ_SATA ? ? ? ? ? ? ? IRQ_SPI(115)
-> ?#define EXYNOS5_IRQ_NFCON ? ? ? ? ? ? ?IRQ_SPI(116)
->
-> +#define EXYNOS5_IRQ_MCT_L0 ? ? ? ? ? ? IRQ_SPI(120)
-> +#define EXYNOS5_IRQ_MCT_L1 ? ? ? ? ? ? IRQ_SPI(121)
-> ?#define EXYNOS5_IRQ_MMC44 ? ? ? ? ? ? ?IRQ_SPI(123)
-> ?#define EXYNOS5_IRQ_MDMA1 ? ? ? ? ? ? ?IRQ_SPI(124)
-> ?#define EXYNOS5_IRQ_FIMC_LITE0 ? ? ? ? IRQ_SPI(125)
-> @@ -410,8 +412,6 @@
-> ?#define EXYNOS5_IRQ_FIMD1_SYSTEM ? ? ? COMBINER_IRQ(18, 6)
->
-> ?#define EXYNOS5_IRQ_EINT0 ? ? ? ? ? ? ?COMBINER_IRQ(23, 0)
-> -#define EXYNOS5_IRQ_MCT_L0 ? ? ? ? ? ? COMBINER_IRQ(23, 1)
-> -#define EXYNOS5_IRQ_MCT_L1 ? ? ? ? ? ? COMBINER_IRQ(23, 2)
-> ?#define EXYNOS5_IRQ_MCT_G0 ? ? ? ? ? ? COMBINER_IRQ(23, 3)
-> ?#define EXYNOS5_IRQ_MCT_G1 ? ? ? ? ? ? COMBINER_IRQ(23, 4)
-> ?#define EXYNOS5_IRQ_MCT_G2 ? ? ? ? ? ? COMBINER_IRQ(23, 5)
-> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-> index 897d9a9..b601fb8 100644
-> --- a/arch/arm/mach-exynos/mct.c
-> +++ b/arch/arm/mach-exynos/mct.c
-> @@ -388,6 +388,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
-> ?{
-> ? ? ? ?struct mct_clock_event_device *mevt;
-> ? ? ? ?unsigned int cpu = smp_processor_id();
-> + ? ? ? int mct_lx_irq;
->
-> ? ? ? ?mevt = this_cpu_ptr(&percpu_mct_tick);
-> ? ? ? ?mevt->evt = evt;
-> @@ -414,14 +415,18 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->
-> ? ? ? ?if (mct_int_type == MCT_INT_SPI) {
-> ? ? ? ? ? ? ? ?if (cpu == 0) {
-> + ? ? ? ? ? ? ? ? ? ? ? mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L0 :
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? EXYNOS5_IRQ_MCT_L0;
-Does it still valid for exynos4x12?. It means exynos4x12 uses
-EXYNOS5_IRQ_MCT_L0?
-> ? ? ? ? ? ? ? ? ? ? ? ?mct_tick0_event_irq.dev_id = mevt;
-> - ? ? ? ? ? ? ? ? ? ? ? evt->irq = EXYNOS4_IRQ_MCT_L0;
-> - ? ? ? ? ? ? ? ? ? ? ? setup_irq(EXYNOS4_IRQ_MCT_L0, &mct_tick0_event_irq);
-> + ? ? ? ? ? ? ? ? ? ? ? evt->irq = mct_lx_irq;
-> + ? ? ? ? ? ? ? ? ? ? ? setup_irq(mct_lx_irq, &mct_tick0_event_irq);
-> ? ? ? ? ? ? ? ?} else {
-> + ? ? ? ? ? ? ? ? ? ? ? mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L1 :
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? EXYNOS5_IRQ_MCT_L1;
-ditto
-> ? ? ? ? ? ? ? ? ? ? ? ?mct_tick1_event_irq.dev_id = mevt;
-> - ? ? ? ? ? ? ? ? ? ? ? evt->irq = EXYNOS4_IRQ_MCT_L1;
-> - ? ? ? ? ? ? ? ? ? ? ? setup_irq(EXYNOS4_IRQ_MCT_L1, &mct_tick1_event_irq);
-> - ? ? ? ? ? ? ? ? ? ? ? irq_set_affinity(EXYNOS4_IRQ_MCT_L1, cpumask_of(1));
-> + ? ? ? ? ? ? ? ? ? ? ? evt->irq = mct_lx_irq;
-> + ? ? ? ? ? ? ? ? ? ? ? setup_irq(mct_lx_irq, &mct_tick1_event_irq);
-> + ? ? ? ? ? ? ? ? ? ? ? irq_set_affinity(mct_lx_irq, cpumask_of(1));
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?enable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, 0);
-> @@ -473,7 +478,7 @@ static void __init exynos4_timer_resources(void)
->
-> ?static void __init exynos4_timer_init(void)
-> ?{
-> - ? ? ? if (soc_is_exynos4210())
-> + ? ? ? if ((soc_is_exynos4210()) || (soc_is_exynos5250()))
-> ? ? ? ? ? ? ? ?mct_int_type = MCT_INT_SPI;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?mct_int_type = MCT_INT_PPI;
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Detlev Zundel <dzu@denx.de>
+CC: Dong Aisheng <b29396@freescale.com>
+CC: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-i2c at vger.kernel.org
+CC: Sascha Hauer <s.hauer@pengutronix.de>
+CC: Shawn Guo <shawn.guo@linaro.org>
+Cc: Stefano Babic <sbabic@denx.de>
+CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Wolfgang Denk <wd@denx.de>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+---
+ Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    1 +
+ arch/arm/boot/dts/imx28.dtsi                      |    2 +
+ drivers/i2c/busses/i2c-mxs.c                      |   64 +++++++++++++++++++++
+ 3 files changed, 67 insertions(+)
 
-BTW exynos4x12 uses MCT_INT_PPI?
-
-Kyungmin Park
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+index 1bfc02d..790b5c6 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Should be "fsl,<chip>-i2c"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain ERROR and DMA interrupts
++- speed: Speed of the bus in kHz (400 or 100 are supported)
+ 
+ Examples:
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 4634cb8..d927155 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -381,6 +381,7 @@
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x80058000 2000>;
+ 				interrupts = <111 68>;
++				fsl,speed = <400>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -390,6 +391,7 @@
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x8005a000 2000>;
+ 				interrupts = <110 69>;
++				fsl,speed = <400>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 04eb441..fff0a09 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -46,6 +46,10 @@
+ #define MXS_I2C_CTRL0_DIRECTION			0x00010000
+ #define MXS_I2C_CTRL0_XFER_COUNT(v)		((v) & 0x0000FFFF)
+ 
++#define MXS_I2C_TIMING0		(0x10)
++#define MXS_I2C_TIMING1		(0x20)
++#define MXS_I2C_TIMING2		(0x30)
++
+ #define MXS_I2C_CTRL1		(0x40)
+ #define MXS_I2C_CTRL1_SET	(0x44)
+ #define MXS_I2C_CTRL1_CLR	(0x48)
+@@ -97,6 +101,24 @@
+ #define MXS_CMD_I2C_READ	(MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
+ 				 MXS_I2C_CTRL0_MASTER_MODE)
+ 
++struct mxs_i2c_speed_config {
++	uint32_t	timing0;
++	uint32_t	timing1;
++	uint32_t	timing2;
++};
++
++const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
++	.timing0	= 0x00780030,
++	.timing1	= 0x00800030,
++	.timing2	= 0x0015000d,
++};
++
++const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
++	.timing0	= 0x000f0007,
++	.timing1	= 0x001f000f,
++	.timing2	= 0x0015000d,
++};
++
+ /**
+  * struct mxs_i2c_dev - per device, private MXS-I2C data
+  *
+@@ -112,11 +134,17 @@ struct mxs_i2c_dev {
+ 	struct completion cmd_complete;
+ 	u32 cmd_err;
+ 	struct i2c_adapter adapter;
++	const struct mxs_i2c_speed_config *speed;
+ };
+ 
+ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+ {
+ 	stmp_reset_block(i2c->regs);
++
++	writel(i2c->speed->timing0, i2c->regs + MXS_I2C_TIMING0);
++	writel(i2c->speed->timing1, i2c->regs + MXS_I2C_TIMING1);
++	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
++
+ 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
+ 	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+ 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
+@@ -319,6 +347,38 @@ static const struct i2c_algorithm mxs_i2c_algo = {
+ 	.functionality = mxs_i2c_func,
+ };
+ 
++#ifdef CONFIG_OF
++static int mxs_i2c_get_ofdata(struct platform_device *pdev,
++				struct mxs_i2c_dev *i2c)
++{
++	const __be32 *speed;
++	uint32_t speed_khz;
++	struct device_node *node = pdev->dev.of_node;
++
++	if (!node)
++		return -EINVAL;
++
++	i2c->speed = &mxs_i2c_95kHz_config;
++	speed = of_get_property(node, "fsl,speed", NULL);
++	if (!speed)
++		dev_warn(&pdev->dev,
++			"No I2C speed selected, using 100kHz\n");
++
++	speed_khz = be32_to_cpup(speed);
++	if (speed_khz == 400)
++		i2c->speed = &mxs_i2c_400kHz_config;
++	else if (speed_khz != 100)
++		dev_warn(&pdev->dev,
++			"Invalid I2C speed selected, using 100kHz\n");
++
++	return 0;
++}
++#else
++static int mxs_i2c_get_ofdata(struct platform_device *pdev,
++				struct mxs_i2c_dev *i2c)
++{ }
++#endif /* CONFIG_OF */
++
+ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -357,6 +417,10 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
+ 
++	err = mxs_i2c_get_ofdata(pdev, i2c);
++	if (err)
++		return err;
++
+ 	i2c->dev = dev;
+ 	platform_set_drvdata(pdev, i2c);
+ 
+-- 
+1.7.10
