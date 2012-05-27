@@ -1,14 +1,14 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sat, 26 May 2012 21:19:09 +0100
+From: greg@kroah.com (Greg KH)
+Date: Sun, 27 May 2012 09:07:38 +0900
 Subject: [STABLE PATCH] ARM: 7409/1: Do not call flush_cache_user_range
  with mmap_sem held
 In-Reply-To: <1337956684-23569-1-git-send-email-will.deacon@arm.com>
 References: <1337956684-23569-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1338063549.20487.20.camel@deadeye>
+Message-ID: <20120527000738.GF14234@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-05-25 at 15:38 +0100, Will Deacon wrote:
+On Fri, May 25, 2012 at 03:38:04PM +0100, Will Deacon wrote:
 > From: Dima Zavin <dima@android.com>
 > 
 > commit 435a7ef52db7d86e67a009b36cac1457f8972391 upstream
@@ -34,19 +34,7 @@ On Fri, 2012-05-25 at 15:38 +0100, Will Deacon wrote:
 > 
 > Greg: This patch is a candidate for -stable, but its dependency (listed
 >       above) wasn't marked as such, hence this retrospective submission.
-[...]
 
-Both queued up for 3.2.y, thanks.
+Both now queued up for 3.0, 3.3, and 3.4-stable trees
 
-Ben.
-
--- 
-Ben Hutchings
-You can't have everything.  Where would you put it?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120526/98eb634a/attachment.sig>
+greg k-h
