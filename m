@@ -1,21 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 27 May 2012 12:07:36 +0000
-Subject: [PATCH RFC] serial/8250: Adjusting FIFO parameters for LPC32xx
-In-Reply-To: <4FC21214.7060804@antcom.de>
-References: <1338048678-23991-1-git-send-email-stigge@antcom.de>
- <201205271023.16742.arnd@arndb.de> <4FC21214.7060804@antcom.de>
-Message-ID: <201205271207.36770.arnd@arndb.de>
+From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
+Date: Sun, 27 May 2012 08:35:23 -0400
+Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas used
+ by dma-mapping framework
+In-Reply-To: <20120524122854.GD11860@linux-sh.org>
+References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+ <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
+ <4FBB3B41.8010102@kernel.org>
+ <01e501cd39a8$67f34ea0$37d9ebe0$%szyprowski@samsung.com>
+ <20120524122854.GD11860@linux-sh.org>
+Message-ID: <CAHGf_=qmBMFfV=UhXFtepO8styaQonfBA0E0+FO0qSi7RLfJFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 27 May 2012, Roland Stigge wrote:
-> > Actually some of the other entries are wrong, too. The ns8250 entry should
-> > be i8250, and I guess the 16750 and 16850 were also not made by national.
-> 
-> But maybe we should keep the existing compatible strings because
-> existing boards/bootloaders are providing them already?
+On Thu, May 24, 2012 at 8:28 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Thu, May 24, 2012 at 02:26:12PM +0200, Marek Szyprowski wrote:
+>> On Tuesday, May 22, 2012 9:08 AM Minchan Kim wrote:
+>> > Hmm, VM_DMA would become generic flag?
+>> > AFAIU, maybe VM_DMA would be used only on ARM arch.
+>>
+>> Right now yes, it will be used only on ARM architecture, but maybe other architecture will
+>> start using it once it is available.
+>>
+> There's very little about the code in question that is ARM-specific to
+> begin with. I plan to adopt similar changes on SH once the work has
+> settled one way or the other, so we'll probably use the VMA flag there,
+> too.
 
-Right, we should only add to the list. Any entry that's already used potentially
-needs to stay in there as you say.
-
-	Arnd
+I don't think VM_DMA is good idea because x86_64 has two dma zones. x86 unaware
+patches make no sense.
