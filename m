@@ -1,45 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 28 May 2012 10:19:39 +0200
-Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas used
- by dma-mapping framework
-In-Reply-To: <CAHGf_=qmBMFfV=UhXFtepO8styaQonfBA0E0+FO0qSi7RLfJFA@mail.gmail.com>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
- <4FBB3B41.8010102@kernel.org>
- <01e501cd39a8$67f34ea0$37d9ebe0$%szyprowski@samsung.com>
- <20120524122854.GD11860@linux-sh.org>
- <CAHGf_=qmBMFfV=UhXFtepO8styaQonfBA0E0+FO0qSi7RLfJFA@mail.gmail.com>
-Message-ID: <001d01cd3caa$a05d0510$e1170f30$%szyprowski@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 28 May 2012 11:22:18 +0300
+Subject: [PATCH] mmc: omap: Fix a section warning regression
+In-Reply-To: <20120528065347.GR17852@atomide.com>
+References: <20120528065347.GR17852@atomide.com>
+Message-ID: <20120528082217.GI18918@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Sunday, May 27, 2012 2:35 PM KOSAKI Motohiro wrote:
-
-> On Thu, May 24, 2012 at 8:28 AM, Paul Mundt <lethal@linux-sh.org> wrote:
-> > On Thu, May 24, 2012 at 02:26:12PM +0200, Marek Szyprowski wrote:
-> >> On Tuesday, May 22, 2012 9:08 AM Minchan Kim wrote:
-> >> > Hmm, VM_DMA would become generic flag?
-> >> > AFAIU, maybe VM_DMA would be used only on ARM arch.
-> >>
-> >> Right now yes, it will be used only on ARM architecture, but maybe other architecture will
-> >> start using it once it is available.
-> >>
-> > There's very little about the code in question that is ARM-specific to
-> > begin with. I plan to adopt similar changes on SH once the work has
-> > settled one way or the other, so we'll probably use the VMA flag there,
-> > too.
+On Sun, May 27, 2012 at 11:53:47PM -0700, Tony Lindgren wrote:
+> Commit b6e0703b (mmc: omap: make it behave well as a module) made some
+> __devinit changes but missed one function causing a section warning:
 > 
-> I don't think VM_DMA is good idea because x86_64 has two dma zones. x86 unaware
-> patches make no sense.
+> WARNING: vmlinux.o(.devinit.text+0x8604): Section mismatch in reference
+> from the function mmc_omap_probe)
+> The function __devinit mmc_omap_probe() references a function
+> __init mmc_omap_new_slot()
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-I see no problems to add VM_DMA64 later if x86_64 starts using vmalloc areas for creating 
-kernel mappings for the dma buffers (I assume that there are 2 dma zones: one 32bit and one
-64bit). Right now x86 and x86_64 don't use vmalloc areas for dma buffers, so I hardly see
-how this patch can be considered as 'x86 unaware'.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Best regards
+> 
+> --- a/drivers/mmc/host/omap.c
+> +++ b/drivers/mmc/host/omap.c
+> @@ -1300,7 +1300,7 @@ static const struct mmc_host_ops mmc_omap_ops = {
+>  	.set_ios	= mmc_omap_set_ios,
+>  };
+>  
+> -static int __init mmc_omap_new_slot(struct mmc_omap_host *host, int id)
+> +static int __devinit mmc_omap_new_slot(struct mmc_omap_host *host, int id)
+>  {
+>  	struct mmc_omap_slot *slot = NULL;
+>  	struct mmc_host *mmc;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120528/2669f1a8/attachment.sig>
