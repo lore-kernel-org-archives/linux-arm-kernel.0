@@ -1,66 +1,54 @@
 From: alexg@meprolight.com (Alex Gershgorin)
-Date: Mon, 28 May 2012 15:04:47 +0300
-Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
-Message-ID: <1338206687-14551-1-git-send-email-alexg@meprolight.com>
+Date: Mon, 28 May 2012 15:13:31 +0300
+Subject: [PATCH] ARM: i.MX: Keypad prepare/unprepare clock
+Message-ID: <1338207211-14637-1-git-send-email-alexg@meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch also adds mux and divider for camera clock.
-
 Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
 ---
- arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+ drivers/input/keyboard/imx_keypad.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index a9e60bf..42131d5 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -62,8 +62,8 @@ enum mx35_clks {
- 	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
- 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
- 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
--	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
--	clk_max
-+	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
-+	gpu2d_gate, clk_max
- };
+diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+index 6ee7421..9d57945 100644
+--- a/drivers/input/keyboard/imx_keypad.c
++++ b/drivers/input/keyboard/imx_keypad.c
+@@ -378,7 +378,7 @@ static void imx_keypad_close(struct input_dev *dev)
+ 	imx_keypad_inhibit(keypad);
  
- static struct clk *clk[clk_max];
-@@ -142,6 +142,9 @@ int __init mx35_clocks_init()
+ 	/* Disable clock unit */
+-	clk_disable(keypad->clk);
++	clk_disable_unprepare(keypad->clk);
+ }
  
- 	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
+ static int imx_keypad_open(struct input_dev *dev)
+@@ -391,7 +391,7 @@ static int imx_keypad_open(struct input_dev *dev)
+ 	keypad->enabled = true;
  
-+	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
-+	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
-+
- 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
- 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
- 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
-@@ -192,7 +195,7 @@ int __init mx35_clocks_init()
- 	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
- 	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
+ 	/* Enable the kpp clock */
+-	clk_enable(keypad->clk);
++	clk_prepare_enable(keypad->clk);
+ 	imx_keypad_config(keypad);
  
--	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
-+	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
- 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
- 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
+ 	/* Sanity control, not all the rows must be actived now. */
+@@ -581,7 +581,7 @@ static int imx_kbd_suspend(struct device *dev)
+ 	mutex_lock(&input_dev->mutex);
  
-@@ -229,6 +232,7 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
-+	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
- 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
- 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
-@@ -256,6 +260,7 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+ 	if (input_dev->users)
+-		clk_disable(kbd->clk);
++		clk_disable_unprepare(kbd->clk);
  
- 	clk_prepare_enable(clk[spba_gate]);
- 	clk_prepare_enable(clk[gpio1_gate]);
+ 	mutex_unlock(&input_dev->mutex);
+ 
+@@ -603,7 +603,7 @@ static int imx_kbd_resume(struct device *dev)
+ 	mutex_lock(&input_dev->mutex);
+ 
+ 	if (input_dev->users)
+-		clk_enable(kbd->clk);
++		clk_prepare_enable(kbd->clk);
+ 
+ 	mutex_unlock(&input_dev->mutex);
+ 
 -- 
 1.7.0.4
