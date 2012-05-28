@@ -1,88 +1,70 @@
 From: vincent.sanders@collabora.co.uk (Vincent Sanders)
-Date: Mon, 28 May 2012 19:33:38 +0100
-Subject: [PATCH 2/2] Enable gcov support on the ARM architecture
+Date: Mon, 28 May 2012 19:33:37 +0100
+Subject: [PATCH 1/2] Allow constructor name selection by architecture.
 In-Reply-To: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
 References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
-Message-ID: <1338230018-31052-3-git-send-email-vincent.sanders@collabora.co.uk>
+Message-ID: <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vincent Sanders <vince@collabora.co.uk>
 
-Enable gcov support for ARM based on original patches by David
-Singleton and George G. Davis
+The constructor symbol name is different between platforms. Allow this
+to be selected by configuration and set suitable default values.
 
 Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
 ---
- arch/arm/boot/bootp/Makefile      |    2 ++
- arch/arm/boot/compressed/Makefile |    2 ++
- arch/arm/include/asm/elf.h        |    1 +
- arch/arm/kernel/module.c          |    1 +
- kernel/gcov/Kconfig               |    2 +-
- 5 files changed, 7 insertions(+), 1 deletion(-)
+ include/asm-generic/vmlinux.lds.h |    6 +++---
+ init/Kconfig                      |    6 ++++++
+ kernel/module.c                   |    2 +-
+ 3 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
-index c394e30..5761f00 100644
---- a/arch/arm/boot/bootp/Makefile
-+++ b/arch/arm/boot/bootp/Makefile
-@@ -5,6 +5,8 @@
- # architecture-specific flags and dependencies.
- #
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 8aeadf6..fd34808 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -471,9 +471,9 @@
+ 	}
  
-+GCOV_PROFILE	:= n
+ #ifdef CONFIG_CONSTRUCTORS
+-#define KERNEL_CTORS()	. = ALIGN(8);			   \
+-			VMLINUX_SYMBOL(__ctors_start) = .; \
+-			*(.ctors)			   \
++#define KERNEL_CTORS()	. = ALIGN(8);					\
++			VMLINUX_SYMBOL(__ctors_start) = .;		\
++			*(CONFIG_CONSTRUCTORS_NAME)			\
+ 			VMLINUX_SYMBOL(__ctors_end) = .;
+ #else
+ #define KERNEL_CTORS()
+diff --git a/init/Kconfig b/init/Kconfig
+index 6cfd71d..52181a1 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -20,6 +20,12 @@ config CONSTRUCTORS
+ 	bool
+ 	depends on !UML
+ 
++config CONSTRUCTORS_NAME
++	string
++	depends on CONSTRUCTORS
++	default ".init_array" if ARM && AEABI
++	default ".ctors"
 +
- LDFLAGS_bootp	:=-p --no-undefined -X \
- 		 --defsym initrd_phys=$(INITRD_PHYS) \
- 		 --defsym params_phys=$(PARAMS_PHYS) -T
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index bb26756..7482fcd 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -30,6 +30,8 @@ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
- OBJS		+= string.o
- CFLAGS_string.o	:= -Os
+ config HAVE_IRQ_WORK
+ 	bool
  
-+GCOV_PROFILE		:= n
-+
- #
- # Architecture dependencies
- #
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index 38050b1..64afbd0 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -52,6 +52,7 @@ typedef struct user_fp elf_fpregset_t;
- #define R_ARM_ABS32		2
- #define R_ARM_CALL		28
- #define R_ARM_JUMP24		29
-+#define R_ARM_TARGET1		38
- #define R_ARM_V4BX		40
- #define R_ARM_PREL31		42
- #define R_ARM_MOVW_ABS_NC	43
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 1e9be5d..b22fc22 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -89,6 +89,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			break;
+diff --git a/kernel/module.c b/kernel/module.c
+index 78ac6ec..e5fad5e 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -2600,7 +2600,7 @@ static void find_module_sections(struct module *mod, struct load_info *info)
+ 	mod->unused_gpl_crcs = section_addr(info, "__kcrctab_unused_gpl");
+ #endif
+ #ifdef CONFIG_CONSTRUCTORS
+-	mod->ctors = section_objs(info, ".ctors",
++	mod->ctors = section_objs(info, CONFIG_CONSTRUCTORS_NAME,
+ 				  sizeof(*mod->ctors), &mod->num_ctors);
+ #endif
  
- 		case R_ARM_ABS32:
-+		case R_ARM_TARGET1:
- 			*(u32 *)loc += sym->st_value;
- 			break;
- 
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index a920281..2a02dae 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -35,7 +35,7 @@ config GCOV_KERNEL
- config GCOV_PROFILE_ALL
- 	bool "Profile entire Kernel"
- 	depends on GCOV_KERNEL
--	depends on SUPERH || S390 || X86 || (PPC && EXPERIMENTAL) || MICROBLAZE
-+	depends on SUPERH || S390 || X86 || (PPC && EXPERIMENTAL) || MICROBLAZE || ARM
- 	default n
- 	---help---
- 	This options activates profiling for the entire kernel.
 -- 
 1.7.10
