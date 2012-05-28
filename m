@@ -1,30 +1,31 @@
-From: alainsergenagni@yahoo.com (Jean-Paul)
-Date: Mon, 28 May 2012 07:25:08 +0000 (UTC)
-Subject: [PATCH 2/3] ARM: mx28: Add SPI resources
-References: <1333480807-10480-1-git-send-email-festevam@gmail.com>
- <1333480807-10480-2-git-send-email-festevam@gmail.com>
-Message-ID: <loom.20120528T090703-293@post.gmane.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 May 2012 08:36:09 +0100
+Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+In-Reply-To: <CACRpkdZO=B9gWkhvgf4Ewi1GKibFxki36uF06ispQzDK7T+4sA@mail.gmail.com>
+References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+ <CACRpkdZC8LOOLkWbrPbXN_nKaw-WvueusYDyrX48Q1Pcdwv3Aw@mail.gmail.com>
+ <CAGOxZ52w1nn8g4d_vuNAzjA9qYZ1=yEfihFvSOK+pBz=ZD=J7Q@mail.gmail.com>
+ <CACRpkdZO=B9gWkhvgf4Ewi1GKibFxki36uF06ispQzDK7T+4sA@mail.gmail.com>
+Message-ID: <20120528073609.GG24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 28, 2012 at 12:41:42PM +0800, Linus Walleij wrote:
+> On Thu, Dec 8, 2011 at 9:03 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> 
+> > Hello Linus,
+> > sorry for the delay in submitting V3 of the pl080 patches for s3c64xx.
+> > I am very busy with my current assignment.
+> > I will come back to my patch series incorporating yours and Viresh
+> > suggestions in v3.
+> 
+> Ping on this, is there something in specific that you need help on here?
+> We really need to get rid of this forked code, and it should be beneficial
+> to S3C because we have fixed a lot of bugs in the PL08x driver now,
+> plus it'll likely be a prerequisite to DT support for S3C.
 
-Hi Fabio Estevam,
- I have im28 evk board and I fallowed your instructions to add the SPI resources
-in my kernel. I'm using the kernel 3.2.15. After rebuilding the kernel, I still
-can not see the imx28 spi drivers. Im sorry to ask these beginner questions but
-I'm new in using linux spi drivers.
+So this hasn't gone in?
 
- I checked at these locations:
-     /sys/class/spidev   and    /sys/class/spi_master
-I could not see any SPI device, it was just empty.
-
-when I do: ls /sys/bus/spi/drivers
-I can see:   enc28j60 , mc33880 , mmc_spi , and spidev
-
-How can I create a device spi node since it looks like that i don't have spi
-driver for the imx28 evk board?
-
-
-Thanks for your help,
-Jean-Paul
- 
+This is going to be painful - I have 40 odd patches to PL08x converting it
+to virt-dma now...  It's probably going to be easier for the S3C conversion
+to be based upon my work rather than me having to rework all those patches.
