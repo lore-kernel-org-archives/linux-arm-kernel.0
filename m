@@ -1,48 +1,29 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 May 2012 11:22:18 +0300
-Subject: [PATCH] mmc: omap: Fix a section warning regression
-In-Reply-To: <20120528065347.GR17852@atomide.com>
-References: <20120528065347.GR17852@atomide.com>
-Message-ID: <20120528082217.GI18918@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 May 2012 09:24:52 +0100
+Subject: amba, tegra-ahb and pci (Kconfig question)
+In-Reply-To: <20120528081737.GA8031@mail.gnudd.com>
+References: <20120528081737.GA8031@mail.gnudd.com>
+Message-ID: <20120528082452.GH24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 27, 2012 at 11:53:47PM -0700, Tony Lindgren wrote:
-> Commit b6e0703b (mmc: omap: make it behave well as a module) made some
-> __devinit changes but missed one function causing a section warning:
+On Mon, May 28, 2012 at 10:17:37AM +0200, Alessandro Rubini wrote:
+> If the former (CONFIG_PCI_AMBA), where should the symbol be defined?
+> My personal preference is doing it like this, plus help message:
 > 
-> WARNING: vmlinux.o(.devinit.text+0x8604): Section mismatch in reference
-> from the function mmc_omap_probe)
-> The function __devinit mmc_omap_probe() references a function
-> __init mmc_omap_new_slot()
+>    config PCI_AMBA
+>           bool "PCI-to-AMBA bridge"
+>           depends on ARM_AMBA && PCI
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> In this case, shall I name CONFIG_STA2X11 in the depends, or in the
+> help message, or I'd better be generic, knowing someone else will soon
+> have similar things?
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Normally, ARM_AMBA is selected when required, so this would be:
 
-> 
-> --- a/drivers/mmc/host/omap.c
-> +++ b/drivers/mmc/host/omap.c
-> @@ -1300,7 +1300,7 @@ static const struct mmc_host_ops mmc_omap_ops = {
->  	.set_ios	= mmc_omap_set_ios,
->  };
->  
-> -static int __init mmc_omap_new_slot(struct mmc_omap_host *host, int id)
-> +static int __devinit mmc_omap_new_slot(struct mmc_omap_host *host, int id)
->  {
->  	struct mmc_omap_slot *slot = NULL;
->  	struct mmc_host *mmc;
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+config PCI_AMBA
+	bool "PCI-to-AMBA bridge"
+	depends on PCI
+	select ARM_AMBA
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120528/2669f1a8/attachment.sig>
+I guess I should look at moving ARM_AMBA to drivers/amba/Kconfig too...
