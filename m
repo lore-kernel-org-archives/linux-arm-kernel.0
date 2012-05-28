@@ -1,32 +1,26 @@
-From: volkan-k@users.sourceforge.net (Volkan K.)
-Date: Mon, 28 May 2012 08:49:01 +0000 (UTC)
-Subject: A good sub-architecture to base new ports on?
-References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
- <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
- <4FB5343D.5090509@yahoo.es> <201205181331.07566.arnd@arndb.de>
- <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
- <4FBD4B83.5010102@yahoo.es>
-Message-ID: <loom.20120528T104731-101@post.gmane.org>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Mon, 28 May 2012 11:00:31 +0200
+Subject: Wrong location of omap_writel?
+Message-ID: <3426836.dn1rYLBNLa@dizzy-6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jorge Amor?s Argos <joramar76 <at> yahoo.es> writes:
+Hi
 
-> 
-> No wi-fi. I just wanted to have the basis working and then build up the 
-> rest.
-> 
-> How should we proceed now? Where can we share the code?
-> 
-> Regards,
-> Jorge
-> 
+Under linux-next 20120528
 
-Hello,
+I've just found "omap_writel" within "arch/arm/plat-omap/include/plat/usb.h"...
+Shouldn't it be located within "arch/arm/plat-omap/include/plat/io.h"?
 
-I'm interested in the port, could you please share the code on SourceForge.net?
+Just some logical question.
+It looks somehow wrong to me...
 
-Please see: http://sourceforge.net/publish/
-
-Best Regards,
-Volkan
+best regards
+	David
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120528/266af70a/attachment.sig>
