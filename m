@@ -1,29 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 May 2012 09:24:52 +0100
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Mon, 28 May 2012 10:34:43 +0200
 Subject: amba, tegra-ahb and pci (Kconfig question)
-In-Reply-To: <20120528081737.GA8031@mail.gnudd.com>
-References: <20120528081737.GA8031@mail.gnudd.com>
-Message-ID: <20120528082452.GH24149@n2100.arm.linux.org.uk>
+In-Reply-To: <20120528082452.GH24149@n2100.arm.linux.org.uk>
+References: <20120528082452.GH24149@n2100.arm.linux.org.uk>
+ <20120528081737.GA8031@mail.gnudd.com>
+Message-ID: <20120528083443.GA8599@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 10:17:37AM +0200, Alessandro Rubini wrote:
-> If the former (CONFIG_PCI_AMBA), where should the symbol be defined?
-> My personal preference is doing it like this, plus help message:
+> Normally, ARM_AMBA is selected when required, so this would be:
 > 
->    config PCI_AMBA
->           bool "PCI-to-AMBA bridge"
->           depends on ARM_AMBA && PCI
-> 
-> In this case, shall I name CONFIG_STA2X11 in the depends, or in the
-> help message, or I'd better be generic, knowing someone else will soon
-> have similar things?
+> config PCI_AMBA
+> 	bool "PCI-to-AMBA bridge"
+> 	depends on PCI
+> 	select ARM_AMBA
 
-Normally, ARM_AMBA is selected when required, so this would be:
+But this would open the new question in a zillion boards that are
+not interested in it. It's the board that selects arm-amba, in my opinion.
+ 
+> I guess I should look at moving ARM_AMBA to drivers/amba/Kconfig too...
 
-config PCI_AMBA
-	bool "PCI-to-AMBA bridge"
-	depends on PCI
-	select ARM_AMBA
+If you want I can submit a patch for this (btw, the rename to primecell
+is dead, isn't it?)
 
-I guess I should look at moving ARM_AMBA to drivers/amba/Kconfig too...
+thanks
+/alessandro
