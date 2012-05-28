@@ -1,89 +1,62 @@
 From: eduardo.valentin@ti.com (Valentin, Eduardo)
-Date: Mon, 28 May 2012 13:26:04 +0300
-Subject: [RFC PATCH 10/11] omap4: thermal: add basic CPU thermal zone
-In-Reply-To: <20120528094850.GS18918@arwen.pp.htv.fi>
+Date: Mon, 28 May 2012 13:30:55 +0300
+Subject: [RFC PATCH 02/11] ARM: OMAP: expose control.h to mach area
+In-Reply-To: <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
 References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-11-git-send-email-eduardo.valentin@ti.com>
- <CAMQu2gxNa4sPMKPLXGkKz_wkbQF8bTYipo4910p-ui9WNdeVFQ@mail.gmail.com>
- <20120528094850.GS18918@arwen.pp.htv.fi>
-Message-ID: <CAGF5oy9Dwrasv3Hr_fkGg2N5uBei4tyRbZ+ADrEZ1FR-R_Q+0w@mail.gmail.com>
+ <1337934361-1606-3-git-send-email-eduardo.valentin@ti.com>
+ <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
+Message-ID: <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Santosh,
+Hello,
 
-On Mon, May 28, 2012 at 12:48 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, May 28, 2012 at 03:03:26PM +0530, Shilimkar, Santosh wrote:
->> On Fri, May 25, 2012 at 1:56 PM, Eduardo Valentin
->> <eduardo.valentin@ti.com> wrote:
->> > This patch exposes OMAP4 thermal sensor as a thermal zone
->> > named "cpu". Only thermal creation is done here.
->> >
->> > TODO:
->> >
->> > ?- Add cooling bindings
->> > ?- Add extrapolation rules
->> >
->> > Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> > ---
->> > ?drivers/thermal/Kconfig ? ? ? ? | ? 12 ++++++
->> > ?drivers/thermal/Makefile ? ? ? ?| ? ?1 +
->> > ?drivers/thermal/omap-bandgap.c ?| ? ?1 +
->> > ?drivers/thermal/omap-bandgap.h ?| ? 12 ++++++
->> > ?drivers/thermal/omap4-thermal.c | ? 72 +++++++++++++++++++++++++++++++++++++++
->> > ?5 files changed, 98 insertions(+), 0 deletions(-)
->> > ?create mode 100644 drivers/thermal/omap4-thermal.c
->> >
->> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->> > index ffdd240..2e82797 100644
->> > --- a/drivers/thermal/Kconfig
->> > +++ b/drivers/thermal/Kconfig
->> > @@ -39,3 +39,15 @@ config OMAP_BANDGAP
->> > ? ? ? ? ?This includes alert interrupts generation and also the TSHUT
->> > ? ? ? ? ?support.
->> >
->> > +config OMAP4_THERMAL
->> > + ? ? ? bool "Texas Instruments OMAP4 thermal support"
->> > + ? ? ? depends on OMAP_BANDGAP
->> > + ? ? ? depends on ARCH_OMAP4
->> > + ? ? ? help
->> > + ? ? ? ? If you say yes here you get thermal support for the Texas Instruments
->> > + ? ? ? ? OMAP4 SoC family. The current chip supported are:
->> > + ? ? ? ? ?- OMAP4460
->> > +
->> It's more of IP feature than OMAP specific, so something like
+On Mon, May 28, 2012 at 12:25 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
+> <eduardo.valentin@ti.com> wrote:
+>> This patch exposes the definitions under control.h to
+>> drivers outside the machine code.
 >>
->> config ?HAVE_BANDGAP_THERMAL_SUPPORT
->>
->> and then let processor's which support enable it. That OMAP varients
->> in AMXX etc if needed can make use of it.
+>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+>> ---
+> After second thought, this complete header movement needs to avoided.
+> Drivers should not anyway include something like <mach/control.h>
 >
-> Those are just an OMAP in disguise.
->
->> If you agree, then rest of the driver also can be cleaned to avoid
->> omap_* in file names and variables.
->>
->> Apart from this minor comment, rest of the patch looks fine to me.
->
-> Then it will appear as a fully generic bandgap driver, which is not the
-> case. This is really a TI thing, right ?
+> May be split the control.h header file data into ..
+> - defines used by mach-omap2/* files which can remain in "control.h"
+> in existing location.
 
-I have to agree with Felipe here. I do see your point to have a name
-which is applicable to AMxx, but having such generic naming is not
-helping either :-( as this bandgap driver is not supposed to be
-generic.
+OK..
 
-I though of "ti_bandgap.*", but still seams to be misleading..
+> - common functions/defines used across drivers/*, mach-omap2/*,
+> plat-omap/*, should
+> go to include/linux/omap_control.h
 
-I guess same applies to usb_phy and scm.
+Right..
 
-Again, if you have a name that fits better I won't hesitate to use it :-)
+> - Driver specific defines like thermal, usb etc, should go to
+> respective drivers file.
+
+Indeed.
 
 >
-> --
-> balbi
+> What do you think ?
+
+I think we are in line. And I believe I saw a similar comment by
+Benoit in other email thread.
+
+Having a better thinking of this, it makes sense to have the
+definition specific to drivers in the driver scope only, as they are
+going to be used only there anyway.
+
+I will drop this patch off and update the remaining changes
+accordingly (drop the change in control.h for thermal specific and
+move it to omap_bandgap.h).
+
+>
+> Regards
+> santosh
 
 
 
