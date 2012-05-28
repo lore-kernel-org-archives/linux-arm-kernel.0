@@ -1,24 +1,50 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 28 May 2012 15:34:28 +0530
-Subject: [RFC PATCH 08/11] ARM: OMAP4+: Adding the temperature sensor
- register set bit fields
-In-Reply-To: <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <CAMQu2gweS9O7+n3_J=7W3CeDOBgMML+z+BXKafqChhEZd3bmDQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 May 2012 11:11:32 +0100
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+ <20120522093410.GC7286@mudshark.cambridge.arm.com>
+ <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+ <20120525145603.GG13467@mudshark.cambridge.arm.com>
+ <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
+Message-ID: <20120528101132.GA956@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
-<eduardo.valentin@ti.com> wrote:
-> OMAP4460 specific temperature sensor register bit fields are added.
-> Existing OMAP4 entries are renamed to OMAP4430.
->
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
-Once you split the header, as mentioned in earlier comment,
-you can move those defines in driver file directly.
+Hi Colin,
 
-Regards
-Santsoh
+On Fri, May 25, 2012 at 09:04:22PM +0100, Colin Cross wrote:
+> On Fri, May 25, 2012 at 7:56 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Right, ok. This is definitely a different problem though. Firstly, r3p1 is
+> > not affected by the original erratum and secondly the symptoms do not
+> > include deadlock. The clean during boot also sounds highly suspicious -- is
+> > there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
+> > disabled when entering the kernel [I think u8500 has it enabled]?
+> 
+> In a previous thread, I wrote that the 4430 I was using had r2p0.  I
+> can't verify the accuracy of that claim right now, but my patch was
+> based on that assumption.  Where are you getting r3p1 from?
+
+Apologies, that's what Santosh mentioned here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101302.html
+
+so, assuming that it's the same problem, it seems that both r3p1 and r2p0
+are affected.
+
+> When I said I couldn't reproduce the issue with clean during boot, I
+> meant that I couldn't trigger the issue during boot by calling clean
+> repeatedly.  I could still reproduce the issue after boot even if the
+> cache was cleaned during boot.
+
+Ok, that's interesting. I wonder if erratum #769419 is to blame? We now have
+a workaround in the kernel for that, so you could give it a try if you're in
+a position to do so.
+
+Cheers,
+
+Will
