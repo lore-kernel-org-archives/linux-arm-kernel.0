@@ -1,44 +1,32 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 28 May 2012 16:50:50 +0800
-Subject: [PATCH v9 1/3] MTD: at91: extract hw ecc initialization to one
- function and use relaxed read/write
-In-Reply-To: <1338122668.19389.4.camel@koala>
-References: <1338038677-6752-1-git-send-email-josh.wu@atmel.com>
- <1338038677-6752-2-git-send-email-josh.wu@atmel.com>
- <1338122668.19389.4.camel@koala>
-Message-ID: <4FC33C6A.4070104@atmel.com>
+From: volkan-k@users.sourceforge.net (Volkan K.)
+Date: Mon, 28 May 2012 08:49:01 +0000 (UTC)
+Subject: A good sub-architecture to base new ports on?
+References: <CAB9v_DFdTkAFQWFthLncx5frJX0jed11CUoKXJDT-ac6j3hWOQ@mail.gmail.com>
+ <CAB9v_DE-FRdyutcZL7EMpTv-9rXqoi+V15T_WyeP9CggrcMZdQ@mail.gmail.com>
+ <4FB5343D.5090509@yahoo.es> <201205181331.07566.arnd@arndb.de>
+ <CAB9v_DGyOzK5JH56XnuW39icCSujrVfoySwD4-0sixVRaSsEDw@mail.gmail.com>
+ <4FBD4B83.5010102@yahoo.es>
+Message-ID: <loom.20120528T104731-101@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/27/2012 8:44 PM, Artem Bityutskiy wrote:
-> On Sat, 2012-05-26 at 21:24 +0800, Josh Wu wrote:
->> use _relaxed read/write in most place. And use writel in operations of Control Register since it needs memory barrier.
->>
->> Signed-off-by: Hong Xu<hong.xu@atmel.com>
->> Signed-off-by: Josh Wu<josh.wu@atmel.com>
-> This should be split on 2 or even 3 parts:
->
-> 1. You move definitions and things around.
-> 2. You separate out the init stuff into a function
-> 3. You start using _relaxed helpers.
->
-> And you should provide better commit messages. You should explain why
-> you do things - just cleanup? improvement? fix? preparation for
-> something?
+Jorge Amor?s Argos <joramar76 <at> yahoo.es> writes:
 
-My goal here is to prepare for the PMECC support.
-    Point 1 is consistent for the later PMECC patch.
-    Point 2 is prepare for PMECC support.
+> 
+> No wi-fi. I just wanted to have the basis working and then build up the 
+> rest.
+> 
+> How should we proceed now? Where can we share the code?
+> 
+> Regards,
+> Jorge
+> 
 
-So I think I will not add the _relaxed helpers for HW ECC operation in 
-this patch series. Since that is out of the goal of this patch series.
+Hello,
 
->
-> I think this patch is too big, commit message is poor, patch does more
-> things than documented in the commit message.
->
+I'm interested in the port, could you please share the code on SourceForge.net?
 
-Indeed the commit message is poor. I will fix it.
+Please see: http://sourceforge.net/publish/
 
 Best Regards,
-Josh Wu
+Volkan
