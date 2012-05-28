@@ -1,304 +1,66 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 28 May 2012 14:42:25 +0300
-Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
-In-Reply-To: <CAMQu2gy_rgLidHWy7xxZBiVD4wfFuTvA+wC7joogrcFptwsx8w@mail.gmail.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
- <CAMQu2gy_rgLidHWy7xxZBiVD4wfFuTvA+wC7joogrcFptwsx8w@mail.gmail.com>
-Message-ID: <20120528114225.GH3923@besouro>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Mon, 28 May 2012 15:04:47 +0300
+Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
+Message-ID: <1338206687-14551-1-git-send-email-alexg@meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch also adds mux and divider for camera clock.
 
-On Mon, May 28, 2012 at 03:24:01PM +0530, Shilimkar, Santosh wrote:
-> On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
-> <eduardo.valentin@ti.com> wrote:
-> > This patch introduces a MFD core device driver for
-> > OMAP system control module.
-> >
-> > The control module allows software control of
-> > various static modes supported by the device. It is
-> > composed of two control submodules: general control
-> > module and device (padconfiguration) control
-> > module.
-> >
-> > In this patch, the children defined are for:
-> > . USB-phy pin control
-> > . Bangap temperature sensor
-> >
-> > Device driver is probed with postcore_initcall.
-> > However, as some of the APIs exposed by this driver
-> > may be needed in very early init phase, an early init
-> > class is also available: "early_omap_control".
-> >
-> > Signed-off-by: J Keerthy <j-keerthy@ti.com>
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> > ---
-> 
-> [..]
-> > diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> > index ad95c7a..222dbad 100644
-> > --- a/arch/arm/plat-omap/Kconfig
-> > +++ b/arch/arm/plat-omap/Kconfig
-> > @@ -5,6 +5,9 @@ menu "TI OMAP Common Features"
-> > ?config ARCH_OMAP_OTG
-> > ? ? ? ?bool
-> >
-> > +config ARCH_HAS_CONTROL_MODULE
-> > + ? ? ? bool
-> > +
-> Thanks for getting rid of OMAP CONFIG here.
+Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+---
+ arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-OK. ARCH_HAS_CONTROL_MODULE is a bit too generic though..
-
-> 
-> > ?choice
-> > ? ? ? ?prompt "OMAP System Type"
-> > ? ? ? ?default ARCH_OMAP2PLUS
-> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> > index 11e4438..25a66d8 100644
-> > --- a/drivers/mfd/Kconfig
-> > +++ b/drivers/mfd/Kconfig
-> > @@ -795,6 +795,15 @@ config MFD_WL1273_CORE
-> > ? ? ? ? ?driver connects the radio-wl1273 V4L2 module and the wl1273
-> > ? ? ? ? ?audio codec.
-> >
-> > +config MFD_OMAP_CONTROL
-> > + ? ? ? bool "Texas Instruments OMAP System control module"
-> > + ? ? ? depends on ARCH_HAS_CONTROL_MODULE
-> > + ? ? ? help
-> > + ? ? ? ? This is the core driver for system control module. This driver
-> > + ? ? ? ? is responsible for creating the control module mfd child,
-> > + ? ? ? ? like USB-pin control, pin muxing, MMC-pbias and DDR IO dynamic
-> > + ? ? ? ? change for off mode.
-> > +
-> > ?config MFD_OMAP_USB_HOST
-> > ? ? ? ?bool "Support OMAP USBHS core driver"
-> > ? ? ? ?depends on USB_EHCI_HCD_OMAP || USB_OHCI_HCD_OMAP3
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > index 05fa538..00f99d6 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -106,6 +106,7 @@ obj-$(CONFIG_MFD_TPS6586X) ?+= tps6586x.o
-> > ?obj-$(CONFIG_MFD_VX855) ? ? ? ? ? ? ? ?+= vx855.o
-> > ?obj-$(CONFIG_MFD_WL1273_CORE) ?+= wl1273-core.o
-> > ?obj-$(CONFIG_MFD_CS5535) ? ? ? += cs5535-mfd.o
-> > +obj-$(CONFIG_MFD_OMAP_CONTROL) += omap-control-core.o
-> > ?obj-$(CONFIG_MFD_OMAP_USB_HOST) ? ? ? ?+= omap-usb-host.o
-> > ?obj-$(CONFIG_MFD_PM8921_CORE) ?+= pm8921-core.o
-> > ?obj-$(CONFIG_MFD_PM8XXX_IRQ) ? += pm8xxx-irq.o
-> > diff --git a/drivers/mfd/omap-control-core.c b/drivers/mfd/omap-control-core.c
-> > new file mode 100644
-> > index 0000000..7d8d408
-> > --- /dev/null
-> > +++ b/drivers/mfd/omap-control-core.c
-> > @@ -0,0 +1,211 @@
-> > +/*
-> > + * OMAP system control module driver file
-> > + *
-> > + * Copyright (C) 2011-2012 Texas Instruments Incorporated - http://www.ti.com/
-> > + * Contacts:
-> > + * Based on original code written by:
-> > + * ? ?J Keerthy <j-keerthy@ti.com>
-> > + * ? ?Moiz Sonasath <m-sonasath@ti.com>
-> > + * MFD clean up and re-factoring:
-> > + * ? ?Eduardo Valentin <eduardo.valentin@ti.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License
-> > + * version 2 as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful, but
-> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
-> > + * General Public License for more details.
-> > + *
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/export.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/io.h>
-> > +#include <linux/err.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/mfd/core.h>
-> > +#include <linux/mfd/omap_control.h>
-> > +
-> > +static struct omap_control *omap_control_module;
-> > +
-> > +/**
-> > + * omap_control_readl: Read a single omap control module register.
-> > + *
-> > + * @dev: device to read from.
-> > + * @reg: register to read.
-> > + * @val: output with register value.
-> > + *
-> > + * returns 0 on success or -EINVAL in case struct device is invalid.
-> > + */
-> > +int omap_control_readl(struct device *dev, u32 reg, u32 *val)
-> > +{
-> > + ? ? ? struct omap_control *omap_control = dev_get_drvdata(dev);
-> > +
-> > + ? ? ? if (!omap_control)
-> > + ? ? ? ? ? ? ? return -EINVAL;
-> > +
-> > + ? ? ? *val = readl(omap_control->base + reg);
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(omap_control_readl);
-> > +
-> I might have missed in the last scan, but can you let
-> function return the register value.
-
-Why?
-
-> 
-> I am guessing, you did this for error case handling. You might
-> want to stick to read API semantic and just have WARN_ON()
-> to take care of error case.
-
-Yeah, that was for error handling and to do not confuse register
-values with error values.
-
-> 
-> > +/**
-> > + * omap_control_writel: Write a single omap control module register.
-> > + *
-> > + * @dev: device to read from.
-> > + * @val: value to write.
-> > + * @reg: register to write to.
-> > + *
-> > + * returns 0 on success or -EINVAL in case struct device is invalid.
-> > + */
-> > +int omap_control_writel(struct device *dev, u32 val, u32 reg)
-> > +{
-> > + ? ? ? struct omap_control *omap_control = dev_get_drvdata(dev);
-> > + ? ? ? unsigned long flags;
-> > +
-> > + ? ? ? if (!omap_control)
-> > + ? ? ? ? ? ? ? return -EINVAL;
-> > +
-> > + ? ? ? spin_lock_irqsave(&omap_control->reg_lock, flags);
-> > + ? ? ? writel(val, omap_control->base + reg);
-> > + ? ? ? spin_unlock_irqrestore(&omap_control->reg_lock, flags);
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(omap_control_writel);
-> > +
-> > +/**
-> > + * omap_control_get: returns the control module device pinter
-> > + *
-> > + * The modules which has to use control module API's to read or write should
-> > + * call this API to get the control module device pointer.
-> > + */
-> > +struct device *omap_control_get(void)
-> > +{
-> > + ? ? ? unsigned long flags;
-> > +
-> > + ? ? ? if (!omap_control_module)
-> > + ? ? ? ? ? ? ? return ERR_PTR(-ENODEV);
-> > +
-> > + ? ? ? spin_lock_irqsave(&omap_control_module->reg_lock, flags);
-> > + ? ? ? omap_control_module->use_count++;
-> > + ? ? ? spin_unlock_irqrestore(&omap_control_module->reg_lock, flags);
-> > +
-> > + ? ? ? return omap_control_module->dev;
-> > +}
-> > +EXPORT_SYMBOL_GPL(omap_control_get);
-> > +
-> > +/**
-> > + * omap_control_put: returns the control module device pinter
-> > + *
-> > + * The modules which has to use control module API's to read or write should
-> > + * call this API to get the control module device pointer.
-> > + */
-> > +void omap_control_put(struct device *dev)
-> > +{
-> > + ? ? ? struct omap_control *omap_control = dev_get_drvdata(dev);
-> > + ? ? ? unsigned long flags;
-> > +
-> > + ? ? ? if (!omap_control)
-> > + ? ? ? ? ? ? ? return;
-> > +
-> > + ? ? ? spin_lock_irqsave(&omap_control->reg_lock, flags);
-> > + ? ? ? omap_control->use_count--;
-> > + ? ? ? spin_unlock_irqrestore(&omap_control_module->reg_lock, flags);
-> > +}
-> > +EXPORT_SYMBOL_GPL(omap_control_put);
-> > +
-> > +static const struct of_device_id of_omap_control_match[] = {
-> > + ? ? ? { .compatible = "ti,omap3-control", },
-> > + ? ? ? { .compatible = "ti,omap4-control", },
-> > + ? ? ? { .compatible = "ti,omap5-control", },
-> > + ? ? ? { },
-> > +};
-> > +
-> > +static int __devinit omap_control_probe(struct platform_device *pdev)
-> > +{
-> > + ? ? ? struct resource *res;
-> > + ? ? ? void __iomem *base;
-> > + ? ? ? struct device *dev = &pdev->dev;
-> > + ? ? ? struct device_node *np = dev->of_node;
-> > + ? ? ? struct omap_control *omap_control;
-> > +
-> > + ? ? ? omap_control = devm_kzalloc(dev, sizeof(*omap_control), GFP_KERNEL);
-> > + ? ? ? if (!omap_control) {
-> > + ? ? ? ? ? ? ? dev_err(dev, "not enough memory for omap_control\n");
-> > + ? ? ? ? ? ? ? return -ENOMEM;
-> > + ? ? ? }
-> > +
-> > + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > + ? ? ? if (!res) {
-> > + ? ? ? ? ? ? ? dev_err(dev, "missing memory base resource\n");
-> > + ? ? ? ? ? ? ? return -EINVAL;
-> > + ? ? ? }
-> > +
-> > + ? ? ? base = devm_request_and_ioremap(dev, res);
-> > + ? ? ? if (!base) {
-> > + ? ? ? ? ? ? ? dev_err(dev, "ioremap failed\n");
-> > + ? ? ? ? ? ? ? return -EADDRNOTAVAIL;
-> > + ? ? ? }
-> > +
-> > + ? ? ? omap_control->base = base;
-> > + ? ? ? omap_control->dev = dev;
-> > + ? ? ? spin_lock_init(&omap_control->reg_lock);
-> > +
-> > + ? ? ? platform_set_drvdata(pdev, omap_control);
-> > + ? ? ? omap_control_module = omap_control;
-> > +
-> > + ? ? ? return of_platform_populate(np, of_omap_control_match, NULL, dev);
-> > +}
-> > +
-> 
-> Will the probe get called on multiple devices and race ?
-
-It depends. If we decide to have an early device for scm, then the probe will
-be called more than once. If not, then only once.
-
-> 
-> > +static int __devexit omap_control_remove(struct platform_device *pdev)
-> > +{
-> > + ? ? ? struct omap_control *omap_control = platform_get_drvdata(pdev);
-> > +
-> > + ? ? ? spin_lock(&omap_control->reg_lock);
-> > + ? ? ? if (omap_control->use_count > 0) {
-> > + ? ? ? ? ? ? ? spin_unlock(&omap_control->reg_lock);
-> > + ? ? ? ? ? ? ? dev_err(&pdev->dev, "device removed while still being used\n");
-> > + ? ? ? ? ? ? ? return -EBUSY;
-> > + ? ? ? }
-> > + ? ? ? spin_unlock(&omap_control->reg_lock);
-> > +
-> Do you really need above lock where you are just doing the
-> register read. smp_rmb(), should be enough, I guess.
-
-It is locking the use counter not a register..
-
-> 
-> Regards
-> Santosh
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index a9e60bf..42131d5 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -62,8 +62,8 @@ enum mx35_clks {
+ 	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
+ 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+ 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+-	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
+-	clk_max
++	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
++	gpu2d_gate, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -142,6 +142,9 @@ int __init mx35_clocks_init()
+ 
+ 	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
+ 
++	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
++	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
++
+ 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
+ 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
+ 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
+@@ -192,7 +195,7 @@ int __init mx35_clocks_init()
+ 	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
+ 	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
+ 
+-	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
++	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
+ 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
+ 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
+ 
+@@ -229,6 +232,7 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
++	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
+ 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+ 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+@@ -256,6 +260,7 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
+ 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+ 	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
++	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+ 
+ 	clk_prepare_enable(clk[spba_gate]);
+ 	clk_prepare_enable(clk[gpio1_gate]);
+-- 
+1.7.0.4
