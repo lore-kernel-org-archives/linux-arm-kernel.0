@@ -1,70 +1,20 @@
-From: vincent.sanders@collabora.co.uk (Vincent Sanders)
-Date: Mon, 28 May 2012 19:33:37 +0100
-Subject: [PATCH 1/2] Allow constructor name selection by architecture.
-In-Reply-To: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
-References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
-Message-ID: <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+From: p-style@ts-pro.co.jp (Wgijh)
+Date: Tue, 29 May 2012 02:25:00 +0800
+Subject: =?gb2312?B?vau7+bLj1LG5pLzGyrHQzdC9s+rJ6LzGtcO24NSqu69z?=
+Message-ID: <201205290225001399892@ts-pro.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vincent Sanders <vince@collabora.co.uk>
+86M328F7ez7IwlL5dHm
+        					
 
-The constructor symbol name is different between platforms. Allow this
-to be selected by configuration and set suitable default values.
-
-Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
----
- include/asm-generic/vmlinux.lds.h |    6 +++---
- init/Kconfig                      |    6 ++++++
- kernel/module.c                   |    2 +-
- 3 files changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 8aeadf6..fd34808 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -471,9 +471,9 @@
- 	}
- 
- #ifdef CONFIG_CONSTRUCTORS
--#define KERNEL_CTORS()	. = ALIGN(8);			   \
--			VMLINUX_SYMBOL(__ctors_start) = .; \
--			*(.ctors)			   \
-+#define KERNEL_CTORS()	. = ALIGN(8);					\
-+			VMLINUX_SYMBOL(__ctors_start) = .;		\
-+			*(CONFIG_CONSTRUCTORS_NAME)			\
- 			VMLINUX_SYMBOL(__ctors_end) = .;
- #else
- #define KERNEL_CTORS()
-diff --git a/init/Kconfig b/init/Kconfig
-index 6cfd71d..52181a1 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -20,6 +20,12 @@ config CONSTRUCTORS
- 	bool
- 	depends on !UML
- 
-+config CONSTRUCTORS_NAME
-+	string
-+	depends on CONSTRUCTORS
-+	default ".init_array" if ARM && AEABI
-+	default ".ctors"
-+
- config HAVE_IRQ_WORK
- 	bool
- 
-diff --git a/kernel/module.c b/kernel/module.c
-index 78ac6ec..e5fad5e 100644
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -2600,7 +2600,7 @@ static void find_module_sections(struct module *mod, struct load_info *info)
- 	mod->unused_gpl_crcs = section_addr(info, "__kcrctab_unused_gpl");
- #endif
- #ifdef CONFIG_CONSTRUCTORS
--	mod->ctors = section_objs(info, ".ctors",
-+	mod->ctors = section_objs(info, CONFIG_CONSTRUCTORS_NAME,
- 				  sizeof(*mod->ctors), &mod->num_ctors);
- #endif
- 
--- 
-1.7.10
+?????????????????????????????
+        
+3436669933333739
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ?????????.eml
+Type: application/octet-stream
+Size: 17651 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120529/86c30a38/attachment-0001.obj>
