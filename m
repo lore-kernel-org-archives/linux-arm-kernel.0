@@ -1,31 +1,169 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 May 2012 08:36:09 +0100
-Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <CACRpkdZO=B9gWkhvgf4Ewi1GKibFxki36uF06ispQzDK7T+4sA@mail.gmail.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
- <CACRpkdZC8LOOLkWbrPbXN_nKaw-WvueusYDyrX48Q1Pcdwv3Aw@mail.gmail.com>
- <CAGOxZ52w1nn8g4d_vuNAzjA9qYZ1=yEfihFvSOK+pBz=ZD=J7Q@mail.gmail.com>
- <CACRpkdZO=B9gWkhvgf4Ewi1GKibFxki36uF06ispQzDK7T+4sA@mail.gmail.com>
-Message-ID: <20120528073609.GG24149@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 28 May 2012 09:37:33 +0200
+Subject: [PATCH 1/4 v5] mmc: atmel-mci: add device tree support
+In-Reply-To: <1337872556-17667-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1337872556-17667-1-git-send-email-ludovic.desroches@atmel.com>
+ <1337872556-17667-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20120528073733.GQ3377@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 12:41:42PM +0800, Linus Walleij wrote:
-> On Thu, Dec 8, 2011 at 9:03 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+On 17:15 Thu 24 May     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> > Hello Linus,
-> > sorry for the delay in submitting V3 of the pl080 patches for s3c64xx.
-> > I am very busy with my current assignment.
-> > I will come back to my patch series incorporating yours and Viresh
-> > suggestions in v3.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  .../devicetree/bindings/mmc/atmel-hsmci.txt        |   67 +++++++++++++++
+>  drivers/mmc/host/atmel-mci.c                       |   85 +++++++++++++++++++-
+>  2 files changed, 150 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
 > 
-> Ping on this, is there something in specific that you need help on here?
-> We really need to get rid of this forked code, and it should be beneficial
-> to S3C because we have fixed a lot of bugs in the PL08x driver now,
-> plus it'll likely be a prerequisite to DT support for S3C.
+> diff --git a/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> new file mode 100644
+> index 0000000..81c20cc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+> @@ -0,0 +1,67 @@
+> +* Atmel High Speed MultiMedia Card Interface
+> +
+> +This controller on atmel products provides an interface for MMC, SD and SDIO
+> +types of memory cards.
+> +
+> +1) MCI node
+> +
+> +Required properties:
+> +- compatible: no blank "atmel,hsmci"
+> +- reg: should contain HSMCI registers location and length
+> +- interrupts: should contain HSMCI interrupt number
+> +- #address-cells: should be one. The cell is the slot id.
+> +- #size-cells: should be zero.
+> +- at least one slot node
+> +
+> +The node contains child nodes for each slot that the platform uses
+> +
+> +Example MCI node:
+> +
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	[ child node definitions...]
+> +};
+> +
+> +2) slot nodes
+> +
+> +Required properties:
+> +- reg: should contain the slot id.
+> +- bus-width: number of data lines connected to the controller
+> +
+> +Optional properties:
+> +- cd-gpios: specify GPIOs for card detection
+> +- cd-inverted: invert the value of external card detect gpio line
+> +- wp-gpios: specify GPIOs for write protection
+> +
+> +Example slot node:
+> +
+> +slot at 0 {
+> +	reg = <0>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pioD 15 0>
+> +	cd-inverted;
+> +};
+> +
+> +Example full MCI node:
+> +mmc0: mmc at f0008000 {
+> +	compatible = "atmel,hsmci";
+> +	reg = <0xf0008000 0x600>;
+> +	interrupts = <12 4>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	slot at 0 {
+> +		reg = <0>;
+> +		bus-width = <4>;
+> +		cd-gpios = <&pioD 15 0>
+> +		cd-inverted;
+> +	};
+> +	slot at 1 {
+> +		reg = <1>;
+> +		bus-width = <4>;
+> +	};
+> +};
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index f2c115e..47421fc 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -19,6 +19,9 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/scatterlist.h>
+>  #include <linux/seq_file.h>
+> @@ -493,6 +496,70 @@ err:
+>  	dev_err(&mmc->class_dev, "failed to initialize debugfs for slot\n");
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmci_dt_ids[] = {
+> +	{ .compatible = "atmel,hsmci" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmci_dt_ids);
+> +
+> +static struct mci_platform_data __devinit*
+> +atmci_of_init(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *cnp;
+> +	struct mci_platform_data *pdata;
+> +	u32 slot_id;
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "device node not found\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	for_each_child_of_node(np, cnp) {
+> +		if (of_property_read_u32(cnp, "reg", &slot_id)) {
+> +			dev_warn(&pdev->dev, "reg property is missing for %s\n",
+> +				 cnp->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (slot_id >= ATMCI_MAX_NR_SLOTS) {
+> +			dev_warn(&pdev->dev, "can't have more than %d slots\n",
+> +			         ATMCI_MAX_NR_SLOTS);
+> +			break;
+> +		}
+> +
+> +		if (of_property_read_u32(cnp, "bus-width",
+> +		                         &pdata->slot[slot_id].bus_width))
+> +			pdata->slot[slot_id].bus_width = 1;
+> +
+> +		pdata->slot[slot_id].detect_pin =
+> +			of_get_named_gpio(cnp, "cd-gpios", 0);
+> +
+> +		pdata->slot[slot_id].detect_is_active_high =
+> +			of_property_read_bool(cnp, "cd-inverted");
+as this is going to be removed at once
 
-So this hasn't gone in?
+please implement the gpio active low too
 
-This is going to be painful - I have 40 odd patches to PL08x converting it
-to virt-dma now...  It's probably going to be easier for the S3C conversion
-to be based upon my work rather than me having to rework all those patches.
+otherwise
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Best Regards,
+J.
