@@ -1,43 +1,18 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 28 May 2012 13:20:55 +0200
-Subject: [PATCH] serial/of-serial: Add 16654 chip to compatible string list
-In-Reply-To: <20120528100338.GI24149@n2100.arm.linux.org.uk>
-References: <1338199134-23885-1-git-send-email-stigge@antcom.de>
- <20120528100338.GI24149@n2100.arm.linux.org.uk>
-Message-ID: <4FC35F97.2030400@antcom.de>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Mon, 28 May 2012 16:52:50 +0530
+Subject: [PATCHv9 07/10] I2C: OMAP: Handle error check for pm runtime
+In-Reply-To: <87likfkjar.fsf@ti.com>
+References: <1335969135-20858-1-git-send-email-shubhrajyoti@ti.com>
+ <1335969135-20858-8-git-send-email-shubhrajyoti@ti.com>
+ <87likfkjar.fsf@ti.com>
+Message-ID: <4FC3600A.7010407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/12 12:03, Russell King - ARM Linux wrote:
-> Something which occurs to me.  Normally, the digit at the end indicates
-> how many ports are integrated into the device (0=1port, 2=2port, 4=4port.)
-> Are you sure there isn't a ST16650 which has the same characteristics?
-> 
-> We really should stick with naming these using the single port versions if
-> at all possible.
-
-Right.
-
-This indicates to me that maybe this is not the right solution for my
-original problem, anyway. :-)
-
-Initially, with my RFC patch, there was an #ifdef for bigger FIFO in
-case of LPC32xx where we have a 16550A variant with 64 byte fifos.
-
-Looking at the 16x50 line:
-
-16550A  16 bytes FIFOs
-16650V2 32 bytes FIFOs
-16750   64 bytes FIFOs
-
-(?)
-
-So maybe 16750 is the better choice for me, anyway. Already supported in
-of-serial. Works for now, but need more testing. Another hint is that
-16750 is advertised as "IP core for Soc" which matches the case of LPC32xx.
-
-Maybe NXP can comment on this?
-
-Thanks in advance,
-
-Roland
+On Saturday 26 May 2012 03:36 AM, Kevin Hilman wrote:
+>> +	r = pm_runtime_get_sync(dev->dev);
+>> > +	if (r < 0)
+>> > +		return r;
+> nit: please use IS_ERR_VALUE() 
+Will fix that and resend.
+> Kevin
