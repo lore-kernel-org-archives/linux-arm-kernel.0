@@ -1,26 +1,27 @@
-From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
-Date: Mon, 28 May 2012 11:00:31 +0200
-Subject: Wrong location of omap_writel?
-Message-ID: <3426836.dn1rYLBNLa@dizzy-6>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 28 May 2012 14:42:45 +0530
+Subject: [RFC PATCH 01/11] ARM: OMAP4: Remove un-used control module
+ headers and defines.
+In-Reply-To: <1337934361-1606-2-git-send-email-eduardo.valentin@ti.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-2-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <CAMQu2gynGAByh-aV5JoLcx3qrh8y6XCU5VDDHoDM6weBLAgh3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
+<eduardo.valentin@ti.com> wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> Most of the OMAP4 control module register defines are not used and
+> can be removed. Keep only needed defines and move them to common
+> control module header just like other OMAP versions.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> ---
 
-Under linux-next 20120528
+Thanks for picking this up in your series
 
-I've just found "omap_writel" within "arch/arm/plat-omap/include/plat/usb.h"...
-Shouldn't it be located within "arch/arm/plat-omap/include/plat/io.h"?
-
-Just some logical question.
-It looks somehow wrong to me...
-
-best regards
-	David
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120528/266af70a/attachment.sig>
+Regards
+Santposh
