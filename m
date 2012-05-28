@@ -1,20 +1,46 @@
-From: p-style@ts-pro.co.jp (Wgijh)
-Date: Tue, 29 May 2012 02:25:00 +0800
-Subject: =?gb2312?B?vau7+bLj1LG5pLzGyrHQzdC9s+rJ6LzGtcO24NSqu69z?=
-Message-ID: <201205290225001399892@ts-pro.co.jp>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Mon, 28 May 2012 22:30:05 +0200
+Subject: [PATCH 1/2] Allow constructor name selection by architecture.
+In-Reply-To: <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
+ <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+Message-ID: <20120528203005.GA20560@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-86M328F7ez7IwlL5dHm
-        					
+On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
+> From: Vincent Sanders <vince@collabora.co.uk>
+> 
+> The constructor symbol name is different between platforms. Allow this
+> to be selected by configuration and set suitable default values.
+> 
+> Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
+> ---
+>  include/asm-generic/vmlinux.lds.h |    6 +++---
+>  init/Kconfig                      |    6 ++++++
+>  kernel/module.c                   |    2 +-
+>  3 files changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 8aeadf6..fd34808 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -471,9 +471,9 @@
+>  	}
+>  
+>  #ifdef CONFIG_CONSTRUCTORS
+> -#define KERNEL_CTORS()	. = ALIGN(8);			   \
+> -			VMLINUX_SYMBOL(__ctors_start) = .; \
+> -			*(.ctors)			   \
+> +#define KERNEL_CTORS()	. = ALIGN(8);					\
+> +			VMLINUX_SYMBOL(__ctors_start) = .;		\
+> +			*(CONFIG_CONSTRUCTORS_NAME)			\
+>  			VMLINUX_SYMBOL(__ctors_end) = .;
 
-?????????????????????????????
-        
-3436669933333739
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ?????????.eml
-Type: application/octet-stream
-Size: 17651 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120529/86c30a38/attachment-0001.obj>
+What is wrong with adding both "standard" names for ctors uncnditionally?
+Like this:
+> 			*(.ctors)			   \
+> +			*(.init_array)			   \
+
+
+	Sam
