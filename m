@@ -1,40 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 May 2012 00:24:06 +0800
-Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending
- on pinmux APIs
-In-Reply-To: <CAGsJ_4zknQjNK6-T7+av1N=7gijZ821keM=qaDEJZ9zOfnLhkw@mail.gmail.com>
-References: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdZOTZaVp6rfuQvZaQyk0+zxeAjwHryBMYY-C1WVABaLLA@mail.gmail.com>
- <CAGsJ_4zknQjNK6-T7+av1N=7gijZ821keM=qaDEJZ9zOfnLhkw@mail.gmail.com>
-Message-ID: <CACRpkdb=00UP3NaBj4NhVy0wYhwkqqRB5e3Gid5hcpVhxH0wYw@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 28 May 2012 18:27:20 +0200
+Subject: [PATCH] serial/of-serial: Add 16654 chip to compatible string list
+In-Reply-To: <20120528150311.GA28290@n2100.arm.linux.org.uk>
+References: <1338199134-23885-1-git-send-email-stigge@antcom.de>
+ <20120528100338.GI24149@n2100.arm.linux.org.uk> <4FC35F97.2030400@antcom.de>
+ <20120528150311.GA28290@n2100.arm.linux.org.uk>
+Message-ID: <4FC3A768.3060208@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 11:03 PM, Barry Song <21cnbao@gmail.com> wrote:
-> 2012/5/24 Linus Walleij <linus.walleij@linaro.org>:
+On 28/05/12 17:03, Russell King - ARM Linux wrote:
+>> Initially, with my RFC patch, there was an #ifdef for bigger FIFO in
+>> case of LPC32xx where we have a 16550A variant with 64 byte fifos.
+> 
+> What are all the differences?  Is it just a larger FIFO?
 
->> This is actually such a nice and clean cut that it can be put into
->> drivers/gpio, it's just using pinctrl, not sharing code or hardware
->> registers with it. (If I understand correctly.)
->
-> it is actually one pinmux/gpio/irq controller. as you see, i am using
-> the same dt node with pinctrl-sirf.c:
-> static const struct of_device_id sgpio_of_match[] __devinitconst = {
-> ? ? ? {.compatible = "sirf,prima2-gpio-pinmux", },
-> ? ? ? {},
-> };
->
-> here i splitted into two files just for viewing, and at the same time,
-> i remap the same memory twice in pinctrl-sirf.c and gpio-sirf.c. they
-> share same memory area.
+Yes, this is how it's summarized in the manual (LPC32xx SoC).
 
-Hmmmm.... but do they ever write into the same registers?
+>> So maybe 16750 is the better choice for me, anyway. Already supported in
+>> of-serial. Works for now, but need more testing. Another hint is that
+>> 16750 is advertised as "IP core for Soc" which matches the case of LPC32xx.
+> 
+> 16750 also has automatic hardware flow control support, selectable through
+> bit 5 in the MCR register.  If your UART has that, then it's probably a
+> 16750 derivative rather than a 16550 or 16650 derivative.
+> 
+> 16650s have an EFR register at offset 2, selectable by writing 0xBF into
+> the LCR register, which the 16750 doesn't have.  16650 also has automatic
+> hardware flow control, bit this is selected through a couple of bits in
+> the EFR.
 
-> these codes might be in pinctrl-sirf.c directly?
+The 4 LPC32xx's "Standard" UARTs have neither of those.
 
-That also works. If you want one hardware block to be handled by
-one driver you should do that. But if the split version works you
-can also do that, so I'm not sure.
+Is it ok to use "ns16650", i.e. PORT_16650, or do I need to introduce a
+FIFO depth configuration?
 
-Yours,
-Linus Walleij
+Thanks in advance,
+
+Roland
