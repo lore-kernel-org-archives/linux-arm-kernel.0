@@ -1,52 +1,136 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 28 May 2012 09:37:26 -0700
-Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
- errata 727915
-In-Reply-To: <20120528101132.GA956@mudshark.cambridge.arm.com>
-References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
- <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
- <20120522085256.GA7286@mudshark.cambridge.arm.com>
- <4FBB5AE8.4000801@ti.com>
- <20120522093410.GC7286@mudshark.cambridge.arm.com>
- <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
- <20120525145603.GG13467@mudshark.cambridge.arm.com>
- <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
- <20120528101132.GA956@mudshark.cambridge.arm.com>
-Message-ID: <CAMbhsRTYq=Ezg-ypJfEKSxQTsKTJFuNWQJRoOXc7O8Oj2rsWwg@mail.gmail.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Mon, 28 May 2012 18:37:14 +0200
+Subject: [PATCH V2 1/6] sizes.h: move from asm-generic to <linux/sizes.h>
+In-Reply-To: <cover.1338222460.git.rubini@gnudd.com>
+References: <cover.1338222460.git.rubini@gnudd.com>
+Message-ID: <3c8248fcd1d73fa0a070a673b83a4772bb3ca0c1.1338222461.git.rubini@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 3:11 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Colin,
->
-> On Fri, May 25, 2012 at 09:04:22PM +0100, Colin Cross wrote:
->> On Fri, May 25, 2012 at 7:56 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > Right, ok. This is definitely a different problem though. Firstly, r3p1 is
->> > not affected by the original erratum and secondly the symptoms do not
->> > include deadlock. The clean during boot also sounds highly suspicious -- is
->> > there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
->> > disabled when entering the kernel [I think u8500 has it enabled]?
->>
->> In a previous thread, I wrote that the 4430 I was using had r2p0. ?I
->> can't verify the accuracy of that claim right now, but my patch was
->> based on that assumption. ?Where are you getting r3p1 from?
->
-> Apologies, that's what Santosh mentioned here:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101302.html
->
-> so, assuming that it's the same problem, it seems that both r3p1 and r2p0
-> are affected.
+sizes.h is used throughout the AMBA code and drivers, so the header
+should be available to everyone in order to driver AMBA/PrimeCell
+peripherals behind a PCI bridge where the host can be any platform
+(I'm doing it under x86).
 
-Ah, I missed that.  The issue I was seeing only affected 4430 (r2p0).
+At this step <asm-generic/sizes.h> includes <linux/sizes.h>,
+to allow a grace period for both in-tree and out-of-tree drivers.
 
->> When I said I couldn't reproduce the issue with clean during boot, I
->> meant that I couldn't trigger the issue during boot by calling clean
->> repeatedly. ?I could still reproduce the issue after boot even if the
->> cache was cleaned during boot.
->
-> Ok, that's interesting. I wonder if erratum #769419 is to blame? We now have
-> a workaround in the kernel for that, so you could give it a try if you're in
-> a position to do so.
+Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Alan Cox <alan@linux.intel.com>
+---
+ include/asm-generic/sizes.h |   49 +-----------------------------------------
+ include/linux/sizes.h       |   47 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 47 deletions(-)
+ create mode 100644 include/linux/sizes.h
 
-I don't have any 4430 devices any more.
+diff --git a/include/asm-generic/sizes.h b/include/asm-generic/sizes.h
+index ea5d4ef..1dcfad9 100644
+--- a/include/asm-generic/sizes.h
++++ b/include/asm-generic/sizes.h
+@@ -1,47 +1,2 @@
+-/*
+- * linux/include/asm-generic/sizes.h
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_GENERIC_SIZES_H__
+-#define __ASM_GENERIC_SIZES_H__
+-
+-#define SZ_1				0x00000001
+-#define SZ_2				0x00000002
+-#define SZ_4				0x00000004
+-#define SZ_8				0x00000008
+-#define SZ_16				0x00000010
+-#define SZ_32				0x00000020
+-#define SZ_64				0x00000040
+-#define SZ_128				0x00000080
+-#define SZ_256				0x00000100
+-#define SZ_512				0x00000200
+-
+-#define SZ_1K				0x00000400
+-#define SZ_2K				0x00000800
+-#define SZ_4K				0x00001000
+-#define SZ_8K				0x00002000
+-#define SZ_16K				0x00004000
+-#define SZ_32K				0x00008000
+-#define SZ_64K				0x00010000
+-#define SZ_128K				0x00020000
+-#define SZ_256K				0x00040000
+-#define SZ_512K				0x00080000
+-
+-#define SZ_1M				0x00100000
+-#define SZ_2M				0x00200000
+-#define SZ_4M				0x00400000
+-#define SZ_8M				0x00800000
+-#define SZ_16M				0x01000000
+-#define SZ_32M				0x02000000
+-#define SZ_64M				0x04000000
+-#define SZ_128M				0x08000000
+-#define SZ_256M				0x10000000
+-#define SZ_512M				0x20000000
+-
+-#define SZ_1G				0x40000000
+-#define SZ_2G				0x80000000
+-
+-#endif /* __ASM_GENERIC_SIZES_H__ */
++/* This is a placeholder, to be removed over time */
++#include <linux/sizes.h>
+diff --git a/include/linux/sizes.h b/include/linux/sizes.h
+new file mode 100644
+index 0000000..ce3e815
+--- /dev/null
++++ b/include/linux/sizes.h
+@@ -0,0 +1,47 @@
++/*
++ * include/linux/sizes.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __LINUX_SIZES_H__
++#define __LINUX_SIZES_H__
++
++#define SZ_1				0x00000001
++#define SZ_2				0x00000002
++#define SZ_4				0x00000004
++#define SZ_8				0x00000008
++#define SZ_16				0x00000010
++#define SZ_32				0x00000020
++#define SZ_64				0x00000040
++#define SZ_128				0x00000080
++#define SZ_256				0x00000100
++#define SZ_512				0x00000200
++
++#define SZ_1K				0x00000400
++#define SZ_2K				0x00000800
++#define SZ_4K				0x00001000
++#define SZ_8K				0x00002000
++#define SZ_16K				0x00004000
++#define SZ_32K				0x00008000
++#define SZ_64K				0x00010000
++#define SZ_128K				0x00020000
++#define SZ_256K				0x00040000
++#define SZ_512K				0x00080000
++
++#define SZ_1M				0x00100000
++#define SZ_2M				0x00200000
++#define SZ_4M				0x00400000
++#define SZ_8M				0x00800000
++#define SZ_16M				0x01000000
++#define SZ_32M				0x02000000
++#define SZ_64M				0x04000000
++#define SZ_128M				0x08000000
++#define SZ_256M				0x10000000
++#define SZ_512M				0x20000000
++
++#define SZ_1G				0x40000000
++#define SZ_2G				0x80000000
++
++#endif /* __LINUX_SIZES_H__ */
+-- 
+1.7.7.2
