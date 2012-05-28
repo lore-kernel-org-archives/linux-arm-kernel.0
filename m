@@ -1,72 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 May 2012 03:36:42 -0700
-Subject: [PATCH] mmc: omap: Fix NULL pointer dereference if
- mmc_omap_new_slot() fails
-In-Reply-To: <20120528065347.GR17852@atomide.com>
-References: <20120528065347.GR17852@atomide.com>
-Message-ID: <20120528103641.GA12766@atomide.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 28 May 2012 11:55:56 +0100
+Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1338084656-11961-1-git-send-email-marex@denx.de>
+References: <1338084656-11961-1-git-send-email-marex@denx.de>
+Message-ID: <4FC359BC.8080606@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b01a4f1c (mmc: omap: convert to per instance workqueue) initializes
-the workqueue too late causing the following:
+On 27/05/12 03:10, Marek Vasut wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
+>
+> Signed-off-by: Marek Vasut<marex@denx.de>
+> Cc: Detlev Zundel<dzu@denx.de>
+> CC: Dong Aisheng<b29396@freescale.com>
+> CC: Fabio Estevam<fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel<linux-arm-kernel@lists.infradead.org>
+> Cc: linux-i2c at vger.kernel.org
+> CC: Sascha Hauer<s.hauer@pengutronix.de>
+> CC: Shawn Guo<shawn.guo@linaro.org>
+> Cc: Stefano Babic<sbabic@denx.de>
+> CC: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
+> Cc: Wolfgang Denk<wd@denx.de>
+> Cc: Wolfram Sang<w.sang@pengutronix.de>
+> ---
+>   Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    1 +
+>   arch/arm/boot/dts/imx28.dtsi                      |    2 +
+>   drivers/i2c/busses/i2c-mxs.c                      |   64 +++++++++++++++++++++
+>   3 files changed, 67 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> index 1bfc02d..790b5c6 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>   - compatible: Should be "fsl,<chip>-i2c"
+>   - reg: Should contain registers location and length
+>   - interrupts: Should contain ERROR and DMA interrupts
+> +- speed: Speed of the bus in kHz (400 or 100 are supported)
+>
+>   Examples:
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 4634cb8..d927155 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -381,6 +381,7 @@
+>   				compatible = "fsl,imx28-i2c";
+>   				reg =<0x80058000 2000>;
+>   				interrupts =<111 68>;
+> +				fsl,speed =<400>;
+>   				status = "disabled";
+>   			};
+>
+> @@ -390,6 +391,7 @@
+>   				compatible = "fsl,imx28-i2c";
+>   				reg =<0x8005a000 2000>;
+>   				interrupts =<110 69>;
+> +				fsl,speed =<400>;
+>   				status = "disabled";
+>   			};
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0004000
-[00000000] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0    Not tainted  (3.4.0-08218-gb48b2c3 #158)
-PC is at __queue_work+0x8/0x46c
-LR is at queue_work_on+0x38/0x40
-pc : [<c005bb4c>]    lr : [<c005c00c>]    psr: 60000193
-sp : c0691e1c  ip : 00000000  fp : c07374ac
-r10: c7aae400  r9 : c0395700  r8 : 00000100
-r7 : c0691e70  r6 : 00000000  r5 : 00000000  r4 : c7aae440
-r3 : 00000001  r2 : c7aae440  r1 : 00000000  r0 : 00000000
-Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 00c5387d  Table: 80004000  DAC: 00000017
-Process swapper/0 (pid: 0, stack limit = 0xc06902f8)
-Stack: (0xc0691e1c to 0xc0692000)
+Is there not a standard speed setting in the i2c binding?
 
-Fix this by initializing the workqueue before mmc_omap_remove_slot()
-get called. Tested on n770, looks like n800 at least still has some
-other issue with MMC.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -1485,24 +1485,27 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
- 	}
- 
- 	host->nr_slots = pdata->nr_slots;
-+
-+	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
-+	if (!host->mmc_omap_wq)
-+		goto err_plat_cleanup;
-+
- 	for (i = 0; i < pdata->nr_slots; i++) {
- 		ret = mmc_omap_new_slot(host, i);
- 		if (ret < 0) {
- 			while (--i >= 0)
- 				mmc_omap_remove_slot(host->slots[i]);
- 
--			goto err_plat_cleanup;
-+			goto err_destroy_wq;
- 		}
- 	}
- 
- 	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
- 
--	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
--	if (!host->mmc_omap_wq)
--		goto err_plat_cleanup;
--
- 	return 0;
- 
-+err_destroy_wq:
-+	destroy_workqueue(host->mmc_omap_wq);
- err_plat_cleanup:
- 	if (pdata->cleanup)
- 		pdata->cleanup(&pdev->dev);
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
