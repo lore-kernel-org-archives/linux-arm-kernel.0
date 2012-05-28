@@ -1,40 +1,44 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 28 May 2012 18:27:20 +0200
-Subject: [PATCH] serial/of-serial: Add 16654 chip to compatible string list
-In-Reply-To: <20120528150311.GA28290@n2100.arm.linux.org.uk>
-References: <1338199134-23885-1-git-send-email-stigge@antcom.de>
- <20120528100338.GI24149@n2100.arm.linux.org.uk> <4FC35F97.2030400@antcom.de>
- <20120528150311.GA28290@n2100.arm.linux.org.uk>
-Message-ID: <4FC3A768.3060208@antcom.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 28 May 2012 18:28:42 +0200
+Subject: [PATCH] MXS: Add DENX M28 dts file
+In-Reply-To: <CAOMZO5C-XbGqWHxpX24V6X58rcnSeSobuyJNiZTJErQi55tEbQ@mail.gmail.com>
+References: <1338084735-12083-1-git-send-email-marex@denx.de>
+ <CAOMZO5C-XbGqWHxpX24V6X58rcnSeSobuyJNiZTJErQi55tEbQ@mail.gmail.com>
+Message-ID: <201205281828.43129.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/12 17:03, Russell King - ARM Linux wrote:
->> Initially, with my RFC patch, there was an #ifdef for bigger FIFO in
->> case of LPC32xx where we have a 16550A variant with 64 byte fifos.
+Dear Fabio Estevam,
+
+> Hi Marek,
 > 
-> What are all the differences?  Is it just a larger FIFO?
-
-Yes, this is how it's summarized in the manual (LPC32xx SoC).
-
->> So maybe 16750 is the better choice for me, anyway. Already supported in
->> of-serial. Works for now, but need more testing. Another hint is that
->> 16750 is advertised as "IP core for Soc" which matches the case of LPC32xx.
+> On Sat, May 26, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
+> > +       sound {
+> > +               compatible = "fsl,imx28-evk-sgtl5000",
+> > +                            "fsl,mxs-audio-sgtl5000";
+> > +               model = "imx28-evk-sgtl5000";
+> > +               saif-controllers = <&saif0 &saif1>;
+> > +               audio-codec = <&sgtl5000>;
+> > +       };
+> > +};
 > 
-> 16750 also has automatic hardware flow control support, selectable through
-> bit 5 in the MCR register.  If your UART has that, then it's probably a
-> 16750 derivative rather than a 16550 or 16650 derivative.
+> Shouldn't this be:
+
+it should ... you know the drill, s/xxx/yyy/g ;-)
+
+btw the way I set up GPIOs is correct? I'm quite unsure about it, can you please 
+verify?
+
+Thanks!
+
 > 
-> 16650s have an EFR register at offset 2, selectable by writing 0xBF into
-> the LCR register, which the 16750 doesn't have.  16650 also has automatic
-> hardware flow control, bit this is selected through a couple of bits in
-> the EFR.
+> sound {
+> 	compatible = "fsl,imx28-m28-sgtl5000",
+> 		     "fsl,mxs-audio-sgtl5000";
+> 	model = "imx28-m28-sgtl5000";
+> 	saif-controllers = <&saif0 &saif1>;
+> 	audio-codec = <&sgtl5000>;
+> };
 
-The 4 LPC32xx's "Standard" UARTs have neither of those.
-
-Is it ok to use "ns16650", i.e. PORT_16650, or do I need to introduce a
-FIFO depth configuration?
-
-Thanks in advance,
-
-Roland
+Best regards,
+Marek Vasut
