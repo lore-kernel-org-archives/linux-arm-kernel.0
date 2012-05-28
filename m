@@ -1,86 +1,52 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Mon, 28 May 2012 18:36:59 +0200
-Subject: [PATCH V2 0/6] Bridging PCI to amba
-Message-ID: <cover.1338220457.git.rubini@gnudd.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 28 May 2012 09:37:26 -0700
+Subject: [PATCH v2] RFC: ARM: cache-l2x0: update workaround for PL310
+ errata 727915
+In-Reply-To: <20120528101132.GA956@mudshark.cambridge.arm.com>
+References: <1337546505-24660-1-git-send-email-linus.walleij@stericsson.com>
+ <CAMQu2gy3VTtQhnVVvzgYGhr_vA=vnW=rSBW17yoBTNwkN3wHqQ@mail.gmail.com>
+ <20120522085256.GA7286@mudshark.cambridge.arm.com>
+ <4FBB5AE8.4000801@ti.com>
+ <20120522093410.GC7286@mudshark.cambridge.arm.com>
+ <CAMbhsRSJADaXBEpFr2Mk3xm0-c2brYiDUAcY8u1rzP-XwycfBA@mail.gmail.com>
+ <20120525145603.GG13467@mudshark.cambridge.arm.com>
+ <CAMbhsRS_RtuvkrOh1nJ=cdYDgfM0tY9MivnbuWDcS_+NcW0qjQ@mail.gmail.com>
+ <20120528101132.GA956@mudshark.cambridge.arm.com>
+Message-ID: <CAMbhsRTYq=Ezg-ypJfEKSxQTsKTJFuNWQJRoOXc7O8Oj2rsWwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2: accepted comments I got on V1; rewritten the driver to be generic;
-    made it tristate instead of boolean. Rebased on new next.
+On Mon, May 28, 2012 at 3:11 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Colin,
+>
+> On Fri, May 25, 2012 at 09:04:22PM +0100, Colin Cross wrote:
+>> On Fri, May 25, 2012 at 7:56 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > Right, ok. This is definitely a different problem though. Firstly, r3p1 is
+>> > not affected by the original erratum and secondly the symptoms do not
+>> > include deadlock. The clean during boot also sounds highly suspicious -- is
+>> > there a chance you boot the kernel with a dirty L2? Is the L2 enabled or
+>> > disabled when entering the kernel [I think u8500 has it enabled]?
+>>
+>> In a previous thread, I wrote that the 4430 I was using had r2p0. ?I
+>> can't verify the accuracy of that claim right now, but my patch was
+>> based on that assumption. ?Where are you getting r3p1 from?
+>
+> Apologies, that's what Santosh mentioned here:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101302.html
+>
+> so, assuming that it's the same problem, it seems that both r3p1 and r2p0
+> are affected.
 
+Ah, I missed that.  The issue I was seeing only affected 4430 (r2p0).
 
-This patch set introduces use of AMBA devices under a PCI bridge.
-The device table in the driver include all the devices that we'll be
-able to run using AMBA drivers.
+>> When I said I couldn't reproduce the issue with clean during boot, I
+>> meant that I couldn't trigger the issue during boot by calling clean
+>> repeatedly. ?I could still reproduce the issue after boot even if the
+>> cache was cleaned during boot.
+>
+> Ok, that's interesting. I wonder if erratum #769419 is to blame? We now have
+> a workaround in the kernel for that, so you could give it a try if you're in
+> a position to do so.
 
-To compile AMBA under x86, though I need <asm/sizes.h>,
-which is moved to <linux/sizes.h> as suggested earlier.
-
-I'm hereby volunteering to handle the moving of the various users
-of <asm/sizes.h> to <linux/sizes.h>; this set only moves the ARM core
-files and the ones that I need under x86.
-
-The whole patch set is sent to the same set of recipients:
-all relevant lists, Russell King (for arm), Greg-KH (for uart) and
-Arnd Bergmann (for generic include).
-
-With this set in place (plus a clok API not included here) I have
-4 serial ports working.
-
-Success strings:
-   spusa.root# uname -r
-   3.4.0-next-20120528-00016-g1e5853d
-
-   spusa.root# dmesg | grep ttyA
-   amba-0000:03:00.5: ttyAMA0 at MMIO 0xcf400000 (irq = 64) is a PL011 rev3
-   amba-0000:03:00.6: ttyAMA1 at MMIO 0xcec00000 (irq = 65) is a PL011 rev3
-   amba-0000:03:00.7: ttyAMA2 at MMIO 0xce400000 (irq = 66) is a PL011 rev3
-   amba-0000:04:00.5: ttyAMA3 at MMIO 0xd3400000 (irq = 71) is a PL011 rev3
-
-   spusa.root# grep -B2 pl011 /proc/iomem
-           ce400000-ce7fffff : 0000:03:00.7
-             ce400000-ce400fff : amba-0000:03:00.7
-             ce400000-ce400fff : uart-pl011
-   --
-           cec00000-ceffffff : 0000:03:00.6
-             cec00000-cec00fff : amba-0000:03:00.6
-             cec00000-cec00fff : uart-pl011
-   --
-           cf400000-cf7fffff : 0000:03:00.5
-             cf400000-cf400fff : amba-0000:03:00.5
-             cf400000-cf400fff : uart-pl011
-   --
-           d3400000-d37fffff : 0000:04:00.5
-             d3400000-d3400fff : amba-0000:04:00.5
-             d3400000-d3400fff : uart-pl011
-
-
-Alessandro Rubini (6):
-  sizes.h: move from asm-generic to <linux/sizes.h>
-  amba: use the new linux/sizes.h
-  ARM: use the new linux/sizes.h
-  serial: use the new linux/sizes.h
-  x86: add CONFIG_ARM_AMBA, selected by STA2X11
-  drivers/amba: add support for a PCI bridge
-
- arch/arm/include/asm/memory.h   |    2 +-
- arch/arm/mm/dma-mapping.c       |    2 +-
- arch/arm/mm/init.c              |    2 +-
- arch/arm/mm/ioremap.c           |    2 +-
- arch/arm/mm/mmu.c               |    2 +-
- arch/x86/Kconfig                |    4 ++
- drivers/Kconfig                 |    2 +
- drivers/amba/Kconfig            |   10 ++++
- drivers/amba/Makefile           |    1 +
- drivers/amba/bus.c              |    2 +-
- drivers/amba/pci-amba.c         |   95 +++++++++++++++++++++++++++++++++++++++
- drivers/tty/serial/amba-pl011.c |    2 +-
- include/asm-generic/sizes.h     |   49 +-------------------
- include/linux/sizes.h           |   47 +++++++++++++++++++
- 14 files changed, 168 insertions(+), 54 deletions(-)
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/amba/pci-amba.c
- create mode 100644 include/linux/sizes.h
-
--- 
-1.7.7.2
+I don't have any 4430 devices any more.
