@@ -1,65 +1,35 @@
-From: eduardo.valentin@ti.com (Valentin, Eduardo)
-Date: Mon, 28 May 2012 13:30:55 +0300
-Subject: [RFC PATCH 02/11] ARM: OMAP: expose control.h to mach area
-In-Reply-To: <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-3-git-send-email-eduardo.valentin@ti.com>
- <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
-Message-ID: <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 May 2012 11:33:57 +0100
+Subject: amba, tegra-ahb and pci (Kconfig question)
+In-Reply-To: <4FC3523A.1030405@codethink.co.uk>
+References: <20120528082452.GH24149@n2100.arm.linux.org.uk>
+ <20120528081737.GA8031@mail.gnudd.com> <20120528083443.GA8599@mail.gnudd.com>
+ <4FC3523A.1030405@codethink.co.uk>
+Message-ID: <20120528103357.GJ24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, May 28, 2012 at 12:25 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
-> <eduardo.valentin@ti.com> wrote:
->> This patch exposes the definitions under control.h to
->> drivers outside the machine code.
+On Mon, May 28, 2012 at 11:23:54AM +0100, Ben Dooks wrote:
+> On 28/05/12 09:34, Alessandro Rubini wrote:
+>>> Normally, ARM_AMBA is selected when required, so this would be:
+>>>
+>>> config PCI_AMBA
+>>> 	bool "PCI-to-AMBA bridge"
+>>> 	depends on PCI
+>>> 	select ARM_AMBA
 >>
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> ---
-> After second thought, this complete header movement needs to avoided.
-> Drivers should not anyway include something like <mach/control.h>
+>> But this would open the new question in a zillion boards that are
+>> not interested in it. It's the board that selects arm-amba, in my opinion.
+>>
+>>> I guess I should look at moving ARM_AMBA to drivers/amba/Kconfig too...
+>>
+>> If you want I can submit a patch for this (btw, the rename to primecell
+>> is dead, isn't it?)
 >
-> May be split the control.h header file data into ..
-> - defines used by mach-omap2/* files which can remain in "control.h"
-> in existing location.
+> Would doing a change from ARM_AMBA to AMBA also be useful, or
+> adding CONFIG_AMBA and having ARM_AMBA select it?
 
-OK..
-
-> - common functions/defines used across drivers/*, mach-omap2/*,
-> plat-omap/*, should
-> go to include/linux/omap_control.h
-
-Right..
-
-> - Driver specific defines like thermal, usb etc, should go to
-> respective drivers file.
-
-Indeed.
-
->
-> What do you think ?
-
-I think we are in line. And I believe I saw a similar comment by
-Benoit in other email thread.
-
-Having a better thinking of this, it makes sense to have the
-definition specific to drivers in the driver scope only, as they are
-going to be used only there anyway.
-
-I will drop this patch off and update the remaining changes
-accordingly (drop the change in control.h for thermal specific and
-move it to omap_bandgap.h).
-
->
-> Regards
-> santosh
-
-
-
--- 
-
-Eduardo Valentin
+Why?  There's nothing wrong with the ARM prefix, because the bus is an
+ARM design.  And in any case, if we're considering changing the name
+we really should change it to be PRIMECELL and not AMBA - and that is
+even more of a reason to keep the ARM_ prefix.
