@@ -1,29 +1,43 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 28 May 2012 14:18:18 +0300
-Subject: [RFC PATCH 08/11] ARM: OMAP4+: Adding the temperature sensor
- register set bit fields
-In-Reply-To: <CAMQu2gweS9O7+n3_J=7W3CeDOBgMML+z+BXKafqChhEZd3bmDQ@mail.gmail.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-9-git-send-email-eduardo.valentin@ti.com>
- <CAMQu2gweS9O7+n3_J=7W3CeDOBgMML+z+BXKafqChhEZd3bmDQ@mail.gmail.com>
-Message-ID: <20120528111818.GE3923@besouro>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 28 May 2012 13:20:55 +0200
+Subject: [PATCH] serial/of-serial: Add 16654 chip to compatible string list
+In-Reply-To: <20120528100338.GI24149@n2100.arm.linux.org.uk>
+References: <1338199134-23885-1-git-send-email-stigge@antcom.de>
+ <20120528100338.GI24149@n2100.arm.linux.org.uk>
+Message-ID: <4FC35F97.2030400@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 03:34:28PM +0530, Shilimkar, Santosh wrote:
-> On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
-> <eduardo.valentin@ti.com> wrote:
-> > OMAP4460 specific temperature sensor register bit fields are added.
-> > Existing OMAP4 entries are renamed to OMAP4430.
-> >
-> > Signed-off-by: Keerthy <j-keerthy@ti.com>
-> > Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> > ---
-> Once you split the header, as mentioned in earlier comment,
-> you can move those defines in driver file directly.
-
-Agreed, this patch is gonna be dropped and the definition will be part of patch introducing the bandgap driver
-
+On 28/05/12 12:03, Russell King - ARM Linux wrote:
+> Something which occurs to me.  Normally, the digit at the end indicates
+> how many ports are integrated into the device (0=1port, 2=2port, 4=4port.)
+> Are you sure there isn't a ST16650 which has the same characteristics?
 > 
-> Regards
-> Santsoh
+> We really should stick with naming these using the single port versions if
+> at all possible.
+
+Right.
+
+This indicates to me that maybe this is not the right solution for my
+original problem, anyway. :-)
+
+Initially, with my RFC patch, there was an #ifdef for bigger FIFO in
+case of LPC32xx where we have a 16550A variant with 64 byte fifos.
+
+Looking at the 16x50 line:
+
+16550A  16 bytes FIFOs
+16650V2 32 bytes FIFOs
+16750   64 bytes FIFOs
+
+(?)
+
+So maybe 16750 is the better choice for me, anyway. Already supported in
+of-serial. Works for now, but need more testing. Another hint is that
+16750 is advertised as "IP core for Soc" which matches the case of LPC32xx.
+
+Maybe NXP can comment on this?
+
+Thanks in advance,
+
+Roland
