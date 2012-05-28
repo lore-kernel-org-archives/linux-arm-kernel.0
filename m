@@ -1,35 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 May 2012 11:33:57 +0100
-Subject: amba, tegra-ahb and pci (Kconfig question)
-In-Reply-To: <4FC3523A.1030405@codethink.co.uk>
-References: <20120528082452.GH24149@n2100.arm.linux.org.uk>
- <20120528081737.GA8031@mail.gnudd.com> <20120528083443.GA8599@mail.gnudd.com>
- <4FC3523A.1030405@codethink.co.uk>
-Message-ID: <20120528103357.GJ24149@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 May 2012 03:36:42 -0700
+Subject: [PATCH] mmc: omap: Fix NULL pointer dereference if
+ mmc_omap_new_slot() fails
+In-Reply-To: <20120528065347.GR17852@atomide.com>
+References: <20120528065347.GR17852@atomide.com>
+Message-ID: <20120528103641.GA12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 11:23:54AM +0100, Ben Dooks wrote:
-> On 28/05/12 09:34, Alessandro Rubini wrote:
->>> Normally, ARM_AMBA is selected when required, so this would be:
->>>
->>> config PCI_AMBA
->>> 	bool "PCI-to-AMBA bridge"
->>> 	depends on PCI
->>> 	select ARM_AMBA
->>
->> But this would open the new question in a zillion boards that are
->> not interested in it. It's the board that selects arm-amba, in my opinion.
->>
->>> I guess I should look at moving ARM_AMBA to drivers/amba/Kconfig too...
->>
->> If you want I can submit a patch for this (btw, the rename to primecell
->> is dead, isn't it?)
->
-> Would doing a change from ARM_AMBA to AMBA also be useful, or
-> adding CONFIG_AMBA and having ARM_AMBA select it?
+Commit b01a4f1c (mmc: omap: convert to per instance workqueue) initializes
+the workqueue too late causing the following:
 
-Why?  There's nothing wrong with the ARM prefix, because the bus is an
-ARM design.  And in any case, if we're considering changing the name
-we really should change it to be PRIMECELL and not AMBA - and that is
-even more of a reason to keep the ARM_ prefix.
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = c0004000
+[00000000] *pgd=00000000
+Internal error: Oops: 5 [#1] SMP ARM
+Modules linked in:
+CPU: 0    Not tainted  (3.4.0-08218-gb48b2c3 #158)
+PC is at __queue_work+0x8/0x46c
+LR is at queue_work_on+0x38/0x40
+pc : [<c005bb4c>]    lr : [<c005c00c>]    psr: 60000193
+sp : c0691e1c  ip : 00000000  fp : c07374ac
+r10: c7aae400  r9 : c0395700  r8 : 00000100
+r7 : c0691e70  r6 : 00000000  r5 : 00000000  r4 : c7aae440
+r3 : 00000001  r2 : c7aae440  r1 : 00000000  r0 : 00000000
+Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 00c5387d  Table: 80004000  DAC: 00000017
+Process swapper/0 (pid: 0, stack limit = 0xc06902f8)
+Stack: (0xc0691e1c to 0xc0692000)
+
+Fix this by initializing the workqueue before mmc_omap_remove_slot()
+get called. Tested on n770, looks like n800 at least still has some
+other issue with MMC.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/mmc/host/omap.c
++++ b/drivers/mmc/host/omap.c
+@@ -1485,24 +1485,27 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	host->nr_slots = pdata->nr_slots;
++
++	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
++	if (!host->mmc_omap_wq)
++		goto err_plat_cleanup;
++
+ 	for (i = 0; i < pdata->nr_slots; i++) {
+ 		ret = mmc_omap_new_slot(host, i);
+ 		if (ret < 0) {
+ 			while (--i >= 0)
+ 				mmc_omap_remove_slot(host->slots[i]);
+ 
+-			goto err_plat_cleanup;
++			goto err_destroy_wq;
+ 		}
+ 	}
+ 
+ 	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
+ 
+-	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
+-	if (!host->mmc_omap_wq)
+-		goto err_plat_cleanup;
+-
+ 	return 0;
+ 
++err_destroy_wq:
++	destroy_workqueue(host->mmc_omap_wq);
+ err_plat_cleanup:
+ 	if (pdata->cleanup)
+ 		pdata->cleanup(&pdev->dev);
