@@ -1,35 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 29 May 2012 17:57:21 +0200
-Subject: [PATCH v2] ARM: at91: add atmel-mci support for chips and
- boards which can use it
-In-Reply-To: <4FC4AB4A.8060605@atmel.com>
-References: <1337183519-25459-3-git-send-email-ludovic.desroches@atmel.com>
- <1337595807-8539-1-git-send-email-ludovic.desroches@atmel.com>
- <20120528074133.GR3377@game.jcrosoft.org>
- <4FC4AB4A.8060605@atmel.com>
-Message-ID: <20120529155721.GS3377@game.jcrosoft.org>
+Date: Tue, 29 May 2012 18:01:12 +0200
+Subject: [PATCH v9 3/3] MTD: at91: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <4FC3389C.5050303@atmel.com>
+References: <1338038677-6752-1-git-send-email-josh.wu@atmel.com>
+ <1338038677-6752-4-git-send-email-josh.wu@atmel.com>
+ <20120528065822.GL3377@game.jcrosoft.org>
+ <4FC3389C.5050303@atmel.com>
+Message-ID: <20120529160112.GT3377@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:56 Tue 29 May     , Nicolas Ferre wrote:
-> On 05/28/2012 09:41 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> > On 12:23 Mon 21 May     , ludovic.desroches at atmel.com wrote:
-> >> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>
-> >> Since atmel-mci driver supports all atmel mci version excepted the rm9200 one,
-> >> use it instead of at91_mci driver.
-> >>
-> >> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >> ---
-> >> V2: add several boards I missed
-> > for the 9g20 and 9260 please drop the old driver support too
+> >>+
+> >>+static void __iomem *pmecc_get_index_of(struct atmel_nand_host *host)
+> >this is a __dev_init function plese check the other too
+> >
+> >btw you need to use __dev_init and not __init
 > 
-> No, we will drop the support for old driver when we finish the
-> transition period. We will then drop at91_mci with all configuration
-> data in device/board files.
-on 9g20 and 9260 the new drivers is present for release
+> Here I use pmecc_get_index_of() function to get a lookup table base
+> which is in ROM.
+> I'm not clear about how should I need __dev_init here. Can you give
+> more information?
 
-there is no reason to keep one more release
+it is the section where the function is going to be stored
+
+pmecc_get_index_of is use at probe time so it's __devinit section
+
+as it's supposed to be for the probe function too
 
 Best Regards,
 J.
