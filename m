@@ -1,9 +1,22 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 29 May 2012 15:30:18 -0700
+Date: Tue, 29 May 2012 17:36:17 -0500
 Subject: [PATCH] staging: comedi: Make COMEDI_FC a hidden Kconfig option
-Message-ID: <201205291530.19371.hartleys@visionengravers.com>
+In-Reply-To: <201205291530.19371.hartleys@visionengravers.com>
+References: <201205291530.19371.hartleys@visionengravers.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698C58C18@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Oops... ARM list, please ignore...
+
+Sorry for the noise.
+
+-----Original Message-----
+From: devel-bounces@linuxdriverproject.org [mailto:devel-bounces at linuxdriverproject.org] On Behalf Of H Hartley Sweeten
+Sent: Tuesday, May 29, 2012 3:30 PM
+To: ARM Kernel
+Cc: devel at driverdev.osuosl.org; fmhess at users.sourceforge.net; abbotti at mev.co.uk; gregkh at linuxfoundation.org
+Subject: [PATCH] staging: comedi: Make COMEDI_FC a hidden Kconfig option
 
 The COMEDI_FC Kconfig option is selected by the relevant drivers
 when needed. Since it only contains shared functions, selecting
@@ -37,3 +50,7 @@ index 3bbe3fd..54e32da 100644
  
  config COMEDI_AMPLC_DIO200
  	tristate
+_______________________________________________
+devel mailing list
+devel at linuxdriverproject.org
+http://driverdev.linuxdriverproject.org/mailman/listinfo/devel
