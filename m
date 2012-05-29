@@ -1,64 +1,72 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 29 May 2012 11:47:40 +0200
-Subject: [PATCH v2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <20120529093948.GG12217@n2100.arm.linux.org.uk>
-References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
- <20120529091254.GY3710@pengutronix.de>
- <20120529093629.GQ30400@pengutronix.de>
- <20120529093948.GG12217@n2100.arm.linux.org.uk>
-Message-ID: <20120529094740.GR30400@pengutronix.de>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 29 May 2012 10:41:39 +0100
+Subject: [RFC 19/34] dmaengine: PL08x: track mux usage on a per-channel basis.
+In-Reply-To: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+Message-ID: <E1SZIvr-0006zy-Uk@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 10:39:48AM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 29, 2012 at 11:36:29AM +0200, Sascha Hauer wrote:
-> > On Tue, May 29, 2012 at 11:12:54AM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > On Tue, May 29, 2012 at 10:16:09AM +0200, Sascha Hauer wrote:
-> > > > The following commit changes the function used to copy from/to
-> > > > the hardware buffer to memcpy_[from|to]io. This does not work
-> > > > since the hardware cannot handle the byte accesses used by these
-> > > > functions. Instead of reverting this patch introduce 32bit
-> > > > correspondents of these functions.
-> > > Hmm, I didn't run an mtd test suite, but on mx27 it worked for me. IMHO
-> > > it's surprising that memcpy used to work, but memcpy_fromio doesn't. I
-> > > wouldn't expect a different semantic (apart from normal vs. __iomem
-> > > memory). And I wonder what will break when ARM's memcpy_fromio et al.
-> > > is optimized.
-> > 
-> > Have a look at the (ARM) implementation of memcpy_fromio:
-> > 
-> > void _memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
-> > {
-> > 	unsigned char *t = to;
-> > 	while (count) {
-> > 		count--;
-> > 		*t = readb(from);
-> > 		t++;
-> > 		from++;
-> > 	}
-> > }
-> > 
-> > Appearently this uses byte accesses which do not work on NFC SRAM,
-> > whereas memcpy uses optimized (so 32bit whenever possible) accesses.
-> > If someone would implement an optimized version of memcpy_fromio, it
-> > would work for the NFC aswell.
-> > 
-> > btw on i.MX27 byte accesses also do not work on NFC SRAM, so I doubt
-> > this worked for you.
-> 
-> And then when you ask for an odd alignment or an odd number of bytes...
+Keep track of the number of descriptors currently using a MUX setting
+on a per-channel basis.  This allows us to know when we have descriptors
+queued somewhere which have been assigned a DMA request signal.
 
-Then the person will get an oops and hopefully report it, which so far
-did not happen. I could try and implement this, but I rather don't do
-this as long as we don't know what it's used for and thus we can check
-that the result is correct.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/amba-pl08x.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
 
-Sascha
-
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index e5b13e6..3532833 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -220,6 +220,7 @@ enum pl08x_dma_chan_state {
+  * @waiting: a TX descriptor on this channel which is waiting for a physical
+  * channel to become available
+  * @signal: the physical DMA request signal which this channel is using
++ * @mux_use: count of descriptors using this DMA request signal setting
+  */
+ struct pl08x_dma_chan {
+ 	struct dma_chan chan;
+@@ -237,6 +238,7 @@ struct pl08x_dma_chan {
+ 	bool slave;
+ 	struct pl08x_txd *waiting;
+ 	int signal;
++	unsigned mux_use;
+ };
+ 
+ /**
+@@ -303,10 +305,12 @@ static int pl08x_request_mux(struct pl08x_dma_chan *plchan)
+ 	const struct pl08x_platform_data *pd = plchan->host->pd;
+ 	int ret;
+ 
+-	if (pd->get_signal) {
++	if (plchan->mux_use++ == 0 && pd->get_signal) {
+ 		ret = pd->get_signal(plchan->cd);
+-		if (ret < 0)
++		if (ret < 0) {
++			plchan->mux_use = 0;
+ 			return ret;
++		}
+ 
+ 		plchan->signal = ret;
+ 	}
+@@ -317,9 +321,13 @@ static void pl08x_release_mux(struct pl08x_dma_chan *plchan)
+ {
+ 	const struct pl08x_platform_data *pd = plchan->host->pd;
+ 
+-	if (plchan->signal >= 0 && pd->put_signal) {
+-		pd->put_signal(plchan->cd, plchan->signal);
+-		plchan->signal = -1;
++	if (plchan->signal >= 0) {
++		WARN_ON(plchan->mux_use == 0);
++
++		if (--plchan->mux_use == 0 && pd->put_signal) {
++			pd->put_signal(plchan->cd, plchan->signal);
++			plchan->signal = -1;
++		}
+ 	}
+ }
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.4.4
