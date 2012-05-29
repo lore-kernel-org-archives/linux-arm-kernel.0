@@ -1,42 +1,31 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 29 May 2012 12:47:14 -0500
-Subject: [PATCH 0/3] omap3/omap4: add device tree support for wdt
-In-Reply-To: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
-References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
-Message-ID: <4FC50BA2.4070404@ti.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 29 May 2012 10:51:25 -0700
+Subject: [RFC PATCH 09/11] ARM: OMAP4+: thermal: introduce bandgap
+ temperature sensor
+In-Reply-To: <4FC4CBC8.2040600@ti.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-10-git-send-email-eduardo.valentin@ti.com>
+ <4FBFAA18.4040103@ti.com> <20120528111624.GC3923@besouro>
+ <4FC4CBC8.2040600@ti.com>
+Message-ID: <20120529175125.GD2722@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiao Jiang,
-
-On 05/25/2012 05:42 AM, jgq516 at gmail.com wrote:
-> From: Xiao Jiang <jgq516@gmail.com>
+On 20120529-15:14, Cousson, Benoit wrote:
+> On 5/28/2012 1:16 PM, Eduardo Valentin wrote:
+> >In fact I didn't touch the clk data on purpose and left the clock handling
+> >as is. On my side I didn't know how the clock struct would look like with DT,
+> >so, I didn't mess with it.
+> >
+> >Do you have a reference to check the work in progress for clock DT ?
 > 
-> This series can be applied to dt branch of linux-omap tree.
-
-Thanks for sending this!
-
-> Since omap24xx series has different wdt base addr (omap2420: 0x48022000 and
-> omap2430: 0x49016000) per commit 2817142f31bfbf26c216bf4f9192540c81b2d071, so
-> I don't add wdt node in omap2.dtsi just like omap3 and omap4, maybe different
-> dts files are needed for omap2420 and omap2430.
-
-Good point. I am wondering if we can simple drop the address from the
-wdt2 node for omap2. It is not really being used. May be Benoit can comment.
-
-Cheers
-Jon
-
-> Tested with omap4430 blaze board.
+> Rob sent a pull request, it seems that now it is up to Mike T. :-)
 > 
-> Xiao Jiang (3):
->   arm/dts: add wdt node for omap3 and omap4
->   OMAP: wdt: add device tree support
->   watchdog: omap_wdt: add device tree support
+> http://lists-archives.com/linux-kernel/27640907-dt-clk-binding-support.html
 > 
->  arch/arm/boot/dts/omap3.dtsi  |    5 +++++
->  arch/arm/boot/dts/omap4.dtsi  |    5 +++++
->  arch/arm/mach-omap2/devices.c |    2 +-
->  drivers/watchdog/omap_wdt.c   |    8 ++++++++
->  4 files changed, 19 insertions(+), 1 deletions(-)
-> 
+
+Due to the on-going discussion around those patches I haven't pulled
+yet.  If everyone agrees once the dust settles then I'll take them in.
+
+Regards,
+Mike
