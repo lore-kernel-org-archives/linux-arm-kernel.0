@@ -1,78 +1,50 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 29 May 2012 10:46:01 +0100
-Subject: [RFC 32/34] dmaengine: PL08x: get rid of pl08x_prep_channel_resources
-In-Reply-To: <20120529093015.GF12217@n2100.arm.linux.org.uk>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
-Message-ID: <E1SZJ05-00070z-Eq@rmk-PC.arm.linux.org.uk>
+From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
+Date: Tue, 29 May 2012 13:49:25 +0400
+Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
+ for OMAP4
+In-Reply-To: <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <4FC49BA5.5050008@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is now unnecessary; we can move its internals inline
-instead.
+  Hi, Eduardo.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |   32 +++++++++-----------------------
- 1 files changed, 9 insertions(+), 23 deletions(-)
+On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
+> This patch add device tree entries on OMAP4 based boards
+> for System Control Module (SCM).
+>
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 359c497..d2cb392 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -272,5 +272,18 @@
+>  			ti,hwmods = "mmc5";
+>  			ti,needs-special-reset;
+>  		};
+> +
+> +		ctrl_module_core: ctrl_module_core at 4a002000 {
+> +			compatible = "ti,omap4-control";
+> +			ti,hwmods = "ctrl_module_core";
+> +			bandgap {
+> +				compatible = "ti,omap4460-bandgap";
+> +				interrupts = <0 126 4>; /* talert */
+> +				ti,tshut-gpio = <86>; /* tshut */
+> +			};
+I believe that CPU-specific bandgap definition should be moved to bard specific dts.
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index a8f2b20..9132993 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1345,25 +1345,6 @@ static void pl08x_issue_pending(struct dma_chan *chan)
- 	spin_unlock_irqrestore(&plchan->vc.lock, flags);
- }
- 
--static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
--					struct pl08x_txd *txd)
--{
--	struct pl08x_driver_data *pl08x = plchan->host;
--	int num_llis;
--
--	num_llis = pl08x_fill_llis_for_desc(pl08x, txd);
--	if (!num_llis) {
--		unsigned long flags;
--
--		spin_lock_irqsave(&plchan->vc.lock, flags);
--		pl08x_free_txd(pl08x, txd);
--		spin_unlock_irqrestore(&plchan->vc.lock, flags);
--
--		return -EINVAL;
--	}
--	return 0;
--}
--
- static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan)
- {
- 	struct pl08x_txd *txd = kzalloc(sizeof(*txd), GFP_NOWAIT);
-@@ -1423,9 +1404,11 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 		txd->cctl |= pl08x_select_bus(pl08x->mem_buses,
- 					      pl08x->mem_buses);
- 
--	ret = pl08x_prep_channel_resources(plchan, txd);
--	if (ret)
-+	ret = pl08x_fill_llis_for_desc(plchan->host, txd);
-+	if (!ret) {
-+		pl08x_free_txd(pl08x, txd);
- 		return NULL;
-+	}
- 
- 	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
-@@ -1539,9 +1522,12 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 		}
- 	}
- 
--	ret = pl08x_prep_channel_resources(plchan, txd);
--	if (ret)
-+	ret = pl08x_fill_llis_for_desc(plchan->host, txd);
-+	if (!ret) {
-+		pl08x_release_mux(plchan);
-+		pl08x_free_txd(pl08x, txd);
- 		return NULL;
-+	}
- 
- 	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
--- 
-1.7.4.4
+  BR,
+    Konstantin Baydarov.
+
+> +			usb {
+> +				compatible = "ti,omap4-usb-phy";
+> +			};
+> +		};
+>  	};
+>  };
