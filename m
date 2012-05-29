@@ -1,63 +1,69 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:23 +0530
-Subject: [PATCHv10 11/11] OMAP/I2C - Fix timeout problem during suspend.
+Date: Tue, 29 May 2012 16:26:19 +0530
+Subject: [PATCH 07/11] I2C: OMAP: Handle error check for pm runtime
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-12-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Neil Brown <neilb@suse.de>
+If PM runtime get_sync fails return with the error
+so that no further reads/writes goes through the interface.
+This will avoid possible abort. Add a error message in case
+of failure with the cause of the failure.
 
-On a board with OMAP3 processor and TWL4030 Power management,
-we need to talk to the TWL4030 during late suspend but cannot
-because the I2C interrupt is disabled (as late suspend disables
-interrupt).
-
-e.g. I get messages like:
-
-[   62.161102] musb-omap2430 musb-omap2430: LATE power domain suspend
-[   63.167205] omap_i2c omap_i2c.1: controller timed out
-[   63.183044] twl: i2c_read failed to transfer all messages
-[   64.182861] omap_i2c omap_i2c.1: controller timed out
-[   64.198455] twl: i2c_write failed to transfer all messages
-[   65.198455] omap_i2c omap_i2c.1: controller timed out
-[   65.203765] twl: i2c_write failed to transfer all messages
-
-The stack shows omap2430_runtime_suspend calling twl4030_set_suspend
-which tries to power-down the USB PHY (twl4030_phy_suspend ->
-twl4030_phy_power -> __twl4030_phy_power which as a nice WARN_ON
-that helps).
-
-Then we get the same in resume:
-
-[   69.603912] musb-omap2430 musb-omap2430: EARLY power domain resume
-[   70.610473] omap_i2c omap_i2c.1: controller timed out
-[   70.626129] twl: i2c_write failed to transfer all messages
-etc.
-
-So don't disable interrupts for I2C.
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: NeilBrown <neilb@suse.de>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+-v10 Use IS_ERR_VALUE
+-v9 Fix the error handling
+
+ drivers/i2c/busses/i2c-omap.c |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dc3bd40..9895fa7 100644
+index 44e8cfa..c39b72f 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1053,7 +1053,7 @@ omap_i2c_probe(struct platform_device *pdev)
+@@ -585,7 +585,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	int i;
+ 	int r;
  
- 	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
- 								   omap_i2c_isr;
--	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
-+	r = request_irq(dev->irq, isr, IRQF_NO_SUSPEND, pdev->name, dev);
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (IS_ERR_VALUE(r))
++		return r;
  
- 	if (r) {
- 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
+@@ -1011,7 +1013,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
+-	pm_runtime_get_sync(dev->dev);
++	r = pm_runtime_get_sync(dev->dev);
++	if (IS_ERR_VALUE(r))
++		goto err_free_mem;
+ 
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+ 
+@@ -1103,12 +1107,16 @@ omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	struct resource		*mem;
++	int ret;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+-	pm_runtime_get_sync(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
 -- 
 1.7.5.4
