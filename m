@@ -1,39 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 May 2012 09:53:59 +0800
-Subject: [PATCH 15/16] ARM: ux500: Add regulator support for nomadik-i2c
- into the db8500 Device Tree
-In-Reply-To: <4FBB4782.9090101@linaro.org>
+Date: Tue, 29 May 2012 09:54:48 +0800
+Subject: [PATCH 16/16] ARM: ux500: Re-enable SMSC911x platform code
+ registration during non-DT boots
+In-Reply-To: <4FBB47D0.9020109@linaro.org>
 References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-16-git-send-email-lee.jones@linaro.org>
- <CACRpkdanT17H4VV1AzaYN0wnsFKJTVhw0ZT+o3nP9v=gpKdyAQ@mail.gmail.com>
- <4FBB4782.9090101@linaro.org>
-Message-ID: <CACRpkdb80+4i_9JJpSu9X3biFywnFPvU-7HkZ94btz0iPL723A@mail.gmail.com>
+ <1337330355-17747-17-git-send-email-lee.jones@linaro.org>
+ <CACRpkdarTLa3TtKCbXA+rp8wsLgEGG2U2YxFCLBZkxuv5ZUQGA@mail.gmail.com>
+ <4FBB47D0.9020109@linaro.org>
+Message-ID: <CACRpkdZy05yEck=Z2LtSRW5J0ycUXg2B=OhrdDwXUz_w5TtqaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 22, 2012 at 4:00 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Tue, May 22, 2012 at 4:01 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> This doesn't change the behavior of the current system, only DT:s it.
+> Do you want to take it?
 >
-> It's just that:
->
->> struct regulator_consumer_supply db8500_vape_consumers[] = {
->> ? ? ? ?REGULATOR_SUPPLY("v-i2c", "nmk-i2c.0")
->
-> In drivers/mfd/db8500-prcmu.c is replaced by:
->
->> v-i2c-supply = <&db8500_vape_reg>;
->
-> In the Device Tree
+> If not, how would you like me to take it forward?
 
-Yes...
+Please do, I've screwed up DT patches in the past so it's better
+if they go through a separate pull request.
 
-> If we want to start re-working things, can we do it after the DT enablement
-> please?
-
-I'm told not to put DT bindings for things in place if they are
-incorrect, since they get set in stone... and I'm told we should
-probably remove this one regulator from the device rather.
-I'm just uncertain.
-
+Yours,
 Linus Walleij
