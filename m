@@ -1,67 +1,63 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:16 +0530
-Subject: [PATCHv10 04/11] I2C: OMAP: Prevent the register access after
- pm_runtime_put in probe
+Date: Tue, 29 May 2012 16:26:23 +0530
+Subject: [PATCHv10 11/11] OMAP/I2C - Fix timeout problem during suspend.
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-12-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in probe
-pm_runtime_put(dev->dev);
+From: Neil Brown <neilb@suse.de>
 
-...
-        /* i2c device drivers may be active on return from add_adapter() */
-        adap->nr = pdev->id;
-        r = i2c_add_numbered_adapter(adap);
-        if (r) {
-                dev_err(dev->dev, "failure adding adapter\n");
-                goto err_free_irq;
-        }
-...
+On a board with OMAP3 processor and TWL4030 Power management,
+we need to talk to the TWL4030 during late suspend but cannot
+because the I2C interrupt is disabled (as late suspend disables
+interrupt).
 
-return 0;
+e.g. I get messages like:
 
-err_free_irq:
-        free_irq(dev->irq, dev);
-err_unuse_clocks:
-        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-        pm_runtime_put(dev->dev);
+[   62.161102] musb-omap2430 musb-omap2430: LATE power domain suspend
+[   63.167205] omap_i2c omap_i2c.1: controller timed out
+[   63.183044] twl: i2c_read failed to transfer all messages
+[   64.182861] omap_i2c omap_i2c.1: controller timed out
+[   64.198455] twl: i2c_write failed to transfer all messages
+[   65.198455] omap_i2c omap_i2c.1: controller timed out
+[   65.203765] twl: i2c_write failed to transfer all messages
 
-This may access the i2c registers without the clocks in the error cases.
-Fix the same by moving the pm_runtime_put after the error check.
+The stack shows omap2430_runtime_suspend calling twl4030_set_suspend
+which tries to power-down the USB PHY (twl4030_phy_suspend ->
+twl4030_phy_power -> __twl4030_phy_power which as a nice WARN_ON
+that helps).
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
+Then we get the same in resume:
+
+[   69.603912] musb-omap2430 musb-omap2430: EARLY power domain resume
+[   70.610473] omap_i2c omap_i2c.1: controller timed out
+[   70.626129] twl: i2c_write failed to transfer all messages
+etc.
+
+So don't disable interrupts for I2C.
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: NeilBrown <neilb@suse.de>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
--v9 Changed the $SUBJECT as it was too generic.
--v9 Dropping attempting
-
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index bf07ffd..1777d79 100644
+index dc3bd40..9895fa7 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1061,8 +1061,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
- 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+@@ -1053,7 +1053,7 @@ omap_i2c_probe(struct platform_device *pdev)
  
--	pm_runtime_put(dev->dev);
--
- 	adap = &dev->adapter;
- 	i2c_set_adapdata(adap, dev);
- 	adap->owner = THIS_MODULE;
-@@ -1082,6 +1080,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
+ 								   omap_i2c_isr;
+-	r = request_irq(dev->irq, isr, 0, pdev->name, dev);
++	r = request_irq(dev->irq, isr, IRQF_NO_SUSPEND, pdev->name, dev);
  
- 	of_i2c_register_devices(adap);
- 
-+	pm_runtime_put(dev->dev);
-+
- 	return 0;
- 
- err_free_irq:
+ 	if (r) {
+ 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
 -- 
 1.7.5.4
