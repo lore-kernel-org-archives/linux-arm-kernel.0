@@ -1,66 +1,58 @@
-From: vincent.sanders@collabora.co.uk (Vincent Sanders)
-Date: Tue, 29 May 2012 10:21:20 +0100
-Subject: [PATCH 1/2] Allow constructor name selection by architecture.
-In-Reply-To: <20120528203005.GA20560@merkur.ravnborg.org>
-References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
- <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
- <20120528203005.GA20560@merkur.ravnborg.org>
-Message-ID: <20120529092120.GA6433@kyllikki.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2012 10:21:29 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: mmp: add audio dma support
+In-Reply-To: <20120529090215.GA3954@opensource.wolfsonmicro.com>
+References: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
+ <1337929863-31885-3-git-send-email-zhangfei.gao@marvell.com>
+ <1337932416.1580.2.camel@vkoul-udesk3>
+ <20120525080500.GB24149@n2100.arm.linux.org.uk>
+ <CAMj5Bkhc46zqY5AbJkc=-h02taP_esxrqpNu--aYtZZcVcPK6A@mail.gmail.com>
+ <20120525094231.GC24149@n2100.arm.linux.org.uk>
+ <CAMj5BkjhCakuZdUcA+P_nbETi8tnYK5Ok6HMWTG61whZXwCD6g@mail.gmail.com>
+ <1338268734.1580.26.camel@vkoul-udesk3>
+ <20120529073334.GA12217@n2100.arm.linux.org.uk>
+ <20120529090215.GA3954@opensource.wolfsonmicro.com>
+Message-ID: <20120529092129.GE12217@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
-> On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
-> > From: Vincent Sanders <vince@collabora.co.uk>
-> > 
-> > The constructor symbol name is different between platforms. Allow this
-> > to be selected by configuration and set suitable default values.
-> > 
-> > Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
-> > ---
-> >  include/asm-generic/vmlinux.lds.h |    6 +++---
-> >  init/Kconfig                      |    6 ++++++
-> >  kernel/module.c                   |    2 +-
-> >  3 files changed, 10 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> > index 8aeadf6..fd34808 100644
-> > --- a/include/asm-generic/vmlinux.lds.h
-> > +++ b/include/asm-generic/vmlinux.lds.h
-> > @@ -471,9 +471,9 @@
-> >  	}
-> >  
-> >  #ifdef CONFIG_CONSTRUCTORS
-> > -#define KERNEL_CTORS()	. = ALIGN(8);			   \
-> > -			VMLINUX_SYMBOL(__ctors_start) = .; \
-> > -			*(.ctors)			   \
-> > +#define KERNEL_CTORS()	. = ALIGN(8);					\
-> > +			VMLINUX_SYMBOL(__ctors_start) = .;		\
-> > +			*(CONFIG_CONSTRUCTORS_NAME)			\
-> >  			VMLINUX_SYMBOL(__ctors_end) = .;
+On Tue, May 29, 2012 at 10:02:15AM +0100, Mark Brown wrote:
+> On Tue, May 29, 2012 at 08:33:34AM +0100, Russell King - ARM Linux wrote:
 > 
-> What is wrong with adding both "standard" names for ctors uncnditionally?
-> Like this:
-> > 			*(.ctors)			   \
-> > +			*(.init_array)			   \
+> > But, as I pointed out earlier, there's the issue of using the wrong
+> > struct device to allocate memory for the DMA engine.  That's something
+> > that my soc-dmaengine.c got _right_, and soc-dmaengine-pcm.c gets _wrong_.
 > 
+> What is the issue with the current code - it *looks* like you want to
+> use the component device for the DMA as the struct device with dmaengine
+> but I don't understand the issue that's created if we don't (and why
+> things appear to be working for people as they are).
 
-Persoinally I have no strong opinion and would alter approach.
+Look.  It's very very very very simple.
 
-As I understand it the previous objections to the "put them all in"
-approach (this change has been round the loop before) were:
+What does the DMA API take?  A struct device.  What struct device?  Some
+random struct device for something in the system, or what?  No, it takes
+the struct device for the _device_ in the system which is _performing_
+the DMA.
 
- - It contaminates the x86 symbol namespace and if init_array was used on
-   not ARM it might lead to surprises
+If your DMA is offloaded onto anther device, as is the case with DMA engine,
+the _correct_ struct device to use with the DMA API is the DMA engine
+device structure.  Because, if there's any restrictions on how that memory
+is accessed - as I said in my other email - for instance, whether it be
+that the DMA engine has an IOMMU in the way, or maybe has a restricted
+view of memory - then your local struct device is the wrong one to be
+using, because it will _not_ have that information to convey into the
+DMA API.
 
- - If another architecture needs something different again then we are
-   going to end up with another symbol.
+Therefore, allocating or mapping DMA memory against one struct device,
+and then passing it to an entirely different device in the system to
+perform DMA on is _WRONG_.
 
- - The module loading code has to be changed to allow either symbol.
+It _may_ work as long as there are no restrictions or IOMMUs in the way,
+because you'll happen to setup your local struct device the same as the
+DMA engine struct device.  That's not always going to be the case.
 
-The only technical issue really is the module symbol handling and I am
-unsure how to robustly handle that.
-
--- 
-Regards Vincent
-http://www.kyllikki.org/
+If you persist in not wanting to care about this, then I'm afraid I'll
+ignore soc-dmaengine-pcm.c entirely as to me its totally bolloxed code.
+What I have as my own version (now with cyclic DMA support) is IMHO a
+far superior and more correct implementation.
