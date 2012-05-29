@@ -1,56 +1,122 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 May 2012 09:01:54 +0100
-Subject: [alsa-devel] [PATCH 2/4] ASoC: mmp: add audio dma support
-In-Reply-To: <CAMj5Bkg-Jy7=JUwhkGVWvGJJ+HQOmNY5f4r75VkevitJPEx6Sg@mail.gmail.com>
-References: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
- <1337929863-31885-3-git-send-email-zhangfei.gao@marvell.com>
- <1337932416.1580.2.camel@vkoul-udesk3>
- <20120525080500.GB24149@n2100.arm.linux.org.uk>
- <CAMj5Bkhc46zqY5AbJkc=-h02taP_esxrqpNu--aYtZZcVcPK6A@mail.gmail.com>
- <20120525094231.GC24149@n2100.arm.linux.org.uk>
- <CAMj5BkjhCakuZdUcA+P_nbETi8tnYK5Ok6HMWTG61whZXwCD6g@mail.gmail.com>
- <1338268734.1580.26.camel@vkoul-udesk3>
- <20120529073334.GA12217@n2100.arm.linux.org.uk>
- <CAMj5Bkg-Jy7=JUwhkGVWvGJJ+HQOmNY5f4r75VkevitJPEx6Sg@mail.gmail.com>
-Message-ID: <20120529080154.GB12217@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 May 2012 10:16:09 +0200
+Subject: [PATCH v2] mtd mxc_nand: use 32bit copy functions
+Message-ID: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 03:57:18PM +0800, zhangfei gao wrote:
-> On Tue, May 29, 2012 at 3:33 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, May 29, 2012 at 10:48:54AM +0530, Vinod Koul wrote:
-> >> On Tue, 2012-05-29 at 13:14 +0800, zhangfei gao wrote:
-> >> >
-> >> > When debugging with putting snd_dmaengine_pcm_open to probe or
-> >> > pcm_new, there is issue.
-> >> > snd_dmaengine_pcm_open ->
-> >> > snd_pcm_hw_constraint_integer(substream->runtime,
-> >> >
-> >> > SNDRV_PCM_HW_PARAM_PERIODS);
-> >> > The runtime is only exist at runtime.
-> >> > So if using soc-dmaengine, I am afraid the snd_dmaengine_pcm_open has
-> >> > to be put in open instead of probe.
-> >> I think you got it wrong, the snd_dmaengine_pcm_open needs to be called
-> >> from your CPU pcm_open. See other examples how this is used in other
-> >> drivers.
-> >
-> > But, as I pointed out earlier, there's the issue of using the wrong
-> > struct device to allocate memory for the DMA engine. ?That's something
-> > that my soc-dmaengine.c got _right_, and soc-dmaengine-pcm.c gets _wrong_.
-> 
-> Could you help clarify what's the struct device should be used?
-> Any example, not find soc-dmaengine.c.
-> When debug,
-> rtd->card->snd_card->dev is same as substream->pcm->card->dev, which
-> we using now.
+The following commit changes the function used to copy from/to
+the hardware buffer to memcpy_[from|to]io. This does not work
+since the hardware cannot handle the byte accesses used by these
+functions. Instead of reverting this patch introduce 32bit
+correspondents of these functions.
 
-When your intention is to DMA to/from some memory, that memory _should_
-be mapped via the DMA API (or, in the case of dma_alloc_coherent,
-allocated) _using_ the device associated with the agent performing the
-DMA.
+| commit 5775ba36ea9c760c2d7e697dac04f2f7fc95aa62
+| Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+| Date:   Tue Apr 24 10:05:22 2012 +0200
+|
+|    mtd: mxc_nand: fix several sparse warnings about incorrect address space
+|
+|     Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+|     Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 
-This is so that the DMA API can know whether there's an IOMMU that has
-to be programmed for the DMA agent to be able to see the memory, or
-whether there's restrictions on the range of RAM which is visible to
-the DMA agent.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+
+v2: remove volatile, fix line over 80 characters
+
+ drivers/mtd/nand/mxc_nand.c |   37 +++++++++++++++++++++++++++++--------
+ 1 file changed, 29 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index fd14966..17ddcf0 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -273,6 +273,26 @@ static struct nand_ecclayout nandv2_hw_eccoob_4k = {
+ 
+ static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
+ 
++static void memcpy32_fromio(void *trg, const void __iomem  *src, size_t size)
++{
++	int i;
++	u32 *t = trg;
++	const __iomem u32 *s = src;
++
++	for (i = 0; i < (size >> 2); i++)
++		*t++ = __raw_readl(s++);
++}
++
++static void memcpy32_toio(void __iomem *trg, const void *src, int size)
++{
++	int i;
++	u32 __iomem *t = trg;
++	const u32 *s = src;
++
++	for (i = 0; i < (size >> 2); i++)
++		__raw_writel(*s++, t++);
++}
++
+ static int check_int_v3(struct mxc_nand_host *host)
+ {
+ 	uint32_t tmp;
+@@ -519,7 +539,7 @@ static void send_read_id_v3(struct mxc_nand_host *host)
+ 
+ 	wait_op_done(host, true);
+ 
+-	memcpy_fromio(host->data_buf, host->main_area0, 16);
++	memcpy32_fromio(host->data_buf, host->main_area0, 16);
+ }
+ 
+ /* Request the NANDFC to perform a read of the NAND device ID. */
+@@ -535,7 +555,7 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ 	/* Wait for operation to complete */
+ 	wait_op_done(host, true);
+ 
+-	memcpy_fromio(host->data_buf, host->main_area0, 16);
++	memcpy32_fromio(host->data_buf, host->main_area0, 16);
+ 
+ 	if (this->options & NAND_BUSWIDTH_16) {
+ 		/* compress the ID info */
+@@ -797,16 +817,16 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
+ 
+ 	if (bfrom) {
+ 		for (i = 0; i < n - 1; i++)
+-			memcpy_fromio(d + i * j, s + i * t, j);
++			memcpy32_fromio(d + i * j, s + i * t, j);
+ 
+ 		/* the last section */
+-		memcpy_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
++		memcpy32_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
+ 	} else {
+ 		for (i = 0; i < n - 1; i++)
+-			memcpy_toio(&s[i * t], &d[i * j], j);
++			memcpy32_toio(&s[i * t], &d[i * j], j);
+ 
+ 		/* the last section */
+-		memcpy_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
++		memcpy32_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
+ 	}
+ }
+ 
+@@ -1070,7 +1090,8 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+ 
+ 		host->devtype_data->send_page(mtd, NFC_OUTPUT);
+ 
+-		memcpy_fromio(host->data_buf, host->main_area0, mtd->writesize);
++		memcpy32_fromio(host->data_buf, host->main_area0,
++				mtd->writesize);
+ 		copy_spare(mtd, true);
+ 		break;
+ 
+@@ -1086,7 +1107,7 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+ 		break;
+ 
+ 	case NAND_CMD_PAGEPROG:
+-		memcpy_toio(host->main_area0, host->data_buf, mtd->writesize);
++		memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
+ 		copy_spare(mtd, false);
+ 		host->devtype_data->send_page(mtd, NFC_INPUT);
+ 		host->devtype_data->send_cmd(host, command, true);
+-- 
+1.7.10
