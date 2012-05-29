@@ -1,75 +1,64 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Tue, 29 May 2012 12:44:01 +0300
-Subject: [RFC PATCH 03/11] arm: omap: device: create a device for system
- control module
-In-Reply-To: <4FBF7B74.4020302@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-4-git-send-email-eduardo.valentin@ti.com>
- <4FBF7B74.4020302@ti.com>
-Message-ID: <20120529094400.GA3505@besouro>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 May 2012 11:47:40 +0200
+Subject: [PATCH v2] mtd mxc_nand: use 32bit copy functions
+In-Reply-To: <20120529093948.GG12217@n2100.arm.linux.org.uk>
+References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
+ <20120529091254.GY3710@pengutronix.de>
+ <20120529093629.GQ30400@pengutronix.de>
+ <20120529093948.GG12217@n2100.arm.linux.org.uk>
+Message-ID: <20120529094740.GR30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2012 at 02:30:44PM +0200, Cousson Benoit wrote:
-> On 5/25/2012 10:25 AM, Eduardo Valentin wrote:
-> >From: Kishon Vijay Abraham I<kishon@ti.com>
-> >
-> >Extracts the device data from hwmod database and create a platform device
-> >using omap device build.
-> >
-> >The device build is done during postcore_initcall.
+On Tue, May 29, 2012 at 10:39:48AM +0100, Russell King - ARM Linux wrote:
+> On Tue, May 29, 2012 at 11:36:29AM +0200, Sascha Hauer wrote:
+> > On Tue, May 29, 2012 at 11:12:54AM +0200, Uwe Kleine-K?nig wrote:
+> > > Hello,
+> > > 
+> > > On Tue, May 29, 2012 at 10:16:09AM +0200, Sascha Hauer wrote:
+> > > > The following commit changes the function used to copy from/to
+> > > > the hardware buffer to memcpy_[from|to]io. This does not work
+> > > > since the hardware cannot handle the byte accesses used by these
+> > > > functions. Instead of reverting this patch introduce 32bit
+> > > > correspondents of these functions.
+> > > Hmm, I didn't run an mtd test suite, but on mx27 it worked for me. IMHO
+> > > it's surprising that memcpy used to work, but memcpy_fromio doesn't. I
+> > > wouldn't expect a different semantic (apart from normal vs. __iomem
+> > > memory). And I wonder what will break when ARM's memcpy_fromio et al.
+> > > is optimized.
+> > 
+> > Have a look at the (ARM) implementation of memcpy_fromio:
+> > 
+> > void _memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
+> > {
+> > 	unsigned char *t = to;
+> > 	while (count) {
+> > 		count--;
+> > 		*t = readb(from);
+> > 		t++;
+> > 		from++;
+> > 	}
+> > }
+> > 
+> > Appearently this uses byte accesses which do not work on NFC SRAM,
+> > whereas memcpy uses optimized (so 32bit whenever possible) accesses.
+> > If someone would implement an optimized version of memcpy_fromio, it
+> > would work for the NFC aswell.
+> > 
+> > btw on i.MX27 byte accesses also do not work on NFC SRAM, so I doubt
+> > this worked for you.
 > 
-> Do you still need that since you are supporting only DT?
-> The device will be built automatically in the DT case.
+> And then when you ask for an odd alignment or an odd number of bytes...
 
-In fact this is not needed for DT only probing. Dropping this one.
+Then the person will get an oops and hopefully report it, which so far
+did not happen. I could try and implement this, but I rather don't do
+this as long as we don't know what it's used for and thus we can check
+that the result is correct.
 
-> 
-> Regards,
-> Benoit
-> 
-> >
-> >Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
-> >Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
-> >---
-> >  arch/arm/mach-omap2/devices.c |   26 ++++++++++++++++++++++++++
-> >  1 files changed, 26 insertions(+), 0 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> >index 152c266..9332673 100644
-> >--- a/arch/arm/mach-omap2/devices.c
-> >+++ b/arch/arm/mach-omap2/devices.c
-> >@@ -40,6 +40,32 @@
-> >  #define L3_MODULES_MAX_LEN 12
-> >  #define L3_MODULES 3
-> >
-> >+static int omap_init_control(void)
-> >+{
-> >+	struct omap_hwmod		*oh;
-> >+	struct platform_device		*pdev;
-> >+	const char			*oh_name, *name;
-> >+
-> >+	oh_name = "ctrl_module_core";
-> >+	name = "omap-control-core";
-> >+
-> >+	oh = omap_hwmod_lookup(oh_name);
-> >+	if (!oh) {
-> >+		pr_err("Could not lookup hwmod for %s\n", oh_name);
-> >+		return PTR_ERR(oh);
-> >+	}
-> >+
-> >+	pdev = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, true);
-> >+	if (IS_ERR(pdev)) {
-> >+		pr_err("Could not build omap_device for %s %s\n",
-> >+		       name, oh_name);
-> >+		return PTR_ERR(pdev);
-> >+	}
-> >+
-> >+	return 0;
-> >+}
-> >+postcore_initcall(omap_init_control);
-> >+
-> >  static int __init omap3_l3_init(void)
-> >  {
-> >  	struct omap_hwmod *oh;
-> 
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
