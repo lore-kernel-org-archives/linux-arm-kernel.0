@@ -1,243 +1,51 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 29 May 2012 14:15:43 -0700
-Subject: [PATCH 2/2] clk: Add support for rate table based dividers
-In-Reply-To: <1337250134-29206-3-git-send-email-rnayak@ti.com>
-References: <1337250134-29206-1-git-send-email-rnayak@ti.com>
- <1337250134-29206-3-git-send-email-rnayak@ti.com>
-Message-ID: <CAJOA=zOmJdH+zDyyBmSEH_4sSXXpPfEpAMgZ=N-RWCrCo4EWOw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 29 May 2012 14:29:15 -0700
+Subject: [PATCH 0/3] ARM: OMAP4: add support for TPS62361 PMIC
+In-Reply-To: <1336139842-845-1-git-send-email-t-kristo@ti.com> (Tero Kristo's
+ message of "Fri, 4 May 2012 16:57:19 +0300")
+References: <1336139842-845-1-git-send-email-t-kristo@ti.com>
+Message-ID: <87ehq2ekwk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 3:22 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> Some divider clks do not have any obvious relationship
-> between the divider and the value programmed in the
-> register. For instance, say a value of 1 could signify divide
-> by 6 and a value of 2 could signify divide by 4 etc.
-> Also there are dividers where not all values possible
-> based on the bitfield width are valid. For instance
-> a 3 bit wide bitfield can be used to program a value
-> from 0 to 7. However its possible that only 0 to 4
-> are valid values.
->
-> All these cases need the platform code to pass a simple
-> table of divider/value tuple, so the framework knows
-> the exact value to be written based on the divider
-> calculation and can also do better error checking.
->
-> This patch adds support for such rate table based
-> dividers.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Tero Kristo <t-kristo@ti.com> writes:
 
-Thanks Rajendra.  I'll take this into my clk-next.
+> Hi,
+>
+> This set adds support for TPS62361 PMIC, which is used to power
+> MPU voltagedomain on OMAP4460 boards. These patches apply on top
+> of 3.4 + my voltagedomain fixes set to avoid adding redundant code.
 
-Regards,
-Mike
+Hmm... do you have an updated version of your voltagedomain fixes?  Or
+are you waiting for me to review something?  I thought I had been
+through them already, but if I have not, they slipped throught the
+cracks.  I'm sorry.  Can you please update/repost?
 
-> ---
-> ?drivers/clk/clk-divider.c ? ?| ? 67 ++++++++++++++++++++++++++++++++++++++++--
-> ?include/linux/clk-private.h ?| ? ?3 +-
-> ?include/linux/clk-provider.h | ? 10 +++++-
-> ?3 files changed, 75 insertions(+), 5 deletions(-)
+Thanks.
+
+Kevin
+
+> Working tree available here for interested parties:
 >
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index e548c43..e4911ee 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -32,30 +32,69 @@
-> ?#define div_mask(d) ? ?((1 << (d->width)) - 1)
-> ?#define is_power_of_two(i) ? ? !(i & ~i)
+> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> branch: mainline-3.4-voltdm-tps-v1
 >
-> +static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
-> +{
-> + ? ? ? unsigned int maxdiv;
-> + ? ? ? const struct clk_div_table *clkt;
-> +
-> + ? ? ? for (clkt = table; clkt->div; clkt++)
-> + ? ? ? ? ? ? ? if (clkt->div > maxdiv)
-> + ? ? ? ? ? ? ? ? ? ? ? maxdiv = clkt->div;
-> + ? ? ? return maxdiv;
-> +}
-> +
-> ?static unsigned int _get_maxdiv(struct clk_divider *divider)
-> ?{
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> ? ? ? ? ? ? ? ?return div_mask(divider);
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> ? ? ? ? ? ? ? ?return 1 << div_mask(divider);
-> + ? ? ? if (divider->table)
-> + ? ? ? ? ? ? ? return _get_table_maxdiv(divider->table);
-> ? ? ? ?return div_mask(divider) + 1;
-> ?}
+> Tree has been tested with:
+> - omap3beagle board
+> - omap4panda es board (OMAP4460)
+> - omap4blaze board (OMAP4430)
 >
-> +static unsigned int _get_table_div(const struct clk_div_table *table,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int val)
-> +{
-> + ? ? ? const struct clk_div_table *clkt;
-> +
-> + ? ? ? for (clkt = table; clkt->div; clkt++)
-> + ? ? ? ? ? ? ? if (clkt->val == val)
-> + ? ? ? ? ? ? ? ? ? ? ? return clkt->div;
-> + ? ? ? return 0;
-> +}
-> +
-> ?static unsigned int _get_div(struct clk_divider *divider, unsigned int val)
-> ?{
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> ? ? ? ? ? ? ? ?return val;
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> ? ? ? ? ? ? ? ?return 1 << val;
-> + ? ? ? if (divider->table)
-> + ? ? ? ? ? ? ? return _get_table_div(divider->table, val);
-> ? ? ? ?return val + 1;
-> ?}
+> Tested modifying the voltage levels on all core regulators (vdd1...vdd3)
+> and measuring that the voltages do actually change.
 >
-> +static unsigned int _get_table_val(const struct clk_div_table *table,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int div)
-> +{
-> + ? ? ? const struct clk_div_table *clkt;
-> +
-> + ? ? ? for (clkt = table; clkt->div; clkt++)
-> + ? ? ? ? ? ? ? if (clkt->div == div)
-> + ? ? ? ? ? ? ? ? ? ? ? return clkt->val;
-> + ? ? ? return 0;
-> +}
-> +
-> ?static unsigned int _get_val(struct clk_divider *divider, u8 div)
-> ?{
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> ? ? ? ? ? ? ? ?return div;
-> ? ? ? ?if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> ? ? ? ? ? ? ? ?return __ffs(div);
-> + ? ? ? if (divider->table)
-> + ? ? ? ? ? ? ? return ?_get_table_val(divider->table, div);
-> ? ? ? ?return div - 1;
-> ?}
+> Patch #1 was needed before the voltages could be modified on a panda
+> board es device, otherwise the timing for the I2C channel was so bogus
+> it usually failed. The values used were taken from an android tree and
+> are based on TI analysis.
 >
-> @@ -84,6 +123,26 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> ?*/
-> ?#define MULT_ROUND_UP(r, m) ((r) * (m) + (m) - 1)
+> -Tero
 >
-> +static bool _is_valid_table_div(const struct clk_div_table *table,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int div)
-> +{
-> + ? ? ? const struct clk_div_table *clkt;
-> +
-> + ? ? ? for (clkt = table; clkt->div; clkt++)
-> + ? ? ? ? ? ? ? if (clkt->div == div)
-> + ? ? ? ? ? ? ? ? ? ? ? return true;
-> + ? ? ? return false;
-> +}
-> +
-> +static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
-> +{
-> + ? ? ? if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> + ? ? ? ? ? ? ? return is_power_of_two(div);
-> + ? ? ? if (divider->table)
-> + ? ? ? ? ? ? ? return _is_valid_table_div(divider->table, div);
-> + ? ? ? return true;
-> +}
-> +
-> ?static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> ? ? ? ? ? ? ? ?unsigned long *best_parent_rate)
-> ?{
-> @@ -111,8 +170,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> ? ? ? ?maxdiv = min(ULONG_MAX / rate, maxdiv);
->
-> ? ? ? ?for (i = 1; i <= maxdiv; i++) {
-> - ? ? ? ? ? ? ? if ((divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> - ? ? ? ? ? ? ? ? ? ? ? && (!is_power_of_two(i)))
-> + ? ? ? ? ? ? ? if (!_is_valid_div(divider, i))
-> ? ? ? ? ? ? ? ? ? ? ? ?continue;
-> ? ? ? ? ? ? ? ?parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MULT_ROUND_UP(rate, i));
-> @@ -186,12 +244,14 @@ EXPORT_SYMBOL_GPL(clk_divider_ops);
-> ?* @shift: number of bits to shift the bitfield
-> ?* @width: width of the bitfield
-> ?* @clk_divider_flags: divider-specific flags for this clock
-> + * @table: array of divider/value pairs ending with a div set to 0
-> ?* @lock: shared register lock for this clock
-> ?*/
-> ?struct clk *clk_register_divider(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
-> - ? ? ? ? ? ? ? u8 clk_divider_flags, spinlock_t *lock)
-> + ? ? ? ? ? ? ? u8 clk_divider_flags, const struct clk_div_table *table,
-> + ? ? ? ? ? ? ? spinlock_t *lock)
-> ?{
-> ? ? ? ?struct clk_divider *div;
-> ? ? ? ?struct clk *clk;
-> @@ -217,6 +277,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
-> ? ? ? ?div->flags = clk_divider_flags;
-> ? ? ? ?div->lock = lock;
-> ? ? ? ?div->hw.init = &init;
-> + ? ? ? div->table = table;
->
-> ? ? ? ?/* register the clock */
-> ? ? ? ?clk = clk_register(dev, &div->hw);
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index eb3f84b..2479239 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -105,7 +105,7 @@ struct clk {
->
-> ?#define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr, ? \
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?_flags, _reg, _shift, _width, ? \
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _divider_flags, _lock) ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _divider_flags, _table, _lock) ?\
-> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?static const char *_name##_parent_names[] = { ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?_parent_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> @@ -121,6 +121,7 @@ struct clk {
-> ? ? ? ? ? ? ? ?.shift = _shift, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.width = _width, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.flags = _divider_flags, ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? .table = _table, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.lock = _lock, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?}; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?DEFINE_CLK(_name, clk_divider_ops, _flags, ? ? ? ? ? ? ?\
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 4a0b483..22bc067 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -203,6 +203,11 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 bit_idx,
-> ? ? ? ? ? ? ? ?u8 clk_gate_flags, spinlock_t *lock);
->
-> +struct clk_div_table {
-> + ? ? ? unsigned int ? ?val;
-> + ? ? ? unsigned int ? ?div;
-> +};
-> +
-> ?/**
-> ?* struct clk_divider - adjustable divider clock
-> ?*
-> @@ -210,6 +215,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
-> ?* @reg: ? ? ? register containing the divider
-> ?* @shift: ? ? shift to the divider bit field
-> ?* @width: ? ? width of the divider bit field
-> + * @table: ? ? array of value/divider pairs, last entry should have div = 0
-> ?* @lock: ? ? ?register lock
-> ?*
-> ?* Clock with an adjustable divider affecting its output frequency. ?Implements
-> @@ -229,6 +235,7 @@ struct clk_divider {
-> ? ? ? ?u8 ? ? ? ? ? ? ?shift;
-> ? ? ? ?u8 ? ? ? ? ? ? ?width;
-> ? ? ? ?u8 ? ? ? ? ? ? ?flags;
-> + ? ? ? const struct clk_div_table ? ? ?*table;
-> ? ? ? ?spinlock_t ? ? ?*lock;
-> ?};
->
-> @@ -239,7 +246,8 @@ extern const struct clk_ops clk_divider_ops;
-> ?struct clk *clk_register_divider(struct device *dev, const char *name,
-> ? ? ? ? ? ? ? ?const char *parent_name, unsigned long flags,
-> ? ? ? ? ? ? ? ?void __iomem *reg, u8 shift, u8 width,
-> - ? ? ? ? ? ? ? u8 clk_divider_flags, spinlock_t *lock);
-> + ? ? ? ? ? ? ? u8 clk_divider_flags, const struct clk_div_table *table,
-> + ? ? ? ? ? ? ? spinlock_t *lock);
->
-> ?/**
-> ?* struct clk_mux - multiplexer clock
 > --
-> 1.7.1
->
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
