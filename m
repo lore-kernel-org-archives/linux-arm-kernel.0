@@ -1,36 +1,20 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 May 2012 12:56:10 +0200
-Subject: [PATCH v2] ARM: at91: add atmel-mci support for chips and boards
- which can use it
-In-Reply-To: <20120528074133.GR3377@game.jcrosoft.org>
-References: <1337183519-25459-3-git-send-email-ludovic.desroches@atmel.com>
- <1337595807-8539-1-git-send-email-ludovic.desroches@atmel.com>
- <20120528074133.GR3377@game.jcrosoft.org>
-Message-ID: <4FC4AB4A.8060605@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2012 13:29:32 +0100
+Subject: [GIT PULL] CMA and ARM DMA-mapping updates for v3.5
+In-Reply-To: <1337672417-10065-1-git-send-email-m.szyprowski@samsung.com>
+References: <1337672417-10065-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120529122932.GA24623@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2012 09:41 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 12:23 Mon 21 May     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Since atmel-mci driver supports all atmel mci version excepted the rm9200 one,
->> use it instead of at91_mci driver.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> ---
->> V2: add several boards I missed
-> for the 9g20 and 9260 please drop the old driver support too
+I notice we have new warnings as a result of CMA being merged, though
+thankfully they're just in Kconfig:
 
-No, we will drop the support for old driver when we finish the
-transition period. We will then drop at91_mci with all configuration
-data in device/board files.
+warning: (ARM) selects CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK && EXPERIMENTAL)
 
-> for calao bord you can do it too
+This seems totally weird: you're mandating that ARM must have CMA
+selected, but it's an experimental feature?  So you're implying that
+the entire ARM kernel becomes totally experimental for the next
+release cycle?
 
-Well, you can add it yourself. As you may be able to test it, it sounds
-better if you handle this part...
-
-Bye,
--- 
-Nicolas Ferre
+I think this needs fixing.
