@@ -1,69 +1,47 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:19 +0530
-Subject: [PATCH 07/11] I2C: OMAP: Handle error check for pm runtime
+Date: Tue, 29 May 2012 16:26:15 +0530
+Subject: [PATCHv10 03/11] I2C: OMAP: Fix the interrupt clearing in OMAP4
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-8-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If PM runtime get_sync fails return with the error
-so that no further reads/writes goes through the interface.
-This will avoid possible abort. Add a error message in case
-of failure with the cause of the failure.
+On OMAP4 we were writing 1 to IRQENABLE_CLR which cleared only
+the arbitration lost interrupt. The patch intends to fix the same by writing 0
+to the IE register clearing all interrupts.
 
+This is based on the work done by Vikram Pandita <vikram.pandita@ti.com>.
+
+The  changes from the original patch ...
+-  Does not use the IRQENABLE_CLR register to clear as it is not mentioned
+  to be legacy register IRQENABLE_CLR helps in  atomically
+  setting/clearing specific interrupts, instead use the OMAP_I2C_IE_REG as we
+  are clearing all interrupts.
+
+Cc: Vikram Pandita <vikram.pandita@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
--v10 Use IS_ERR_VALUE
--v9 Fix the error handling
-
- drivers/i2c/busses/i2c-omap.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 44e8cfa..c39b72f 100644
+index c851672..bf07ffd 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -585,7 +585,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 	int i;
- 	int r;
+@@ -1127,10 +1127,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 	u16 iv;
  
--	pm_runtime_get_sync(dev->dev);
-+	r = pm_runtime_get_sync(dev->dev);
-+	if (IS_ERR_VALUE(r))
-+		return r;
- 
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
-@@ -1011,7 +1013,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
--	pm_runtime_get_sync(dev->dev);
-+	r = pm_runtime_get_sync(dev->dev);
-+	if (IS_ERR_VALUE(r))
-+		goto err_free_mem;
- 
- 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
- 
-@@ -1103,12 +1107,16 @@ omap_i2c_remove(struct platform_device *pdev)
- {
- 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
- 	struct resource		*mem;
-+	int ret;
- 
- 	platform_set_drvdata(pdev, NULL);
- 
- 	free_irq(dev->irq, dev);
- 	i2c_del_adapter(&dev->adapter);
--	pm_runtime_get_sync(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (IS_ERR_VALUE(ret))
-+		return ret;
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+-	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
+-	else
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
 +
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
++	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+ 
+ 	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
+ 		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
 -- 
 1.7.5.4
