@@ -1,26 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 May 2012 10:01:08 +0800
-Subject: [PATCH 05/15] ARM: ux500: New DT:ed snowball_platform_devs for
- one-by-one device enablement
-In-Reply-To: <4FC304F4.9020902@linaro.org>
-References: <1334867804-31942-1-git-send-email-lee.jones@linaro.org>
- <1334867804-31942-6-git-send-email-lee.jones@linaro.org>
- <4F967B01.2050807@linaro.org>
- <CACRpkdZoaoGYqgikd4RqhFToPzkEWb7fx8cmOTrrZcxeQOkROQ@mail.gmail.com>
- <4FC304F4.9020902@linaro.org>
-Message-ID: <CACRpkdZiSW=4PhhuMCj8A8DTiExebq8Ae-jTuaF4a_Rp+1qm5A@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 28 May 2012 20:34:29 -0600
+Subject: amba, tegra-ahb and pci (Kconfig question)
+In-Reply-To: <20120528081737.GA8031@mail.gnudd.com>
+References: <20120528081737.GA8031@mail.gnudd.com>
+Message-ID: <4FC435B5.8030007@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 28, 2012 at 12:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 05/28/2012 02:17 AM, Alessandro Rubini wrote:
+> Hello.
+> 
+> I plan to submit drivers/amba/apb-pci.c (and later ahb-pci.c), because
+> the amba-pl011-pci.c I proposed is actually a generic bridge and there
+> are several such devices in my chip.
+> 
+> I planned to use obj-$(CONFIG_PCI) in drivers/amba/Makefile, but 
+> commit 87d0bab2cba3c31624b80cc68bcf5e29ef969458 had this in drivers/Makefile:
+> 
+>   -obj-$(CONFIG_ARM_AMBA)         += amba/
+>   +obj-y                          += amba/
+> 
+> So I ask how to proceed. Shall I define CONFIG_PCI_AMBA or something
+> like that, or should drivers/amba/tegra-ahb.c be moved to
+> arch/arm/mach-tegra ?  (I prefer the latter and can submit such patch,
+> but not without authorization from the involved parties).
 
-> Looks like neither of these made it into Mainline, however subsequent
-> patches which made changes to them did. This has caused some merge error,
-> thus the code, especially in arch/arm/mach-ux500/cpu-db8500.c, but also in
-> arch/arm/mach-ux500/board-mop500.c is quite wrong. :(
-
-OK can you create a fixup patch for the 3.5-rc series and send it
-to the ARM SoC tree?
-
-Yours,
-Linus Walleij
+FYI, there's a desire to keep all (especially new) drivers out of
+arch/arm/mach-*. We had originally wanted to put the tegra-ahb driver in
+that directory since it is highly Tegra-specific, but that location was
+NAKd.
