@@ -1,47 +1,67 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:14 +0530
-Subject: [PATCHv10 02/11] I2C: OMAP: Fix the mismatch of pm_runtime enable and
- disable
-In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-3-git-send-email-shubhrajyoti@ti.com>
+Date: Tue, 29 May 2012 16:26:12 +0530
+Subject: [PATCHv10 00/11] I2C fixes
+Message-ID: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the i2c driver calls the pm_runtime_enable and never
-the disable. This may cause a warning when pm_runtime_enable
-checks for the count match.Fix the same by calling
-pm_runtime_disable in the error and the remove path.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Acked-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
--v10 Adding Kevin's ack.
--v9 Remove attempting from the changelogs.
+The patch series does the following
 
- drivers/i2c/busses/i2c-omap.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+- Warn fixes if CONFIG_PM_RUNTIME is not selected.
+- In case of i2c remove register access was done without any
+ get_sync fix the same.
+- Folds a patch from Tasslehoff to prevent any merge conflicts.
+- Prevents the XDUF flag to be set if the underflow condition is not met.
+- As per discussion in [1] .Adds a patch to rename the 1p153 errata and
+ use the unique id instead as the section number in the recent errata
+ docs has changed.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 4f4188d..c851672 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1090,6 +1090,7 @@ err_unuse_clocks:
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
- 	pm_runtime_put(dev->dev);
- 	iounmap(dev->base);
-+	pm_runtime_disable(&pdev->dev);
- err_free_mem:
- 	platform_set_drvdata(pdev, NULL);
- 	kfree(dev);
-@@ -1110,6 +1111,7 @@ omap_i2c_remove(struct platform_device *pdev)
- 	free_irq(dev->irq, dev);
- 	i2c_del_adapter(&dev->adapter);
- 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	pm_runtime_disable(&pdev->dev);
- 	iounmap(dev->base);
- 	kfree(dev);
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+v9:
+Fix the comments from Wolfram Sang
+
+v10:
+Add a patch from Neil to the series.
+Fix kevin comments
+update the patches with comments.
+
+[1] http://www.spinics.net/lists/linux-i2c/msg07607.html
+
+Tested on omap4sdp and omap3sdp.
+- Did functional tests read write on both the platforms.
+- Off mode and retention on OMAP3
+- On OMAP4 just did echo mem > /sys/power/state and wakeup.
+Did see.
+[ 1360.595855] Successfully put all powerdomains to target state
+However didnt see the ret count for other than mpu_pwrdm increase.
+I think power support for omap4 is minimal. 
+
+The following changes since commit b48b2c3e50433ff6f7e46186daa7f986bd960215:
+
+  openrisc: use generic strnlen_user() function (2012-05-27 21:00:32 -0700)
+
+are available in the git repository at:
+  git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
+
+Neil Brown (1):
+      OMAP/I2C - Fix timeout problem during suspend.
+
+Shubhrajyoti D (9):
+      I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
+      I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
+      I2C: OMAP: Fix the interrupt clearing in OMAP4
+      I2C: OMAP: Prevent the register access after pm_runtime_put in probe
+      I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
+      I2C: OMAP: Fix the crash in i2c remove
+      I2C: OMAP: Handle error check for pm runtime
+      I2C: OMAP: Do not set the XUDF(Transmit underflow) if the underflow is not reached
+      I2C: OMAP: Rename the 1p153 to the erratum id i462
+
+Tasslehoff Kjappfot (1):
+      I2C: OMAP: prevent the overwrite of the errata flags
+
+ drivers/i2c/busses/i2c-omap.c |  129 ++++++++++++++++++++---------------------
+ 1 files changed, 63 insertions(+), 66 deletions(-)
+
 -- 
 1.7.5.4
