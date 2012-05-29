@@ -1,32 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 29 May 2012 18:01:12 +0200
-Subject: [PATCH v9 3/3] MTD: at91: atmel_nand: Update driver to support
- Programmable Multibit ECC controller
-In-Reply-To: <4FC3389C.5050303@atmel.com>
-References: <1338038677-6752-1-git-send-email-josh.wu@atmel.com>
- <1338038677-6752-4-git-send-email-josh.wu@atmel.com>
- <20120528065822.GL3377@game.jcrosoft.org>
- <4FC3389C.5050303@atmel.com>
-Message-ID: <20120529160112.GT3377@game.jcrosoft.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 29 May 2012 10:14:16 -0600
+Subject: arm: Remaining issue with alignment of __log_buf in printk.c
+In-Reply-To: <4FC25048.109@wwwdotorg.org>
+References: <4FC22098.3070803@kernel.org> <4FC25048.109@wwwdotorg.org>
+Message-ID: <4FC4F5D8.8090701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>+
-> >>+static void __iomem *pmecc_get_index_of(struct atmel_nand_host *host)
-> >this is a __dev_init function plese check the other too
-> >
-> >btw you need to use __dev_init and not __init
-> 
-> Here I use pmecc_get_index_of() function to get a lookup table base
-> which is in ROM.
-> I'm not clear about how should I need __dev_init here. Can you give
-> more information?
+On 05/27/2012 10:03 AM, Stephen Warren wrote:
+> On 05/27/2012 06:39 AM, Jonathan Cameron wrote:
+>> Hi All,
+>>
+>> My stargate 2 board refused to start and after bisection I ended
+>> up at the same patch that Stephen found an alignment issue in.
+>> Unfortunately Stephen's patch doesn't seem to have fixed the
+>> issue for me.
+>> https://lkml.org/lkml/2012/5/10/510 is the thread.  Patch from
+>> Stephen is : f8450fca6ecdea38b5a882fdf6cd097e3ec8651c
+>>
+>> Increasing the alignement for 32 bit systems to 8 seems to do the
+>> job but I can't immediately think why...
+>>
+>> System is a pxa27x strong arm.
+...
+> #if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+> #define LOG_ALIGN 4
+> #else
+> #define LOG_ALIGN 8
+> #endif
 
-it is the section where the function is going to be stored
+Actually, why not replace that with:
 
-pmecc_get_index_of is use at probe time so it's __devinit section
+#define LOG_ALIGN (__alignof__(struct log_buf))
 
-as it's supposed to be for the probe function too
-
-Best Regards,
-J.
+That way, the compiler will calculate the arch-/ABI-appropriate
+alignment value automatically and correctly in all cases, so we won't
+have to fix that ifdef above.
