@@ -1,44 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 29 May 2012 19:22:34 +0200
-Subject: [PATCH] Drop superfluous setting of i2c_board_info.type
-In-Reply-To: <1337877626.22505.30.camel@x61.thuisdomein>
-References: <1337870303.22505.20.camel@x61.thuisdomein>
- <20120524162230.GU3710@pengutronix.de>
- <1337877626.22505.30.camel@x61.thuisdomein>
-Message-ID: <20120529172234.GC30400@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 29 May 2012 12:47:14 -0500
+Subject: [PATCH 0/3] omap3/omap4: add device tree support for wdt
+In-Reply-To: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
+References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
+Message-ID: <4FC50BA2.4070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 24, 2012 at 06:40:26PM +0200, Paul Bolle wrote:
-> On Thu, 2012-05-24 at 18:22 +0200, Uwe Kleine-K?nig wrote:
-> > On Thu, May 24, 2012 at 04:38:23PM +0200, Paul Bolle wrote:
-> > > 1) This is apparently legal. Doesn't gcc issue a warning for this?
-> > I wondered about that too, gcc doesn't even warn when the two values are
-> > different. See for example commit
-> > bd9e310dca15c9987256f67af19f9f42426e7493.
+Hi Xiao Jiang,
+
+On 05/25/2012 05:42 AM, jgq516 at gmail.com wrote:
+> From: Xiao Jiang <jgq516@gmail.com>
 > 
-> In that case it were two strings ("rtc-pcf8563" versus "pcf8563"). Why
-> should gcc care? Or is there something going on behind the scenes which
-> somehow depends on the contents of the string?
->  
-> > >  arch/arm/mach-imx/mach-cpuimx35.c     |    1 -
-> > >  arch/arm/mach-imx/mach-cpuimx51sd.c   |    1 -
-> > I already submitted a patch for the imx bits with Message id
-> > 1335989287-10094-1-git-send-email-u.kleine-koenig at pengutronix.de.
-> > (e.g.
-> > http://mid.gmane.org/1335989287-10094-1-git-send-email-u.kleine-koenig at pengutronix.de)
+> This series can be applied to dt branch of linux-omap tree.
+
+Thanks for sending this!
+
+> Since omap24xx series has different wdt base addr (omap2420: 0x48022000 and
+> omap2430: 0x49016000) per commit 2817142f31bfbf26c216bf4f9192540c81b2d071, so
+> I don't add wdt node in omap2.dtsi just like omap3 and omap4, maybe different
+> dts files are needed for omap2420 and omap2430.
+
+Good point. I am wondering if we can simple drop the address from the
+wdt2 node for omap2. It is not really being used. May be Benoit can comment.
+
+Cheers
+Jon
+
+> Tested with omap4430 blaze board.
 > 
-> Thanks. I missed that one, obviously. Should I just drop that part of
-> the patch and resend?
-
-I just merged Uwes patch, this leaves the sh-mobile hunk still to be
-fixed.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Xiao Jiang (3):
+>   arm/dts: add wdt node for omap3 and omap4
+>   OMAP: wdt: add device tree support
+>   watchdog: omap_wdt: add device tree support
+> 
+>  arch/arm/boot/dts/omap3.dtsi  |    5 +++++
+>  arch/arm/boot/dts/omap4.dtsi  |    5 +++++
+>  arch/arm/mach-omap2/devices.c |    2 +-
+>  drivers/watchdog/omap_wdt.c   |    8 ++++++++
+>  4 files changed, 19 insertions(+), 1 deletions(-)
+> 
