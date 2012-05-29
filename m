@@ -1,202 +1,205 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 29 May 2012 10:44:40 +0100
-Subject: [RFC 28/34] dmaengine: PL08x: use vchan's spinlock
+Date: Tue, 29 May 2012 10:45:01 +0100
+Subject: [RFC 29/34] dmaengine: PL08x: convert to use vchan submitted/issued
+ lists
 In-Reply-To: <20120529093015.GF12217@n2100.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
-Message-ID: <E1SZIym-00070a-W5@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1SZIz7-00070e-3J@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the vchan struct, and use the provided spinlock rather than
-our own.
+Convert to use the virtual dma channel submitted/issued descriptor
+lists rather than our own private lists, and use the virtual dma
+channel support functions to manage these lists.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/Kconfig      |    1 +
- drivers/dma/amba-pl08x.c |   45 ++++++++++++++++++++-------------------------
- 2 files changed, 21 insertions(+), 25 deletions(-)
+ drivers/dma/amba-pl08x.c |   64 ++++++++++++---------------------------------
+ 1 files changed, 17 insertions(+), 47 deletions(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index b792b03..2e5ac10 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -53,6 +53,7 @@ config AMBA_PL08X
- 	bool "ARM PrimeCell PL080 or PL081 support"
- 	depends on ARM_AMBA && EXPERIMENTAL
- 	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
- 	help
- 	  Platform has a PL08x DMAC device
- 	  which can provide DMA engine support
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 6fafebc..6e53a22 100644
+index 6e53a22..eb556c5 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -230,7 +230,6 @@ struct pl08x_dma_chan {
- 	struct list_head issued_list;
+@@ -208,8 +208,6 @@ enum pl08x_dma_chan_state {
+  * @name: name of channel
+  * @cd: channel platform data
+  * @runtime_addr: address for RX/TX according to the runtime config
+- * @pend_list: queued transactions pending on this channel
+- * @issued_list: issued transactions for this channel
+  * @done_list: list of completed transactions
+  * @at: active transaction on this channel
+  * @lock: a lock for this channel data
+@@ -226,8 +224,6 @@ struct pl08x_dma_chan {
+ 	const char *name;
+ 	const struct pl08x_channel_data *cd;
+ 	struct dma_slave_config cfg;
+-	struct list_head pend_list;
+-	struct list_head issued_list;
  	struct list_head done_list;
  	struct pl08x_txd *at;
--	spinlock_t lock;
  	struct pl08x_driver_data *host;
- 	enum pl08x_dma_chan_state state;
- 	bool slave;
-@@ -477,7 +476,7 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
- 	unsigned long flags;
- 	size_t bytes = 0;
+@@ -350,12 +346,12 @@ static void pl08x_start_next_txd(struct pl08x_dma_chan *plchan)
+ {
+ 	struct pl08x_driver_data *pl08x = plchan->host;
+ 	struct pl08x_phy_chan *phychan = plchan->phychan;
++	struct virt_dma_desc *vd = vchan_next_desc(&plchan->vc);
++	struct pl08x_txd *txd = to_pl08x_txd(&vd->tx);
+ 	struct pl08x_lli *lli;
+-	struct pl08x_txd *txd;
+ 	u32 val;
  
--	spin_lock_irqsave(&plchan->lock, flags);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	ch = plchan->phychan;
- 	txd = plchan->at;
+-	txd = list_first_entry(&plchan->issued_list, struct pl08x_txd, node);
+-	list_del(&txd->node);
++	list_del(&txd->vd.node);
  
-@@ -536,7 +535,7 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ 	plchan->at = txd;
+ 
+@@ -517,18 +513,18 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
+ 	}
+ 
+ 	/* Sum up all queued transactions */
+-	if (!list_empty(&plchan->issued_list)) {
++	if (!list_empty(&plchan->vc.desc_issued)) {
+ 		struct pl08x_txd *txdi;
+-		list_for_each_entry(txdi, &plchan->issued_list, node) {
++		list_for_each_entry(txdi, &plchan->vc.desc_issued, vd.node) {
+ 			struct pl08x_sg *dsg;
+ 			list_for_each_entry(dsg, &txd->dsg_list, node)
+ 				bytes += dsg->len;
  		}
  	}
  
--	spin_unlock_irqrestore(&plchan->lock, flags);
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
+-	if (!list_empty(&plchan->pend_list)) {
++	if (!list_empty(&plchan->vc.desc_submitted)) {
+ 		struct pl08x_txd *txdi;
+-		list_for_each_entry(txdi, &plchan->pend_list, node) {
++		list_for_each_entry(txdi, &plchan->vc.desc_submitted, vd.node) {
+ 			struct pl08x_sg *dsg;
+ 			list_for_each_entry(dsg, &txd->dsg_list, node)
+ 				bytes += dsg->len;
+@@ -1087,13 +1083,12 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
+ 	LIST_HEAD(head);
+ 	struct pl08x_txd *txd;
  
- 	return bytes;
+-	list_splice_tail_init(&plchan->issued_list, &head);
+-	list_splice_tail_init(&plchan->pend_list, &head);
++	vchan_get_all_descriptors(&plchan->vc, &head);
+ 
+ 	while (!list_empty(&head)) {
+-		txd = list_first_entry(&head, struct pl08x_txd, node);
++		txd = list_first_entry(&head, struct pl08x_txd, vd.node);
+ 		pl08x_release_mux(plchan);
+-		list_del(&txd->node);
++		list_del(&txd->vd.node);
+ 		pl08x_free_txd(pl08x, txd);
+ 	}
  }
-@@ -666,12 +665,12 @@ static void pl08x_phy_free(struct pl08x_dma_chan *plchan)
- 		 * Eww.  We know this isn't going to deadlock
- 		 * but lockdep probably doesn't.
- 		 */
--		spin_lock(&next->lock);
-+		spin_lock(&next->vc.lock);
- 		/* Re-check the state now that we have the lock */
- 		success = next->state == PL08X_CHAN_WAITING;
- 		if (success)
- 			pl08x_phy_reassign_start(plchan->phychan, next);
--		spin_unlock(&next->lock);
-+		spin_unlock(&next->vc.lock);
- 
- 		/* If the state changed, try to find another channel */
- 		if (!success)
-@@ -1118,12 +1117,12 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
- 	unsigned long flags;
- 	dma_cookie_t cookie;
- 
--	spin_lock_irqsave(&plchan->lock, flags);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	cookie = dma_cookie_assign(tx);
- 
- 	/* Put this onto the pending list */
- 	list_add_tail(&txd->node, &plchan->pend_list);
--	spin_unlock_irqrestore(&plchan->lock, flags);
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
- 
- 	return cookie;
+@@ -1110,23 +1105,6 @@ static void pl08x_free_chan_resources(struct dma_chan *chan)
+ {
  }
-@@ -1311,13 +1310,13 @@ static void pl08x_issue_pending(struct dma_chan *chan)
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+ 
+-static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
+-{
+-	struct pl08x_dma_chan *plchan = to_pl08x_chan(tx->chan);
+-	struct pl08x_txd *txd = to_pl08x_txd(tx);
+-	unsigned long flags;
+-	dma_cookie_t cookie;
+-
+-	spin_lock_irqsave(&plchan->vc.lock, flags);
+-	cookie = dma_cookie_assign(tx);
+-
+-	/* Put this onto the pending list */
+-	list_add_tail(&txd->node, &plchan->pend_list);
+-	spin_unlock_irqrestore(&plchan->vc.lock, flags);
+-
+-	return cookie;
+-}
+-
+ static struct dma_async_tx_descriptor *pl08x_prep_dma_interrupt(
+ 		struct dma_chan *chan, unsigned long flags)
+ {
+@@ -1311,8 +1289,7 @@ static void pl08x_issue_pending(struct dma_chan *chan)
  	unsigned long flags;
  
--	spin_lock_irqsave(&plchan->lock, flags);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	list_splice_tail_init(&plchan->pend_list, &plchan->issued_list);
- 	if (!list_empty(&plchan->issued_list)) {
+ 	spin_lock_irqsave(&plchan->vc.lock, flags);
+-	list_splice_tail_init(&plchan->pend_list, &plchan->issued_list);
+-	if (!list_empty(&plchan->issued_list)) {
++	if (vchan_issue_pending(&plchan->vc)) {
  		if (!plchan->phychan && plchan->state != PL08X_CHAN_WAITING)
  			pl08x_phy_alloc_and_start(plchan);
  	}
--	spin_unlock_irqrestore(&plchan->lock, flags);
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
+@@ -1338,16 +1315,11 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
+ 	return 0;
  }
  
- static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
-@@ -1330,9 +1329,9 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 	if (!num_llis) {
- 		unsigned long flags;
+-static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan,
+-	unsigned long flags)
++static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan)
+ {
+ 	struct pl08x_txd *txd = kzalloc(sizeof(*txd), GFP_NOWAIT);
  
--		spin_lock_irqsave(&plchan->lock, flags);
-+		spin_lock_irqsave(&plchan->vc.lock, flags);
- 		pl08x_free_txd(pl08x, txd);
--		spin_unlock_irqrestore(&plchan->lock, flags);
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
+ 	if (txd) {
+-		dma_async_tx_descriptor_init(&txd->vd.tx, &plchan->vc.chan);
+-		txd->vd.tx.flags = flags;
+-		txd->vd.tx.tx_submit = pl08x_tx_submit;
+-		INIT_LIST_HEAD(&txd->node);
+ 		INIT_LIST_HEAD(&txd->dsg_list);
  
- 		return -EINVAL;
- 	}
-@@ -1544,9 +1543,9 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	 * Anything succeeds on channels with no physical allocation and
- 	 * no queued transfers.
- 	 */
--	spin_lock_irqsave(&plchan->lock, flags);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	if (!plchan->phychan && !plchan->at) {
--		spin_unlock_irqrestore(&plchan->lock, flags);
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
- 		return 0;
- 	}
+ 		/* Always enable error and terminal interrupts */
+@@ -1370,7 +1342,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
+ 	struct pl08x_sg *dsg;
+ 	int ret;
  
-@@ -1585,7 +1584,7 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		break;
- 	}
+-	txd = pl08x_get_txd(plchan, flags);
++	txd = pl08x_get_txd(plchan);
+ 	if (!txd) {
+ 		dev_err(&pl08x->adev->dev,
+ 			"%s no memory for descriptor\n", __func__);
+@@ -1406,7 +1378,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
+ 	if (ret)
+ 		return NULL;
  
--	spin_unlock_irqrestore(&plchan->lock, flags);
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
- 
- 	return ret;
+-	return &txd->vd.tx;
++	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
  }
-@@ -1654,9 +1653,9 @@ static void pl08x_tasklet(unsigned long data)
- 	unsigned long flags;
- 	LIST_HEAD(head);
  
--	spin_lock_irqsave(&plchan->lock, flags);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	list_splice_tail_init(&plchan->done_list, &head);
--	spin_unlock_irqrestore(&plchan->lock, flags);
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
+ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+@@ -1428,7 +1400,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 	dev_dbg(&pl08x->adev->dev, "%s prepare transaction of %d bytes from %s\n",
+ 			__func__, sgl->length, plchan->name);
  
- 	while (!list_empty(&head)) {
- 		struct pl08x_txd *txd = list_first_entry(&head,
-@@ -1671,9 +1670,9 @@ static void pl08x_tasklet(unsigned long data)
- 			pl08x_unmap_buffers(txd);
+-	txd = pl08x_get_txd(plchan, flags);
++	txd = pl08x_get_txd(plchan);
+ 	if (!txd) {
+ 		dev_err(&pl08x->adev->dev, "%s no txd\n", __func__);
+ 		return NULL;
+@@ -1522,7 +1494,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 	if (ret)
+ 		return NULL;
  
- 		/* Free the descriptor */
--		spin_lock_irqsave(&plchan->lock, flags);
-+		spin_lock_irqsave(&plchan->vc.lock, flags);
- 		pl08x_free_txd(pl08x, txd);
--		spin_unlock_irqrestore(&plchan->lock, flags);
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
+-	return &txd->vd.tx;
++	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
+ }
  
- 		/* Callback to signal completion */
- 		if (callback)
-@@ -1714,7 +1713,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
- 				continue;
- 			}
- 
--			spin_lock(&plchan->lock);
-+			spin_lock(&plchan->vc.lock);
- 			tx = plchan->at;
- 			if (tx) {
- 				plchan->at = NULL;
-@@ -1735,7 +1734,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
+ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+@@ -1729,7 +1701,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
+ 				 * And start the next descriptor (if any),
+ 				 * otherwise free this channel.
+ 				 */
+-				if (!list_empty(&plchan->issued_list))
++				if (vchan_next_desc(&plchan->vc))
+ 					pl08x_start_next_txd(plchan);
  				else
  					pl08x_phy_free(plchan);
- 			}
--			spin_unlock(&plchan->lock);
-+			spin_unlock(&plchan->vc.lock);
- 
- 			/* Schedule tasklet on this channel */
- 			tasklet_schedule(&plchan->tasklet);
-@@ -1798,17 +1797,13 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+@@ -1797,8 +1769,6 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
  			 "initialize virtual channel \"%s\"\n",
  			 chan->name);
  
--		chan->vc.chan.device = dmadev;
--		dma_cookie_init(&chan->vc.chan);
--
--		spin_lock_init(&chan->lock);
- 		INIT_LIST_HEAD(&chan->pend_list);
- 		INIT_LIST_HEAD(&chan->issued_list);
+-		INIT_LIST_HEAD(&chan->pend_list);
+-		INIT_LIST_HEAD(&chan->issued_list);
  		INIT_LIST_HEAD(&chan->done_list);
  		tasklet_init(&chan->tasklet, pl08x_tasklet,
  			     (unsigned long) chan);
- 
--		list_add_tail(&chan->vc.chan.device_node, &dmadev->channels);
-+		vchan_init(&chan->vc, dmadev);
- 	}
- 	dev_info(&pl08x->adev->dev, "initialized %d virtual %s channels\n",
- 		 i, slave ? "slave" : "memcpy");
 -- 
 1.7.4.4
