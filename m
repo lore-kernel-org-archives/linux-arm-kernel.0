@@ -1,43 +1,65 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 29 May 2012 14:46:55 -0500
-Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
- <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
- <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
-Message-ID: <CAOMWX4ctJcfGNxXK4hT+QH-m7zUfP1N3H56oVDVzPFmhVTFOMw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 May 2012 15:02:41 -0500
+Subject: v3.4 boot failure on qemu-system-arm -M versatilepb
+In-Reply-To: <XNM1$5$0$1$$3$9$0$A$8005401U4fc38a01@hitachi.com>
+References: <XNM1$5$0$1$$3$9$0$A$8005401U4fc38a01@hitachi.com>
+Message-ID: <4FC52B61.2000604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2012 at 3:52 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> Tero Kristo <t-kristo@ti.com> writes:
->>>
-[...]
->>> - Rather than hooking into omap4_enter_lowpower(), should use
->>> ?the cluster PM enter/exit notifier chain.
->>>
->> This is again specific to device OFF only and not related to CPU
->> cluster state as such. So I don't think notifiers should be used here.
->>
->> O.w even when we attempt just MPU OSWR C-state, all these functions will
->> get called in notifier chain.
->>
-> Just a thought, we can have a separate notifier chain for device OFF. It can
-> allow use to get rid of 'enable_off_mode" kind of flags and can be
-> used by many drivers too.
+Adding linux-arm-kernel...
 
-Like the overall idea, but one minor dumb concern might be sequencing
-of notifiers
- - OFF entry and restore needs things to be executed in a specific sequence.
-How do we plan to ensure the sequence is maintained in a notifier call
-chain? one
-possible option might be a "priority" based scheme?
+On 05/28/2012 09:22 AM, takuo.koguchi.sw at hitachi.com wrote:
+> Hi,
+> 
+> I found linux-3.4 kernel fails to mount the rootfs on
+> "qemu-system-arm -M versatile."
+> 
+> Git bisect shows commit c334bc1 cause this first.
+> 
+> So I tried to revert it by putting
+> arch/arm/mach-versatile/include/mach/io.h and adding select
+> NEED_MACH_IO_H in the section of ARCH_VERSATILE in arch/arm/Kconfig,
+> then the kernel can mount the rootfs.
+> 
+> Can someone confirm and fix this?
+> 
 
-Regards,
-Nishanth Menon
+What config are you using, and what is your kernel command line?
+
+Rob
+
+> Takuo Koguchi
+> 
+> 
+> ----------- Uncompressing Linux... done, booting the kernel. Booting
+> Linux on physical CPU 0 Initializing cgroup subsys cpuset 
+> Initializing cgroup subsys cpu Linux version 3.4.0-yocto-standard
+> (koguchi at mg70k) (gcc version 4.5.2 (Sourcery G++ Lite 2011.03-41) )
+> #37 PREEMPT Sun May 27 22:36:22 JST 2012 CPU: ARM926EJ-S [41069265]
+> revision 5 (ARMv5TEJ), cr=00093177 CPU: VIVT data cache, VIVT
+> instruction cache Machine: ARM-Versatile PB ... eth0: link up 
+> IP-Config: Complete: device=eth0, addr=192.168.7.3,
+> mask=255.255.255.0, gw=192.168.7.1 host=192.168.7.3, domain=,
+> nis-domain=(none) bootserver=255.255.255.255,
+> rootserver=255.255.255.255, rootpath= input: AT Raw Set 2 keyboard as
+> /devices/fpga:06/serio0/input/input0 md: Skipping autodetection of
+> RAID arrays. (raid=autodetect will force) VFS: Cannot open root
+> device "0x0800" or unknown-block(8,0): error -6 Please append a
+> correct "root=" boot option; here are the available partitions: 
+> Kernel panic - not syncing: VFS: Unable to mount root fs on
+> unknown-block(8,0) [<c0013870>] (unwind_backtrace+0x0/0xec) from
+> [<c0389b68>] (dump_stack+0x20/0x24) [<c0389b68>]
+> (dump_stack+0x20/0x24) from [<c0389bf4>] (panic+0x88/0x1c4) 
+> [<c0389bf4>] (panic+0x88/0x1c4) from [<c04fbde8>]
+> (mount_block_root+0x240/0x290) [<c04fbde8>]
+> (mount_block_root+0x240/0x290) from [<c04fbf80>]
+> (mount_root+0x50/0x68) [<c04fbf80>] (mount_root+0x50/0x68) from
+> [<c04fc108>] (prepare_namespace+0x170/0x1d0) [<c04fc108>]
+> (prepare_namespace+0x170/0x1d0) from [<c04fba08>]
+> (kernel_init+0x1bc/0x204) [<c04fba08>] (kernel_init+0x1bc/0x204) from
+> [<c000e7dc>] (kernel_thread_exit+0x0/0x8)
+> 
+> 
+> 
+> 
