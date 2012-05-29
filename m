@@ -1,149 +1,82 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 May 2012 11:12:54 +0200
-Subject: [PATCH v2] mtd mxc_nand: use 32bit copy functions
-In-Reply-To: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
-References: <1338279369-25915-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120529091254.GY3710@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 May 2012 11:15:36 +0200
+Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
+In-Reply-To: <1338206687-14551-1-git-send-email-alexg@meprolight.com>
+References: <1338206687-14551-1-git-send-email-alexg@meprolight.com>
+Message-ID: <20120529091536.GE30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, May 29, 2012 at 10:16:09AM +0200, Sascha Hauer wrote:
-> The following commit changes the function used to copy from/to
-> the hardware buffer to memcpy_[from|to]io. This does not work
-> since the hardware cannot handle the byte accesses used by these
-> functions. Instead of reverting this patch introduce 32bit
-> correspondents of these functions.
-Hmm, I didn't run an mtd test suite, but on mx27 it worked for me. IMHO
-it's surprising that memcpy used to work, but memcpy_fromio doesn't. I
-wouldn't expect a different semantic (apart from normal vs. __iomem
-memory). And I wonder what will break when ARM's memcpy_fromio et al.
-is optimized.
-
-> | commit 5775ba36ea9c760c2d7e697dac04f2f7fc95aa62
-> | Author: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> | Date:   Tue Apr 24 10:05:22 2012 +0200
-> |
-> |    mtd: mxc_nand: fix several sparse warnings about incorrect address space
-> |
-> |     Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> |     Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+On Mon, May 28, 2012 at 03:04:47PM +0300, Alex Gershgorin wrote:
+> This patch also adds mux and divider for camera clock.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+
+Applied, thanks
+
+Sascha
+
 > ---
+>  arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
+>  1 files changed, 8 insertions(+), 3 deletions(-)
 > 
-> v2: remove volatile, fix line over 80 characters
-I'm not sure about the need for volatile. I don't have my C Reference
-handy, but maybe adding volatile prevents the compilier issuing code
-that e.g. uses a different word size?! Not sure if it matters for a
-static and so maybe inlined function.
-
-Still:
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Thanks
-Uwe
-
-> 
->  drivers/mtd/nand/mxc_nand.c |   37 +++++++++++++++++++++++++++++--------
->  1 file changed, 29 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index fd14966..17ddcf0 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -273,6 +273,26 @@ static struct nand_ecclayout nandv2_hw_eccoob_4k = {
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index a9e60bf..42131d5 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -62,8 +62,8 @@ enum mx35_clks {
+>  	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
+>  	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+>  	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+> -	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
+> -	clk_max
+> +	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
+> +	gpu2d_gate, clk_max
+>  };
 >  
->  static const char *part_probes[] = { "RedBoot", "cmdlinepart", "ofpart", NULL };
+>  static struct clk *clk[clk_max];
+> @@ -142,6 +142,9 @@ int __init mx35_clocks_init()
 >  
-> +static void memcpy32_fromio(void *trg, const void __iomem  *src, size_t size)
-> +{
-> +	int i;
-> +	u32 *t = trg;
-> +	const __iomem u32 *s = src;
+>  	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
+>  
+> +	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
+> +	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
 > +
-> +	for (i = 0; i < (size >> 2); i++)
-> +		*t++ = __raw_readl(s++);
-> +}
-> +
-> +static void memcpy32_toio(void __iomem *trg, const void *src, int size)
-> +{
-> +	int i;
-> +	u32 __iomem *t = trg;
-> +	const u32 *s = src;
-> +
-> +	for (i = 0; i < (size >> 2); i++)
-> +		__raw_writel(*s++, t++);
-> +}
-> +
->  static int check_int_v3(struct mxc_nand_host *host)
->  {
->  	uint32_t tmp;
-> @@ -519,7 +539,7 @@ static void send_read_id_v3(struct mxc_nand_host *host)
+>  	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
+>  	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
+>  	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
+> @@ -192,7 +195,7 @@ int __init mx35_clocks_init()
+>  	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
+>  	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
 >  
->  	wait_op_done(host, true);
+> -	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
+> +	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
+>  	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
+>  	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
 >  
-> -	memcpy_fromio(host->data_buf, host->main_area0, 16);
-> +	memcpy32_fromio(host->data_buf, host->main_area0, 16);
->  }
+> @@ -229,6 +232,7 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+> +	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
+>  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+>  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+>  	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+> @@ -256,6 +260,7 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
+>  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+>  	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
+> +	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
 >  
->  /* Request the NANDFC to perform a read of the NAND device ID. */
-> @@ -535,7 +555,7 @@ static void send_read_id_v1_v2(struct mxc_nand_host *host)
->  	/* Wait for operation to complete */
->  	wait_op_done(host, true);
->  
-> -	memcpy_fromio(host->data_buf, host->main_area0, 16);
-> +	memcpy32_fromio(host->data_buf, host->main_area0, 16);
->  
->  	if (this->options & NAND_BUSWIDTH_16) {
->  		/* compress the ID info */
-> @@ -797,16 +817,16 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
->  
->  	if (bfrom) {
->  		for (i = 0; i < n - 1; i++)
-> -			memcpy_fromio(d + i * j, s + i * t, j);
-> +			memcpy32_fromio(d + i * j, s + i * t, j);
->  
->  		/* the last section */
-> -		memcpy_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
-> +		memcpy32_fromio(d + i * j, s + i * t, mtd->oobsize - i * j);
->  	} else {
->  		for (i = 0; i < n - 1; i++)
-> -			memcpy_toio(&s[i * t], &d[i * j], j);
-> +			memcpy32_toio(&s[i * t], &d[i * j], j);
->  
->  		/* the last section */
-> -		memcpy_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
-> +		memcpy32_toio(&s[i * t], &d[i * j], mtd->oobsize - i * j);
->  	}
->  }
->  
-> @@ -1070,7 +1090,8 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
->  
->  		host->devtype_data->send_page(mtd, NFC_OUTPUT);
->  
-> -		memcpy_fromio(host->data_buf, host->main_area0, mtd->writesize);
-> +		memcpy32_fromio(host->data_buf, host->main_area0,
-> +				mtd->writesize);
->  		copy_spare(mtd, true);
->  		break;
->  
-> @@ -1086,7 +1107,7 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
->  		break;
->  
->  	case NAND_CMD_PAGEPROG:
-> -		memcpy_toio(host->main_area0, host->data_buf, mtd->writesize);
-> +		memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
->  		copy_spare(mtd, false);
->  		host->devtype_data->send_page(mtd, NFC_INPUT);
->  		host->devtype_data->send_cmd(host, command, true);
+>  	clk_prepare_enable(clk[spba_gate]);
+>  	clk_prepare_enable(clk[gpio1_gate]);
 > -- 
-> 1.7.10
+> 1.7.0.4
 > 
 > 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
