@@ -1,157 +1,141 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 29 May 2012 10:40:39 +0100
-Subject: [RFC 16/34] dmaengine: PL08x: get rid of unnecessary checks in
- dma_slave_config
+Date: Tue, 29 May 2012 10:41:19 +0100
+Subject: [RFC 18/34] dmaengine: PL08x: move DMA signal muxing into
+ pl08x_dma_chan struct
 In-Reply-To: <20120529093015.GF12217@n2100.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
-Message-ID: <E1SZIut-0006zm-Jl@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1SZIvX-0006zu-R9@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the unnecessary checks in dma_slave_config utilizing
-the DMA direction.  This allows us to move the computation of
-cctl to the prepare function.
+Move the signal handling out of the physical channel structure into
+the virtual channel structure, where it should belong as it has more
+to do with the virtual channel than the physical one.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c   |   41 +++++++++++++----------------------------
- include/linux/amba/pl08x.h |    5 +++--
- 2 files changed, 16 insertions(+), 30 deletions(-)
+ drivers/dma/amba-pl08x.c |   26 ++++++++++++--------------
+ 1 files changed, 12 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index a99a59d..fa1f9d2 100644
+index 7156d49..e5b13e6 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -231,8 +231,6 @@ struct pl08x_dma_chan {
- 	const char *name;
- 	const struct pl08x_channel_data *cd;
- 	struct dma_slave_config cfg;
--	u32 src_cctl;
--	u32 dst_cctl;
- 	struct list_head pend_list;
- 	struct pl08x_txd *at;
+@@ -132,8 +132,6 @@ struct pl08x_bus_data {
+  * struct pl08x_phy_chan - holder for the physical channels
+  * @id: physical index to this channel
+  * @lock: a lock to use when altering an instance of this struct
+- * @signal: the physical signal (aka channel) serving this physical channel
+- * right now
+  * @serving: the virtual channel currently being served by this physical
+  * channel
+  */
+@@ -141,7 +139,6 @@ struct pl08x_phy_chan {
+ 	unsigned int id;
+ 	void __iomem *base;
  	spinlock_t lock;
-@@ -1231,30 +1229,15 @@ static int dma_set_runtime_config(struct dma_chan *chan,
- 				  struct dma_slave_config *config)
+-	int signal;
+ 	struct pl08x_dma_chan *serving;
+ };
+ 
+@@ -222,6 +219,7 @@ enum pl08x_dma_chan_state {
+  * @slave: whether this channel is a device (slave) or for memcpy
+  * @waiting: a TX descriptor on this channel which is waiting for a physical
+  * channel to become available
++ * @signal: the physical DMA request signal which this channel is using
+  */
+ struct pl08x_dma_chan {
+ 	struct dma_chan chan;
+@@ -238,6 +236,7 @@ struct pl08x_dma_chan {
+ 	enum pl08x_dma_chan_state state;
+ 	bool slave;
+ 	struct pl08x_txd *waiting;
++	int signal;
+ };
+ 
+ /**
+@@ -299,7 +298,7 @@ static inline struct pl08x_txd *to_pl08x_txd(struct dma_async_tx_descriptor *tx)
+  * via a board/SoC specific external MUX.  One important point to note
+  * here is that this does not depend on the physical channel.
+  */
+-static int pl08x_request_mux(struct pl08x_dma_chan *plchan, struct pl08x_phy_chan *ch)
++static int pl08x_request_mux(struct pl08x_dma_chan *plchan)
  {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
--	struct pl08x_driver_data *pl08x = plchan->host;
--	u32 src_cctl, dst_cctl;
+ 	const struct pl08x_platform_data *pd = plchan->host->pd;
+ 	int ret;
+@@ -309,7 +308,7 @@ static int pl08x_request_mux(struct pl08x_dma_chan *plchan, struct pl08x_phy_cha
+ 		if (ret < 0)
+ 			return ret;
  
- 	if (!plchan->slave)
- 		return -EINVAL;
- 
--	dst_cctl = pl08x_get_cctl(plchan, config->dst_addr_width,
--				  config->dst_maxburst);
--	if (dst_cctl == ~0 && config->direction == DMA_MEM_TO_DEV) {
--		dev_err(&pl08x->adev->dev,
--			"bad runtime_config: alien address width (M2D)\n");
-+	/* Reject definitely invalid configurations */
-+	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-+	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
- 		return -EINVAL;
--	}
- 
--	src_cctl = pl08x_get_cctl(plchan, config->src_addr_width,
--				  config->src_maxburst);
--	if (src_cctl == ~0 && config->direction == DMA_DEV_TO_MEM) {
--		dev_err(&pl08x->adev->dev,
--			"bad runtime_config: alien address width (D2M)\n");
--		return -EINVAL;
--	}
--
--	plchan->dst_cctl = dst_cctl;
--	plchan->src_cctl = src_cctl;
- 	plchan->cfg = *config;
- 
- 	return 0;
-@@ -1403,7 +1386,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 
- 	/* Set platform data for m2m */
- 	txd->ccfg |= PL080_FLOW_MEM2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT;
--	txd->cctl = pl08x->pd->memcpy_channel.cctl &
-+	txd->cctl = pl08x->pd->memcpy_channel.cctl_memcpy &
- 			~(PL080_CONTROL_DST_AHB2 | PL080_CONTROL_SRC_AHB2);
- 
- 	/* Both to be incremented or the code will break */
-@@ -1430,10 +1413,11 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	struct pl08x_txd *txd;
- 	struct pl08x_sg *dsg;
- 	struct scatterlist *sg;
-+	enum dma_slave_buswidth addr_width;
- 	dma_addr_t slave_addr;
- 	int ret, tmp;
- 	u8 src_buses, dst_buses;
--	u32 cctl;
-+	u32 maxburst, cctl;
- 
- 	dev_dbg(&pl08x->adev->dev, "%s prepare transaction of %d bytes from %s\n",
- 			__func__, sgl->length, plchan->name);
-@@ -1452,13 +1436,17 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	txd->direction = direction;
- 
- 	if (direction == DMA_MEM_TO_DEV) {
--		cctl = plchan->dst_cctl | PL080_CONTROL_SRC_INCR;
-+		cctl = PL080_CONTROL_SRC_INCR;
- 		slave_addr = plchan->cfg.dst_addr;
-+		addr_width = plchan->cfg.dst_addr_width;
-+		maxburst = plchan->cfg.dst_maxburst;
- 		src_buses = pl08x->mem_buses;
- 		dst_buses = plchan->cd->periph_buses;
- 	} else if (direction == DMA_DEV_TO_MEM) {
--		cctl = plchan->src_cctl | PL080_CONTROL_DST_INCR;
-+		cctl = PL080_CONTROL_DST_INCR;
- 		slave_addr = plchan->cfg.src_addr;
-+		addr_width = plchan->cfg.src_addr_width;
-+		maxburst = plchan->cfg.src_maxburst;
- 		src_buses = plchan->cd->periph_buses;
- 		dst_buses = pl08x->mem_buses;
- 	} else {
-@@ -1468,6 +1456,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 		return NULL;
+-		ch->signal = ret;
++		plchan->signal = ret;
  	}
- 
-+	cctl |= pl08x_get_cctl(plchan, addr_width, maxburst);
- 	if (cctl == ~0) {
- 		pl08x_free_txd(pl08x, txd);
- 		dev_err(&pl08x->adev->dev,
-@@ -1767,14 +1756,10 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
- 
- static void pl08x_dma_slave_init(struct pl08x_dma_chan *chan)
+ 	return 0;
+ }
+@@ -318,9 +317,9 @@ static void pl08x_release_mux(struct pl08x_dma_chan *plchan)
  {
--	u32 cctl = pl08x_cctl(chan->cd->cctl);
--
- 	chan->slave = true;
- 	chan->name = chan->cd->bus_id;
- 	chan->cfg.src_addr = chan->cd->addr;
- 	chan->cfg.dst_addr = chan->cd->addr;
--	chan->src_cctl = cctl;
--	chan->dst_cctl = cctl;
+ 	const struct pl08x_platform_data *pd = plchan->host->pd;
+ 
+-	if (plchan->phychan->signal >= 0 && pd->put_signal) {
+-		pd->put_signal(plchan->cd, plchan->phychan->signal);
+-		plchan->phychan->signal = -1;
++	if (plchan->signal >= 0 && pd->put_signal) {
++		pd->put_signal(plchan->cd, plchan->signal);
++		plchan->signal = -1;
+ 	}
  }
  
- /*
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 158ce26..2a5f64a 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -47,7 +47,8 @@ enum {
-  * devices with static assignments
-  * @muxval: a number usually used to poke into some mux regiser to
-  * mux in the signal to this channel
-- * @cctl_opt: default options for the channel control register
-+ * @cctl_memcpy: options for the channel control register for memcpy
-+ *  *** not used for slave channels ***
-  * @addr: source/target address in physical memory for this DMA channel,
-  * can be the address of a FIFO register for burst requests for example.
-  * This can be left undefined if the PrimeCell API is used for configuring
-@@ -62,7 +63,7 @@ struct pl08x_channel_data {
- 	int min_signal;
- 	int max_signal;
- 	u32 muxval;
--	u32 cctl;
-+	u32 cctl_memcpy;
- 	dma_addr_t addr;
- 	bool single;
- 	u8 periph_buses;
+@@ -545,7 +544,6 @@ pl08x_get_phy_channel(struct pl08x_driver_data *pl08x,
+ 
+ 		if (!ch->serving) {
+ 			ch->serving = virt_chan;
+-			ch->signal = -1;
+ 			spin_unlock_irqrestore(&ch->lock, flags);
+ 			break;
+ 		}
+@@ -1029,7 +1027,7 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
+ 	 * Can the platform allow us to use this channel?
+ 	 */
+ 	if (plchan->slave) {
+-		ret = pl08x_request_mux(plchan, ch);
++		ret = pl08x_request_mux(plchan);
+ 		if (ret < 0) {
+ 			dev_dbg(&pl08x->adev->dev,
+ 				"unable to use physical channel %d for transfer on %s due to platform restrictions\n",
+@@ -1043,15 +1041,15 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
+ 	plchan->phychan = ch;
+ 	dev_dbg(&pl08x->adev->dev, "allocated physical channel %d and signal %d for xfer on %s\n",
+ 		 ch->id,
+-		 ch->signal,
++		 plchan->signal,
+ 		 plchan->name);
+ 
+ got_channel:
+ 	/* Assign the flow control signal to this channel */
+ 	if (txd->direction == DMA_MEM_TO_DEV)
+-		txd->ccfg |= ch->signal << PL080_CONFIG_DST_SEL_SHIFT;
++		txd->ccfg |= plchan->signal << PL080_CONFIG_DST_SEL_SHIFT;
+ 	else if (txd->direction == DMA_DEV_TO_MEM)
+-		txd->ccfg |= ch->signal << PL080_CONFIG_SRC_SEL_SHIFT;
++		txd->ccfg |= plchan->signal << PL080_CONFIG_SRC_SEL_SHIFT;
+ 
+ 	plchan->phychan_hold++;
+ 
+@@ -1818,6 +1816,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+ 
+ 		chan->host = pl08x;
+ 		chan->state = PL08X_CHAN_IDLE;
++		chan->signal = -1;
+ 
+ 		if (slave) {
+ 			chan->cd = &pl08x->pd->slave_channels[i];
+@@ -2054,7 +2053,6 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 		ch->base = pl08x->base + PL080_Cx_BASE(i);
+ 		spin_lock_init(&ch->lock);
+ 		ch->serving = NULL;
+-		ch->signal = -1;
+ 		dev_dbg(&adev->dev, "physical channel %d is %s\n",
+ 			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+ 	}
 -- 
 1.7.4.4
