@@ -1,70 +1,61 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:22 +0530
-Subject: [PATCHv10 10/11] I2C: OMAP: Rename the 1p153 to the erratum id i462
+Date: Tue, 29 May 2012 16:26:17 +0530
+Subject: [PATCHv10 05/11] I2C: OMAP: Don't check if
+ wait_for_completion_timeout() returns less than zero
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-11-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-6-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The section number in the recent errata document has changed.
-Rename the erratum 1p153 to the unique id i462 instead, so that
-it is easier to reference. Also change the function name and comments
-to reflect the same.
+By definition, wait_for_completion_timeout() returns an unsigned value and
+therefore, it is not necessary to check if the return value is less than zero
+as this is not possible.
 
-Cc: Jon Hunter <jon-hunter@ti.com>
+This is based on a patch from Jon Hunter <jon-hunter@ti.com>
+Changes from his patch
+- Declare a long as the wait_for_completion_timeout returns long.
+
+Original patch is
+http://git.omapzoom.org/?p=kernel/omap.git;a=commitdiff;h=ea02cece7b0000bc736e60c4188a11aaa74bc6e6
+
 Reviewed-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+-v9 Added Jon's sob
+
+ drivers/i2c/busses/i2c-omap.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index cd6feea..dc3bd40 100644
+index 1777d79..fec8d5c 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -173,7 +173,7 @@ enum {
- 
- /* Errata definitions */
- #define I2C_OMAP_ERRATA_I207		(1 << 0)
--#define I2C_OMAP3_1P153			(1 << 1)
-+#define I2C_OMAP_ERRATA_I462		(1 << 1)
- 
- struct omap_i2c_dev {
- 	struct device		*dev;
-@@ -718,11 +718,11 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
- #endif
- 
- /*
-- * OMAP3430 Errata 1.153: When an XRDY/XDR is hit, wait for XUDF before writing
-+ * OMAP3430 Errata i462: When an XRDY/XDR is hit, wait for XUDF before writing
-  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
-  * them from the memory to the I2C interface.
-  */
--static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
-+static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
+@@ -473,7 +473,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 			     struct i2c_msg *msg, int stop)
  {
- 	unsigned long timeout = 10000;
+ 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+-	int r;
++	unsigned long timeout;
+ 	u16 w;
  
-@@ -881,8 +881,8 @@ complete:
- 					break;
- 				}
- 
--				if ((dev->errata & I2C_OMAP3_1P153) &&
--				    errata_omap3_1p153(dev, &stat, &err))
-+				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
-+				    errata_omap3_i462(dev, &stat, &err))
- 					goto complete;
- 
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
-@@ -1020,7 +1020,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->errata |= I2C_OMAP_ERRATA_I207;
- 
- 	if (dev->rev <= OMAP_I2C_REV_ON_3430)
--		dev->errata |= I2C_OMAP3_1P153;
-+		dev->errata |= I2C_OMAP_ERRATA_I462;
- 
- 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
- 		u16 s;
+ 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+@@ -541,12 +541,10 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	 * REVISIT: We should abort the transfer on signals, but the bus goes
+ 	 * into arbitration and we're currently unable to recover from it.
+ 	 */
+-	r = wait_for_completion_timeout(&dev->cmd_complete,
+-					OMAP_I2C_TIMEOUT);
++	timeout = wait_for_completion_timeout(&dev->cmd_complete,
++						OMAP_I2C_TIMEOUT);
+ 	dev->buf_len = 0;
+-	if (r < 0)
+-		return r;
+-	if (r == 0) {
++	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
 -- 
 1.7.5.4
