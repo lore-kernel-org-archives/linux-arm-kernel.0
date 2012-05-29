@@ -1,59 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 May 2012 11:13:47 -0600
-Subject: arm: Remaining issue with alignment of __log_buf in printk.c
-In-Reply-To: <CAPXgP10gLk1UPp8iGkDSapwMzqd2kHuOer3BOq73f5i7if4aoA@mail.gmail.com>
-References: <4FC22098.3070803@kernel.org> <4FC25048.109@wwwdotorg.org>
- <4FC4F5D8.8090701@wwwdotorg.org>
- <CAPXgP10gLk1UPp8iGkDSapwMzqd2kHuOer3BOq73f5i7if4aoA@mail.gmail.com>
-Message-ID: <4FC503CB.3070405@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 May 2012 19:18:25 +0200
+Subject: [PATCH] ARM: imx: only specify i2c device type once
+In-Reply-To: <1335989287-10094-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1335989287-10094-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120529171825.GA30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2012 10:32 AM, Kay Sievers wrote:
-> On Tue, May 29, 2012 at 6:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/27/2012 10:03 AM, Stephen Warren wrote:
->>> On 05/27/2012 06:39 AM, Jonathan Cameron wrote:
->>>> Hi All,
->>>>
->>>> My stargate 2 board refused to start and after bisection I ended
->>>> up at the same patch that Stephen found an alignment issue in.
->>>> Unfortunately Stephen's patch doesn't seem to have fixed the
->>>> issue for me.
->>>> https://lkml.org/lkml/2012/5/10/510 is the thread.  Patch from
->>>> Stephen is : f8450fca6ecdea38b5a882fdf6cd097e3ec8651c
->>>>
->>>> Increasing the alignement for 32 bit systems to 8 seems to do the
->>>> job but I can't immediately think why...
->>>>
->>>> System is a pxa27x strong arm.
->> ...
->>> #if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
->>> #define LOG_ALIGN 4
->>> #else
->>> #define LOG_ALIGN 8
->>> #endif
->>
->> Actually, why not replace that with:
->>
->> #define LOG_ALIGN (__alignof__(struct log_buf))
->>
->> That way, the compiler will calculate the arch-/ABI-appropriate
->> alignment value automatically and correctly in all cases, so we won't
->> have to fix that ifdef above.
+On Wed, May 02, 2012 at 10:08:07PM +0200, Uwe Kleine-K?nig wrote:
+> The first argument of I2C_BOARD_INFO is used to assign .type, so drop
+> second assignment.
 > 
-> __alignof__(u64) will be 8 on x86_64, while the current logic results
-> in 4. Not sure if x86_64 would somehow benefit from that, or if it's
-> just a waste of bytes.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Applied, thanks
+
+Sascha
+
+> ---
+>  arch/arm/mach-imx/mach-cpuimx35.c   |    1 -
+>  arch/arm/mach-imx/mach-cpuimx51sd.c |    1 -
+>  2 files changed, 2 deletions(-)
 > 
-> Are you sure it results in 4 on some architectures?
+> diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
+> index 8ecc872..b1a4796 100644
+> --- a/arch/arm/mach-imx/mach-cpuimx35.c
+> +++ b/arch/arm/mach-imx/mach-cpuimx35.c
+> @@ -70,7 +70,6 @@ static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
+>  		I2C_BOARD_INFO("pcf8563", 0x51),
+>  	}, {
+>  		I2C_BOARD_INFO("tsc2007", 0x48),
+> -		.type		= "tsc2007",
+>  		.platform_data	= &tsc2007_info,
+>  		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
+>  	},
+> diff --git a/arch/arm/mach-imx/mach-cpuimx51sd.c b/arch/arm/mach-imx/mach-cpuimx51sd.c
+> index 9fbe923..89eb93c 100644
+> --- a/arch/arm/mach-imx/mach-cpuimx51sd.c
+> +++ b/arch/arm/mach-imx/mach-cpuimx51sd.c
+> @@ -124,7 +124,6 @@ static struct i2c_board_info eukrea_cpuimx51sd_i2c_devices[] = {
+>  		I2C_BOARD_INFO("pcf8563", 0x51),
+>  	}, {
+>  		I2C_BOARD_INFO("tsc2007", 0x49),
+> -		.type		= "tsc2007",
+>  		.platform_data	= &tsc2007_info,
+>  		.irq		= IMX_GPIO_TO_IRQ(TSC2007_IRQGPIO),
+>  	},
+> -- 
+> 1.7.10
+> 
+> 
 
-I have no idea to be honest, but I'd tend towards making this reliable
-first, and optimizing a few bytes later.
-
-Perhaps something like the following would work though:
-
-> #if (__alignof__(struct log_buf) == 4) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
-> #define LOG_ALIGN 4
-> #else
-> #define LOG_ALIGN 8
-> #endif
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
