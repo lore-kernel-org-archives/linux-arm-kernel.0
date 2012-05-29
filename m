@@ -1,49 +1,60 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 29 May 2012 11:09:29 +0200
-Subject: [PATCH 1/2] serial/8250: Add LPC3220 standard UART type
-Message-ID: <1338282570-19799-1-git-send-email-stigge@antcom.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 May 2012 11:10:57 +0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add sound support
+In-Reply-To: <1338051128-29816-1-git-send-email-festevam@gmail.com>
+References: <1338051128-29816-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120529091057.GC30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPC32xx has "Standard" UARTs that are actually 16550A compatible but have
-bigger FIFOs. Since the already supported 16X50 line still doesn't match here,
-we agreed on adding a new type.
+On Sat, May 26, 2012 at 01:52:08PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Applied, thanks
 
----
-Applies to v3.4
+Sascha
 
- drivers/tty/serial/8250/8250.c |    8 ++++++++
- include/linux/serial_core.h    |    3 ++-
- 2 files changed, 10 insertions(+), 1 deletion(-)
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index b1d3675..59beb7a 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -131,6 +131,8 @@ CONFIG_GPIO_SYSFS=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_IMX2_WDT=y
+>  CONFIG_MFD_MC13XXX=y
+> +CONFIG_MFD_MC13XXX_SPI=y
+> +CONFIG_MFD_MC13XXX_I2C=y
+>  CONFIG_REGULATOR=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_REGULATOR_MC13783=y
+> @@ -166,6 +168,14 @@ CONFIG_LOGO=y
+>  CONFIG_LOGO_LINUX_MONO=y
+>  CONFIG_LOGO_LINUX_VGA16=y
+>  CONFIG_LOGO_LINUX_CLUT224=y
+> +CONFIG_SOUND=y
+> +CONFIG_SND=y
+> +CONFIG_SND_SOC=y
+> +CONFIG_SND_IMX_SOC=y
+> +CONFIG_SND_SOC_PHYCORE_AC97=y
+> +CONFIG_SND_SOC_EUKREA_TLV320=y
+> +CONFIG_SND_SOC_IMX_SGTL5000=y
+> +CONFIG_SND_SOC_IMX_MC13783=y
+>  CONFIG_USB=y
+>  CONFIG_USB_EHCI_HCD=y
+>  CONFIG_USB_EHCI_MXC=y
+> -- 
+> 1.7.1
+> 
+> 
 
---- linux-2.6.orig/drivers/tty/serial/8250/8250.c
-+++ linux-2.6/drivers/tty/serial/8250/8250.c
-@@ -282,6 +282,14 @@ static const struct serial8250_config ua
- 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
- 		.flags		= UART_CAP_FIFO | UART_CAP_AFE | UART_CAP_EFR,
- 	},
-+	[PORT_LPC3220] = {
-+		.name		= "LPC3220",
-+		.fifo_size	= 64,
-+		.tx_loadsz	= 32,
-+		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
-+				  UART_FCR_R_TRIG_00 | UART_FCR_T_TRIG_00,
-+		.flags		= UART_CAP_FIFO,
-+	},
- };
- 
- #if defined(CONFIG_MIPS_ALCHEMY)
---- linux-2.6.orig/include/linux/serial_core.h
-+++ linux-2.6/include/linux/serial_core.h
-@@ -47,7 +47,8 @@
- #define PORT_U6_16550A	19	/* ST-Ericsson U6xxx internal UART */
- #define PORT_TEGRA	20	/* NVIDIA Tegra internal UART */
- #define PORT_XR17D15X	21	/* Exar XR17D15x UART */
--#define PORT_MAX_8250	21	/* max port ID */
-+#define PORT_LPC3220	22	/* NXP LPC32xx SoC "Standard" UART */
-+#define PORT_MAX_8250	22	/* max port ID */
- 
- /*
-  * ARM specific type numbers.  These are not currently guaranteed
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
