@@ -1,131 +1,74 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:13 +0530
-Subject: [PATCHv10 01/11] I2C: OMAP: make omap_i2c_unidle/idle functions
- depend on CONFIG_PM_RUNTIME
+Date: Tue, 29 May 2012 16:26:18 +0530
+Subject: [PATCH 06/11] I2C: OMAP: Fix the crash in i2c remove
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions omap_i2c_unidle/idle are called from omap_i2c_runtime_resume
-and omap_i2c_runtime_suspend which is compiled for CONFIG_PM_RUNTIME.
-This patch removes the omap_i2c_unidle/idle functions and folds them
-into the runtime callbacks.
+    In omap_i2c_remove we are accessing the I2C_CON register without
+    enabling the clocks. Fix the same by ensure device is accessible by calling
+    pm_runtime_get_sync before accessing the registers and calling pm_runtime_put
+    after accessing.
 
-This fixes the below warn when CONFIG_PM_RUNTIME is not defined
+    This fixes the following crash.
+    [  154.723022] ------------[ cut here ]------------
+    [  154.725677] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:112 l3_interrupt_handler+0x1b4/0x1c4()
+    [  154.725677] L3 custom error: MASTER:MPU TARGET:L4 PER2
+    [  154.742614] Modules linked in: i2c_omap(-)
+    [  154.746948] Backtrace:
+    [  154.746948] [<c0013078>] (dump_backtrace+0x0/0x110) from [<c026c158>] (dump_stack+0x18/0x1c)
+    [  154.752716]  r6:00000070 r5:c002c43c r4:df9b9e98 r3:df9b8000
+    [  154.764465] [<c026c140>] (dump_stack+0x0/0x1c) from [<c0041a2c>] (warn_slowpath_common+0x5c/0x6c)
+    [  154.768341] [<c00419d0>] (warn_slowpath_common+0x0/0x6c) from [<c0041ae0>] (warn_slowpath_fmt+0x38/0x40)
+    [  154.776153]  r8:00000180 r7:c0361594 r6:c0379b48 r5:00080003 r4:e0838b00
+    [  154.790771] r3:00000009
+    [  154.791778] [<c0041aa8>] (warn_slowpath_fmt+0x0/0x40) from [<c002c43c>] (l3_interrupt_handler+0x1b4/0x1c4)
+    [  154.803710]  r3:c0361598 r2:c02ef74c
+    [  154.807403] [<c002c288>] (l3_interrupt_handler+0x0/0x1c4) from [<c0085f44>] (handle_irq_event_percpu+0x58/0
+    [  154.818237]  r8:0000002a r7:00000000 r6:00000000 r5:df808054 r4:df8893c0
+    [  154.825378] [<c0085eec>] (handle_irq_event_percpu+0x0/0x188) from [<c00860b8>] (handle_irq_event+0x44/0x64)
+    [  154.835662] [<c0086074>] (handle_irq_event+0x0/0x64) from [<c0088ec0>] (handle_fasteoi_irq+0xa4/0x10c)
+    [  154.845458]  r6:0000002a r5:df808054 r4:df808000 r3:c034a150
+    [  154.846466] [<c0088e1c>] (handle_fasteoi_irq+0x0/0x10c) from [<c0085ed0>] (generic_handle_irq+0x30/0x38)
+    [  154.854278]  r5:c034aa48 r4:0000002a
+    [  154.862091] [<c0085ea0>] (generic_handle_irq+0x0/0x38) from [<c000fd38>] (handle_IRQ+0x60/0xc0)
+    [  154.874450]  r4:c034ea70 r3:000001f8
+    [  154.878234] [<c000fcd8>] (handle_IRQ+0x0/0xc0) from [<c0008478>] (gic_handle_irq+0x20/0x5c)
+    [  154.887023]  r7:ffffff40 r6:df9b9fb0 r5:c034e2b4 r4:0000001a
+    [  154.887054] [<c0008458>] (gic_handle_irq+0x0/0x5c) from [<c000ea80>] (__irq_usr+0x40/0x60)
+    [  154.901153] Exception stack(0xdf9b9fb0 to 0xdf9b9ff8)
+    [  154.907104] 9fa0:                                     beaf1f04 4006be00 0000000f 0000000c
+    [  154.915710] 9fc0: 4006c000 00000000 00008034 ffffff40 00000007 00000000 00000000 0007b8d7
+    [  154.916778] 9fe0: 00000000 beaf1b68 0000d23c 4005baf0 80000010 ffffffff
+    [  154.931335]  r6:ffffffff r5:80000010 r4:4005baf0 r3:beaf1f04
+    [  154.937316] ---[ end trace 1b75b31a2719ed21 ]--
 
- CC      arch/arm/mach-omap2/board-ti8168evm.o
-drivers/i2c/busses/i2c-omap.c:272: warning: 'omap_i2c_unidle' defined but not used
-drivers/i2c/busses/i2c-omap.c:293: warning: 'omap_i2c_idle' defined but not used
-  CC      net/ipv4/ip_forward.o
-
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Linux PM list <linux-pm@vger.kernel.org>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   75 +++++++++++++++++-----------------------
- 1 files changed, 32 insertions(+), 43 deletions(-)
+-v10 Instead of "clock enable" use "device is accessible" as runtime
+does much more.
+
+ drivers/i2c/busses/i2c-omap.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 801df60..4f4188d 100644
+index fec8d5c..44e8cfa 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -269,47 +269,6 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
+@@ -1108,7 +1108,9 @@ omap_i2c_remove(struct platform_device *pdev)
  
--static void omap_i2c_unidle(struct omap_i2c_dev *dev)
--{
--	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
--	}
--
--	/*
--	 * Don't write to this register if the IE state is 0 as it can
--	 * cause deadlock.
--	 */
--	if (dev->iestate)
--		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
--}
--
--static void omap_i2c_idle(struct omap_i2c_dev *dev)
--{
--	u16 iv;
--
--	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
--	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
--		omap_i2c_write_reg(dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
--	else
--		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
--
--	if (dev->rev < OMAP_I2C_OMAP1_REV_2) {
--		iv = omap_i2c_read_reg(dev, OMAP_I2C_IV_REG); /* Read clears */
--	} else {
--		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, dev->iestate);
--
--		/* Flush posted write */
--		omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
--	}
--}
--
- static int omap_i2c_init(struct omap_i2c_dev *dev)
- {
- 	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
-@@ -1163,8 +1122,22 @@ static int omap_i2c_runtime_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+	u16 iv;
-+
-+	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
-+	if (_dev->dtrev == OMAP_I2C_IP_VERSION_2)
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR, 1);
-+	else
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
-+
-+	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
-+		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
-+	} else {
-+		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
- 
--	omap_i2c_idle(_dev);
-+		/* Flush posted write */
-+		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
-+	}
- 
- 	return 0;
- }
-@@ -1174,7 +1147,23 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
- 
--	omap_i2c_unidle(_dev);
-+	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-+		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
-+		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+	}
-+
-+	/*
-+	 * Don't write to this register if the IE state is 0 as it can
-+	 * cause deadlock.
-+	 */
-+	if (_dev->iestate)
-+		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
- 
- 	return 0;
- }
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
++	pm_runtime_get_sync(&pdev->dev);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	iounmap(dev->base);
+ 	kfree(dev);
 -- 
 1.7.5.4
