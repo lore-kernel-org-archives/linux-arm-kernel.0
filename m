@@ -1,48 +1,48 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Tue, 29 May 2012 11:52:32 +0100
-Subject: [PATCH] netwinder: nw_gpio_lock is a raw_spinlock_t
-In-Reply-To: <20120529100619.GA23186@faui49q.informatik.uni-erlangen.de>
-References: <1338040464.2525.38.camel@koala>
- <20120525082812.GA12238@faui49q.informatik.uni-erlangen.de>
- <20120529100619.GA23186@faui49q.informatik.uni-erlangen.de>
-Message-ID: <1338288752.11518.166.camel@shinybook.infradead.org>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 29 May 2012 16:26:21 +0530
+Subject: [PATCHv10 09/11] I2C: OMAP: Do not set the XUDF(Transmit underflow)
+ if the underflow is not reached
+In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
+References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-10-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-05-29 at 12:06 +0200, Christian Dietrich wrote:
-> --- a/drivers/char/ds1620.c
-> +++ b/drivers/char/ds1620.c
-> @@ -74,21 +74,21 @@ static inline void netwinder_ds1620_reset(void)
->  
->  static inline void netwinder_lock(unsigned long *flags)
->  {
-> -       spin_lock_irqsave(&nw_gpio_lock, *flags);
-> +       raw_spin_lock_irqsave(&nw_gpio_lock, *flags);
->  }
->  
->  static inline void netwinder_unlock(unsigned long *flags)
->  {
-> -       spin_unlock_irqrestore(&nw_gpio_lock, *flags);
-> +       raw_spin_unlock_irqrestore(&nw_gpio_lock, *flags);
->  } 
+Currently in the 1.153 errata handling, while waiting for transmitter
+underflow, if NACK is got the XUDF(Transmit underflow) flag is also set.
+Fix this by setting the XUDF(Transmit underflow) flag after wait for the
+condition is over.
 
-If you were to make these functions public by shifting them into
-arch/arm/mach-footbridge/include/mach/hardware.h that would be a lot
-nicer, and other places wouldn't have to touch the raw spinlock
-directly.
+Cc: Alexander Shishkin <virtuoso@slind.org>
+Acked-by: Moiz Sonasath <m-sonasath@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+-v10 Change the punctuation and reword.
+-v9 XUDF is expanded to transmit underflow
 
-Also... while we're thinking about preemption and netwinder, note that
-the write enable is valid for only 2ms or so. So all the functions in
-dc21285.c that you just touched should probably *also* be disabling
-preemption when they're run on a netwinder, to ensure that that time
-doesn't expire before they actually get to run.
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 6129cb8..cd6feea 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -730,7 +730,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+ 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
+-			*err |= OMAP_I2C_STAT_XUDF;
+ 			return -ETIMEDOUT;
+ 		}
+ 
+@@ -743,6 +742,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
+ 		return 0;
+ 	}
+ 
++	*err |= OMAP_I2C_STAT_XUDF;
+ 	return 0;
+ }
+ 
 -- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6171 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120529/15a9a04f/attachment-0001.bin>
+1.7.5.4
