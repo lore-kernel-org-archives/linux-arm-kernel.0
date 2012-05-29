@@ -1,47 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 29 May 2012 14:52:34 +0800
-Subject: Regression for non-eMMC cards with commit fa550189?
-In-Reply-To: <20120528132147.GC12766@atomide.com>
-References: <20120528132147.GC12766@atomide.com>
-Message-ID: <CAPDyKFrcviT3_Fz13LpFJ+1oKxQ5LKswN7EmzVcWTJkiiDWusA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 May 2012 08:33:34 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: mmp: add audio dma support
+In-Reply-To: <1338268734.1580.26.camel@vkoul-udesk3>
+References: <1337929863-31885-1-git-send-email-zhangfei.gao@marvell.com>
+ <1337929863-31885-3-git-send-email-zhangfei.gao@marvell.com>
+ <1337932416.1580.2.camel@vkoul-udesk3>
+ <20120525080500.GB24149@n2100.arm.linux.org.uk>
+ <CAMj5Bkhc46zqY5AbJkc=-h02taP_esxrqpNu--aYtZZcVcPK6A@mail.gmail.com>
+ <20120525094231.GC24149@n2100.arm.linux.org.uk>
+ <CAMj5BkjhCakuZdUcA+P_nbETi8tnYK5Ok6HMWTG61whZXwCD6g@mail.gmail.com>
+ <1338268734.1580.26.camel@vkoul-udesk3>
+Message-ID: <20120529073334.GA12217@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, May 29, 2012 at 10:48:54AM +0530, Vinod Koul wrote:
+> On Tue, 2012-05-29 at 13:14 +0800, zhangfei gao wrote:
+> > 
+> > When debugging with putting snd_dmaengine_pcm_open to probe or
+> > pcm_new, there is issue.
+> > snd_dmaengine_pcm_open ->
+> > snd_pcm_hw_constraint_integer(substream->runtime,
+> > 
+> > SNDRV_PCM_HW_PARAM_PERIODS);
+> > The runtime is only exist at runtime.
+> > So if using soc-dmaengine, I am afraid the snd_dmaengine_pcm_open has
+> > to be put in open instead of probe. 
+> I think you got it wrong, the snd_dmaengine_pcm_open needs to be called
+> from your CPU pcm_open. See other examples how this is used in other
+> drivers.
 
-This patch changes the sequence of how the host drivers set_ios
-function gets called during probe.
-
-Before:
-1. mmc_power_off
-2. mmc_power_up
-
-Now:
-1. mmc_power_up
-
-My guess is then; the omap driver set_ios function requires that
-mmc_power_off is called before a mmc_power_up.
-Hopefully this requirement can be removed and fixed in the host driver somehow.
-
-Please get back to me if you need some more assistance around this matter.
-
-Kind regards
-Ulf Hansson
-
-
-On 28 May 2012 21:21, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Ulf & Chris,
->
-> Looks like commit fa550189 (mmc: core: Prevent eMMC VCC supply to be
-> cut from late init) causes MMC card to stop working at least with
-> n8x0 using drivers/mmc/host/omap.c. The card(s) on it are not eMMC.
->
-> Reverting fa550189 makes things work again. Any ideas what could
-> be causing this?
->
-> No debug output from MMC_DEBUG, looks like commands won't even
-> get started?
->
-> Regards,
->
-> Tony
+But, as I pointed out earlier, there's the issue of using the wrong
+struct device to allocate memory for the DMA engine.  That's something
+that my soc-dmaengine.c got _right_, and soc-dmaengine-pcm.c gets _wrong_.
