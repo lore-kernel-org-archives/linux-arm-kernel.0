@@ -1,51 +1,43 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 29 May 2012 14:29:15 -0700
-Subject: [PATCH 0/3] ARM: OMAP4: add support for TPS62361 PMIC
-In-Reply-To: <1336139842-845-1-git-send-email-t-kristo@ti.com> (Tero Kristo's
- message of "Fri, 4 May 2012 16:57:19 +0300")
+Date: Tue, 29 May 2012 14:30:34 -0700
+Subject: [PATCH 1/3] ARM: OMAP4: VC: fix I2C timing
+In-Reply-To: <1336139842-845-2-git-send-email-t-kristo@ti.com> (Tero Kristo's
+ message of "Fri, 4 May 2012 16:57:20 +0300")
 References: <1336139842-845-1-git-send-email-t-kristo@ti.com>
-Message-ID: <87ehq2ekwk.fsf@ti.com>
+ <1336139842-845-2-git-send-email-t-kristo@ti.com>
+Message-ID: <877gvuekud.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tero Kristo <t-kristo@ti.com> writes:
 
-> Hi,
+> Current I2C timing parameters do not work with Panda board at least.
+> Parameters updated based on TI recommendation.
 >
-> This set adds support for TPS62361 PMIC, which is used to power
-> MPU voltagedomain on OMAP4460 boards. These patches apply on top
-> of 3.4 + my voltagedomain fixes set to avoid adding redundant code.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Hmm... do you have an updated version of your voltagedomain fixes?  Or
-are you waiting for me to review something?  I thought I had been
-through them already, but if I have not, they slipped throught the
-cracks.  I'm sorry.  Can you please update/repost?
+Let's fix this correctly by deriving/calculating them from the proper
+source clocks.
 
-Thanks.
+Otherwise, this is going to work for Panda and break for something else.
 
 Kevin
 
-> Working tree available here for interested parties:
+> ---
+>  arch/arm/mach-omap2/vc.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
 >
-> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> branch: mainline-3.4-voltdm-tps-v1
->
-> Tree has been tested with:
-> - omap3beagle board
-> - omap4panda es board (OMAP4460)
-> - omap4blaze board (OMAP4430)
->
-> Tested modifying the voltage levels on all core regulators (vdd1...vdd3)
-> and measuring that the voltages do actually change.
->
-> Patch #1 was needed before the voltages could be modified on a panda
-> board es device, otherwise the timing for the I2C channel was so bogus
-> it usually failed. The values used were taken from an android tree and
-> are based on TI analysis.
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+> index 1fd976e..a731400 100644
+> --- a/arch/arm/mach-omap2/vc.c
+> +++ b/arch/arm/mach-omap2/vc.c
+> @@ -585,7 +585,9 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
+>  	omap4_set_timings(voltdm, true);
+>  
+>  	/* XXX These are magic numbers and do not belong! */
+> -	vc_val = (0x60 << OMAP4430_SCLL_SHIFT | 0x26 << OMAP4430_SCLH_SHIFT);
+> +	vc_val = (0x28 << OMAP4430_SCLL_SHIFT | 0x2c << OMAP4430_SCLH_SHIFT);
+> +	vc_val |= (0x0b << OMAP4430_HSSCLL_SHIFT);
+> +	vc_val |= (0x0 << OMAP4430_HSSCLH_SHIFT);
+>  	voltdm->write(vc_val, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
+>  }
