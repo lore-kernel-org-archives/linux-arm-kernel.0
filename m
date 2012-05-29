@@ -1,205 +1,250 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 29 May 2012 10:45:01 +0100
-Subject: [RFC 29/34] dmaengine: PL08x: convert to use vchan submitted/issued
- lists
+Date: Tue, 29 May 2012 10:45:21 +0100
+Subject: [RFC 30/34] dmaengine: PL08x: convert to use vchan done list
 In-Reply-To: <20120529093015.GF12217@n2100.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
-Message-ID: <E1SZIz7-00070e-3J@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1SZIzR-00070l-78@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to use the virtual dma channel submitted/issued descriptor
-lists rather than our own private lists, and use the virtual dma
-channel support functions to manage these lists.
+Convert to use the virtual dma channel done list, tasklet, and
+descriptor freeing.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |   64 ++++++++++++---------------------------------
- 1 files changed, 17 insertions(+), 47 deletions(-)
+ drivers/dma/amba-pl08x.c |  135 ++++++++++++++++++---------------------------
+ 1 files changed, 54 insertions(+), 81 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 6e53a22..eb556c5 100644
+index eb556c5..2b9fe0e 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -208,8 +208,6 @@ enum pl08x_dma_chan_state {
+@@ -160,16 +160,16 @@ struct pl08x_sg {
+ /**
+  * struct pl08x_txd - wrapper for struct dma_async_tx_descriptor
+  * @vd: virtual DMA descriptor
+- * @node: node for txd list for channels
+  * @dsg_list: list of children sg's
+  * @llis_bus: DMA memory address (physical) start for the LLIs
+  * @llis_va: virtual memory address start for the LLIs
+  * @cctl: control reg values for current txd
+  * @ccfg: config reg values for current txd
++ * @done: this marks completed descriptors, which should not have their
++ *   mux released.
+  */
+ struct pl08x_txd {
+ 	struct virt_dma_desc vd;
+-	struct list_head node;
+ 	struct list_head dsg_list;
+ 	dma_addr_t llis_bus;
+ 	struct pl08x_lli *llis_va;
+@@ -180,6 +180,7 @@ struct pl08x_txd {
+ 	 * trigger this txd.  Other registers are in llis_va[0].
+ 	 */
+ 	u32 ccfg;
++	bool done;
+ };
+ 
+ /**
+@@ -204,11 +205,9 @@ enum pl08x_dma_chan_state {
+  * struct pl08x_dma_chan - this structure wraps a DMA ENGINE channel
+  * @vc: wrappped virtual channel
+  * @phychan: the physical channel utilized by this channel, if there is one
+- * @tasklet: tasklet scheduled by the IRQ to handle actual work etc
   * @name: name of channel
   * @cd: channel platform data
   * @runtime_addr: address for RX/TX according to the runtime config
-- * @pend_list: queued transactions pending on this channel
-- * @issued_list: issued transactions for this channel
-  * @done_list: list of completed transactions
+- * @done_list: list of completed transactions
   * @at: active transaction on this channel
   * @lock: a lock for this channel data
-@@ -226,8 +224,6 @@ struct pl08x_dma_chan {
+  * @host: a pointer to the host (internal use)
+@@ -220,11 +219,9 @@ enum pl08x_dma_chan_state {
+ struct pl08x_dma_chan {
+ 	struct virt_dma_chan vc;
+ 	struct pl08x_phy_chan *phychan;
+-	struct tasklet_struct tasklet;
  	const char *name;
  	const struct pl08x_channel_data *cd;
  	struct dma_slave_config cfg;
--	struct list_head pend_list;
--	struct list_head issued_list;
- 	struct list_head done_list;
+-	struct list_head done_list;
  	struct pl08x_txd *at;
  	struct pl08x_driver_data *host;
-@@ -350,12 +346,12 @@ static void pl08x_start_next_txd(struct pl08x_dma_chan *plchan)
- {
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	struct pl08x_phy_chan *phychan = plchan->phychan;
-+	struct virt_dma_desc *vd = vchan_next_desc(&plchan->vc);
+ 	enum pl08x_dma_chan_state state;
+@@ -1077,6 +1074,52 @@ static void pl08x_free_txd(struct pl08x_driver_data *pl08x,
+ 	kfree(txd);
+ }
+ 
++static void pl08x_unmap_buffers(struct pl08x_txd *txd)
++{
++	struct device *dev = txd->vd.tx.chan->device->dev;
++	struct pl08x_sg *dsg;
++
++	if (!(txd->vd.tx.flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
++		if (txd->vd.tx.flags & DMA_COMPL_SRC_UNMAP_SINGLE)
++			list_for_each_entry(dsg, &txd->dsg_list, node)
++				dma_unmap_single(dev, dsg->src_addr, dsg->len,
++						DMA_TO_DEVICE);
++		else {
++			list_for_each_entry(dsg, &txd->dsg_list, node)
++				dma_unmap_page(dev, dsg->src_addr, dsg->len,
++						DMA_TO_DEVICE);
++		}
++	}
++	if (!(txd->vd.tx.flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
++		if (txd->vd.tx.flags & DMA_COMPL_DEST_UNMAP_SINGLE)
++			list_for_each_entry(dsg, &txd->dsg_list, node)
++				dma_unmap_single(dev, dsg->dst_addr, dsg->len,
++						DMA_FROM_DEVICE);
++		else
++			list_for_each_entry(dsg, &txd->dsg_list, node)
++				dma_unmap_page(dev, dsg->dst_addr, dsg->len,
++						DMA_FROM_DEVICE);
++	}
++}
++
++static void pl08x_desc_free(struct virt_dma_desc *vd)
++{
 +	struct pl08x_txd *txd = to_pl08x_txd(&vd->tx);
- 	struct pl08x_lli *lli;
--	struct pl08x_txd *txd;
- 	u32 val;
- 
--	txd = list_first_entry(&plchan->issued_list, struct pl08x_txd, node);
--	list_del(&txd->node);
-+	list_del(&txd->vd.node);
- 
- 	plchan->at = txd;
- 
-@@ -517,18 +513,18 @@ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
- 	}
- 
- 	/* Sum up all queued transactions */
--	if (!list_empty(&plchan->issued_list)) {
-+	if (!list_empty(&plchan->vc.desc_issued)) {
- 		struct pl08x_txd *txdi;
--		list_for_each_entry(txdi, &plchan->issued_list, node) {
-+		list_for_each_entry(txdi, &plchan->vc.desc_issued, vd.node) {
- 			struct pl08x_sg *dsg;
- 			list_for_each_entry(dsg, &txd->dsg_list, node)
- 				bytes += dsg->len;
- 		}
- 	}
- 
--	if (!list_empty(&plchan->pend_list)) {
-+	if (!list_empty(&plchan->vc.desc_submitted)) {
- 		struct pl08x_txd *txdi;
--		list_for_each_entry(txdi, &plchan->pend_list, node) {
-+		list_for_each_entry(txdi, &plchan->vc.desc_submitted, vd.node) {
- 			struct pl08x_sg *dsg;
- 			list_for_each_entry(dsg, &txd->dsg_list, node)
- 				bytes += dsg->len;
-@@ -1087,13 +1083,12 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
- 	LIST_HEAD(head);
- 	struct pl08x_txd *txd;
- 
--	list_splice_tail_init(&plchan->issued_list, &head);
--	list_splice_tail_init(&plchan->pend_list, &head);
-+	vchan_get_all_descriptors(&plchan->vc, &head);
++	struct pl08x_dma_chan *plchan = to_pl08x_chan(vd->tx.chan);
++	struct pl08x_driver_data *pl08x = plchan->host;
++	unsigned long flags;
++
++	if (!plchan->slave)
++		pl08x_unmap_buffers(txd);
++
++	if (!txd->done)
++		pl08x_release_mux(plchan);
++
++	spin_lock_irqsave(&pl08x->lock, flags);
++	pl08x_free_txd(plchan->host, txd);
++	spin_unlock_irqrestore(&pl08x->lock, flags);
++}
++
+ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
+ 				struct pl08x_dma_chan *plchan)
+ {
+@@ -1087,9 +1130,8 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
  
  	while (!list_empty(&head)) {
--		txd = list_first_entry(&head, struct pl08x_txd, node);
-+		txd = list_first_entry(&head, struct pl08x_txd, vd.node);
- 		pl08x_release_mux(plchan);
--		list_del(&txd->node);
-+		list_del(&txd->vd.node);
- 		pl08x_free_txd(pl08x, txd);
+ 		txd = list_first_entry(&head, struct pl08x_txd, vd.node);
+-		pl08x_release_mux(plchan);
+ 		list_del(&txd->vd.node);
+-		pl08x_free_txd(pl08x, txd);
++		pl08x_desc_free(&txd->vd);
  	}
  }
-@@ -1110,23 +1105,6 @@ static void pl08x_free_chan_resources(struct dma_chan *chan)
- {
+ 
+@@ -1534,9 +1576,7 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		}
+ 		/* Dequeue jobs and free LLIs */
+ 		if (plchan->at) {
+-			/* Killing this one off, release its mux */
+-			pl08x_release_mux(plchan);
+-			pl08x_free_txd(pl08x, plchan->at);
++			pl08x_desc_free(&plchan->at->vd);
+ 			plchan->at = NULL;
+ 		}
+ 		/* Dequeue jobs not yet fired as well */
+@@ -1590,68 +1630,6 @@ static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+ 	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
  }
  
--static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
+-static void pl08x_unmap_buffers(struct pl08x_txd *txd)
 -{
--	struct pl08x_dma_chan *plchan = to_pl08x_chan(tx->chan);
--	struct pl08x_txd *txd = to_pl08x_txd(tx);
--	unsigned long flags;
--	dma_cookie_t cookie;
+-	struct device *dev = txd->vd.tx.chan->device->dev;
+-	struct pl08x_sg *dsg;
 -
--	spin_lock_irqsave(&plchan->vc.lock, flags);
--	cookie = dma_cookie_assign(tx);
--
--	/* Put this onto the pending list */
--	list_add_tail(&txd->node, &plchan->pend_list);
--	spin_unlock_irqrestore(&plchan->vc.lock, flags);
--
--	return cookie;
+-	if (!(txd->vd.tx.flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+-		if (txd->vd.tx.flags & DMA_COMPL_SRC_UNMAP_SINGLE)
+-			list_for_each_entry(dsg, &txd->dsg_list, node)
+-				dma_unmap_single(dev, dsg->src_addr, dsg->len,
+-						DMA_TO_DEVICE);
+-		else {
+-			list_for_each_entry(dsg, &txd->dsg_list, node)
+-				dma_unmap_page(dev, dsg->src_addr, dsg->len,
+-						DMA_TO_DEVICE);
+-		}
+-	}
+-	if (!(txd->vd.tx.flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+-		if (txd->vd.tx.flags & DMA_COMPL_DEST_UNMAP_SINGLE)
+-			list_for_each_entry(dsg, &txd->dsg_list, node)
+-				dma_unmap_single(dev, dsg->dst_addr, dsg->len,
+-						DMA_FROM_DEVICE);
+-		else
+-			list_for_each_entry(dsg, &txd->dsg_list, node)
+-				dma_unmap_page(dev, dsg->dst_addr, dsg->len,
+-						DMA_FROM_DEVICE);
+-	}
 -}
 -
- static struct dma_async_tx_descriptor *pl08x_prep_dma_interrupt(
- 		struct dma_chan *chan, unsigned long flags)
+-static void pl08x_tasklet(unsigned long data)
+-{
+-	struct pl08x_dma_chan *plchan = (struct pl08x_dma_chan *) data;
+-	struct pl08x_driver_data *pl08x = plchan->host;
+-	unsigned long flags;
+-	LIST_HEAD(head);
+-
+-	spin_lock_irqsave(&plchan->vc.lock, flags);
+-	list_splice_tail_init(&plchan->done_list, &head);
+-	spin_unlock_irqrestore(&plchan->vc.lock, flags);
+-
+-	while (!list_empty(&head)) {
+-		struct pl08x_txd *txd = list_first_entry(&head,
+-						struct pl08x_txd, node);
+-		dma_async_tx_callback callback = txd->vd.tx.callback;
+-		void *callback_param = txd->vd.tx.callback_param;
+-
+-		list_del(&txd->node);
+-
+-		/* Don't try to unmap buffers on slave channels */
+-		if (!plchan->slave)
+-			pl08x_unmap_buffers(txd);
+-
+-		/* Free the descriptor */
+-		spin_lock_irqsave(&plchan->vc.lock, flags);
+-		pl08x_free_txd(pl08x, txd);
+-		spin_unlock_irqrestore(&plchan->vc.lock, flags);
+-
+-		/* Callback to signal completion */
+-		if (callback)
+-			callback(callback_param);
+-	}
+-}
+-
+ static irqreturn_t pl08x_irq(int irq, void *dev)
  {
-@@ -1311,8 +1289,7 @@ static void pl08x_issue_pending(struct dma_chan *chan)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&plchan->vc.lock, flags);
--	list_splice_tail_init(&plchan->pend_list, &plchan->issued_list);
--	if (!list_empty(&plchan->issued_list)) {
-+	if (vchan_issue_pending(&plchan->vc)) {
- 		if (!plchan->phychan && plchan->state != PL08X_CHAN_WAITING)
- 			pl08x_phy_alloc_and_start(plchan);
- 	}
-@@ -1338,16 +1315,11 @@ static int pl08x_prep_channel_resources(struct pl08x_dma_chan *plchan,
- 	return 0;
- }
- 
--static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan,
--	unsigned long flags)
-+static struct pl08x_txd *pl08x_get_txd(struct pl08x_dma_chan *plchan)
- {
- 	struct pl08x_txd *txd = kzalloc(sizeof(*txd), GFP_NOWAIT);
- 
- 	if (txd) {
--		dma_async_tx_descriptor_init(&txd->vd.tx, &plchan->vc.chan);
--		txd->vd.tx.flags = flags;
--		txd->vd.tx.tx_submit = pl08x_tx_submit;
--		INIT_LIST_HEAD(&txd->node);
- 		INIT_LIST_HEAD(&txd->dsg_list);
- 
- 		/* Always enable error and terminal interrupts */
-@@ -1370,7 +1342,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 	struct pl08x_sg *dsg;
- 	int ret;
- 
--	txd = pl08x_get_txd(plchan, flags);
-+	txd = pl08x_get_txd(plchan);
- 	if (!txd) {
- 		dev_err(&pl08x->adev->dev,
- 			"%s no memory for descriptor\n", __func__);
-@@ -1406,7 +1378,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 	if (ret)
- 		return NULL;
- 
--	return &txd->vd.tx;
-+	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
- 
- static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
-@@ -1428,7 +1400,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	dev_dbg(&pl08x->adev->dev, "%s prepare transaction of %d bytes from %s\n",
- 			__func__, sgl->length, plchan->name);
- 
--	txd = pl08x_get_txd(plchan, flags);
-+	txd = pl08x_get_txd(plchan);
- 	if (!txd) {
- 		dev_err(&pl08x->adev->dev, "%s no txd\n", __func__);
- 		return NULL;
-@@ -1522,7 +1494,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	if (ret)
- 		return NULL;
- 
--	return &txd->vd.tx;
-+	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
- 
- static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-@@ -1729,7 +1701,7 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
- 				 * And start the next descriptor (if any),
- 				 * otherwise free this channel.
+ 	struct pl08x_driver_data *pl08x = dev;
+@@ -1694,8 +1672,8 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
+ 				 * reservation.
  				 */
--				if (!list_empty(&plchan->issued_list))
-+				if (vchan_next_desc(&plchan->vc))
- 					pl08x_start_next_txd(plchan);
- 				else
- 					pl08x_phy_free(plchan);
-@@ -1797,8 +1769,6 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+ 				pl08x_release_mux(plchan);
+-				dma_cookie_complete(&tx->vd.tx);
+-				list_add_tail(&tx->node, &plchan->done_list);
++				tx->done = true;
++				vchan_cookie_complete(&tx->vd);
+ 
+ 				/*
+ 				 * And start the next descriptor (if any),
+@@ -1708,8 +1686,6 @@ static irqreturn_t pl08x_irq(int irq, void *dev)
+ 			}
+ 			spin_unlock(&plchan->vc.lock);
+ 
+-			/* Schedule tasklet on this channel */
+-			tasklet_schedule(&plchan->tasklet);
+ 			mask |= (1 << i);
+ 		}
+ 	}
+@@ -1769,10 +1745,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
  			 "initialize virtual channel \"%s\"\n",
  			 chan->name);
  
--		INIT_LIST_HEAD(&chan->pend_list);
--		INIT_LIST_HEAD(&chan->issued_list);
- 		INIT_LIST_HEAD(&chan->done_list);
- 		tasklet_init(&chan->tasklet, pl08x_tasklet,
- 			     (unsigned long) chan);
+-		INIT_LIST_HEAD(&chan->done_list);
+-		tasklet_init(&chan->tasklet, pl08x_tasklet,
+-			     (unsigned long) chan);
+-
++		chan->vc.desc_free = pl08x_desc_free;
+ 		vchan_init(&chan->vc, dmadev);
+ 	}
+ 	dev_info(&pl08x->adev->dev, "initialized %d virtual %s channels\n",
 -- 
 1.7.4.4
