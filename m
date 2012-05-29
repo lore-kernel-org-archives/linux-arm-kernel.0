@@ -1,47 +1,22 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 29 May 2012 06:16:39 +0000
-Subject: [GIT PULL] ARM: OMAP2+: Add AM335x and AM3517/05 EVM DT support
-In-Reply-To: <4FAD0A71.80201@ti.com>
-References: <4FAD0A71.80201@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA39262@DBDE01.ent.ti.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Tue, 29 May 2012 08:31:38 +0200
+Subject: amba, tegra-ahb and pci (Kconfig question)
+In-Reply-To: <4FC435B5.8030007@nvidia.com>
+References: <4FC435B5.8030007@nvidia.com>
+ <20120528081737.GA8031@mail.gnudd.com>
+Message-ID: <20120529063138.GA22542@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2012 at 18:17:45, Cousson, Benoit wrote:
-> Hi Tony,
-> 
-> Here are some remaining DT patches I was not able to push at 3.4 due to some missing dependency.
-> It applies now fine on top of lo/dt branch.
-> 
-> Regards,
-> Benoit
-> 
-> 
-> The following changes since commit 40364b9f5a4d167d97bb6a76cd239ca8cfff056a:
->   Benoit Cousson (1):
->         arm/dts: omap4-panda: Add LEDs support
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.5/dts/am33xx
-> 
-> Vaibhav Hiremath (3):
->       arm/dts: Add support for TI AM335x EVM board
->       arm/dts: omap3-evm: Add i2c and twl4030 support
->       arm/dts: Add support for TI AM3517/05 EVM board
-> 
->  arch/arm/boot/dts/am335x-evm.dts |   39 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/am3517-evm.dts |   32 +++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-evm.dts  |   28 +++++++++++++++++++++++++++
->  3 files changed, 99 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/am335x-evm.dts
->  create mode 100644 arch/arm/boot/dts/am3517-evm.dts
-> 
+> FYI, there's a desire to keep all (especially new) drivers out of
+> arch/arm/mach-*. We had originally wanted to put the tegra-ahb driver in
+> that directory since it is highly Tegra-specific, but that location was
+> NAKd.
 
+Ok. I've seen this trend, actually.  Yesterday I posted the code for
+the pci bridge living in drivers/amba besides yours, as Russell
+suggested.  I didn't Cc: because it wasn't tegra specific, maybe
+I would better have cc'd you.
 
-Tony (and Benoit),
-
-Can this patch merged into your "dt" branch??? And into "master" as well, so that we can be sure that, it goes in next merge window.
-
-Thanks,
-Vaibhav
+Thanks
+/alessandro
