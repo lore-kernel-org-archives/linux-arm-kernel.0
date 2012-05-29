@@ -1,36 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 29 May 2012 16:50:45 +0200
-Subject: [GIT PULL] CMA and ARM DMA-mapping updates for v3.5
-In-Reply-To: <20120529122932.GA24623@n2100.arm.linux.org.uk>
-References: <1337672417-10065-1-git-send-email-m.szyprowski@samsung.com>
- <20120529122932.GA24623@n2100.arm.linux.org.uk>
-Message-ID: <015e01cd3daa$6d910e50$48b32af0$%szyprowski@samsung.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 29 May 2012 11:07:14 -0400
+Subject: [PATCHv2 3/4] mm: vmalloc: add VM_DMA flag to indicate areas
+ used by dma-mapping framework
+In-Reply-To: <001d01cd3caa$a05d0510$e1170f30$%szyprowski@samsung.com>
+References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
+ <1337252085-22039-4-git-send-email-m.szyprowski@samsung.com>
+ <4FBB3B41.8010102@kernel.org>
+ <01e501cd39a8$67f34ea0$37d9ebe0$%szyprowski@samsung.com>
+ <20120524122854.GD11860@linux-sh.org>
+ <CAHGf_=qmBMFfV=UhXFtepO8styaQonfBA0E0+FO0qSi7RLfJFA@mail.gmail.com>
+ <001d01cd3caa$a05d0510$e1170f30$%szyprowski@samsung.com>
+Message-ID: <20120529150714.GA8293@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, May 29, 2012 2:30 PM Russell King - ARM Linux wrote:
-
-> I notice we have new warnings as a result of CMA being merged, though
-> thankfully they're just in Kconfig:
+On Mon, May 28, 2012 at 10:19:39AM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
-> warning: (ARM) selects CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS &&
-> HAVE_MEMBLOCK && EXPERIMENTAL)
+> On Sunday, May 27, 2012 2:35 PM KOSAKI Motohiro wrote:
 > 
-> This seems totally weird: you're mandating that ARM must have CMA
-> selected, but it's an experimental feature?  So you're implying that
-> the entire ARM kernel becomes totally experimental for the next
-> release cycle?
+> > On Thu, May 24, 2012 at 8:28 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+> > > On Thu, May 24, 2012 at 02:26:12PM +0200, Marek Szyprowski wrote:
+> > >> On Tuesday, May 22, 2012 9:08 AM Minchan Kim wrote:
+> > >> > Hmm, VM_DMA would become generic flag?
+> > >> > AFAIU, maybe VM_DMA would be used only on ARM arch.
+> > >>
+> > >> Right now yes, it will be used only on ARM architecture, but maybe other architecture will
+> > >> start using it once it is available.
+> > >>
+> > > There's very little about the code in question that is ARM-specific to
+> > > begin with. I plan to adopt similar changes on SH once the work has
+> > > settled one way or the other, so we'll probably use the VMA flag there,
+> > > too.
+> > 
+> > I don't think VM_DMA is good idea because x86_64 has two dma zones. x86 unaware
+> > patches make no sense.
 > 
-> I think this needs fixing.
+> I see no problems to add VM_DMA64 later if x86_64 starts using vmalloc areas for creating 
+> kernel mappings for the dma buffers (I assume that there are 2 dma zones: one 32bit and one
+> 64bit). Right now x86 and x86_64 don't use vmalloc areas for dma buffers, so I hardly see
+> how this patch can be considered as 'x86 unaware'.
 
-No, that wasn't my intention. I will provide a patch which removes unconditional dependency
-on CMA - it will let one to disable CMA and use old allocation method if needed, but this 
-requires a few more changes in the dma-mapping implementation. I wasn't aware of the 
-consequences and no one has complained about this since v15 of CMA patches (Aug 2011).
+Well they do - kind off. It is usually done by calling vmalloc_32 and then using
+the DMA API on top of those pages (or sometimes the non-portable virt_to_phys macro).
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Introducing this and replacing the vmalloc_32 with this seems like a nice step in making
+those device drivers APIs more portable?
