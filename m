@@ -1,48 +1,54 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 29 May 2012 16:26:21 +0530
-Subject: [PATCHv10 09/11] I2C: OMAP: Do not set the XUDF(Transmit underflow)
- if the underflow is not reached
+Date: Tue, 29 May 2012 16:26:20 +0530
+Subject: [PATCHv10 08/11] I2C: OMAP: prevent the overwrite of the errata flags
 In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
 References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1338288983-15026-10-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1338288983-15026-9-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the 1.153 errata handling, while waiting for transmitter
-underflow, if NACK is got the XUDF(Transmit underflow) flag is also set.
-Fix this by setting the XUDF(Transmit underflow) flag after wait for the
-condition is over.
+From: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 
-Cc: Alexander Shishkin <virtuoso@slind.org>
-Acked-by: Moiz Sonasath <m-sonasath@ti.com>
+i2c_probe set the dev->errata flag, but omap_i2c_init cleared the flag again.
+Prevent the overwrite of the errata flags.Move the errata handling to a unified
+place in probe to prevent such errors.
+
 Reviewed-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Tasslehoff Kjappfot <tasskjapp@gmail.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
--v10 Change the punctuation and reword.
--v9 XUDF is expanded to transmit underflow
+-v9  Update the changelogs to be more explainatory.
 
- drivers/i2c/busses/i2c-omap.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6129cb8..cd6feea 100644
+index c39b72f..6129cb8 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -730,7 +730,6 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
- 			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
--			*err |= OMAP_I2C_STAT_XUDF;
- 			return -ETIMEDOUT;
- 		}
+@@ -427,11 +427,6 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 	/* Take the I2C module out of reset: */
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
  
-@@ -743,6 +742,7 @@ static int errata_omap3_1p153(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 		return 0;
- 	}
+-	dev->errata = 0;
+-
+-	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
+-		dev->errata |= I2C_OMAP_ERRATA_I207;
+-
+ 	/* Enable interrupts */
+ 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+ 			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+@@ -1019,6 +1014,11 @@ omap_i2c_probe(struct platform_device *pdev)
  
-+	*err |= OMAP_I2C_STAT_XUDF;
- 	return 0;
- }
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+ 
++	dev->errata = 0;
++
++	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
++		dev->errata |= I2C_OMAP_ERRATA_I207;
++
+ 	if (dev->rev <= OMAP_I2C_REV_ON_3430)
+ 		dev->errata |= I2C_OMAP3_1P153;
  
 -- 
 1.7.5.4
