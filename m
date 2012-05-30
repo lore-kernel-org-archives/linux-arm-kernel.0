@@ -1,56 +1,34 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Wed, 30 May 2012 13:13:09 +0200
-Subject: [PATCH] Visstrim M10: fix gpio handling.
-Message-ID: <1338376389-32256-1-git-send-email-javier.martin@vista-silicon.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 30 May 2012 13:15:47 +0100
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
+ <20120530100302.GD9947@opensource.wolfsonmicro.com>
+ <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
+Message-ID: <20120530121547.GJ9947@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIOs in Visstrim M10 are used without being registered.
-This leads to USB and video malfunctions. This patch registers
-those GPIOs to solve the issue.
+On Wed, May 30, 2012 at 07:40:49PM +0800, Lee Jones wrote:
+> On May 30, 2012 6:03 PM, "Mark Brown" <broonie@opensource.wolfsonmicro.com>
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+> > If we are changing the names then not including the ab8500 bit would
+> > seem more idiomatic - we've already worked out which chip this is by the
+> > time we're looking here.
 
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index e8741f9..db4aa6f 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -116,6 +116,8 @@ static const int visstrim_m10_pins[] __initconst = {
- 	PB23_PF_USB_PWR,
- 	PB24_PF_USB_OC,
- 	/* CSI */
-+	TVP5150_RSTN | GPIO_GPIO | GPIO_OUT,
-+	TVP5150_PWDN | GPIO_GPIO | GPIO_OUT,
- 	PB10_PF_CSI_D0,
- 	PB11_PF_CSI_D1,
- 	PB12_PF_CSI_D2,
-@@ -182,10 +184,10 @@ static void __init visstrim_camera_init(void)
- 	int dma;
- 
- 	/* Initialize tvp5150 gpios */
--	mxc_gpio_mode(TVP5150_RSTN | GPIO_GPIO | GPIO_OUT);
--	mxc_gpio_mode(TVP5150_PWDN | GPIO_GPIO | GPIO_OUT);
--	gpio_set_value(TVP5150_RSTN, 1);
--	gpio_set_value(TVP5150_PWDN, 0);
-+	gpio_request_one(TVP5150_RSTN, GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
-+			 "tvp5150_rstn");
-+	gpio_request_one(TVP5150_PWDN, GPIOF_DIR_OUT | GPIOF_INIT_LOW,
-+			 "tvp5150_pwdn");
- 	ndelay(1);
- 
- 	gpio_set_value(TVP5150_PWDN, 1);
-@@ -414,7 +416,8 @@ static struct i2c_board_info visstrim_m10_i2c_devices[] = {
- /* USB OTG */
- static int otg_phy_init(struct platform_device *pdev)
- {
--	gpio_set_value(OTG_PHY_CS_GPIO, 0);
-+	gpio_request_one(OTG_PHY_CS_GPIO, GPIOF_DIR_OUT | GPIOF_INIT_LOW,
-+			 "usbotg_cs");
- 
- 	mdelay(10);
- 
--- 
-1.7.0.4
+> No, Linus had the wrong end of the stick. I've just spoken to him in person.
+
+> Those are not the names of the regulators. They're the names of the Device
+> Tree nodes. The regulator names shall remain the same.
+
+Fair enough.  My point about the ab8500_ bit still stands though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120530/b62cd32e/attachment.sig>
