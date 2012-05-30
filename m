@@ -1,62 +1,31 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 30 May 2012 12:10:58 +0800
-Subject: [PATCH v4 4/6] gpio: introduce lock mechanism for gpiochip_find
-In-Reply-To: <20120526002500.CA3123E14E9@localhost>
-References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-4-git-send-email-b29396@freescale.com>
- <20120526002500.CA3123E14E9@localhost>
-Message-ID: <20120530041058.GB2235@b29396-Latitude-E6410>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 30 May 2012 12:47:18 +0800
+Subject: [PATCH 01/22] Fixes and clean-ups for Device Tree on Snowball
+Message-ID: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+This patch-set contains some fixes and clean-ups that will ensure
+smooth booting on Snowball. Without them some devices will either
+fail on probe, or fail to probe at all. Some patches contained
+here work towards suppressing useless warning boot messages which
+originate from the non-existent User Interface Board (UIB). Others
+aim to fix some previous merge conflict errors previously applied
+to the Mainline kernel.
 
-On Fri, May 25, 2012 at 06:25:00PM -0600, Grant Likely wrote:
-> On Fri, 25 May 2012 21:36:18 +0800, Dong Aisheng <b29396@freescale.com> wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > The module lock will be automatically claimed for gpiochip_find function
-> > in case the gpio module is removed during the using of gpiochip instance.
-> > Users are responsible to call gpiochip_put to release the lock after
-> > the using.
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-...
-> Also, it doesn't do anything to protect against the gpio_chip being
-> removed after the gpio number is resolved, which means the gpio number
-> may no longer be valid, or may no longer point to the same gpio chip.
-> It looks like the locking protection needs to be wider to be useful.
-> 
-I understand the issue now.
-It's correct that we did not lock gpio_chip before calling gpio_request
-after the gpio number is resolved.
-
-I thought about adding a new API called of_gpio_request to hide the lock
-to users like:
-int of_gpio_request(..)
-{
-	spin_lock_irqsave(&gpio_lock, flags);
-	ret = of_get_named_gpio(..);
-	if (ret < 0)
-		do_err..
-	ret = gpio_request(..)
-
-	spin_unlock_irqrestore(&gpio_lock, flags);
-	return ret;
-}
-But it seems it does not work since the gpio_request may sleep and we may
-need a new sleepable lock rather using the exist gpio_lock.
-
-In the same time, i'm also thinking about a question that do we really
-need to do this to protect gpio_chip being removed afer gpio number is
-resolved?
-My doubts is that gpio lib really does not block the gpiochip to be removed
-before calling gpio_request, so why we need to do that for dt?
-Maybe just let gpio_request to detect if gpio number is valid is already ok
-for dt.
-
-what's your suggestion on it?
-
-Regards
-Dong Aisheng
+ arch/arm/boot/dts/db8500.dtsi          |  204 +++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/snowball.dts         |   32 +++--
+ arch/arm/configs/u8500_defconfig       |    1 +
+ arch/arm/mach-ux500/board-mop500-uib.c |    4 +-
+ arch/arm/mach-ux500/board-mop500.c     |   32 ++++-
+ arch/arm/mach-ux500/board-mop500.h     |    4 +
+ arch/arm/mach-ux500/cpu-db8500.c       |   25 +++-
+ drivers/mfd/Kconfig                    |   10 --
+ drivers/mfd/ab8500-gpadc.c             |    3 +-
+ drivers/mfd/db8500-prcmu.c             |    6 +
+ drivers/net/ethernet/smsc/smsc911x.c   |    7 +-
+ drivers/pinctrl/pinctrl-nomadik.c      |   20 +++-
+ drivers/regulator/ab8500.c             |   22 ++--
+ drivers/regulator/db8500-prcmu.c       |   40 +++----
+ drivers/rtc/rtc-ab8500.c               |    2 +-
+ 15 files changed, 344 insertions(+), 68 deletions(-)
