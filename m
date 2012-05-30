@@ -1,44 +1,190 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 May 2012 21:52:08 -0600
-Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
-In-Reply-To: <20120530030157.GA2235@b29396-Latitude-E6410>
-References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
- <1337952980-14621-6-git-send-email-b29396@freescale.com>
- <4FBFBB74.901@wwwdotorg.org>
- <CAA+hA=QMe6Yo2aLMBcbkYLDXSagb9L919hjdQaq8TyH4uKh9Mw@mail.gmail.com>
- <4FC24AA7.9040100@wwwdotorg.org>
- <20120530030157.GA2235@b29396-Latitude-E6410>
-Message-ID: <4FC59968.1060600@wwwdotorg.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 30 May 2012 06:06:53 +0200
+Subject: [PATCH] ARM: OMAP3/4: consolidate cpuidle Makefile
+In-Reply-To: <4FB08D24.7070101@ti.com>
+References: <1336644177-13834-1-git-send-email-daniel.lezcano@linaro.org>
+ <4FB08D24.7070101@ti.com>
+Message-ID: <4FC59CDD.1030100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2012 09:01 PM, Dong Aisheng wrote:
-> On Sun, May 27, 2012 at 09:39:19AM -0600, Stephen Warren wrote:
->> On 05/26/2012 10:52 AM, Dong Aisheng wrote:
->>> On Fri, May 25, 2012 at 10:03 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 05/25/2012 07:36 AM, Dong Aisheng wrote:
->> ...
->>>> If we don't do that, [lock ranges[i].gc] I would argue that we
->>>> shouldn't store ranges[i].gc, since it might become invalid - I
->>>> believe the only use of it is withinthis function?
->>>>
->>> In my option, i think it's ok to store it since they're just some data
->>> to describe
->>> hw properties. The gpio function may become invalid but not data.
->>> Is it reasonable to you?
+On 05/14/2012 06:42 AM, Rajendra Nayak wrote:
+> On Thursday 10 May 2012 03:32 PM, Daniel Lezcano wrote:
+>> The current Makefile compiles the cpuidle34xx.c and cpuidle44xx.c files
+>> even if the cpuidle option is not set in the kernel.
 >>
->> The problem is that if someone tries to dereference the gc field, and
->> it's no longer valid, which could cause an OOPS. Perhaps we can get away
->> just with a comment in the struct definition indicating that this field
->> should only be used by drivers that provided the gc field directly
->> rather than having it set up by DT, but then why even store it when
->> creating the ranges from DT in that case?
->
-> Yes, you're right.
-> Maybe we could both not store the gc filed for DT (currently we did not see
-> the need to store it for dt, right?) and add a comment in the struct definition
-> as you said. For non-dt users the driver owner should manage that field
-> correctly with lock since it's provided directly by driver.
-> Is that ok?
+>> This patch fixes this by creating a section in the Makefile where these
+>> files are compiled only if the CONFIG_CPU_IDLE option is set.
+>>
+>> This modification breaks an implicit dependency between CPU_IDLE and
+>> PM as
+>> they belong to the same block in the Makefile. This is fixed in the
+>> Kconfig
+>> by selecting explicitely PM is CPU_IDLE is set.
+>>
+>> The linux coding style recommend to use no-op functions in the headers
+>> when the subsystem is disabled instead of adding big section in C files.
+> 
+> Looks good to me.
+> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
 
-Yes, that makes sense to me. Thanks.
+Hi Kevin,
+
+I think I addressed all the points. Is it possible to consider this
+patch for inclusion ?
+
+Thanks
+  -- Daniel
+
+>> This patch fix this also.
+>>
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> Reviewed-by: Jean Pihet<j-pihet@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/Kconfig       |    2 ++
+>>   arch/arm/mach-omap2/Makefile      |   11 +++++++----
+>>   arch/arm/mach-omap2/cpuidle34xx.c |    8 --------
+>>   arch/arm/mach-omap2/cpuidle44xx.c |    8 --------
+>>   arch/arm/mach-omap2/pm.h          |   17 +++++++++++++++--
+>>   5 files changed, 24 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index 8141b76..42f6b89 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -34,6 +34,7 @@ config ARCH_OMAP3
+>>       select CPU_V7
+>>       select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>>       select ARCH_HAS_OPP
+>> +    select PM if CPU_IDLE
+>>       select PM_OPP if PM
+>>       select ARM_CPU_SUSPEND if PM
+>>       select MULTI_IRQ_HANDLER
+>> @@ -51,6 +52,7 @@ config ARCH_OMAP4
+>>       select PL310_ERRATA_727915
+>>       select ARM_ERRATA_720789
+>>       select ARCH_HAS_OPP
+>> +    select PM if CPU_IDLE
+>>       select PM_OPP if PM
+>>       select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>>       select ARM_CPU_SUSPEND if PM
+>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+>> index 49f92bc..f46c735 100644
+>> --- a/arch/arm/mach-omap2/Makefile
+>> +++ b/arch/arm/mach-omap2/Makefile
+>> @@ -64,10 +64,8 @@ endif
+>>   ifeq ($(CONFIG_PM),y)
+>>   obj-$(CONFIG_ARCH_OMAP2)        += pm24xx.o
+>>   obj-$(CONFIG_ARCH_OMAP2)        += sleep24xx.o
+>> -obj-$(CONFIG_ARCH_OMAP3)        += pm34xx.o sleep34xx.o \
+>> -                       cpuidle34xx.o
+>> -obj-$(CONFIG_ARCH_OMAP4)        += pm44xx.o omap-mpuss-lowpower.o \
+>> -                       cpuidle44xx.o
+>> +obj-$(CONFIG_ARCH_OMAP3)        += pm34xx.o sleep34xx.o
+>> +obj-$(CONFIG_ARCH_OMAP4)        += pm44xx.o omap-mpuss-lowpower.o
+>>   obj-$(CONFIG_PM_DEBUG)            += pm-debug.o
+>>   obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
+>>   obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)    += smartreflex-class3.o
+>> @@ -81,6 +79,11 @@ endif
+>>
+>>   endif
+>>
+>> +ifeq ($(CONFIG_CPU_IDLE),y)
+>> +obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
+>> +obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+>> +endif
+>> +
+>>   # PRCM
+>>   obj-y                    += prm_common.o
+>>   obj-$(CONFIG_ARCH_OMAP2)        += prcm.o cm2xxx_3xxx.o prm2xxx_3xxx.o
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c
+>> b/arch/arm/mach-omap2/cpuidle34xx.c
+>> index 207bc1c..3134452 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> @@ -36,8 +36,6 @@
+>>   #include "control.h"
+>>   #include "common.h"
+>>
+>> -#ifdef CONFIG_CPU_IDLE
+>> -
+>>   /* Mach specific information to be recorded in the C-state
+>> driver_data */
+>>   struct omap3_idle_statedata {
+>>       u32 mpu_state;
+>> @@ -379,9 +377,3 @@ int __init omap3_idle_init(void)
+>>
+>>       return 0;
+>>   }
+>> -#else
+>> -int __init omap3_idle_init(void)
+>> -{
+>> -    return 0;
+>> -}
+>> -#endif /* CONFIG_CPU_IDLE */
+>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c
+>> b/arch/arm/mach-omap2/cpuidle44xx.c
+>> index be1617c..02d15bb 100644
+>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+>> @@ -22,8 +22,6 @@
+>>   #include "pm.h"
+>>   #include "prm.h"
+>>
+>> -#ifdef CONFIG_CPU_IDLE
+>> -
+>>   /* Machine specific information */
+>>   struct omap4_idle_statedata {
+>>       u32 cpu_state;
+>> @@ -199,9 +197,3 @@ int __init omap4_idle_init(void)
+>>
+>>       return 0;
+>>   }
+>> -#else
+>> -int __init omap4_idle_init(void)
+>> -{
+>> -    return 0;
+>> -}
+>> -#endif /* CONFIG_CPU_IDLE */
+>> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+>> index 7856489..ab04d3b 100644
+>> --- a/arch/arm/mach-omap2/pm.h
+>> +++ b/arch/arm/mach-omap2/pm.h
+>> @@ -15,12 +15,25 @@
+>>
+>>   #include "powerdomain.h"
+>>
+>> +#ifdef CONFIG_CPU_IDLE
+>> +extern int __init omap3_idle_init(void);
+>> +extern int __init omap4_idle_init(void);
+>> +#else
+>> +static inline int omap3_idle_init(void)
+>> +{
+>> +    return 0;
+>> +}
+>> +
+>> +static inline int omap4_idle_init(void)
+>> +{
+>> +    return 0;
+>> +}
+>> +#endif
+>> +
+>>   extern void *omap3_secure_ram_storage;
+>>   extern void omap3_pm_off_mode_enable(int);
+>>   extern void omap_sram_idle(void);
+>>   extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+>> -extern int omap3_idle_init(void);
+>> -extern int omap4_idle_init(void);
+>>   extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void
+>> *unused);
+>>   extern int (*omap_pm_suspend)(void);
+>>
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
