@@ -1,199 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:25 +0800
-Subject: [PATCH 07/22] ARM: ux500: Use correct format for dynamic IRQ
- assignment
+Date: Wed, 30 May 2012 12:47:27 +0800
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to reflect
+ Device Tree
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies the correct format requested by the irq
-domain. For chained IRQs which use GPIO lines as IRQs, we
-stipulate that a two cell request is required. The first cell
-contains the requested IRQ and the second can contain flags
-pertaining to edge detection and level sensitive values. The
-zeroth cell specifies the GPIO controller by use of a phandle.
+The 'name' field in 'struct of_regulator_match' expects to match with
+its corresponding regulator device node in the Device Tree. This patch
+renames each of the regulators in the db8500-prcum regulator driver so
+this is true.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi  |   21 ++++++++++++++++++++-
- arch/arm/boot/dts/snowball.dts |   17 ++++++++---------
- 2 files changed, 28 insertions(+), 10 deletions(-)
+ drivers/regulator/db8500-prcmu.c |   40 +++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 7be77df..7070000 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -58,6 +58,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8012e000 0x80>;
- 			interrupts = <0 119 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -69,6 +71,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8012e080 0x80>;
- 			interrupts = <0 120 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -80,6 +84,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8000e000 0x80>;
- 			interrupts = <0 121 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -91,6 +97,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8000e080 0x80>;
- 			interrupts = <0 122 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -102,6 +110,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8000e100 0x80>;
- 			interrupts = <0 123 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -113,6 +123,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8000e180 0x80>;
- 			interrupts = <0 124 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -124,6 +136,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8011e000 0x80>;
- 			interrupts = <0 125 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -135,6 +149,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0x8011e080 0x80>;
- 			interrupts = <0 126 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -146,6 +162,8 @@
- 				"st,nomadik-gpio";
- 			reg =  <0xa03fe000 0x80>;
- 			interrupts = <0 127 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			supports-sleepmode;
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -235,7 +253,8 @@
- 			status = "disabled";
+diff --git a/drivers/regulator/db8500-prcmu.c b/drivers/regulator/db8500-prcmu.c
+index 968f97f..9dbb491 100644
+--- a/drivers/regulator/db8500-prcmu.c
++++ b/drivers/regulator/db8500-prcmu.c
+@@ -452,26 +452,26 @@ static __devinit int db8500_regulator_register(struct platform_device *pdev,
+ }
  
- 			// Add one of these for each child device
--			cs-gpios = <&gpio0 31 &gpio4 14 &gpio4 16 &gpio6 22 &gpio7 0>;
-+			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
-+				    &gpio6 22 0x4 &gpio7 0 0x4>;
+ static struct of_regulator_match db8500_regulator_matches[] = {
+-	{ .name	= "db8500-vape",          .driver_data = (void *) DB8500_REGULATOR_VAPE, },
+-	{ .name	= "db8500-varm",          .driver_data = (void *) DB8500_REGULATOR_VARM, },
+-	{ .name	= "db8500-vmodem",        .driver_data = (void *) DB8500_REGULATOR_VMODEM, },
+-	{ .name	= "db8500-vpll",          .driver_data = (void *) DB8500_REGULATOR_VPLL, },
+-	{ .name	= "db8500-vsmps1",        .driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
+-	{ .name	= "db8500-vsmps2",        .driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
+-	{ .name	= "db8500-vsmps3",        .driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
+-	{ .name	= "db8500-vrf1",          .driver_data = (void *) DB8500_REGULATOR_VRF1, },
+-	{ .name	= "db8500-sva-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
+-	{ .name	= "db8500-sva-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
+-	{ .name	= "db8500-sva-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
+-	{ .name	= "db8500-sia-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
+-	{ .name	= "db8500-sia-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
+-	{ .name	= "db8500-sia-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
+-	{ .name	= "db8500-sga",           .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
+-	{ .name	= "db8500-b2r2-mcde",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
+-	{ .name	= "db8500-esram12",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
+-	{ .name	= "db8500-esram12-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
+-	{ .name	= "db8500-esram34",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
+-	{ .name	= "db8500-esram34-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
++	{ .name	= "db8500_vape",          .driver_data = (void *) DB8500_REGULATOR_VAPE, },
++	{ .name	= "db8500_varm",          .driver_data = (void *) DB8500_REGULATOR_VARM, },
++	{ .name	= "db8500_vmodem",        .driver_data = (void *) DB8500_REGULATOR_VMODEM, },
++	{ .name	= "db8500_vpll",          .driver_data = (void *) DB8500_REGULATOR_VPLL, },
++	{ .name	= "db8500_vsmps1",        .driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
++	{ .name	= "db8500_vsmps2",        .driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
++	{ .name	= "db8500_vsmps3",        .driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
++	{ .name	= "db8500_vrf1",          .driver_data = (void *) DB8500_REGULATOR_VRF1, },
++	{ .name	= "db8500_sva_mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
++	{ .name	= "db8500_sva_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
++	{ .name	= "db8500_sva_pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
++	{ .name	= "db8500_sia_mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
++	{ .name	= "db8500_sia_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
++	{ .name	= "db8500_sia_pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
++	{ .name	= "db8500_sga",           .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
++	{ .name	= "db8500_b2r2_mcde",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
++	{ .name	= "db8500_esram12",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
++	{ .name	= "db8500_esram12_ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
++	{ .name	= "db8500_esram34",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
++	{ .name	= "db8500_esram34_ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
+ };
  
- 		};
- 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index d99dc04..81ff557 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -30,35 +30,35 @@
- 			wakeup = <1>;
- 			linux,code = <2>;
- 			label = "userpb";
--			gpios = <&gpio1 0 0>;
-+			gpios = <&gpio1 0 0x4>;
- 		};
- 		button at 2 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <3>;
- 			label = "extkb1";
--			gpios = <&gpio4 23 0>;
-+			gpios = <&gpio4 23 0x4>;
- 		};
- 		button at 3 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <4>;
- 			label = "extkb2";
--			gpios = <&gpio4 24 0>;
-+			gpios = <&gpio4 24 0x4>;
- 		};
- 		button at 4 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <5>;
- 			label = "extkb3";
--			gpios = <&gpio5 1 0>;
-+			gpios = <&gpio5 1 0x4>;
- 		};
- 		button at 5 {
- 			debounce_interval = <50>;
- 			wakeup = <1>;
- 			linux,code = <6>;
- 			label = "extkb4";
--			gpios = <&gpio5 2 0>;
-+			gpios = <&gpio5 2 0x4>;
- 		};
- 	};
- 
-@@ -66,12 +66,11 @@
- 		compatible = "gpio-leds";
- 		used-led {
- 			label = "user_led";
--			gpios = <&gpio4 14>;
-+			gpios = <&gpio4 14 0x4>;
- 		};
- 	};
- 
- 	soc-u9500 {
--
- 		external-bus at 50000000 {
- 			status = "okay";
- 
-@@ -91,7 +90,7 @@
- 
- 		sdi at 80126000 {
- 			status = "enabled";
--			cd-gpios = <&gpio6 26>;
-+			cd-gpios  = <&gpio6 26 0x4>; // 218
- 		};
- 
- 		sdi at 80114000 {
-@@ -114,7 +113,7 @@
- 			tc3589x at 42 {
- 				//compatible = "tc3589x";
- 				reg = <0x42>;
--				interrupts = <25>;
-+				gpios = <&gpio6 25 0x4>;
- 				interrupt-parent = <&gpio6>;
- 			};
- 			tps61052 at 33 {
+ static __devinit int
 -- 
 1.7.9.5
