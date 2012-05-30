@@ -1,54 +1,79 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 30 May 2012 15:11:13 -0700
-Subject: [PATCH] ARM: OMAP3/4: consolidate cpuidle Makefile
-In-Reply-To: <4FC671CE.6040807@linaro.org> (Daniel Lezcano's message of "Wed,
- 30 May 2012 21:15:26 +0200")
-References: <1336644177-13834-1-git-send-email-daniel.lezcano@linaro.org>
- <4FB08D24.7070101@ti.com> <4FC59CDD.1030100@linaro.org>
- <87pq9l8ruv.fsf@ti.com> <4FC671CE.6040807@linaro.org>
-Message-ID: <87d35l5nge.fsf@ti.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 31 May 2012 00:40:43 +0200
+Subject: [RFC 0/6] RFC: ARM: Disintegrating mach/uncompress.h: low-level debug
+Message-ID: <20120530224043.240221676@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+Hi,
 
-> On 05/30/2012 08:07 PM, Kevin Hilman wrote:
->> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
->> 
->>> On 05/14/2012 06:42 AM, Rajendra Nayak wrote:
->>>> On Thursday 10 May 2012 03:32 PM, Daniel Lezcano wrote:
->>>>> The current Makefile compiles the cpuidle34xx.c and cpuidle44xx.c files
->>>>> even if the cpuidle option is not set in the kernel.
->>>>>
->>>>> This patch fixes this by creating a section in the Makefile where these
->>>>> files are compiled only if the CONFIG_CPU_IDLE option is set.
->>>>>
->>>>> This modification breaks an implicit dependency between CPU_IDLE and
->>>>> PM as
->>>>> they belong to the same block in the Makefile. This is fixed in the
->>>>> Kconfig
->>>>> by selecting explicitely PM is CPU_IDLE is set.
->>>>>
->>>>> The linux coding style recommend to use no-op functions in the headers
->>>>> when the subsystem is disabled instead of adding big section in C files.
->>>>
->>>> Looks good to me.
->>>> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
->>>
->>> Hi Kevin,
->>>
->>> I think I addressed all the points. Is it possible to consider this
->>> patch for inclusion ?
->>>
->> 
->> Yes.  I'll queue up as a cleanup for v3.6 with the reviewed-by from
->> Rajendra.
->
-> Cool !
->
+  Earlycon is a thin I/O layer used in the early stage of the
+kernel loading, before the kernel is decompressed. It provides basic
+functionality to output characters one by one and flush a queue/buffer.
 
-Sorry for the lag.  Since this one patch was a bit late for 3.5, I had
-it on my "to look at later" pile while tracking down various regressions
-introduced in 3.5.
+Such abstraction allows the management of multiple drivers and the runtime
+selection of the one to be used (ex. "earlyprintk=amba-pl011,0xc1000" on
+the cmdline).  If no suitable driver is found, fallback ops are used.
 
-Kevin
+Mainline implementation of low-level debugging functionality is currently
+left to the machine specific uncompress.h header file, which greatly
+limits the usage of the kernel on multiple machines. Hence the need to
+remove any driver implementation detail from the said headers.
+
+The idea is to collect/refactor the various implementations into separate
+drivers which can coexist in the same kernel image. In the case of debug
+UARTs, the natural place for such drivers is the respective kernel
+serial driver.  Some linker magics is used later to inject them into
+the decompressor.
+
+Here is a minimal (and very commmon) driver example:
+
+static void __earlyconinit minimal_earlycon_putc(struct earlycon_drv *drv, int ch)
+{
+	while (STATUS_REG(drv->base) & BUSY_MASK)
+		barrier();
+
+	DATA_REG(drv->base) = ch;
+}
+
+EARLYCON_START("minimal-uart")
+	.putc = minimal_earlycon_putc,
+EARLYCON_END
+
+The EARLYCON_START's argument ("minimal-uart") is the name used to
+select this driver during the early boot process.  The __earlyconinit and
+EARLYCON_START specifiers are defined to put all the related driver stuff
+into the sections designated to be injected.  Besides some restrictions,
+the Earlycon driver is quite straightforward to code.
+
+Some effort has been spent also to lay down an easy migration path
+for the various platforms, each one independently from the others.
+The backward compatibility is granted by the fallback logics, which
+is controller by two pre-processor knobs: CONFIG_DEBUG_LL_EARLYCON
+and EARLYCON_STATIC_SETUP.
+
+The fallback logics is used when no suitable Earlycon driver is found
+or none is searched.  In case neither CONFIG_DEBUG_LL_EARLYCON nor
+EARLYCON_STATIC_SETUP are defined, the fallback ops actually invoke
+the legacy putc/flush otherwise they don't do anything.
+
+CONFIG_DEBUG_LL_EARLYCON is a configuration option that says "whatever
+legacy putc/flush stuff is coming from uncompress.h, don't use it,
+use only the available Earlycom drivers". It's a global setting,
+it should help to simulate a world without uncompress.h. Actually it
+really removes the dependency on uncompress.h at the cost of breaking
+stuff depending on arch_decomp_setup().
+
+EARLYCON_STATIC_SETUP instead is local, it's defined in the uncompress.h
+header itself. It is used by the driver writer to quickly go back and
+forth the "world without uncompress.h" and find his/her way out of
+the blank console. It also helps to identify the uncompress.h headers
+substantially ready to be removed.
+
+I'm surely missing something but I hope you'll spot it reading/testing
+the code, which is based on mainline commit f2fde3a.
+
+Thank you for reading so far.
+
+cheers,
+Domenico
