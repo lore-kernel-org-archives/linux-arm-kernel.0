@@ -1,51 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:37 +0800
-Subject: [PATCH 19/22] net/smsc911x: Repair broken failure paths
+Date: Wed, 30 May 2012 12:47:38 +0800
+Subject: [PATCH 20/22] pinctrl-nomadik: Allow Device Tree driver probing
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current failure paths attempt to free resources which we failed to request
-and disable resources which we failed to enable ones. This leads to kernel
-oops/panic. This patch does some simple re-ordering to prevent this from
-happening.
+The Nomadik GPIO controller now relies on Nomadik pinctrl, however
+the pinctrl driver is not currently started by any ux500 platform.
+This is requred or GPIOs do not work at all.
 
-Cc: netdev at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/net/ethernet/smsc/smsc911x.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/pinctrl/pinctrl-nomadik.c |   20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-index dab9c6f..1466e5d 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -2390,11 +2390,11 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index b8e01c3..b26395d 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -24,6 +24,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/slab.h>
++#include <linux/of_device.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+ #include <linux/pinctrl/pinconf.h>
+@@ -1688,18 +1689,34 @@ static struct pinctrl_desc nmk_pinctrl_desc = {
+ 	.owner = THIS_MODULE,
+ };
  
- 	retval = smsc911x_request_resources(pdev);
- 	if (retval)
--		goto out_return_resources;
-+		goto out_request_resources_fail;
++static const struct of_device_id nmk_pinctrl_match[] = {
++	{
++		.compatible = "stericsson,nmk_pinctrl",
++		.data = (void *)PINCTRL_NMK_DB8500,
++	},
++	{},
++};
++
+ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
++	struct device_node *np = pdev->dev.of_node;
+ 	struct nmk_pinctrl *npct;
++	unsigned int version = 0;
+ 	int i;
  
- 	retval = smsc911x_enable_resources(pdev);
- 	if (retval)
--		goto out_disable_resources;
-+		goto out_enable_resources_fail;
+ 	npct = devm_kzalloc(&pdev->dev, sizeof(*npct), GFP_KERNEL);
+ 	if (!npct)
+ 		return -ENOMEM;
  
- 	if (pdata->ioaddr == NULL) {
- 		SMSC_WARN(pdata, probe, "Error smsc911x base address invalid");
-@@ -2501,8 +2501,9 @@ out_free_irq:
- 	free_irq(dev->irq, dev);
- out_disable_resources:
- 	(void)smsc911x_disable_resources(pdev);
--out_return_resources:
-+out_enable_resources_fail:
- 	smsc911x_free_resources(pdev);
-+out_request_resources_fail:
- 	platform_set_drvdata(pdev, NULL);
- 	iounmap(pdata->ioaddr);
- 	free_netdev(dev);
++	if (platid)
++		version = platid->driver_data;
++	else if (np)
++		version = (unsigned int)
++			of_match_device(nmk_pinctrl_match, &pdev->dev)->data;
++
+ 	/* Poke in other ASIC variants here */
+-	if (platid->driver_data == PINCTRL_NMK_DB8500)
++	if (version == PINCTRL_NMK_DB8500)
+ 		nmk_pinctrl_db8500_init(&npct->soc);
+ 
+ 	/*
+@@ -1758,6 +1775,7 @@ static struct platform_driver nmk_pinctrl_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = "pinctrl-nomadik",
++		.of_match_table = nmk_pinctrl_match,
+ 	},
+ 	.probe = nmk_pinctrl_probe,
+ 	.id_table = nmk_pinctrl_id,
 -- 
 1.7.9.5
