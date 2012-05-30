@@ -1,33 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 May 2012 09:02:16 +0100
-Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
- periodic callbacks
-In-Reply-To: <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
- <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
-Message-ID: <20120530080216.GH12217@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 30 May 2012 11:02:24 +0300
+Subject: [PATCHv5 5/8] ARM: OMAP: hwmod: Add support for per
+ hwmod/module context lost count
+In-Reply-To: <CAOMWX4eKp+JymSNyapRJ3+u=Q1U-yMyFS5M6KUe7pOgOYyt6Ug@mail.gmail.com>
+References: <1336989796-26594-1-git-send-email-t-kristo@ti.com>
+ <1336989796-26594-6-git-send-email-t-kristo@ti.com>
+ <CAOMWX4eKp+JymSNyapRJ3+u=Q1U-yMyFS5M6KUe7pOgOYyt6Ug@mail.gmail.com>
+Message-ID: <1338364944.8834.104.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 03:52:53PM +0800, Linus Walleij wrote:
-> On Tue, May 29, 2012 at 5:36 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > Add support for cyclic DMA's periodic callbacks. ?Drivers are expected
-> > to call vchan_cyclic_callback() when a period has completed, which will
-> > schedule the tasklet to make the callback into the driver.
+On Tue, 2012-05-29 at 14:32 -0500, Menon, Nishanth wrote:
+> On Mon, May 14, 2012 at 5:03 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> [...]
+> > +/**
+> >  * _enable - enable an omap_hwmod
+> >  * @oh: struct omap_hwmod *
+> >  *
+> > @@ -1599,6 +1629,8 @@ static int _enable(struct omap_hwmod *oh)
+> >        _enable_clocks(oh);
+> >        _enable_module(oh);
 > >
-> > As callbacks are made from tasklet context, it is important to realise
-> > that we don't guarantee a callback for each completed period, but for
-> > N completed periods where N may be greater than one.
+> > +       _omap4_update_context_lost(oh);
+> > +
+> >        r = _wait_target_ready(oh);
+> >        if (!r) {
+> >                /*
 > 
-> This last thing was something we have to fix right?
-> Like for each driver to keep a counter of completed periods
-> and call the handler repeatedly if N > 1.
+> Dumb q: Since we monitor the count around _enable, how do we ensure
+> that context loss counter is accurate
+> around OFF and idle transitions for domains that could have been
+> hwauto? it might be good to have limitations
+> in the $commit_message if it is not targeted to do so.
 
-No, I don't think we should do that - ALSA doesn't require it, and ALSA
-is about the only user of this.  As I've said, DMA engine drivers should
-implement a correct tx_status function, which returns the remaining bytes
-to be transferred to the end of the buffer so it's possible to find out
-how many periods have completed when the callback is called.
+True, I can add a comment to the commit msg about this.
+
+-Tero
