@@ -1,45 +1,28 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 30 May 2012 11:07:52 -0700
-Subject: [PATCH] ARM: OMAP3/4: consolidate cpuidle Makefile
-In-Reply-To: <4FC59CDD.1030100@linaro.org> (Daniel Lezcano's message of "Wed,
- 30 May 2012 06:06:53 +0200")
-References: <1336644177-13834-1-git-send-email-daniel.lezcano@linaro.org>
- <4FB08D24.7070101@ti.com> <4FC59CDD.1030100@linaro.org>
-Message-ID: <87pq9l8ruv.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 30 May 2012 19:13:40 +0100
+Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
+In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+Message-ID: <20120530181340.GT9947@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Tue, May 29, 2012 at 07:11:33PM -0600, Sagar Dharia wrote:
+> SLIMbus (Serial Low Power Interchip Media Bus) is a specification
+> developed by MIPI (Mobile Industry Processor Interface) alliance.
 
-> On 05/14/2012 06:42 AM, Rajendra Nayak wrote:
->> On Thursday 10 May 2012 03:32 PM, Daniel Lezcano wrote:
->>> The current Makefile compiles the cpuidle34xx.c and cpuidle44xx.c files
->>> even if the cpuidle option is not set in the kernel.
->>>
->>> This patch fixes this by creating a section in the Makefile where these
->>> files are compiled only if the CONFIG_CPU_IDLE option is set.
->>>
->>> This modification breaks an implicit dependency between CPU_IDLE and
->>> PM as
->>> they belong to the same block in the Makefile. This is fixed in the
->>> Kconfig
->>> by selecting explicitely PM is CPU_IDLE is set.
->>>
->>> The linux coding style recommend to use no-op functions in the headers
->>> when the subsystem is disabled instead of adding big section in C files.
->> 
->> Looks good to me.
->> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
->
-> Hi Kevin,
->
-> I think I addressed all the points. Is it possible to consider this
-> patch for inclusion ?
->
+This patch is about 150k which is rather large to review.  It would be
+enormously helpful for review if it could be broken down into a patch
+series.  For example, things like the device registration could be
+broken out into a separate patch as could the core bus operations and
+things like the clocking/bandwidth management.
 
-Yes.  I'll queue up as a cleanup for v3.6 with the reviewed-by from
-Rajendra.
-
-Thanks,
-
-Kevin
+I've not actually looked through the patch yet, partly because doing it
+all in one sitting will take some time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120530/b2d4b17a/attachment.sig>
