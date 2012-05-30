@@ -1,33 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 May 2012 18:43:51 +0000
-Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
-In-Reply-To: <1338375394-16268-1-git-send-email-kishon@ti.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
-Message-ID: <201205301843.51568.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 30 May 2012 21:15:26 +0200
+Subject: [PATCH] ARM: OMAP3/4: consolidate cpuidle Makefile
+In-Reply-To: <87pq9l8ruv.fsf@ti.com>
+References: <1336644177-13834-1-git-send-email-daniel.lezcano@linaro.org>
+ <4FB08D24.7070101@ti.com> <4FC59CDD.1030100@linaro.org>
+ <87pq9l8ruv.fsf@ti.com>
+Message-ID: <4FC671CE.6040807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 May 2012, Kishon Vijay Abraham I wrote:
+On 05/30/2012 08:07 PM, Kevin Hilman wrote:
+> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 > 
-> This patch series is done as a preparatory step for adding phy drivers
-> for dwc3 and musb.
+>> On 05/14/2012 06:42 AM, Rajendra Nayak wrote:
+>>> On Thursday 10 May 2012 03:32 PM, Daniel Lezcano wrote:
+>>>> The current Makefile compiles the cpuidle34xx.c and cpuidle44xx.c files
+>>>> even if the cpuidle option is not set in the kernel.
+>>>>
+>>>> This patch fixes this by creating a section in the Makefile where these
+>>>> files are compiled only if the CONFIG_CPU_IDLE option is set.
+>>>>
+>>>> This modification breaks an implicit dependency between CPU_IDLE and
+>>>> PM as
+>>>> they belong to the same block in the Makefile. This is fixed in the
+>>>> Kconfig
+>>>> by selecting explicitely PM is CPU_IDLE is set.
+>>>>
+>>>> The linux coding style recommend to use no-op functions in the headers
+>>>> when the subsystem is disabled instead of adding big section in C files.
+>>>
+>>> Looks good to me.
+>>> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+>>
+>> Hi Kevin,
+>>
+>> I think I addressed all the points. Is it possible to consider this
+>> patch for inclusion ?
+>>
 > 
-> This series adds a new driver for ocp2scp to which phy drivers are connected.
-> 
-> I'm planning to send phy drivers asap. Meanwhile I'd like to get some
-> review comments for this series. I have also plans to send device tree
-> adaptation of the ocp2scp driver.
-> 
-> Developed on
-> http://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-next
-> 
-> If it has to be based on some other tree, please let me know.
+> Yes.  I'll queue up as a cleanup for v3.6 with the reviewed-by from
+> Rajendra.
 
-This must be the most pointless driver I've seen in a long time. It doesn't
-actually do anything at all, it just creates child devices from a static
-lookup table.
+Cool !
 
-Just put the devices you actually want into the device tree instead and
-have them automatically created.
+Thanks
+  -- Daniel
 
-	Arnd
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
