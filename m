@@ -1,101 +1,33 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 30 May 2012 13:42:53 +0300
-Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
- for OMAP4
-In-Reply-To: <4FC5F4F9.6020106@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
- <4FC49BA5.5050008@dev.rtsoft.ru> <4FC5DC9F.7080104@ti.com>
- <4FC5E2EE.8030504@dev.rtsoft.ru> <4FC5E7DE.2060905@ti.com>
- <4FC5F3C3.2000309@dev.rtsoft.ru> <4FC5F4F9.6020106@ti.com>
-Message-ID: <20120530104253.GB3261@besouro>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 30 May 2012 16:26:30 +0530
+Subject: [RFC PATCH 1/5] arm: omap: hwmod: make *phy_48m* as the main_clk of
+ ocp2scp
+In-Reply-To: <1338375394-16268-1-git-send-email-kishon@ti.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+Message-ID: <1338375394-16268-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp.
+Since this ocp2scp module does not have any fck but does have a
+single opt_clock, it is added as the main_clk for ocp2scp.
 
-On Wed, May 30, 2012 at 12:22:49PM +0200, Cousson Benoit wrote:
-> On 5/30/2012 12:17 PM, Konstantin Baydarov wrote:
-> >   Hi.
-> >On 05/30/2012 01:26 PM, Cousson, Benoit wrote:
-> >>On 5/30/2012 11:05 AM, Konstantin Baydarov wrote:
-> >>>On 05/30/2012 12:38 PM, Cousson, Benoit wrote:
-> >>>>On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
-> >>>>>Hi, Eduardo.
-> >>>>>
-> >>>>>On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
-> >>>>>>This patch add device tree entries on OMAP4 based boards for
-> >>>>>>System Control Module (SCM).
-> >>
-> >>...
-> >>
-> >>>>>I believe that CPU-specific bandgap definition should be moved to
-> >>>>>bard specific dts.
-> >>>>
-> >>>>Mmm, why, since it is CPU specific and not board specific. I has to
-> >>>>be in the SoC file.
-> >>>Speaking about omap4430 - omap4430 bandgap differs from omap4460, so
-> >>>if omap4430 bandgap support will be added to omap-bandgap driver the
-> >>>version of bandgap should specified in dts file. omap4.dtsi is a
-> >>>common for omap4 boards, that is why I'm suggesting to move bandgap
-> >>>description to probably board specific file.
-> >>
-> >>OK, I got your point, but in that case we could potentially define a omap4460.dtsi file.
-> >>
-> >>>Another solution is to
-> >>>determine bandgap type in driver probe function, but in that case
-> >>>"ti,omap4460-bandgap" in omap4.dtsi should be replaced to
-> >>>"ti,omap4-bandgap".
-> >>
-> >>Yes, this is the best solution, but that assume that we can identify the control module version from the HW, which is not necessarily true :-(
-> >>
-> >>The IP_REVISION (offset = 0) value are unfortunately not documented, so we should read it to check if they are different from omap4430 and 4460.
-> >>
-> >>The bitfield layout in that register is:
-> >>
-> >>IP_REV_MAJOR: 8..10
-> >>IP_REV_CUSTOM: 6..7
-> >>IP_REV_MINOR: 0..5
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I have the weird deja vu feeling... 
-The DT entry I sent, I already knew it would cause troubles :-)
-Having it per board it would be really a PITA. Image that every
-body doing a 4430 board needs to define a BG entry...
-That would work, but still do we want this?
-
-Benoit, I guess you should know my option by now.
-Ideally we should rely on revision register to decide what to do in the driver.
-And as we discussed, looks like for BG this is somewhat non-existing.
-
-If we go with the SCM revision register, what do we do if the BG goes away from SCM?
-
-If we go with "ti,omap4-bandgap", we still need a way to say if it is 4430, 4460 or 4470.
-There are configuration / settings specific for each. Not only on bandgap,
-but also wrt to sensor location and hotspot extrapolation rules.
-
-Because we lack a revision register for bandgap, one way to go is to have still the
-revisioning on the same way: "ti,omapXXXX-bandgap", but having a omapXXXX.dtsi
-per omap revision. But do we want to this only due to bandgap?
-BTW, is it only BG which is suffering of this issue?
-
-> >Probably, cpu_is_omap443x() and cpu_is_omap446x() can be used in bandgap driver probe function. Actually many drivers use cpu_is_omap*():
-
-
-No please! Let's not use that stuff...
-
-> 
-> No, we cannot, we are in the process of getting rid of that.
-> A driver should only focus on the IP version in theory. The CPU
-> version is not the proper way of getting that. It will make the
-> driver not scalable at all for future OMAP revision.
-> 
-> >drivers/mfd/omap-usb-host.c
-> >drivers/mfd/twl-core.c
-> 
-> Yeah, these are the ones that still need to be fixed...
-
-agreed with Benoit here.
-
-> 
-> Regards,
-> Benoit
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 950454a..249ff76 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2508,6 +2508,7 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
+ 	.name		= "ocp2scp_usb_phy",
+ 	.class		= &omap44xx_ocp2scp_hwmod_class,
+ 	.clkdm_name	= "l3_init_clkdm",
++	.main_clk	= "ocp2scp_usb_phy_phy_48m",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = OMAP4_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL_OFFSET,
+-- 
+1.7.5.4
