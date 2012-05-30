@@ -1,37 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 23:22:33 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
- Device Tree
-In-Reply-To: <20120530151119.GN9947@opensource.wolfsonmicro.com>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
- <20120530100302.GD9947@opensource.wolfsonmicro.com>
- <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
- <20120530121547.GJ9947@opensource.wolfsonmicro.com>
- <4FC63632.4030504@linaro.org>
- <20120530151119.GN9947@opensource.wolfsonmicro.com>
-Message-ID: <4FC63B39.6040905@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 30 May 2012 17:23:57 +0200
+Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
+In-Reply-To: <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <1338375394-16268-3-git-send-email-kishon@ti.com>
+ <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
+Message-ID: <4FC63B8D.3070107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/12 23:11, Mark Brown wrote:
-> On Wed, May 30, 2012 at 11:01:06PM +0800, Lee Jones wrote:
->> On 30/05/12 20:15, Mark Brown wrote:
+On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
+> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>  wrote:
+>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
+>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now added
+>> (which can be used to control MODULEMODE) this clock node is removed.
+>>
+>> Cc: Benoit Cousson<b-cousson@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/clock44xx_data.c |   11 -----------
 >
->> I personally think:
->
->> 	vin-supply =<&db8500_vape_reg>;
->> 	vmmc-supply =<&ab8500_ldo_aux2_reg>;
->
-> Oh, oops.  This is going to be fun when someone puts down two of the
-> same PMIC on a system...
+> Have you patched clock44xx_data.c manually or you have a patch for
+> the clock_data autogen script to generate it ?
 
-What does that mean sorry?
+I have a series that will remove all these clock nodes. I should be able 
+to post that soon.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Potentially at that time, Kishon might be able to drop that patch.
+
+Regards,
+Benoit
