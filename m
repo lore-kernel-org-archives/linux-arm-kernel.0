@@ -1,96 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 30 May 2012 14:19:22 -0500
-Subject: ARM Versatile defconfig PCI io out of range?
-In-Reply-To: <20120530180242.GA15772@codethink.co.uk>
-References: <20120530180242.GA15772@codethink.co.uk>
-Message-ID: <4FC672BA.8070009@gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 30 May 2012 14:31:57 -0500
+Subject: [PATCH 0/2] OMAP: mailbox initial device tree support
+In-Reply-To: <4FBE574F.6070408@ti.com>
+References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
+ <B5906170F1614E41A8A28DE3B8D121433EA68F6D@DBDE01.ent.ti.com>
+ <4FBE574F.6070408@ti.com>
+Message-ID: <CALLhW=7hdmTZsipbVvGXNNCwE=NsvYJc9mUWRff3V7CA=_vskQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2012 01:02 PM, Richard Maw wrote:
-> When I build from f9369910a6225b8d4892c3f20ae740a711cd5ace
-> with versatile_defconfig, after making the changes described in
-> http://fedoraproject.org/wiki/Architectures/ARM/HowToQemu#Build_Kernel_Image_From_Source
-> Enabling PCI and the SYM53C8XX scsi disk driver, which aren't in the
-> defconfig.
-> 
-> QEMU is run with the command
->   qemu-system-arm -M versatilepb \
->   -drive file=$diskimage,if=scsi \
->   -kernel linux/arch/arm/boot/zImage -append root=/dev/sda1
->   
-> The system fails to find the scsi disk, due to the controller failing to
-> request the IO resource.
-> 
-> It gives the following on the console
-> Uncompressing Linux... done, booting the kernel.
-> Booting Linux on physical CPU 0
-> Linux version 3.4.0+ (richardmaw at aegir) (gcc version 4.6.1
-> (Ubuntu/Linaro 4.6.1-9ubuntu3) ) #14 Wed May 30 16:54:55 BST 2012
-> CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00093177
-> CPU: VIVT data cache, VIVT instruction cache
-> Machine: ARM-Versatile PB
-> Memory policy: ECC disabled, Data cache writeback
-> --SNIP--
-> PCI core found (slot 11)
-> PCI host bridge to bus 0000:00
-> pci_bus 0000:00: root bus resource [io  0x44000000-0x4fffffff]
-> pci_bus 0000:00: root bus resource [mem 0x50000000-0x5fffffff]
-> pci_bus 0000:00: root bus resource [mem 0x60000000-0x6fffffff pref]
-> PCI: bus0: Fast back to back transfers disabled
-> pci 0000:00:0c.0: BAR 2: assigned [mem 0x50000000-0x50001fff]
-> pci 0000:00:0c.0: BAR 1: assigned [mem 0x50002000-0x500023ff]
-> pci 0000:00:0c.0: BAR 0: assigned [io  0x44000000-0x440000ff]
-> bio: create slab <bio-0> at 0
-> --SNIP--
-> brd: module loaded
-> PCI: enabling device 0000:00:0c.0 (0100 -> 0103)
-> sym53c8xx 0000:00:0c.0: pci_request_regions called
-> sym53c8xx 0000:00:0c.0: BAR 0: can't reserve [io  0x44000000-0x440000ff]
-> --SNIP--
-> VFS: Cannot open root device "(null)" or unknown-block(0,0): error -6
-> Please append a correct "root=" boot option; here are the available
-> partitions:
-> Kernel panic - not syncing: VFS: Unable to mount root fs on
-> unknown-block(0,0)
-> [<c0019360>] (unwind_backtrace+0x0/0xf0) from [<c02876e8>]
-> (panic+0x74/0x1a8)
-> [<c02876e8>] (panic+0x74/0x1a8) from [<c035fc50>]
-> (mount_block_root+0x178/0x22c)
-> [<c035fc50>] (mount_block_root+0x178/0x22c) from [<c035fee4>]
-> (mount_root+0xe4/0x10c)
-> [<c035fee4>] (mount_root+0xe4/0x10c) from [<c036006c>]
-> (prepare_namespace+0x160/0x1b8)
-> [<c036006c>] (prepare_namespace+0x160/0x1b8) from [<c035f908>]
-> (kernel_init+0x198/0x1d8)
-> [<c035f908>] (kernel_init+0x198/0x1d8) from [<c0014510>]
-> (kernel_thread_exit+0x0/0x8)
-> QEMU: Terminated
-> 
-> We've tried to track down the problem, but we couldn't get much further
-> than finding out that the IO_SPACE_LIMIT in kernel/resource.c is 0xffff,
-> which is lower than the required 0x44000000.
-> 
-> We're not sure whether this is a problem with it not being allocated
-> enough space, or that it is not being translated properly.
-> 
-> Is this a known issue, I did a quick google for the "sym53c8xx
->  can't reserve io" error, but nothing turned up.
-> If not, does anyone have any pointers to how this could be fixed?
-> 
+Hi,
 
-I believe this is the same issue:
+On 24 May 2012 10:44, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 5/2/2012 7:42 AM, Bedia, Vaibhav wrote:
+>>
+>> Hi Omar,
+>>
+>> On Tue, May 01, 2012 at 23:17:38, Omar Ramirez Luna wrote:
+>>>
+>>> To allow mailbox driver to function with device tree.
+>>>
+>>> Tested in OMAP4 and OMAP3. OMAP2 untested.
+>>
+>>
+>> I think the mailbox code needs a cleanup similar to what you
+>> had proposed earlier [1] before the device tree support is added.
+>>
+>> We probably need to decide whether the number of mailbox sub-modules
+>> should be part of hwmod attribute or come from device tree. IMO the
+>> static allocation of the mailboxes is better suited in the device-tree
+>> data.
+>
+>
+> Ideally yes, but that assumes we are supporting only DT boot method, which
+> is still not the case today.
+>
+> That being said, the driver might still be able to leverage DT if available
+> already.
+>
+>
+> This can be done later as well.
+>
+> Omar,
+> That's up to you.
 
-http://www.gossamer-threads.com/lists/linux/kernel/1543569
+Thanks for the ack on the 2nd patch.
 
-In looking at various PCI platforms and for a qemu platform with PCI to
-test PCI changes, I had concluded (wrongly I guess) that Versatile PCI
-was broken. This patch which has never gone upstream also played a part
-in my conclusion:
+Yes, I think these changes doesn't depend on the cleanup of the
+driver, they could be included prior to them.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/021035.html
+Regards,
 
-The simple fix is to restore io.h for Versatile, but I'm looking for a
-better way.
-
-Rob
+Omar
