@@ -1,36 +1,45 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 30 May 2012 12:40:59 -0700
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 May 2012 13:28:52 -0700
 Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <4FC5DFCF.1020606@codeaurora.org>
+In-Reply-To: <20120530194059.GA13243@gmail.com>
 References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
-Message-ID: <20120530194059.GA13243@gmail.com>
+ <4FC5DFCF.1020606@codeaurora.org> <20120530194059.GA13243@gmail.com>
+Message-ID: <4FC68304.9050208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120530-01:52, Stephen Boyd wrote:
-> On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
-> > Add an extension API for clocks. This allows clocktypes to provide extensions
-> > for features which are uncommon and cannot be easily mapped onto normal clock
-> > framework concecpts. eg: resetting blocks, configuring clock phase etc.
-> 
-> This seems rather generic. Why not add more specific APIs/concepts like
-> clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
-> make them map.
-> 
+On 05/30/12 12:40, Mike Turquette wrote:
+> I also wonder if exposing some of these knobs should be done in the
+> basic clock types.  Meaning that instead of having additional calls in
+> the clk.h API those calls could be exposed by the basic clock types that
+> map to the actions.
 
-I also wonder if exposing some of these knobs should be done in the
-basic clock types.  Meaning that instead of having additional calls in
-the clk.h API those calls could be exposed by the basic clock types that
-map to the actions.
+What do you mean by basic clock types that map to actions? Perhaps an
+example?
 
-The question that needs to be answered is this: do generic drivers need
-access to these additional functions (clk.h) or just the platform code
-which implements some of the clock logic (basic clock types &
-platform-speciic clock types).
+>
+> The question that needs to be answered is this: do generic drivers need
+> access to these additional functions (clk.h) or just the platform code
+> which implements some of the clock logic (basic clock types &
+> platform-speciic clock types).
 
-Regards,
-Mike
+At least for tegra it looks like they need reset assertion and
+deassertion in generic drivers.
 
-> At the least it should be documented so that people know what it should
-> be used for.
+$ git grep tegra_periph_reset_assert
+arch/arm/mach-tegra/clock.c:void tegra_periph_reset_assert(struct clk *c)
+arch/arm/mach-tegra/clock.c:EXPORT_SYMBOL(tegra_periph_reset_assert);
+arch/arm/mach-tegra/include/mach/clk.h:void tegra_periph_reset_assert(struct clk *c);
+arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
+arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pex_clk);
+arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
+arch/arm/mach-tegra/powergate.c:        tegra_periph_reset_assert(clk);
+drivers/i2c/busses/i2c-tegra.c: tegra_periph_reset_assert(i2c_dev->clk);
+drivers/input/keyboard/tegra-kbc.c:     tegra_periph_reset_assert(kbc->clk);
+drivers/staging/nvec/nvec.c:    tegra_periph_reset_assert(nvec->i2c_clk);
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
