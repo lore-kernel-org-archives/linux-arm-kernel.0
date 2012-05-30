@@ -1,43 +1,131 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 May 2012 00:28:55 -0700
-Subject: [PATCH v2 4/6] ARM: Samsung: Modify
- s3c64xx_spi{0|1|2}_set_platdata function
-In-Reply-To: <20120520092113.GA20652@opensource.wolfsonmicro.com>
-References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
- <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
- <20120520092113.GA20652@opensource.wolfsonmicro.com>
-Message-ID: <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 30 May 2012 15:29:55 +0800
+Subject: [PATCH v4 6/6] pinctrl: add pinctrl gpio binding support
+In-Reply-To: <20120530064641.26D383E065C@localhost>
+References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
+ <1337952980-14621-6-git-send-email-b29396@freescale.com>
+ <20120526002950.062683E14F7@localhost>
+ <CAA+hA=QT83wqe8MOi4B4xY4zTGbQPVhKxwuU_A+cPg-U3JicGw@mail.gmail.com>
+ <20120530064641.26D383E065C@localhost>
+Message-ID: <20120530072955.GA3438@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2012 at 2:21 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, May 18, 2012 at 03:03:31PM +0530, Thomas Abraham wrote:
->
->> - ? ? s3c64xx_spi0_set_platdata(&s3c64xx_spi0_pdata, 0, 1);
->> + ? ? s3c64xx_spi0_set_platdata("s3c6410-spi", NULL, 0, 1);
->
-> ...
->
->> + ? ? pd.src_clk_nr = src_clk_nr;
->> + ? ? pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
->> + ? ? s3c64xx_device_spi0.name = dev_name;
->
-> This looks *really* strange. ?Why do we need to pass in a name to set in
-> s3c64xx_device_spi0's name, why would we want to use a different name?
-> This dev_name also isn't equivalent to dev_name() which makes matters
-> more confusing than they need to be.
->
-> There was similar code for the I2C controllers which caused some really
-> hard to debug brittleness.
+On Wed, May 30, 2012 at 02:46:41PM +0800, Grant Likely wrote:
+> On Sat, 26 May 2012 09:58:06 -0700, Dong Aisheng <dongas86@gmail.com> wrote:
+> > On Fri, May 25, 2012 at 5:29 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > > On Fri, 25 May 2012 21:36:20 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+> > >> From: Dong Aisheng <dong.aisheng@linaro.org>
+> > >>
+> > >> This patch implements a standard common binding for pinctrl gpio ranges.
+> > >> Each SoC can add gpio ranges through device tree by adding a gpio-maps property
+> > >> under their pinctrl devices node with the format:
+> > >> <&gpio $gpio-specifier $pin_offset $count>
+> > >> while the gpio phandle and gpio-specifier are the standard approach
+> > >> to represent a gpio in device tree.
+> > >> Then we can cooperate it with the gpio xlate function to get the gpio number
+> > >> from device tree to set up the gpio ranges map.
+> > >>
+> > >> Then the pinctrl driver can call pinctrl_dt_add_gpio_ranges(pctldev, node)
+> > >> to parse and register the gpio ranges from device tree.
+> > >>
+> > >> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > >> ---
+> > >> Personally i'm not very satisfied with current solution due to a few reasons:
+> > >> 1) i can not user standard gpio api to get gpio number
+> > >> 2) i need to reinvent a new api of_parse_phandles_with_args_ext which i'm not
+> > >> sure if it can be accepted by DT maintainer.
+> > >
+> > > Right, as mentioned in my other email, doing it this way completely
+> > > breaks the way the phandle-with-args pattern works. ?That pattern
+> > > depends on the phandle node to have a #-cells property telling it how
+> > > many cells to process for the binding. ?Adding additional data cells
+> > > means the kernel is no longer able to parse multiple entries in the
+> > > gpios property.
+> > Hmm, it can still parse multiple entries in the gpios property except
+> > that it adds two args although it's not related to gpio, but it is useful
+> > for users for special case like pinctrl gpio ranges map.
+> 
+> Really?  How exactly does it know that each record is longer than
+> #gpio-cells specifies (I'm speaking from the binding level; not having
+> custom code that just "knows" the the records have additional
+> padding).
+> 
+I'm not sure i understood your question correctly,
+but yes, binding level does not know it.
+Customer should call the correct of_parse_phandle_with_args or
+of_parse_phandles_with_args_ext to do parsing.
 
-Looks like they use the name as the magic string to pick initialization data.
+> I have no interest in creating exceptions to the phandle-with-args
+> pattern since it adds yet more implicit knowledge about how to parse.
+Yes, i admit that's a problem.
+But i did not know if any better solution.
 
-I wonder if it makes more sense to keep the platform_data still
-around, and just fill it in with the table (from patch "spi: s3c64xx:
-move controller information into driver data") based on the OF
-compatible field for the device-tree probe case, instead of trying to
-overload and having to change the name in this way.
+> For example, the common gpio code can no longer parse a gpios property
+> that is padded out because the common code doesn't know anything about
+> padding.
+> 
+I guess the common gpio code won't break since we already have the
+standard gpio format for dt.
+Users shouldn't use the wrong format to represent gpios.
 
+> g.
+> 
+> > > Hmmm.... I need more information about this gpio-maps property. ?How
+> > > is it arranged? ?What kind of data is in it. ?Can you give some
+> > > specific examples of how hardware would be described with a gpio-maps
+> > > property?
+> > >
+> > For exampe:
+> > MX6Q_PAD_SD2_DAT2__GPIO_1_13 means MX6Q_PAD_SD2_DAT2 can be used as GPIO_1_13,
+> > For reference gpio1,13, we usually do: xx-gpios = <gpio1 13 0> in device tree.
+> > Here we want to create a pin map of gpio1,13 to MX6Q_PAD_SD2_DAT2 for
+> > pinctrl gpio ranges map,
+> > the format should be <GPIO_NUMBER PIN_ID NPINS>, then the pinctrl core
+> > can automatically mux
+> > the PIN_ID to gpio function by refer to this map.
+> > For GPIO_NUMBER, we want to use the standard gpio dt represent way
+> > since the gpio base may
+> > be dynamically.
+> > Assume MX6Q_PAD_SD2_DAT2 pin id is 1 and only one pin starting from it
+> > can be used as gpio.
+> > Then the gpio-maps for MX6Q_PAD_SD2_DAT2 can be:
+> > gpio-maps = <gpio1 13 0 1 1>
+> > 
+> > We may have several pins can be used as gpio on mx6q.
+> > Then the gpio-maps may becomes:
+> > gpio-maps = <gpio1 13 0 1 1>,
+> >                    <gpio1 14 0 5 1>,
+> >                    <gpio2 0 0 20 1>,
+> >                    ................
+> > 
+> > Since the format is a little different from the standard gpio
+> > represent way, so i can not use the standard gpio
+> > api to parse the gpio number. That's why i need to invent
+> > of_parse_phandle_args_ext function for this special
+> > format.
+> > 
+> > we still did not find any better way to do that.
+> > Do you have any suggestion for this special case?
+> 
+> Oh, I see....  Does this gpio-maps property sit beside a normal
+> "gpios" property?  Or is it in a completely separate node?  If it sits
+no, currently it is in a completely separate node and is recommended
+to be under pinctrl device node since pinctrl driver needs to use it.
 
--Olof
+> beside a normal "gpios" property and lines up with the gpio properties
+> there, then I would just make it a tuple for each gpio.  Ie:
+> 
+> gpios = <&gpio1 13 0>, <&gpio1 14 0>, <&gpio2 0 0>;
+> gpio-pinmux = <1 1>,   <5 1>,         <20 1>;
+> 
+I've had the same idea before but seemed Stephen did not like that since
+it's nature to put them at the same line with the format of
+<GPIO PIN_ID COUNT>. (Here the GPIO is standard gpio dt format)
+See:
+http://www.spinics.net/lists/arm-kernel/msg176830.html
+
+And above format may be hard to read if the tuples get big.
+
+Regards
+Dong Aisheng
