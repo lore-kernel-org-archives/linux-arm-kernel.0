@@ -1,42 +1,118 @@
-From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
-Date: Wed, 30 May 2012 03:22:53 -0400
-Subject: [PATCHv2 4/4] ARM: dma-mapping: remove custom consistent dma
- region
-In-Reply-To: <019401cd3e34$0c6af4d0$2540de70$%szyprowski@samsung.com>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-5-git-send-email-m.szyprowski@samsung.com>
- <4FC5659D.6040805@gmail.com>
- <019401cd3e34$0c6af4d0$2540de70$%szyprowski@samsung.com>
-Message-ID: <4FC5CACD.6000105@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 May 2012 00:23:49 -0700
+Subject: [PATCH 02/10] spi: s3c64xx: move controller information into
+ driver data
+In-Reply-To: <1336514694-22393-3-git-send-email-thomas.abraham@linaro.org>
+References: <1336514694-22393-1-git-send-email-thomas.abraham@linaro.org>
+ <1336514694-22393-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAOesGMjGfCH1T6WXPzMDLKsD=URdm15G1SDM=ac624KLmSS=4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(5/30/12 3:15 AM), Marek Szyprowski wrote:
-> Hello,
->
-> On Wednesday, May 30, 2012 2:11 AM KOSAKI Motohiro wrote:
->
->>>    static void *
->>>    __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
->>>    	const void *caller)
->>>    {
->>> -	struct arm_vmregion *c;
->>> -	size_t align;
->>> -	int bit;
->>> +	struct vm_struct *area;
->>> +	unsigned long addr;
->>>
->>> -	if (!consistent_pte) {
->>> -		printk(KERN_ERR "%s: not initialised\n", __func__);
->>> +	area = get_vm_area_caller(size, VM_DMA | VM_USERMAP, caller);
->>
->> In this patch, VM_DMA is only used here. So, is this no effect?
->
-> I introduced it mainly to let user know which areas have been allocated by the dma-mapping api.
+Hi,
 
-vma->flags are limited resource, it has only 32 (or 64) bits. Please don't use it for such unimportant
-thing.
+Some comments below.
+
+On Tue, May 8, 2012 at 3:04 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> Platform data is used to specify controller hardware specific information
+> such as the tx/rx fifo level mask and bit offset of rx fifo level. Such
+> information is not suitable to be supplied from device tree. Instead,
+> it can be moved into the driver data and removed from platform data.
+>
+> Cc: Jaswinder Singh <jaswinder.singh@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> ?drivers/spi/spi-s3c64xx.c | ?180 ++++++++++++++++++++++++++++++++++++++-------
+> ?1 files changed, 153 insertions(+), 27 deletions(-)
+>
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index 6a3d51a..f6bc0e3 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+
+> @@ -171,6 +198,8 @@ struct s3c64xx_spi_driver_data {
+> ? ? ? ?struct s3c64xx_spi_dma_data ? ? rx_dma;
+> ? ? ? ?struct s3c64xx_spi_dma_data ? ? tx_dma;
+> ? ? ? ?struct samsung_dma_ops ? ? ? ? ?*ops;
+> + ? ? ? struct s3c64xx_spi_port_config ?*port_conf;
+> + ? ? ? unsigned ? ? ? ? ? ? ? ? ? ? ? ?port_id;
+
+unsigned int
 
 
-> I also plan to add a check suggested by Minchan Kim in __dma_free_remap() if the vmalloc area
-> have been in fact allocated with VM_DMA set.
+> @@ -942,6 +964,13 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+> ? ? ? ?flush_fifo(sdd);
+> ?}
+>
+> +static inline struct s3c64xx_spi_port_config *s3c64xx_spi_get_port_config(
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct platform_device *pdev)
+> +{
+> + ? ? ? return (struct s3c64xx_spi_port_config *)
+> + ? ? ? ? ? ? ? ? ? ? ? ?platform_get_device_id(pdev)->driver_data;
+> +}
+> +
+> ?static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct resource *mem_res, *dmatx_res, *dmarx_res;
+> @@ -1000,6 +1029,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+> ? ? ? ?platform_set_drvdata(pdev, master);
+>
+> ? ? ? ?sdd = spi_master_get_devdata(master);
+> + ? ? ? sdd->port_conf = s3c64xx_spi_get_port_config(pdev);
+> ? ? ? ?sdd->master = master;
+> ? ? ? ?sdd->cntrlr_info = sci;
+> ? ? ? ?sdd->pdev = pdev;
+
+Single-use helper? Might as well open code it in this case.
+
+
+> @@ -1227,6 +1258,100 @@ static const struct dev_pm_ops s3c64xx_spi_pm = {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? s3c64xx_spi_runtime_resume, NULL)
+> ?};
+>
+> +#if defined(CONFIG_CPU_S3C2416) || defined(CONFIG_CPU_S3C2443)
+> +struct s3c64xx_spi_port_config s3c2443_spi_port_config = {
+> + ? ? ? .fifo_lvl_mask ?= { 0x7f },
+> + ? ? ? .rx_lvl_offset ?= 13,
+> + ? ? ? .tx_st_done ? ? = 21,
+> + ? ? ? .high_speed ? ? = true,
+> +};
+> +#define S3C2443_SPI_PORT_CONFIG ((kernel_ulong_t)&s3c2443_spi_port_config)
+> +#else
+> +#define S3C2443_SPI_PORT_CONFIG ((kernel_ulong_t)NULL)
+> +#endif
+
+Is it really worth it to do the ifdefs here for just 16 bytes of data
+per entry? The table itself below takes more space.
+
+
+[..]
+
+> +#ifdef CONFIG_ARCH_S5PV210
+> +struct s3c64xx_spi_port_config s5pv210_spi_port_config = {
+> + ? ? ? .fifo_lvl_mask ?= { 0x1ff, 0x7F },
+> + ? ? ? .rx_lvl_offset ?= 15,
+> + ? ? ? .tx_st_done ? ? = 25,
+> + ? ? ? .high_speed ? ? = 1,
+
+high_speed = true
+
+> +};
+> +#define S5PV210_SPI_PORT_CONFIG ((kernel_ulong_t)&s5pv210_spi_port_config)
+> +#else
+> +#define S5PV210_SPI_PORT_CONFIG ((kernel_ulong_t)NULL)
+> +#endif /* CONFIG_ARCH_S5PV210 */
+> +
+> +#ifdef CONFIG_ARCH_EXYNOS4
+> +struct s3c64xx_spi_port_config exynos4_spi_port_config = {
+> + ? ? ? .fifo_lvl_mask ?= { 0x1ff, 0x7F, 0x7F },
+> + ? ? ? .rx_lvl_offset ?= 15,
+> + ? ? ? .tx_st_done ? ? = 25,
+> + ? ? ? .high_speed ? ? = 1,
+
+high_speed = true
+
+
+
+-Olof
