@@ -1,50 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 08:33:02 +0800
-Subject: [PATCH 15/16] ARM: ux500: Add regulator support for nomadik-i2c
- into the db8500 Device Tree
-In-Reply-To: <CACRpkdafqKU8fUYPMsB5Pu+NBDDV_iSXez7F3BT-To7E1Vfs2w@mail.gmail.com>
-References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
- <1337330355-17747-16-git-send-email-lee.jones@linaro.org>
- <CACRpkdanT17H4VV1AzaYN0wnsFKJTVhw0ZT+o3nP9v=gpKdyAQ@mail.gmail.com>
- <4FBB4782.9090101@linaro.org>
- <CACRpkdb80+4i_9JJpSu9X3biFywnFPvU-7HkZ94btz0iPL723A@mail.gmail.com>
- <4FC45598.903@linaro.org>
- <CACRpkdafqKU8fUYPMsB5Pu+NBDDV_iSXez7F3BT-To7E1Vfs2w@mail.gmail.com>
-Message-ID: <4FC56ABE.2020700@linaro.org>
+From: jgq516@gmail.com (Xiao Jiang)
+Date: Wed, 30 May 2012 11:18:09 +0800
+Subject: [PATCH 3/3] watchdog: omap_wdt: add device tree support
+In-Reply-To: <4FC51008.1050004@ti.com>
+References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
+ <1337942552-28218-4-git-send-email-jgq516@gmail.com>
+ <4FC51008.1050004@ti.com>
+Message-ID: <4FC59171.8040009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/12 08:09, Linus Walleij wrote:
-> On Tue, May 29, 2012 at 12:50 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->> [Me]
->>> I'm told not to put DT bindings for things in place if they are
->>> incorrect, since they get set in stone... and I'm told we should
->>> probably remove this one regulator from the device rather.
->>> I'm just uncertain.
+Jon Hunter wrote:
+> On 05/25/2012 05:42 AM, jgq516 at gmail.com wrote:
+>   
+>> From: Xiao Jiang <jgq516@gmail.com>
 >>
->> Nothing is set in stone. I'm always happy to do clean-ups and code
->> corrections. :)
+>> Add device table for omap_wdt to support dt.
+>>
+>> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+>> ---
+>>  drivers/watchdog/omap_wdt.c |    8 ++++++++
+>>  1 files changed, 8 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+>> index 8285d65..d98c615 100644
+>> --- a/drivers/watchdog/omap_wdt.c
+>> +++ b/drivers/watchdog/omap_wdt.c
+>> @@ -430,6 +430,13 @@ static int omap_wdt_resume(struct platform_device *pdev)
+>>  #define	omap_wdt_resume		NULL
+>>  #endif
+>>  
+>> +static const struct of_device_id omap_wdt_of_match[] = {
+>> +	{ .compatible = "ti,omap3-wdt", },
+>> +	{ .compatible = "ti,omap4-wdt", },
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
+>> +
+>>  static struct platform_driver omap_wdt_driver = {
+>>  	.probe		= omap_wdt_probe,
+>>  	.remove		= __devexit_p(omap_wdt_remove),
+>> @@ -439,6 +446,7 @@ static struct platform_driver omap_wdt_driver = {
+>>  	.driver		= {
+>>  		.owner	= THIS_MODULE,
+>>  		.name	= "omap_wdt",
+>> +		.of_match_table = omap_wdt_of_match,
+>>  	},
+>>  };
+>>  
+>>     
 >
-> So assume this one device tree gets deployed, and some poor windows
-> phone developer start scratching his head about the strange voltage
-> domain regulator for the I2C device, when in reality there is no such
-> thing, there is only an APE voltage domain regulator common for all
-> these devices.
- >
-> So with device trees the fit between physical reality and what we
-> model in the kernel needs to be as close as possible or we will
-> cause trouble.
+> I think we need to add some code to the probe function that calls
+> of_match_device() and ensures we find a match. For example ...
 >
-> That's the implications it will have unless we get it right, and that's
-> why I'm hesitant.
+> 	if (of_have_populated_dt())
+> 		if (!of_match_device(omap_wdt_of_match, &pdev->dev))
+> 			return -EINVAL;
+>
+>   
+Will add it in v2, thanks for suggestion.
 
-I'm more than happy to 'do the right thing', but I need to know what 
-that is first.
-
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Xiao
+> Cheers
+> Jon
+>   
