@@ -1,43 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 30 May 2012 18:19:37 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Add WM5102 EVM to Cragganmore modules
-In-Reply-To: <1338398378-18268-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1338398378-18268-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1338398378-18268-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Wed, 30 May 2012 19:45:30 +0200
+Subject: [PATCH RFC 0/3] i2c-nomadik changes
+Message-ID: <cover.1338398567.git.rubini@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No platform data yet as driver is not yet merged.
+The patch set turns a platform device into an amba device. Its users,
+i.e. mach-ux500, are converted too.  The set has no external
+dependencies, although is has no visible effect until other patches
+are accepted.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Reasoning:
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 985e255..f80761c 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -192,6 +192,11 @@ static const struct i2c_board_info wm1277_devs[] = {
- 	},
- };
- 
-+static const struct i2c_board_info wm5102_devs[] = {
-+	{ I2C_BOARD_INFO("wm5102", 0x1a),
-+	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2, },
-+};
-+
- static const struct i2c_board_info wm6230_i2c_devs[] = {
- 	{ I2C_BOARD_INFO("wm9081", 0x6c),
- 	  .platform_data = &wm9081_pdata, },
-@@ -229,6 +234,8 @@ static __devinitdata const struct {
- 	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
- 	{ .id = 0x3d, .name = "1277-EV1 Littlemill",
- 	  .i2c_devs = wm1277_devs, .num_i2c_devs = ARRAY_SIZE(wm1277_devs) },
-+	{ .id = 0x3e, .name = "WM5102-6271-EV1-CS127",
-+	  .i2c_devs = wm5102_devs, .num_i2c_devs = ARRAY_SIZE(wm5102_devs) },
- };
- 
- static __devinit int wlf_gf_module_probe(struct i2c_client *i2c,
+In the STA2X11 I/O hub we are exporting a number of AMBA peripherals
+to the PCI world. Using a generic pci-amba driver there is no further
+code for each device, provided they are already registered under the
+AMBA bus.  I already submitted the generic bridge
+(https://lkml.org/lkml/2012/5/28/194).
+
+Status of this patch set:
+
+The users of the driver (i.e. mach-ux600) compile properly, but I
+couldn't test on any board.  The driver, as is, works on x86 under the
+PCI bridge, with the not-yet-upstream clock framework and platform
+data for sta2x11 devices.  However, this set is not introducing any
+dead code as it only adds more flexibility.  The big part of it is a
+massive s/platform_device/amba_device/ and s/pdev/adev/ .
+
+The cell-id I used in the table are the one for ux500 (only as far as
+I know from the stn-8815 manuals) and the one for STA2X11.
+
+Alessandro Rubini (3):
+  i2c-nomadik: move header from <plat/i2c.h> to <linux/i2c-nomadik.h>
+  i2c-nomadik: turn the platform driver to an amba driver
+  i2c-nomadik: depend on ARM_AMBA, not PLAT_NOMADIK
+
+ arch/arm/mach-ux500/board-mop500.c       |    2 +-
+ arch/arm/mach-ux500/devices-common.h     |   23 +----
+ arch/arm/plat-nomadik/include/plat/i2c.h |   39 --------
+ drivers/i2c/busses/Kconfig               |    5 +-
+ drivers/i2c/busses/i2c-nomadik.c         |  140 +++++++++++++++---------------
+ include/linux/i2c-nomadik.h              |   39 ++++++++
+ 6 files changed, 116 insertions(+), 132 deletions(-)
+ delete mode 100644 arch/arm/plat-nomadik/include/plat/i2c.h
+ create mode 100644 include/linux/i2c-nomadik.h
+
 -- 
-1.7.10
+1.7.7.2
