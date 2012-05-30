@@ -1,42 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:40 +0800
-Subject: [PATCH 22/22] mfd: Enable DT probing of the DB8500 PRCMU
-In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-23-git-send-email-lee.jones@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 30 May 2012 14:33:25 +0800
+Subject: [PATCH v4 4/6] gpio: introduce lock mechanism for gpiochip_find
+In-Reply-To: <20120530041058.GB2235@b29396-Latitude-E6410>
+References: <1337952980-14621-1-git-send-email-b29396@freescale.com>
+ <1337952980-14621-4-git-send-email-b29396@freescale.com>
+ <20120526002500.CA3123E14E9@localhost>
+ <20120530041058.GB2235@b29396-Latitude-E6410>
+Message-ID: <20120530063325.0F6AA3E065C@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the correct compatible string for use during Device Tree
-population. Without it the DB8500 PRCMU will not be probed.
+On Wed, 30 May 2012 12:10:58 +0800, Dong Aisheng <dongas86@gmail.com> wrote:
+> Hi Grant,
+> 
+> On Fri, May 25, 2012 at 06:25:00PM -0600, Grant Likely wrote:
+> > On Fri, 25 May 2012 21:36:18 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+> > > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > > 
+> > > The module lock will be automatically claimed for gpiochip_find function
+> > > in case the gpio module is removed during the using of gpiochip instance.
+> > > Users are responsible to call gpiochip_put to release the lock after
+> > > the using.
+> > > 
+> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> ...
+> > Also, it doesn't do anything to protect against the gpio_chip being
+> > removed after the gpio number is resolved, which means the gpio number
+> > may no longer be valid, or may no longer point to the same gpio chip.
+> > It looks like the locking protection needs to be wider to be useful.
+> > 
+> I understand the issue now.
+> It's correct that we did not lock gpio_chip before calling gpio_request
+> after the gpio number is resolved.
+> 
+> I thought about adding a new API called of_gpio_request to hide the lock
+> to users like:
+> int of_gpio_request(..)
+> {
+> 	spin_lock_irqsave(&gpio_lock, flags);
+> 	ret = of_get_named_gpio(..);
+> 	if (ret < 0)
+> 		do_err..
+> 	ret = gpio_request(..)
+> 
+> 	spin_unlock_irqrestore(&gpio_lock, flags);
+> 	return ret;
+> }
+> But it seems it does not work since the gpio_request may sleep and we may
+> need a new sleepable lock rather using the exist gpio_lock.
+> 
+> In the same time, i'm also thinking about a question that do we really
+> need to do this to protect gpio_chip being removed afer gpio number is
+> resolved?
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/db8500-prcmu.c |    5 +++++
- 1 file changed, 5 insertions(+)
+Probably not (for this series) because it shouldn't cause an oops if
+it happens.  Ultimately however it would be good to have proper
+reference counting on gpio chips to prevent any problems.
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 74595e1..01f01f3 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2994,11 +2994,16 @@ static int __init db8500_prcmu_probe(struct platform_device *pdev)
- no_irq_return:
- 	return err;
- }
-+static const struct of_device_id db8500_prcmu_match[] = {
-+	{ .compatible = "stericsson,db8500-prcmu"},
-+	{ },
-+};
- 
- static struct platform_driver db8500_prcmu_driver = {
- 	.driver = {
- 		.name = "db8500-prcmu",
- 		.owner = THIS_MODULE,
-+		.of_match_table = db8500_prcmu_match,
- 	},
- };
- 
--- 
-1.7.9.5
+g.
