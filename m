@@ -1,39 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 May 2012 15:11:51 +0800
-Subject: [rtc-linux] [PATCH 17/22] rtc: ab8500-rtc: IRQF_ONESHOT when
- requesting a threaded IRQ
-In-Reply-To: <1338353260-10097-18-git-send-email-lee.jones@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-18-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbFtFDmHcZUVwAq+z1fhNMT1556dyBqqr=GR8CzxgSXZg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 May 2012 00:13:01 -0700
+Subject: [PATCH] mmc: omap: Fix broken reg_shift initialization
+In-Reply-To: <20120529130312.GE12766@atomide.com>
+References: <20120528132147.GC12766@atomide.com>
+ <CAPDyKFrcviT3_Fz13LpFJ+1oKxQ5LKswN7EmzVcWTJkiiDWusA@mail.gmail.com>
+ <20120529074047.GE16340@arwen.pp.htv.fi>
+ <20120529124732.GD12766@atomide.com>
+ <20120529125024.GM9577@arwen.pp.htv.fi>
+ <20120529130312.GE12766@atomide.com>
+Message-ID: <20120530071300.GH12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Commit fa550189 (mmc: core: Prevent eMMC VCC supply to be cut from late init)
+slightly affected timings for how things are done for the omap MMC driver
+causing the MMC cards not getting detected any longer.
 
-> The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
->
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: rtc-linux at googlegroups.com
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> ?drivers/rtc/rtc-ab8500.c | ? ?2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
-> index 4bcf9ca..b11a2ec 100644
-> --- a/drivers/rtc/rtc-ab8500.c
-> +++ b/drivers/rtc/rtc-ab8500.c
-> @@ -422,7 +422,7 @@ static int __devinit ab8500_rtc_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?err = request_threaded_irq(irq, NULL, rtc_alarm_handler,
-> - ? ? ? ? ? ? ? IRQF_NO_SUSPEND, "ab8500-rtc", rtc);
-> + ? ? ? ? ? ? ? IRQF_NO_SUSPEND | IRQF_ONESHOT, "ab8500-rtc", rtc);
-> ? ? ? ?if (err < 0) {
-> ? ? ? ? ? ? ? ?rtc_device_unregister(rtc);
-> ? ? ? ? ? ? ? ?return err;
+Turns out this was caused by buggy reg_shift initialization in the omap
+MMC driver that was happening after mmc_add_host() was being called.
 
-Looks correct, Acked-by (also for the previous patch).
+Fix this by initializing reg_shift before mmc_add_host() is called.
 
-Linus Walleij
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+---
+
+Heh found it! Chris, maybe Cc stable on this one?
+
+--- a/drivers/mmc/host/omap.c
++++ b/drivers/mmc/host/omap.c
+@@ -1485,6 +1485,7 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	host->nr_slots = pdata->nr_slots;
++	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
+ 
+ 	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
+ 	if (!host->mmc_omap_wq)
+@@ -1500,8 +1501,6 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
+-
+ 	return 0;
+ 
+ err_destroy_wq:
