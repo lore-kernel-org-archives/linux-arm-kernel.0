@@ -1,98 +1,140 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:29 +0800
-Subject: [PATCH 11/22] ARM: ux500: Only initialise STE's UIBs on boards which
- support them
+Date: Wed, 30 May 2012 12:47:30 +0800
+Subject: [PATCH 12/22] ARM: ux500: Apply db8500-prcmu regulator information to
+ db8500 Device Tree
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST-Ericsson uses User Interface Boards to extend functionality of
-some of their development boards. However, these aren't compatible
-with all the supported boards found in Mainline (Snowball for
-instance). This patch ensures that the UIBs are only probed on
-boards which can actually support them. This in turn saves lots of
-unnecessary error messages normally found in Snowball's boot log.
+Here we inform Device Tree of which regulators are provided by the db8500-
+prcmu. This way we can reference some of their consumers directly from the
+Device Tree e.g. SMSC911x Ethernet chip.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-uib.c |    4 +---
- arch/arm/mach-ux500/board-mop500.c     |    8 ++++++++
- arch/arm/mach-ux500/board-mop500.h     |    1 +
- 3 files changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi |  107 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-uib.c b/arch/arm/mach-ux500/board-mop500-uib.c
-index b29a788..1f47d96 100644
---- a/arch/arm/mach-ux500/board-mop500-uib.c
-+++ b/arch/arm/mach-ux500/board-mop500-uib.c
-@@ -96,7 +96,7 @@ static void __init __mop500_uib_init(struct uib *uib, const char *why)
- /*
-  * Detect the UIB attached based on the presence or absence of i2c devices.
-  */
--static int __init mop500_uib_init(void)
-+int __init mop500_uib_init(void)
- {
- 	struct uib *uib = mop500_uib;
- 	struct i2c_adapter *i2c0;
-@@ -131,5 +131,3 @@ static int __init mop500_uib_init(void)
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 7070000..646c80b 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -197,6 +197,113 @@
+ 				reg = <0x80157450 0xC>;
+ 			};
  
- 	return 0;
- }
--
--module_init(mop500_uib_init);
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index ea6082a..6b3fef5 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -716,6 +716,8 @@ static void __init mop500_init_machine(void)
- 
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
++			db8500-prcmu-regulators {
++				compatible = "stericsson,db8500-prcmu-regulator";
 +
-+	mop500_uib_init();
- }
- 
- static void __init snowball_init_machine(void)
-@@ -780,6 +782,8 @@ static void __init hrefv60_init_machine(void)
- 
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
++				// DB8500_REGULATOR_VAPE
++				db8500_vape_reg: db8500_vape {
++					regulator-name = "db8500-vape";
++					regulator-always-on;
++				};
 +
-+	mop500_uib_init();
- }
- 
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
-@@ -883,6 +887,8 @@ static void __init u8500_init_machine(void)
- 		i2c_register_board_info(2, mop500_i2c2_devices,
- 					ARRAY_SIZE(mop500_i2c2_devices));
- 
-+		mop500_uib_init();
++				// DB8500_REGULATOR_VARM
++				db8500_varm_reg: db8500_varm {
++					regulator-name = "db8500-varm";
++				};
 +
- 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
- 		/*
- 		 * Devices to be DT:ed:
-@@ -913,6 +919,8 @@ static void __init u8500_init_machine(void)
- 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 		i2c_register_board_info(2, mop500_i2c2_devices,
- 					ARRAY_SIZE(mop500_i2c2_devices));
++				// DB8500_REGULATOR_VMODEM
++				db8500_vmodem_reg: db8500_vmodem {
++					regulator-name = "db8500-vmodem";
++				};
 +
-+		mop500_uib_init();
- 	}
- 	mop500_i2c_init(parent);
- 
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 3be0cb8..2f87b25 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -89,6 +89,7 @@ void __init mop500_pinmaps_init(void);
- void __init snowball_pinmaps_init(void);
- void __init hrefv60_pinmaps_init(void);
- 
-+int __init mop500_uib_init(void);
- void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
- 		unsigned n);
- 
++				// DB8500_REGULATOR_VPLL
++				db8500_vpll_reg: db8500_vpll {
++					regulator-name = "db8500-vpll";
++				};
++
++				// DB8500_REGULATOR_VSMPS1
++				db8500_vsmps1_reg: db8500_vsmps1 {
++					regulator-name = "db8500-vsmps1";
++				};
++
++				// DB8500_REGULATOR_VSMPS2
++				db8500_vsmps2_reg: db8500_vsmps2 {
++					regulator-name = "db8500-vsmps2";
++				};
++
++				// DB8500_REGULATOR_VSMPS3
++				db8500_vsmps3_reg: db8500_vsmps3 {
++					regulator-name = "db8500-vsmps3";
++				};
++
++				// DB8500_REGULATOR_VRF1
++				db8500_vrf1_reg: db8500_vrf1 {
++					regulator-name = "db8500-vrf1";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSP
++				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
++					regulator-name = "db8500-sva-mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSPRET
++				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
++					regulator-name = "db8500-sva-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAPIPE
++				db8500_sva_pipe_reg: db8500_sva_pipe {
++					regulator-name = "db8500_sva_pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSP
++				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
++					regulator-name = "db8500_sia_mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSPRET
++				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
++					regulator-name = "db8500-sia-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAPIPE
++				db8500_sia_pipe_reg: db8500_sia_pipe {
++					regulator-name = "db8500-sia-pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SGA
++				db8500_sga_reg: db8500_sga {
++					regulator-name = "db8500-sga";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_B2R2_MCDE
++				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
++					regulator-name = "db8500-b2r2-mcde";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12
++				db8500_esram12_reg: db8500_esram12 {
++					regulator-name = "db8500-esram12";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12RET
++				db8500_esram12_ret_reg: db8500_esram12_ret {
++					regulator-name = "db8500-esram12-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34
++				db8500_esram34_reg: db8500_esram34 {
++					regulator-name = "db8500-esram34";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34RET
++				db8500_esram34_ret_reg: db8500_esram34_ret {
++					regulator-name = "db8500-esram34-ret";
++				};
++			};
++
+ 			ab8500 at 5 {
+ 				compatible = "stericsson,ab8500";
+ 				reg = <5>; /* mailbox 5 is i2c */
 -- 
 1.7.9.5
