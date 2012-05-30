@@ -1,50 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 23:01:06 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
- Device Tree
-In-Reply-To: <20120530121547.GJ9947@opensource.wolfsonmicro.com>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
- <20120530100302.GD9947@opensource.wolfsonmicro.com>
- <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
- <20120530121547.GJ9947@opensource.wolfsonmicro.com>
-Message-ID: <4FC63632.4030504@linaro.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 30 May 2012 10:03:37 -0500
+Subject: [PATCH 3/3] watchdog: omap_wdt: add device tree support
+In-Reply-To: <4FC5D21F.2030702@ti.com>
+References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
+ <1337942552-28218-4-git-send-email-jgq516@gmail.com>
+ <4FC51008.1050004@ti.com> <4FC59171.8040009@gmail.com>
+ <4FC5D21F.2030702@ti.com>
+Message-ID: <4FC636C9.2050902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/12 20:15, Mark Brown wrote:
-> On Wed, May 30, 2012 at 07:40:49PM +0800, Lee Jones wrote:
->> On May 30, 2012 6:03 PM, "Mark Brown"<broonie@opensource.wolfsonmicro.com>
->
->>> If we are changing the names then not including the ab8500 bit would
->>> seem more idiomatic - we've already worked out which chip this is by the
->>> time we're looking here.
->
->> No, Linus had the wrong end of the stick. I've just spoken to him in person.
->
->> Those are not the names of the regulators. They're the names of the Device
->> Tree nodes. The regulator names shall remain the same.
->
-> Fair enough.  My point about the ab8500_ bit still stands though.
+Hi Benoit,
 
-It's a Device Tree thing. I do it so we can easily see which regulator 
-is driving which device(s).
+On 05/30/2012 02:54 AM, Cousson, Benoit wrote:
+> On 5/30/2012 5:18 AM, Xiao Jiang wrote:
+>> Jon Hunter wrote:
+>>> On 05/25/2012 05:42 AM, jgq516 at gmail.com wrote:
+>>>> From: Xiao Jiang <jgq516@gmail.com>
+>>>>
+>>>> Add device table for omap_wdt to support dt.
+>>>>
+>>>> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+>>>> ---
+>>>> drivers/watchdog/omap_wdt.c | 8 ++++++++
+>>>> 1 files changed, 8 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+>>>> index 8285d65..d98c615 100644
+>>>> --- a/drivers/watchdog/omap_wdt.c
+>>>> +++ b/drivers/watchdog/omap_wdt.c
+>>>> @@ -430,6 +430,13 @@ static int omap_wdt_resume(struct
+>>>> platform_device *pdev)
+>>>> #define omap_wdt_resume NULL
+>>>> #endif
+>>>>
+>>>> +static const struct of_device_id omap_wdt_of_match[] = {
+>>>> + { .compatible = "ti,omap3-wdt", },
+>>>> + { .compatible = "ti,omap4-wdt", },
+> 
+> If there is no difference between the OMAP3 and the OMAP4 WDT IP, just
+> add one entry "ti,omap3-wdt". And then in the OMAP4 DTS you will just
+> put : compatible = "ti,omap3-wdt"; or compatible =  "ti,omap4-wdt",
+> "ti,omap3-wdt";
 
-I personally think:
+Hmmm ... comparing the omap3 and omap4 wdt registers there are some
+differences. omap4 seems to have more registers than omap3. May be we
+are not using these right now, but from a register perspective the wdt
+in omap2, omap3 and omap4 appear to be slightly different. The revision
+ID register on omap3 and omap4 have different values too.
 
-	vin-supply = <&db8500_vape_reg>;
-	vmmc-supply = <&ab8500_ldo_aux2_reg>;
+I guess from a driver perspective there is no difference, but it seemed
+to me that the IP is not completely the same.
 
-Tells us so much more and is simpler to decrypt at a glance than 
-something like:
+> I'm still a little bit confused about the real need for the
+> "ti,omap4-wdt: entry, but it seems to be the way to do it in PPC.
+> 
+>>>> + {},
+>>>> +};
+>>>> +MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
+>>>> +
+>>>> static struct platform_driver omap_wdt_driver = {
+>>>> .probe = omap_wdt_probe,
+>>>> .remove = __devexit_p(omap_wdt_remove),
+>>>> @@ -439,6 +446,7 @@ static struct platform_driver omap_wdt_driver = {
+>>>> .driver = {
+>>>> .owner = THIS_MODULE,
+>>>> .name = "omap_wdt",
+>>>> + .of_match_table = omap_wdt_of_match,
+>>>> },
+>>>> };
+>>>>
+>>>
+>>> I think we need to add some code to the probe function that calls
+>>> of_match_device() and ensures we find a match. For example ...
+>>>
+>>> if (of_have_populated_dt())
+>>> if (!of_match_device(omap_wdt_of_match, &pdev->dev))
+>>> return -EINVAL;
+>>>
+>> Will add it in v2, thanks for suggestion.
+> 
+> No, in fact this is not needed. We need that mainly when several
+> instances can match the same driver and thus we select the proper one
+> using the of_match_device. Otherwise, just check is the device_node is
+> there.
+> 
+> In that case, the driver does not even care about any DT node so there
+> is no need to add extra code for that. Keep it simple.
 
-	vin-supply = <&vape_reg>;
-	vmmc-supply = <&ldo_aux2_reg>;
+Ok. So are you saying get rid of the match table altogether? In other
+words, drop this patch?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I agree that it does not really do anything today, but I did not know if
+in the future you were planning to pass things like, register addresses,
+via DT.
+
+Cheers
+Jon
