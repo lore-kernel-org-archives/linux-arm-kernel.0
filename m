@@ -1,35 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:34 +0800
-Subject: [PATCH 16/22] mfd: ab8500-gpadc: Enable IRQF_ONESHOT when requesting
- a threaded IRQ
+Date: Wed, 30 May 2012 12:47:35 +0800
+Subject: [PATCH 17/22] rtc: ab8500-rtc: IRQF_ONESHOT when requesting a
+ threaded IRQ
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-17-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: linux-kernel at vger.kernel.org
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-gpadc.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/rtc/rtc-ab8500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index c39fc71..358d502 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -599,7 +599,8 @@ static int __devinit ab8500_gpadc_probe(struct platform_device *pdev)
- 	/* Register interrupt  - SwAdcComplete */
- 	ret = request_threaded_irq(gpadc->irq, NULL,
- 		ab8500_bm_gpswadcconvend_handler,
--		IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc", gpadc);
-+		IRQF_ONESHOT | IRQF_NO_SUSPEND | IRQF_SHARED,
-+				"ab8500-gpadc", gpadc);
- 	if (ret < 0) {
- 		dev_err(gpadc->dev, "Failed to register interrupt, irq: %d\n",
- 			gpadc->irq);
+diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+index 4bcf9ca..b11a2ec 100644
+--- a/drivers/rtc/rtc-ab8500.c
++++ b/drivers/rtc/rtc-ab8500.c
+@@ -422,7 +422,7 @@ static int __devinit ab8500_rtc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	err = request_threaded_irq(irq, NULL, rtc_alarm_handler,
+-		IRQF_NO_SUSPEND, "ab8500-rtc", rtc);
++		IRQF_NO_SUSPEND | IRQF_ONESHOT, "ab8500-rtc", rtc);
+ 	if (err < 0) {
+ 		rtc_device_unregister(rtc);
+ 		return err;
 -- 
 1.7.9.5
