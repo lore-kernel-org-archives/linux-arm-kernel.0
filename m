@@ -1,48 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 May 2012 00:13:01 -0700
-Subject: [PATCH] mmc: omap: Fix broken reg_shift initialization
-In-Reply-To: <20120529130312.GE12766@atomide.com>
-References: <20120528132147.GC12766@atomide.com>
- <CAPDyKFrcviT3_Fz13LpFJ+1oKxQ5LKswN7EmzVcWTJkiiDWusA@mail.gmail.com>
- <20120529074047.GE16340@arwen.pp.htv.fi>
- <20120529124732.GD12766@atomide.com>
- <20120529125024.GM9577@arwen.pp.htv.fi>
- <20120529130312.GE12766@atomide.com>
-Message-ID: <20120530071300.GH12766@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 May 2012 15:15:52 +0800
+Subject: [PATCH 18/22] mfd: Remove redundant Kconfig entry
+In-Reply-To: <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYpCMRurpDgz5X-Qsv5qUgzeVX3S8trWHByTaw6R35_jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fa550189 (mmc: core: Prevent eMMC VCC supply to be cut from late init)
-slightly affected timings for how things are done for the omap MMC driver
-causing the MMC cards not getting detected any longer.
+On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Turns out this was caused by buggy reg_shift initialization in the omap
-MMC driver that was happening after mmc_add_host() was being called.
+> During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
+> was left remnant. This patch simply removes it.
+>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> ?drivers/mfd/Kconfig | ? 10 ----------
+> ?1 file changed, 10 deletions(-)
+>
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 11a1b65..b697136 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -660,16 +660,6 @@ config AB8500_CORE
+> ? ? ? ? ?the irq_chip parts for handling the Mixed Signal chip events.
+> ? ? ? ? ?This chip embeds various other multimedia funtionalities as well.
+>
+> -config AB8500_I2C_CORE
+> - ? ? ? bool "AB8500 register access via PRCMU I2C"
+> - ? ? ? depends on AB8500_CORE && MFD_DB8500_PRCMU
 
-Fix this by initializing reg_shift before mmc_add_host() is called.
+You need to move these dependencies under the AB8500_CORE config
+entry instead.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> - ? ? ? default y
 
----
+I wonder if in  arch/arm/mach-ux500/Kconfig MACH_MOP500 should
+select this instead, all MOP500 children have this an *won't* work
+without it.
 
-Heh found it! Chris, maybe Cc stable on this one?
-
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -1485,6 +1485,7 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
- 	}
- 
- 	host->nr_slots = pdata->nr_slots;
-+	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
- 
- 	host->mmc_omap_wq = alloc_workqueue("mmc_omap", 0, 0);
- 	if (!host->mmc_omap_wq)
-@@ -1500,8 +1501,6 @@ static int __devinit mmc_omap_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	host->reg_shift = (cpu_is_omap7xx() ? 1 : 2);
--
- 	return 0;
- 
- err_destroy_wq:
+Yours,
+Linus Walleij
