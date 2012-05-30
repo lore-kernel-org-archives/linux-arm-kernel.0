@@ -1,56 +1,36 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 30 May 2012 15:38:51 -0400
-Subject: [PATCH 3/9] ARM: mmp: support DT in irq
-In-Reply-To: <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
- (Haojian Zhuang's message of "Fri, 27 Apr 2012 16:39:11 +0800")
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
- <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <87ehq1tq5w.fsf@laptop.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 30 May 2012 12:40:59 -0700
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <4FC5DFCF.1020606@codeaurora.org>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+Message-ID: <20120530194059.GA13243@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On 20120530-01:52, Stephen Boyd wrote:
+> On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
+> > Add an extension API for clocks. This allows clocktypes to provide extensions
+> > for features which are uncommon and cannot be easily mapped onto normal clock
+> > framework concecpts. eg: resetting blocks, configuring clock phase etc.
+> 
+> This seems rather generic. Why not add more specific APIs/concepts like
+> clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
+> make them map.
+> 
 
-On Fri, Apr 27 2012, Haojian Zhuang wrote:
-> Append new interrupt driver that could support both pxa168 and mmp2
-> silicon. And this driver supports device tree.
->
-> Since CONFIG_SPARSE_IRQ is enabled in arch-mmp, irq driver should
-> handle reserved NR_IRQS_LEGACY in irq domain.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+I also wonder if exposing some of these knobs should be done in the
+basic clock types.  Meaning that instead of having additional calls in
+the clk.h API those calls could be exposed by the basic clock types that
+map to the actions.
 
-This patch (now in mainline) breaks boot on XO-1.75 (MMP2, non-DT).
-I hit the error path below:
+The question that needs to be answered is this: do generic drivers need
+access to these additional functions (clk.h) or just the platform code
+which implements some of the clock logic (basic clock types &
+platform-speciic clock types).
 
-> +	for (i = 1; i < max_icu_nr; i++) {
-> +		if (irq == icu_data[i].cascade_irq) {
-> +			domain = icu_data[i].domain;
-> +			data = (struct icu_chip_data *)domain->host_data;
-> +			break;
-> +		}
-> +	}
-> +	if (i >= max_icu_nr) {
-> +		pr_err("Spurious irq %d in MMP INTC\n", irq);
-> +		return;
-> +	}
+Regards,
+Mike
 
-This error path is hit because i=8 and max_icu_nr=8, which is because
-we never matched (irq == icu_data[i].cascade_irq) in the for loop above.
-This test is outside of a DT path, but cascade_irq appears to only ever
-be set *inside* a DT path:
-
-> +		icu_data[i].cascade_irq = irq_of_parse_and_map(node, 0);
-> +		if (!icu_data[i].cascade_irq) {
-> +			ret = -EINVAL;
-> +			goto err;
-> +		}
-
-Did you test non-DT boot with these changes?
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> At the least it should be documented so that people know what it should
+> be used for.
