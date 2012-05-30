@@ -1,107 +1,39 @@
-From: jgq516@gmail.com (Xiao Jiang)
-Date: Wed, 30 May 2012 11:19:37 +0800
-Subject: [PATCH 1/3] arm/dts: add wdt node for omap3 and omap4
-In-Reply-To: <4FC50CCD.7090404@ti.com>
-References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
- <1337942552-28218-2-git-send-email-jgq516@gmail.com>
- <4FC50CCD.7090404@ti.com>
-Message-ID: <4FC591C9.2050004@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 May 2012 10:51:30 +0800
+Subject: [PATCH 15/16] ARM: ux500: Add regulator support for nomadik-i2c
+ into the db8500 Device Tree
+In-Reply-To: <4FC56ABE.2020700@linaro.org>
+References: <1337330355-17747-1-git-send-email-lee.jones@linaro.org>
+ <1337330355-17747-16-git-send-email-lee.jones@linaro.org>
+ <CACRpkdanT17H4VV1AzaYN0wnsFKJTVhw0ZT+o3nP9v=gpKdyAQ@mail.gmail.com>
+ <4FBB4782.9090101@linaro.org>
+ <CACRpkdb80+4i_9JJpSu9X3biFywnFPvU-7HkZ94btz0iPL723A@mail.gmail.com>
+ <4FC45598.903@linaro.org>
+ <CACRpkdafqKU8fUYPMsB5Pu+NBDDV_iSXez7F3BT-To7E1Vfs2w@mail.gmail.com>
+ <4FC56ABE.2020700@linaro.org>
+Message-ID: <CACRpkdbY9=bNhAui+b2Tb0Q6S0n7ZVHBuPz-wYuGMKfgdQrq3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter wrote:
-> On 05/25/2012 05:42 AM, jgq516 at gmail.com wrote:
->   
->> From: Xiao Jiang <jgq516@gmail.com>
->>
->> Add wdt node to support dt.
->>
->> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
->> ---
->>  arch/arm/boot/dts/omap3.dtsi |    5 +++++
->>  arch/arm/boot/dts/omap4.dtsi |    5 +++++
->>  2 files changed, 10 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index 99474fa..039df5c 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -215,5 +215,10 @@
->>  			compatible = "ti,omap3-hsmmc";
->>  			ti,hwmods = "mmc3";
->>  		};
->> +
->> +		wdt: wdt at 48314000{
->>     
->
-> Minor comment, may be call this wdt2 as this is watchdog timer 2. Also
-> ass a space between the address and the "{".
->
->   
-Ok, will change it to "wdt2: wdt at 48314000 {".
->> +			compatible = "ti,omap3-wdt";
->> +			ti,hwmods = "wd_timer2";
->> +		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 359c497..d01403d 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -272,5 +272,10 @@
->>  			ti,hwmods = "mmc5";
->>  			ti,needs-special-reset;
->>  		};
->> +
->> +		wdt: wdt at 4a314000{
->>     
->
-> Same as above.
->
->   
-Ditto.
->> +			compatible = "ti,omap4-wdt";
->> +			ti,hwmods = "wd_timer2";
->> +		};
->>  	};
->>  };
->>     
->
-> Also we should add some documentation to describe the binding. Here it
-> is very simple, but nonetheless we should have something as we have for
-> gpio [1].
->
->   
-Thanks for reminding, how about below patch?
+On Wed, May 30, 2012 at 8:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 30/05/12 08:09, Linus Walleij wrote:
 
-diff --git a/Documentation/devicetree/bindings/watchdog/omap-wdt.txt 
-b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
-new file mode 100644
-index 0000000..4272d06
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
-@@ -0,0 +1,15 @@
-+TI Watchdog Timer (WDT) Controller for OMAP
-+
-+Required properties:
-+- compatible:
-+  - "ti,omap2-wdt" for OMAP2
-+  - "ti,omap3-wdt" for OMAP3
-+  - "ti,omap4-wdt" for OMAP4
-+- ti,hwmods: Name of the hwmod associated to the WDT
-+
-+Examples:
-+
-+wdt2: wdt at 73f98000 {
-+       compatible = "ti,omap4-wdt";
-+       ti,hwmods = "wd_timer2";
-+};
-
-Regards,
-Xiao
-> Cheers
-> Jon
+>> So assume this one device tree gets deployed, and some poor windows
+>> phone developer start scratching his head about the strange voltage
+>> domain regulator for the I2C device, when in reality there is no such
+>> thing, there is only an APE voltage domain regulator common for all
+>> these devices.
 >
-> [1]
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=Documentation/devicetree/bindings/gpio/gpio-omap.txt;h=bff51a2fee1eae7d387b40ea913e04782554bf68;hb=HEAD
->   
+> I'm more than happy to 'do the right thing', but I need to know what that is
+> first.
+
+My working assumption is that the right thing to do is delete this regulator
+from the I2C driver, then refactor the (out-of-tree) runtime PM code to
+fetch the voltage domain regulators, so the APE voltage domain
+regulators get taken by the voltage domains instead.
+
+I haven't tried deleting it though, plese try it and see if the domain is
+still on anyway, then it's the way to proceed.
+
+Yours,
+Linus Walleij
