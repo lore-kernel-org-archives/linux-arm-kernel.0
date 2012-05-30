@@ -1,32 +1,83 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 30 May 2012 17:23:57 +0200
-Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
-In-Reply-To: <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <1338375394-16268-3-git-send-email-kishon@ti.com>
- <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
-Message-ID: <4FC63B8D.3070107@ti.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Wed, 30 May 2012 16:31:52 +0100
+Subject: [PATCH] serial: Add driver for LPC32xx High Speed UARTs
+In-Reply-To: <1338389751-16022-1-git-send-email-stigge@antcom.de>
+References: <1338389751-16022-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120530163152.38c26da0@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
-> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>  wrote:
->> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
->> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now added
->> (which can be used to control MODULEMODE) this clock node is removed.
->>
->> Cc: Benoit Cousson<b-cousson@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->> ---
->>   arch/arm/mach-omap2/clock44xx_data.c |   11 -----------
->
-> Have you patched clock44xx_data.c manually or you have a patch for
-> the clock_data autogen script to generate it ?
+> +#define LPC32XX_TTY_MINOR_START	196
+> +#define LPC32XX_TTY_MAJOR 204
 
-I have a series that will remove all these clock nodes. I should be able 
-to post that soon.
+NAK - please use dynamic allocations.
 
-Potentially at that time, Kishon might be able to drop that patch.
 
-Regards,
-Benoit
+> +	/* Read data from FIFO and push into terminal */
+> +	tmp = readl(LPC32XX_HSUART_FIFO(port->membase));
+> +	while (!(tmp & LPC32XX_HSU_RX_EMPTY)) {
+> +		flag = TTY_NORMAL;
+> +		port->icount.rx++;
+> +
+> +		if (tmp & LPC32XX_HSU_ERROR_DATA) {
+> +			/* Framing error */
+> +			writel(LPC32XX_HSU_FE_INT,
+> +			       LPC32XX_HSUART_IIR(port->membase));
+> +			port->icount.frame++;
+> +			flag = TTY_FRAME;
+> +			tty_insert_flip_char(port->state->port.tty, 0,
+> +					     TTY_FRAME);
+> +			tty_schedule_flip(port->state->port.tty);
+> +		}
+> +
+> +		tty_insert_flip_char(port->state->port.tty, (tmp & 0xFF), flag);
+> +
+> +		tmp = readl(LPC32XX_HSUART_FIFO(port->membase));
+
+This seems odd - you don't need to schedule the flip of the framing error
+separately. It all just ends up in the queue and can be kicked in one go.
+
+Also if the last byte is a normal char - who ensures the buffer is pushed
+and not wedged until a future I/O ?
+
+Second problem is port->state->port.tty can be or go to NULL. Take a look
+how drivers use tty_port_tty_get(), and tty_kref_put.
+
+
+> +	/* Data received? */
+> +	if (status & (LPC32XX_HSU_RX_TIMEOUT_INT | LPC32XX_HSU_RX_TRIG_INT)) {
+> +		__serial_lpc32xx_rx(port);
+> +		spin_unlock(&port->lock);
+> +		tty_flip_buffer_push(port->state->port.tty);
+> +		spin_lock(&port->lock);
+> +	}
+
+Not sure what the locking is about here - you shouldn't need to fiddle
+with locks unless you are using low latency and you can't use low latency
+safely from an IRQ handler...
+
+(Also again tty and NULL - you may want to grab it once at the start of
+the handler)
+
+
+> +static void serial_lpc32xx_set_termios(struct uart_port *port,
+> +				       struct ktermios *termios,
+> +				       struct ktermios *old)
+> +{
+> +	unsigned long flags;
+> +	unsigned int baud, quot;
+> +	u32 tmp;
+> +
+> +	/* Always 8-bit, no parity, 1 stop bit */
+> +	termios->c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD);
+> +	termios->c_cflag |= CS8;
+> +
+> +	termios->c_cflag &= ~(HUPCL | CMSPAR | CLOCAL | CRTSCTS);
+> +
+> +	baud = uart_get_baud_rate(port, termios, old, 0,
+> +				  port->uartclk / 14);
+
+You want to set the resulting baud rate back into the struct - see 8250.c
+for an example.
+
+Alan
