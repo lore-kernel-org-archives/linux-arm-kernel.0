@@ -1,37 +1,27 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 30 May 2012 18:08:38 +0100
-Subject: [PATCH 2/2] MFD: mc13xxx workaround SPI hardware bug on i.Mx
-In-Reply-To: <1338282389-26177-3-git-send-email-philippe.retornaz@epfl.ch>
-References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
- <1338282389-26177-2-git-send-email-philippe.retornaz@epfl.ch>
- <1338282389-26177-3-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20120530170837.GR9947@opensource.wolfsonmicro.com>
+Date: Wed, 30 May 2012 18:19:36 +0100
+Subject: [PATCH 1/2] ARM: S3C64XX: Add module identification for Balblair
+ Cragganmore module
+Message-ID: <1338398378-18268-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 11:06:29AM +0200, Philippe R?tornaz wrote:
-> The MC13xxx PMIC is mainly used on i.Mx SoC. On thoses SoC the SPI
-> hardware will deassert CS line as soon as the SPI FIFO is empty.
-> The MC13xxx hardware is very sensitive to CS line change as it
-> corrupts the transfert if CS is deasserted in the middle of a register
-> read or write.
-> It is not possible to use the CS line as a GPIO on some SoC, so we
-> need to workaround this by implementing a single SPI transfer to
-> access the PMIC.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-though it's really sad this can't be done in the SPI controller where
-the bug is.  You should also set use_single_rw in the regmap_config,
-though this is less critical as currently the core won't automatically
-generate any bulk I/O.
-
-Obviously this will affect a much wider range of devices when used with
-i.MX.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120530/0b925a82/attachment.sig>
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index dbd5771..985e255 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -219,6 +219,7 @@ static __devinitdata const struct {
+ 	  .spi_devs = wm1253_devs, .num_spi_devs = ARRAY_SIZE(wm1253_devs) },
+ 	{ .id = 0x32, .name = "XXXX-EV1 Caol Illa" },
+ 	{ .id = 0x33, .name = "XXXX-EV1 Oban" },
++	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair" },
+ 	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
+ 	  .i2c_devs = wm1254_devs, .num_i2c_devs = ARRAY_SIZE(wm1254_devs) },
+ 	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
+-- 
+1.7.10
