@@ -1,31 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:18 +0800
-Subject: [PATCH 01/22] Fixes and clean-ups for Device Tree on Snowball
-Message-ID: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 30 May 2012 12:47:19 +0800
+Subject: [PATCH 01/22] ARM: ux500: New DT:ed snowball_platform_devs for
+ one-by-one device enablement
+In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set contains some fixes and clean-ups that will ensure
-smooth booting on Snowball. Without them some devices will either
-fail on probe, or fail to probe at all. Some patches contained
-here work towards suppressing useless warning boot messages which
-originate from the non-existent User Interface Board (UIB). Others
-aim to fix some previous merge conflict errors previously applied
-to the Mainline kernel.
+During Device Tree enablement it is necessary to remove snowball_<device>*
+platform_data segments one at at time, as and when particular devices are
+DT enabled. This patch provides a temporary solution. Once this new struct
+is empty it will be removed again.
 
- arch/arm/boot/dts/db8500.dtsi          |  204 +++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/snowball.dts         |   32 +++--
- arch/arm/configs/u8500_defconfig       |    1 +
- arch/arm/mach-ux500/board-mop500-uib.c |    4 +-
- arch/arm/mach-ux500/board-mop500.c     |   32 ++++-
- arch/arm/mach-ux500/board-mop500.h     |    4 +
- arch/arm/mach-ux500/cpu-db8500.c       |   25 +++-
- drivers/mfd/Kconfig                    |   10 --
- drivers/mfd/ab8500-gpadc.c             |    3 +-
- drivers/mfd/db8500-prcmu.c             |    6 +
- drivers/net/ethernet/smsc/smsc911x.c   |    7 +-
- drivers/pinctrl/pinctrl-nomadik.c      |   20 +++-
- drivers/regulator/ab8500.c             |   22 ++--
- drivers/regulator/db8500-prcmu.c       |   40 +++----
- drivers/rtc/rtc-ab8500.c               |    2 +-
- 15 files changed, 344 insertions(+), 68 deletions(-)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index b23a643..d4132f5 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -676,6 +676,13 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&ab8500_device,
+ };
+ 
++static struct platform_device *snowball_of_platform_devs[] __initdata = {
++	&snowball_led_dev,
++	&snowball_key_dev,
++	&snowball_sbnet_dev,
++	&ab8500_device,
++};
++
+ static void __init mop500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+@@ -876,8 +883,15 @@ static void __init u8500_init_machine(void)
+ 					ARRAY_SIZE(mop500_i2c2_devices));
+ 
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+-		platform_add_devices(snowball_platform_devs,
+-				ARRAY_SIZE(snowball_platform_devs));
++		/*
++		 * Devices to be DT:ed:
++		 *   snowball_led_dev   = todo
++		 *   snowball_key_dev   = todo
++		 *   snowball_sbnet_dev = todo
++		 *   ab8500_device      = todo
++		 */
++		platform_add_devices(snowball_of_platform_devs,
++				ARRAY_SIZE(snowball_of_platform_devs));
+ 
+ 		snowball_sdi_init(parent);
+ 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+-- 
+1.7.9.5
