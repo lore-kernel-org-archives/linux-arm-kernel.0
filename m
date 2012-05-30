@@ -1,53 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 May 2012 14:58:44 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
- Device Tree
-In-Reply-To: <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+Date: Wed, 30 May 2012 15:00:39 +0800
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbJe_P==QOPiRi0rZ58aCwyOD8zhxjTX8Do5g_8EFHVGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The 'name' field in 'struct of_regulator_match' expects to match with
-> its corresponding regulator device node in the Device Tree. This patch
-> renames each of the regulators in the ab8500 regulator driver so this
-> is true.
+> ?static struct of_regulator_match db8500_regulator_matches[] = {
+> - ? ? ? { .name = "db8500-vape", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VAPE, },
+> - ? ? ? { .name = "db8500-varm", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VARM, },
+> - ? ? ? { .name = "db8500-vmodem", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VMODEM, },
+> - ? ? ? { .name = "db8500-vpll", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VPLL, },
+> - ? ? ? { .name = "db8500-vsmps1", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
+> - ? ? ? { .name = "db8500-vsmps2", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
+> - ? ? ? { .name = "db8500-vsmps3", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
+> - ? ? ? { .name = "db8500-vrf1", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VRF1, },
+> - ? ? ? { .name = "db8500-sva-mmdsp", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
+> - ? ? ? { .name = "db8500-sva-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
+> - ? ? ? { .name = "db8500-sva-pipe", ? ? ?.driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
+> - ? ? ? { .name = "db8500-sia-mmdsp", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
+> - ? ? ? { .name = "db8500-sia-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
+> - ? ? ? { .name = "db8500-sia-pipe", ? ? ?.driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
+> - ? ? ? { .name = "db8500-sga", ? ? ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
+> - ? ? ? { .name = "db8500-b2r2-mcde", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
+> - ? ? ? { .name = "db8500-esram12", ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
+> - ? ? ? { .name = "db8500-esram12-ret", ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
+> - ? ? ? { .name = "db8500-esram34", ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
+> - ? ? ? { .name = "db8500-esram34-ret", ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
+> + ? ? ? { .name = "db8500_vape", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VAPE, },
+> + ? ? ? { .name = "db8500_varm", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VARM, },
+> + ? ? ? { .name = "db8500_vmodem", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VMODEM, },
+> + ? ? ? { .name = "db8500_vpll", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VPLL, },
+> + ? ? ? { .name = "db8500_vsmps1", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
+> + ? ? ? { .name = "db8500_vsmps2", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
+> + ? ? ? { .name = "db8500_vsmps3", ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
+> + ? ? ? { .name = "db8500_vrf1", ? ? ? ? ?.driver_data = (void *) DB8500_REGULATOR_VRF1, },
+> + ? ? ? { .name = "db8500_sva_mmdsp", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
+> + ? ? ? { .name = "db8500_sva_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
+> + ? ? ? { .name = "db8500_sva_pipe", ? ? ?.driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
+> + ? ? ? { .name = "db8500_sia_mmdsp", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
+> + ? ? ? { .name = "db8500_sia_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
+> + ? ? ? { .name = "db8500_sia_pipe", ? ? ?.driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
+> + ? ? ? { .name = "db8500_sga", ? ? ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
+> + ? ? ? { .name = "db8500_b2r2_mcde", ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
+> + ? ? ? { .name = "db8500_esram12", ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
+> + ? ? ? { .name = "db8500_esram12_ret", ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
+> + ? ? ? { .name = "db8500_esram34", ? ? ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
+> + ? ? ? { .name = "db8500_esram34_ret", ? .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
 
-OK...
-
-> ?static struct of_regulator_match ab8500_regulator_matches[] = {
-> - ? ? ? { .name = "LDO-AUX1", ? ?.driver_data = (void *) AB8500_LDO_AUX1, },
-> - ? ? ? { .name = "LDO-AUX2", ? ?.driver_data = (void *) AB8500_LDO_AUX2, },
-> - ? ? ? { .name = "LDO-AUX3", ? ?.driver_data = (void *) AB8500_LDO_AUX3, },
-> - ? ? ? { .name = "LDO-INTCORE", .driver_data = (void *) AB8500_LDO_INTCORE, },
-> - ? ? ? { .name = "LDO-TVOUT", ? .driver_data = (void *) AB8500_LDO_TVOUT, },
-> - ? ? ? { .name = "LDO-USB", ? ? .driver_data = (void *) AB8500_LDO_USB, },
-> - ? ? ? { .name = "LDO-AUDIO", ? .driver_data = (void *) AB8500_LDO_AUDIO, },
-> - ? ? ? { .name = "LDO-ANAMIC1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
-> - ? ? ? { .name = "LDO-ANAMIC2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
-> - ? ? ? { .name = "LDO-DMIC", ? ?.driver_data = (void *) AB8500_LDO_DMIC, },
-> - ? ? ? { .name = "LDO-ANA", ? ? .driver_data = (void *) AB8500_LDO_ANA, },
-> + ? ? ? { .name = "ab8500_ldo_aux1", ? ?.driver_data = (void *) AB8500_LDO_AUX1, },
-> + ? ? ? { .name = "ab8500_ldo_aux2", ? ?.driver_data = (void *) AB8500_LDO_AUX2, },
-> + ? ? ? { .name = "ab8500_ldo_aux3", ? ?.driver_data = (void *) AB8500_LDO_AUX3, },
-> + ? ? ? { .name = "ab8500_ldo_intcore", .driver_data = (void *) AB8500_LDO_INTCORE, },
-> + ? ? ? { .name = "ab8500_ldo_tvout", ? .driver_data = (void *) AB8500_LDO_TVOUT, },
-> + ? ? ? { .name = "ab8500_ldo_usb", ? ? .driver_data = (void *) AB8500_LDO_USB, },
-> + ? ? ? { .name = "ab8500_ldo_audio", ? .driver_data = (void *) AB8500_LDO_AUDIO, },
-> + ? ? ? { .name = "ab8500_ldo_anamic1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
-> + ? ? ? { .name = "ab8500_ldo_amamic2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
-> + ? ? ? { .name = "ab8500_ldo_dmic", ? ?.driver_data = (void *) AB8500_LDO_DMIC, },
-> + ? ? ? { .name = "ab8500_ldo_ana", ? ? .driver_data = (void *) AB8500_LDO_ANA, },
-> ?};
-
-So why is the device tree going to use these lowercase names etc?
-I guess there is a rationale...
-
-Anyway: the name is used in more parts of the file, so please change
-it everywhere if you change it.
+So again what is the rationale for changing the names, and
+again the strings are in several places in this file.
 
 Yours,
 Linus Walleij
