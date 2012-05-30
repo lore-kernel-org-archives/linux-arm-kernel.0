@@ -1,42 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:36 +0800
-Subject: [PATCH 18/22] mfd: Remove redundant Kconfig entry
+Date: Wed, 30 May 2012 12:47:37 +0800
+Subject: [PATCH 19/22] net/smsc911x: Repair broken failure paths
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
-was left remnant. This patch simply removes it.
+Current failure paths attempt to free resources which we failed to request
+and disable resources which we failed to enable ones. This leads to kernel
+oops/panic. This patch does some simple re-ordering to prevent this from
+happening.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: linux-kernel at vger.kernel.org
+Cc: netdev at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/Kconfig |   10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/net/ethernet/smsc/smsc911x.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 11a1b65..b697136 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -660,16 +660,6 @@ config AB8500_CORE
- 	  the irq_chip parts for handling the Mixed Signal chip events.
- 	  This chip embeds various other multimedia funtionalities as well.
+diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
+index dab9c6f..1466e5d 100644
+--- a/drivers/net/ethernet/smsc/smsc911x.c
++++ b/drivers/net/ethernet/smsc/smsc911x.c
+@@ -2390,11 +2390,11 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
  
--config AB8500_I2C_CORE
--	bool "AB8500 register access via PRCMU I2C"
--	depends on AB8500_CORE && MFD_DB8500_PRCMU
--	default y
--	help
--	  This enables register access to the AB8500 chip via PRCMU I2C.
--	  The AB8500 chip can be accessed via SPI or I2C. On DB8500 hardware
--	  the I2C bus is connected to the Power Reset
--	  and Mangagement Unit, PRCMU.
--
- config AB8500_DEBUG
-        bool "Enable debug info via debugfs"
-        depends on AB8500_CORE && DEBUG_FS
+ 	retval = smsc911x_request_resources(pdev);
+ 	if (retval)
+-		goto out_return_resources;
++		goto out_request_resources_fail;
+ 
+ 	retval = smsc911x_enable_resources(pdev);
+ 	if (retval)
+-		goto out_disable_resources;
++		goto out_enable_resources_fail;
+ 
+ 	if (pdata->ioaddr == NULL) {
+ 		SMSC_WARN(pdata, probe, "Error smsc911x base address invalid");
+@@ -2501,8 +2501,9 @@ out_free_irq:
+ 	free_irq(dev->irq, dev);
+ out_disable_resources:
+ 	(void)smsc911x_disable_resources(pdev);
+-out_return_resources:
++out_enable_resources_fail:
+ 	smsc911x_free_resources(pdev);
++out_request_resources_fail:
+ 	platform_set_drvdata(pdev, NULL);
+ 	iounmap(pdata->ioaddr);
+ 	free_netdev(dev);
 -- 
 1.7.9.5
