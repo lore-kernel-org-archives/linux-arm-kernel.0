@@ -1,63 +1,196 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Wed, 30 May 2012 14:17:39 +0400
-Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
- for OMAP4
-In-Reply-To: <4FC5E7DE.2060905@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
- <4FC49BA5.5050008@dev.rtsoft.ru> <4FC5DC9F.7080104@ti.com>
- <4FC5E2EE.8030504@dev.rtsoft.ru> <4FC5E7DE.2060905@ti.com>
-Message-ID: <4FC5F3C3.2000309@dev.rtsoft.ru>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 30 May 2012 12:18:57 +0200
+Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
+In-Reply-To: <1338373143-7467-1-git-send-email-hs@denx.de>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+Message-ID: <1338373143-7467-2-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi.
-On 05/30/2012 01:26 PM, Cousson, Benoit wrote:
-> On 5/30/2012 11:05 AM, Konstantin Baydarov wrote:
->> On 05/30/2012 12:38 PM, Cousson, Benoit wrote:
->>> On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
->>>> Hi, Eduardo.
->>>>
->>>> On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
->>>>> This patch add device tree entries on OMAP4 based boards for
->>>>> System Control Module (SCM).
->
-> ...
->
->>>> I believe that CPU-specific bandgap definition should be moved to
->>>> bard specific dts.
->>>
->>> Mmm, why, since it is CPU specific and not board specific. I has to
->>> be in the SoC file.
->> Speaking about omap4430 - omap4430 bandgap differs from omap4460, so
->> if omap4430 bandgap support will be added to omap-bandgap driver the
->> version of bandgap should specified in dts file. omap4.dtsi is a
->> common for omap4 boards, that is why I'm suggesting to move bandgap
->> description to probably board specific file.
->
-> OK, I got your point, but in that case we could potentially define a omap4460.dtsi file.
->
->> Another solution is to
->> determine bandgap type in driver probe function, but in that case
->> "ti,omap4460-bandgap" in omap4.dtsi should be replaced to
->> "ti,omap4-bandgap".
->
-> Yes, this is the best solution, but that assume that we can identify the control module version from the HW, which is not necessarily true :-(
->
-> The IP_REVISION (offset = 0) value are unfortunately not documented, so we should read it to check if they are different from omap4430 and 4460.
->
-> The bitfield layout in that register is:
->
-> IP_REV_MAJOR: 8..10
-> IP_REV_CUSTOM: 6..7
-> IP_REV_MINOR: 0..5
-Probably, cpu_is_omap443x() and cpu_is_omap446x() can be used in bandgap driver probe function. Actually many drivers use cpu_is_omap*():
-drivers/mfd/omap-usb-host.c
-drivers/mfd/twl-core.c
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Wolfgang Denk <wd@denx.de>
+Cc: Sergei Shtylyov <sshtylyov@mvista.com>
 
-  BR,
-    Konstantin Baydarov.
+---
+- changes for v2:
+- add comment from Grant Likely:
+  - migrate the whole interrupt controller to natively use an
+    irq_domain. Rebased complete patchserie to:
+    git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
 
->
-> Regards,
-> Benoit
+    commit 3a806bfcde2cc3e4853f2807b2e3c94e7ccaf450
+    Author: Grant Likely <grant.likely@secretlab.ca>
+    Date:   Fri Jan 27 06:44:34 2012 -0700
+
+    irq_domain: mostly eliminate slow-path revmap lookups
+- changes for v3:
+  - add comments from Sergei Shtylyov:
+    - rename compatible" prop to "ti,cp_intc"
+    - cp_intc_init() is now also for the of case
+      the name of the init function (it calls the
+      "new" __cp_intc_init() function, which was
+      the "old" cp_intc_init()). Throught this
+      rework the changes for OF is better visible.
+      As the OF case uses the irq_domain rework from
+      Grant Likely, maybe the none OF case can use
+      this also, but this should be tested on a hw ...
+  - rebased to:
+    git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+
+    commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
+    Author: Grant Likely <grant.likely@secretlab.ca>
+    Date:   Fri Feb 24 14:58:54 2012 -0700
+
+    mfd: twl-core: Add IRQ_DOMAIN dependency
+
+- changes for v4
+  - split patch in 2 patches, one for irq_domain adaption
+    one for DT enhancement, as Nori Sekhar suggested
+  - add comment from Grant Likely for the DT part:
+    remove if/else clause, not needed.
+    Make use of DT runtime configurable
+
+- changes for v5:
+  add comments from Sergei Shtylyov:
+  - s/intc/cp_intc in commit subject
+  - Codingstyle fixes
+  add comment from Grant Likely:
+  - call irq_domain_add also in the non DT case
+    (was fixed in v4)
+  - switched from using d->irq to d->hwirq for the hardware
+    irq number in irq_chip hooks
+
+ arch/arm/mach-davinci/cp_intc.c |   63 ++++++++++++++++++++++++++++++--------
+ 1 files changed, 49 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+index f83152d..45d5256 100644
+--- a/arch/arm/mach-davinci/cp_intc.c
++++ b/arch/arm/mach-davinci/cp_intc.c
+@@ -9,8 +9,10 @@
+  * kind, whether express or implied.
+  */
+ 
++#include <linux/export.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/io.h>
+ 
+ #include <mach/common.h>
+@@ -28,7 +30,7 @@ static inline void cp_intc_write(unsigned long value, unsigned offset)
+ 
+ static void cp_intc_ack_irq(struct irq_data *d)
+ {
+-	cp_intc_write(d->irq, CP_INTC_SYS_STAT_IDX_CLR);
++	cp_intc_write(d->hwirq, CP_INTC_SYS_STAT_IDX_CLR);
+ }
+ 
+ /* Disable interrupt */
+@@ -36,20 +38,20 @@ static void cp_intc_mask_irq(struct irq_data *d)
+ {
+ 	/* XXX don't know why we need to disable nIRQ here... */
+ 	cp_intc_write(1, CP_INTC_HOST_ENABLE_IDX_CLR);
+-	cp_intc_write(d->irq, CP_INTC_SYS_ENABLE_IDX_CLR);
++	cp_intc_write(d->hwirq, CP_INTC_SYS_ENABLE_IDX_CLR);
+ 	cp_intc_write(1, CP_INTC_HOST_ENABLE_IDX_SET);
+ }
+ 
+ /* Enable interrupt */
+ static void cp_intc_unmask_irq(struct irq_data *d)
+ {
+-	cp_intc_write(d->irq, CP_INTC_SYS_ENABLE_IDX_SET);
++	cp_intc_write(d->hwirq, CP_INTC_SYS_ENABLE_IDX_SET);
+ }
+ 
+ static int cp_intc_set_irq_type(struct irq_data *d, unsigned int flow_type)
+ {
+-	unsigned reg		= BIT_WORD(d->irq);
+-	unsigned mask		= BIT_MASK(d->irq);
++	unsigned reg		= BIT_WORD(d->hwirq);
++	unsigned mask		= BIT_MASK(d->hwirq);
+ 	unsigned polarity	= cp_intc_read(CP_INTC_SYS_POLARITY(reg));
+ 	unsigned type		= cp_intc_read(CP_INTC_SYS_TYPE(reg));
+ 
+@@ -99,18 +101,36 @@ static struct irq_chip cp_intc_irq_chip = {
+ 	.irq_set_wake	= cp_intc_set_wake,
+ };
+ 
+-void __init cp_intc_init(void)
++static struct irq_domain *cp_intc_domain;
++
++static int cp_intc_host_map(struct irq_domain *h, unsigned int virq,
++			  irq_hw_number_t hw)
++{
++	pr_debug("cp_intc_host_map(%d, 0x%lx)\n", virq, hw);
++
++	irq_set_chip(virq, &cp_intc_irq_chip);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++	irq_set_handler(virq, handle_edge_irq);
++	return 0;
++}
++
++static const struct irq_domain_ops cp_intc_host_ops = {
++	.map = cp_intc_host_map,
++	.xlate = irq_domain_xlate_onetwocell,
++};
++
++int __init __cp_intc_init(struct device_node *node)
+ {
+-	unsigned long num_irq	= davinci_soc_info.intc_irq_num;
++	u32 num_irq		= davinci_soc_info.intc_irq_num;
+ 	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
+ 	u32 *host_map		= davinci_soc_info.intc_host_map;
+ 	unsigned num_reg	= BITS_TO_LONGS(num_irq);
+-	int i;
++	int i, irq_base;
+ 
+ 	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
+ 	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
+ 	if (WARN_ON(!davinci_intc_base))
+-		return;
++		return -EINVAL;
+ 
+ 	cp_intc_write(0, CP_INTC_GLOBAL_ENABLE);
+ 
+@@ -165,13 +185,28 @@ void __init cp_intc_init(void)
+ 		for (i = 0; host_map[i] != -1; i++)
+ 			cp_intc_write(host_map[i], CP_INTC_HOST_MAP(i));
+ 
+-	/* Set up genirq dispatching for cp_intc */
+-	for (i = 0; i < num_irq; i++) {
+-		irq_set_chip(i, &cp_intc_irq_chip);
+-		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+-		irq_set_handler(i, handle_edge_irq);
++	irq_base = irq_alloc_descs(-1, 0, num_irq, 0);
++	if (irq_base < 0) {
++		pr_warn("Couldn't allocate IRQ numbers\n");
++		irq_base = 0;
++	}
++
++	/* create a legacy host */
++	cp_intc_domain = irq_domain_add_legacy(node, num_irq,
++					irq_base, 0, &cp_intc_host_ops, NULL);
++
++	if (!cp_intc_domain) {
++		pr_err("cp_intc: failed to allocate irq host!\n");
++		return -EINVAL;
+ 	}
+ 
+ 	/* Enable global interrupt */
+ 	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
++
++	return 0;
++}
++
++void __init cp_intc_init(void)
++{
++	__cp_intc_init(NULL);
+ }
+-- 
+1.7.7.6
