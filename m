@@ -1,75 +1,42 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 30 May 2012 14:58:23 +0530
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4FC5E837.30702@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 30 May 2012 10:34:21 +0100
+Subject: [PATCH v2 4/6] ARM: Samsung: Modify
+ s3c64xx_spi{0|1|2}_set_platdata function
+In-Reply-To: <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
+References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
+ <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
+ <20120520092113.GA20652@opensource.wolfsonmicro.com>
+ <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
+Message-ID: <20120530093421.GA9947@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Wed, May 30, 2012 at 12:28:55AM -0700, Olof Johansson wrote:
+> On Sun, May 20, 2012 at 2:21 AM, Mark Brown
 
-On Tuesday 29 May 2012 03:28 PM, Peter De Schrijver wrote:
-> Add an extension API for clocks. This allows clocktypes to provide extensions
-> for features which are uncommon and cannot be easily mapped onto normal clock
-> framework concecpts. eg: resetting blocks, configuring clock phase etc.
+> > This dev_name also isn't equivalent to dev_name() which makes matters
+> > more confusing than they need to be.
 
-I was thinking on similar lines for OMAP wherein I need to control
-'hardware-auto-gating' bits on clocks which are otherwise just normal
-gates or dividers. We just disable all of them early at boot and
-re-enable them late in the boot process once PM kicks in.
+> Looks like they use the name as the magic string to pick initialization data.
 
-regards,
-Rajendra
+Right, and there's no problem at all with using the name.  The thing is
+that there's no need to set the name at runtime since the struct device
+being configured is always going to end up with the same name and doing
+so is just causing confusion.  The device being registered is specific
+to the SoC already so setting the SoC name at runtime isn't needed.
 
->
-> Signed-off-by: Peter De Schrijver<pdeschrijver@nvidia.com>
-> ---
->   drivers/clk/clk.c            |    8 ++++++++
->   include/linux/clk-provider.h |    2 ++
->   include/linux/clk.h          |    2 ++
->   3 files changed, 12 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e5d5dc1..39bc458 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -956,6 +956,14 @@ struct clk *clk_get_parent(struct clk *clk)
->   }
->   EXPORT_SYMBOL_GPL(clk_get_parent);
->
-> +int clk_ext(struct clk *clk, unsigned int op, unsigned long param)
-> +{
-> +	if (clk->ops->ext)
-> +		return clk->ops->ext(clk->hw, op, param);
-> +
-> +	return -EINVAL;
-> +}
-> +
->   /*
->    * .get_parent is mandatory for clocks with multiple possible parents.  It is
->    * optional for single-parent clocks.  Always call .get_parent if it is
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 6803fb4..08025d3 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -109,6 +109,8 @@ struct clk_ops {
->   	int		(*set_rate)(struct clk_hw *hw, unsigned long,
->   				    unsigned long);
->   	void		(*init)(struct clk_hw *hw);
-> +	int		(*ext)(struct clk_hw *hw, unsigned int op,
-> +					unsigned long param);
->   };
->
->   /**
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 0e078bd..74be656 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -278,4 +278,6 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id);
->   int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
->   			struct device *dev);
->
-> +int clk_ext(struct clk *clk, unsigned int op, unsigned long param);
-> +
->   #endif
+> I wonder if it makes more sense to keep the platform_data still
+> around, and just fill it in with the table (from patch "spi: s3c64xx:
+> move controller information into driver data") based on the OF
+> compatible field for the device-tree probe case, instead of trying to
+> overload and having to change the name in this way.
+
+We could do that, though it does seem nice to have everything be
+consistent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120530/0db84730/attachment.sig>
