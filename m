@@ -1,54 +1,56 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed, 30 May 2012 14:31:57 -0500
-Subject: [PATCH 0/2] OMAP: mailbox initial device tree support
-In-Reply-To: <4FBE574F.6070408@ti.com>
-References: <1335894460-19941-1-git-send-email-omar.luna@linaro.org>
- <B5906170F1614E41A8A28DE3B8D121433EA68F6D@DBDE01.ent.ti.com>
- <4FBE574F.6070408@ti.com>
-Message-ID: <CALLhW=7hdmTZsipbVvGXNNCwE=NsvYJc9mUWRff3V7CA=_vskQ@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 30 May 2012 15:38:51 -0400
+Subject: [PATCH 3/9] ARM: mmp: support DT in irq
+In-Reply-To: <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
+ (Haojian Zhuang's message of "Fri, 27 Apr 2012 16:39:11 +0800")
+References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
+ <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <87ehq1tq5w.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Haojian,
 
-On 24 May 2012 10:44, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 5/2/2012 7:42 AM, Bedia, Vaibhav wrote:
->>
->> Hi Omar,
->>
->> On Tue, May 01, 2012 at 23:17:38, Omar Ramirez Luna wrote:
->>>
->>> To allow mailbox driver to function with device tree.
->>>
->>> Tested in OMAP4 and OMAP3. OMAP2 untested.
->>
->>
->> I think the mailbox code needs a cleanup similar to what you
->> had proposed earlier [1] before the device tree support is added.
->>
->> We probably need to decide whether the number of mailbox sub-modules
->> should be part of hwmod attribute or come from device tree. IMO the
->> static allocation of the mailboxes is better suited in the device-tree
->> data.
+On Fri, Apr 27 2012, Haojian Zhuang wrote:
+> Append new interrupt driver that could support both pxa168 and mmp2
+> silicon. And this driver supports device tree.
 >
+> Since CONFIG_SPARSE_IRQ is enabled in arch-mmp, irq driver should
+> handle reserved NR_IRQS_LEGACY in irq domain.
 >
-> Ideally yes, but that assumes we are supporting only DT boot method, which
-> is still not the case today.
->
-> That being said, the driver might still be able to leverage DT if available
-> already.
->
->
-> This can be done later as well.
->
-> Omar,
-> That's up to you.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Thanks for the ack on the 2nd patch.
+This patch (now in mainline) breaks boot on XO-1.75 (MMP2, non-DT).
+I hit the error path below:
 
-Yes, I think these changes doesn't depend on the cleanup of the
-driver, they could be included prior to them.
+> +	for (i = 1; i < max_icu_nr; i++) {
+> +		if (irq == icu_data[i].cascade_irq) {
+> +			domain = icu_data[i].domain;
+> +			data = (struct icu_chip_data *)domain->host_data;
+> +			break;
+> +		}
+> +	}
+> +	if (i >= max_icu_nr) {
+> +		pr_err("Spurious irq %d in MMP INTC\n", irq);
+> +		return;
+> +	}
 
-Regards,
+This error path is hit because i=8 and max_icu_nr=8, which is because
+we never matched (irq == icu_data[i].cascade_irq) in the for loop above.
+This test is outside of a DT path, but cascade_irq appears to only ever
+be set *inside* a DT path:
 
-Omar
+> +		icu_data[i].cascade_irq = irq_of_parse_and_map(node, 0);
+> +		if (!icu_data[i].cascade_irq) {
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+
+Did you test non-DT boot with these changes?
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
