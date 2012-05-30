@@ -1,196 +1,314 @@
 From: hs@denx.de (Heiko Schocher)
-Date: Wed, 30 May 2012 12:18:57 +0200
-Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
+Date: Wed, 30 May 2012 12:18:59 +0200
+Subject: [PATCH v5 3/7] ARM: davinci: configure davinci aemif chipselects
+ through OF
 In-Reply-To: <1338373143-7467-1-git-send-email-hs@denx.de>
 References: <1338373143-7467-1-git-send-email-hs@denx.de>
-Message-ID: <1338373143-7467-2-git-send-email-hs@denx.de>
+Message-ID: <1338373143-7467-4-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for configuring the aemif timing registers
+through device tree. Introduce new compatible property
+"ti,davinci-cs", see full description in
+Documentation/devicetree/bindings/arm/davinci/aemif.txt
+
 Signed-off-by: Heiko Schocher <hs@denx.de>
 Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-arm-kernel at lists.infradead.org
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
 Cc: Wolfgang Denk <wd@denx.de>
 Cc: Sergei Shtylyov <sshtylyov@mvista.com>
 
 ---
-- changes for v2:
-- add comment from Grant Likely:
-  - migrate the whole interrupt controller to natively use an
-    irq_domain. Rebased complete patchserie to:
-    git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+- changes for v2
+  - add comment from Sergei Shtylyov:
+    - use of_property_read_u32()
+    - Conding Style changes
+  - add comment from Sekhar Nori:
+    - add patch description
+    - use davinci_aemif_setup_timing
+    - change compatible node to "ti,davinci-aemif"
 
-    commit 3a806bfcde2cc3e4853f2807b2e3c94e7ccaf450
-    Author: Grant Likely <grant.likely@secretlab.ca>
-    Date:   Fri Jan 27 06:44:34 2012 -0700
+  - not moved to mfd, as mentioned in this discussion:
+    http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-td7059739.html
+    instead use a phandle in the DTS, so drivers which
+    uses the davinci aemif, can call davinci_aemif_setup_timing_of()
 
-    irq_domain: mostly eliminate slow-path revmap lookups
-- changes for v3:
-  - add comments from Sergei Shtylyov:
-    - rename compatible" prop to "ti,cp_intc"
-    - cp_intc_init() is now also for the of case
-      the name of the init function (it calls the
-      "new" __cp_intc_init() function, which was
-      the "old" cp_intc_init()). Throught this
-      rework the changes for OF is better visible.
-      As the OF case uses the irq_domain rework from
-      Grant Likely, maybe the none OF case can use
-      this also, but this should be tested on a hw ...
-  - rebased to:
-    git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
+    This is just thought as an RFC ... The enbw_cmc board
+    support not really need to setup this bus timings, as
+    they are setup in U-Boot ... but I want to post this,
+    as I think, it is a nice to have ... as an example used
+    in the davinci nand controller OF support patch, in this
+    patchserie.
+- no changes for v3
+- no changes for v4
+- no changes for v5
 
-    commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
-    Author: Grant Likely <grant.likely@secretlab.ca>
-    Date:   Fri Feb 24 14:58:54 2012 -0700
+ .../devicetree/bindings/arm/davinci/aemif.txt      |  119 ++++++++++++++++++++
+ arch/arm/mach-davinci/aemif.c                      |   86 ++++++++++++++-
+ arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
+ 3 files changed, 205 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
 
-    mfd: twl-core: Add IRQ_DOMAIN dependency
-
-- changes for v4
-  - split patch in 2 patches, one for irq_domain adaption
-    one for DT enhancement, as Nori Sekhar suggested
-  - add comment from Grant Likely for the DT part:
-    remove if/else clause, not needed.
-    Make use of DT runtime configurable
-
-- changes for v5:
-  add comments from Sergei Shtylyov:
-  - s/intc/cp_intc in commit subject
-  - Codingstyle fixes
-  add comment from Grant Likely:
-  - call irq_domain_add also in the non DT case
-    (was fixed in v4)
-  - switched from using d->irq to d->hwirq for the hardware
-    irq number in irq_chip hooks
-
- arch/arm/mach-davinci/cp_intc.c |   63 ++++++++++++++++++++++++++++++--------
- 1 files changed, 49 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index f83152d..45d5256 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -9,8 +9,10 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <linux/export.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/io.h>
- 
- #include <mach/common.h>
-@@ -28,7 +30,7 @@ static inline void cp_intc_write(unsigned long value, unsigned offset)
- 
- static void cp_intc_ack_irq(struct irq_data *d)
- {
--	cp_intc_write(d->irq, CP_INTC_SYS_STAT_IDX_CLR);
-+	cp_intc_write(d->hwirq, CP_INTC_SYS_STAT_IDX_CLR);
- }
- 
- /* Disable interrupt */
-@@ -36,20 +38,20 @@ static void cp_intc_mask_irq(struct irq_data *d)
- {
- 	/* XXX don't know why we need to disable nIRQ here... */
- 	cp_intc_write(1, CP_INTC_HOST_ENABLE_IDX_CLR);
--	cp_intc_write(d->irq, CP_INTC_SYS_ENABLE_IDX_CLR);
-+	cp_intc_write(d->hwirq, CP_INTC_SYS_ENABLE_IDX_CLR);
- 	cp_intc_write(1, CP_INTC_HOST_ENABLE_IDX_SET);
- }
- 
- /* Enable interrupt */
- static void cp_intc_unmask_irq(struct irq_data *d)
- {
--	cp_intc_write(d->irq, CP_INTC_SYS_ENABLE_IDX_SET);
-+	cp_intc_write(d->hwirq, CP_INTC_SYS_ENABLE_IDX_SET);
- }
- 
- static int cp_intc_set_irq_type(struct irq_data *d, unsigned int flow_type)
- {
--	unsigned reg		= BIT_WORD(d->irq);
--	unsigned mask		= BIT_MASK(d->irq);
-+	unsigned reg		= BIT_WORD(d->hwirq);
-+	unsigned mask		= BIT_MASK(d->hwirq);
- 	unsigned polarity	= cp_intc_read(CP_INTC_SYS_POLARITY(reg));
- 	unsigned type		= cp_intc_read(CP_INTC_SYS_TYPE(reg));
- 
-@@ -99,18 +101,36 @@ static struct irq_chip cp_intc_irq_chip = {
- 	.irq_set_wake	= cp_intc_set_wake,
- };
- 
--void __init cp_intc_init(void)
-+static struct irq_domain *cp_intc_domain;
+diff --git a/Documentation/devicetree/bindings/arm/davinci/aemif.txt b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
+new file mode 100644
+index 0000000..0dbb842
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
+@@ -0,0 +1,119 @@
++* Texas Instruments Davinci AEMIF
 +
-+static int cp_intc_host_map(struct irq_domain *h, unsigned int virq,
-+			  irq_hw_number_t hw)
++This file provides information, what the device node for the
++davinci aemif interface contain.
++
++Required properties:
++- compatible: "ti,davinci-aemif";
++- #address-cells : Should be either two or three.  The first cell is the
++                   chipselect number, and the remaining cells are the
++                   offset into the chipselect.
++- #size-cells : Either one or two, depending on how large each chipselect
++                can be.
++- ranges : Each range corresponds to a single chipselect, and cover
++           the entire access window as configured.
++
++Optional properties:
++- none
++
++Optional subnodes:
++- Chipselect setup:
++	- compatible: "ti,davinci-cs";
++	- #address-cells = <1>;
++	- #size-cells = <1>;
++
++    Timing setup, all timings in nanoseconds
++	- cs:		chipselect (value 2,3,4 or 5)
++	- asize:	Asynchronous Data Bus Width.
++			value:
++			0: 8 bit
++			1: 16 bit
++	- ta:		Minimum Turn-Around time.
++	- rhold:	Read hold width
++	- rstrobe:	Read strobe width
++	- rsetup:	Read setup width
++	- whold:	Write hold width
++	- wstrobe:	Write strobe width
++	- wsetup:	Write setup width
++	- ew:		Extend Wait bit
++			value:
++			0: Extended wait cycles disabled.
++			1: Extended wait cycles enabled.
++	- ss:		Select Strobe bit.
++			value:
++			0: Normal Mode enabled.
++			1: Select Strobe Mode enabled.
++- CFI driver:
++  see: Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++
++Example (enbw_cmc board):
++	aemif at 60000000 {
++		compatible = "ti,davinci-aemif";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		reg = <0x68000000 0x80000>;
++		ranges = <2 0 0x60000000 0x02000000
++			  3 0 0x62000000 0x02000000
++			  4 0 0x64000000 0x02000000
++			  5 0 0x66000000 0x02000000
++			  6 0 0x68000000 0x02000000>;
++		cs2 at 68000000 {
++			compatible = "ti,davinci-cs";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			/* all timings in nanoseconds */
++			cs = <2>;
++			asize = <1>;
++			ta = <0>;
++			rhold = <7>;
++			rstrobe = <42>;
++			rsetup = <14>;
++			whold = <7>;
++			wstrobe = <42>;
++			wsetup = <14>;
++			ew = <0>;
++			ss = <0>;
++		};
++		flash at 2,0 {
++			compatible = "cfi-flash";
++			reg = <2 0x0 0x400000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			bank-width = <2>;
++			device-width = <2>;
++		};
++		nand_cs: cs3 at 68000000 {
++			compatible = "ti,davinci-cs";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			/* all timings in nanoseconds */
++			cs = <3>;
++			asize = <0>;
++			ta = <0>;
++			rhold = <7>;
++			rstrobe = <42>;
++			rsetup = <7>;
++			whold = <7>;
++			wstrobe = <14>;
++			wsetup = <7>;
++			ew = <0>;
++			ss = <0>;
++		};
++		nandflash at 3,0 {
++			compatible = "ti,davinci-nand";
++			reg = <3 0x0 0x807ff
++				6 0x0 0x8000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			mask_ale = <0>;
++			mask_cle = <0>;
++			mask_chipsel = <0>;
++			ecc_mode = <2>;
++			ecc_bits = <4>;
++			options = <0>;
++			bbt_options = <0x20000>;
++			pinmux-handle = <&nand_pins>;
++			timing-handle = <&nand_cs>;
++		};
++
++	};
+diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+index 1ce70a9..e3d94a5 100644
+--- a/arch/arm/mach-davinci/aemif.c
++++ b/arch/arm/mach-davinci/aemif.c
+@@ -13,12 +13,14 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/time.h>
+ 
+ #include <mach/aemif.h>
+ 
+ /* Timing value configuration */
+-
++#define ASIZE(x)	(x)
+ #define TA(x)		((x) << 2)
+ #define RHOLD(x)	((x) << 4)
+ #define RSTROBE(x)	((x) << 7)
+@@ -26,7 +28,10 @@
+ #define WHOLD(x)	((x) << 17)
+ #define WSTROBE(x)	((x) << 20)
+ #define WSETUP(x)	((x) << 26)
++#define EW(x)		((x) << 30)
++#define SS(x)		((x) << 31)
+ 
++#define ASIZE_MAX	0x1
+ #define TA_MAX		0x3
+ #define RHOLD_MAX	0x7
+ #define RSTROBE_MAX	0x3f
+@@ -34,6 +39,8 @@
+ #define WHOLD_MAX	0x7
+ #define WSTROBE_MAX	0x3f
+ #define WSETUP_MAX	0xf
++#define EW_MAX		0x1
++#define SS_MAX		0x1
+ 
+ #define TIMING_MASK	(TA(TA_MAX) | \
+ 				RHOLD(RHOLD_MAX) | \
+@@ -131,3 +138,80 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
+ 	return 0;
+ }
+ EXPORT_SYMBOL(davinci_aemif_setup_timing);
++
++#if defined(CONFIG_OF)
++static int dv_get_value(struct device_node *np, const char *name)
 +{
-+	pr_debug("cp_intc_host_map(%d, 0x%lx)\n", virq, hw);
++	u32 data;
++	int ret;
 +
-+	irq_set_chip(virq, &cp_intc_irq_chip);
-+	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-+	irq_set_handler(virq, handle_edge_irq);
-+	return 0;
++	ret = of_property_read_u32(np, name, &data);
++	if (ret != 0)
++		return ret;
++
++	return data;
 +}
 +
-+static const struct irq_domain_ops cp_intc_host_ops = {
-+	.map = cp_intc_host_map,
-+	.xlate = irq_domain_xlate_onetwocell,
-+};
++int davinci_aemif_setup_timing_of(struct device_node *np)
++{
++	struct device_node *parent;
++	struct davinci_aemif_timing t;
++	void __iomem *base;
++	unsigned val;
++	int asize, ew, ss;
++	int cs;
++	unsigned offset;
++	int ret;
 +
-+int __init __cp_intc_init(struct device_node *node)
- {
--	unsigned long num_irq	= davinci_soc_info.intc_irq_num;
-+	u32 num_irq		= davinci_soc_info.intc_irq_num;
- 	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
- 	u32 *host_map		= davinci_soc_info.intc_host_map;
- 	unsigned num_reg	= BITS_TO_LONGS(num_irq);
--	int i;
-+	int i, irq_base;
- 
- 	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
- 	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
- 	if (WARN_ON(!davinci_intc_base))
--		return;
++	if (!np)
++		return -ENODEV;
++
++	parent = np->parent;
++	if (!np)
++		return -ENODEV;
++
++	base = of_iomap(parent, 0);
++	if (!base)
 +		return -EINVAL;
- 
- 	cp_intc_write(0, CP_INTC_GLOBAL_ENABLE);
- 
-@@ -165,13 +185,28 @@ void __init cp_intc_init(void)
- 		for (i = 0; host_map[i] != -1; i++)
- 			cp_intc_write(host_map[i], CP_INTC_HOST_MAP(i));
- 
--	/* Set up genirq dispatching for cp_intc */
--	for (i = 0; i < num_irq; i++) {
--		irq_set_chip(i, &cp_intc_irq_chip);
--		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
--		irq_set_handler(i, handle_edge_irq);
-+	irq_base = irq_alloc_descs(-1, 0, num_irq, 0);
-+	if (irq_base < 0) {
-+		pr_warn("Couldn't allocate IRQ numbers\n");
-+		irq_base = 0;
-+	}
 +
-+	/* create a legacy host */
-+	cp_intc_domain = irq_domain_add_legacy(node, num_irq,
-+					irq_base, 0, &cp_intc_host_ops, NULL);
-+
-+	if (!cp_intc_domain) {
-+		pr_err("cp_intc: failed to allocate irq host!\n");
++	cs = dv_get_value(np, "cs");
++	if (cs < 2)
 +		return -EINVAL;
- 	}
- 
- 	/* Enable global interrupt */
- 	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
 +
++	t.ta		= dv_get_value(np, "ta");
++	t.rhold		= dv_get_value(np, "rhold");
++	t.rstrobe	= dv_get_value(np, "rstrobe");
++	t.rsetup	= dv_get_value(np, "rsetup");
++	t.whold		= dv_get_value(np, "whold");
++	t.wstrobe	= dv_get_value(np, "wstrobe");
++	t.wsetup	= dv_get_value(np, "wsetup");
++
++	ret = davinci_aemif_setup_timing(&t, base, cs);
++	if (ret != 0)
++		return ret;
++
++	/* setup none timing paramters */
++	offset = A1CR_OFFSET + cs * 4;
++	asize = dv_get_value(np, "asize");
++	ew = dv_get_value(np, "ew");
++	ss = dv_get_value(np, "ss");
++	val = __raw_readl(base + offset);
++	val &= TIMING_MASK;
++	val |= (asize & ACR_ASIZE_MASK);
++	if (ew)
++		val |= ACR_EW_MASK;
++	if (ss)
++		val |= ACR_SS_MASK;
++
++	__raw_writel(val, base + offset);
++
++	iounmap(base);
 +	return 0;
 +}
-+
-+void __init cp_intc_init(void)
++#else
++int davinci_aemif_setup_timing_of(struct device_node *np)
 +{
-+	__cp_intc_init(NULL);
- }
++	return 0;
++}
++#endif
++EXPORT_SYMBOL(davinci_aemif_setup_timing_of);
+diff --git a/arch/arm/mach-davinci/include/mach/aemif.h b/arch/arm/mach-davinci/include/mach/aemif.h
+index 05b2934..f3bbec6 100644
+--- a/arch/arm/mach-davinci/include/mach/aemif.h
++++ b/arch/arm/mach-davinci/include/mach/aemif.h
+@@ -33,4 +33,5 @@ struct davinci_aemif_timing {
+ 
+ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
+ 					void __iomem *base, unsigned cs);
++int davinci_aemif_setup_timing_of(struct device_node *np);
+ #endif
 -- 
 1.7.7.6
