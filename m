@@ -1,41 +1,24 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 30 May 2012 09:15:53 +0200
-Subject: [PATCHv2 4/4] ARM: dma-mapping: remove custom consistent dma
- region
-In-Reply-To: <4FC5659D.6040805@gmail.com>
-References: <1337252085-22039-1-git-send-email-m.szyprowski@samsung.com>
- <1337252085-22039-5-git-send-email-m.szyprowski@samsung.com>
- <4FC5659D.6040805@gmail.com>
-Message-ID: <019401cd3e34$0c6af4d0$2540de70$%szyprowski@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 May 2012 15:16:39 +0800
+Subject: [PATCH 19/22] net/smsc911x: Repair broken failure paths
+In-Reply-To: <1338353260-10097-20-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdY=2j4gRGO4P4RfQDKo+sgV4akAQ6dpP4RbL+XywNCC5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Wednesday, May 30, 2012 2:11 AM KOSAKI Motohiro wrote:
+> Current failure paths attempt to free resources which we failed to request
+> and disable resources which we failed to enable ones. This leads to kernel
+> oops/panic. This patch does some simple re-ordering to prevent this from
+> happening.
+>
+> Cc: netdev at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> >   static void *
-> >   __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
-> >   	const void *caller)
-> >   {
-> > -	struct arm_vmregion *c;
-> > -	size_t align;
-> > -	int bit;
-> > +	struct vm_struct *area;
-> > +	unsigned long addr;
-> >
-> > -	if (!consistent_pte) {
-> > -		printk(KERN_ERR "%s: not initialised\n", __func__);
-> > +	area = get_vm_area_caller(size, VM_DMA | VM_USERMAP, caller);
-> 
-> In this patch, VM_DMA is only used here. So, is this no effect?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I introduced it mainly to let user know which areas have been allocated by the dma-mapping api.
-
-I also plan to add a check suggested by Minchan Kim in __dma_free_remap() if the vmalloc area
-have been in fact allocated with VM_DMA set. 
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Thanks,
+Linus Walleij
