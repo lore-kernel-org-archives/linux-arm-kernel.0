@@ -1,132 +1,69 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 30 May 2012 12:18:58 +0200
-Subject: [PATCH v5 2/7] ARM: davinci,
- cp_intc: Add OF support for TI interrupt controller
-In-Reply-To: <1338373143-7467-1-git-send-email-hs@denx.de>
-References: <1338373143-7467-1-git-send-email-hs@denx.de>
-Message-ID: <1338373143-7467-3-git-send-email-hs@denx.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 30 May 2012 12:22:49 +0200
+Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
+ for OMAP4
+In-Reply-To: <4FC5F3C3.2000309@dev.rtsoft.ru>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
+ <4FC49BA5.5050008@dev.rtsoft.ru> <4FC5DC9F.7080104@ti.com>
+ <4FC5E2EE.8030504@dev.rtsoft.ru> <4FC5E7DE.2060905@ti.com>
+ <4FC5F3C3.2000309@dev.rtsoft.ru>
+Message-ID: <4FC5F4F9.6020106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to initialize the Common Platform Interrupt Controller
-(cp_intc) from TI used on OMAP-L1x SoCs using a device tree node.
+On 5/30/2012 12:17 PM, Konstantin Baydarov wrote:
+>    Hi.
+> On 05/30/2012 01:26 PM, Cousson, Benoit wrote:
+>> On 5/30/2012 11:05 AM, Konstantin Baydarov wrote:
+>>> On 05/30/2012 12:38 PM, Cousson, Benoit wrote:
+>>>> On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
+>>>>> Hi, Eduardo.
+>>>>>
+>>>>> On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
+>>>>>> This patch add device tree entries on OMAP4 based boards for
+>>>>>> System Control Module (SCM).
+>>
+>> ...
+>>
+>>>>> I believe that CPU-specific bandgap definition should be moved to
+>>>>> bard specific dts.
+>>>>
+>>>> Mmm, why, since it is CPU specific and not board specific. I has to
+>>>> be in the SoC file.
+>>> Speaking about omap4430 - omap4430 bandgap differs from omap4460, so
+>>> if omap4430 bandgap support will be added to omap-bandgap driver the
+>>> version of bandgap should specified in dts file. omap4.dtsi is a
+>>> common for omap4 boards, that is why I'm suggesting to move bandgap
+>>> description to probably board specific file.
+>>
+>> OK, I got your point, but in that case we could potentially define a omap4460.dtsi file.
+>>
+>>> Another solution is to
+>>> determine bandgap type in driver probe function, but in that case
+>>> "ti,omap4460-bandgap" in omap4.dtsi should be replaced to
+>>> "ti,omap4-bandgap".
+>>
+>> Yes, this is the best solution, but that assume that we can identify the control module version from the HW, which is not necessarily true :-(
+>>
+>> The IP_REVISION (offset = 0) value are unfortunately not documented, so we should read it to check if they are different from omap4430 and 4460.
+>>
+>> The bitfield layout in that register is:
+>>
+>> IP_REV_MAJOR: 8..10
+>> IP_REV_CUSTOM: 6..7
+>> IP_REV_MINOR: 0..5
+> Probably, cpu_is_omap443x() and cpu_is_omap446x() can be used in bandgap driver probe function. Actually many drivers use cpu_is_omap*():
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Wolfgang Denk <wd@denx.de>
-Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+No, we cannot, we are in the process of getting rid of that.
+A driver should only focus on the IP version in theory. The CPU version 
+is not the proper way of getting that. It will make the driver not 
+scalable at all for future OMAP revision.
 
----
-- changes for v4
-  - split patch in 2 patches, one for irq_domain adaption
-    one for DT enhancement, as Nori Sekhar suggested.
-  - add comment from Grant Likely for the DT part:
-    remove if/else clause, not needed.
-    Make use of DT runtime configurable
+> drivers/mfd/omap-usb-host.c
+> drivers/mfd/twl-core.c
 
-- changes for v5:
-  add comments from Sergei Shtylyov:
-  - s/intc/cp_intc in commit subject
-  add comments from Grant Likely:
-  - rename compatible" prop to "ti,cp-intc"
+Yeah, these are the ones that still need to be fixed...
 
- .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++++++++++++++++++++
- arch/arm/mach-davinci/cp_intc.c                    |   24 ++++++++++++++++-
- 2 files changed, 49 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt b/Documentation/devicetree/bindings/arm/davinci/intc.txt
-new file mode 100644
-index 0000000..597e8a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
-@@ -0,0 +1,27 @@
-+* TI Common Platform Interrupt Controller
-+
-+Common Platform Interrupt Controller (cp_intc) is used on
-+OMAP-L1x SoCs and can support several configurable number
-+of interrupts.
-+
-+Main node required properties:
-+
-+- compatible : should be:
-+	"ti,cp-intc"
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The type shall be a <u32> and the value shall be 1.
-+
-+  The cell contains the interrupt number in the range [0-128].
-+- ti,intc-size: Number of interrupts handled by the interrupt controller.
-+- reg: physical base address and size of the intc registers map.
-+
-+Example:
-+
-+	intc: interrupt-controller at 1 {
-+		compatible = "ti,cp-intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		ti,intc-size = <101>;
-+		reg = <0xfffee000 0x2000>;
-+	};
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 45d5256..d1bef55 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -14,6 +14,9 @@
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- 
- #include <mach/common.h>
- #include <mach/cp_intc.h>
-@@ -119,7 +122,7 @@ static const struct irq_domain_ops cp_intc_host_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
- 
--int __init __cp_intc_init(struct device_node *node)
-+int __init __cp_intc_init(struct device_node *node, struct device_node *parent)
- {
- 	u32 num_irq		= davinci_soc_info.intc_irq_num;
- 	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
-@@ -129,6 +132,15 @@ int __init __cp_intc_init(struct device_node *node)
- 
- 	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
- 	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
-+	if (node) {
-+		davinci_intc_base = of_iomap(node, 0);
-+		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
-+			pr_warn("unable to get intc-size, default to %d\n",
-+				num_irq);
-+	} else {
-+		davinci_intc_base = ioremap(davinci_soc_info.intc_base,
-+					SZ_8K);
-+	}
- 	if (WARN_ON(!davinci_intc_base))
- 		return -EINVAL;
- 
-@@ -206,7 +218,15 @@ int __init __cp_intc_init(struct device_node *node)
- 	return 0;
- }
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "ti,cp-intc", .data = __cp_intc_init, },
-+	{ }
-+};
-+
- void __init cp_intc_init(void)
- {
--	__cp_intc_init(NULL);
-+	if (!of_find_compatible_node(NULL, NULL, "ti,cp-intc"))
-+		__cp_intc_init(NULL, NULL);
-+	else
-+		of_irq_init(irq_match);
- }
--- 
-1.7.7.6
+Regards,
+Benoit
