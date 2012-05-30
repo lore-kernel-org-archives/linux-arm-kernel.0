@@ -1,56 +1,98 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 May 2012 12:47:26 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect Device
- Tree
+Date: Wed, 30 May 2012 12:47:29 +0800
+Subject: [PATCH 11/22] ARM: ux500: Only initialise STE's UIBs on boards which
+ support them
 In-Reply-To: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1338353260-10097-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'name' field in 'struct of_regulator_match' expects to match with
-its corresponding regulator device node in the Device Tree. This patch
-renames each of the regulators in the ab8500 regulator driver so this
-is true.
+ST-Ericsson uses User Interface Boards to extend functionality of
+some of their development boards. However, these aren't compatible
+with all the supported boards found in Mainline (Snowball for
+instance). This patch ensures that the UIBs are only probed on
+boards which can actually support them. This in turn saves lots of
+unnecessary error messages normally found in Snowball's boot log.
 
-Cc: linux-kernel at vger.kernel.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/ab8500.c |   22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-ux500/board-mop500-uib.c |    4 +---
+ arch/arm/mach-ux500/board-mop500.c     |    8 ++++++++
+ arch/arm/mach-ux500/board-mop500.h     |    1 +
+ 3 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index e1b8c54..a739f5c 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -794,17 +794,17 @@ static __devinit int ab8500_regulator_register(struct platform_device *pdev,
+diff --git a/arch/arm/mach-ux500/board-mop500-uib.c b/arch/arm/mach-ux500/board-mop500-uib.c
+index b29a788..1f47d96 100644
+--- a/arch/arm/mach-ux500/board-mop500-uib.c
++++ b/arch/arm/mach-ux500/board-mop500-uib.c
+@@ -96,7 +96,7 @@ static void __init __mop500_uib_init(struct uib *uib, const char *why)
+ /*
+  * Detect the UIB attached based on the presence or absence of i2c devices.
+  */
+-static int __init mop500_uib_init(void)
++int __init mop500_uib_init(void)
+ {
+ 	struct uib *uib = mop500_uib;
+ 	struct i2c_adapter *i2c0;
+@@ -131,5 +131,3 @@ static int __init mop500_uib_init(void)
+ 
+ 	return 0;
+ }
+-
+-module_init(mop500_uib_init);
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index ea6082a..6b3fef5 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -716,6 +716,8 @@ static void __init mop500_init_machine(void)
+ 
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
++
++	mop500_uib_init();
  }
  
- static struct of_regulator_match ab8500_regulator_matches[] = {
--	{ .name	= "LDO-AUX1",    .driver_data = (void *) AB8500_LDO_AUX1, },
--	{ .name	= "LDO-AUX2",    .driver_data = (void *) AB8500_LDO_AUX2, },
--	{ .name	= "LDO-AUX3",    .driver_data = (void *) AB8500_LDO_AUX3, },
--	{ .name	= "LDO-INTCORE", .driver_data = (void *) AB8500_LDO_INTCORE, },
--	{ .name	= "LDO-TVOUT",   .driver_data = (void *) AB8500_LDO_TVOUT, },
--	{ .name = "LDO-USB",     .driver_data = (void *) AB8500_LDO_USB, },
--	{ .name = "LDO-AUDIO",   .driver_data = (void *) AB8500_LDO_AUDIO, },
--	{ .name	= "LDO-ANAMIC1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
--	{ .name	= "LDO-ANAMIC2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
--	{ .name	= "LDO-DMIC",    .driver_data = (void *) AB8500_LDO_DMIC, },
--	{ .name	= "LDO-ANA",     .driver_data = (void *) AB8500_LDO_ANA, },
-+	{ .name	= "ab8500_ldo_aux1",    .driver_data = (void *) AB8500_LDO_AUX1, },
-+	{ .name	= "ab8500_ldo_aux2",    .driver_data = (void *) AB8500_LDO_AUX2, },
-+	{ .name	= "ab8500_ldo_aux3",    .driver_data = (void *) AB8500_LDO_AUX3, },
-+	{ .name	= "ab8500_ldo_intcore", .driver_data = (void *) AB8500_LDO_INTCORE, },
-+	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB8500_LDO_TVOUT, },
-+	{ .name = "ab8500_ldo_usb",     .driver_data = (void *) AB8500_LDO_USB, },
-+	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8500_LDO_AUDIO, },
-+	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
-+	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
-+	{ .name	= "ab8500_ldo_dmic",    .driver_data = (void *) AB8500_LDO_DMIC, },
-+	{ .name	= "ab8500_ldo_ana",     .driver_data = (void *) AB8500_LDO_ANA, },
- };
+ static void __init snowball_init_machine(void)
+@@ -780,6 +782,8 @@ static void __init hrefv60_init_machine(void)
  
- static __devinit int
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
++
++	mop500_uib_init();
+ }
+ 
+ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+@@ -883,6 +887,8 @@ static void __init u8500_init_machine(void)
+ 		i2c_register_board_info(2, mop500_i2c2_devices,
+ 					ARRAY_SIZE(mop500_i2c2_devices));
+ 
++		mop500_uib_init();
++
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+ 		/*
+ 		 * Devices to be DT:ed:
+@@ -913,6 +919,8 @@ static void __init u8500_init_machine(void)
+ 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+ 		i2c_register_board_info(2, mop500_i2c2_devices,
+ 					ARRAY_SIZE(mop500_i2c2_devices));
++
++		mop500_uib_init();
+ 	}
+ 	mop500_i2c_init(parent);
+ 
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 3be0cb8..2f87b25 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -89,6 +89,7 @@ void __init mop500_pinmaps_init(void);
+ void __init snowball_pinmaps_init(void);
+ void __init hrefv60_pinmaps_init(void);
+ 
++int __init mop500_uib_init(void);
+ void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
+ 		unsigned n);
+ 
 -- 
 1.7.9.5
