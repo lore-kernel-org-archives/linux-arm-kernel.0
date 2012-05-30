@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 May 2012 15:10:28 +0800
-Subject: [PATCH 16/22] mfd: ab8500-gpadc: Enable IRQF_ONESHOT when
+Date: Wed, 30 May 2012 15:11:51 +0800
+Subject: [rtc-linux] [PATCH 17/22] rtc: ab8500-rtc: IRQF_ONESHOT when
  requesting a threaded IRQ
-In-Reply-To: <1338353260-10097-17-git-send-email-lee.jones@linaro.org>
+In-Reply-To: <1338353260-10097-18-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-17-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYZaxW52dWwGzEo-7yV31dW_U37xUP2TM4G+Dz=dJ8EKw@mail.gmail.com>
+ <1338353260-10097-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbFtFDmHcZUVwAq+z1fhNMT1556dyBqqr=GR8CzxgSXZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,26 +13,27 @@ On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
 > The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
 >
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: linux-kernel at vger.kernel.org
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: rtc-linux at googlegroups.com
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
-> ?drivers/mfd/ab8500-gpadc.c | ? ?3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
+> ?drivers/rtc/rtc-ab8500.c | ? ?2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-> index c39fc71..358d502 100644
-> --- a/drivers/mfd/ab8500-gpadc.c
-> +++ b/drivers/mfd/ab8500-gpadc.c
-> @@ -599,7 +599,8 @@ static int __devinit ab8500_gpadc_probe(struct platform_device *pdev)
-> ? ? ? ?/* Register interrupt ?- SwAdcComplete */
-> ? ? ? ?ret = request_threaded_irq(gpadc->irq, NULL,
-> ? ? ? ? ? ? ? ?ab8500_bm_gpswadcconvend_handler,
-> - ? ? ? ? ? ? ? IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc", gpadc);
-> + ? ? ? ? ? ? ? IRQF_ONESHOT | IRQF_NO_SUSPEND | IRQF_SHARED,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "ab8500-gpadc", gpadc);
+> diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+> index 4bcf9ca..b11a2ec 100644
+> --- a/drivers/rtc/rtc-ab8500.c
+> +++ b/drivers/rtc/rtc-ab8500.c
+> @@ -422,7 +422,7 @@ static int __devinit ab8500_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?}
+>
+> ? ? ? ?err = request_threaded_irq(irq, NULL, rtc_alarm_handler,
+> - ? ? ? ? ? ? ? IRQF_NO_SUSPEND, "ab8500-rtc", rtc);
+> + ? ? ? ? ? ? ? IRQF_NO_SUSPEND | IRQF_ONESHOT, "ab8500-rtc", rtc);
+> ? ? ? ?if (err < 0) {
+> ? ? ? ? ? ? ? ?rtc_device_unregister(rtc);
+> ? ? ? ? ? ? ? ?return err;
 
-Looks correct to me I think this one should be ONESHOT anyway.
+Looks correct, Acked-by (also for the previous patch).
 
-Yours,
 Linus Walleij
