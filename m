@@ -1,48 +1,95 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 30 May 2012 10:38:55 +0200
-Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
- for OMAP4
-In-Reply-To: <4FC49BA5.5050008@dev.rtsoft.ru>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
- <4FC49BA5.5050008@dev.rtsoft.ru>
-Message-ID: <4FC5DC9F.7080104@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 May 2012 01:42:28 -0700
+Subject: [PATCH 2/2] remoteproc: remove the now-redundant kref
+In-Reply-To: <1338017791-9442-2-git-send-email-ohad@wizery.com>
+References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
+ <1338017791-9442-2-git-send-email-ohad@wizery.com>
+Message-ID: <4FC5DD74.4030202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
->    Hi, Eduardo.
->
-> On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
->> This patch add device tree entries on OMAP4 based boards
->> for System Control Module (SCM).
->>
->> Signed-off-by: Eduardo Valentin<eduardo.valentin@ti.com>
->> ---
->>   arch/arm/boot/dts/omap4.dtsi |   13 +++++++++++++
->>   1 files changed, 13 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 359c497..d2cb392 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -272,5 +272,18 @@
->>   			ti,hwmods = "mmc5";
->>   			ti,needs-special-reset;
->>   		};
->> +
->> +		ctrl_module_core: ctrl_module_core at 4a002000 {
->> +			compatible = "ti,omap4-control";
->> +			ti,hwmods = "ctrl_module_core";
->> +			bandgap {
->> +				compatible = "ti,omap4460-bandgap";
->> +				interrupts =<0 126 4>; /* talert */
->> +				ti,tshut-gpio =<86>; /* tshut */
->> +			};
-> I believe that CPU-specific bandgap definition should be moved to bard specific dts.
+On 5/26/2012 12:36 AM, Ohad Ben-Cohen wrote:
+>  /* will be called when an rproc is added to the rprocs klist */
+>  static void klist_rproc_get(struct klist_node *n)
+>  {
+>  	struct rproc *rproc = container_of(n, struct rproc, node);
+>  
+> -	kref_get(&rproc->refcount);
+> +	get_device(&rproc->dev);
+>  }
+>  
+>  /* will be called when an rproc is removed from the rprocs klist */
+> @@ -1312,7 +1282,7 @@ static void klist_rproc_put(struct klist_node *n)
+>  {
+>  	struct rproc *rproc = container_of(n, struct rproc, node);
+>  
+> -	kref_put(&rproc->refcount, rproc_release);
+> +	put_device(&rproc->dev);
+>  }
+>  
+>  static struct rproc *next_rproc(struct klist_iter *i)
+> @@ -1354,7 +1324,7 @@ struct rproc *rproc_get_by_name(const char *name)
+>  	klist_iter_init(&rprocs, &i);
+>  	while ((rproc = next_rproc(&i)) != NULL)
+>  		if (!strcmp(rproc->name, name)) {
+> -			kref_get(&rproc->refcount);
+> +			get_device(&rproc->dev);
+>  			break;
+>  		}
+>  	klist_iter_exit(&i);
+> @@ -1367,7 +1337,7 @@ struct rproc *rproc_get_by_name(const char *name)
+>  
+>  	ret = rproc_boot(rproc);
+>  	if (ret < 0) {
+> -		kref_put(&rproc->refcount, rproc_release);
+> +		put_device(&rproc->dev);
+>  		return NULL;
+>  	}
 
-Mmm, why, since it is CPU specific and not board specific. I has to be 
-in the SoC file.
+I was hoping we could use class_for_each_device() and
+class_find_device() to replace all this code. Then we wouldn't need all
+this klist stuff that the class is taking care of already.
 
-Regards,
-Benoit
+> @@ -1462,10 +1432,23 @@ int rproc_register(struct rproc *rproc)
+>  }
+>  EXPORT_SYMBOL(rproc_register);
+>  
+> +/**
+> + * rproc_class_release() - release a remote processor instance
+> + * @dev: the rproc's device
+> + *
+> + * This function should _never_ be called directly.
+> + *
+> + * It will be called by the driver core when no one holds a valid pointer
+> + * to @dev anymore.
+> + */
+
+Why is this added now and not in the previous patch?
+
+>  static void rproc_class_release(struct device *dev)
+>  {
+>  	struct rproc *rproc = container_of(dev, struct rproc, dev);
+>  
+> +	dev_info(&rproc->dev, "releasing %s\n", rproc->name);
+> +
+> +	rproc_delete_debug_dir(rproc);
+> +
+>  	idr_remove_all(&rproc->notifyids);
+>  	idr_destroy(&rproc->notifyids);
+>  
+[snip]
+> @@ -1603,8 +1584,8 @@ int rproc_unregister(struct rproc *rproc)
+>  
+>  	device_del(&rproc->dev);
+>  
+> -	/* the rproc will only be released after its refcount drops to zero */
+> -	kref_put(&rproc->refcount, rproc_release);
+> +	/* unroll rproc_alloc. TODO: we may want to let the users do that */
+> +	put_device(&rproc->dev);
+
+Yes I think we want rproc_free() to actually call put_device() the last
+time and free the resources.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
