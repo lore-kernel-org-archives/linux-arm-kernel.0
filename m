@@ -1,20 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 May 2012 15:18:54 +0800
-Subject: [PATCH 21/22] ARM: ux500: Enable probing of pinctrl through
- Device Tree
-In-Reply-To: <1338353260-10097-22-git-send-email-lee.jones@linaro.org>
+Date: Wed, 30 May 2012 15:19:42 +0800
+Subject: [PATCH 22/22] mfd: Enable DT probing of the DB8500 PRCMU
+In-Reply-To: <1338353260-10097-23-git-send-email-lee.jones@linaro.org>
 References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZkOOP9aANBtqQ1CPFGNJ8WD5CWi2OmpF_2PdbiAEBy4A@mail.gmail.com>
+ <1338353260-10097-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYieu5BOR4c=nnGm4MLu26oYb0pLU2=UtgvEMH+=RdfaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The Nomadik GPIO controller now relies on Nomadik pinctrl, however
-> the pinctrl driver is not currently started by any ux500 platform.
-> This is requred or GPIOs do not work at all.
+> This patch adds the correct compatible string for use during Device Tree
+> population. Without it the DB8500 PRCMU will not be probed.
 >
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-kernel at vger.kernel.org
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
