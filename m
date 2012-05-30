@@ -1,28 +1,64 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 30 May 2012 19:13:40 +0100
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-Message-ID: <20120530181340.GT9947@opensource.wolfsonmicro.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Wed, 30 May 2012 13:24:17 -0500
+Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
+ OFF mode
+In-Reply-To: <87wr3t8s81.fsf@ti.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
+ <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
+ <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
+ <CAOMWX4ctJcfGNxXK4hT+QH-m7zUfP1N3H56oVDVzPFmhVTFOMw@mail.gmail.com>
+ <87wr3t8s81.fsf@ti.com>
+Message-ID: <CAOMWX4ewVauzYW9pJq07=moLcgkBLyvx68o7T8975cGvshfK3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 07:11:33PM -0600, Sagar Dharia wrote:
-> SLIMbus (Serial Low Power Interchip Media Bus) is a specification
-> developed by MIPI (Mobile Industry Processor Interface) alliance.
+On Wed, May 30, 2012 at 12:59 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Menon, Nishanth" <nm@ti.com> writes:
+>
+>> On Thu, May 17, 2012 at 3:52 AM, Shilimkar, Santosh
+>> <santosh.shilimkar@ti.com> wrote:
+>>> On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
+>>> <santosh.shilimkar@ti.com> wrote:
+>>>> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>>>> Tero Kristo <t-kristo@ti.com> writes:
+>>>>>
+>> [...]
+>>>>> - Rather than hooking into omap4_enter_lowpower(), should use
+>>>>> ?the cluster PM enter/exit notifier chain.
+>>>>>
+>>>> This is again specific to device OFF only and not related to CPU
+>>>> cluster state as such. So I don't think notifiers should be used here.
+>>>>
+>>>> O.w even when we attempt just MPU OSWR C-state, all these functions will
+>>>> get called in notifier chain.
+>>>>
+>>> Just a thought, we can have a separate notifier chain for device OFF. It can
+>>> allow use to get rid of 'enable_off_mode" kind of flags and can be
+>>> used by many drivers too.
+>>
+>> Like the overall idea, but one minor dumb concern might be sequencing
+>> of notifiers
+>> ?- OFF entry and restore needs things to be executed in a specific sequence.
+>> How do we plan to ensure the sequence is maintained in a notifier call
+>> chain? one
+>> possible option might be a "priority" based scheme?
+>
+> Or just combine the events that need a specific sequence into single
+> notifier callback function.
+There is other issues in case of failure cases -> abort of OFF
+sequence due to pending interrupt
+detected as part of a notifier - error handling needs to be sane in
+proper sequence.
+I understand and appreciate the intent of replacing the single mega
+enter_sleep with a chain of notifiers
+but any such option will need to be scalable enough to handle weird
+erratum handling (HSI CAWAKE as an example)
+which potentially break the logic flow and be either be equal or
+better than what we have today interms of
+error handling. since these notifiers will be triggered for
+CPUIDLE(performance sensitive) and suspend, the intricacies
+might be better understood by seeing how this proposed notifiers look like.
 
-This patch is about 150k which is rather large to review.  It would be
-enormously helpful for review if it could be broken down into a patch
-series.  For example, things like the device registration could be
-broken out into a separate patch as could the core bus operations and
-things like the clocking/bandwidth management.
-
-I've not actually looked through the patch yet, partly because doing it
-all in one sitting will take some time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120530/b2d4b17a/attachment.sig>
+Regards,
+Nishanth Menon
