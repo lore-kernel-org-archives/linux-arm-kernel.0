@@ -1,40 +1,89 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 31 May 2012 11:45:54 +0800
-Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
- periodic callbacks
-In-Reply-To: <20120530080216.GH12217@n2100.arm.linux.org.uk>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
- <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
- <20120530080216.GH12217@n2100.arm.linux.org.uk>
-Message-ID: <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 30 May 2012 20:46:57 -0700
+Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
+ clk_enable()
+In-Reply-To: <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
+References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
+ <4FB29E7C.7010606@codeaurora.org>
+ <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
+ <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
+ <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FC6E9B1.10605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 4:02 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, May 30, 2012 at 03:52:53PM +0800, Linus Walleij wrote:
->> On Tue, May 29, 2012 at 5:36 PM, Russell King
->> <rmk+kernel@arm.linux.org.uk> wrote:
+On 05/23/2012 02:16 AM, Peter De Schrijver wrote:
+> On Tue, May 22, 2012 at 08:06:45PM +0200, Turquette, Mike wrote:
+>> On Tue, May 22, 2012 at 6:58 AM, Peter De Schrijver
+>> <pdeschrijver@nvidia.com>  wrote:
+>>> On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
+>>>> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
+>>>>> Without this patch, the following race conditions are possible.
+>>>>>
+>>>>> Race condition 1:
+>>>>> * clk-A has two parents - clk-X and clk-Y.
+>>>>> * All three are disabled and clk-X is current parent.
+>>>>> * Thread A: clk_set_parent(clk-A, clk-Y).
+>>>>> * Thread A:<snip execution flow>
+>>>>> * Thread A: Grabs enable lock.
+>>>>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+>>>>> * Thread A: Releases enable lock.
+>>>>> * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
+>>>>> * Thread A: Switches clk-A's parent to clk-Y in hardware.
+>>>>>
+>>>>> clk-A is now enabled in software, but not clocking in hardware.
+>>>>>
+>>>>> Race condition 2:
+>>>>> * clk-A has two parents - clk-X and clk-Y.
+>>>>> * All three are disabled and clk-X is current parent.
+>>>>> * Thread A: clk_set_parent(clk-A, clk-Y).
+>>>>> * Thread A:<snip execution flow>
+>>>>> * Thread A: Switches parent in hardware to clk-Y.
+>>>>> * Thread A: Grabs enable lock.
+>>>>> * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
+>>>>> * Thread A: Releases enable lock.
+>>>>> * Thread B: Calls clk_enable(clk-A)
+>>>>> * Thread B: Software state still says parent is clk-X.
+>>>>> * Thread B: So, enables clk-X and then itself.
+>>>>> * Thread A: Updates parent in software state to clk-Y.
+>>>>>
+>>>
+>>> This looks correct to me. Is there any usecase where enabling/disabling a
+>>> clock would require sleeping but changing the parent would not?
+>>>
 >>
->> > Add support for cyclic DMA's periodic callbacks. ?Drivers are expected
->> > to call vchan_cyclic_callback() when a period has completed, which will
->> > schedule the tasklet to make the callback into the driver.
->> >
->> > As callbacks are made from tasklet context, it is important to realise
->> > that we don't guarantee a callback for each completed period, but for
->> > N completed periods where N may be greater than one.
+>> clk_enable&  clk_disable must never sleep.  clk_prepare and
+>> clk_unprepare may sleep.
 >>
->> This last thing was something we have to fix right?
->> Like for each driver to keep a counter of completed periods
->> and call the handler repeatedly if N > 1.
 >
-> No, I don't think we should do that - ALSA doesn't require it, and ALSA
-> is about the only user of this. ?As I've said, DMA engine drivers should
-> implement a correct tx_status function, which returns the remaining bytes
-> to be transferred to the end of the buffer so it's possible to find out
-> how many periods have completed when the callback is called.
+> In that case the clock is actually enabled in clk_prepare and disabled in
+> clk_unprepare I guess (and clk_enable/clk_disable are dummy functions)?
+>
+> What I'm trying to say is that I don't think there are clocks which can be
+> enabled/disabled using non blocking operations, but where a parent change
+> would require a blocking operation.
+>
+> Cheers,
+>
+> Peter.
 
-Could we directly use pos, but unmatch with dma_tx_state.residue.
-For cyclic buffer, when pos reach to buffer size, pos will change to 0,
-remaining bytes also 0, we may have to distinguish them.
+Mark, Shawn, Russell,
+
+Can you guys please respond? I'm surprised that no one seem to care 
+about fixing race conditions between clk_set_parent/clk_set_rate() and 
+clk_enable() that will result in incorrect enable count propagation and 
+have the SW get out of sync with HW.
+
+If we absolutely need to support clocks that where the ops->set_parent() 
+is not atomic and can't go with the CLK_SET_PARENT_GATE option, then 
+maybe we can add a "I promise the consumers of this clock won't call 
+clk_set_parent() and clk_enable() in a racy way" clock flag 
+(CLK_IGNORE_PARENT_ENABLE_RACE). Yes, it would be a hack for such 
+clocks, but that's still better than leaving a gaping hole for all the 
+clocks.
+
+-Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
