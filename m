@@ -1,72 +1,43 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 31 May 2012 12:09:46 -0700
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <4FC68304.9050208@codeaurora.org>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120530194059.GA13243@gmail.com>
- <4FC68304.9050208@codeaurora.org>
-Message-ID: <20120531190946.GA16878@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 May 2012 20:17:57 +0100
+Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
+ periodic callbacks
+In-Reply-To: <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
+References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+ <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
+ <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
+ <20120530080216.GH12217@n2100.arm.linux.org.uk>
+ <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
+Message-ID: <20120531191757.GI12217@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120530-13:28, Stephen Boyd wrote:
-> On 05/30/12 12:40, Mike Turquette wrote:
-> > I also wonder if exposing some of these knobs should be done in the
-> > basic clock types.  Meaning that instead of having additional calls in
-> > the clk.h API those calls could be exposed by the basic clock types that
-> > map to the actions.
+On Thu, May 31, 2012 at 11:45:54AM +0800, zhangfei gao wrote:
+> On Wed, May 30, 2012 at 4:02 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, May 30, 2012 at 03:52:53PM +0800, Linus Walleij wrote:
+> > No, I don't think we should do that - ALSA doesn't require it, and ALSA
+> > is about the only user of this. ?As I've said, DMA engine drivers should
+> > implement a correct tx_status function, which returns the remaining bytes
+> > to be transferred to the end of the buffer so it's possible to find out
+> > how many periods have completed when the callback is called.
 > 
-> What do you mean by basic clock types that map to actions? Perhaps an
-> example?
-> 
+> Could we directly use pos, but unmatch with dma_tx_state.residue.
+> For cyclic buffer, when pos reach to buffer size, pos will change to 0,
+> remaining bytes also 0, we may have to distinguish them.
 
-No exmaples to give, just tossing out ideas.
+What pos?
 
-> >
-> > The question that needs to be answered is this: do generic drivers need
-> > access to these additional functions (clk.h) or just the platform code
-> > which implements some of the clock logic (basic clock types &
-> > platform-speciic clock types).
-> 
-> At least for tegra it looks like they need reset assertion and
-> deassertion in generic drivers.
-> 
-> $ git grep tegra_periph_reset_assert
-> arch/arm/mach-tegra/clock.c:void tegra_periph_reset_assert(struct clk *c)
-> arch/arm/mach-tegra/clock.c:EXPORT_SYMBOL(tegra_periph_reset_assert);
-> arch/arm/mach-tegra/include/mach/clk.h:void tegra_periph_reset_assert(struct clk *c);
-> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
-> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
-> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pex_clk);
-> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
-> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
-> arch/arm/mach-tegra/powergate.c:        tegra_periph_reset_assert(clk);
-> drivers/i2c/busses/i2c-tegra.c: tegra_periph_reset_assert(i2c_dev->clk);
-> drivers/input/keyboard/tegra-kbc.c:     tegra_periph_reset_assert(kbc->clk);
-> drivers/staging/nvec/nvec.c:    tegra_periph_reset_assert(nvec->i2c_clk);
-> 
+The way I said above, you work out how many periods have expired by
+using dma_tx_state.residue.  This tells you how many bytes are left to
+transfer until the _end_ of the looped buffer.
 
-Ok, this is good to know.  The same sort of thing is achieved via
-runtime pm and the hwmod framework in OMAP code.  I had given similar
-feedback to Andrew Lunn for using clk_prepare/clk_unprepare to power
-down the PHY for some of his IP blocks.  I don't think that the clock
-framework should be used for that and this clk_reset(...) stuff seems
-similar.
+>From that, you can tell directly how many periods have expired.
 
-Like Benoit, I am partial to associating these actions to module-level
-APIs, not necessarily clock-level APIs.
+Really, ALSA is not interested in "how many periods have expired" but
+is really after a regular update of where DMA is _now_, so it knows
+how many bytes it can write into or read from the circular buffer.  It
+really doesn't need to know that N periods have expired _if_ you're
+capable of telling it exactly where the DMA is in the buffer.
 
-A yardstick to determine whether or not the clock framework is the right
-place for a _reset() function might be whether or not it will change the
-values of struct clk's members.  If we had a clk_reset(...) call it
-would clearly bang some bits in a register via clk->ops->reset ... but
-what data would it change in struct clk?  Adjust the rate to 0?  Reset
-prepare_count and enable_count to 0?
-
-If it doesn't actually change any of the bookkeeping or accounting in
-the clock framework then it might be a clue that the clock framework
-isn't the best place for this API.
-
-Thanks,
-Mike
+And with a working dma_tx_state.residue, you can do exactly that.
