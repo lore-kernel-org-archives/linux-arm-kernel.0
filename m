@@ -1,77 +1,31 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 May 2012 16:55:50 +0300
-Subject: [PATCHv6 14/14] ARM: OMAP3+: voltage: remove unused volt_setup_time
- parameter
-In-Reply-To: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
-References: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1338472550-20743-15-git-send-email-t-kristo@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 May 2012 14:57:40 +0100
+Subject: [PATCH 2/2] MFD: mc13xxx workaround SPI hardware bug on i.Mx
+In-Reply-To: <2358422.efTs8lXp1l@laptop>
+References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1338282389-26177-3-git-send-email-philippe.retornaz@epfl.ch>
+ <20120530170837.GR9947@opensource.wolfsonmicro.com>
+ <2358422.efTs8lXp1l@laptop>
+Message-ID: <20120531135739.GH2666@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no longer needed as the ramp times are calculated from
-voltage deltas + slew rates.
+On Thu, May 31, 2012 at 09:08:39AM +0200, Philippe R?tornaz wrote:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap_twl.c |    5 -----
- arch/arm/mach-omap2/voltage.h  |    1 -
- 2 files changed, 0 insertions(+), 6 deletions(-)
+> I already put it in struct regmap_config, should I put it elsewhere ? 
 
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 188f210..ecae989 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -141,7 +141,6 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
- static struct omap_voltdm_pmic omap3_mpu_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12500,
--	.volt_setup_time	= 0xfff,
- 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-@@ -158,7 +157,6 @@ static struct omap_voltdm_pmic omap3_mpu_pmic = {
- static struct omap_voltdm_pmic omap3_core_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12500,
--	.volt_setup_time        = 0xfff,
- 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-@@ -175,7 +173,6 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
- static struct omap_voltdm_pmic omap4_mpu_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-@@ -193,7 +190,6 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
- static struct omap_voltdm_pmic omap4_iva_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-@@ -211,7 +207,6 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
- static struct omap_voltdm_pmic omap4_core_pmic = {
- 	.slew_rate		= 4000,
- 	.step_size		= 12660,
--	.volt_setup_time	= 0,
- 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
- 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
- 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index d2d5b2b..4d02d6e 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -155,7 +155,6 @@ struct omap_volt_data {
- struct omap_voltdm_pmic {
- 	int slew_rate;
- 	int step_size;
--	u16 volt_setup_time;
- 	u16 i2c_slave_addr;
- 	u16 volt_reg_addr;
- 	u16 cmd_reg_addr;
--- 
-1.7.4.1
+> @@ -54,6 +54,67 @@ static struct regmap_config mc13xxx_regmap_spi_config = {
+>         .max_register = MC13XXX_NUMREGS,
+>  
+>         .cache_type = REGCACHE_NONE,
+> +       .use_single_rw = 1,
+> +};
+
+That's fine, I'd just expected to see it here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/9f8a5d68/attachment.sig>
