@@ -1,20 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 08:56:27 +0800
-Subject: [RFC 11/34] dmaengine: PL08x: get src/dst addr direct from
- dma_slave_config struct
-In-Reply-To: <E1SZItH-0006zR-2R@rmk-PC.arm.linux.org.uk>
+Date: Thu, 31 May 2012 08:57:15 +0800
+Subject: [RFC 12/34] dmaengine: PL08x: get rid of device_fc in struct
+ pl08x_dma_chan
+In-Reply-To: <E1SZItb-0006zV-69@rmk-PC.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZItH-0006zR-2R@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdajmYUGb0PhVJraTREmMZ4PuA+RUwqmhXY8ZTrt7GAXEw@mail.gmail.com>
+ <E1SZItb-0006zV-69@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdaai-+weddOVcXqTG2seguH4qjk2xpD860gfQxxJEPDwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 5:38 PM, Russell King
+On Tue, May 29, 2012 at 5:39 PM, Russell King
 <rmk+kernel@arm.linux.org.uk> wrote:
 
-> Add a dma_slave_config struct to struct pl08x_dma_chan, and move the
-> src_addr/dst_addr arguments into this struct. ?This is a step away
-> from using the dma_slave_config's direction member.
+> As we now store the dma_slave_config in pl08x_dma_chan, we don't need
+> to store this separately. ?Use the one in dma_slave_config directly.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
