@@ -1,37 +1,150 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 May 2012 16:55:44 +0300
-Subject: [PATCHv6 08/14] ARM: OMAP3+: vp: use new vp_params for calculating
- vddmin and vddmax
+Date: Thu, 31 May 2012 16:55:45 +0300
+Subject: [PATCHv6 09/14] ARM: OMAP3+: voltage: use oscillator data to
+ calculate setup times
 In-Reply-To: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
 References: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1338472550-20743-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1338472550-20743-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we select the vddmin and vddmax values based on both pmic and
-voltage processor data, this allows usage of different power ICs.
+We now use the previously defined oscillator setup / shutdown times
+to calculate the register values for CLKSETUP.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/vp.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/vc.c |   62 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index c585dfb..c9277c3 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -58,8 +58,10 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
- 	sys_clk_rate = voltdm->sys_clk.rate / 1000;
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 0a37673..5fe2ff1 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -11,14 +11,20 @@
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/bug.h>
++#include <linux/io.h>
++
++#include <asm/div64.h>
  
- 	timeout = (sys_clk_rate * voltdm->pmic->vp_timeout_us) / 1000;
--	vddmin = voltdm->pmic->uv_to_vsel(voltdm->pmic->vddmin);
--	vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->vddmax);
-+	vddmin = max(voltdm->vp_param->vddmin, voltdm->pmic->vddmin);
-+	vddmax = min(voltdm->vp_param->vddmax, voltdm->pmic->vddmax);
-+	vddmin = voltdm->pmic->uv_to_vsel(vddmin);
-+	vddmax = voltdm->pmic->uv_to_vsel(vddmax);
+ #include <plat/cpu.h>
  
- 	waittime = DIV_ROUND_UP(voltdm->pmic->step_size * sys_clk_rate,
- 				1000 * voltdm->pmic->slew_rate);
++#include "iomap.h"
+ #include "voltage.h"
+ #include "vc.h"
+ #include "prm-regbits-34xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prm44xx.h"
++#include "pm.h"
++#include "scrm44xx.h"
+ 
+ /**
+  * struct omap_vc_channel_cfg - describe the cfg_channel bitfield
+@@ -206,6 +212,18 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
+ 	return 0;
+ }
+ 
++/* Convert microsecond value to number of 32kHz clock cycles */
++static inline u32 omap_usec_to_32k(u32 usec)
++{
++	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
++}
++
++/* Set oscillator setup time for omap3 */
++static void omap3_set_clksetup(u32 usec, struct voltagedomain *voltdm)
++{
++	voltdm->write(omap_usec_to_32k(usec), OMAP3_PRM_CLKSETUP_OFFSET);
++}
++
+ /**
+  * omap3_set_i2c_timings - sets i2c sleep timings for a channel
+  * @voltdm: channel to configure
+@@ -222,6 +240,12 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
+ 	unsigned long voltsetup1;
+ 	u32 tgt_volt;
+ 
++	/*
++	 * Oscillator is shut down only if we are using sys_off_mode pad,
++	 * thus we set a minimal setup time here
++	 */
++	omap3_set_clksetup(1, voltdm);
++
+ 	if (off_mode)
+ 		tgt_volt = voltdm->vc_param->off;
+ 	else
+@@ -262,6 +286,7 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
+ 	unsigned long voltsetup2;
+ 	unsigned long voltsetup2_old;
+ 	u32 val;
++	u32 tstart, tshut;
+ 
+ 	/* check if sys_off_mode is used to control off-mode voltages */
+ 	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
+@@ -271,6 +296,9 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
+ 		return;
+ 	}
+ 
++	omap_pm_get_oscillator(&tstart, &tshut);
++	omap3_set_clksetup(tstart, voltdm);
++
+ 	clksetup = voltdm->read(OMAP3_PRM_CLKSETUP_OFFSET);
+ 
+ 	/* voltsetup 2 in us */
+@@ -367,6 +395,30 @@ static u32 omap4_calc_volt_ramp(struct voltagedomain *voltdm, u32 voltage_diff)
+ }
+ 
+ /**
++ * omap4_usec_to_val_scrm - convert microsecond value to SCRM module bitfield
++ * @usec: microseconds
++ * @shift: number of bits to shift left
++ * @mask: bitfield mask
++ *
++ * Converts microsecond value to OMAP4 SCRM bitfield. Bitfield is
++ * shifted to requested position, and checked agains the mask value.
++ * If larger, forced to the max value of the field (i.e. the mask itself.)
++ * Returns the SCRM bitfield value.
++ */
++static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
++{
++	u32 val;
++
++	val = omap_usec_to_32k(usec) << shift;
++
++	/* Check for overflow, if yes, force to max value */
++	if (val > mask)
++		val = mask;
++
++	return val;
++}
++
++/**
+  * omap4_set_timings - set voltage ramp timings for a channel
+  * @voltdm: channel to configure
+  * @off_mode: whether off-mode values are used
+@@ -378,6 +430,7 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
+ 	u32 val;
+ 	u32 ramp;
+ 	int offset;
++	u32 tstart, tshut;
+ 
+ 	if (off_mode) {
+ 		ramp = omap4_calc_volt_ramp(voltdm,
+@@ -399,6 +452,15 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
+ 	val |= ramp << OMAP4430_RAMP_UP_COUNT_SHIFT;
+ 
+ 	voltdm->write(val, offset);
++
++	omap_pm_get_oscillator(&tstart, &tshut);
++
++	val = omap4_usec_to_val_scrm(tstart, OMAP4_SETUPTIME_SHIFT,
++		OMAP4_SETUPTIME_MASK);
++	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
++		OMAP4_DOWNTIME_MASK);
++
++	__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
+ }
+ 
+ /* OMAP4 specific voltage init functions */
 -- 
 1.7.4.1
