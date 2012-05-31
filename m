@@ -1,56 +1,29 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 31 May 2012 18:40:28 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP3: prevent per_clkdm from attempting manual
- domain transitions
-In-Reply-To: <1338470942-20185-9-git-send-email-t-kristo@ti.com>
-References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
- <1338470942-20185-9-git-send-email-t-kristo@ti.com>
-Message-ID: <4FC8016C.9000801@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 31 May 2012 20:51:00 -0300
+Subject: [PATCH 1/2] MFD: Fix mc13xxx SPI regmap
+In-Reply-To: <1338282389-26177-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1338282389-26177-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <CAOMZO5C9B-xUzo+OQ1HWPqc5pdiGreE3oArC+FM=8q+FB9K1ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Hi Philippe,
 
-On 05/31/2012 08:29 AM, Tero Kristo wrote:
-> Previously, PER clock domain was always enabled, as the usecounts
-> for this domain incorrectly always showed positive value. On HW
-> level though, the domain enters idle as it is set in HW supervised
-> mode. Now, when the usecounts reflect real values, PER domain will
-> attempt to enter software supervised idle, which is not supported by the
-> hardware/kernel that well, and causes multiple problems. First of all,
-> coming back from idle, PER domain remains idle as the wakedeps have
-> been disabled for the domain, and this causes a crash with the GPIO
-> code, as the resume code attempts to access domain which is not active.
-> Just enabling the interface clocks for the GPIO does not help, as they
-> are autoidled and don't bring the domain out of idle. Secondly, there
-> are multiple erratas for omap3, which say that the wakedeps should be
-> enabled for the PER domain, see e.g. errata i582 for omap3630.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> index 6038adb..0dae4c8 100644
-> --- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-> @@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
->  static struct clockdomain per_clkdm = {
->  	.name		= "per_clkdm",
->  	.pwrdm		= { .name = "per_pwrdm" },
-> -	.flags		= CLKDM_CAN_HWSUP_SWSUP,
-> +	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_SKIP_MANUAL_TRANS,
->  	.dep_bit	= OMAP3430_EN_PER_SHIFT,
->  	.wkdep_srcs	= per_wkdeps,
->  	.sleepdep_srcs	= per_sleepdeps,
+On Tue, May 29, 2012 at 6:06 AM, Philippe R?tornaz
+<philippe.retornaz@epfl.ch> wrote:
+> This fix the SPI regmap configuration, the wrong write flag was used.
+> Also, bits_per_word should not be set as the regmap spi implementation
+> uses a 8bits transfert granularity.
+>
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 
-So this change is just preventing software from clearing the wakeup-deps
-and keeping the PER clock domain always in HW_AUTO?
+Excellent!
 
-Sorry for the dumb question, but what is the circumstance under which we
-want to clear the wakeup-deps when we disable the clock domain? I am
-just curious why this is being done in the first place.
+I tested your patch series on a mx51evk, mx27pdk and mx31pdk:
 
-Cheers
-Jon
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Thanks,
+
+Fabio Estevam
