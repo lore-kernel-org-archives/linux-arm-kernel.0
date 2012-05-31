@@ -1,28 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 09:29:39 +0800
-Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
- periodic callbacks
-In-Reply-To: <20120530080216.GH12217@n2100.arm.linux.org.uk>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
- <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
- <20120530080216.GH12217@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYM1DX7BGd3EQLiqaZmRUk=NRAFsN0E_4ActW4tx5WgOw@mail.gmail.com>
+Date: Thu, 31 May 2012 09:40:10 +0800
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
+Message-ID: <CACRpkdbFgwF+rYthawxn8mW90u_BP0c+h=GODwQk5VwTF+JdqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 4:02 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, May 30, 2012 at 03:52:53PM +0800, Linus Walleij wrote:
->>
->> This last thing was something we have to fix right?
->> Like for each driver to keep a counter of completed periods
->> and call the handler repeatedly if N > 1.
+On Wed, May 30, 2012 at 2:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 >
-> No, I don't think we should do that - ALSA doesn't require it, and ALSA
-> is about the only user of this.
+>> The 'name' field in 'struct of_regulator_match' expects to match with
+>> its corresponding regulator device node in the Device Tree. This patch
+>> renames each of the regulators in the ab8500 regulator driver so this
+>> is true.
+>
+> Anyway: the name is used in more parts of the file, so please change
+> it everywhere if you change it.
 
-OK then there won't be any problems, let's go ahead with this.
+I was wrong on this, ignore that comment. I understand this now...
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
