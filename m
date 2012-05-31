@@ -1,66 +1,36 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Thu, 31 May 2012 16:06:00 +0400
-Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
- for OMAP4
-In-Reply-To: <4FC5E7DE.2060905@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
- <4FC49BA5.5050008@dev.rtsoft.ru> <4FC5DC9F.7080104@ti.com>
- <4FC5E2EE.8030504@dev.rtsoft.ru> <4FC5E7DE.2060905@ti.com>
-Message-ID: <4FC75EA8.6090406@dev.rtsoft.ru>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 31 May 2012 13:31:29 +0100
+Subject: [PATCH] netwinder: encapsulate CPLD hardware locking and access
+In-Reply-To: <86d35k7j2d.fsf_-_@gandalf.zerties.org>
+References: <1338040464.2525.38.camel@koala>
+ <20120525082812.GA12238@faui49q.informatik.uni-erlangen.de>
+ <20120529100619.GA23186@faui49q.informatik.uni-erlangen.de>
+ <1338040464.2525.38.camel@koala>
+ <20120525082812.GA12238@faui49q.informatik.uni-erlangen.de>
+ <20120529100619.GA23186@faui49q.informatik.uni-erlangen.de>
+ <1338286268.11518.157.camel@shinybook.infradead.org>
+ <1338040464.2525.38.camel@koala>
+ <20120525082812.GA12238@faui49q.informatik.uni-erlangen.de>
+ <20120529100619.GA23186@faui49q.informatik.uni-erlangen.de>
+ <1338286268.11518.157.camel@shinybook.infradead.org>
+ <86d35k7j2d.fsf_-_@gandalf.zerties.org>
+Message-ID: <1338467489.11518.459.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi.
+On Thu, 2012-05-31 at 12:15 +0200, Christian Dietrich wrote:
+> I hope my draft of the preemption disabling is not to much crap. I would
+> appreciate some comments. And please be aware, that i don't own this
+> hardware, and haven't tested it on real hardware therefore. 
 
-On 05/30/2012 01:26 PM, Cousson, Benoit wrote:
-> On 5/30/2012 11:05 AM, Konstantin Baydarov wrote:
->> On 05/30/2012 12:38 PM, Cousson, Benoit wrote:
->>> On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
->>>> Hi, Eduardo.
->>>>
->>>> On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
->>>>> This patch add device tree entries on OMAP4 based boards for
->>>>> System Control Module (SCM).
->
-> ...
->
->>>> I believe that CPU-specific bandgap definition should be moved to
->>>> bard specific dts.
->>>
->>> Mmm, why, since it is CPU specific and not board specific. I has to
->>> be in the SoC file.
->> Speaking about omap4430 - omap4430 bandgap differs from omap4460, so
->> if omap4430 bandgap support will be added to omap-bandgap driver the
->> version of bandgap should specified in dts file. omap4.dtsi is a
->> common for omap4 boards, that is why I'm suggesting to move bandgap
->> description to probably board specific file.
->
-> OK, I got your point, but in that case we could potentially define a omap4460.dtsi file.
->
->> Another solution is to
->> determine bandgap type in driver probe function, but in that case
->> "ti,omap4460-bandgap" in omap4.dtsi should be replaced to
->> "ti,omap4-bandgap".
->
-> Yes, this is the best solution, but that assume that we can identify the control module version from the HW, which is not necessarily true :-(
->
-> The IP_REVISION (offset = 0) value are unfortunately not documented, so we should read it to check if they are different from omap4430 and 4460.
->
-> The bitfield layout in that register is:
->
-> IP_REV_MAJOR: 8..10
-> IP_REV_CUSTOM: 6..7
-> IP_REV_MINOR: 0..5
-The value of CONTROL_GEN_CORE_REVISION register on my panda board(4430) is:
-CONTROL_GEN_CORE_REVISION: 0x40000900
-CONTROL_GEN_CORE_HWINFO:  0x0
+Looks relatively sane at first glance; thanks.
 
-  Eduardo, could you check CONTROL_GEN_CORE_REVISION on your 4460 board.
-
-  BR,
-    Konstantin Baydarov.
-
->
-> Regards,
-> Benoit
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6171 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/574905d6/attachment-0001.bin>
