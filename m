@@ -1,45 +1,35 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 31 May 2012 12:10:40 +0300
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <4FC73424.80107@codeaurora.org>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
- <4FC73424.80107@codeaurora.org>
-Message-ID: <20120531091040.GS8026@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 31 May 2012 09:22:18 +0000
+Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
+In-Reply-To: <CAAe_U6LFFstds=iQ7cy7gM9vWbfRgf5z0gaRp_-bu0Qjx6eA1Q@mail.gmail.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <201205301843.51568.arnd@arndb.de>
+ <CAAe_U6LFFstds=iQ7cy7gM9vWbfRgf5z0gaRp_-bu0Qjx6eA1Q@mail.gmail.com>
+Message-ID: <201205310922.18550.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 11:04:36AM +0200, Stephen Boyd wrote:
-> On 5/31/2012 12:51 AM, Peter De Schrijver wrote:
-> > On Wed, May 30, 2012 at 10:52:31AM +0200, Stephen Boyd wrote:
-> >> On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
-> >>> Add an extension API for clocks. This allows clocktypes to provide extensions
-> >>> for features which are uncommon and cannot be easily mapped onto normal clock
-> >>> framework concecpts. eg: resetting blocks, configuring clock phase etc.
-> >> This seems rather generic. Why not add more specific APIs/concepts like
-> >> clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
-> >> make them map.
-> >>
-> > Some of those might be very SoC specific. Eg OMAP doesn't need software
-> > controlled modulereset. I don't think we should add a new function to the
-> > clock framework for clock related features which only exist in a single
-> > SoC or family. Ideally we could use inheritance to add methods to derived
-> > clocktypes, but that's not really possible in C unfortunately.
+On Thursday 31 May 2012, ABRAHAM, KISHON VIJAY wrote:
+> >
+> > Just put the devices you actually want into the device tree instead and
+> > have them automatically created.
 > 
-> Most likely your hardware is not that special and the functionality you
-> think exists only on your SoC actually exists on 5 others. MSM needs
-> software resets too and we also associate them with each clock (there
-> can be many clocks for one device and one reset for each clock). We use
-> them mostly for the power domain code (looks like tegra and omap do the
-> same thing albeit slightly differently).
-> 
-> What do you plan to support under this API?
+> But shouldn't device tree support and non-device tree support co-exist
+> till the non-device tree is completely knocked out of the kernel? Even
 
-Anything which isn't available on other SoCs. If it is available, then we
-could indeed add another method. I guess this will need to be decided on
-a case by case basis.
+Well, it's a new driver, so there is no regression in supporting it only
+on DT-enabled boards. OMAP5 is DT-only anyway and OMAP4 only supports two
+boards that should both be working with the generic DT code already.
 
-Cheers,
+> then shouldn't there be a separate driver to extract the child nodes
+> of ocp2scp and create a device (using of_platform_populate)?
+> As far as I've seen, the devices are automatically created (by virtue
+> of of_platform_populate() in  mach-omap2/board-generic.c in omap case)
+> only for the devices that is connected to the system bus. For other
+> cases, the parent should be responsible for creating the child
+> devices.
 
-Peter.
+I would mark the multiplexed device compatible with "simple-bus", which
+results in the child devices automatically getting added.
+
+	Arnd
