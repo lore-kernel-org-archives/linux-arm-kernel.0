@@ -1,21 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 09:01:08 +0800
-Subject: [RFC 15/34] dmaengine: PL08x: ignore 'direction' argument in
+Date: Thu, 31 May 2012 09:02:07 +0800
+Subject: [RFC 16/34] dmaengine: PL08x: get rid of unnecessary checks in
  dma_slave_config
-In-Reply-To: <E1SZIuZ-0006zi-Gf@rmk-PC.arm.linux.org.uk>
+In-Reply-To: <E1SZIut-0006zm-Jl@rmk-PC.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIuZ-0006zi-Gf@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdYeYgjbrCTsf=PaRCujtOsx5939sZeXxv8KwiJ4mY_m7A@mail.gmail.com>
+ <E1SZIut-0006zm-Jl@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdZc0rAFxQJCGNT9EjBH9CWymfCnBJwYn_ZDMHU7TFb4HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 29, 2012 at 5:40 PM, Russell King
 <rmk+kernel@arm.linux.org.uk> wrote:
 
-> Ignore the direction argument in dma_slave_config, and configure both
-> directions independently. ?We still check that the configuration for
-> the intended direction is valid; this check will eventually be dropped.
-> This check is just for debugging at present.
+> Get rid of the unnecessary checks in dma_slave_config utilizing
+> the DMA direction. ?This allows us to move the computation of
+> cctl to the prepare function.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
