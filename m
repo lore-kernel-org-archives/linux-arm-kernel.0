@@ -1,118 +1,74 @@
-From: jgq516@gmail.com (Xiao Jiang)
-Date: Thu, 31 May 2012 13:51:19 +0800
-Subject: [PATCH 1/3] arm/dts: add wdt node for omap3 and omap4
-In-Reply-To: <4FC631E5.9080000@ti.com>
-References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
- <1337942552-28218-2-git-send-email-jgq516@gmail.com>
- <4FC50CCD.7090404@ti.com> <4FC591C9.2050004@gmail.com>
- <4FC631E5.9080000@ti.com>
-Message-ID: <4FC706D7.2010801@gmail.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Thu, 31 May 2012 13:06:00 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+References: <4FAA34A9.5020708@gmail.com>
+ <20120511085150.GA17453@mudshark.cambridge.arm.com>
+ <4FC45E6B.2070202@gmail.com>
+ <20120530063858.GB6484@mudshark.cambridge.arm.com>
+ <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
+ <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
+ <4FC6E7CE.9090004@gmail.com>
+ <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+Message-ID: <4FC6FC38.8090904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon and Benoit,
->> Thanks for reminding, how about below patch?
+
+
+On 2012?05?31? 11:58, Catalin Marinas wrote:
+> On 31 May 2012 11:38, bill4carson<bill4carson@gmail.com>  wrote:
+>> On 2012?05?31? 11:19, Catalin Marinas wrote:
+>>> BTW, see this as a starting point (and a hack):
+>>>
+>>> http://article.gmane.org/gmane.linux.ports.arm.kernel/51556
 >>
->> diff --git a/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
->> b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
->> new file mode 100644
->> index 0000000..4272d06
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
->> @@ -0,0 +1,15 @@
->> +TI Watchdog Timer (WDT) Controller for OMAP
->> +
->> +Required properties:
->> +- compatible:
->> +  - "ti,omap2-wdt" for OMAP2
->> +  - "ti,omap3-wdt" for OMAP3
->> +  - "ti,omap4-wdt" for OMAP4
->> +- ti,hwmods: Name of the hwmod associated to the WDT
->> +
->> +Examples:
->> +
->> +wdt2: wdt at 73f98000 {
->> +       compatible = "ti,omap4-wdt";
->> +       ti,hwmods = "wd_timer2";
->> +};
->>     
+>> I think we has some mis-understanding here :(
+>>
+>> As for:v6_flush_kern_dcache_area/v6_flush_kern_dcache_all
+>> these two hooks is supposed to be globally effective, *not*
+>> locally!
+>>
+>> Hence, there should below fix to make it as globally effective.
+>>
+>>
+>> +#ifdef CONFIG_SMP
+>> +       ldr     r2, [r0]                        @ read for ownership
+>> +       str     r2, [r0]                        @ write for ownership
+>> +#endif /* CONFIG_SMP */
+>>
+>> Or there maybe some other better solution for this issue.
 >
-> Yes looks good. Thanks! Minor nit-pick in the example I would just copy
-> the omap4 node completely with the actual omap4 address :-)
+> I still didn't fully understand what the problem is. So, to make sure,
+> if you run some applications from flash using a yaffs filesystem, you
+> get random crashes. Is this correct? If yes, a solution is to actually
+> call flush_dcache_page() on the CPU that does the page copying from
+> flash into RAM, which could be the yaffs filesystem.
 >
->   
-Oops, wrong addr, :). Perhaps we can drop address as you said, since the 
-right addresses are defined
-in wd_timer2 hwmod (see [1]), and wdt also works without the address as 
-follows.
 
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index f2ab4ea..0017bd8 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -63,5 +63,10 @@
-                        ti,hwmods = "uart3";
-                        clock-frequency = <48000000>;
-                };
-+
-+               wdt2: wdt {
-+                       compatible = "ti,omap2-wdt";
-+                       ti,hwmods = "wd_timer2";
-+               };
-        };
- };
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 99474fa..dbf8a5b 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -215,5 +215,10 @@
-                        compatible = "ti,omap3-hsmmc";
-                        ti,hwmods = "mmc3";
-                };
-+
-+               wdt2: wdt {
-+                       compatible = "ti,omap3-wdt", "ti,omap2-wdt";
-+                       ti,hwmods = "wd_timer2";
-+               };
-        };
- };
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 359c497..ce74e87 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -272,5 +272,10 @@
-                        ti,hwmods = "mmc5";
-                        ti,needs-special-reset;
-                };
-+
-+               wdt2: wdt {
-+                       compatible = "ti,omap4-wdt", "ti,omap2-wdt";
-+                       ti,hwmods = "wd_timer2";
-+               };
-        };
- };
+The story goes like this:
+function "flush_dcache_page" should be global effective
+but in ARMv6 MPCore, it was not, it was just local effective due
+to hardware design. This may cause error in some cases for example:
 
-Infos for omap3:
-# dmesg|grep Machine
-<6>[    0.000000] Machine: Generic OMAP3 (Flattened Device Tree), model: 
-TI OMAP3 EVM (OMAP3530, AM/DM37x)
-# dmesg|grep omap_wdt_probe
-<4>[    2.552825] in omap_wdt_probe: 299, res->start = 0x48314000
+1) Task running on Core-0 loading text section into memory.
+    It was preempted and then migrate into Core-1;
+2) On Core-1, this task continue loading it and then
+    "flush_dcache_page" to make sure the loaded text section write
+    into main memory.
+3) Task tend to the loaded text section and running it.
 
-Infos for omap4:
-root at localhost:/root> dmesg|grep Machine
-[    0.000000] Machine: Generic OMAP4 (Flattened Device Tree), model: TI 
-OMAP4 SDP board
-root at localhost:/root> dmesg|grep omap_wdt_probe
-[    1.687896] in omap_wdt_probe: 299, res->start = 0x4a314000
+If the "flush_dcache_page" was not global effective,
+there maybe data still in Core-0's data cache, not write
+into main memory. Thus in step 3, error instruction maybe
+fetched thus cause strange error.
 
-So can I drop the wdt addr from dts file? otherwise it is not feasible 
-to add omap2 wdt node in omap2.dtsi
-due to different addrs for omap2420 and omap2430.
+If I'm missing something here, please let me know.
 
-Regards,
-Xiao
-[1] http://marc.info/?l=linux-omap&m=133836995026565&w=2
-> Cheers
-> Jon
->   
+thanks
+
+-- 
+Love each day!
+
+--bill
