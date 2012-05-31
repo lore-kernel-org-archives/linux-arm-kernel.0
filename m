@@ -1,43 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 31 May 2012 12:36:59 +0100
-Subject: [PATCH v2 4/6] ARM: Samsung: Modify
- s3c64xx_spi{0|1|2}_set_platdata function
-In-Reply-To: <CAJuYYwT88mpTKmOD8mpCjsQo9O_+Giri7+q-Rzz=zPNj+F7aDg@mail.gmail.com>
-References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
- <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
- <20120520092113.GA20652@opensource.wolfsonmicro.com>
- <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
- <20120530093421.GA9947@opensource.wolfsonmicro.com>
- <CAJuYYwShLhKSrpGhaTyxX4dqaiKDAcjBtuWSMYAdsWcOMfP=qw@mail.gmail.com>
- <20120530101326.GF9947@opensource.wolfsonmicro.com>
- <CAJuYYwT88mpTKmOD8mpCjsQo9O_+Giri7+q-Rzz=zPNj+F7aDg@mail.gmail.com>
-Message-ID: <20120531113659.GB2666@opensource.wolfsonmicro.com>
+Date: Thu, 31 May 2012 13:00:58 +0100
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+ <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
+ <20120531081841.GG5377@arwen.pp.htv.fi>
+ <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20120531120057.GA15786@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 10:05:42AM +0800, Thomas Abraham wrote:
-> On 30 May 2012 18:13, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+On Thu, May 31, 2012 at 11:31:31AM +0300, Peter De Schrijver wrote:
 
-> > No there isn't. ?You've got things like s3c64xx_device_spi0 in
-> > arch/arm/plat-samsung/devs.c (which you'd expect since the resources
-> > that are passed in for memory mapping, DMA and interrupt vary with the
-> > SoC). ?The bit of code I was querying just changes "s3c64xx-spi" to
-> > "s3c6410-spi" at runtime in that structure which seems like a waste of
-> > time.
+> > What I wonder most is if this should be done at the clock level or at
+> > the device level. In the end you reset the IP block, not the clock,
+> > right ?
 
-> So is the concern only with the change of device name from
-> "s3c64xx-spi" to "s3c6410-spi"? Is there any concern with changing the
-> name of the static spi platform device (s3c64xx_device_spi0/1/2) at
-> runtime which then is used to select a driver data?
+> Yes. but, every block has at least 1 clock and thus the mapping is identical
+> down to the register level. Ie. we could do this outside the clockframework,
+> but then we would have the keep a list of IDs (1 per module) which the drivers
+> can use to call some tegra reset function which would in the end use registers
+> in the same memory area to cause a reset. (the registers controlling
+> modulereset are interleaved with those controlling the enable/disable of the
+> main moduleclock and bitpositions are identical)
 
-No, you're not getting it at all.  The changing at runtime is the
-problem, it's achieving nothing except making the code more fragile and
-obscure.  Those devices will always come out with exactly the same name
-so we should just assign that name statically.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/a83da38e/attachment.sig>
+One option which doesn't really need anything from the clock API is for
+the module resets to restore these registers so the clock API never
+notices anything changed.
