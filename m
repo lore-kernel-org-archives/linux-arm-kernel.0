@@ -1,117 +1,89 @@
-From: snakky.zhang@gmail.com (snakky.zhang at gmail.com)
-Date: Thu, 31 May 2012 15:46:37 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <4FC71C13.7090301@gmail.com>
-References: <20120530063858.GB6484@mudshark.cambridge.arm.com>
- <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
- <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
- <4FC6E7CE.9090004@gmail.com>
- <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
- <4FC6FC38.8090904@gmail.com>
- <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
- <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
- <4FC71C13.7090301@gmail.com>
-Message-ID: <4FC721DD.5020905@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 31 May 2012 09:50:15 +0200
+Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
+In-Reply-To: <4FBE4FE7.3010005@atmel.com>
+References: <4FBE4FE7.3010005@atmel.com>
+Message-ID: <4FC722B7.10409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012?05?31? 15:21, bill4carson wrote:
->
->
-> On 2012?05?31? 14:56, Catalin Marinas wrote:
->> On Thu, May 31, 2012 at 06:51:22AM +0100, bill4carson wrote:
->>> On 2012?05?31? 13:19, Catalin Marinas wrote:
->>>> On 31 May 2012 13:06, bill4carson<bill4carson@gmail.com>   wrote:
->>>>> On 2012?05?31? 11:58, Catalin Marinas wrote:
->>>>>> I still didn't fully understand what the problem is. So, to make 
->>>>>> sure,
->>>>>> if you run some applications from flash using a yaffs filesystem, 
->>>>>> you
->>>>>> get random crashes. Is this correct? If yes, a solution is to 
->>>>>> actually
->>>>>> call flush_dcache_page() on the CPU that does the page copying from
->>>>>> flash into RAM, which could be the yaffs filesystem.
->>>>>
->>>>> The story goes like this:
->>>>> function "flush_dcache_page" should be global effective
->>>>> but in ARMv6 MPCore, it was not, it was just local effective due
->>>>> to hardware design.
->>>>
->>>> Yes, I know this.
->>>
->>> Then, why not fix "flush_dcache_page" to make it globally effective?
->>
->> Performance?
->>
->> And it's also just ARM11MPCore microarchitecture specific.
->>
-Yes, seems newer CPUs has no such limitation thus this function is 
-global effective naturally. :-)
+On 05/24/2012 05:12 PM, Nicolas Ferre :
+> Hi Arnd, hi Olof,
 
-And , I find Mips's c-r4k also has this issue but it use IPI to make it. 
-Details in arch/mips/mm/c-r4k.c.
+Ping?
 
- From my point of view, PREEMPT should not related to CPU type. So if 
-this type of CPU does not support PREEMPT for performance reason, can we 
-add something in Documentation and related Kconfig to make/mark it?
+(or maybe you will have a look at this after the merge window...)
 
-Or maybe disable task migration is also a choice. :-)
+> Here is an additional AT91 patch for 3.5 concerning platform data
+> related to atmel-mci driver. It is maybe a bit late on your side
+> but you can choose to sent it during 3.5-rc cycle considering the
+> reasons that I give in the tag comment...
+> 
+> If you feel it does not have to integrate 3.5, having it in
+> a kind of "staging" or "late" branch can help us to exercise it
+> in linux-next.
+> 
+> (is merges seamlessly with current Linus' tree as the commit that I have
+> based my tag upon is already integrated upstream)
+> 
+> The following changes since commit cce783c608fee0716cff65926d1835a5fd097b69:
+> 
+>   ARM: at91: Add DT description files for AT91SAM9N12-EK (2012-04-28 01:40:27 +0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-for-next-soc
+> 
+> for you to fetch changes up to 6df5c23817852e865c452e72414063acd0cd7309:
+> 
+>   ARM: at91: add atmel-mci support for chips and boards which can use it (2012-05-21 12:30:41 +0200)
+> 
+> ----------------------------------------------------------------
+> This addition of platform data for atmel-mci driver in AT91 SoC & boards
+> will temporary overload the information for at91_mci driver.
+> This situation will end in 3.7 when the at91_mci driver marked deprecated
+> will be removed. At this time, all platform data for this old driver will
+> be erased from all SoC & boards files.
+> The sooner we provide elements for people to switch to this newer and more
+> stable driver, the better we will run this transition.
+> 
+> ----------------------------------------------------------------
+> Ludovic Desroches (1):
+>       ARM: at91: add atmel-mci support for chips and boards which can use it
+> 
+>  arch/arm/mach-at91/at91rm9200_devices.c  |   99 ++++++++++++++++++
+>  arch/arm/mach-at91/at91sam9261_devices.c |   67 ++++++++++++
+>  arch/arm/mach-at91/at91sam9263.c         |    2 +
+>  arch/arm/mach-at91/at91sam9263_devices.c |  164 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/at91sam9rl_devices.c  |   70 +++++++++++++
+>  arch/arm/mach-at91/board-afeb-9260v1.c   |   14 +++
+>  arch/arm/mach-at91/board-carmeva.c       |   14 +++
+>  arch/arm/mach-at91/board-cpu9krea.c      |   14 +++
+>  arch/arm/mach-at91/board-cpuat91.c       |   14 +++
+>  arch/arm/mach-at91/board-csb337.c        |   14 +++
+>  arch/arm/mach-at91/board-eb9200.c        |   14 +++
+>  arch/arm/mach-at91/board-ecbat91.c       |   14 +++
+>  arch/arm/mach-at91/board-eco920.c        |   14 +++
+>  arch/arm/mach-at91/board-flexibity.c     |   14 +++
+>  arch/arm/mach-at91/board-foxg20.c        |   16 ++-
+>  arch/arm/mach-at91/board-kb9202.c        |   14 +++
+>  arch/arm/mach-at91/board-neocore926.c    |   14 +++
+>  arch/arm/mach-at91/board-picotux200.c    |   14 +++
+>  arch/arm/mach-at91/board-qil-a9260.c     |   14 +++
+>  arch/arm/mach-at91/board-rm9200dk.c      |   14 +++
+>  arch/arm/mach-at91/board-rm9200ek.c      |   14 +++
+>  arch/arm/mach-at91/board-rsi-ews.c       |   14 +++
+>  arch/arm/mach-at91/board-sam9-l9260.c    |   16 ++-
+>  arch/arm/mach-at91/board-sam9260ek.c     |   16 ++-
+>  arch/arm/mach-at91/board-sam9261ek.c     |   14 +++
+>  arch/arm/mach-at91/board-sam9263ek.c     |   14 +++
+>  arch/arm/mach-at91/board-sam9rlek.c      |   14 +++
+>  arch/arm/mach-at91/board-usb-a926x.c     |    2 +-
+>  arch/arm/mach-at91/board-yl-9200.c       |   14 +++
+>  29 files changed, 728 insertions(+), 4 deletions(-)
+> 
+> Thanks, best regards,
 
-Thanks
-Xiao
->>>>> This may cause error in some cases for example:
->>>>>
->>>>> 1) Task running on Core-0 loading text section into memory.
->>>>>     It was preempted and then migrate into Core-1;
->>>>
->>>> BTW, do you have CONFIG_PREEMPT enabled?
->>>>
->>> Yes, CONFIG_PREEMPT enabled. Thus cause the task was preempted. :-)
->>
->> I told you that CONFIG_PREEMPT is not supported on ARM11MPCore :).
->
-> Point!
->
-> Is it better to add comment, such as "PREEMPT is not supported for
-> ARM11MPCore" in somewhere(for now, I don't find such place)?
-> then custom will be alerted with such notice when they trying change
-> to PREEMPT.
->
-> And again, thanks for your patience with me :)
->
->
->>
->>>> To be clear - is your application reading some data from flash and
->>>> trying to execute or it's the kernel doing the load via the
->>>> page/prefetch abort mechanism?
->>>
->>> In my current case, it is yaffs root file system.
->>>
->>>> If the latter, task running on core 0 gets a prefetch abort when
->>>> trying to execute some code. The kernel reads the page from flash (via
->>>> mtd, block layer, VFS) and copies it into RAM. It can be on any CPU as
->>>> long as it calls flush_dcache_page on the same CPU that copied the
->>>> data.
->>>>
->>>> No matter where the task was running or migrated to, if the code doing
->>>> the copy also called flush_dcache_page() on the same core, there is no
->>>> data left in the D-cache for that page.
->>>
->>> Yes, I agree with it.
->>> But how to flush the data cache on the same core with PREEMPT enabled?
->>
->> That's not easily possible. But you may get better results with
->> VOLUNTARY_PREEMPT.
->>
->>> And, I think according to the design, there is no such operation that
->>> guarantee it.
->>
->> RFO/WFO tricks only work on ARM11MPCore.
->>
->>> But any way, I think flush_dcache_page should be global effective.
->>> If ARMv6 MPCore didn't make it, we should try to accomplish it.
->>
->> Do some performance tests first.
->>
->
+
+-- 
+Nicolas Ferre
