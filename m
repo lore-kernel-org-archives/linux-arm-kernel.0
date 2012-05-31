@@ -1,87 +1,67 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 31 May 2012 08:08:51 +0530
-Subject: [PATCHv2 04/19] ARM: OMAP4: PM: save/restore all DPLL settings in
- OFF mode
-In-Reply-To: <87mx4p5niq.fsf@ti.com>
-References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
- <1336990730-26892-5-git-send-email-t-kristo@ti.com> <87d363928g.fsf@ti.com>
- <CAMQu2gw5myvyvM8x225KnN59vEYBYLBiEsvML8RAoE0t+RrbYA@mail.gmail.com>
- <CAMQu2gywor2o+g8Fn80ogbTtEZPSXM74M65GsO2zH44tg-W7gQ@mail.gmail.com>
- <CAOMWX4ctJcfGNxXK4hT+QH-m7zUfP1N3H56oVDVzPFmhVTFOMw@mail.gmail.com>
- <87wr3t8s81.fsf@ti.com>
- <CAOMWX4ewVauzYW9pJq07=moLcgkBLyvx68o7T8975cGvshfK3Q@mail.gmail.com>
- <87mx4p5niq.fsf@ti.com>
-Message-ID: <CAMQu2gyD7W0whj=0jBhpo91EyduXPDGOH396kxEc+K5OUepyPw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 May 2012 11:00:17 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC5F017.4050202@gmail.com>
+References: <4FAA34A9.5020708@gmail.com>
+ <20120511085150.GA17453@mudshark.cambridge.arm.com>
+ <4FC45E6B.2070202@gmail.com>
+ <20120530063858.GB6484@mudshark.cambridge.arm.com>
+ <4FC5F017.4050202@gmail.com>
+Message-ID: <20120531030016.GB29372@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 3:39 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Menon, Nishanth" <nm@ti.com> writes:
->
->> On Wed, May 30, 2012 at 12:59 PM, Kevin Hilman <khilman@ti.com> wrote:
->>> "Menon, Nishanth" <nm@ti.com> writes:
->>>
->>>> On Thu, May 17, 2012 at 3:52 AM, Shilimkar, Santosh
->>>> <santosh.shilimkar@ti.com> wrote:
->>>>> On Thu, May 17, 2012 at 12:34 PM, Shilimkar, Santosh
->>>>> <santosh.shilimkar@ti.com> wrote:
->>>>>> On Thu, May 17, 2012 at 4:12 AM, Kevin Hilman <khilman@ti.com> wrote:
->>>>>>> Tero Kristo <t-kristo@ti.com> writes:
->>>>>>>
->>>> [...]
->>>>>>> - Rather than hooking into omap4_enter_lowpower(), should use
->>>>>>> ?the cluster PM enter/exit notifier chain.
->>>>>>>
->>>>>> This is again specific to device OFF only and not related to CPU
->>>>>> cluster state as such. So I don't think notifiers should be used here.
->>>>>>
->>>>>> O.w even when we attempt just MPU OSWR C-state, all these functions will
->>>>>> get called in notifier chain.
->>>>>>
->>>>> Just a thought, we can have a separate notifier chain for device OFF. It can
->>>>> allow use to get rid of 'enable_off_mode" kind of flags and can be
->>>>> used by many drivers too.
->>>>
->>>> Like the overall idea, but one minor dumb concern might be sequencing
->>>> of notifiers
->>>> ?- OFF entry and restore needs things to be executed in a specific sequence.
->>>> How do we plan to ensure the sequence is maintained in a notifier call
->>>> chain? one
->>>> possible option might be a "priority" based scheme?
->>>
->>> Or just combine the events that need a specific sequence into single
->>> notifier callback function.
->> There is other issues in case of failure cases -> abort of OFF
->> sequence due to pending interrupt
->> detected as part of a notifier - error handling needs to be sane in
->> proper sequence.
->> I understand and appreciate the intent of replacing the single mega
->> enter_sleep with a chain of notifiers
->> but any such option will need to be scalable enough to handle weird
->> erratum handling (HSI CAWAKE as an example)
->> which potentially break the logic flow and be either be equal or
->> better than what we have today interms of
->> error handling. since these notifiers will be triggered for
->> CPUIDLE(performance sensitive) and suspend, the intricacies
->> might be better understood by seeing how this proposed notifiers look like.
->
-> Makes sense. ?Thanks for clarifying.
->
-> What $SUBJECT series proposed was indeed a "mega function", but one that
-> was just a list of function calls with no error checking or recovery,
-> and no documentation/description about dependencies/sequencing etc. etc.
-> Based on the patches at hadn (which is all reviewers have to go on),
-> notifiers seemed to be a good fit.
->
-> If there are good reasons that all of the device-off events need to be
-> coordinated/synchronized/sequenced (and it sounds like there are, thanks
-> for pointing them out), I am not opposed to that approach. ?It simply
-> needs to be well described in the changlog.
->
-There are sequence dependencies but lot of code can be extracted and put
-into smaller blocks that is independent.
+Hi,
 
-I agree for the error handling part notifier chain could be an issue.
+On Wed, May 30, 2012 at 11:01:59AM +0100, bill4carson wrote:
+> On 2012?05?30? 14:38, Will Deacon wrote:
+> > On Tue, May 29, 2012 at 06:28:11AM +0100, bill4carson wrote:
+> >> --- a/arch/arm/mm/cache-v6.S
+> >> +++ b/arch/arm/mm/cache-v6.S
+> >> @@ -170,6 +170,10 @@ ENDPROC(v6_coherent_kern_range)
+> >>    ENTRY(v6_flush_kern_dcache_area)
+> >>           add     r1, r0, r1
+> >>    1:
+> >> +#ifdef CONFIG_SMP
+> >> +       ldr     r2, [r0]                        @ read for ownership
+> >> +       str     r2, [r0]                        @ write for ownership
+> >> +#endif /* CONFIG_SMP */
+> >>    #ifdef HARVARD_CACHE
+> >>           mcr     p15, 0, r0, c7, c14, 1          @ clean&  invalidate D line
+> >>    #else
+> >
+> > I don't think the invalidation is needed here, so you probably don't need to
+> > hack this function at all.
+...
+> 1. task t runs on CPU 0, it executes one program in nand flash,
+>     so first task t read *part* of this program into its local Dcache,
+>     let's call it part_a;
+> 
+> 2. task t migrates from CPU0 onto CPU1, in there reads the rest of
+>     program into its local Dcache, label it part_b;
+> 
+> 3. on CPU1, task t flush the whole address range of this program,
+>     As with ARM11 MPCore, this flush is locally effective, after flush
+>     part_a still resides in CPU0 L1 Dcache.
+> 
+> 4. When this program gets executed, CPU 1 fetch its instructions from
+>     Icache, SCU will notice this action,
+> 
+>     Question:
+>     At this point, is stale part_a in main memory *or* L1 Dcache part_a
+>     in CPU0 routed into CPU1 as instruction?
 
-Regards
-Santosh
+This has been discussed in the past. The first thing is to disable
+CONFIG_PREEMPT to make sure you are not preempted between page copying
+and task execution. The code doing the page copy needs to call
+flush_dcache_page() on the CPU where the copy occurred and Linux does a
+non-lazy D-cache flush. But there are many situations where Linux
+doesn't do this (you can google for flush_dcache_page and my name to
+find a few places where I tried to fix this).
+
+AFAIK, The SCU only snoops the D-cache, not the I-cache. We have a full
+I-cache invalidation during task migration.
+
+-- 
+Catalin
