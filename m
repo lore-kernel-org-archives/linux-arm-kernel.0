@@ -1,64 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 31 May 2012 11:18:42 +0300
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20120531081841.GG5377@arwen.pp.htv.fi>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Thu, 31 May 2012 10:21:24 +0200
+Subject: [RFC PATCH 0/2] Remove at91 workaround from handle_IRQ
+In-Reply-To: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
+References: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4FC72A04.3040504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 10:51:25AM +0300, Peter De Schrijver wrote:
-> On Wed, May 30, 2012 at 10:52:31AM +0200, Stephen Boyd wrote:
-> > On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
-> > > Add an extension API for clocks. This allows clocktypes to provide extensions
-> > > for features which are uncommon and cannot be easily mapped onto normal clock
-> > > framework concecpts. eg: resetting blocks, configuring clock phase etc.
-> > 
-> > This seems rather generic. Why not add more specific APIs/concepts like
-> > clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
-> > make them map.
-> > 
-> 
-> Some of those might be very SoC specific. Eg OMAP doesn't need software
-> controlled modulereset. I don't think we should add a new function to the
+Hi Will,
 
-it depends on what you call modulereset. We have soft-reset logic hidden
-under the hood, it's done before device creation, so drivers (most of
-them) assume we're probe with the IP in reset state.
+Le 05/31/2012 09:38 AM, Will Deacon a ?crit :
+> Hello,
+>
+> This is a couple of patches that I wrote quickly to try and remove the
+> irq_finish hook from handle_IRQ on ARM. Currently, the hook is only used
+> by at91 in order to issue an EOI when using level_irq flow control.
+>
+> This patch moves the at91 irq_chip to fasteoi flow control, removing the
+> need for the additional hook. Since I (a) don't know anything about at91
+> (the TRM I found for the IRQ controller is only a few pages long) and (b)
+> don't have a platform on which to test, this is very much an RFC series.
+>
+> All comments welcome.
+>
+> Will
 
-What I wonder most is if this should be done at the clock level or at
-the device level. In the end you reset the IP block, not the clock,
-right ?
+I have sent a patch with the same purpose a few days ago: 
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/169371
 
-> clock framework for clock related features which only exist in a single
-> SoC or family. Ideally we could use inheritance to add methods to derived
-> clocktypes, but that's not really possible in C unfortunately.
+The content of our patches is really close:
+- I missed the remove of irq_finish macro in arch/arm/irq/kernel.c
+- AIC don't care about the value written into AT91_AIC_EOICR, I don't 
+know if it's better to write 0 or a precise value as you did.
+- I didn't remove irq_ack but you're right it's no more useful.
+- You missed gpio part, it has to use fasteoi flow control also.
 
-Well, it can be done... in a weird manner, but it can:
+I have also to remove some comments so I can send a second version and 
+add what I missed the first time if you have no objections.
 
-struct my_new_clk {
-	struct clk	clk;
 
-	int		(*reset)(struct my_new_clk *m);
-};
+> Cc: Arnd Bergmann<arnd@arndb.de>
+> Cc: Jean-Christophe Plagniol-Villard<plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+>
+> Will Deacon (2):
+>    ARM: at91: use EOI flow control for interrupt handling
+>    ARM: irq: remove unused irq_finish hook from core interrupt handling
+>
+>   arch/arm/kernel/irq.c                  |   10 ----------
+>   arch/arm/mach-at91/include/mach/irqs.h |    8 --------
+>   arch/arm/mach-at91/irq.c               |   12 +++++++++---
+>   3 files changed, 9 insertions(+), 21 deletions(-)
+>
 
-int clk_reset(struct clk *clk)
-{
-	strut my_new_clk	*m = container_of(clk, struct my_new_clk, clk);
+Regards
 
-	return m->reset(m);
-}
-
-it doesn't look pretty, but it can be done.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/1acbf2af/attachment.sig>
+Ludovic
