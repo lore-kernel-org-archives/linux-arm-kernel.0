@@ -1,46 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 May 2012 11:58:01 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <4FC6E7CE.9090004@gmail.com>
-References: <4FAA34A9.5020708@gmail.com>
- <20120511085150.GA17453@mudshark.cambridge.arm.com>
- <4FC45E6B.2070202@gmail.com>
- <20120530063858.GB6484@mudshark.cambridge.arm.com>
- <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
- <4FC6E172.4080601@gmail.com>
- <20120531031941.GA29906@mbp> <4FC6E7CE.9090004@gmail.com>
-Message-ID: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 30 May 2012 21:05:20 -0700
+Subject: [PATCH 2/2] clk: Add support for rate table based dividers
+In-Reply-To: <4FBB19E6.2040403@ti.com>
+References: <1337250134-29206-1-git-send-email-rnayak@ti.com>
+ <1337250134-29206-3-git-send-email-rnayak@ti.com>
+ <4FBA0F3D.0@codethink.co.uk> <4FBB19E6.2040403@ti.com>
+Message-ID: <4FC6EE00.8010401@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2012 11:38, bill4carson <bill4carson@gmail.com> wrote:
-> On 2012?05?31? 11:19, Catalin Marinas wrote:
->> BTW, see this as a starting point (and a hack):
+On 05/21/2012 09:45 PM, Rajendra Nayak wrote:
+> Hi Ben,
+>
+> On Monday 21 May 2012 03:17 PM, Ben Dooks wrote:
+>> On 17/05/12 11:22, Rajendra Nayak wrote:
+>>> Some divider clks do not have any obvious relationship
+>>> between the divider and the value programmed in the
+>>> register. For instance, say a value of 1 could signify divide
+>>> by 6 and a value of 2 could signify divide by 4 etc.
+>>> Also there are dividers where not all values possible
+>>> based on the bitfield width are valid. For instance
+>>> a 3 bit wide bitfield can be used to program a value
+>>> from 0 to 7. However its possible that only 0 to 4
+>>> are valid values.
+>>>
+>>> All these cases need the platform code to pass a simple
+>>> table of divider/value tuple, so the framework knows
+>>> the exact value to be written based on the divider
+>>> calculation and can also do better error checking.
+>>>
+>>> This patch adds support for such rate table based
+>>> dividers.
 >>
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/51556
+>> I was considering the idea that you simply pass a
+>> pointer to a set of routines and a data pointer to
+>> the clk-divider code so that any new cases don't
+>> require changing the drivers/clk/clk-divider.c
 >
-> I think we has some mis-understanding here :(
+> I don;t know if I understand your comment completely.
+> Are you suggesting the get min/max etc be function pointers
+> passed by platform code (and implemented in platform code?)
+> so clk-divider does not need an update every time a new divider
+> type is added?
+> The idea of extending clk-divider was so its useful for more
+> than just OMAP, so the code in clk-divider can be reused across
+> multiple platforms. Did I understand your comment right?
 >
-> As for:v6_flush_kern_dcache_area/v6_flush_kern_dcache_all
-> these two hooks is supposed to be globally effective, *not*
-> locally!
+> regards,
+> Rajendra
 >
-> Hence, there should below fix to make it as globally effective.
->
->
-> +#ifdef CONFIG_SMP
-> + ? ? ? ldr ? ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ read for ownership
-> + ? ? ? str ? ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ write for ownership
-> +#endif /* CONFIG_SMP */
->
-> Or there maybe some other better solution for this issue.
+>>
+>> This would make the get max / min / special just
+>> a function call through a struct.
+>>
+>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>> ---
+>>> drivers/clk/clk-divider.c | 67
+>>> ++++++++++++++++++++++++++++++++++++++++--
+>>> include/linux/clk-private.h | 3 +-
+>>> include/linux/clk-provider.h | 10 +++++-
+>>> 3 files changed, 75 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+>>> index e548c43..e4911ee 100644
+>>> --- a/drivers/clk/clk-divider.c
+>>> +++ b/drivers/clk/clk-divider.c
+>>> @@ -32,30 +32,69 @@
+>>> #define div_mask(d) ((1<< (d->width)) - 1)
+>>> #define is_power_of_two(i) !(i& ~i)
+>>>
+>>> +static unsigned int _get_table_maxdiv(const struct clk_div_table
+>>> *table)
+>>> +{
+>>> + unsigned int maxdiv;
+>>> + const struct clk_div_table *clkt;
+>>> +
+>>> + for (clkt = table; clkt->div; clkt++)
+>>> + if (clkt->div> maxdiv)
+>>> + maxdiv = clkt->div;
+>>> + return maxdiv;
+>>> +}
+>>> +
+>>> static unsigned int _get_maxdiv(struct clk_divider *divider)
+>>> {
+>>> if (divider->flags& CLK_DIVIDER_ONE_BASED)
+>>> return div_mask(divider);
+>>> if (divider->flags& CLK_DIVIDER_POWER_OF_TWO)
+>>> return 1<< div_mask(divider);
 
-I still didn't fully understand what the problem is. So, to make sure,
-if you run some applications from flash using a yaffs filesystem, you
-get random crashes. Is this correct? If yes, a solution is to actually
-call flush_dcache_page() on the CPU that does the page copying from
-flash into RAM, which could be the yaffs filesystem.
+Where are these flags defined? I don't see it in any of the patches in 
+the series. Is my search foo not up to par today?
+
+I think what Ben is saying is that you provider a way (using function or 
+data/table pointers in clk_divider) that will allow the clk provider to 
+define a "divider" to "register value" mapping. Say you decide to do 
+that using a function pointer, then you would implement the following in 
+clk-divider.c.
+
+div_to_reg_one_based
+div_to_reg_pow_two
+
+The actual clock-provider code will pick one of these or implement their 
+own mapping function. That way, clk-divider won't have to change for any 
+other convoluted variants of clk divider to register value mapping.
+
+-Saravana
 
 -- 
-Catalin
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
