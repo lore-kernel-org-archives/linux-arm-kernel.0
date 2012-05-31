@@ -1,101 +1,33 @@
-From: B17645@freescale.com (Liu Ying-B17645)
-Date: Thu, 31 May 2012 01:54:52 +0000
-Subject: [PATCH 1/1] mx3fb: support pan display with fb_set_var
-In-Reply-To: <1338352042-26522-1-git-send-email-Ying.Liu@freescale.com>
-References: <1338352042-26522-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <470BE2F1512C0C4C9734129B6363687609FA98@039-SN2MPN1-011.039d.mgd.msft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 May 2012 09:55:33 +0800
+Subject: [PATCH RFC 0/3] i2c-nomadik changes
+In-Reply-To: <cover.1338398567.git.rubini@gnudd.com>
+References: <cover.1338398567.git.rubini@gnudd.com>
+Message-ID: <CACRpkdZqD0_5oRwBg2J7ZyCK9=ynGOZnSWrQmtCyph9C3W3jDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.mx SoC maintainer Sacha and ARM maillist, and update Guennadi's email address.
+On Thu, May 31, 2012 at 1:45 AM, Alessandro Rubini <rubini@gnudd.com> wrote:
 
-Liu Ying
------Original Message-----
-From: Liu Ying-B17645 
-Sent: Wednesday, May 30, 2012 12:27 PM
-To: FlorianSchandinat at gmx.de
-Cc: lg at denx.de; linux-fbdev at vger.kernel.org; linux-kernel at vger.kernel.org; Liu Ying-B17645
-Subject: [PATCH 1/1] mx3fb: support pan display with fb_set_var
+> In the STA2X11 I/O hub we are exporting a number of AMBA peripherals
+> to the PCI world. Using a generic pci-amba driver there is no further
+> code for each device, provided they are already registered under the
+> AMBA bus. ?I already submitted the generic bridge
+> (https://lkml.org/lkml/2012/5/28/194).
 
-Users may call FBIOPUT_VSCREENINFO ioctrl to do pan display.
-This ioctrl relies on fb_set_var() to do the job. fb_set_var() calls custom fb_set_par() method and then calls custom
-fb_pan_display() method. The current implementation of mx3fb reinitializes IPU display controller every time the custom
-fb_set_par() method is called, which makes the display flash if fb_set_var() is called to do panning frequently. The custom
-fb_pan_display() method checks if the current xoffset and yoffset are different from previous ones before doing actual panning, which prevents the panning from happening within the
-fb_set_var() context. This patch checks new var info to decide whether we really need to reinitialize IPU display controller.
-We ignore xoffset and yoffset update because it doesn't require to reinitialize the controller. Users may specify activate field of var info with FB_ACTIVATE_NOW and FB_ACTIVATE_FORCE to reinialize the controller by force. Meanwhile, this patch removes the check in custom fb_pan_display() method mentioned before to have the panning work within fb_set_var() context. It doesn't hurt to do panning again if there is no update for xoffset and yoffset.
+Yeah I buy this concept, it's a good way to share this code.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- drivers/video/mx3fb.c |   31 +++++++++++++++++++++++++++----
- 1 files changed, 27 insertions(+), 4 deletions(-)
+> The cell-id I used in the table are the one for ux500 (only as far as
+> I know from the stn-8815 manuals) and the one for STA2X11.
 
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c index e3406ab..238b9aa 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -269,6 +269,8 @@ struct mx3fb_info {
- 	struct scatterlist		sg[2];
- 
- 	u32				sync;	/* preserve var->sync flags */
-+
-+	struct fb_var_screeninfo	cur_var; /* current var info */
- };
- 
- static void mx3fb_dma_done(void *);
-@@ -721,6 +723,26 @@ static void mx3fb_dma_done(void *arg)
- 	complete(&mx3_fbi->flip_cmpl);
- }
- 
-+static bool mx3fb_need_not_to_set_par(struct fb_info *fbi) {
-+	struct mx3fb_info *mx3_fbi = fbi->par;
-+	struct fb_var_screeninfo old_var = mx3_fbi->cur_var;
-+	struct fb_var_screeninfo new_var = fbi->var;
-+
-+	if ((fbi->var.activate & FB_ACTIVATE_FORCE) &&
-+	    (fbi->var.activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW)
-+		return false;
-+
-+	/*
-+	 * Ignore xoffset and yoffset update,
-+	 * because pan display handles this case.
-+	 */
-+	old_var.xoffset = new_var.xoffset;
-+	old_var.yoffset = new_var.yoffset;
-+
-+	return !memcmp(&old_var, &new_var, sizeof(struct fb_var_screeninfo)); 
-+}
-+
- static int __set_par(struct fb_info *fbi, bool lock)  {
- 	u32 mem_len;
-@@ -732,6 +754,9 @@ static int __set_par(struct fb_info *fbi, bool lock)
- 	struct idmac_video_param *video = &ichan->params.video;
- 	struct scatterlist *sg = mx3_fbi->sg;
- 
-+	if (mx3fb_need_not_to_set_par(fbi))
-+		return 0;
-+
- 	/* Total cleanup */
- 	if (mx3_fbi->txd)
- 		sdc_disable_channel(mx3_fbi);
-@@ -808,6 +833,8 @@ static int __set_par(struct fb_info *fbi, bool lock)
- 	if (mx3_fbi->blank == FB_BLANK_UNBLANK)
- 		sdc_enable_channel(mx3_fbi);
- 
-+	mx3_fbi->cur_var = fbi->var;
-+
- 	return 0;
- }
- 
-@@ -1068,10 +1095,6 @@ static int mx3fb_pan_display(struct fb_var_screeninfo *var,
- 		return -EINVAL;
- 	}
- 
--	if (fbi->var.xoffset == var->xoffset &&
--	    fbi->var.yoffset == var->yoffset)
--		return 0;	/* No change, do nothing */
--
- 	y_bottom = var->yoffset;
- 
- 	if (!(var->vmode & FB_VMODE_YWRAP))
---
-1.7.1
+I've tried a few times to get this driver working on the S8815 Calao
+dongle version of Nomadik 8815, but failed miserably (I managed
+to get DMA and MMC working, which I will likely try to merge.)
+I'm still trying to figure out why sometimes now and then.
+
+So this doesn't make anything worse anyway.
+
+Thanks for this nice patch set!
+
+Yours,
+Linus Walleij
