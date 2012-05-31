@@ -1,37 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 31 May 2012 14:11:06 +0100
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <4FC76D29.8070802@ti.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
- <20120531081841.GG5377@arwen.pp.htv.fi>
- <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
- <20120531085432.GK5377@arwen.pp.htv.fi>
- <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com>
- <4FC768F8.4050406@ti.com> <20120531130456.GB15786@sirena.org.uk>
- <4FC76D29.8070802@ti.com>
-Message-ID: <20120531131106.GF2666@opensource.wolfsonmicro.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 May 2012 16:28:53 +0300
+Subject: [PATCHv3 0/9] ARM: OMAP3+: pwrdm changes for usecounting
+Message-ID: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 03:07:53PM +0200, Cousson, Benoit wrote:
-> On 5/31/2012 3:04 PM, Mark Brown wrote:
-> >On Thu, May 31, 2012 at 02:50:00PM +0200, Cousson, Benoit wrote:
+Hi,
 
-> >>It looks to me that this kind of function does belong to the device
-> >>more than to the clock node.
+Refreshed the patches against latest mainline kernel, and did some
+updates mainly proposed by Nishanth Menon <nm@ti.com>. Changes compared
+to previous version:
 
-> >This is looking a lot like what power domains do to me...
+patch 1:
+ - added check against null pointer
 
-> Do you mean the reset part?
+patch 2:
+ - added BUG_ON in case clkdm / pwrdm usecount goes negative
 
-Yes, the general "this block goes into an idle state and so we need to
-rebuild/reset the state of the things in it afterwards" thing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/8a7de937/attachment.sig>
+patch 3:
+ - added BUG_ON in case voltdm usecount goes negative
+ - removed smartreflex enable / disable from voltdm code (this should
+   be added in a separate patch once this is deemed safe)
+ - changed target_state from int to u8
+
+patch 4:
+ - changed idle loop count initializations to happen synchronously with
+   PM init, this avoids potential trouble in a case where a CPU would
+   enter idle before usecount init for the idle has been done
+ - added functions pwrdm_cpu_wakeup + pwrdm_cpu_idle to be called from idle
+   cycle
+
+patch 7:
+ - changed flag name from CLKDM_NO_MANUAL_TRANS to CLKDM_SKIP_MANUAL_TRANS
+
+patch 9:
+ - added as new patch, would appreciate testing for this one!
+
+Tested on omap3 beagle + boot tested on omap4460 panda es. Previous version
+of this set had some issues with omap3430 devices (n900), which might have
+been caused by improper clock handling or security on these devices. I can't
+test these patches myself on n900, so if someone could do this that would
+be extra nice.
+
+git tree also available:
+tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+branch: mainline-3.4-pwrdm-changes-v3
+
+-Tero
