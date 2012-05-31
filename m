@@ -1,19 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 08:57:53 +0800
-Subject: [RFC 13/34] dmaengine: PL08x: move the bus and increment
- selection to dma prepare function
-In-Reply-To: <E1SZItv-0006zZ-9O@rmk-PC.arm.linux.org.uk>
+Date: Thu, 31 May 2012 09:00:09 +0800
+Subject: [RFC 14/34] dmaengine: PL08x: extract function to to generate
+ cctl values
+In-Reply-To: <E1SZIuF-0006zd-D0@rmk-PC.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZItv-0006zZ-9O@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdY5joL7zJ_vZiG0rg8apWCexRLF8+5bj8E_wiUHJsKLqQ@mail.gmail.com>
+ <E1SZIuF-0006zd-D0@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdZyzjcMefZZVzo_1e6Bmus5+UVzcf8VR3iXinmODUzvUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 29, 2012 at 5:39 PM, Russell King
 <rmk+kernel@arm.linux.org.uk> wrote:
 
-> Move the bus and transfer increment selection to the DMA prepare
-> function rather than the slave configuration function.
+> Extract the functionality from dma_slave_config to generate the cctl
+> values for a given bus width and burst size. ?This allows us to use
+> this elsewhere in the driver, namely the prepare functions.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
