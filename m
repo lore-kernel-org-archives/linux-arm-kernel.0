@@ -1,75 +1,27 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 May 2012 23:09:31 -0400
-Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
- allocate memory
-In-Reply-To: <1338431047.1822.11.camel@hactar>
-References: <1338401183.22894.11.camel@hactar>
- <20120531005109.GW24238@titan.lakedaemon.net>
- <1338431047.1822.11.camel@hactar>
-Message-ID: <20120531030931.GX24238@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 May 2012 11:12:23 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC6E172.4080601@gmail.com>
+References: <4FAA34A9.5020708@gmail.com>
+ <20120511085150.GA17453@mudshark.cambridge.arm.com>
+ <4FC45E6B.2070202@gmail.com>
+ <20120530063858.GB6484@mudshark.cambridge.arm.com>
+ <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
+ <4FC6E172.4080601@gmail.com>
+Message-ID: <20120531031222.GC29372@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 11:24:07PM -0300, Thiago Jung Bauermann wrote:
-> On Wed, 2012-05-30 at 20:51 -0400, Jason Cooper wrote:
-> > On Wed, May 30, 2012 at 03:06:23PM -0300, Thiago Jung Bauermann wrote:
-> > > Hello,
-> > > 
-> > > I have just upgraded my Dreamplug to the 3.4 kernel, and when creating
-> > > an LVM snapshot volume, I see errors for which I didn't find any report
-> > > yet:
-> > > 
-> > > # lvcreate -s -L 80M -n root-fsck-snapshot marv2-vg/root
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
-> > >   Logical volume "root-fsck-snapshot" created
-> > > 
-> > > # lvremove -f marv2-vg/root-fsck-snapshot
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
-> > >   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
-> > >   Logical volume "root-fsck-snapshot" successfully removed
-> > > 
-> > > This is on the following kernel:
-> > > 
-> > > Linux marv 3.4.0-1bauer2-kirkwood #1 Wed May 30 01:31:47 BRT 2012 armv5tel GNU/Linux
-> > 
-> > Is this a vanilla v3.4 kernel?  Is this a repeatable error, even after
-> > hard reboot?
+On Thu, May 31, 2012 at 04:11:46AM +0100, bill4carson wrote:
+> On 2012?05?31? 11:00, Catalin Marinas wrote:
+> > AFAIK, The SCU only snoops the D-cache, not the I-cache. We have a full
+> > I-cache invalidation during task migration.
 > 
-> Yes, the error happens every time even after rebooting or powering off
-> the machine and then on again after a minute.
+>                              ^^^^^^^^^^^^
+> Could you please point it to me?
 
-Ok, that rules out one error I've seen in the past.
+There is a check in switch_mm() in the asm/mmu_context.h file.
 
-> The kernel is almost vanilla... I'm using the patches here on top of the
-> vanilla kernel:
-> 
-> https://github.com/bauermann/dreamplug/tree/master/with-linux-3.4
-> 
-> There's not much really. One patch (dreamplug-3.4.0.patch) adapts the
-> kernel to use the Guruplug machine id and adapts the kernel to boot
-> without a flattened device tree (I'm using Marvell's original u-boot,
-> with the old id and no device tree support), three of them (mvsdio-*)
-> add magic delays to the SD card driver and three others add the
-> libertas_uap wireless driver (which I'm not using and the modules aren't
-> even loaded).
-> 
-> The phys-virt.diff one may be of interest. It sets PHYS_OFFSET to 0x0.
-> Also, I have CONFIG_EMBEDDED=y but I disabled
-> CONFIG_ARM_PATCH_PHYS_VIRT. This is because of some forum posts saying
-> that ARM_PATCH_PHYS_VIRT yelds an unbootable kernel. I didn't test if
-> that was indeed the case though.
-
-Please try a vanilla v3.4 kernel with CONFIG_ARM_APPENDED_DTB.
-
-thx,
-
-Jason.
+-- 
+Catalin
