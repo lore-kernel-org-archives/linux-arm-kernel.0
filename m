@@ -1,37 +1,44 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 30 May 2012 23:23:37 -0400
-Subject: [PATCH 3/9] ARM: mmp: support DT in irq
-In-Reply-To: <CAN1soZz2=NcadK1kD6d9t92G6Xdfn=TPGP5_ngwX_fGj+QhOVA@mail.gmail.com>
- (Haojian Zhuang's message of "Thu, 31 May 2012 11:07:52 +0800")
-References: <1335515957-1798-1-git-send-email-haojian.zhuang@gmail.com>
- <1335515957-1798-4-git-send-email-haojian.zhuang@gmail.com>
- <87ehq1tq5w.fsf@laptop.org>
- <CAN1soZz2=NcadK1kD6d9t92G6Xdfn=TPGP5_ngwX_fGj+QhOVA@mail.gmail.com>
-Message-ID: <87vcjdm3t2.fsf@laptop.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 30 May 2012 20:29:54 -0700
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <20120530194059.GA13243@gmail.com>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org> <20120530194059.GA13243@gmail.com>
+Message-ID: <4FC6E5B2.2010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 30 2012, Haojian Zhuang wrote:
->> Did you test non-DT boot with these changes?
+On 05/30/2012 12:40 PM, Mike Turquette wrote:
+> On 20120530-01:52, Stephen Boyd wrote:
+>> On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
+>>> Add an extension API for clocks. This allows clocktypes to provide extensions
+>>> for features which are uncommon and cannot be easily mapped onto normal clock
+>>> framework concecpts. eg: resetting blocks, configuring clock phase etc.
 >>
-> I tested non-DT boot on my brownstone board on TTC dkb board.
+>> This seems rather generic. Why not add more specific APIs/concepts like
+>> clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
+>> make them map.
+>>
+>
+> I also wonder if exposing some of these knobs should be done in the
+> basic clock types.  Meaning that instead of having additional calls in
+> the clk.h API those calls could be exposed by the basic clock types that
+> map to the actions.
+>
+> The question that needs to be answered is this: do generic drivers need
+> access to these additional functions (clk.h) or just the platform code
+> which implements some of the clock logic (basic clock types&
+> platform-speciic clock types).
 
-Thanks.  Do you know how/where cascade_irq gets set on that board?
+One of the main reason for the common clock framework is so that each 
+platform doesn't have it's own extension and have mostly similar code 
+repeat all over the place. So, having clock APIs outside of clk.h 
+doesn't make sense when we look at the direction we want the code base 
+to proceed in.
 
-> It seems that you meet issue in icu_mux_irq_demux(). Could you give me
-> the detail which interrupt is running while you meet the error?
+-Saravana
 
-It was IRQ 17 (TWSI).
 
-> By the way, do you have the boot log?
-
-I'll send it tomorrow when I get back to work.
-
-Thanks,
-
-- Chris.
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
