@@ -1,150 +1,98 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 May 2012 16:55:45 +0300
-Subject: [PATCHv6 09/14] ARM: OMAP3+: voltage: use oscillator data to
- calculate setup times
+Date: Thu, 31 May 2012 16:55:46 +0300
+Subject: [PATCHv6 10/14] ARM: OMAP: TWL: change the vddmin / vddmax voltages
+ to spec
 In-Reply-To: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
 References: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1338472550-20743-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1338472550-20743-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now use the previously defined oscillator setup / shutdown times
-to calculate the register values for CLKSETUP.
+As vddmin / vddmax voltages for the pmic only describe the pmic
+capabilities now, change the voltages to be according to spec.
+TWL data manuals give following values:
+
+TWL4030 (SWCS019L) : VDD1: 600mV ... 1450mV, VDD2: 600mV ... 1500mV
+TWL5030 (SWCS030E) : VDD1: 600mV ... 1450mV, VDD2: 600mV ... 1500mV
+TWL6030 (SWCS045A) : 0V ... 2100mV
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/vc.c |   62 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_twl.c |   27 ++++++++++-----------------
+ 1 files changed, 10 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index 0a37673..5fe2ff1 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -11,14 +11,20 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/bug.h>
-+#include <linux/io.h>
-+
-+#include <asm/div64.h>
+diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+index dca1d66..188f210 100644
+--- a/arch/arm/mach-omap2/omap_twl.c
++++ b/arch/arm/mach-omap2/omap_twl.c
+@@ -145,8 +145,8 @@ static struct omap_voltdm_pmic omap3_mpu_pmic = {
+ 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+ 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= OMAP3430_VP1_VLIMITTO_VDDMIN,
+-	.vddmax			= OMAP3430_VP1_VLIMITTO_VDDMAX,
++	.vddmin			= 600000,
++	.vddmax			= 1450000,
+ 	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
+ 	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
+ 	.volt_reg_addr		= OMAP3_VDD_MPU_SR_CONTROL_REG,
+@@ -162,8 +162,8 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
+ 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+ 	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= OMAP3430_VP2_VLIMITTO_VDDMIN,
+-	.vddmax			= OMAP3430_VP2_VLIMITTO_VDDMAX,
++	.vddmin			= 600000,
++	.vddmax			= 1450000,
+ 	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
+ 	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
+ 	.volt_reg_addr		= OMAP3_VDD_CORE_SR_CONTROL_REG,
+@@ -179,8 +179,8 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+ 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
+-	.vddmax			= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
++	.vddmin			= 0,
++	.vddmax			= 2100000,
+ 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+ 	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+ 	.volt_reg_addr		= OMAP4_VDD_MPU_SR_VOLT_REG,
+@@ -197,8 +197,8 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+ 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
+-	.vddmax			= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
++	.vddmin			= 0,
++	.vddmax			= 2100000,
+ 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+ 	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+ 	.volt_reg_addr		= OMAP4_VDD_IVA_SR_VOLT_REG,
+@@ -215,8 +215,8 @@ static struct omap_voltdm_pmic omap4_core_pmic = {
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+ 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
+-	.vddmin			= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
+-	.vddmax			= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
++	.vddmin			= 0,
++	.vddmax			= 2100000,
+ 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
+ 	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+ 	.volt_reg_addr		= OMAP4_VDD_CORE_SR_VOLT_REG,
+@@ -251,13 +251,6 @@ int __init omap3_twl_init(void)
+ 	if (!cpu_is_omap34xx())
+ 		return -ENODEV;
  
- #include <plat/cpu.h>
- 
-+#include "iomap.h"
- #include "voltage.h"
- #include "vc.h"
- #include "prm-regbits-34xx.h"
- #include "prm-regbits-44xx.h"
- #include "prm44xx.h"
-+#include "pm.h"
-+#include "scrm44xx.h"
- 
- /**
-  * struct omap_vc_channel_cfg - describe the cfg_channel bitfield
-@@ -206,6 +212,18 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
- 	return 0;
- }
- 
-+/* Convert microsecond value to number of 32kHz clock cycles */
-+static inline u32 omap_usec_to_32k(u32 usec)
-+{
-+	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
-+}
-+
-+/* Set oscillator setup time for omap3 */
-+static void omap3_set_clksetup(u32 usec, struct voltagedomain *voltdm)
-+{
-+	voltdm->write(omap_usec_to_32k(usec), OMAP3_PRM_CLKSETUP_OFFSET);
-+}
-+
- /**
-  * omap3_set_i2c_timings - sets i2c sleep timings for a channel
-  * @voltdm: channel to configure
-@@ -222,6 +240,12 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
- 	unsigned long voltsetup1;
- 	u32 tgt_volt;
- 
-+	/*
-+	 * Oscillator is shut down only if we are using sys_off_mode pad,
-+	 * thus we set a minimal setup time here
-+	 */
-+	omap3_set_clksetup(1, voltdm);
-+
- 	if (off_mode)
- 		tgt_volt = voltdm->vc_param->off;
- 	else
-@@ -262,6 +286,7 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
- 	unsigned long voltsetup2;
- 	unsigned long voltsetup2_old;
- 	u32 val;
-+	u32 tstart, tshut;
- 
- 	/* check if sys_off_mode is used to control off-mode voltages */
- 	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
-@@ -271,6 +296,9 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
- 		return;
- 	}
- 
-+	omap_pm_get_oscillator(&tstart, &tshut);
-+	omap3_set_clksetup(tstart, voltdm);
-+
- 	clksetup = voltdm->read(OMAP3_PRM_CLKSETUP_OFFSET);
- 
- 	/* voltsetup 2 in us */
-@@ -367,6 +395,30 @@ static u32 omap4_calc_volt_ramp(struct voltagedomain *voltdm, u32 voltage_diff)
- }
- 
- /**
-+ * omap4_usec_to_val_scrm - convert microsecond value to SCRM module bitfield
-+ * @usec: microseconds
-+ * @shift: number of bits to shift left
-+ * @mask: bitfield mask
-+ *
-+ * Converts microsecond value to OMAP4 SCRM bitfield. Bitfield is
-+ * shifted to requested position, and checked agains the mask value.
-+ * If larger, forced to the max value of the field (i.e. the mask itself.)
-+ * Returns the SCRM bitfield value.
-+ */
-+static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
-+{
-+	u32 val;
-+
-+	val = omap_usec_to_32k(usec) << shift;
-+
-+	/* Check for overflow, if yes, force to max value */
-+	if (val > mask)
-+		val = mask;
-+
-+	return val;
-+}
-+
-+/**
-  * omap4_set_timings - set voltage ramp timings for a channel
-  * @voltdm: channel to configure
-  * @off_mode: whether off-mode values are used
-@@ -378,6 +430,7 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
- 	u32 val;
- 	u32 ramp;
- 	int offset;
-+	u32 tstart, tshut;
- 
- 	if (off_mode) {
- 		ramp = omap4_calc_volt_ramp(voltdm,
-@@ -399,6 +452,15 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
- 	val |= ramp << OMAP4430_RAMP_UP_COUNT_SHIFT;
- 
- 	voltdm->write(val, offset);
-+
-+	omap_pm_get_oscillator(&tstart, &tshut);
-+
-+	val = omap4_usec_to_val_scrm(tstart, OMAP4_SETUPTIME_SHIFT,
-+		OMAP4_SETUPTIME_MASK);
-+	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
-+		OMAP4_DOWNTIME_MASK);
-+
-+	__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
- }
- 
- /* OMAP4 specific voltage init functions */
+-	if (cpu_is_omap3630()) {
+-		omap3_mpu_pmic.vddmin = OMAP3630_VP1_VLIMITTO_VDDMIN;
+-		omap3_mpu_pmic.vddmax = OMAP3630_VP1_VLIMITTO_VDDMAX;
+-		omap3_core_pmic.vddmin = OMAP3630_VP2_VLIMITTO_VDDMIN;
+-		omap3_core_pmic.vddmax = OMAP3630_VP2_VLIMITTO_VDDMAX;
+-	}
+-
+ 	/*
+ 	 * The smartreflex bit on twl4030 specifies if the setting of voltage
+ 	 * is done over the I2C_SR path. Since this setting is independent of
 -- 
 1.7.4.1
