@@ -1,25 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 May 2012 10:42:09 -0600
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4FC79F61.6030907@wwwdotorg.org>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Thu, 31 May 2012 20:02:04 +0200
+Subject: [PATCH RFC 2/3] i2c-nomadik: turn the platform driver to an
+ amba driver
+In-Reply-To: <CACRpkdZpjn0RBGY+CqqSW3ip0MSQUJSaqN0GD=a4THnPHNM-jg@mail.gmail.com>
+References: <CACRpkdZpjn0RBGY+CqqSW3ip0MSQUJSaqN0GD=a4THnPHNM-jg@mail.gmail.com>
+ <cover.1338398567.git.rubini@gnudd.com>
+ <349645b61d0b28f6e84f7ae1f2c8c28e12a11d92.1338398567.git.rubini@gnudd.com>
+ <CACRpkdZ79=B8N7omxYY4UPotg8gYotfLeBRViYMr8hA-Uhie0w@mail.gmail.com>
+ <4FC72DDF.7080209@codethink.co.uk>
+Message-ID: <20120531180204.GA28779@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2012 03:58 AM, Peter De Schrijver wrote:
-> Add an extension API for clocks. This allows clocktypes to provide extensions
-> for features which are uncommon and cannot be easily mapped onto normal clock
-> framework concecpts. eg: resetting blocks, configuring clock phase etc.
+> But since the device has PrimeCell ID registers, this is really the
+> right thing to do anyway, since autodetecting from hardware is
+> allways NiceToDo(TM).  Else ST and us shouldn't have put the magic
+> numbers (0xB105F00D) in there anyway.
 
-I'm not sure that we should expose module reset as an operation on a clock.
+Exactly. The pci-amba.c driver just says "here's an amba thing at
+my BAR0 address", and then it is idenfitied automatically. There is
+also automatic modalias support in place.
 
-In Tegra, there are resets that affect multiple clocks (well, they
-affect portions of HW that use multiple clocks, not the clocks themselves).
+So I'll resubmit in the right way (-M, include/linux/platform_data)
+as soon as I have information for ftd fixup.
 
-Conversely, it's possible in general that there could be some clock
-domains where different subsets of the clock domain are affected by
-different reset domains.
-
-Tieing the clock and reset domains together doesn't seem correct. A
-separate reset API (and perhaps reset binding for DT) might make more sense.
+Thanks
+/alessandro
