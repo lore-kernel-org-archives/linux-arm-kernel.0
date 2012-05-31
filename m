@@ -1,45 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 May 2012 20:51:09 -0400
-Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
- allocate memory
-In-Reply-To: <1338401183.22894.11.camel@hactar>
-References: <1338401183.22894.11.camel@hactar>
-Message-ID: <20120531005109.GW24238@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 31 May 2012 09:20:31 +0800
+Subject: [RFC 24/34] dmaengine: PL08x: split the pend_list in two
+In-Reply-To: <E1SZIxU-00070J-HB@rmk-PC.arm.linux.org.uk>
+References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+ <E1SZIxU-00070J-HB@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdZ=13F8TDwH_-ajB-u_A-dUN8ZbnNV5dmpabHJ2z5cRAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 03:06:23PM -0300, Thiago Jung Bauermann wrote:
-> Hello,
-> 
-> I have just upgraded my Dreamplug to the 3.4 kernel, and when creating
-> an LVM snapshot volume, I see errors for which I didn't find any report
-> yet:
-> 
-> # lvcreate -s -L 80M -n root-fsck-snapshot marv2-vg/root
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->   Logical volume "root-fsck-snapshot" created
-> 
-> # lvremove -f marv2-vg/root-fsck-snapshot
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->   Logical volume "root-fsck-snapshot" successfully removed
-> 
-> This is on the following kernel:
-> 
-> Linux marv 3.4.0-1bauer2-kirkwood #1 Wed May 30 01:31:47 BRT 2012 armv5tel GNU/Linux
+On Tue, May 29, 2012 at 5:43 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
 
-Is this a vanilla v3.4 kernel?  Is this a repeatable error, even after
-hard reboot?
+> Our behaviour wasn't correct; issue_pending is supposed to be called
+> before any submitted descriptors are available for processing by the
+> DMA engine. ?Split the pend_list in two, one for submitted descriptors
+> and another list for issued descriptors.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-thx,
+I suspect many DMAengine drivers get this wrong, or rather, they merge the
+semantics for submitted/issued like this driver used to do.
 
-Jason.
+Dan, please check this, we might need to notify a few driver maintainers to
+look at this and add TODO:s to their driver files.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
