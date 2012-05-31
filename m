@@ -1,88 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 May 2012 08:38:20 +0100
-Subject: [RFC PATCH 1/2] ARM: at91: use EOI flow control for interrupt handling
-In-Reply-To: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
-References: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1338449901-10288-2-git-send-email-will.deacon@arm.com>
+From: snakky.zhang@gmail.com (snakky.zhang at gmail.com)
+Date: Thu, 31 May 2012 15:46:37 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC71C13.7090301@gmail.com>
+References: <20120530063858.GB6484@mudshark.cambridge.arm.com>
+ <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
+ <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
+ <4FC6E7CE.9090004@gmail.com>
+ <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+ <4FC6FC38.8090904@gmail.com>
+ <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
+ <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
+ <4FC71C13.7090301@gmail.com>
+Message-ID: <4FC721DD.5020905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the at91 interrupt handling to use EOI flow control
-in preparation for removing the irq_finish hook on ARM.
+On 2012?05?31? 15:21, bill4carson wrote:
+>
+>
+> On 2012?05?31? 14:56, Catalin Marinas wrote:
+>> On Thu, May 31, 2012 at 06:51:22AM +0100, bill4carson wrote:
+>>> On 2012?05?31? 13:19, Catalin Marinas wrote:
+>>>> On 31 May 2012 13:06, bill4carson<bill4carson@gmail.com>   wrote:
+>>>>> On 2012?05?31? 11:58, Catalin Marinas wrote:
+>>>>>> I still didn't fully understand what the problem is. So, to make 
+>>>>>> sure,
+>>>>>> if you run some applications from flash using a yaffs filesystem, 
+>>>>>> you
+>>>>>> get random crashes. Is this correct? If yes, a solution is to 
+>>>>>> actually
+>>>>>> call flush_dcache_page() on the CPU that does the page copying from
+>>>>>> flash into RAM, which could be the yaffs filesystem.
+>>>>>
+>>>>> The story goes like this:
+>>>>> function "flush_dcache_page" should be global effective
+>>>>> but in ARMv6 MPCore, it was not, it was just local effective due
+>>>>> to hardware design.
+>>>>
+>>>> Yes, I know this.
+>>>
+>>> Then, why not fix "flush_dcache_page" to make it globally effective?
+>>
+>> Performance?
+>>
+>> And it's also just ARM11MPCore microarchitecture specific.
+>>
+Yes, seems newer CPUs has no such limitation thus this function is 
+global effective naturally. :-)
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-at91/include/mach/irqs.h |    8 --------
- arch/arm/mach-at91/irq.c               |   12 +++++++++---
- 2 files changed, 9 insertions(+), 11 deletions(-)
+And , I find Mips's c-r4k also has this issue but it use IPI to make it. 
+Details in arch/mips/mm/c-r4k.c.
 
-diff --git a/arch/arm/mach-at91/include/mach/irqs.h b/arch/arm/mach-at91/include/mach/irqs.h
-index ac8b7df..592cb43 100644
---- a/arch/arm/mach-at91/include/mach/irqs.h
-+++ b/arch/arm/mach-at91/include/mach/irqs.h
-@@ -26,14 +26,6 @@
- 
- #define NR_AIC_IRQS 32
- 
--
--/*
-- * Acknowledge interrupt with AIC after interrupt has been handled.
-- *   (by kernel/irq.c)
-- */
--#define irq_finish(irq) do { at91_aic_write(AT91_AIC_EOICR, 0); } while (0)
--
--
- /*
-  * IRQ interrupt symbols are the AT91xxx_ID_* symbols
-  * for IRQs handled directly through the AIC, or else the AT91_PIN_*
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index cfcfcbe..3095fe0 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -55,6 +55,12 @@ static void at91_aic_unmask_irq(struct irq_data *d)
- 	at91_aic_write(AT91_AIC_IECR, 1 << d->hwirq);
- }
- 
-+static void at91_aic_eoi_irq(struct irq_data *d)
-+{
-+	/* Mark end-of-interrupt on AIC */
-+	at91_aic_write(AT91_AIC_EOICR, 1 << d->hwirq);
-+}
-+
- unsigned int at91_extern_irq;
- 
- #define is_extern_irq(hwirq) ((1 << (hwirq)) & at91_extern_irq)
-@@ -128,9 +134,9 @@ void at91_irq_resume(void)
- 
- static struct irq_chip at91_aic_chip = {
- 	.name		= "AIC",
--	.irq_ack	= at91_aic_mask_irq,
- 	.irq_mask	= at91_aic_mask_irq,
- 	.irq_unmask	= at91_aic_unmask_irq,
-+	.irq_eoi	= at91_aic_eoi_irq,
- 	.irq_set_type	= at91_aic_set_type,
- 	.irq_set_wake	= at91_aic_set_wake,
- };
-@@ -171,7 +177,7 @@ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
- 	/* Active Low interrupt, without priority */
- 	at91_aic_write(AT91_AIC_SMR(hw), AT91_AIC_SRCTYPE_LOW);
- 
--	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_level_irq);
-+	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
- 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
- 
- 	return 0;
-@@ -238,7 +244,7 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 		/* Active Low interrupt, with the specified priority */
- 		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
- 
--		irq_set_chip_and_handler(i, &at91_aic_chip, handle_level_irq);
-+		irq_set_chip_and_handler(i, &at91_aic_chip, handle_fasteoi_irq);
- 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
- 	}
- 
--- 
-1.7.3.4
+ From my point of view, PREEMPT should not related to CPU type. So if 
+this type of CPU does not support PREEMPT for performance reason, can we 
+add something in Documentation and related Kconfig to make/mark it?
+
+Or maybe disable task migration is also a choice. :-)
+
+Thanks
+Xiao
+>>>>> This may cause error in some cases for example:
+>>>>>
+>>>>> 1) Task running on Core-0 loading text section into memory.
+>>>>>     It was preempted and then migrate into Core-1;
+>>>>
+>>>> BTW, do you have CONFIG_PREEMPT enabled?
+>>>>
+>>> Yes, CONFIG_PREEMPT enabled. Thus cause the task was preempted. :-)
+>>
+>> I told you that CONFIG_PREEMPT is not supported on ARM11MPCore :).
+>
+> Point!
+>
+> Is it better to add comment, such as "PREEMPT is not supported for
+> ARM11MPCore" in somewhere(for now, I don't find such place)?
+> then custom will be alerted with such notice when they trying change
+> to PREEMPT.
+>
+> And again, thanks for your patience with me :)
+>
+>
+>>
+>>>> To be clear - is your application reading some data from flash and
+>>>> trying to execute or it's the kernel doing the load via the
+>>>> page/prefetch abort mechanism?
+>>>
+>>> In my current case, it is yaffs root file system.
+>>>
+>>>> If the latter, task running on core 0 gets a prefetch abort when
+>>>> trying to execute some code. The kernel reads the page from flash (via
+>>>> mtd, block layer, VFS) and copies it into RAM. It can be on any CPU as
+>>>> long as it calls flush_dcache_page on the same CPU that copied the
+>>>> data.
+>>>>
+>>>> No matter where the task was running or migrated to, if the code doing
+>>>> the copy also called flush_dcache_page() on the same core, there is no
+>>>> data left in the D-cache for that page.
+>>>
+>>> Yes, I agree with it.
+>>> But how to flush the data cache on the same core with PREEMPT enabled?
+>>
+>> That's not easily possible. But you may get better results with
+>> VOLUNTARY_PREEMPT.
+>>
+>>> And, I think according to the design, there is no such operation that
+>>> guarantee it.
+>>
+>> RFO/WFO tricks only work on ARM11MPCore.
+>>
+>>> But any way, I think flush_dcache_page should be global effective.
+>>> If ARMv6 MPCore didn't make it, we should try to accomplish it.
+>>
+>> Do some performance tests first.
+>>
+>
