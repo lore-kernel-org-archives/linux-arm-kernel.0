@@ -1,28 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 09:40:10 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
- Device Tree
-In-Reply-To: <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
-Message-ID: <CACRpkdbFgwF+rYthawxn8mW90u_BP0c+h=GODwQk5VwTF+JdqQ@mail.gmail.com>
+Date: Thu, 31 May 2012 09:47:12 +0800
+Subject: [PATCH RFC 1/3] i2c-nomadik: move header from <plat/i2c.h> to
+ <linux/i2c-nomadik.h>
+In-Reply-To: <ca47a47e0a4db31545549ed978e1dc7b3aad4377.1338398567.git.rubini@gnudd.com>
+References: <cover.1338398567.git.rubini@gnudd.com>
+ <ca47a47e0a4db31545549ed978e1dc7b3aad4377.1338398567.git.rubini@gnudd.com>
+Message-ID: <CACRpkdY_bg5s_eKot8Ywbmb+SmixsJOSJW_jWjjenedjJng4Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 2:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 30, 2012 at 12:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
->> The 'name' field in 'struct of_regulator_match' expects to match with
->> its corresponding regulator device node in the Device Tree. This patch
->> renames each of the regulators in the ab8500 regulator driver so this
->> is true.
->
-> Anyway: the name is used in more parts of the file, so please change
-> it everywhere if you change it.
+On Thu, May 31, 2012 at 1:45 AM, Alessandro Rubini <rubini@gnudd.com> wrote:
 
-I was wrong on this, ignore that comment. I understand this now...
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> The header and driver were only used by arm/mach-nomadik and
+> arm/mach-u8500. ?The STA2X11 I/O Hub exports on PCIe a number of
+> devices, including i2c-nomadik. ?This patch allows compilation of
+> the driver under x86.
+>
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+
+The new place to put pure platform data headers is:
+include/linux/platform_data/i2c-nomadik.h so please use this.
+
+Pls use git format-patch -M so we get a nice movement patch
+without all the -/+ lines. (No big deal though.)
 
 Yours,
 Linus Walleij
