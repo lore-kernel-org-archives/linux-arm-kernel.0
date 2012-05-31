@@ -1,78 +1,72 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 May 2012 20:59:37 +0200
-Subject: [GIT PULL] i.MX common clock fixes
-In-Reply-To: <20120517094121.GY30400@pengutronix.de>
-References: <20120517094121.GY30400@pengutronix.de>
-Message-ID: <20120531185937.GF16535@pengutronix.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 31 May 2012 12:09:46 -0700
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <4FC68304.9050208@codeaurora.org>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+ <20120530194059.GA13243@gmail.com>
+ <4FC68304.9050208@codeaurora.org>
+Message-ID: <20120531190946.GA16878@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-Have you missed this one?
-
-Sascha
-
-On Thu, May 17, 2012 at 11:41:21AM +0200, Sascha Hauer wrote:
-> Hi Arnd, Olof,
+On 20120530-13:28, Stephen Boyd wrote:
+> On 05/30/12 12:40, Mike Turquette wrote:
+> > I also wonder if exposing some of these knobs should be done in the
+> > basic clock types.  Meaning that instead of having additional calls in
+> > the clk.h API those calls could be exposed by the basic clock types that
+> > map to the actions.
 > 
-> Please pull the following fixes to the i.MX common clock conversion
-> based on the imx/clock branch in arm-soc.
-> 
-> Thanks
->  Sascha
-> 
-> The following changes since commit 4f5a9fd341e8ffd825ecf56155df6fe6c3d732b1:
-> 
->   Merge branch 'imx/pinctrl' into imx/clock (2012-05-14 15:30:52 +0200)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-clk-common-fixes
-> 
-> for you to fetch changes up to b0286f20c36d0c1e7537489daddaf574abf403dd:
-> 
->   ARM: imx6q: prepare and enable init on clks directly instead of clk_get first (2012-05-16 12:46:23 +0200)
-> 
-> ----------------------------------------------------------------
-> Some fixes for the fresh i.MX common clock support
-> 
-> ----------------------------------------------------------------
-> Richard Zhao (2):
->       ARM: i.MX: change timer clock from ipg to perclk
->       ARM: imx6q: prepare and enable init on clks directly instead of clk_get first
-> 
-> Sascha Hauer (2):
->       ARM i.MX5: fix gpt peripheral clock path
->       ARM i.MX: remove now unnecessary argument from mxc_timer_init
-> 
->  arch/arm/mach-imx/clk-imx1.c            |    3 +--
->  arch/arm/mach-imx/clk-imx21.c           |    4 ++--
->  arch/arm/mach-imx/clk-imx25.c           |    2 +-
->  arch/arm/mach-imx/clk-imx27.c           |    3 +--
->  arch/arm/mach-imx/clk-imx31.c           |    3 +--
->  arch/arm/mach-imx/clk-imx35.c           |    6 ++----
->  arch/arm/mach-imx/clk-imx51-imx53.c     |   12 +++++-------
->  arch/arm/mach-imx/clk-imx6q.c           |   22 +++++++---------------
->  arch/arm/plat-mxc/epit.c                |   11 ++++++++++-
->  arch/arm/plat-mxc/include/mach/common.h |    4 ++--
->  arch/arm/plat-mxc/time.c                |   24 ++++++++++++------------
->  11 files changed, 44 insertions(+), 50 deletions(-)
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> What do you mean by basic clock types that map to actions? Perhaps an
+> example?
 > 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+No exmaples to give, just tossing out ideas.
+
+> >
+> > The question that needs to be answered is this: do generic drivers need
+> > access to these additional functions (clk.h) or just the platform code
+> > which implements some of the clock logic (basic clock types &
+> > platform-speciic clock types).
+> 
+> At least for tegra it looks like they need reset assertion and
+> deassertion in generic drivers.
+> 
+> $ git grep tegra_periph_reset_assert
+> arch/arm/mach-tegra/clock.c:void tegra_periph_reset_assert(struct clk *c)
+> arch/arm/mach-tegra/clock.c:EXPORT_SYMBOL(tegra_periph_reset_assert);
+> arch/arm/mach-tegra/include/mach/clk.h:void tegra_periph_reset_assert(struct clk *c);
+> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
+> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pex_clk);
+> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+> arch/arm/mach-tegra/pcie.c:     tegra_periph_reset_assert(tegra_pcie.afi_clk);
+> arch/arm/mach-tegra/powergate.c:        tegra_periph_reset_assert(clk);
+> drivers/i2c/busses/i2c-tegra.c: tegra_periph_reset_assert(i2c_dev->clk);
+> drivers/input/keyboard/tegra-kbc.c:     tegra_periph_reset_assert(kbc->clk);
+> drivers/staging/nvec/nvec.c:    tegra_periph_reset_assert(nvec->i2c_clk);
+> 
+
+Ok, this is good to know.  The same sort of thing is achieved via
+runtime pm and the hwmod framework in OMAP code.  I had given similar
+feedback to Andrew Lunn for using clk_prepare/clk_unprepare to power
+down the PHY for some of his IP blocks.  I don't think that the clock
+framework should be used for that and this clk_reset(...) stuff seems
+similar.
+
+Like Benoit, I am partial to associating these actions to module-level
+APIs, not necessarily clock-level APIs.
+
+A yardstick to determine whether or not the clock framework is the right
+place for a _reset() function might be whether or not it will change the
+values of struct clk's members.  If we had a clk_reset(...) call it
+would clearly bang some bits in a register via clk->ops->reset ... but
+what data would it change in struct clk?  Adjust the rate to 0?  Reset
+prepare_count and enable_count to 0?
+
+If it doesn't actually change any of the bookkeeping or accounting in
+the clock framework then it might be a clue that the clock framework
+isn't the best place for this API.
+
+Thanks,
+Mike
