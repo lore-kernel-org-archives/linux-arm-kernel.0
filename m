@@ -1,88 +1,49 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 31 May 2012 09:32:15 +0100
-Subject: [PATCH RFC 1/3] i2c-nomadik: move header from <plat/i2c.h> to
- <linux/i2c-nomadik.h>
-In-Reply-To: <ca47a47e0a4db31545549ed978e1dc7b3aad4377.1338398567.git.rubini@gnudd.com>
-References: <cover.1338398567.git.rubini@gnudd.com>
- <ca47a47e0a4db31545549ed978e1dc7b3aad4377.1338398567.git.rubini@gnudd.com>
-Message-ID: <4FC72C8F.30206@codethink.co.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 31 May 2012 11:31:31 +0300
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <20120531081841.GG5377@arwen.pp.htv.fi>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+ <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
+ <20120531081841.GG5377@arwen.pp.htv.fi>
+Message-ID: <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/12 18:45, Alessandro Rubini wrote:
-> The header and driver were only used by arm/mach-nomadik and
-> arm/mach-u8500.  The STA2X11 I/O Hub exports on PCIe a number of
-> devices, including i2c-nomadik.  This patch allows compilation of
-> the driver under x86.
->
-> Signed-off-by: Alessandro Rubini<rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi<giancarlo.asnaghi@st.com>
+On Thu, May 31, 2012 at 10:18:42AM +0200, Felipe Balbi wrote:
+> * PGP Signed by an unknown key
+> 
+> On Thu, May 31, 2012 at 10:51:25AM +0300, Peter De Schrijver wrote:
+> > On Wed, May 30, 2012 at 10:52:31AM +0200, Stephen Boyd wrote:
+> > > On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
+> > > > Add an extension API for clocks. This allows clocktypes to provide extensions
+> > > > for features which are uncommon and cannot be easily mapped onto normal clock
+> > > > framework concecpts. eg: resetting blocks, configuring clock phase etc.
+> > > 
+> > > This seems rather generic. Why not add more specific APIs/concepts like
+> > > clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
+> > > make them map.
+> > > 
+> > 
+> > Some of those might be very SoC specific. Eg OMAP doesn't need software
+> > controlled modulereset. I don't think we should add a new function to the
+> 
+> it depends on what you call modulereset. We have soft-reset logic hidden
+> under the hood, it's done before device creation, so drivers (most of
+> them) assume we're probe with the IP in reset state.
+> 
+> What I wonder most is if this should be done at the clock level or at
+> the device level. In the end you reset the IP block, not the clock,
+> right ?
 
-> -
-> -#endif	/* __PLAT_I2C_H */
-> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-> index 5267ab9..09b7589 100644
-> --- a/drivers/i2c/busses/i2c-nomadik.c
-> +++ b/drivers/i2c/busses/i2c-nomadik.c
-> @@ -23,8 +23,7 @@
->   #include<linux/io.h>
->   #include<linux/regulator/consumer.h>
->   #include<linux/pm_runtime.h>
-> -
-> -#include<plat/i2c.h>
-> +#include<linux/i2c-nomadik.h>
->
->   #define DRIVER_NAME "nmk-i2c"
->
-> diff --git a/include/linux/i2c-nomadik.h b/include/linux/i2c-nomadik.h
-> new file mode 100644
-> index 0000000..9350fe9
-> --- /dev/null
-> +++ b/include/linux/i2c-nomadik.h
-> @@ -0,0 +1,39 @@
-> +/*
-> + * Copyright (C) 2009 ST-Ericsson
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __LINUX_I2C_NOMADIK_H
-> +#define __LINUX_I2C_NOMADIK_H
-> +
-> +enum i2c_freq_mode {
-> +	I2C_FREQ_MODE_STANDARD,		/* up to 100 Kb/s */
-> +	I2C_FREQ_MODE_FAST,		/* up to 400 Kb/s */
-> +	I2C_FREQ_MODE_HIGH_SPEED,	/* up to 3.4 Mb/s */
-> +	I2C_FREQ_MODE_FAST_PLUS,	/* up to 1 Mb/s */
-> +};
-> +
-> +/**
-> + * struct nmk_i2c_controller - client specific controller configuration
-> + * @clk_freq:	clock frequency for the operation mode
-> + * @slsu:	Slave data setup time in ns.
-> + *		The needed setup time for three modes of operation
-> + *		are 250ns, 100ns and 10ns respectively thus leading
-> + *		to the values of 14, 6, 2 for a 48 MHz i2c clk
-> + * @tft:	Tx FIFO Threshold in bytes
-> + * @rft:	Rx FIFO Threshold in bytes
-> + * @timeout	Slave response timeout(ms)
-> + * @sm:		speed mode
-> + */
-> +struct nmk_i2c_controller {
-> +	unsigned long	clk_freq;
-> +	unsigned short	slsu;
-> +	unsigned char	tft;
-> +	unsigned char	rft;
-> +	int timeout;
-> +	enum i2c_freq_mode	sm;
-> +};
-> +
-> +#endif	/* __LINUX_I2C_NOMADIK_H */
+Yes. but, every block has at least 1 clock and thus the mapping is identical
+down to the register level. Ie. we could do this outside the clockframework,
+but then we would have the keep a list of IDs (1 per module) which the drivers
+can use to call some tegra reset function which would in the end use registers
+in the same memory area to cause a reset. (the registers controlling
+modulereset are interleaved with those controlling the enable/disable of the
+main moduleclock and bitpositions are identical)
 
-How about moving it to include/linux/platform_data so that we're
-not filling include/linux with a bunch of driver specific includes?
+Cheers,
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Peter.
