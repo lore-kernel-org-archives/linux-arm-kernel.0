@@ -1,70 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 31 May 2012 08:07:22 -0500
-Subject: ARM Versatile defconfig PCI io out of range?
-In-Reply-To: <201205310932.51140.arnd@arndb.de>
-References: <20120530180242.GA15772@codethink.co.uk>
- <4FC672BA.8070009@gmail.com> <201205310932.51140.arnd@arndb.de>
-Message-ID: <4FC76D0A.9060009@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 31 May 2012 15:07:53 +0200
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <20120531130456.GB15786@sirena.org.uk>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+ <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
+ <20120531081841.GG5377@arwen.pp.htv.fi>
+ <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
+ <20120531085432.GK5377@arwen.pp.htv.fi>
+ <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com> <4FC768F8.4050406@ti.com>
+ <20120531130456.GB15786@sirena.org.uk>
+Message-ID: <4FC76D29.8070802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2012 04:32 AM, Arnd Bergmann wrote:
-> On Wednesday 30 May 2012, Rob Herring wrote:
->> On 05/30/2012 01:02 PM, Richard Maw wrote:
-> 
->>>
->>> We've tried to track down the problem, but we couldn't get much further
->>> than finding out that the IO_SPACE_LIMIT in kernel/resource.c is 0xffff,
->>> which is lower than the required 0x44000000.
->>>
->>> We're not sure whether this is a problem with it not being allocated
->>> enough space, or that it is not being translated properly.
->>>
->>> Is this a known issue, I did a quick google for the "sym53c8xx
->>>  can't reserve io" error, but nothing turned up.
->>> If not, does anyone have any pointers to how this could be fixed?
->>>
->>
->> I believe this is the same issue:
->>
->> http://www.gossamer-threads.com/lists/linux/kernel/1543569
->>
->> In looking at various PCI platforms and for a qemu platform with PCI to
->> test PCI changes, I had concluded (wrongly I guess) that Versatile PCI
->> was broken. This patch which has never gone upstream also played a part
->> in my conclusion:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/021035.html
->>
->> The simple fix is to restore io.h for Versatile, but I'm looking for a
->> better way.
-> 
-> It looks like it's a simple bug in pci.c, which puts the wrong thing into the
-> pcibios_min_io variable.
-> 
-> Does the below patch fix it?
+On 5/31/2012 3:04 PM, Mark Brown wrote:
+> On Thu, May 31, 2012 at 02:50:00PM +0200, Cousson, Benoit wrote:
+>
+>> Now the question is should we extend the Linux device structure to
+>> handle such HW IP, or should we extend the clock definition to
+>> handle this kind of extended clock node.
+>
+>> It looks to me that this kind of function does belong to the device
+>> more than to the clock node.
+>
+> This is looking a lot like what power domains do to me...
 
-I've resurrected your patch from ~2 years ago and that does fix it. Any
-reason it was never merged? I could go with a more simple fix which just
-restore IO_SPACE_LIMIT to ~0, but yours is more in the direction we want
-to go with PCI mappings.
-
-Rob
-
-> 
-> 	Arnd
-> 
-> diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-> index 4ae4fc8..aeb7b60 100644
-> --- a/arch/arm/mach-versatile/pci.c
-> +++ b/arch/arm/mach-versatile/pci.c
-> @@ -305,7 +305,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
->  
->  void __init pci_versatile_preinit(void)
->  {
-> -	pcibios_min_io = 0x44000000;
-> +	pcibios_min_io = 0x100;
->  	pcibios_min_mem = 0x50000000;
->  
->  	__raw_writel(VERSATILE_PCI_MEM_BASE0 >> 28, PCI_IMAP0);
-> 
+Do you mean the reset part?
