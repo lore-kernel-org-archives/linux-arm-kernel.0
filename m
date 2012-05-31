@@ -1,91 +1,43 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 31 May 2012 08:57:50 +0200
-Subject: [PATCH] ARM: at91: add support for Telit EVK GE863-PRO3
- Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Message-ID: <1338447470-3492-1-git-send-email-fabio.porcedda@gmail.com>
+From: philippe.retornaz@epfl.ch (Philippe =?ISO-8859-1?Q?R=E9tornaz?=)
+Date: Thu, 31 May 2012 09:08:39 +0200
+Subject: [PATCH 2/2] MFD: mc13xxx workaround SPI hardware bug on i.Mx
+In-Reply-To: <20120530170837.GR9947@opensource.wolfsonmicro.com>
+References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1338282389-26177-3-git-send-email-philippe.retornaz@epfl.ch>
+ <20120530170837.GR9947@opensource.wolfsonmicro.com>
+Message-ID: <2358422.efTs8lXp1l@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/boot/dts/evk_ge863_pro3.dts |   57 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Makefile.boot     |    1 +
- 2 files changed, 58 insertions(+)
- create mode 100644 arch/arm/boot/dts/evk_ge863_pro3.dts
+Le mercredi 30 mai 2012 18:08:38 Mark Brown a ?crit :
+> On Tue, May 29, 2012 at 11:06:29AM +0200, Philippe R?tornaz wrote:
+> > The MC13xxx PMIC is mainly used on i.Mx SoC. On thoses SoC the SPI
+> > hardware will deassert CS line as soon as the SPI FIFO is empty.
+> > The MC13xxx hardware is very sensitive to CS line change as it
+> > corrupts the transfert if CS is deasserted in the middle of a register
+> > read or write.
+> > It is not possible to use the CS line as a GPIO on some SoC, so we
+> > need to workaround this by implementing a single SPI transfer to
+> > access the PMIC.
+> 
+> Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+> though it's really sad this can't be done in the SPI controller where
+> the bug is.  You should also set use_single_rw in the regmap_config,
+> though this is less critical as currently the core won't automatically
+> generate any bulk I/O.
 
-diff --git a/arch/arm/boot/dts/evk_ge863_pro3.dts b/arch/arm/boot/dts/evk_ge863_pro3.dts
-new file mode 100644
-index 0000000..bcd5ae1
---- /dev/null
-+++ b/arch/arm/boot/dts/evk_ge863_pro3.dts
-@@ -0,0 +1,57 @@
-+/*
-+ * evk_ge863_pro3.dts - Device Tree file for Telit EVK GE863-PRO3
-+ *
-+ * Copyright (C) 2012 Telit,
-+ *               2012 Fabio Porcedda <fabio.porcedda@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9260.dtsi"
-+
-+/ {
-+	model = "Telit EVK GE863-PRO3";
-+	compatible = "telit,evk_ge863-pro3", "atmel,at91sam9260", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=ubi0:rootfs ubi.mtd=1 rootfstype=ubifs";
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <6000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 4 0>;
-+				status = "okay";
-+			};
-+		};
-+
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt;
-+			status = "okay";
-+
-+			root at 07c0000 {
-+				label = "root";
-+				reg = <0x7c0000 0x7840000>;
-+			};
-+
-+		};
-+	};
+I already put it in struct regmap_config, should I put it elsewhere ? 
+
+@@ -54,6 +54,67 @@ static struct regmap_config mc13xxx_regmap_spi_config = {
+        .max_register = MC13XXX_NUMREGS,
+ 
+        .cache_type = REGCACHE_NONE,
++       .use_single_rw = 1,
 +};
-diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-index 9e84fe4..7bb44f0 100644
---- a/arch/arm/mach-at91/Makefile.boot
-+++ b/arch/arm/mach-at91/Makefile.boot
-@@ -16,6 +16,7 @@ endif
- # Keep dtb files sorted alphabetically for each SoC
- # sam9260
- dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += evk_ge863_pro3.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
- # sam9263
--- 
-1.7.10
+
+BTW, who will merge this patchset ? 
+
+Thanks ! 
+
+Philippe
