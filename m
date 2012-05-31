@@ -1,89 +1,46 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 30 May 2012 20:46:57 -0700
-Subject: [PATCH] clk: Fix race conditions between clk_set_parent() and
- clk_enable()
-In-Reply-To: <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
-References: <1336798797-8724-1-git-send-email-skannan@codeaurora.org>
- <4FB29E7C.7010606@codeaurora.org>
- <20120522135813.GL8730@tbergstrom-lnx.Nvidia.com>
- <CAJOA=zOcEQc70gg+4U2jNaNRTB5YeyOwgsL12YWNoviQ5qFjaQ@mail.gmail.com>
- <20120523091617.GZ8730@tbergstrom-lnx.Nvidia.com>
-Message-ID: <4FC6E9B1.10605@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 May 2012 11:58:01 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC6E7CE.9090004@gmail.com>
+References: <4FAA34A9.5020708@gmail.com>
+ <20120511085150.GA17453@mudshark.cambridge.arm.com>
+ <4FC45E6B.2070202@gmail.com>
+ <20120530063858.GB6484@mudshark.cambridge.arm.com>
+ <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
+ <4FC6E172.4080601@gmail.com>
+ <20120531031941.GA29906@mbp> <4FC6E7CE.9090004@gmail.com>
+Message-ID: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2012 02:16 AM, Peter De Schrijver wrote:
-> On Tue, May 22, 2012 at 08:06:45PM +0200, Turquette, Mike wrote:
->> On Tue, May 22, 2012 at 6:58 AM, Peter De Schrijver
->> <pdeschrijver@nvidia.com>  wrote:
->>> On Tue, May 15, 2012 at 08:20:44PM +0200, Saravana Kannan wrote:
->>>> On 05/11/2012 09:59 PM, Saravana Kannan wrote:
->>>>> Without this patch, the following race conditions are possible.
->>>>>
->>>>> Race condition 1:
->>>>> * clk-A has two parents - clk-X and clk-Y.
->>>>> * All three are disabled and clk-X is current parent.
->>>>> * Thread A: clk_set_parent(clk-A, clk-Y).
->>>>> * Thread A:<snip execution flow>
->>>>> * Thread A: Grabs enable lock.
->>>>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
->>>>> * Thread A: Releases enable lock.
->>>>> * Thread B: Calls clk_enable(clk-A), which in turn enables clk-X.
->>>>> * Thread A: Switches clk-A's parent to clk-Y in hardware.
->>>>>
->>>>> clk-A is now enabled in software, but not clocking in hardware.
->>>>>
->>>>> Race condition 2:
->>>>> * clk-A has two parents - clk-X and clk-Y.
->>>>> * All three are disabled and clk-X is current parent.
->>>>> * Thread A: clk_set_parent(clk-A, clk-Y).
->>>>> * Thread A:<snip execution flow>
->>>>> * Thread A: Switches parent in hardware to clk-Y.
->>>>> * Thread A: Grabs enable lock.
->>>>> * Thread A: Sees enable count of clk-A is 0, so doesn't disable clk-X.
->>>>> * Thread A: Releases enable lock.
->>>>> * Thread B: Calls clk_enable(clk-A)
->>>>> * Thread B: Software state still says parent is clk-X.
->>>>> * Thread B: So, enables clk-X and then itself.
->>>>> * Thread A: Updates parent in software state to clk-Y.
->>>>>
->>>
->>> This looks correct to me. Is there any usecase where enabling/disabling a
->>> clock would require sleeping but changing the parent would not?
->>>
+On 31 May 2012 11:38, bill4carson <bill4carson@gmail.com> wrote:
+> On 2012?05?31? 11:19, Catalin Marinas wrote:
+>> BTW, see this as a starting point (and a hack):
 >>
->> clk_enable&  clk_disable must never sleep.  clk_prepare and
->> clk_unprepare may sleep.
->>
+>> http://article.gmane.org/gmane.linux.ports.arm.kernel/51556
 >
-> In that case the clock is actually enabled in clk_prepare and disabled in
-> clk_unprepare I guess (and clk_enable/clk_disable are dummy functions)?
+> I think we has some mis-understanding here :(
 >
-> What I'm trying to say is that I don't think there are clocks which can be
-> enabled/disabled using non blocking operations, but where a parent change
-> would require a blocking operation.
+> As for:v6_flush_kern_dcache_area/v6_flush_kern_dcache_all
+> these two hooks is supposed to be globally effective, *not*
+> locally!
 >
-> Cheers,
+> Hence, there should below fix to make it as globally effective.
 >
-> Peter.
+>
+> +#ifdef CONFIG_SMP
+> + ? ? ? ldr ? ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ read for ownership
+> + ? ? ? str ? ? r2, [r0] ? ? ? ? ? ? ? ? ? ? ? ?@ write for ownership
+> +#endif /* CONFIG_SMP */
+>
+> Or there maybe some other better solution for this issue.
 
-Mark, Shawn, Russell,
-
-Can you guys please respond? I'm surprised that no one seem to care 
-about fixing race conditions between clk_set_parent/clk_set_rate() and 
-clk_enable() that will result in incorrect enable count propagation and 
-have the SW get out of sync with HW.
-
-If we absolutely need to support clocks that where the ops->set_parent() 
-is not atomic and can't go with the CLK_SET_PARENT_GATE option, then 
-maybe we can add a "I promise the consumers of this clock won't call 
-clk_set_parent() and clk_enable() in a racy way" clock flag 
-(CLK_IGNORE_PARENT_ENABLE_RACE). Yes, it would be a hack for such 
-clocks, but that's still better than leaving a gaping hole for all the 
-clocks.
-
--Saravana
+I still didn't fully understand what the problem is. So, to make sure,
+if you run some applications from flash using a yaffs filesystem, you
+get random crashes. Is this correct? If yes, a solution is to actually
+call flush_dcache_page() on the CPU that does the page copying from
+flash into RAM, which could be the yaffs filesystem.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Catalin
