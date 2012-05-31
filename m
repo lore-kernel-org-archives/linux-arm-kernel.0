@@ -1,37 +1,118 @@
-From: thiago.bauermann@gmail.com (Thiago Jung Bauermann)
-Date: Thu, 31 May 2012 01:32:10 -0300
-Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
- allocate memory
-In-Reply-To: <20120531030931.GX24238@titan.lakedaemon.net>
-References: <1338401183.22894.11.camel@hactar>
- <20120531005109.GW24238@titan.lakedaemon.net>
- <1338431047.1822.11.camel@hactar>
- <20120531030931.GX24238@titan.lakedaemon.net>
-Message-ID: <1338438730.4173.8.camel@hactar>
+From: jgq516@gmail.com (Xiao Jiang)
+Date: Thu, 31 May 2012 13:51:19 +0800
+Subject: [PATCH 1/3] arm/dts: add wdt node for omap3 and omap4
+In-Reply-To: <4FC631E5.9080000@ti.com>
+References: <1337942552-28218-1-git-send-email-jgq516@gmail.com>
+ <1337942552-28218-2-git-send-email-jgq516@gmail.com>
+ <4FC50CCD.7090404@ti.com> <4FC591C9.2050004@gmail.com>
+ <4FC631E5.9080000@ti.com>
+Message-ID: <4FC706D7.2010801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-30 at 23:09 -0400, Jason Cooper wrote:
-> Please try a vanilla v3.4 kernel with CONFIG_ARM_APPENDED_DTB.
+Hi Jon and Benoit,
+>> Thanks for reminding, how about below patch?
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
+>> b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
+>> new file mode 100644
+>> index 0000000..4272d06
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/watchdog/omap-wdt.txt
+>> @@ -0,0 +1,15 @@
+>> +TI Watchdog Timer (WDT) Controller for OMAP
+>> +
+>> +Required properties:
+>> +- compatible:
+>> +  - "ti,omap2-wdt" for OMAP2
+>> +  - "ti,omap3-wdt" for OMAP3
+>> +  - "ti,omap4-wdt" for OMAP4
+>> +- ti,hwmods: Name of the hwmod associated to the WDT
+>> +
+>> +Examples:
+>> +
+>> +wdt2: wdt at 73f98000 {
+>> +       compatible = "ti,omap4-wdt";
+>> +       ti,hwmods = "wd_timer2";
+>> +};
+>>     
+>
+> Yes looks good. Thanks! Minor nit-pick in the example I would just copy
+> the omap4 node completely with the actual omap4 address :-)
+>
+>   
+Oops, wrong addr, :). Perhaps we can drop address as you said, since the 
+right addresses are defined
+in wd_timer2 hwmod (see [1]), and wdt also works without the address as 
+follows.
 
-To be honest I don't feel comfortable about doing that. One
-knowledgeable guy on the debian-kernel mailing list said that "the
-Kconfig entry for ARM_APPENDED_DTB is quite scary about enabling it and
-booting without a DTB appended"[1] and indeed it doesn't look very
-encouraging.
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index f2ab4ea..0017bd8 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -63,5 +63,10 @@
+                        ti,hwmods = "uart3";
+                        clock-frequency = <48000000>;
+                };
++
++               wdt2: wdt {
++                       compatible = "ti,omap2-wdt";
++                       ti,hwmods = "wd_timer2";
++               };
+        };
+ };
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 99474fa..dbf8a5b 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -215,5 +215,10 @@
+                        compatible = "ti,omap3-hsmmc";
+                        ti,hwmods = "mmc3";
+                };
++
++               wdt2: wdt {
++                       compatible = "ti,omap3-wdt", "ti,omap2-wdt";
++                       ti,hwmods = "wd_timer2";
++               };
+        };
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 359c497..ce74e87 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -272,5 +272,10 @@
+                        ti,hwmods = "mmc5";
+                        ti,needs-special-reset;
+                };
++
++               wdt2: wdt {
++                       compatible = "ti,omap4-wdt", "ti,omap2-wdt";
++                       ti,hwmods = "wd_timer2";
++               };
+        };
+ };
 
-Another message on the thread talks about "concerns about damaging other
-boards"[2] (maybe I am misreading this one?).
+Infos for omap3:
+# dmesg|grep Machine
+<6>[    0.000000] Machine: Generic OMAP3 (Flattened Device Tree), model: 
+TI OMAP3 EVM (OMAP3530, AM/DM37x)
+# dmesg|grep omap_wdt_probe
+<4>[    2.552825] in omap_wdt_probe: 299, res->start = 0x48314000
 
-[1] http://lists.debian.org/debian-kernel/2012/03/msg00049.html
-[2] http://lists.debian.org/debian-kernel/2012/03/msg00645.html
+Infos for omap4:
+root at localhost:/root> dmesg|grep Machine
+[    0.000000] Machine: Generic OMAP4 (Flattened Device Tree), model: TI 
+OMAP4 SDP board
+root at localhost:/root> dmesg|grep omap_wdt_probe
+[    1.687896] in omap_wdt_probe: 299, res->start = 0x4a314000
 
-Is there a risk of damaging the board if it is accidentally booted with
-the wrong DTB or without one?
+So can I drop the wdt addr from dts file? otherwise it is not feasible 
+to add omap2 wdt node in omap2.dtsi
+due to different addrs for omap2420 and omap2430.
 
-Does it help if I test with only dreamplug-3.4.0.patch (which adds
-CONFIG_MACH_DREAMPLUG) applied?
-
--- 
-[]'s
-Thiago Jung Bauermann
+Regards,
+Xiao
+[1] http://marc.info/?l=linux-omap&m=133836995026565&w=2
+> Cheers
+> Jon
+>   
