@@ -1,23 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 09:11:22 +0800
-Subject: [RFC 21/34] dmaengine: PL08x: move DMA signal muxing into slave
- prepare code
-In-Reply-To: <E1SZIwW-000706-6T@rmk-PC.arm.linux.org.uk>
+Date: Thu, 31 May 2012 09:11:56 +0800
+Subject: [RFC 22/34] dmaengine: PL08x: remove waiting descriptor pointer
+In-Reply-To: <E1SZIwq-00070A-AK@rmk-PC.arm.linux.org.uk>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIwW-000706-6T@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdbT3L+mXc3WJG9NqhZRznnvD=5dSYkcgQCzUJiMXHZuhA@mail.gmail.com>
+ <E1SZIwq-00070A-AK@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdbSRUh4HArtNmak5ko1KhYz6rkVqbFyo0XBxsA_MdAoqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 29, 2012 at 5:42 PM, Russell King
 <rmk+kernel@arm.linux.org.uk> wrote:
 
-> Move the DMA request muxing into the slave prepare code and txd
-> release/completion code. ?This means we only hold the DMA request
-> mux while there are descriptors waiting to be started or are in
-> progress.
->
-> This leaves txd->direction as a write-only variable; remove it.
+> As we no longer need to pass a descriptor to prep_phy_channel(), we
+> don't need to keep track of the descriptor which is waiting for a
+> channel to become available. ?So let's get rid of it.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
