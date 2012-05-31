@@ -1,79 +1,47 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 31 May 2012 15:59:47 -0700
-Subject: [PATCHv10 00/11] I2C fixes
-In-Reply-To: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
- (Shubhrajyoti D.'s message of "Tue, 29 May 2012 16:26:12 +0530")
-References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87obp4x8gs.fsf@ti.com>
+Date: Thu, 31 May 2012 16:15:38 -0700
+Subject: [PATCH] ARM: OMAP2+: OPP: Fix to ensure check of right oppdef
+ after bad one
+In-Reply-To: <1337361979-19052-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Fri, 18 May 2012 12:26:19 -0500")
+References: <1337361979-19052-1-git-send-email-nm@ti.com>
+Message-ID: <87d35kx7qd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Nishanth Menon <nm@ti.com> writes:
 
-> The patch series does the following
+> Commit 9fa2df6b90786301b175e264f5fa9846aba81a65
+> (ARM: OMAP2+: OPP: allow OPP enumeration to continue if device is not present)
+> makes the logic:
+> for (i = 0; i < opp_def_size; i++) {
+> 	<snip>
+> 	if (!oh || !oh->od) {
+> 		<snip>
+> 		continue;
+> 	}
+> <snip>
+> opp_def++;
+> }
 >
-> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
-> - In case of i2c remove register access was done without any
->  get_sync fix the same.
-> - Folds a patch from Tasslehoff to prevent any merge conflicts.
-> - Prevents the XDUF flag to be set if the underflow condition is not met.
-> - As per discussion in [1] .Adds a patch to rename the 1p153 errata and
->  use the unique id instead as the section number in the recent errata
->  docs has changed.
+> In short, the moment we hit a "Bad OPP", we end up looping the list
+> comparing against the bad opp definition pointer for the rest of the
+> iteration count. Instead, increment opp_def in the for loop itself
+> and allow continue to be used in code without much thought so that
+> we check the next set of OPP definition pointers :)
 >
-> v9:
-> Fix the comments from Wolfram Sang
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Steve Sakoman <steve@sakoman.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
 >
-> v10:
-> Add a patch from Neil to the series.
-> Fix kevin comments
-> update the patches with comments.
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Shubhrajyoti, thanks for the updates.
+Good catch.
 
-Wolfgang, with these updates and testing a bit better described, I'm OK
-with you merging it.  Merging it now will give it plenty of time to
-bake in linux-next and get more test exposure.
+Queuing for my next set of PM fixes for v3.5-rc (branch: for_3.5/fixes/pm-2)
 
-Thanks,
+Thanks for the fix!
 
 Kevin
-
-
-> [1] http://www.spinics.net/lists/linux-i2c/msg07607.html
->
-> Tested on omap4sdp and omap3sdp.
-> - Did functional tests read write on both the platforms.
-> - Off mode and retention on OMAP3
-> - On OMAP4 just did echo mem > /sys/power/state and wakeup.
-> Did see.
-> [ 1360.595855] Successfully put all powerdomains to target state
-> However didnt see the ret count for other than mpu_pwrdm increase.
-> I think power support for omap4 is minimal. 
->
-> The following changes since commit b48b2c3e50433ff6f7e46186daa7f986bd960215:
->
->   openrisc: use generic strnlen_user() function (2012-05-27 21:00:32 -0700)
->
-> are available in the git repository at:
->   git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
->
-> Neil Brown (1):
->       OMAP/I2C - Fix timeout problem during suspend.
->
-> Shubhrajyoti D (9):
->       I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
->       I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
->       I2C: OMAP: Fix the interrupt clearing in OMAP4
->       I2C: OMAP: Prevent the register access after pm_runtime_put in probe
->       I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
->       I2C: OMAP: Fix the crash in i2c remove
->       I2C: OMAP: Handle error check for pm runtime
->       I2C: OMAP: Do not set the XUDF(Transmit underflow) if the underflow is not reached
->       I2C: OMAP: Rename the 1p153 to the erratum id i462
->
-> Tasslehoff Kjappfot (1):
->       I2C: OMAP: prevent the overwrite of the errata flags
->
->  drivers/i2c/busses/i2c-omap.c |  129 ++++++++++++++++++++---------------------
->  1 files changed, 63 insertions(+), 66 deletions(-)
