@@ -1,58 +1,48 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 31 May 2012 10:21:24 +0200
-Subject: [RFC PATCH 0/2] Remove at91 workaround from handle_IRQ
-In-Reply-To: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
-References: <1338449901-10288-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4FC72A04.3040504@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 31 May 2012 11:23:09 +0300
+Subject: [RFC PATCH] clk: add extension API
+In-Reply-To: <4FC6E5B2.2010700@codeaurora.org>
+References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
+ <4FC5DFCF.1020606@codeaurora.org>
+ <20120530194059.GA13243@gmail.com>
+ <4FC6E5B2.2010700@codeaurora.org>
+Message-ID: <20120531082309.GP8026@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, May 31, 2012 at 05:29:54AM +0200, Saravana Kannan wrote:
+> On 05/30/2012 12:40 PM, Mike Turquette wrote:
+> > On 20120530-01:52, Stephen Boyd wrote:
+> >> On 5/29/2012 2:58 AM, Peter De Schrijver wrote:
+> >>> Add an extension API for clocks. This allows clocktypes to provide extensions
+> >>> for features which are uncommon and cannot be easily mapped onto normal clock
+> >>> framework concecpts. eg: resetting blocks, configuring clock phase etc.
+> >>
+> >> This seems rather generic. Why not add more specific APIs/concepts like
+> >> clk_reset(), clk_set_phase(), etc.? If they don't map, maybe we should
+> >> make them map.
+> >>
+> >
+> > I also wonder if exposing some of these knobs should be done in the
+> > basic clock types.  Meaning that instead of having additional calls in
+> > the clk.h API those calls could be exposed by the basic clock types that
+> > map to the actions.
+> >
+> > The question that needs to be answered is this: do generic drivers need
+> > access to these additional functions (clk.h) or just the platform code
+> > which implements some of the clock logic (basic clock types&
+> > platform-speciic clock types).
+> 
+> One of the main reason for the common clock framework is so that each 
+> platform doesn't have it's own extension and have mostly similar code 
+> repeat all over the place. So, having clock APIs outside of clk.h 
+> doesn't make sense when we look at the direction we want the code base 
+> to proceed in.
 
-Le 05/31/2012 09:38 AM, Will Deacon a ?crit :
-> Hello,
->
-> This is a couple of patches that I wrote quickly to try and remove the
-> irq_finish hook from handle_IRQ on ARM. Currently, the hook is only used
-> by at91 in order to issue an EOI when using level_irq flow control.
->
-> This patch moves the at91 irq_chip to fasteoi flow control, removing the
-> need for the additional hook. Since I (a) don't know anything about at91
-> (the TRM I found for the IRQ controller is only a few pages long) and (b)
-> don't have a platform on which to test, this is very much an RFC series.
->
-> All comments welcome.
->
-> Will
+I don't think this will lead to 'mostly similar code repeat all over the
+place'. I don't know of any intree SoC which has a similar requirement.
+So which code duplication would this cause?
 
-I have sent a patch with the same purpose a few days ago: 
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/169371
+Cheers,
 
-The content of our patches is really close:
-- I missed the remove of irq_finish macro in arch/arm/irq/kernel.c
-- AIC don't care about the value written into AT91_AIC_EOICR, I don't 
-know if it's better to write 0 or a precise value as you did.
-- I didn't remove irq_ack but you're right it's no more useful.
-- You missed gpio part, it has to use fasteoi flow control also.
-
-I have also to remove some comments so I can send a second version and 
-add what I missed the first time if you have no objections.
-
-
-> Cc: Arnd Bergmann<arnd@arndb.de>
-> Cc: Jean-Christophe Plagniol-Villard<plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
->
-> Will Deacon (2):
->    ARM: at91: use EOI flow control for interrupt handling
->    ARM: irq: remove unused irq_finish hook from core interrupt handling
->
->   arch/arm/kernel/irq.c                  |   10 ----------
->   arch/arm/mach-at91/include/mach/irqs.h |    8 --------
->   arch/arm/mach-at91/irq.c               |   12 +++++++++---
->   3 files changed, 9 insertions(+), 21 deletions(-)
->
-
-Regards
-
-Ludovic
+Peter.
