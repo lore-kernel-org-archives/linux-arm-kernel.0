@@ -1,132 +1,81 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 May 2012 16:55:42 +0300
-Subject: [PATCHv6 06/14] ARM: OMAP4: VC: calculate ramp times
+Date: Thu, 31 May 2012 16:55:43 +0300
+Subject: [PATCHv6 07/14] ARM: OMAP: add support for oscillator setup
 In-Reply-To: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
 References: <1338472550-20743-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1338472550-20743-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1338472550-20743-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 VC code now uses voltage deltas + slew rates for calculating
-actual ramp times for voltage changes. Both retention / sleep +
-off mode voltage ramp times are setup at the same time during
-initialization.
+This contains startup and shutdown times for the oscillator. By default
+use ULONG_MAX. Oscillator setup is used for calculating and setting up
+latencies for sleep modes that disable oscillator.
+
+Based on a patch from Nishanth Menon <nm@ti.com>.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/vc.c |   94 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 94 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm.c |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.h |    8 ++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index bba0d7c..0a37673 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -310,12 +310,106 @@ static void __init omap3_vc_init_channel(struct voltagedomain *voltdm)
- 	omap3_set_off_timings(voltdm);
- }
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 9cb5ced..05ec8ca 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -38,6 +38,36 @@ static struct omap_device_pm_latency *pm_lats;
+  */
+ int (*omap_pm_suspend)(void);
  
 +/**
-+ * omap4_calc_volt_ramp - calculates voltage ramping delays on omap4
-+ * @voltdm: channel to calculate values for
-+ * @voltage_diff: voltage difference in microvolts
-+ *
-+ * Calculates voltage ramp prescaler + counter values for a voltage
-+ * difference on omap4. Returns a field value suitable for writing to
-+ * VOLTSETUP register for a channel in following format:
-+ * bits[8:9] prescaler ... bits[0:5] counter. See OMAP4 TRM for reference.
++ * struct omap2_oscillator - Describe the board main oscillator latencies
++ * @startup_time: oscillator startup latency
++ * @shutdown_time: oscillator shutdown latency
 + */
-+static u32 omap4_calc_volt_ramp(struct voltagedomain *voltdm, u32 voltage_diff)
++struct omap2_oscillator {
++	u32 startup_time;
++	u32 shutdown_time;
++};
++
++static struct omap2_oscillator oscillator = {
++	.startup_time = ULONG_MAX,
++	.shutdown_time = ULONG_MAX,
++};
++
++void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
 +{
-+	u32 prescaler;
-+	u32 cycles;
-+	u32 time;
-+
-+	time = voltage_diff / voltdm->pmic->slew_rate;
-+
-+	cycles = voltdm->sys_clk.rate / 1000 * time / 1000;
-+
-+	cycles /= 64;
-+	prescaler = 0;
-+
-+	/* shift to next prescaler until no overflow */
-+
-+	/* scale for div 256 = 64 * 4 */
-+	if (cycles > 63) {
-+		cycles /= 4;
-+		prescaler++;
-+	}
-+
-+	/* scale for div 512 = 256 * 2 */
-+	if (cycles > 63) {
-+		cycles /= 2;
-+		prescaler++;
-+	}
-+
-+	/* scale for div 2048 = 512 * 4 */
-+	if (cycles > 63) {
-+		cycles /= 4;
-+		prescaler++;
-+	}
-+
-+	/* check for overflow => invalid ramp time */
-+	if (cycles > 63) {
-+		pr_warning("%s: invalid setuptime for vdd_%s\n", __func__,
-+			voltdm->name);
-+		return 0;
-+	}
-+
-+	cycles++;
-+
-+	return (prescaler << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-+		(cycles << OMAP4430_RAMP_UP_COUNT_SHIFT);
++	oscillator.startup_time = tstart;
++	oscillator.shutdown_time = tshut;
 +}
 +
-+/**
-+ * omap4_set_timings - set voltage ramp timings for a channel
-+ * @voltdm: channel to configure
-+ * @off_mode: whether off-mode values are used
-+ *
-+ * Calculates and sets the voltage ramp up / down values for a channel.
-+ */
-+static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
++void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
 +{
-+	u32 val;
-+	u32 ramp;
-+	int offset;
-+
-+	if (off_mode) {
-+		ramp = omap4_calc_volt_ramp(voltdm,
-+			voltdm->vc_param->on - voltdm->vc_param->off);
-+		offset = voltdm->vfsm->voltsetup_off_reg;
-+	} else {
-+		ramp = omap4_calc_volt_ramp(voltdm,
-+			voltdm->vc_param->on - voltdm->vc_param->ret);
-+		offset = voltdm->vfsm->voltsetup_reg;
-+	}
-+
-+	if (!ramp)
++	if (!tstart || !tshut)
 +		return;
 +
-+	val = voltdm->read(offset);
-+
-+	val |= ramp << OMAP4430_RAMP_DOWN_COUNT_SHIFT;
-+
-+	val |= ramp << OMAP4430_RAMP_UP_COUNT_SHIFT;
-+
-+	voltdm->write(val, offset);
++	*tstart = oscillator.startup_time;
++	*tshut = oscillator.shutdown_time;
 +}
 +
- /* OMAP4 specific voltage init functions */
- static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
+ static int __init _init_omap_device(char *name)
  {
- 	static bool is_initialized;
- 	u32 vc_val;
+ 	struct omap_hwmod *oh;
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 312f2de..af1234c 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -121,4 +121,12 @@ static inline int omap4_twl_init(void)
+ }
+ #endif
  
-+	omap4_set_timings(voltdm, true);
-+	omap4_set_timings(voltdm, false);
++#ifdef CONFIG_PM
++extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
++extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
++#else
++static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
++static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
++#endif
 +
- 	if (is_initialized)
- 		return;
- 
+ #endif
 -- 
 1.7.4.1
