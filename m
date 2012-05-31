@@ -1,95 +1,40 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Thu, 31 May 2012 11:38:54 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <20120531031941.GA29906@mbp>
-References: <4FAA34A9.5020708@gmail.com>
- <20120511085150.GA17453@mudshark.cambridge.arm.com>
- <4FC45E6B.2070202@gmail.com>
- <20120530063858.GB6484@mudshark.cambridge.arm.com>
- <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
- <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
-Message-ID: <4FC6E7CE.9090004@gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 31 May 2012 11:45:54 +0800
+Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
+ periodic callbacks
+In-Reply-To: <20120530080216.GH12217@n2100.arm.linux.org.uk>
+References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+ <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
+ <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
+ <20120530080216.GH12217@n2100.arm.linux.org.uk>
+Message-ID: <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2012?05?31? 11:19, Catalin Marinas wrote:
-> On Thu, May 31, 2012 at 04:11:46AM +0100, bill4carson wrote:
->> On 2012?05?31? 11:00, Catalin Marinas wrote:
->>> On Wed, May 30, 2012 at 11:01:59AM +0100, bill4carson wrote:
->>>> On 2012?05?30? 14:38, Will Deacon wrote:
->>>>> On Tue, May 29, 2012 at 06:28:11AM +0100, bill4carson wrote:
->>>>>> --- a/arch/arm/mm/cache-v6.S
->>>>>> +++ b/arch/arm/mm/cache-v6.S
->>>>>> @@ -170,6 +170,10 @@ ENDPROC(v6_coherent_kern_range)
->>>>>>      ENTRY(v6_flush_kern_dcache_area)
->>>>>>             add     r1, r0, r1
->>>>>>      1:
->>>>>> +#ifdef CONFIG_SMP
->>>>>> +       ldr     r2, [r0]                        @ read for ownership
->>>>>> +       str     r2, [r0]                        @ write for ownership
->>>>>> +#endif /* CONFIG_SMP */
->>>>>>      #ifdef HARVARD_CACHE
->>>>>>             mcr     p15, 0, r0, c7, c14, 1          @ clean&    invalidate D line
->>>>>>      #else
->>>>>
->>>>> I don't think the invalidation is needed here, so you probably don't need to
->>>>> hack this function at all.
->>> ...
->>>> 1. task t runs on CPU 0, it executes one program in nand flash,
->>>>       so first task t read *part* of this program into its local Dcache,
->>>>       let's call it part_a;
->>>>
->>>> 2. task t migrates from CPU0 onto CPU1, in there reads the rest of
->>>>       program into its local Dcache, label it part_b;
->>>>
->>>> 3. on CPU1, task t flush the whole address range of this program,
->>>>       As with ARM11 MPCore, this flush is locally effective, after flush
->>>>       part_a still resides in CPU0 L1 Dcache.
->>>>
->>>> 4. When this program gets executed, CPU 1 fetch its instructions from
->>>>       Icache, SCU will notice this action,
->>>>
->>>>       Question:
->>>>       At this point, is stale part_a in main memory *or* L1 Dcache part_a
->>>>       in CPU0 routed into CPU1 as instruction?
->>>
->>> This has been discussed in the past. The first thing is to disable
->>> CONFIG_PREEMPT to make sure you are not preempted between page copying
->>> and task execution. The code doing the page copy needs to call
->>> flush_dcache_page() on the CPU where the copy occurred and Linux does a
->>> non-lazy D-cache flush. But there are many situations where Linux
->>> doesn't do this (you can google for flush_dcache_page and my name to
->>> find a few places where I tried to fix this).
+On Wed, May 30, 2012 at 4:02 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, May 30, 2012 at 03:52:53PM +0800, Linus Walleij wrote:
+>> On Tue, May 29, 2012 at 5:36 PM, Russell King
+>> <rmk+kernel@arm.linux.org.uk> wrote:
 >>
->> Thanks:)
+>> > Add support for cyclic DMA's periodic callbacks. ?Drivers are expected
+>> > to call vchan_cyclic_callback() when a period has completed, which will
+>> > schedule the tasklet to make the callback into the driver.
+>> >
+>> > As callbacks are made from tasklet context, it is important to realise
+>> > that we don't guarantee a callback for each completed period, but for
+>> > N completed periods where N may be greater than one.
+>>
+>> This last thing was something we have to fix right?
+>> Like for each driver to keep a counter of completed periods
+>> and call the handler repeatedly if N > 1.
 >
-> BTW, see this as a starting point (and a hack):
->
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/51556
+> No, I don't think we should do that - ALSA doesn't require it, and ALSA
+> is about the only user of this. ?As I've said, DMA engine drivers should
+> implement a correct tx_status function, which returns the remaining bytes
+> to be transferred to the end of the buffer so it's possible to find out
+> how many periods have completed when the callback is called.
 
-
-I think we has some mis-understanding here :(
-
-As for:v6_flush_kern_dcache_area/v6_flush_kern_dcache_all
-these two hooks is supposed to be globally effective, *not*
-locally!
-
-Hence, there should below fix to make it as globally effective.
-
-+#ifdef CONFIG_SMP
-+       ldr     r2, [r0]                        @ read for ownership
-+       str     r2, [r0]                        @ write for ownership
-+#endif /* CONFIG_SMP */
-
-Or there maybe some other better solution for this issue.
-
-
-thanks
-
--- 
-Love each day!
-
---bill
+Could we directly use pos, but unmatch with dma_tx_state.residue.
+For cyclic buffer, when pos reach to buffer size, pos will change to 0,
+remaining bytes also 0, we may have to distinguish them.
