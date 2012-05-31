@@ -1,36 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 May 2012 09:14:15 +0800
-Subject: [RFC 23/34] dmaengine: PL08x: re-jig the starting of txds
-In-Reply-To: <E1SZIxA-00070E-Dc@rmk-PC.arm.linux.org.uk>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIxA-00070E-Dc@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdb15mx2jPZ3zqD01htvvLsQ27snsQQ+o=aSM8F6y=WKcw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 30 May 2012 20:51:09 -0400
+Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
+ allocate memory
+In-Reply-To: <1338401183.22894.11.camel@hactar>
+References: <1338401183.22894.11.camel@hactar>
+Message-ID: <20120531005109.GW24238@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 5:43 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
+On Wed, May 30, 2012 at 03:06:23PM -0300, Thiago Jung Bauermann wrote:
+> Hello,
+> 
+> I have just upgraded my Dreamplug to the 3.4 kernel, and when creating
+> an LVM snapshot volume, I see errors for which I didn't find any report
+> yet:
+> 
+> # lvcreate -s -L 80M -n root-fsck-snapshot marv2-vg/root
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>   Logical volume "root-fsck-snapshot" created
+> 
+> # lvremove -f marv2-vg/root-fsck-snapshot
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>   ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>   Logical volume "root-fsck-snapshot" successfully removed
+> 
+> This is on the following kernel:
+> 
+> Linux marv 3.4.0-1bauer2-kirkwood #1 Wed May 30 01:31:47 BRT 2012 armv5tel GNU/Linux
 
-> Rather than code the de-queue of the txd several times, move that into
-> the start_txd function. ?Rename this to better illustrate what it's
-> now doing, and call this function when starting a delayed memcpy().
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Is this a vanilla v3.4 kernel?  Is this a repeatable error, even after
+hard reboot?
 
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* Eww. ?We know this isn't going to deadlock
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* but lockdep probably doens't.
+thx,
 
-Speling...
-
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spin_lock(&waiting->lock);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_start_next_txd(waiting);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spin_unlock(&waiting->lock);
-
-I've seen this construct in the past and have no better suggestions...
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Jason.
