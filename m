@@ -1,81 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 31 May 2012 12:26:05 +0300
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
- <20120531081841.GG5377@arwen.pp.htv.fi>
- <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
- <20120531085432.GK5377@arwen.pp.htv.fi>
- <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20120531092603.GM5377@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 31 May 2012 09:32:50 +0000
+Subject: ARM Versatile defconfig PCI io out of range?
+In-Reply-To: <4FC672BA.8070009@gmail.com>
+References: <20120530180242.GA15772@codethink.co.uk>
+ <4FC672BA.8070009@gmail.com>
+Message-ID: <201205310932.51140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 30 May 2012, Rob Herring wrote:
+> On 05/30/2012 01:02 PM, Richard Maw wrote:
 
-On Thu, May 31, 2012 at 12:05:18PM +0300, Peter De Schrijver wrote:
 > > 
-> > What if a module needs two clocks and you drive the reset on both of the
-> > clocks ? What would happen ?
+> > We've tried to track down the problem, but we couldn't get much further
+> > than finding out that the IO_SPACE_LIMIT in kernel/resource.c is 0xffff,
+> > which is lower than the required 0x44000000.
+> > 
+> > We're not sure whether this is a problem with it not being allocated
+> > enough space, or that it is not being translated properly.
+> > 
+> > Is this a known issue, I did a quick google for the "sym53c8xx
+> >  can't reserve io" error, but nothing turned up.
+> > If not, does anyone have any pointers to how this could be fixed?
 > > 
 > 
-> Only 'leave clocks' have this reset method and a module can only have 1 of
-> them.
-
-fair enough... got mislead by you "every module has at least one clock"
-statement.
-
-> > > but then we would have the keep a list of IDs (1 per module) which the drivers
-> > > can use to call some tegra reset function which would in the end use registers
-> > > in the same memory area to cause a reset. (the registers controlling
-> > > modulereset are interleaved with those controlling the enable/disable of the
-> > > main moduleclock and bitpositions are identical)
-> > 
-> > Well, under a generic device-level API, you could just call an internal
-> > clk_reset() function because you know which clocks feed into which
-> > devices anyway. It could look something like:
-> > 
-> > on Tegra:
-> > 
-> > device_reset(dev)
-> > 	-> dev_pm_domain->reset()
-> > 		-> tegra_periph_reset()
-> > 
+> I believe this is the same issue:
 > 
-> These methods are also needed internally by the powergating code.
-
-so ? Just call them when you need...
-
-> > on OMAP:
-> > 
-> > device_reset(dev)
-> > 	-> dev_pm_domain->reset()
-> > 		-> omap_hwmod_reset()
-> > 
-> > 
-> > btw:
-> > 
-> > tegra_periph_reset(....)
-> > {
-> > 	tegra_periph_reset_assert(...);
-> > 	udelay(2);
-> > 	tegra_periph_reset_deassert(...);
-> > }
+> http://www.gossamer-threads.com/lists/linux/kernel/1543569
 > 
-> which uses the clockframework currently.
+> In looking at various PCI platforms and for a qemu platform with PCI to
+> test PCI changes, I had concluded (wrongly I guess) that Versatile PCI
+> was broken. This patch which has never gone upstream also played a part
+> in my conclusion:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/021035.html
+> 
+> The simple fix is to restore io.h for Versatile, but I'm looking for a
+> better way.
 
-no problems there. The point is that you already know which clock feed
-into which device, so if you have a device-based API for device
-soft-reset, you can figure out which exact clock to toggle, right ?
+It looks like it's a simple bug in pci.c, which puts the wrong thing into the
+pcibios_min_io variable.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120531/20cd9415/attachment-0001.sig>
+Does the below patch fix it?
+
+	Arnd
+
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index 4ae4fc8..aeb7b60 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -305,7 +305,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
+ 
+ void __init pci_versatile_preinit(void)
+ {
+-	pcibios_min_io = 0x44000000;
++	pcibios_min_io = 0x100;
+ 	pcibios_min_mem = 0x50000000;
+ 
+ 	__raw_writel(VERSATILE_PCI_MEM_BASE0 >> 28, PCI_IMAP0);
