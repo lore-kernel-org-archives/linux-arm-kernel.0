@@ -1,30 +1,78 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 31 May 2012 11:58:43 -0700
-Subject: [PATCH v2 2/2] arm: omap3: am35x: Disable hlt when using Davinci
- EMAC
-In-Reply-To: <1337105642-22711-3-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Tue, 15 May 2012 11:14:02 -0700")
-References: <1337105642-22711-1-git-send-email-mgreer@animalcreek.com>
- <1337105642-22711-3-git-send-email-mgreer@animalcreek.com>
-Message-ID: <871um018kc.fsf@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 31 May 2012 20:59:37 +0200
+Subject: [GIT PULL] i.MX common clock fixes
+In-Reply-To: <20120517094121.GY30400@pengutronix.de>
+References: <20120517094121.GY30400@pengutronix.de>
+Message-ID: <20120531185937.GF16535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+Hi Olof,
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> The am35x family of SoCs has a Davinci EMAC ethernet
-> controller on-chip.  Unfortunately, the EMAC is unable
-> to wake the PRCM when there is network activity which
-> leads to a hung or extremely slow system when the MPU
-> has executed a 'wfi' instruction (because of pm_idle
-> or CPUidle).  To prevent this, add hooks to the EMAC
-> pm_runtime suspend/resume calls so that hlt is disabled
-> whenever the EMAC is in use.
->
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Have you missed this one?
 
-Looks good,
+Sascha
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+On Thu, May 17, 2012 at 11:41:21AM +0200, Sascha Hauer wrote:
+> Hi Arnd, Olof,
+> 
+> Please pull the following fixes to the i.MX common clock conversion
+> based on the imx/clock branch in arm-soc.
+> 
+> Thanks
+>  Sascha
+> 
+> The following changes since commit 4f5a9fd341e8ffd825ecf56155df6fe6c3d732b1:
+> 
+>   Merge branch 'imx/pinctrl' into imx/clock (2012-05-14 15:30:52 +0200)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-clk-common-fixes
+> 
+> for you to fetch changes up to b0286f20c36d0c1e7537489daddaf574abf403dd:
+> 
+>   ARM: imx6q: prepare and enable init on clks directly instead of clk_get first (2012-05-16 12:46:23 +0200)
+> 
+> ----------------------------------------------------------------
+> Some fixes for the fresh i.MX common clock support
+> 
+> ----------------------------------------------------------------
+> Richard Zhao (2):
+>       ARM: i.MX: change timer clock from ipg to perclk
+>       ARM: imx6q: prepare and enable init on clks directly instead of clk_get first
+> 
+> Sascha Hauer (2):
+>       ARM i.MX5: fix gpt peripheral clock path
+>       ARM i.MX: remove now unnecessary argument from mxc_timer_init
+> 
+>  arch/arm/mach-imx/clk-imx1.c            |    3 +--
+>  arch/arm/mach-imx/clk-imx21.c           |    4 ++--
+>  arch/arm/mach-imx/clk-imx25.c           |    2 +-
+>  arch/arm/mach-imx/clk-imx27.c           |    3 +--
+>  arch/arm/mach-imx/clk-imx31.c           |    3 +--
+>  arch/arm/mach-imx/clk-imx35.c           |    6 ++----
+>  arch/arm/mach-imx/clk-imx51-imx53.c     |   12 +++++-------
+>  arch/arm/mach-imx/clk-imx6q.c           |   22 +++++++---------------
+>  arch/arm/plat-mxc/epit.c                |   11 ++++++++++-
+>  arch/arm/plat-mxc/include/mach/common.h |    4 ++--
+>  arch/arm/plat-mxc/time.c                |   24 ++++++++++++------------
+>  11 files changed, 44 insertions(+), 50 deletions(-)
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
