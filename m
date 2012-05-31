@@ -1,80 +1,85 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 31 May 2012 14:50:00 +0200
-Subject: [RFC PATCH] clk: add extension API
-In-Reply-To: <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com>
-References: <1338285540-24407-1-git-send-email-pdeschrijver@nvidia.com>
- <4FC5DFCF.1020606@codeaurora.org>
- <20120531075125.GL8026@tbergstrom-lnx.Nvidia.com>
- <20120531081841.GG5377@arwen.pp.htv.fi>
- <20120531083131.GQ8026@tbergstrom-lnx.Nvidia.com>
- <20120531085432.GK5377@arwen.pp.htv.fi>
- <20120531090518.GR8026@tbergstrom-lnx.Nvidia.com>
-Message-ID: <4FC768F8.4050406@ti.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 31 May 2012 15:49:58 +0300
+Subject: [RFC PATCH 11/11] ARM: DT: Add support to system control module
+ for OMAP4
+In-Reply-To: <4FC75EA8.6090406@dev.rtsoft.ru>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-12-git-send-email-eduardo.valentin@ti.com>
+ <4FC49BA5.5050008@dev.rtsoft.ru> <4FC5DC9F.7080104@ti.com>
+ <4FC5E2EE.8030504@dev.rtsoft.ru> <4FC5E7DE.2060905@ti.com>
+ <4FC75EA8.6090406@dev.rtsoft.ru>
+Message-ID: <20120531124958.GD3673@besouro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hello,
 
-On 5/31/2012 11:05 AM, Peter De Schrijver wrote:
->>
->> What if a module needs two clocks and you drive the reset on both of the
->> clocks ? What would happen ?
->>
->
-> Only 'leave clocks' have this reset method and a module can only have 1 of
-> them.
->
->>> but then we would have the keep a list of IDs (1 per module) which the drivers
->>> can use to call some tegra reset function which would in the end use registers
->>> in the same memory area to cause a reset. (the registers controlling
->>> modulereset are interleaved with those controlling the enable/disable of the
->>> main moduleclock and bitpositions are identical)
->>
->> Well, under a generic device-level API, you could just call an internal
->> clk_reset() function because you know which clocks feed into which
->> devices anyway. It could look something like:
->>
->> on Tegra:
->>
->> device_reset(dev)
->> 	->  dev_pm_domain->reset()
->> 		->  tegra_periph_reset()
->>
->
-> These methods are also needed internally by the powergating code.
->
->> on OMAP:
->>
->> device_reset(dev)
->> 	->  dev_pm_domain->reset()
->> 		->  omap_hwmod_reset()
->>
->>
->> btw:
->>
->> tegra_periph_reset(....)
->> {
->> 	tegra_periph_reset_assert(...);
->> 	udelay(2);
->> 	tegra_periph_reset_deassert(...);
->> }
->
-> which uses the clockframework currently.
+On Thu, May 31, 2012 at 04:06:00PM +0400, Konstantin Baydarov wrote:
+>   Hi.
+> 
+> On 05/30/2012 01:26 PM, Cousson, Benoit wrote:
+> > On 5/30/2012 11:05 AM, Konstantin Baydarov wrote:
+> >> On 05/30/2012 12:38 PM, Cousson, Benoit wrote:
+> >>> On 5/29/2012 11:49 AM, Konstantin Baydarov wrote:
+> >>>> Hi, Eduardo.
+> >>>>
+> >>>> On 05/25/2012 12:26 PM, Eduardo Valentin wrote:
+> >>>>> This patch add device tree entries on OMAP4 based boards for
+> >>>>> System Control Module (SCM).
+> >
+> > ...
+> >
+> >>>> I believe that CPU-specific bandgap definition should be moved to
+> >>>> bard specific dts.
+> >>>
+> >>> Mmm, why, since it is CPU specific and not board specific. I has to
+> >>> be in the SoC file.
+> >> Speaking about omap4430 - omap4430 bandgap differs from omap4460, so
+> >> if omap4430 bandgap support will be added to omap-bandgap driver the
+> >> version of bandgap should specified in dts file. omap4.dtsi is a
+> >> common for omap4 boards, that is why I'm suggesting to move bandgap
+> >> description to probably board specific file.
+> >
+> > OK, I got your point, but in that case we could potentially define a omap4460.dtsi file.
+> >
+> >> Another solution is to
+> >> determine bandgap type in driver probe function, but in that case
+> >> "ti,omap4460-bandgap" in omap4.dtsi should be replaced to
+> >> "ti,omap4-bandgap".
+> >
+> > Yes, this is the best solution, but that assume that we can identify the control module version from the HW, which is not necessarily true :-(
+> >
+> > The IP_REVISION (offset = 0) value are unfortunately not documented, so we should read it to check if they are different from omap4430 and 4460.
+> >
+> > The bitfield layout in that register is:
+> >
+> > IP_REV_MAJOR: 8..10
+> > IP_REV_CUSTOM: 6..7
+> > IP_REV_MINOR: 0..5
+> The value of CONTROL_GEN_CORE_REVISION register on my panda board(4430) is:
+> CONTROL_GEN_CORE_REVISION: 0x40000900
+> CONTROL_GEN_CORE_HWINFO:  0x0
+> 
+>   Eduardo, could you check CONTROL_GEN_CORE_REVISION on your 4460 board.
 
-Hehe, that a little bit why we had to introduce hwmod for OMAP.
-A HW IP cannot just be represented by a clock node like it used to be in 
-the good old time.
+4460:
+[root@(none) ~]# omapconf read 0x4A002000
+40000A00
+[root@(none) ~]# omapconf read 0x4A002004
+00000000
 
-Now the question is should we extend the Linux device structure to 
-handle such HW IP, or should we extend the clock definition to handle 
-this kind of extended clock node.
+4470:
+[root@(none) ~]# omapconf read 0x4A002000
+40000B00
+[root@(none) ~]# omapconf read 0x4A002004
+00000000
 
-It looks to me that this kind of function does belong to the device more 
-than to the clock node.
 
-FWIW, we do have as well issue managing properly the reset for OMAP IPs. 
-It is done using custom OMAP hooks today and hwmod whereas it looks like 
-it is really a common problem for SoC in general.
-
-Regards,
-Benoit
+> 
+>   BR,
+>     Konstantin Baydarov.
+> 
+> >
+> > Regards,
+> > Benoit
+> 
