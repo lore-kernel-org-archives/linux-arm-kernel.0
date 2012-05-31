@@ -1,108 +1,190 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Thu, 31 May 2012 13:51:22 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
-References: <4FAA34A9.5020708@gmail.com>
- <20120511085150.GA17453@mudshark.cambridge.arm.com>
- <4FC45E6B.2070202@gmail.com>
- <20120530063858.GB6484@mudshark.cambridge.arm.com>
- <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
- <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
- <4FC6E7CE.9090004@gmail.com>
- <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
- <4FC6FC38.8090904@gmail.com>
- <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
-Message-ID: <4FC706DA.5040308@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 May 2012 09:50:21 +0300
+Subject: [PATCHv2 19/19] ARM: OMAP4: powerdomain: update mpu / core off
+ counters during device off
+In-Reply-To: <CAOMWX4fV_UEOuUi3M0yT5QfyunAw7Gf85LoXOP2DquQzv=rB6w@mail.gmail.com>
+References: <1336990730-26892-1-git-send-email-t-kristo@ti.com>
+ <1336990730-26892-20-git-send-email-t-kristo@ti.com>
+ <CAOMWX4fV_UEOuUi3M0yT5QfyunAw7Gf85LoXOP2DquQzv=rB6w@mail.gmail.com>
+Message-ID: <1338447021.8834.161.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2012-05-30 at 16:08 -0500, Menon, Nishanth wrote:
+> On Mon, May 14, 2012 at 5:18 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> > Currently device off does not have any counters / timers of its own
+> > and it is impossible to track the time spent in this state. In device
+> > off, MPU / CORE powerdomains enter OSWR, so normally the RETENTION
+> > state times / counts are increased during device off.
+> >
+> > This patch adds a new field to the powerdomain struct for context loss
+> > register, which is checked during pwrdm_post_transition to see if
+> > a device off type context loss has happened. If this is the case,
+> > the counters + timers for OFF state are touched instead of RETENTION.
+> >
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    1 -
+> >  arch/arm/mach-omap2/powerdomain.c           |    9 +++++++++
+> >  arch/arm/mach-omap2/powerdomain.h           |    2 ++
+> >  arch/arm/mach-omap2/powerdomains44xx_data.c |    2 ++
+> >  arch/arm/mach-omap2/prm44xx.c               |   15 +++++++++++++++
+> >  arch/arm/mach-omap2/prm44xx.h               |    2 ++
+> >  6 files changed, 30 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > index 1f06f97..f187025 100644
+> > --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > @@ -404,7 +404,6 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+> >        if (omap4_device_prev_state_off()) {
+> >                omap4_dpll_resume_off();
+> >                omap4_cm_resume_off();
+> > -               omap4_device_clear_prev_off_state();
+> 
+> We should probably delete the function in it's entirety - not just the
+> call - the original implementation just clears L3 and this
+> implementation seems superior.
 
+Yeah, that can be done, I don't think it is used anymore after this
+change.
 
-On 2012?05?31? 13:19, Catalin Marinas wrote:
-> On 31 May 2012 13:06, bill4carson<bill4carson@gmail.com>  wrote:
->> On 2012?05?31? 11:58, Catalin Marinas wrote:
->>> I still didn't fully understand what the problem is. So, to make sure,
->>> if you run some applications from flash using a yaffs filesystem, you
->>> get random crashes. Is this correct? If yes, a solution is to actually
->>> call flush_dcache_page() on the CPU that does the page copying from
->>> flash into RAM, which could be the yaffs filesystem.
->>
->> The story goes like this:
->> function "flush_dcache_page" should be global effective
->> but in ARMv6 MPCore, it was not, it was just local effective due
->> to hardware design.
->
-> Yes, I know this.
->
-Then, why not fix "flush_dcache_page" to make it globally effective?
+> 
+> >        }
+> >
+> >  sar_save_failed:
+> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> > index 96ad3dbe..f13bb2c 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.c
+> > +++ b/arch/arm/mach-omap2/powerdomain.c
+> > @@ -156,6 +156,15 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+> >                break;
+> >        case PWRDM_STATE_PREV:
+> >                prev = pwrdm_read_prev_pwrst(pwrdm);
+> > +
+> > +               /*
+> > +                * If powerdomain has context offset defined, check if
+> > +                * the domain has lost context (i.e. entered off)
+> > +                */
+> > +               if (pwrdm->context_offs)
+> > +                       if (omap4_pwrdm_lost_context_rff(pwrdm->prcm_offs,
+> > +                                                        pwrdm->context_offs))
+> 
+> We should wrap this under pwrdm_lost_context(pwrdm)
+> pwrdm_lost_context should call the arch_pwrdm->lost_context_rff as
+> needed? the rest of the powerdomain.c does not use OMAP4 specific
+> APIs.
 
+Yes, that sounds like a good change, I'll change this.
 
->> This may cause error in some cases for example:
->>
->> 1) Task running on Core-0 loading text section into memory.
->>    It was preempted and then migrate into Core-1;
->
-> BTW, do you have CONFIG_PREEMPT enabled?
->
-Yes, CONFIG_PREEMPT enabled. Thus cause the task was preempted. :-)
+> 
+> 
+> > +                               prev = PWRDM_POWER_OFF;
+> >                if (pwrdm->state != prev)
+> >                        pwrdm->state_counter[prev]++;
+> >                if (prev == PWRDM_POWER_RET)
+> > diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+> > index 0d72a8a..a427645 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.h
+> > +++ b/arch/arm/mach-omap2/powerdomain.h
+> > @@ -82,6 +82,7 @@ struct powerdomain;
+> >  * @name: Powerdomain name
+> >  * @voltdm: voltagedomain containing this powerdomain
+> >  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
+> > + * @context_offs: the address offset for the CONTEXT register
+> >  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
+> >  * @pwrsts: Possible powerdomain power states
+> >  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
+> > @@ -106,6 +107,7 @@ struct powerdomain {
+> >                struct voltagedomain *ptr;
+> >        } voltdm;
+> >        const s16 prcm_offs;
+> > +       const s16 context_offs;
+> >        const u8 pwrsts;
+> >        const u8 pwrsts_logic_ret;
+> >        const u8 flags;
+> > diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> > index d8701ce..c4de02f 100644
+> > --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
+> > +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> > @@ -36,6 +36,7 @@ static struct powerdomain core_44xx_pwrdm = {
+> >        .voltdm           = { .name = "core" },
+> >        .prcm_offs        = OMAP4430_PRM_CORE_INST,
+> >        .prcm_partition   = OMAP4430_PRM_PARTITION,
+> > +       .context_offs     = OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET,
+> >        .pwrsts           = PWRSTS_RET_ON,
+> >        .pwrsts_logic_ret = PWRSTS_OFF_RET,
+> >        .banks            = 5,
+> > @@ -205,6 +206,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
+> >        .voltdm           = { .name = "mpu" },
+> >        .prcm_offs        = OMAP4430_PRM_MPU_INST,
+> >        .prcm_partition   = OMAP4430_PRM_PARTITION,
+> > +       .context_offs     = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
+> >        .pwrsts           = PWRSTS_RET_ON,
+> >        .pwrsts_logic_ret = PWRSTS_OFF_RET,
+> >        .banks            = 3,
+> 
+> Why are we not populating the rest of the CONTEXT_OFFSET registers?
 
+Well, the thing is, other domains don't have any 'spare' context
+registers that are not needed by anything else. Like, all the per domain
+context registers are used by some hwmod. If we grab the register for
+this use, then the context lost count for that hwmod will break.
 
-> To be clear - is your application reading some data from flash and
-> trying to execute or it's the kernel doing the load via the
-> page/prefetch abort mechanism?
->
+For PER domain, it might be possible to use RM_L4PER_L4_PER_CONTEXT
+though (it has two bit positions), but that is the only one missing...
+Other domains do go to OFF. L3_init domain doesn't have anything.
 
-In my current case, it is yaffs root file system.
+> 
+> > diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> > index 86c6c6b..de9132f 100644
+> > --- a/arch/arm/mach-omap2/prm44xx.c
+> > +++ b/arch/arm/mach-omap2/prm44xx.c
+> > @@ -289,6 +289,21 @@ static void __init omap44xx_prm_enable_io_wakeup(void)
+> >                        OMAP4_PRM_IO_PMCTRL_OFFSET);
+> >  }
+> >
+> > +bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset)
+> > +{
+> > +       u32 val;
+> > +
+> > +       val = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION, inst, offset);
+> > +
+> > +       if (val & OMAP4430_LOSTCONTEXT_RFF_MASK) {
+> > +               omap4_prminst_write_inst_reg(val, OMAP4430_PRM_PARTITION, inst,
+> > +                                            offset);
+> > +               return true;
+> > +       }
+> > +
+> > +       return false;
+> > +}
+> > +
+> 
+> could move to powerdomain4xx.c?
 
-> If the latter, task running on core 0 gets a prefetch abort when
-> trying to execute some code. The kernel reads the page from flash (via
-> mtd, block layer, VFS) and copies it into RAM. It can be on any CPU as
-> long as it calls flush_dcache_page on the same CPU that copied the
-> data.
->
-> No matter where the task was running or migrated to, if the code doing
-> the copy also called flush_dcache_page() on the same core, there is no
-> data left in the D-cache for that page.
+Yes, I'll do that.
 
-Yes, I agree with it.
-But how to flush the data cache on the same core with PREEMPT enabled?
-And, I think according to the design, there is no such operation that
-guarantee it.
+-Tero
 
-
->
->> 2) On Core-1, this task continue loading it and then
->>    "flush_dcache_page" to make sure the loaded text section write
->>    into main memory.
->
-> The flush_dcache_page() must be called by the code doing the copy. If
-> that copy happened on core 0, the call is done there and not where the
-> task migrated. We don't do lazy flushing on ARM11MPCore.
->
-WHY?
-
->> 3) Task tend to the loaded text section and running it.
->>
->> If the "flush_dcache_page" was not global effective,
->> there maybe data still in Core-0's data cache, not write
->> into main memory. Thus in step 3, error instruction maybe
->> fetched thus cause strange error.
->
-> This can only happen if you have either preempt enabled (so that the
-> kernel code doing the copy is migrated) or the mtd driver or fs do not
-> call flush_dcache_page().
->
-
-
-PREEMPT + MTD root file system. :-)
-
-But any way, I think flush_dcache_page should be global effective.
-If ARMv6 MPCore didn't make it, we should try to accomplish it.
-
-
-
--- 
-Love each day!
-
---bill
+> 
+> >  /**
+> >  * omap4_device_set_state_off() - setup device off state
+> >  * @enable:    set to off or not.
+> > diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+> > index ee72ae6..fa76d9c 100644
+> > --- a/arch/arm/mach-omap2/prm44xx.h
+> > +++ b/arch/arm/mach-omap2/prm44xx.h
+> > @@ -771,6 +771,8 @@ extern void omap44xx_prm_ocp_barrier(void);
+> >  extern void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask);
+> >  extern void omap44xx_prm_restore_irqen(u32 *saved_mask);
+> >
+> > +extern bool omap4_pwrdm_lost_context_rff(s16 inst, s16 offset);
+> we dont need to do this if we use arch_pwrdm->
+> > +
+> >  # endif
+> >
+> >  #endif
+> 
+> ---
+> Regards,
+> Nishanth Menon
