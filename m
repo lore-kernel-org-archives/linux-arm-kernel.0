@@ -1,90 +1,39 @@
-From: marc@plastictigers.com (Marc Butler)
-Date: Thu, 31 May 2012 20:16:17 -0400
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-Message-ID: <20120601001617.GA16311@plastictigers.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 May 2012 20:41:35 -0500
+Subject: [PATCH V4 0/4] ARM: OMAP3+: VP: collate fixes
+Message-ID: <1338514899-3560-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 07:11:33PM -0600, Sagar Dharia wrote:
-> SLIMbus (Serial Low Power Interchip Media Bus) is a specification
-> developed by MIPI (Mobile Industry Processor Interface) alliance.
+Reviewing the android code base brought out a few fixes that upstream
+does not have, so collating them and posting them out in this chain.
 
-These are initial comments. A full review of the patch will take some
-time. While I am posting this email, this is the result of work both
-by myself, and my colleague Greg Clemson (cc'ed).
+Nishanth Menon (3):
+  ARM: OMAP3+: PM: VP: check only the VPINIDLE status bit
+  ARM: OMAP3+: PM: VP: move check of idle to separate function
+  ARM: OMAP3+: PM: VP: check to ensure VP is idle before forceupdate
 
-1. enum slim_ch_proto
+Wenbiao Wang (1):
+  ARM: OMAP3+: PM: VP: ensure VP is idle before disable
 
-The enumeration slim_ch_proto is incorrect. It declares 2 transport
-protocols which do not exist in the specification: SLIM_HARD_ISO;
-SLIM_AUTO_ISO.
+ arch/arm/mach-omap2/vp.c          |   65 +++++++++++++++++++++++++++++++------
+ arch/arm/mach-omap2/vp.h          |   10 ++++--
+ arch/arm/mach-omap2/vp3xxx_data.c |    1 +
+ arch/arm/mach-omap2/vp44xx_data.c |    1 +
+ 4 files changed, 65 insertions(+), 12 deletions(-)
 
-This in turn causes the subsequent values for the other protocols such
-as SLIM_PUSH, to be incorrectly coded in the NEXT_DEFINE_CHANNEL
-message generated in slim_reconfigure_now(). That is the push protocol
-is incorrectly encoded as 3 instead of 2 as per the specification
-(Table 47).
+Changes in v4:
+	vp idle moved off to a seperate function
+	reordered patches to reduce loc changes
+	rate controlled warnings
 
-I believe a correct definition would be:
+Previous revs:
+	V1: http://marc.info/?l=linux-omap&m=133736976423629&w=2
 
-enum slim_ch_proto {
-        SLIM_ISO,
-	SLIM_PUSH,
-	SLIM_PULL,
-	SLIM_LOCKED,
-	SLIM_ASYNC_SMPLX,
-	SLIM_ASYNC_HALF_DUP,
-	SLIM_EXT_SMPLX,
-	SLIM_EXT_HALF_DUP,
-	SLIM_USER_DEF1 = 14,
-	SLIM_USER_DEF2 = 15
-};
-
-However doing so will break the logic in slim_nextdefine_ch().
-
-2. Use of the term elemental address.
-
-Commentary around the use of struct slim_eaddr uses the term
-"elemental address". However, the term used in the specification is
-"enumeration address". There is no elemental address in the
-specification, and using this term may result confusion when referring
-to accessing the information and value elements.
-
-I suggest that term "enumeration address" should be used. 
-
-3. Probing sequence for drivers.
-
-The current probing sequence for drivers appears to make some
-assumptions, that are problematic.
-
-a) The code assumes that when the controller is registered the bus is
-operational (booted). No allowance is made for any problems the active
-framer may have synchronizing the bus. 
-
-The drivers really should not be probed until the bus has at least
-booted. This can be worked around by only registering the controller
-after it has booted the bus. This should be noted in the comments.
-
-b) Similarly to (a) the driver may be probed before the device has
-been given a logical address (LA). This makes sense in the case of
-driver that turns on the device (say via gpio) once the bus has
-booted. However, the driver then needs to sit and poll
-slim_get_logical_addr() until the logical address.
-
-A possible alternate solution would be to add a parameter to probe:
-
-enum slim_dev_status {
-        SLIM_BUS_READY,
-	SLIM_DEV_READY
-};
-
-int (*probe)(struct slim_device *sldev, enum slim_dev_status status);
-
-Where SLIM_BUS_READY == bus has booted, and SLIM_DEV_READY == device
-has been assigned its logical address.
-
-Alternatively you could have 2 separate probe type callbacks. 
-
-This would make the driver logical simpler.
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+--
+Regards,
+Nishanth Menon
+-- 
+1.7.9.5
