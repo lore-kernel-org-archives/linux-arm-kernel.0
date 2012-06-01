@@ -1,45 +1,63 @@
-From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Fri, 1 Jun 2012 12:44:16 +0800
-Subject: [PATCHv2 3/3] watchdog: omap_wdt: add device tree support
-In-Reply-To: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
-References: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
-Message-ID: <1338525856-4359-4-git-send-email-jgq516@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 01 Jun 2012 12:36:28 +0800
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <20120530164152.GP9947@opensource.wolfsonmicro.com>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbQv8Q07iRAmG3UQRm7UNDi_Y+s_vvACDKKxR9tg+1iqg@mail.gmail.com>
+ <20120530100302.GD9947@opensource.wolfsonmicro.com>
+ <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
+ <20120530121547.GJ9947@opensource.wolfsonmicro.com>
+ <4FC63632.4030504@linaro.org>
+ <20120530151119.GN9947@opensource.wolfsonmicro.com>
+ <4FC63B39.6040905@linaro.org>
+ <20120530164152.GP9947@opensource.wolfsonmicro.com>
+Message-ID: <4FC846CC.20801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiao Jiang <jgq516@gmail.com>
+On 31/05/12 00:41, Mark Brown wrote:
+> On Wed, May 30, 2012 at 11:22:33PM +0800, Lee Jones wrote:
+>> On 30/05/12 23:11, Mark Brown wrote:
+>
+>>>> 	vin-supply =<&db8500_vape_reg>;
+>>>> 	vmmc-supply =<&ab8500_ldo_aux2_reg>;
+>
+>>> Oh, oops.  This is going to be fun when someone puts down two of the
+>>> same PMIC on a system...
+>
+>> What does that mean sorry?
+>
+> Lots of regulators are using this mechanism for identifying child nodes.
+> If the node name is also used as a handle by other things to reference
+> the regulator then if you have two PMICs of the same type DTC isn't
+> going to be able to figure out which node you mean.
 
-Add device table for omap_wdt to support dt.
+Yes, so it doesn't look like this is an issue.
 
-Signed-off-by: Xiao Jiang <jgq516@gmail.com>
----
- drivers/watchdog/omap_wdt.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+This:
 
-diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-index 8285d65..02ebfd5 100644
---- a/drivers/watchdog/omap_wdt.c
-+++ b/drivers/watchdog/omap_wdt.c
-@@ -430,6 +430,12 @@ static int omap_wdt_resume(struct platform_device *pdev)
- #define	omap_wdt_resume		NULL
- #endif
- 
-+static const struct of_device_id omap_wdt_of_match[] = {
-+	{ .compatible = "ti,omap3-wdt", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
-+
- static struct platform_driver omap_wdt_driver = {
- 	.probe		= omap_wdt_probe,
- 	.remove		= __devexit_p(omap_wdt_remove),
-@@ -439,6 +445,7 @@ static struct platform_driver omap_wdt_driver = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "omap_wdt",
-+		.of_match_table = omap_wdt_of_match,
- 	},
- };
- 
+> sdi at 80126000 {
+>          vmmc-supply = <&ab8500_ldo_aux3_reg>;
+> };
+
+Is the same as, and will cause no more issues than:
+
+> static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
+>         REGULATOR_SUPPLY("vmmc", "sdi0"),
+> };
+
+... because only nodes which we care about (dictated by compatible 
+declaration protections) will be parsed. So different platforms will not 
+affect each other.
+
+Kind regards,
+Lee
+
 -- 
-1.7.3
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
