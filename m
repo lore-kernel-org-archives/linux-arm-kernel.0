@@ -1,179 +1,192 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 1 Jun 2012 12:08:18 +0200
-Subject: [PATCH v3] ARM: at91: aic can use fast eoi handler type
-Message-ID: <1338545298-6687-1-git-send-email-ludovic.desroches@atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri,  1 Jun 2012 18:13:12 +0800
+Subject: [PATCH v10 1/3] MTD: at91: extract hw ecc initialization to one
+ function
+In-Reply-To: <1338545594-18483-1-git-send-email-josh.wu@atmel.com>
+References: <1338545594-18483-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1338545594-18483-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+This patch moves hw ecc initialization code to one function.
 
-The Advanced Interrupt Controller allows to use the fast EOI handler type.
-It lets remove the Atmel specific workaround into arch/arm/kernel/irq.c used
-to indicate to the AIC the end of the interrupt treatment.
-Removing irq_finish from handle_IRQ involves to manage it in the gpio irq
-handler.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
+ drivers/mtd/nand/atmel_nand.c |  127 +++++++++++++++++++++--------------------
+ 1 file changed, 66 insertions(+), 61 deletions(-)
 
-Hi,
-
-This patch removes the at91 workaround from handle_IRQ.
-
-I tested it on at91sam9m10g45 but if you see some potential issues please let
-me know.
-
-v3:
-- use of chained_irq_enter and chained_irq_exit in gpio handler
-v2:
-- remove stuff which is no more used thanks to Will's patch: irq_finish macro,
-irq_ack.
-- gpio controller was using irq_ack instead of irq_mask.
-- gpio irq handler has to mark the end of interrupt since it is no more done
-in handle_IRQ.
-
- arch/arm/kernel/irq.c                  |   10 ----------
- arch/arm/mach-at91/gpio.c              |    9 +++++----
- arch/arm/mach-at91/include/mach/irqs.h |    7 -------
- arch/arm/mach-at91/irq.c               |   15 ++++++++++++---
- 4 files changed, 17 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 71ccdbf..3e50d71 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -40,13 +40,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
--/*
-- * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
-- */
--#ifndef irq_finish
--#define irq_finish(irq) do { } while (0)
--#endif
--
- unsigned long irq_err_count;
- 
- int arch_show_interrupts(struct seq_file *p, int prec)
-@@ -85,9 +78,6 @@ void handle_IRQ(unsigned int irq, struct pt_regs *regs)
- 		generic_handle_irq(irq);
- 	}
- 
--	/* AT91 specific workaround */
--	irq_finish(irq);
--
- 	irq_exit();
- 	set_irq_regs(old_regs);
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 2165576..4ea0a04 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -523,6 +523,66 @@ static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
  }
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 325837a..be42cf0 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -26,6 +26,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_gpio.h>
+ #endif
  
-+#include <asm/mach/irq.h>
-+
- #include <mach/hardware.h>
- #include <mach/at91_pio.h>
- 
-@@ -585,15 +587,14 @@ static struct irq_chip gpio_irqchip = {
- 
- static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	struct irq_data *idata = irq_desc_get_irq_data(desc);
--	struct irq_chip *chip = irq_data_get_irq_chip(idata);
- 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(idata);
- 	void __iomem	*pio = at91_gpio->regbase;
- 	unsigned long	isr;
- 	int		n;
- 
--	/* temporarily mask (level sensitive) parent IRQ */
--	chip->irq_ack(idata);
-+	chained_irq_enter(chip, desc);
- 	for (;;) {
- 		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
- 		 * When there none are pending, we're finished unless we need
-@@ -614,7 +615,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
- 		}
- 	}
--	chip->irq_unmask(idata);
-+	chained_irq_exit(chip, desc);
- 	/* now it may re-trigger */
- }
- 
-diff --git a/arch/arm/mach-at91/include/mach/irqs.h b/arch/arm/mach-at91/include/mach/irqs.h
-index ac8b7df..2d510ee 100644
---- a/arch/arm/mach-at91/include/mach/irqs.h
-+++ b/arch/arm/mach-at91/include/mach/irqs.h
-@@ -28,13 +28,6 @@
- 
- 
- /*
-- * Acknowledge interrupt with AIC after interrupt has been handled.
-- *   (by kernel/irq.c)
-- */
--#define irq_finish(irq) do { at91_aic_write(AT91_AIC_EOICR, 0); } while (0)
--
--
--/*
-  * IRQ interrupt symbols are the AT91xxx_ID_* symbols
-  * for IRQs handled directly through the AIC, or else the AT91_PIN_*
-  * symbols in gpio.h for ones handled indirectly as GPIOs.
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index 601b4ee..8e6ac53 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -55,6 +55,15 @@ static void at91_aic_unmask_irq(struct irq_data *d)
- 	at91_aic_write(AT91_AIC_IECR, 1 << d->hwirq);
- }
- 
-+static void at91_aic_eoi(struct irq_data *d)
++static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
++					 struct atmel_nand_host *host)
 +{
-+	/*
-+	 * Mark end-of-interrupt on AIC, the controller doesn't care about
-+	 * the value written. Moreover it's a write-only register.
-+	 */
-+	at91_aic_write(AT91_AIC_EOICR, 0);
++	struct mtd_info *mtd = &host->mtd;
++	struct nand_chip *nand_chip = &host->nand_chip;
++	struct resource		*regs;
++
++	regs = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!regs) {
++		dev_err(host->dev,
++			"Can't get I/O resource regs, use software ECC\n");
++		nand_chip->ecc.mode = NAND_ECC_SOFT;
++		return 0;
++	}
++
++	host->ecc = ioremap(regs->start, resource_size(regs));
++	if (host->ecc == NULL) {
++		dev_err(host->dev, "ioremap failed\n");
++		return -EIO;
++	}
++
++	/* ECC is calculated for the whole page (1 step) */
++	nand_chip->ecc.size = mtd->writesize;
++
++	/* set ECC page size and oob layout */
++	switch (mtd->writesize) {
++	case 512:
++		nand_chip->ecc.layout = &atmel_oobinfo_small;
++		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_528);
++		break;
++	case 1024:
++		nand_chip->ecc.layout = &atmel_oobinfo_large;
++		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_1056);
++		break;
++	case 2048:
++		nand_chip->ecc.layout = &atmel_oobinfo_large;
++		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_2112);
++		break;
++	case 4096:
++		nand_chip->ecc.layout = &atmel_oobinfo_large;
++		ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_4224);
++		break;
++	default:
++		/* page size not handled by HW ECC */
++		/* switching back to soft ECC */
++		nand_chip->ecc.mode = NAND_ECC_SOFT;
++		return 0;
++	}
++
++	/* set up for HW ECC */
++	nand_chip->ecc.calculate = atmel_nand_calculate;
++	nand_chip->ecc.correct = atmel_nand_correct;
++	nand_chip->ecc.hwctl = atmel_nand_hwctl;
++	nand_chip->ecc.read_page = atmel_nand_read_page;
++	nand_chip->ecc.bytes = 4;
++	nand_chip->ecc.strength = 1;
++
++	return 0;
 +}
 +
- unsigned int at91_extern_irq;
+ /*
+  * Probe for the NAND device.
+  */
+@@ -531,7 +591,6 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	struct atmel_nand_host *host;
+ 	struct mtd_info *mtd;
+ 	struct nand_chip *nand_chip;
+-	struct resource *regs;
+ 	struct resource *mem;
+ 	struct mtd_part_parser_data ppdata = {};
+ 	int res;
+@@ -583,29 +642,6 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		nand_chip->dev_ready = atmel_nand_device_ready;
  
- #define is_extern_irq(hwirq) ((1 << (hwirq)) & at91_extern_irq)
-@@ -128,11 +137,11 @@ void at91_irq_resume(void)
+ 	nand_chip->ecc.mode = host->board.ecc_mode;
+-
+-	regs = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!regs && nand_chip->ecc.mode == NAND_ECC_HW) {
+-		printk(KERN_ERR "atmel_nand: can't get I/O resource "
+-				"regs\nFalling back on software ECC\n");
+-		nand_chip->ecc.mode = NAND_ECC_SOFT;
+-	}
+-
+-	if (nand_chip->ecc.mode == NAND_ECC_HW) {
+-		host->ecc = ioremap(regs->start, resource_size(regs));
+-		if (host->ecc == NULL) {
+-			printk(KERN_ERR "atmel_nand: ioremap failed\n");
+-			res = -EIO;
+-			goto err_ecc_ioremap;
+-		}
+-		nand_chip->ecc.calculate = atmel_nand_calculate;
+-		nand_chip->ecc.correct = atmel_nand_correct;
+-		nand_chip->ecc.hwctl = atmel_nand_hwctl;
+-		nand_chip->ecc.read_page = atmel_nand_read_page;
+-		nand_chip->ecc.bytes = 4;
+-		nand_chip->ecc.strength = 1;
+-	}
+-
+ 	nand_chip->chip_delay = 20;		/* 20us command delay time */
  
- static struct irq_chip at91_aic_chip = {
- 	.name		= "AIC",
--	.irq_ack	= at91_aic_mask_irq,
- 	.irq_mask	= at91_aic_mask_irq,
- 	.irq_unmask	= at91_aic_unmask_irq,
- 	.irq_set_type	= at91_aic_set_type,
- 	.irq_set_wake	= at91_aic_set_wake,
-+	.irq_eoi	= at91_aic_eoi,
- };
- 
- static void __init at91_aic_hw_init(unsigned int spu_vector)
-@@ -171,7 +180,7 @@ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
- 	/* Active Low interrupt, without priority */
- 	at91_aic_write(AT91_AIC_SMR(hw), AT91_AIC_SRCTYPE_LOW);
- 
--	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_level_irq);
-+	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
- 	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
- 
- 	return 0;
-@@ -271,7 +280,7 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 		/* Active Low interrupt, with the specified priority */
- 		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
- 
--		irq_set_chip_and_handler(i, &at91_aic_chip, handle_level_irq);
-+		irq_set_chip_and_handler(i, &at91_aic_chip, handle_fasteoi_irq);
- 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+ 	if (host->board.bus_width_16)	/* 16-bit bus width */
+@@ -657,40 +693,9 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
  	}
  
+ 	if (nand_chip->ecc.mode == NAND_ECC_HW) {
+-		/* ECC is calculated for the whole page (1 step) */
+-		nand_chip->ecc.size = mtd->writesize;
+-
+-		/* set ECC page size and oob layout */
+-		switch (mtd->writesize) {
+-		case 512:
+-			nand_chip->ecc.layout = &atmel_oobinfo_small;
+-			ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_528);
+-			break;
+-		case 1024:
+-			nand_chip->ecc.layout = &atmel_oobinfo_large;
+-			ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_1056);
+-			break;
+-		case 2048:
+-			nand_chip->ecc.layout = &atmel_oobinfo_large;
+-			ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_2112);
+-			break;
+-		case 4096:
+-			nand_chip->ecc.layout = &atmel_oobinfo_large;
+-			ecc_writel(host->ecc, MR, ATMEL_ECC_PAGESIZE_4224);
+-			break;
+-		default:
+-			/* page size not handled by HW ECC */
+-			/* switching back to soft ECC */
+-			nand_chip->ecc.mode = NAND_ECC_SOFT;
+-			nand_chip->ecc.calculate = NULL;
+-			nand_chip->ecc.correct = NULL;
+-			nand_chip->ecc.hwctl = NULL;
+-			nand_chip->ecc.read_page = NULL;
+-			nand_chip->ecc.postpad = 0;
+-			nand_chip->ecc.prepad = 0;
+-			nand_chip->ecc.bytes = 0;
+-			break;
+-		}
++		res = atmel_hw_nand_init_params(pdev, host);
++		if (res != 0)
++			goto err_hw_ecc;
+ 	}
+ 
+ 	/* second phase scan */
+@@ -707,15 +712,15 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		return res;
+ 
+ err_scan_tail:
++	if (host->ecc)
++		iounmap(host->ecc);
++err_hw_ecc:
+ err_scan_ident:
+ err_no_card:
+ 	atmel_nand_disable(host);
+ 	platform_set_drvdata(pdev, NULL);
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
+-	if (host->ecc)
+-		iounmap(host->ecc);
+-err_ecc_ioremap:
+ 	iounmap(host->io_base);
+ err_nand_ioremap:
+ 	kfree(host);
 -- 
-1.7.5.4
+1.7.10
