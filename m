@@ -1,30 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Jun 2012 00:26:13 -0300
-Subject: [PATCH] ARM: mxs: Enable MACH_APX4DEVKIT
-Message-ID: <1338521173-32357-1-git-send-email-festevam@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Jun 2012 11:29:13 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC81C14.7030702@gmail.com>
+References: <4FC6E7CE.9090004@gmail.com>
+ <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+ <4FC6FC38.8090904@gmail.com>
+ <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
+ <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
+ <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
+ <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
+ <4FC81C14.7030702@gmail.com>
+Message-ID: <20120601032912.GB16273@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jun 01, 2012 at 02:34:12AM +0100, snakky.zhang at gmail.com wrote:
+> >> Yes, seems newer CPUs has no such limitation thus this function is global
+> >> effective naturally. :-)
+> >>
+> >> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
+> >> Details in arch/mips/mm/c-r4k.c.
+> > Rather than IPI we would better use the read-for-ownership trick like
+> > in this patch to make flush_dcache_page global (no need for
+> > write-for-ownership):
+> >
+> > http://dchs.spinics.net/lists/arm-kernel/msg125075.html
+> >
+> > (it may no longer apply, I haven't checked it for some time).
+> >
+> > That's the first thing. Secondly you still need preemption disable so
+> > that it is not preempted between RFO and the actual cache cleaning.
+> >
+> And, another confusion for PREEMPT: Even if we disable preempt, with locally
+> effective flush_dcache_xxx, there is still possibility to reproduce such
+> issue(Similar with the previous case):
+> 
+> 1) Task running on Core-0 loading text section into memory.
+>      It was schedule out and then migrate into Core-1;
+> 2) On Core-1, this task continue loading it and then
+>      "flush_dcache_page" to make sure the loaded text section write
+>      into main memory.
+> 3) Task tend to the loaded text section and running it.
+> 
+> Similar as the previous case, the difference lies in step1 that the
+> task was interrupted by timer interrupt. Thus it still can be switch
+> out and then been migrate to another core. Thus in step2 and 3, this
+> issue may still been reproduced.  So, disable preempt can only lower
+> the possibility of this issue but can't avoid it.
 
-Enable MACH_APX4DEVKIT to be built by default.
+It would work as long as the data copying into the text area (done by
+the driver and VFS layer) and the flush_dcache_page() sequence are not
+preemptible. A timer interrupt between data copying and
+flush_dcache_page() would interrupt a kernel routine which is not
+preemptible.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 5406c23..ce97c33 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -28,6 +28,7 @@ CONFIG_MACH_MX28EVK=y
- CONFIG_MACH_STMP378X_DEVB=y
- CONFIG_MACH_TX28=y
- CONFIG_MACH_M28EVK=y
-+CONFIG_MACH_APX4DEVKIT=y
- # CONFIG_ARM_THUMB is not set
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
 -- 
-1.7.1
+Catalin
