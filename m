@@ -1,96 +1,74 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  1 Jun 2012 09:45:33 +0200
-Subject: [PATCH v2] Visstrim M10: fix gpio handling.
-Message-ID: <1338536733-11092-1-git-send-email-javier.martin@vista-silicon.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Fri, 1 Jun 2012 09:45:56 +0200
+Subject: [PATCH v2] ARM: at91: aic can use fast eoi handler type
+In-Reply-To: <20120601032442.GA11721@mudshark.cambridge.arm.com>
+References: <1338474704-16665-1-git-send-email-ludovic.desroches@atmel.com>
+ <20120601032442.GA11721@mudshark.cambridge.arm.com>
+Message-ID: <4FC87334.90303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIOs in Visstrim M10 are used without being registered.
-This leads to USB and video malfunctions. This patch registers
-those GPIOs to solve the issue.
+Hi Will,
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
-Request all gpios using a single gpio_request_array() call.
+Le 06/01/2012 05:24 AM, Will Deacon a ?crit :
+> Hi Ludovic,
+>
+> Thanks for the update. Few comments inline.
+>
+> On Thu, May 31, 2012 at 03:31:44PM +0100, ludovic.desroches at atmel.com wrote:
+>> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+>> index 325837a..a8bd715 100644
+>> --- a/arch/arm/mach-at91/gpio.c
+>> +++ b/arch/arm/mach-at91/gpio.c
+>> @@ -593,7 +593,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>>   	int		n;
+>>
+>>   	/* temporarily mask (level sensitive) parent IRQ */
+>> -	chip->irq_ack(idata);
+>> +	chip->irq_mask(idata);
+>
+> You don't need to mask the IRQ for fasteoi. However, you shouldn't be coding
+> the flow control like this -- use chained_irq_enter instead.
+>
+>>   	for (;;) {
+>>   		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
+>>   		 * When there none are pending, we're finished unless we need
+>> @@ -614,6 +614,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>>   			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
+>>   		}
+>>   	}
+>> +	chip->irq_eoi(idata);
+>
+> chained_irq_exit.
 
----
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   36 ++++++++++++++++++--------
- 1 files changed, 25 insertions(+), 11 deletions(-)
+Thanks I was not aware about this two functions.
 
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index e8741f9..f00c0cc 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -116,6 +116,8 @@ static const int visstrim_m10_pins[] __initconst = {
- 	PB23_PF_USB_PWR,
- 	PB24_PF_USB_OC,
- 	/* CSI */
-+	TVP5150_RSTN | GPIO_GPIO | GPIO_OUT,
-+	TVP5150_PWDN | GPIO_GPIO | GPIO_OUT,
- 	PB10_PF_CSI_D0,
- 	PB11_PF_CSI_D1,
- 	PB12_PF_CSI_D2,
-@@ -138,6 +140,24 @@ static const int visstrim_m10_pins[] __initconst = {
- 	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
- };
- 
-+static const struct gpio visstrim_m10_gpios[] __initconst = {
-+	{
-+		.gpio = TVP5150_RSTN,
-+		.flags = GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
-+		.label = "tvp5150_rstn",
-+	},
-+	{
-+		.gpio = TVP5150_PWDN,
-+		.flags = GPIOF_DIR_OUT | GPIOF_INIT_LOW,
-+		.label = "tvp5150_pwdn",
-+	},
-+	{
-+		.gpio = OTG_PHY_CS_GPIO,
-+		.flags = GPIOF_DIR_OUT | GPIOF_INIT_LOW,
-+		.label = "usbotg_cs",
-+	},
-+};
-+
- /* Camera */
- static int visstrim_camera_power(struct device *dev, int on)
- {
-@@ -181,13 +201,6 @@ static void __init visstrim_camera_init(void)
- 	struct platform_device *pdev;
- 	int dma;
- 
--	/* Initialize tvp5150 gpios */
--	mxc_gpio_mode(TVP5150_RSTN | GPIO_GPIO | GPIO_OUT);
--	mxc_gpio_mode(TVP5150_PWDN | GPIO_GPIO | GPIO_OUT);
--	gpio_set_value(TVP5150_RSTN, 1);
--	gpio_set_value(TVP5150_PWDN, 0);
--	ndelay(1);
--
- 	gpio_set_value(TVP5150_PWDN, 1);
- 	ndelay(1);
- 	gpio_set_value(TVP5150_RSTN, 0);
-@@ -414,10 +427,6 @@ static struct i2c_board_info visstrim_m10_i2c_devices[] = {
- /* USB OTG */
- static int otg_phy_init(struct platform_device *pdev)
- {
--	gpio_set_value(OTG_PHY_CS_GPIO, 0);
--
--	mdelay(10);
--
- 	return mx27_initialize_usb_hw(pdev->id, MXC_EHCI_POWER_PINS_ENABLED);
- }
- 
-@@ -474,6 +483,11 @@ static void __init visstrim_m10_board_init(void)
- 	if (ret)
- 		pr_err("Failed to setup pins (%d)\n", ret);
- 
-+	ret = gpio_request_array(visstrim_m10_gpios,
-+				ARRAY_SIZE(visstrim_m10_gpios));
-+	if (ret)
-+		pr_err("Failed to request gpios (%d)\n", ret);
-+
- 	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
- 	imx27_add_imx_uart0(&uart_pdata);
- 
--- 
-1.7.0.4
+>
+>> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+>> index 601b4ee..3aa18a6 100644
+>> --- a/arch/arm/mach-at91/irq.c
+>> +++ b/arch/arm/mach-at91/irq.c
+>> @@ -55,6 +55,15 @@ static void at91_aic_unmask_irq(struct irq_data *d)
+>>   	at91_aic_write(AT91_AIC_IECR, 1<<  d->hwirq);
+>>   }
+>>
+>> +static void at91_aic_eoi(struct irq_data *d)
+>> +{
+>> +	/*
+>> +	 * Mark end-of-interrupt on AIC, the controller doesn't care about
+>> +	 * the value written in this register.
+>> +	 */
+>> +	at91_aic_write(AT91_AIC_EOICR, 0);
+>> +}
+>
+> Does the EOICR read as zero, or can you read back the value which you wrote?
+> In the latter case, writing the interrupt number can be a useful debugging
+> aid when you have to debug IRQ issues with JTAG. Your call.
+
+It is a write only register so value read back is 0. Moreover there is a 
+new version of AIC where writing '1 << d->hwirq' as no more sense since 
+we have an interrupt select register.
+
+Regards
+
+Ludovic
