@@ -1,4151 +1,659 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 1 Jun 2012 17:38:05 +0530
-Subject: [RFC 24/24] ARM: omap2: clk: Delete old OMAP clock data
+Date: Fri, 1 Jun 2012 17:37:58 +0530
+Subject: [RFC 17/24] ARM: omap: clk: Use plat clock.c & clock.h only for OMAP1
 In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
 References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-Message-ID: <1338552485-31325-25-git-send-email-rnayak@ti.com>
+Message-ID: <1338552485-31325-18-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have switched to using new common clk
-data for OMAP2, delete the old one.
+Get rid of all OMAP2+ content from plat/clock.h and use it along with
+plat/clock.c only for OMAP1.
+Get rid of all '#include <plat/clock.h>' from OMAP2+ files.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/clock2420_data.c | 2009 --------------------------------
- arch/arm/mach-omap2/clock2430_data.c | 2108 ----------------------------------
- 2 files changed, 0 insertions(+), 4117 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clock2420_data.c
- delete mode 100644 arch/arm/mach-omap2/clock2430_data.c
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |    1 -
+ arch/arm/mach-omap2/clkt2xxx_dpll.c          |    2 -
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |    1 -
+ arch/arm/mach-omap2/clkt2xxx_osc.c           |    2 -
+ arch/arm/mach-omap2/clkt2xxx_sys.c           |    2 -
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    1 -
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |    1 -
+ arch/arm/mach-omap2/clkt_clksel.c            |    2 -
+ arch/arm/mach-omap2/clkt_dpll.c              |    1 -
+ arch/arm/mach-omap2/clkt_iclk.c              |    1 -
+ arch/arm/mach-omap2/clock.c                  |    1 -
+ arch/arm/mach-omap2/clock.h                  |    6 -
+ arch/arm/mach-omap2/clock2430.c              |    1 -
+ arch/arm/mach-omap2/clock2xxx.c              |    1 -
+ arch/arm/mach-omap2/clock34xx.c              |    2 -
+ arch/arm/mach-omap2/clock3517.c              |    2 -
+ arch/arm/mach-omap2/clock36xx.c              |    2 -
+ arch/arm/mach-omap2/clock3xxx.c              |    1 -
+ arch/arm/mach-omap2/clockdomain.c            |    1 -
+ arch/arm/mach-omap2/clockdomain.h            |    1 -
+ arch/arm/mach-omap2/common.c                 |    1 -
+ arch/arm/mach-omap2/dpll3xxx.c               |    1 -
+ arch/arm/mach-omap2/dpll44xx.c               |    1 -
+ arch/arm/mach-omap2/omap_hwmod.c             |    1 -
+ arch/arm/mach-omap2/pm-debug.c               |    1 -
+ arch/arm/mach-omap2/pm24xx.c                 |    1 -
+ arch/arm/mach-omap2/sdram-nokia.c            |    1 -
+ arch/arm/mach-omap2/sdrc.c                   |    1 -
+ arch/arm/mach-omap2/sdrc2xxx.c               |    1 -
+ arch/arm/plat-omap/Makefile                  |    3 +-
+ arch/arm/plat-omap/clock.c                   |    2 -
+ arch/arm/plat-omap/counter_32k.c             |    2 -
+ arch/arm/plat-omap/include/plat/clock.h      |  140 --------------------------
+ drivers/spi/spi-omap2-mcspi.c                |    1 -
+ 34 files changed, 2 insertions(+), 187 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-deleted file mode 100644
-index bace930..0000000
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ /dev/null
-@@ -1,2009 +0,0 @@
--/*
-- * OMAP2420 clock data
+diff --git a/arch/arm/mach-omap2/clkt2xxx_apll.c b/arch/arm/mach-omap2/clkt2xxx_apll.c
+index a147188..882eab9 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_apll.c
++++ b/arch/arm/mach-omap2/clkt2xxx_apll.c
+@@ -21,7 +21,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/prcm.h>
+ 
+ #include "clock.h"
+diff --git a/arch/arm/mach-omap2/clkt2xxx_dpll.c b/arch/arm/mach-omap2/clkt2xxx_dpll.c
+index a1f9915..4bc699c 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_dpll.c
++++ b/arch/arm/mach-omap2/clkt2xxx_dpll.c
+@@ -14,8 +14,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+index d5e9c94..fd7b9ab 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
++++ b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+@@ -25,7 +25,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ #include <plat/sdrc.h>
+ 
+diff --git a/arch/arm/mach-omap2/clkt2xxx_osc.c b/arch/arm/mach-omap2/clkt2xxx_osc.c
+index 3b1d13f..52a4508 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_osc.c
++++ b/arch/arm/mach-omap2/clkt2xxx_osc.c
+@@ -23,8 +23,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "clock2xxx.h"
+ #include "prm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/clkt2xxx_sys.c b/arch/arm/mach-omap2/clkt2xxx_sys.c
+index 12164a6..d68b3bc 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_sys.c
++++ b/arch/arm/mach-omap2/clkt2xxx_sys.c
+@@ -22,8 +22,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "clock2xxx.h"
+ #include "prm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index a0b2b28..eb7f553 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -34,7 +34,6 @@
+ #include <linux/slab.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ #include <plat/sdrc.h>
+ 
+diff --git a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+index 7e550b1..74cc4ed 100644
+--- a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
++++ b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+@@ -21,7 +21,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ #include <plat/sdrc.h>
+ 
+diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
+index c99222a..396f7fb 100644
+--- a/arch/arm/mach-omap2/clkt_clksel.c
++++ b/arch/arm/mach-omap2/clkt_clksel.c
+@@ -49,8 +49,6 @@
+ #include <linux/io.h>
+ #include <linux/bug.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ 
+ /* Private functions */
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index e84512f..23c677e 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -25,7 +25,6 @@
+ 
+ #include <asm/div64.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/cpu.h>
+ 
+ #include "clock.h"
+diff --git a/arch/arm/mach-omap2/clkt_iclk.c b/arch/arm/mach-omap2/clkt_iclk.c
+index b3aa8d3..16f84fb 100644
+--- a/arch/arm/mach-omap2/clkt_iclk.c
++++ b/arch/arm/mach-omap2/clkt_iclk.c
+@@ -18,7 +18,6 @@
+ #endif
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/prcm.h>
+ 
+ #include "clock.h"
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index cdfa9c5..d19af9b 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -29,7 +29,6 @@
+ #include <trace/events/power.h>
+ 
+ #include <asm/cpu.h>
+-#include <plat/clock.h>
+ #include "clockdomain.h"
+ #include <plat/cpu.h>
+ #include <plat/prcm.h>
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index bfeb18e..fd022b3 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -17,11 +17,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_CLOCK_H
+ 
+ #include <linux/kernel.h>
+-
+-#include <plat/clock.h>
+-
+-#ifdef CONFIG_COMMON_CLK
+-
+ #include <linux/clk-provider.h>
+ #include <linux/list.h>
+ 
+@@ -261,7 +256,6 @@ struct clk_hw_omap_ops {
+ 
+ unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
+ 		unsigned long parent_rate);
+-#endif /* CONFIG_COMMON_CLK */
+ 
+ /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
+ #define CORE_CLK_SRC_32K		0x0
+diff --git a/arch/arm/mach-omap2/clock2430.c b/arch/arm/mach-omap2/clock2430.c
+index a629bc3..b3f07c3 100644
+--- a/arch/arm/mach-omap2/clock2430.c
++++ b/arch/arm/mach-omap2/clock2430.c
+@@ -22,7 +22,6 @@
+ #include <linux/io.h>
+ 
+ #include <plat/hardware.h>
+-#include <plat/clock.h>
+ 
+ #include "iomap.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index 39a183b..3377221 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -23,7 +23,6 @@
+ #include <linux/io.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include "clock.h"
+ #include "clock2xxx.h"
+diff --git a/arch/arm/mach-omap2/clock34xx.c b/arch/arm/mach-omap2/clock34xx.c
+index a4b0d38..16da66e 100644
+--- a/arch/arm/mach-omap2/clock34xx.c
++++ b/arch/arm/mach-omap2/clock34xx.c
+@@ -21,8 +21,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "clock34xx.h"
+ #include "cm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/clock3517.c b/arch/arm/mach-omap2/clock3517.c
+index f338697..07cb9e2 100644
+--- a/arch/arm/mach-omap2/clock3517.c
++++ b/arch/arm/mach-omap2/clock3517.c
+@@ -21,8 +21,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "clock3517.h"
+ #include "cm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/clock36xx.c b/arch/arm/mach-omap2/clock36xx.c
+index 502c960..9f50e97 100644
+--- a/arch/arm/mach-omap2/clock36xx.c
++++ b/arch/arm/mach-omap2/clock36xx.c
+@@ -22,8 +22,6 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ 
+-#include <plat/clock.h>
+-
+ #include "clock.h"
+ #include "clock36xx.h"
+ 
+diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
+index af05eeb..ecb6029 100644
+--- a/arch/arm/mach-omap2/clock3xxx.c
++++ b/arch/arm/mach-omap2/clock3xxx.c
+@@ -22,7 +22,6 @@
+ #include <linux/io.h>
+ 
+ #include <plat/hardware.h>
+-#include <plat/clock.h>
+ 
+ #include "clock.h"
+ #include "clock3xxx.h"
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index ad07689..b765228 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -27,7 +27,6 @@
+ 
+ #include <linux/bitops.h>
+ 
+-#include <plat/clock.h>
+ #include "clockdomain.h"
+ 
+ /* clkdm_list contains all registered struct clockdomains */
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index f7b5860..c77d7b7 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -20,7 +20,6 @@
+ #include <linux/spinlock.h>
+ 
+ #include "powerdomain.h"
+-#include <plat/clock.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/cpu.h>
+ 
+diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+index 1549c11..cf91170 100644
+--- a/arch/arm/mach-omap2/common.c
++++ b/arch/arm/mach-omap2/common.c
+@@ -20,7 +20,6 @@
+ #include <plat/hardware.h>
+ #include <plat/board.h>
+ #include <plat/mux.h>
+-#include <plat/clock.h>
+ 
+ #include "iomap.h"
+ #include "common.h"
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 13535b1..aadc8c1 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -29,7 +29,6 @@
+ #include <linux/clkdev.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include "clock.h"
+ #include "cm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
+index fbf94d2..529c79d 100644
+--- a/arch/arm/mach-omap2/dpll44xx.c
++++ b/arch/arm/mach-omap2/dpll44xx.c
+@@ -16,7 +16,6 @@
+ #include <linux/bitops.h>
+ 
+ #include <plat/cpu.h>
+-#include <plat/clock.h>
+ 
+ #include "clock.h"
+ #include "clock44xx.h"
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 91d0f19..e153298 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -146,7 +146,6 @@
+ #include <plat/cpu.h>
+ #include "clockdomain.h"
+ #include "powerdomain.h"
+-#include <plat/clock.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/prcm.h>
+ 
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 6fa332c..eff10e4 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -27,7 +27,6 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/board.h>
+ #include "powerdomain.h"
+ #include "clockdomain.h"
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 7656ff8..d719959 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -39,7 +39,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/system_misc.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ #include <plat/dma.h>
+ #include <plat/board.h>
+diff --git a/arch/arm/mach-omap2/sdram-nokia.c b/arch/arm/mach-omap2/sdram-nokia.c
+index 845c4fd..810ad8c 100644
+--- a/arch/arm/mach-omap2/sdram-nokia.c
++++ b/arch/arm/mach-omap2/sdram-nokia.c
+@@ -18,7 +18,6 @@
+ #include <linux/io.h>
+ 
+ #include "common.h"
+-#include <plat/clock.h>
+ #include <plat/sdrc.h>
+ 
+ #include "sdram-nokia.h"
+diff --git a/arch/arm/mach-omap2/sdrc.c b/arch/arm/mach-omap2/sdrc.c
+index e3d345f..93e0fd4 100644
+--- a/arch/arm/mach-omap2/sdrc.c
++++ b/arch/arm/mach-omap2/sdrc.c
+@@ -24,7 +24,6 @@
+ #include <linux/io.h>
+ 
+ #include "common.h"
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ 
+ #include <plat/sdrc.h>
+diff --git a/arch/arm/mach-omap2/sdrc2xxx.c b/arch/arm/mach-omap2/sdrc2xxx.c
+index 1133bb2..59608ff 100644
+--- a/arch/arm/mach-omap2/sdrc2xxx.c
++++ b/arch/arm/mach-omap2/sdrc2xxx.c
+@@ -25,7 +25,6 @@
+ #include <linux/io.h>
+ 
+ #include <plat/hardware.h>
+-#include <plat/clock.h>
+ #include <plat/sram.h>
+ #include <plat/sdrc.h>
+ 
+diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+index c0fe275..69b3888 100644
+--- a/arch/arm/plat-omap/Makefile
++++ b/arch/arm/plat-omap/Makefile
+@@ -3,12 +3,13 @@
+ #
+ 
+ # Common support
+-obj-y := common.o sram.o clock.o devices.o dma.o mux.o \
++obj-y := common.o sram.o devices.o dma.o mux.o \
+ 	 usb.o fb.o counter_32k.o
+ obj-m :=
+ obj-n :=
+ obj-  :=
+ 
++obj-$(CONFIG_ARCH_OMAP1) += clock.o
+ # OCPI interconnect support for 1710, 1610 and 5912
+ obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
+ 
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index d311b7c..62ec5c4 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -10,7 +10,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#ifndef CONFIG_COMMON_CLK
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/list.h>
+@@ -568,4 +567,3 @@ err_out:
+ late_initcall(clk_debugfs_init);
+ 
+ #endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
+-#endif /* CONFIG_COMMON_CLK */
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index f96b803..c88d6b2 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -25,8 +25,6 @@
+ #include <plat/common.h>
+ #include <plat/board.h>
+ 
+-#include <plat/clock.h>
+-
+ /*
+  * 32KHz clocksource ... always available, on pretty most chips except
+  * OMAP 730 and 1510.  Other timers could be used as clocksources, with
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index d937cfb..6cba482 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -13,17 +13,12 @@
+ #ifndef __ARCH_ARM_OMAP_CLOCK_H
+ #define __ARCH_ARM_OMAP_CLOCK_H
+ 
+-#ifndef CONFIG_COMMON_CLK
+ #include <linux/list.h>
+ 
+ struct module;
+ struct clk;
+ struct clockdomain;
+ 
+-#define __clk_get_name(clk) clk->name
+-#define __clk_get_parent(clk) clk->parent
+-#define __clk_get_rate(clk) clk->rate
+-
+ /**
+  * struct clkops - some clock function pointers
+  * @enable: fn ptr that enables the current clock in hardware
+@@ -53,131 +48,6 @@ struct clkops {
+ 	void			(*deny_idle)(struct clk *);
+ };
+ 
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+-
+-/* struct clksel_rate.flags possibilities */
+-#define RATE_IN_242X		(1 << 0)
+-#define RATE_IN_243X		(1 << 1)
+-#define RATE_IN_3430ES1		(1 << 2)	/* 3430ES1 rates only */
+-#define RATE_IN_3430ES2PLUS	(1 << 3)	/* 3430 ES >= 2 rates only */
+-#define RATE_IN_36XX		(1 << 4)
+-#define RATE_IN_4430		(1 << 5)
+-#define RATE_IN_TI816X		(1 << 6)
+-#define RATE_IN_4460		(1 << 7)
+-#define RATE_IN_AM33XX		(1 << 8)
+-#define RATE_IN_TI814X		(1 << 9)
+-
+-#define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
+-#define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
+-#define RATE_IN_3XXX		(RATE_IN_34XX | RATE_IN_36XX)
+-#define RATE_IN_44XX		(RATE_IN_4430 | RATE_IN_4460)
+-
+-/* RATE_IN_3430ES2PLUS_36XX includes 34xx/35xx with ES >=2, and all 36xx/37xx */
+-#define RATE_IN_3430ES2PLUS_36XX	(RATE_IN_3430ES2PLUS | RATE_IN_36XX)
+-
+-
+-/**
+- * struct clksel_rate - register bitfield values corresponding to clk divisors
+- * @val: register bitfield value (shifted to bit 0)
+- * @div: clock divisor corresponding to @val
+- * @flags: (see "struct clksel_rate.flags possibilities" above)
 - *
-- * Copyright (C) 2005-2009 Texas Instruments, Inc.
-- * Copyright (C) 2004-2011 Nokia Corporation
+- * @val should match the value of a read from struct clk.clksel_reg
+- * AND'ed with struct clk.clksel_mask, shifted right to bit 0.
 - *
-- * Contacts:
-- * Richard Woodruff <r-woodruff2@ti.com>
-- * Paul Walmsley
+- * @div is the divisor that should be applied to the parent clock's rate
+- * to produce the current clock's rate.
+- */
+-struct clksel_rate {
+-	u32			val;
+-	u8			div;
+-	u16			flags;
+-};
+-
+-/**
+- * struct clksel - available parent clocks, and a pointer to their divisors
+- * @parent: struct clk * to a possible parent clock
+- * @rates: available divisors for this parent clock
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
+- * A struct clksel is always associated with one or more struct clks
+- * and one or more struct clksel_rates.
 - */
+-struct clksel {
+-	struct clk		 *parent;
+-	const struct clksel_rate *rates;
+-};
 -
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/clk.h>
--#include <linux/list.h>
--
--#include <plat/hardware.h>
--#include <plat/clkdev_omap.h>
--
--#include "iomap.h"
--#include "clock.h"
--#include "clock2xxx.h"
--#include "opp2xxx.h"
--#include "cm2xxx_3xxx.h"
--#include "prm2xxx_3xxx.h"
--#include "prm-regbits-24xx.h"
--#include "cm-regbits-24xx.h"
--#include "sdrc.h"
--#include "control.h"
--
--#define OMAP_CM_REGADDR                 OMAP2420_CM_REGADDR
--
--/*
-- * 2420 clock tree.
+-/**
+- * struct dpll_data - DPLL registers and integration data
+- * @mult_div1_reg: register containing the DPLL M and N bitfields
+- * @mult_mask: mask of the DPLL M bitfield in @mult_div1_reg
+- * @div1_mask: mask of the DPLL N bitfield in @mult_div1_reg
+- * @clk_bypass: struct clk pointer to the clock's bypass clock input
+- * @clk_ref: struct clk pointer to the clock's reference clock input
+- * @control_reg: register containing the DPLL mode bitfield
+- * @enable_mask: mask of the DPLL mode bitfield in @control_reg
+- * @last_rounded_rate: cache of the last rate result of omap2_dpll_round_rate()
+- * @last_rounded_m: cache of the last M result of omap2_dpll_round_rate()
+- * @max_multiplier: maximum valid non-bypass multiplier value (actual)
+- * @last_rounded_n: cache of the last N result of omap2_dpll_round_rate()
+- * @min_divider: minimum valid non-bypass divider value (actual)
+- * @max_divider: maximum valid non-bypass divider value (actual)
+- * @modes: possible values of @enable_mask
+- * @autoidle_reg: register containing the DPLL autoidle mode bitfield
+- * @idlest_reg: register containing the DPLL idle status bitfield
+- * @autoidle_mask: mask of the DPLL autoidle mode bitfield in @autoidle_reg
+- * @freqsel_mask: mask of the DPLL jitter correction bitfield in @control_reg
+- * @idlest_mask: mask of the DPLL idle status bitfield in @idlest_reg
+- * @auto_recal_bit: bitshift of the driftguard enable bit in @control_reg
+- * @recal_en_bit: bitshift of the PRM_IRQENABLE_* bit for recalibration IRQs
+- * @recal_st_bit: bitshift of the PRM_IRQSTATUS_* bit for recalibration IRQs
+- * @flags: DPLL type/features (see below)
 - *
-- * NOTE:In many cases here we are assigning a 'default' parent. In
-- *	many cases the parent is selectable. The set parent calls will
-- *	also switch sources.
+- * Possible values for @flags:
+- * DPLL_J_TYPE: "J-type DPLL" (only some 36xx, 4xxx DPLLs)
 - *
-- *	Several sources are given initial rates which may be wrong, this will
-- *	be fixed up in the init func.
+- * @freqsel_mask is only used on the OMAP34xx family and AM35xx.
 - *
-- *	Things are broadly separated below by clock domains. It is
-- *	noteworthy that most peripherals have dependencies on multiple clock
-- *	domains. Many get their interface clocks from the L4 domain, but get
-- *	functional clocks from fixed sources or other core domain derived
-- *	clocks.
-- */
--
--/* Base external input clocks */
--static struct clk func_32k_ck = {
--	.name		= "func_32k_ck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--static struct clk secure_32k_ck = {
--	.name		= "secure_32k_ck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--/* Typical 12/13MHz in standalone mode, will be 26Mhz in chassis mode */
--static struct clk osc_ck = {		/* (*12, *13, 19.2, *26, 38.4)MHz */
--	.name		= "osc_ck",
--	.ops		= &clkops_oscck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_osc_clk_recalc,
--};
--
--/* Without modem likely 12MHz, with modem likely 13MHz */
--static struct clk sys_ck = {		/* (*12, *13, 19.2, 26, 38.4)MHz */
--	.name		= "sys_ck",		/* ~ ref_clk also */
--	.ops		= &clkops_null,
--	.parent		= &osc_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2xxx_sys_clk_recalc,
--};
--
--static struct clk alt_ck = {		/* Typical 54M or 48M, may not exist */
--	.name		= "alt_ck",
--	.ops		= &clkops_null,
--	.rate		= 54000000,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--/* Optional external clock input for McBSP CLKS */
--static struct clk mcbsp_clks = {
--	.name		= "mcbsp_clks",
--	.ops		= &clkops_null,
--};
--
--/*
-- * Analog domain root source clocks
-- */
--
--/* dpll_ck, is broken out in to special cases through clksel */
--/* REVISIT: Rate changes on dpll_ck trigger a full set change.	...
-- * deal with this
-- */
--
--static struct dpll_data dpll_dd = {
--	.mult_div1_reg		= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.mult_mask		= OMAP24XX_DPLL_MULT_MASK,
--	.div1_mask		= OMAP24XX_DPLL_DIV_MASK,
--	.clk_bypass		= &sys_ck,
--	.clk_ref		= &sys_ck,
--	.control_reg		= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_mask		= OMAP24XX_EN_DPLL_MASK,
--	.max_multiplier		= 1023,
--	.min_divider		= 1,
--	.max_divider		= 16,
--};
--
--/*
-- * XXX Cannot add round_rate here yet, as this is still a composite clock,
-- * not just a DPLL
-- */
--static struct clk dpll_ck = {
--	.name		= "dpll_ck",
--	.ops		= &clkops_omap2xxx_dpll_ops,
--	.parent		= &sys_ck,		/* Can be func_32k also */
--	.dpll_data	= &dpll_dd,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_dpllcore_recalc,
--	.set_rate	= &omap2_reprogram_dpllcore,
--};
--
--static struct clk apll96_ck = {
--	.name		= "apll96_ck",
--	.ops		= &clkops_apll96,
--	.parent		= &sys_ck,
--	.rate		= 96000000,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP24XX_EN_96M_PLL_SHIFT,
--};
--
--static struct clk apll54_ck = {
--	.name		= "apll54_ck",
--	.ops		= &clkops_apll54,
--	.parent		= &sys_ck,
--	.rate		= 54000000,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP24XX_EN_54M_PLL_SHIFT,
--};
--
--/*
-- * PRCM digital base sources
-- */
--
--/* func_54m_ck */
--
--static const struct clksel_rate func_54m_apll54_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate func_54m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel func_54m_clksel[] = {
--	{ .parent = &apll54_ck, .rates = func_54m_apll54_rates, },
--	{ .parent = &alt_ck,	.rates = func_54m_alt_rates, },
--	{ .parent = NULL },
--};
--
--static struct clk func_54m_ck = {
--	.name		= "func_54m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll54_ck,	/* can also be alt_clk */
--	.clkdm_name	= "wkup_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_54M_SOURCE_MASK,
--	.clksel		= func_54m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk core_ck = {
--	.name		= "core_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll_ck,		/* can also be 32k */
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk func_96m_ck = {
--	.name		= "func_96m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll96_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* func_48m_ck */
--
--static const struct clksel_rate func_48m_apll96_rates[] = {
--	{ .div = 2, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate func_48m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel func_48m_clksel[] = {
--	{ .parent = &apll96_ck,	.rates = func_48m_apll96_rates },
--	{ .parent = &alt_ck, .rates = func_48m_alt_rates },
--	{ .parent = NULL }
--};
--
--static struct clk func_48m_ck = {
--	.name		= "func_48m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll96_ck,	 /* 96M or Alt */
--	.clkdm_name	= "wkup_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_48M_SOURCE_MASK,
--	.clksel		= func_48m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk func_12m_ck = {
--	.name		= "func_12m_ck",
--	.ops		= &clkops_null,
--	.parent		= &func_48m_ck,
--	.fixed_div	= 4,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--/* Secure timer, only available in secure mode */
--static struct clk wdt1_osc_ck = {
--	.name		= "ck_wdt1_osc",
--	.ops		= &clkops_null, /* RMK: missing? */
--	.parent		= &osc_ck,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The common_clkout* clksel_rate structs are common to
-- * sys_clkout, sys_clkout_src, sys_clkout2, and sys_clkout2_src.
-- * sys_clkout2_* are 2420-only, so the
-- * clksel_rate flags fields are inaccurate for those clocks. This is
-- * harmless since access to those clocks are gated by the struct clk
-- * flags fields, which mark them as 2420-only.
-- */
--static const struct clksel_rate common_clkout_src_core_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_96m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_54m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel common_clkout_src_clksel[] = {
--	{ .parent = &core_ck,	  .rates = common_clkout_src_core_rates },
--	{ .parent = &sys_ck,	  .rates = common_clkout_src_sys_rates },
--	{ .parent = &func_96m_ck, .rates = common_clkout_src_96m_rates },
--	{ .parent = &func_54m_ck, .rates = common_clkout_src_54m_rates },
--	{ .parent = NULL }
--};
--
--static struct clk sys_clkout_src = {
--	.name		= "sys_clkout_src",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.enable_bit	= OMAP24XX_CLKOUT_EN_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP24XX_CLKOUT_SOURCE_MASK,
--	.clksel		= common_clkout_src_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static const struct clksel_rate common_clkout_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 8, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 16, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel sys_clkout_clksel[] = {
--	{ .parent = &sys_clkout_src, .rates = common_clkout_rates },
--	{ .parent = NULL }
--};
--
--static struct clk sys_clkout = {
--	.name		= "sys_clkout",
--	.ops		= &clkops_null,
--	.parent		= &sys_clkout_src,
--	.clkdm_name	= "wkup_clkdm",
--	.clksel_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP24XX_CLKOUT_DIV_MASK,
--	.clksel		= sys_clkout_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--/* In 2430, new in 2420 ES2 */
--static struct clk sys_clkout2_src = {
--	.name		= "sys_clkout2_src",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.enable_bit	= OMAP2420_CLKOUT2_EN_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP2420_CLKOUT2_SOURCE_MASK,
--	.clksel		= common_clkout_src_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static const struct clksel sys_clkout2_clksel[] = {
--	{ .parent = &sys_clkout2_src, .rates = common_clkout_rates },
--	{ .parent = NULL }
--};
--
--/* In 2430, new in 2420 ES2 */
--static struct clk sys_clkout2 = {
--	.name		= "sys_clkout2",
--	.ops		= &clkops_null,
--	.parent		= &sys_clkout2_src,
--	.clkdm_name	= "wkup_clkdm",
--	.clksel_reg	= OMAP2420_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP2420_CLKOUT2_DIV_MASK,
--	.clksel		= sys_clkout2_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk emul_ck = {
--	.name		= "emul_ck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP2420_PRCM_CLKEMUL_CTRL,
--	.enable_bit	= OMAP24XX_EMULATION_EN_SHIFT,
--	.recalc		= &followparent_recalc,
--
--};
--
--/*
-- * MPU clock domain
-- *	Clocks:
-- *		MPU_FCLK, MPU_ICLK
-- *		INT_M_FCLK, INT_M_I_CLK
+- * XXX Some DPLLs have multiple bypass inputs, so it's not technically
+- * correct to only have one @clk_bypass pointer.
 - *
-- * - Individual clocks are hardware managed.
-- * - Base divider comes from: CM_CLKSEL_MPU
-- *
+- * XXX The runtime-variable fields (@last_rounded_rate, @last_rounded_m,
+- * @last_rounded_n) should be separated from the runtime-fixed fields
+- * and placed into a different structure, so that the runtime-fixed data
+- * can be placed into read-only space.
 - */
--static const struct clksel_rate mpu_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_242X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_242X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_242X },
--	{ .div = 0 },
--};
--
--static const struct clksel mpu_clksel[] = {
--	{ .parent = &core_ck, .rates = mpu_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mpu_ck = {	/* Control cpu */
--	.name		= "mpu_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.clkdm_name	= "mpu_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(MPU_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_MPU_MASK,
--	.clksel		= mpu_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * DSP (2420-UMA+IVA1) clock domain
-- * Clocks:
-- *	2420: UMA_FCLK, UMA_ICLK, IVA_MPU, IVA_COP
-- *
-- * Won't be too specific here. The core clock comes into this block
-- * it is divided then tee'ed. One branch goes directly to xyz enable
-- * controls. The other branch gets further divided by 2 then possibly
-- * routed into a synchronizer and out of clocks abc.
-- */
--static const struct clksel_rate dsp_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_242X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_242X },
--	{ .div = 12, .val = 12, .flags = RATE_IN_242X },
--	{ .div = 0 },
--};
--
--static const struct clksel dsp_fck_clksel[] = {
--	{ .parent = &core_ck, .rates = dsp_fck_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dsp_fck = {
--	.name		= "dsp_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "dsp_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSP_MASK,
--	.clksel		= dsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel dsp_ick_clksel[] = {
--	{ .parent = &dsp_fck, .rates = dsp_ick_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dsp_ick = {
--	.name		= "dsp_ick",	 /* apparently ipi and isp */
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &dsp_fck,
--	.clkdm_name	= "dsp_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP2420_EN_DSP_IPI_SHIFT,	      /* for ipi */
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSP_IF_MASK,
--	.clksel		= dsp_ick_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * The IVA1 is an ARM7 core on the 2420 that has nothing to do with
-- * the C54x, but which is contained in the DSP powerdomain.  Does not
-- * exist on later OMAPs.
-- */
--static struct clk iva1_ifck = {
--	.name		= "iva1_ifck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "iva1_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP2420_EN_IVA_COP_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP2420_CLKSEL_IVA_MASK,
--	.clksel		= dsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* IVA1 mpu/int/i/f clocks are /2 of parent */
--static struct clk iva1_mpu_int_ifck = {
--	.name		= "iva1_mpu_int_ifck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &iva1_ifck,
--	.clkdm_name	= "iva1_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP2420_EN_IVA_MPU_SHIFT,
--	.fixed_div	= 2,
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--/*
-- * L3 clock domain
-- * L3 clocks are used for both interface and functional clocks to
-- * multiple entities. Some of these clocks are completely managed
-- * by hardware, and some others allow software control. Hardware
-- * managed ones general are based on directly CLK_REQ signals and
-- * various auto idle settings. The functional spec sets many of these
-- * as 'tie-high' for their enables.
-- *
-- * I-CLOCKS:
-- *	L3-Interconnect, SMS, GPMC, SDRC, OCM_RAM, OCM_ROM, SDMA
-- *	CAM, HS-USB.
-- * F-CLOCK
-- *	SSI.
-- *
-- * GPMC memories and SDRC have timing and clock sensitive registers which
-- * may very well need notification when the clock changes. Currently for low
-- * operating points, these are taken care of in sleep.S.
-- */
--static const struct clksel_rate core_l3_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_242X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_24XX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_242X },
--	{ .div = 12, .val = 12, .flags = RATE_IN_242X },
--	{ .div = 16, .val = 16, .flags = RATE_IN_242X },
--	{ .div = 0 }
--};
--
--static const struct clksel core_l3_clksel[] = {
--	{ .parent = &core_ck, .rates = core_l3_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk core_l3_ck = {	/* Used for ick and fck, interconnect */
--	.name		= "core_l3_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_L3_MASK,
--	.clksel		= core_l3_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* usb_l4_ick */
--static const struct clksel_rate usb_l4_ick_core_l3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel usb_l4_ick_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = usb_l4_ick_core_l3_rates },
--	{ .parent = NULL },
--};
--
--/* It is unclear from TRM whether usb_l4_ick is really in L3 or L4 clkdm */
--static struct clk usb_l4_ick = {	/* FS-USB interface clock */
--	.name		= "usb_l4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_USB_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_USB_MASK,
--	.clksel		= usb_l4_ick_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * L4 clock management domain
-- *
-- * This domain contains lots of interface clocks from the L4 interface, some
-- * functional clocks.	Fixed APLL functional source clocks are managed in
-- * this domain.
-- */
--static const struct clksel_rate l4_core_l3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel l4_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = l4_core_l3_rates },
--	{ .parent = NULL }
--};
--
--static struct clk l4_ck = {		/* used both as an ick and fck */
--	.name		= "l4_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_L4_MASK,
--	.clksel		= l4_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * SSI is in L3 management domain, its direct parent is core not l3,
-- * many core power domain entities are grouped into the L3 clock
-- * domain.
-- * SSI_SSR_FCLK, SSI_SST_FCLK, SSI_L4_ICLK
-- *
-- * ssr = core/1/2/3/4/5, sst = 1/2 ssr.
-- */
--static const struct clksel_rate ssi_ssr_sst_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_242X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_242X },
--	{ .div = 0 }
--};
--
--static const struct clksel ssi_ssr_sst_fck_clksel[] = {
--	{ .parent = &core_ck, .rates = ssi_ssr_sst_fck_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk ssi_ssr_sst_fck = {
--	.name		= "ssi_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_SSI_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_SSI_MASK,
--	.clksel		= ssi_ssr_sst_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * Presumably this is the same as SSI_ICLK.
-- * TRM contradicts itself on what clockdomain SSI_ICLK is in
-- */
--static struct clk ssi_l4_ick = {
--	.name		= "ssi_l4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_SSI_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--
--/*
-- * GFX clock domain
-- *	Clocks:
-- * GFX_FCLK, GFX_ICLK
-- * GFX_CG1(2d), GFX_CG2(3d)
-- *
-- * GFX_FCLK runs from L3, and is divided by (1,2,3,4)
-- * The 2d and 3d clocks run at a hardware determined
-- * divided value of fclk.
-- *
-- */
--
--/* This clksel struct is shared between gfx_3d_fck and gfx_2d_fck */
--static const struct clksel gfx_fck_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = gfx_l3_rates },
--	{ .parent = NULL },
--};
--
--static struct clk gfx_3d_fck = {
--	.name		= "gfx_3d_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_3D_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP_CLKSEL_GFX_MASK,
--	.clksel		= gfx_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk gfx_2d_fck = {
--	.name		= "gfx_2d_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_2D_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP_CLKSEL_GFX_MASK,
--	.clksel		= gfx_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* This interface clock does not have a CM_AUTOIDLE bit */
--static struct clk gfx_ick = {
--	.name		= "gfx_ick",		/* From l3 */
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP_EN_GFX_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * DSS clock domain
-- * CLOCKs:
-- * DSS_L4_ICLK, DSS_L3_ICLK,
-- * DSS_CLK1, DSS_CLK2, DSS_54MHz_CLK
-- *
-- * DSS is both initiator and target.
-- */
--/* XXX Add RATE_NOT_VALIDATED */
--
--static const struct clksel_rate dss1_fck_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate dss1_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_24XX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_24XX },
--	{ .div = 9, .val = 9, .flags = RATE_IN_24XX },
--	{ .div = 12, .val = 12, .flags = RATE_IN_24XX },
--	{ .div = 16, .val = 16, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel dss1_fck_clksel[] = {
--	{ .parent = &sys_ck,  .rates = dss1_fck_sys_rates },
--	{ .parent = &core_ck, .rates = dss1_fck_core_rates },
--	{ .parent = NULL },
--};
--
--static struct clk dss_ick = {		/* Enables both L3,L4 ICLK's */
--	.name		= "dss_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ck,	/* really both l3 and l4 */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss1_fck = {
--	.name		= "dss1_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &core_ck,		/* Core or sys */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS1_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSS1_MASK,
--	.clksel		= dss1_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate dss2_fck_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate dss2_fck_48m_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel dss2_fck_clksel[] = {
--	{ .parent = &sys_ck,	  .rates = dss2_fck_sys_rates },
--	{ .parent = &func_48m_ck, .rates = dss2_fck_48m_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dss2_fck = {		/* Alt clk used in power management */
--	.name		= "dss2_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &sys_ck,		/* fixed at sys_ck or 48MHz */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS2_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSS2_MASK,
--	.clksel		= dss2_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk dss_54m_fck = {	/* Alt clk used in power management */
--	.name		= "dss_54m_fck",	/* 54m tv clk */
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_TV_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wu_l4_ick = {
--	.name		= "wu_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &sys_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * CORE power domain ICLK & FCLK defines.
-- * Many of the these can have more than one possible parent. Entries
-- * here will likely have an L4 interface parent, and may have multiple
-- * functional clock parents.
-- */
--static const struct clksel_rate gpt_alt_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel omap24xx_gpt_clksel[] = {
--	{ .parent = &func_32k_ck, .rates = gpt_32k_rates },
--	{ .parent = &sys_ck,	  .rates = gpt_sys_rates },
--	{ .parent = &alt_ck,	  .rates = gpt_alt_rates },
--	{ .parent = NULL },
--};
--
--static struct clk gpt1_ick = {
--	.name		= "gpt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt1_fck = {
--	.name		= "gpt1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT1_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk gpt2_ick = {
--	.name		= "gpt2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt2_fck = {
--	.name		= "gpt2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT2_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT2_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt3_ick = {
--	.name		= "gpt3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt3_fck = {
--	.name		= "gpt3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT3_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT3_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt4_ick = {
--	.name		= "gpt4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt4_fck = {
--	.name		= "gpt4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT4_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT4_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt5_ick = {
--	.name		= "gpt5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT5_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt5_fck = {
--	.name		= "gpt5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT5_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT5_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt6_ick = {
--	.name		= "gpt6_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT6_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt6_fck = {
--	.name		= "gpt6_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT6_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT6_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt7_ick = {
--	.name		= "gpt7_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT7_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt7_fck = {
--	.name		= "gpt7_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT7_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT7_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt8_ick = {
--	.name		= "gpt8_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT8_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt8_fck = {
--	.name		= "gpt8_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT8_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT8_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt9_ick = {
--	.name		= "gpt9_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT9_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt9_fck = {
--	.name		= "gpt9_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT9_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT9_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt10_ick = {
--	.name		= "gpt10_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT10_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt10_fck = {
--	.name		= "gpt10_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT10_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT10_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt11_ick = {
--	.name		= "gpt11_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT11_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt11_fck = {
--	.name		= "gpt11_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT11_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT11_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt12_ick = {
--	.name		= "gpt12_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT12_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt12_fck = {
--	.name		= "gpt12_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &secure_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT12_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT12_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp1_ick = {
--	.name		= "mcbsp1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel_rate common_mcbsp_96m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel mcbsp_fck_clksel[] = {
--	{ .parent = &func_96m_ck,  .rates = common_mcbsp_96m_rates },
--	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mcbsp1_fck = {
--	.name		= "mcbsp1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP1_SHIFT,
--	.clksel_reg	= OMAP242X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP1_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp2_ick = {
--	.name		= "mcbsp2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp2_fck = {
--	.name		= "mcbsp2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP2_SHIFT,
--	.clksel_reg	= OMAP242X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP2_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcspi1_ick = {
--	.name		= "mcspi1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi1_fck = {
--	.name		= "mcspi1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi2_ick = {
--	.name		= "mcspi2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi2_fck = {
--	.name		= "mcspi2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_ick = {
--	.name		= "uart1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_fck = {
--	.name		= "uart1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart2_ick = {
--	.name		= "uart2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart2_fck = {
--	.name		= "uart2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_ick = {
--	.name		= "uart3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_UART3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_fck = {
--	.name		= "uart3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_UART3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpios_ick = {
--	.name		= "gpios_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpios_fck = {
--	.name		= "gpios_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mpu_wdt_ick = {
--	.name		= "mpu_wdt_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mpu_wdt_fck = {
--	.name		= "mpu_wdt_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sync_32k_ick = {
--	.name		= "sync_32k_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.flags		= ENABLE_ON_INIT,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_32KSYNC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt1_ick = {
--	.name		= "wdt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_WDT1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk omapctrl_ick = {
--	.name		= "omapctrl_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.flags		= ENABLE_ON_INIT,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_OMAPCTRL_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk cam_ick = {
--	.name		= "cam_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_CAM_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * cam_fck controls both CAM_MCLK and CAM_FCLK.  It should probably be
-- * split into two separate clocks, since the parent clocks are different
-- * and the clockdomains are also different.
-- */
--static struct clk cam_fck = {
--	.name		= "cam_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_CAM_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mailboxes_ick = {
--	.name		= "mailboxes_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MAILBOXES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt4_ick = {
--	.name		= "wdt4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_WDT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt4_fck = {
--	.name		= "wdt4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_WDT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt3_ick = {
--	.name		= "wdt3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_WDT3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt3_fck = {
--	.name		= "wdt3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_WDT3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_ick = {
--	.name		= "mspro_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MSPRO_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_fck = {
--	.name		= "mspro_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MSPRO_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmc_ick = {
--	.name		= "mmc_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_MMC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmc_fck = {
--	.name		= "mmc_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_MMC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fac_ick = {
--	.name		= "fac_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_FAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fac_fck = {
--	.name		= "fac_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_FAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk eac_ick = {
--	.name		= "eac_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_EAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk eac_fck = {
--	.name		= "eac_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_EAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_ick = {
--	.name		= "hdq_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_HDQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_fck = {
--	.name		= "hdq_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_HDQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c2_ick = {
--	.name		= "i2c2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c2_fck = {
--	.name		= "i2c2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c1_ick = {
--	.name		= "i2c1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c1_fck = {
--	.name		= "i2c1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-- * accesses derived from this data.
-- */
--static struct clk gpmc_fck = {
--	.name		= "gpmc_fck",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP24XX_AUTO_GPMC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sdma_fck = {
--	.name		= "sdma_fck",
--	.ops		= &clkops_null, /* RMK: missing? */
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-- * accesses derived from this data.
-- */
--static struct clk sdma_ick = {
--	.name		= "sdma_ick",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-- * accesses derived from this data.
-- */
--static struct clk sdrc_ick = {
--	.name		= "sdrc_ick",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP24XX_AUTO_SDRC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk vlynq_ick = {
--	.name		= "vlynq_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_VLYNQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel_rate vlynq_fck_96m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_242X },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate vlynq_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_242X },
--	{ .div = 2, .val = 2, .flags = RATE_IN_242X },
--	{ .div = 3, .val = 3, .flags = RATE_IN_242X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_242X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_242X },
--	{ .div = 8, .val = 8, .flags = RATE_IN_242X },
--	{ .div = 9, .val = 9, .flags = RATE_IN_242X },
--	{ .div = 12, .val = 12, .flags = RATE_IN_242X },
--	{ .div = 16, .val = 16, .flags = RATE_IN_242X },
--	{ .div = 18, .val = 18, .flags = RATE_IN_242X },
--	{ .div = 0 }
--};
--
--static const struct clksel vlynq_fck_clksel[] = {
--	{ .parent = &func_96m_ck, .rates = vlynq_fck_96m_rates },
--	{ .parent = &core_ck,	  .rates = vlynq_fck_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk vlynq_fck = {
--	.name		= "vlynq_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP2420_EN_VLYNQ_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP2420_CLKSEL_VLYNQ_MASK,
--	.clksel		= vlynq_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk des_ick = {
--	.name		= "des_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_DES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sha_ick = {
--	.name		= "sha_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_SHA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk rng_ick = {
--	.name		= "rng_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_RNG_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk aes_ick = {
--	.name		= "aes_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_AES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk pka_ick = {
--	.name		= "pka_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_PKA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usb_fck = {
--	.name		= "usb_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_USB_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * This clock is a composite clock which does entire set changes then
-- * forces a rebalance. It keys on the MPU speed, but it really could
-- * be any key speed part of a set in the rate table.
-- *
-- * to really change a set, you need memory table sets which get changed
-- * in sram, pre-notifiers & post notifiers, changing the top set, without
-- * having low level display recalc's won't work... this is why dpm notifiers
-- * work, isr's off, walk a list of clocks already _off_ and not messing with
-- * the bus.
-- *
-- * This clock should have no parent. It embodies the entire upper level
-- * active set. A parent will mess up some of the init also.
-- */
--static struct clk virt_prcm_set = {
--	.name		= "virt_prcm_set",
--	.ops		= &clkops_null,
--	.parent		= &mpu_ck,	/* Indexed by mpu speed, no parent */
--	.recalc		= &omap2_table_mpu_recalc,	/* sets are keyed on mpu rate */
--	.set_rate	= &omap2_select_table_rate,
--	.round_rate	= &omap2_round_to_table_rate,
--};
--
--
--/*
-- * clkdev integration
-- */
--
--static struct omap_clk omap2420_clks[] = {
--	/* external root sources */
--	CLK(NULL,	"func_32k_ck",	&func_32k_ck,	CK_242X),
--	CLK(NULL,	"secure_32k_ck", &secure_32k_ck, CK_242X),
--	CLK(NULL,	"osc_ck",	&osc_ck,	CK_242X),
--	CLK(NULL,	"sys_ck",	&sys_ck,	CK_242X),
--	CLK(NULL,	"alt_ck",	&alt_ck,	CK_242X),
--	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,	CK_242X),
--	CLK("omap-mcbsp.2",	"pad_fck",	&mcbsp_clks,	CK_242X),
--	CLK(NULL,	"mcbsp_clks",	&mcbsp_clks,	CK_242X),
--	/* internal analog sources */
--	CLK(NULL,	"dpll_ck",	&dpll_ck,	CK_242X),
--	CLK(NULL,	"apll96_ck",	&apll96_ck,	CK_242X),
--	CLK(NULL,	"apll54_ck",	&apll54_ck,	CK_242X),
--	/* internal prcm root sources */
--	CLK(NULL,	"func_54m_ck",	&func_54m_ck,	CK_242X),
--	CLK(NULL,	"core_ck",	&core_ck,	CK_242X),
--	CLK("omap-mcbsp.1",	"prcm_fck",	&func_96m_ck,	CK_242X),
--	CLK("omap-mcbsp.2",	"prcm_fck",	&func_96m_ck,	CK_242X),
--	CLK(NULL,	"func_96m_ck",	&func_96m_ck,	CK_242X),
--	CLK(NULL,	"func_48m_ck",	&func_48m_ck,	CK_242X),
--	CLK(NULL,	"func_12m_ck",	&func_12m_ck,	CK_242X),
--	CLK(NULL,	"ck_wdt1_osc",	&wdt1_osc_ck,	CK_242X),
--	CLK(NULL,	"sys_clkout_src", &sys_clkout_src, CK_242X),
--	CLK(NULL,	"sys_clkout",	&sys_clkout,	CK_242X),
--	CLK(NULL,	"sys_clkout2_src", &sys_clkout2_src, CK_242X),
--	CLK(NULL,	"sys_clkout2",	&sys_clkout2,	CK_242X),
--	CLK(NULL,	"emul_ck",	&emul_ck,	CK_242X),
--	/* mpu domain clocks */
--	CLK(NULL,	"mpu_ck",	&mpu_ck,	CK_242X),
--	/* dsp domain clocks */
--	CLK(NULL,	"dsp_fck",	&dsp_fck,	CK_242X),
--	CLK(NULL,	"dsp_ick",	&dsp_ick,	CK_242X),
--	CLK(NULL,	"iva1_ifck",	&iva1_ifck,	CK_242X),
--	CLK(NULL,	"iva1_mpu_int_ifck", &iva1_mpu_int_ifck, CK_242X),
--	/* GFX domain clocks */
--	CLK(NULL,	"gfx_3d_fck",	&gfx_3d_fck,	CK_242X),
--	CLK(NULL,	"gfx_2d_fck",	&gfx_2d_fck,	CK_242X),
--	CLK(NULL,	"gfx_ick",	&gfx_ick,	CK_242X),
--	/* DSS domain clocks */
--	CLK("omapdss_dss",	"ick",		&dss_ick,	CK_242X),
--	CLK(NULL,	"dss1_fck",		&dss1_fck,	CK_242X),
--	CLK(NULL,	"dss2_fck",	&dss2_fck,	CK_242X),
--	CLK(NULL,	"dss_54m_fck",	&dss_54m_fck,	CK_242X),
--	/* L3 domain clocks */
--	CLK(NULL,	"core_l3_ck",	&core_l3_ck,	CK_242X),
--	CLK(NULL,	"ssi_fck",	&ssi_ssr_sst_fck, CK_242X),
--	CLK(NULL,	"usb_l4_ick",	&usb_l4_ick,	CK_242X),
--	/* L4 domain clocks */
--	CLK(NULL,	"l4_ck",	&l4_ck,		CK_242X),
--	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_242X),
--	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_242X),
--	/* virtual meta-group clock */
--	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_242X),
--	/* general l4 interface ck, multi-parent functional clk */
--	CLK(NULL,	"gpt1_ick",	&gpt1_ick,	CK_242X),
--	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_242X),
--	CLK(NULL,	"gpt2_ick",	&gpt2_ick,	CK_242X),
--	CLK(NULL,	"gpt2_fck",	&gpt2_fck,	CK_242X),
--	CLK(NULL,	"gpt3_ick",	&gpt3_ick,	CK_242X),
--	CLK(NULL,	"gpt3_fck",	&gpt3_fck,	CK_242X),
--	CLK(NULL,	"gpt4_ick",	&gpt4_ick,	CK_242X),
--	CLK(NULL,	"gpt4_fck",	&gpt4_fck,	CK_242X),
--	CLK(NULL,	"gpt5_ick",	&gpt5_ick,	CK_242X),
--	CLK(NULL,	"gpt5_fck",	&gpt5_fck,	CK_242X),
--	CLK(NULL,	"gpt6_ick",	&gpt6_ick,	CK_242X),
--	CLK(NULL,	"gpt6_fck",	&gpt6_fck,	CK_242X),
--	CLK(NULL,	"gpt7_ick",	&gpt7_ick,	CK_242X),
--	CLK(NULL,	"gpt7_fck",	&gpt7_fck,	CK_242X),
--	CLK(NULL,	"gpt8_ick",	&gpt8_ick,	CK_242X),
--	CLK(NULL,	"gpt8_fck",	&gpt8_fck,	CK_242X),
--	CLK(NULL,	"gpt9_ick",	&gpt9_ick,	CK_242X),
--	CLK(NULL,	"gpt9_fck",	&gpt9_fck,	CK_242X),
--	CLK(NULL,	"gpt10_ick",	&gpt10_ick,	CK_242X),
--	CLK(NULL,	"gpt10_fck",	&gpt10_fck,	CK_242X),
--	CLK(NULL,	"gpt11_ick",	&gpt11_ick,	CK_242X),
--	CLK(NULL,	"gpt11_fck",	&gpt11_fck,	CK_242X),
--	CLK(NULL,	"gpt12_ick",	&gpt12_ick,	CK_242X),
--	CLK(NULL,	"gpt12_fck",	&gpt12_fck,	CK_242X),
--	CLK("omap-mcbsp.1", "ick",	&mcbsp1_ick,	CK_242X),
--	CLK(NULL,	"mcbsp1_fck",	&mcbsp1_fck,	CK_242X),
--	CLK("omap-mcbsp.2", "ick",	&mcbsp2_ick,	CK_242X),
--	CLK(NULL,	"mcbsp2_fck",	&mcbsp2_fck,	CK_242X),
--	CLK("omap2_mcspi.1", "ick",	&mcspi1_ick,	CK_242X),
--	CLK(NULL,	"mcspi1_fck",	&mcspi1_fck,	CK_242X),
--	CLK("omap2_mcspi.2", "ick",	&mcspi2_ick,	CK_242X),
--	CLK(NULL,	"mcspi2_fck",	&mcspi2_fck,	CK_242X),
--	CLK(NULL,	"uart1_ick",	&uart1_ick,	CK_242X),
--	CLK(NULL,	"uart1_fck",	&uart1_fck,	CK_242X),
--	CLK(NULL,	"uart2_ick",	&uart2_ick,	CK_242X),
--	CLK(NULL,	"uart2_fck",	&uart2_fck,	CK_242X),
--	CLK(NULL,	"uart3_ick",	&uart3_ick,	CK_242X),
--	CLK(NULL,	"uart3_fck",	&uart3_fck,	CK_242X),
--	CLK(NULL,	"gpios_ick",	&gpios_ick,	CK_242X),
--	CLK(NULL,	"gpios_fck",	&gpios_fck,	CK_242X),
--	CLK("omap_wdt",	"ick",		&mpu_wdt_ick,	CK_242X),
--	CLK(NULL,	"mpu_wdt_fck",	&mpu_wdt_fck,	CK_242X),
--	CLK(NULL,	"sync_32k_ick",	&sync_32k_ick,	CK_242X),
--	CLK(NULL,	"wdt1_ick",	&wdt1_ick,	CK_242X),
--	CLK(NULL,	"omapctrl_ick",	&omapctrl_ick,	CK_242X),
--	CLK("omap24xxcam", "fck",	&cam_fck,	CK_242X),
--	CLK("omap24xxcam", "ick",	&cam_ick,	CK_242X),
--	CLK(NULL,	"mailboxes_ick", &mailboxes_ick,	CK_242X),
--	CLK(NULL,	"wdt4_ick",	&wdt4_ick,	CK_242X),
--	CLK(NULL,	"wdt4_fck",	&wdt4_fck,	CK_242X),
--	CLK(NULL,	"wdt3_ick",	&wdt3_ick,	CK_242X),
--	CLK(NULL,	"wdt3_fck",	&wdt3_fck,	CK_242X),
--	CLK(NULL,	"mspro_ick",	&mspro_ick,	CK_242X),
--	CLK(NULL,	"mspro_fck",	&mspro_fck,	CK_242X),
--	CLK("mmci-omap.0", "ick",	&mmc_ick,	CK_242X),
--	CLK("mmci-omap.0", "fck",	&mmc_fck,	CK_242X),
--	CLK(NULL,	"fac_ick",	&fac_ick,	CK_242X),
--	CLK(NULL,	"fac_fck",	&fac_fck,	CK_242X),
--	CLK(NULL,	"eac_ick",	&eac_ick,	CK_242X),
--	CLK(NULL,	"eac_fck",	&eac_fck,	CK_242X),
--	CLK("omap_hdq.0", "ick",	&hdq_ick,	CK_242X),
--	CLK("omap_hdq.0", "fck",	&hdq_fck,	CK_242X),
--	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_242X),
--	CLK(NULL,	"i2c1_fck",	&i2c1_fck,	CK_242X),
--	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_242X),
--	CLK(NULL,	"i2c2_fck",	&i2c2_fck,	CK_242X),
--	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_242X),
--	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_242X),
--	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_242X),
--	CLK(NULL,	"sdrc_ick",	&sdrc_ick,	CK_242X),
--	CLK(NULL,	"vlynq_ick",	&vlynq_ick,	CK_242X),
--	CLK(NULL,	"vlynq_fck",	&vlynq_fck,	CK_242X),
--	CLK(NULL,	"des_ick",	&des_ick,	CK_242X),
--	CLK("omap-sham",	"ick",	&sha_ick,	CK_242X),
--	CLK("omap_rng",	"ick",		&rng_ick,	CK_242X),
--	CLK("omap-aes",	"ick",	&aes_ick,	CK_242X),
--	CLK(NULL,	"pka_ick",	&pka_ick,	CK_242X),
--	CLK(NULL,	"usb_fck",	&usb_fck,	CK_242X),
--	CLK("musb-hdrc",	"fck",	&osc_ck,	CK_242X),
--	CLK("omap_timer.1",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.2",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.3",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.4",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.5",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.6",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.7",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.8",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.9",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.10",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.11",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.12",	"32k_ck",	&func_32k_ck,	CK_243X),
--	CLK("omap_timer.1",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.2",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.3",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.4",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.5",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.6",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.7",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.8",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.9",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.10",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.11",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.12",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.1",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.2",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.3",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.4",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.5",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.6",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.7",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.8",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.9",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.10",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.11",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.12",	"alt_ck",	&alt_ck,	CK_243X),
--};
--
--/*
-- * init code
-- */
--
--int __init omap2420_clk_init(void)
--{
--	const struct prcm_config *prcm;
--	struct omap_clk *c;
--	u32 clkrate;
--
--	prcm_clksrc_ctrl = OMAP2420_PRCM_CLKSRC_CTRL;
--	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
--	cpu_mask = RATE_IN_242X;
--	rate_table = omap2420_rate_table;
--
--	clk_init(&omap2_clk_functions);
--
--	for (c = omap2420_clks; c < omap2420_clks + ARRAY_SIZE(omap2420_clks);
--	     c++)
--		clk_preinit(c->lk.clk);
--
--	osc_ck.rate = omap2_osc_clk_recalc(&osc_ck);
--	propagate_rate(&osc_ck);
--	sys_ck.rate = omap2xxx_sys_clk_recalc(&sys_ck);
--	propagate_rate(&sys_ck);
--
--	for (c = omap2420_clks; c < omap2420_clks + ARRAY_SIZE(omap2420_clks);
--	     c++) {
--		clkdev_add(&c->lk);
--		clk_register(c->lk.clk);
--		omap2_init_clk_clkdm(c->lk.clk);
--	}
--
--	/* Disable autoidle on all clocks; let the PM code enable it later */
--	omap_clk_disable_autoidle_all();
--
--	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sys_ck.rate)
--			continue;
--		if (prcm->dpll_speed <= clkrate)
--			break;
--	}
--	curr_prcm_set = prcm;
--
--	recalculate_root_clocks();
--
--	pr_info("Clocking rate (Crystal/DPLL/MPU): %ld.%01ld/%ld/%ld MHz\n",
--		(sys_ck.rate / 1000000), (sys_ck.rate / 100000) % 10,
--		(dpll_ck.rate / 1000000), (mpu_ck.rate / 1000000)) ;
--
--	/*
--	 * Only enable those clocks we will need, let the drivers
--	 * enable other clocks as necessary
--	 */
--	clk_enable_init_clocks();
--
--	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
--	vclk = clk_get(NULL, "virt_prcm_set");
--	sclk = clk_get(NULL, "sys_ck");
--	dclk = clk_get(NULL, "dpll_ck");
--
--	return 0;
--}
--
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-deleted file mode 100644
-index 3b4d09a..0000000
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ /dev/null
-@@ -1,2108 +0,0 @@
--/*
-- * OMAP2430 clock data
-- *
-- * Copyright (C) 2005-2009 Texas Instruments, Inc.
-- * Copyright (C) 2004-2011 Nokia Corporation
-- *
-- * Contacts:
-- * Richard Woodruff <r-woodruff2@ti.com>
-- * Paul Walmsley
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/list.h>
--
--#include <plat/hardware.h>
--#include <plat/clkdev_omap.h>
--
--#include "iomap.h"
--#include "clock.h"
--#include "clock2xxx.h"
--#include "opp2xxx.h"
--#include "cm2xxx_3xxx.h"
--#include "prm2xxx_3xxx.h"
--#include "prm-regbits-24xx.h"
--#include "cm-regbits-24xx.h"
--#include "sdrc.h"
--#include "control.h"
--
--#define OMAP_CM_REGADDR			OMAP2430_CM_REGADDR
--
--/*
-- * 2430 clock tree.
-- *
-- * NOTE:In many cases here we are assigning a 'default' parent. In
-- *	many cases the parent is selectable. The set parent calls will
-- *	also switch sources.
-- *
-- *	Several sources are given initial rates which may be wrong, this will
-- *	be fixed up in the init func.
-- *
-- *	Things are broadly separated below by clock domains. It is
-- *	noteworthy that most peripherals have dependencies on multiple clock
-- *	domains. Many get their interface clocks from the L4 domain, but get
-- *	functional clocks from fixed sources or other core domain derived
-- *	clocks.
-- */
--
--/* Base external input clocks */
--static struct clk func_32k_ck = {
--	.name		= "func_32k_ck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--static struct clk secure_32k_ck = {
--	.name		= "secure_32k_ck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--/* Typical 12/13MHz in standalone mode, will be 26Mhz in chassis mode */
--static struct clk osc_ck = {		/* (*12, *13, 19.2, *26, 38.4)MHz */
--	.name		= "osc_ck",
--	.ops		= &clkops_oscck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_osc_clk_recalc,
--};
--
--/* Without modem likely 12MHz, with modem likely 13MHz */
--static struct clk sys_ck = {		/* (*12, *13, 19.2, 26, 38.4)MHz */
--	.name		= "sys_ck",		/* ~ ref_clk also */
--	.ops		= &clkops_null,
--	.parent		= &osc_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2xxx_sys_clk_recalc,
--};
--
--static struct clk alt_ck = {		/* Typical 54M or 48M, may not exist */
--	.name		= "alt_ck",
--	.ops		= &clkops_null,
--	.rate		= 54000000,
--	.clkdm_name	= "wkup_clkdm",
--};
--
--/* Optional external clock input for McBSP CLKS */
--static struct clk mcbsp_clks = {
--	.name		= "mcbsp_clks",
--	.ops		= &clkops_null,
--};
--
--/*
-- * Analog domain root source clocks
-- */
--
--/* dpll_ck, is broken out in to special cases through clksel */
--/* REVISIT: Rate changes on dpll_ck trigger a full set change.	...
-- * deal with this
-- */
--
--static struct dpll_data dpll_dd = {
--	.mult_div1_reg		= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.mult_mask		= OMAP24XX_DPLL_MULT_MASK,
--	.div1_mask		= OMAP24XX_DPLL_DIV_MASK,
--	.clk_bypass		= &sys_ck,
--	.clk_ref		= &sys_ck,
--	.control_reg		= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_mask		= OMAP24XX_EN_DPLL_MASK,
--	.max_multiplier		= 1023,
--	.min_divider		= 1,
--	.max_divider		= 16,
--};
--
--/*
-- * XXX Cannot add round_rate here yet, as this is still a composite clock,
-- * not just a DPLL
-- */
--static struct clk dpll_ck = {
--	.name		= "dpll_ck",
--	.ops		= &clkops_omap2xxx_dpll_ops,
--	.parent		= &sys_ck,		/* Can be func_32k also */
--	.dpll_data	= &dpll_dd,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_dpllcore_recalc,
--	.set_rate	= &omap2_reprogram_dpllcore,
--};
--
--static struct clk apll96_ck = {
--	.name		= "apll96_ck",
--	.ops		= &clkops_apll96,
--	.parent		= &sys_ck,
--	.rate		= 96000000,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP24XX_EN_96M_PLL_SHIFT,
--};
--
--static struct clk apll54_ck = {
--	.name		= "apll54_ck",
--	.ops		= &clkops_apll54,
--	.parent		= &sys_ck,
--	.rate		= 54000000,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP24XX_EN_54M_PLL_SHIFT,
--};
--
--/*
-- * PRCM digital base sources
-- */
--
--/* func_54m_ck */
--
--static const struct clksel_rate func_54m_apll54_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate func_54m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel func_54m_clksel[] = {
--	{ .parent = &apll54_ck, .rates = func_54m_apll54_rates, },
--	{ .parent = &alt_ck,	.rates = func_54m_alt_rates, },
--	{ .parent = NULL },
--};
--
--static struct clk func_54m_ck = {
--	.name		= "func_54m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll54_ck,	/* can also be alt_clk */
--	.clkdm_name	= "wkup_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_54M_SOURCE_MASK,
--	.clksel		= func_54m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk core_ck = {
--	.name		= "core_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll_ck,		/* can also be 32k */
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* func_96m_ck */
--static const struct clksel_rate func_96m_apll96_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate func_96m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_243X },
--	{ .div = 0 },
--};
--
--static const struct clksel func_96m_clksel[] = {
--	{ .parent = &apll96_ck,	.rates = func_96m_apll96_rates },
--	{ .parent = &alt_ck,	.rates = func_96m_alt_rates },
--	{ .parent = NULL }
--};
--
--static struct clk func_96m_ck = {
--	.name		= "func_96m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll96_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP2430_96M_SOURCE_MASK,
--	.clksel		= func_96m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* func_48m_ck */
--
--static const struct clksel_rate func_48m_apll96_rates[] = {
--	{ .div = 2, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate func_48m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel func_48m_clksel[] = {
--	{ .parent = &apll96_ck,	.rates = func_48m_apll96_rates },
--	{ .parent = &alt_ck, .rates = func_48m_alt_rates },
--	{ .parent = NULL }
--};
--
--static struct clk func_48m_ck = {
--	.name		= "func_48m_ck",
--	.ops		= &clkops_null,
--	.parent		= &apll96_ck,	 /* 96M or Alt */
--	.clkdm_name	= "wkup_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_48M_SOURCE_MASK,
--	.clksel		= func_48m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk func_12m_ck = {
--	.name		= "func_12m_ck",
--	.ops		= &clkops_null,
--	.parent		= &func_48m_ck,
--	.fixed_div	= 4,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--/* Secure timer, only available in secure mode */
--static struct clk wdt1_osc_ck = {
--	.name		= "ck_wdt1_osc",
--	.ops		= &clkops_null, /* RMK: missing? */
--	.parent		= &osc_ck,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The common_clkout* clksel_rate structs are common to
-- * sys_clkout, sys_clkout_src, sys_clkout2, and sys_clkout2_src.
-- * sys_clkout2_* are 2420-only, so the
-- * clksel_rate flags fields are inaccurate for those clocks. This is
-- * harmless since access to those clocks are gated by the struct clk
-- * flags fields, which mark them as 2420-only.
-- */
--static const struct clksel_rate common_clkout_src_core_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_96m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_clkout_src_54m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel common_clkout_src_clksel[] = {
--	{ .parent = &core_ck,	  .rates = common_clkout_src_core_rates },
--	{ .parent = &sys_ck,	  .rates = common_clkout_src_sys_rates },
--	{ .parent = &func_96m_ck, .rates = common_clkout_src_96m_rates },
--	{ .parent = &func_54m_ck, .rates = common_clkout_src_54m_rates },
--	{ .parent = NULL }
--};
--
--static struct clk sys_clkout_src = {
--	.name		= "sys_clkout_src",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP2430_PRCM_CLKOUT_CTRL,
--	.enable_bit	= OMAP24XX_CLKOUT_EN_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP2430_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP24XX_CLKOUT_SOURCE_MASK,
--	.clksel		= common_clkout_src_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static const struct clksel_rate common_clkout_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 8, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 16, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel sys_clkout_clksel[] = {
--	{ .parent = &sys_clkout_src, .rates = common_clkout_rates },
--	{ .parent = NULL }
--};
--
--static struct clk sys_clkout = {
--	.name		= "sys_clkout",
--	.ops		= &clkops_null,
--	.parent		= &sys_clkout_src,
--	.clkdm_name	= "wkup_clkdm",
--	.clksel_reg	= OMAP2430_PRCM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP24XX_CLKOUT_DIV_MASK,
--	.clksel		= sys_clkout_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk emul_ck = {
--	.name		= "emul_ck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP2430_PRCM_CLKEMUL_CTRL,
--	.enable_bit	= OMAP24XX_EMULATION_EN_SHIFT,
--	.recalc		= &followparent_recalc,
--
--};
--
--/*
-- * MPU clock domain
-- *	Clocks:
-- *		MPU_FCLK, MPU_ICLK
-- *		INT_M_FCLK, INT_M_I_CLK
-- *
-- * - Individual clocks are hardware managed.
-- * - Base divider comes from: CM_CLKSEL_MPU
-- *
-- */
--static const struct clksel_rate mpu_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel mpu_clksel[] = {
--	{ .parent = &core_ck, .rates = mpu_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mpu_ck = {	/* Control cpu */
--	.name		= "mpu_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.clkdm_name	= "mpu_clkdm",
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(MPU_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_MPU_MASK,
--	.clksel		= mpu_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * DSP (2430-IVA2.1) clock domain
-- * Clocks:
-- *	2430: IVA2.1_FCLK (really just DSP_FCLK), IVA2.1_ICLK
-- *
-- * Won't be too specific here. The core clock comes into this block
-- * it is divided then tee'ed. One branch goes directly to xyz enable
-- * controls. The other branch gets further divided by 2 then possibly
-- * routed into a synchronizer and out of clocks abc.
-- */
--static const struct clksel_rate dsp_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 0 },
--};
--
--static const struct clksel dsp_fck_clksel[] = {
--	{ .parent = &core_ck, .rates = dsp_fck_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dsp_fck = {
--	.name		= "dsp_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "dsp_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSP_MASK,
--	.clksel		= dsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel dsp_ick_clksel[] = {
--	{ .parent = &dsp_fck, .rates = dsp_ick_rates },
--	{ .parent = NULL }
--};
--
--/* 2430 only - EN_DSP controls both dsp fclk and iclk on 2430 */
--static struct clk iva2_1_ick = {
--	.name		= "iva2_1_ick",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dsp_fck,
--	.clkdm_name	= "dsp_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSP_IF_MASK,
--	.clksel		= dsp_ick_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * L3 clock domain
-- * L3 clocks are used for both interface and functional clocks to
-- * multiple entities. Some of these clocks are completely managed
-- * by hardware, and some others allow software control. Hardware
-- * managed ones general are based on directly CLK_REQ signals and
-- * various auto idle settings. The functional spec sets many of these
-- * as 'tie-high' for their enables.
-- *
-- * I-CLOCKS:
-- *	L3-Interconnect, SMS, GPMC, SDRC, OCM_RAM, OCM_ROM, SDMA
-- *	CAM, HS-USB.
-- * F-CLOCK
-- *	SSI.
-- *
-- * GPMC memories and SDRC have timing and clock sensitive registers which
-- * may very well need notification when the clock changes. Currently for low
-- * operating points, these are taken care of in sleep.S.
-- */
--static const struct clksel_rate core_l3_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel core_l3_clksel[] = {
--	{ .parent = &core_ck, .rates = core_l3_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk core_l3_ck = {	/* Used for ick and fck, interconnect */
--	.name		= "core_l3_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_L3_MASK,
--	.clksel		= core_l3_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* usb_l4_ick */
--static const struct clksel_rate usb_l4_ick_core_l3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel usb_l4_ick_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = usb_l4_ick_core_l3_rates },
--	{ .parent = NULL },
--};
--
--/* It is unclear from TRM whether usb_l4_ick is really in L3 or L4 clkdm */
--static struct clk usb_l4_ick = {	/* FS-USB interface clock */
--	.name		= "usb_l4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_USB_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_USB_MASK,
--	.clksel		= usb_l4_ick_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * L4 clock management domain
-- *
-- * This domain contains lots of interface clocks from the L4 interface, some
-- * functional clocks.	Fixed APLL functional source clocks are managed in
-- * this domain.
-- */
--static const struct clksel_rate l4_core_l3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel l4_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = l4_core_l3_rates },
--	{ .parent = NULL }
--};
--
--static struct clk l4_ck = {		/* used both as an ick and fck */
--	.name		= "l4_ck",
--	.ops		= &clkops_null,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_L4_MASK,
--	.clksel		= l4_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * SSI is in L3 management domain, its direct parent is core not l3,
-- * many core power domain entities are grouped into the L3 clock
-- * domain.
-- * SSI_SSR_FCLK, SSI_SST_FCLK, SSI_L4_ICLK
-- *
-- * ssr = core/1/2/3/4/5, sst = 1/2 ssr.
-- */
--static const struct clksel_rate ssi_ssr_sst_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_243X },
--	{ .div = 0 }
--};
--
--static const struct clksel ssi_ssr_sst_fck_clksel[] = {
--	{ .parent = &core_ck, .rates = ssi_ssr_sst_fck_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk ssi_ssr_sst_fck = {
--	.name		= "ssi_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_SSI_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_SSI_MASK,
--	.clksel		= ssi_ssr_sst_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * Presumably this is the same as SSI_ICLK.
-- * TRM contradicts itself on what clockdomain SSI_ICLK is in
-- */
--static struct clk ssi_l4_ick = {
--	.name		= "ssi_l4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_SSI_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--
--/*
-- * GFX clock domain
-- *	Clocks:
-- * GFX_FCLK, GFX_ICLK
-- * GFX_CG1(2d), GFX_CG2(3d)
-- *
-- * GFX_FCLK runs from L3, and is divided by (1,2,3,4)
-- * The 2d and 3d clocks run at a hardware determined
-- * divided value of fclk.
-- *
-- */
--
--/* This clksel struct is shared between gfx_3d_fck and gfx_2d_fck */
--static const struct clksel gfx_fck_clksel[] = {
--	{ .parent = &core_l3_ck, .rates = gfx_l3_rates },
--	{ .parent = NULL },
--};
--
--static struct clk gfx_3d_fck = {
--	.name		= "gfx_3d_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_3D_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP_CLKSEL_GFX_MASK,
--	.clksel		= gfx_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk gfx_2d_fck = {
--	.name		= "gfx_2d_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_2D_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP_CLKSEL_GFX_MASK,
--	.clksel		= gfx_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* This interface clock does not have a CM_AUTOIDLE bit */
--static struct clk gfx_ick = {
--	.name		= "gfx_ick",		/* From l3 */
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "gfx_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP_EN_GFX_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * Modem clock domain (2430)
-- *	CLOCKS:
-- *		MDM_OSC_CLK
-- *		MDM_ICLK
-- * These clocks are usable in chassis mode only.
-- */
--static const struct clksel_rate mdm_ick_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_243X },
--	{ .div = 4, .val = 4, .flags = RATE_IN_243X },
--	{ .div = 6, .val = 6, .flags = RATE_IN_243X },
--	{ .div = 9, .val = 9, .flags = RATE_IN_243X },
--	{ .div = 0 }
--};
--
--static const struct clksel mdm_ick_clksel[] = {
--	{ .parent = &core_ck, .rates = mdm_ick_core_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mdm_ick = {		/* used both as a ick and fck */
--	.name		= "mdm_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_ck,
--	.clkdm_name	= "mdm_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP2430_CM_ICLKEN_MDM_EN_MDM_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP2430_CLKSEL_MDM_MASK,
--	.clksel		= mdm_ick_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mdm_osc_ck = {
--	.name		= "mdm_osc_ck",
--	.ops		= &clkops_omap2_mdmclk_dflt_wait,
--	.parent		= &osc_ck,
--	.clkdm_name	= "mdm_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP2430_EN_OSC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * DSS clock domain
-- * CLOCKs:
-- * DSS_L4_ICLK, DSS_L3_ICLK,
-- * DSS_CLK1, DSS_CLK2, DSS_54MHz_CLK
-- *
-- * DSS is both initiator and target.
-- */
--/* XXX Add RATE_NOT_VALIDATED */
--
--static const struct clksel_rate dss1_fck_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate dss1_fck_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_24XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_24XX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_24XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_24XX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_24XX },
--	{ .div = 9, .val = 9, .flags = RATE_IN_24XX },
--	{ .div = 12, .val = 12, .flags = RATE_IN_24XX },
--	{ .div = 16, .val = 16, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel dss1_fck_clksel[] = {
--	{ .parent = &sys_ck,  .rates = dss1_fck_sys_rates },
--	{ .parent = &core_ck, .rates = dss1_fck_core_rates },
--	{ .parent = NULL },
--};
--
--static struct clk dss_ick = {		/* Enables both L3,L4 ICLK's */
--	.name		= "dss_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ck,	/* really both l3 and l4 */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss1_fck = {
--	.name		= "dss1_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &core_ck,		/* Core or sys */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS1_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSS1_MASK,
--	.clksel		= dss1_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate dss2_fck_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate dss2_fck_48m_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel dss2_fck_clksel[] = {
--	{ .parent = &sys_ck,	  .rates = dss2_fck_sys_rates },
--	{ .parent = &func_48m_ck, .rates = dss2_fck_48m_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dss2_fck = {		/* Alt clk used in power management */
--	.name		= "dss2_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &sys_ck,		/* fixed at sys_ck or 48MHz */
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_DSS2_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_DSS2_MASK,
--	.clksel		= dss2_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk dss_54m_fck = {	/* Alt clk used in power management */
--	.name		= "dss_54m_fck",	/* 54m tv clk */
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_54m_ck,
--	.clkdm_name	= "dss_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_TV_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wu_l4_ick = {
--	.name		= "wu_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &sys_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * CORE power domain ICLK & FCLK defines.
-- * Many of the these can have more than one possible parent. Entries
-- * here will likely have an L4 interface parent, and may have multiple
-- * functional clock parents.
-- */
--static const struct clksel_rate gpt_alt_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel omap24xx_gpt_clksel[] = {
--	{ .parent = &func_32k_ck, .rates = gpt_32k_rates },
--	{ .parent = &sys_ck,	  .rates = gpt_sys_rates },
--	{ .parent = &alt_ck,	  .rates = gpt_alt_rates },
--	{ .parent = NULL },
--};
--
--static struct clk gpt1_ick = {
--	.name		= "gpt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt1_fck = {
--	.name		= "gpt1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT1_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--static struct clk gpt2_ick = {
--	.name		= "gpt2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt2_fck = {
--	.name		= "gpt2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT2_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT2_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt3_ick = {
--	.name		= "gpt3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt3_fck = {
--	.name		= "gpt3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT3_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT3_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt4_ick = {
--	.name		= "gpt4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt4_fck = {
--	.name		= "gpt4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT4_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT4_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt5_ick = {
--	.name		= "gpt5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT5_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt5_fck = {
--	.name		= "gpt5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT5_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT5_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt6_ick = {
--	.name		= "gpt6_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT6_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt6_fck = {
--	.name		= "gpt6_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT6_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT6_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt7_ick = {
--	.name		= "gpt7_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT7_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt7_fck = {
--	.name		= "gpt7_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT7_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT7_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt8_ick = {
--	.name		= "gpt8_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT8_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt8_fck = {
--	.name		= "gpt8_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT8_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT8_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt9_ick = {
--	.name		= "gpt9_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT9_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt9_fck = {
--	.name		= "gpt9_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT9_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT9_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt10_ick = {
--	.name		= "gpt10_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT10_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt10_fck = {
--	.name		= "gpt10_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT10_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT10_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt11_ick = {
--	.name		= "gpt11_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT11_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt11_fck = {
--	.name		= "gpt11_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT11_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT11_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt12_ick = {
--	.name		= "gpt12_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT12_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt12_fck = {
--	.name		= "gpt12_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &secure_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_GPT12_SHIFT,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
--	.clksel_mask	= OMAP24XX_CLKSEL_GPT12_MASK,
--	.clksel		= omap24xx_gpt_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp1_ick = {
--	.name		= "mcbsp1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel_rate common_mcbsp_96m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_24XX },
--	{ .div = 0 }
--};
--
--static const struct clksel mcbsp_fck_clksel[] = {
--	{ .parent = &func_96m_ck,  .rates = common_mcbsp_96m_rates },
--	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mcbsp1_fck = {
--	.name		= "mcbsp1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP1_SHIFT,
--	.clksel_reg	= OMAP243X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP1_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp2_ick = {
--	.name		= "mcbsp2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp2_fck = {
--	.name		= "mcbsp2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCBSP2_SHIFT,
--	.clksel_reg	= OMAP243X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP2_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp3_ick = {
--	.name		= "mcbsp3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp3_fck = {
--	.name		= "mcbsp3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP3_SHIFT,
--	.clksel_reg	= OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP3_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp4_ick = {
--	.name		= "mcbsp4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp4_fck = {
--	.name		= "mcbsp4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP4_SHIFT,
--	.clksel_reg	= OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP4_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp5_ick = {
--	.name		= "mcbsp5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP5_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp5_fck = {
--	.name		= "mcbsp5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MCBSP5_SHIFT,
--	.clksel_reg	= OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP5_CLKS_MASK,
--	.clksel		= mcbsp_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcspi1_ick = {
--	.name		= "mcspi1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi1_fck = {
--	.name		= "mcspi1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi2_ick = {
--	.name		= "mcspi2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi2_fck = {
--	.name		= "mcspi2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MCSPI2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi3_ick = {
--	.name		= "mcspi3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MCSPI3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi3_fck = {
--	.name		= "mcspi3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MCSPI3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_ick = {
--	.name		= "uart1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_fck = {
--	.name		= "uart1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart2_ick = {
--	.name		= "uart2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart2_fck = {
--	.name		= "uart2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_UART2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_ick = {
--	.name		= "uart3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP24XX_EN_UART3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_fck = {
--	.name		= "uart3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_UART3_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpios_ick = {
--	.name		= "gpios_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpios_fck = {
--	.name		= "gpios_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mpu_wdt_ick = {
--	.name		= "mpu_wdt_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mpu_wdt_fck = {
--	.name		= "mpu_wdt_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sync_32k_ick = {
--	.name		= "sync_32k_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.flags		= ENABLE_ON_INIT,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_32KSYNC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt1_ick = {
--	.name		= "wdt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_WDT1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk omapctrl_ick = {
--	.name		= "omapctrl_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.flags		= ENABLE_ON_INIT,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP24XX_EN_OMAPCTRL_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk icr_ick = {
--	.name		= "icr_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wu_l4_ick,
--	.clkdm_name	= "wkup_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP2430_EN_ICR_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk cam_ick = {
--	.name		= "cam_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_CAM_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * cam_fck controls both CAM_MCLK and CAM_FCLK.  It should probably be
-- * split into two separate clocks, since the parent clocks are different
-- * and the clockdomains are also different.
-- */
--static struct clk cam_fck = {
--	.name		= "cam_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_CAM_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mailboxes_ick = {
--	.name		= "mailboxes_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MAILBOXES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt4_ick = {
--	.name		= "wdt4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_WDT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt4_fck = {
--	.name		= "wdt4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_WDT4_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_ick = {
--	.name		= "mspro_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_MSPRO_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_fck = {
--	.name		= "mspro_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_MSPRO_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fac_ick = {
--	.name		= "fac_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_FAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fac_fck = {
--	.name		= "fac_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_FAC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_ick = {
--	.name		= "hdq_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP24XX_EN_HDQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_fck = {
--	.name		= "hdq_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_12m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP24XX_EN_HDQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * XXX This is marked as a 2420-only define, but it claims to be present
-- * on 2430 also.  Double-check.
-- */
--static struct clk i2c2_ick = {
--	.name		= "i2c2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2chs2_fck = {
--	.name		= "i2chs2_fck",
--	.ops		= &clkops_omap2430_i2chs_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_I2CHS2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * XXX This is marked as a 2420-only define, but it claims to be present
-- * on 2430 also.  Double-check.
-- */
--static struct clk i2c1_ick = {
--	.name		= "i2c1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP2420_EN_I2C1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2chs1_fck = {
--	.name		= "i2chs1_fck",
--	.ops		= &clkops_omap2430_i2chs_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_I2CHS1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-- * accesses derived from this data.
-- */
--static struct clk gpmc_fck = {
--	.name		= "gpmc_fck",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP24XX_AUTO_GPMC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sdma_fck = {
--	.name		= "sdma_fck",
--	.ops		= &clkops_null, /* RMK: missing? */
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-- * accesses derived from this data.
-- */
--static struct clk sdma_ick = {
--	.name		= "sdma_ick",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sdrc_ick = {
--	.name		= "sdrc_ick",
--	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &core_l3_ck,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP2430_EN_SDRC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk des_ick = {
--	.name		= "des_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_DES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sha_ick = {
--	.name		= "sha_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_SHA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk rng_ick = {
--	.name		= "rng_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_RNG_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk aes_ick = {
--	.name		= "aes_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_AES_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk pka_ick = {
--	.name		= "pka_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
--	.enable_bit	= OMAP24XX_EN_PKA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usb_fck = {
--	.name		= "usb_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_48m_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP24XX_EN_USB_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usbhs_ick = {
--	.name		= "usbhs_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l3_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_USBHS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs1_ick = {
--	.name		= "mmchs1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHS1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs1_fck = {
--	.name		= "mmchs1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHS1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs2_ick = {
--	.name		= "mmchs2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHS2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs2_fck = {
--	.name		= "mmchs2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_96m_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHS2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio5_ick = {
--	.name		= "gpio5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_GPIO5_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio5_fck = {
--	.name		= "gpio5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_GPIO5_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mdm_intc_ick = {
--	.name		= "mdm_intc_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP2430_EN_MDM_INTC_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchsdb1_fck = {
--	.name		= "mmchsdb1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHSDB1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchsdb2_fck = {
--	.name		= "mmchsdb2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &func_32k_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
--	.enable_bit	= OMAP2430_EN_MMCHSDB2_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * This clock is a composite clock which does entire set changes then
-- * forces a rebalance. It keys on the MPU speed, but it really could
-- * be any key speed part of a set in the rate table.
-- *
-- * to really change a set, you need memory table sets which get changed
-- * in sram, pre-notifiers & post notifiers, changing the top set, without
-- * having low level display recalc's won't work... this is why dpm notifiers
-- * work, isr's off, walk a list of clocks already _off_ and not messing with
-- * the bus.
-- *
-- * This clock should have no parent. It embodies the entire upper level
-- * active set. A parent will mess up some of the init also.
-- */
--static struct clk virt_prcm_set = {
--	.name		= "virt_prcm_set",
--	.ops		= &clkops_null,
--	.parent		= &mpu_ck,	/* Indexed by mpu speed, no parent */
--	.recalc		= &omap2_table_mpu_recalc,	/* sets are keyed on mpu rate */
--	.set_rate	= &omap2_select_table_rate,
--	.round_rate	= &omap2_round_to_table_rate,
--};
--
--
--/*
-- * clkdev integration
-- */
--
--static struct omap_clk omap2430_clks[] = {
--	/* external root sources */
--	CLK(NULL,	"func_32k_ck",	&func_32k_ck,	CK_243X),
--	CLK(NULL,	"secure_32k_ck", &secure_32k_ck, CK_243X),
--	CLK(NULL,	"osc_ck",	&osc_ck,	CK_243X),
--	CLK(NULL,	"sys_ck",	&sys_ck,	CK_243X),
--	CLK(NULL,	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,	CK_243X),
--	CLK("omap-mcbsp.2",	"pad_fck",	&mcbsp_clks,	CK_243X),
--	CLK("omap-mcbsp.3",	"pad_fck",	&mcbsp_clks,	CK_243X),
--	CLK("omap-mcbsp.4",	"pad_fck",	&mcbsp_clks,	CK_243X),
--	CLK("omap-mcbsp.5",	"pad_fck",	&mcbsp_clks,	CK_243X),
--	CLK(NULL,	"mcbsp_clks",	&mcbsp_clks,	CK_243X),
--	/* internal analog sources */
--	CLK(NULL,	"dpll_ck",	&dpll_ck,	CK_243X),
--	CLK(NULL,	"apll96_ck",	&apll96_ck,	CK_243X),
--	CLK(NULL,	"apll54_ck",	&apll54_ck,	CK_243X),
--	/* internal prcm root sources */
--	CLK(NULL,	"func_54m_ck",	&func_54m_ck,	CK_243X),
--	CLK(NULL,	"core_ck",	&core_ck,	CK_243X),
--	CLK("omap-mcbsp.1",	"prcm_fck",	&func_96m_ck,	CK_243X),
--	CLK("omap-mcbsp.2",	"prcm_fck",	&func_96m_ck,	CK_243X),
--	CLK("omap-mcbsp.3",	"prcm_fck",	&func_96m_ck,	CK_243X),
--	CLK("omap-mcbsp.4",	"prcm_fck",	&func_96m_ck,	CK_243X),
--	CLK("omap-mcbsp.5",	"prcm_fck",	&func_96m_ck,	CK_243X),
--	CLK(NULL,	"func_96m_ck",	&func_96m_ck,	CK_243X),
--	CLK(NULL,	"func_48m_ck",	&func_48m_ck,	CK_243X),
--	CLK(NULL,	"func_12m_ck",	&func_12m_ck,	CK_243X),
--	CLK(NULL,	"ck_wdt1_osc",	&wdt1_osc_ck,	CK_243X),
--	CLK(NULL,	"sys_clkout_src", &sys_clkout_src, CK_243X),
--	CLK(NULL,	"sys_clkout",	&sys_clkout,	CK_243X),
--	CLK(NULL,	"emul_ck",	&emul_ck,	CK_243X),
--	/* mpu domain clocks */
--	CLK(NULL,	"mpu_ck",	&mpu_ck,	CK_243X),
--	/* dsp domain clocks */
--	CLK(NULL,	"dsp_fck",	&dsp_fck,	CK_243X),
--	CLK(NULL,	"iva2_1_ick",	&iva2_1_ick,	CK_243X),
--	/* GFX domain clocks */
--	CLK(NULL,	"gfx_3d_fck",	&gfx_3d_fck,	CK_243X),
--	CLK(NULL,	"gfx_2d_fck",	&gfx_2d_fck,	CK_243X),
--	CLK(NULL,	"gfx_ick",	&gfx_ick,	CK_243X),
--	/* Modem domain clocks */
--	CLK(NULL,	"mdm_ick",	&mdm_ick,	CK_243X),
--	CLK(NULL,	"mdm_osc_ck",	&mdm_osc_ck,	CK_243X),
--	/* DSS domain clocks */
--	CLK("omapdss_dss",	"ick",		&dss_ick,	CK_243X),
--	CLK(NULL,	"dss1_fck",		&dss1_fck,	CK_243X),
--	CLK(NULL,	"dss2_fck",	&dss2_fck,	CK_243X),
--	CLK(NULL,	"dss_54m_fck",	&dss_54m_fck,	CK_243X),
--	/* L3 domain clocks */
--	CLK(NULL,	"core_l3_ck",	&core_l3_ck,	CK_243X),
--	CLK(NULL,	"ssi_fck",	&ssi_ssr_sst_fck, CK_243X),
--	CLK(NULL,	"usb_l4_ick",	&usb_l4_ick,	CK_243X),
--	/* L4 domain clocks */
--	CLK(NULL,	"l4_ck",	&l4_ck,		CK_243X),
--	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_243X),
--	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_243X),
--	/* virtual meta-group clock */
--	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_243X),
--	/* general l4 interface ck, multi-parent functional clk */
--	CLK(NULL,	"gpt1_ick",	&gpt1_ick,	CK_243X),
--	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_243X),
--	CLK(NULL,	"gpt2_ick",	&gpt2_ick,	CK_243X),
--	CLK(NULL,	"gpt2_fck",	&gpt2_fck,	CK_243X),
--	CLK(NULL,	"gpt3_ick",	&gpt3_ick,	CK_243X),
--	CLK(NULL,	"gpt3_fck",	&gpt3_fck,	CK_243X),
--	CLK(NULL,	"gpt4_ick",	&gpt4_ick,	CK_243X),
--	CLK(NULL,	"gpt4_fck",	&gpt4_fck,	CK_243X),
--	CLK(NULL,	"gpt5_ick",	&gpt5_ick,	CK_243X),
--	CLK(NULL,	"gpt5_fck",	&gpt5_fck,	CK_243X),
--	CLK(NULL,	"gpt6_ick",	&gpt6_ick,	CK_243X),
--	CLK(NULL,	"gpt6_fck",	&gpt6_fck,	CK_243X),
--	CLK(NULL,	"gpt7_ick",	&gpt7_ick,	CK_243X),
--	CLK(NULL,	"gpt7_fck",	&gpt7_fck,	CK_243X),
--	CLK(NULL,	"gpt8_ick",	&gpt8_ick,	CK_243X),
--	CLK(NULL,	"gpt8_fck",	&gpt8_fck,	CK_243X),
--	CLK(NULL,	"gpt9_ick",	&gpt9_ick,	CK_243X),
--	CLK(NULL,	"gpt9_fck",	&gpt9_fck,	CK_243X),
--	CLK(NULL,	"gpt10_ick",	&gpt10_ick,	CK_243X),
--	CLK(NULL,	"gpt10_fck",	&gpt10_fck,	CK_243X),
--	CLK(NULL,	"gpt11_ick",	&gpt11_ick,	CK_243X),
--	CLK(NULL,	"gpt11_fck",	&gpt11_fck,	CK_243X),
--	CLK(NULL,	"gpt12_ick",	&gpt12_ick,	CK_243X),
--	CLK(NULL,	"gpt12_fck",	&gpt12_fck,	CK_243X),
--	CLK("omap-mcbsp.1", "ick",	&mcbsp1_ick,	CK_243X),
--	CLK(NULL,	"mcbsp1_fck",	&mcbsp1_fck,	CK_243X),
--	CLK("omap-mcbsp.2", "ick",	&mcbsp2_ick,	CK_243X),
--	CLK(NULL,	"mcbsp2_fck",	&mcbsp2_fck,	CK_243X),
--	CLK("omap-mcbsp.3", "ick",	&mcbsp3_ick,	CK_243X),
--	CLK(NULL,	"mcbsp3_fck",	&mcbsp3_fck,	CK_243X),
--	CLK("omap-mcbsp.4", "ick",	&mcbsp4_ick,	CK_243X),
--	CLK(NULL,	"mcbsp4_fck",	&mcbsp4_fck,	CK_243X),
--	CLK("omap-mcbsp.5", "ick",	&mcbsp5_ick,	CK_243X),
--	CLK(NULL,	"mcbsp5_fck",	&mcbsp5_fck,	CK_243X),
--	CLK("omap2_mcspi.1", "ick",	&mcspi1_ick,	CK_243X),
--	CLK(NULL,	"mcspi1_fck",	&mcspi1_fck,	CK_243X),
--	CLK("omap2_mcspi.2", "ick",	&mcspi2_ick,	CK_243X),
--	CLK(NULL,	"mcspi2_fck",	&mcspi2_fck,	CK_243X),
--	CLK("omap2_mcspi.3", "ick",	&mcspi3_ick,	CK_243X),
--	CLK(NULL,	"mcspi3_fck",	&mcspi3_fck,	CK_243X),
--	CLK(NULL,	"uart1_ick",	&uart1_ick,	CK_243X),
--	CLK(NULL,	"uart1_fck",	&uart1_fck,	CK_243X),
--	CLK(NULL,	"uart2_ick",	&uart2_ick,	CK_243X),
--	CLK(NULL,	"uart2_fck",	&uart2_fck,	CK_243X),
--	CLK(NULL,	"uart3_ick",	&uart3_ick,	CK_243X),
--	CLK(NULL,	"uart3_fck",	&uart3_fck,	CK_243X),
--	CLK(NULL,	"gpios_ick",	&gpios_ick,	CK_243X),
--	CLK(NULL,	"gpios_fck",	&gpios_fck,	CK_243X),
--	CLK("omap_wdt",	"ick",		&mpu_wdt_ick,	CK_243X),
--	CLK(NULL,	"mpu_wdt_fck",	&mpu_wdt_fck,	CK_243X),
--	CLK(NULL,	"sync_32k_ick",	&sync_32k_ick,	CK_243X),
--	CLK(NULL,	"wdt1_ick",	&wdt1_ick,	CK_243X),
--	CLK(NULL,	"omapctrl_ick",	&omapctrl_ick,	CK_243X),
--	CLK(NULL,	"icr_ick",	&icr_ick,	CK_243X),
--	CLK("omap24xxcam", "fck",	&cam_fck,	CK_243X),
--	CLK("omap24xxcam", "ick",	&cam_ick,	CK_243X),
--	CLK(NULL,	"mailboxes_ick", &mailboxes_ick,	CK_243X),
--	CLK(NULL,	"wdt4_ick",	&wdt4_ick,	CK_243X),
--	CLK(NULL,	"wdt4_fck",	&wdt4_fck,	CK_243X),
--	CLK(NULL,	"mspro_ick",	&mspro_ick,	CK_243X),
--	CLK(NULL,	"mspro_fck",	&mspro_fck,	CK_243X),
--	CLK(NULL,	"fac_ick",	&fac_ick,	CK_243X),
--	CLK(NULL,	"fac_fck",	&fac_fck,	CK_243X),
--	CLK("omap_hdq.0", "ick",	&hdq_ick,	CK_243X),
--	CLK("omap_hdq.1", "fck",	&hdq_fck,	CK_243X),
--	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_243X),
--	CLK(NULL,	"i2chs1_fck",	&i2chs1_fck,	CK_243X),
--	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_243X),
--	CLK(NULL,	"i2chs2_fck",	&i2chs2_fck,	CK_243X),
--	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_243X),
--	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_243X),
--	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_243X),
--	CLK(NULL,	"sdrc_ick",	&sdrc_ick,	CK_243X),
--	CLK(NULL,	"des_ick",	&des_ick,	CK_243X),
--	CLK("omap-sham",	"ick",	&sha_ick,	CK_243X),
--	CLK("omap_rng",	"ick",		&rng_ick,	CK_243X),
--	CLK("omap-aes",	"ick",	&aes_ick,	CK_243X),
--	CLK(NULL,	"pka_ick",	&pka_ick,	CK_243X),
--	CLK(NULL,	"usb_fck",	&usb_fck,	CK_243X),
--	CLK("musb-omap2430",	"ick",	&usbhs_ick,	CK_243X),
--	CLK("omap_hsmmc.0", "ick",	&mmchs1_ick,	CK_243X),
--	CLK(NULL,	"mmchs1_fck",	&mmchs1_fck,	CK_243X),
--	CLK("omap_hsmmc.1", "ick",	&mmchs2_ick,	CK_243X),
--	CLK(NULL,	"mmchs2_fck",	&mmchs2_fck,	CK_243X),
--	CLK(NULL,	"gpio5_ick",	&gpio5_ick,	CK_243X),
--	CLK(NULL,	"gpio5_fck",	&gpio5_fck,	CK_243X),
--	CLK(NULL,	"mdm_intc_ick",	&mdm_intc_ick,	CK_243X),
--	CLK("omap_hsmmc.0", "mmchsdb_fck",	&mmchsdb1_fck,	CK_243X),
--	CLK("omap_hsmmc.1", "mmchsdb_fck",	&mmchsdb2_fck,	CK_243X),
--	CLK("omap_timer.1",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.2",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.3",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.4",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.5",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.6",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.7",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.8",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.9",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.10",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.11",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.12",	"32k_ck",  &func_32k_ck,   CK_243X),
--	CLK("omap_timer.1",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.2",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.3",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.4",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.5",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.6",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.7",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.8",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.9",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.10",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.11",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.12",	"sys_ck",	&sys_ck,	CK_243X),
--	CLK("omap_timer.1",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.2",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.3",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.4",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.5",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.6",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.7",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.8",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.9",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.10",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.11",	"alt_ck",	&alt_ck,	CK_243X),
--	CLK("omap_timer.12",	"alt_ck",	&alt_ck,	CK_243X),
--};
--
--/*
-- * init code
-- */
--
--int __init omap2430_clk_init(void)
--{
--	const struct prcm_config *prcm;
--	struct omap_clk *c;
--	u32 clkrate;
--
--	prcm_clksrc_ctrl = OMAP2430_PRCM_CLKSRC_CTRL;
--	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
--	cpu_mask = RATE_IN_243X;
--	rate_table = omap2430_rate_table;
--
--	clk_init(&omap2_clk_functions);
--
--	for (c = omap2430_clks; c < omap2430_clks + ARRAY_SIZE(omap2430_clks);
--	     c++)
--		clk_preinit(c->lk.clk);
--
--	osc_ck.rate = omap2_osc_clk_recalc(&osc_ck);
--	propagate_rate(&osc_ck);
--	sys_ck.rate = omap2xxx_sys_clk_recalc(&sys_ck);
--	propagate_rate(&sys_ck);
--
--	for (c = omap2430_clks; c < omap2430_clks + ARRAY_SIZE(omap2430_clks);
--	     c++) {
--		clkdev_add(&c->lk);
--		clk_register(c->lk.clk);
--		omap2_init_clk_clkdm(c->lk.clk);
--	}
--
--	/* Disable autoidle on all clocks; let the PM code enable it later */
--	omap_clk_disable_autoidle_all();
--
--	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sys_ck.rate)
--			continue;
--		if (prcm->dpll_speed <= clkrate)
--			break;
--	}
--	curr_prcm_set = prcm;
--
--	recalculate_root_clocks();
--
--	pr_info("Clocking rate (Crystal/DPLL/MPU): %ld.%01ld/%ld/%ld MHz\n",
--		(sys_ck.rate / 1000000), (sys_ck.rate / 100000) % 10,
--		(dpll_ck.rate / 1000000), (mpu_ck.rate / 1000000)) ;
--
--	/*
--	 * Only enable those clocks we will need, let the drivers
--	 * enable other clocks as necessary
--	 */
--	clk_enable_init_clocks();
--
--	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
--	vclk = clk_get(NULL, "virt_prcm_set");
--	sclk = clk_get(NULL, "sys_ck");
--	dclk = clk_get(NULL, "dpll_ck");
--
--	return 0;
--}
--
+-struct dpll_data {
+-	void __iomem		*mult_div1_reg;
+-	u32			mult_mask;
+-	u32			div1_mask;
+-	struct clk		*clk_bypass;
+-	struct clk		*clk_ref;
+-	void __iomem		*control_reg;
+-	u32			enable_mask;
+-	unsigned long		last_rounded_rate;
+-	u16			last_rounded_m;
+-	u16			max_multiplier;
+-	u8			last_rounded_n;
+-	u8			min_divider;
+-	u16			max_divider;
+-	u8			modes;
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+-	void __iomem		*autoidle_reg;
+-	void __iomem		*idlest_reg;
+-	u32			autoidle_mask;
+-	u32			freqsel_mask;
+-	u32			idlest_mask;
+-	u32			dco_mask;
+-	u32			sddiv_mask;
+-	u8			auto_recal_bit;
+-	u8			recal_en_bit;
+-	u8			recal_st_bit;
+-#  endif
+-	u8			flags;
+-};
+-
+-#endif
+-
+ /*
+  * struct clk.flags possibilities
+  *
+@@ -261,17 +131,8 @@ struct clk {
+ 	s8			usecount;
+ 	u8			fixed_div;
+ 	u8			flags;
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+-	void __iomem		*clksel_reg;
+-	u32			clksel_mask;
+-	const struct clksel	*clksel;
+-	struct dpll_data	*dpll_data;
+-	const char		*clkdm_name;
+-	struct clockdomain	*clkdm;
+-#else
+ 	u8			rate_offset;
+ 	u8			src_offset;
+-#endif
+ #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+ 	struct dentry		*dent;	/* For visible tree hierarchy */
+ #endif
+@@ -308,5 +169,4 @@ extern const struct clkops clkops_null;
+ 
+ extern struct clk dummy_ck;
+ 
+-#endif /* CONFIG_COMMON_CLK */
+ #endif
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index bb9274c..bb37511 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -40,7 +40,6 @@
+ #include <linux/spi/spi.h>
+ 
+ #include <plat/dma.h>
+-#include <plat/clock.h>
+ #include <plat/mcspi.h>
+ 
+ #define OMAP2_MCSPI_MAX_FREQ		48000000
 -- 
 1.7.1
