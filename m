@@ -1,84 +1,136 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 May 2012 20:41:39 -0500
-Subject: [PATCH V2 4/4] ARM: OMAP3+: PM: VP: ensure VP is idle before disable
+Date: Thu, 31 May 2012 20:41:37 -0500
+Subject: [PATCH V2 2/4] ARM: OMAP3+: PM: VP: move check of idle to separate
+ function
 In-Reply-To: <1338514899-3560-1-git-send-email-nm@ti.com>
 References: <1338514899-3560-1-git-send-email-nm@ti.com>
-Message-ID: <1338514899-3560-5-git-send-email-nm@ti.com>
+Message-ID: <1338514899-3560-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenbiao Wang <wwang@ti.com>
+In general, the idle check tends to be time sensitive so that the
+followon operation after the idle status verification is done in
+a timely manner. However, since we'd be using this in multiple
+places in follow-on patches, isolate this out to a separate inline
+function.
 
-Voltage Processor state machine transition to disable need to
-occur from IDLE state. When we transition OPP in a functioning
-system, the call sequence for an OPP transition is as follows:
-omap_sr_disable
-      -> sr class 3 disable
-           -> vp disable
-           -> sr disable
-forceupdate to voltage/frequency scale depending on which OPP
-we are transitioning to.
-
-If we hit a critical timing window where SR had commanded VP
-for a voltage transition and VP is in the middle of operating
-on that command, it needs to go through a few states before
-going to update state(where it actually sends the command to
-VC). Initial view of h/w owners is that the state disable of VP
-is expected to be sampled for the next transition.
-
-Instead, to be on a safer side, we ensure that the valid states
-of the VP state machine is diligently followed by software. This
-can be done by waiting for VP to be in idle  prior to disabling
-VP. Existing prints have been updated to ensure context is
-available on error messages.
-
-As part of this change, increase timeout for VP idle check to
-improbable 500uSec to be certain that system is indeed unable
-to continue before crashing out with error(worst case expectancy
-remains the same 3-100uSec depending on when we caught VP).
+As part of this change, convert the pr_warning to a rate limited
+warning as the situation is most probably going to stick around
+(since Voltage Processor state machine might be stuck) + a WARN_ONCE
+to ensure adequate attention is received. Document the information
+about idle timeout. Based on the idea from Kevin Hilman.
 
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Kevin Hilman <khilman@ti.com>
-
-[nm at ti.com: port from android]
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Wenbiao Wang <wwang@ti.com>
 ---
- arch/arm/mach-omap2/vp.c |    4 ++++
- arch/arm/mach-omap2/vp.h |    5 +++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/vp.c |   55 ++++++++++++++++++++++++++++++++++++----------
+ arch/arm/mach-omap2/vp.h |    6 ++++-
+ 2 files changed, 49 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index 2a8a085..9a72deb 100644
+index faefef7..4723879 100644
 --- a/arch/arm/mach-omap2/vp.c
 +++ b/arch/arm/mach-omap2/vp.c
-@@ -308,6 +308,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 		return;
- 	}
+@@ -1,5 +1,6 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/ratelimit.h>
  
+ #include "common.h"
+ 
+@@ -9,6 +10,45 @@
+ #include "prm-regbits-44xx.h"
+ #include "prm44xx.h"
+ 
++/**
++ * _vp_wait_for_idle() - wait for voltage processor to idle
++ * @voltdm:	voltage domain
++ * @vp:		voltage processor instance
++ *
++ * In some conditions, it is important to ensure that Voltage Processor
++ * is idle before performing operations on the Voltage Processor(VP).
++ * This is primarily to ensure that VP state machine does not enter into
++ * invalid state.
++ *
++ * Returns -ETIMEDOUT if timeout occurs - This could be critical failure
++ * as it indicates that Voltage processor might have it's state machine
++ * stuck up without recovering out(theoretically should never happen
++ * ofcourse). Returns 0 if idle state is detected.
++ *
++ * Note: callers are expected to ensure requisite checks are performed
++ * on the pointers passed.
++ */
++static inline int _vp_wait_for_idle(struct voltagedomain *voltdm,
++				    struct omap_vp_instance *vp)
++{
++	int timeout;
++
++	omap_test_timeout((voltdm->read(vp->vstatus) &
++			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
++			  timeout);
++
++	if (timeout >= VP_IDLE_TIMEOUT) {
++		/* Dont spam the console but ensure we catch attention */
++		pr_warn_ratelimited("%s: vdd_%s idle timedout\n",
++				    __func__, voltdm->name);
++		WARN_ONCE("vdd_%s idle timedout\n", voltdm->name);
++
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
+ static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
+ {
+ 	struct omap_vp_instance *vp = voltdm->vp;
+@@ -241,7 +281,6 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ {
+ 	struct omap_vp_instance *vp;
+ 	u32 vpconfig;
+-	int timeout;
+ 
+ 	if (!voltdm || IS_ERR(voltdm)) {
+ 		pr_warning("%s: VDD specified does not exist!\n", __func__);
+@@ -267,16 +306,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 	vpconfig &= ~vp->common->vpconfig_vpenable;
+ 	voltdm->write(vpconfig, vp->vpconfig);
+ 
+-	/*
+-	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
+-	 */
+-	omap_test_timeout((voltdm->read(vp->vstatus) &
+-			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
+-			  timeout);
+-
+-	if (timeout >= VP_IDLE_TIMEOUT)
+-		pr_warning("%s: vdd_%s idle timedout\n",
+-			__func__, voltdm->name);
 +	if (_vp_wait_for_idle(voltdm, vp)) {
-+		pr_warn_ratelimited("%s: vdd_%s timedout!Ignore and try\n",
++		pr_warn_ratelimited("%s: vdd_%s timedout after disable!!\n",
 +				    __func__, voltdm->name);
 +	}
- 	/* Disable VP */
- 	vpconfig = voltdm->read(vp->vpconfig);
- 	vpconfig &= ~vp->common->vpconfig_vpenable;
+ 
+ 	vp->enabled = false;
+ 
 diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 4655b39..4b4eeb6 100644
+index ac1d6cf..4655b39 100644
 --- a/arch/arm/mach-omap2/vp.h
 +++ b/arch/arm/mach-omap2/vp.h
-@@ -33,9 +33,10 @@ struct voltagedomain;
- /*
-  * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
-  * but worst case latencies could be around 3-200uS depending on where we
-- * interrupted VP's operation.
-+ * interrupted VP's operation. Use an improbable timeout value to be
-+ * sure that timeout events are beyond doubt.
-  */
--#define VP_IDLE_TIMEOUT		200
-+#define VP_IDLE_TIMEOUT		500
+@@ -30,7 +30,11 @@ struct voltagedomain;
+ #define OMAP4_VP_VDD_IVA_ID 1
+ #define OMAP4_VP_VDD_MPU_ID 2
+ 
+-/* XXX document */
++/*
++ * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
++ * but worst case latencies could be around 3-200uS depending on where we
++ * interrupted VP's operation.
++ */
+ #define VP_IDLE_TIMEOUT		200
  #define VP_TRANXDONE_TIMEOUT	300
  
- /**
 -- 
 1.7.9.5
