@@ -1,9 +1,9 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri,  1 Jun 2012 09:22:00 -0700
-Subject: [PATCH variant 1] ARM: Prevent KALLSYM size mismatch on ARM.
+Date: Fri,  1 Jun 2012 09:22:01 -0700
+Subject: [PATCH variant 2] ARM: Prevent KALLSYM size mismatch on ARM.
 In-Reply-To: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
 References: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1338567721-19514-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1338567721-19514-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -64,32 +64,28 @@ pass.  It's probably even possible for it to never reach a fixedpoint.
 
 The problem only occurs on non-SMP, when the per-cpu data is empty,
 and when the data segment has alignment (and immediately follows the
-text segments).  In these cases, add the THREAD_SIZE alignment above
-the per-cpu data so that the empty segment will always be adjacent to
-the data segment.
-
-This shouldn't ever change the size of the kernel, and only should
-affect the location of the per_cpu symbols, which contain no data.
+text segments).  Fix this by only including the per_cpu section on
+SMP, when it is not empty.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/kernel/vmlinux.lds.S |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/kernel/vmlinux.lds.S |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 43a31fb..f3778c7 100644
+index 43a31fb..36ff15b 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -183,6 +183,9 @@ SECTIONS
+@@ -183,7 +183,9 @@ SECTIONS
  	}
  #endif
  
-+#if !defined(CONFIG_SMP) && !defined(CONFIG_XIP_KERNEL)
-+	. = ALIGN(THREAD_SIZE);
-+#endif
++#ifdef CONFIG_SMP
  	PERCPU_SECTION(L1_CACHE_BYTES)
++#endif
  
  #ifdef CONFIG_XIP_KERNEL
+ 	__data_loc = ALIGN(4);		/* location in binary */
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
