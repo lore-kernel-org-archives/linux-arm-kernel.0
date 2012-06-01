@@ -1,136 +1,64 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 May 2012 20:41:37 -0500
-Subject: [PATCH V2 2/4] ARM: OMAP3+: PM: VP: move check of idle to separate
- function
-In-Reply-To: <1338514899-3560-1-git-send-email-nm@ti.com>
-References: <1338514899-3560-1-git-send-email-nm@ti.com>
-Message-ID: <1338514899-3560-3-git-send-email-nm@ti.com>
+From: thiago.bauermann@gmail.com (Thiago Jung Bauermann)
+Date: Thu, 31 May 2012 23:17:29 -0300
+Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
+ allocate memory
+In-Reply-To: <20120531133158.GY24238@titan.lakedaemon.net>
+References: <1338401183.22894.11.camel@hactar>
+ <20120531005109.GW24238@titan.lakedaemon.net>
+ <1338431047.1822.11.camel@hactar>
+ <20120531030931.GX24238@titan.lakedaemon.net>
+ <1338438730.4173.8.camel@hactar>
+ <20120531133158.GY24238@titan.lakedaemon.net>
+Message-ID: <1338517049.24549.9.camel@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general, the idle check tends to be time sensitive so that the
-followon operation after the idle status verification is done in
-a timely manner. However, since we'd be using this in multiple
-places in follow-on patches, isolate this out to a separate inline
-function.
+On Thu, 2012-05-31 at 09:31 -0400, Jason Cooper wrote:
+> On Thu, May 31, 2012 at 01:32:10AM -0300, Thiago Jung Bauermann wrote:
+> You may want to look at the kwboot patches to u-boot [1].  It's a
+> utility that allows you to load u-boot with only the serial port
+> connected.  Many have reported success with it.  This would then allow
+> you to add DT boot support (and fix a bunch of bugs in the stock
+> u-boot ;-) ).
 
-As part of this change, convert the pr_warning to a rate limited
-warning as the situation is most probably going to stick around
-(since Voltage Processor state machine might be stuck) + a WARN_ONCE
-to ensure adequate attention is received. Document the information
-about idle timeout. Based on the idea from Kevin Hilman.
+Thanks, I'll have a look. The impression I get though is that these
+things are still too recent to have settled, so if I flash an u-boot
+now, maybe I'll have to flash it again later. Might as well wait a bit
+and do it just once.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/vp.c |   55 ++++++++++++++++++++++++++++++++++++----------
- arch/arm/mach-omap2/vp.h |    6 ++++-
- 2 files changed, 49 insertions(+), 12 deletions(-)
+> > Is there a risk of damaging the board if it is accidentally booted with
+> > the wrong DTB or without one?
+> 
+> There's always a risk at this level.  The statement in the Kconfig is
+> true.  However, If you aren't willing to upgrade u-boot, you aren't
+> leaving too many other options.  Knives are dangerous, too.  People
+> still use them every day.  Just be careful.
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index faefef7..4723879 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -1,5 +1,6 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/ratelimit.h>
- 
- #include "common.h"
- 
-@@ -9,6 +10,45 @@
- #include "prm-regbits-44xx.h"
- #include "prm44xx.h"
- 
-+/**
-+ * _vp_wait_for_idle() - wait for voltage processor to idle
-+ * @voltdm:	voltage domain
-+ * @vp:		voltage processor instance
-+ *
-+ * In some conditions, it is important to ensure that Voltage Processor
-+ * is idle before performing operations on the Voltage Processor(VP).
-+ * This is primarily to ensure that VP state machine does not enter into
-+ * invalid state.
-+ *
-+ * Returns -ETIMEDOUT if timeout occurs - This could be critical failure
-+ * as it indicates that Voltage processor might have it's state machine
-+ * stuck up without recovering out(theoretically should never happen
-+ * ofcourse). Returns 0 if idle state is detected.
-+ *
-+ * Note: callers are expected to ensure requisite checks are performed
-+ * on the pointers passed.
-+ */
-+static inline int _vp_wait_for_idle(struct voltagedomain *voltdm,
-+				    struct omap_vp_instance *vp)
-+{
-+	int timeout;
-+
-+	omap_test_timeout((voltdm->read(vp->vstatus) &
-+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-+			  timeout);
-+
-+	if (timeout >= VP_IDLE_TIMEOUT) {
-+		/* Dont spam the console but ensure we catch attention */
-+		pr_warn_ratelimited("%s: vdd_%s idle timedout\n",
-+				    __func__, voltdm->name);
-+		WARN_ONCE("vdd_%s idle timedout\n", voltdm->name);
-+
-+		return -ETIMEDOUT;
-+	}
-+
-+	return 0;
-+}
-+
- static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
- {
- 	struct omap_vp_instance *vp = voltdm->vp;
-@@ -241,7 +281,6 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- {
- 	struct omap_vp_instance *vp;
- 	u32 vpconfig;
--	int timeout;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-@@ -267,16 +306,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 	vpconfig &= ~vp->common->vpconfig_vpenable;
- 	voltdm->write(vpconfig, vp->vpconfig);
- 
--	/*
--	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
--	 */
--	omap_test_timeout((voltdm->read(vp->vstatus) &
--			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
--			  timeout);
--
--	if (timeout >= VP_IDLE_TIMEOUT)
--		pr_warning("%s: vdd_%s idle timedout\n",
--			__func__, voltdm->name);
-+	if (_vp_wait_for_idle(voltdm, vp)) {
-+		pr_warn_ratelimited("%s: vdd_%s timedout after disable!!\n",
-+				    __func__, voltdm->name);
-+	}
- 
- 	vp->enabled = false;
- 
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index ac1d6cf..4655b39 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -30,7 +30,11 @@ struct voltagedomain;
- #define OMAP4_VP_VDD_IVA_ID 1
- #define OMAP4_VP_VDD_MPU_ID 2
- 
--/* XXX document */
-+/*
-+ * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
-+ * but worst case latencies could be around 3-200uS depending on where we
-+ * interrupted VP's operation.
-+ */
- #define VP_IDLE_TIMEOUT		200
- #define VP_TRANXDONE_TIMEOUT	300
- 
+If you have an accident with a knife at home, the worst that will happen
+is that you'll have to use a band-aid for a few days. On the other hand,
+when I go to the butcher I see him wearing a metal chain gauntlet when
+cutting meat. If he has an accident with *that* knife, he'll be in
+trouble. In both cases you are dealing with knives and in both cases you
+have to be careful... My question was, what kind of knife I'm dealing
+with here? ;-)
+
+I bought this Dreamplug for personal use and if it breaks, I won't buy
+another one. That's a different level of risk tolerance than someone
+who's
+working professionally on an ARM board, where breaking it is just cost
+of
+doing business. 
+
+> > Does it help if I test with only dreamplug-3.4.0.patch (which adds
+> > CONFIG_MACH_DREAMPLUG) applied?
+> 
+> Sure, see if the problem persists.  That would rule out the other
+> patches.
+
+I built a kernel with just that patch and it got stuck after
+uncompressing the kernel. I'll have to build a new one with
+CONFIG_ARM_PATCH_PHYS_VIRT disabled and try again tomorrow (I know, a
+newer u-boot works around/fixes this).
 -- 
-1.7.9.5
+[]'s
+Thiago Jung Bauermann
