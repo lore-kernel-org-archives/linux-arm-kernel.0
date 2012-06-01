@@ -1,68 +1,32 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 01 Jun 2012 19:31:08 +0200
-Subject: [PATCH 7/9] staging: nvec: add clk_prepare/clk_unprepare
-In-Reply-To: <1338541968-7961-8-git-send-email-pgaikwad@nvidia.com>
-References: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
- <1338541968-7961-8-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1505860.QOgf9duN2r@ax5200p>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 1 Jun 2012 10:58:46 -0700
+Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+Message-ID: <20120601175846.GA23978@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 June 2012 14:42:46 Prashant Gaikwad wrote:
-> Use clk_prepare/clk_unprepare as required by the generic clk framework.
+On 20120601-17:37, Rajendra Nayak wrote:
+> Hi,
 > 
-> This patch should go through Tegra tree since other patches to port Tegra
-> to generic clock framework are dependent on it. Posting here to get ack from
-> the maintainers.
+> This RFC series is based of Mikes' latest clk-next. I will
+> rebase it once 3.5-rc1 is out and post with more testing thats
+> in progress. Meanwhile, the RFC is for me to get some early
+> feedback on the patches.
 > 
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> This series retains the static clock declarations
 
-tested and ...
+Hi Rajendra,
 
-Acked-By: Marc Dietrich <marvin24@gmx.de>
+Thanks for sending this out.  FYI I'm looking into using bootmem to get
+rid of the terrible static init macros.  That's just something to
+consider for the future since I do not know when I will have time to
+implement that.
 
-> ---
->  drivers/staging/nvec/nvec.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-> index 3c60088..9356886 100644
-> --- a/drivers/staging/nvec/nvec.c
-> +++ b/drivers/staging/nvec/nvec.c
-> @@ -675,7 +675,7 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
-> {
->  	u32 val;
-> 
-> -	clk_enable(nvec->i2c_clk);
-> +	clk_prepare_enable(nvec->i2c_clk);
-> 
->  	tegra_periph_reset_assert(nvec->i2c_clk);
->  	udelay(2);
-> @@ -695,14 +695,14 @@ static void tegra_init_i2c_slave(struct nvec_chip
-> *nvec)
-> 
->  	enable_irq(nvec->irq);
-> 
-> -	clk_disable(nvec->i2c_clk);
-> +	clk_disable_unprepare(nvec->i2c_clk);
->  }
-> 
->  static void nvec_disable_i2c_slave(struct nvec_chip *nvec)
->  {
->  	disable_irq(nvec->irq);
->  	writel(I2C_SL_NEWSL | I2C_SL_NACK, nvec->base + I2C_SL_CNFG);
-> -	clk_disable(nvec->i2c_clk);
-> +	clk_disable_unprepare(nvec->i2c_clk);
->  }
-> 
->  static void nvec_power_off(void)
-> @@ -812,7 +812,7 @@ static int __devinit tegra_nvec_probe(struct
-> platform_device *pdev)
-> 
->  	tegra_init_i2c_slave(nvec);
-> 
-> -	clk_enable(i2c_clk);
-> +	clk_prepare_enable(i2c_clk);
-> 
-> 
->  	/* enable event reporting */
+Hopefully that change could make it possible to get rid of the static
+init macros entirely.  It won't block acceptance of these patches
+though.
+
+Regards,
+Mike
