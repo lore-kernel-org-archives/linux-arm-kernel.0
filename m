@@ -1,59 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 01 Jun 2012 06:54:48 -0700
-Subject: [PATCH] ARM: OMAP2+: OPP: Fix to ensure check of right oppdef
- after bad one
-In-Reply-To: <4FC86926.5050404@compulab.co.il> (Igor Grinberg's message of
- "Fri, 01 Jun 2012 10:03:02 +0300")
-References: <1337361979-19052-1-git-send-email-nm@ti.com>
- <87d35kx7qd.fsf@ti.com> <4FC86926.5050404@compulab.co.il>
-Message-ID: <87fwafuogn.fsf@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 1 Jun 2012 08:54:46 -0500
+Subject: [PATCHv2 0/3] omap3 and omap4: add device tree support for wdt
+In-Reply-To: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
+References: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
+Message-ID: <4FC8C9A6.1040206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
 
-> Hi Kevin, Nishanth,
->
-> On 06/01/12 02:15, Kevin Hilman wrote:
->> Nishanth Menon <nm@ti.com> writes:
->> 
->>> Commit 9fa2df6b90786301b175e264f5fa9846aba81a65
->>> (ARM: OMAP2+: OPP: allow OPP enumeration to continue if device is not present)
->>> makes the logic:
->>> for (i = 0; i < opp_def_size; i++) {
->>> 	<snip>
->>> 	if (!oh || !oh->od) {
->>> 		<snip>
->>> 		continue;
->>> 	}
->>> <snip>
->>> opp_def++;
->>> }
->>>
->>> In short, the moment we hit a "Bad OPP", we end up looping the list
->>> comparing against the bad opp definition pointer for the rest of the
->>> iteration count. Instead, increment opp_def in the for loop itself
->>> and allow continue to be used in code without much thought so that
->>> we check the next set of OPP definition pointers :)
->>>
->>> Cc: Kevin Hilman <khilman@ti.com>
->>> Cc: Steve Sakoman <steve@sakoman.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: linux-omap at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->> 
->> Good catch.
->> 
->> Queuing for my next set of PM fixes for v3.5-rc (branch: for_3.5/fixes/pm-2)
->
-> I think this should also apply for stable, right?
-> If it should, can you please add a
-> Cc: stable at vger.kernel.org
+On 05/31/2012 11:44 PM, jgq516 at gmail.com wrote:
+> From: Xiao Jiang <jgq516@gmail.com>
+> 
+> Changes compared to previous version:
+> - created document for omap wdt
+> - some modifications per the comments from Benoit and Jon
+> 
+> This series is based on latest Linus'tree, and also can be applied to dt branch
+> of linux-omap tree. Tested with omap4430 blaze board and am37xx board.
+> 
+> Xiao Jiang (3):
+>   arm/dts: add wdt node for omap3 and omap4
+>   OMAP: avoid build wdt platform device if with dt support
+>   watchdog: omap_wdt: add device tree support
+> 
+>  .../devicetree/bindings/watchdog/omap-wdt.txt      |   14 ++++++++++++++
+>  arch/arm/boot/dts/omap3.dtsi                       |    5 +++++
+>  arch/arm/boot/dts/omap4.dtsi                       |    5 +++++
+>  arch/arm/mach-omap2/devices.c                      |    2 +-
+>  drivers/watchdog/omap_wdt.c                        |    7 +++++++
+>  5 files changed, 32 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/omap-wdt.txt
 
-Yes, added.
+Thanks! Looks good to me.
 
-Thanks,
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-Kevin
+Cheers
+Jon
