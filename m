@@ -1,37 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jun 2012 04:42:39 -0700
-Subject: [RFC PATCH 09/11] ARM: OMAP4+: thermal: introduce bandgap
- temperature sensor
-In-Reply-To: <1337934361-1606-10-git-send-email-eduardo.valentin@ti.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-10-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <20120601114238.GP12766@atomide.com>
+Date: Fri, 1 Jun 2012 03:58:00 -0700
+Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
+In-Reply-To: <201205310922.18550.arnd@arndb.de>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <201205301843.51568.arnd@arndb.de>
+ <CAAe_U6LFFstds=iQ7cy7gM9vWbfRgf5z0gaRp_-bu0Qjx6eA1Q@mail.gmail.com>
+ <201205310922.18550.arnd@arndb.de>
+Message-ID: <20120601105759.GJ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eduardo Valentin <eduardo.valentin@ti.com> [120525 01:31]:
-> In the System Control Module, OMAP supplies a voltage reference
-> and a temperature sensor feature that are gathered in the band
-> gap voltage and temperature sensor (VBGAPTS) module. The band
-> gap provides current and voltage reference for its internal
-> circuits and other analog IP blocks. The analog-to-digital
-> converter (ADC) produces an output value that is proportional
-> to the silicon temperature.
+* Arnd Bergmann <arnd@arndb.de> [120531 02:26]:
+> On Thursday 31 May 2012, ABRAHAM, KISHON VIJAY wrote:
+> > >
+> > > Just put the devices you actually want into the device tree instead and
+> > > have them automatically created.
+> > 
+> > But shouldn't device tree support and non-device tree support co-exist
+> > till the non-device tree is completely knocked out of the kernel? Even
 > 
-> This patch provides a platform driver which expose this feature.
-> It is moduled as a MFD child of the System Control Module core
-> MFD driver.
-> 
-> This driver provides only APIs to access the device properties,
-> like temperature, thresholds and update rate.
+> Well, it's a new driver, so there is no regression in supporting it only
+> on DT-enabled boards. OMAP5 is DT-only anyway and OMAP4 only supports two
+> boards that should both be working with the generic DT code already.
 
-Here too you a better long term solution is probably to ioremap
-the temp sensor registers for the driver. That way alloc_mem_region()
-provides some checks so the driver won't stomp over other registers.
-
-If you need to use omap_ctrl_read/write here, then we should at
-least clearly understand and document why it needs to be done that
-way instead of following standard ioremap + readl/writel.
+I agree, let's keep the new omap4/5 drivers DT only.
 
 Regards,
 
