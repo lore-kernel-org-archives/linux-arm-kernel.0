@@ -1,54 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jun 2012 16:06:21 +0100
-Subject: [GIT PULL] CMA and ARM DMA-mapping updates for v3.5
-In-Reply-To: <015e01cd3daa$6d910e50$48b32af0$%szyprowski@samsung.com>
-References: <1337672417-10065-1-git-send-email-m.szyprowski@samsung.com>
- <20120529122932.GA24623@n2100.arm.linux.org.uk>
- <015e01cd3daa$6d910e50$48b32af0$%szyprowski@samsung.com>
-Message-ID: <20120601150621.GA9525@n2100.arm.linux.org.uk>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Fri, 1 Jun 2012 21:24:42 +0530
+Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
+In-Reply-To: <4FC8C288.5060200@ti.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <1338375394-16268-3-git-send-email-kishon@ti.com>
+ <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
+ <4FC63B8D.3070107@ti.com>
+ <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
+ <4FC8C288.5060200@ti.com>
+Message-ID: <CAAe_U6+3dCpvsX4WZDopa-V9G=cnhFzaMe49wWk6AoAVx6ESRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 04:50:45PM +0200, Marek Szyprowski wrote:
-> Hello,
-> 
-> On Tuesday, May 29, 2012 2:30 PM Russell King - ARM Linux wrote:
-> 
-> > I notice we have new warnings as a result of CMA being merged, though
-> > thankfully they're just in Kconfig:
-> > 
-> > warning: (ARM) selects CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS &&
-> > HAVE_MEMBLOCK && EXPERIMENTAL)
-> > 
-> > This seems totally weird: you're mandating that ARM must have CMA
-> > selected, but it's an experimental feature?  So you're implying that
-> > the entire ARM kernel becomes totally experimental for the next
-> > release cycle?
-> > 
-> > I think this needs fixing.
-> 
-> No, that wasn't my intention. I will provide a patch which removes unconditional dependency
-> on CMA - it will let one to disable CMA and use old allocation method if needed, but this 
-> requires a few more changes in the dma-mapping implementation. I wasn't aware of the 
-> consequences and no one has complained about this since v15 of CMA patches (Aug 2011).
+On Fri, Jun 1, 2012 at 6:54 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 6/1/2012 2:52 PM, ABRAHAM, KISHON VIJAY wrote:
+>>
+>> Hi Benoit,
+>>
+>> On Wed, May 30, 2012 at 8:53 PM, Cousson, Benoit<b-cousson@ti.com> ?wrote:
+>>>
+>>> On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
+>>>>
+>>>>
+>>>> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>
+>>>> ?wrote:
+>>>>>
+>>>>>
+>>>>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
+>>>>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now
+>>>>> added
+>>>>> (which can be used to control MODULEMODE) this clock node is removed.
+>>>>>
+>>>>> Cc: Benoit Cousson<b-cousson@ti.com>
+>>>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>>>>> ---
+>>>>> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
+>>>>
+>>>>
+>>>>
+>>>> Have you patched clock44xx_data.c manually or you have a patch for
+>>>> the clock_data autogen script to generate it ?
+>>>
+>>>
+>>>
+>>> I have a series that will remove all these clock nodes. I should be able
+>>> to
+>>> post that soon.
+>>>
+>>> Potentially at that time, Kishon might be able to drop that patch.
+>>
+>>
+>> Will you be sending a patch for *[RFC PATCH 1/5] arm: omap: hwmod:
+>> make *phy_48m* as the main_clk of ocp2scp* also or I have to keep that
+>> as part of my series?
+>
+>
+> Good point. In fact, I'm fixing both at the same time to avoid any bisect
+> issue.
 
-I've just been looking at the automatic build and boot logs, and CMA looks
-like it has the potential to cause regressions:
+Thanks :-)
 
-Linux version 3.4.0+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.3.5 (GCC) ) #1 PREEMPT Fri Jun 1 02:01:58 BST 2012
-CPU: ARMv7 Processor [411fc082] revision 2 (ARMv7), cr=10c53c7d
-CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-Machine: OMAP LDP board
-vmalloc area is too big, limiting to 976MB
-Reserving 2097152 bytes SDRAM for VRAM
-cma: CMA: failed to reserve 16 MiB
-...
-Kernel command line: console=ttyO2,115200n8 noinitrd vmalloc=1G mem=128M root=/dev/mmcblk0p2 rw ip=none rootdelay=2 video=omap24xxfb:rotation=270
-...
-NET: Registered protocol family 16
-initlevel:2=postcore, 16 registered initcalls
-DMA: failed to allocate 256 KiB pool for atomic coherent allocation
-
-I don't see any other failures, but that doesn't look good...
-
-Note that that command line has worked perfectly well up until now.
+-Kishon
