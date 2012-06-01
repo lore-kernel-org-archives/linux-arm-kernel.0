@@ -1,21 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jun 2012 11:39:44 +0100
-Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
- periodic callbacks
-In-Reply-To: <CAMj5Bkgca-KQ1xPDjeS6uskYN_jbLQRbQBtuPBz7teWz064aOw@mail.gmail.com>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
- <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
- <20120530080216.GH12217@n2100.arm.linux.org.uk>
- <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
- <20120531191757.GI12217@n2100.arm.linux.org.uk>
- <CAMj5Bkgca-KQ1xPDjeS6uskYN_jbLQRbQBtuPBz7teWz064aOw@mail.gmail.com>
-Message-ID: <20120601103944.GA21245@n2100.arm.linux.org.uk>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Fri, 1 Jun 2012 11:40:10 +0100
+Subject: pinctrl: group/pin identity mapping
+In-Reply-To: <4FC89437.1070304@parrot.com>
+References: <4FC89437.1070304@parrot.com>
+Message-ID: <20120601104010.GA26077@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2012 at 10:26:37AM +0800, zhangfei gao wrote:
-> Could we directly treat dma_tx_state.residue as "how many periods have expired"
+On Fri, Jun 01, 2012 at 12:06:47PM +0200, Gr?gor Boirie wrote:
+> Hi All,
+> 
+> I'm trying to implement pinctrl support for our new cortex based SoC.
+> Our driver should provide support for pinctrl/pinmux/pinconf combination
+> without device tree handling at the moment.
+> However, I'm afraid I misunderstand how groups relate to muxed pins and
+> I'd like to hear your suggestions.
+> 
+> Here's the HW: our I/O pins subsystem allows us to multiplex every
+> controllable pins using up to 4 mutually exclusive functions, i.e. there
+> is no notion of pin GROUP multiplexing at the HW level (one register per
+> pin is available to setup multiplexing and other electronic properties
+> like drive strength, pull up/down...).
 
-Why change the behaviour and add complexity to _both_ sides of the API,
-as well as confusion about what "residue" means?
+That sounds very much like how the Samsung system works, you might have
+a look at their implementation or get them to give you some feedback on
+the approach they took.
+
+I brought this to Linus' attention a couple of times when he was designing
+the system originally, so he may also have a good idea of what can be done.
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
