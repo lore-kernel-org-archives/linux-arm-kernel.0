@@ -1,47 +1,82 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun,  3 Jun 2012 13:42:41 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Dynamically assign interrupts for CPU PMIC
- on Cragganmore
-In-Reply-To: <1338727361-25243-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1338727361-25243-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1338727361-25243-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 1 Jun 2012 17:37:45 +0530
+Subject: [RFC 04/24] ARM: omap: hwmod: get rid of all omap_clk_get_by_name
+ usage
+In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+Message-ID: <1338552485-31325-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the WM831x driver uses irq_domain we can happily allow it to
-assign its own IRQs.
+Moving to COMMON clk for OMAP would mean we no longer use
+internal lookup mechanism like omap_clk_get_by_name().
+get rid of all its usage mostly from hwmod and omap_device
+code.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Also use IS_ERR_OR_NULL() for error checking.
+
+Based on original changes from Mike Turquette.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-s3c64xx/include/mach/crag6410.h |    3 +--
- arch/arm/mach-s3c64xx/mach-crag6410.c         |    1 -
- 2 files changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   12 ++++++------
+ arch/arm/plat-omap/omap_device.c |    6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/crag6410.h b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-index ec97c15..4c3c999 100644
---- a/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
-@@ -13,8 +13,7 @@
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 7aa73f8..6c7c322 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -559,8 +559,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 	if (!oh->main_clk)
+ 		return 0;
  
- #include <linux/gpio.h>
+-	oh->_clk = omap_clk_get_by_name(oh->main_clk);
+-	if (!oh->_clk) {
++	oh->_clk = clk_get(NULL, oh->main_clk);
++	if (IS_ERR_OR_NULL(oh->_clk)) {
+ 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			   oh->name, oh->main_clk);
+ 		return -EINVAL;
+@@ -595,8 +595,8 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+ 		if (!os->clk)
+ 			continue;
  
--#define BANFF_PMIC_IRQ_BASE		IRQ_BOARD_START
--#define GLENFARCLAS_PMIC_IRQ_BASE	(IRQ_BOARD_START + 64)
-+#define GLENFARCLAS_PMIC_IRQ_BASE	IRQ_BOARD_START
+-		c = omap_clk_get_by_name(os->clk);
+-		if (!c) {
++		c = clk_get(NULL, os->clk);
++		if (IS_ERR_OR_NULL(c)) {
+ 			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
+ 				   oh->name, os->clk);
+ 			ret = -EINVAL;
+@@ -622,8 +622,8 @@ static int _init_opt_clks(struct omap_hwmod *oh)
+ 	int ret = 0;
  
- #define PCA935X_GPIO_BASE		GPIO_BOARD_START
- #define CODEC_GPIO_BASE			(GPIO_BOARD_START + 8)
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index d0c352d..161c3b6 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -525,7 +525,6 @@ static struct wm831x_touch_pdata touch_pdata __initdata = {
+ 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
+-		c = omap_clk_get_by_name(oc->clk);
+-		if (!c) {
++		c = clk_get(NULL, oc->clk);
++		if (IS_ERR_OR_NULL(c)) {
+ 			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
+ 				   oh->name, oc->clk);
+ 			ret = -EINVAL;
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index d50cbc6..16bcace 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -266,10 +266,10 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+ 		return;
+ 	}
  
- static struct wm831x_pdata crag_pmic_pdata __initdata = {
- 	.wm831x_num = 1,
--	.irq_base = BANFF_PMIC_IRQ_BASE,
- 	.gpio_base = BANFF_PMIC_GPIO_BASE,
- 	.soft_shutdown = true,
+-	r = omap_clk_get_by_name(clk_name);
+-	if (IS_ERR(r)) {
++	r = clk_get(NULL, clk_name);
++	if (IS_ERR_OR_NULL(r)) {
+ 		dev_err(&od->pdev->dev,
+-			"omap_clk_get_by_name for %s failed\n", clk_name);
++			"clk_get for %s failed\n", clk_name);
+ 		return;
+ 	}
  
 -- 
-1.7.10
+1.7.1
