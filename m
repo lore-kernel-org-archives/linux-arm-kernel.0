@@ -1,63 +1,40 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Fri, 1 Jun 2012 21:24:42 +0530
-Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
-In-Reply-To: <4FC8C288.5060200@ti.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <1338375394-16268-3-git-send-email-kishon@ti.com>
- <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
- <4FC63B8D.3070107@ti.com>
- <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
- <4FC8C288.5060200@ti.com>
-Message-ID: <CAAe_U6+3dCpvsX4WZDopa-V9G=cnhFzaMe49wWk6AoAVx6ESRA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri,  1 Jun 2012 09:21:59 -0700
+Subject: [PATCH] ARM: two possible fixes for the KALLSYMS build problem
+Message-ID: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 1, 2012 at 6:54 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 6/1/2012 2:52 PM, ABRAHAM, KISHON VIJAY wrote:
->>
->> Hi Benoit,
->>
->> On Wed, May 30, 2012 at 8:53 PM, Cousson, Benoit<b-cousson@ti.com> ?wrote:
->>>
->>> On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
->>>>
->>>>
->>>> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>
->>>> ?wrote:
->>>>>
->>>>>
->>>>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
->>>>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now
->>>>> added
->>>>> (which can be used to control MODULEMODE) this clock node is removed.
->>>>>
->>>>> Cc: Benoit Cousson<b-cousson@ti.com>
->>>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->>>>> ---
->>>>> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
->>>>
->>>>
->>>>
->>>> Have you patched clock44xx_data.c manually or you have a patch for
->>>> the clock_data autogen script to generate it ?
->>>
->>>
->>>
->>> I have a series that will remove all these clock nodes. I should be able
->>> to
->>> post that soon.
->>>
->>> Potentially at that time, Kishon might be able to drop that patch.
->>
->>
->> Will you be sending a patch for *[RFC PATCH 1/5] arm: omap: hwmod:
->> make *phy_48m* as the main_clk of ocp2scp* also or I have to keep that
->> as part of my series?
->
->
-> Good point. In fact, I'm fixing both at the same time to avoid any bisect
-> issue.
+In trying to build numerous targets, I've managed to reproduce the
+problem with KALLSYMS enough to come up with some ideas for a fix.
+Neither of these fixes affects the size of the kernel.  I've compile
+tested all of the defconfigs that are present in the kernel, and
+neither causes any new compilation failures (several don't build).
 
-Thanks :-)
+The first fix adjusts the alignment of the per-cpu section, in the
+cases where it is blank.  If it has the same alignment as the
+following section, there won't be inconsistencies in the position when
+the kallsyms data is inserted.
 
--Kishon
+The second fix just eliminates the per_cpu section on non-smp builds.
+
+Either case only affects the position of an empty section, and should
+have no effect on the position or size of anything else.
+
+I think the second patch (eliminate the per-cpu section) is cleaner,
+but I'm concerned about something I've missed or changed.
+
+The second patch does make the per-cpu section smaller (since some
+symbols are left out).  It also affects the position of init_end, and
+may need a page alignment before it.  But, this would also suggest
+that currently, on SMP, there might be a page that isn't being freed.
+
+David Brown (1):
+  ARM: Prevent KALLSYM size mismatch on ARM.
+
+ arch/arm/kernel/vmlinux.lds.S |    3 +++
+ 1 file changed, 3 insertions(+)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
