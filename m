@@ -1,70 +1,101 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 1 Jun 2012 14:42:41 +0530
-Subject: [PATCH 2/9] i2c: tegra: Add clk_prepare/clk_unprepare
-In-Reply-To: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
-References: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1338541968-7961-3-git-send-email-pgaikwad@nvidia.com>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Fri, 01 Jun 2012 14:46:20 +0530
+Subject: [PATCH 26/27] arm, smpboot: Use generic SMP booting infrastructure
+In-Reply-To: <20120601090952.31979.24799.stgit@srivatsabhat.in.ibm.com>
+References: <20120601090952.31979.24799.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20120601091614.31979.39272.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_prepare/clk_unprepare as required by the generic clk framework.
+Convert arm to use the generic framework to boot secondary CPUs.
 
-This patch should go through Tegra tree since other patches to port tegra
-to generic clock framework are dependent on it. Posting here to get ack from
-the maintainers.
+Notes:
+The calls to local_irq_enable() and local_fiq_enable() which were there
+in secondary_start_kernel() originally, are retained in __cpu_post_online()
+since the generic code only calls local_irq_enable().
+Also, we were anyway going to enable interrupts in the generic code
+immediately after __cpu_post_online(), so its not like we enabled interrupts
+way too early.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
- drivers/i2c/busses/i2c-tegra.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 8b2e555..3da7ee3 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -341,7 +341,7 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
- 	u32 val;
- 	int err = 0;
+ arch/arm/kernel/smp.c |   26 +++++++++++++-------------
+ 1 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b735521..460b7e7 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/smpboot.h>
  
--	clk_enable(i2c_dev->clk);
-+	clk_prepare_enable(i2c_dev->clk);
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -227,6 +228,11 @@ static void percpu_timer_setup(void);
+  */
+ asmlinkage void __cpuinit secondary_start_kernel(void)
+ {
++	smpboot_start_secondary(NULL);
++}
++
++void __cpuinit __cpu_pre_starting(void *unused)
++{
+ 	struct mm_struct *mm = &init_mm;
+ 	unsigned int cpu = smp_processor_id();
  
- 	tegra_periph_reset_assert(i2c_dev->clk);
- 	udelay(2);
-@@ -372,7 +372,7 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
- 	if (tegra_i2c_flush_fifos(i2c_dev))
- 		err = -ETIMEDOUT;
+@@ -244,26 +250,25 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	printk("CPU%u: Booted secondary processor\n", cpu);
  
--	clk_disable(i2c_dev->clk);
-+	clk_disable_unprepare(i2c_dev->clk);
+ 	cpu_init();
+-	preempt_disable();
+ 	trace_hardirqs_off();
  
- 	if (i2c_dev->irq_disabled) {
- 		i2c_dev->irq_disabled = 0;
-@@ -546,14 +546,14 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
- 	if (i2c_dev->is_suspended)
- 		return -EBUSY;
+ 	/*
+ 	 * Give the platform a chance to do its own initialisation.
+ 	 */
+ 	platform_secondary_init(cpu);
++}
  
--	clk_enable(i2c_dev->clk);
-+	clk_prepare_enable(i2c_dev->clk);
- 	for (i = 0; i < num; i++) {
- 		int stop = (i == (num - 1)) ? 1  : 0;
- 		ret = tegra_i2c_xfer_msg(i2c_dev, &msgs[i], stop);
- 		if (ret)
- 			break;
- 	}
--	clk_disable(i2c_dev->clk);
-+	clk_disable_unprepare(i2c_dev->clk);
- 	return ret ?: i;
+-	notify_cpu_starting(cpu);
++void __cpuinit __cpu_pre_online(void *unused)
++{
++	unsigned int cpu = smp_processor_id();
+ 
+ 	calibrate_delay();
+ 
+ 	smp_store_cpu_info(cpu);
++}
+ 
+-	/*
+-	 * OK, now it's safe to let the boot CPU continue.  Wait for
+-	 * the CPU migration code to notice that the CPU is online
+-	 * before we continue - which happens after __cpu_up returns.
+-	 */
+-	set_cpu_online(cpu, true);
++void __cpuinit __cpu_post_online(void *unused)
++{
+ 	complete(&cpu_running);
+ 
+ 	/*
+@@ -273,11 +278,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 
+ 	local_irq_enable();
+ 	local_fiq_enable();
+-
+-	/*
+-	 * OK, it's off to the idle thread for us
+-	 */
+-	cpu_idle();
  }
  
-@@ -666,7 +666,7 @@ static int __devinit tegra_i2c_probe(struct platform_device *pdev)
- 		goto err_free;
- 	}
- 
--	clk_enable(i2c_dev->i2c_clk);
-+	clk_prepare_enable(i2c_dev->i2c_clk);
- 
- 	i2c_set_adapdata(&i2c_dev->adapter, i2c_dev);
- 	i2c_dev->adapter.owner = THIS_MODULE;
--- 
-1.7.4.1
+ void __init smp_cpus_done(unsigned int max_cpus)
