@@ -1,9 +1,9 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 1 Jun 2012 14:42:48 +0530
-Subject: [PATCH 9/9] crypto: add clk_prepare/clk_unprepare
+Date: Fri, 1 Jun 2012 14:42:46 +0530
+Subject: [PATCH 7/9] staging: nvec: add clk_prepare/clk_unprepare
 In-Reply-To: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
 References: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1338541968-7961-10-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <1338541968-7961-8-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,66 +15,47 @@ the maintainers.
 
 Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 ---
- drivers/crypto/tegra-aes.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/staging/nvec/nvec.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/crypto/tegra-aes.c b/drivers/crypto/tegra-aes.c
-index 422a976..ac236f6 100644
---- a/drivers/crypto/tegra-aes.c
-+++ b/drivers/crypto/tegra-aes.c
-@@ -572,7 +572,7 @@ static void aes_workqueue_handler(struct work_struct *work)
- 	struct tegra_aes_dev *dd = aes_dev;
- 	int ret;
+diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
+index 3c60088..9356886 100644
+--- a/drivers/staging/nvec/nvec.c
++++ b/drivers/staging/nvec/nvec.c
+@@ -675,7 +675,7 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
+ {
+ 	u32 val;
  
--	ret = clk_enable(dd->aes_clk);
-+	ret = clk_prepare_enable(dd->aes_clk);
- 	if (ret)
- 		BUG_ON("clock enable failed");
+-	clk_enable(nvec->i2c_clk);
++	clk_prepare_enable(nvec->i2c_clk);
  
-@@ -581,7 +581,7 @@ static void aes_workqueue_handler(struct work_struct *work)
- 		ret = tegra_aes_handle_req(dd);
- 	} while (!ret);
+ 	tegra_periph_reset_assert(nvec->i2c_clk);
+ 	udelay(2);
+@@ -695,14 +695,14 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
  
--	clk_disable(dd->aes_clk);
-+	clk_disable_unprepare(dd->aes_clk);
+ 	enable_irq(nvec->irq);
+ 
+-	clk_disable(nvec->i2c_clk);
++	clk_disable_unprepare(nvec->i2c_clk);
  }
  
- static irqreturn_t aes_irq(int irq, void *dev_id)
-@@ -673,7 +673,7 @@ static int tegra_aes_get_random(struct crypto_rng *tfm, u8 *rdata,
- 	/* take mutex to access the aes hw */
- 	mutex_lock(&aes_lock);
+ static void nvec_disable_i2c_slave(struct nvec_chip *nvec)
+ {
+ 	disable_irq(nvec->irq);
+ 	writel(I2C_SL_NEWSL | I2C_SL_NACK, nvec->base + I2C_SL_CNFG);
+-	clk_disable(nvec->i2c_clk);
++	clk_disable_unprepare(nvec->i2c_clk);
+ }
  
--	ret = clk_enable(dd->aes_clk);
-+	ret = clk_prepare_enable(dd->aes_clk);
- 	if (ret)
- 		return ret;
+ static void nvec_power_off(void)
+@@ -812,7 +812,7 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
  
-@@ -700,7 +700,7 @@ static int tegra_aes_get_random(struct crypto_rng *tfm, u8 *rdata,
- 	}
+ 	tegra_init_i2c_slave(nvec);
  
- out:
--	clk_disable(dd->aes_clk);
-+	clk_disable_unprepare(dd->aes_clk);
- 	mutex_unlock(&aes_lock);
+-	clk_enable(i2c_clk);
++	clk_prepare_enable(i2c_clk);
  
- 	dev_dbg(dd->dev, "%s: done\n", __func__);
-@@ -758,7 +758,7 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
  
- 	dd->flags = FLAGS_ENCRYPT | FLAGS_RNG;
- 
--	ret = clk_enable(dd->aes_clk);
-+	ret = clk_prepare_enable(dd->aes_clk);
- 	if (ret)
- 		return ret;
- 
-@@ -788,7 +788,7 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
- 	memcpy(dd->dt, dt, DEFAULT_RNG_BLK_SZ);
- 
- out:
--	clk_disable(dd->aes_clk);
-+	clk_disable_unprepare(dd->aes_clk);
- 	mutex_unlock(&aes_lock);
- 
- 	dev_dbg(dd->dev, "%s: done\n", __func__);
+ 	/* enable event reporting */
 -- 
 1.7.4.1
