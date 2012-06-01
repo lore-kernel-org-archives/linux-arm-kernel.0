@@ -1,34 +1,38 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 1 Jun 2012 10:06:27 +0800
-Subject: [PATCH 0/3] pinctrl: add support for samsung pinctrl driver
-In-Reply-To: <CACRpkdZ++GiqE55ofuwOssY4RLE5NctiY1rik1PDtm5r+CL4dw@mail.gmail.com>
-References: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdZ++GiqE55ofuwOssY4RLE5NctiY1rik1PDtm5r+CL4dw@mail.gmail.com>
-Message-ID: <CAJuYYwQWDFx-13_Q5a0dFTjd=KbfkoFg5ciCcD4G4hybsBd6fA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 01 Jun 2012 10:24:08 +0800
+Subject: [PATCH RFC 2/3] i2c-nomadik: turn the platform driver to an amba
+ driver
+In-Reply-To: <CACRpkdZXnuQe5NXyQBEZJD71Rs=+wvmXkw-4oT53FdU7KE7m2g@mail.gmail.com>
+References: <cover.1338398567.git.rubini@gnudd.com>
+ <349645b61d0b28f6e84f7ae1f2c8c28e12a11d92.1338398567.git.rubini@gnudd.com>
+ <CACRpkdZ79=B8N7omxYY4UPotg8gYotfLeBRViYMr8hA-Uhie0w@mail.gmail.com>
+ <4FC72DDF.7080209@codethink.co.uk>
+ <CACRpkdZpjn0RBGY+CqqSW3ip0MSQUJSaqN0GD=a4THnPHNM-jg@mail.gmail.com>
+ <20120531180204.GA28779@mail.gnudd.com>
+ <CACRpkdZXnuQe5NXyQBEZJD71Rs=+wvmXkw-4oT53FdU7KE7m2g@mail.gmail.com>
+Message-ID: <4FC827C8.20605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2012 09:40, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, May 24, 2012 at 7:47 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
+On 01/06/12 09:53, Linus Walleij wrote:
+> On Fri, Jun 1, 2012 at 2:02 AM, Alessandro Rubini<rubini@gnudd.com>  wrote:
 >
->> Note that, the Samsung pinctrl driver is usable only on device tree enabled
->> Samsung platforms. Legacy platforms would still continue to use the older
->> gpiolib driver and hence updates to device drivers to use the pinctrl api
->> should ensure that support for legacy platforms is maintained.
+>> So I'll resubmit in the right way (-M, include/linux/platform_data)
+>> as soon as I have information for ftd fixup.
 >
-> Is the plan to move also the older platforms over to the DT-based model?
-> It'd be really nice to be able to just delete the old drivers at some point...
-
-As of now, there is no plan to move the older Samsung platforms to
-DT-based model. Moving to DT-based model requires people with the
-board support upstreamed for older Samsung SoC's to sign up for the dt
-conversion process without which testing will not be possible. So for
-now, we will have to maintain the old drivers also.
-
-Thanks,
-Thomas.
-
+> OK if nothing happens you can probably just go in and patch:
+> arch/arm/boot/dts/db8500.dtsi
 >
-> Yours,
-> Linus Walleij
+> I suspect it's just the compatible= that needs to be changed to
+> "arm,primecell" or just have that string added to the others that
+> are already there for each i2c device entry.
+
+I already have a patch to enabled I2C. If this patch goes in, I will fix 
+it up to register itself as a Primecell device instead. No problem.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
