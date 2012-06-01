@@ -1,64 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jun 2012 04:19:39 -0700
-Subject: [RFC PATCH 02/11] ARM: OMAP: expose control.h to mach area
-In-Reply-To: <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
+Date: Fri, 1 Jun 2012 04:29:51 -0700
+Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
+In-Reply-To: <4FC4CE4B.8020708@ti.com>
 References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-3-git-send-email-eduardo.valentin@ti.com>
- <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
- <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
-Message-ID: <20120601111938.GL12766@atomide.com>
+ <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
+ <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
+ <4FC4CE4B.8020708@ti.com>
+Message-ID: <20120601112951.GM12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Valentin, Eduardo <eduardo.valentin@ti.com> [120528 03:34]:
-> Hello,
-> 
-> On Mon, May 28, 2012 at 12:25 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
-> > On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
-> > <eduardo.valentin@ti.com> wrote:
-> >> This patch exposes the definitions under control.h to
-> >> drivers outside the machine code.
+* Cousson, Benoit <b-cousson@ti.com> [120529 06:29]:
+> On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
 > >>
-> >> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> >> ---
-> > After second thought, this complete header movement needs to avoided.
-> > Drivers should not anyway include something like <mach/control.h>
+> >>Mmm, we can have up to 4 control module instances in OMAP4.
+> >>
+> >>Well, I'm not sure it worth considering them as separate devices. Is
+> >>that your plan as well?
 > >
-> > May be split the control.h header file data into ..
-> > - defines used by mach-omap2/* files which can remain in "control.h"
-> > in existing location.
+> >At least for now I was focusing on the ctrl_module_core ...
 > 
-> OK..
+> OK, that's a good start already :-)
 > 
-> > - common functions/defines used across drivers/*, mach-omap2/*,
-> > plat-omap/*, should
-> > go to include/linux/omap_control.h
-> 
-> Right..
-> 
-> > - Driver specific defines like thermal, usb etc, should go to
-> > respective drivers file.
-> 
-> Indeed.
-> 
+> >>But since they all have different base address, it will be trick to
+> >>handle them with only a single entry.
 > >
-> > What do you think ?
+> >Indeed. We can always add the support latter on.
+> >
+> >I am not sure what would be the best way to handle those instances though,
+> >and how they are going to expose APIs. Would need to have an instance bound
+> >to API set?
 > 
-> I think we are in line. And I believe I saw a similar comment by
-> Benoit in other email thread.
-> 
-> Having a better thinking of this, it makes sense to have the
-> definition specific to drivers in the driver scope only, as they are
-> going to be used only there anyway.
-> 
-> I will drop this patch off and update the remaining changes
-> accordingly (drop the change in control.h for thermal specific and
-> move it to omap_bandgap.h).
+> We should not go to that path I guess. We should have an API at
+> children level independent of the underlying control module
+> partitioning.
 
-Yes good, we should not expose these to the other drivers, that will
-lead into misuse of these defines from various other drivers that we
-may not notice until it's too late.
+These should be separate driver instances for the control modules.
+
+And then the ioremapped area should ignore at least the padconf
+registers so drivers/pinctrl/pinctrl-simple can handle those. There
+should not be any dependencies to the SCM driver from pinctrl-simple,
+the core SCM driver can manage the clocks and trigger the save of
+padconf regs.
+
+Also we should allow MMC driver handle the MMC specific registers
+and USB driver(s) handle the USB specific registers if possible. Those
+should not live under drivers/mfd unless there are some dependencies
+other than trying to ioremap the whole SCM module instead of ioremapping
+in each driver.
+
+We can have a static map for the SCM, so ioremapping each driver
+individually should not be an issue.
 
 Regards,
 
