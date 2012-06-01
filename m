@@ -1,47 +1,96 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 1 Jun 2012 15:37:45 -0500
-Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-Message-ID: <4FC92819.7040504@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 01 Jun 2012 14:03:54 -0700
+Subject: [PATCH V2 4/4] ARM: OMAP3+: PM: VP: ensure VP is idle before
+ disable
+In-Reply-To: <1338514899-3560-5-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Thu, 31 May 2012 20:41:39 -0500")
+References: <1338514899-3560-1-git-send-email-nm@ti.com>
+ <1338514899-3560-5-git-send-email-nm@ti.com>
+Message-ID: <87sjeesq11.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra, Paul,
+Nishanth Menon <nm@ti.com> writes:
 
-On 06/01/2012 07:07 AM, Rajendra Nayak wrote:
-> Hi,
-> 
-> This RFC series is based of Mikes' latest clk-next. I will
-> rebase it once 3.5-rc1 is out and post with more testing thats
-> in progress. Meanwhile, the RFC is for me to get some early
-> feedback on the patches.
-> 
-> This series retains the static clock declarations and also
-> all data and code in mach-omap folders and does not move
-> it as yet to drivers/clk. I know its desierable that we move
-> away from static declaration of data and move over to drivers/clk
-> but thats not addressed by this series.
-> Also the series moves over only OMAP2+ (OMAP2/3/4)
-> to use COMMON clk and leaves OMAP1 still using OMAP
-> clock framework.
+> From: Wenbiao Wang <wwang@ti.com>
+>
+> Voltage Processor state machine transition to disable need to
+> occur from IDLE state. When we transition OPP in a functioning
+> system, the call sequence for an OPP transition is as follows:
+> omap_sr_disable
+>       -> sr class 3 disable
+>            -> vp disable
+>            -> sr disable
+> forceupdate to voltage/frequency scale depending on which OPP
+> we are transitioning to.
+>
+> If we hit a critical timing window where SR had commanded VP
+> for a voltage transition and VP is in the middle of operating
+> on that command, it needs to go through a few states before
+> going to update state(where it actually sends the command to
+> VC). Initial view of h/w owners is that the state disable of VP
+> is expected to be sampled for the next transition.
+>
+> Instead, to be on a safer side, we ensure that the valid states
+> of the VP state machine is diligently followed by software. This
+> can be done by waiting for VP to be in idle  prior to disabling
+> VP. Existing prints have been updated to ensure context is
+> available on error messages.
+>
+> As part of this change, increase timeout for VP idle check to
+> improbable 500uSec to be certain that system is indeed unable
+> to continue before crashing out with error(worst case expectancy
+> remains the same 3-100uSec depending on when we caught VP).
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+>
+> [nm at ti.com: port from android]
 
-I had wanted to move the file mach-omap2/clkt_sel.c into
-plat-omap/clkt_sel.c so that this could be used by omap1. The reason for
-doing this is to fix clock configuration for dmtimers, which right now
-is complete broken. I have posted a series here [1], however, it appears
-that patch #1 to move clkt_sel.c never made it to the mailing list :-(
+and you also convert to use new _vp_wait_for_idle()
 
-Looking at this series, all the functions on clkt_sel.c have been
-converted to the clock common framework and so this will probably no
-longer work for omap1. So there are possibly a couple solutions ...
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Wenbiao Wang <wwang@ti.com>
+> ---
+>  arch/arm/mach-omap2/vp.c |    4 ++++
+>  arch/arm/mach-omap2/vp.h |    5 +++--
+>  2 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+> index 2a8a085..9a72deb 100644
+> --- a/arch/arm/mach-omap2/vp.c
+> +++ b/arch/arm/mach-omap2/vp.c
+> @@ -308,6 +308,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+>  		return;
+>  	}
+>  
+> +	if (_vp_wait_for_idle(voltdm, vp)) {
+> +		pr_warn_ratelimited("%s: vdd_%s timedout!Ignore and try\n",
 
-1. Move omap1 to the common clock framework (I am sure this would be
-preferred but a lot more work).
-2. Duplicate the appropriate functions from the current clkt_sel.c in an
-equivalent file in mach-omap1.
+s/timedout/timed out/
+no space after '!', also I don't get the "Ignore and try" part
 
-[1] http://marc.info/?l=linux-omap&m=133771799505501&w=2
+Kevin
 
-Cheers
-Jon
+> +				    __func__, voltdm->name);
+> +	}
+>  	/* Disable VP */
+>  	vpconfig = voltdm->read(vp->vpconfig);
+>  	vpconfig &= ~vp->common->vpconfig_vpenable;
+> diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+> index 4655b39..4b4eeb6 100644
+> --- a/arch/arm/mach-omap2/vp.h
+> +++ b/arch/arm/mach-omap2/vp.h
+> @@ -33,9 +33,10 @@ struct voltagedomain;
+>  /*
+>   * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
+>   * but worst case latencies could be around 3-200uS depending on where we
+> - * interrupted VP's operation.
+> + * interrupted VP's operation. Use an improbable timeout value to be
+> + * sure that timeout events are beyond doubt.
+>   */
+> -#define VP_IDLE_TIMEOUT		200
+> +#define VP_IDLE_TIMEOUT		500
+>  #define VP_TRANXDONE_TIMEOUT	300
+>  
+>  /**
