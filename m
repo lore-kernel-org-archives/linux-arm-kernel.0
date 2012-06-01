@@ -1,79 +1,45 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 May 2012 20:41:36 -0500
-Subject: [PATCH V2 1/4] ARM: OMAP3+: PM: VP: check only the VPINIDLE status bit
+Date: Thu, 31 May 2012 20:41:38 -0500
+Subject: [PATCH V2 3/4] ARM: OMAP3+: PM: VP: check to ensure VP is idle before
+ forceupdate
 In-Reply-To: <1338514899-3560-1-git-send-email-nm@ti.com>
 References: <1338514899-3560-1-git-send-email-nm@ti.com>
-Message-ID: <1338514899-3560-2-git-send-email-nm@ti.com>
+Message-ID: <1338514899-3560-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we check against the entire 32 bits of the status register
-Where, bits 1-31 are marked as reserved and mentioned in TRM as read
-returns undefined values. Hence, check against purely the vpinidle
-status bit.
+Ideally in the flow of DVFS programming, VP should be in idle state
+(since we disabled it) before entering forceupdate. Ensure that
+this is the case. Not doing this could cause VP statemachine
+to enter invalid states. Use ratelimited warnings to prevent spam
+if VP state machine is stuck.
 
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Kevin Hilman <khilman@ti.com>
-Reported-by: Vinay Amancha <vinaykumar@ti.com>
+
+Signed-off-by: Vinay Amancha <vinaykumar@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/vp.c          |    5 +++--
- arch/arm/mach-omap2/vp.h          |    1 +
- arch/arm/mach-omap2/vp3xxx_data.c |    1 +
- arch/arm/mach-omap2/vp44xx_data.c |    1 +
- 4 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/vp.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index f95c1ba..faefef7 100644
+index 4723879..2a8a085 100644
 --- a/arch/arm/mach-omap2/vp.c
 +++ b/arch/arm/mach-omap2/vp.c
-@@ -270,8 +270,9 @@ void omap_vp_disable(struct voltagedomain *voltdm)
- 	/*
- 	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
- 	 */
--	omap_test_timeout((voltdm->read(vp->vstatus)),
--			  VP_IDLE_TIMEOUT, timeout);
-+	omap_test_timeout((voltdm->read(vp->vstatus) &
-+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-+			  timeout);
+@@ -163,6 +163,13 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ 	u8 target_vsel, current_vsel;
+ 	int ret, timeout = 0;
  
- 	if (timeout >= VP_IDLE_TIMEOUT)
- 		pr_warning("%s: vdd_%s idle timedout\n",
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 7c155d2..ac1d6cf 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -73,6 +73,7 @@ struct omap_vp_common {
- 	u8 vpconfig_initvdd;
- 	u8 vpconfig_forceupdate;
- 	u8 vpconfig_vpenable;
-+	u8 vstatus_vpidle;
- 	u8 vstepmin_stepmin_shift;
- 	u8 vstepmin_smpswaittimemin_shift;
- 	u8 vstepmax_stepmax_shift;
-diff --git a/arch/arm/mach-omap2/vp3xxx_data.c b/arch/arm/mach-omap2/vp3xxx_data.c
-index bd89f80..a65909b 100644
---- a/arch/arm/mach-omap2/vp3xxx_data.c
-+++ b/arch/arm/mach-omap2/vp3xxx_data.c
-@@ -44,6 +44,7 @@ static const struct omap_vp_common omap3_vp_common = {
- 	.vpconfig_initvdd = OMAP3430_INITVDD_MASK,
- 	.vpconfig_forceupdate = OMAP3430_FORCEUPDATE_MASK,
- 	.vpconfig_vpenable = OMAP3430_VPENABLE_MASK,
-+	.vstatus_vpidle = OMAP3430_VPINIDLE_MASK,
- 	.vstepmin_smpswaittimemin_shift = OMAP3430_SMPSWAITTIMEMIN_SHIFT,
- 	.vstepmax_smpswaittimemax_shift = OMAP3430_SMPSWAITTIMEMAX_SHIFT,
- 	.vstepmin_stepmin_shift = OMAP3430_VSTEPMIN_SHIFT,
-diff --git a/arch/arm/mach-omap2/vp44xx_data.c b/arch/arm/mach-omap2/vp44xx_data.c
-index 8c031d1..9d14881 100644
---- a/arch/arm/mach-omap2/vp44xx_data.c
-+++ b/arch/arm/mach-omap2/vp44xx_data.c
-@@ -44,6 +44,7 @@ static const struct omap_vp_common omap4_vp_common = {
- 	.vpconfig_initvdd = OMAP4430_INITVDD_MASK,
- 	.vpconfig_forceupdate = OMAP4430_FORCEUPDATE_MASK,
- 	.vpconfig_vpenable = OMAP4430_VPENABLE_MASK,
-+	.vstatus_vpidle = OMAP4430_VPINIDLE_MASK,
- 	.vstepmin_smpswaittimemin_shift = OMAP4430_SMPSWAITTIMEMIN_SHIFT,
- 	.vstepmax_smpswaittimemax_shift = OMAP4430_SMPSWAITTIMEMAX_SHIFT,
- 	.vstepmin_stepmin_shift = OMAP4430_VSTEPMIN_SHIFT,
++	ret = _vp_wait_for_idle(voltdm, vp);
++	if (ret) {
++		pr_warn_ratelimited("%s: vdd_%s idle timedout (v=%ld)\n",
++				    __func__, voltdm->name, target_volt);
++		return ret;
++	}
++
+ 	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
+ 	if (ret)
+ 		return ret;
 -- 
 1.7.9.5
