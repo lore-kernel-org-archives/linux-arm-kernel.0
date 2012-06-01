@@ -1,39 +1,31 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Fri, 01 Jun 2012 18:26:28 +0400
-Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
-In-Reply-To: <20120601141342.GS12766@atomide.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
- <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
- <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
- <4FC8C649.10507@dev.rtsoft.ru> <20120601141342.GS12766@atomide.com>
-Message-ID: <4FC8D114.6020100@dev.rtsoft.ru>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 1 Jun 2012 15:32:35 +0100
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120601143235.GT24139@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2012 06:13 PM, Tony Lindgren wrote:
-> * Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120601 06:44]:
->> On 06/01/2012 03:29 PM, Tony Lindgren wrote:
->>> We can have a static map for the SCM, so ioremapping each driver
->>> individually should not be an issue.
->> Actually SCM registers window is mapped statically. Mapping is defined in omap44xx_io_desc[] in arch/arm/mach-omap2/io.c:
->>
->> ...
->>         .virtual    = L4_44XX_VIRT,
->>         .pfn        = __phys_to_pfn(L4_44XX_PHYS),
->>         .length        = L4_44XX_SIZE,
->>         .type        = MT_DEVICE,
->> ...
->>
->>
->> So ioremap() always returns same virtual address (0xfc002000).
-> Hmm I guess you mean L4_44XX_VIRT + offset. Otherwise drivers
-> would not work at all.. Or else I don't follow you.
-Right. I mean when 0x4A00 2000(scm base) is remapped in scm driver, ioremap() always returns same virtual address (0xfc002000).
-> Regards,
->
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Wed, May 30, 2012 at 12:47:26PM +0800, Lee Jones wrote:
+> The 'name' field in 'struct of_regulator_match' expects to match with
+> its corresponding regulator device node in the Device Tree. This patch
+> renames each of the regulators in the ab8500 regulator driver so this
+> is true.
+
+Applied both, thanks.
+
+> Cc: linux-kernel at vger.kernel.org
+
+It's helpful to avoid inclding things like this (I mostly point this out
+as you've got a much wider CC list so you clearly have some other system
+that you're using to track where to send things).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120601/66f2b964/attachment.sig>
