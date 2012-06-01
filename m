@@ -1,91 +1,104 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri,  1 Jun 2012 09:22:01 -0700
-Subject: [PATCH variant 2] ARM: Prevent KALLSYM size mismatch on ARM.
-In-Reply-To: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
-References: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1338567721-19514-3-git-send-email-davidb@codeaurora.org>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Fri, 1 Jun 2012 20:19:58 +0300
+Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
+In-Reply-To: <4FC8B90A.9040505@ti.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
+ <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
+ <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
+ <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
+ <4FC8B90A.9040505@ti.com>
+Message-ID: <20120601171941.GA2451@besouro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM builds seem to be plagued by an occasional build error:
+Hello,
 
-    Inconsistent kallsyms data
-    This is a bug - please report about it
-    Try "make KALLSYMS_EXTRA_PASS=1" as a workaround
+On Fri, Jun 01, 2012 at 02:43:54PM +0200, Cousson Benoit wrote:
+> On 6/1/2012 2:30 PM, Shilimkar, Santosh wrote:
+> >On Fri, Jun 1, 2012 at 7:29 PM, Tony Lindgren<tony@atomide.com>  wrote:
+> >>* Cousson, Benoit<b-cousson@ti.com>  [120529 06:29]:
+> >>>On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
+> >>>>>
+> >>>>>Mmm, we can have up to 4 control module instances in OMAP4.
+> >>>>>
+> >>>>>Well, I'm not sure it worth considering them as separate devices. Is
+> >>>>>that your plan as well?
+> >>>>
+> >>>>At least for now I was focusing on the ctrl_module_core ...
+> >>>
+> >>>OK, that's a good start already :-)
+> >>>
+> >>>>>But since they all have different base address, it will be trick to
+> >>>>>handle them with only a single entry.
+> >>>>
+> >>>>Indeed. We can always add the support latter on.
+> >>>>
+> >>>>I am not sure what would be the best way to handle those instances though,
+> >>>>and how they are going to expose APIs. Would need to have an instance bound
+> >>>>to API set?
+> >>>
+> >>>We should not go to that path I guess. We should have an API at
+> >>>children level independent of the underlying control module
+> >>>partitioning.
+> >>
+> >>These should be separate driver instances for the control modules.
+> >>
+> >>And then the ioremapped area should ignore at least the padconf
+> >>registers so drivers/pinctrl/pinctrl-simple can handle those. There
+> >>should not be any dependencies to the SCM driver from pinctrl-simple,
+> >>the core SCM driver can manage the clocks and trigger the save of
+> >>padconf regs.
+> >>
+> >>Also we should allow MMC driver handle the MMC specific registers
+> >>and USB driver(s) handle the USB specific registers if possible. Those
+> >>should not live under drivers/mfd unless there are some dependencies
+> >>other than trying to ioremap the whole SCM module instead of ioremapping
+> >>in each driver.
+> >>
+> >>We can have a static map for the SCM, so ioremapping each driver
+> >>individually should not be an issue.
 
-The problem has to do with alignment of some sections by the linker.
-The kallsyms data is built in two passes by first linking the kernel
-without it, and then linking the kernel again with the symbols
-included.  Normally, this just shifts the symbols, without changing
-their order, and the compression used by the kallsyms gives the same
-result.
+Within this series I kept the original MFD setup in the original driver
+found in the TI Android tree. But in fact, I agree with Tony here.
 
-On non SMP, the per CPU data is empty.  Depending on the where the
-alignment ends up, it can come out as either:
+In general, ideally it would be good if we could setup this driver
+family, having for each driver their respective resources;
+a separated individual io area, IRQs, locking, APIs, etc.
 
-   +-------------------+
-   | last text segment |
-   +-------------------+
-   /* padding */
-   +-------------------+     <- L1_CACHE_BYTES alignemnt
-   | per cpu (empty)   |
-   +-------------------+
-__per_cpu_end:
-   /* padding */
-__data_loc:
-   +-------------------+     <- THREAD_SIZE alignment
-   | data              |
-   +-------------------+
+But, the issue is to avoid having hard coded io areas in the code,
+and move them  to auto generated data, DT/hwmod.
 
-or
+> >>
+> >This sounds a good idea. With this we may not even need a core control
+> >module drivers if all the individual drivers take care of the registers they
+> >care. Mapping shouldn't be a problem as you mentioned.
+> 
+> We should keep the MFD for PM / OCP single port correctness. Other
+> than that it will be mostly useless, indeed.
 
-   +-------------------+
-   | last text segment |
-   +-------------------+
-   /* padding */
-   +-------------------+     <- L1_CACHE_BYTES alignemnt
-   | per cpu (empty)   |
-   +-------------------+
-__per_cpu_end:
-   /* no padding */
-__data_loc:
-   +-------------------+     <- THREAD_SIZE alignment
-   | data              |
-   +-------------------+
+Then, I guess the idea of having 1 static mapping for the MFD core, either in DT or hwmod,
+is to maintain the single OCP port we have today for SCM.
 
-if the alignment satisfies both.  Because symbols that have the same
-address are sorted by 'nm -n', the second case will be in a different
-order than the first case.  This changes the compression, changing the
-size of the kallsym data, causing the build failure.
+But, Benoit, IIRC, from our previous discussions, we won't have the io area for children
+autogenerated anyway, as they don't have any OCP. I suppose this applies also for
+clock data?
 
-The KALLSYMS_EXTRA_PASS=1 workaround usually works, but it is still
-possible to have the alignment change between the second and third
-pass.  It's probably even possible for it to never reach a fixedpoint.
+If children data won't be autogenerated, assuming we are relying on the autogenerated
+data, it means that SCM core area is the boundary that will be ioremapped and protected.
+But then we still have a flaw because children can still stomp between each other.
+Not to mention non-children users and the pin ctrl simple.
 
-The problem only occurs on non-SMP, when the per-cpu data is empty,
-and when the data segment has alignment (and immediately follows the
-text segments).  Fix this by only including the per_cpu section on
-SMP, when it is not empty.
+That said, if we want to have these io areas properly assigned to their drivers,
+we either have children area autogenerated, in DT / hwmod. Or we have them in the code.
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- arch/arm/kernel/vmlinux.lds.S |    2 ++
- 1 file changed, 2 insertions(+)
+Assuming you still want to have the MFD core, for matching w/ the OCP single port,
+it would still need to have the resources for its children in the driver code.
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 43a31fb..36ff15b 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -183,7 +183,9 @@ SECTIONS
- 	}
- #endif
- 
-+#ifdef CONFIG_SMP
- 	PERCPU_SECTION(L1_CACHE_BYTES)
-+#endif
- 
- #ifdef CONFIG_XIP_KERNEL
- 	__data_loc = ALIGN(4);		/* location in binary */
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Or we hack them in the DT entries. Like I already did in this series for the thermal IRQ :-)
+
+
+> 
+> Regards,
+> Benoit
+> 
