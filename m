@@ -1,28 +1,61 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 01 Jun 2012 16:22:13 +0400
-Subject: [PATCH 1/9] ARM: tegra: add clk_prepare/clk_unprepare
-In-Reply-To: <1338541968-7961-2-git-send-email-pgaikwad@nvidia.com>
-References: <1338541968-7961-1-git-send-email-pgaikwad@nvidia.com>
- <1338541968-7961-2-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <4FC8B3F5.5@mvista.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 1 Jun 2012 20:30:35 +0800
+Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
+In-Reply-To: <20120601112951.GM12766@atomide.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
+ <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
+ <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
+Message-ID: <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jun 1, 2012 at 7:29 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Cousson, Benoit <b-cousson@ti.com> [120529 06:29]:
+>> On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
+>> >>
+>> >>Mmm, we can have up to 4 control module instances in OMAP4.
+>> >>
+>> >>Well, I'm not sure it worth considering them as separate devices. Is
+>> >>that your plan as well?
+>> >
+>> >At least for now I was focusing on the ctrl_module_core ...
+>>
+>> OK, that's a good start already :-)
+>>
+>> >>But since they all have different base address, it will be trick to
+>> >>handle them with only a single entry.
+>> >
+>> >Indeed. We can always add the support latter on.
+>> >
+>> >I am not sure what would be the best way to handle those instances though,
+>> >and how they are going to expose APIs. Would need to have an instance bound
+>> >to API set?
+>>
+>> We should not go to that path I guess. We should have an API at
+>> children level independent of the underlying control module
+>> partitioning.
+>
+> These should be separate driver instances for the control modules.
+>
+> And then the ioremapped area should ignore at least the padconf
+> registers so drivers/pinctrl/pinctrl-simple can handle those. There
+> should not be any dependencies to the SCM driver from pinctrl-simple,
+> the core SCM driver can manage the clocks and trigger the save of
+> padconf regs.
+>
+> Also we should allow MMC driver handle the MMC specific registers
+> and USB driver(s) handle the USB specific registers if possible. Those
+> should not live under drivers/mfd unless there are some dependencies
+> other than trying to ioremap the whole SCM module instead of ioremapping
+> in each driver.
+>
+> We can have a static map for the SCM, so ioremapping each driver
+> individually should not be an issue.
+>
+This sounds a good idea. With this we may not even need a core control
+module drivers if all the individual drivers take care of the registers they
+care. Mapping shouldn't be a problem as you mentioned.
 
-On 01-06-2012 13:12, Prashant Gaikwad wrote:
-
-> Use clk_prepare/clk_unprepare as required by the generic clk framework.
-
-> This patch should go through Tegra tree since other patches to port Tegra
-> to generic clock framework are dependent on it. Posting here to get ack from
-> the maintainers.
-
-    This paragraph should have followed the --- tear line; likewise in all the 
-other patches. It's not fit for the patch description.
-
-> Tested on Ventana and Cardhu.
-
-> Signed-off-by: Prashant Gaikwad<pgaikwad@nvidia.com>
-
-WBR, Sergei
+Regards
+Santosh
