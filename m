@@ -1,45 +1,90 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 31 May 2012 17:12:31 -0700
-Subject: [linux-pm] [RFC PATCH 00/11] OMAP System Control Module
-In-Reply-To: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- (Eduardo Valentin's message of "Fri, 25 May 2012 11:25:50 +0300")
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <87y5o7vqj4.fsf@ti.com>
+From: marc@plastictigers.com (Marc Butler)
+Date: Thu, 31 May 2012 20:16:17 -0400
+Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
+In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+Message-ID: <20120601001617.GA16311@plastictigers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+On Tue, May 29, 2012 at 07:11:33PM -0600, Sagar Dharia wrote:
+> SLIMbus (Serial Low Power Interchip Media Bus) is a specification
+> developed by MIPI (Mobile Industry Processor Interface) alliance.
 
-Eduardo Valentin <eduardo.valentin@ti.com> writes:
+These are initial comments. A full review of the patch will take some
+time. While I am posting this email, this is the result of work both
+by myself, and my colleague Greg Clemson (cc'ed).
 
-> Hello Paul and Tony,
->
-> This is a series of patches adding a basic support for system control module,
-> on OMAP4+ context. It is a working in progress, but I wanted to share already
-> to get your feedback.
+1. enum slim_ch_proto
 
-This is a great start, thanks for working on this.  We have been needing
-to do this for awhile now so I'm glad to see you working on it.
+The enumeration slim_ch_proto is incorrect. It declares 2 transport
+protocols which do not exist in the specification: SLIM_HARD_ISO;
+SLIM_AUTO_ISO.
 
-> I've modeled the driver as an MFD. You will see in this series:
-> . A rework of the system control module header (patch from Santosh, picked from the list)
-> . Device creation for control module core
-> . Early device creation for control module core
-> . The MFD core driver for system control module
-> . The MFD child for usb-phy pin control
-> . The MFD child for bandgap sensor
-> . Very early exposure of OMAP4 thermal zone
-> . All added drivers are only supporting DT probing
-> . The series is based on linux-omap master, as it has the hwmod entries for SCM.
->
-> The overall idea of this series is to put in place the infrastructure. It is
-> not touching nor removing the existing APIs under mach-omap2/control.c for now.
-> But the target is to have these APIs moved to the MFD core driver.
+This in turn causes the subsequent values for the other protocols such
+as SLIM_PUSH, to be incorrectly coded in the NEXT_DEFINE_CHANNEL
+message generated in slim_reconfigure_now(). That is the push protocol
+is incorrectly encoded as 3 instead of 2 as per the specification
+(Table 47).
 
-IMO, the best time to create the APIs is when the new MFD children are
-created.
+I believe a correct definition would be:
 
-The goal should be that none of these drivers should be doing direct
-read/writes to the control module.
+enum slim_ch_proto {
+        SLIM_ISO,
+	SLIM_PUSH,
+	SLIM_PULL,
+	SLIM_LOCKED,
+	SLIM_ASYNC_SMPLX,
+	SLIM_ASYNC_HALF_DUP,
+	SLIM_EXT_SMPLX,
+	SLIM_EXT_HALF_DUP,
+	SLIM_USER_DEF1 = 14,
+	SLIM_USER_DEF2 = 15
+};
 
-Kevin
+However doing so will break the logic in slim_nextdefine_ch().
+
+2. Use of the term elemental address.
+
+Commentary around the use of struct slim_eaddr uses the term
+"elemental address". However, the term used in the specification is
+"enumeration address". There is no elemental address in the
+specification, and using this term may result confusion when referring
+to accessing the information and value elements.
+
+I suggest that term "enumeration address" should be used. 
+
+3. Probing sequence for drivers.
+
+The current probing sequence for drivers appears to make some
+assumptions, that are problematic.
+
+a) The code assumes that when the controller is registered the bus is
+operational (booted). No allowance is made for any problems the active
+framer may have synchronizing the bus. 
+
+The drivers really should not be probed until the bus has at least
+booted. This can be worked around by only registering the controller
+after it has booted the bus. This should be noted in the comments.
+
+b) Similarly to (a) the driver may be probed before the device has
+been given a logical address (LA). This makes sense in the case of
+driver that turns on the device (say via gpio) once the bus has
+booted. However, the driver then needs to sit and poll
+slim_get_logical_addr() until the logical address.
+
+A possible alternate solution would be to add a parameter to probe:
+
+enum slim_dev_status {
+        SLIM_BUS_READY,
+	SLIM_DEV_READY
+};
+
+int (*probe)(struct slim_device *sldev, enum slim_dev_status status);
+
+Where SLIM_BUS_READY == bus has booted, and SLIM_DEV_READY == device
+has been assigned its logical address.
+
+Alternatively you could have 2 separate probe type callbacks. 
+
+This would make the driver logical simpler.
