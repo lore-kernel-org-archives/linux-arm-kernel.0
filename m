@@ -1,115 +1,32 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 1 Jun 2012 09:58:49 +0800
-Subject: [PATCH 1/3] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <CACRpkdZDnFW4-bDsHN5BOr2e5NLGzouSBY7ngf-VsoPn-SyxAA@mail.gmail.com>
+Date: Fri, 1 Jun 2012 10:06:27 +0800
+Subject: [PATCH 0/3] pinctrl: add support for samsung pinctrl driver
+In-Reply-To: <CACRpkdZ++GiqE55ofuwOssY4RLE5NctiY1rik1PDtm5r+CL4dw@mail.gmail.com>
 References: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
- <1337816857-14694-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdZDnFW4-bDsHN5BOr2e5NLGzouSBY7ngf-VsoPn-SyxAA@mail.gmail.com>
-Message-ID: <CAJuYYwQ_ec+dWVd49ZKqO1zk-8x93966gvrWddbx9kS8NBdMvg@mail.gmail.com>
+ <CACRpkdZ++GiqE55ofuwOssY4RLE5NctiY1rik1PDtm5r+CL4dw@mail.gmail.com>
+Message-ID: <CAJuYYwQWDFx-13_Q5a0dFTjd=KbfkoFg5ciCcD4G4hybsBd6fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2012 09:36, Linus Walleij <linus.walleij@linaro.org> wrote:
+On 1 June 2012 09:40, Linus Walleij <linus.walleij@linaro.org> wrote:
 > On Thu, May 24, 2012 at 7:47 AM, Thomas Abraham
 > <thomas.abraham@linaro.org> wrote:
 >
->> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> Note that, the Samsung pinctrl driver is usable only on device tree enabled
+>> Samsung platforms. Legacy platforms would still continue to use the older
+>> gpiolib driver and hence updates to device drivers to use the pinctrl api
+>> should ensure that support for legacy platforms is maintained.
 >
-> It would be nice if some DT person could review the bindings, but if
-> nothing happens
-> I will accept them as-is.
->
-> This driver is special since it seems to keep all pin, group and
-> function information
-> in the device tree, but not like Tony is doing it in pinctrl-simple,
-> if I understand
-> correctly?
->
->> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
->> new file mode 100644
->> index 0000000..480e2f0
-> (...)
->> +/* reading pin pull up/down and driver strength settings not implemented */
->> +static int samsung_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *config)
->> +{
->> + ? ? ? return -ENOTSUPP;
->> +}
->> +
->> +/* reading pin pull up/down and driver strength settings not implemented */
->> +static int samsung_pinconf_group_get(struct pinctrl_dev *pctldev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int group, unsigned long *config)
->> +{
->> + ? ? ? return -ENOTSUPP;
->> +}
->
-> I think we made these optional now, so you can just leave them undefined
-> in the pinconf_ops.
+> Is the plan to move also the older platforms over to the DT-based model?
+> It'd be really nice to be able to just delete the old drivers at some point...
 
-Ok. I will leave them undefined.
+As of now, there is no plan to move the older Samsung platforms to
+DT-based model. Moving to DT-based model requires people with the
+board support upstreamed for older Samsung SoC's to sign up for the dt
+conversion process without which testing will not be possible. So for
+now, we will have to maintain the old drivers also.
 
->
->> +static inline struct samsung_pinctrl_drv_data *samsung_pinctrl_get_driver_data(
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct platform_device *pdev)
->> +{
->> +#ifdef CONFIG_OF
->> + ? ? ? if (pdev->dev.of_node) {
->> + ? ? ? ? ? ? ? int id;
->> + ? ? ? ? ? ? ? const struct of_device_id *match;
->> + ? ? ? ? ? ? ? const struct device_node *node = pdev->dev.of_node;
->> +
->> + ? ? ? ? ? ? ? id = of_alias_get_id(pdev->dev.of_node, "pinctrl");
->> + ? ? ? ? ? ? ? if (id < 0) {
->> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to get alias id\n");
->> + ? ? ? ? ? ? ? ? ? ? ? return NULL;
->> + ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? match = of_match_node(samsung_pinctrl_dt_match, node);
->> + ? ? ? ? ? ? ? return (struct samsung_pinctrl_drv_data *)match->data + id;
->> + ? ? ? }
->> +#endif
->
-> You don't need this #ifdef because in Kconfig the driver already depends on
-> OF so this is always available.
-
-Yes, I missed that.
-
->
->> +/* driver data for various samsung soc's */
->> +#ifdef CONFIG_CPU_EXYNOS4210
->> +#define EXYNOS4210_PCTRL_DRVDATA (&exynos4210_pinctrl_drv_data)
->> +#else
->> +#define EXYNOS4210_PCTRL_DRVDATA (NULL)
->> +#endif /* CONFIG_CPU_EXYNOS4210 */
->
-> Can you do this in some .h file instead?
-
-Ok. I will check on this.
-
->
->> +#ifdef CONFIG_OF
->
-> You don't need this because in Kconfig the driver depends on OF
-> already.
->
->> +static const struct of_device_id samsung_pinctrl_dt_match[] = {
->> +#ifdef CONFIG_CPU_EXYNOS4210
->> + ? ? ? { .compatible = "samsung,pinctrl-exynos4210",
->> + ? ? ? ? ? ? ? .data = (void *)exynos4210_pinctrl_drv_data },
->> +#endif /* CONFIG_CPU_EXYNOS4210 */
->> + ? ? ? {},
->> +};
->> +MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
->> +#endif /* CONFIG_OF */
->
-> So delete the closing #endif too.
-
-Initially, it started with dt and non-dt support. Then switched over
-to dt-only support and in the process, I left these artifacts. I will
-clean this up.
-
-Thank you Linus for your review and comments.
-
-Regards,
+Thanks,
 Thomas.
 
 >
