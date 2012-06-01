@@ -1,46 +1,56 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Fri, 1 Jun 2012 18:22:59 +0530
-Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
-In-Reply-To: <4FC63B8D.3070107@ti.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <1338375394-16268-3-git-send-email-kishon@ti.com>
- <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
- <4FC63B8D.3070107@ti.com>
-Message-ID: <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Jun 2012 06:20:57 -0700
+Subject: [linux-pm] [RFC PATCH 07/11] mfd: omap: control: usb-phy:
+ introduce the ctrl-module usb driver
+In-Reply-To: <20120601113853.GO12766@atomide.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-8-git-send-email-eduardo.valentin@ti.com>
+ <20120601113853.GO12766@atomide.com>
+Message-ID: <20120601132056.GR12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+* Tony Lindgren <tony@atomide.com> [120601 04:43]:
+> * Eduardo Valentin <eduardo.valentin@ti.com> [120525 01:31]:
+> > +int omap4_usb_phy_power(struct device *dev, int on)
+> > +{
+> > +	u32 val;
+> > +	int ret;
+> > +
+> > +	if (on) {
+> > +		ret = omap_control_readl(dev, CONTROL_DEV_CONF, &val);
+> > +		if (!ret && (val & PHY_PD)) {
+> > +			ret = omap_control_writel(dev, ~PHY_PD,
+> > +						  CONTROL_DEV_CONF);
+> > +			/* XXX: add proper documentation for this delay */
+> > +			mdelay(200);
+> > +		}
+> > +	} else {
+> > +		ret = omap_control_writel(dev, PHY_PD, CONTROL_DEV_CONF);
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(omap4_usb_phy_power);
+> 
+> I'm not quite convinced that we should export omap_control_read/write
+> to drivers. If there's a clear register area this USB phy driver can
+> manage, then ioremaping it separately makes sense. If it's just one
+> register, then exporting something like omap_control_usb_phy_set()
+> might be better for ensuring that drivers don't mess up things for
+> other drivers.
 
-On Wed, May 30, 2012 at 8:53 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
->>
->> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>
->> ?wrote:
->>>
->>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
->>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now
->>> added
->>> (which can be used to control MODULEMODE) this clock node is removed.
->>>
->>> Cc: Benoit Cousson<b-cousson@ti.com>
->>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->>> ---
->>> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
->>
->>
->> Have you patched clock44xx_data.c manually or you have a patch for
->> the clock_data autogen script to generate it ?
->
->
-> I have a series that will remove all these clock nodes. I should be able to
-> post that soon.
->
-> Potentially at that time, Kishon might be able to drop that patch.
+After chatting with Benoit a bit we came to the conclusion that the
+clock and powerdomain state needs to be managed for the children by
+the SCM core driver so the children can't be completely independent.
 
-Will you be sending a patch for *[RFC PATCH 1/5] arm: omap: hwmod:
-make *phy_48m* as the main_clk of ocp2scp* also or I have to keep that
-as part of my series?
+But rather than exporting omap_control_read/write, maybe you can
+register the usb/bandgap whatever children with SCM core driver,
+then have the runtime PM calls from children be passthrough calls
+to the parent?
 
-Thanks
-Kishon
+Maybe Kevin has some better ideas here?
+
+Regards,
+
+Tony
