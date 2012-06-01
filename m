@@ -1,29 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 31 May 2012 20:51:00 -0300
-Subject: [PATCH 1/2] MFD: Fix mc13xxx SPI regmap
-In-Reply-To: <1338282389-26177-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1338282389-26177-1-git-send-email-philippe.retornaz@epfl.ch>
- <1338282389-26177-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <CAOMZO5C9B-xUzo+OQ1HWPqc5pdiGreE3oArC+FM=8q+FB9K1ug@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 31 May 2012 17:12:31 -0700
+Subject: [linux-pm] [RFC PATCH 00/11] OMAP System Control Module
+In-Reply-To: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ (Eduardo Valentin's message of "Fri, 25 May 2012 11:25:50 +0300")
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <87y5o7vqj4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+Hi Eduardo,
 
-On Tue, May 29, 2012 at 6:06 AM, Philippe R?tornaz
-<philippe.retornaz@epfl.ch> wrote:
-> This fix the SPI regmap configuration, the wrong write flag was used.
-> Also, bits_per_word should not be set as the regmap spi implementation
-> uses a 8bits transfert granularity.
+Eduardo Valentin <eduardo.valentin@ti.com> writes:
+
+> Hello Paul and Tony,
 >
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+> This is a series of patches adding a basic support for system control module,
+> on OMAP4+ context. It is a working in progress, but I wanted to share already
+> to get your feedback.
 
-Excellent!
+This is a great start, thanks for working on this.  We have been needing
+to do this for awhile now so I'm glad to see you working on it.
 
-I tested your patch series on a mx51evk, mx27pdk and mx31pdk:
+> I've modeled the driver as an MFD. You will see in this series:
+> . A rework of the system control module header (patch from Santosh, picked from the list)
+> . Device creation for control module core
+> . Early device creation for control module core
+> . The MFD core driver for system control module
+> . The MFD child for usb-phy pin control
+> . The MFD child for bandgap sensor
+> . Very early exposure of OMAP4 thermal zone
+> . All added drivers are only supporting DT probing
+> . The series is based on linux-omap master, as it has the hwmod entries for SCM.
+>
+> The overall idea of this series is to put in place the infrastructure. It is
+> not touching nor removing the existing APIs under mach-omap2/control.c for now.
+> But the target is to have these APIs moved to the MFD core driver.
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+IMO, the best time to create the APIs is when the new MFD children are
+created.
 
-Thanks,
+The goal should be that none of these drivers should be doing direct
+read/writes to the control module.
 
-Fabio Estevam
+Kevin
