@@ -1,82 +1,153 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 1 Jun 2012 17:37:45 +0530
-Subject: [RFC 04/24] ARM: omap: hwmod: get rid of all omap_clk_get_by_name
- usage
+Date: Fri, 1 Jun 2012 17:37:48 +0530
+Subject: [RFC 07/24] ARM: omap: hwmod: Fix up hwmod based clkdm accesses
 In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
 References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-Message-ID: <1338552485-31325-5-git-send-email-rnayak@ti.com>
+Message-ID: <1338552485-31325-8-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving to COMMON clk for OMAP would mean we no longer use
-internal lookup mechanism like omap_clk_get_by_name().
-get rid of all its usage mostly from hwmod and omap_device
-code.
-
-Also use IS_ERR_OR_NULL() for error checking.
-
-Based on original changes from Mike Turquette.
+hwmod uses deferencing the clk pointer to acccess the clkdm.
+With COMMON clk hwoever this will need to be deferenced through
+the clk_hw_omap pointer, so do the necessary changes.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   12 ++++++------
- arch/arm/plat-omap/omap_device.c |    6 +++---
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   65 ++++++++++++++++++++++++++++++++------
+ 1 files changed, 55 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 7aa73f8..6c7c322 100644
+index ddea015..91d0f19 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -559,8 +559,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 	if (!oh->main_clk)
+@@ -130,7 +130,11 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/io.h>
++#ifdef CONFIG_COMMON_CLK
++#include <linux/clk-provider.h>
++#else
+ #include <linux/clk.h>
++#endif
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/list.h>
+@@ -497,6 +501,25 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+ 	return 0;
+ }
+ 
++struct clockdomain *_get_clkdm(struct omap_hwmod *oh)
++{
++	struct clk_hw_omap *clk;
++
++	if (oh->clkdm) {
++		return oh->clkdm;
++	} else if (oh->_clk) {
++#ifdef CONFIG_COMMON_CLK
++		clk = to_clk_hw_omap(__clk_get_hw(oh->_clk));
++		return  clk->clkdm;
++#else
++		return oh->_clk->clkdm;
++#endif
++	}
++
++	pr_err("%s: %s does not have .clkdm\n", __func__, oh->name);
++	return NULL;
++}
++
+ /**
+  * _add_initiator_dep: prevent @oh from smart-idling while @init_oh is active
+  * @oh: struct omap_hwmod *
+@@ -512,13 +535,18 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+  */
+ static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+ {
+-	if (!oh->_clk)
++	struct clockdomain *clkdm, *init_clkdm;
++
++	clkdm = _get_clkdm(oh);
++	init_clkdm = _get_clkdm(init_oh);
++
++	if (!clkdm || !init_clkdm)
+ 		return -EINVAL;
+ 
+-	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
++	if (clkdm && clkdm->flags & CLKDM_NO_AUTODEPS)
  		return 0;
  
--	oh->_clk = omap_clk_get_by_name(oh->main_clk);
--	if (!oh->_clk) {
-+	oh->_clk = clk_get(NULL, oh->main_clk);
-+	if (IS_ERR_OR_NULL(oh->_clk)) {
- 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
- 			   oh->name, oh->main_clk);
+-	return clkdm_add_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
++	return clkdm_add_sleepdep(clkdm, init_clkdm);
+ }
+ 
+ /**
+@@ -536,13 +564,18 @@ static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+  */
+ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+ {
+-	if (!oh->_clk)
++	struct clockdomain *clkdm, *init_clkdm;
++
++	clkdm = _get_clkdm(oh);
++	init_clkdm = _get_clkdm(init_oh);
++
++	if (!clkdm || !init_clkdm)
  		return -EINVAL;
-@@ -595,8 +595,8 @@ static int _init_interface_clks(struct omap_hwmod *oh)
- 		if (!os->clk)
- 			continue;
  
--		c = omap_clk_get_by_name(os->clk);
--		if (!c) {
-+		c = clk_get(NULL, os->clk);
-+		if (IS_ERR_OR_NULL(c)) {
- 			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
- 				   oh->name, os->clk);
- 			ret = -EINVAL;
-@@ -622,8 +622,8 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 	int ret = 0;
+-	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
++	if (clkdm && clkdm->flags & CLKDM_NO_AUTODEPS)
+ 		return 0;
  
- 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
--		c = omap_clk_get_by_name(oc->clk);
--		if (!c) {
-+		c = clk_get(NULL, oc->clk);
-+		if (IS_ERR_OR_NULL(c)) {
- 			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
- 				   oh->name, oc->clk);
- 			ret = -EINVAL;
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index d50cbc6..16bcace 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -266,10 +266,10 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
- 		return;
+-	return clkdm_del_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
++	return clkdm_del_sleepdep(clkdm, init_clkdm);
+ }
+ 
+ /**
+@@ -567,7 +600,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 		return -EINVAL;
  	}
  
--	r = omap_clk_get_by_name(clk_name);
--	if (IS_ERR(r)) {
-+	r = clk_get(NULL, clk_name);
-+	if (IS_ERR_OR_NULL(r)) {
- 		dev_err(&od->pdev->dev,
--			"omap_clk_get_by_name for %s failed\n", clk_name);
-+			"clk_get for %s failed\n", clk_name);
- 		return;
+-	if (!oh->_clk->clkdm)
++	if (!_get_clkdm(oh))
+ 		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
+ 			   oh->name, oh->main_clk);
+ 
+@@ -2371,10 +2404,17 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
+ {
+ 	struct clk *c;
++	struct clockdomain *clkdm;
++#ifdef CONFIG_COMMON_CLK
++	struct clk_hw_omap *clk;
++#endif
+ 
+ 	if (!oh)
+ 		return NULL;
+ 
++	if (oh->clkdm)
++		return oh->clkdm->pwrdm.ptr;
++
+ 	if (oh->_clk) {
+ 		c = oh->_clk;
+ 	} else {
+@@ -2383,11 +2423,16 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
+ 		c = oh->slaves[oh->_mpu_port_index]->_clk;
  	}
  
+-	if (!c->clkdm)
++#ifdef CONFIG_COMMON_CLK
++	clk = to_clk_hw_omap(__clk_get_hw(c));
++	clkdm = clk->clkdm;
++#else
++	clkdm = c->clkdm;
++#endif
++	if (!clkdm)
+ 		return NULL;
+ 
+-	return c->clkdm->pwrdm.ptr;
+-
++	return clkdm->pwrdm.ptr;
+ }
+ 
+ /**
 -- 
 1.7.1
