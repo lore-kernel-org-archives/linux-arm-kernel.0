@@ -1,283 +1,66 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Fri, 1 Jun 2012 15:17:58 +0530
-Subject: [PATCHv5 1/2] drivers: input: keypad: Add device tree support
-In-Reply-To: <1337781350-1411-1-git-send-email-sourav.poddar@ti.com>
-References: <1337781350-1411-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <CAKdam559t0tFTZuRq8Ese0hULrtMRTaqUvSMb=rPUtdJunKQzw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jun 2012 09:56:47 +0000
+Subject: [GIT PULL] ARM: ux500: fixes for mismerge
+Message-ID: <201206010956.47658.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The following changes since commit 76f901eb4659779ecacd0e4eba49f55442daef53:                                                                                                                                       
 
-Gentle ping on this..
+  Merge tag 'for-v3.5' of git://git.infradead.org/battery-2.6 (2012-05-31 12:10:15 -0700)
 
-~Sourav
-On Wed, May 23, 2012 at 7:25 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
-> Update the Documentation with omap4 keypad device tree
-> binding information.
-> Add device tree support for omap4 keypad driver.
->
-> Tested on omap4430 sdp.
->
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Dmitry Torokhov <dtor@mail.ru>
-> Cc: Randy Dunlap <rdunlap@xenotime.net>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
-> changes since v4:
-> - Developed it on top of dmitry's 'next' branch due to
-> dependency on generic "matrix_keypad_build_keymap" api
-> patches queued in that branch
-> - Adapted the driver to fill "keymap" in device tree
-> using "matrix_keypad_build_keymap" api defined in
-> drivers/input/matrix-keymap.c
-> ?.../devicetree/bindings/input/omap-keypad.txt ? ? ?| ? 31 ++++++
-> ?drivers/input/keyboard/omap4-keypad.c ? ? ? ? ? ? ?| ?108 +++++++++++++++-----
-> ?2 files changed, 111 insertions(+), 28 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/input/omap-keypad.txt
->
-> diff --git a/Documentation/devicetree/bindings/input/omap-keypad.txt b/Documentation/devicetree/bindings/input/omap-keypad.txt
-> new file mode 100644
-> index 0000000..722425b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/omap-keypad.txt
-> @@ -0,0 +1,31 @@
-> +* TI's Keypad Controller device tree bindings
-> +
-> +TI's Keypad controller is used to interface a SoC with a matrix-type
-> +keypad device. The keypad controller supports multiple row and column lines.
-> +A key can be placed at each intersection of a unique row and a unique column.
-> +The keypad controller can sense a key-press and key-release and report the
-> +event using a interrupt to the cpu.
-> +
-> +Required SoC Specific Properties:
-> +- compatible: should be one of the following
-> + ? - "ti,omap4-keypad": For controllers compatible with omap4 keypad
-> + ? ? ?controller.
-> +
-> +Required Board Specific Properties, in addition to those specified by
-> +the shared matrix-keyboard bindings:
-> +- keypad,num-rows: Number of row lines connected to the keypad
-> + ?controller.
-> +
-> +- keypad,num-columns: Number of column lines connected to the
-> + ?keypad controller.
-> +
-> +Optional Properties specific to linux:
-> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
-> +
-> +Example:
-> + ? ? ? ?keypad at 4ae1c000{
-> + ? ? ? ? ? ? ? ?compatible = "ti,omap4-keypad";
-> + ? ? ? ? ? ? ? ?keypad,num-rows = <2>;
-> + ? ? ? ? ? ? ? ?keypad,num-columns = <8>;
-> + ? ? ? ? ? ? ? linux,keypad-no-autorepeat;
-> + ? ? ? };
-> diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
-> index aed5f69..d5a2d1a 100644
-> --- a/drivers/input/keyboard/omap4-keypad.c
-> +++ b/drivers/input/keyboard/omap4-keypad.c
-> @@ -27,6 +27,7 @@
-> ?#include <linux/platform_device.h>
-> ?#include <linux/errno.h>
-> ?#include <linux/io.h>
-> +#include <linux/of.h>
-> ?#include <linux/input.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/pm_runtime.h>
-> @@ -75,6 +76,7 @@ enum {
->
-> ?struct omap4_keypad {
-> ? ? ? ?struct input_dev *input;
-> + ? ? ? struct matrix_keymap_data *keymap_data;
->
-> ? ? ? ?void __iomem *base;
-> ? ? ? ?unsigned int irq;
-> @@ -84,6 +86,7 @@ struct omap4_keypad {
-> ? ? ? ?u32 reg_offset;
-> ? ? ? ?u32 irqreg_offset;
-> ? ? ? ?unsigned int row_shift;
-> + ? ? ? bool no_autorepeat;
-> ? ? ? ?unsigned char key_state[8];
-> ? ? ? ?unsigned short keymap[];
-> ?};
-> @@ -208,25 +211,74 @@ static void omap4_keypad_close(struct input_dev *input)
-> ? ? ? ?pm_runtime_put_sync(input->dev.parent);
-> ?}
->
-> +static struct omap4_keypad *omap_keypad_parse_dt(struct device *dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? uint32_t rows, uint32_t cols,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct input_dev *input_dev)
-> +{
-> + ? ? ? struct device_node *np = dev->of_node;
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> + ? ? ? struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
-> + ? ? ? int error;
-> +
-> + ? ? ? error = matrix_keypad_build_keymap(NULL, "linux,keymap",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? rows, cols, keypad_data->keymap, input_dev);
-> + ? ? ? if (error) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to build keymap\n");
-> + ? ? ? ? ? ? ? input_free_device(input_dev);
-> + ? ? ? }
-> +
-> + ? ? ? if (of_get_property(np, "linux,input-no-autorepeat", NULL))
-> + ? ? ? ? ? ? ? keypad_data->no_autorepeat = true;
-> +
-> + ? ? ? return keypad_data;
-> +}
-> +
-> ?static int __devinit omap4_keypad_probe(struct platform_device *pdev)
-> ?{
-> + ? ? ? struct device *dev = &pdev->dev;
-> + ? ? ? struct device_node *np = dev->of_node;
-> ? ? ? ?const struct omap4_keypad_platform_data *pdata;
-> ? ? ? ?struct omap4_keypad *keypad_data;
-> ? ? ? ?struct input_dev *input_dev;
-> ? ? ? ?struct resource *res;
-> ? ? ? ?resource_size_t size;
-> - ? ? ? unsigned int row_shift, max_keys;
-> + ? ? ? unsigned int row_shift = 0, max_keys = 0;
-> + ? ? ? uint32_t num_rows = 0, num_cols = 0;
-> ? ? ? ?int rev;
-> ? ? ? ?int irq;
-> ? ? ? ?int error;
->
-> ? ? ? ?/* platform data */
-> ? ? ? ?pdata = pdev->dev.platform_data;
-> - ? ? ? if (!pdata) {
-> + ? ? ? if (np) {
-> + ? ? ? ? ? ? ? of_property_read_u32(np, "keypad,num-rows", &num_rows);
-> + ? ? ? ? ? ? ? of_property_read_u32(np, "keypad,num-columns", &num_cols);
-> + ? ? ? ? ? ? ? if (!num_rows || !num_cols) {
-> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "number of keypad rows/columns not specified\n");
-> + ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? } else if (pdata) {
-> + ? ? ? ? ? ? ? num_rows = pdata->rows;
-> + ? ? ? ? ? ? ? num_cols = pdata->cols;
-> + ? ? ? } else {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "no platform data defined\n");
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
->
-> + ? ? ? row_shift = get_count_order(num_cols);
-> + ? ? ? max_keys = num_rows << row_shift;
-> +
-> + ? ? ? keypad_data = devm_kzalloc(dev, sizeof(struct omap4_keypad) +
-> + ? ? ? ? ? ? ? ? ? ? ? max_keys * sizeof(keypad_data->keymap[0]),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
-> +
-> + ? ? ? if (!keypad_data) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> + ? ? ? }
-> +
-> + ? ? ? platform_set_drvdata(pdev, keypad_data);
-> +
-> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> ? ? ? ?if (!res) {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "no base address specified\n");
-> @@ -239,22 +291,6 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
->
-> - ? ? ? if (!pdata->keymap_data) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "no keymap data defined\n");
-> - ? ? ? ? ? ? ? return -EINVAL;
-> - ? ? ? }
-> -
-> - ? ? ? row_shift = get_count_order(pdata->cols);
-> - ? ? ? max_keys = pdata->rows << row_shift;
-> -
-> - ? ? ? keypad_data = kzalloc(sizeof(struct omap4_keypad) +
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? max_keys * sizeof(keypad_data->keymap[0]),
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
-> - ? ? ? if (!keypad_data) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "keypad_data memory allocation failed\n");
-> - ? ? ? ? ? ? ? return -ENOMEM;
-> - ? ? ? }
-> -
-> ? ? ? ?size = resource_size(res);
->
-> ? ? ? ?res = request_mem_region(res->start, size, pdev->name);
-> @@ -271,10 +307,10 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?goto err_release_mem;
-> ? ? ? ?}
->
-> + ? ? ? keypad_data->rows = num_rows;
-> + ? ? ? keypad_data->cols = num_cols;
-> ? ? ? ?keypad_data->irq = irq;
-> ? ? ? ?keypad_data->row_shift = row_shift;
-> - ? ? ? keypad_data->rows = pdata->rows;
-> - ? ? ? keypad_data->cols = pdata->cols;
->
-> ? ? ? ?/*
-> ? ? ? ?* Enable clocks for the keypad module so that we can read
-> @@ -322,15 +358,25 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
-> ? ? ? ?input_dev->open = omap4_keypad_open;
-> ? ? ? ?input_dev->close = omap4_keypad_close;
->
-> - ? ? ? error = matrix_keypad_build_keymap(pdata->keymap_data, NULL,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdata->rows, pdata->cols,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?keypad_data->keymap, input_dev);
-> - ? ? ? if (error) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to build keymap\n");
-> - ? ? ? ? ? ? ? goto err_free_input;
-> + ? ? ? if (np) {
-> + ? ? ? ? ? ? ? keypad_data = omap_keypad_parse_dt(&pdev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? keypad_data->rows, keypad_data->cols,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? input_dev);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? keypad_data->keymap_data =
-> + ? ? ? ? ? ? ? ? ? ? ? (struct matrix_keymap_data *)pdata->keymap_data;
-> + ? ? ? ? ? ? ? error = matrix_keypad_build_keymap(keypad_data->keymap_data,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? NULL, keypad_data->rows, keypad_data->cols,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? keypad_data->keymap, input_dev);
-> + ? ? ? ? ? ? ? if (error) {
-> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to build keymap\n");
-> + ? ? ? ? ? ? ? ? ? ? ? goto err_free_input;
-> + ? ? ? ? ? ? ? }
-> ? ? ? ?}
->
-> - ? ? ? __set_bit(EV_REP, input_dev->evbit);
-> + ? ? ? if (!keypad_data->no_autorepeat)
-> + ? ? ? ? ? ? ? __set_bit(EV_REP, input_dev->evbit);
-> +
-> ? ? ? ?input_set_capability(input_dev, EV_MSC, MSC_SCAN);
->
-> ? ? ? ?input_set_drvdata(input_dev, keypad_data);
-> @@ -351,7 +397,6 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?goto err_pm_disable;
-> ? ? ? ?}
->
-> - ? ? ? platform_set_drvdata(pdev, keypad_data);
-> ? ? ? ?return 0;
->
-> ?err_pm_disable:
-> @@ -392,12 +437,19 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
-> ? ? ? ?return 0;
-> ?}
->
-> +static const struct of_device_id omap_keypad_dt_match[] = {
-> + ? ? ? { .compatible = "ti,omap4-keypad" },
-> + ? ? ? {},
-> +};
-> +MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
-> +
-> ?static struct platform_driver omap4_keypad_driver = {
-> ? ? ? ?.probe ? ? ? ? ?= omap4_keypad_probe,
-> ? ? ? ?.remove ? ? ? ? = __devexit_p(omap4_keypad_remove),
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "omap4-keypad",
-> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
-> + ? ? ? ? ? ? ? .of_match_table = of_match_ptr(omap_keypad_dt_match),
-> ? ? ? ?},
-> ?};
-> ?module_platform_driver(omap4_keypad_driver);
-> --
-> 1.7.1
->
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git ux500/hickup
+
+for you to fetch changes up to 5910de9e2de453956c3a18816f4838d96ac86988:
+
+  ARM: ux500: Enable probing of pinctrl through Device Tree (2012-06-01 02:04:53 +0200)
+
+----------------------------------------------------------------
+ARM: ux500: fixes for mismerge
+
+The device tree conversion for arm/ux500 in 3.5 turns out to be
+incomplete because of a mismerge done by Linus Walleij that
+I failed to notice early enough and that Lee Jones as the original
+author of those patches did not manage to fix during the -next
+cycle. While we originally to get a much larger set of ux500
+device tree enablement patches merged, this did not happen in time.
+
+After some discussion at Linaro Connect conference this week,
+Lee has been able to do damage control and provide a series to put
+the broken platform back into usable shape for both DT and non-DT
+based booting.
+
+This series has not been part of linux-next and is based on top
+of the current state of the upstream kernel rather than an -rc,
+but this is the best we could manage given the earlier breakage.
+
+----------------------------------------------------------------
+Lee Jones (15):
+      pinctrl-nomadik: Allow Device Tree driver probing
+      ARM: ux500: New DT:ed snowball_platform_devs for one-by-one device enablement
+      ARM: ux500: New DT:ed u8500_init_devices for one-by-one device enablement
+      ARM: ux500: Disable SMSC911x platform code registration when DT is enabled
+      ARM: ux500: Remove DB8500 PRCMU platform registration when DT is enabled
+      ARM: ux500: PRCMU related configuration and layout corrections for Device Tree
+      ARM: ux500: Re-enable SMSC911x platform code registration during non-DT boots
+      ARM: ux500: Use correct format for dynamic IRQ assignment
+      ARM: ux500: Disable platform setup of the ab8500 when DT is enabled
+      ARM: ux500: Only initialise STE's UIBs on boards which support them
+      ARM: ux500: Apply db8500-prcmu regulator information to db8500 Device Tree
+      ARM: ux500: Allow PRCMU regulator to be probed during a DT enabled boot
+      ARM: ux500: Provide regulator support for SMSC911x via Device Tree
+      ARM: ux500: Add support for ab8500 regulators into the Device Tree
+      ARM: ux500: Enable probing of pinctrl through Device Tree
+
+ arch/arm/boot/dts/db8500.dtsi          |  204 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/snowball.dts         |   32 ++++++++++++++++++--------
+ arch/arm/configs/u8500_defconfig       |    1 +
+ arch/arm/mach-ux500/board-mop500-uib.c |    4 +---
+ arch/arm/mach-ux500/board-mop500.c     |   32 ++++++++++++++++++++++----
+ arch/arm/mach-ux500/board-mop500.h     |    4 ++++
+ arch/arm/mach-ux500/cpu-db8500.c       |   25 ++++++++++++++++++--
+ drivers/mfd/db8500-prcmu.c             |    1 +
+ drivers/pinctrl/pinctrl-nomadik.c      |   20 +++++++++++++++-
+ 9 files changed, 301 insertions(+), 22 deletions(-)
