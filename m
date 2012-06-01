@@ -1,59 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Jun 2012 11:29:13 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <4FC81C14.7030702@gmail.com>
-References: <4FC6E7CE.9090004@gmail.com>
- <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
- <4FC6FC38.8090904@gmail.com>
- <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
- <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
- <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
- <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
- <4FC81C14.7030702@gmail.com>
-Message-ID: <20120601032912.GB16273@mbp>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Fri, 1 Jun 2012 09:15:45 +0530
+Subject: [PATCH V3 00/10] PM: Create the AVS(Adaptive Voltage Scaling)
+In-Reply-To: <874nqwynxd.fsf@ti.com>
+References: <1335462041-4949-1-git-send-email-j-keerthy@ti.com>
+ <87397by2h9.fsf@ti.com>
+ <CAJ6a13aJwesHw0frCV+EfvYaep09cZGcu_PopuHzye1HS2tgvg@mail.gmail.com>
+ <CAJ6a13YLogA7M=rzSJAW6fHZOujFY0Crfdz9Sc5qL0mt8kX9CA@mail.gmail.com>
+ <87obpdv6f4.fsf@ti.com> <874nqwynxd.fsf@ti.com>
+Message-ID: <CAJ6a13YzgxK1QJVLd+ZKRM=w4mM3P3YXicwdazpBaRDqdUDHqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2012 at 02:34:12AM +0100, snakky.zhang at gmail.com wrote:
-> >> Yes, seems newer CPUs has no such limitation thus this function is global
-> >> effective naturally. :-)
-> >>
-> >> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
-> >> Details in arch/mips/mm/c-r4k.c.
-> > Rather than IPI we would better use the read-for-ownership trick like
-> > in this patch to make flush_dcache_page global (no need for
-> > write-for-ownership):
-> >
-> > http://dchs.spinics.net/lists/arm-kernel/msg125075.html
-> >
-> > (it may no longer apply, I haven't checked it for some time).
-> >
-> > That's the first thing. Secondly you still need preemption disable so
-> > that it is not preempted between RFO and the actual cache cleaning.
-> >
-> And, another confusion for PREEMPT: Even if we disable preempt, with locally
-> effective flush_dcache_xxx, there is still possibility to reproduce such
-> issue(Similar with the previous case):
-> 
-> 1) Task running on Core-0 loading text section into memory.
->      It was schedule out and then migrate into Core-1;
-> 2) On Core-1, this task continue loading it and then
->      "flush_dcache_page" to make sure the loaded text section write
->      into main memory.
-> 3) Task tend to the loaded text section and running it.
-> 
-> Similar as the previous case, the difference lies in step1 that the
-> task was interrupted by timer interrupt. Thus it still can be switch
-> out and then been migrate to another core. Thus in step2 and 3, this
-> issue may still been reproduced.  So, disable preempt can only lower
-> the possibility of this issue but can't avoid it.
+On Fri, Jun 1, 2012 at 4:10 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Kevin Hilman <khilman@ti.com> writes:
+>
+>> "J, KEERTHY" <j-keerthy@ti.com> writes:
+>>
+>>> On Tue, May 15, 2012 at 11:16 AM, J, KEERTHY <j-keerthy@ti.com> wrote:
+>>>> On Tue, May 8, 2012 at 5:21 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>>>> Rafael,
+>>>>>
+>>>>> Keerthy <j-keerthy@ti.com> writes:
+>>>>>
+>>>>>> From: J Keerthy <j-keerthy@ti.com>
+>>>>>>
+>>>>>> AVS(Adaptive Voltage Scaling) is a power management technique which
+>>>>>> controls the operating voltage of a device in order to optimize (i.e. reduce)
+>>>>>> its power consumption. The voltage is adapted depending on static factors
+>>>>>> (chip manufacturing process) and dynamic factors (temperature
+>>>>>> depending performance).
+>>>>>> The TI AVS solution is named Smartreflex.
+>>>>>>
+>>>>>> To that end, create the AVS driver in drivers/power/avs and
+>>>>>> move the OMAP SmartReflex code to the new directory. The
+>>>>>> class driver is still retained in the mach-omap2 directory.
+>>>>>
+>>>>> How should we handle this for upstream?
+>>>>>
+>>>>> It does a bunch of cleanup under arch/arm then does the move to
+>>>>> drivers/power the end. ?To avoid conflicts with other OMAP core changes,
+>>>>> I would suggest we take this through the OMAP tree.
+>>>>>
+>>>>> With your ack, I'd be glad to take it.
+>>>>
+>>>> Hello Rafael,
+>>>>
+>>>> A gentle ping on this series.
+>>>
+>>> Hi Greg,
+>>>
+>>> This series has Kevin's comments incorporated.
+>>>
+>>> Kevin,
+>>>
+>>> Can i have your Ack for this series?
+>>>
+>>
+>> Well, as mentioned above, I'm waiting for Rafael's ack, then I will
+>> merge it.
+>>
+>> Because of all the arch/arm/mach-omap2/* changes, I would like to merge
+>> this via the OMAP tree to avoid conflicts with other stuff we have
+>> changing in arch/arm/mach-omap2/*
+>
+> OK, I had an off-line discussion with Rafael and he's OK that I take
+> these. ?I will add an ack from Rafael and queue this series up for v3.6.
 
-It would work as long as the data copying into the text area (done by
-the driver and VFS layer) and the flush_dcache_page() sequence are not
-preemptible. A timer interrupt between data copying and
-flush_dcache_page() would interrupt a kernel routine which is not
-preemptible.
+Thanks Kevin.
+
+>
+> Thanks,
+>
+> Kevin
+
+
 
 -- 
-Catalin
+Regards and Thanks,
+Keerthy
