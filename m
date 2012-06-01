@@ -1,73 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 01 Jun 2012 09:05:47 -0600
-Subject: pinctrl: group/pin identity mapping
-In-Reply-To: <4FC89437.1070304@parrot.com>
-References: <4FC89437.1070304@parrot.com>
-Message-ID: <4FC8DA4B.2040600@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Jun 2012 16:06:21 +0100
+Subject: [GIT PULL] CMA and ARM DMA-mapping updates for v3.5
+In-Reply-To: <015e01cd3daa$6d910e50$48b32af0$%szyprowski@samsung.com>
+References: <1337672417-10065-1-git-send-email-m.szyprowski@samsung.com>
+ <20120529122932.GA24623@n2100.arm.linux.org.uk>
+ <015e01cd3daa$6d910e50$48b32af0$%szyprowski@samsung.com>
+Message-ID: <20120601150621.GA9525@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2012 04:06 AM, Gr?gor Boirie wrote:
-> Hi All,
+On Tue, May 29, 2012 at 04:50:45PM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
-> I'm trying to implement pinctrl support for our new cortex based SoC.
-> Our driver should provide support for pinctrl/pinmux/pinconf combination
-> without device tree handling at the moment.
-> However, I'm afraid I misunderstand how groups relate to muxed pins and
-> I'd like to hear your suggestions.
+> On Tuesday, May 29, 2012 2:30 PM Russell King - ARM Linux wrote:
 > 
-> Here's the HW: our I/O pins subsystem allows us to multiplex every
-> controllable pins using up to 4 mutually exclusive functions, i.e. there
-> is no notion of pin GROUP multiplexing at the HW level (one register per
-> pin is available to setup multiplexing and other electronic properties
-> like drive strength, pull up/down...).
+> > I notice we have new warnings as a result of CMA being merged, though
+> > thankfully they're just in Kconfig:
+> > 
+> > warning: (ARM) selects CMA which has unmet direct dependencies (HAVE_DMA_CONTIGUOUS &&
+> > HAVE_MEMBLOCK && EXPERIMENTAL)
+> > 
+> > This seems totally weird: you're mandating that ARM must have CMA
+> > selected, but it's an experimental feature?  So you're implying that
+> > the entire ARM kernel becomes totally experimental for the next
+> > release cycle?
+> > 
+> > I think this needs fixing.
 > 
-> However, it seems the pinctrl subsystem requires the driver to provide
-> pin groups for pinmux implementation.
-> So my question is: having no notion of HW pin groups whatsoever, should I:
-> 
-> 1) implement a software/logical group that would arbitrarily gather
-> multiple HW pins in a platform dependent manner ?
-> 
-> 2) perform an identity mapping between HW pin and software/logical group
-> with up to 4 groups/HW pins per pinmux function ?
-> 
-> 3) anything else ? any way to bypass the pinctrl group logic to directly
-> assign pins rather than groups to pinmux functions ?
+> No, that wasn't my intention. I will provide a patch which removes unconditional dependency
+> on CMA - it will let one to disable CMA and use old allocation method if needed, but this 
+> requires a few more changes in the dma-mapping implementation. I wasn't aware of the 
+> consequences and no one has complained about this since v15 of CMA patches (Aug 2011).
 
-Here's my take.
+I've just been looking at the automatic build and boot logs, and CMA looks
+like it has the potential to cause regressions:
 
-pinctrl originally (early during design) only supported per-pin muxing.
-This didn't work for Tegra (since it really has register fields that
-affect muxing of multiple pins at once; groups), so I requested allowing
-per-group muxing as well. We ended up only allowing per-group muxing and
-dropped per-pin muxing:-( So, /my/ intention was to only use groups for
-true groups in HW.
+Linux version 3.4.0+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.3.5 (GCC) ) #1 PREEMPT Fri Jun 1 02:01:58 BST 2012
+CPU: ARMv7 Processor [411fc082] revision 2 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+Machine: OMAP LDP board
+vmalloc area is too big, limiting to 976MB
+Reserving 2097152 bytes SDRAM for VRAM
+cma: CMA: failed to reserve 16 MiB
+...
+Kernel command line: console=ttyO2,115200n8 noinitrd vmalloc=1G mem=128M root=/dev/mmcblk0p2 rw ip=none rootdelay=2 video=omap24xxfb:rotation=270
+...
+NET: Registered protocol family 16
+initlevel:2=postcore, 16 registered initcalls
+DMA: failed to allocate 256 KiB pool for atomic coherent allocation
 
-However, many others have taken this group muxing capability and used it
-for a different purpose; to define SW-only groups that end up affecting
-HW registers/fields and hence multiple pins at once, e.g. a group for
-for each of the possible mux locations for e.g. HW module UART A , which
-contain s of the pins used for that mux option.
+I don't see any other failures, but that doesn't look good...
 
-So, you have two choices:
-
-a) (Like Tegra30): Define a group for each pin, that contains just that
-one pin. This will allow you to pick the mux option for each pin
-individually (since there's a group per pin) in the pinctrl mapping
-table. In my (personal) opinion (which is evidently rarely shared), this
-is the correct approach, since the pinctrl driver directly models the HW
-capabilities. Also, if/when pinctrl re-gains the capability to request
-mux options per-pin in addition to per-group, the conversion will likely
-be quite trivial if you want to do so.
-
-b) For each HW module, for each set of pins it makes sense to use for
-that HW module (i.e. all the different sets of pins it can be mux'd to),
-create a group for those pins. Many pins will be in multiple different
-semi-arbitrarily overlapping groups. I personally call these "virtual
-groups" since they don't correspond 1:1 with HW registers/fields. Create
-a function for each HW module. Allow each HW module's function to be
-mux'd onto each of the groups you created for it. There are probably
-quite a few existing examples of this in drivers/pinctrl.
-
-Hope this helps!
+Note that that command line has worked perfectly well up until now.
