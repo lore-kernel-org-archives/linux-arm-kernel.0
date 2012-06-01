@@ -1,108 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jun 2012 12:04:15 +0100
-Subject: [PATCH 26/27] arm, smpboot: Use generic SMP booting infrastructure
-In-Reply-To: <20120601091614.31979.39272.stgit@srivatsabhat.in.ibm.com>
-References: <20120601090952.31979.24799.stgit@srivatsabhat.in.ibm.com>
- <20120601091614.31979.39272.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20120601110415.GG21245@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Jun 2012 04:19:39 -0700
+Subject: [RFC PATCH 02/11] ARM: OMAP: expose control.h to mach area
+In-Reply-To: <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-3-git-send-email-eduardo.valentin@ti.com>
+ <CAMQu2gxbkFCtkK+NCVksC82-R4SAKKtK2w=zNbrNi9a10s1t1Q@mail.gmail.com>
+ <CAGF5oy_R0xKsKQoqq2ReCjEP2tWC4UcawnAkTPU35thysnSj7g@mail.gmail.com>
+Message-ID: <20120601111938.GL12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If you're expecting an ack from me, you're not going to get it because
-this patch is useless on its own.  It can't be reviewed and it can't be
-tested without the rest of the series.
+* Valentin, Eduardo <eduardo.valentin@ti.com> [120528 03:34]:
+> Hello,
+> 
+> On Mon, May 28, 2012 at 12:25 PM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> > On Fri, May 25, 2012 at 1:55 PM, Eduardo Valentin
+> > <eduardo.valentin@ti.com> wrote:
+> >> This patch exposes the definitions under control.h to
+> >> drivers outside the machine code.
+> >>
+> >> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> >> ---
+> > After second thought, this complete header movement needs to avoided.
+> > Drivers should not anyway include something like <mach/control.h>
+> >
+> > May be split the control.h header file data into ..
+> > - defines used by mach-omap2/* files which can remain in "control.h"
+> > in existing location.
+> 
+> OK..
+> 
+> > - common functions/defines used across drivers/*, mach-omap2/*,
+> > plat-omap/*, should
+> > go to include/linux/omap_control.h
+> 
+> Right..
+> 
+> > - Driver specific defines like thermal, usb etc, should go to
+> > respective drivers file.
+> 
+> Indeed.
+> 
+> >
+> > What do you think ?
+> 
+> I think we are in line. And I believe I saw a similar comment by
+> Benoit in other email thread.
+> 
+> Having a better thinking of this, it makes sense to have the
+> definition specific to drivers in the driver scope only, as they are
+> going to be used only there anyway.
+> 
+> I will drop this patch off and update the remaining changes
+> accordingly (drop the change in control.h for thermal specific and
+> move it to omap_bandgap.h).
 
-On Fri, Jun 01, 2012 at 02:46:20PM +0530, Srivatsa S. Bhat wrote:
-> Convert arm to use the generic framework to boot secondary CPUs.
-> 
-> Notes:
-> The calls to local_irq_enable() and local_fiq_enable() which were there
-> in secondary_start_kernel() originally, are retained in __cpu_post_online()
-> since the generic code only calls local_irq_enable().
-> Also, we were anyway going to enable interrupts in the generic code
-> immediately after __cpu_post_online(), so its not like we enabled interrupts
-> way too early.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> ---
-> 
->  arch/arm/kernel/smp.c |   26 +++++++++++++-------------
->  1 files changed, 13 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index b735521..460b7e7 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -25,6 +25,7 @@
->  #include <linux/percpu.h>
->  #include <linux/clockchips.h>
->  #include <linux/completion.h>
-> +#include <linux/smpboot.h>
->  
->  #include <linux/atomic.h>
->  #include <asm/cacheflush.h>
-> @@ -227,6 +228,11 @@ static void percpu_timer_setup(void);
->   */
->  asmlinkage void __cpuinit secondary_start_kernel(void)
->  {
-> +	smpboot_start_secondary(NULL);
-> +}
-> +
-> +void __cpuinit __cpu_pre_starting(void *unused)
-> +{
->  	struct mm_struct *mm = &init_mm;
->  	unsigned int cpu = smp_processor_id();
->  
-> @@ -244,26 +250,25 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  	printk("CPU%u: Booted secondary processor\n", cpu);
->  
->  	cpu_init();
-> -	preempt_disable();
->  	trace_hardirqs_off();
->  
->  	/*
->  	 * Give the platform a chance to do its own initialisation.
->  	 */
->  	platform_secondary_init(cpu);
-> +}
->  
-> -	notify_cpu_starting(cpu);
-> +void __cpuinit __cpu_pre_online(void *unused)
-> +{
-> +	unsigned int cpu = smp_processor_id();
->  
->  	calibrate_delay();
->  
->  	smp_store_cpu_info(cpu);
-> +}
->  
-> -	/*
-> -	 * OK, now it's safe to let the boot CPU continue.  Wait for
-> -	 * the CPU migration code to notice that the CPU is online
-> -	 * before we continue - which happens after __cpu_up returns.
-> -	 */
-> -	set_cpu_online(cpu, true);
-> +void __cpuinit __cpu_post_online(void *unused)
-> +{
->  	complete(&cpu_running);
->  
->  	/*
-> @@ -273,11 +278,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  
->  	local_irq_enable();
->  	local_fiq_enable();
-> -
-> -	/*
-> -	 * OK, it's off to the idle thread for us
-> -	 */
-> -	cpu_idle();
->  }
->  
->  void __init smp_cpus_done(unsigned int max_cpus)
-> 
+Yes good, we should not expose these to the other drivers, that will
+lead into misuse of these defines from various other drivers that we
+may not notice until it's too late.
+
+Regards,
+
+Tony
