@@ -1,59 +1,96 @@
-From: snakky.zhang@gmail.com (snakky.zhang at gmail.com)
-Date: Fri, 01 Jun 2012 09:34:12 +0800
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
-References: <20120530063858.GB6484@mudshark.cambridge.arm.com>
- <4FC5F017.4050202@gmail.com> <20120531030016.GB29372@mbp>
- <4FC6E172.4080601@gmail.com> <20120531031941.GA29906@mbp>
- <4FC6E7CE.9090004@gmail.com>
- <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
- <4FC6FC38.8090904@gmail.com>
- <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
- <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
- <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
- <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
-Message-ID: <4FC81C14.7030702@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Jun 2012 09:36:17 +0800
+Subject: [PATCH 1/3] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <1337816857-14694-2-git-send-email-thomas.abraham@linaro.org>
+References: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
+ <1337816857-14694-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdZDnFW4-bDsHN5BOr2e5NLGzouSBY7ngf-VsoPn-SyxAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 24, 2012 at 7:47 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
->> Yes, seems newer CPUs has no such limitation thus this function is global
->> effective naturally. :-)
->>
->> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
->> Details in arch/mips/mm/c-r4k.c.
-> Rather than IPI we would better use the read-for-ownership trick like
-> in this patch to make flush_dcache_page global (no need for
-> write-for-ownership):
->
-> http://dchs.spinics.net/lists/arm-kernel/msg125075.html
->
-> (it may no longer apply, I haven't checked it for some time).
->
-> That's the first thing. Secondly you still need preemption disable so
-> that it is not preempted between RFO and the actual cache cleaning.
->
-And, another confusion for PREEMPT: Even if we disable preempt, with locally
-effective flush_dcache_xxx, there is still possibility to reproduce such
-issue(Similar with the previous case):
+> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
 
-1) Task running on Core-0 loading text section into memory.
-     It was schedule out and then migrate into Core-1;
-2) On Core-1, this task continue loading it and then
-     "flush_dcache_page" to make sure the loaded text section write
-     into main memory.
-3) Task tend to the loaded text section and running it.
+It would be nice if some DT person could review the bindings, but if
+nothing happens
+I will accept them as-is.
 
-Similar as the previous case, the difference lies in step1 that the task was
-interrupted by timer interrupt. Thus it still can be switch out and then 
-been
-migrate to another core. Thus in step2 and 3, this issue may still been 
-reproduced.
-So, disable preempt can only lower the possibility of this issue but 
-can't avoid it.
+This driver is special since it seems to keep all pin, group and
+function information
+in the device tree, but not like Tony is doing it in pinctrl-simple,
+if I understand
+correctly?
 
-If I mis-understand something, please correct me.
+> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+> new file mode 100644
+> index 0000000..480e2f0
+(...)
+> +/* reading pin pull up/down and driver strength settings not implemented */
+> +static int samsung_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *config)
+> +{
+> + ? ? ? return -ENOTSUPP;
+> +}
+> +
+> +/* reading pin pull up/down and driver strength settings not implemented */
+> +static int samsung_pinconf_group_get(struct pinctrl_dev *pctldev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int group, unsigned long *config)
+> +{
+> + ? ? ? return -ENOTSUPP;
+> +}
 
-Thanks
-Xiao
+I think we made these optional now, so you can just leave them undefined
+in the pinconf_ops.
+
+> +static inline struct samsung_pinctrl_drv_data *samsung_pinctrl_get_driver_data(
+> +                               struct platform_device *pdev)
+> +{
+> +#ifdef CONFIG_OF
+> +       if (pdev->dev.of_node) {
+> +               int id;
+> +               const struct of_device_id *match;
+> +               const struct device_node *node = pdev->dev.of_node;
+> +
+> +               id = of_alias_get_id(pdev->dev.of_node, "pinctrl");
+> +               if (id < 0) {
+> +                       dev_err(&pdev->dev, "failed to get alias id\n");
+> +                       return NULL;
+> +               }
+> +               match = of_match_node(samsung_pinctrl_dt_match, node);
+> +               return (struct samsung_pinctrl_drv_data *)match->data + id;
+> +       }
+> +#endif
+
+You don't need this #ifdef because in Kconfig the driver already depends on
+OF so this is always available.
+
+> +/* driver data for various samsung soc's */
+> +#ifdef CONFIG_CPU_EXYNOS4210
+> +#define EXYNOS4210_PCTRL_DRVDATA (&exynos4210_pinctrl_drv_data)
+> +#else
+> +#define EXYNOS4210_PCTRL_DRVDATA (NULL)
+> +#endif /* CONFIG_CPU_EXYNOS4210 */
+
+Can you do this in some .h file instead?
+
+> +#ifdef CONFIG_OF
+
+You don't need this because in Kconfig the driver depends on OF
+already.
+
+> +static const struct of_device_id samsung_pinctrl_dt_match[] = {
+> +#ifdef CONFIG_CPU_EXYNOS4210
+> + ? ? ? { .compatible = "samsung,pinctrl-exynos4210",
+> + ? ? ? ? ? ? ? .data = (void *)exynos4210_pinctrl_drv_data },
+> +#endif /* CONFIG_CPU_EXYNOS4210 */
+> + ? ? ? {},
+> +};
+> +MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
+> +#endif /* CONFIG_OF */
+
+So delete the closing #endif too.
+
+Yours,
+Linus Walleij
