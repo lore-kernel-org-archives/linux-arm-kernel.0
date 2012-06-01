@@ -1,61 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Jun 2012 04:24:43 +0100
-Subject: [PATCH v2] ARM: at91: aic can use fast eoi handler type
-In-Reply-To: <1338474704-16665-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1338474704-16665-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120601032442.GA11721@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Jun 2012 11:25:34 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FC816DF.4010801@gmail.com>
+References: <4FC6E7CE.9090004@gmail.com>
+ <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+ <4FC6FC38.8090904@gmail.com>
+ <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
+ <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
+ <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
+ <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
+ <4FC816DF.4010801@gmail.com>
+Message-ID: <20120601032532.GA16273@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On Fri, Jun 01, 2012 at 02:11:59AM +0100, snakky.zhang at gmail.com wrote:
+> On 2012?06?01? 00:04, Catalin Marinas wrote:
+> > Rather than IPI we would better use the read-for-ownership trick like
+> > in this patch to make flush_dcache_page global (no need for
+> > write-for-ownership):
+> 
+> I think write for ownership is necessary for flush_dcache_xxx: Read
+> guarantee local data cache get newest data, at the same time write
+> guarantee the data can be flushed into memory.
+> 
+> See Section 7.1 of ARM11 MPCore. Processor Technical Reference 
+> Manual(Revision: r2p0) P146/728:
+> ======
+> Clean Applies to write-back data caches. If the cache line targeted by
+> the Clean operation contains stored data that has not yet been written
+> out to main memory, it is written to main memory, and the line is
+> marked as clean.
+> ======
+> 
+> So I am afraid without the write action, the "clean & invalidate"
+> action later will not write data back to main memory.
 
-Thanks for the update. Few comments inline.
+If there is a dirty cache line, it will be written to memory by the
+clean&invalidate operation. If the data in the cache line is in a clean
+state, it means that it is identical to the main memory (or L2 if
+present).
 
-On Thu, May 31, 2012 at 03:31:44PM +0100, ludovic.desroches at atmel.com wrote:
-> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-> index 325837a..a8bd715 100644
-> --- a/arch/arm/mach-at91/gpio.c
-> +++ b/arch/arm/mach-at91/gpio.c
-> @@ -593,7 +593,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  	int		n;
->  
->  	/* temporarily mask (level sensitive) parent IRQ */
-> -	chip->irq_ack(idata);
-> +	chip->irq_mask(idata);
+With just a read, clean&invalidate would not invalidate (remove) the
+cache lines from the other CPUs. Doing a write forces the cache line to
+only be present on the current CPU (though automatically invalidating it
+on the other CPUs).
 
-You don't need to mask the IRQ for fasteoi. However, you shouldn't be coding
-the flow control like this -- use chained_irq_enter instead.
+> Another question here:  Why the flush_kern_dcache_xxx in
+> arch/arm/mm/cache-v6 use "clean & invalidate" progress instead of
+> "clean"? Seems clean is enough here.
 
->  	for (;;) {
->  		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
->  		 * When there none are pending, we're finished unless we need
-> @@ -614,6 +614,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
->  		}
->  	}
-> +	chip->irq_eoi(idata);
+I think in the context of VIPT caches clean would be enough.
 
-chained_irq_exit.
+> > http://dchs.spinics.net/lists/arm-kernel/msg125075.html
+> >
+> > (it may no longer apply, I haven't checked it for some time).
+> >
+> > That's the first thing. Secondly you still need preemption disable so
+> > that it is not preempted between RFO and the actual cache cleaning.
+>
+> PREEMPT. :-)
+> 
+> Get it. But currently, I can't find anything related to ARMv6 MPCore
+> conflict with PREEMPT. So if it is also necessary to add something in
+> Documentation and related Kconfig to describe it and make sure PREEMPT
+> can't been enabled on such CPUs?
 
-> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-> index 601b4ee..3aa18a6 100644
-> --- a/arch/arm/mach-at91/irq.c
-> +++ b/arch/arm/mach-at91/irq.c
-> @@ -55,6 +55,15 @@ static void at91_aic_unmask_irq(struct irq_data *d)
->  	at91_aic_write(AT91_AIC_IECR, 1 << d->hwirq);
->  }
->  
-> +static void at91_aic_eoi(struct irq_data *d)
-> +{
-> +	/*
-> +	 * Mark end-of-interrupt on AIC, the controller doesn't care about
-> +	 * the value written in this register.
-> +	 */
-> +	at91_aic_write(AT91_AIC_EOICR, 0);
-> +}
+Well, we either get it to work or, if not possible, we add a comment.
+Let's try the former option first :)
 
-Does the EOICR read as zero, or can you read back the value which you wrote?
-In the latter case, writing the interrupt number can be a useful debugging
-aid when you have to debug IRQ issues with JTAG. Your call.
-
-Will
+-- 
+Catalin
