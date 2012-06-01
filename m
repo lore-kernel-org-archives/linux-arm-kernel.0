@@ -1,3658 +1,3661 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 1 Jun 2012 17:38:04 +0530
-Subject: [RFC 23/24] ARM: omap3: clk: Delete old OMAP clock data
-In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-Message-ID: <1338552485-31325-24-git-send-email-rnayak@ti.com>
+From: matthias.leblanc@gmail.com (Mathias Leblanc)
+Date: Fri,  1 Jun 2012 20:06:00 +0200
+Subject: [PATCH 1/1] TPM: STMicroelectronics ST33 I2C/SPI & ST19 I2C
+Message-ID: <1338573960-12425-1-git-send-email-mathias.leblanc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have switched to using new common clk
-data for OMAP3, delete the old one.
+ * STMicroelectronics version 1.2.0, Copyright (C) 2010
+ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
+ * This is free software, and you are welcome to redistribute it
+ * under certain conditions.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+This is the driver for TPM chip from ST Microelectronics.
+
+If you have a TPM security chip from STMicroelectronics working with
+an I2C/SPI, in menuconfig or .config choose the tpm driver on
+device --> tpm and activate the protocol of your choice before compiling
+the kernel.
+The driver will be accessible from within Linux.
+
+Tested on linux x86/x64 and beagleboard REV B & XM REV C
+
+Signed-off-by: Mathias Leblanc <mathias.leblanc@st.com>
 ---
- arch/arm/mach-omap2/clock3xxx_data.c | 3632 ----------------------------------
- 1 files changed, 0 insertions(+), 3632 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clock3xxx_data.c
+ arch/arm/mach-omap2/board-omap3beagle.c |   58 ++
+ drivers/char/tpm/Kconfig                |   32 +-
+ drivers/char/tpm/Makefile               |    2 +
+ drivers/char/tpm/tpm_stm_st19_i2c.c     |  560 ++++++++++++++
+ drivers/char/tpm/tpm_stm_st19_i2c.h     |   52 ++
+ drivers/char/tpm/tpm_stm_st33_i2c.c     | 1200 +++++++++++++++++++++++++++++
+ drivers/char/tpm/tpm_stm_st33_i2c.h     |   76 ++
+ drivers/char/tpm/tpm_stm_st33_spi.c     | 1285 +++++++++++++++++++++++++++++++
+ drivers/char/tpm/tpm_stm_st33_spi.h     |   80 ++
+ include/linux/i2c/tpm_stm_st19_i2c.h    |   42 +
+ include/linux/i2c/tpm_stm_st33_i2c.h    |   48 ++
+ include/linux/spi/tpm_stm_st33_spi.h    |   46 ++
+ 12 files changed, 3473 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/char/tpm/tpm_stm_st19_i2c.c
+ create mode 100644 drivers/char/tpm/tpm_stm_st19_i2c.h
+ create mode 100644 drivers/char/tpm/tpm_stm_st33_i2c.c
+ create mode 100644 drivers/char/tpm/tpm_stm_st33_i2c.h
+ create mode 100644 drivers/char/tpm/tpm_stm_st33_spi.c
+ create mode 100644 drivers/char/tpm/tpm_stm_st33_spi.h
+ create mode 100644 include/linux/i2c/tpm_stm_st19_i2c.h
+ create mode 100644 include/linux/i2c/tpm_stm_st33_i2c.h
+ create mode 100644 include/linux/spi/tpm_stm_st33_spi.h
 
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-deleted file mode 100644
-index f4a626f..0000000
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ /dev/null
-@@ -1,3632 +0,0 @@
--/*
-- * OMAP3 clock data
-- *
-- * Copyright (C) 2007-2010 Texas Instruments, Inc.
-- * Copyright (C) 2007-2011 Nokia Corporation
-- *
-- * Written by Paul Walmsley
-- * With many device clock fixes by Kevin Hilman and Jouni H??gander
-- * DPLL bypass clock support added by Roman Tereshonkov
-- *
-- */
--
--/*
-- * Virtual clocks are introduced as convenient tools.
-- * They are sources for other clocks and not supposed
-- * to be requested from drivers directly.
-- */
--
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/list.h>
--#include <linux/io.h>
--
--#include <plat/hardware.h>
--#include <plat/clkdev_omap.h>
--
--#include "iomap.h"
--#include "clock.h"
--#include "clock3xxx.h"
--#include "clock34xx.h"
--#include "clock36xx.h"
--#include "clock3517.h"
--#include "cm2xxx_3xxx.h"
--#include "cm-regbits-34xx.h"
--#include "prm2xxx_3xxx.h"
--#include "prm-regbits-34xx.h"
--#include "control.h"
--
--/*
-- * clocks
-- */
--
--#define OMAP_CM_REGADDR		OMAP34XX_CM_REGADDR
--
--/* Maximum DPLL multiplier, divider values for OMAP3 */
--#define OMAP3_MAX_DPLL_MULT		2047
--#define OMAP3630_MAX_JTYPE_DPLL_MULT	4095
--#define OMAP3_MAX_DPLL_DIV		128
--
--/*
-- * DPLL1 supplies clock to the MPU.
-- * DPLL2 supplies clock to the IVA2.
-- * DPLL3 supplies CORE domain clocks.
-- * DPLL4 supplies peripheral clocks.
-- * DPLL5 supplies other peripheral clocks (USBHOST, USIM).
-- */
--
--/* Forward declarations for DPLL bypass clocks */
--static struct clk dpll1_fck;
--static struct clk dpll2_fck;
--
--/* PRM CLOCKS */
--
--/* According to timer32k.c, this is a 32768Hz clock, not a 32000Hz clock. */
--static struct clk omap_32k_fck = {
--	.name		= "omap_32k_fck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--};
--
--static struct clk secure_32k_fck = {
--	.name		= "secure_32k_fck",
--	.ops		= &clkops_null,
--	.rate		= 32768,
--};
--
--/* Virtual source clocks for osc_sys_ck */
--static struct clk virt_12m_ck = {
--	.name		= "virt_12m_ck",
--	.ops		= &clkops_null,
--	.rate		= 12000000,
--};
--
--static struct clk virt_13m_ck = {
--	.name		= "virt_13m_ck",
--	.ops		= &clkops_null,
--	.rate		= 13000000,
--};
--
--static struct clk virt_16_8m_ck = {
--	.name		= "virt_16_8m_ck",
--	.ops		= &clkops_null,
--	.rate		= 16800000,
--};
--
--static struct clk virt_19_2m_ck = {
--	.name		= "virt_19_2m_ck",
--	.ops		= &clkops_null,
--	.rate		= 19200000,
--};
--
--static struct clk virt_26m_ck = {
--	.name		= "virt_26m_ck",
--	.ops		= &clkops_null,
--	.rate		= 26000000,
--};
--
--static struct clk virt_38_4m_ck = {
--	.name		= "virt_38_4m_ck",
--	.ops		= &clkops_null,
--	.rate		= 38400000,
--};
--
--static const struct clksel_rate osc_sys_12m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate osc_sys_13m_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate osc_sys_16_8m_rates[] = {
--	{ .div = 1, .val = 5, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate osc_sys_19_2m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate osc_sys_26m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate osc_sys_38_4m_rates[] = {
--	{ .div = 1, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel osc_sys_clksel[] = {
--	{ .parent = &virt_12m_ck,   .rates = osc_sys_12m_rates },
--	{ .parent = &virt_13m_ck,   .rates = osc_sys_13m_rates },
--	{ .parent = &virt_16_8m_ck, .rates = osc_sys_16_8m_rates },
--	{ .parent = &virt_19_2m_ck, .rates = osc_sys_19_2m_rates },
--	{ .parent = &virt_26m_ck,   .rates = osc_sys_26m_rates },
--	{ .parent = &virt_38_4m_ck, .rates = osc_sys_38_4m_rates },
--	{ .parent = NULL },
--};
--
--/* Oscillator clock */
--/* 12, 13, 16.8, 19.2, 26, or 38.4 MHz */
--static struct clk osc_sys_ck = {
--	.name		= "osc_sys_ck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP3430_PRM_CLKSEL,
--	.clksel_mask	= OMAP3430_SYS_CLKIN_SEL_MASK,
--	.clksel		= osc_sys_clksel,
--	/* REVISIT: deal with autoextclkmode? */
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate div2_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel sys_clksel[] = {
--	{ .parent = &osc_sys_ck, .rates = div2_rates },
--	{ .parent = NULL }
--};
--
--/* Latency: this clock is only enabled after PRM_CLKSETUP.SETUP_TIME */
--/* Feeds DPLLs - divided first by PRM_CLKSRC_CTRL.SYSCLKDIV? */
--static struct clk sys_ck = {
--	.name		= "sys_ck",
--	.ops		= &clkops_null,
--	.parent		= &osc_sys_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP3430_PRM_CLKSRC_CTRL,
--	.clksel_mask	= OMAP_SYSCLKDIV_MASK,
--	.clksel		= sys_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk sys_altclk = {
--	.name		= "sys_altclk",
--	.ops		= &clkops_null,
--};
--
--/* Optional external clock input for some McBSPs */
--static struct clk mcbsp_clks = {
--	.name		= "mcbsp_clks",
--	.ops		= &clkops_null,
--};
--
--/* PRM EXTERNAL CLOCK OUTPUT */
--
--static struct clk sys_clkout1 = {
--	.name		= "sys_clkout1",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &osc_sys_ck,
--	.enable_reg	= OMAP3430_PRM_CLKOUT_CTRL,
--	.enable_bit	= OMAP3430_CLKOUT_EN_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* DPLLS */
--
--/* CM CLOCKS */
--
--static const struct clksel_rate div16_dpll_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_3XXX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
--	{ .div = 7, .val = 7, .flags = RATE_IN_3XXX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_3XXX },
--	{ .div = 9, .val = 9, .flags = RATE_IN_3XXX },
--	{ .div = 10, .val = 10, .flags = RATE_IN_3XXX },
--	{ .div = 11, .val = 11, .flags = RATE_IN_3XXX },
--	{ .div = 12, .val = 12, .flags = RATE_IN_3XXX },
--	{ .div = 13, .val = 13, .flags = RATE_IN_3XXX },
--	{ .div = 14, .val = 14, .flags = RATE_IN_3XXX },
--	{ .div = 15, .val = 15, .flags = RATE_IN_3XXX },
--	{ .div = 16, .val = 16, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate dpll4_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_3XXX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
--	{ .div = 7, .val = 7, .flags = RATE_IN_3XXX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_3XXX },
--	{ .div = 9, .val = 9, .flags = RATE_IN_3XXX },
--	{ .div = 10, .val = 10, .flags = RATE_IN_3XXX },
--	{ .div = 11, .val = 11, .flags = RATE_IN_3XXX },
--	{ .div = 12, .val = 12, .flags = RATE_IN_3XXX },
--	{ .div = 13, .val = 13, .flags = RATE_IN_3XXX },
--	{ .div = 14, .val = 14, .flags = RATE_IN_3XXX },
--	{ .div = 15, .val = 15, .flags = RATE_IN_3XXX },
--	{ .div = 16, .val = 16, .flags = RATE_IN_3XXX },
--	{ .div = 17, .val = 17, .flags = RATE_IN_36XX },
--	{ .div = 18, .val = 18, .flags = RATE_IN_36XX },
--	{ .div = 19, .val = 19, .flags = RATE_IN_36XX },
--	{ .div = 20, .val = 20, .flags = RATE_IN_36XX },
--	{ .div = 21, .val = 21, .flags = RATE_IN_36XX },
--	{ .div = 22, .val = 22, .flags = RATE_IN_36XX },
--	{ .div = 23, .val = 23, .flags = RATE_IN_36XX },
--	{ .div = 24, .val = 24, .flags = RATE_IN_36XX },
--	{ .div = 25, .val = 25, .flags = RATE_IN_36XX },
--	{ .div = 26, .val = 26, .flags = RATE_IN_36XX },
--	{ .div = 27, .val = 27, .flags = RATE_IN_36XX },
--	{ .div = 28, .val = 28, .flags = RATE_IN_36XX },
--	{ .div = 29, .val = 29, .flags = RATE_IN_36XX },
--	{ .div = 30, .val = 30, .flags = RATE_IN_36XX },
--	{ .div = 31, .val = 31, .flags = RATE_IN_36XX },
--	{ .div = 32, .val = 32, .flags = RATE_IN_36XX },
--	{ .div = 0 }
--};
--
--/* DPLL1 */
--/* MPU clock source */
--/* Type: DPLL */
--static struct dpll_data dpll1_dd = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL),
--	.mult_mask	= OMAP3430_MPU_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430_MPU_DPLL_DIV_MASK,
--	.clk_bypass	= &dpll1_fck,
--	.clk_ref	= &sys_ck,
--	.freqsel_mask	= OMAP3430_MPU_DPLL_FREQSEL_MASK,
--	.control_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_CLKEN_PLL),
--	.enable_mask	= OMAP3430_EN_MPU_DPLL_MASK,
--	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
--	.auto_recal_bit	= OMAP3430_EN_MPU_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430_MPU_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430_MPU_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_AUTOIDLE_PLL),
--	.autoidle_mask	= OMAP3430_AUTO_MPU_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_IDLEST_PLL),
--	.idlest_mask	= OMAP3430_ST_MPU_CLK_MASK,
--	.max_multiplier = OMAP3_MAX_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--};
--
--static struct clk dpll1_ck = {
--	.name		= "dpll1_ck",
--	.ops		= &clkops_omap3_noncore_dpll_ops,
--	.parent		= &sys_ck,
--	.dpll_data	= &dpll1_dd,
--	.round_rate	= &omap2_dpll_round_rate,
--	.set_rate	= &omap3_noncore_dpll_set_rate,
--	.clkdm_name	= "dpll1_clkdm",
--	.recalc		= &omap3_dpll_recalc,
--};
--
--/*
-- * This virtual clock provides the CLKOUTX2 output from the DPLL if the
-- * DPLL isn't bypassed.
-- */
--static struct clk dpll1_x2_ck = {
--	.name		= "dpll1_x2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll1_ck,
--	.clkdm_name	= "dpll1_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--/* On DPLL1, unlike other DPLLs, the divider is downstream from CLKOUTX2 */
--static const struct clksel div16_dpll1_x2m2_clksel[] = {
--	{ .parent = &dpll1_x2_ck, .rates = div16_dpll_rates },
--	{ .parent = NULL }
--};
--
--/*
-- * Does not exist in the TRM - needed to separate the M2 divider from
-- * bypass selection in mpu_ck
-- */
--static struct clk dpll1_x2m2_ck = {
--	.name		= "dpll1_x2m2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll1_x2_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL),
--	.clksel_mask	= OMAP3430_MPU_DPLL_CLKOUT_DIV_MASK,
--	.clksel		= div16_dpll1_x2m2_clksel,
--	.clkdm_name	= "dpll1_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* DPLL2 */
--/* IVA2 clock source */
--/* Type: DPLL */
--
--static struct dpll_data dpll2_dd = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSEL1_PLL),
--	.mult_mask	= OMAP3430_IVA2_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430_IVA2_DPLL_DIV_MASK,
--	.clk_bypass	= &dpll2_fck,
--	.clk_ref	= &sys_ck,
--	.freqsel_mask	= OMAP3430_IVA2_DPLL_FREQSEL_MASK,
--	.control_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKEN_PLL),
--	.enable_mask	= OMAP3430_EN_IVA2_DPLL_MASK,
--	.modes		= (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED) |
--				(1 << DPLL_LOW_POWER_BYPASS),
--	.auto_recal_bit	= OMAP3430_EN_IVA2_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430_PRM_IRQENABLE_MPU_IVA2_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430_PRM_IRQSTATUS_MPU_IVA2_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, OMAP3430_CM_AUTOIDLE_PLL),
--	.autoidle_mask	= OMAP3430_AUTO_IVA2_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, OMAP3430_CM_IDLEST_PLL),
--	.idlest_mask	= OMAP3430_ST_IVA2_CLK_MASK,
--	.max_multiplier = OMAP3_MAX_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--};
--
--static struct clk dpll2_ck = {
--	.name		= "dpll2_ck",
--	.ops		= &clkops_omap3_noncore_dpll_ops,
--	.parent		= &sys_ck,
--	.dpll_data	= &dpll2_dd,
--	.round_rate	= &omap2_dpll_round_rate,
--	.set_rate	= &omap3_noncore_dpll_set_rate,
--	.clkdm_name	= "dpll2_clkdm",
--	.recalc		= &omap3_dpll_recalc,
--};
--
--static const struct clksel div16_dpll2_m2x2_clksel[] = {
--	{ .parent = &dpll2_ck, .rates = div16_dpll_rates },
--	{ .parent = NULL }
--};
--
--/*
-- * The TRM is conflicted on whether IVA2 clock comes from DPLL2 CLKOUT
-- * or CLKOUTX2. CLKOUT seems most plausible.
-- */
--static struct clk dpll2_m2_ck = {
--	.name		= "dpll2_m2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll2_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD,
--					  OMAP3430_CM_CLKSEL2_PLL),
--	.clksel_mask	= OMAP3430_IVA2_DPLL_CLKOUT_DIV_MASK,
--	.clksel		= div16_dpll2_m2x2_clksel,
--	.clkdm_name	= "dpll2_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/*
-- * DPLL3
-- * Source clock for all interfaces and for some device fclks
-- * REVISIT: Also supports fast relock bypass - not included below
-- */
--static struct dpll_data dpll3_dd = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.mult_mask	= OMAP3430_CORE_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430_CORE_DPLL_DIV_MASK,
--	.clk_bypass	= &sys_ck,
--	.clk_ref	= &sys_ck,
--	.freqsel_mask	= OMAP3430_CORE_DPLL_FREQSEL_MASK,
--	.control_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_mask	= OMAP3430_EN_CORE_DPLL_MASK,
--	.auto_recal_bit	= OMAP3430_EN_CORE_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430_CORE_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430_CORE_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_AUTOIDLE),
--	.autoidle_mask	= OMAP3430_AUTO_CORE_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST),
--	.idlest_mask	= OMAP3430_ST_CORE_CLK_MASK,
--	.max_multiplier = OMAP3_MAX_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--};
--
--static struct clk dpll3_ck = {
--	.name		= "dpll3_ck",
--	.ops		= &clkops_omap3_core_dpll_ops,
--	.parent		= &sys_ck,
--	.dpll_data	= &dpll3_dd,
--	.round_rate	= &omap2_dpll_round_rate,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &omap3_dpll_recalc,
--};
--
--/*
-- * This virtual clock provides the CLKOUTX2 output from the DPLL if the
-- * DPLL isn't bypassed
-- */
--static struct clk dpll3_x2_ck = {
--	.name		= "dpll3_x2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_ck,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--static const struct clksel_rate div31_dpll3_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 5, .val = 5, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 7, .val = 7, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 9, .val = 9, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 10, .val = 10, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 11, .val = 11, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 12, .val = 12, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 13, .val = 13, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 14, .val = 14, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 15, .val = 15, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 16, .val = 16, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 17, .val = 17, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 18, .val = 18, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 19, .val = 19, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 20, .val = 20, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 21, .val = 21, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 22, .val = 22, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 23, .val = 23, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 24, .val = 24, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 25, .val = 25, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 26, .val = 26, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 27, .val = 27, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 28, .val = 28, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 29, .val = 29, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 30, .val = 30, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 31, .val = 31, .flags = RATE_IN_3430ES2PLUS_36XX },
--	{ .div = 0 },
--};
--
--static const struct clksel div31_dpll3m2_clksel[] = {
--	{ .parent = &dpll3_ck, .rates = div31_dpll3_rates },
--	{ .parent = NULL }
--};
--
--/* DPLL3 output M2 - primary control point for CORE speed */
--static struct clk dpll3_m2_ck = {
--	.name		= "dpll3_m2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_CORE_DPLL_CLKOUT_DIV_MASK,
--	.clksel		= div31_dpll3m2_clksel,
--	.clkdm_name	= "dpll3_clkdm",
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap3_core_dpll_m2_set_rate,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk core_ck = {
--	.name		= "core_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_m2_ck,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dpll3_m2x2_ck = {
--	.name		= "dpll3_m2x2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_m2_ck,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static const struct clksel div16_dpll3_clksel[] = {
--	{ .parent = &dpll3_ck, .rates = div16_dpll_rates },
--	{ .parent = NULL }
--};
--
--/* This virtual clock is the source for dpll3_m3x2_ck */
--static struct clk dpll3_m3_ck = {
--	.name		= "dpll3_m3_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_DIV_DPLL3_MASK,
--	.clksel		= div16_dpll3_clksel,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll3_m3x2_ck = {
--	.name		= "dpll3_m3x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll3_m3_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_EMU_CORE_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--static struct clk emu_core_alwon_ck = {
--	.name		= "emu_core_alwon_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_m3x2_ck,
--	.clkdm_name	= "dpll3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* DPLL4 */
--/* Supplies 96MHz, 54Mhz TV DAC, DSS fclk, CAM sensor clock, emul trace clk */
--/* Type: DPLL */
--static struct dpll_data dpll4_dd;
--
--static struct dpll_data dpll4_dd_34xx __initdata = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL2),
--	.mult_mask	= OMAP3430_PERIPH_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430_PERIPH_DPLL_DIV_MASK,
--	.clk_bypass	= &sys_ck,
--	.clk_ref	= &sys_ck,
--	.freqsel_mask	= OMAP3430_PERIPH_DPLL_FREQSEL_MASK,
--	.control_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_mask	= OMAP3430_EN_PERIPH_DPLL_MASK,
--	.modes		= (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
--	.auto_recal_bit	= OMAP3430_EN_PERIPH_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430_PERIPH_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430_PERIPH_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_AUTOIDLE),
--	.autoidle_mask	= OMAP3430_AUTO_PERIPH_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST),
--	.idlest_mask	= OMAP3430_ST_PERIPH_CLK_MASK,
--	.max_multiplier = OMAP3_MAX_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--};
--
--static struct dpll_data dpll4_dd_3630 __initdata = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL2),
--	.mult_mask	= OMAP3630_PERIPH_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430_PERIPH_DPLL_DIV_MASK,
--	.clk_bypass	= &sys_ck,
--	.clk_ref	= &sys_ck,
--	.control_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_mask	= OMAP3430_EN_PERIPH_DPLL_MASK,
--	.modes		= (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
--	.auto_recal_bit	= OMAP3430_EN_PERIPH_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430_PERIPH_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430_PERIPH_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_AUTOIDLE),
--	.autoidle_mask	= OMAP3430_AUTO_PERIPH_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST),
--	.idlest_mask	= OMAP3430_ST_PERIPH_CLK_MASK,
--	.dco_mask	= OMAP3630_PERIPH_DPLL_DCO_SEL_MASK,
--	.sddiv_mask	= OMAP3630_PERIPH_DPLL_SD_DIV_MASK,
--	.max_multiplier = OMAP3630_MAX_JTYPE_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--	.flags		= DPLL_J_TYPE
--};
--
--static struct clk dpll4_ck = {
--	.name		= "dpll4_ck",
--	.ops		= &clkops_omap3_noncore_dpll_ops,
--	.parent		= &sys_ck,
--	.dpll_data	= &dpll4_dd,
--	.round_rate	= &omap2_dpll_round_rate,
--	.set_rate	= &omap3_dpll4_set_rate,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_dpll_recalc,
--};
--
--/*
-- * This virtual clock provides the CLKOUTX2 output from the DPLL if the
-- * DPLL isn't bypassed --
-- * XXX does this serve any downstream clocks?
-- */
--static struct clk dpll4_x2_ck = {
--	.name		= "dpll4_x2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--static const struct clksel dpll4_clksel[] = {
--	{ .parent = &dpll4_ck, .rates = dpll4_rates },
--	{ .parent = NULL }
--};
--
--/* This virtual clock is the source for dpll4_m2x2_ck */
--static struct clk dpll4_m2_ck = {
--	.name		= "dpll4_m2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430_CM_CLKSEL3),
--	.clksel_mask	= OMAP3630_DIV_96M_MASK,
--	.clksel		= dpll4_clksel,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll4_m2x2_ck = {
--	.name		= "dpll4_m2x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll4_m2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_96M_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--/*
-- * DPLL4 generates DPLL4_M2X2_CLK which is then routed into the PRM as
-- * PRM_96M_ALWON_(F)CLK.  Two clocks then emerge from the PRM:
-- * 96M_ALWON_FCLK (called "omap_96m_alwon_fck" below) and
-- * CM_96K_(F)CLK.
-- */
--
--/* Adding 192MHz Clock node needed by SGX */
--static struct clk omap_192m_alwon_fck = {
--	.name		= "omap_192m_alwon_fck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_m2x2_ck,
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel_rate omap_96m_alwon_fck_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_36XX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_36XX },
--	{ .div = 0 }
--};
--
--static const struct clksel omap_96m_alwon_fck_clksel[] = {
--	{ .parent = &omap_192m_alwon_fck, .rates = omap_96m_alwon_fck_rates },
--	{ .parent = NULL }
--};
--
--static const struct clksel_rate omap_96m_dpll_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate omap_96m_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static struct clk omap_96m_alwon_fck = {
--	.name		= "omap_96m_alwon_fck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_m2x2_ck,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk omap_96m_alwon_fck_3630 = {
--	.name		= "omap_96m_alwon_fck",
--	.parent		= &omap_192m_alwon_fck,
--	.init		= &omap2_init_clksel_parent,
--	.ops		= &clkops_null,
--	.recalc		= &omap2_clksel_recalc,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3630_CLKSEL_96M_MASK,
--	.clksel		= omap_96m_alwon_fck_clksel
--};
--
--static struct clk cm_96m_fck = {
--	.name		= "cm_96m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_96m_alwon_fck,
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel omap_96m_fck_clksel[] = {
--	{ .parent = &cm_96m_fck, .rates = omap_96m_dpll_rates },
--	{ .parent = &sys_ck,	 .rates = omap_96m_sys_rates },
--	{ .parent = NULL }
--};
--
--static struct clk omap_96m_fck = {
--	.name		= "omap_96m_fck",
--	.ops		= &clkops_null,
--	.parent		= &sys_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_SOURCE_96M_MASK,
--	.clksel		= omap_96m_fck_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* This virtual clock is the source for dpll4_m3x2_ck */
--static struct clk dpll4_m3_ck = {
--	.name		= "dpll4_m3_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3630_CLKSEL_TV_MASK,
--	.clksel		= dpll4_clksel,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll4_m3x2_ck = {
--	.name		= "dpll4_m3x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll4_m3_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_TV_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--static const struct clksel_rate omap_54m_d4m3x2_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate omap_54m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel omap_54m_clksel[] = {
--	{ .parent = &dpll4_m3x2_ck, .rates = omap_54m_d4m3x2_rates },
--	{ .parent = &sys_altclk,    .rates = omap_54m_alt_rates },
--	{ .parent = NULL }
--};
--
--static struct clk omap_54m_fck = {
--	.name		= "omap_54m_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_SOURCE_54M_MASK,
--	.clksel		= omap_54m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate omap_48m_cm96m_rates[] = {
--	{ .div = 2, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate omap_48m_alt_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel omap_48m_clksel[] = {
--	{ .parent = &cm_96m_fck, .rates = omap_48m_cm96m_rates },
--	{ .parent = &sys_altclk, .rates = omap_48m_alt_rates },
--	{ .parent = NULL }
--};
--
--static struct clk omap_48m_fck = {
--	.name		= "omap_48m_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_SOURCE_48M_MASK,
--	.clksel		= omap_48m_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk omap_12m_fck = {
--	.name		= "omap_12m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_48m_fck,
--	.fixed_div	= 4,
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--/* This virtual clock is the source for dpll4_m4x2_ck */
--static struct clk dpll4_m4_ck = {
--	.name		= "dpll4_m4_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3630_CLKSEL_DSS1_MASK,
--	.clksel		= dpll4_clksel,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--	.set_rate	= &omap2_clksel_set_rate,
--	.round_rate	= &omap2_clksel_round_rate,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll4_m4x2_ck = {
--	.name		= "dpll4_m4x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll4_m4_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_DSS1_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--/* This virtual clock is the source for dpll4_m5x2_ck */
--static struct clk dpll4_m5_ck = {
--	.name		= "dpll4_m5_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3630_CLKSEL_CAM_MASK,
--	.clksel		= dpll4_clksel,
--	.clkdm_name	= "dpll4_clkdm",
--	.set_rate	= &omap2_clksel_set_rate,
--	.round_rate	= &omap2_clksel_round_rate,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll4_m5x2_ck = {
--	.name		= "dpll4_m5x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll4_m5_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_CAM_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--/* This virtual clock is the source for dpll4_m6x2_ck */
--static struct clk dpll4_m6_ck = {
--	.name		= "dpll4_m6_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3630_DIV_DPLL4_MASK,
--	.clksel		= dpll4_clksel,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* The PWRDN bit is apparently only available on 3430ES2 and above */
--static struct clk dpll4_m6x2_ck = {
--	.name		= "dpll4_m6x2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll4_m6_ck,
--	.enable_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
--	.enable_bit	= OMAP3430_PWRDN_EMU_PERIPH_SHIFT,
--	.flags		= INVERT_ENABLE,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &omap3_clkoutx2_recalc,
--};
--
--static struct clk emu_per_alwon_ck = {
--	.name		= "emu_per_alwon_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll4_m6x2_ck,
--	.clkdm_name	= "dpll4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* DPLL5 */
--/* Supplies 120MHz clock, USIM source clock */
--/* Type: DPLL */
--/* 3430ES2 only */
--static struct dpll_data dpll5_dd = {
--	.mult_div1_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430ES2_CM_CLKSEL4),
--	.mult_mask	= OMAP3430ES2_PERIPH2_DPLL_MULT_MASK,
--	.div1_mask	= OMAP3430ES2_PERIPH2_DPLL_DIV_MASK,
--	.clk_bypass	= &sys_ck,
--	.clk_ref	= &sys_ck,
--	.freqsel_mask	= OMAP3430ES2_PERIPH2_DPLL_FREQSEL_MASK,
--	.control_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430ES2_CM_CLKEN2),
--	.enable_mask	= OMAP3430ES2_EN_PERIPH2_DPLL_MASK,
--	.modes		= (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
--	.auto_recal_bit	= OMAP3430ES2_EN_PERIPH2_DPLL_DRIFTGUARD_SHIFT,
--	.recal_en_bit	= OMAP3430ES2_SND_PERIPH_DPLL_RECAL_EN_SHIFT,
--	.recal_st_bit	= OMAP3430ES2_SND_PERIPH_DPLL_ST_SHIFT,
--	.autoidle_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430ES2_CM_AUTOIDLE2_PLL),
--	.autoidle_mask	= OMAP3430ES2_AUTO_PERIPH2_DPLL_MASK,
--	.idlest_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST2),
--	.idlest_mask	= OMAP3430ES2_ST_PERIPH2_CLK_MASK,
--	.max_multiplier = OMAP3_MAX_DPLL_MULT,
--	.min_divider	= 1,
--	.max_divider	= OMAP3_MAX_DPLL_DIV,
--};
--
--static struct clk dpll5_ck = {
--	.name		= "dpll5_ck",
--	.ops		= &clkops_omap3_noncore_dpll_ops,
--	.parent		= &sys_ck,
--	.dpll_data	= &dpll5_dd,
--	.round_rate	= &omap2_dpll_round_rate,
--	.set_rate	= &omap3_noncore_dpll_set_rate,
--	.clkdm_name	= "dpll5_clkdm",
--	.recalc		= &omap3_dpll_recalc,
--};
--
--static const struct clksel div16_dpll5_clksel[] = {
--	{ .parent = &dpll5_ck, .rates = div16_dpll_rates },
--	{ .parent = NULL }
--};
--
--static struct clk dpll5_m2_ck = {
--	.name		= "dpll5_m2_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll5_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430ES2_CM_CLKSEL5),
--	.clksel_mask	= OMAP3430ES2_DIV_120M_MASK,
--	.clksel		= div16_dpll5_clksel,
--	.clkdm_name	= "dpll5_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* CM EXTERNAL CLOCK OUTPUTS */
--
--static const struct clksel_rate clkout2_src_core_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate clkout2_src_sys_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate clkout2_src_96m_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate clkout2_src_54m_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel clkout2_src_clksel[] = {
--	{ .parent = &core_ck,		.rates = clkout2_src_core_rates },
--	{ .parent = &sys_ck,		.rates = clkout2_src_sys_rates },
--	{ .parent = &cm_96m_fck,	.rates = clkout2_src_96m_rates },
--	{ .parent = &omap_54m_fck,	.rates = clkout2_src_54m_rates },
--	{ .parent = NULL }
--};
--
--static struct clk clkout2_src_ck = {
--	.name		= "clkout2_src_ck",
--	.ops		= &clkops_omap2_dflt,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP3430_CM_CLKOUT_CTRL,
--	.enable_bit	= OMAP3430_CLKOUT2_EN_SHIFT,
--	.clksel_reg	= OMAP3430_CM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP3430_CLKOUT2SOURCE_MASK,
--	.clksel		= clkout2_src_clksel,
--	.clkdm_name	= "core_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate sys_clkout2_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 8, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 16, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel sys_clkout2_clksel[] = {
--	{ .parent = &clkout2_src_ck, .rates = sys_clkout2_rates },
--	{ .parent = NULL },
--};
--
--static struct clk sys_clkout2 = {
--	.name		= "sys_clkout2",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP3430_CM_CLKOUT_CTRL,
--	.clksel_mask	= OMAP3430_CLKOUT2_DIV_MASK,
--	.clksel		= sys_clkout2_clksel,
--	.recalc		= &omap2_clksel_recalc,
--	.round_rate	= &omap2_clksel_round_rate,
--	.set_rate	= &omap2_clksel_set_rate
--};
--
--/* CM OUTPUT CLOCKS */
--
--static struct clk corex2_fck = {
--	.name		= "corex2_fck",
--	.ops		= &clkops_null,
--	.parent		= &dpll3_m2x2_ck,
--	.recalc		= &followparent_recalc,
--};
--
--/* DPLL power domain clock controls */
--
--static const struct clksel_rate div4_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel div4_core_clksel[] = {
--	{ .parent = &core_ck, .rates = div4_rates },
--	{ .parent = NULL }
--};
--
--/*
-- * REVISIT: Are these in DPLL power domain or CM power domain? docs
-- * may be inconsistent here?
-- */
--static struct clk dpll1_fck = {
--	.name		= "dpll1_fck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL),
--	.clksel_mask	= OMAP3430_MPU_CLK_SRC_MASK,
--	.clksel		= div4_core_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mpu_ck = {
--	.name		= "mpu_ck",
--	.ops		= &clkops_null,
--	.parent		= &dpll1_x2m2_ck,
--	.clkdm_name	= "mpu_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* arm_fck is divided by two when DPLL1 locked; otherwise, passthrough mpu_ck */
--static const struct clksel_rate arm_fck_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel arm_fck_clksel[] = {
--	{ .parent = &mpu_ck, .rates = arm_fck_rates },
--	{ .parent = NULL }
--};
--
--static struct clk arm_fck = {
--	.name		= "arm_fck",
--	.ops		= &clkops_null,
--	.parent		= &mpu_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(MPU_MOD, OMAP3430_CM_IDLEST_PLL),
--	.clksel_mask	= OMAP3430_ST_MPU_CLK_MASK,
--	.clksel		= arm_fck_clksel,
--	.clkdm_name	= "mpu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* XXX What about neon_clkdm ? */
--
--/*
-- * REVISIT: This clock is never specifically defined in the 3430 TRM,
-- * although it is referenced - so this is a guess
-- */
--static struct clk emu_mpu_alwon_ck = {
--	.name		= "emu_mpu_alwon_ck",
--	.ops		= &clkops_null,
--	.parent		= &mpu_ck,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dpll2_fck = {
--	.name		= "dpll2_fck",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSEL1_PLL),
--	.clksel_mask	= OMAP3430_IVA2_CLK_SRC_MASK,
--	.clksel		= div4_core_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk iva2_ck = {
--	.name		= "iva2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll2_m2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_IVA2_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_SHIFT,
--	.clkdm_name	= "iva2_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* Common interface clocks */
--
--static const struct clksel div2_core_clksel[] = {
--	{ .parent = &core_ck, .rates = div2_rates },
--	{ .parent = NULL }
--};
--
--static struct clk l3_ick = {
--	.name		= "l3_ick",
--	.ops		= &clkops_null,
--	.parent		= &core_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_L3_MASK,
--	.clksel		= div2_core_clksel,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel div2_l3_clksel[] = {
--	{ .parent = &l3_ick, .rates = div2_rates },
--	{ .parent = NULL }
--};
--
--static struct clk l4_ick = {
--	.name		= "l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &l3_ick,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_L4_MASK,
--	.clksel		= div2_l3_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--
--};
--
--static const struct clksel div2_l4_clksel[] = {
--	{ .parent = &l4_ick, .rates = div2_rates },
--	{ .parent = NULL }
--};
--
--static struct clk rm_ick = {
--	.name		= "rm_ick",
--	.ops		= &clkops_null,
--	.parent		= &l4_ick,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_RM_MASK,
--	.clksel		= div2_l4_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* GFX power domain */
--
--/* GFX clocks are in 3430ES1 only. 3430ES2 and later uses the SGX instead */
--
--static const struct clksel gfx_l3_clksel[] = {
--	{ .parent = &l3_ick, .rates = gfx_l3_rates },
--	{ .parent = NULL }
--};
--
--/*
-- * Virtual parent clock for gfx_l3_ick and gfx_l3_fck
-- * This interface clock does not have a CM_AUTOIDLE bit
-- */
--static struct clk gfx_l3_ck = {
--	.name		= "gfx_l3_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP_EN_GFX_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gfx_l3_fck = {
--	.name		= "gfx_l3_fck",
--	.ops		= &clkops_null,
--	.parent		= &gfx_l3_ck,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP_CLKSEL_GFX_MASK,
--	.clksel		= gfx_l3_clksel,
--	.clkdm_name	= "gfx_3430es1_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gfx_l3_ick = {
--	.name		= "gfx_l3_ick",
--	.ops		= &clkops_null,
--	.parent		= &gfx_l3_ck,
--	.clkdm_name	= "gfx_3430es1_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gfx_cg1_ck = {
--	.name		= "gfx_cg1_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &gfx_l3_fck, /* REVISIT: correct? */
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES1_EN_2D_SHIFT,
--	.clkdm_name	= "gfx_3430es1_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gfx_cg2_ck = {
--	.name		= "gfx_cg2_ck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &gfx_l3_fck, /* REVISIT: correct? */
--	.enable_reg	= OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES1_EN_3D_SHIFT,
--	.clkdm_name	= "gfx_3430es1_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* SGX power domain - 3430ES2 only */
--
--static const struct clksel_rate sgx_core_rates[] = {
--	{ .div = 2, .val = 5, .flags = RATE_IN_36XX },
--	{ .div = 3, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 6, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate sgx_192m_rates[] = {
--	{ .div = 1,  .val = 4, .flags = RATE_IN_36XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate sgx_corex2_rates[] = {
--	{ .div = 3, .val = 6, .flags = RATE_IN_36XX },
--	{ .div = 5, .val = 7, .flags = RATE_IN_36XX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate sgx_96m_rates[] = {
--	{ .div = 1,  .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel sgx_clksel[] = {
--	{ .parent = &core_ck,	 .rates = sgx_core_rates },
--	{ .parent = &cm_96m_fck, .rates = sgx_96m_rates },
--	{ .parent = &omap_192m_alwon_fck, .rates = sgx_192m_rates },
--	{ .parent = &corex2_fck, .rates = sgx_corex2_rates },
--	{ .parent = NULL }
--};
--
--static struct clk sgx_fck = {
--	.name		= "sgx_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430ES2_SGX_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES2_CM_FCLKEN_SGX_EN_SGX_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430ES2_SGX_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430ES2_CLKSEL_SGX_MASK,
--	.clksel		= sgx_clksel,
--	.clkdm_name	= "sgx_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--	.set_rate	= &omap2_clksel_set_rate,
--	.round_rate	= &omap2_clksel_round_rate
--};
--
--/* This interface clock does not have a CM_AUTOIDLE bit */
--static struct clk sgx_ick = {
--	.name		= "sgx_ick",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430ES2_SGX_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430ES2_CM_ICLKEN_SGX_EN_SGX_SHIFT,
--	.clkdm_name	= "sgx_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* CORE power domain */
--
--static struct clk d2d_26m_fck = {
--	.name		= "d2d_26m_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &sys_ck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430ES1_EN_D2D_SHIFT,
--	.clkdm_name	= "d2d_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk modem_fck = {
--	.name		= "modem_fck",
--	.ops		= &clkops_omap2_mdmclk_dflt_wait,
--	.parent		= &sys_ck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MODEM_SHIFT,
--	.clkdm_name	= "d2d_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sad2d_ick = {
--	.name		= "sad2d_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_SAD2D_SHIFT,
--	.clkdm_name	= "d2d_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mad2d_ick = {
--	.name		= "mad2d_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP3430_EN_MAD2D_SHIFT,
--	.clkdm_name	= "d2d_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel omap343x_gpt_clksel[] = {
--	{ .parent = &omap_32k_fck, .rates = gpt_32k_rates },
--	{ .parent = &sys_ck,	   .rates = gpt_sys_rates },
--	{ .parent = NULL}
--};
--
--static struct clk gpt10_fck = {
--	.name		= "gpt10_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &sys_ck,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_GPT10_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT10_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt11_fck = {
--	.name		= "gpt11_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &sys_ck,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_GPT11_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT11_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk cpefuse_fck = {
--	.name		= "cpefuse_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &sys_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP3430ES2_CM_FCLKEN3),
--	.enable_bit	= OMAP3430ES2_EN_CPEFUSE_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk ts_fck = {
--	.name		= "ts_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &omap_32k_fck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP3430ES2_CM_FCLKEN3),
--	.enable_bit	= OMAP3430ES2_EN_TS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usbtll_fck = {
--	.name		= "usbtll_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &dpll5_m2_ck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP3430ES2_CM_FCLKEN3),
--	.enable_bit	= OMAP3430ES2_EN_USBTLL_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* CORE 96M FCLK-derived clocks */
--
--static struct clk core_96m_fck = {
--	.name		= "core_96m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_96m_fck,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs3_fck = {
--	.name		= "mmchs3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430ES2_EN_MMC3_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs2_fck = {
--	.name		= "mmchs2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MMC2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_fck = {
--	.name		= "mspro_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MSPRO_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs1_fck = {
--	.name		= "mmchs1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MMC1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c3_fck = {
--	.name		= "i2c3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C3_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c2_fck = {
--	.name		= "i2c2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c1_fck = {
--	.name		= "i2c1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * MCBSP 1 & 5 get their 96MHz clock from core_96m_fck;
-- * MCBSP 2, 3, 4 get their 96MHz clock from per_96m_fck.
-- */
--static const struct clksel_rate common_mcbsp_96m_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel mcbsp_15_clksel[] = {
--	{ .parent = &core_96m_fck, .rates = common_mcbsp_96m_rates },
--	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mcbsp5_fck = {
--	.name		= "mcbsp5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCBSP5_SHIFT,
--	.clksel_reg	= OMAP343X_CTRL_REGADDR(OMAP343X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP5_CLKS_MASK,
--	.clksel		= mcbsp_15_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp1_fck = {
--	.name		= "mcbsp1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCBSP1_SHIFT,
--	.clksel_reg	= OMAP343X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP1_CLKS_MASK,
--	.clksel		= mcbsp_15_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* CORE_48M_FCK-derived clocks */
--
--static struct clk core_48m_fck = {
--	.name		= "core_48m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_48m_fck,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi4_fck = {
--	.name		= "mcspi4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI4_SHIFT,
--	.recalc		= &followparent_recalc,
--	.clkdm_name	= "core_l4_clkdm",
--};
--
--static struct clk mcspi3_fck = {
--	.name		= "mcspi3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI3_SHIFT,
--	.recalc		= &followparent_recalc,
--	.clkdm_name	= "core_l4_clkdm",
--};
--
--static struct clk mcspi2_fck = {
--	.name		= "mcspi2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI2_SHIFT,
--	.recalc		= &followparent_recalc,
--	.clkdm_name	= "core_l4_clkdm",
--};
--
--static struct clk mcspi1_fck = {
--	.name		= "mcspi1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI1_SHIFT,
--	.recalc		= &followparent_recalc,
--	.clkdm_name	= "core_l4_clkdm",
--};
--
--static struct clk uart2_fck = {
--	.name		= "uart2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_UART2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_fck = {
--	.name		= "uart1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_UART1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fshostusb_fck = {
--	.name		= "fshostusb_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_48m_fck,
--	.clkdm_name	= "core_l4_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430ES1_EN_FSHOSTUSB_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* CORE_12M_FCK based clocks */
--
--static struct clk core_12m_fck = {
--	.name		= "core_12m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_12m_fck,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_fck = {
--	.name		= "hdq_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_12m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_HDQ_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* DPLL3-derived clock */
--
--static const struct clksel_rate ssi_ssr_corex2_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
--	{ .div = 8, .val = 8, .flags = RATE_IN_3XXX },
--	{ .div = 0 }
--};
--
--static const struct clksel ssi_ssr_clksel[] = {
--	{ .parent = &corex2_fck, .rates = ssi_ssr_corex2_rates },
--	{ .parent = NULL }
--};
--
--static struct clk ssi_ssr_fck_3430es1 = {
--	.name		= "ssi_ssr_fck",
--	.ops		= &clkops_omap2_dflt,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_SSI_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_SSI_MASK,
--	.clksel		= ssi_ssr_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk ssi_ssr_fck_3430es2 = {
--	.name		= "ssi_ssr_fck",
--	.ops		= &clkops_omap3430es2_ssi_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit	= OMAP3430_EN_SSI_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_SSI_MASK,
--	.clksel		= ssi_ssr_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk ssi_sst_fck_3430es1 = {
--	.name		= "ssi_sst_fck",
--	.ops		= &clkops_null,
--	.parent		= &ssi_ssr_fck_3430es1,
--	.fixed_div	= 2,
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--static struct clk ssi_sst_fck_3430es2 = {
--	.name		= "ssi_sst_fck",
--	.ops		= &clkops_null,
--	.parent		= &ssi_ssr_fck_3430es2,
--	.fixed_div	= 2,
--	.recalc		= &omap_fixed_divisor_recalc,
--};
--
--
--
--/* CORE_L3_ICK based clocks */
--
--/*
-- * XXX must add clk_enable/clk_disable for these if standard code won't
-- * handle it
-- */
--static struct clk core_l3_ick = {
--	.name		= "core_l3_ick",
--	.ops		= &clkops_null,
--	.parent		= &l3_ick,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hsotgusb_ick_3430es1 = {
--	.name		= "hsotgusb_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &core_l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_HSOTGUSB_SHIFT,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hsotgusb_ick_3430es2 = {
--	.name		= "hsotgusb_ick",
--	.ops		= &clkops_omap3430es2_iclk_hsotgusb_wait,
--	.parent		= &core_l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_HSOTGUSB_SHIFT,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* This interface clock does not have a CM_AUTOIDLE bit */
--static struct clk sdrc_ick = {
--	.name		= "sdrc_ick",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &core_l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_SDRC_SHIFT,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpmc_fck = {
--	.name		= "gpmc_fck",
--	.ops		= &clkops_null,
--	.parent		= &core_l3_ick,
--	.flags		= ENABLE_ON_INIT, /* huh? */
--	.clkdm_name	= "core_l3_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* SECURITY_L3_ICK based clocks */
--
--static struct clk security_l3_ick = {
--	.name		= "security_l3_ick",
--	.ops		= &clkops_null,
--	.parent		= &l3_ick,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk pka_ick = {
--	.name		= "pka_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &security_l3_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP3430_EN_PKA_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* CORE_L4_ICK based clocks */
--
--static struct clk core_l4_ick = {
--	.name		= "core_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &l4_ick,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usbtll_ick = {
--	.name		= "usbtll_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
--	.enable_bit	= OMAP3430ES2_EN_USBTLL_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs3_ick = {
--	.name		= "mmchs3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430ES2_EN_MMC3_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* Intersystem Communication Registers - chassis mode only */
--static struct clk icr_ick = {
--	.name		= "icr_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_ICR_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk aes2_ick = {
--	.name		= "aes2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_AES2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sha12_ick = {
--	.name		= "sha12_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_SHA12_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk des2_ick = {
--	.name		= "des2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_DES2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs2_ick = {
--	.name		= "mmchs2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MMC2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mmchs1_ick = {
--	.name		= "mmchs1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MMC1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mspro_ick = {
--	.name		= "mspro_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MSPRO_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hdq_ick = {
--	.name		= "hdq_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_HDQ_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi4_ick = {
--	.name		= "mcspi4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI4_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi3_ick = {
--	.name		= "mcspi3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI3_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi2_ick = {
--	.name		= "mcspi2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcspi1_ick = {
--	.name		= "mcspi1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCSPI1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c3_ick = {
--	.name		= "i2c3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C3_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c2_ick = {
--	.name		= "i2c2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk i2c1_ick = {
--	.name		= "i2c1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_I2C1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart2_ick = {
--	.name		= "uart2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_UART2_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart1_ick = {
--	.name		= "uart1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_UART1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt11_ick = {
--	.name		= "gpt11_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_GPT11_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt10_ick = {
--	.name		= "gpt10_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_GPT10_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp5_ick = {
--	.name		= "mcbsp5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCBSP5_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp1_ick = {
--	.name		= "mcbsp1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MCBSP1_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk fac_ick = {
--	.name		= "fac_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430ES1_EN_FAC_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mailboxes_ick = {
--	.name		= "mailboxes_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_MAILBOXES_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk omapctrl_ick = {
--	.name		= "omapctrl_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_OMAPCTRL_SHIFT,
--	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* SSI_L4_ICK based clocks */
--
--static struct clk ssi_l4_ick = {
--	.name		= "ssi_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &l4_ick,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk ssi_ick_3430es1 = {
--	.name		= "ssi_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &ssi_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_SSI_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk ssi_ick_3430es2 = {
--	.name		= "ssi_ick",
--	.ops		= &clkops_omap3430es2_iclk_ssi_wait,
--	.parent		= &ssi_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430_EN_SSI_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* REVISIT: Technically the TRM claims that this is CORE_CLK based,
-- * but l4_ick makes more sense to me */
--
--static const struct clksel usb_l4_clksel[] = {
--	{ .parent = &l4_ick, .rates = div2_rates },
--	{ .parent = NULL },
--};
--
--static struct clk usb_l4_ick = {
--	.name		= "usb_l4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ick,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= OMAP3430ES1_EN_FSHOSTUSB_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430ES1_CLKSEL_FSHOSTUSB_MASK,
--	.clksel		= usb_l4_clksel,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* SECURITY_L4_ICK2 based clocks */
--
--static struct clk security_l4_ick2 = {
--	.name		= "security_l4_ick2",
--	.ops		= &clkops_null,
--	.parent		= &l4_ick,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk aes1_ick = {
--	.name		= "aes1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &security_l4_ick2,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP3430_EN_AES1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk rng_ick = {
--	.name		= "rng_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &security_l4_ick2,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP3430_EN_RNG_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sha11_ick = {
--	.name		= "sha11_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &security_l4_ick2,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP3430_EN_SHA11_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk des1_ick = {
--	.name		= "des1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &security_l4_ick2,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
--	.enable_bit	= OMAP3430_EN_DES1_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/* DSS */
--static struct clk dss1_alwon_fck_3430es1 = {
--	.name		= "dss1_alwon_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &dpll4_m4x2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_DSS1_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss1_alwon_fck_3430es2 = {
--	.name		= "dss1_alwon_fck",
--	.ops		= &clkops_omap3430es2_dss_usbhost_wait,
--	.parent		= &dpll4_m4x2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_DSS1_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss_tv_fck = {
--	.name		= "dss_tv_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &omap_54m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_TV_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss_96m_fck = {
--	.name		= "dss_96m_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &omap_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_TV_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss2_alwon_fck = {
--	.name		= "dss2_alwon_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &sys_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_DSS2_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss_ick_3430es1 = {
--	/* Handles both L3 and L4 clocks */
--	.name		= "dss_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_CM_ICLKEN_DSS_EN_DSS_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dss_ick_3430es2 = {
--	/* Handles both L3 and L4 clocks */
--	.name		= "dss_ick",
--	.ops		= &clkops_omap3430es2_iclk_dss_usbhost_wait,
--	.parent		= &l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_CM_ICLKEN_DSS_EN_DSS_SHIFT,
--	.clkdm_name	= "dss_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* CAM */
--
--static struct clk cam_mclk = {
--	.name		= "cam_mclk",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &dpll4_m5x2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_CAM_SHIFT,
--	.clkdm_name	= "cam_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk cam_ick = {
--	/* Handles both L3 and L4 clocks */
--	.name		= "cam_ick",
--	.ops		= &clkops_omap2_iclk_dflt,
--	.parent		= &l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_CAM_SHIFT,
--	.clkdm_name	= "cam_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk csi2_96m_fck = {
--	.name		= "csi2_96m_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &core_96m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_CSI2_SHIFT,
--	.clkdm_name	= "cam_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* USBHOST - 3430ES2 only */
--
--static struct clk usbhost_120m_fck = {
--	.name		= "usbhost_120m_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &dpll5_m2_ck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430ES2_USBHOST_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES2_EN_USBHOST2_SHIFT,
--	.clkdm_name	= "usbhost_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usbhost_48m_fck = {
--	.name		= "usbhost_48m_fck",
--	.ops		= &clkops_omap3430es2_dss_usbhost_wait,
--	.parent		= &omap_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430ES2_USBHOST_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES2_EN_USBHOST1_SHIFT,
--	.clkdm_name	= "usbhost_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk usbhost_ick = {
--	/* Handles both L3 and L4 clocks */
--	.name		= "usbhost_ick",
--	.ops		= &clkops_omap3430es2_iclk_dss_usbhost_wait,
--	.parent		= &l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430ES2_USBHOST_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430ES2_EN_USBHOST_SHIFT,
--	.clkdm_name	= "usbhost_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* WKUP */
--
--static const struct clksel_rate usim_96m_rates[] = {
--	{ .div = 2,  .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 4,  .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 8,  .val = 5, .flags = RATE_IN_3XXX },
--	{ .div = 10, .val = 6, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate usim_120m_rates[] = {
--	{ .div = 4,  .val = 7,	.flags = RATE_IN_3XXX },
--	{ .div = 8,  .val = 8,	.flags = RATE_IN_3XXX },
--	{ .div = 16, .val = 9,	.flags = RATE_IN_3XXX },
--	{ .div = 20, .val = 10, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel usim_clksel[] = {
--	{ .parent = &omap_96m_fck,	.rates = usim_96m_rates },
--	{ .parent = &dpll5_m2_ck,	.rates = usim_120m_rates },
--	{ .parent = &sys_ck,		.rates = div2_rates },
--	{ .parent = NULL },
--};
--
--/* 3430ES2 only */
--static struct clk usim_fck = {
--	.name		= "usim_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430ES2_EN_USIMOCP_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430ES2_CLKSEL_USIMOCP_MASK,
--	.clksel		= usim_clksel,
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* XXX should gpt1's clksel have wkup_32k_fck as the 32k opt? */
--static struct clk gpt1_fck = {
--	.name		= "gpt1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT1_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT1_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk wkup_32k_fck = {
--	.name		= "wkup_32k_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_32k_fck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio1_dbck = {
--	.name		= "gpio1_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &wkup_32k_fck,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO1_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt2_fck = {
--	.name		= "wdt2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &wkup_32k_fck,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_WDT2_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wkup_l4_ick = {
--	.name		= "wkup_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &sys_ck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* 3430ES2 only */
--/* Never specifically named in the TRM, so we have to infer a likely name */
--static struct clk usim_ick = {
--	.name		= "usim_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430ES2_EN_USIMOCP_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt2_ick = {
--	.name		= "wdt2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_WDT2_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt1_ick = {
--	.name		= "wdt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_WDT1_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio1_ick = {
--	.name		= "gpio1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO1_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk omap_32ksync_ick = {
--	.name		= "omap_32ksync_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_32KSYNC_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* XXX This clock no longer exists in 3430 TRM rev F */
--static struct clk gpt12_ick = {
--	.name		= "gpt12_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT12_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt1_ick = {
--	.name		= "gpt1_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &wkup_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT1_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--
--
--/* PER clock domain */
--
--static struct clk per_96m_fck = {
--	.name		= "per_96m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_96m_alwon_fck,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk per_48m_fck = {
--	.name		= "per_48m_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_48m_fck,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_fck = {
--	.name		= "uart3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &per_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_UART3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart4_fck = {
--	.name		= "uart4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &per_48m_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3630_EN_UART4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart4_fck_am35xx = {
--	.name           = "uart4_fck",
--	.ops            = &clkops_omap2_dflt_wait,
--	.parent         = &per_48m_fck,
--	.enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
--	.enable_bit     = OMAP3430_EN_UART4_SHIFT,
--	.clkdm_name     = "core_l4_clkdm",
--	.recalc         = &followparent_recalc,
--};
--
--static struct clk gpt2_fck = {
--	.name		= "gpt2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT2_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT2_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt3_fck = {
--	.name		= "gpt3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT3_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT3_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt4_fck = {
--	.name		= "gpt4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT4_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT4_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt5_fck = {
--	.name		= "gpt5_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT5_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT5_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt6_fck = {
--	.name		= "gpt6_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT6_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT6_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt7_fck = {
--	.name		= "gpt7_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT7_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT7_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt8_fck = {
--	.name		= "gpt8_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT8_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT8_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk gpt9_fck = {
--	.name		= "gpt9_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPT9_SHIFT,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_CLKSEL),
--	.clksel_mask	= OMAP3430_CLKSEL_GPT9_MASK,
--	.clksel		= omap343x_gpt_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk per_32k_alwon_fck = {
--	.name		= "per_32k_alwon_fck",
--	.ops		= &clkops_null,
--	.parent		= &omap_32k_fck,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio6_dbck = {
--	.name		= "gpio6_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO6_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio5_dbck = {
--	.name		= "gpio5_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO5_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio4_dbck = {
--	.name		= "gpio4_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio3_dbck = {
--	.name		= "gpio3_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio2_dbck = {
--	.name		= "gpio2_dbck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO2_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt3_fck = {
--	.name		= "wdt3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &per_32k_alwon_fck,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_WDT3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk per_l4_ick = {
--	.name		= "per_l4_ick",
--	.ops		= &clkops_null,
--	.parent		= &l4_ick,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio6_ick = {
--	.name		= "gpio6_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO6_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio5_ick = {
--	.name		= "gpio5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO5_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio4_ick = {
--	.name		= "gpio4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio3_ick = {
--	.name		= "gpio3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpio2_ick = {
--	.name		= "gpio2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPIO2_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt3_ick = {
--	.name		= "wdt3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_WDT3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart3_ick = {
--	.name		= "uart3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_UART3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk uart4_ick = {
--	.name		= "uart4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3630_EN_UART4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt9_ick = {
--	.name		= "gpt9_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT9_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt8_ick = {
--	.name		= "gpt8_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT8_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt7_ick = {
--	.name		= "gpt7_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT7_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt6_ick = {
--	.name		= "gpt6_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT6_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt5_ick = {
--	.name		= "gpt5_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT5_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt4_ick = {
--	.name		= "gpt4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt3_ick = {
--	.name		= "gpt3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk gpt2_ick = {
--	.name		= "gpt2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_GPT2_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp2_ick = {
--	.name		= "mcbsp2_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP2_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp3_ick = {
--	.name		= "mcbsp3_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP3_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk mcbsp4_ick = {
--	.name		= "mcbsp4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &per_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_ICLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP4_SHIFT,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static const struct clksel mcbsp_234_clksel[] = {
--	{ .parent = &per_96m_fck,  .rates = common_mcbsp_96m_rates },
--	{ .parent = &mcbsp_clks,   .rates = common_mcbsp_mcbsp_rates },
--	{ .parent = NULL }
--};
--
--static struct clk mcbsp2_fck = {
--	.name		= "mcbsp2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP2_SHIFT,
--	.clksel_reg	= OMAP343X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
--	.clksel_mask	= OMAP2_MCBSP2_CLKS_MASK,
--	.clksel		= mcbsp_234_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp3_fck = {
--	.name		= "mcbsp3_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP3_SHIFT,
--	.clksel_reg	= OMAP343X_CTRL_REGADDR(OMAP343X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP3_CLKS_MASK,
--	.clksel		= mcbsp_234_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk mcbsp4_fck = {
--	.name		= "mcbsp4_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.init		= &omap2_init_clksel_parent,
--	.enable_reg	= OMAP_CM_REGADDR(OMAP3430_PER_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_MCBSP4_SHIFT,
--	.clksel_reg	= OMAP343X_CTRL_REGADDR(OMAP343X_CONTROL_DEVCONF1),
--	.clksel_mask	= OMAP2_MCBSP4_CLKS_MASK,
--	.clksel		= mcbsp_234_clksel,
--	.clkdm_name	= "per_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* EMU clocks */
--
--/* More information: ARM Cortex-A8 Technical Reference Manual, sect 10.1 */
--
--static const struct clksel_rate emu_src_sys_rates[] = {
--	{ .div = 1, .val = 0, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate emu_src_core_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate emu_src_per_rates[] = {
--	{ .div = 1, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel_rate emu_src_mpu_rates[] = {
--	{ .div = 1, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel emu_src_clksel[] = {
--	{ .parent = &sys_ck,		.rates = emu_src_sys_rates },
--	{ .parent = &emu_core_alwon_ck, .rates = emu_src_core_rates },
--	{ .parent = &emu_per_alwon_ck,	.rates = emu_src_per_rates },
--	{ .parent = &emu_mpu_alwon_ck,	.rates = emu_src_mpu_rates },
--	{ .parent = NULL },
--};
--
--/*
-- * Like the clkout_src clocks, emu_src_clk is a virtual clock, existing only
-- * to switch the source of some of the EMU clocks.
-- * XXX Are there CLKEN bits for these EMU clks?
-- */
--static struct clk emu_src_ck = {
--	.name		= "emu_src_ck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_MUX_CTRL_MASK,
--	.clksel		= emu_src_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate pclk_emu_rates[] = {
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 6, .val = 6, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel pclk_emu_clksel[] = {
--	{ .parent = &emu_src_ck, .rates = pclk_emu_rates },
--	{ .parent = NULL },
--};
--
--static struct clk pclk_fck = {
--	.name		= "pclk_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_CLKSEL_PCLK_MASK,
--	.clksel		= pclk_emu_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate pclkx2_emu_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel pclkx2_emu_clksel[] = {
--	{ .parent = &emu_src_ck, .rates = pclkx2_emu_rates },
--	{ .parent = NULL },
--};
--
--static struct clk pclkx2_fck = {
--	.name		= "pclkx2_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_CLKSEL_PCLKX2_MASK,
--	.clksel		= pclkx2_emu_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel atclk_emu_clksel[] = {
--	{ .parent = &emu_src_ck, .rates = div2_rates },
--	{ .parent = NULL },
--};
--
--static struct clk atclk_fck = {
--	.name		= "atclk_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_CLKSEL_ATCLK_MASK,
--	.clksel		= atclk_emu_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static struct clk traceclk_src_fck = {
--	.name		= "traceclk_src_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_TRACE_MUX_CTRL_MASK,
--	.clksel		= emu_src_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--static const struct clksel_rate traceclk_rates[] = {
--	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
--	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
--	{ .div = 4, .val = 4, .flags = RATE_IN_3XXX },
--	{ .div = 0 },
--};
--
--static const struct clksel traceclk_clksel[] = {
--	{ .parent = &traceclk_src_fck, .rates = traceclk_rates },
--	{ .parent = NULL },
--};
--
--static struct clk traceclk_fck = {
--	.name		= "traceclk_fck",
--	.ops		= &clkops_null,
--	.init		= &omap2_init_clksel_parent,
--	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
--	.clksel_mask	= OMAP3430_CLKSEL_TRACECLK_MASK,
--	.clksel		= traceclk_clksel,
--	.clkdm_name	= "emu_clkdm",
--	.recalc		= &omap2_clksel_recalc,
--};
--
--/* SR clocks */
--
--/* SmartReflex fclk (VDD1) */
--static struct clk sr1_fck = {
--	.name		= "sr1_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &sys_ck,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_SR1_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* SmartReflex fclk (VDD2) */
--static struct clk sr2_fck = {
--	.name		= "sr2_fck",
--	.ops		= &clkops_omap2_dflt_wait,
--	.parent		= &sys_ck,
--	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
--	.enable_bit	= OMAP3430_EN_SR2_SHIFT,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk sr_l4_ick = {
--	.name		= "sr_l4_ick",
--	.ops		= &clkops_null, /* RMK: missing? */
--	.parent		= &l4_ick,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* SECURE_32K_FCK clocks */
--
--static struct clk gpt12_fck = {
--	.name		= "gpt12_fck",
--	.ops		= &clkops_null,
--	.parent		= &secure_32k_fck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk wdt1_fck = {
--	.name		= "wdt1_fck",
--	.ops		= &clkops_null,
--	.parent		= &secure_32k_fck,
--	.clkdm_name	= "wkup_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--/* Clocks for AM35XX */
--static struct clk ipss_ick = {
--	.name		= "ipss_ick",
--	.ops		= &clkops_am35xx_ipss_wait,
--	.parent		= &core_l3_ick,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= AM35XX_EN_IPSS_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk emac_ick = {
--	.name		= "emac_ick",
--	.ops		= &clkops_am35xx_ipss_module_wait,
--	.parent		= &ipss_ick,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_CPGMAC_VBUSP_CLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk rmii_ck = {
--	.name		= "rmii_ck",
--	.ops		= &clkops_null,
--	.rate		= 50000000,
--};
--
--static struct clk emac_fck = {
--	.name		= "emac_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &rmii_ck,
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_CPGMAC_FCLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hsotgusb_ick_am35xx = {
--	.name		= "hsotgusb_ick",
--	.ops		= &clkops_am35xx_ipss_module_wait,
--	.parent		= &ipss_ick,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_USBOTG_VBUSP_CLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hsotgusb_fck_am35xx = {
--	.name		= "hsotgusb_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &sys_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_USBOTG_FCLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk hecc_ck = {
--	.name		= "hecc_ck",
--	.ops		= &clkops_am35xx_ipss_module_wait,
--	.parent		= &sys_ck,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_HECC_VBUSP_CLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk vpfe_ick = {
--	.name		= "vpfe_ick",
--	.ops		= &clkops_am35xx_ipss_module_wait,
--	.parent		= &ipss_ick,
--	.clkdm_name	= "core_l3_clkdm",
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_VPFE_VBUSP_CLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk pclk_ck = {
--	.name		= "pclk_ck",
--	.ops		= &clkops_null,
--	.rate		= 27000000,
--};
--
--static struct clk vpfe_fck = {
--	.name		= "vpfe_fck",
--	.ops		= &clkops_omap2_dflt,
--	.parent		= &pclk_ck,
--	.enable_reg	= OMAP343X_CTRL_REGADDR(AM35XX_CONTROL_IPSS_CLK_CTRL),
--	.enable_bit	= AM35XX_VPFE_FCLK_SHIFT,
--	.recalc		= &followparent_recalc,
--};
--
--/*
-- * The UART1/2 functional clock acts as the functional
-- * clock for UART4. No separate fclk control available.
-- */
--static struct clk uart4_ick_am35xx = {
--	.name		= "uart4_ick",
--	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &core_l4_ick,
--	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
--	.enable_bit	= AM35XX_EN_UART4_SHIFT,
--	.clkdm_name	= "core_l4_clkdm",
--	.recalc		= &followparent_recalc,
--};
--
--static struct clk dummy_apb_pclk = {
--	.name		= "apb_pclk",
--	.ops		= &clkops_null,
--};
--
--/*
-- * clkdev
-- */
--
--/* XXX At some point we should rename this file to clock3xxx_data.c */
--static struct omap_clk omap3xxx_clks[] = {
--	CLK(NULL,	"apb_pclk",	&dummy_apb_pclk,	CK_3XXX),
--	CLK(NULL,	"omap_32k_fck",	&omap_32k_fck,	CK_3XXX),
--	CLK(NULL,	"virt_12m_ck",	&virt_12m_ck,	CK_3XXX),
--	CLK(NULL,	"virt_13m_ck",	&virt_13m_ck,	CK_3XXX),
--	CLK(NULL,	"virt_16_8m_ck", &virt_16_8m_ck, CK_3430ES2PLUS | CK_AM35XX  | CK_36XX),
--	CLK(NULL,	"virt_19_2m_ck", &virt_19_2m_ck, CK_3XXX),
--	CLK(NULL,	"virt_26m_ck",	&virt_26m_ck,	CK_3XXX),
--	CLK(NULL,	"virt_38_4m_ck", &virt_38_4m_ck, CK_3XXX),
--	CLK(NULL,	"osc_sys_ck",	&osc_sys_ck,	CK_3XXX),
--	CLK(NULL,	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK(NULL,	"sys_altclk",	&sys_altclk,	CK_3XXX),
--	CLK("omap-mcbsp.1",	"pad_fck",	&mcbsp_clks,	CK_3XXX),
--	CLK("omap-mcbsp.2",	"pad_fck",	&mcbsp_clks,	CK_3XXX),
--	CLK("omap-mcbsp.3",	"pad_fck",	&mcbsp_clks,	CK_3XXX),
--	CLK("omap-mcbsp.4",	"pad_fck",	&mcbsp_clks,	CK_3XXX),
--	CLK("omap-mcbsp.5",	"pad_fck",	&mcbsp_clks,	CK_3XXX),
--	CLK(NULL,	"mcbsp_clks",	&mcbsp_clks,	CK_3XXX),
--	CLK(NULL,	"sys_clkout1",	&sys_clkout1,	CK_3XXX),
--	CLK(NULL,	"dpll1_ck",	&dpll1_ck,	CK_3XXX),
--	CLK(NULL,	"dpll1_x2_ck",	&dpll1_x2_ck,	CK_3XXX),
--	CLK(NULL,	"dpll1_x2m2_ck", &dpll1_x2m2_ck, CK_3XXX),
--	CLK(NULL,	"dpll2_ck",	&dpll2_ck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"dpll2_m2_ck",	&dpll2_m2_ck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"dpll3_ck",	&dpll3_ck,	CK_3XXX),
--	CLK(NULL,	"core_ck",	&core_ck,	CK_3XXX),
--	CLK(NULL,	"dpll3_x2_ck",	&dpll3_x2_ck,	CK_3XXX),
--	CLK(NULL,	"dpll3_m2_ck",	&dpll3_m2_ck,	CK_3XXX),
--	CLK(NULL,	"dpll3_m2x2_ck", &dpll3_m2x2_ck, CK_3XXX),
--	CLK(NULL,	"dpll3_m3_ck",	&dpll3_m3_ck,	CK_3XXX),
--	CLK(NULL,	"dpll3_m3x2_ck", &dpll3_m3x2_ck, CK_3XXX),
--	CLK("etb",	"emu_core_alwon_ck", &emu_core_alwon_ck, CK_3XXX),
--	CLK(NULL,	"dpll4_ck",	&dpll4_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_x2_ck",	&dpll4_x2_ck,	CK_3XXX),
--	CLK(NULL,	"omap_192m_alwon_fck", &omap_192m_alwon_fck, CK_36XX),
--	CLK(NULL,	"omap_96m_alwon_fck", &omap_96m_alwon_fck, CK_3XXX),
--	CLK(NULL,	"omap_96m_fck",	&omap_96m_fck,	CK_3XXX),
--	CLK(NULL,	"cm_96m_fck",	&cm_96m_fck,	CK_3XXX),
--	CLK(NULL,	"omap_54m_fck",	&omap_54m_fck,	CK_3XXX),
--	CLK(NULL,	"omap_48m_fck",	&omap_48m_fck,	CK_3XXX),
--	CLK(NULL,	"omap_12m_fck",	&omap_12m_fck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m2_ck",	&dpll4_m2_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m2x2_ck", &dpll4_m2x2_ck, CK_3XXX),
--	CLK(NULL,	"dpll4_m3_ck",	&dpll4_m3_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m3x2_ck", &dpll4_m3x2_ck, CK_3XXX),
--	CLK(NULL,	"dpll4_m4_ck",	&dpll4_m4_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m4x2_ck", &dpll4_m4x2_ck, CK_3XXX),
--	CLK(NULL,	"dpll4_m5_ck",	&dpll4_m5_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m5x2_ck", &dpll4_m5x2_ck, CK_3XXX),
--	CLK(NULL,	"dpll4_m6_ck",	&dpll4_m6_ck,	CK_3XXX),
--	CLK(NULL,	"dpll4_m6x2_ck", &dpll4_m6x2_ck, CK_3XXX),
--	CLK("etb",	"emu_per_alwon_ck", &emu_per_alwon_ck, CK_3XXX),
--	CLK(NULL,	"dpll5_ck",	&dpll5_ck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"dpll5_m2_ck",	&dpll5_m2_ck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"clkout2_src_ck", &clkout2_src_ck, CK_3XXX),
--	CLK(NULL,	"sys_clkout2",	&sys_clkout2,	CK_3XXX),
--	CLK(NULL,	"corex2_fck",	&corex2_fck,	CK_3XXX),
--	CLK(NULL,	"dpll1_fck",	&dpll1_fck,	CK_3XXX),
--	CLK(NULL,	"mpu_ck",	&mpu_ck,	CK_3XXX),
--	CLK(NULL,	"arm_fck",	&arm_fck,	CK_3XXX),
--	CLK("etb",	"emu_mpu_alwon_ck", &emu_mpu_alwon_ck, CK_3XXX),
--	CLK(NULL,	"dpll2_fck",	&dpll2_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"iva2_ck",	&iva2_ck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"l3_ick",	&l3_ick,	CK_3XXX),
--	CLK(NULL,	"l4_ick",	&l4_ick,	CK_3XXX),
--	CLK(NULL,	"rm_ick",	&rm_ick,	CK_3XXX),
--	CLK(NULL,	"gfx_l3_ck",	&gfx_l3_ck,	CK_3430ES1),
--	CLK(NULL,	"gfx_l3_fck",	&gfx_l3_fck,	CK_3430ES1),
--	CLK(NULL,	"gfx_l3_ick",	&gfx_l3_ick,	CK_3430ES1),
--	CLK(NULL,	"gfx_cg1_ck",	&gfx_cg1_ck,	CK_3430ES1),
--	CLK(NULL,	"gfx_cg2_ck",	&gfx_cg2_ck,	CK_3430ES1),
--	CLK(NULL,	"sgx_fck",	&sgx_fck,	CK_3430ES2PLUS | CK_3517 | CK_36XX),
--	CLK(NULL,	"sgx_ick",	&sgx_ick,	CK_3430ES2PLUS | CK_3517 | CK_36XX),
--	CLK(NULL,	"d2d_26m_fck",	&d2d_26m_fck,	CK_3430ES1),
--	CLK(NULL,	"modem_fck",	&modem_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"sad2d_ick",	&sad2d_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"mad2d_ick",	&mad2d_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"gpt10_fck",	&gpt10_fck,	CK_3XXX),
--	CLK(NULL,	"gpt11_fck",	&gpt11_fck,	CK_3XXX),
--	CLK(NULL,	"cpefuse_fck",	&cpefuse_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"ts_fck",	&ts_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("usbhs_omap",	"usbtll_fck",	&usbtll_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("omap-mcbsp.1",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
--	CLK("omap-mcbsp.5",	"prcm_fck",	&core_96m_fck,	CK_3XXX),
--	CLK(NULL,	"core_96m_fck",	&core_96m_fck,	CK_3XXX),
--	CLK(NULL,	"mmchs3_fck",	&mmchs3_fck,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"mmchs2_fck",	&mmchs2_fck,	CK_3XXX),
--	CLK(NULL,	"mspro_fck",	&mspro_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"mmchs1_fck",	&mmchs1_fck,	CK_3XXX),
--	CLK(NULL,	"i2c3_fck",	&i2c3_fck,	CK_3XXX),
--	CLK(NULL,	"i2c2_fck",	&i2c2_fck,	CK_3XXX),
--	CLK(NULL,	"i2c1_fck",	&i2c1_fck,	CK_3XXX),
--	CLK(NULL,	"mcbsp5_fck",	&mcbsp5_fck,	CK_3XXX),
--	CLK(NULL,	"mcbsp1_fck",	&mcbsp1_fck,	CK_3XXX),
--	CLK(NULL,	"core_48m_fck",	&core_48m_fck,	CK_3XXX),
--	CLK(NULL,	"mcspi4_fck",	&mcspi4_fck,	CK_3XXX),
--	CLK(NULL,	"mcspi3_fck",	&mcspi3_fck,	CK_3XXX),
--	CLK(NULL,	"mcspi2_fck",	&mcspi2_fck,	CK_3XXX),
--	CLK(NULL,	"mcspi1_fck",	&mcspi1_fck,	CK_3XXX),
--	CLK(NULL,	"uart2_fck",	&uart2_fck,	CK_3XXX),
--	CLK(NULL,	"uart1_fck",	&uart1_fck,	CK_3XXX),
--	CLK(NULL,	"fshostusb_fck", &fshostusb_fck, CK_3430ES1),
--	CLK(NULL,	"core_12m_fck",	&core_12m_fck,	CK_3XXX),
--	CLK("omap_hdq.0",	"fck",	&hdq_fck,	CK_3XXX),
--	CLK(NULL,	"ssi_ssr_fck",	&ssi_ssr_fck_3430es1,	CK_3430ES1),
--	CLK(NULL,	"ssi_ssr_fck",	&ssi_ssr_fck_3430es2,	CK_3430ES2PLUS | CK_36XX),
--	CLK(NULL,	"ssi_sst_fck",	&ssi_sst_fck_3430es1,	CK_3430ES1),
--	CLK(NULL,	"ssi_sst_fck",	&ssi_sst_fck_3430es2,	CK_3430ES2PLUS | CK_36XX),
--	CLK(NULL,	"core_l3_ick",	&core_l3_ick,	CK_3XXX),
--	CLK("musb-omap2430",	"ick",	&hsotgusb_ick_3430es1,	CK_3430ES1),
--	CLK("musb-omap2430",	"ick",	&hsotgusb_ick_3430es2,	CK_3430ES2PLUS | CK_36XX),
--	CLK(NULL,	"sdrc_ick",	&sdrc_ick,	CK_3XXX),
--	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_3XXX),
--	CLK(NULL,	"security_l3_ick", &security_l3_ick, CK_34XX | CK_36XX),
--	CLK(NULL,	"pka_ick",	&pka_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"core_l4_ick",	&core_l4_ick,	CK_3XXX),
--	CLK(NULL,	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("usbhs_omap",	"usbtll_ick",	&usbtll_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("omap_hsmmc.2",	"ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
--	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
--	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
--	CLK("omap_hsmmc.1",	"ick",	&mmchs2_ick,	CK_3XXX),
--	CLK("omap_hsmmc.0",	"ick",	&mmchs1_ick,	CK_3XXX),
--	CLK(NULL,	"mspro_ick",	&mspro_ick,	CK_34XX | CK_36XX),
--	CLK("omap_hdq.0", "ick",	&hdq_ick,	CK_3XXX),
--	CLK("omap2_mcspi.4", "ick",	&mcspi4_ick,	CK_3XXX),
--	CLK("omap2_mcspi.3", "ick",	&mcspi3_ick,	CK_3XXX),
--	CLK("omap2_mcspi.2", "ick",	&mcspi2_ick,	CK_3XXX),
--	CLK("omap2_mcspi.1", "ick",	&mcspi1_ick,	CK_3XXX),
--	CLK("omap_i2c.3", "ick",	&i2c3_ick,	CK_3XXX),
--	CLK("omap_i2c.2", "ick",	&i2c2_ick,	CK_3XXX),
--	CLK("omap_i2c.1", "ick",	&i2c1_ick,	CK_3XXX),
--	CLK(NULL,	"uart2_ick",	&uart2_ick,	CK_3XXX),
--	CLK(NULL,	"uart1_ick",	&uart1_ick,	CK_3XXX),
--	CLK(NULL,	"gpt11_ick",	&gpt11_ick,	CK_3XXX),
--	CLK(NULL,	"gpt10_ick",	&gpt10_ick,	CK_3XXX),
--	CLK("omap-mcbsp.5", "ick",	&mcbsp5_ick,	CK_3XXX),
--	CLK("omap-mcbsp.1", "ick",	&mcbsp1_ick,	CK_3XXX),
--	CLK(NULL,	"fac_ick",	&fac_ick,	CK_3430ES1),
--	CLK(NULL,	"mailboxes_ick", &mailboxes_ick, CK_34XX | CK_36XX),
--	CLK(NULL,	"omapctrl_ick",	&omapctrl_ick,	CK_3XXX),
--	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"ssi_ick",	&ssi_ick_3430es1,	CK_3430ES1),
--	CLK(NULL,	"ssi_ick",	&ssi_ick_3430es2,	CK_3430ES2PLUS | CK_36XX),
--	CLK(NULL,	"usb_l4_ick",	&usb_l4_ick,	CK_3430ES1),
--	CLK(NULL,	"security_l4_ick2", &security_l4_ick2, CK_34XX | CK_36XX),
--	CLK(NULL,	"aes1_ick",	&aes1_ick,	CK_34XX | CK_36XX),
--	CLK("omap_rng",	"ick",		&rng_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"sha11_ick",	&sha11_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"des1_ick",	&des1_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"dss1_alwon_fck",		&dss1_alwon_fck_3430es1, CK_3430ES1),
--	CLK(NULL,	"dss1_alwon_fck",		&dss1_alwon_fck_3430es2, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"dss_tv_fck",	&dss_tv_fck,	CK_3XXX),
--	CLK(NULL,	"dss_96m_fck",	&dss_96m_fck,	CK_3XXX),
--	CLK(NULL,	"dss2_alwon_fck",	&dss2_alwon_fck, CK_3XXX),
--	CLK("omapdss_dss",	"ick",		&dss_ick_3430es1,	CK_3430ES1),
--	CLK("omapdss_dss",	"ick",		&dss_ick_3430es2,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"cam_mclk",	&cam_mclk,	CK_34XX | CK_36XX),
--	CLK(NULL,	"cam_ick",	&cam_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"csi2_96m_fck",	&csi2_96m_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"usbhost_120m_fck", &usbhost_120m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"usbhost_48m_fck", &usbhost_48m_fck, CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK(NULL,	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("usbhs_omap",	"usbhost_ick",	&usbhost_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
--	CLK("usbhs_omap",	"utmi_p1_gfclk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"utmi_p2_gfclk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"xclk60mhsp1_ck",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"xclk60mhsp2_ck",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_host_hs_utmi_p1_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_host_hs_utmi_p2_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_tll_hs_usb_ch0_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"usb_tll_hs_usb_ch1_clk",	&dummy_ck,	CK_3XXX),
--	CLK("usbhs_omap",	"init_60m_fclk",	&dummy_ck,	CK_3XXX),
--	CLK(NULL,	"usim_fck",	&usim_fck,	CK_3430ES2PLUS | CK_36XX),
--	CLK(NULL,	"gpt1_fck",	&gpt1_fck,	CK_3XXX),
--	CLK(NULL,	"wkup_32k_fck",	&wkup_32k_fck,	CK_3XXX),
--	CLK(NULL,	"gpio1_dbck",	&gpio1_dbck,	CK_3XXX),
--	CLK(NULL,	"wdt2_fck",		&wdt2_fck,	CK_3XXX),
--	CLK(NULL,	"wkup_l4_ick",	&wkup_l4_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"usim_ick",	&usim_ick,	CK_3430ES2PLUS | CK_36XX),
--	CLK("omap_wdt",	"ick",		&wdt2_ick,	CK_3XXX),
--	CLK(NULL,	"wdt1_ick",	&wdt1_ick,	CK_3XXX),
--	CLK(NULL,	"gpio1_ick",	&gpio1_ick,	CK_3XXX),
--	CLK(NULL,	"omap_32ksync_ick", &omap_32ksync_ick, CK_3XXX),
--	CLK(NULL,	"gpt12_ick",	&gpt12_ick,	CK_3XXX),
--	CLK(NULL,	"gpt1_ick",	&gpt1_ick,	CK_3XXX),
--	CLK("omap-mcbsp.2",	"prcm_fck",	&per_96m_fck,	CK_3XXX),
--	CLK("omap-mcbsp.3",	"prcm_fck",	&per_96m_fck,	CK_3XXX),
--	CLK("omap-mcbsp.4",	"prcm_fck",	&per_96m_fck,	CK_3XXX),
--	CLK(NULL,	"per_96m_fck",	&per_96m_fck,	CK_3XXX),
--	CLK(NULL,	"per_48m_fck",	&per_48m_fck,	CK_3XXX),
--	CLK(NULL,	"uart3_fck",	&uart3_fck,	CK_3XXX),
--	CLK(NULL,	"uart4_fck",	&uart4_fck,	CK_36XX),
--	CLK(NULL,	"uart4_fck",	&uart4_fck_am35xx, CK_3505 | CK_3517),
--	CLK(NULL,	"gpt2_fck",	&gpt2_fck,	CK_3XXX),
--	CLK(NULL,	"gpt3_fck",	&gpt3_fck,	CK_3XXX),
--	CLK(NULL,	"gpt4_fck",	&gpt4_fck,	CK_3XXX),
--	CLK(NULL,	"gpt5_fck",	&gpt5_fck,	CK_3XXX),
--	CLK(NULL,	"gpt6_fck",	&gpt6_fck,	CK_3XXX),
--	CLK(NULL,	"gpt7_fck",	&gpt7_fck,	CK_3XXX),
--	CLK(NULL,	"gpt8_fck",	&gpt8_fck,	CK_3XXX),
--	CLK(NULL,	"gpt9_fck",	&gpt9_fck,	CK_3XXX),
--	CLK(NULL,	"per_32k_alwon_fck", &per_32k_alwon_fck, CK_3XXX),
--	CLK(NULL,	"gpio6_dbck",	&gpio6_dbck,	CK_3XXX),
--	CLK(NULL,	"gpio5_dbck",	&gpio5_dbck,	CK_3XXX),
--	CLK(NULL,	"gpio4_dbck",	&gpio4_dbck,	CK_3XXX),
--	CLK(NULL,	"gpio3_dbck",	&gpio3_dbck,	CK_3XXX),
--	CLK(NULL,	"gpio2_dbck",	&gpio2_dbck,	CK_3XXX),
--	CLK(NULL,	"wdt3_fck",	&wdt3_fck,	CK_3XXX),
--	CLK(NULL,	"per_l4_ick",	&per_l4_ick,	CK_3XXX),
--	CLK(NULL,	"gpio6_ick",	&gpio6_ick,	CK_3XXX),
--	CLK(NULL,	"gpio5_ick",	&gpio5_ick,	CK_3XXX),
--	CLK(NULL,	"gpio4_ick",	&gpio4_ick,	CK_3XXX),
--	CLK(NULL,	"gpio3_ick",	&gpio3_ick,	CK_3XXX),
--	CLK(NULL,	"gpio2_ick",	&gpio2_ick,	CK_3XXX),
--	CLK(NULL,	"wdt3_ick",	&wdt3_ick,	CK_3XXX),
--	CLK(NULL,	"uart3_ick",	&uart3_ick,	CK_3XXX),
--	CLK(NULL,	"uart4_ick",	&uart4_ick,	CK_36XX),
--	CLK(NULL,	"gpt9_ick",	&gpt9_ick,	CK_3XXX),
--	CLK(NULL,	"gpt8_ick",	&gpt8_ick,	CK_3XXX),
--	CLK(NULL,	"gpt7_ick",	&gpt7_ick,	CK_3XXX),
--	CLK(NULL,	"gpt6_ick",	&gpt6_ick,	CK_3XXX),
--	CLK(NULL,	"gpt5_ick",	&gpt5_ick,	CK_3XXX),
--	CLK(NULL,	"gpt4_ick",	&gpt4_ick,	CK_3XXX),
--	CLK(NULL,	"gpt3_ick",	&gpt3_ick,	CK_3XXX),
--	CLK(NULL,	"gpt2_ick",	&gpt2_ick,	CK_3XXX),
--	CLK("omap-mcbsp.2", "ick",	&mcbsp2_ick,	CK_3XXX),
--	CLK("omap-mcbsp.3", "ick",	&mcbsp3_ick,	CK_3XXX),
--	CLK("omap-mcbsp.4", "ick",	&mcbsp4_ick,	CK_3XXX),
--	CLK(NULL,	"mcbsp2_fck",	&mcbsp2_fck,	CK_3XXX),
--	CLK(NULL,	"mcbsp3_fck",	&mcbsp3_fck,	CK_3XXX),
--	CLK(NULL,	"mcbsp4_fck",	&mcbsp4_fck,	CK_3XXX),
--	CLK("etb",	"emu_src_ck",	&emu_src_ck,	CK_3XXX),
--	CLK(NULL,	"pclk_fck",	&pclk_fck,	CK_3XXX),
--	CLK(NULL,	"pclkx2_fck",	&pclkx2_fck,	CK_3XXX),
--	CLK(NULL,	"atclk_fck",	&atclk_fck,	CK_3XXX),
--	CLK(NULL,	"traceclk_src_fck", &traceclk_src_fck, CK_3XXX),
--	CLK(NULL,	"traceclk_fck",	&traceclk_fck,	CK_3XXX),
--	CLK(NULL,	"sr1_fck",	&sr1_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"sr2_fck",	&sr2_fck,	CK_34XX | CK_36XX),
--	CLK(NULL,	"sr_l4_ick",	&sr_l4_ick,	CK_34XX | CK_36XX),
--	CLK(NULL,	"secure_32k_fck", &secure_32k_fck, CK_3XXX),
--	CLK(NULL,	"gpt12_fck",	&gpt12_fck,	CK_3XXX),
--	CLK(NULL,	"wdt1_fck",	&wdt1_fck,	CK_3XXX),
--	CLK(NULL,	"ipss_ick",	&ipss_ick,	CK_AM35XX),
--	CLK(NULL,	"rmii_ck",	&rmii_ck,	CK_AM35XX),
--	CLK(NULL,	"pclk_ck",	&pclk_ck,	CK_AM35XX),
--	CLK("davinci_emac",	NULL,	&emac_ick,	CK_AM35XX),
--	CLK("davinci_mdio.0",	NULL,	&emac_fck,	CK_AM35XX),
--	CLK("vpfe-capture",	"master",	&vpfe_ick,	CK_AM35XX),
--	CLK("vpfe-capture",	"slave",	&vpfe_fck,	CK_AM35XX),
--	CLK("musb-am35x",	"ick",		&hsotgusb_ick_am35xx,	CK_AM35XX),
--	CLK("musb-am35x",	"fck",		&hsotgusb_fck_am35xx,	CK_AM35XX),
--	CLK(NULL,	"hecc_ck",	&hecc_ck,	CK_AM35XX),
--	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
--	CLK("omap_timer.1",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.2",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.3",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.4",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.5",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.6",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.7",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.8",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.9",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.10",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.11",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.12",	"32k_ck",	&omap_32k_fck,  CK_3XXX),
--	CLK("omap_timer.1",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.2",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.3",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.4",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.5",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.6",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.7",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.8",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.9",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.10",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.11",	"sys_ck",	&sys_ck,	CK_3XXX),
--	CLK("omap_timer.12",	"sys_ck",	&sys_ck,	CK_3XXX),
--};
--
--
--int __init omap3xxx_clk_init(void)
--{
--	struct omap_clk *c;
--	u32 cpu_clkflg = 0;
--
--	/*
--	 * 3505 must be tested before 3517, since 3517 returns true
--	 * for both AM3517 chips and AM3517 family chips, which
--	 * includes 3505.  Unfortunately there's no obvious family
--	 * test for 3517/3505 :-(
--	 */
--	if (cpu_is_omap3505()) {
--		cpu_mask = RATE_IN_34XX;
--		cpu_clkflg = CK_3505;
--	} else if (cpu_is_omap3517()) {
--		cpu_mask = RATE_IN_34XX;
--		cpu_clkflg = CK_3517;
--	} else if (cpu_is_omap3505()) {
--		cpu_mask = RATE_IN_34XX;
--		cpu_clkflg = CK_3505;
--	} else if (cpu_is_omap3630()) {
--		cpu_mask = (RATE_IN_34XX | RATE_IN_36XX);
--		cpu_clkflg = CK_36XX;
--	} else if (cpu_is_ti816x()) {
--		cpu_mask = RATE_IN_TI816X;
--		cpu_clkflg = CK_TI816X;
--	} else if (cpu_is_am33xx()) {
--		cpu_mask = RATE_IN_AM33XX;
--	} else if (cpu_is_ti814x()) {
--		cpu_mask = RATE_IN_TI814X;
--	} else if (cpu_is_omap34xx()) {
--		if (omap_rev() == OMAP3430_REV_ES1_0) {
--			cpu_mask = RATE_IN_3430ES1;
--			cpu_clkflg = CK_3430ES1;
--		} else {
--			/*
--			 * Assume that anything that we haven't matched yet
--			 * has 3430ES2-type clocks.
--			 */
--			cpu_mask = RATE_IN_3430ES2PLUS;
--			cpu_clkflg = CK_3430ES2PLUS;
--		}
--	} else {
--		WARN(1, "clock: could not identify OMAP3 variant\n");
--	}
--
--	if (omap3_has_192mhz_clk())
--		omap_96m_alwon_fck = omap_96m_alwon_fck_3630;
--
--	if (cpu_is_omap3630()) {
--		/*
--		 * XXX This type of dynamic rewriting of the clock tree is
--		 * deprecated and should be revised soon.
--		 *
--		 * For 3630: override clkops_omap2_dflt_wait for the
--		 * clocks affected from PWRDN reset Limitation
--		 */
--		dpll3_m3x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--		dpll4_m2x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--		dpll4_m3x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--		dpll4_m4x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--		dpll4_m5x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--		dpll4_m6x2_ck.ops =
--				&clkops_omap36xx_pwrdn_with_hsdiv_wait_restore;
--	}
--
--	/*
--	 * XXX This type of dynamic rewriting of the clock tree is
--	 * deprecated and should be revised soon.
--	 */
--	if (cpu_is_omap3630())
--		dpll4_dd = dpll4_dd_3630;
--	else
--		dpll4_dd = dpll4_dd_34xx;
--
--	clk_init(&omap2_clk_functions);
--
--	for (c = omap3xxx_clks; c < omap3xxx_clks + ARRAY_SIZE(omap3xxx_clks);
--	     c++)
--		clk_preinit(c->lk.clk);
--
--	for (c = omap3xxx_clks; c < omap3xxx_clks + ARRAY_SIZE(omap3xxx_clks);
--	     c++)
--		if (c->cpu & cpu_clkflg) {
--			clkdev_add(&c->lk);
--			clk_register(c->lk.clk);
--			omap2_init_clk_clkdm(c->lk.clk);
--		}
--
--	/* Disable autoidle on all clocks; let the PM code enable it later */
--	omap_clk_disable_autoidle_all();
--
--	recalculate_root_clocks();
--
--	pr_info("Clocking rate (Crystal/Core/MPU): %ld.%01ld/%ld/%ld MHz\n",
--		(osc_sys_ck.rate / 1000000), (osc_sys_ck.rate / 100000) % 10,
--		(core_ck.rate / 1000000), (arm_fck.rate / 1000000));
--
--	/*
--	 * Only enable those clocks we will need, let the drivers
--	 * enable other clocks as necessary
--	 */
--	clk_enable_init_clocks();
--
--	/*
--	 * Lock DPLL5 -- here only until other device init code can
--	 * handle this
--	 */
--	if (!cpu_is_ti81xx() && (omap_rev() >= OMAP3430_REV_ES2_0))
--		omap3_clk_lock_dpll5();
--
--	/* Avoid sleeping during omap3_core_dpll_m2_set_rate() */
--	sdrc_ick_p = clk_get(NULL, "sdrc_ick");
--	arm_fck_p = clk_get(NULL, "arm_fck");
--
--	return 0;
--}
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 7be8d65..80b2280 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -48,6 +48,15 @@
+ #include <plat/usb.h>
+ #include <plat/omap_device.h>
+ 
++#ifdef CONFIG_TCG_ST33_I2C
++#include <linux/i2c/tpm_stm_st33_i2c.h>
++#endif /* CONFIG_TCG_ST33_I2C */
++
++#ifdef CONFIG_TCG_ST33_SPI
++#include <linux/spi/tpm_stm_st33_spi.h>
++#include <linux/spi/spi.h>
++#endif /* CONFIG_TCG_ST33_SPI */
++
+ #include "mux.h"
+ #include "hsmmc.h"
+ #include "pm.h"
+@@ -374,6 +383,35 @@ static struct i2c_board_info __initdata beagle_i2c_eeprom[] = {
+        },
+ };
+ 
++#if defined CONFIG_TCG_ST33_I2C || defined CONFIG_TCG_ST33_SPI
++static struct st33zp24_platform_data tpm_data = {
++        .io_serirq = 137,
++        .io_lpcpd  = 143,
++};
++#endif
++
++#ifdef CONFIG_TCG_ST33_I2C
++static struct i2c_board_info __initdata tpm_st33_i2c_board_info[] = {
++        {
++                I2C_BOARD_INFO(TPM_ST33_I2C, TPM_I2C_ST33_ADDR_WR_LOC0),
++                .platform_data = &tpm_data,
++        },
++};
++#endif
++
++#ifdef CONFIG_TCG_ST33_SPI
++static struct  spi_board_info tpm_st33_spi_board_info[] = {
++        {
++                .modalias = TPM_ST33_SPI,
++                .max_speed_hz = 10000000,
++                .bus_num = 4,
++                .chip_select = 0,
++                .mode = SPI_MODE_0,
++                .platform_data = &tpm_data,
++        },
++};
++#endif
++
+ static int __init omap3_beagle_i2c_init(void)
+ {
+ 	omap3_pmic_get_config(&beagle_twldata,
+@@ -553,6 +591,26 @@ static void __init omap3_beagle_init(void)
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+ 
+ 	beagle_display_init();
++	#if defined CONFIG_TCG_ST33_I2C || defined CONFIG_TCG_ST33_SPI
++		omap_mux_init_gpio(tpm_data.io_serirq, OMAP_PIN_INPUT);
++		omap_mux_init_gpio(tpm_data.io_lpcpd, OMAP_PIN_OUTPUT);
++	#endif
++
++	#ifdef CONFIG_TCG_ST33_I2C
++		omap_mux_init_signal("i2c2_scl", OMAP_PIN_INPUT);
++		omap_mux_init_signal("i2c2_sda", OMAP_PIN_INPUT);
++		omap_register_i2c_bus(2, 400, tpm_st33_i2c_board_info, ARRAY_SIZE(tpm_st33_i2c_board_info));
++	#endif
++
++	#ifdef CONFIG_TCG_ST33_SPI
++		omap_mux_init_signal("mcspi4_clk", OMAP_PIN_INPUT);
++		omap_mux_init_signal("mcspi4_cs0", OMAP_PIN_OUTPUT);
++		omap_mux_init_signal("mcspi4_simo", OMAP_PIN_OUTPUT);
++		omap_mux_init_signal("mcspi4_somi", OMAP_PIN_INPUT);
++
++		spi_register_board_info(tpm_st33_spi_board_info, ARRAY_SIZE(tpm_st33_spi_board_info));
++	#endif
++
+ 	beagle_opp_init();
+ }
+ 
+diff --git a/drivers/char/tpm/Kconfig b/drivers/char/tpm/Kconfig
+index a048199..7384c93 100644
+--- a/drivers/char/tpm/Kconfig
++++ b/drivers/char/tpm/Kconfig
+@@ -5,6 +5,7 @@
+ menuconfig TCG_TPM
+ 	tristate "TPM Hardware Support"
+ 	depends on HAS_IOMEM
++	depends on EXPERIMENTAL
+ 	select SECURITYFS
+ 	---help---
+ 	  If you have a TPM security chip in your system, which
+@@ -16,17 +17,14 @@ menuconfig TCG_TPM
+ 	  obtained at: <http://sourceforge.net/projects/trousers>.  To 
+ 	  compile this driver as a module, choose M here; the module 
+ 	  will be called tpm. If unsure, say N.
+-	  Notes:
+-	  1) For more TPM drivers enable CONFIG_PNP, CONFIG_ACPI
++	  Note: For more TPM drivers enable CONFIG_PNP, CONFIG_ACPI
+ 	  and CONFIG_PNPACPI.
+-	  2) Without ACPI enabled, the BIOS event log won't be accessible,
+-	  which is required to validate the PCR 0-7 values.
+ 
+ if TCG_TPM
+ 
+ config TCG_TIS
+ 	tristate "TPM Interface Specification 1.2 Interface"
+-	depends on X86
++	depends on PNP
+ 	---help---
+ 	  If you have a TPM security chip that is compliant with the
+ 	  TCG TIS 1.2 TPM specification say Yes and it will be accessible
+@@ -35,7 +33,6 @@ config TCG_TIS
+ 
+ config TCG_NSC
+ 	tristate "National Semiconductor TPM Interface"
+-	depends on X86
+ 	---help---
+ 	  If you have a TPM security chip from National Semiconductor 
+ 	  say Yes and it will be accessible from within Linux.  To 
+@@ -44,7 +41,6 @@ config TCG_NSC
+ 
+ config TCG_ATMEL
+ 	tristate "Atmel TPM Interface"
+-	depends on PPC64 || HAS_IOPORT
+ 	---help---
+ 	  If you have a TPM security chip from Atmel say Yes and it 
+ 	  will be accessible from within Linux.  To compile this driver 
+@@ -60,6 +56,26 @@ config TCG_INFINEON
+ 	  To compile this driver as a module, choose M here; the module
+ 	  will be called tpm_infineon.
+ 	  Further information on this driver and the supported hardware
+-	  can be found at http://www.trust.rub.de/projects/linux-device-driver-infineon-tpm/ 
++	  can be found at http://www.prosec.rub.de/tpm
++
++config TCG_ST33_I2C
++        tristate "STMicroelectronics ST33 I2C TPM with locality 0 & 4"
++        depends on I2C
++        depends on GPIOLIB
++        ---help---
++        If you have a TPM security chip from STMicroelectronics working with
++        an I2C bus say Yes and it will be accessible from within Linux.
++        To compile this driver as a module, choose M here; the module will be
++        called tpm_stm_st33_i2c.
++
++config TCG_ST33_SPI
++	tristate "STMicroelectronics ST33 SPI"
++	depends on SPI
++	depends on GPIOLIB
++	---help---
++	If you have a TPM security chip from STMicroelectronics working with
++	an SPI bus say Yes and it will be accessible from within Linux.
++	To compile this driver as a module, choose M here; the module will be
++	called tpm_stm_st33_spi.
+ 
+ endif # TCG_TPM
+diff --git a/drivers/char/tpm/Makefile b/drivers/char/tpm/Makefile
+index ea3a1e0..8d3449f 100644
+--- a/drivers/char/tpm/Makefile
++++ b/drivers/char/tpm/Makefile
+@@ -9,3 +9,5 @@ obj-$(CONFIG_TCG_TIS) += tpm_tis.o
+ obj-$(CONFIG_TCG_NSC) += tpm_nsc.o
+ obj-$(CONFIG_TCG_ATMEL) += tpm_atmel.o
+ obj-$(CONFIG_TCG_INFINEON) += tpm_infineon.o
++obj-$(CONFIG_TCG_ST33_I2C) += tpm_stm_st33_i2c.o
++obj-$(CONFIG_TCG_ST33_SPI) += tpm_stm_st33_spi.o 
+diff --git a/drivers/char/tpm/tpm_stm_st19_i2c.c b/drivers/char/tpm/tpm_stm_st19_i2c.c
+new file mode 100644
+index 0000000..c8f9ed7
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st19_i2c.c
+@@ -0,0 +1,560 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST19NP18
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: tpm_stm_st19_i2c.c
++ *
++ * @Synopsis:
++ * ----------------------------------------------------------------------
++ *	02/12/2008
++ *	- Stand alone implementation (without any TPM api)
++ * ----------------------------------------------------------------------
++ *	03/02/2010
++ *	- Power management (suspend and resume functions)
++ *	implementation
++ * ----------------------------------------------------------------------
++ *	03/19/2010
++ *	- Use of the linux kernel TPM api --> driver/char/tpm
++ * ----------------------------------------------------------------------
++ *	05/26/2010
++ *	- Update code for code submission and bug fixes:
++ *	- Comments spelling fixes
++ *	- Lindent script execution
++ *	- checkpatch.pl script execution
++ *	- fix syslog error when loaded as a module:
++ *	 "release() function missing and must be fixed"
++ *	- name files change from
++ *	  stm_st19_tpm_i2c to tpm_stm_st19_i2c
++ * ----------------------------------------------------------------------
++ *	06/15/2010
++ *	- Update for new tpm core device.
++ *	num_opens --> is_open
++ * ----------------------------------------------------------------------
++ *	07/08/2010
++ *	- Update probe, resume suspend functions
++ *	- Fix issue suspend buffer and work around related to the
++ *	chip->data_buffer not allocated.
++ * ----------------------------------------------------------------------
++ *	09/03/2010
++ *	- Review under LKLM
++ *	- Patches from Joe Perches after review which fix some break and
++ *	some neatings.
++ * ----------------------------------------------------------------------
++ *	09/16/2010
++ *	- Remove unaccurate comment.
++ * ----------------------------------------------------------------------
++ *	01/12/2011
++ *	- update ioctl function to unlocked_ioctl for kernel >= 2.6.36
++ *	- Some cleaning
++ */
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/i2c.h>
++#include <linux/wait.h>
++#include <linux/string.h>
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/sysfs.h>
++#include <linux/gpio.h>
++#include <linux/sched.h>
++#include <linux/uaccess.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/version.h>
++
++#include <linux/i2c/tpm_stm_st19_i2c.h>
++
++#include "tpm.h"
++
++#include "tpm_stm_st19_i2c.h"
++
++#ifdef DEBUG
++#define FUNC_ENTER() pr_info("%s\n", __func__)
++#else
++#define FUNC_ENTER() do {} while (0)
++#endif
++
++static struct st19np18_platform_data *pin_infos;
++
++#define TPM_STS_DATA_AVAIL 0x10
++#define TPM_STS_ACCEPT_COMMAND 0x01
++#define TPM_STS_CANCEL (TPM_STS_DATA_AVAIL | TPM_STS_ACCEPT_COMMAND)
++
++/*
++ * gpio_readpin is a wrapper to read a gpio value.
++ * Use generic gpio APIs
++ * @param: pin_id, the pin identifier where the value will be read.
++ * @return: the gpio value (should be 0 or 1) or negative errno
++ */
++static int gpio_readpin(int pin_id)
++{
++	int ret;
++	ret = gpio_direction_input(pin_id);
++	if (ret == 0)
++		return gpio_get_value(pin_id);
++	return ret;
++}
++
++/*
++ * tpm_stm_i2c_status return the TPM state
++ */
++static u8 tpm_stm_i2c_status(struct tpm_chip *chip)
++{
++	u8 state_data, state_command;
++
++	state_data = gpio_readpin(pin_infos->data_avail_pin);
++	state_command = gpio_readpin(pin_infos->accept_pin);
++
++	return (state_data << 4) | state_command;
++}
++
++/*
++ * tpm_stm_i2c_send send TPM commands through the I2C bus.
++ * Before sending any TPM commands, tpm_stm_i2c_send poll data_available and
++ * accept_command TPM GPIOs.
++ *
++ * In case the data_available is high (logical value 1), tpm_stm_i2c_send will
++ * empty the TPM FIFO by reading all the datas stored inside the TPM.
++ *
++ * Then, if the accept_command TPM GPIO is high(logical value 1)
++ * tpm_stm_i2c_send will first send the 10 bytes header of the TCG commands and
++ * then send the others bytes by 40 bytes blocks.
++ *
++ * data_available and accept_command TPM GPIOs will goes low when the TPM
++ * compute the command.
++ *
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ * @param: buf,	the buffer to send.
++ * @param: count, the number of bytes to send.
++ * @return: In case of success the number of bytes sent.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_i2c_send(struct tpm_chip *chip, unsigned char *buf,
++			    size_t count)
++{
++	u32 ret = 0, i, size, ordinal;
++	struct i2c_client *client;
++
++	FUNC_ENTER();
++
++	if (chip == NULL)
++		return -EBUSY;
++
++	if (count < TPM_HEADER_SIZE)
++		return -EBUSY;
++
++	client = (struct i2c_client *)pin_infos->client;
++
++	ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
++
++	size = TPM_HEADER_SIZE;
++	i = 0;
++	while (i < size && wait_for_tpm_stat(chip, TPM_STS_ACCEPT_COMMAND,
++					     TPM_I2C_SHORT,
++					     &chip->vendor.int_queue) == 0) {
++		int bytes;
++
++		if (i == 0)
++			bytes = TPM_HEADER_SIZE;
++		else
++			bytes = min_t(int, count - i, TPM_I2C_BLOCK_SIZE);
++
++		if (i == 0) {
++			size = be32_to_cpu(*(__be32 *) (buf + 2));
++			size = size < count ? size : count;
++		}
++		if (count < TPM_HEADER_SIZE)
++			bytes = count;
++		ret = i2c_master_send(client, buf + i, bytes);
++		if (ret < 0) {
++			pr_info("Failed to send data\n");
++			goto end;
++		}
++
++		if (i == 0)
++			i += TPM_HEADER_SIZE;
++		else
++			i += TPM_I2C_BLOCK_SIZE;
++	}
++
++	if (i == 0) {
++		pr_info("Failed to read gpio pin (AcceptCmd)\n");
++		ret = -EIO;
++	}
++end:
++	return ret ? ret : count;
++}
++
++/*
++ * tpm_stm_i2c_recv received TPM response through the I2C bus.
++ * Before receiving any TPM response, tpm_stm_i2c_recv poll data_available and
++ * accept_command TPM GPIOs.
++ *
++ * In case the accept_command is high (logical value 1), tpm_stm_i2c_recv will
++ * do nothing.
++ *
++ * Then, if the data_available TPM GPIO is high(logical value 1)
++ * tpm_stm_i2c_recv will first receive the 10 bytes header of the TCG TPM
++ * response and then receive the others bytes by 40 bytes blocks.
++ *
++ * accept_command TPM GPIOs will goes high when the TPM Fifo is empty.
++ *
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ * @param: buf,	the buffer to store datas.
++ * @param: count, the number of bytes to send.
++ * @return: In case of success the number of bytes received.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_i2c_recv(struct tpm_chip *chip, unsigned char *buf,
++			    size_t count)
++{
++	int ret = 0;
++	int i, size;
++	struct i2c_client *client;
++
++	FUNC_ENTER();
++
++	if (chip == NULL)
++		return -EBUSY;
++	if (count < TPM_HEADER_SIZE)
++		return -EBUSY;
++
++	client = (struct i2c_client *)pin_infos->client;
++
++	size = TPM_HEADER_SIZE;
++	i = 0;
++	while (i < size && wait_for_tpm_stat(chip, TPM_STS_DATA_AVAIL,
++					     TPM_I2C_SHORT,
++					     &chip->vendor.read_queue) == 0) {
++		int bytes;
++
++		if (count < TPM_HEADER_SIZE)
++			bytes = count;
++		else if (i == 0)
++			bytes = TPM_HEADER_SIZE;
++		else
++			bytes = min_t(int, size - i, TPM_I2C_BLOCK_SIZE);
++
++		ret = i2c_master_recv(client, buf + i, bytes);
++		if (ret < 0) {
++			pr_info(" Failed to read gpio pin (DataAvailable)\n");
++			goto end;
++		}
++
++		if (!buf) {
++			pr_info("read buffer is NULL\n");
++			goto end;
++		}
++
++		if (i == 0) {
++			size = be32_to_cpu(*(__be32 *) (buf + 2));
++			if (size > count)
++				size = count;
++			i += TPM_HEADER_SIZE;
++		} else
++			i += TPM_I2C_BLOCK_SIZE;
++	}
++
++	if (i == 0) {
++		pr_info("Failed to read gpio pin (DataAvailable)\n");
++		ret = -EIO;
++		goto end;
++	}
++	return size;
++end:
++	return ret;
++}
++
++/*
++ * tpm_stm_i2c_cancel, cancel is not implemented.
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ */
++static void tpm_stm_i2c_cancel(struct tpm_chip *chip)
++{
++}
++
++/*
++ * tpm_st19_i2c_ioctl provides 2 handles:
++ * - TPMIOC_CANCEL: allow to CANCEL a TPM commands execution.
++ *   See tpm_stm_i2c_cancel description above
++ * - TPMIOC_TRANSMIT: allow to transmit a TPM commands.
++ *
++ * @return: In case of success, return TPM response size.
++ * In other case return < 0 value describing the issue.
++ */
++static long tpm_stm_i2c_ioctl(struct file *file,
++			      unsigned int cmd, unsigned long arg)
++{
++	int in_size = 0, out_size = 0, ret = -ENOTTY;
++	struct tpm_chip *chip = file->private_data;
++
++	switch (cmd) {
++	case TPMIOC_CANCEL:
++		tpm_stm_i2c_cancel(chip);
++		ret = -ENOSYS;
++		break;
++	case TPMIOC_TRANSMIT:
++		if (copy_from_user(chip->data_buffer,
++				   (const char *)arg, TPM_HEADER_SIZE)) {
++			ret = -EFAULT;
++			break;
++		}
++
++		in_size = be32_to_cpu(*(__be32 *) (chip->data_buffer + 2));
++		if (copy_from_user(chip->data_buffer,
++				   (const char *)arg, in_size)) {
++			ret = -EFAULT;
++			break;
++		}
++
++		tpm_stm_i2c_send(chip, chip->data_buffer, in_size);
++
++		out_size = tpm_stm_i2c_recv(chip, chip->data_buffer,
++					    TPM_BUFSIZE);
++		if (copy_to_user((char *)arg, chip->data_buffer, out_size)) {
++			ret = -EFAULT;
++			break;
++		}
++		ret = out_size;
++		break;
++	}
++	return ret;
++}
++
++static const struct file_operations tpm_st19_i2c_fops = {
++	.owner = THIS_MODULE,
++	.llseek = no_llseek,
++	.read = tpm_read,
++	.unlocked_ioctl = tpm_stm_i2c_ioctl,
++	.write = tpm_write,
++	.open = tpm_open,
++	.release = tpm_release,
++};
++
++static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
++static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
++static DEVICE_ATTR(enabled, S_IRUGO, tpm_show_enabled, NULL);
++static DEVICE_ATTR(active, S_IRUGO, tpm_show_active, NULL);
++static DEVICE_ATTR(owned, S_IRUGO, tpm_show_owned, NULL);
++static DEVICE_ATTR(temp_deactivated, S_IRUGO, tpm_show_temp_deactivated, NULL);
++static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps_1_2, NULL);
++static DEVICE_ATTR(cancel, S_IWUSR | S_IWGRP, NULL, tpm_store_cancel);
++
++static struct attribute *stm_tpm_attrs[] = {
++	&dev_attr_pubek.attr,
++	&dev_attr_pcrs.attr,
++	&dev_attr_enabled.attr,
++	&dev_attr_active.attr,
++	&dev_attr_owned.attr,
++	&dev_attr_temp_deactivated.attr,
++	&dev_attr_caps.attr,
++	&dev_attr_cancel.attr, NULL,
++};
++
++static struct attribute_group stm_tpm_attr_grp = {
++	.attrs = stm_tpm_attrs
++};
++
++static struct tpm_vendor_specific st_i2c_tpm = {
++	.send = tpm_stm_i2c_send,
++	.recv = tpm_stm_i2c_recv,
++	.cancel = tpm_stm_i2c_cancel,
++	.status = tpm_stm_i2c_status,
++	.req_complete_mask = TPM_STS_DATA_AVAIL,
++	.req_complete_val = TPM_STS_DATA_AVAIL,
++	.req_canceled = TPM_STS_CANCEL,
++	.attr_group = &stm_tpm_attr_grp,
++	.miscdev = {.fops = &tpm_st19_i2c_fops,},
++};
++
++/*
++ * tpm_st19_i2c_probe initialize the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @param: id, the i2c_device_id struct.
++ * @return: 0 in case of success.
++ *			-1 in other case.
++ */
++static int
++tpm_st19_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	int err;
++	struct tpm_chip *chip;
++	struct st19np18_platform_data *platform_data;
++
++	FUNC_ENTER();
++
++	err = 0;
++
++	/* Check I2C platform functionnalities */
++	if (client == NULL) {
++		pr_info("client is NULL. exiting.\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
++		pr_info("client not i2c capable\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	chip = tpm_register_hardware(&client->dev, &st_i2c_tpm);
++	if (!chip) {
++		err = -ENODEV;
++		goto end;
++	}
++
++	platform_data = client->dev.platform_data;
++	pin_infos = platform_data;
++	platform_data->client = client;
++
++	chip->vendor.timeout_a = msecs_to_jiffies(TPM_I2C_SHORT);
++	chip->vendor.timeout_b = msecs_to_jiffies(TPM_I2C_SHORT);
++	chip->vendor.timeout_c = msecs_to_jiffies(TPM_I2C_SHORT);
++	chip->vendor.timeout_d = msecs_to_jiffies(TPM_I2C_SHORT);
++
++	/* Register GPIO pin through generic Linux GPIO API */
++	err = gpio_request(platform_data->accept_pin, "accept command");
++	if (err)
++		goto _gpio_init;
++
++	err = gpio_request(platform_data->data_avail_pin, "data available");
++	if (err)
++		goto _gpio_init;
++
++	tpm_get_timeouts(chip);
++	tpm_continue_selftest(chip);
++
++	/* attach chip datas to client */
++	i2c_set_clientdata(client, chip);
++
++	pr_info("TPM I2C Initialized\n");
++	return 0;
++_gpio_init:
++	if (platform_data) {
++		gpio_free(platform_data->accept_pin);
++		gpio_free(platform_data->data_avail_pin);
++	}
++	tpm_remove_hardware(chip->dev);
++end:
++	i2c_set_clientdata(client, NULL);
++	pr_info("TPM I2C initialisation fail\n");
++	return err;
++}
++
++/*
++ * tpm_st19_i2c_remove remove the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++		clear_bit(0, &chip->is_open);
++ * @return: 0 in case of success.
++ */
++static __devexit int tpm_st19_i2c_remove(struct i2c_client *client)
++{
++	struct tpm_chip *chip = (struct tpm_chip *)i2c_get_clientdata(client);
++	FUNC_ENTER();
++
++	if (pin_infos != NULL) {
++		gpio_free(pin_infos->accept_pin);
++		gpio_free(pin_infos->data_avail_pin);
++	}
++
++	/* Check if chip has been previously clean */
++	if (chip != NULL)
++		tpm_remove_hardware(chip->dev);
++
++	return 0;
++}
++
++/*
++ * tpm_st19_i2c_pm_suspend suspend the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @param: mesg, the power management message.
++ * @return: 0 in case of success.
++ */
++static int tpm_st19_i2c_pm_suspend(struct i2c_client *client, pm_message_t mesg)
++{
++	return tpm_pm_suspend(&client->dev, mesg);
++}
++
++/*
++ * tpm_st19_i2c_pm_resume resume the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @return: 0 in case of success.
++ */
++static int tpm_st19_i2c_pm_resume(struct i2c_client *client)
++{
++	return tpm_pm_resume(&client->dev);
++}				/* tpm_st19_i2c_pm_resume() */
++
++static const struct i2c_device_id tpm_st19_i2c_id[] = {
++	{TPM_DRIVER_NAME, 0},
++	{}
++};
++
++MODULE_DEVICE_TABLE(i2c, tpm_st19_i2c_id);
++
++static struct i2c_driver tpm_st19_i2c_driver = {
++	.driver = {
++		   .owner = THIS_MODULE,
++		   .name = TPM_DRIVER_NAME,
++		   },
++	.probe = tpm_st19_i2c_probe,
++	.remove = tpm_st19_i2c_remove,
++	.resume = tpm_st19_i2c_pm_resume,
++	.suspend = tpm_st19_i2c_pm_suspend,
++	.id_table = tpm_st19_i2c_id
++};
++
++/*
++ * tpm_st19_i2c_init initialize driver
++ * @return: 0 if successful, else non zero value.
++ */
++static int __init tpm_st19_i2c_init(void)
++{
++	FUNC_ENTER();
++	return i2c_add_driver(&tpm_st19_i2c_driver);
++}
++
++/*
++ * tpm_st19_i2c_exit The kernel calls this function during unloading the
++ * module or during shut down process
++ */
++static void __exit tpm_st19_i2c_exit(void)
++{
++	FUNC_ENTER();
++	i2c_del_driver(&tpm_st19_i2c_driver);
++}
++
++module_init(tpm_st19_i2c_init);
++module_exit(tpm_st19_i2c_exit);
++
++MODULE_AUTHOR("Christophe Ricard (tpmsupport at st.com)");
++MODULE_DESCRIPTION("STM TPM I2C ST19 Driver");
++MODULE_VERSION("1.2.0");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/char/tpm/tpm_stm_st19_i2c.h b/drivers/char/tpm/tpm_stm_st19_i2c.h
+new file mode 100644
+index 0000000..d79fa0d
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st19_i2c.h
+@@ -0,0 +1,52 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST19NP18
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: stm_st19_tpm_i2c.h
++ *
++ * @Date: 02/12/2008
++ */
++#ifndef __STM_ST19_TPM_I2C_MAIN_H__
++#define __STM_ST19_TPM_I2C_MAIN_H__
++
++#include <linux/pci.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/i2c.h>
++/*#include <linux/i2c-id.h>*/
++#include <linux/fs.h>
++#include <linux/miscdevice.h>
++
++#define TPM_BUFSIZE		2048
++#define TPM_HEADER_SIZE		10
++#define TPM_I2C_BLOCK_SIZE	0x28
++
++#define TPM_I2C_SHORT		2000	/* 2s */
++#define STARTUP_WAIT_INTERVAL	8	/* 8ms */
++
++/* ioctl commands */
++#define TPMIOC_CANCEL		_IO('T', 0x00)	/* Not supported */
++#define TPMIOC_TRANSMIT		_IO('T', 0x01)
++
++#endif /* __STM_ST19_TPM_I2C_MAIN_H__ */
+diff --git a/drivers/char/tpm/tpm_stm_st33_i2c.c b/drivers/char/tpm/tpm_stm_st33_i2c.c
+new file mode 100644
+index 0000000..b4cbbc5
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st33_i2c.c
+@@ -0,0 +1,1200 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST33ZP24
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: tpm_stm_st33_i2c.c
++ *
++ * @Synopsis:
++ * 	09/15/2010:	First shot driver tpm_tis driver for lpc is used as model.
++ */
++
++#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/i2c.h>
++//#include <linux/i2c-id.h>
++#include <linux/wait.h>
++#include <linux/string.h>
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/sysfs.h>
++#include <linux/gpio.h>
++#include <linux/sched.h>
++#include <linux/uaccess.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/sched.h>
++
++#include <linux/i2c/tpm_stm_st33_i2c.h>
++
++#include "tpm.h"
++
++#include "tpm_stm_st33_i2c.h"
++
++#ifdef DEBUG
++#define FUNC_ENTER()	pr_info("%s\n", __func__)
++#else
++#define	FUNC_ENTER()	do{}	while(0)
++#endif
++
++enum stm33zp24_access {
++        TPM_ACCESS_VALID = 0x80,
++        TPM_ACCESS_ACTIVE_LOCALITY = 0x20,
++        TPM_ACCESS_REQUEST_PENDING = 0x04,
++        TPM_ACCESS_REQUEST_USE = 0x02,
++};
++
++enum stm33zp24_status {
++        TPM_STS_VALID = 0x80,
++        TPM_STS_COMMAND_READY = 0x40,
++        TPM_STS_GO = 0x20,
++        TPM_STS_DATA_AVAIL = 0x10,
++        TPM_STS_DATA_EXPECT = 0x08,
++};
++
++enum stm33zp24_int_flags {
++	TPM_GLOBAL_INT_ENABLE = 0x80,
++        TPM_INTF_CMD_READY_INT = 0x080,	
++	TPM_INTF_FIFO_AVALAIBLE_INT = 0x040,
++	TPM_INTF_WAKE_UP_READY_INT = 0x020, 
++	TPM_INTF_LOC4SOFTRELEASE_INT = 0x008,	
++	TPM_INTF_LOCALITY_CHANGE_INT = 0x004,
++        TPM_INTF_STS_VALID_INT = 0x002,
++        TPM_INTF_DATA_AVAIL_INT = 0x001,
++};
++
++enum tis_defaults {
++        TIS_SHORT_TIMEOUT = 750,        /* ms */
++        TIS_LONG_TIMEOUT = 2000,        /* 2 sec */
++};
++
++//static DEFINE_SPINLOCK(tpm_stm_st33_lock);
++
++/*
++ * write8_reg
++ * Send byte to the TIS register according to the ST33ZP24 I2C protocol.
++ * @param: tpm_register, the tpm tis register where the data should be written
++ * @param: tpm_data, the tpm_data to write inside the tpm_register
++ * @param: tpm_size, The length of the data
++ * @return: number of byte written successfully: should be one if success.
++ */
++static int write8_reg(struct i2c_client* client, u8 tpm_register, 
++		      u8* tpm_data, u16 tpm_size)
++{
++	u8 data; 
++	int value = 0;
++	struct st33zp24_platform_data* pin_infos;
++
++	FUNC_ENTER();
++	pin_infos = client->dev.platform_data;
++
++	data = tpm_register;
++	memcpy(pin_infos->tpm_i2c_buffer[0], &data, sizeof(data));
++	memcpy(pin_infos->tpm_i2c_buffer[0] + 1, tpm_data, tpm_size);
++	value = i2c_master_send(client, pin_infos->tpm_i2c_buffer[0], tpm_size + 1);
++	return value;
++}/* write8_reg() */
++
++/*
++ * read8_reg
++ * Recv byte from the TIS register according to the ST33ZP24 I2C protocol.
++ * @param: tpm_register, the tpm tis register where the data should be read
++ * @param: tpm_data, the TPM response
++ * @param: tpm_size, tpm TPM response size to read.
++ * @return: number of byte read successfully: should be one if success.
++ */
++static int read8_reg(struct i2c_client* client, u8 tpm_register, 
++		    u8* tpm_data, int tpm_size )
++{
++	u8 status = 0;
++	u8 data;
++	struct st33zp24_platform_data* pin_infos;
++
++	FUNC_ENTER();
++	pin_infos = client->dev.platform_data;
++
++	data = TPM_DUMMY_BYTE;
++	status = write8_reg(client, tpm_register, &data, 1);
++	if (status == 2 )
++		status = i2c_master_recv(client, tpm_data, tpm_size);
++	return status;
++}/* read8_reg() */
++
++/*
++ * I2C_WRITE_DATA
++ * Send byte to the TIS register according to the ST33ZP24 I2C protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be written
++ * @param: tpm_data, the tpm_data to write inside the tpm_register
++ * @param: tpm_size, The length of the data
++ * @return: number of byte written successfully: should be one if success.
++ */
++static int I2C_WRITE_DATA(struct i2c_client* client, u8 tpm_register, 
++			 u8* tpm_data, u16 tpm_size)
++{
++	u8 value = 0;
++	//unsigned long flags;	
++
++	FUNC_ENTER();	
++
++        //spin_lock_irqsave(&tpm_stm_st33_lock, flags);	
++	value = write8_reg(client, tpm_register | TPM_WRITE_DIRECTION, tpm_data, tpm_size);
++	//spin_unlock_irqrestore(&tpm_stm_st33_lock, flags);
++	return value;
++}/* I2C_WRITE_DATA() */
++
++/*
++ * I2C_READ_DATA
++ * Recv byte from the TIS register according to the ST33ZP24 I2C protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be read
++ * @param: tpm_data, the TPM response
++ * @param: tpm_size, tpm TPM response size to read.
++ * @return: number of byte read successfully: should be one if success.
++ */
++static int I2C_READ_DATA(struct i2c_client* client, u8 tpm_register,
++			 u8* tpm_data, u16 tpm_size)
++{
++	u8 value = 0;
++	//unsigned long flags;	
++
++	FUNC_ENTER();	
++
++        //spin_lock_irqsave(&tpm_stm_st33_lock, flags);	
++	value = read8_reg(client, tpm_register, tpm_data, tpm_size); 
++	//spin_unlock_irqrestore(&tpm_stm_st33_lock, flags); 
++	return value;
++}/* I2C_READ_DATA () */
++
++/*
++ * clear_interruption
++ * clear the TPM interrupt register.
++ * @param: tpm, the chip description
++ */
++static void clear_interruption(struct i2c_client* client)
++{
++        u8 interrupt;
++        I2C_READ_DATA(client, TPM_INT_STATUS, &interrupt, 1);
++        /* Clear interrupts handled with TPM_EOI */
++        I2C_WRITE_DATA(client, TPM_INT_STATUS, &interrupt, 1);
++        I2C_READ_DATA(client, TPM_INT_STATUS, &interrupt, 1);
++}/* clear_interruption() */
++
++/*
++ * _wait_for_interrupt_serirq_timeout
++ * @param: tpm, the chip description
++ * @param: timeout, the timeout of the interrupt
++ * @return: the status of the interruption.
++ */
++static int _wait_for_interrupt_serirq_timeout(struct tpm_chip* chip, unsigned long timeout)
++{
++        unsigned long status;
++        struct i2c_client *client;
++        struct st33zp24_platform_data* pin_infos;
++
++        FUNC_ENTER();
++
++        client = (struct i2c_client *) chip->vendor.iobase;
++        pin_infos = client->dev.platform_data;
++
++        status = wait_for_completion_interruptible_timeout(&pin_infos->irq_detection, timeout);
++        if ( status > 0 )
++                enable_irq(gpio_to_irq(pin_infos->io_serirq));
++        gpio_direction_input(pin_infos->io_serirq);
++
++        return status;
++}/* wait_for_interrupt_serirq_timeout() */
++
++#define wait_for_serirq_timeout(chip, condition, timeout) \
++({ \
++        unsigned long status = 2; \
++        struct i2c_client *client; \
++        struct st33zp24_platform_data* pin_infos; \
++\
++        client = (struct i2c_client *) chip->vendor.iobase; \
++        pin_infos = client->dev.platform_data;  \
++\
++        status = _wait_for_interrupt_serirq_timeout(chip, timeout); \
++        if (!status) \
++        { \
++                status = -EBUSY; \
++                goto wait_end; \
++        } \
++        clear_interruption(client);     \
++        if (condition) \
++                status = 1; \
++\
++wait_end: \
++        status;\
++}) 
++
++/*
++ * tpm_stm_i2c_cancel, cancel is not implemented.
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ */
++static void tpm_stm_i2c_cancel(struct tpm_chip *chip)
++{
++	struct i2c_client* client;
++	u8 data;	
++
++	client = (struct i2c_client *) chip->vendor.iobase;
++
++	FUNC_ENTER();	
++
++	/* this causes the current command to be aborted */
++	data = TPM_STS_COMMAND_READY;
++        I2C_WRITE_DATA(client, TPM_STS, &data, 1);
++        if ( chip->vendor.irq )
++                wait_for_serirq_timeout(chip, 1, chip->vendor.timeout_a);
++}	/* tpm_stm_i2c_cancel() */
++
++/*
++ * tpm_stm_spi_status return the TPM_STS register 
++ * @param: chip, the tpm chip description
++ * @return: the TPM_STS register value.
++ */
++static u8 tpm_stm_i2c_status(struct tpm_chip *chip)
++{
++	struct i2c_client* client;
++	u8 data;	
++	client = (struct i2c_client *) chip->vendor.iobase;
++
++	FUNC_ENTER();	
++
++	I2C_READ_DATA(client, TPM_STS, &data, 1);	
++	return data;
++}				/* tpm_stm_i2c_status() */
++
++/*
++ * responseSize return the command size
++ * @param: buffer, command buffer.
++ * @param: size, the buffer size.
++ * @return: the command size.
++ */
++static int responseSize(const char *buffer, size_t size)
++{
++	size_t val = 0;
++
++	FUNC_ENTER();	
++
++	if (size >= TPM_HEADER_SIZE) {
++		val = (size_t) (((unsigned)buffer[2]) << 24
++				| ((unsigned)buffer[3]) << 16
++				| ((unsigned)buffer[4]) << 8 | (unsigned)
++				buffer[5]);
++	}
++
++	if (val < TPM_BUFSIZE)
++		return val;
++	else
++		return TPM_BUFSIZE;
++}
++
++/*
++ * check_locality if the locality is active 
++ * @param: chip, the tpm chip description
++ * @return: the active locality or -EACCESS.
++ */
++static int check_locality(struct tpm_chip* chip)
++{
++	struct i2c_client* client;
++	u8 data;
++	u8 status;
++
++	FUNC_ENTER();	
++
++	client = (struct i2c_client *) chip->vendor.iobase;
++
++	status = I2C_READ_DATA(client, TPM_ACCESS, &data, 1);
++	if ( status && (data &  
++		(TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID)) ==  
++		(TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID) )
++		return chip->vendor.locality;
++
++	return -EACCES;
++	
++}/* check_locality() */
++
++/*
++ * request_locality request the TPM locality
++ * @param: chip, the chip description
++ * @return: the active locality or EACCESS.
++ */
++static int request_locality(struct tpm_chip* chip)
++{
++	unsigned long stop;
++	long rc;
++	struct i2c_client* client; 
++	u8 data;
++
++	FUNC_ENTER();
++
++	client = (struct i2c_client *) chip->vendor.iobase;
++	
++	/* Check locality */
++	if ( check_locality(chip) == chip->vendor.locality )
++		return chip->vendor.locality;	
++	
++	/* Request locality */
++	data = TPM_ACCESS_REQUEST_USE;
++	rc = I2C_WRITE_DATA(client, TPM_ACCESS, &data, 1);
++	if ( rc < 0)
++		goto end;
++
++	/* If request locality succeed return l else -EACCES */ 
++	/* wait for burstcount */
++	if (chip->vendor.irq) {
++                rc = wait_for_serirq_timeout(chip, (check_locality
++                                                       (chip) >= 0),
++                                                      chip->vendor.timeout_a);
++                if (rc > 0)
++                        return chip->vendor.locality;
++        } else {
++	        stop = jiffies + chip->vendor.timeout_a;
++        	do {
++        		if (check_locality(chip) >= 0)
++                		return chip->vendor.locality;
++	                msleep(TPM_TIMEOUT);
++        	}
++	        while (time_before(jiffies, stop));
++	}
++	rc = -EACCES;
++end:
++	return rc;
++}/* request_locality() */
++
++/*
++ * release_locality release the active locality
++ * @param: chip, the tpm chip description.
++ */
++static void release_locality(struct tpm_chip *chip)
++{
++	struct i2c_client* client; 
++	u8 data;
++
++	FUNC_ENTER();
++
++	client = (struct i2c_client *) chip->vendor.iobase; 
++	data = TPM_ACCESS_ACTIVE_LOCALITY;
++
++        I2C_WRITE_DATA(client, TPM_ACCESS, &data, 1);
++}
++
++/*
++ * get_burstcount return the burstcount address 0x19 0x1A
++ * @param: chip, the chip description
++ * return: the burstcount.
++ */
++static int get_burstcount(struct tpm_chip *chip)
++{
++        unsigned long stop;
++        int burstcnt, status;
++	u8 tpm_reg, temp;
++
++	struct i2c_client* client = (struct i2c_client* ) chip->vendor.iobase;
++
++	FUNC_ENTER();
++
++        /* wait for burstcount */
++        /* which timeout value, spec has 2 answers (c & d) */
++        stop = jiffies + chip->vendor.timeout_d;
++        do {
++		tpm_reg = TPM_STS + 1;
++                status = I2C_READ_DATA(client, tpm_reg, &temp, 1 );
++                if (status < 0)
++                        goto end;
++
++                tpm_reg = tpm_reg + 1;
++                burstcnt = temp;
++                status = I2C_READ_DATA(client, tpm_reg, &temp, 1);
++                if (status < 0)
++                        goto end;
++
++                burstcnt |= temp << 8;
++                if (burstcnt)
++                        return burstcnt;
++                msleep(TPM_TIMEOUT);
++        } while (time_before(jiffies, stop));
++
++end:
++        return -EBUSY;
++}/* get_burstcount() */
++
++/*
++ * wait_for_stat wait for a TPM_STS value
++ * @param: chip, the tpm chip description
++ * @param: mask, the value mask to wait
++ * @param: timeout, the timeout
++ * @param: queue, the wait queue.
++ * @return: the tpm status, 0 if success, -ETIME if timeout is reached.
++ */
++static int wait_for_stat(struct tpm_chip *chip, u8 mask, unsigned long timeout,
++                         wait_queue_head_t *queue)
++{
++        unsigned long stop;
++	long rc;
++        u8 status;
++
++	FUNC_ENTER();
++
++        /* check current status */
++        /*status = tpm_stm_i2c_status(chip);
++        if ((status & mask) == mask)
++                return 0;*/
++
++	 if (chip->vendor.irq) {
++                rc = wait_for_serirq_timeout(chip, ((tpm_stm_i2c_status
++                                                        (chip) & mask) ==
++                                                       mask), timeout);
++                if (rc > 0)
++                        return 0;
++        } else {
++	        stop = jiffies + timeout;
++	        do {
++        		msleep(TPM_TIMEOUT);
++                	status = tpm_stm_i2c_status(chip);
++	                if ((status & mask) == mask)
++        	        	return 0;
++	        } while (time_before(jiffies, stop));
++	}
++        return -ETIME;
++} /* wait_for_stat() */
++
++/*
++ * recv_data receive data
++ * @param: chip, the tpm chip description
++ * @param: buf, the buffer where the data are received
++ * @param: count, the number of data to receive
++ * @return: the tpm status, 0 if success, -ETIME if timeout is reached.
++ */
++static int recv_data(struct tpm_chip *chip, u8 *buf, size_t count)
++{
++        int size = 0, burstcnt, len;
++	struct i2c_client* client;
++
++	FUNC_ENTER();
++
++	client = (struct i2c_client *) chip->vendor.iobase;
++
++        while (size < count &&
++               wait_for_stat(chip,
++                             TPM_STS_DATA_AVAIL | TPM_STS_VALID,
++                             chip->vendor.timeout_c,
++                             &chip->vendor.read_queue)
++               == 0) {
++                burstcnt = get_burstcount(chip);
++		len = min_t(int, burstcnt, count - size);
++		I2C_READ_DATA(client, TPM_DATA_FIFO, buf + size, len);
++		size += len;
++        }
++        return size;
++} 
++
++/*
++ * tpm_ioserirq_handler the serirq irq handler
++ * @param: irq, the tpm chip description
++ * @param: dev_id, the description of the chip
++ * @return: the status of the handler.
++ */
++static irqreturn_t tpm_ioserirq_handler(int irq, void *dev_id)
++{
++        struct tpm_chip *chip = dev_id;
++        struct i2c_client *client;
++        struct st33zp24_platform_data* pin_infos;
++
++        disable_irq_nosync(irq);
++        FUNC_ENTER();
++
++        client = (struct i2c_client *) chip->vendor.iobase;
++        pin_infos = client->dev.platform_data;
++
++        complete(&pin_infos->irq_detection);
++        return IRQ_HANDLED;
++}/* tpm_ioserirq_handler() */
++
++
++/*
++ * tpm_stm_i2c_send send TPM commands through the I2C bus.
++ *
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ * @param: buf,	the buffer to send.
++ * @param: count, the number of bytes to send.
++ * @return: In case of success the number of bytes sent.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_i2c_send(struct tpm_chip *chip, unsigned char *buf,
++			    size_t len)
++{
++	u32 ret = 0, ordinal, 
++	    status,
++	    burstcnt = 0, i, size;
++	u8 data;
++	struct i2c_client* client;
++	struct st33zp24_platform_data* pin_infos;
++
++
++	FUNC_ENTER();
++	if (chip == NULL)
++		return -EBUSY;
++	if (len < TPM_HEADER_SIZE)
++		return -EBUSY;
++	
++	client = (struct i2c_client *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++	
++	ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
++
++	/* i2c_client initialization */
++	client->flags = 0;
++
++	ret = request_locality(chip);
++	if (ret < 0)
++		return ret;
++
++	status = tpm_stm_i2c_status(chip);
++        if ((status & TPM_STS_COMMAND_READY) == 0) {
++                tpm_stm_i2c_cancel(chip);
++                if (wait_for_stat
++                    (chip, TPM_STS_COMMAND_READY, chip->vendor.timeout_b,
++                     &chip->vendor.int_queue) < 0) {
++                        ret = -ETIME;
++                        goto out_err;
++                }
++        }
++
++
++	for ( i = 0 ; i < len - 1 ; )
++        {
++                burstcnt = get_burstcount(chip);
++                size = min_t(int, len - i - 1, burstcnt);
++                ret = I2C_WRITE_DATA(client, TPM_DATA_FIFO, buf, size);
++		if ( ret < 0 )
++			goto out_err;	
++
++                i += size;
++        }
++
++        status = tpm_stm_i2c_status(chip);
++        if ((status & TPM_STS_DATA_EXPECT) == 0) {
++        	ret = -EIO;
++                goto out_err;
++        }
++
++        /* write last byte */
++        ret = I2C_WRITE_DATA(client, TPM_DATA_FIFO, buf + len - 1, 1);
++	if (ret < 0)
++		goto out_err;
++                
++        status = tpm_stm_i2c_status(chip);
++        if ((status & TPM_STS_DATA_EXPECT) != 0) {
++                ret = -EIO;
++                goto out_err;
++        }
++
++	/* go and do it */
++	data = TPM_STS_GO;
++        I2C_WRITE_DATA(client, TPM_STS, &data, 1); 
++
++        return len;
++out_err:
++        tpm_stm_i2c_cancel(chip);
++        release_locality(chip);
++	return ret;
++}
++
++/*
++ * tpm_stm_i2c_recv received TPM response through the I2C bus.
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ * @param: buf,	the buffer to store datas.
++ * @param: count, the number of bytes to send.
++ * @return: In case of success the number of bytes received.
++ *      	In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_i2c_recv(struct tpm_chip *chip, unsigned char *buf,
++			    size_t count)
++{
++	int size = 0;
++	int expected;	
++
++	struct i2c_client* client;
++	struct st33zp24_platform_data* pin_infos;
++
++
++	FUNC_ENTER();
++
++	client = (struct i2c_client *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++
++
++	if (chip == NULL)
++		return -EBUSY;
++
++	if (count < TPM_HEADER_SIZE) {
++                size = -EIO;
++                goto out;
++        }	
++
++        /* read first 10 bytes, including tag, paramsize, and result */
++        if ((size =
++             recv_data(chip, buf, TPM_HEADER_SIZE)) < TPM_HEADER_SIZE) {
++                dev_err(chip->dev, "Unable to read header\n");
++                goto out;
++        }
++
++        expected = be32_to_cpu(*(__be32 *) (buf + 2));
++        if (expected > count) {
++                size = -EIO;
++                goto out;
++        }
++
++        if ((size +=
++             recv_data(chip, &buf[TPM_HEADER_SIZE],
++                       expected - TPM_HEADER_SIZE)) < expected) {
++                dev_err(chip->dev, "Unable to read remainder of result\n");
++                size = -ETIME;
++                goto out;
++        }
++
++out:
++	chip->vendor.cancel(chip);
++        release_locality(chip); 
++	return size;
++}
++
++/*
++ * tpm_stm_i2c_send_hash send TPM locality 4 hash datas through the I2C bus.
++ * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
++ * @param: buf,	the data buffer to send.
++ * @param: len, the number of bytes to send.
++ * @return: In case of success the number of bytes sent.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_i2c_send_hash(struct tpm_chip *chip, unsigned char *buf,
++			    size_t len)
++{
++	u32 ret = 0, i, size, burstcnt;
++	u8 data;
++	
++	struct i2c_client* client;
++	struct st33zp24_platform_data* pin_infos;	
++
++	FUNC_ENTER();
++
++	if (chip == NULL)
++		return -EBUSY;
++
++	client = (struct i2c_client *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++
++	/* i2c_client initialization */
++	client->flags = 0;
++
++	ret = request_locality(chip);
++        if (ret < 0)
++                goto end;
++
++        burstcnt = get_burstcount(chip);		
++	if (burstcnt < 0)
++		goto end;
++
++	/* HASH_START */
++	data = TPM_DUMMY_BYTE;
++	ret = I2C_WRITE_DATA(client, TPM_HASH_START, &data, 1);
++	if (ret < 0)
++		goto end;
++
++	/* Send data  */	
++        for ( i = 0 ; i < len ; )
++        {
++                size = min_t(int, len - i, burstcnt);
++                ret = I2C_WRITE_DATA(client, TPM_DATA_FIFO, buf + i, size);
++                if (ret < 0)
++                        goto end;
++                i += size;
++        }	
++
++end:
++	/* In case of any error we try to end the hash mecanism to recover the tpm */
++	/* HASH_END  */
++	I2C_WRITE_DATA(client, TPM_HASH_END, &data, 1);	
++	return ret;
++}
++
++
++/*
++ * tpm_st33_i2c_ioctl provides 2 handles:
++ * - TPMIOC_CANCEL: allow to CANCEL a TPM commands execution.
++ *   See tpm_stm_i2c_cancel description above
++ * - TPMIOC_TRANSMIT: allow to transmit a TPM commands.
++ * - TPMIOC_HASH: allow to compute a locality 4 hash
++ * - TPMIOC_CHANGELOCALITY: allow to change the current locality
++ *
++ * @return: In case of success, return TPM response size.
++ * In other case return < 0 value describing the issue.
++ */
++static ssize_t tpm_st33_i2c_ioctl(struct inode *inode, struct file *file,
++				  unsigned int cmd, unsigned long arg)
++{
++	int in_size = 0, out_size = 0, rc, status;
++	unsigned long stop;
++	struct tpm_chip *chip = file->private_data;
++	st_tpm_hash_t hash_data;		
++	struct i2c_client* client;
++	client = (struct i2c_client *) chip->vendor.iobase;
++
++	FUNC_ENTER();	
++
++	switch (cmd) {
++	case TPMIOC_CANCEL:
++		tpm_stm_i2c_cancel(chip);
++		return 0;
++	case TPMIOC_TRANSMIT:
++		if (copy_from_user(chip->data_buffer,
++		    (const char *)arg, TPM_HEADER_SIZE))
++			return -EFAULT;
++
++		in_size = responseSize(chip->data_buffer,
++				      TPM_HEADER_SIZE);
++		if (copy_from_user(chip->data_buffer,
++				   (const char *)arg, in_size))
++			return -EFAULT;
++		tpm_stm_i2c_send(chip, chip->data_buffer, in_size);
++
++		out_size = tpm_stm_i2c_recv(chip, chip->data_buffer,
++					    TPM_BUFSIZE);
++		if (copy_to_user((char *)arg, chip->data_buffer,
++				 out_size))
++			return -EFAULT;
++		return out_size;
++	case TPMIOC_HASH:
++		if (chip->vendor.locality == LOCALITY4 )
++		{
++			if (copy_from_user(&hash_data,
++		   			 (st_tpm_hash_t __user *)arg, sizeof(st_tpm_hash_t)))
++				return -EFAULT;
++			tpm_stm_i2c_send_hash(chip, hash_data.data, hash_data.size);
++
++			if (chip->vendor.irq)
++                        {
++                                rc = wait_event_interruptible_timeout(chip->vendor.read_queue,
++                                                 (check_locality(chip) != chip->vendor.locality),
++                                                 chip->vendor.timeout_a);
++                                if (rc < 0)
++                                        return -ETIME;
++                                return hash_data.size; 
++                        }
++
++			stop = jiffies + chip->vendor.timeout_a;
++                        do {
++                                msleep(TPM_TIMEOUT);
++                                status = check_locality(chip);
++                                if (status != chip->vendor.locality)
++                                        return hash_data.size;
++                        } while (time_before(jiffies, stop));
++			return hash_data.size;
++		}
++		return -ENOSYS;
++		break;
++	case TPMIOC_CHANGELOCALITY:
++		if ( arg == LOCALITY0 )
++		{
++			client->addr = TPM_I2C_ST33_ADDR_WR_LOC0;
++			chip->vendor.locality = LOCALITY0;
++			return 0;
++		}
++		else if ( arg == LOCALITY4 )
++		{
++			client->addr = TPM_I2C_ST33_ADDR_WR_LOC4;
++			chip->vendor.locality = LOCALITY4;
++			return 0;
++		}
++		else
++			return -ENOSYS;
++		break;
++	default:
++		return -ENOTTY;
++	}
++	return -ENOTTY;
++}
++
++static const struct file_operations tpm_st33_i2c_fops = {
++	.owner = THIS_MODULE,
++	.llseek = no_llseek,
++	.read = tpm_read,
++	.compat_ioctl = tpm_st33_i2c_ioctl,
++	.write = tpm_write,
++	.open = tpm_open,
++	.release = tpm_release,
++};
++
++static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
++static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
++static DEVICE_ATTR(enabled, S_IRUGO, tpm_show_enabled, NULL);
++static DEVICE_ATTR(active, S_IRUGO, tpm_show_active, NULL);
++static DEVICE_ATTR(owned, S_IRUGO, tpm_show_owned, NULL);
++static DEVICE_ATTR(temp_deactivated, S_IRUGO, tpm_show_temp_deactivated, NULL);
++static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps_1_2, NULL);
++static DEVICE_ATTR(cancel, S_IWUSR | S_IWGRP, NULL, tpm_store_cancel);
++
++static struct attribute *stm_tpm_attrs[] = {
++	&dev_attr_pubek.attr,
++	&dev_attr_pcrs.attr,
++	&dev_attr_enabled.attr,
++	&dev_attr_active.attr,
++	&dev_attr_owned.attr,
++	&dev_attr_temp_deactivated.attr,
++	&dev_attr_caps.attr,
++	&dev_attr_cancel.attr, NULL,
++};
++
++static struct attribute_group stm_tpm_attr_grp = {
++	.attrs = stm_tpm_attrs
++};
++
++static struct tpm_vendor_specific st_i2c_tpm = {
++	.send = tpm_stm_i2c_send,
++	.recv = tpm_stm_i2c_recv,
++	.cancel = tpm_stm_i2c_cancel,
++	.status = tpm_stm_i2c_status,
++	.req_complete_mask = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
++	.req_complete_val = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
++	.req_canceled = TPM_STS_COMMAND_READY,
++	.attr_group = &stm_tpm_attr_grp,
++	.miscdev = {.fops = &tpm_st33_i2c_fops,},
++};
++
++static int interrupts = 0;
++module_param(interrupts, bool, 0444);
++MODULE_PARM_DESC(interrupts, "Enable interrupts");
++
++static int power_mgt = 1;
++module_param(power_mgt, bool, 0444);
++MODULE_PARM_DESC(power_mgt, "Power Management");
++
++/*
++ * tpm_st33_i2c_probe initialize the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @param: id, the i2c_device_id struct.
++ * @return: 0 in case of success.
++ *         -1 in other case.
++ */
++static int
++tpm_st33_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	u32 err;
++	u8 intmask;
++	struct tpm_chip *chip;
++	struct st33zp24_platform_data *platform_data;
++
++	FUNC_ENTER();
++
++	err = 0;
++
++	/* Check I2C platform functionnalities */
++	if (client == NULL) {
++		pr_info("client is NULL. exiting.\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
++		pr_info("client not i2c capable\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	chip = tpm_register_hardware(&client->dev, &st_i2c_tpm);
++	if (!chip) {
++		pr_info("fail chip\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	platform_data = client->dev.platform_data;
++	platform_data->tpm_i2c_buffer[0] =
++	    kmalloc(TPM_BUFSIZE * sizeof(u8), GFP_KERNEL);
++	if (platform_data->tpm_i2c_buffer[0] == NULL) {
++		err = -ENOMEM;
++		goto _tpm_clean_answer;
++	}
++	platform_data->tpm_i2c_buffer[1] =
++	    kmalloc(TPM_BUFSIZE * sizeof(u8), GFP_KERNEL);
++	if (platform_data->tpm_i2c_buffer[1] == NULL) {
++		err = -ENOMEM;
++		goto _tpm_clean_response;
++	}
++
++	chip->vendor.iobase = client;
++
++	/* Default timeouts */	
++        chip->vendor.timeout_a = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++        chip->vendor.timeout_b = msecs_to_jiffies(TIS_LONG_TIMEOUT);
++        chip->vendor.timeout_c = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++        chip->vendor.timeout_d = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++
++	chip->vendor.locality = LOCALITY0;
++	
++	if ( power_mgt )
++	{
++		err = gpio_request(platform_data->io_lpcpd, "TPM IO_LPCPD");
++		if (err)
++			goto _gpio_init1; 
++		gpio_set_value(platform_data->io_lpcpd, 1);
++	}
++
++	/* Enable interrupt */
++	/* Register GPIO pin through generic Linux GPIO API */
++	if (interrupts) {
++		init_completion(&platform_data->irq_detection);	
++		if (request_locality(chip) != LOCALITY0) {
++                	err = -ENODEV;
++	                goto _tpm_clean_response;
++        	}	
++		err = gpio_request(platform_data->io_serirq, "TPM IO_SERIRQ");
++		if (err)
++			goto _gpio_init2; 
++
++		/* Clear all existing */
++		clear_interruption(client);
++		err = request_irq(gpio_to_irq(platform_data->io_serirq), &tpm_ioserirq_handler,
++        		        IRQF_TRIGGER_HIGH,
++		                "TPM SERIRQ management", chip);
++		if (err < 0) {
++
++                	pr_info("TPM SERIRQ signals %d not available\n",
++                       	gpio_to_irq(platform_data->io_serirq));
++			goto _irq_set;
++		}
++
++		err = I2C_READ_DATA(client, TPM_INT_ENABLE, &intmask, 1);
++		if (err < 0)
++			goto _irq_set;
++
++        	intmask |= TPM_INTF_CMD_READY_INT
++			|  TPM_INTF_FIFO_AVALAIBLE_INT 
++			|  TPM_INTF_WAKE_UP_READY_INT 
++		        |  TPM_INTF_LOC4SOFTRELEASE_INT
++			|  TPM_INTF_LOCALITY_CHANGE_INT
++			|  TPM_INTF_STS_VALID_INT
++			|  TPM_INTF_DATA_AVAIL_INT;
++
++       		err = I2C_WRITE_DATA(client, TPM_INT_ENABLE, &intmask, 1);	
++		if (err < 0)	
++			goto _irq_set;
++
++		intmask = TPM_GLOBAL_INT_ENABLE;
++		err = I2C_WRITE_DATA(client, TPM_INT_ENABLE + 3, &intmask, 1);		
++		if (err < 0)
++			goto _irq_set;
++
++		err = I2C_READ_DATA(client, TPM_INT_STATUS, &intmask, 1);
++		if (err < 0)
++			goto _irq_set;
++
++		chip->vendor.irq = interrupts;
++
++                tpm_gen_interrupt(chip);
++        } 	
++	
++	tpm_get_timeouts(chip);
++
++	/* attach chip datas to client */
++	i2c_set_clientdata(client, chip);
++	platform_data->bChipF = false;
++	
++	pr_info("TPM I2C Initialized\n");
++	return 0;
++_irq_set:
++        free_irq(gpio_to_irq(platform_data->io_serirq), (void *) chip);
++_gpio_init2:
++        if (platform_data && interrupts) {
++                gpio_free(platform_data->io_serirq);
++        }
++_gpio_init1:
++        if ( platform_data && power_mgt ) {
++                gpio_free(platform_data->io_lpcpd);
++        }
++_tpm_clean_response:
++	tpm_remove_hardware(chip->dev);
++	if (platform_data->tpm_i2c_buffer[1] != NULL) {
++		kfree(platform_data->tpm_i2c_buffer[1]);
++		platform_data->tpm_i2c_buffer[1] = NULL;
++	}
++_tpm_clean_answer:
++	if (platform_data->tpm_i2c_buffer[0] != NULL) {
++		kfree(platform_data->tpm_i2c_buffer[0]);
++		platform_data->tpm_i2c_buffer[0] = NULL;
++	}
++	
++	platform_data->bChipF = true;
++end:
++	pr_info("TPM I2C initialisation fail\n");
++	return err;
++}
++
++/*
++ * tpm_st33_i2c_remove remove the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++		clear_bit(0, &chip->is_open);
++ * @return: 0 in case of success.
++ */
++static __devexit int tpm_st33_i2c_remove(struct i2c_client *client)
++{
++	struct tpm_chip *chip = (struct tpm_chip *)i2c_get_clientdata(client);
++	struct st33zp24_platform_data* pin_infos = 
++		((struct i2c_client* ) chip->vendor.iobase)->dev.platform_data;
++
++	FUNC_ENTER();
++
++	if (pin_infos != NULL) {
++		free_irq(pin_infos->io_serirq, chip);
++
++		gpio_free(pin_infos->io_serirq);
++		gpio_free(pin_infos->io_lpcpd);
++
++		/* Check if chip has been previously clean */
++		if (pin_infos->bChipF != true)
++			tpm_remove_hardware(chip->dev);
++		if (pin_infos->tpm_i2c_buffer[1] != NULL) {
++			kfree(pin_infos->tpm_i2c_buffer[1]);
++			pin_infos->tpm_i2c_buffer[1] = NULL;
++		}
++		if (pin_infos->tpm_i2c_buffer[0] != NULL) {
++			kfree(pin_infos->tpm_i2c_buffer[0]);
++			pin_infos->tpm_i2c_buffer[0] = NULL;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * tpm_st33_i2c_pm_suspend suspend the TPM device
++ * Added: Work around when suspend and no tpm application is running, suspend
++ * may fail because chip->data_buffer is not set (only set in tpm_open in Linux
++ * TPM core)
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @param: mesg, the power management message.
++ * @return: 0 in case of success.
++ */
++static int tpm_st33_i2c_pm_suspend(struct i2c_client *client, pm_message_t mesg)
++{
++	struct tpm_chip *chip =
++            (struct tpm_chip *)i2c_get_clientdata(client);
++        struct st33zp24_platform_data* pin_infos =
++                ((struct i2c_client *)chip->vendor.iobase)->dev.platform_data;
++        int ret = 0;
++
++        if ( power_mgt )
++                gpio_set_value(pin_infos->io_lpcpd, 0);
++        else
++        {
++                if (chip->data_buffer == NULL)
++                        chip->data_buffer = pin_infos->tpm_i2c_buffer[0];
++                ret = tpm_pm_suspend(&client->dev, mesg);
++        }
++        return ret;
++}				/* tpm_st33_i2c_suspend() */
++
++/*
++ * tpm_st33_i2c_pm_resume resume the TPM device
++ * @param: client, the i2c_client drescription (TPM I2C description).
++ * @return: 0 in case of success.
++ */
++static int tpm_st33_i2c_pm_resume(struct i2c_client *client)
++{
++	struct tpm_chip *chip =
++            (struct tpm_chip *)i2c_get_clientdata(client);
++        struct st33zp24_platform_data* pin_infos =
++                ((struct i2c_client *)chip->vendor.iobase)->dev.platform_data;
++
++        int ret = 0;
++
++        if ( power_mgt )
++        {
++                gpio_set_value(pin_infos->io_lpcpd, 1);
++                ret = wait_for_serirq_timeout(chip, (chip->vendor.status(chip) &&
++                                                  TPM_STS_VALID) == TPM_STS_VALID,
++                                                  chip->vendor.timeout_b);
++        }
++        else
++        {
++                if (chip->data_buffer == NULL)
++                        chip->data_buffer = pin_infos->tpm_i2c_buffer[0];
++                ret = tpm_pm_resume(&client->dev);
++                if (!ret)
++                        tpm_continue_selftest(chip);
++        }
++        return ret;
++}				/* tpm_st33_i2c_pm_resume() */
++
++static const struct i2c_device_id tpm_st33_i2c_id[] = {
++	{TPM_ST33_I2C, 0},
++	{}
++};
++
++MODULE_DEVICE_TABLE(i2c, tpm_st33_i2c_id);
++
++static struct i2c_driver tpm_st33_i2c_driver = {
++	.driver = {
++		   .owner = THIS_MODULE,
++		   .name = TPM_ST33_I2C,
++		   },
++	.probe = tpm_st33_i2c_probe,
++	.remove = tpm_st33_i2c_remove,
++	.resume = tpm_st33_i2c_pm_resume,
++	.suspend = tpm_st33_i2c_pm_suspend,
++	.id_table = tpm_st33_i2c_id
++};
++
++/*
++ * tpm_st33_i2c_init initialize driver
++ * @return: 0 if successful, else non zero value.
++ */
++static int __init tpm_st33_i2c_init(void)
++{
++	FUNC_ENTER();
++	return i2c_add_driver(&tpm_st33_i2c_driver);
++}
++
++/*
++ * tpm_st33_i2c_exit The kernel calls this function during unloading the
++ * module or during shut down process
++ */
++static void __exit tpm_st33_i2c_exit(void)
++{
++	FUNC_ENTER();
++	i2c_del_driver(&tpm_st33_i2c_driver);
++}
++
++module_init(tpm_st33_i2c_init);
++module_exit(tpm_st33_i2c_exit);
++
++MODULE_AUTHOR("Christophe Ricard (tpmsupport at st.com)");
++MODULE_DESCRIPTION("STM TPM I2C ST33 Driver");
++MODULE_VERSION("1.2.0");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/char/tpm/tpm_stm_st33_i2c.h b/drivers/char/tpm/tpm_stm_st33_i2c.h
+new file mode 100644
+index 0000000..0f63bf4
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st33_i2c.h
+@@ -0,0 +1,76 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST33ZP24
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: stm_st33_tpm_i2c.h
++ *
++ * @Date: 09/15/2010
++ */
++#ifndef __STM_ST33_TPM_I2C_MAIN_H__
++#define __STM_ST33_TPM_I2C_MAIN_H__
++
++#include <linux/pci.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/i2c.h>
++//#include <linux/i2c-id.h>
++#include <linux/fs.h>
++#include <linux/miscdevice.h>
++
++#define MINOR_NUM_I2C		224
++
++/*#define TPM_DRIVER_NAME		"st33np18_i2c"*/
++
++#define TPM_ACCESS			(0x0)		
++#define TPM_STS				(0x18)
++#define TPM_HASH_END			(0x20)
++#define TPM_DATA_FIFO			(0x24)
++#define TPM_HASH_DATA			(0x24)
++#define TPM_HASH_START			(0x28)
++#define TPM_INTF_CAPABILITY		(0x14)
++#define TPM_INT_STATUS			(0x10)
++#define TPM_INT_ENABLE			(0x08)
++
++
++#define TPM_DUMMY_BYTE			0xAA
++#define TPM_WRITE_DIRECTION		0x80
++#define TPM_HEADER_SIZE 		10
++#define TPM_BUFSIZE			2048
++
++/* ioctl commands */
++#define TPMIOC_CANCEL		_IO('T', 0x00)
++#define TPMIOC_TRANSMIT		_IO('T', 0x01)
++#define TPMIOC_HASH		_IO('T', 0x02)
++#define TPMIOC_CHANGELOCALITY	_IO('T', 0x03)
++
++#define LOCALITY0		0
++#define LOCALITY4		4
++
++typedef struct st_tpm_hash
++{
++        int size;
++        u8* data;
++}st_tpm_hash_t;
++
++#endif /* __STM_ST33_TPM_I2C_MAIN_H__ */
+diff --git a/drivers/char/tpm/tpm_stm_st33_spi.c b/drivers/char/tpm/tpm_stm_st33_spi.c
+new file mode 100644
+index 0000000..551a356
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st33_spi.c
+@@ -0,0 +1,1285 @@
++/*
++ * STMicroelectronics TPM SPI Linux driver for TPM ST33ZP24
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: tpm_stm_st33_spi.c
++ *
++ * @Synopsis:
++ * 	09/15/2010:	First shot driver tpm_tis driver for lpc is used as model.
++ */
++
++#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/spi/spi.h>
++#include <linux/wait.h>
++#include <linux/string.h>
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/sysfs.h>
++#include <linux/gpio.h>
++#include <linux/sched.h>
++#include <linux/uaccess.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/sched.h>
++
++#include <linux/spi/tpm_stm_st33_spi.h>
++
++#include "tpm.h"
++
++#include "tpm_stm_st33_spi.h"
++
++#ifdef DEBUG
++#define FUNC_ENTER()	pr_info("%s\n", __func__)
++#else
++#define	FUNC_ENTER()	do{}	while(0)
++#endif
++
++enum stm33zp24_access {
++        TPM_ACCESS_VALID = 0x80,
++        TPM_ACCESS_ACTIVE_LOCALITY = 0x20,
++        TPM_ACCESS_REQUEST_PENDING = 0x04,
++        TPM_ACCESS_REQUEST_USE = 0x02,
++};
++
++enum stm33zp24_status {
++        TPM_STS_VALID = 0x80,
++        TPM_STS_COMMAND_READY = 0x40,
++        TPM_STS_GO = 0x20,
++        TPM_STS_DATA_AVAIL = 0x10,
++        TPM_STS_DATA_EXPECT = 0x08,
++};
++
++enum stm33zp24_int_flags {
++	TPM_GLOBAL_INT_ENABLE = 0x80,
++        TPM_INTF_CMD_READY_INT = 0x080,	
++	TPM_INTF_FIFO_AVALAIBLE_INT = 0x040,
++	TPM_INTF_WAKE_UP_READY_INT = 0x020, 
++	TPM_INTF_LOC4SOFTRELEASE_INT = 0x008,	
++	TPM_INTF_LOCALITY_CHANGE_INT = 0x004,
++        TPM_INTF_STS_VALID_INT = 0x002,
++        TPM_INTF_DATA_AVAIL_INT = 0x001,
++};
++
++enum tis_defaults {
++        TIS_SHORT_TIMEOUT = 750,        /* ms */
++        TIS_LONG_TIMEOUT = 2000,        /* 2 sec */
++};
++
++/*
++ * write8_reg
++ * Send byte to the TIS register according to the ST33ZP24 SPI protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be written
++ * @param: tpm_data, the tpm_data to write inside the tpm_register
++ * @param: tpm_size, The length of the data
++ * @return: number of byte written successfully: should be one if success.
++ */
++static int write8_reg(struct tpm_chip* tpm, u8 tpm_register, 
++		      u8* tpm_data, u16 tpm_size)
++{
++	/* u8 LOC+DIR u8 ADD u16 LENGHT u8* data */
++	/* u8 LATENCY u8 LATENCY */
++
++	u8 data;
++	int i = 0, j;
++	int value = 0;
++	//u8 status;
++	struct spi_device* dev = (struct spi_device*) tpm->vendor.iobase;
++	struct st33zp24_platform_data *platform_data = dev->dev.platform_data;
++	u8* data_buffer = platform_data->tpm_spi_buffer[0];
++	struct spi_transfer xfer = {
++                .tx_buf         = data_buffer,
++                .rx_buf         = platform_data->tpm_spi_buffer[1],
++        };
++        struct spi_message msg;
++	u8 latency = platform_data->latency + tpm_size + 1;
++
++
++	FUNC_ENTER();
++	/* Pre-Header */
++
++	data = TPM_WRITE_DIRECTION | tpm->vendor.locality;
++	memcpy(data_buffer + i, &data, sizeof(data));
++	i++;
++	data = tpm_register;
++	memcpy(data_buffer + i, &data, sizeof(data));
++	i++;
++
++	if ( tpm_size > 0 && 
++	     (tpm_register == TPM_DATA_FIFO ||
++	      tpm_register == TPM_HASH_DATA) )
++	{
++		data = tpm_size >> 8 & 0x00ff;
++		memcpy(data_buffer + i, &data, sizeof(data));
++		i++; 
++		data = tpm_size & 0x00ff; 
++		memcpy(data_buffer + i, &data, sizeof(data));
++		i++;
++		latency -= 2;
++	}
++
++	memcpy(data_buffer + i, tpm_data, tpm_size);
++	i += tpm_size;
++
++	for ( j = 0 ; j < platform_data->latency + 1; j++ )
++	{
++		data = TPM_DUMMY_BYTE; 
++		memcpy(data_buffer + i, &data, sizeof(data));
++		i++; 
++	}
++	xfer.len = i;
++	spi_message_init(&msg);
++        spi_message_add_tail(&xfer, &msg);
++	value = spi_sync(dev, &msg); 
++
++	if (value == 0 )
++	{
++		j = i - 1 - j;
++		for ( ; j < i && ((u8 *) xfer.rx_buf)[j] == 0; j++);
++
++		if ( ((u8 *) xfer.rx_buf)[j] != 0 )
++			value = ((u8 *) xfer.rx_buf)[j];
++	}
++
++	return value;
++}/* write8_reg() */
++
++/*
++ * read8_reg
++ * Recv byte from the TIS register according to the ST33ZP24 SPI protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be read
++ * @param: tpm_data, the TPM response
++ * @param: tpm_size, tpm TPM response size to read.
++ * @return: number of byte read successfully: should be one if success.
++ */
++static u8 read8_reg(struct tpm_chip* tpm, u8 tpm_register, 
++		    u8* tpm_data, u16 tpm_size)
++{
++	u8 data;
++	int i = 0, j;
++	int value = 0;
++	struct spi_device* dev = (struct spi_device*) tpm->vendor.iobase;
++	struct st33zp24_platform_data *platform_data = dev->dev.platform_data;
++	u8* data_buffer = platform_data->tpm_spi_buffer[0];
++	struct spi_transfer xfer = {
++                .tx_buf         = data_buffer,
++                .rx_buf         = platform_data->tpm_spi_buffer[1],
++        };
++        struct spi_message msg;
++	
++	u8 latency = platform_data->latency + tpm_size + 1;
++
++	FUNC_ENTER();
++	/* Pre-Header */
++
++	data = tpm->vendor.locality;
++	memcpy(data_buffer + i, &data, sizeof(data));
++	i++;
++	data = tpm_register;
++	memcpy(data_buffer + i, &data, sizeof(data));
++	i++;
++	
++	for ( j = 0 ; j < latency; j++ )
++        {
++                data = TPM_DUMMY_BYTE;
++                memcpy(data_buffer + i, &data, sizeof(data));
++                i++;
++        }
++        xfer.len = i;
++
++	/* header + status byte + size of the data + status byte */	
++	spi_message_init(&msg);
++        spi_message_add_tail(&xfer, &msg);
++	value = spi_sync(dev, &msg);
++	if (tpm_size > 0 && value == 0 )
++	{
++		j = 2; 
++		for ( ; j < i && ((u8 *) xfer.rx_buf)[j] == 0; j++);
++
++		if ( j + 1 < i )
++		{
++			value = ((u8 *) xfer.rx_buf)[j];
++
++			if ( tpm_size > 0 )
++				memcpy(tpm_data, xfer.rx_buf + j + 1, tpm_size);
++		}
++	}
++        return value;
++}/* read8_reg() */
++
++/*
++ * SPI_WRITE_DATA
++ * Send byte to the TIS register according to the ST33ZP24 SPI protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be written
++ * @param: tpm_data, the tpm_data to write inside the tpm_register
++ * @param: tpm_size, The length of the data
++ * @return: number of byte written successfully: should be one if success.
++ */
++static u32 SPI_WRITE_DATA(struct tpm_chip* tpm, u8 tpm_register, 
++	 		  u8* tpm_data, u16 tpm_size)
++{
++	u8 value = 0;
++
++	FUNC_ENTER();	
++
++	value = write8_reg(tpm, tpm_register, tpm_data, tpm_size);
++	
++	switch(value)
++	{
++		case TPM_ST_SPI_OK:
++			return TPM_ST_SPI_OK;
++		case 0:
++			return 0;
++		default:
++			return -EBUSY;
++	}
++}/* SPI_WRITE_DATA() */
++
++/*
++ * SPI_READ_DATA
++ * Recv byte from the TIS register according to the ST33ZP24 SPI protocol.
++ * @param: tpm, the chip description
++ * @param: tpm_register, the tpm tis register where the data should be read
++ * @param: tpm_data, the TPM response
++ * @param: tpm_size, tpm TPM response size to read.
++ * @return: number of byte read successfully: should be one if success.
++ */ 
++static u32 SPI_READ_DATA(struct tpm_chip* tpm, u8 tpm_register, 
++			u8* tpm_data, u16 tpm_size)
++{
++	u8 value = 0;
++
++	FUNC_ENTER();	
++
++	value = read8_reg(tpm, tpm_register, tpm_data, tpm_size); 
++
++	switch(value)
++	{
++		case TPM_ST_SPI_OK:
++			return TPM_ST_SPI_OK;
++		case 0:
++			return 0;
++		default:
++			return -EBUSY;
++	}
++}/* SPI_READ_DATA () */
++
++/*
++ * clear_interruption
++ * clear the TPM interrupt register.
++ * @param: tpm, the chip description
++ */
++static void clear_interruption(struct tpm_chip* tpm)
++{
++        u8 interrupt;
++        SPI_READ_DATA(tpm, TPM_INT_STATUS, &interrupt, 1);
++        /* Clear interrupts handled with TPM_EOI */
++        SPI_WRITE_DATA(tpm, TPM_INT_STATUS, &interrupt, 1);
++        SPI_READ_DATA(tpm, TPM_INT_STATUS, &interrupt, 1);
++}/* clear_interruption() */
++
++/*
++ * _wait_for_interrupt_serirq_timeout
++ * @param: tpm, the chip description
++ * @param: timeout, the timeout of the interrupt
++ * @return: the status of the interruption.
++ */
++static int _wait_for_interrupt_serirq_timeout(struct tpm_chip* chip, unsigned long timeout)
++{
++        unsigned long status;
++        struct spi_device *client;
++        struct st33zp24_platform_data* pin_infos;
++
++        FUNC_ENTER();
++
++        client = (struct spi_device *) chip->vendor.iobase;
++        pin_infos = client->dev.platform_data;
++
++        status = wait_for_completion_interruptible_timeout(&pin_infos->irq_detection, timeout);
++        if ( status > 0 )
++                enable_irq(gpio_to_irq(pin_infos->io_serirq));
++        gpio_direction_input(pin_infos->io_serirq);
++
++        return status;
++}/* wait_for_interrupt_serirq_timeout() */
++
++#define wait_for_serirq_timeout(chip, condition, timeout) \
++({ \
++        unsigned long status = 0; \
++        struct spi_device *client; \
++        struct st33zp24_platform_data* pin_infos; \
++\
++        client = (struct spi_device *) chip->vendor.iobase; \
++        pin_infos = client->dev.platform_data;  \
++\
++        status = _wait_for_interrupt_serirq_timeout(chip, timeout); \
++        if (!status) \
++        { \
++                status = -EBUSY; \
++                goto wait_end; \
++        } \
++        clear_interruption(chip);     \
++        if (condition) \
++                status = 1; \
++\
++wait_end: \
++        status;\
++}) 
++
++
++/*
++ * tpm_stm_spi_cancel, cancel is not implemented.
++ * @param: chip, the tpm chip description as specified in driver/char/tpm/tpm.h.
++ */
++static void tpm_stm_spi_cancel(struct tpm_chip *chip)
++{
++	struct spi_device* client;
++	u8 data = TPM_STS_COMMAND_READY;
++	client = (struct spi_device *) chip->vendor.iobase;
++
++	FUNC_ENTER();	
++
++	/* this causes the current command to be aborted */
++        SPI_WRITE_DATA(chip, TPM_STS, &data, 1);
++}	/* tpm_stm_spi_cancel() */
++
++/*
++ * tpm_stm_spi_status return the TPM_STS register 
++ * @param: chip, the tpm chip description
++ * @return: the TPM_STS register value.
++ */
++static u8 tpm_stm_spi_status(struct tpm_chip *chip)
++{
++	struct spi_device* client;
++	u8 data;
++	client = (struct spi_device *) chip->vendor.iobase;
++
++	FUNC_ENTER();	
++
++	SPI_READ_DATA(chip, TPM_STS, &data, 1);	
++	return data;
++}				/* tpm_stm_spi_status() */
++
++/*
++ * responseSize return the command size
++ * @param: buffer, command buffer.
++ * @param: size, the buffer size.
++ * @return: the command size.
++ */
++static int responseSize(const char *buffer, size_t size)
++{
++	size_t val = 0;
++
++	FUNC_ENTER();	
++
++	if (size >= TPM_HEADER_SIZE) {
++		val = (size_t) (((unsigned)buffer[2]) << 24
++				| ((unsigned)buffer[3]) << 16
++				| ((unsigned)buffer[4]) << 8 | (unsigned)
++				buffer[5]);
++	}
++
++	if (val < TPM_BUFSIZE)
++		return val;
++	else
++		return TPM_BUFSIZE;
++}
++
++/*
++ * check_locality if the locality is active 
++ * @param: chip, the tpm chip description
++ * @return: the active locality or -EACCESS.
++ */
++static int check_locality(struct tpm_chip* chip)
++{
++	struct spi_device* client;
++	u8 data;
++	u8 status;
++
++	FUNC_ENTER();	
++
++	client = (struct spi_device *) chip->vendor.iobase;
++
++	status = SPI_READ_DATA(chip, TPM_ACCESS, &data, 1);
++	if (status && (data &
++		(TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID)) ==  
++		(TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID) )
++		return chip->vendor.locality;
++
++	return -EACCES; 
++}/* check_locality() */
++
++/*
++ * request_locality request the TPM locality
++ * @param: chip, the chip description
++ * @return: the active locality or EACCESS.
++ */
++static int request_locality(struct tpm_chip* chip)
++{
++	unsigned long stop;
++	long rc;
++	u8 data;
++	struct spi_device* client; 
++
++	FUNC_ENTER();
++
++	client = (struct spi_device *) chip->vendor.iobase;
++	/* Check locality */
++	if ( check_locality(chip) == chip->vendor.locality )
++		return chip->vendor.locality;	
++	
++	/* Request locality */
++	data = TPM_ACCESS_REQUEST_USE;
++	rc = SPI_WRITE_DATA(chip, TPM_ACCESS, &data, 1);
++	if (rc < 0)
++		goto end;
++
++	/* wait for burstcount */
++	if (chip->vendor.irq) {
++                rc = wait_for_serirq_timeout(chip, (check_locality
++                                                       (chip) >= 0),
++                                                      chip->vendor.timeout_a);
++                if (rc > 0)
++                        return chip->vendor.locality;
++        } else {
++	        stop = jiffies + chip->vendor.timeout_a;
++	        do {
++        		if (check_locality(chip) >= 0)
++                		return chip->vendor.locality;
++	                msleep(TPM_TIMEOUT);
++        	} while (time_before(jiffies, stop));
++	}
++end:
++	return -EACCES;
++}/* request_locality() */
++
++/*
++ * release_locality release the active locality
++ * @param: chip, the tpm chip description.
++ */
++static void release_locality(struct tpm_chip *chip)
++{
++	struct spi_device* client; 
++	u8 data;
++
++	FUNC_ENTER();
++
++	client = (struct spi_device *) chip->vendor.iobase; 
++	data = TPM_ACCESS_ACTIVE_LOCALITY; 
++        SPI_WRITE_DATA(chip, TPM_ACCESS, &data, 1);
++}/* release_locality()*/
++
++/*
++ * get_burstcount return the burstcount address 0x19 0x1A
++ * @param: chip, the chip description
++ * return: the burstcount.
++ */ 
++static int get_burstcount(struct tpm_chip *chip)
++{
++        unsigned long stop;
++        u32 burstcnt, status;
++	u8 tpm_reg, temp;
++
++	FUNC_ENTER();
++
++        /* wait for burstcount */
++        /* which timeout value, spec has 2 answers (c & d) */
++        stop = jiffies + chip->vendor.timeout_d;
++        do {
++		tpm_reg = TPM_STS + 1;
++                status = SPI_READ_DATA(chip, tpm_reg, &temp, 1 );
++		if (status < 0)
++			goto end;
++
++		tpm_reg = tpm_reg + 1;
++		burstcnt = temp;
++                status = SPI_READ_DATA(chip, tpm_reg, &temp, 1);
++		if (status < 0)
++			goto end;
++
++		burstcnt |= temp << 8;
++                if (burstcnt)
++                        return burstcnt;
++                msleep(TPM_TIMEOUT);
++        } while (time_before(jiffies, stop));
++
++end:
++        return -EBUSY;
++}/* get_burstcount() */
++
++/*
++ * wait_for_stat wait for a TPM_STS value
++ * @param: chip, the tpm chip description
++ * @param: mask, the value mask to wait
++ * @param: timeout, the timeout
++ * @param: queue, the wait queue.
++ * @return: the tpm status, 0 if success, -ETIME if timeout is reached.
++ */ 
++static int wait_for_stat(struct tpm_chip *chip, u8 mask, unsigned long timeout,
++                         wait_queue_head_t *queue)
++{
++        unsigned long stop;
++	long rc;
++        u8 status;
++
++	FUNC_ENTER();
++
++        /* check current status */
++        status = tpm_stm_spi_status(chip);
++        if (!chip->vendor.irq && (status & mask) == mask)
++                return 0;
++
++	if (chip->vendor.irq) {
++        	rc = wait_for_serirq_timeout(chip, ((tpm_stm_spi_status
++                                                    (chip) & mask) ==
++                                                     mask), timeout);
++                if (rc > 0)
++                	return 0;
++        } else {
++	       	stop = jiffies + timeout;
++       		do {
++       			msleep(TPM_TIMEOUT);
++	       		status = tpm_stm_spi_status(chip);
++        		if ((status & mask) == mask)
++                		return 0;
++		} while (time_before(jiffies, stop));
++	}
++        return -ETIME;
++} /* wait_for_stat() */
++
++/*
++ * recv_data receive data
++ * @param: chip, the tpm chip description
++ * @param: buf, the buffer where the data are received
++ * @param: count, the number of data to receive
++ * @return: the tpm status, 0 if success, -ETIME if timeout is reached.
++ */ 
++static int recv_data(struct tpm_chip *chip, u8 *buf, size_t count)
++{
++        u32 size = 0, burstcnt, status, len;
++	struct spi_device* client;
++
++	FUNC_ENTER();
++
++	client = (struct spi_device *) chip->vendor.iobase;
++
++        while (size < count &&
++               wait_for_stat(chip,
++                             TPM_STS_DATA_AVAIL | TPM_STS_VALID,
++                             chip->vendor.timeout_c,
++                             &chip->vendor.read_queue)
++               == 0) {
++                burstcnt = get_burstcount(chip);
++		len = min_t(int, burstcnt, count - size);
++                status = SPI_READ_DATA(chip, TPM_DATA_FIFO, buf + size, len);
++		if (status < 0)
++			return status;
++		
++
++		size += len;
++        }
++        return size;
++} 
++
++/*
++ * tpm_ioserirq_handler the serirq irq handler
++ * @param: irq, the tpm chip description
++ * @param: dev_id, the description of the chip
++ * @return: the status of the handler.
++ */ 
++static irqreturn_t tpm_ioserirq_handler(int irq, void *dev_id)
++{
++        struct tpm_chip *chip = dev_id;
++        struct spi_device *client;
++        struct st33zp24_platform_data* pin_infos;
++
++        disable_irq_nosync(irq);
++        FUNC_ENTER();
++
++        client = (struct spi_device *) chip->vendor.iobase;
++        pin_infos = client->dev.platform_data;
++
++        complete(&pin_infos->irq_detection);
++        return IRQ_HANDLED;
++}/* tpm_ioserirq_handler() */
++
++/*
++ * tpm_stm_spi_send send TPM commands through the SPI bus.
++ * @param: chip, the tpm chip description
++ * @param: buf, the tpm command buffer 
++ * @param: len, the tpm command size
++ * @return: In case of success the number of bytes sent.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_spi_send(struct tpm_chip *chip, unsigned char *buf,
++			    size_t len)
++{
++	u32 ret = 0, ordinal, 
++	    status, burstcnt = 0, i, size = 0;
++	u8 data;
++	
++	struct spi_device* client;
++	struct st33zp24_platform_data* pin_infos; 
++
++	FUNC_ENTER();
++
++	if (chip == NULL)
++		return -EBUSY;
++	if (len < TPM_HEADER_SIZE)
++		return -EBUSY;
++	
++	client = (struct spi_device *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++	
++	ordinal = be32_to_cpu(*((__be32 *) (buf + 6)));
++
++	ret = request_locality(chip);
++	if (ret < 0)
++		return ret;
++
++	status = tpm_stm_spi_status(chip);
++        if ((status & TPM_STS_COMMAND_READY) == 0) {
++                tpm_stm_spi_cancel(chip);
++                if (wait_for_stat
++                    (chip, TPM_STS_COMMAND_READY, chip->vendor.timeout_b,
++                     &chip->vendor.int_queue) < 0) {
++                        ret = -ETIME;
++                        goto out_err;
++                }
++        }
++
++	for ( i = 0 ; i < len - 1 ; )
++	{
++	        burstcnt = get_burstcount(chip);		
++		size = min_t(int, len - i - 1, burstcnt);
++	        ret = SPI_WRITE_DATA(chip, TPM_DATA_FIFO, buf, size);		
++		if (ret < 0)
++			goto out_err;
++		i += size;
++	}
++
++        status = tpm_stm_spi_status(chip);
++        if ((status & TPM_STS_DATA_EXPECT) == 0) {
++        	ret = -EIO;
++                goto out_err;
++        }
++
++        /* write last byte */
++        SPI_WRITE_DATA(chip, TPM_DATA_FIFO, buf + len - 1, 1);
++                
++        status = tpm_stm_spi_status(chip);
++        if ((status & TPM_STS_DATA_EXPECT) != 0) {
++                ret = -EIO;
++                goto out_err;
++        }
++
++	/* go and do it */
++	data = TPM_STS_GO;
++        ret = SPI_WRITE_DATA(chip, TPM_STS, &data, 1); 
++	if (ret < 0)
++		goto out_err;
++
++        return len;
++out_err:
++        tpm_stm_spi_cancel(chip);
++        release_locality(chip);
++	return ret;
++}
++
++/*
++ * tpm_stm_spi_recv received TPM response through the SPI bus.
++ * @param: chip, the tpm chip description
++ * @param: buf, the tpm command buffer 
++ * @param: len, the tpm command size
++* @return: In case of success the number of bytes received.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_spi_recv(struct tpm_chip *chip, unsigned char *buf,
++			    size_t count)
++{
++	int size = 0;
++	int expected;	
++
++	struct spi_device* client;
++	struct st33zp24_platform_data* pin_infos;
++
++
++	FUNC_ENTER();
++
++	client = (struct spi_device *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++
++
++	if (chip == NULL)
++		return -EBUSY;
++	if (count < TPM_HEADER_SIZE) {
++                size = -EIO;
++                goto out;
++        }	
++
++        /* read first 10 bytes, including tag, paramsize, and result */
++        if ((size =
++             recv_data(chip, buf, TPM_HEADER_SIZE)) < TPM_HEADER_SIZE) {
++                dev_err(chip->dev, "Unable to read header\n");
++                goto out;
++        }
++
++        expected = be32_to_cpu(*(__be32 *) (buf + 2));
++        if (expected > count) {
++                size = -EIO;
++                goto out;
++        }
++
++        if ((size +=
++             recv_data(chip, &buf[TPM_HEADER_SIZE],
++                       expected - TPM_HEADER_SIZE)) < expected) {
++                dev_err(chip->dev, "Unable to read remainder of result\n");
++                size = -ETIME;
++                goto out;
++        }
++
++out:
++	chip->vendor.cancel(chip);
++        release_locality(chip); 
++	return size;
++}
++
++/*
++ * tpm_stm_spi_send send TPM locality 4 hash through the SPI bus.
++ * @param: chip, the tpm chip description
++ * @param: buf, the tpm data buffer 
++ * @param: len, the tpm data size 
++ * @return: In case of success the number of bytes sent.
++ *			In other case, a < 0 value describing the issue.
++ */
++static int tpm_stm_spi_send_hash(struct tpm_chip *chip, unsigned char *buf,
++			    size_t len)
++{
++	u32 ret = 0, burstcnt, i, size;
++	u8 data;
++	
++	struct spi_device* client;
++	struct st33zp24_platform_data* pin_infos;	
++
++	FUNC_ENTER();
++
++	if (chip == NULL)
++		return -EBUSY;
++
++	client = (struct spi_device *)chip->vendor.iobase;
++	pin_infos = client->dev.platform_data;
++
++	ret = request_locality(chip);
++        if (ret < 0)
++                goto end;
++
++	data = TPM_DUMMY_BYTE;
++	/* HASH_START */
++	ret = SPI_WRITE_DATA(chip, TPM_HASH_START, &data, 1);
++	if (ret < 0)
++		goto end;
++
++	/* Send data  */
++	for ( i = 0 ; i < len ; )
++	{
++		burstcnt = get_burstcount(chip);		
++		if (burstcnt < 0)
++			goto end;	
++		size = min_t(int, len - i, burstcnt);
++	        ret = SPI_WRITE_DATA(chip, TPM_DATA_FIFO, buf + i, size);		
++		if (ret < 0)
++			goto end;
++		i += size;
++	}
++	
++end: 
++	/* HASH_END   */
++	ret = SPI_WRITE_DATA(chip, TPM_HASH_END, &data, 1);	
++	return ret;
++}
++
++
++/*
++ * tpm_st33_spi_ioctl provides 2 handles:
++ * - TPMIOC_CANCEL: allow to CANCEL a TPM commands execution.
++ *   See tpm_stm_spi_cancel description above
++ * - TPMIOC_TRANSMIT: allow to transmit a TPM commands.
++ * - TPMIOC_HASH: allow to compute a locality 4 hash
++ * - TPMIOC_CHANGELOCALITY: allow to change the current locality
++ *
++ * @return: In case of success, return TPM response size.
++ * In other case return < 0 value describing the issue.
++ */
++static ssize_t tpm_st33_spi_ioctl(struct inode *inode, struct file *file,
++				  unsigned int cmd, unsigned long arg)
++{
++	int in_size = 0, out_size = 0, rc;
++	int status;
++	unsigned long stop = 0;
++	struct tpm_chip *chip = file->private_data;
++	st_tpm_hash_t hash_data;
++
++	FUNC_ENTER();	
++
++	switch (cmd) {
++	case TPMIOC_CANCEL:
++		tpm_stm_spi_cancel(chip);
++		return 0;
++	case TPMIOC_TRANSMIT:
++		if (copy_from_user(chip->data_buffer,
++		    (const char *)arg, TPM_HEADER_SIZE))
++			return -EFAULT;
++		in_size = responseSize(chip->data_buffer,
++				      TPM_HEADER_SIZE);
++		if (copy_from_user(chip->data_buffer,
++				   (const char *)arg, in_size))
++			return -EFAULT;
++		tpm_stm_spi_send(chip, chip->data_buffer, in_size);
++
++		out_size = tpm_stm_spi_recv(chip, chip->data_buffer,
++					    TPM_BUFSIZE);
++
++		if (copy_to_user((char *)arg, chip->data_buffer,
++				 out_size))
++			return -EFAULT;
++		
++		return out_size;
++	case TPMIOC_HASH:
++		if (chip->vendor.locality == LOCALITY4 )
++		{
++			if (copy_from_user(&hash_data,
++		   			 (st_tpm_hash_t __user *)arg, sizeof(st_tpm_hash_t)))
++				return -EFAULT;
++			tpm_stm_spi_send_hash(chip, hash_data.data, hash_data.size);
++
++			if (chip->vendor.irq)
++			{
++				rc = wait_event_interruptible_timeout(chip->vendor.read_queue,
++        		                         (check_locality(chip) != chip->vendor.locality),
++                                                 chip->vendor.timeout_a);
++				if (rc < 0)
++					return -ETIME;
++				return hash_data.size; 
++			}
++
++	       		stop = jiffies + chip->vendor.timeout_a;
++	       		do {
++       				msleep(TPM_TIMEOUT);
++	       			status = check_locality(chip); 
++        			if (status != chip->vendor.locality)
++                			return hash_data.size;
++			} while (time_before(jiffies, stop));
++			
++			return -ETIME;
++		} 
++                return -ENOSYS;
++                break;
++        case TPMIOC_CHANGELOCALITY:
++		if ( arg >= LOCALITY0 && arg <= LOCALITY4 )
++		{
++			chip->vendor.locality = arg;
++			return 0;
++		}
++		return -ENOSYS;
++                break; 
++	default:
++		return -ENOTTY;
++	}
++	return -ENOTTY;
++}
++
++static const struct file_operations tpm_st33_spi_fops = {
++	.owner = THIS_MODULE,
++	.llseek = no_llseek,
++	.read = tpm_read,
++	.compat_ioctl = tpm_st33_spi_ioctl,
++	.write = tpm_write,
++	.open = tpm_open,
++	.release = tpm_release,
++};
++
++static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
++static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
++static DEVICE_ATTR(enabled, S_IRUGO, tpm_show_enabled, NULL);
++static DEVICE_ATTR(active, S_IRUGO, tpm_show_active, NULL);
++static DEVICE_ATTR(owned, S_IRUGO, tpm_show_owned, NULL);
++static DEVICE_ATTR(temp_deactivated, S_IRUGO, tpm_show_temp_deactivated, NULL);
++static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps_1_2, NULL);
++static DEVICE_ATTR(cancel, S_IWUSR | S_IWGRP, NULL, tpm_store_cancel);
++
++static struct attribute *stm_tpm_attrs[] = {
++	&dev_attr_pubek.attr,
++	&dev_attr_pcrs.attr,
++	&dev_attr_enabled.attr,
++	&dev_attr_active.attr,
++	&dev_attr_owned.attr,
++	&dev_attr_temp_deactivated.attr,
++	&dev_attr_caps.attr,
++	&dev_attr_cancel.attr, NULL,
++};
++
++static struct attribute_group stm_tpm_attr_grp = {
++	.attrs = stm_tpm_attrs
++};
++
++static struct tpm_vendor_specific st_spi_tpm = {
++	.send = tpm_stm_spi_send,
++	.recv = tpm_stm_spi_recv,
++	.cancel = tpm_stm_spi_cancel,
++	.status = tpm_stm_spi_status,
++	.attr_group = &stm_tpm_attr_grp,
++	.miscdev = {.fops = &tpm_st33_spi_fops,},
++};
++
++static int evaluate_latency(struct tpm_chip* chip)
++{
++	int latency = 0;
++        struct spi_device* dev = (struct spi_device*) chip->vendor.iobase;
++	struct st33zp24_platform_data *platform_data = dev->dev.platform_data;
++	int status = 0;
++	u8 data;
++	
++	for ( ; status == 0x00 && latency < MAX_SPI_LATENCY ; latency++ )
++	{
++		platform_data->latency = latency;
++		status = SPI_READ_DATA(chip, TPM_INTF_CAPABILITY, &data, 1);		
++	}
++	return latency - 1;
++}/* evaluate_latency() */
++
++static int interrupts = 0;
++module_param(interrupts, bool, 0444);
++MODULE_PARM_DESC(interrupts, "Enable interrupts");
++
++static int power_mgt = 1;
++module_param(power_mgt, bool, 0444);
++MODULE_PARM_DESC(power_mgt, "Power Management");
++
++/*
++ * tpm_st33_spi_probe initialize the TPM device
++ * @param: client, the spi_device drescription (TPM SPI description).
++ * @param: id, the spi_device_id struct.
++ * @return: 0 in case of success.
++ *         -1 in other case.
++ */
++static int
++tpm_st33_spi_probe(struct spi_device *dev)
++{
++	u32 err;
++	u8 intmask;
++	struct tpm_chip *chip;
++	struct st33zp24_platform_data *platform_data;
++
++	FUNC_ENTER();
++
++	err = 0;
++
++	/* Check SPI platform functionnalities */
++	if (dev == NULL) {
++		pr_info("dev is NULL. exiting.\n");
++		err = -ENODEV;
++		goto end;
++	}
++
++	chip = tpm_register_hardware(&dev->dev, &st_spi_tpm);
++	if (!chip) {
++		err = -ENODEV;
++		goto end;
++	}
++
++	/* Allocation of SPI buffers MISO and MOSI 	      */
++	/* Size is as follow: 			   	      */
++	/* Request burstcount value  = 0x800 = 2048	      */
++	/* +						      */
++	/* Response burstcount value = 0x400 = 1024	      */			
++	/* +						      */
++        /* At least:					      */
++	/* 1 byte for direction/locality	      	      */
++	/* 1 byte tpm tis register			      */
++	/* 2 bytes spi data length (for request only)	      */	
++	/* 2 latency bytes				      */
++	/* 1 status byte				      */  
++	/* = 2048 + 1024 + 7				      */
++	/* We reserved 2048 + 1024 + 20 in case latency byte  */
++	/* change 					      */
++	platform_data = dev->dev.platform_data;
++	platform_data->tpm_spi_buffer[0] =
++	    kmalloc((TPM_BUFSIZE + (TPM_BUFSIZE / 2) + TPM_DIGEST_SIZE) * sizeof(u8), GFP_KERNEL);
++	if (platform_data->tpm_spi_buffer[0] == NULL) {
++		err = -ENOMEM;
++		goto _tpm_clean_answer;
++	}
++	platform_data->tpm_spi_buffer[1] =
++	    kmalloc((TPM_BUFSIZE + (TPM_BUFSIZE / 2) + TPM_DIGEST_SIZE) * sizeof(u8) , GFP_KERNEL);
++	if (platform_data->tpm_spi_buffer[1] == NULL) {
++		err = -ENOMEM;
++		goto _tpm_clean_response;
++	}
++
++	chip->vendor.iobase = dev;
++
++	/* Default timeouts */
++        chip->vendor.timeout_a = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++        chip->vendor.timeout_b = msecs_to_jiffies(TIS_LONG_TIMEOUT);
++        chip->vendor.timeout_c = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++        chip->vendor.timeout_d = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
++	chip->vendor.locality = LOCALITY0;
++
++	if ( power_mgt )
++	{
++		err = gpio_request(platform_data->io_lpcpd, "TPM IO_LPCPD");
++		if (err)
++			goto _gpio_init1; 
++		gpio_set_value(platform_data->io_lpcpd, 1);
++	}
++
++	platform_data->latency = evaluate_latency(chip);
++	if (platform_data->latency <= 0x00) {
++		err = -ENODEV;
++		goto _gpio_init1;
++	}
++
++	/* Enable interrupt */
++	/* Register GPIO pin through generic Linux GPIO API */
++	if (interrupts) {
++		init_completion(&platform_data->irq_detection);	
++		if (request_locality(chip) != LOCALITY0) {
++                	err = -ENODEV;
++	                goto _tpm_clean_response;
++        	}	
++		err = gpio_request(platform_data->io_serirq, "TPM IO_SERIRQ");
++		if (err)
++			goto _gpio_init2; 
++
++		/* Clear all existing */
++		clear_interruption(chip);
++		err = request_irq(gpio_to_irq(platform_data->io_serirq), &tpm_ioserirq_handler,
++        		        IRQF_TRIGGER_HIGH | IRQF_SHARED,
++		                "TPM SERIRQ management", chip);
++		if (err < 0) {
++
++                	pr_info("TPM SERIRQ signals %d not available\n",
++                       	gpio_to_irq(platform_data->io_serirq));
++			goto _irq_set;
++		}
++		err = SPI_READ_DATA(chip, TPM_INT_ENABLE, &intmask, 1);
++		if (err < 0)
++			goto _irq_set; 
++
++        	intmask |= TPM_INTF_CMD_READY_INT
++			|  TPM_INTF_FIFO_AVALAIBLE_INT 
++			|  TPM_INTF_WAKE_UP_READY_INT 
++		        |  TPM_INTF_LOC4SOFTRELEASE_INT
++			|  TPM_INTF_LOCALITY_CHANGE_INT
++			|  TPM_INTF_STS_VALID_INT
++			|  TPM_INTF_DATA_AVAIL_INT;
++
++       		err = SPI_WRITE_DATA(chip, TPM_INT_ENABLE, &intmask, 1);	
++		if (err < 0)
++			goto _irq_set;
++
++		intmask = TPM_GLOBAL_INT_ENABLE;
++		err = SPI_WRITE_DATA(chip, TPM_INT_ENABLE + 3, &intmask, 1);
++		if (err < 0)
++			goto _irq_set;
++
++		err = SPI_READ_DATA(chip, TPM_INT_STATUS, &intmask, 1);
++		if (err < 0)
++			goto _irq_set;
++
++		chip->vendor.irq = interrupts;
++
++                tpm_gen_interrupt(chip);
++        } 	
++
++	tpm_get_timeouts(chip);
++
++	/* attach chip datas to client */
++	spi_set_drvdata(dev, chip);
++	platform_data->bChipF = false;
++	
++	pr_info("TPM SPI Initialized\n");
++	return 0;
++_irq_set:
++        free_irq(gpio_to_irq(platform_data->io_serirq), chip);
++_gpio_init2:
++        if (platform_data && interrupts) {
++                gpio_free(platform_data->io_serirq);
++        }
++_gpio_init1:
++	if ( platform_data && power_mgt ) {
++		gpio_free(platform_data->io_lpcpd);
++	}
++_tpm_clean_response:
++	tpm_remove_hardware(chip->dev);
++	if (platform_data->tpm_spi_buffer[1] != NULL) {
++		kfree(platform_data->tpm_spi_buffer[1]);
++		platform_data->tpm_spi_buffer[1] = NULL;
++	}
++_tpm_clean_answer:
++	if (platform_data->tpm_spi_buffer[0] != NULL) {
++		kfree(platform_data->tpm_spi_buffer[0]);
++		platform_data->tpm_spi_buffer[0] = NULL;
++	}
++	
++	platform_data->bChipF = true;
++end:
++	pr_info("TPM SPI initialisation fail\n");
++	return err;
++}
++
++/*
++ * tpm_st33_spi_remove remove the TPM device
++ * @param: client, the spi_device drescription (TPM SPI description).
++		clear_bit(0, &chip->is_open);
++ * @return: 0 in case of success.
++ */
++static __devexit int tpm_st33_spi_remove(struct spi_device *client)
++{
++	struct tpm_chip *chip = (struct tpm_chip *)spi_get_drvdata(client);
++	struct st33zp24_platform_data* pin_infos = 
++		((struct spi_device* ) chip->vendor.iobase)->dev.platform_data;
++
++	FUNC_ENTER();
++
++	if (pin_infos != NULL) {
++		gpio_free(pin_infos->io_lpcpd);
++
++		/* Check if chip has been previously clean */
++		if (pin_infos->bChipF != true)
++			tpm_remove_hardware(chip->dev);
++		if (pin_infos->tpm_spi_buffer[1] != NULL) {
++			kfree(pin_infos->tpm_spi_buffer[1]);
++			pin_infos->tpm_spi_buffer[1] = NULL;
++		}
++		if (pin_infos->tpm_spi_buffer[0] != NULL) {
++			kfree(pin_infos->tpm_spi_buffer[0]);
++			pin_infos->tpm_spi_buffer[0] = NULL;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * tpm_st33_spi_pm_suspend suspend the TPM device
++ * Added: Work around when suspend and no tpm application is running, suspend
++ * may fail because chip->data_buffer is not set (only set in tpm_open in Linux
++ * TPM core)
++ * @param: client, the spi_device drescription (TPM SPI description).
++ * @param: mesg, the power management message.
++ * @return: 0 in case of success.
++ */
++static int tpm_st33_spi_pm_suspend(struct spi_device *client, pm_message_t mesg)
++{
++	struct tpm_chip *chip =
++	    (struct tpm_chip *)spi_get_drvdata(client);
++	struct st33zp24_platform_data* pin_infos = 
++		((struct spi_device *)chip->vendor.iobase)->dev.platform_data;
++	int ret = 0;	
++
++	if ( power_mgt )
++		gpio_set_value(pin_infos->io_lpcpd, 0);
++	else
++	{
++		if (chip->data_buffer == NULL)
++			chip->data_buffer = pin_infos->tpm_spi_buffer[0];
++		ret = tpm_pm_suspend(&client->dev, mesg);
++	}
++	return ret;
++}				/* tpm_st33_spi_suspend() */
++
++/*
++ * tpm_st33_spi_pm_resume resume the TPM device
++ * @param: spi, the spi_device drescription (TPM SPI description).
++ * @return: 0 in case of success.
++ */
++static int tpm_st33_spi_pm_resume(struct spi_device *spi)
++{
++	struct tpm_chip *chip =
++	    (struct tpm_chip *)spi_get_drvdata(spi);
++	struct st33zp24_platform_data* pin_infos = 
++		((struct spi_device *)chip->vendor.iobase)->dev.platform_data;
++	
++	int ret = 0;
++	if ( power_mgt ) {
++                gpio_set_value(pin_infos->io_lpcpd, 1);
++                ret = wait_for_serirq_timeout(chip, (chip->vendor.status(chip) &&
++                                                  TPM_STS_VALID) == TPM_STS_VALID,
++                                                  chip->vendor.timeout_b);
++        } else {
++		if (chip->data_buffer == NULL)
++			chip->data_buffer = pin_infos->tpm_spi_buffer[0];
++		ret = tpm_pm_resume(&spi->dev);
++		if (!ret)
++			tpm_continue_selftest(chip); 
++	}
++	return ret;
++}				/* tpm_st33_spi_pm_resume() */
++
++static struct spi_driver tpm_st33_spi_driver = {
++	.driver = {
++		   .owner = THIS_MODULE,
++		   .name = TPM_ST33_SPI,
++		   },
++	.probe = tpm_st33_spi_probe,
++	.remove = tpm_st33_spi_remove,
++	.resume = tpm_st33_spi_pm_resume,
++	.suspend = tpm_st33_spi_pm_suspend,
++};
++
++/*
++ * tpm_st33_spi_init initialize driver
++ * @return: 0 if successful, else non zero value.
++ */
++static int __init tpm_st33_spi_init(void)
++{
++	FUNC_ENTER();
++	return spi_register_driver(&tpm_st33_spi_driver);
++}
++
++/*
++ * tpm_st33_spi_exit The kernel calls this function during unloading the
++ * module or during shut down process
++ */
++static void __exit tpm_st33_spi_exit(void)
++{
++	FUNC_ENTER();
++	spi_unregister_driver(&tpm_st33_spi_driver);
++}
++
++module_init(tpm_st33_spi_init);
++module_exit(tpm_st33_spi_exit);
++
++MODULE_AUTHOR("Christophe Ricard (tpmsupport at st.com)");
++MODULE_DESCRIPTION("STM TPM SPI ST33 Driver");
++MODULE_VERSION("1.2.0");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/char/tpm/tpm_stm_st33_spi.h b/drivers/char/tpm/tpm_stm_st33_spi.h
+new file mode 100644
+index 0000000..dfcc7fd
+--- /dev/null
++++ b/drivers/char/tpm/tpm_stm_st33_spi.h
+@@ -0,0 +1,80 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST33NP18
++ * Copyright (C) 2009, 2010  STMicroelectronics
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @Author: Christophe RICARD tpmsupport at st.com
++ *
++ * @File: stm_st33_tpm_i2c.h
++ *
++ * @Date: 09/15/2010
++ */
++#ifndef __STM_ST33_TPM_I2C_MAIN_H__
++#define __STM_ST33_TPM_I2C_MAIN_H__
++
++#include <linux/pci.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/i2c.h>
++//#include <linux/i2c-id.h>
++#include <linux/fs.h>
++#include <linux/miscdevice.h>
++
++#define MINOR_NUM_I2C		224
++
++/*#define TPM_DRIVER_NAME		"st33np18_i2c"*/
++
++#define TPM_ACCESS			(0x0)		
++#define TPM_STS				(0x18)
++#define TPM_HASH_END			(0x20)
++#define TPM_DATA_FIFO			(0x24)
++#define TPM_HASH_DATA			(0x24)
++#define TPM_HASH_START			(0x28)
++#define TPM_INTF_CAPABILITY		(0x14)
++#define TPM_INT_STATUS			(0x10)
++#define TPM_INT_ENABLE			(0x08)
++
++#define TPM_DUMMY_BYTE			0x00
++#define TPM_WRITE_DIRECTION		0x80
++#define TPM_HEADER_SIZE 		10
++#define TPM_BUFSIZE			2048
++
++/* ioctl commands */
++#define TPMIOC_CANCEL		_IO('T', 0x00)	
++#define TPMIOC_TRANSMIT		_IO('T', 0x01)
++#define TPMIOC_HASH		_IO('T', 0x02)
++#define TPMIOC_CHANGELOCALITY	_IO('T', 0x03)
++
++#define LOCALITY0		0
++#define LOCALITY4		4
++
++#define TPM_ST_SPI_OK 		0x5A
++
++
++#define MAX_SPI_LATENCY		15
++
++typedef struct st_tpm_hash
++{
++        int size;
++        u8* data;
++}st_tpm_hash_t;
++
++#endif /* __STM_ST33_TPM_I2C_MAIN_H__ */
+diff --git a/include/linux/i2c/tpm_stm_st19_i2c.h b/include/linux/i2c/tpm_stm_st19_i2c.h
+new file mode 100644
+index 0000000..d97f50f
+--- /dev/null
++++ b/include/linux/i2c/tpm_stm_st19_i2c.h
+@@ -0,0 +1,42 @@
++/*
++ * STMicroelectronics TPM I2C Linux driver for TPM ST19NP18
++ * Copyright (C) 2009, 2010 STMicroelectronics
++ * Christophe RICARD tpmsupport at st.com
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * STMicroelectronics version 1.2.0, Copyright (C) 2010
++ * STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++ * This is free software, and you are welcome to redistribute it
++ * under certain conditions.
++ *
++ * @File: stm_st19_tpm_i2c.h
++ *
++ * @Date: 06/15/2008
++ */
++#ifndef __STM_ST19_TPM_I2C_H__
++#define __STM_ST19_TPM_I2C_H__
++
++#include <linux/i2c.h>
++
++#define TPM_DRIVER_NAME         "st19np18"
++#define TPM_I2C_ST19_ADDR_WR	(0x26 >> 1)	/*0x13 7 bits address */
++
++struct st19np18_platform_data {
++	int accept_pin;		/* accept command pin */
++	int data_avail_pin;	/* data available pin */
++	struct i2c_client *client;
++};
++
++#endif /* __STM_ST19_TPM_I2C_H__ */
+diff --git a/include/linux/i2c/tpm_stm_st33_i2c.h b/include/linux/i2c/tpm_stm_st33_i2c.h
+new file mode 100644
+index 0000000..2d0991e
+--- /dev/null
++++ b/include/linux/i2c/tpm_stm_st33_i2c.h
+@@ -0,0 +1,48 @@
++/*
++* STMicroelectronics TPM I2C Linux driver for TPM ST33ZP24
++* Copyright (C) 2009, 2010 STMicroelectronics
++* Christophe RICARD tpmsupport at st.com
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 2 of the License, or
++* (at your option) any later version.
++*
++* This program is distributed in the hope that it will be useful,
++* but WITHOUT ANY WARRANTY; without even the implied warranty of
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++* GNU General Public License for more details.
++*
++* You should have received a copy of the GNU General Public License along
++* with this program; if not, write to the Free Software Foundation, Inc.,
++* 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++*
++* STMicroelectronics version 1.2.0, Copyright (C) 2010
++* STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++* This is free software, and you are welcome to redistribute it
++* under certain conditions.
++*
++* @File: stm_st33_tpm_i2c.h
++*
++* @Date: 06/15/2008
++*/
++#ifndef __STM_ST33_TPM_I2C_H__
++#define __STM_ST33_TPM_I2C_H__
++
++#include <linux/i2c.h>
++
++#define TPM_ST33_I2C		    	"st33zp24_i2c"
++#define TPM_I2C_ST33_ADDR_WR_LOC0	(0x26 >> 1)
++#define TPM_I2C_ST33_ADDR_WR_LOC4	(0x36 >> 1)
++
++
++struct st33zp24_platform_data {
++	int io_serirq;	
++	int io_lpcpd;
++	struct i2c_client *client;
++	bool bChipF;
++	u8 *tpm_i2c_buffer[2]; /* 0 Request 1 Response */
++	struct completion irq_detection;
++	struct mutex lock;
++};
++
++#endif /* __STM_ST33_TPM_I2C_H__ */
+diff --git a/include/linux/spi/tpm_stm_st33_spi.h b/include/linux/spi/tpm_stm_st33_spi.h
+new file mode 100644
+index 0000000..4bf31c4
+--- /dev/null
++++ b/include/linux/spi/tpm_stm_st33_spi.h
+@@ -0,0 +1,46 @@
++/*
++* STMicroelectronics TPM SPI Linux driver for TPM ST33NP18
++* Copyright (C) 2009, 2010 STMicroelectronics
++* Christophe RICARD tpmsupport at st.com
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 2 of the License, or
++* (at your option) any later version.
++*
++* This program is distributed in the hope that it will be useful,
++* but WITHOUT ANY WARRANTY; without even the implied warranty of
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++* GNU General Public License for more details.
++*
++* You should have received a copy of the GNU General Public License along
++* with this program; if not, write to the Free Software Foundation, Inc.,
++* 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++*
++* STMicroelectronics version 1.2.0, Copyright (C) 2010
++* STMicroelectronics comes with ABSOLUTELY NO WARRANTY.
++* This is free software, and you are welcome to redistribute it
++* under certain conditions.
++*
++* @File: stm_st33_tpm_spi.h
++*
++* @Date: 06/15/2008
++*/
++#ifndef __STM_ST33_TPM_SPI_H__
++#define __STM_ST33_TPM_SPI_H__
++
++#include <linux/spi/spi.h>
++
++#define TPM_ST33_SPI		"st33zp24_spi"
++
++#ifndef __STM_ST33_TPM_I2C_H__
++struct st33zp24_platform_data {
++	int io_serirq;
++	int io_lpcpd;
++	int latency;
++	bool bChipF;
++	u8 *tpm_spi_buffer[2]; /* 0 Request 1 Response */
++	struct completion irq_detection;
++};
++#endif
++
++#endif /* __STM_ST33_TPM_SPI_H__ */
 -- 
 1.7.1
