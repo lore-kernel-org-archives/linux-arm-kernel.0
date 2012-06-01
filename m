@@ -1,74 +1,59 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Fri, 01 Jun 2012 17:40:25 +0400
-Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
-In-Reply-To: <20120601112951.GM12766@atomide.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
- <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
- <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
-Message-ID: <4FC8C649.10507@dev.rtsoft.ru>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 01 Jun 2012 06:54:48 -0700
+Subject: [PATCH] ARM: OMAP2+: OPP: Fix to ensure check of right oppdef
+ after bad one
+In-Reply-To: <4FC86926.5050404@compulab.co.il> (Igor Grinberg's message of
+ "Fri, 01 Jun 2012 10:03:02 +0300")
+References: <1337361979-19052-1-git-send-email-nm@ti.com>
+ <87d35kx7qd.fsf@ti.com> <4FC86926.5050404@compulab.co.il>
+Message-ID: <87fwafuogn.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi, Tony.
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-On 06/01/2012 03:29 PM, Tony Lindgren wrote:
-> * Cousson, Benoit <b-cousson@ti.com> [120529 06:29]:
->> On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
->>>> Mmm, we can have up to 4 control module instances in OMAP4.
->>>>
->>>> Well, I'm not sure it worth considering them as separate devices. Is
->>>> that your plan as well?
->>> At least for now I was focusing on the ctrl_module_core ...
->> OK, that's a good start already :-)
->>
->>>> But since they all have different base address, it will be trick to
->>>> handle them with only a single entry.
->>> Indeed. We can always add the support latter on.
+> Hi Kevin, Nishanth,
+>
+> On 06/01/12 02:15, Kevin Hilman wrote:
+>> Nishanth Menon <nm@ti.com> writes:
+>> 
+>>> Commit 9fa2df6b90786301b175e264f5fa9846aba81a65
+>>> (ARM: OMAP2+: OPP: allow OPP enumeration to continue if device is not present)
+>>> makes the logic:
+>>> for (i = 0; i < opp_def_size; i++) {
+>>> 	<snip>
+>>> 	if (!oh || !oh->od) {
+>>> 		<snip>
+>>> 		continue;
+>>> 	}
+>>> <snip>
+>>> opp_def++;
+>>> }
 >>>
->>> I am not sure what would be the best way to handle those instances though,
->>> and how they are going to expose APIs. Would need to have an instance bound
->>> to API set?
->> We should not go to that path I guess. We should have an API at
->> children level independent of the underlying control module
->> partitioning.
-> These should be separate driver instances for the control modules.
+>>> In short, the moment we hit a "Bad OPP", we end up looping the list
+>>> comparing against the bad opp definition pointer for the rest of the
+>>> iteration count. Instead, increment opp_def in the for loop itself
+>>> and allow continue to be used in code without much thought so that
+>>> we check the next set of OPP definition pointers :)
+>>>
+>>> Cc: Kevin Hilman <khilman@ti.com>
+>>> Cc: Steve Sakoman <steve@sakoman.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: linux-omap at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> 
+>> Good catch.
+>> 
+>> Queuing for my next set of PM fixes for v3.5-rc (branch: for_3.5/fixes/pm-2)
 >
-> And then the ioremapped area should ignore at least the padconf
-> registers so drivers/pinctrl/pinctrl-simple can handle those. There
-> should not be any dependencies to the SCM driver from pinctrl-simple,
-> the core SCM driver can manage the clocks and trigger the save of
-> padconf regs.
->
-> Also we should allow MMC driver handle the MMC specific registers
-> and USB driver(s) handle the USB specific registers if possible. Those
-> should not live under drivers/mfd unless there are some dependencies
-> other than trying to ioremap the whole SCM module instead of ioremapping
-> in each driver.
->
-> We can have a static map for the SCM, so ioremapping each driver
-> individually should not be an issue.
-Actually SCM registers window is mapped statically. Mapping is defined in omap44xx_io_desc[] in arch/arm/mach-omap2/io.c:
+> I think this should also apply for stable, right?
+> If it should, can you please add a
+> Cc: stable at vger.kernel.org
 
-...
-        .virtual    = L4_44XX_VIRT,
-        .pfn        = __phys_to_pfn(L4_44XX_PHYS),
-        .length        = L4_44XX_SIZE,
-        .type        = MT_DEVICE,
-...
+Yes, added.
 
+Thanks,
 
-So ioremap() always returns same virtual address (0xfc002000).
-
-BR,
-    Konstantin Baydarov.
-
->
-> Regards,
->
-> Tony
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kevin
