@@ -1,33 +1,108 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jun 2012 11:55:50 +0100
-Subject: [RFC 34/34] dmaengine: PL08x: ensure all descriptors are freed
- when channel is released
-In-Reply-To: <CACRpkdawZm2J_4ujUv96-d0kDV0m7XOrr+wk8Wr92a3KLZcf2w@mail.gmail.com>
-References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZJ0j-000717-M3@rmk-PC.arm.linux.org.uk>
- <CACRpkdawZm2J_4ujUv96-d0kDV0m7XOrr+wk8Wr92a3KLZcf2w@mail.gmail.com>
-Message-ID: <20120601105550.GF21245@n2100.arm.linux.org.uk>
+Date: Fri, 1 Jun 2012 12:04:15 +0100
+Subject: [PATCH 26/27] arm, smpboot: Use generic SMP booting infrastructure
+In-Reply-To: <20120601091614.31979.39272.stgit@srivatsabhat.in.ibm.com>
+References: <20120601090952.31979.24799.stgit@srivatsabhat.in.ibm.com>
+ <20120601091614.31979.39272.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20120601110415.GG21245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 09:27:55AM +0800, Linus Walleij wrote:
-> On Tue, May 29, 2012 at 5:46 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > Ensure all queued descriptors are freed when the channel is released,
-> > ensuring we don't leak memory
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Excellent series Russell, looking forward to a version that
-> applies on top of v3.5-rc:s and I'll test it. Would be great to get
-> this into the -next tree as soon as you think it's ripe.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+If you're expecting an ack from me, you're not going to get it because
+this patch is useless on its own.  It can't be reviewed and it can't be
+tested without the rest of the series.
 
-Note that I have four additional patches on top of this which I didn't
-post, which I've kept up to date - two of them add the Versatile and
-Realview support, though I've kept them in a slightly messy state to
-work around some of the brokenness on the hardware I've experienced
-(mostly just commenting out various bits of the DMA data for various
-drivers.)
+On Fri, Jun 01, 2012 at 02:46:20PM +0530, Srivatsa S. Bhat wrote:
+> Convert arm to use the generic framework to boot secondary CPUs.
+> 
+> Notes:
+> The calls to local_irq_enable() and local_fiq_enable() which were there
+> in secondary_start_kernel() originally, are retained in __cpu_post_online()
+> since the generic code only calls local_irq_enable().
+> Also, we were anyway going to enable interrupts in the generic code
+> immediately after __cpu_post_online(), so its not like we enabled interrupts
+> way too early.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+> ---
+> 
+>  arch/arm/kernel/smp.c |   26 +++++++++++++-------------
+>  1 files changed, 13 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index b735521..460b7e7 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/percpu.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/completion.h>
+> +#include <linux/smpboot.h>
+>  
+>  #include <linux/atomic.h>
+>  #include <asm/cacheflush.h>
+> @@ -227,6 +228,11 @@ static void percpu_timer_setup(void);
+>   */
+>  asmlinkage void __cpuinit secondary_start_kernel(void)
+>  {
+> +	smpboot_start_secondary(NULL);
+> +}
+> +
+> +void __cpuinit __cpu_pre_starting(void *unused)
+> +{
+>  	struct mm_struct *mm = &init_mm;
+>  	unsigned int cpu = smp_processor_id();
+>  
+> @@ -244,26 +250,25 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+>  	printk("CPU%u: Booted secondary processor\n", cpu);
+>  
+>  	cpu_init();
+> -	preempt_disable();
+>  	trace_hardirqs_off();
+>  
+>  	/*
+>  	 * Give the platform a chance to do its own initialisation.
+>  	 */
+>  	platform_secondary_init(cpu);
+> +}
+>  
+> -	notify_cpu_starting(cpu);
+> +void __cpuinit __cpu_pre_online(void *unused)
+> +{
+> +	unsigned int cpu = smp_processor_id();
+>  
+>  	calibrate_delay();
+>  
+>  	smp_store_cpu_info(cpu);
+> +}
+>  
+> -	/*
+> -	 * OK, now it's safe to let the boot CPU continue.  Wait for
+> -	 * the CPU migration code to notice that the CPU is online
+> -	 * before we continue - which happens after __cpu_up returns.
+> -	 */
+> -	set_cpu_online(cpu, true);
+> +void __cpuinit __cpu_post_online(void *unused)
+> +{
+>  	complete(&cpu_running);
+>  
+>  	/*
+> @@ -273,11 +278,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+>  
+>  	local_irq_enable();
+>  	local_fiq_enable();
+> -
+> -	/*
+> -	 * OK, it's off to the idle thread for us
+> -	 */
+> -	cpu_idle();
+>  }
+>  
+>  void __init smp_cpus_done(unsigned int max_cpus)
+> 
