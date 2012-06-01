@@ -1,51 +1,21 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 1 Jun 2012 15:24:24 +0200
-Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
-In-Reply-To: <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <1338375394-16268-3-git-send-email-kishon@ti.com>
- <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
- <4FC63B8D.3070107@ti.com>
- <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
-Message-ID: <4FC8C288.5060200@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 1 Jun 2012 07:37:16 -0600 (MDT)
+Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1206010735540.17068@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/1/2012 2:52 PM, ABRAHAM, KISHON VIJAY wrote:
-> Hi Benoit,
->
-> On Wed, May 30, 2012 at 8:53 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
->>>
->>> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>
->>>   wrote:
->>>>
->>>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
->>>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now
->>>> added
->>>> (which can be used to control MODULEMODE) this clock node is removed.
->>>>
->>>> Cc: Benoit Cousson<b-cousson@ti.com>
->>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->>>> ---
->>>>   arch/arm/mach-omap2/clock44xx_data.c |   11 -----------
->>>
->>>
->>> Have you patched clock44xx_data.c manually or you have a patch for
->>> the clock_data autogen script to generate it ?
->>
->>
->> I have a series that will remove all these clock nodes. I should be able to
->> post that soon.
->>
->> Potentially at that time, Kishon might be able to drop that patch.
->
-> Will you be sending a patch for *[RFC PATCH 1/5] arm: omap: hwmod:
-> make *phy_48m* as the main_clk of ocp2scp* also or I have to keep that
-> as part of my series?
+On Fri, 1 Jun 2012, Rajendra Nayak wrote:
 
-Good point. In fact, I'm fixing both at the same time to avoid any 
-bisect issue.
+> This RFC series is based of Mikes' latest clk-next. I will
+> rebase it once 3.5-rc1 is out and post with more testing thats
+> in progress. Meanwhile, the RFC is for me to get some early
+> feedback on the patches.
 
-Regards,
-Benoit
+Please describe further what's been tested with this series, and what 
+hasn't been.
+
+
+- Paul
