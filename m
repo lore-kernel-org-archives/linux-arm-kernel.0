@@ -1,34 +1,45 @@
 From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Fri, 1 Jun 2012 12:44:15 +0800
-Subject: [PATCHv3 2/3] OMAP: avoid build wdt platform device if with dt support
+Date: Fri, 1 Jun 2012 12:44:16 +0800
+Subject: [PATCHv2 3/3] watchdog: omap_wdt: add device tree support
 In-Reply-To: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
 References: <1338525856-4359-1-git-send-email-jgq516@gmail.com>
-Message-ID: <1338525856-4359-3-git-send-email-jgq516@gmail.com>
+Message-ID: <1338525856-4359-4-git-send-email-jgq516@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Xiao Jiang <jgq516@gmail.com>
 
-If provided dt support, then skip add wdt platform device as usual.
+Add device table for omap_wdt to support dt.
 
 Signed-off-by: Xiao Jiang <jgq516@gmail.com>
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/devices.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/watchdog/omap_wdt.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 7b4b932..527c004 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -772,7 +772,7 @@ static int __init omap_init_wdt(void)
- 	char *oh_name = "wd_timer2";
- 	char *dev_name = "omap_wdt";
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index 8285d65..02ebfd5 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -430,6 +430,12 @@ static int omap_wdt_resume(struct platform_device *pdev)
+ #define	omap_wdt_resume		NULL
+ #endif
  
--	if (!cpu_class_is_omap2())
-+	if (!cpu_class_is_omap2() || of_have_populated_dt())
- 		return 0;
++static const struct of_device_id omap_wdt_of_match[] = {
++	{ .compatible = "ti,omap3-wdt", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
++
+ static struct platform_driver omap_wdt_driver = {
+ 	.probe		= omap_wdt_probe,
+ 	.remove		= __devexit_p(omap_wdt_remove),
+@@ -439,6 +445,7 @@ static struct platform_driver omap_wdt_driver = {
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "omap_wdt",
++		.of_match_table = omap_wdt_of_match,
+ 	},
+ };
  
- 	oh = omap_hwmod_lookup(oh_name);
 -- 
 1.7.3
