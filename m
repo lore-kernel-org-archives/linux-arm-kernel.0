@@ -1,32 +1,21 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 1 Jun 2012 04:27:50 -0600 (MDT)
-Subject: [PATCHv3 2/9] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add recursive
- usecount tracking
-In-Reply-To: <CAOMWX4dPQGw=_u5HvD8T9cJ1aSo8tTsmok+bj2Op5TWtbp9R4A@mail.gmail.com>
-References: <1338470942-20185-1-git-send-email-t-kristo@ti.com>
- <1338470942-20185-3-git-send-email-t-kristo@ti.com>
- <CAOMWX4dPQGw=_u5HvD8T9cJ1aSo8tTsmok+bj2Op5TWtbp9R4A@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1206010427030.17068@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Jun 2012 11:39:44 +0100
+Subject: [RFC 03/34] dmaengine: virt-dma: add support for cyclic DMA
+ periodic callbacks
+In-Reply-To: <CAMj5Bkgca-KQ1xPDjeS6uskYN_jbLQRbQBtuPBz7teWz064aOw@mail.gmail.com>
+References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
+ <E1SZIqg-0006yu-5Z@rmk-PC.arm.linux.org.uk>
+ <CACRpkdba_aFbyBt9hkYqBR=oY6fq0KHchjGcuS_NhbOMbE0Owg@mail.gmail.com>
+ <20120530080216.GH12217@n2100.arm.linux.org.uk>
+ <CAMj5BkjGQXxA0gaNLKDSuRpYXoY3sqbzquKo-Lth9-TG_QcqHQ@mail.gmail.com>
+ <20120531191757.GI12217@n2100.arm.linux.org.uk>
+ <CAMj5Bkgca-KQ1xPDjeS6uskYN_jbLQRbQBtuPBz7teWz064aOw@mail.gmail.com>
+Message-ID: <20120601103944.GA21245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Jun 2012, Menon, Nishanth wrote:
+On Fri, Jun 01, 2012 at 10:26:37AM +0800, zhangfei gao wrote:
+> Could we directly treat dma_tx_state.residue as "how many periods have expired"
 
-> On Thu, May 31, 2012 at 8:28 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> minor comment:
-> > +void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
-> <snip>
-> > +void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
-> 
-> I know the understand that rest of the code lacks kernel-doc,
-
-Almost all of the powerdomain code has kerneldoc present.
-
-> but at least can we ensure that the new functions does?
-
-Indeed:
-
-http://www.spinics.net/lists/arm-kernel/msg164548.html
-
-
-- Paul
+Why change the behaviour and add complexity to _both_ sides of the API,
+as well as confusion about what "residue" means?
