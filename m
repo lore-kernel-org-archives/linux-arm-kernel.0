@@ -1,32 +1,25 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 1 Jun 2012 10:58:46 -0700
-Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
-Message-ID: <20120601175846.GA23978@gmail.com>
+From: thavatchai.makpahibulchoke@hp.com (Thavatchai Makphaibulcboke)
+Date: Fri, 01 Jun 2012 12:37:53 -0600
+Subject: [PATCH] lib/decompress_unxz.c: removing all memory helper
+ functions
+In-Reply-To: <4FC83940.9010708@zytor.com>
+References: <1337875436-27640-1-git-send-email-tmac@hp.com>
+ <20120528070336.GM3377@game.jcrosoft.org> <4FC82D89.1040108@hp.com>
+ <4FC83940.9010708@zytor.com>
+Message-ID: <4FC90C01.2060005@hp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120601-17:37, Rajendra Nayak wrote:
-> Hi,
+On 05/31/2012 09:38 PM, H. Peter Anvin wrote:
+> We could always make a source code library, like we already in effect
+> have for the compression functions themselves.
 > 
-> This RFC series is based of Mikes' latest clk-next. I will
-> rebase it once 3.5-rc1 is out and post with more testing thats
-> in progress. Meanwhile, the RFC is for me to get some early
-> feedback on the patches.
+> 	-hpa
 > 
-> This series retains the static clock declarations
 
-Hi Rajendra,
+Thanks for the suggestion and comment.  I guess we could add a new
+directory with a new file under arch, such as arch/lib/mem.c and use the
+source include similar to the compression.
 
-Thanks for sending this out.  FYI I'm looking into using bootmem to get
-rid of the terrible static init macros.  That's just something to
-consider for the future since I do not know when I will have time to
-implement that.
-
-Hopefully that change could make it possible to get rid of the static
-init macros entirely.  It won't block acceptance of these patches
-though.
-
-Regards,
-Mike
+Thanks,
+Mak.
