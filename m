@@ -1,50 +1,66 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Jun 2012 13:39:03 +0100
-Subject: [PATCH v2 4/6] ARM: Samsung: Modify
- s3c64xx_spi{0|1|2}_set_platdata function
-In-Reply-To: <CAJuYYwS5vPO9GNFMGArroOe57Z80+gP0vnRMjPuXRaxukNJ8uw@mail.gmail.com>
-References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
- <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
- <20120520092113.GA20652@opensource.wolfsonmicro.com>
- <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
- <20120530093421.GA9947@opensource.wolfsonmicro.com>
- <CAJuYYwShLhKSrpGhaTyxX4dqaiKDAcjBtuWSMYAdsWcOMfP=qw@mail.gmail.com>
- <20120530101326.GF9947@opensource.wolfsonmicro.com>
- <CAJuYYwT88mpTKmOD8mpCjsQo9O_+Giri7+q-Rzz=zPNj+F7aDg@mail.gmail.com>
- <20120531113659.GB2666@opensource.wolfsonmicro.com>
- <CAJuYYwS5vPO9GNFMGArroOe57Z80+gP0vnRMjPuXRaxukNJ8uw@mail.gmail.com>
-Message-ID: <20120601123902.GL24139@opensource.wolfsonmicro.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 1 Jun 2012 14:43:54 +0200
+Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
+In-Reply-To: <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
+References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
+ <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
+ <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
+ <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
+ <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
+Message-ID: <4FC8B90A.9040505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2012 at 10:47:44AM +0800, Thomas Abraham wrote:
+On 6/1/2012 2:30 PM, Shilimkar, Santosh wrote:
+> On Fri, Jun 1, 2012 at 7:29 PM, Tony Lindgren<tony@atomide.com>  wrote:
+>> * Cousson, Benoit<b-cousson@ti.com>  [120529 06:29]:
+>>> On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
+>>>>>
+>>>>> Mmm, we can have up to 4 control module instances in OMAP4.
+>>>>>
+>>>>> Well, I'm not sure it worth considering them as separate devices. Is
+>>>>> that your plan as well?
+>>>>
+>>>> At least for now I was focusing on the ctrl_module_core ...
+>>>
+>>> OK, that's a good start already :-)
+>>>
+>>>>> But since they all have different base address, it will be trick to
+>>>>> handle them with only a single entry.
+>>>>
+>>>> Indeed. We can always add the support latter on.
+>>>>
+>>>> I am not sure what would be the best way to handle those instances though,
+>>>> and how they are going to expose APIs. Would need to have an instance bound
+>>>> to API set?
+>>>
+>>> We should not go to that path I guess. We should have an API at
+>>> children level independent of the underlying control module
+>>> partitioning.
+>>
+>> These should be separate driver instances for the control modules.
+>>
+>> And then the ioremapped area should ignore at least the padconf
+>> registers so drivers/pinctrl/pinctrl-simple can handle those. There
+>> should not be any dependencies to the SCM driver from pinctrl-simple,
+>> the core SCM driver can manage the clocks and trigger the save of
+>> padconf regs.
+>>
+>> Also we should allow MMC driver handle the MMC specific registers
+>> and USB driver(s) handle the USB specific registers if possible. Those
+>> should not live under drivers/mfd unless there are some dependencies
+>> other than trying to ioremap the whole SCM module instead of ioremapping
+>> in each driver.
+>>
+>> We can have a static map for the SCM, so ioremapping each driver
+>> individually should not be an issue.
+>>
+> This sounds a good idea. With this we may not even need a core control
+> module drivers if all the individual drivers take care of the registers they
+> care. Mapping shouldn't be a problem as you mentioned.
 
-> 1. There is one instance of 'struct platform_device' for each of the
-> spi controller instances (0/1/2) named "s3c64xx-spi" (in
-> arch/arm/plat-samsung/devs.c).
+We should keep the MFD for PM / OCP single port correctness. Other than 
+that it will be mostly useless, indeed.
 
-Right, which looks rather like it is specific to s3c64xx at least given
-the naming...  there aren't any current in tree users, though I do have
-one out of tree user on s3c6410.  If this is supposed to be used on the
-later SoCs too then I guess it ought to be renamed anyway since what's
-there looks wrong.
-
-> 5. If point 4 is not correct, the other option is to create a separate
-> instances of 'struct platform_device' for each of the s3c, s5p and
-> Exynos4/5 SoC's. Is this the correct way, and if yes, could you please
-> help me understand the issues in setting the name of the platform
-> device at runtime.
-
-That would seem less painful to me.  The big problem I've found is with
-things like matching clocks up where if you look at the device that's
-being registered it has one name but at runtime it has another name, it
-makes everything much harder to follow.  There was one of the devices
-where the .id also ended up getting changed which created even more
-confusion.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120601/f821ab6d/attachment-0001.sig>
+Regards,
+Benoit
