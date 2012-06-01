@@ -1,66 +1,46 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 1 Jun 2012 14:43:54 +0200
-Subject: [RFC PATCH 05/11] mfd: omap: control: core system control driver
-In-Reply-To: <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
-References: <1337934361-1606-1-git-send-email-eduardo.valentin@ti.com>
- <1337934361-1606-6-git-send-email-eduardo.valentin@ti.com>
- <4FBF8078.9050809@ti.com> <20120528113502.GG3923@besouro>
- <4FC4CE4B.8020708@ti.com> <20120601112951.GM12766@atomide.com>
- <CAMQu2gyn_Fir=Jp0cQR_t7yc_JkwajFMvR1yDx-VYv9JOOwivw@mail.gmail.com>
-Message-ID: <4FC8B90A.9040505@ti.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Fri, 1 Jun 2012 18:22:59 +0530
+Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
+In-Reply-To: <4FC63B8D.3070107@ti.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <1338375394-16268-3-git-send-email-kishon@ti.com>
+ <CAMQu2gxcP8At5j4UOK3bgX+Q+OunXeTxyXEr6hAhGiwjLs-gJg@mail.gmail.com>
+ <4FC63B8D.3070107@ti.com>
+Message-ID: <CAAe_U6L6b26J4Q3mB6K0BLtwkaL92SFZSQTMCd=Rv3UBynVCBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/1/2012 2:30 PM, Shilimkar, Santosh wrote:
-> On Fri, Jun 1, 2012 at 7:29 PM, Tony Lindgren<tony@atomide.com>  wrote:
->> * Cousson, Benoit<b-cousson@ti.com>  [120529 06:29]:
->>> On 5/28/2012 1:35 PM, Eduardo Valentin wrote:
->>>>>
->>>>> Mmm, we can have up to 4 control module instances in OMAP4.
->>>>>
->>>>> Well, I'm not sure it worth considering them as separate devices. Is
->>>>> that your plan as well?
->>>>
->>>> At least for now I was focusing on the ctrl_module_core ...
->>>
->>> OK, that's a good start already :-)
->>>
->>>>> But since they all have different base address, it will be trick to
->>>>> handle them with only a single entry.
->>>>
->>>> Indeed. We can always add the support latter on.
->>>>
->>>> I am not sure what would be the best way to handle those instances though,
->>>> and how they are going to expose APIs. Would need to have an instance bound
->>>> to API set?
->>>
->>> We should not go to that path I guess. We should have an API at
->>> children level independent of the underlying control module
->>> partitioning.
->>
->> These should be separate driver instances for the control modules.
->>
->> And then the ioremapped area should ignore at least the padconf
->> registers so drivers/pinctrl/pinctrl-simple can handle those. There
->> should not be any dependencies to the SCM driver from pinctrl-simple,
->> the core SCM driver can manage the clocks and trigger the save of
->> padconf regs.
->>
->> Also we should allow MMC driver handle the MMC specific registers
->> and USB driver(s) handle the USB specific registers if possible. Those
->> should not live under drivers/mfd unless there are some dependencies
->> other than trying to ioremap the whole SCM module instead of ioremapping
->> in each driver.
->>
->> We can have a static map for the SCM, so ioremapping each driver
->> individually should not be an issue.
->>
-> This sounds a good idea. With this we may not even need a core control
-> module drivers if all the individual drivers take care of the registers they
-> care. Mapping shouldn't be a problem as you mentioned.
+Hi Benoit,
 
-We should keep the MFD for PM / OCP single port correctness. Other than 
-that it will be mostly useless, indeed.
+On Wed, May 30, 2012 at 8:53 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 5/30/2012 4:51 PM, Shilimkar, Santosh wrote:
+>>
+>> On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I<kishon@ti.com>
+>> ?wrote:
+>>>
+>>> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
+>>> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now
+>>> added
+>>> (which can be used to control MODULEMODE) this clock node is removed.
+>>>
+>>> Cc: Benoit Cousson<b-cousson@ti.com>
+>>> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>>> ---
+>>> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
+>>
+>>
+>> Have you patched clock44xx_data.c manually or you have a patch for
+>> the clock_data autogen script to generate it ?
+>
+>
+> I have a series that will remove all these clock nodes. I should be able to
+> post that soon.
+>
+> Potentially at that time, Kishon might be able to drop that patch.
 
-Regards,
-Benoit
+Will you be sending a patch for *[RFC PATCH 1/5] arm: omap: hwmod:
+make *phy_48m* as the main_clk of ocp2scp* also or I have to keep that
+as part of my series?
+
+Thanks
+Kishon
