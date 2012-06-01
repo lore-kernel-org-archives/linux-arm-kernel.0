@@ -1,43 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jun 2012 11:52:28 +0100
-Subject: [RFC 23/34] dmaengine: PL08x: re-jig the starting of txds
-In-Reply-To: <CACRpkdb15mx2jPZ3zqD01htvvLsQ27snsQQ+o=aSM8F6y=WKcw@mail.gmail.com>
+Date: Fri, 1 Jun 2012 11:55:50 +0100
+Subject: [RFC 34/34] dmaengine: PL08x: ensure all descriptors are freed
+ when channel is released
+In-Reply-To: <CACRpkdawZm2J_4ujUv96-d0kDV0m7XOrr+wk8Wr92a3KLZcf2w@mail.gmail.com>
 References: <20120529093015.GF12217@n2100.arm.linux.org.uk>
- <E1SZIxA-00070E-Dc@rmk-PC.arm.linux.org.uk>
- <CACRpkdb15mx2jPZ3zqD01htvvLsQ27snsQQ+o=aSM8F6y=WKcw@mail.gmail.com>
-Message-ID: <20120601105228.GE21245@n2100.arm.linux.org.uk>
+ <E1SZJ0j-000717-M3@rmk-PC.arm.linux.org.uk>
+ <CACRpkdawZm2J_4ujUv96-d0kDV0m7XOrr+wk8Wr92a3KLZcf2w@mail.gmail.com>
+Message-ID: <20120601105550.GF21245@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 31, 2012 at 09:14:15AM +0800, Linus Walleij wrote:
-> On Tue, May 29, 2012 at 5:43 PM, Russell King
+On Thu, May 31, 2012 at 09:27:55AM +0800, Linus Walleij wrote:
+> On Tue, May 29, 2012 at 5:46 PM, Russell King
 > <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> > Rather than code the de-queue of the txd several times, move that into
-> > the start_txd function. ?Rename this to better illustrate what it's
-> > now doing, and call this function when starting a delayed memcpy().
+> > Ensure all queued descriptors are freed when the channel is released,
+> > ensuring we don't leak memory
 > >
 > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /*
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* Eww. ?We know this isn't going to deadlock
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* but lockdep probably doens't.
+> Excellent series Russell, looking forward to a version that
+> applies on top of v3.5-rc:s and I'll test it. Would be great to get
+> this into the -next tree as soon as you think it's ripe.
 > 
-> Speling...
-> 
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spin_lock(&waiting->lock);
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_start_next_txd(waiting);
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spin_unlock(&waiting->lock);
-> 
-> I've seen this construct in the past and have no better suggestions...
-
-I have no way to test whether my statement is true as I can't get enough
-DMA engine usage through the PL011 transmit support to check what happens.
-So the statement is purely theoretical.
-
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-> 
+
+Note that I have four additional patches on top of this which I didn't
+post, which I've kept up to date - two of them add the Versatile and
+Realview support, though I've kept them in a slightly messy state to
+work around some of the brokenness on the hardware I've experienced
+(mostly just commenting out various bits of the DMA data for various
+drivers.)
