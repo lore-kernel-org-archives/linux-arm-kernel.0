@@ -1,32 +1,29 @@
-From: lenb@kernel.org (Len Brown)
-Date: Sat, 02 Jun 2012 01:50:50 -0400
-Subject: [linux-pm] [PATCH 0/2] bug fixes for coupled cpuidle
-In-Reply-To: <1337364324-12171-1-git-send-email-ccross@android.com>
-References: <1337364324-12171-1-git-send-email-ccross@android.com>
-Message-ID: <4FC9A9BA.1020904@kernel.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 2 Jun 2012 08:48:39 +0200
+Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <201205290846.53960.marex@denx.de>
+References: <1338084656-11961-1-git-send-email-marex@denx.de>
+ <4FC359BC.8080606@codethink.co.uk>
+ <201205290846.53960.marex@denx.de>
+Message-ID: <20120602064839.GA13441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2012 02:05 PM, Colin Cross wrote:
 
-> The last modifications made to the coupled cpuidle patches introduced
-> two bugs that I missed during testing.  The online count was never
-> initialized, causing coupled idle to always wait and never enter the
-> ready loop.  That hid the second bug, the ready count could never be
-> decremented after exiting idle.
+> > Is there not a standard speed setting in the i2c binding?
 > 
-> Len, these two patches could be squashed into patch 3 of the original
-> set.  If you do squash them, you could also add Rafael's tags to the
-> set (Reviewed-by on 1 and 2, acked-by on 3).
+> Not that I know of, but if someone hinted one to me, I'd gladly rework the 
+> patches :)
 
+It is "clock-frequency". Check 'Documentation/devicetree/bindings/i2c'.
 
-squash & tags update done.
-
-> Or I can reupload the
-> whole stack as v5 if you prefer.
-
-
-no need.
-
-thanks,
--Len Brown, Intel Open Source Technology Center
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120602/b19a34e9/attachment.sig>
