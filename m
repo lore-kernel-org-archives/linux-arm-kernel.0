@@ -1,37 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 3 Jun 2012 02:41:52 +0000
+Date: Sun, 3 Jun 2012 05:56:49 +0000
 Subject: ARM PCI controller registration and representation using device
  tree?
-In-Reply-To: <20120602143448.GA1624@n2100.arm.linux.org.uk>
+In-Reply-To: <4113992.BTnO0ZYQON@bender>
 References: <4113992.BTnO0ZYQON@bender>
- <20120602143448.GA1624@n2100.arm.linux.org.uk>
-Message-ID: <201206030241.52775.arnd@arndb.de>
+Message-ID: <201206030556.49821.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 June 2012, Russell King - ARM Linux wrote:
-> I think we have to keep the existing strategy of having struct hw_pci and
-> its pci_sys_data, registering each bus separately with its own individual
-> swizzle and map_irq functions depending on how the bus hardware is setup.
+On Saturday 02 June 2012, Florian Fainelli wrote:
+> I was wondering if anyone had started working on representing the various PCI 
+> controllers found on SoCs to a device tree representation?
+> 
+> It seems like quite some generic code could be borrowed from PowerPC, 
+> especially the parsing of the PCI ranges, though I don't see ARM directly 
+> exposing a struct pci_controller to easily allow that.
+> 
+> Any thoughts about this?
 
-Actually, I think we won't need to call pci_fixup_irqs for DT at all, so
-there won't be host specific swizzle and map_irq functions. AFAICT the
-interrupt-map property can handle all possible cases, it certainly does
-so for a large number of obscure buses on powerpc.
+I think the PCI host controller code should be a lot more generic than it
+currently is. Each architecture has to provide quite a bit of infrastructure
+and the differences are to a large part not related to the CPU architecture.
 
-Please have a look at drivers/of/of_pci_irq.c to see if you can spot
-anything missing in there. The interrupt-map lets you define a mapping
-from a bus-specific interrupt number to a global one, with an address/mask
-of the bus/dev/fn ID of the device(s) it applies to. For anything with
-default swizzling, we just provide the map for the root dev, while those
-devices that require a more complex mapping need to list each IRQ line
-that is connected differently. See arch/powerpc/boot/dts/mpc5121ads.dts
-for an example with a nonstandard mapping.
+I'd love to get to the point where we can have host controllers defined
+in drivers/pci/host/*.c in a way that is completely architecture independent.
+Alpha, ia64, microblaze, mips, powerpc, tile and xtensa all have a structure
+named "pci_controller" for doing this, but I think they are all different.
+ARM has two structures: pci_sys_data (corresponds to pci_controller) and
+hw_pci mostly to provide function pointers that are all the same for each
+instance. arch/sh has a pci_channel that does the same thing and parisc
+has pci_hba_data.
 
-> Also rememer that the PCI configuration space accessor functions are highly
-> PCI host bridge specific.
-
-Right. We can have a default ones for mmconfig and PIO 0xcfc in drivers/pci,
-but I think most will have a separate one on ARM.
+I don't think it's realistic to aim for completely unifying those structures
+and implementations, but we can try to define a new architecture independent
+abstraction that covers all the common parts and has a pointer the architecture
+specific data, which can hold the more obscure things.
 
 	Arnd
