@@ -1,13 +1,16 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 2 Jun 2012 20:57:17 +0200
+From: hanskroner@gmail.com (Hans =?utf-8?b?S3LDtm5lcg==?=)
+Date: Sun, 3 Jun 2012 15:26:14 +0000 (UTC)
 Subject: Kernel 3.4 on Dreamplug: no serial console
-Message-ID: <20120602185717.GA19945@lunn.ch>
+References: <loom.20120602T135715-548@post.gmane.org>
+Message-ID: <loom.20120603T172511-816@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans
+Hi again,
 
-Do you have SERIAL_OF_PLATFORM enabled. Without that, the serial ports
-won't work.
+Many thanks to the both of you. CONFIG_SERIAL_OF_PLATFORM was exactly what
+I was missing in my .config
 
-   Andrew
+Thanks a bunch!
+
+Hans
