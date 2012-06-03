@@ -1,30 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jun 2012 08:55:44 +0100
-Subject: ARM PCI controller registration and representation using
- device tree?
-In-Reply-To: <201206030241.52775.arnd@arndb.de>
-References: <4113992.BTnO0ZYQON@bender>
- <20120602143448.GA1624@n2100.arm.linux.org.uk>
- <201206030241.52775.arnd@arndb.de>
-Message-ID: <20120603075544.GA15354@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 3 Jun 2012 14:59:50 +0530
+Subject: [PATCH v2 4/6] ARM: Samsung: Modify
+ s3c64xx_spi{0|1|2}_set_platdata function
+In-Reply-To: <20120601123902.GL24139@opensource.wolfsonmicro.com>
+References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
+ <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
+ <20120520092113.GA20652@opensource.wolfsonmicro.com>
+ <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
+ <20120530093421.GA9947@opensource.wolfsonmicro.com>
+ <CAJuYYwShLhKSrpGhaTyxX4dqaiKDAcjBtuWSMYAdsWcOMfP=qw@mail.gmail.com>
+ <20120530101326.GF9947@opensource.wolfsonmicro.com>
+ <CAJuYYwT88mpTKmOD8mpCjsQo9O_+Giri7+q-Rzz=zPNj+F7aDg@mail.gmail.com>
+ <20120531113659.GB2666@opensource.wolfsonmicro.com>
+ <CAJuYYwS5vPO9GNFMGArroOe57Z80+gP0vnRMjPuXRaxukNJ8uw@mail.gmail.com>
+ <20120601123902.GL24139@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwS6xgTQD=azEc_020fBCvEzpu5bF6ANvnu1_iZfGptP-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 03, 2012 at 02:41:52AM +0000, Arnd Bergmann wrote:
-> On Saturday 02 June 2012, Russell King - ARM Linux wrote:
-> > I think we have to keep the existing strategy of having struct hw_pci and
-> > its pci_sys_data, registering each bus separately with its own individual
-> > swizzle and map_irq functions depending on how the bus hardware is setup.
-> 
-> Actually, I think we won't need to call pci_fixup_irqs for DT at all, so
-> there won't be host specific swizzle and map_irq functions. AFAICT the
-> interrupt-map property can handle all possible cases, it certainly does
-> so for a large number of obscure buses on powerpc.
+On 1 June 2012 18:09, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, Jun 01, 2012 at 10:47:44AM +0800, Thomas Abraham wrote:
+>
+>> 1. There is one instance of 'struct platform_device' for each of the
+>> spi controller instances (0/1/2) named "s3c64xx-spi" (in
+>> arch/arm/plat-samsung/devs.c).
+>
+> Right, which looks rather like it is specific to s3c64xx at least given
+> the naming... ?there aren't any current in tree users, though I do have
+> one out of tree user on s3c6410. ?If this is supposed to be used on the
+> later SoCs too then I guess it ought to be renamed anyway since what's
+> there looks wrong.
 
-That means you have to list every PCI device in DT along with its
-interrupt number - which means your boot loader will have to scan the
-PCI bus and provide interrupt and BAR settings into the kernel.
+The spi platform device is not really s3c64xx specific. It can be
+reused on all other Samsung SoC's as well, but there are no users of
+this except for s3c64xx SoC. The resources for this platform devices
+are statically bound for a SoC during compile time. I would not
+consider the existing spi platform device instance name
+(s3c64xx_device_spi0) or the .name (s3c64xx-spi) to be factor in
+reusing it on other Samsung SoC's.
 
-And that will suck if you have something like a 4 port PCI network card
-which has a PCI-to-PCI bridge on - are boot loaders going to have the
-correct swizzling support?  I think not.
+>
+>> 5. If point 4 is not correct, the other option is to create a separate
+>> instances of 'struct platform_device' for each of the s3c, s5p and
+>> Exynos4/5 SoC's. Is this the correct way, and if yes, could you please
+>> help me understand the issues in setting the name of the platform
+>> device at runtime.
+>
+> That would seem less painful to me. ?The big problem I've found is with
+> things like matching clocks up where if you look at the device that's
+> being registered it has one name but at runtime it has another name, it
+> makes everything much harder to follow. ?There was one of the devices
+> where the .id also ended up getting changed which created even more
+> confusion.
+
+Yes, I agree with you that changing device names at runtime can be
+confusing at times. Probably, additional comments to indicate possible
+runtime changes in device names could be useful.
+
+For now, I will avoid runtime setting of platform device name as you
+have suggested. Thank your for providing clarification for my
+questions.
+
+Regards,
+Thomas.
