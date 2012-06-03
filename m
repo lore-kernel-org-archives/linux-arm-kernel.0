@@ -1,63 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jun 2012 12:34:50 +0100
-Subject: Query about: ARM11 MPCore: preemption/task migration cache
- coherency
-In-Reply-To: <20120601032912.GB16273@mbp>
-References: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
- <4FC6FC38.8090904@gmail.com>
- <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
- <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
- <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
- <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
- <4FC81C14.7030702@gmail.com> <20120601032912.GB16273@mbp>
-Message-ID: <20120603113449.GB15354@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 3 Jun 2012 11:54:42 +0000
+Subject: ARM PCI controller registration and representation using device
+ tree?
+In-Reply-To: <20120603075544.GA15354@n2100.arm.linux.org.uk>
+References: <4113992.BTnO0ZYQON@bender> <201206030241.52775.arnd@arndb.de>
+ <20120603075544.GA15354@n2100.arm.linux.org.uk>
+Message-ID: <201206031154.42290.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 01, 2012 at 11:29:13AM +0800, Catalin Marinas wrote:
-> On Fri, Jun 01, 2012 at 02:34:12AM +0100, snakky.zhang at gmail.com wrote:
-> > >> Yes, seems newer CPUs has no such limitation thus this function is global
-> > >> effective naturally. :-)
-> > >>
-> > >> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
-> > >> Details in arch/mips/mm/c-r4k.c.
-> > > Rather than IPI we would better use the read-for-ownership trick like
-> > > in this patch to make flush_dcache_page global (no need for
-> > > write-for-ownership):
-> > >
-> > > http://dchs.spinics.net/lists/arm-kernel/msg125075.html
-> > >
-> > > (it may no longer apply, I haven't checked it for some time).
-> > >
-> > > That's the first thing. Secondly you still need preemption disable so
-> > > that it is not preempted between RFO and the actual cache cleaning.
-> > >
-> > And, another confusion for PREEMPT: Even if we disable preempt, with locally
-> > effective flush_dcache_xxx, there is still possibility to reproduce such
-> > issue(Similar with the previous case):
-> > 
-> > 1) Task running on Core-0 loading text section into memory.
-> >      It was schedule out and then migrate into Core-1;
-> > 2) On Core-1, this task continue loading it and then
-> >      "flush_dcache_page" to make sure the loaded text section write
-> >      into main memory.
-> > 3) Task tend to the loaded text section and running it.
-> > 
-> > Similar as the previous case, the difference lies in step1 that the
-> > task was interrupted by timer interrupt. Thus it still can be switch
-> > out and then been migrate to another core. Thus in step2 and 3, this
-> > issue may still been reproduced.  So, disable preempt can only lower
-> > the possibility of this issue but can't avoid it.
+On Sunday 03 June 2012, Russell King - ARM Linux wrote:
 > 
-> It would work as long as the data copying into the text area (done by
-> the driver and VFS layer) and the flush_dcache_page() sequence are not
-> preemptible. A timer interrupt between data copying and
-> flush_dcache_page() would interrupt a kernel routine which is not
-> preemptible.
+> On Sun, Jun 03, 2012 at 02:41:52AM +0000, Arnd Bergmann wrote:
+> > On Saturday 02 June 2012, Russell King - ARM Linux wrote:
+> > > I think we have to keep the existing strategy of having struct hw_pci and
+> > > its pci_sys_data, registering each bus separately with its own individual
+> > > swizzle and map_irq functions depending on how the bus hardware is setup.
+> > 
+> > Actually, I think we won't need to call pci_fixup_irqs for DT at all, so
+> > there won't be host specific swizzle and map_irq functions. AFAICT the
+> > interrupt-map property can handle all possible cases, it certainly does
+> > so for a large number of obscure buses on powerpc.
+> 
+> That means you have to list every PCI device in DT along with its
+> interrupt number - which means your boot loader will have to scan the
+> PCI bus and provide interrupt and BAR settings into the kernel.
 
-And that doesn't matter because on a non-preemptible kernel, timer ticks
-do _not_ cause the threads to be rescheduled while in kernel mode.  If
-they did, it would be a _preemptible_ kernel.
+Actually not, there is only one "interrupt-map" property in the PCI
+host node, no need to list the add-on cards that use regular swizzling.
 
-The only things on a non-preemptible kernel which cause a schedule point
-are functions which may sleep, so semaphores, waiting for events, etc.
+The binding is a little hard to understand at first, but it's all in there:
+http://www.openfirmware.org/1275/proposals/Attachments/321att.pdf
+
+> And that will suck if you have something like a 4 port PCI network card
+> which has a PCI-to-PCI bridge on - are boot loaders going to have the
+> correct swizzling support?  I think not.
+
+I can assure you that those cases are covered by the binding. We have PCI
+buses on most PowerPC systems, and we don't normally list the devices on
+them, although the PCI binding allows us to. In the example you mention,
+of_irq_map_pci will walk up the buses across all PCI bridges using standard
+swizzling until it gets to a device that has a device node, which is
+normally the host controller, but it can also be a device that is hardwired.
+
+If a device or slot is hardwired to a specific IRQ, there is no problem
+listing it in the device tree without the need for a bus walk in the boot
+loarder. If it's not hardwired, then it should use the swizzling algorithm
+in the bridge.
+
+	Arnd
