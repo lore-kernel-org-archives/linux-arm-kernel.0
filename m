@@ -1,65 +1,63 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 3 Jun 2012 14:59:50 +0530
-Subject: [PATCH v2 4/6] ARM: Samsung: Modify
- s3c64xx_spi{0|1|2}_set_platdata function
-In-Reply-To: <20120601123902.GL24139@opensource.wolfsonmicro.com>
-References: <1337333613-6216-1-git-send-email-thomas.abraham@linaro.org>
- <1337333613-6216-5-git-send-email-thomas.abraham@linaro.org>
- <20120520092113.GA20652@opensource.wolfsonmicro.com>
- <CAOesGMhFcdv7QW=_1U8HHfaETD83mJt=Dgk-8z40yOrC3PB_fA@mail.gmail.com>
- <20120530093421.GA9947@opensource.wolfsonmicro.com>
- <CAJuYYwShLhKSrpGhaTyxX4dqaiKDAcjBtuWSMYAdsWcOMfP=qw@mail.gmail.com>
- <20120530101326.GF9947@opensource.wolfsonmicro.com>
- <CAJuYYwT88mpTKmOD8mpCjsQo9O_+Giri7+q-Rzz=zPNj+F7aDg@mail.gmail.com>
- <20120531113659.GB2666@opensource.wolfsonmicro.com>
- <CAJuYYwS5vPO9GNFMGArroOe57Z80+gP0vnRMjPuXRaxukNJ8uw@mail.gmail.com>
- <20120601123902.GL24139@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwS6xgTQD=azEc_020fBCvEzpu5bF6ANvnu1_iZfGptP-Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 3 Jun 2012 12:34:50 +0100
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <20120601032912.GB16273@mbp>
+References: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+ <4FC6FC38.8090904@gmail.com>
+ <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
+ <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
+ <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
+ <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
+ <4FC81C14.7030702@gmail.com> <20120601032912.GB16273@mbp>
+Message-ID: <20120603113449.GB15354@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2012 18:09, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Jun 01, 2012 at 10:47:44AM +0800, Thomas Abraham wrote:
->
->> 1. There is one instance of 'struct platform_device' for each of the
->> spi controller instances (0/1/2) named "s3c64xx-spi" (in
->> arch/arm/plat-samsung/devs.c).
->
-> Right, which looks rather like it is specific to s3c64xx at least given
-> the naming... ?there aren't any current in tree users, though I do have
-> one out of tree user on s3c6410. ?If this is supposed to be used on the
-> later SoCs too then I guess it ought to be renamed anyway since what's
-> there looks wrong.
+On Fri, Jun 01, 2012 at 11:29:13AM +0800, Catalin Marinas wrote:
+> On Fri, Jun 01, 2012 at 02:34:12AM +0100, snakky.zhang at gmail.com wrote:
+> > >> Yes, seems newer CPUs has no such limitation thus this function is global
+> > >> effective naturally. :-)
+> > >>
+> > >> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
+> > >> Details in arch/mips/mm/c-r4k.c.
+> > > Rather than IPI we would better use the read-for-ownership trick like
+> > > in this patch to make flush_dcache_page global (no need for
+> > > write-for-ownership):
+> > >
+> > > http://dchs.spinics.net/lists/arm-kernel/msg125075.html
+> > >
+> > > (it may no longer apply, I haven't checked it for some time).
+> > >
+> > > That's the first thing. Secondly you still need preemption disable so
+> > > that it is not preempted between RFO and the actual cache cleaning.
+> > >
+> > And, another confusion for PREEMPT: Even if we disable preempt, with locally
+> > effective flush_dcache_xxx, there is still possibility to reproduce such
+> > issue(Similar with the previous case):
+> > 
+> > 1) Task running on Core-0 loading text section into memory.
+> >      It was schedule out and then migrate into Core-1;
+> > 2) On Core-1, this task continue loading it and then
+> >      "flush_dcache_page" to make sure the loaded text section write
+> >      into main memory.
+> > 3) Task tend to the loaded text section and running it.
+> > 
+> > Similar as the previous case, the difference lies in step1 that the
+> > task was interrupted by timer interrupt. Thus it still can be switch
+> > out and then been migrate to another core. Thus in step2 and 3, this
+> > issue may still been reproduced.  So, disable preempt can only lower
+> > the possibility of this issue but can't avoid it.
+> 
+> It would work as long as the data copying into the text area (done by
+> the driver and VFS layer) and the flush_dcache_page() sequence are not
+> preemptible. A timer interrupt between data copying and
+> flush_dcache_page() would interrupt a kernel routine which is not
+> preemptible.
 
-The spi platform device is not really s3c64xx specific. It can be
-reused on all other Samsung SoC's as well, but there are no users of
-this except for s3c64xx SoC. The resources for this platform devices
-are statically bound for a SoC during compile time. I would not
-consider the existing spi platform device instance name
-(s3c64xx_device_spi0) or the .name (s3c64xx-spi) to be factor in
-reusing it on other Samsung SoC's.
+And that doesn't matter because on a non-preemptible kernel, timer ticks
+do _not_ cause the threads to be rescheduled while in kernel mode.  If
+they did, it would be a _preemptible_ kernel.
 
->
->> 5. If point 4 is not correct, the other option is to create a separate
->> instances of 'struct platform_device' for each of the s3c, s5p and
->> Exynos4/5 SoC's. Is this the correct way, and if yes, could you please
->> help me understand the issues in setting the name of the platform
->> device at runtime.
->
-> That would seem less painful to me. ?The big problem I've found is with
-> things like matching clocks up where if you look at the device that's
-> being registered it has one name but at runtime it has another name, it
-> makes everything much harder to follow. ?There was one of the devices
-> where the .id also ended up getting changed which created even more
-> confusion.
-
-Yes, I agree with you that changing device names at runtime can be
-confusing at times. Probably, additional comments to indicate possible
-runtime changes in device names could be useful.
-
-For now, I will avoid runtime setting of platform device name as you
-have suggested. Thank your for providing clarification for my
-questions.
-
-Regards,
-Thomas.
+The only things on a non-preemptible kernel which cause a schedule point
+are functions which may sleep, so semaphores, waiting for events, etc.
