@@ -1,156 +1,52 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 03 Jun 2012 18:12:45 +0530
-Subject: [PATCH v2 2/6] ARM: Exynos5: Add spi clock support
+Date: Sun, 03 Jun 2012 18:12:46 +0530
+Subject: [PATCH v2 3/6] ARM: Exynos4: Enable platform support for SPI
+ controllers
 In-Reply-To: <1338727369-18241-1-git-send-email-thomas.abraham@linaro.org>
 References: <1338727369-18241-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1338727369-18241-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1338727369-18241-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for clock instances for each spi controller.
+Add the platform bits which are required to support SPI controllers.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Jaswinder Singh <jaswinder.singh@linaro.org>
 ---
- arch/arm/mach-exynos/clock-exynos5.c |   98 ++++++++++++++++++++++++++++++++++
- 1 files changed, 98 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos/include/mach/irqs.h |    4 ++++
+ arch/arm/mach-exynos/mach-exynos4-dt.c   |    6 ++++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index fefa336..7369b51 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -131,6 +131,11 @@ static int exynos5_clksrc_mask_peric0_ctrl(struct clk *clk, int enable)
- 	return s5p_gatectrl(EXYNOS5_CLKSRC_MASK_PERIC0, clk, enable);
- }
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 7a4b478..35bced6 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -195,6 +195,10 @@
+ #define IRQ_IIC6			EXYNOS4_IRQ_IIC6
+ #define IRQ_IIC7			EXYNOS4_IRQ_IIC7
  
-+static int exynos5_clksrc_mask_peric1_ctrl(struct clk *clk, int enable)
-+{
-+	return s5p_gatectrl(EXYNOS5_CLKSRC_MASK_PERIC1, clk, enable);
-+}
++#define IRQ_SPI0			EXYNOS4_IRQ_SPI0
++#define IRQ_SPI1			EXYNOS4_IRQ_SPI1
++#define IRQ_SPI2			EXYNOS4_IRQ_SPI2
 +
- static int exynos5_clk_ip_acp_ctrl(struct clk *clk, int enable)
- {
- 	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ACP, clk, enable);
-@@ -741,6 +746,24 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.enable		= exynos5_clk_ip_peric_ctrl,
- 		.ctrlbit	= (1 << 14),
- 	}, {
-+		.name		= "spi",
-+		.devname	= "exynos4210-spi.0",
-+		.parent		= &exynos5_clk_aclk_66.clk,
-+		.enable		= exynos5_clk_ip_peric_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	}, {
-+		.name		= "spi",
-+		.devname	= "exynos4210-spi.1",
-+		.parent		= &exynos5_clk_aclk_66.clk,
-+		.enable		= exynos5_clk_ip_peric_ctrl,
-+		.ctrlbit	= (1 << 17),
-+	}, {
-+		.name		= "spi",
-+		.devname	= "exynos4210-spi.2",
-+		.parent		= &exynos5_clk_aclk_66.clk,
-+		.enable		= exynos5_clk_ip_peric_ctrl,
-+		.ctrlbit	= (1 << 18),
-+	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
-@@ -1034,6 +1057,72 @@ static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
- 	.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS2, .shift = 24, .size = 8 },
- };
+ #define IRQ_USB_HOST			EXYNOS4_IRQ_USB_HOST
+ #define IRQ_OTG				EXYNOS4_IRQ_USB_HSOTG
  
-+static struct clksrc_clk exynos5_clk_mdout_spi0 = {
-+	.clk	= {
-+		.name		= "sclk_spi_mdout",
-+		.devname	= "exynos4210-spi.0",
-+	},
-+	.sources = &exynos5_clkset_group,
-+	.reg_src = { .reg = EXYNOS5_CLKSRC_PERIC1, .shift = 16, .size = 4 },
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC1, .shift = 0, .size = 4 },
-+
-+};
-+
-+static struct clksrc_clk exynos5_clk_sclk_spi0 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "exynos4210-spi.0",
-+		.parent		= &exynos5_clk_mdout_spi0.clk,
-+		.enable		= exynos5_clksrc_mask_peric1_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	},
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC1, .shift = 8, .size = 8 },
-+};
-+
-+static struct clksrc_clk exynos5_clk_mdout_spi1 = {
-+	.clk	= {
-+		.name		= "sclk_spi_mdout",
-+		.devname	= "exynos4210-spi.1",
-+	},
-+	.sources = &exynos5_clkset_group,
-+	.reg_src = { .reg = EXYNOS5_CLKSRC_PERIC1, .shift = 20, .size = 4 },
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC1, .shift = 16, .size = 4 },
-+
-+};
-+
-+static struct clksrc_clk exynos5_clk_sclk_spi1 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "exynos4210-spi.1",
-+		.parent		= &exynos5_clk_mdout_spi1.clk,
-+		.enable		= exynos5_clksrc_mask_peric1_ctrl,
-+		.ctrlbit	= (1 << 20),
-+	},
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC1, .shift = 24, .size = 8 },
-+};
-+
-+static struct clksrc_clk exynos5_clk_mdout_spi2 = {
-+	.clk	= {
-+		.name		= "sclk_spi_mdout",
-+		.devname	= "exynos4210-spi.2",
-+	},
-+	.sources = &exynos5_clkset_group,
-+	.reg_src = { .reg = EXYNOS5_CLKSRC_PERIC1, .shift = 24, .size = 4 },
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 0, .size = 4 },
-+
-+};
-+
-+static struct clksrc_clk exynos5_clk_sclk_spi2 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "exynos4210-spi.2",
-+		.parent		= &exynos5_clk_mdout_spi2.clk,
-+		.enable		= exynos5_clksrc_mask_peric1_ctrl,
-+		.ctrlbit	= (1 << 24),
-+	},
-+	.reg_div = { .reg = EXYNOS5_CLKDIV_PERIC2, .shift = 8, .size = 8 },
-+};
-+
- static struct clksrc_clk exynos5_clksrcs[] = {
- 	{
- 		.clk	= {
-@@ -1148,6 +1237,12 @@ static struct clksrc_clk *exynos5_sysclks[] = {
- 	&exynos5_clk_dout_mmc4,
- 	&exynos5_clk_aclk_acp,
- 	&exynos5_clk_pclk_acp,
-+	&exynos5_clk_sclk_spi0,
-+	&exynos5_clk_sclk_spi1,
-+	&exynos5_clk_sclk_spi2,
-+	&exynos5_clk_mdout_spi0,
-+	&exynos5_clk_mdout_spi1,
-+	&exynos5_clk_mdout_spi2,
- };
- 
- static struct clk *exynos5_clk_cdev[] = {
-@@ -1176,6 +1271,9 @@ static struct clk_lookup exynos5_clk_lookup[] = {
- 	CLKDEV_INIT("exynos4-sdhci.1", "mmc_busclk.2", &exynos5_clk_sclk_mmc1.clk),
- 	CLKDEV_INIT("exynos4-sdhci.2", "mmc_busclk.2", &exynos5_clk_sclk_mmc2.clk),
- 	CLKDEV_INIT("exynos4-sdhci.3", "mmc_busclk.2", &exynos5_clk_sclk_mmc3.clk),
-+	CLKDEV_INIT("exynos4210-spi.0", "spi_busclk0", &exynos5_clk_sclk_spi0.clk),
-+	CLKDEV_INIT("exynos4210-spi.1", "spi_busclk0", &exynos5_clk_sclk_spi1.clk),
-+	CLKDEV_INIT("exynos4210-spi.2", "spi_busclk0", &exynos5_clk_sclk_spi2.clk),
- 	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
- 	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
- 	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index e7e9743..b2b5d5f 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -55,6 +55,12 @@ static const struct of_dev_auxdata exynos4210_auxdata_lookup[] __initconst = {
+ 				"exynos4-sdhci.3", NULL),
+ 	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(0),
+ 				"s3c2440-i2c.0", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI0,
++				"exynos4210-spi.0", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI1,
++				"exynos4210-spi.1", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI2,
++				"exynos4210-spi.2", NULL),
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA0, "dma-pl330.0", NULL),
+ 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
+ 	{},
 -- 
 1.6.6.rc2
