@@ -1,67 +1,115 @@
 From: michael@walle.cc (Michael Walle)
-Date: Sun,  3 Jun 2012 22:17:56 +0200
-Subject: [PATCH 1/3] spi-orion: add device tree binding
-Message-ID: <1338754678-17000-1-git-send-email-michael@walle.cc>
+Date: Sun,  3 Jun 2012 22:17:58 +0200
+Subject: [PATCH 3/3] ARM: kirkwood: use devicetree for SPI on dreamplug
+In-Reply-To: <1338754678-17000-1-git-send-email-michael@walle.cc>
+References: <1338754678-17000-1-git-send-email-michael@walle.cc>
+Message-ID: <1338754678-17000-3-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use the device tree for the SPI driver and partition layout.
+
 Signed-off-by: Michael Walle <michael@walle.cc>
 ---
- .../devicetree/bindings/spi/spi-orion.txt          |    5 +++++
- drivers/spi/spi-orion.c                            |   11 +++++++++++
- 2 files changed, 16 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-orion.txt
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   28 +++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dreamplug.c |   40 ------------------------------
+ 2 files changed, 28 insertions(+), 40 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-new file mode 100644
-index 0000000..e68597a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-@@ -0,0 +1,5 @@
-+Marvell Orion SPI device
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index a5376b8..f31d2b5 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -20,5 +20,33 @@
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+ 		};
 +
-+Required properties:
-+- compatible : should be "marvell,orion-spi".
-+- reg : offset and length of the register set for the device
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 2760450..2de58bb 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/spi/spi.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/clk.h>
- #include <asm/unaligned.h>
- 
-@@ -506,6 +507,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
- 	if (orion_spi_reset(spi) < 0)
- 		goto out_rel_mem;
- 
-+	master->dev.of_node = pdev->dev.of_node;
- 	status = spi_register_master(master);
- 	if (status < 0)
- 		goto out_rel_mem;
-@@ -547,10 +549,19 @@ static int __exit orion_spi_remove(struct platform_device *pdev)
- 
- MODULE_ALIAS("platform:" DRIVER_NAME);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id orion_spi_of_match_table[] __devinitdata = {
-+	{ .compatible = "mrvl,orion-spi", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, orion_spi_of_match_table);
-+#endif
++		spi at 10600 {
++			status = "okay";
 +
- static struct platform_driver orion_spi_driver = {
- 	.driver = {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(orion_spi_of_match_table),
- 	},
- 	.remove		= __exit_p(orion_spi_remove),
++			m25p40 at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "mx25l1606e";
++				reg = <0>;
++				spi-max-frequency = <50000000>;
++				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x80000>;
++					label = "u-boot";
++				};
++
++				partition at 100000 {
++					reg = <0x100000 0x10000>;
++					label = "u-boot env";
++				};
++
++				partition at 180000 {
++					reg = <0x180000 0x10000>;
++					label = "dtb";
++				};
++			};
++		};
+ 	};
  };
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index 55e357a..b3aba7d 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -36,42 +36,6 @@
+ #include "common.h"
+ #include "mpp.h"
+ 
+-struct mtd_partition dreamplug_partitions[] = {
+-	{
+-		.name	= "u-boot",
+-		.size	= SZ_512K,
+-		.offset = 0,
+-	},
+-	{
+-		.name	= "u-boot env",
+-		.size	= SZ_64K,
+-		.offset = SZ_512K + SZ_512K,
+-	},
+-	{
+-		.name	= "dtb",
+-		.size	= SZ_64K,
+-		.offset = SZ_512K + SZ_512K + SZ_512K,
+-	},
+-};
+-
+-static const struct flash_platform_data dreamplug_spi_slave_data = {
+-	.type		= "mx25l1606e",
+-	.name		= "spi_flash",
+-	.parts		= dreamplug_partitions,
+-	.nr_parts	= ARRAY_SIZE(dreamplug_partitions),
+-};
+-
+-static struct spi_board_info __initdata dreamplug_spi_slave_info[] = {
+-	{
+-		.modalias	= "m25p80",
+-		.platform_data	= &dreamplug_spi_slave_data,
+-		.irq		= -1,
+-		.max_speed_hz	= 50000000,
+-		.bus_num	= 0,
+-		.chip_select	= 0,
+-	},
+-};
+-
+ static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+@@ -137,10 +101,6 @@ void __init dreamplug_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(dreamplug_mpp_config);
+ 
+-	spi_register_board_info(dreamplug_spi_slave_info,
+-				ARRAY_SIZE(dreamplug_spi_slave_info));
+-	kirkwood_spi_init();
+-
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dreamplug_ge00_data);
+ 	kirkwood_ge01_init(&dreamplug_ge01_data);
 -- 
 1.7.2.5
