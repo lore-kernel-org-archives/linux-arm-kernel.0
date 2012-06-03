@@ -1,89 +1,78 @@
 From: michael@walle.cc (Michael Walle)
-Date: Sun, 3 Jun 2012 23:48:49 +0200
-Subject: [PATCH 1/3] spi-orion: add device tree binding
-In-Reply-To: <20120603210123.GL14756@titan.lakedaemon.net>
-References: <1338754678-17000-1-git-send-email-michael@walle.cc>
- <20120603210123.GL14756@titan.lakedaemon.net>
-Message-ID: <201206032348.49208.michael@walle.cc>
+Date: Sun, 3 Jun 2012 23:51:22 +0200
+Subject: [PATCH] spi-orion: remove uneeded spi_info
+In-Reply-To: <20120603210424.GM14756@titan.lakedaemon.net>
+References: <1338754215-16022-1-git-send-email-michael@walle.cc>
+ <20120603210424.GM14756@titan.lakedaemon.net>
+Message-ID: <201206032351.22925.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jason,
 
-Am Sonntag 03 Juni 2012, 23:01:23 schrieb Jason Cooper:
-> On Sun, Jun 03, 2012 at 10:17:56PM +0200, Michael Walle wrote:
+Am Sonntag 03 Juni 2012, 23:04:24 schrieb Jason Cooper:
+> On Sun, Jun 03, 2012 at 10:10:14PM +0200, Michael Walle wrote:
+> > This was formerly used to store the tclk value. Remove it.
+> > 
 > > Signed-off-by: Michael Walle <michael@walle.cc>
 > > ---
 > > 
-> >  .../devicetree/bindings/spi/spi-orion.txt          |    5 +++++
-> >  drivers/spi/spi-orion.c                            |   11 +++++++++++
-> >  2 files changed, 16 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/spi/spi-orion.txt
+> >  drivers/spi/spi-orion.c |    5 -----
+> >  1 files changed, 0 insertions(+), 5 deletions(-)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt
-> > b/Documentation/devicetree/bindings/spi/spi-orion.txt new file mode
-> > 100644
-> > index 0000000..e68597a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-> > @@ -0,0 +1,5 @@
-> > +Marvell Orion SPI device
-> > +
-> > +Required properties:
-> > +- compatible : should be "marvell,orion-spi".
-> 
-> The above is correct, and a change in policy from when dreamplug DT
-> support was first added.
-> 
-> > +- reg : offset and length of the register set for the device
 > > diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> > index 2760450..2de58bb 100644
+> > index dfd04e9..2760450 100644
 > > --- a/drivers/spi/spi-orion.c
 > > +++ b/drivers/spi/spi-orion.c
-> > @@ -17,6 +17,7 @@
+> > @@ -45,7 +45,6 @@ struct orion_spi {
 > > 
-> >  #include <linux/io.h>
-> >  #include <linux/spi/spi.h>
-> >  #include <linux/module.h>
+> >  	void __iomem		*base;
+> >  	unsigned int		max_speed;
+> >  	unsigned int		min_speed;
 > > 
-> > +#include <linux/of.h>
+> > -	struct orion_spi_info	*spi_info;
 > > 
-> >  #include <linux/clk.h>
-> >  #include <asm/unaligned.h>
+> >  	struct clk              *clk;
+> >  
+> >  };
 > > 
-> > @@ -506,6 +507,7 @@ static int __init orion_spi_probe(struct
+> > @@ -450,12 +449,9 @@ static int __init orion_spi_probe(struct
 > > platform_device *pdev)
 > > 
-> >  	if (orion_spi_reset(spi) < 0)
+> >  	struct spi_master *master;
+> >  	struct orion_spi *spi;
+> >  	struct resource *r;
+> > 
+> > -	struct orion_spi_info *spi_info;
+> > 
+> >  	unsigned long tclk_hz;
+> >  	int status = 0;
+> > 
+> > -	spi_info = pdev->dev.platform_data;
+> > -
+> > 
+> >  	master = spi_alloc_master(&pdev->dev, sizeof *spi);
+> >  	if (master == NULL) {
 > >  	
-> >  		goto out_rel_mem;
+> >  		dev_dbg(&pdev->dev, "master allocation failed\n");
 > > 
-> > +	master->dev.of_node = pdev->dev.of_node;
-> > 
-> >  	status = spi_register_master(master);
-> >  	if (status < 0)
-> >  	
-> >  		goto out_rel_mem;
-> > 
-> > @@ -547,10 +549,19 @@ static int __exit orion_spi_remove(struct
+> > @@ -476,7 +472,6 @@ static int __init orion_spi_probe(struct
 > > platform_device *pdev)
 > > 
-> >  MODULE_ALIAS("platform:" DRIVER_NAME);
+> >  	spi = spi_master_get_devdata(master);
+> >  	spi->master = master;
 > > 
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id orion_spi_of_match_table[]
-> > __devinitdata = { +	{ .compatible = "mrvl,orion-spi", },
+> > -	spi->spi_info = spi_info;
+> > 
+> >  	spi->clk = clk_get(&pdev->dev, NULL);
 > 
-> Please make this consistent with the documentation, "marvell,orion-spi",
-> thanks.  That'll be one less to convert over later.
+> It's not relevant to this patch, but later in the patch series, you
+> initialize this device via devicetree.  Did you add the clock node?  Is
+> there a dependency for this series that I missed?
 
-oh, actually i forgot to change the documentation. wasnt the convention to use 
-the name used in the stock exchange?
-
-eg. the nand driver uses mrvl,orion-nand, or kirkwood itself is named 
-"mrvl,kirkwood".
-
-Or did i miss sth, because you wrote "one less to convert over later"?
+i added the original device name by using the auxdata in 
+of_platform_populate(). See "[PATCH 2/3] ARM: kirkwood: use devicetree for 
+orion-spi"
 
 -- 
-michael
+Michael
