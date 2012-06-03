@@ -1,66 +1,67 @@
 From: michael@walle.cc (Michael Walle)
-Date: Sun,  3 Jun 2012 22:17:57 +0200
-Subject: [PATCH 2/3] ARM: kirkwood: use devicetree for orion-spi
-In-Reply-To: <1338754678-17000-1-git-send-email-michael@walle.cc>
-References: <1338754678-17000-1-git-send-email-michael@walle.cc>
-Message-ID: <1338754678-17000-2-git-send-email-michael@walle.cc>
+Date: Sun,  3 Jun 2012 22:17:56 +0200
+Subject: [PATCH 1/3] spi-orion: add device tree binding
+Message-ID: <1338754678-17000-1-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate the devices with auxdata to set the device names which are used by
-clkdev to lookup the clocks.
-
 Signed-off-by: Michael Walle <michael@walle.cc>
 ---
- arch/arm/boot/dts/kirkwood.dtsi   |    9 +++++++++
- arch/arm/mach-kirkwood/board-dt.c |    8 +++++++-
- 2 files changed, 16 insertions(+), 1 deletions(-)
+ .../devicetree/bindings/spi/spi-orion.txt          |    5 +++++
+ drivers/spi/spi-orion.c                            |   11 +++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-orion.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 926528b..46223b3 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -33,6 +33,15 @@
- 			interrupts = <53>;
- 		};
- 
-+		spi at 10600 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			cell-index = <0>;
-+			compatible = "mrvl,orion-spi";
-+			reg = <0x10600 0x28>;
-+			status = "disabled";
-+		};
+diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
+new file mode 100644
+index 0000000..e68597a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
+@@ -0,0 +1,5 @@
++Marvell Orion SPI device
 +
- 		nand at 3000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index edc3f8a..cf1e141 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -25,6 +25,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
- 	{ }
- };
++Required properties:
++- compatible : should be "marvell,orion-spi".
++- reg : offset and length of the register set for the device
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 2760450..2de58bb 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -17,6 +17,7 @@
+ #include <linux/io.h>
+ #include <linux/spi/spi.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/clk.h>
+ #include <asm/unaligned.h>
  
-+struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("mrvl,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+@@ -506,6 +507,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	if (orion_spi_reset(spi) < 0)
+ 		goto out_rel_mem;
+ 
++	master->dev.of_node = pdev->dev.of_node;
+ 	status = spi_register_master(master);
+ 	if (status < 0)
+ 		goto out_rel_mem;
+@@ -547,10 +549,19 @@ static int __exit orion_spi_remove(struct platform_device *pdev)
+ 
+ MODULE_ALIAS("platform:" DRIVER_NAME);
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id orion_spi_of_match_table[] __devinitdata = {
++	{ .compatible = "mrvl,orion-spi", },
 +	{}
 +};
++MODULE_DEVICE_TABLE(of, orion_spi_of_match_table);
++#endif
 +
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-@@ -68,7 +73,8 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
- 		ib62x0_init();
- 
--	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
-+	of_platform_populate(NULL, kirkwood_dt_match_table,
-+				kirkwood_auxdata_lookup, NULL);
- }
- 
- static const char *kirkwood_dt_board_compat[] = {
+ static struct platform_driver orion_spi_driver = {
+ 	.driver = {
+ 		.name	= DRIVER_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(orion_spi_of_match_table),
+ 	},
+ 	.remove		= __exit_p(orion_spi_remove),
+ };
 -- 
 1.7.2.5
