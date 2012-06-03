@@ -1,38 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 3 Jun 2012 17:12:18 +0000
-Subject: Kernel 3.4 on Dreamplug: no serial console
-In-Reply-To: <1475115.7BtuQWbDGm@gromit>
-References: <loom.20120602T135715-548@post.gmane.org>
- <loom.20120603T172511-816@post.gmane.org> <1475115.7BtuQWbDGm@gromit>
-Message-ID: <201206031712.18645.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun,  3 Jun 2012 20:24:52 +0200
+Subject: [PATCH] ohci-nxp: Use ohci_finish_controller_resume()
+Message-ID: <1338747893-29338-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 03 June 2012, Adam Baker wrote:
-> As there are now two of us who have been tripped up by this does anyone think 
-> the untested patch below is
-> 
-> a) worthwhile
+OHCI drivers are supposed to use ohci_finish_controller_resume(). This patch
+adds respective suspend and resume code to ohci-nxp. The following compiler
+warning is fixed this way:
 
-yes
+drivers/usb/host/ohci-hub.c:321: warning: 'ohci_finish_controller_resume'
+defined but not used
 
-> b) likely to be acceptable
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-no
+---
+Applies to v3.5-rc1
 
-> c) likely to work
+ drivers/usb/host/ohci-nxp.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-yes
-
-> It feels wrong to be putting something arch specific in such general code but 
-> setting it as a default is cleaner than trying to select it from 
-> ARCH_KIRKWOOD_DT because default respects depends lines.
-
-Just put it into the kirkwood_defconfig file, that is the cleanest approach by
-far. We might still get a few people who run into this problem when updating,
-but in the long run it will be ok.
-
-I'd also accept a patch to make ARCH_KIRKWOOD_DT select OF_SERIAL if people
-prefer that, but I think just changing the defconfig is better.
-
-	Arnd
+--- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
++++ linux-2.6/drivers/usb/host/ohci-nxp.c
+@@ -432,6 +432,23 @@ static int usb_hcd_nxp_remove(struct pla
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int usb_hcd_suspend(struct platform_device *pdev, pm_message_t message)
++{
++	clk_disable(usb_clk);
++	return 0;
++}
++
++static int usb_hcd_resume(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++
++	clk_enable(usb_clk);
++	ohci_finish_controller_resume(hcd);
++	return 0;
++}
++#endif
++
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:usb-ohci");
+ 
+@@ -451,5 +468,9 @@ static struct platform_driver usb_hcd_nx
+ 	},
+ 	.probe = usb_hcd_nxp_probe,
+ 	.remove = usb_hcd_nxp_remove,
++#ifdef CONFIG_PM
++	.suspend = usb_hcd_suspend,
++	.resume = usb_hcd_resume,
++#endif
+ };
+ 
