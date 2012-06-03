@@ -1,58 +1,74 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun,  3 Jun 2012 20:24:52 +0200
-Subject: [PATCH] ohci-nxp: Use ohci_finish_controller_resume()
-Message-ID: <1338747893-29338-1-git-send-email-stigge@antcom.de>
+Date: Sun,  3 Jun 2012 20:33:32 +0200
+Subject: [PATCH v4 2/2] ARM: LPC32xx: Make platform use key driver
+In-Reply-To: <1338748412-29527-1-git-send-email-stigge@antcom.de>
+References: <1338748412-29527-1-git-send-email-stigge@antcom.de>
+Message-ID: <1338748412-29527-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OHCI drivers are supposed to use ohci_finish_controller_resume(). This patch
-adds respective suspend and resume code to ohci-nxp. The following compiler
-warning is fixed this way:
-
-drivers/usb/host/ohci-hub.c:321: warning: 'ohci_finish_controller_resume'
-defined but not used
+This patch connects the lpc32xx-key driver to the LPC32xx platform (via
+lpc32xx.dtsi), and more specifically to the reference board via its dts file.
+The clock.c file needs to be changed to match the automatic device name to its
+clock.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
 ---
+
 Applies to v3.5-rc1
 
- drivers/usb/host/ohci-nxp.c |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Please pick this patch for the arm-soc subsystem.
 
---- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
-+++ linux-2.6/drivers/usb/host/ohci-nxp.c
-@@ -432,6 +432,23 @@ static int usb_hcd_nxp_remove(struct pla
- 	return 0;
- }
+Changes since v3:
+* None
+
+Changes since v2:
+* DT: Use "keypad,num-rows", "keypad,num-columns" and "linux,keymap" properties
+
+ arch/arm/boot/dts/lpc32xx.dtsi |    2 ++
+ arch/arm/boot/dts/phy3250.dts  |    9 +++++++++
+ arch/arm/mach-lpc32xx/clock.c  |    2 +-
+ 3 files changed, 12 insertions(+), 1 deletion(-)
+
+--- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -249,6 +249,8 @@
+ 			key at 40050000 {
+ 				compatible = "nxp,lpc3220-key";
+ 				reg = <0x40050000 0x1000>;
++				interrupts = <54 0>;
++				status = "disable";
+ 			};
  
-+#ifdef CONFIG_PM
-+static int usb_hcd_suspend(struct platform_device *pdev, pm_message_t message)
-+{
-+	clk_disable(usb_clk);
-+	return 0;
-+}
+ 		};
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -135,6 +135,15 @@
+ 			tsc at 40048000 {
+ 				status = "okay";
+ 			};
 +
-+static int usb_hcd_resume(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+
-+	clk_enable(usb_clk);
-+	ohci_finish_controller_resume(hcd);
-+	return 0;
-+}
-+#endif
-+
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:usb-ohci");
++			key at 40050000 {
++				status = "okay";
++				keypad,num-rows = <1>;
++				keypad,num-columns = <1>;
++				nxp,debounce-delay-ms = <3>;
++				nxp,scan-delay-ms = <34>;
++				linux,keymap = <0x00000002>;
++			};
+ 		};
+ 	};
  
-@@ -451,5 +468,9 @@ static struct platform_driver usb_hcd_nx
- 	},
- 	.probe = usb_hcd_nxp_probe,
- 	.remove = usb_hcd_nxp_remove,
-+#ifdef CONFIG_PM
-+	.suspend = usb_hcd_suspend,
-+	.resume = usb_hcd_resume,
-+#endif
- };
- 
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -1131,7 +1131,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_INIT("31020300.i2c", NULL, &clk_i2c2),
+ 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
+ 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
+-	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
++	CLKDEV_INIT("40050000.key", NULL, &clk_kscan),
+ 	CLKDEV_INIT("20020000.flash", NULL, &clk_nand),
+ 	CLKDEV_INIT("200a8000.flash", NULL, &clk_nand_mlc),
+ 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
