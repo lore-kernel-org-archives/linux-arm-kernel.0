@@ -1,38 +1,38 @@
-From: adam@baker-net.org.uk (Adam Baker)
-Date: Sun, 03 Jun 2012 17:59:04 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 3 Jun 2012 17:12:18 +0000
 Subject: Kernel 3.4 on Dreamplug: no serial console
-In-Reply-To: <loom.20120603T172511-816@post.gmane.org>
+In-Reply-To: <1475115.7BtuQWbDGm@gromit>
 References: <loom.20120602T135715-548@post.gmane.org>
- <loom.20120603T172511-816@post.gmane.org>
-Message-ID: <1475115.7BtuQWbDGm@gromit>
+ <loom.20120603T172511-816@post.gmane.org> <1475115.7BtuQWbDGm@gromit>
+Message-ID: <201206031712.18645.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 03 Jun 2012 15:26:14 Hans Kr?ner wrote:
-> Hi again,
+On Sunday 03 June 2012, Adam Baker wrote:
+> As there are now two of us who have been tripped up by this does anyone think 
+> the untested patch below is
 > 
-> Many thanks to the both of you. CONFIG_SERIAL_OF_PLATFORM was exactly what
-> I was missing in my .config
-> 
+> a) worthwhile
 
-As there are now two of us who have been tripped up by this does anyone think 
-the untested patch below is
+yes
 
-a) worthwhile
-b) likely to be acceptable
-c) likely to work
+> b) likely to be acceptable
 
-It feels wrong to be putting something arch specific in such general code but 
-setting it as a default is cleaner than trying to select it from 
-ARCH_KIRKWOOD_DT because default respects depends lines.
+no
 
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1021,6 +1021,7 @@ config SERIAL_OF_PLATFORM
-        tristate "Serial port on Open Firmware platform bus"
-        depends on OF
-        depends on SERIAL_8250 || SERIAL_OF_PLATFORM_NWPSERIAL
-+        default y if ARCH_KIRKWOOD_DT
-        help
-          If you have a PowerPC based system that has serial ports
-          on a platform specific bus, you should enable this option.
+> c) likely to work
+
+yes
+
+> It feels wrong to be putting something arch specific in such general code but 
+> setting it as a default is cleaner than trying to select it from 
+> ARCH_KIRKWOOD_DT because default respects depends lines.
+
+Just put it into the kirkwood_defconfig file, that is the cleanest approach by
+far. We might still get a few people who run into this problem when updating,
+but in the long run it will be ok.
+
+I'd also accept a patch to make ARCH_KIRKWOOD_DT select OF_SERIAL if people
+prefer that, but I think just changing the defconfig is better.
+
+	Arnd
