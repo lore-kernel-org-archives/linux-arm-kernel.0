@@ -1,122 +1,44 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 03 Jun 2012 18:12:49 +0530
-Subject: [PATCH v2 6/6] ARM: dts: Add nodes for spi controllers for Samsung
- Exynos5 platforms
-In-Reply-To: <1338727369-18241-1-git-send-email-thomas.abraham@linaro.org>
-References: <1338727369-18241-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1338727369-18241-7-git-send-email-thomas.abraham@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun,  3 Jun 2012 13:42:40 +0100
+Subject: [PATCH 1/2] ARM: S3C64XX: Dynamically allocate the IRQ range for
+ WM8994 on Cragganmore
+Message-ID: <1338727361-25243-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the three instances of spi controllers in Exynos5
-platforms and enable instance spi 1 for smdk5250 board.
+Use the new irqdomain support in the WM8994 driver to dynamically allocate
+the interrupt range for the WM8994 rather than doing it explicitly. This
+is more idiomatic for modern interrupt usage.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   38 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   36 +++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/include/mach/crag6410.h |    1 -
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c  |    1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 49945cc..8a5e348 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -71,4 +71,42 @@
- 	i2c at 12CD0000 {
- 		status = "disabled";
- 	};
-+
-+	spi_0: spi at 12d20000 {
-+		status = "disabled";
-+	};
-+
-+	spi_1: spi at 12d30000 {
-+		gpios = <&gpa2 4 2 3 0>,
-+			<&gpa2 6 2 3 0>,
-+			<&gpa2 7 2 3 0>;
-+
-+		w25q80bw at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "w25x80";
-+			reg = <0>;
-+			spi-max-frequency = <1000000>;
-+
-+			controller-data {
-+				cs-gpio = <&gpa2 5 1 0 3>;
-+				samsung,spi-feedback-delay = <0>;
-+			};
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0x0 0x40000>;
-+				read-only;
-+			};
-+
-+			partition at 40000 {
-+				label = "Kernel";
-+				reg = <0x40000 0xc0000>;
-+			};
-+		};
-+	};
-+
-+	spi_2: spi at 12d40000 {
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 4272b29..a3a2eb2 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -23,6 +23,12 @@
- 	compatible = "samsung,exynos5250";
- 	interrupt-parent = <&gic>;
+diff --git a/arch/arm/mach-s3c64xx/include/mach/crag6410.h b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
+index 4cb2f951..ec97c15 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/crag6410.h
++++ b/arch/arm/mach-s3c64xx/include/mach/crag6410.h
+@@ -15,7 +15,6 @@
  
-+	aliases {
-+		spi0 = &spi_0;
-+		spi1 = &spi_1;
-+		spi2 = &spi_2;
-+	};
-+
- 	gic:interrupt-controller at 10481000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
-@@ -146,6 +152,36 @@
- 		#size-cells = <0>;
- 	};
+ #define BANFF_PMIC_IRQ_BASE		IRQ_BOARD_START
+ #define GLENFARCLAS_PMIC_IRQ_BASE	(IRQ_BOARD_START + 64)
+-#define CODEC_IRQ_BASE			(IRQ_BOARD_START + 128)
  
-+	spi_0: spi at 12d20000 {
-+		compatible = "samsung,exynos4210-spi";
-+		reg = <0x12d20000 0x100>;
-+		interrupts = <0 66 0>;
-+		tx-dma-channel = <&pdma0 5>;
-+		rx-dma-channel = <&pdma0 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	spi_1: spi at 12d30000 {
-+		compatible = "samsung,exynos4210-spi";
-+		reg = <0x12d30000 0x100>;
-+		interrupts = <0 67 0>;
-+		tx-dma-channel = <&pdma1 5>;
-+		rx-dma-channel = <&pdma1 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	spi_2: spi at 12d40000 {
-+		compatible = "samsung,exynos4210-spi";
-+		reg = <0x12d40000 0x100>;
-+		interrupts = <0 68 0>;
-+		tx-dma-channel = <&pdma0 7>;
-+		rx-dma-channel = <&pdma0 6>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ #define PCA935X_GPIO_BASE		GPIO_BOARD_START
+ #define CODEC_GPIO_BASE			(GPIO_BOARD_START + 8)
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 4979372..4a83b4e 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -168,7 +168,6 @@ static struct wm8994_pdata wm8994_pdata = {
+ 	.gpio_defaults = {
+ 		0x3,          /* IRQ out, active high, CMOS */
+ 	},
+-	.irq_base = CODEC_IRQ_BASE,
+ 	.ldo = {
+ 		 { .init_data = &wm8994_ldo1, },
+ 		 { .init_data = &wm8994_ldo2, },
 -- 
-1.6.6.rc2
+1.7.10
