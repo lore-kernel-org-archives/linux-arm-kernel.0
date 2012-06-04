@@ -1,62 +1,46 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 04 Jun 2012 17:24:03 +0200
-Subject: [PATCH] usb: gadget: regression fix - useage of usb_ep
-In-Reply-To: <20120604145917.GM8002@arwen.pp.htv.fi>
-References: <CAOMZO5C729Ki0Bequ+s1nnrgt4NZWvwg3Wnjk4kHp=d9BtkeXw@mail.gmail.com>
- <20120509000221.GA19525@lovely.krouter>
- <20120513225126.GA3683@lovely.krouter> <20120514042142.GD9750@kroah.com>
- <20120520231724.GA7941@mars>
- <F281D0F91ED19E4D8E63A7504E8A649803BB1E25@039-SN2MPN1-023.039d.mgd.msft.net>
- <1337583221.3394.21.camel@mars> <20120521065722.GA4363@mars>
- <20120521190450.GA27492@arwen.pp.htv.fi> <1338809424.3371.20.camel@mars>
- <20120604145917.GM8002@arwen.pp.htv.fi>
-Message-ID: <1338823443.2979.3.camel@mars>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 4 Jun 2012 17:48:41 +0200
+Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
+In-Reply-To: <CAOesGMhq8uzei+Dn8=1iYrTiAOtuByjm58j9zgFyORVG5VZuNQ@mail.gmail.com>
+References: <4FBE4FE7.3010005@atmel.com> <4FC722B7.10409@atmel.com>
+ <CAOesGMhq8uzei+Dn8=1iYrTiAOtuByjm58j9zgFyORVG5VZuNQ@mail.gmail.com>
+Message-ID: <4FCCD8D9.2070005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes redundant pointer to struct usb_endpoint_descriptor which
-were missed in commit 79149b8:
+On 05/31/2012 11:04 PM, Olof Johansson :
+> Hi Nicolas,
+> 
+> On Thu, May 31, 2012 at 12:50 AM, Nicolas Ferre <nicolas.ferre@atmel.com
+> <mailto:nicolas.ferre@atmel.com>> wrote:
+> 
+>     On 05/24/2012 05:12 PM, Nicolas Ferre :
+>     > Hi Arnd, hi Olof,
+> 
+>     Ping?
+> 
+>     (or maybe you will have a look at this after the merge window...)
+> 
+> 
+> So, I looked at this branch yesterday but I wasn't entirely happy with
+> the number of ifdefs it adds.
 
- usb: gadget: Update fsl_udc_core to use usb_endpoint_descriptor inside the
- struct usb_ep
+Unfortunately, this is the usual shape of any devices/boards files on
+AT91. This amount will be reduced when we remove the old driver and when
+we move newer/popular devices to Device Tree...
 
-Due to clock framework regressions, this patch is only compile tested!
+> If the idea is to deprecate the old driver, wouldn't it make more sense
+> to just cut everyone over instead of having both sets of setup in the
+> kernel?
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
----
- drivers/usb/gadget/fsl_udc_core.c |    2 +-
- drivers/usb/gadget/fsl_usb2_udc.h |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Well, the old driver has existed since a very long time and I think that
+people are used to it on oldest platforms. This is why we put in place a
+overlapping period. This way we hope that the transition will be smoother.
+On the other hand, the old code will be removed in 3.7 so the
+overlapping period will not be so long.
+I hope that it will allow people to track bugs if some are remaining and
+switch to newer driver easily.
 
-diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-index 2831685..678ec4d 100644
---- a/drivers/usb/gadget/fsl_udc_core.c
-+++ b/drivers/usb/gadget/fsl_udc_core.c
-@@ -2575,7 +2575,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
- 	/* for ep0: the desc defined here;
- 	 * for other eps, gadget layer called ep_enable with defined desc
- 	 */
--	udc_controller->eps[0].desc = &fsl_ep0_desc;
-+	udc_controller->eps[0].ep.desc = &fsl_ep0_desc;
- 	udc_controller->eps[0].ep.maxpacket = USB_MAX_CTRL_PAYLOAD;
- 
- 	/* setup the udc->eps[] for non-control endpoints and link
-diff --git a/drivers/usb/gadget/fsl_usb2_udc.h b/drivers/usb/gadget/fsl_usb2_udc.h
-index 5cd7b7e..f61a967 100644
---- a/drivers/usb/gadget/fsl_usb2_udc.h
-+++ b/drivers/usb/gadget/fsl_usb2_udc.h
-@@ -568,10 +568,10 @@ static void dump_msg(const char *label, const u8 * buf, unsigned int length)
- /*
-  * ### internal used help routines.
-  */
--#define ep_index(EP)		((EP)->desc->bEndpointAddress&0xF)
-+#define ep_index(EP)		((EP)->ep.desc->bEndpointAddress&0xF)
- #define ep_maxpacket(EP)	((EP)->ep.maxpacket)
- #define ep_is_in(EP)	( (ep_index(EP) == 0) ? (EP->udc->ep0_dir == \
--			USB_DIR_IN ):((EP)->desc->bEndpointAddress \
-+			USB_DIR_IN) : ((EP)->ep.desc->bEndpointAddress \
- 			& USB_DIR_IN)==USB_DIR_IN)
- #define get_ep_by_pipe(udc, pipe)	((pipe == 1)? &udc->eps[0]: \
- 					&udc->eps[pipe])
+Best regards,
 -- 
-1.7.2.5
+Nicolas Ferre
