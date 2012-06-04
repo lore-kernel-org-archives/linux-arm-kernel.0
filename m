@@ -1,26 +1,18 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 4 Jun 2012 19:16:33 +0200
-Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <20120604150024.GN8002@arwen.pp.htv.fi>
-References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
- <20120604004610.GA2857@b20223-02.ap.freescale.net>
- <20120604150024.GN8002@arwen.pp.htv.fi>
-Message-ID: <201206041916.33918.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Jun 2012 11:44:33 -0600
+Subject: [PATCH 1/3] ARM: tegra: make .dts compilation depend on Tegra2
+ support
+In-Reply-To: <1337636690-28211-1-git-send-email-swarren@wwwdotorg.org>
+References: <1337636690-28211-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <4FCCF401.1060502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Felipe Balbi,
-
-> On Mon, Jun 04, 2012 at 08:46:11AM +0800, Richard Zhao wrote:
-> > Hi Guys,
-> > 
-> > The merge window was closed. Do you have time to check whether the
-> > patch series is ok to pick up?
+On 05/21/2012 03:44 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> The drivers/ part looks fine to me.
+> Update Makefile.boot to compile *.dts when the appropriate Tegra SoC
+> support is enabled, rather than requiring Kconfig to list each board
+> individually. Remove CONFIG_MACH_VENTANA now that it has no use.
 
-Shitty me, I'm stuck with an exam until 20th. If it's not in by then, I'll have 
-time to poke into it. Sorry guys :-(
-
-Best regards,
-Marek Vasut
+Applied for 3.6 (the series).
