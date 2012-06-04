@@ -1,24 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 3 Jun 2012 22:44:18 -0700
-Subject: [RFC 11/24] ARM: omap: clk: list all clk_hw_omap clks to
- enable/disable autoidle
-In-Reply-To: <1338552485-31325-12-git-send-email-rnayak@ti.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
- <1338552485-31325-12-git-send-email-rnayak@ti.com>
-Message-ID: <20120604054417.GU12766@atomide.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 04 Jun 2012 15:52:13 +1000
+Subject: Request for inclusion of ep93xx tree in linux-next
+In-Reply-To: <4F9F16A9.9090108@gmail.com>
+References: <4F9F16A9.9090108@gmail.com>
+Message-ID: <4FCC4D0D.8000504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120601 05:12]:
-> @@ -359,6 +391,8 @@ const struct clk_hw_omap_ops clkhwops_wait = {
->  	.find_idlest	= omap2_clk_dflt_find_idlest,
->  	.find_companion	= omap2_clk_dflt_find_companion,
->  };
-> +late_initcall(omap2_clk_enable_autoidle_all);
+Hi Stephen,
 
-With -rc1, the SoC specific late_initcalls need to be called from
-*_init_late that are in mach-omap2/io.c for omap2+.
+I have ended up adding another branch to my ep93xx tree, so I have
+created an ep93xx-for-next branch, which I will just merge all of
+branches into. Can you please drop the ep93xx-cleanup and ep93xx-fixes
+branches and just include ep93xx-for-next instead.
 
-Regards,
+Thanks,
+~Ryan
 
-Tony
+On 01/05/12 08:48, Ryan Mallon wrote:
+
+> Hi Stephen,
+> 
+> Can you please add the following branches:
+> 
+>   ep93xx-cleanup
+>   ep93xx-fixes
+> 
+> from the ep93xx git tree:
+> 
+>   git://github.com/RyanMallon/linux-ep93xx.git
+> 
+> To linux-next. Both branches are stable and based on v3.4-rc2. Testing
+> for the tree is covered by the arm ep93xx_defconfig.
+> 
+> Thanks,
+> ~Ryan
