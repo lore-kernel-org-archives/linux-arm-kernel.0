@@ -1,42 +1,33 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 04 Jun 2012 14:08:10 +0530
-Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
-In-Reply-To: <alpine.DEB.2.00.1206010735540.17068@utopia.booyaka.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1206010735540.17068@utopia.booyaka.com>
-Message-ID: <4FCC73F2.4030808@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jun 2012 09:47:46 +0100
+Subject: [RFC 1/6] From: Domenico Andreoli
+ <domenico.andreoli@linux.com> ARM: Inject the Earlycon drivers into
+ the decompressor
+In-Reply-To: <20120530224043.582229064@gmail.com>
+References: <20120530224043.240221676@gmail.com>
+ <20120530224043.582229064@gmail.com>
+Message-ID: <20120604084746.GA8262@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 June 2012 07:07 PM, Paul Walmsley wrote:
-> On Fri, 1 Jun 2012, Rajendra Nayak wrote:
->
->> This RFC series is based of Mikes' latest clk-next. I will
->> rebase it once 3.5-rc1 is out and post with more testing thats
->> in progress. Meanwhile, the RFC is for me to get some early
->> feedback on the patches.
->
-> Please describe further what's been tested with this series, and what
-> hasn't been.
+On Thu, May 31, 2012 at 12:40:44AM +0200, Domenico Andreoli wrote:
+> This linker voodoo clones the Earlycon drivers from the kernel into
+> the decompressor, selecting everything in the designated ELF sections
+> (.text.earlycon.info and .init.earlycon.info).
 
-Hi Paul,
+No, the debug stuff in the main kernel and the decompressor stuff can
+(and is in some cases) different.  There's a reason we have the two
+implementations separate.
 
-I have been mostly boot-testing on the OMAP3/4 boards I have access to, 
-3430SDP, 3630 Beagle, 4430 Panda/SDP. Apart from this I was using
-omapconf to run the clkspeed audit tests on OMAP4.
-I used powerdebug to make sure the tree modeling (parent/child
-relations, clk rates etc) are sane after bootup.
-I haven't done any low power tests around suspend/idle for OMAP3
-or OMAP4 which is on my list to do before I do a repost/rebase on
-3.5-rc1. And so is testing on OMAP2430sdp and N800. Any other tests
-you recommend I do?
+Moreover, these two things operate in two different address spaces; the
+debug stuff in the kernel has to cope with the MMU being either on or
+off, and use the kernel v:p mappings when the MMU is on.  The decompressor
+on the other hand has a 1:1 v:p mapping when the MMU is on - so it
+would not be able to tell the difference if you just cloned the exact
+same code.
 
-Meanwhile it would be good to know if you see any major issues around
-the migration itself and/or the way the patches are structured.
+One example of this would be RiscPC, where the decompressor writes to
+the framebuffer, but the debug stuff writes to the serial port.
 
-regards,
-Rajendra
-
->
->
-> - Paul
+The preference is for the decompressor to write to the normal user visible
+interface when possible, and the debug stuff to a serial port.
