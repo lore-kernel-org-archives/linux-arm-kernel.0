@@ -1,60 +1,22 @@
-From: sdharia@codeaurora.org (Sagar Dharia)
-Date: Mon, 4 Jun 2012 02:51:49 -0700 (PDT)
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <4FCC280C.6030103@landley.net>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
- <4FCC280C.6030103@landley.net>
-Message-ID: <53f16b8f6198e1adb9cc54bb8b9d80cb.squirrel@www.codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 4 Jun 2012 10:52:16 +0100
+Subject: [PATCH v2 REBASE] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <1338774174-3960-2-git-send-email-richard.zhao@freescale.com>
+References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
+ <1338774174-3960-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120604095215.GE3943@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Slim?
->
-SLIMbus is MIPI alliance specification. Since word "bus" is part of the
-specification, I thought it will be good to keep it that way.
+On Mon, Jun 04, 2012 at 09:42:54AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-The specification is available to all MIPI members.
-Some more info here:
-http://mipi.org/specifications/serial-low-power-inter-chip-media-bus-slimbussm-specification
-
->> +and the messages can be of unicast and broadcast type. E.g.
->> reading/writing
->> +device specific values is typically a unicast message. A data channel
->> +reconfiguration sequence is announced to all devices using a broadcast
->> message.
->
-> Unicast messages are seen by all devices?
->
-I was trying to give example of each type of both message. I will reword
-it to be more clear.
-
->> +Slimbus specification has different types of device classifications
->> based on
->> +their capabilities.
->
-> I'm trying to figure out if that sentence conveys any information at all.
->
-I will reword this to say: "has following type of device classifications
-based on capabilities:".
-
-> So each slimbus has 1 manager device that enumerates configures, and
-> allocates channels for the other devices on the bus. The rest are
-> "framer" devices that transmit data packets?
->
-Typically there is 1 framer per bus, but if there are multiple framers
-then manager is responsible for doing handoff between framers.
->
-> However, I expect some example code would be far more useful than this
-> document...
->
-Please refer to slimbus.c for slimbus framework.
-
-Thank you for your comments. I will address all the comments in the next
-patch.
-
-Regards
-Sagar
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/df2321ee/attachment.sig>
