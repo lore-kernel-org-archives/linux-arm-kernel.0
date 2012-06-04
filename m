@@ -1,35 +1,54 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 04 Jun 2012 14:23:49 +0530
-Subject: [RFC 11/24] ARM: omap: clk: list all clk_hw_omap clks to
- enable/disable autoidle
-In-Reply-To: <20120604054417.GU12766@atomide.com>
-References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
- <1338552485-31325-12-git-send-email-rnayak@ti.com>
- <20120604054417.GU12766@atomide.com>
-Message-ID: <4FCC779D.7010208@ti.com>
+From: ofertas@globalbono.com (GlobalBono)
+Date: Mon, 4 Jun 2012 10:54:48 +0200
+Subject: =?utf-8?Q?Primera_p=C3=A1gina_de_bonos_solidarios?=
+Message-ID: <15857-1-5-0000037922@mta0.sbr11.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
 
-On Monday 04 June 2012 11:14 AM, Tony Lindgren wrote:
-> * Rajendra Nayak<rnayak@ti.com>  [120601 05:12]:
->> @@ -359,6 +391,8 @@ const struct clk_hw_omap_ops clkhwops_wait = {
->>   	.find_idlest	= omap2_clk_dflt_find_idlest,
->>   	.find_companion	= omap2_clk_dflt_find_companion,
->>   };
->> +late_initcall(omap2_clk_enable_autoidle_all);
->
-> With -rc1, the SoC specific late_initcalls need to be called from
-> *_init_late that are in mach-omap2/io.c for omap2+.
+( "http://www.globalbono.com/" ) S?guenos
 
-Thanks for the heads-up. Will take care of it while I move over to
-3.5-rc1.
+en:
 
-thanks,
-Rajendra
 
->
-> Regards,
->
-> Tony
+ ( "http://www.facebook.com/GlobalBono" ) ( "http://twitter.com/#!/GlobalBono" )
+
+
+
+
+Queremos presentarte GlobalBono, La Plataforma de Ofertas Solidarias Garantizadas en la web.
+
+
+
+
+En GlobalBono tenemos la misi?n de poner a tu alcance los m?ximos descuentos en ocio y actividades, productos y servicios as? como viajes y escapadas y siempre SIENDO SOLIDARIOS.
+
+
+GlobalBono es La Plataforma de Ofertas Solidarias Garantizadas en la web, las cuales se pueden adquirir a un precio excepcional por sus descuentos, todo ello sin necesidad de alcanzar un m?nimo de compradores. En primer lugar est?n las ?Ofertas de Ocio? que son propuestas de ocio como por ejemplo entradas a espect?culos, restaurantes, wellness, Spas, etc., ?Ofertas de Viajes? que son todas aquellas propuestas de escapadas, noches de hotel, viajes, etc., ?Ofertas de Productos? que corresponden a propuestas de productos originales y dif?ciles de encontrar a un precio como el ofertado por GlobalBono y ?Ofertas Permanentes Low Cost? que propone ofertas permanentes sin limite de tiempo para la compra de ocio, producto y viajes, el resto de ofertas tienen la ?nica restricci?n del tiempo, puesto que suelen tener una duraci?n de 24/48 horas cada oferta.
+
+
+GlobalBono quiere colaborar solidariamente en la sociedad y por ello hemos incorporado un nuevo concepto en el sector, que es: SOMOS SOLIDARIOS donando un porcentaje de la facturaci?n de GlobalBono a las ONG, siendo posible gracias a todos los que intervenimos en el portal.
+
+
+A los ofertantes y por supuesto gracias a los Usuarios que visitan la plataforma, porque con sus visitas consiguen que tengamos una mayor notoriedad y aceptaci?n como La Plataforma de Ofertas Solidarias Garantizadas en la web, y por tanto contribuyen de una manera muy directa con el env?o de su Email Solidario, as? como con sus compras de las mejores ofertas, a nuestra labor solidaria.
+
+
+Muchas gracias por tu atenci?n, te esperamos.
+
+
+
+
+
+
+Si estas leyendo este email es por que estas inscrito en un registro de uno de nuestros proyectos en internet y pensamos que te puede interesar ser solidario con nosotros. No obstante si no te interesa recibir m?s emails te puedes dar de baja haciendo click aqu? y no recibir?s m?s notificaciones de parte nuestra.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/959b220a/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: doble_r2_c1.jpg
+Type: image/jpeg
+Size: 9433 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/959b220a/attachment-0001.jpg>
