@@ -1,52 +1,42 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Mon, 04 Jun 2012 10:29:57 +0200
-Subject: Kernel 3.4 on Dreamplug: no serial console
-In-Reply-To: <20120603184049.GF14756@titan.lakedaemon.net>
-References: <loom.20120602T135715-548@post.gmane.org>
- <201206031712.18645.arnd@arndb.de>
- <20120603184049.GF14756@titan.lakedaemon.net>
-Message-ID: <2396575.dLS9zmzUSD@flexo>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 04 Jun 2012 14:08:10 +0530
+Subject: [RFC 00/24] Move OMAP2+ over to use COMMON clock
+In-Reply-To: <alpine.DEB.2.00.1206010735540.17068@utopia.booyaka.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1206010735540.17068@utopia.booyaka.com>
+Message-ID: <4FCC73F2.4030808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 01 June 2012 07:07 PM, Paul Walmsley wrote:
+> On Fri, 1 Jun 2012, Rajendra Nayak wrote:
+>
+>> This RFC series is based of Mikes' latest clk-next. I will
+>> rebase it once 3.5-rc1 is out and post with more testing thats
+>> in progress. Meanwhile, the RFC is for me to get some early
+>> feedback on the patches.
+>
+> Please describe further what's been tested with this series, and what
+> hasn't been.
 
-On Sunday 03 June 2012 14:40:49 Jason Cooper wrote:
-> On Sun, Jun 03, 2012 at 05:12:18PM +0000, Arnd Bergmann wrote:
-> > I'd also accept a patch to make ARCH_KIRKWOOD_DT select OF_SERIAL if 
-people
-> > prefer that, but I think just changing the defconfig is better.
-> 
-> I'd prefer the defconfig as there are situations where users/oems deploy
-> a kernel without support for serial console.  In order to do that with
-> your patch, or similar approaches, they would have to change the code.
-> With defconfig, they don't.
+Hi Paul,
 
-Should not you rather select OF_SERIAL and add a status propery to the uart 
-node in device tree, so that it is up to dtb provider to determine whether 
-this device node should be enabled or not? You would avoid all kind of 
-defconfig issue.
+I have been mostly boot-testing on the OMAP3/4 boards I have access to, 
+3430SDP, 3630 Beagle, 4430 Panda/SDP. Apart from this I was using
+omapconf to run the clkspeed audit tests on OMAP4.
+I used powerdebug to make sure the tree modeling (parent/child
+relations, clk rates etc) are sane after bootup.
+I haven't done any low power tests around suspend/idle for OMAP3
+or OMAP4 which is on my list to do before I do a repost/rebase on
+3.5-rc1. And so is testing on OMAP2430sdp and N800. Any other tests
+you recommend I do?
 
-> 
-> FYI: there is a running problem with kirkwood_defconfig that I haven't
-> had time to look into.  I've been doing 'make oldconfig' and thus never
-> encountered the problem.
-> 
-> The problem involves CONFIG_ARM_PATCH_PHYS_VIRT and causes the system
-> not to boot.  I'm not sure if this is dreamplug specific, kirkwood, or
-> all orion.  I've only heard reports regarding dreamplug, but that
-> doesn't mean it's limited to that board.
-> 
-> I'd like to have the defconfig working by the time the DT conversion is
-> complete, but I'm currently giving DT conversion higher priority.  So,
-> if anyone wants to take a crack at solving it, please do.  Otherwise, I
-> plan on taking a look at it after the driver bindings are done.
-> 
-> thx,
-> 
-> Jason.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Meanwhile it would be good to know if you see any major issues around
+the migration itself and/or the way the patches are structured.
+
+regards,
+Rajendra
+
+>
+>
+> - Paul
