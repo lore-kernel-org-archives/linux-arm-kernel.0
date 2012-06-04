@@ -1,122 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jun 2012 11:14:47 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <4F8BE5B0.4000900@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org>
-Message-ID: <20120604101447.GF8262@n2100.arm.linux.org.uk>
+From: sdharia@codeaurora.org (Sagar Dharia)
+Date: Mon, 4 Jun 2012 03:21:06 -0700 (PDT)
+Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
+In-Reply-To: <20120601001617.GA16311@plastictigers.com>
+References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+ <20120601001617.GA16311@plastictigers.com>
+Message-ID: <74993ac9d11db0db7080c0864daef397.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So why is this buggy patch now merged in the mainline kernel?
+> These are initial comments. A full review of the patch will take some
+> time. While I am posting this email, this is the result of work both
+> by myself, and my colleague Greg Clemson (cc'ed).
+>
+Thank you Marc and Greg for taking time to review this.
 
-On Mon, Apr 16, 2012 at 10:26:08AM +0100, Lee Jones wrote:
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Mon, 16 Apr 2012 10:18:43 +0100
-> Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500 variants
-> 
-> Provide a means to collect attributes specific to ST-Ericsson's
-> ux500 variant series. This patch registers itself as the AMBA
-> driver to be called during the probe process. Once all
-> attributes and ux500 specifics are are collected the normal
-> mmci core probe is called.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mmc/host/mmci.c |   58 +++++++++++++++++++++++++++++++++++++++++++---
->  1 files changed, 54 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 032b847..5a7da17 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -15,6 +15,7 @@
->  #include <linux/device.h>
->  #include <linux/interrupt.h>
->  #include <linux/kernel.h>
-> +#include <linux/slab.h>
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/highmem.h>
-> @@ -1196,21 +1197,70 @@ static const struct mmc_host_ops mmci_ops = {
->  	.get_cd		= mmci_get_cd,
->  };
->  
-> +#ifdef CONFIG_OF
-> +static void mmci_dt_populate_generic_pdata(struct device_node *np,
-> +					struct mmci_platform_data *pdata)
-> +{
-> +	int bus_width = 0;
-> +
-> +	of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
-> +	if (!pdata->gpio_wp)
-> +		pdata->gpio_wp = -1;
-> +
-> +	of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
-> +	if (!pdata->gpio_cd)
-> +		pdata->gpio_cd = -1;
-> +
-> +	if (of_get_property(np, "cd-inverted", NULL))
-> +		pdata->cd_invert = true;
-> +	else
-> +		pdata->cd_invert = false;
-> +
-> +	of_property_read_u32(np, "max-frequency", &pdata->f_max);
-> +	if (!pdata->f_max)
-> +		pr_warn("%s has no 'max-frequency' property\n", np->full_name);
-> +
-> +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
-> +		pdata->capabilities |= MMC_CAP_MMC_HIGHSPEED;
-> +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
-> +		pdata->capabilities |= MMC_CAP_SD_HIGHSPEED;
-> +
-> +	of_property_read_u32(np, "bus-width", &bus_width);
-> +	switch (bus_width) {
-> +	case 0 :
-> +		/* No bus-width supplied. */
-> +		break;
-> +	case 4 :
-> +		pdata->capabilities |= MMC_CAP_4_BIT_DATA;
-> +		break;
-> +	case 8 :
-> +		pdata->capabilities |= MMC_CAP_8_BIT_DATA;
-> +		break;
-> +	default :
-> +		pr_warn("%s: Unsupported bus width\n", np->full_name);
-> +	}
-> +}
-> +#endif
-> +
->  static int __devinit mmci_probe(struct amba_device *dev,
->  	const struct amba_id *id)
->  {
->  	struct mmci_platform_data *plat = dev->dev.platform_data;
-> +	struct device_node *np = dev->dev.of_node;
->  	struct variant_data *variant = id->data;
->  	struct mmci_host *host;
->  	struct mmc_host *mmc;
->  	int ret;
->  
-> -	/* must have platform data */
-> -	if (!plat) {
-> -		ret = -EINVAL;
-> -		goto out;
-> +	/* Must have platform data or Device Tree. */
-> +	if (!plat && !np) {
-> +		dev_err(&dev->dev, "No plat data or DT found\n");
-> +		return -EINVAL;
->  	}
->  
-> +	if (np)
-> +		mmci_dt_populate_generic_pdata(np, plat);
-> +
->  	ret = amba_request_regions(dev, DRIVER_NAME);
->  	if (ret)
->  		goto out;
-> -- 
-> 1.7.9.1
-> 
+> The enumeration slim_ch_proto is incorrect. It declares 2 transport
+> protocols which do not exist in the specification: SLIM_HARD_ISO;
+> SLIM_AUTO_ISO.
+
+The enums are more SW representation (and not 1-1 mapping). Difference
+between HARD_ISO and AUTO_ISO with example:
+Let's say the root frequency is 24.576MHz. then all 4K family channels
+(sample rate multiple of 4K) can run isochronously, and all 11.025KHz
+channel can run with good efficiency.
+So if a client wants 11.025KHz and is does not want to do flow-control at
+this root frequency, then the client can specify AUTO_ISO to get the next
+available isochronous frequency.
+
+> I suggest that term "enumeration address" should be used.
+>
+Thank you for catching this. I will change it where-ever applicable.
+
+> b) Similarly to (a) the driver may be probed before the device has
+> been given a logical address (LA). This makes sense in the case of
+> driver that turns on the device (say via gpio) once the bus has
+> booted. However, the driver then needs to sit and poll
+> slim_get_logical_addr() until the logical address.
+This is not the case anymore.
+While taking care of the comments for RFC, I have introduced a completion
+that will be signalled when LA is given to the device. The driver can wait
+on that completion (wait_enum) instead of polling.
+
+Regards
+Sagar
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
