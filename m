@@ -1,54 +1,32 @@
-From: ofertas@globalbono.com (GlobalBono)
-Date: Mon, 4 Jun 2012 10:54:48 +0200
-Subject: =?utf-8?Q?Primera_p=C3=A1gina_de_bonos_solidarios?=
-Message-ID: <15857-1-5-0000037922@mta0.sbr11.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 4 Jun 2012 10:16:16 +0100
+Subject: Freescale fec.c driver breakage
+In-Reply-To: <20120604081937.GH30400@pengutronix.de>
+References: <4FCC3CB4.5030107@snapgear.com>
+ <20120604081937.GH30400@pengutronix.de>
+Message-ID: <20120604091616.GA3943@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 04, 2012 at 10:19:37AM +0200, Sascha Hauer wrote:
+> On Mon, Jun 04, 2012 at 02:42:28PM +1000, Greg Ungerer wrote:
 
-( "http://www.globalbono.com/" ) S?guenos
+> > Trivially we could conditionalize the code block that calls
+> > devm_clk_get() in the probe routine, but that is kind of ugly.
 
-en:
+> It's ugly, but the only other solution I see is that you could provide a
+> dummy devm_clk_get() for coldfire. Added Mark to Cc, maybe he has
+> another idea?
 
-
- ( "http://www.facebook.com/GlobalBono" ) ( "http://twitter.com/#!/GlobalBono" )
-
-
-
-
-Queremos presentarte GlobalBono, La Plataforma de Ofertas Solidarias Garantizadas en la web.
-
-
-
-
-En GlobalBono tenemos la misi?n de poner a tu alcance los m?ximos descuentos en ocio y actividades, productos y servicios as? como viajes y escapadas y siempre SIENDO SOLIDARIOS.
-
-
-GlobalBono es La Plataforma de Ofertas Solidarias Garantizadas en la web, las cuales se pueden adquirir a un precio excepcional por sus descuentos, todo ello sin necesidad de alcanzar un m?nimo de compradores. En primer lugar est?n las ?Ofertas de Ocio? que son propuestas de ocio como por ejemplo entradas a espect?culos, restaurantes, wellness, Spas, etc., ?Ofertas de Viajes? que son todas aquellas propuestas de escapadas, noches de hotel, viajes, etc., ?Ofertas de Productos? que corresponden a propuestas de productos originales y dif?ciles de encontrar a un precio como el ofertado por GlobalBono y ?Ofertas Permanentes Low Cost? que propone ofertas permanentes sin limite de tiempo para la compra de ocio, producto y viajes, el resto de ofertas tienen la ?nica restricci?n del tiempo, puesto que suelen tener una duraci?n de 24/48 horas cada oferta.
-
-
-GlobalBono quiere colaborar solidariamente en la sociedad y por ello hemos incorporado un nuevo concepto en el sector, que es: SOMOS SOLIDARIOS donando un porcentaje de la facturaci?n de GlobalBono a las ONG, siendo posible gracias a todos los que intervenimos en el portal.
-
-
-A los ofertantes y por supuesto gracias a los Usuarios que visitan la plataforma, porque con sus visitas consiguen que tengamos una mayor notoriedad y aceptaci?n como La Plataforma de Ofertas Solidarias Garantizadas en la web, y por tanto contribuyen de una manera muy directa con el env?o de su Email Solidario, as? como con sus compras de las mejores ofertas, a nuestra labor solidaria.
-
-
-Muchas gracias por tu atenci?n, te esperamos.
-
-
-
-
-
-
-Si estas leyendo este email es por que estas inscrito en un registro de uno de nuestros proyectos en internet y pensamos que te puede interesar ser solidario con nosotros. No obstante si no te interesa recibir m?s emails te puedes dar de baja haciendo click aqu? y no recibir?s m?s notificaciones de parte nuestra.
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/959b220a/attachment-0001.html>
+Not really, I think if the clock API is going to be usable we really
+need the platforms to all be implementing it.  Part of this is getting
+the stubs for !HAVE_CLK cases implemented (which doesn't seem to have
+happened :/) ).  We do need to address this at the framework level,
+having to put ifdefs in all the drivers is obviously awful.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: doble_r2_c1.jpg
-Type: image/jpeg
-Size: 9433 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/959b220a/attachment-0001.jpg>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/999edd21/attachment.sig>
