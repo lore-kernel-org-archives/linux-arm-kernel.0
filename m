@@ -1,37 +1,25 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 04 Jun 2012 15:52:13 +1000
-Subject: Request for inclusion of ep93xx tree in linux-next
-In-Reply-To: <4F9F16A9.9090108@gmail.com>
-References: <4F9F16A9.9090108@gmail.com>
-Message-ID: <4FCC4D0D.8000504@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 3 Jun 2012 23:13:57 -0700
+Subject: [PATCH v2] omap: dma: Clear status registers on enable/disable
+ irq.
+In-Reply-To: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
+References: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
+Message-ID: <20120604061357.GV12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+* Oleg Matcovschi <oleg.matcovschi@ti.com> [120515 14:40]:
+> Use omap_disable_channel_irq() function instead of directly accessing CICR.
+> The omap_disable_chanel_irq() function clears pending interrupts
+> and disables interrupt on channel.
+> Functions omap2_enable_irq_lch()/omap2_disable_irq_lch() clear interrupt
+> status register.
 
-I have ended up adding another branch to my ep93xx tree, so I have
-created an ep93xx-for-next branch, which I will just merge all of
-branches into. Can you please drop the ep93xx-cleanup and ep93xx-fixes
-branches and just include ep93xx-for-next instead.
+Looking at this again, I'll apply this into cleanup-dma instead of fixes.
 
-Thanks,
-~Ryan
+If it fixes something that I can't see, please reply with a description
+what it fixes and I'll move it into fixes.
 
-On 01/05/12 08:48, Ryan Mallon wrote:
+Regards,
 
-> Hi Stephen,
-> 
-> Can you please add the following branches:
-> 
->   ep93xx-cleanup
->   ep93xx-fixes
-> 
-> from the ep93xx git tree:
-> 
->   git://github.com/RyanMallon/linux-ep93xx.git
-> 
-> To linux-next. Both branches are stable and based on v3.4-rc2. Testing
-> for the tree is covered by the arm ep93xx_defconfig.
-> 
-> Thanks,
-> ~Ryan
+Tony
