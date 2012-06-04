@@ -1,40 +1,90 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Jun 2012 11:42:33 +0100
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <69926c6ce4b1e004069662fb13287e9b.squirrel@www.codeaurora.org>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
- <20120601001617.GA16311@plastictigers.com>
- <74993ac9d11db0db7080c0864daef397.squirrel@www.codeaurora.org>
- <20120604102747.GC7538@opensource.wolfsonmicro.com>
- <69926c6ce4b1e004069662fb13287e9b.squirrel@www.codeaurora.org>
-Message-ID: <20120604104233.GG7538@opensource.wolfsonmicro.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 4 Jun 2012 18:46:25 +0800
+Subject: [PATCH v2] i2c: imx: convert to use managed functions
+In-Reply-To: <CAM=Q2ctTNs0hq9tO5NW0QGsGaOVMNobRSBg_TmCjbaV+hNaoAw@mail.gmail.com>
+References: <1338776481-23710-1-git-send-email-richard.zhao@freescale.com>
+ <CAM=Q2ctTNs0hq9tO5NW0QGsGaOVMNobRSBg_TmCjbaV+hNaoAw@mail.gmail.com>
+Message-ID: <20120604104624.GD2857@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 03:36:55AM -0700, Sagar Dharia wrote:
+Hi Shubhrajyoti,
 
-> I would expect that the slim_device's driver will only power-on the device
-> during probe (and use wait_for_completion during 1st transfer to get LA).
-> Typically transfers are not done as part of probe. Even if transfers need
+On Mon, Jun 04, 2012 at 10:29:11AM +0530, Shubhrajyoti Datta wrote:
+> Hi  Richard,
+> 
+> On Mon, Jun 4, 2012 at 7:51 AM, Richard Zhao <richard.zhao@freescale.com> wrote:
+> > From: Richard Zhao <richard.zhao@linaro.org>
+> nit: A small description would have helped.
+The title has told what it did, but I'd like to add more description.
+> Otherwise Looks good to me.
+> Reviewed-by: Shubhrajyoti D <Shubhrajyoti@ti.com>
+Thanks.
+> >
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >
+> > Changes since v1:
+> > ?- rebase to 3.5rc1
+> > ?- remove unused imx_i2c_struct.irq.
+> >
+> > ?drivers/i2c/busses/i2c-imx.c | ? 67 ++++++++++-------------------------------
+> > ?1 files changed, 17 insertions(+), 50 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> > index 8d6b504..7f4da2d 100644
+> > --- a/drivers/i2c/busses/i2c-imx.c
+> > +++ b/drivers/i2c/busses/i2c-imx.c
+> > @@ -118,10 +118,8 @@ static u16 __initdata i2c_clk_div[50][2] = {
+> >
+> > ?struct imx_i2c_struct {
+> > ? ? ? ?struct i2c_adapter ? ? ?adapter;
+> > - ? ? ? struct resource ? ? ? ? *res;
+> > ? ? ? ?struct clk ? ? ? ? ? ? ?*clk;
+> > ? ? ? ?void __iomem ? ? ? ? ? ?*base;
+> > - ? ? ? int ? ? ? ? ? ? ? ? ? ? irq;
+> > ? ? ? ?wait_queue_head_t ? ? ? queue;
+> > ? ? ? ?unsigned long ? ? ? ? ? i2csr;
+> > ? ? ? ?unsigned int ? ? ? ? ? ?disable_delay;
+> > @@ -473,7 +471,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+> > ? ? ? ?struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
+> > ? ? ? ?struct pinctrl *pinctrl;
+> > ? ? ? ?void __iomem *base;
+> > - ? ? ? resource_size_t res_size;
+> > ? ? ? ?int irq, bitrate;
+> > ? ? ? ?int ret;
+> >
+> > @@ -490,25 +487,16 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+> > ? ? ? ? ? ? ? ?return -ENOENT;
+> > ? ? ? ?}
+> >
+> > - ? ? ? res_size = resource_size(res);
+> > -
+> > - ? ? ? if (!request_mem_region(res->start, res_size, DRIVER_NAME)) {
+> > - ? ? ? ? ? ? ? dev_err(&pdev->dev, "request_mem_region failed\n");
+> > + ? ? ? base = devm_request_and_ioremap(&pdev->dev, res);
+> > + ? ? ? if (!base)
+> > ? ? ? ? ? ? ? ?return -EBUSY;
+> > - ? ? ? }
+> > -
+> > - ? ? ? base = ioremap(res->start, res_size);
+> > - ? ? ? if (!base) {
+> > - ? ? ? ? ? ? ? dev_err(&pdev->dev, "ioremap failed\n");
+> > - ? ? ? ? ? ? ? ret = -EIO;
+> > - ? ? ? ? ? ? ? goto fail1;
+> > - ? ? ? }
+> >
+> > - ? ? ? i2c_imx = kzalloc(sizeof(struct imx_i2c_struct), GFP_KERNEL);
+> > + ? ? ? i2c_imx = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_struct),
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
+> > ? ? ? ?if (!i2c_imx) {
+> > ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "can't allocate interface\n");
+> > ? ? ? ? ? ? ? ?ret = -ENOMEM;
+> > - ? ? ? ? ? ? ? goto fail2;
+> > + ? ? ? ? ? ? ? return ret;
+> nit : why not return ENOMEM directly, the copy to ret is redundant.
+> feel free to ignore if you  feel so.
+Nice catch. :)
 
-I'd really expect that we'll have devices that we want to interact with
-during probe, for example to determine the device variant.  I'd also
-expect that it'd be useful to defer things like registering the device
-with higher level APIs until we've actually got it up and running, it
-tends to make life simpler.
-
-> to be done as part of probe, I expect wait_for_completion (with timeout to
-> avoid potential HW problems causing linux probe to wait forever) will be
-> better than polling for get_logical_addr.
-
-I agree that a completion is better if we have to block in the device
-driver, but the idea someone suggested of having the framework generate
-a second callback when it's assigned a logical address seems even
-better.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/44ac5acb/attachment.sig>
+Thanks
+Richard
