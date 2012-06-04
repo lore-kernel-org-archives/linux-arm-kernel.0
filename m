@@ -1,24 +1,51 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Mon, 04 Jun 2012 21:58:43 +0300
-Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <20120604004610.GA2857@b20223-02.ap.freescale.net>
-References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
- <20120604004610.GA2857@b20223-02.ap.freescale.net>
-Message-ID: <87wr3m52fw.fsf@ashishki-desk.ger.corp.intel.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon,  4 Jun 2012 21:02:54 +0200
+Subject: [PATCH RESEND 1/2] serial/8250: Add LPC3220 standard UART type
+Message-ID: <1338836575-21738-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+LPC32xx has "Standard" UARTs that are actually 16550A compatible but have
+bigger FIFOs. Since the already supported 16X50 line still doesn't match here,
+we agreed on adding a new type.
 
-> Hi Guys,
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Alan Cox <alan@linux.intel.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Hi,
+---
+Applies to v3.5-rc1
 
-> The merge window was closed. Do you have time to check whether the
-> patch series is ok to pick up?
+ drivers/tty/serial/8250/8250.c |    8 ++++++++
+ include/linux/serial_core.h    |    3 ++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-I'll try to pick the chipidea relevant bits tomorrow morning.
-
-Thanks,
---
-Alex
+--- linux-2.6.orig/drivers/tty/serial/8250/8250.c
++++ linux-2.6/drivers/tty/serial/8250/8250.c
+@@ -282,6 +282,14 @@ static const struct serial8250_config ua
+ 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+ 		.flags		= UART_CAP_FIFO | UART_CAP_AFE | UART_CAP_EFR,
+ 	},
++	[PORT_LPC3220] = {
++		.name		= "LPC3220",
++		.fifo_size	= 64,
++		.tx_loadsz	= 32,
++		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
++				  UART_FCR_R_TRIG_00 | UART_FCR_T_TRIG_00,
++		.flags		= UART_CAP_FIFO,
++	},
+ };
+ 
+ /* Uart divisor latch read */
+--- linux-2.6.orig/include/linux/serial_core.h
++++ linux-2.6/include/linux/serial_core.h
+@@ -47,7 +47,8 @@
+ #define PORT_U6_16550A	19	/* ST-Ericsson U6xxx internal UART */
+ #define PORT_TEGRA	20	/* NVIDIA Tegra internal UART */
+ #define PORT_XR17D15X	21	/* Exar XR17D15x UART */
+-#define PORT_MAX_8250	21	/* max port ID */
++#define PORT_LPC3220	22	/* NXP LPC32xx SoC "Standard" UART */
++#define PORT_MAX_8250	22	/* max port ID */
+ 
+ /*
+  * ARM specific type numbers.  These are not currently guaranteed
