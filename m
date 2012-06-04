@@ -1,52 +1,51 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 4 Jun 2012 09:17:24 +0800
-Subject: [RESEND PATCH] dma: imx-sdma: buf_tail should be initialize in
- prepare function
-Message-ID: <1338772644-3344-1-git-send-email-richard.zhao@freescale.com>
+Date: Mon, 4 Jun 2012 09:42:53 +0800
+Subject: [PATCH v2 REBASE] ASoC: fsl_ssi: convert to use devm_clk_get
+Message-ID: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fix audio underrun issue. When SNDRV_PCM_TRIGGER_STOP
-and SNDRV_PCM_TRIGGER_START, it calls prepare again. buf_tail
-should be reset to zero.
-So move buf_tail initialization into prepare function.
-
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Timur Tabi <timur@freescale.com>
 ---
- drivers/dma/imx-sdma.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index fb4f499..1dc2a4a 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -815,8 +815,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
+Rebase to 3.5rc1.
+
+ sound/soc/fsl/fsl_ssi.c |    7 ++-----
+ 1 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 4ed2afd..b10a427 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -725,7 +725,7 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+ 		u32 dma_events[2];
+ 		ssi_private->ssi_on_imx = true;
  
- 	init_completion(&sdmac->done);
+-		ssi_private->clk = clk_get(&pdev->dev, NULL);
++		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+ 		if (IS_ERR(ssi_private->clk)) {
+ 			ret = PTR_ERR(ssi_private->clk);
+ 			dev_err(&pdev->dev, "could not get clock: %d\n", ret);
+@@ -842,10 +842,8 @@ error_dev:
+ 	device_remove_file(&pdev->dev, dev_attr);
  
--	sdmac->buf_tail = 0;
--
- 	return 0;
- out:
+ error_clk:
+-	if (ssi_private->ssi_on_imx) {
++	if (ssi_private->ssi_on_imx)
+ 		clk_disable_unprepare(ssi_private->clk);
+-		clk_put(ssi_private->clk);
+-	}
  
-@@ -927,6 +925,8 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 
- 	sdmac->flags = 0;
- 
-+	sdmac->buf_tail = 0;
-+
- 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
- 			sg_len, channel);
- 
-@@ -1027,6 +1027,8 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
- 
- 	sdmac->status = DMA_IN_PROGRESS;
- 
-+	sdmac->buf_tail = 0;
-+
- 	sdmac->flags |= IMX_DMA_SG_LOOP;
- 	sdmac->direction = direction;
- 	ret = sdma_load_context(sdmac);
+ error_irq:
+ 	free_irq(ssi_private->irq, ssi_private);
+@@ -871,7 +869,6 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 	if (ssi_private->ssi_on_imx) {
+ 		platform_device_unregister(ssi_private->imx_pcm_pdev);
+ 		clk_disable_unprepare(ssi_private->clk);
+-		clk_put(ssi_private->clk);
+ 	}
+ 	snd_soc_unregister_dai(&pdev->dev);
+ 	device_remove_file(&pdev->dev, &ssi_private->dev_attr);
 -- 
 1.7.5.4
