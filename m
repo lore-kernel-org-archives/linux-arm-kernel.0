@@ -1,27 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 4 Jun 2012 18:00:28 +0300
-Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <20120604004610.GA2857@b20223-02.ap.freescale.net>
-References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
- <20120604004610.GA2857@b20223-02.ap.freescale.net>
-Message-ID: <20120604150024.GN8002@arwen.pp.htv.fi>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 04 Jun 2012 17:02:28 +0200
+Subject: [PATCH] ohci-nxp: Use ohci_finish_controller_resume()
+In-Reply-To: <Pine.LNX.4.44L0.1206041027420.1555-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1206041027420.1555-100000@iolanthe.rowland.org>
+Message-ID: <4FCCCE04.3000904@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 08:46:11AM +0800, Richard Zhao wrote:
-> Hi Guys,
+Hi!
+
+On 06/04/2012 04:29 PM, Alan Stern wrote:
+>> OHCI drivers are supposed to use ohci_finish_controller_resume(). This patch
+>> adds respective suspend and resume code to ohci-nxp. The following compiler
+>> warning is fixed this way:
+>>
+>> drivers/usb/host/ohci-hub.c:321: warning: 'ohci_finish_controller_resume'
+>> defined but not used
 > 
-> The merge window was closed. Do you have time to check whether the
-> patch series is ok to pick up?
+> This is not a correct description of the patch.  A correct description 
+> would be something like:
+> 
+> 	Add suspend/resume support to the ohci-nxp driver.
+> 
+> The compiler warning needs a completely different fix; 
+> ohci_finish_controller_resume should be given a __maybe_unused 
+> annotation.
 
-The drivers/ part looks fine to me.
+Thanks for the suggestion! I'll rather do the latter.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/e184f49c/attachment.sig>
+Roland
