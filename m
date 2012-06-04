@@ -1,36 +1,69 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 4 Jun 2012 16:16:52 -0400 (EDT)
-Subject: [PATCH] ohci-hub: Mark ohci_finish_controller_resume() as
- __maybe_unused
-In-Reply-To: <1338837608-23976-1-git-send-email-stigge@antcom.de>
-Message-ID: <Pine.LNX.4.44L0.1206041616300.1555-100000@iolanthe.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 04 Jun 2012 14:22:47 -0700
+Subject: [PATCH 1/2] remoteproc: maintain a generic child device for each
+ rproc
+In-Reply-To: <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
+References: <1338017791-9442-1-git-send-email-ohad@wizery.com>
+ <4FC5DBFA.2030300@codeaurora.org>
+ <CAK=WgbZJJJPuNWVv8WgL=KKm6Hrx2krDD9gBOTP7sA8p7mh_rA@mail.gmail.com>
+Message-ID: <4FCD2727.7050405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Jun 2012, Roland Stigge wrote:
+(Sorry your mail was lost due to mail outage)
 
-> ohci_finish_controller_resume() is intended to be used in platform specific
-> drivers ohci-*.c, included from ohci-hcd.c. Some of them don't actually use
-> ohci_finish_controller_resume(), so mark it as __maybe_unused.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On 05/30/12 05:16, Ohad Ben-Cohen wrote:
+>
+> On Wed, May 30, 2012 at 11:36 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+>> One complaint I've gotten is that the error messages are essentially
+>> useless now. I believe there are some ongoing discussions on lkml to fix
+>> this by traversing the device hierarchy to find the "real" device but
+>> the hard part is finding the real device.
+> You probably refer to the discussions around the input subsystem's pull request.
+>
+> I was thinking about that too when creating this patch, and it looks
+> like whatever Greg will come up with on that matter will benefit us
+> too. So taking that into account, it might make more sense to do stick
+> with the virtual device rather than use the real one here (we'll end
+> up having more information in the long run).
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Fair enough. Hopefully something comes out of that discussion since this
+will need it.
 
-> ---
->  drivers/usb/host/ohci-hub.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-2.6.orig/drivers/usb/host/ohci-hub.c
-> +++ linux-2.6/drivers/usb/host/ohci-hub.c
-> @@ -317,7 +317,7 @@ static int ohci_bus_resume (struct usb_h
->  }
->  
->  /* Carry out the final steps of resuming the controller device */
-> -static void ohci_finish_controller_resume(struct usb_hcd *hcd)
-> +static void __maybe_unused ohci_finish_controller_resume(struct usb_hcd *hcd)
->  {
->  	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
->  	int			port;
-> 
-> 
+>> I'm not clear on busses versus classes.
+> I think that busses is a whole lot more complex beast. Probably the
+> main indication we want one is when we need to match drivers to
+> devices.
+>
+> In this case, I was more wondering between using a class to a device type.
+>
+>> I recall seeing a thread where
+>> someone said classes were on the way out and shouldn't be used but I
+>> can't find it anymore.
+> I also remembered a similar discussion at a plumbers mini-conf about
+> 2-3 years ago too, so I looked at device_type as an alternative to
+> class. The former looks somewhat simpler, but I couldn't find any
+> major advantage for using one over the other, and both seem to be in
+> use by many subsystems.
+>
+>> Should we use classes for devices that will never
+>> have a matching driver?
+> It's not strictly required, but in case we want to provide these
+> devices some common behavior (and in our case we want them all to have
+> the same release handler, and very soon, the same PM handlers, too),
+> then a class (or a type) is helpful.
+>
+> It looks like moving from a class to a type is quite trivial, in case
+> classes do eventually go away (or an advantage of using the latter
+> shows up), but I'm not aware of any other viable alternative for us
+> other than class/type.
+>
+
+Ok. Will moving from a class to a device type disrupt the kernel ABI?
+First it will be under /sys/class/ and then under /sys/bus? Greg, can
+you shed some light on when to use a class versus a device type?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
