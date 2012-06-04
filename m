@@ -1,80 +1,169 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 04 Jun 2012 14:23:54 -0700
-Subject: [PATCH] remoteproc: block premature rproc booting
-In-Reply-To: <CAK=WgbaP5qSso_Eu=Oup4eqLDcorZ-qf=mysMKiEvOS=m7yLmg@mail.gmail.com>
-References: <1337687472-23009-1-git-send-email-ohad@wizery.com>
- <4FBDFC4A.1060602@codeaurora.org>
- <CAK=WgbaP5qSso_Eu=Oup4eqLDcorZ-qf=mysMKiEvOS=m7yLmg@mail.gmail.com>
-Message-ID: <4FCD276A.80505@codeaurora.org>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon, 04 Jun 2012 23:53:06 +0200
+Subject: [PATCH v2] omap: dma: Clear status registers on enable/disable
+ irq.
+In-Reply-To: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
+References: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
+Message-ID: <2491206.Xgf8oVG38F@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/12 13:11, Ohad Ben-Cohen wrote:
->
->> Would it suffice to
->> have some new rproc->state like RPROC_UNKNOWN that we set in
->> rproc_register() before adding it to the list of rprocs? If we find the
->> firmware then we set it to RPROC_READY or RPROC_REGISTERED? Then we
->> wait_for_completion() and check the state, failing if it's still in the
->> unknown state.
-> That makes me think - what if we'll add the rproc to the list only
-> after we find the firmware? This way we avoid this race completely.
+On Tue, 15 May 2012 14:35:08 Oleg Matcovschi wrote:
+> Use omap_disable_channel_irq() function instead of directly accessing CICR.
+> The omap_disable_chanel_irq() function clears pending interrupts
+> and disables interrupt on channel.
+> Functions omap2_enable_irq_lch()/omap2_disable_irq_lch() clear interrupt
+> status register.
+> 
+> 
+> Signed-off-by: Oleg Matcovschi <oleg.matcovschi@ti.com>
+> ---
+> v1 initial revision
+> v2 Review by Tony Lindgren
 
-I thought we wanted to allow both calls to proceed in parallel? If we
-don't care about that then "announcing" it once the firmware is found
-the first time sounds correct.
+My Tested-by: on OMAP1 still valid for v2 if you care.
 
->
-> Speaking of which, I was wondering whether you guys have some free
-> cycles to try remoteproc out.
+Thanks,
+Janusz
 
-I want to try it out but I've not had enough free time to do so.
-
->
-> The main reason we kept the get/put interface was to make it easier
-> for you guys to adopt it, but I've been re-thinking lately whether we
-> really want that interface. It's a problematic interface with
-> non-negligible maintenance burden, and the code will be greatly
-> simplified without it.
-
-If nobody in the kernel is using it why keep it? If MSM needs we can add
-it back when we move to rproc.
-
->
-> Even if you guys won't be adopting virtio (of any other
-> virtio-over-smd variant) - do you think you'll be able to adopt a
-> similar model with which remoteproc registers, according to the fw
-> capabilities, the relevant devices which then get bound to the
-> relevant higher-level drivers (virtio drivers, smd drivers, etc..) ?
-> That way these devices can point to the rproc context and we don't
-> need any get_by_name interface.
-
-I think we'll need to have some way to describe the resources in the
-kernel when we register the rproc. We aren't going to be able to change
-our firmware to have the resource section. It would probably just be one
-device (the equivalent of the rpmsg device but for smd channels).
-Everything else would build on top of the smd virtio device.
-
-Getting to that point would require changing smd code to be more linux
-device model friendly. We're exploring using virtio over smd (basically
-virtqueues would replace smd APIs while we replace the vrings with smd
-wire protocol). If that works out then we'll be able to attach the smd
-virtio device to the remote proc via some in kernel resource list. Then
-I imagine when the rproc registers we'll add the device directly. We
-need to figure out some way to delay loading of the firmware at that
-point. I guess it means we'll need to move both firmware requests to be
-async and the first firmware request to get the resource table will be
-skipped on MSM.
-
-One sticking point has been the desire to shut down processors when
-they're not in use and reclaim the memory. Also we would like to upgrade
-the firmware without rebooting the phone. Do you have any plans for
-that? It looks like the current design boots anything that is registered
-and has a matching rpmsg driver. I suppose one solution is to use
-modules but that looks like it disrupts other processors (I don't want
-to rmmod all of rpmsg). We probably need some sort of shutdown/boot
-mechanism that isn't driven entirely by the client drivers.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> ---
+>  arch/arm/plat-omap/dma.c |   59 +++++++++++++++++++++------------------------
+>  1 files changed, 28 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index 3ec7ec5..3d5d593 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -563,22 +563,25 @@ EXPORT_SYMBOL(omap_set_dma_dest_burst_mode);
+>  
+>  static inline void omap_enable_channel_irq(int lch)
+>  {
+> -	u32 status;
+> -
+>  	/* Clear CSR */
+>  	if (cpu_class_is_omap1())
+> -		status = p->dma_read(CSR, lch);
+> -	else if (cpu_class_is_omap2())
+> +		p->dma_read(CSR, lch);
+> +	else
+>  		p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, lch);
+>  
+>  	/* Enable some nice interrupts. */
+>  	p->dma_write(dma_chan[lch].enabled_irqs, CICR, lch);
+>  }
+>  
+> -static void omap_disable_channel_irq(int lch)
+> +static inline void omap_disable_channel_irq(int lch)
+>  {
+> -	if (cpu_class_is_omap2())
+> -		p->dma_write(0, CICR, lch);
+> +	/* disable channel interrupts */
+> +	p->dma_write(0, CICR, lch);
+> +	/* Clear CSR */
+> +	if (cpu_class_is_omap1())
+> +		p->dma_read(CSR, lch);
+> +	else
+> +		p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, lch);
+>  }
+>  
+>  void omap_enable_dma_irq(int lch, u16 bits)
+> @@ -622,14 +625,14 @@ static inline void disable_lnk(int lch)
+>  	l = p->dma_read(CLNK_CTRL, lch);
+>  
+>  	/* Disable interrupts */
+> +	omap_disable_channel_irq(lch);
+> +
+>  	if (cpu_class_is_omap1()) {
+> -		p->dma_write(0, CICR, lch);
+>  		/* Set the STOP_LNK bit */
+>  		l |= 1 << 14;
+>  	}
+>  
+>  	if (cpu_class_is_omap2()) {
+> -		omap_disable_channel_irq(lch);
+>  		/* Clear the ENABLE_LNK bit */
+>  		l &= ~(1 << 15);
+>  	}
+> @@ -647,6 +650,9 @@ static inline void omap2_enable_irq_lch(int lch)
+>  		return;
+>  
+>  	spin_lock_irqsave(&dma_chan_lock, flags);
+> +	/* clear IRQ STATUS */
+> +	p->dma_write(1 << lch, IRQSTATUS_L0, lch);
+> +	/* Enable interrupt */
+>  	val = p->dma_read(IRQENABLE_L0, lch);
+>  	val |= 1 << lch;
+>  	p->dma_write(val, IRQENABLE_L0, lch);
+> @@ -662,9 +668,12 @@ static inline void omap2_disable_irq_lch(int lch)
+>  		return;
+>  
+>  	spin_lock_irqsave(&dma_chan_lock, flags);
+> +	/* Disable interrupt */
+>  	val = p->dma_read(IRQENABLE_L0, lch);
+>  	val &= ~(1 << lch);
+>  	p->dma_write(val, IRQENABLE_L0, lch);
+> +	/* clear IRQ STATUS */
+> +	p->dma_write(1 << lch, IRQSTATUS_L0, lch);
+>  	spin_unlock_irqrestore(&dma_chan_lock, flags);
+>  }
+>  
+> @@ -735,11 +744,8 @@ int omap_request_dma(int dev_id, const char *dev_name,
+>  	}
+>  
+>  	if (cpu_class_is_omap2()) {
+> -		omap2_enable_irq_lch(free_ch);
+>  		omap_enable_channel_irq(free_ch);
+> -		/* Clear the CSR register and IRQ status register */
+> -		p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, free_ch);
+> -		p->dma_write(1 << free_ch, IRQSTATUS_L0, 0);
+> +		omap2_enable_irq_lch(free_ch);
+>  	}
+>  
+>  	*dma_ch_out = free_ch;
+> @@ -758,27 +764,19 @@ void omap_free_dma(int lch)
+>  		return;
+>  	}
+>  
+> -	if (cpu_class_is_omap1()) {
+> -		/* Disable all DMA interrupts for the channel. */
+> -		p->dma_write(0, CICR, lch);
+> -		/* Make sure the DMA transfer is stopped. */
+> -		p->dma_write(0, CCR, lch);
+> -	}
+> -
+> -	if (cpu_class_is_omap2()) {
+> +	/* Disable interrupt for logical channel */
+> +	if (cpu_class_is_omap2())
+>  		omap2_disable_irq_lch(lch);
+>  
+> -		/* Clear the CSR register and IRQ status register */
+> -		p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, lch);
+> -		p->dma_write(1 << lch, IRQSTATUS_L0, lch);
+> +	/* Disable all DMA interrupts for the channel. */
+> +	omap_disable_channel_irq(lch);
+>  
+> -		/* Disable all DMA interrupts for the channel. */
+> -		p->dma_write(0, CICR, lch);
+> +	/* Make sure the DMA transfer is stopped. */
+> +	p->dma_write(0, CCR, lch);
+>  
+> -		/* Make sure the DMA transfer is stopped. */
+> -		p->dma_write(0, CCR, lch);
+> +	/* Clear registers */
+> +	if (cpu_class_is_omap2())
+>  		omap_clear_dma(lch);
+> -	}
+>  
+>  	spin_lock_irqsave(&dma_chan_lock, flags);
+>  	dma_chan[lch].dev_id = -1;
+> @@ -926,8 +924,7 @@ void omap_stop_dma(int lch)
+>  	u32 l;
+>  
+>  	/* Disable all interrupts on the channel */
+> -	if (cpu_class_is_omap1())
+> -		p->dma_write(0, CICR, lch);
+> +	omap_disable_channel_irq(lch);
+>  
+>  	l = p->dma_read(CCR, lch);
+>  	if (IS_DMA_ERRATA(DMA_ERRATA_i541) &&
+> 
