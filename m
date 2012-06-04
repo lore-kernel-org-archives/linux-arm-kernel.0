@@ -1,176 +1,125 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 4 Jun 2012 19:04:25 +0800
-Subject: [PATCH v3] i2c: imx: convert to use managed functions
-In-Reply-To: <1338776481-23710-1-git-send-email-richard.zhao@freescale.com>
-References: <1338776481-23710-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1338807865-5487-1-git-send-email-richard.zhao@freescale.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Mon, 04 Jun 2012 13:30:24 +0200
+Subject: [PATCH v2] usb: fsl_udc: errata - postpone freeing current dTD
+In-Reply-To: <20120521190450.GA27492@arwen.pp.htv.fi>
+References: <20120410021151.GB23044@lovely.krouter>
+ <20120411073918.GA9180@lovely.krouter>
+ <CAOMZO5C729Ki0Bequ+s1nnrgt4NZWvwg3Wnjk4kHp=d9BtkeXw@mail.gmail.com>
+ <20120509000221.GA19525@lovely.krouter>
+ <20120513225126.GA3683@lovely.krouter> <20120514042142.GD9750@kroah.com>
+ <20120520231724.GA7941@mars>
+ <F281D0F91ED19E4D8E63A7504E8A649803BB1E25@039-SN2MPN1-023.039d.mgd.msft.net>
+ <1337583221.3394.21.camel@mars> <20120521065722.GA4363@mars>
+ <20120521190450.GA27492@arwen.pp.htv.fi>
+Message-ID: <1338809424.3371.20.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- convert to use devm_request_and_ioremap, devm_kzalloc, devm_clk_get,
-  devm_request_irq.
-- clean up unused variables.
+Hi,
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Reviewed-by: Shubhrajyoti D <Shubhrajyoti@ti.com>
+On Mon, 2012-05-21 at 22:04 +0300, Felipe Balbi wrote:
+> On Mon, May 21, 2012 at 08:57:22AM +0200, Christoph Fritz wrote:
+> > USB controller may access a wrong address for the dTD (endpoint transfer
+> > descriptor) and then hang. This happens a lot when doing tests with
+> > g_ether module and iperf, a tool for measuring maximum TCP and UDP
+> > bandwidth.
+> > 
+> > This hardware bug is explained in detail by errata number 2858 for i.MX23:
+> > http://cache.freescale.com/files/dsp/doc/errata/IMX23CE.pdf
+> > 
+> > All (?) SOCs with an IP from chipidea suffer from this problem.
+> > mv_udc_core fixes this bug by commit daec765.  There still may be
+> > unfixed drivers.
+> > 
+> > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> > Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> > ---
+> >  drivers/usb/gadget/fsl_udc_core.c |   15 ++++++++++++++-
+> >  1 files changed, 14 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
+> > index 55abfb6..72f2139 100644
+> > --- a/drivers/usb/gadget/fsl_udc_core.c
+> > +++ b/drivers/usb/gadget/fsl_udc_core.c
+> > @@ -65,6 +65,8 @@ static struct usb_sys_interface *usb_sys_regs;
+> >  /* it is initialized in probe()  */
+> >  static struct fsl_udc *udc_controller = NULL;
+> >  
+> > +static struct ep_td_struct *last_free_td;
+> 
+> I don't want to see global variables anymore. In fact, please convert
+> this to the new udc_start()/udc_stop() calls and use the generic
+> map/unmap routines.
+> 
+> That'll help you get rid of a bunch of useless code on the driver. After
+> that you should remove all <asm/*> header includes and drop the ARCH
+> dependency.
+> 
+> You can also drop the big-/little-endian helpers as you can make use of
+> generic writel()/readl() routines.
+> 
+> Please make sure these series comes in with enough time to reach v3.6
+> merge window in about 3 months.
+> 
+> You can put this fix together on that series after you drop the global.
+
+Before I came to do the proposed changes, I stumbled upon this:
+
+In file included from drivers/usb/gadget/fsl_udc_core.c:49:
+drivers/usb/gadget/fsl_usb2_udc.h: In function ?get_qh_by_ep?:
+drivers/usb/gadget/fsl_usb2_udc.h:585: error: ?struct fsl_ep? has no member named ?desc?
+drivers/usb/gadget/fsl_udc_core.c: In function ?done?:
+drivers/usb/gadget/fsl_udc_core.c:187: error: ?struct fsl_ep? has no member named ?desc?
+drivers/usb/gadget/fsl_udc_core.c:187: error: ?struct fsl_ep? has no member named ?desc?
+<snip>
+
+my proposed regression patch:
 ---
- drivers/i2c/busses/i2c-imx.c |   71 ++++++++++-------------------------------
- 1 files changed, 18 insertions(+), 53 deletions(-)
+From: Christoph Fritz <chf.fritz@googlemail.com>
+Date: Mon, 4 Jun 2012 12:58:21 +0200
+Subject: [PATCH] usb: gadget: regression fix - useage of usb_ep
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 8d6b504..a93e846 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -118,10 +118,8 @@ static u16 __initdata i2c_clk_div[50][2] = {
+This patch removes redundant pointer to struct usb_endpoint_descriptor which
+were missed in commit 79149b8:
+
+ usb: gadget: Update fsl_udc_core to use usb_endpoint_descriptor inside the
+ struct usb_ep
+
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
+ drivers/usb/gadget/fsl_udc_core.c |    2 +-
+ drivers/usb/gadget/fsl_usb2_udc.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
+index 2831685..678ec4d 100644
+--- a/drivers/usb/gadget/fsl_udc_core.c
++++ b/drivers/usb/gadget/fsl_udc_core.c
+@@ -2575,7 +2575,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
+ 	/* for ep0: the desc defined here;
+ 	 * for other eps, gadget layer called ep_enable with defined desc
+ 	 */
+-	udc_controller->eps[0].desc = &fsl_ep0_desc;
++	udc_controller->eps[0].ep.desc = &fsl_ep0_desc;
+ 	udc_controller->eps[0].ep.maxpacket = USB_MAX_CTRL_PAYLOAD;
  
- struct imx_i2c_struct {
- 	struct i2c_adapter	adapter;
--	struct resource		*res;
- 	struct clk		*clk;
- 	void __iomem		*base;
--	int			irq;
- 	wait_queue_head_t	queue;
- 	unsigned long		i2csr;
- 	unsigned int 		disable_delay;
-@@ -473,7 +471,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
- 	struct pinctrl *pinctrl;
- 	void __iomem *base;
--	resource_size_t res_size;
- 	int irq, bitrate;
- 	int ret;
- 
-@@ -490,25 +487,15 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
--	res_size = resource_size(res);
--
--	if (!request_mem_region(res->start, res_size, DRIVER_NAME)) {
--		dev_err(&pdev->dev, "request_mem_region failed\n");
-+	base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!base)
- 		return -EBUSY;
--	}
--
--	base = ioremap(res->start, res_size);
--	if (!base) {
--		dev_err(&pdev->dev, "ioremap failed\n");
--		ret = -EIO;
--		goto fail1;
--	}
- 
--	i2c_imx = kzalloc(sizeof(struct imx_i2c_struct), GFP_KERNEL);
-+	i2c_imx = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_struct),
-+				GFP_KERNEL);
- 	if (!i2c_imx) {
- 		dev_err(&pdev->dev, "can't allocate interface\n");
--		ret = -ENOMEM;
--		goto fail2;
-+		return -ENOMEM;
- 	}
- 
- 	/* Setup i2c_imx driver structure */
-@@ -518,29 +505,27 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	i2c_imx->adapter.dev.parent	= &pdev->dev;
- 	i2c_imx->adapter.nr 		= pdev->id;
- 	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
--	i2c_imx->irq			= irq;
- 	i2c_imx->base			= base;
--	i2c_imx->res			= res;
- 
- 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
- 	if (IS_ERR(pinctrl)) {
--		ret = PTR_ERR(pinctrl);
--		goto fail3;
-+		dev_err(&pdev->dev, "can't get/select pinctrl\n");
-+		return PTR_ERR(pinctrl);
- 	}
- 
- 	/* Get I2C clock */
--	i2c_imx->clk = clk_get(&pdev->dev, "i2c_clk");
-+	i2c_imx->clk = devm_clk_get(&pdev->dev, "i2c_clk");
- 	if (IS_ERR(i2c_imx->clk)) {
--		ret = PTR_ERR(i2c_imx->clk);
- 		dev_err(&pdev->dev, "can't get I2C clock\n");
--		goto fail3;
-+		return PTR_ERR(i2c_imx->clk);
- 	}
- 
- 	/* Request IRQ */
--	ret = request_irq(i2c_imx->irq, i2c_imx_isr, 0, pdev->name, i2c_imx);
-+	ret = devm_request_irq(&pdev->dev, irq, i2c_imx_isr, 0,
-+				pdev->name, i2c_imx);
- 	if (ret) {
--		dev_err(&pdev->dev, "can't claim irq %d\n", i2c_imx->irq);
--		goto fail4;
-+		dev_err(&pdev->dev, "can't claim irq %d\n", irq);
-+		return ret;
- 	}
- 
- 	/* Init queue */
-@@ -565,7 +550,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	ret = i2c_add_numbered_adapter(&i2c_imx->adapter);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "registration failed\n");
--		goto fail5;
-+		return ret;
- 	}
- 
- 	of_i2c_register_devices(&i2c_imx->adapter);
-@@ -573,28 +558,16 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	/* Set up platform driver data */
- 	platform_set_drvdata(pdev, i2c_imx);
- 
--	dev_dbg(&i2c_imx->adapter.dev, "claimed irq %d\n", i2c_imx->irq);
-+	dev_dbg(&i2c_imx->adapter.dev, "claimed irq %d\n", irq);
- 	dev_dbg(&i2c_imx->adapter.dev, "device resources from 0x%x to 0x%x\n",
--		i2c_imx->res->start, i2c_imx->res->end);
--	dev_dbg(&i2c_imx->adapter.dev, "allocated %d bytes at 0x%x \n",
--		res_size, i2c_imx->res->start);
-+		res->start, res->end);
-+	dev_dbg(&i2c_imx->adapter.dev, "allocated %d bytes at 0x%x\n",
-+		resource_size(res), res->start);
- 	dev_dbg(&i2c_imx->adapter.dev, "adapter name: \"%s\"\n",
- 		i2c_imx->adapter.name);
- 	dev_dbg(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
- 
- 	return 0;   /* Return OK */
--
--fail5:
--	free_irq(i2c_imx->irq, i2c_imx);
--fail4:
--	clk_put(i2c_imx->clk);
--fail3:
--	kfree(i2c_imx);
--fail2:
--	iounmap(base);
--fail1:
--	release_mem_region(res->start, resource_size(res));
--	return ret; /* Return error number */
- }
- 
- static int __exit i2c_imx_remove(struct platform_device *pdev)
-@@ -606,20 +579,12 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
- 	i2c_del_adapter(&i2c_imx->adapter);
- 	platform_set_drvdata(pdev, NULL);
- 
--	/* free interrupt */
--	free_irq(i2c_imx->irq, i2c_imx);
--
- 	/* setup chip registers to defaults */
- 	writeb(0, i2c_imx->base + IMX_I2C_IADR);
- 	writeb(0, i2c_imx->base + IMX_I2C_IFDR);
- 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
- 	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
- 
--	clk_put(i2c_imx->clk);
--
--	iounmap(i2c_imx->base);
--	release_mem_region(i2c_imx->res->start, resource_size(i2c_imx->res));
--	kfree(i2c_imx);
- 	return 0;
- }
- 
+ 	/* setup the udc->eps[] for non-control endpoints and link
+diff --git a/drivers/usb/gadget/fsl_usb2_udc.h b/drivers/usb/gadget/fsl_usb2_udc.h
+index 5cd7b7e..f61a967 100644
+--- a/drivers/usb/gadget/fsl_usb2_udc.h
++++ b/drivers/usb/gadget/fsl_usb2_udc.h
+@@ -568,10 +568,10 @@ static void dump_msg(const char *label, const u8 * buf, unsigned int length)
+ /*
+  * ### internal used help routines.
+  */
+-#define ep_index(EP)		((EP)->desc->bEndpointAddress&0xF)
++#define ep_index(EP)		((EP)->ep.desc->bEndpointAddress&0xF)
+ #define ep_maxpacket(EP)	((EP)->ep.maxpacket)
+ #define ep_is_in(EP)	( (ep_index(EP) == 0) ? (EP->udc->ep0_dir == \
+-			USB_DIR_IN ):((EP)->desc->bEndpointAddress \
++			USB_DIR_IN) : ((EP)->ep.desc->bEndpointAddress \
+ 			& USB_DIR_IN)==USB_DIR_IN)
+ #define get_ep_by_pipe(udc, pipe)	((pipe == 1)? &udc->eps[0]: \
+ 					&udc->eps[pipe])
 -- 
-1.7.5.4
+1.7.2.5
