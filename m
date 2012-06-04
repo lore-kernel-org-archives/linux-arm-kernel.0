@@ -1,241 +1,251 @@
 From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Mon,  4 Jun 2012 14:37:30 +0800
-Subject: [PATCH v1 4/5] ASoC: add mmp brownstone support
+Date: Mon,  4 Jun 2012 14:37:31 +0800
+Subject: [PATCH v1 5/5] ASoC: add ttc-dkb machine support
 In-Reply-To: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
 References: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1338791851-21038-5-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1338791851-21038-6-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds Alsa audio platform driver for mmp brownstone machine
+From: Qiao Zhou <zhouqiao@marvell.com>
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-Signed-off-by: Leo Yan <leoy@marvell.com>
+add ttc-dkb machine support for pxa910. It uses 88pm8607 as codec
+dai, mmp-pcm as platform and pxa-ssp as cpu dai.
+
+Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
 ---
- sound/soc/pxa/Kconfig      |   10 +++
- sound/soc/pxa/Makefile     |    2 +
- sound/soc/pxa/brownstone.c |  178 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 190 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/pxa/brownstone.c
+ sound/soc/pxa/Kconfig   |   20 ++++++
+ sound/soc/pxa/Makefile  |    2 +
+ sound/soc/pxa/ttc-dkb.c |  173 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 195 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/pxa/ttc-dkb.c
 
 diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 6c3d00b..d389fd5 100644
+index d389fd5..4d2e46f 100644
 --- a/sound/soc/pxa/Kconfig
 +++ b/sound/soc/pxa/Kconfig
-@@ -206,3 +206,13 @@ config SND_PXA2XX_SOC_IMOTE2
-        help
-          Say Y if you want to add support for SoC audio on the
- 	 IMote 2.
-+
-+config SND_MMP_SOC_BROWNSTONE
-+	tristate "SoC Audio support for Marvell Brownstone"
-+	depends on SND_MMP_SOC && MACH_BROWNSTONE
-+	select SND_MMP_SOC_SSPA
-+	select MFD_WM8994
-+	select SND_SOC_WM8994
+@@ -150,6 +150,26 @@ config SND_SOC_TAVOREVB3
+ 	  Say Y if you want to add support for SoC audio on the
+ 	  Marvell Saarb reference platform.
+ 
++config SND_PXA910_SOC
++	tristate "SoC Audio for Marvell PXA910 chip"
++	depends on ARCH_MMP && SND
++	select SND_PCM
 +	help
 +	  Say Y if you want to add support for SoC audio on the
-+	  Marvell Brownstone reference platform.
++	  Marvell PXA910 reference platform.
++
++config SND_SOC_TTC_DKB
++	bool "SoC Audio support for TTC DKB"
++	depends on SND_PXA910_SOC && MACH_TTC_DKB
++	select PXA_SSP
++	select SND_PXA_SOC_SSP
++	select SND_MMP_SOC
++	select MFD_88PM860X
++	select SND_SOC_88PM860X
++	help
++	  Say Y if you want to add support for SoC audio on TTC DKB
++
++
+ config SND_SOC_ZYLONITE
+ 	tristate "SoC Audio support for Marvell Zylonite"
+ 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
 diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
-index 07b8417..c12aa2a 100644
+index c12aa2a..d8a265d 100644
 --- a/sound/soc/pxa/Makefile
 +++ b/sound/soc/pxa/Makefile
-@@ -32,6 +32,7 @@ snd-soc-mioa701-objs := mioa701_wm9713.o
- snd-soc-z2-objs := z2.o
+@@ -33,6 +33,7 @@ snd-soc-z2-objs := z2.o
  snd-soc-imote2-objs := imote2.o
  snd-soc-raumfeld-objs := raumfeld.o
-+snd-soc-brownstone-objs := brownstone.o
+ snd-soc-brownstone-objs := brownstone.o
++snd-soc-ttc-dkb-objs := ttc-dkb.o
  
  obj-$(CONFIG_SND_PXA2XX_SOC_CORGI) += snd-soc-corgi.o
  obj-$(CONFIG_SND_PXA2XX_SOC_POODLE) += snd-soc-poodle.o
-@@ -51,3 +52,4 @@ obj-$(CONFIG_SND_SOC_TAVOREVB3) += snd-soc-tavorevb3.o
- obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
+@@ -53,3 +54,4 @@ obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
  obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
  obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
-+obj-$(CONFIG_SND_MMP_SOC_BROWNSTONE) += snd-soc-brownstone.o
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
+ obj-$(CONFIG_SND_MMP_SOC_BROWNSTONE) += snd-soc-brownstone.o
++obj-$(CONFIG_SND_SOC_TTC_DKB) += snd-soc-ttc-dkb.o
+diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
 new file mode 100644
-index 0000000..7aa7064
+index 0000000..ac6bf33
 --- /dev/null
-+++ b/sound/soc/pxa/brownstone.c
-@@ -0,0 +1,178 @@
++++ b/sound/soc/pxa/ttc-dkb.c
+@@ -0,0 +1,173 @@
 +/*
-+ * linux/sound/soc/pxa/brownstone.c
++ * linux/sound/soc/pxa/ttc_dkb.c
 + *
-+ * Copyright (C) 2011 Marvell International Ltd.
++ * Copyright (C) 2012 Marvell International Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
 + *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
 + */
-+
 +#include <linux/module.h>
++#include <linux/moduleparam.h>
 +#include <sound/core.h>
 +#include <sound/pcm.h>
 +#include <sound/soc.h>
 +#include <sound/jack.h>
++#include <asm/mach-types.h>
++#include <sound/pcm_params.h>
++#include "../codecs/88pm860x-codec.h"
 +
-+#include "../codecs/wm8994.h"
-+#include "mmp-sspa.h"
++static struct snd_soc_jack hs_jack, mic_jack;
 +
-+static const struct snd_kcontrol_new brownstone_dapm_control[] = {
-+	SOC_DAPM_PIN_SWITCH("Ext Spk"),
++static struct snd_soc_jack_pin hs_jack_pins[] = {
++	{ .pin = "Headset Stereophone",	.mask = SND_JACK_HEADPHONE, },
 +};
 +
-+static const struct snd_soc_dapm_widget brownstone_dapm_widgets[] = {
-+	SND_SOC_DAPM_SPK("Ext Spk", NULL),
++static struct snd_soc_jack_pin mic_jack_pins[] = {
++	{ .pin = "Headset Mic 2",	.mask = SND_JACK_MICROPHONE, },
++};
++
++/* ttc machine dapm widgets */
++static const struct snd_soc_dapm_widget ttc_dapm_widgets[] = {
 +	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+	SND_SOC_DAPM_MIC("Main Mic", NULL),
++	SND_SOC_DAPM_LINE("Lineout Out 1", NULL),
++	SND_SOC_DAPM_LINE("Lineout Out 2", NULL),
++	SND_SOC_DAPM_SPK("Ext Speaker", NULL),
++	SND_SOC_DAPM_MIC("Ext Mic 1", NULL),
++	SND_SOC_DAPM_MIC("Headset Mic 2", NULL),
++	SND_SOC_DAPM_MIC("Ext Mic 3", NULL),
 +};
 +
-+static const struct snd_soc_dapm_route brownstone_audio_map[] = {
-+	{"Ext Spk", NULL, "SPKOUTLP"},
-+	{"Ext Spk", NULL, "SPKOUTLN"},
-+	{"Ext Spk", NULL, "SPKOUTRP"},
-+	{"Ext Spk", NULL, "SPKOUTRN"},
++/* ttc machine audio map */
++static const struct snd_soc_dapm_route ttc_audio_map[] = {
++	{"Headset Stereophone", NULL, "HS1"},
++	{"Headset Stereophone", NULL, "HS2"},
 +
-+	{"Headset Stereophone", NULL, "HPOUT1L"},
-+	{"Headset Stereophone", NULL, "HPOUT1R"},
++	{"Ext Speaker", NULL, "LSP"},
++	{"Ext Speaker", NULL, "LSN"},
 +
-+	{"IN1RN", NULL, "Headset Mic"},
++	{"Lineout Out 1", NULL, "LINEOUT1"},
++	{"Lineout Out 2", NULL, "LINEOUT2"},
 +
-+	{"DMIC1DAT", NULL, "MICBIAS1"},
-+	{"MICBIAS1", NULL, "Main Mic"},
++	{"MIC1P", NULL, "Mic1 Bias"},
++	{"MIC1N", NULL, "Mic1 Bias"},
++	{"Mic1 Bias", NULL, "Ext Mic 1"},
++
++	{"MIC2P", NULL, "Mic1 Bias"},
++	{"MIC2N", NULL, "Mic1 Bias"},
++	{"Mic1 Bias", NULL, "Headset Mic 2"},
++
++	{"MIC3P", NULL, "Mic3 Bias"},
++	{"MIC3N", NULL, "Mic3 Bias"},
++	{"Mic3 Bias", NULL, "Ext Mic 3"},
 +};
 +
-+static int brownstone_wm8994_init(struct snd_soc_pcm_runtime *rtd)
++static int ttc_pm860x_init(struct snd_soc_pcm_runtime *rtd)
 +{
 +	struct snd_soc_codec *codec = rtd->codec;
 +	struct snd_soc_dapm_context *dapm = &codec->dapm;
-+	int ret;
 +
-+	ret = snd_soc_add_card_controls(dapm->card, brownstone_dapm_control,
-+				   ARRAY_SIZE(brownstone_dapm_control));
-+	if (ret < 0)
-+		return ret;
++	/* connected pins */
++	snd_soc_dapm_enable_pin(dapm, "Ext Speaker");
++	snd_soc_dapm_enable_pin(dapm, "Ext Mic 1");
++	snd_soc_dapm_enable_pin(dapm, "Ext Mic 3");
++	snd_soc_dapm_disable_pin(dapm, "Headset Mic2");
++	snd_soc_dapm_disable_pin(dapm, "Headset Stereophone");
 +
-+	snd_soc_dapm_enable_pin(dapm, "Ext Spk");
-+	snd_soc_dapm_enable_pin(dapm, "Headset Stereophone");
-+	snd_soc_dapm_enable_pin(dapm, "Headset Mic");
-+	snd_soc_dapm_enable_pin(dapm, "Main Mic");
++	/* Headset jack detection */
++	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE
++			| SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
++			&hs_jack);
++	snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
++			      hs_jack_pins);
++	snd_soc_jack_new(codec, "Microphone Jack", SND_JACK_MICROPHONE,
++			 &mic_jack);
++	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
++			      mic_jack_pins);
 +
-+	/* set endpoints to not connected */
-+	snd_soc_dapm_nc_pin(dapm, "HPOUT2P");
-+	snd_soc_dapm_nc_pin(dapm, "HPOUT2N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT1N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT1P");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT2N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT2P");
-+	snd_soc_dapm_nc_pin(dapm, "IN1LN");
-+	snd_soc_dapm_nc_pin(dapm, "IN1LP");
-+	snd_soc_dapm_nc_pin(dapm, "IN1RP");
-+	snd_soc_dapm_nc_pin(dapm, "IN2LP:VXRN");
-+	snd_soc_dapm_nc_pin(dapm, "IN2RN");
-+	snd_soc_dapm_nc_pin(dapm, "IN2RP:VXRP");
-+	snd_soc_dapm_nc_pin(dapm, "IN2LN");
-+
-+	snd_soc_dapm_sync(dapm);
++	/* headphone, microphone detection & headset short detection */
++	pm860x_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADPHONE,
++			      SND_JACK_BTN_0, SND_JACK_BTN_1, SND_JACK_BTN_2);
++	pm860x_mic_jack_detect(codec, &hs_jack, SND_JACK_MICROPHONE);
 +
 +	return 0;
 +}
 +
-+static int brownstone_wm8994_hw_params(struct snd_pcm_substream *substream,
-+				       struct snd_pcm_hw_params *params)
++/* ttc/td-dkb digital audio interface glue - connects codec <--> CPU */
++static struct snd_soc_dai_link ttc_pm860x_hifi_dai[] = {
 +{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	int freq_out, sspa_mclk, sysclk;
-+	int sspa_div;
-+
-+	if (params_rate(params) > 11025) {
-+		freq_out  = params_rate(params) * 512;
-+		sysclk    = params_rate(params) * 256;
-+		sspa_mclk = params_rate(params) * 64;
-+	} else {
-+		freq_out  = params_rate(params) * 1024;
-+		sysclk    = params_rate(params) * 512;
-+		sspa_mclk = params_rate(params) * 64;
-+	}
-+	sspa_div = freq_out;
-+	do_div(sspa_div, sspa_mclk);
-+
-+	snd_soc_dai_set_sysclk(cpu_dai, MMP_SSPA_CLK_AUDIO, freq_out, 0);
-+	snd_soc_dai_set_pll(cpu_dai, MMP_SYSCLK, 0, freq_out, sysclk);
-+	snd_soc_dai_set_pll(cpu_dai, MMP_SSPA_CLK, 0, freq_out, sspa_mclk);
-+
-+	/* set wm8994 sysclk */
-+	snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_MCLK1, sysclk, 0);
-+
-+	return 0;
-+}
-+
-+/* machine stream operations */
-+static struct snd_soc_ops brownstone_ops = {
-+	.hw_params = brownstone_wm8994_hw_params,
-+};
-+
-+static struct snd_soc_dai_link brownstone_wm8994_dai[] = {
-+{
-+	.name		= "WM8994",
-+	.stream_name	= "WM8994 HiFi",
-+	.cpu_dai_name	= "mmp-sspa-dai.0",
-+	.codec_dai_name	= "wm8994-aif1",
-+	.platform_name	= "mmp-pcm-audio",
-+	.codec_name	= "wm8994-codec",
-+	.dai_fmt 	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				SND_SOC_DAIFMT_CBS_CFS,
-+	.ops		= &brownstone_ops,
-+	.init		= brownstone_wm8994_init,
++	 .name = "88pm860x i2s",
++	 .stream_name = "audio playback",
++	 .codec_name = "88pm860x-codec",
++	 .platform_name = "mmp-pcm-audio",
++	 .cpu_dai_name = "pxa-ssp-dai.1",
++	 .codec_dai_name = "88pm860x-i2s",
++	 .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBM_CFM,
++	 .init = ttc_pm860x_init,
 +},
 +};
 +
-+/* audio machine driver */
-+static struct snd_soc_card brownstone = {
-+	.name         = "brownstone",
-+	.dai_link     = brownstone_wm8994_dai,
-+	.num_links    = ARRAY_SIZE(brownstone_wm8994_dai),
++/* ttc/td audio machine driver */
++static struct snd_soc_card ttc_dkb_card = {
++	.name = "ttc-dkb-hifi",
++	.dai_link = ttc_pm860x_hifi_dai,
++	.num_links = ARRAY_SIZE(ttc_pm860x_hifi_dai),
 +
-+	.dapm_widgets = brownstone_dapm_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(brownstone_dapm_widgets),
-+	.dapm_routes = brownstone_audio_map,
-+	.num_dapm_routes = ARRAY_SIZE(brownstone_audio_map),
++	.dapm_widgets = ttc_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(ttc_dapm_widgets),
++	.dapm_routes = ttc_audio_map,
++	.num_dapm_routes = ARRAY_SIZE(ttc_audio_map),
 +};
 +
-+static int __devinit brownstone_probe(struct platform_device *pdev)
++static int __devinit ttc_dkb_probe(struct platform_device *pdev)
 +{
++	struct snd_soc_card *card = &ttc_dkb_card;
 +	int ret;
 +
-+	brownstone.dev = &pdev->dev;
-+	ret = snd_soc_register_card(&brownstone);
++	card->dev = &pdev->dev;
++
++	ret = snd_soc_register_card(card);
 +	if (ret)
 +		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-+				ret);
++			ret);
++
 +	return ret;
 +}
 +
-+static int __devexit brownstone_remove(struct platform_device *pdev)
++static int __devexit ttc_dkb_remove(struct platform_device *pdev)
 +{
-+	snd_soc_unregister_card(&brownstone);
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
++
++	snd_soc_unregister_card(card);
++
 +	return 0;
 +}
 +
-+static struct platform_driver mmp_driver = {
++static struct platform_driver ttc_dkb_driver = {
 +	.driver		= {
-+		.name	= "brownstone-audio",
++		.name	= "ttc-dkb-audio",
 +		.owner	= THIS_MODULE,
 +	},
-+	.probe		= brownstone_probe,
-+	.remove		= __devexit_p(brownstone_remove),
++	.probe		= ttc_dkb_probe,
++	.remove		= __devexit_p(ttc_dkb_remove),
 +};
 +
-+module_platform_driver(mmp_driver);
++module_platform_driver(ttc_dkb_driver);
 +
-+MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
-+MODULE_DESCRIPTION("ALSA SoC Brownstone");
++/* Module information */
++MODULE_AUTHOR("Qiao Zhou, <zhouqiao@marvell.com>");
++MODULE_DESCRIPTION("ALSA SoC TTC DKB");
 +MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:ttc-dkb-audio");
 -- 
 1.7.1
