@@ -1,118 +1,42 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 4 Jun 2012 13:26:35 +0530
-Subject: [PATCH 05/20] ARM: EXYNOS: Redefine IRQ_MCT_L0,1 definition
-In-Reply-To: <CAH9JG2VwwXBWMvnK3ZYK37Gvsv9ORV7pqwM5rYtP-UEAxk_u-Q@mail.gmail.com>
-References: <1335813270-13083-1-git-send-email-thomas.abraham@linaro.org>
- <1335813270-13083-6-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2VwwXBWMvnK3ZYK37Gvsv9ORV7pqwM5rYtP-UEAxk_u-Q@mail.gmail.com>
-Message-ID: <CAJuYYwRFzyzB8+VVt05NJyXBLju-2WHu1AxocK8jK2cZ=zFQHw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Jun 2012 10:19:37 +0200
+Subject: Freescale fec.c driver breakage
+In-Reply-To: <4FCC3CB4.5030107@snapgear.com>
+References: <4FCC3CB4.5030107@snapgear.com>
+Message-ID: <20120604081937.GH30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mr. Park,
+Hi Greg,
 
-On 27 May 2012 06:59, Kyungmin Park <kmpark@infradead.org> wrote:
-> Hi,
->
-> On Tue, May 1, 2012 at 4:14 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->> From: Changhwan Youn <chaos.youn@samsung.com>
->>
->> Redefine IRQ_MCT_L0,1 irq definition as it is changed in rev1 of EXYNOS5.
->>
->> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->> ?arch/arm/mach-exynos/include/mach/irqs.h | ? ?4 ++--
->> ?arch/arm/mach-exynos/mct.c ? ? ? ? ? ? ? | ? 17 +++++++++++------
->> ?2 files changed, 13 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
->> index 591e7852..ef52f61 100644
->> --- a/arch/arm/mach-exynos/include/mach/irqs.h
->> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
->> @@ -331,6 +331,8 @@
->> ?#define EXYNOS5_IRQ_SATA ? ? ? ? ? ? ? IRQ_SPI(115)
->> ?#define EXYNOS5_IRQ_NFCON ? ? ? ? ? ? ?IRQ_SPI(116)
->>
->> +#define EXYNOS5_IRQ_MCT_L0 ? ? ? ? ? ? IRQ_SPI(120)
->> +#define EXYNOS5_IRQ_MCT_L1 ? ? ? ? ? ? IRQ_SPI(121)
->> ?#define EXYNOS5_IRQ_MMC44 ? ? ? ? ? ? ?IRQ_SPI(123)
->> ?#define EXYNOS5_IRQ_MDMA1 ? ? ? ? ? ? ?IRQ_SPI(124)
->> ?#define EXYNOS5_IRQ_FIMC_LITE0 ? ? ? ? IRQ_SPI(125)
->> @@ -410,8 +412,6 @@
->> ?#define EXYNOS5_IRQ_FIMD1_SYSTEM ? ? ? COMBINER_IRQ(18, 6)
->>
->> ?#define EXYNOS5_IRQ_EINT0 ? ? ? ? ? ? ?COMBINER_IRQ(23, 0)
->> -#define EXYNOS5_IRQ_MCT_L0 ? ? ? ? ? ? COMBINER_IRQ(23, 1)
->> -#define EXYNOS5_IRQ_MCT_L1 ? ? ? ? ? ? COMBINER_IRQ(23, 2)
->> ?#define EXYNOS5_IRQ_MCT_G0 ? ? ? ? ? ? COMBINER_IRQ(23, 3)
->> ?#define EXYNOS5_IRQ_MCT_G1 ? ? ? ? ? ? COMBINER_IRQ(23, 4)
->> ?#define EXYNOS5_IRQ_MCT_G2 ? ? ? ? ? ? COMBINER_IRQ(23, 5)
->> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
->> index 897d9a9..b601fb8 100644
->> --- a/arch/arm/mach-exynos/mct.c
->> +++ b/arch/arm/mach-exynos/mct.c
->> @@ -388,6 +388,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->> ?{
->> ? ? ? ?struct mct_clock_event_device *mevt;
->> ? ? ? ?unsigned int cpu = smp_processor_id();
->> + ? ? ? int mct_lx_irq;
->>
->> ? ? ? ?mevt = this_cpu_ptr(&percpu_mct_tick);
->> ? ? ? ?mevt->evt = evt;
->> @@ -414,14 +415,18 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->>
->> ? ? ? ?if (mct_int_type == MCT_INT_SPI) {
->> ? ? ? ? ? ? ? ?if (cpu == 0) {
->> + ? ? ? ? ? ? ? ? ? ? ? mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L0 :
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? EXYNOS5_IRQ_MCT_L0;
-> Does it still valid for exynos4x12?. It means exynos4x12 uses
-> EXYNOS5_IRQ_MCT_L0?
+On Mon, Jun 04, 2012 at 02:42:28PM +1000, Greg Ungerer wrote:
+> 
+> Hi Sascha,
+> 
+> Commit f4d40de39a23f0c39cca55ac63e1175c69c3d2f7 ("net fec: do not
+> depend on grouped clocks") breaks compilation of the FEC driver for
+> non iMX platforms in linux-3.5-rc1. For example when compiling for
+> ColdFire I get:
+> 
+> 	  LD      vmlinux
+>     drivers/built-in.o: In function `fec_probe':
+>     fec.c:(.devinit.text+0x1e0): undefined reference to `devm_clk_get'
 
-For Exynos4x12, PPI interrupts are used for the MCT local timer irqs
-and hence the condition check "mct_int_type == MCT_INT_SPI" above will
-ensure that this code portion is skipped for Exynos4x12.
+Sorry, I forgot that this driver is used on coldfire.
 
->> ? ? ? ? ? ? ? ? ? ? ? ?mct_tick0_event_irq.dev_id = mevt;
->> - ? ? ? ? ? ? ? ? ? ? ? evt->irq = EXYNOS4_IRQ_MCT_L0;
->> - ? ? ? ? ? ? ? ? ? ? ? setup_irq(EXYNOS4_IRQ_MCT_L0, &mct_tick0_event_irq);
->> + ? ? ? ? ? ? ? ? ? ? ? evt->irq = mct_lx_irq;
->> + ? ? ? ? ? ? ? ? ? ? ? setup_irq(mct_lx_irq, &mct_tick0_event_irq);
->> ? ? ? ? ? ? ? ?} else {
->> + ? ? ? ? ? ? ? ? ? ? ? mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L1 :
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? EXYNOS5_IRQ_MCT_L1;
-> ditto
->> ? ? ? ? ? ? ? ? ? ? ? ?mct_tick1_event_irq.dev_id = mevt;
->> - ? ? ? ? ? ? ? ? ? ? ? evt->irq = EXYNOS4_IRQ_MCT_L1;
->> - ? ? ? ? ? ? ? ? ? ? ? setup_irq(EXYNOS4_IRQ_MCT_L1, &mct_tick1_event_irq);
->> - ? ? ? ? ? ? ? ? ? ? ? irq_set_affinity(EXYNOS4_IRQ_MCT_L1, cpumask_of(1));
->> + ? ? ? ? ? ? ? ? ? ? ? evt->irq = mct_lx_irq;
->> + ? ? ? ? ? ? ? ? ? ? ? setup_irq(mct_lx_irq, &mct_tick1_event_irq);
->> + ? ? ? ? ? ? ? ? ? ? ? irq_set_affinity(mct_lx_irq, cpumask_of(1));
->> ? ? ? ? ? ? ? ?}
->> ? ? ? ?} else {
->> ? ? ? ? ? ? ? ?enable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, 0);
+> 
+> Trivially we could conditionalize the code block that calls
+> devm_clk_get() in the probe routine, but that is kind of ugly.
 
-This else portion is applicable for Exynos4x12 and uses PPI interrupts.
+It's ugly, but the only other solution I see is that you could provide a
+dummy devm_clk_get() for coldfire. Added Mark to Cc, maybe he has
+another idea?
 
->> @@ -473,7 +478,7 @@ static void __init exynos4_timer_resources(void)
->>
->> ?static void __init exynos4_timer_init(void)
->> ?{
->> - ? ? ? if (soc_is_exynos4210())
->> + ? ? ? if ((soc_is_exynos4210()) || (soc_is_exynos5250()))
->> ? ? ? ? ? ? ? ?mct_int_type = MCT_INT_SPI;
->> ? ? ? ?else
->> ? ? ? ? ? ? ? ?mct_int_type = MCT_INT_PPI;
->
-> BTW exynos4x12 uses MCT_INT_PPI?
+Sascha
 
-Yes, PPI interrupts are used for 4x12. The mct local timer irqs can be
-routed to either combiner or PPI. Since routing via combiner incurs
-overhead in demuxing the interrupt, PPI is used for mct local timer
-irq.
 
-Thanks,
-Thomas.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
