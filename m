@@ -1,22 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Jun 2012 10:52:16 +0100
-Subject: [PATCH v2 REBASE] ASoC: imx-audmux: add pinctrl support
-In-Reply-To: <1338774174-3960-2-git-send-email-richard.zhao@freescale.com>
-References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
- <1338774174-3960-2-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120604095215.GE3943@opensource.wolfsonmicro.com>
+From: sdharia@codeaurora.org (Sagar Dharia)
+Date: Mon, 4 Jun 2012 02:54:54 -0700 (PDT)
+Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
+In-Reply-To: <20120530181340.GT9947@opensource.wolfsonmicro.com>
+References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+ <20120530181340.GT9947@opensource.wolfsonmicro.com>
+Message-ID: <24d7d95d140259af6fd3c3074348b8fe.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 09:42:54AM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+> This patch is about 150k which is rather large to review.  It would be
+> enormously helpful for review if it could be broken down into a patch
+> series.  For example, things like the device registration could be
+> broken out into a separate patch as could the core bus operations and
+> things like the clocking/bandwidth management.
+>
+Thank you Mark for looking at the patch.
+It's a good idea to break the patch. I am on vacation right now till
+6/15/12. I will work on breaking in logical pieces when I get back.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/df2321ee/attachment.sig>
+Regards
+Sagar
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
