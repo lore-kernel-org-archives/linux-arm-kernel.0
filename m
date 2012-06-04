@@ -1,32 +1,69 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Jun 2012 10:16:16 +0100
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <20120604081937.GH30400@pengutronix.de>
-References: <4FCC3CB4.5030107@snapgear.com>
- <20120604081937.GH30400@pengutronix.de>
-Message-ID: <20120604091616.GA3943@opensource.wolfsonmicro.com>
+From: snakky.zhang@gmail.com (snakky.zhang at gmail.com)
+Date: Mon, 04 Jun 2012 17:20:59 +0800
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <20120603113449.GB15354@n2100.arm.linux.org.uk>
+References: <CAHkRjk4suj4x-mJwvLeOYCNga_YvudNmnz7YxTSzFZ4Jj0iJ+w@mail.gmail.com>
+ <4FC6FC38.8090904@gmail.com>
+ <CAHkRjk4jJphxST86km4ybuVTGxAr-a=3Ag9cQpEysLYxBt-6WQ@mail.gmail.com>
+ <4FC706DA.5040308@gmail.com> <20120531065603.GA2442@mbp>
+ <4FC71C13.7090301@gmail.com> <4FC721DD.5020905@gmail.com>
+ <CAHkRjk7qL1zDO4WD_LPh5v+v4aiU9Z1wHgMF3v=ykVUwKuw+YQ@mail.gmail.com>
+ <4FC81C14.7030702@gmail.com> <20120601032912.GB16273@mbp>
+ <20120603113449.GB15354@n2100.arm.linux.org.uk>
+Message-ID: <4FCC7DFB.6050102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 10:19:37AM +0200, Sascha Hauer wrote:
-> On Mon, Jun 04, 2012 at 02:42:28PM +1000, Greg Ungerer wrote:
+On 2012?06?03? 19:34, Russell King - ARM Linux wrote:
+> On Fri, Jun 01, 2012 at 11:29:13AM +0800, Catalin Marinas wrote:
+>> On Fri, Jun 01, 2012 at 02:34:12AM +0100, snakky.zhang at gmail.com wrote:
+>>>>> Yes, seems newer CPUs has no such limitation thus this function is global
+>>>>> effective naturally. :-)
+>>>>>
+>>>>> And , I find Mips's c-r4k also has this issue but it use IPI to make it.
+>>>>> Details in arch/mips/mm/c-r4k.c.
+>>>> Rather than IPI we would better use the read-for-ownership trick like
+>>>> in this patch to make flush_dcache_page global (no need for
+>>>> write-for-ownership):
+>>>>
+>>>> http://dchs.spinics.net/lists/arm-kernel/msg125075.html
+>>>>
+>>>> (it may no longer apply, I haven't checked it for some time).
+>>>>
+>>>> That's the first thing. Secondly you still need preemption disable so
+>>>> that it is not preempted between RFO and the actual cache cleaning.
+>>>>
+>>> And, another confusion for PREEMPT: Even if we disable preempt, with locally
+>>> effective flush_dcache_xxx, there is still possibility to reproduce such
+>>> issue(Similar with the previous case):
+>>>
+>>> 1) Task running on Core-0 loading text section into memory.
+>>>       It was schedule out and then migrate into Core-1;
+>>> 2) On Core-1, this task continue loading it and then
+>>>       "flush_dcache_page" to make sure the loaded text section write
+>>>       into main memory.
+>>> 3) Task tend to the loaded text section and running it.
+>>>
+>>> Similar as the previous case, the difference lies in step1 that the
+>>> task was interrupted by timer interrupt. Thus it still can be switch
+>>> out and then been migrate to another core. Thus in step2 and 3, this
+>>> issue may still been reproduced.  So, disable preempt can only lower
+>>> the possibility of this issue but can't avoid it.
+>> It would work as long as the data copying into the text area (done by
+>> the driver and VFS layer) and the flush_dcache_page() sequence are not
+>> preemptible. A timer interrupt between data copying and
+>> flush_dcache_page() would interrupt a kernel routine which is not
+>> preemptible.
+> And that doesn't matter because on a non-preemptible kernel, timer ticks
+> do _not_ cause the threads to be rescheduled while in kernel mode.  If
+> they did, it would be a _preemptible_ kernel.
+>
+> The only things on a non-preemptible kernel which cause a schedule point
+> are functions which may sleep, so semaphores, waiting for events, etc.
+>
+>
+Thanks for your description. :-)
 
-> > Trivially we could conditionalize the code block that calls
-> > devm_clk_get() in the probe routine, but that is kind of ugly.
-
-> It's ugly, but the only other solution I see is that you could provide a
-> dummy devm_clk_get() for coldfire. Added Mark to Cc, maybe he has
-> another idea?
-
-Not really, I think if the clock API is going to be usable we really
-need the platforms to all be implementing it.  Part of this is getting
-the stubs for !HAVE_CLK cases implemented (which doesn't seem to have
-happened :/) ).  We do need to address this at the framework level,
-having to put ifdefs in all the drivers is obviously awful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/999edd21/attachment.sig>
+Thanks
+Xiao
