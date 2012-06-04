@@ -1,51 +1,52 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 4 Jun 2012 09:42:53 +0800
-Subject: [PATCH v2 REBASE] ASoC: fsl_ssi: convert to use devm_clk_get
-Message-ID: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
+Date: Mon, 4 Jun 2012 09:42:54 +0800
+Subject: [PATCH v2 REBASE] ASoC: imx-audmux: add pinctrl support
+In-Reply-To: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
+References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1338774174-3960-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Acked-by: Timur Tabi <timur@freescale.com>
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
-
 Rebase to 3.5rc1.
 
- sound/soc/fsl/fsl_ssi.c |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+ sound/soc/fsl/imx-audmux.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 4ed2afd..b10a427 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -725,7 +725,7 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
- 		u32 dma_events[2];
- 		ssi_private->ssi_on_imx = true;
+diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
+index f237003..0803274 100644
+--- a/sound/soc/fsl/imx-audmux.c
++++ b/sound/soc/fsl/imx-audmux.c
+@@ -26,6 +26,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/pinctrl/consumer.h>
  
--		ssi_private->clk = clk_get(&pdev->dev, NULL);
-+		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
- 		if (IS_ERR(ssi_private->clk)) {
- 			ret = PTR_ERR(ssi_private->clk);
- 			dev_err(&pdev->dev, "could not get clock: %d\n", ret);
-@@ -842,10 +842,8 @@ error_dev:
- 	device_remove_file(&pdev->dev, dev_attr);
+ #include "imx-audmux.h"
  
- error_clk:
--	if (ssi_private->ssi_on_imx) {
-+	if (ssi_private->ssi_on_imx)
- 		clk_disable_unprepare(ssi_private->clk);
--		clk_put(ssi_private->clk);
--	}
+@@ -249,6 +250,7 @@ EXPORT_SYMBOL_GPL(imx_audmux_v2_configure_port);
+ static int __devinit imx_audmux_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
++	struct pinctrl *pinctrl;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(imx_audmux_dt_ids, &pdev->dev);
  
- error_irq:
- 	free_irq(ssi_private->irq, ssi_private);
-@@ -871,7 +869,6 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	if (ssi_private->ssi_on_imx) {
- 		platform_device_unregister(ssi_private->imx_pcm_pdev);
- 		clk_disable_unprepare(ssi_private->clk);
--		clk_put(ssi_private->clk);
- 	}
- 	snd_soc_unregister_dai(&pdev->dev);
- 	device_remove_file(&pdev->dev, &ssi_private->dev_attr);
+@@ -257,6 +259,12 @@ static int __devinit imx_audmux_probe(struct platform_device *pdev)
+ 	if (!audmux_base)
+ 		return -EADDRNOTAVAIL;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		dev_err(&pdev->dev, "setup pinctrl failed!");
++		return PTR_ERR(pinctrl);
++	}
++
+ 	audmux_clk = clk_get(&pdev->dev, "audmux");
+ 	if (IS_ERR(audmux_clk)) {
+ 		dev_dbg(&pdev->dev, "cannot get clock: %ld\n",
 -- 
 1.7.5.4
