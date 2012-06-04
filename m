@@ -1,25 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 3 Jun 2012 23:13:57 -0700
-Subject: [PATCH v2] omap: dma: Clear status registers on enable/disable
- irq.
-In-Reply-To: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
-References: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
-Message-ID: <20120604061357.GV12766@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 04 Jun 2012 08:31:10 +0200
+Subject: [GIT PULL] CMA and ARM DMA-mapping fix for v3.5-rc2
+Message-ID: <1338791470-16294-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Oleg Matcovschi <oleg.matcovschi@ti.com> [120515 14:40]:
-> Use omap_disable_channel_irq() function instead of directly accessing CICR.
-> The omap_disable_chanel_irq() function clears pending interrupts
-> and disables interrupt on channel.
-> Functions omap2_enable_irq_lch()/omap2_disable_irq_lch() clear interrupt
-> status register.
+Hi Linus,
 
-Looking at this again, I'll apply this into cleanup-dma instead of fixes.
+I would like to ask for pulling a fix for Contiguous Memory Allocator
+(CMA) integration for ARM architecture for v3.5-rc2.
 
-If it fixes something that I can't see, please reply with a description
-what it fixes and I'll move it into fixes.
+The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
 
-Regards,
+  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
 
-Tony
+are available in the git repository at:
+  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git fixes-for-linus
+
+Marek Szyprowski (1):
+      ARM: dma-mapping: remove unconditional dependency on CMA
+
+ arch/arm/Kconfig          |    1 -
+ arch/arm/mm/dma-mapping.c |   10 ++++------
+ 2 files changed, 4 insertions(+), 7 deletions(-)
+
+Thanks!
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
