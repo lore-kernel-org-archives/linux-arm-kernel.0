@@ -1,75 +1,24 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 04 Jun 2012 15:01:52 +1000
-Subject: [PATCH v3 3/3] ep93xx: Add IDE support to edb93xx boards
-In-Reply-To: <4F86C753.3020200@metasoft.pl>
-References: <4F86C63C.6030908@metasoft.pl> <4F86C753.3020200@metasoft.pl>
-Message-ID: <4FCC4140.6000500@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 3 Jun 2012 22:44:18 -0700
+Subject: [RFC 11/24] ARM: omap: clk: list all clk_hw_omap clks to
+ enable/disable autoidle
+In-Reply-To: <1338552485-31325-12-git-send-email-rnayak@ti.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+ <1338552485-31325-12-git-send-email-rnayak@ti.com>
+Message-ID: <20120604054417.GU12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/12 22:15, Rafal Prylowski wrote:
+* Rajendra Nayak <rnayak@ti.com> [120601 05:12]:
+> @@ -359,6 +391,8 @@ const struct clk_hw_omap_ops clkhwops_wait = {
+>  	.find_idlest	= omap2_clk_dflt_find_idlest,
+>  	.find_companion	= omap2_clk_dflt_find_companion,
+>  };
+> +late_initcall(omap2_clk_enable_autoidle_all);
 
-> 
-> Add IDE support to edb93xx boards.
-> 
-> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
+With -rc1, the SoC specific late_initcalls need to be called from
+*_init_late that are in mach-omap2/io.c for omap2+.
 
-Applied to ep93xx-devel. Sorry for the delay. Note, I fixed a minor
-build error, see below.
+Regards,
 
-~Ryan
-
-> ---
->  arch/arm/mach-ep93xx/edb93xx.c |   24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> Index: linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/mach-ep93xx/edb93xx.c
-> +++ linux-2.6/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -233,6 +233,29 @@ static void __init edb93xx_register_fb(v
->  }
->  
->  
-> +/*************************************************************************
-> + * EDB93xx IDE
-> + *************************************************************************/
-> +static int __init edb93xx_has_ide(void)
-> +{
-> +	/*
-> +	 * Although EDB9312 and EDB9315 do have IDE capability, they have
-> +	 * INTRQ line wired as pull-up, which makes using IDE interface
-> +	 * problematic.
-> +	 */
-> +	return machine_is_edb9312() || machine_is_edb9315 ||
-
-
-  machine_is_edb9315()
-
-> +	       machine_is_edb9315a();
-> +}
-> +
-> +static void __init edb93xx_register_ide(void)
-> +{
-> +	if (!edb93xx_has_ide())
-> +		return;
-> +
-> +	ep93xx_register_ide();
-> +}
-> +
-> +
->  static void __init edb93xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> @@ -243,6 +266,7 @@ static void __init edb93xx_init_machine(
->  	edb93xx_register_i2s();
->  	edb93xx_register_pwm();
->  	edb93xx_register_fb();
-> +	edb93xx_register_ide();
->  }
->  
->  
-> 
+Tony
