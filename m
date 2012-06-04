@@ -1,192 +1,215 @@
-From: rob@landley.net (Rob Landley)
-Date: Sun, 03 Jun 2012 22:14:20 -0500
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-Message-ID: <4FCC280C.6030103@landley.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  3 Jun 2012 21:38:55 -0700
+Subject: [PATCH] ARM: exynos: enable more platforms in defconfig
+Message-ID: <1338784735-10683-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for taking so long, this is really huge and I get distracted every
-5 minutes with other things. Also, you cc'd so many different people and
-lists with this I'm reluctant to "reply all"...
+This enables the new EXYNOS5 platforms in the defconfig, and enables DT
+support on EXYNOS4.
 
-I just care about the documentation here, so:
+While I'm at it, I renamed it exynos4_defconfig -> exynos_defconfig,
+since it now encompasses all (known and supported) versions of exynos.
 
-On 05/29/2012 08:11 PM, Sagar Dharia wrote:
-> SLIMbus (Serial Low Power Interchip Media Bus) is a specification
-> developed by MIPI (Mobile Industry Processor Interface) alliance.
-> SLIMbus is a 2-wire implementation, which is used to communicate with
-> peripheral components like audio. Commonly used digital audio
-> interfaces such as I2S, PCM are intended for point-to-point connection
-> between application processor and single audio device and support one
-> or two channels. Adding more channels or functions is difficult
-> without increasing number of bus structures and hence pin count.
-> In parallel to audio channels, control buses such as I2C are typically
-> used for low-bandwidth control tasks.
-> SLIMbus replaces many digital audio buses and control buses by
-> providing flexible and dynamic bus-bandwidth between data-functions
-> and control-functions.
+Other options enabled: USB host, EXT3/4, regulators and tps65090,
+networking and a few of the common usb ethernet adapters as well as the
+smsc911x controller used on some boards.
 
-So that's a really long way of saying "A bit like I2C but faster"?
+I enabled EFI_PARTITION, since it's used on some filesystem images I'm
+using. I didn't see a need to keep Solaris and BSD partition format
+still enabled.
 
-> The framework supports message APIs, channel scheduling for SLIMbus.
-> Message APIs are used for status/control type of communication with a
-> device. Data Channel APIs are used for setting data channels between
-> SLIMbus devices.
-> 
-> Framework supports multiple busses (1 controller per bus) and multiple
-> clients/slave devices per controller.
-> 
-> Signed-off-by: Sagar Dharia <sdharia@codeaurora.org>
-> ---
->  Documentation/slimbus/slimbus-framework.txt |  319 +++
->  drivers/Kconfig                             |    2 +
->  drivers/Makefile                            |    1 +
->  drivers/of/of_slimbus.c                     |   89 +
->  drivers/slimbus/Kconfig                     |   10 +
->  drivers/slimbus/Makefile                    |    4 +
->  drivers/slimbus/slimbus.c                   | 3050 +++++++++++++++++++++++++++
->  include/linux/mod_devicetable.h             |    7 +
->  include/linux/of_slimbus.h                  |   34 +
->  include/linux/slimbus/slimbus.h             | 1072 ++++++++++
+Finally, framebuffer console, logo and fonts were enabled.
 
-Slim?
+Note that enabling some of these options introduces build coverage
+previously missing, thus introducing a few build errors and warnings
+for which fixes have been sent out already.
 
-methinks-the-lady-doth-protest-too-much-bus.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/configs/exynos4_defconfig | 68 --------------------------
+ arch/arm/configs/exynos_defconfig  | 98 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 98 insertions(+), 68 deletions(-)
+ delete mode 100644 arch/arm/configs/exynos4_defconfig
+ create mode 100644 arch/arm/configs/exynos_defconfig
 
-> diff --git a/Documentation/slimbus/slimbus-framework.txt b/Documentation/slimbus/slimbus-framework.txt
-> new file mode 100644
-> index 0000000..8c27597
-> --- /dev/null
-> +++ b/Documentation/slimbus/slimbus-framework.txt
-> @@ -0,0 +1,319 @@
-> +Introduction
-> +============
-> +
-> +Slimbus (Serial Low Power Interchip Media Bus) is a specification developed by
-> +MIPI (Mobile Industry Processor Interface) alliance. Slimbus is a 2-wire
-> +implementation, which is used to communicate with peripheral components like
-> +audio.
-
-Fine so far.
-
-> Commonly used digital audio interfaces such as I2S and PCM are intended
-> +for point-to-point connection between application processor and single audio
-> +device and support one or two channels. Adding more channels or functions is
-> +difficult without increasing number of bus structures and hence pin count.
-> +In parallel to audio channels, control buses such as I2C are typically used for
-> +low-bandwidth control tasks.
-> +
-> +Slimbus replaces many digital audio buses and control buses by providing
-> +flexible and dynamic bus-bandwidth between data-functions and control-functions.
-
-This seems like an advertisement for your hardware choice. You really
-don't have to compare yourself to other busses here, we're not hardware
-engineers deciding what wires to run. We just want to know how to
-program it.
-
-I'm all for a document describing _your_ bus, but the above isn't it.
-
-> +Hardware Description
-> +====================
-> +
-> +Slimbus is a 2-wire multi-drop interface and uses TDM frame structure.
-> +The devices communicate over a shared bus using predefined transport protocols.
-> +There are 2 different type of transports.
-> +
-> +The message transport is used for various control functions such as bus
-> +management, configuration and status updates. Messages are seen by all devices
-> +and the messages can be of unicast and broadcast type. E.g. reading/writing
-> +device specific values is typically a unicast message. A data channel
-> +reconfiguration sequence is announced to all devices using a broadcast message.
-
-Unicast messages are seen by all devices?
-
-> +A data transport is used for data-transfer between 2 Slimbus devices. Data
-> +transport uses dedicated ports on the device. This data-transfer is not seen
-> +by all devices.
-
-So data transport only offers unicast, then? Or does "seen by" here mean
-that control messages (excuse me, "message messages") are transported in
-an electrically different manner that allows any piece of hardware to
-snoop on them, although it should never actually react to ones that
-aren't addressed to it?
-
-> +Slimbus specification has different types of device classifications based on
-> +their capabilities.
-
-I'm trying to figure out if that sentence conveys any information at all.
-
-> A manager device is responsible for enumeration,
-> +configuration, and dynamic channel allocation. Every bus has 1 active manager.
-> +A framer device is responsible for driving the clock line and placing
-> +information on the data line.
-
-It's  nice to know that the 2 wires in the design are 'clock line' and
-'data line'. Bit of reading to get to that point...
-
-> Multiple framers may exist on a bus and a manager
-> +is responsible for doing framer-handoffs.
-> +(Not supported in the SW driver right now).
-
-So each slimbus has 1 manager device that enumerates configures, and
-allocates channels for the other devices on the bus. The rest are
-"framer" devices that transmit data packets?
-
-> +Per specification,
-
-Ah, I'd assumed that everything in here was in flagrant violation of the
-specification. Good to know.
-
-> Slimbus uses "clock gears" to do power management based on
-> +current frequency and bandwidth requirements. There are 10 clock gears and each
-> +gear changes the Slimbus frequency to be twice its previous gear.
-
-Ok, dynamic clock. Might have been nice to put it in the description.
-(Nice of them to choose a range that _wasn't_ a power of 2...)
-
-The base gear is what clock frequency?
-
-> +A generic device is a device providing Slimbus functionality and typically has
-> +ports for data-channel support. Its registers are mapped as 'value elements'
-> +so that they can be written/read using Slimbus message transport for
-> +exchanging control/status type of information. Generic devices are also referred
-> +to as 'clients' in this document from here onward.
-
-My eyes glazed over at "Its registers are mapped as 'value elements'"
-and I started wondering if the API synergized their core competencies.
-
-It would be nice if you could pick a name for things and stick with it.
-
-> +Each device has a 6-byte enumeration-address and the manager assigns every
-> +device with a 1-byte logical address after the devices report present on the
-> +bus.
-> +
-> +Slimbus uses TDM framing at the physical layer and has a variable number of
-> +frames used for messaging and data-channels. The TDM framing is out of scope
-> +of this document since clients cannot directly access or interfere with it.
-
-THEN WHY DO YOU EVEN MENTION IT HERE?
-
-Please tell us how to program the hardware. Don't try to sell us on
-Qualcomm's design choices. (I assume codeaurora is still qualcomm
-pretending not to be, because Quic wasn't enough of a potholder for open
-source to satisfy the lawyers who run the place? Doesn't matter...)
-
-You refer to "per specification" a lot.  Is the specification online,
-and if so would you like to link to it?
-
-The weekend's over and this is as far as I managed to read.  I think
-it's as far as I'm going to. Please add a link to the spec and I'll ACK
-the doc even if it does seem more concerned with convincing people to
-use the technology than explaining how to program it. (If we NAKed
-documentation for being badly written we wouldn't have much.)
-
-However, I expect some example code would be far more useful than this
-document...
-
-Rob
+diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
+deleted file mode 100644
+index bffe68e..0000000
+--- a/arch/arm/configs/exynos4_defconfig
++++ /dev/null
+@@ -1,68 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_ALL=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_EXYNOS=y
+-CONFIG_S3C_LOWLEVEL_UART_PORT=1
+-CONFIG_MACH_SMDKC210=y
+-CONFIG_MACH_ARMLEX4210=y
+-CONFIG_MACH_UNIVERSAL_C210=y
+-CONFIG_MACH_NURI=y
+-CONFIG_MACH_ORIGEN=y
+-CONFIG_MACH_SMDK4412=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_SMP=y
+-CONFIG_NR_CPUS=2
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_LOOP=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_CHR_DEV_SG=y
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_SAMSUNG=y
+-CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+-CONFIG_HW_RANDOM=y
+-CONFIG_I2C=y
+-# CONFIG_HWMON is not set
+-# CONFIG_MFD_SUPPORT is not set
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_EXT2_FS=y
+-CONFIG_MSDOS_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_TMPFS_POSIX_ACL=y
+-CONFIG_CRAMFS=y
+-CONFIG_ROMFS_FS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_BSD_DISKLABEL=y
+-CONFIG_SOLARIS_X86_PARTITION=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DETECT_HUNG_TASK=y
+-CONFIG_DEBUG_RT_MUTEXES=y
+-CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_INFO=y
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+-CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_LL=y
+-CONFIG_EARLY_PRINTK=y
+-CONFIG_CRC_CCITT=y
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+new file mode 100644
+index 0000000..5f75557
+--- /dev/null
++++ b/arch/arm/configs/exynos_defconfig
+@@ -0,0 +1,98 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_EFI_PARTITION=y
++CONFIG_ARCH_EXYNOS=y
++CONFIG_S3C_LOWLEVEL_UART_PORT=1
++CONFIG_S3C24XX_PWM=y
++CONFIG_ARCH_EXYNOS5=y
++CONFIG_MACH_SMDKC210=y
++CONFIG_MACH_ARMLEX4210=y
++CONFIG_MACH_UNIVERSAL_C210=y
++CONFIG_MACH_NURI=y
++CONFIG_MACH_ORIGEN=y
++CONFIG_MACH_SMDK4412=y
++CONFIG_MACH_EXYNOS4_DT=y
++CONFIG_MACH_EXYNOS5_DT=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_RFKILL_REGULATOR=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_PROC_DEVICETREE=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_NETDEVICES=y
++CONFIG_SMSC911X=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_SMSC75XX=y
++CONFIG_USB_NET_SMSC95XX=y
++CONFIG_INPUT_EVDEV=y
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++# CONFIG_HWMON is not set
++CONFIG_MFD_TPS65090=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_TPS65090=y
++CONFIG_FB=y
++CONFIG_FB_S3C=y
++CONFIG_EXYNOS_VIDEO=y
++CONFIG_EXYNOS_MIPI_DSI=y
++CONFIG_EXYNOS_DP=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FONTS=y
++CONFIG_FONT_7x14=y
++CONFIG_LOGO=y
++# CONFIG_HID_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_CRAMFS=y
++CONFIG_ROMFS_FS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRC_CCITT=y
 -- 
-GNU/Linux isn't: Linux=GPLv2, GNU=GPLv3+, they can't share code.
-Either it's "mere aggregation", or a license violation.  Pick one.
+1.7.10.1.488.g05fbf7a
