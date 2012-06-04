@@ -1,22 +1,34 @@
-From: sdharia@codeaurora.org (Sagar Dharia)
-Date: Mon, 4 Jun 2012 03:25:32 -0700 (PDT)
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 4 Jun 2012 11:27:48 +0100
 Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <1338741260.1881.14.camel@joe2Laptop>
+In-Reply-To: <74993ac9d11db0db7080c0864daef397.squirrel@www.codeaurora.org>
 References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
- <1338741260.1881.14.camel@joe2Laptop>
-Message-ID: <0b49042fd7b1b02788b29ccbe0b9b31a.squirrel@www.codeaurora.org>
+ <20120601001617.GA16311@plastictigers.com>
+ <74993ac9d11db0db7080c0864daef397.squirrel@www.codeaurora.org>
+Message-ID: <20120604102747.GC7538@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Reallocs should _always_ use a new temporary.
-> Otherwise, there will be a memory leak of the
-> original pointer memory on failure.
->
-Thank you Joe for your comments. I will change the allocs, take care of
-the styling based on your comments when I split the patch and resubmit.
+On Mon, Jun 04, 2012 at 03:21:06AM -0700, Sagar Dharia wrote:
 
-Regards
-Sagar
+> > b) Similarly to (a) the driver may be probed before the device has
+> > been given a logical address (LA). This makes sense in the case of
+> > driver that turns on the device (say via gpio) once the bus has
+> > booted. However, the driver then needs to sit and poll
+> > slim_get_logical_addr() until the logical address.
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> This is not the case anymore.
+> While taking care of the comments for RFC, I have introduced a completion
+> that will be signalled when LA is given to the device. The driver can wait
+> on that completion (wait_enum) instead of polling.
+
+This would mean that the thread the probe is happening in will be
+blocked until the LA is assigned.  That sounds like it might cause
+problems, either slowing things down or worst case causing a deadlock.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/56d38981/attachment.sig>
