@@ -1,191 +1,160 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 4 Jun 2012 10:29:11 +0530
-Subject: [PATCH v2] i2c: imx: convert to use managed functions
-In-Reply-To: <1338776481-23710-1-git-send-email-richard.zhao@freescale.com>
-References: <1338776481-23710-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <CAM=Q2ctTNs0hq9tO5NW0QGsGaOVMNobRSBg_TmCjbaV+hNaoAw@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 04 Jun 2012 15:00:38 +1000
+Subject: [PATCH v3 2/3] ep93xx: IDE driver platform support code
+In-Reply-To: <4F86C714.4090605@metasoft.pl>
+References: <4F86C63C.6030908@metasoft.pl> <4F86C714.4090605@metasoft.pl>
+Message-ID: <4FCC40F6.7040400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Richard,
+On 12/04/12 22:14, Rafal Prylowski wrote:
 
-On Mon, Jun 4, 2012 at 7:51 AM, Richard Zhao <richard.zhao@freescale.com> wrote:
-> From: Richard Zhao <richard.zhao@linaro.org>
-nit: A small description would have helped.
-Otherwise Looks good to me.
-Reviewed-by: Shubhrajyoti D <Shubhrajyoti@ti.com>
->
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> 
+> Add IDE driver platform support code for ep93xx.
+> 
+> Signed-off-by: Rafal Prylowski <prylowski@metasoft.pl>
+> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+
+Applied to ep93xx-devel. Sorry for the delay.
+
+~Ryan
+
 > ---
->
-> Changes since v1:
-> ?- rebase to 3.5rc1
-> ?- remove unused imx_i2c_struct.irq.
->
-> ?drivers/i2c/busses/i2c-imx.c | ? 67 ++++++++++-------------------------------
-> ?1 files changed, 17 insertions(+), 50 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index 8d6b504..7f4da2d 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -118,10 +118,8 @@ static u16 __initdata i2c_clk_div[50][2] = {
->
-> ?struct imx_i2c_struct {
-> ? ? ? ?struct i2c_adapter ? ? ?adapter;
-> - ? ? ? struct resource ? ? ? ? *res;
-> ? ? ? ?struct clk ? ? ? ? ? ? ?*clk;
-> ? ? ? ?void __iomem ? ? ? ? ? ?*base;
-> - ? ? ? int ? ? ? ? ? ? ? ? ? ? irq;
-> ? ? ? ?wait_queue_head_t ? ? ? queue;
-> ? ? ? ?unsigned long ? ? ? ? ? i2csr;
-> ? ? ? ?unsigned int ? ? ? ? ? ?disable_delay;
-> @@ -473,7 +471,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
-> ? ? ? ?struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
-> ? ? ? ?struct pinctrl *pinctrl;
-> ? ? ? ?void __iomem *base;
-> - ? ? ? resource_size_t res_size;
-> ? ? ? ?int irq, bitrate;
-> ? ? ? ?int ret;
->
-> @@ -490,25 +487,16 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?return -ENOENT;
-> ? ? ? ?}
->
-> - ? ? ? res_size = resource_size(res);
-> -
-> - ? ? ? if (!request_mem_region(res->start, res_size, DRIVER_NAME)) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "request_mem_region failed\n");
-> + ? ? ? base = devm_request_and_ioremap(&pdev->dev, res);
-> + ? ? ? if (!base)
-> ? ? ? ? ? ? ? ?return -EBUSY;
-> - ? ? ? }
-> -
-> - ? ? ? base = ioremap(res->start, res_size);
-> - ? ? ? if (!base) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "ioremap failed\n");
-> - ? ? ? ? ? ? ? ret = -EIO;
-> - ? ? ? ? ? ? ? goto fail1;
-> - ? ? ? }
->
-> - ? ? ? i2c_imx = kzalloc(sizeof(struct imx_i2c_struct), GFP_KERNEL);
-> + ? ? ? i2c_imx = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_struct),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? GFP_KERNEL);
-> ? ? ? ?if (!i2c_imx) {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "can't allocate interface\n");
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> - ? ? ? ? ? ? ? goto fail2;
-> + ? ? ? ? ? ? ? return ret;
-nit : why not return ENOMEM directly, the copy to ret is redundant.
-feel free to ignore if you  feel so.
-> ? ? ? ?}
->
-> ? ? ? ?/* Setup i2c_imx driver structure */
-> @@ -518,29 +506,28 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
-> ? ? ? ?i2c_imx->adapter.dev.parent ? ? = &pdev->dev;
-> ? ? ? ?i2c_imx->adapter.nr ? ? ? ? ? ? = pdev->id;
-> ? ? ? ?i2c_imx->adapter.dev.of_node ? ?= pdev->dev.of_node;
-> - ? ? ? i2c_imx->irq ? ? ? ? ? ? ? ? ? ?= irq;
-> ? ? ? ?i2c_imx->base ? ? ? ? ? ? ? ? ? = base;
-> - ? ? ? i2c_imx->res ? ? ? ? ? ? ? ? ? ?= res;
->
-> ? ? ? ?pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> ? ? ? ?if (IS_ERR(pinctrl)) {
-> ? ? ? ? ? ? ? ?ret = PTR_ERR(pinctrl);
-> - ? ? ? ? ? ? ? goto fail3;
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?}
->
-> ? ? ? ?/* Get I2C clock */
-> - ? ? ? i2c_imx->clk = clk_get(&pdev->dev, "i2c_clk");
-> + ? ? ? i2c_imx->clk = devm_clk_get(&pdev->dev, "i2c_clk");
-> ? ? ? ?if (IS_ERR(i2c_imx->clk)) {
-> ? ? ? ? ? ? ? ?ret = PTR_ERR(i2c_imx->clk);
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "can't get I2C clock\n");
-> - ? ? ? ? ? ? ? goto fail3;
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?}
->
-> ? ? ? ?/* Request IRQ */
-> - ? ? ? ret = request_irq(i2c_imx->irq, i2c_imx_isr, 0, pdev->name, i2c_imx);
-> + ? ? ? ret = devm_request_irq(&pdev->dev, irq, i2c_imx_isr, 0,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name, i2c_imx);
-> ? ? ? ?if (ret) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't claim irq %d\n", i2c_imx->irq);
-> - ? ? ? ? ? ? ? goto fail4;
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't claim irq %d\n", irq);
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?}
->
-> ? ? ? ?/* Init queue */
-> @@ -565,7 +552,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
-> ? ? ? ?ret = i2c_add_numbered_adapter(&i2c_imx->adapter);
-> ? ? ? ?if (ret < 0) {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "registration failed\n");
-> - ? ? ? ? ? ? ? goto fail5;
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?}
->
-> ? ? ? ?of_i2c_register_devices(&i2c_imx->adapter);
-> @@ -573,28 +560,16 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
-> ? ? ? ?/* Set up platform driver data */
-> ? ? ? ?platform_set_drvdata(pdev, i2c_imx);
->
-> - ? ? ? dev_dbg(&i2c_imx->adapter.dev, "claimed irq %d\n", i2c_imx->irq);
-> + ? ? ? dev_dbg(&i2c_imx->adapter.dev, "claimed irq %d\n", irq);
-> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "device resources from 0x%x to 0x%x\n",
-> - ? ? ? ? ? ? ? i2c_imx->res->start, i2c_imx->res->end);
-> - ? ? ? dev_dbg(&i2c_imx->adapter.dev, "allocated %d bytes at 0x%x \n",
-> - ? ? ? ? ? ? ? res_size, i2c_imx->res->start);
-> + ? ? ? ? ? ? ? res->start, res->end);
-> + ? ? ? dev_dbg(&i2c_imx->adapter.dev, "allocated %d bytes at 0x%x\n",
-> + ? ? ? ? ? ? ? resource_size(res), res->start);
-> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "adapter name: \"%s\"\n",
-> ? ? ? ? ? ? ? ?i2c_imx->adapter.name);
-> ? ? ? ?dev_dbg(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
->
-> ? ? ? ?return 0; ? /* Return OK */
-> -
-> -fail5:
-> - ? ? ? free_irq(i2c_imx->irq, i2c_imx);
-> -fail4:
-> - ? ? ? clk_put(i2c_imx->clk);
-> -fail3:
-> - ? ? ? kfree(i2c_imx);
-> -fail2:
-> - ? ? ? iounmap(base);
-> -fail1:
-> - ? ? ? release_mem_region(res->start, resource_size(res));
-> - ? ? ? return ret; /* Return error number */
-> ?}
->
-> ?static int __exit i2c_imx_remove(struct platform_device *pdev)
-> @@ -606,20 +581,12 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
-> ? ? ? ?i2c_del_adapter(&i2c_imx->adapter);
-> ? ? ? ?platform_set_drvdata(pdev, NULL);
->
-> - ? ? ? /* free interrupt */
-> - ? ? ? free_irq(i2c_imx->irq, i2c_imx);
-> -
-> ? ? ? ?/* setup chip registers to defaults */
-> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_IADR);
-> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_IFDR);
-> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_I2CR);
-> ? ? ? ?writeb(0, i2c_imx->base + IMX_I2C_I2SR);
->
-> - ? ? ? clk_put(i2c_imx->clk);
-> -
-> - ? ? ? iounmap(i2c_imx->base);
-> - ? ? ? release_mem_region(i2c_imx->res->start, resource_size(i2c_imx->res));
-> - ? ? ? kfree(i2c_imx);
-> ? ? ? ?return 0;
-> ?}
->
-> --
-> 1.7.5.4
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>  arch/arm/mach-ep93xx/core.c                  |   96 +++++++++++++++++
+>  arch/arm/mach-ep93xx/include/mach/platform.h |    3
+>  arch/arm/mach-ep93xx/soc.h                   |    1
+> 
+> Index: linux-2.6/arch/arm/mach-ep93xx/soc.h
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ep93xx/soc.h
+> +++ linux-2.6/arch/arm/mach-ep93xx/soc.h
+> @@ -69,6 +69,7 @@
+>  
+>  #define EP93XX_BOOT_ROM_BASE		EP93XX_AHB_IOMEM(0x00090000)
+>  
+> +#define EP93XX_IDE_PHYS_BASE		EP93XX_AHB_PHYS(0x000a0000)
+>  #define EP93XX_IDE_BASE			EP93XX_AHB_IOMEM(0x000a0000)
+>  
+>  #define EP93XX_VIC1_BASE		EP93XX_AHB_IOMEM(0x000b0000)
+> Index: linux-2.6/arch/arm/mach-ep93xx/core.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ep93xx/core.c
+> +++ linux-2.6/arch/arm/mach-ep93xx/core.c
+> @@ -868,6 +868,102 @@ static struct platform_device ep93xx_wdt
+>  	.resource	= ep93xx_wdt_resources,
+>  };
+>  
+> +/*************************************************************************
+> + * EP93xx IDE
+> + *************************************************************************/
+> +static struct resource ep93xx_ide_resources[] = {
+> +	DEFINE_RES_MEM(EP93XX_IDE_PHYS_BASE, 0x38),
+> +	DEFINE_RES_IRQ(IRQ_EP93XX_EXT3),
+> +};
+> +
+> +static struct platform_device ep93xx_ide_device = {
+> +	.name		= "ep93xx-ide",
+> +	.id		= -1,
+> +	.dev		= {
+> +		.dma_mask		= &ep93xx_ide_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ep93xx_ide_resources),
+> +	.resource	= ep93xx_ide_resources,
+> +};
+> +
+> +void __init ep93xx_register_ide(void)
+> +{
+> +	platform_device_register(&ep93xx_ide_device);
+> +}
+> +
+> +int ep93xx_ide_acquire_gpio(struct platform_device *pdev)
+> +{
+> +	int err;
+> +	int i;
+> +
+> +	err = gpio_request(EP93XX_GPIO_LINE_EGPIO2, dev_name(&pdev->dev));
+> +	if (err)
+> +		return err;
+> +	err = gpio_request(EP93XX_GPIO_LINE_EGPIO15, dev_name(&pdev->dev));
+> +	if (err)
+> +		goto fail_egpio15;
+> +	for (i = 2; i < 8; i++) {
+> +		err = gpio_request(EP93XX_GPIO_LINE_E(i), dev_name(&pdev->dev));
+> +		if (err)
+> +			goto fail_gpio_e;
+> +	}
+> +	for (i = 4; i < 8; i++) {
+> +		err = gpio_request(EP93XX_GPIO_LINE_G(i), dev_name(&pdev->dev));
+> +		if (err)
+> +			goto fail_gpio_g;
+> +	}
+> +	for (i = 0; i < 8; i++) {
+> +		err = gpio_request(EP93XX_GPIO_LINE_H(i), dev_name(&pdev->dev));
+> +		if (err)
+> +			goto fail_gpio_h;
+> +	}
+> +
+> +	/* GPIO ports E[7:2], G[7:4] and H used by IDE */
+> +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_EONIDE |
+> +				 EP93XX_SYSCON_DEVCFG_GONIDE |
+> +				 EP93XX_SYSCON_DEVCFG_HONIDE);
+> +	return 0;
+> +
+> +fail_gpio_h:
+> +	for (--i; i >= 0; --i)
+> +		gpio_free(EP93XX_GPIO_LINE_H(i));
+> +	i = 8;
+> +fail_gpio_g:
+> +	for (--i; i >= 4; --i)
+> +		gpio_free(EP93XX_GPIO_LINE_G(i));
+> +	i = 8;
+> +fail_gpio_e:
+> +	for (--i; i >= 2; --i)
+> +		gpio_free(EP93XX_GPIO_LINE_E(i));
+> +	gpio_free(EP93XX_GPIO_LINE_EGPIO15);
+> +fail_egpio15:
+> +	gpio_free(EP93XX_GPIO_LINE_EGPIO2);
+> +	return err;
+> +}
+> +EXPORT_SYMBOL(ep93xx_ide_acquire_gpio);
+> +
+> +void ep93xx_ide_release_gpio(struct platform_device *pdev)
+> +{
+> +	int i;
+> +
+> +	for (i = 2; i < 8; i++)
+> +		gpio_free(EP93XX_GPIO_LINE_E(i));
+> +	for (i = 4; i < 8; i++)
+> +		gpio_free(EP93XX_GPIO_LINE_G(i));
+> +	for (i = 0; i < 8; i++)
+> +		gpio_free(EP93XX_GPIO_LINE_H(i));
+> +	gpio_free(EP93XX_GPIO_LINE_EGPIO15);
+> +	gpio_free(EP93XX_GPIO_LINE_EGPIO2);
+> +
+> +
+> +	/* GPIO ports E[7:2], G[7:4] and H used by GPIO */
+> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_EONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
+> +}
+> +EXPORT_SYMBOL(ep93xx_ide_release_gpio);
+> +
+>  void __init ep93xx_init_devices(void)
+>  {
+>  	/* Disallow access to MaverickCrunch initially */
+> Index: linux-2.6/arch/arm/mach-ep93xx/include/mach/platform.h
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ep93xx/include/mach/platform.h
+> +++ linux-2.6/arch/arm/mach-ep93xx/include/mach/platform.h
+> @@ -48,6 +48,9 @@ void ep93xx_register_i2s(void);
+>  int ep93xx_i2s_acquire(void);
+>  void ep93xx_i2s_release(void);
+>  void ep93xx_register_ac97(void);
+> +void ep93xx_register_ide(void);
+> +int ep93xx_ide_acquire_gpio(struct platform_device *pdev);
+> +void ep93xx_ide_release_gpio(struct platform_device *pdev);
+>  
+>  void ep93xx_init_devices(void);
+>  extern struct sys_timer ep93xx_timer;
