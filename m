@@ -1,42 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jun 2012 10:19:37 +0200
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <4FCC3CB4.5030107@snapgear.com>
-References: <4FCC3CB4.5030107@snapgear.com>
-Message-ID: <20120604081937.GH30400@pengutronix.de>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 04 Jun 2012 10:29:57 +0200
+Subject: Kernel 3.4 on Dreamplug: no serial console
+In-Reply-To: <20120603184049.GF14756@titan.lakedaemon.net>
+References: <loom.20120602T135715-548@post.gmane.org>
+ <201206031712.18645.arnd@arndb.de>
+ <20120603184049.GF14756@titan.lakedaemon.net>
+Message-ID: <2396575.dLS9zmzUSD@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi,
 
-On Mon, Jun 04, 2012 at 02:42:28PM +1000, Greg Ungerer wrote:
+On Sunday 03 June 2012 14:40:49 Jason Cooper wrote:
+> On Sun, Jun 03, 2012 at 05:12:18PM +0000, Arnd Bergmann wrote:
+> > I'd also accept a patch to make ARCH_KIRKWOOD_DT select OF_SERIAL if 
+people
+> > prefer that, but I think just changing the defconfig is better.
 > 
-> Hi Sascha,
-> 
-> Commit f4d40de39a23f0c39cca55ac63e1175c69c3d2f7 ("net fec: do not
-> depend on grouped clocks") breaks compilation of the FEC driver for
-> non iMX platforms in linux-3.5-rc1. For example when compiling for
-> ColdFire I get:
-> 
-> 	  LD      vmlinux
->     drivers/built-in.o: In function `fec_probe':
->     fec.c:(.devinit.text+0x1e0): undefined reference to `devm_clk_get'
+> I'd prefer the defconfig as there are situations where users/oems deploy
+> a kernel without support for serial console.  In order to do that with
+> your patch, or similar approaches, they would have to change the code.
+> With defconfig, they don't.
 
-Sorry, I forgot that this driver is used on coldfire.
+Should not you rather select OF_SERIAL and add a status propery to the uart 
+node in device tree, so that it is up to dtb provider to determine whether 
+this device node should be enabled or not? You would avoid all kind of 
+defconfig issue.
 
 > 
-> Trivially we could conditionalize the code block that calls
-> devm_clk_get() in the probe routine, but that is kind of ugly.
-
-It's ugly, but the only other solution I see is that you could provide a
-dummy devm_clk_get() for coldfire. Added Mark to Cc, maybe he has
-another idea?
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> FYI: there is a running problem with kirkwood_defconfig that I haven't
+> had time to look into.  I've been doing 'make oldconfig' and thus never
+> encountered the problem.
+> 
+> The problem involves CONFIG_ARM_PATCH_PHYS_VIRT and causes the system
+> not to boot.  I'm not sure if this is dreamplug specific, kirkwood, or
+> all orion.  I've only heard reports regarding dreamplug, but that
+> doesn't mean it's limited to that board.
+> 
+> I'd like to have the defconfig working by the time the DT conversion is
+> complete, but I'm currently giving DT conversion higher priority.  So,
+> if anyone wants to take a crack at solving it, please do.  Otherwise, I
+> plan on taking a look at it after the driver bindings are done.
+> 
+> thx,
+> 
+> Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
