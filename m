@@ -1,71 +1,34 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 4 Jun 2012 10:29:32 -0400 (EDT)
-Subject: [PATCH] ohci-nxp: Use ohci_finish_controller_resume()
-In-Reply-To: <1338747893-29338-1-git-send-email-stigge@antcom.de>
-Message-ID: <Pine.LNX.4.44L0.1206041027420.1555-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Jun 2012 14:30:59 +0000
+Subject: Kernel 3.4 on Dreamplug: no serial console
+In-Reply-To: <2396575.dLS9zmzUSD@flexo>
+References: <loom.20120602T135715-548@post.gmane.org>
+ <20120603184049.GF14756@titan.lakedaemon.net> <2396575.dLS9zmzUSD@flexo>
+Message-ID: <201206041430.59397.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 Jun 2012, Roland Stigge wrote:
-
-> OHCI drivers are supposed to use ohci_finish_controller_resume(). This patch
-> adds respective suspend and resume code to ohci-nxp. The following compiler
-> warning is fixed this way:
+On Monday 04 June 2012, Florian Fainelli wrote:
+> On Sunday 03 June 2012 14:40:49 Jason Cooper wrote:
+> > On Sun, Jun 03, 2012 at 05:12:18PM +0000, Arnd Bergmann wrote:
+> > > I'd also accept a patch to make ARCH_KIRKWOOD_DT select OF_SERIAL if 
+> people
+> > > prefer that, but I think just changing the defconfig is better.
+> > 
+> > I'd prefer the defconfig as there are situations where users/oems deploy
+> > a kernel without support for serial console.  In order to do that with
+> > your patch, or similar approaches, they would have to change the code.
+> > With defconfig, they don't.
 > 
-> drivers/usb/host/ohci-hub.c:321: warning: 'ohci_finish_controller_resume'
-> defined but not used
+> Should not you rather select OF_SERIAL and add a status propery to the uart 
+> node in device tree, so that it is up to dtb provider to determine whether 
+> this device node should be enabled or not? You would avoid all kind of 
+> defconfig issue.
 
-This is not a correct description of the patch.  A correct description 
-would be something like:
+Obviously the configuration comes from DT, but there are still reasons to
+not select the driver. E.g. you might want to build a kernel that runs on
+a wide variety of systems and has all drivers as loadable modules rather than
+built-in. There are also some systems that are rather memory constraint and
+even disable printk support, so the console becomes useless too.
 
-	Add suspend/resume support to the ohci-nxp driver.
-
-The compiler warning needs a completely different fix; 
-ohci_finish_controller_resume should be given a __maybe_unused 
-annotation.
-
-Alan Stern
-
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> ---
-> Applies to v3.5-rc1
-> 
->  drivers/usb/host/ohci-nxp.c |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> --- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
-> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
-> @@ -432,6 +432,23 @@ static int usb_hcd_nxp_remove(struct pla
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int usb_hcd_suspend(struct platform_device *pdev, pm_message_t message)
-> +{
-> +	clk_disable(usb_clk);
-> +	return 0;
-> +}
-> +
-> +static int usb_hcd_resume(struct platform_device *pdev)
-> +{
-> +	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-> +
-> +	clk_enable(usb_clk);
-> +	ohci_finish_controller_resume(hcd);
-> +	return 0;
-> +}
-> +#endif
-> +
->  /* work with hotplug and coldplug */
->  MODULE_ALIAS("platform:usb-ohci");
->  
-> @@ -451,5 +468,9 @@ static struct platform_driver usb_hcd_nx
->  	},
->  	.probe = usb_hcd_nxp_probe,
->  	.remove = usb_hcd_nxp_remove,
-> +#ifdef CONFIG_PM
-> +	.suspend = usb_hcd_suspend,
-> +	.resume = usb_hcd_resume,
-> +#endif
->  };
+	Arnd
