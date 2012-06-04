@@ -1,42 +1,36 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 04 Jun 2012 21:32:34 +0200
-Subject: v3.5-rc1 ARM PXA possible regression
-In-Reply-To: <87fwab88o5.fsf@lebrac.rtp-net.org>
-References: <20120604140531.GA7486@lunn.ch> <87fwab88o5.fsf@lebrac.rtp-net.org>
-Message-ID: <4FCD0D52.7020602@gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 4 Jun 2012 16:16:52 -0400 (EDT)
+Subject: [PATCH] ohci-hub: Mark ohci_finish_controller_resume() as
+ __maybe_unused
+In-Reply-To: <1338837608-23976-1-git-send-email-stigge@antcom.de>
+Message-ID: <Pine.LNX.4.44L0.1206041616300.1555-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+On Mon, 4 Jun 2012, Roland Stigge wrote:
 
-Am 04.06.2012 16:15, schrieb Arnaud Patard (Rtp):
-> There has been discussions here about that iirc. I don't know when a
-> proper fix will be merged but one *very* *ugly* workaround is:
->
-> --- linux.orig/kernel/printk.c  2012-06-03 15:26:20.000000000 +0200
-> +++ linux/kernel/printk.c       2012-06-03 16:41:24.000000000 +0200
-> @@ -228,7 +228,7 @@ static u32 clear_idx;
+> ohci_finish_controller_resume() is intended to be used in platform specific
+> drivers ohci-*.c, included from ohci-hcd.c. Some of them don't actually use
+> ohci_finish_controller_resume(), so mark it as __maybe_unused.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+
+> ---
+>  drivers/usb/host/ohci-hub.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- linux-2.6.orig/drivers/usb/host/ohci-hub.c
+> +++ linux-2.6/drivers/usb/host/ohci-hub.c
+> @@ -317,7 +317,7 @@ static int ohci_bus_resume (struct usb_h
+>  }
 >  
->  /* record buffer */
->  #if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
-> -#define LOG_ALIGN 4
-> +#define LOG_ALIGN 8
->  #else
->  #define LOG_ALIGN 8
->  #endif
->
->
-> At least it seems to work here.
-
-Yes, a thread discussing this is at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101783.html
-, which did not really come to a conclusion, but proposed the following
-fix (the original proposal used "struct log_buf", but it should be
-"struct log" I suppose):
-
-/#define LOG_ALIGN (__alignof__(struct log))
-
-/which works for me on kirkwood (but apparently may waste a couple of bytes on other architectures)
-
-
-- Simon
+>  /* Carry out the final steps of resuming the controller device */
+> -static void ohci_finish_controller_resume(struct usb_hcd *hcd)
+> +static void __maybe_unused ohci_finish_controller_resume(struct usb_hcd *hcd)
+>  {
+>  	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
+>  	int			port;
+> 
+> 
