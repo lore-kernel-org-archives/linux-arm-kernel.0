@@ -1,25 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Jun 2012 11:55:39 -0600
-Subject: [PATCH] ARM: dt: tegra: add Whistler device tree file
-In-Reply-To: <1337295233-14575-1-git-send-email-swarren@wwwdotorg.org>
-References: <1337295233-14575-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <4FCCF69B.2050609@wwwdotorg.org>
+Date: Mon, 04 Jun 2012 12:06:34 -0600
+Subject: [PATCH V2 1/2] ARM: tegra: config: enable TPS65910 drivers
+In-Reply-To: <1337753574-32699-1-git-send-email-ldewangan@nvidia.com>
+References: <1337753574-32699-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <4FCCF92A.9040407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2012 04:53 PM, Stephen Warren wrote:
-> Whistler is a highly configurable Tegra evaluation and development board.
-> This change adds support for the following specific configuration:
-> 
-> E1120 motherboard
-> E1108 CPU board
-> E1116 PMU board
-> 
-> The motherboard configuration switches are set as follows:
-> SW1=0 SW2=0 SW3=5
-> S1/S2/S3/S4 all on, except S3 7/8 are off.
-> 
-> Other combinations of daugher boards may work to varying degrees, but will
-> likely require some SW adjustment.
+On 05/23/2012 12:12 AM, Laxman Dewangan wrote:
+> Enable TPS65910 mfd, gpio and regulator drivers.
+> This is the PMIC module for Tegra30 based cardhu
+> platform.
 
-Applied for 3.6.
+I've applied just this one patch for 3.6.
