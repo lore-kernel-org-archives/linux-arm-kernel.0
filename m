@@ -1,28 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Jun 2012 08:29:33 +0100
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <4FCC280C.6030103@landley.net>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
- <4FCC280C.6030103@landley.net>
-Message-ID: <20120604072933.GE26676@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jun 2012 00:40:23 -0700
+Subject: [PATCH] ARM: OMAP4: hwspinlocks_init() should be static
+In-Reply-To: <1336914919-20032-1-git-send-email-ohad@wizery.com>
+References: <1336914919-20032-1-git-send-email-ohad@wizery.com>
+Message-ID: <20120604074022.GX12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 03, 2012 at 10:14:20PM -0500, Rob Landley wrote:
-> On 05/29/2012 08:11 PM, Sagar Dharia wrote:
+* Ohad Ben-Cohen <ohad@wizery.com> [120513 06:19]:
+> Sparse found out that hwspinlocks_init() wasn't marked static,
+> and it should've been.
 
-> > SLIMbus replaces many digital audio buses and control buses by
-> > providing flexible and dynamic bus-bandwidth between data-functions
-> > and control-functions.
+Looks like this already got fixed by Paul's commit 8c3d4534.
 
-> So that's a really long way of saying "A bit like I2C but faster"?
+Regards,
 
-No, it's replacing I2S (or whatever) too.  Really it's much more like
-USB than I2C.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/bff8061a/attachment.sig>
+Tony
+ 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
+>  arch/arm/mach-omap2/hwspinlock.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
+> index 454dfce..8763c85 100644
+> --- a/arch/arm/mach-omap2/hwspinlock.c
+> +++ b/arch/arm/mach-omap2/hwspinlock.c
+> @@ -28,7 +28,7 @@ static struct hwspinlock_pdata omap_hwspinlock_pdata __initdata = {
+>  	.base_id = 0,
+>  };
+>  
+> -int __init hwspinlocks_init(void)
+> +static int __init hwspinlocks_init(void)
+>  {
+>  	int retval = 0;
+>  	struct omap_hwmod *oh;
+> -- 
+> 1.7.5.4
+> 
