@@ -1,30 +1,56 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 4 Jun 2012 16:55:10 +1000
-Subject: Request for inclusion of ep93xx tree in linux-next
-In-Reply-To: <4FCC4D0D.8000504@gmail.com>
-References: <4F9F16A9.9090108@gmail.com>
-	<4FCC4D0D.8000504@gmail.com>
-Message-ID: <20120604165510.3deef0e858b35b3400915c1e@canb.auug.org.au>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Mon, 4 Jun 2012 09:11:54 +0200
+Subject: [PATCH v3] ARM: at91: aic can use fast eoi handler type
+In-Reply-To: <20120602165000.GB14903@mudshark.cambridge.arm.com>
+References: <1338545298-6687-1-git-send-email-ludovic.desroches@atmel.com>
+ <20120602165000.GB14903@mudshark.cambridge.arm.com>
+Message-ID: <4FCC5FBA.2030103@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+Hi Will,
 
-On Mon, 04 Jun 2012 15:52:13 +1000 Ryan Mallon <rmallon@gmail.com> wrote:
+Le 06/02/2012 06:50 PM, Will Deacon a ?crit :
+> Hi Ludovic,
 >
-> I have ended up adding another branch to my ep93xx tree, so I have
-> created an ep93xx-for-next branch, which I will just merge all of
-> branches into. Can you please drop the ep93xx-cleanup and ep93xx-fixes
-> branches and just include ep93xx-for-next instead.
+> I have some minor corrections to the commit message but the code looks fine
+> now. Thanks!
+>
+> On Fri, Jun 01, 2012 at 11:08:18AM +0100, ludovic.desroches at atmel.com wrote:
+>> From: Ludovic Desroches<ludovic.desroches@atmel.com>
+>>
+>> The Advanced Interrupt Controller allows to use the fast EOI handler type.
+>
+> allows us to use
+>
+>> It lets remove the Atmel specific workaround into arch/arm/kernel/irq.c used
+>
+> lets us remove the Atmel specific workaround in
+>
 
-Done.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120604/627378e3/attachment.sig>
+Thanks, I'll correct my commit message.
+
+>> to indicate to the AIC the end of the interrupt treatment.
+>> Removing irq_finish from handle_IRQ involves to manage it in the gpio irq
+>> handler.
+>
+> I don't understand this final sentence. The GPIO changes are just mirroring
+> the change of flow control so I don't think you need to comment on them.
+>
+
+Yes, it was what I wanted to point out. Since it seems obvious, I'll 
+remove this final sentence.
+
+>> Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
+>
+> Signed-off-by: Will Deacon<will.deacon@arm.com>
+>
+> Cheers,
+>
+> Will
+>
+>
+
+Regards
+
+Ludovic
