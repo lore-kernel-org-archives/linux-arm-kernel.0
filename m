@@ -1,24 +1,16 @@
-From: william76.sh@gmail.com (William F.)
-Date: Sun, 03 Jun 2012 20:07:17 -0300
-Subject: PLEASE, REMOVE MY EMAIL ADDRESS FROM ITS LIST.
-In-Reply-To: <20120603193340.GC23368@n2100.arm.linux.org.uk>
-References: <1338748689-29645-1-git-send-email-stigge@antcom.de>
- <20120603190932.GB23368@n2100.arm.linux.org.uk> <4FCBBABF.5080507@gmail.com>
- <20120603193340.GC23368@n2100.arm.linux.org.uk>
-Message-ID: <4FCBEE25.4020704@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 4 Jun 2012 08:46:11 +0800
+Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120604004610.GA2857@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm sorry, mates.
+Hi Guys,
 
-Em 03-06-2012 16:33, Russell King - ARM Linux escreveu:
-> Sigh, here we go again... why are you emailing me directly over this
-> issue?
->
-> In short, I can't.  I don't run these lists anymore.  Please look at
-> the bottom of any message you've received from the list to find the
-> URL you need to go to to control your subscription.
->
-> Thanks.
-> .
->
+The merge window was closed. Do you have time to check whether the
+patch series is ok to pick up?
+
+Thanks
+Richard
