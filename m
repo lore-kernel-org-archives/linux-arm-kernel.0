@@ -1,51 +1,58 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 5 Jun 2012 08:23:10 +0000
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Jun 2012 01:26:29 -0700
 Subject: [PATCH-V2 0/4] ARM: OMAP2+: am33xx: Add clocktree and hwmod data
-In-Reply-To: <20120605075952.GJ12766@atomide.com>
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA41629@DBDE01.ent.ti.com>
 References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
  <20120605075952.GJ12766@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA41629@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA41629@DBDE01.ent.ti.com>
+Message-ID: <20120605082628.GM12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 13:29:52, Tony Lindgren wrote:
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120529 03:01]:
-> > This patch adds complete clockctree and hwmod data for the
-> > AM33XX family of devices.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120605 01:27]:
+> On Tue, Jun 05, 2012 at 13:29:52, Tony Lindgren wrote:
+> > * Vaibhav Hiremath <hvaibhav@ti.com> [120529 03:01]:
+> > > This patch adds complete clockctree and hwmod data for the
+> > > AM33XX family of devices.
+> > > 
+> > > This patch-series is cleaned up further from Paul's cleanup
+> > > activity on AM33xx clocktree, where all leaf nodes have been
+> > > removed and now modules enable/disable is controlled only
+> > > using hwmod framework interface.
+> > > 
+> > > There are certain modules, like clkdiv32k, debugss, etc..., for
+> > > which we still doesn't have hwmod_data present, so in order to
+> > > disable these modules during boot time, we still have to maintain
+> > > clk node for them. Comment has been added to highlight this, and
+> > > in the future we will cleanup this.
+> > > As far as, CLKDIV32K module, in reality is not module but still
+> > > we have MODULEMODE to control it, so we may have to keep this node
+> > > alone in the clocktree.
 > > 
-> > This patch-series is cleaned up further from Paul's cleanup
-> > activity on AM33xx clocktree, where all leaf nodes have been
-> > removed and now modules enable/disable is controlled only
-> > using hwmod framework interface.
+> > Considering that we have the RFC patches available for common
+> > clk fwk, we should probably avoid the extra churn and have this
+> > use the common clk fwk instead. Of course that is assuming the
+> > common clk fwk patches will be mergeable soonish.
 > > 
-> > There are certain modules, like clkdiv32k, debugss, etc..., for
-> > which we still doesn't have hwmod_data present, so in order to
-> > disable these modules during boot time, we still have to maintain
-> > clk node for them. Comment has been added to highlight this, and
-> > in the future we will cleanup this.
-> > As far as, CLKDIV32K module, in reality is not module but still
-> > we have MODULEMODE to control it, so we may have to keep this node
-> > alone in the clocktree.
 > 
-> Considering that we have the RFC patches available for common
-> clk fwk, we should probably avoid the extra churn and have this
-> use the common clk fwk instead. Of course that is assuming the
-> common clk fwk patches will be mergeable soonish.
+> Tony,
 > 
+> I am not quite sure how much time it will take to merge common clock changes 
+> from Rajendra, since it is still in RFC stage and may take couple merge 
+> windows. I would recommend to merge clock-tree and hwmod patches atleast to 
+> the linux-next, so that it gets validated for some time and we atleast would 
+> be able to boot the BeagleBone (community board) from linux-next/master.
+> People can start further development using this on BeagleBone platform.
+> 
+> Based on common-clock migration activity on OMAP, we can certainly make 
+> decision on pushing it to Mainline (Linus's) tree. And also I will start 
+> basing AM33XX clocktree on Rajendra's patches, so that it will get merged at 
+> the same time.
 
-Tony,
+OK that sounds fair to me. Let's see what Paul and Rajendra say, it's
+really up to them to make the call. We need minimize the extra load for
+Paul and Rajendra here as it's already a big effort.
 
-I am not quite sure how much time it will take to merge common clock changes 
-from Rajendra, since it is still in RFC stage and may take couple merge 
-windows. I would recommend to merge clock-tree and hwmod patches atleast to 
-the linux-next, so that it gets validated for some time and we atleast would 
-be able to boot the BeagleBone (community board) from linux-next/master.
-People can start further development using this on BeagleBone platform.
+Regards,
 
-Based on common-clock migration activity on OMAP, we can certainly make 
-decision on pushing it to Mainline (Linus's) tree. And also I will start 
-basing AM33XX clocktree on Rajendra's patches, so that it will get merged at 
-the same time.
-
-Thanks,
-Vaibhav
+Tony
