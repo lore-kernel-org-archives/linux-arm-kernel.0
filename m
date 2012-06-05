@@ -1,5 +1,5 @@
 From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Jun 2012 16:43:12 -0700
+Date: Tue, 05 Jun 2012 16:48:09 -0700
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
 In-Reply-To: <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
 References: <cover.1338889066.git.joe@perches.com>
@@ -10,24 +10,13 @@ References: <cover.1338889066.git.joe@perches.com>
  <20120605162910.caccb0d4.akpm@linux-foundation.org>
  <1338939316.11962.3.camel@joe2Laptop>
  <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
-Message-ID: <1338939792.11962.4.camel@joe2Laptop>
+Message-ID: <1338940089.11962.7.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 2012-06-06 at 01:39 +0200, Kay Sievers wrote:
-> On Wed, Jun 6, 2012 at 1:35 AM, Joe Perches <joe@perches.com> wrote:
-> > On Tue, 2012-06-05 at 16:29 -0700, Andrew Morton wrote:
-> >> What about writes starting with \001n?  AFACIT, that will be stripped
-> >> away and the printk level will be altered.  This is new behavior.
-> >
-> > Nope.
-> >
-> > # echo "\001Hello Andrew" > /dev/kmsg
-> > /dev/kmsg has
-> > 12,774,2462339252;\001Hello Andrew
-> 
 > Try "echo -e"? The stuff is copied verbatim otherwise.
 
-# echo -e "\001Hello Kay" > /dev/kmsg
-gives
-12,776,3046752764;\x01Hello Kay
+btw: I didn't change the devkmsg_writev function
+which does the decoding of any "<n>" prefix for
+printk_emit.
