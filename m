@@ -1,40 +1,96 @@
 From: joe@perches.com (Joe Perches)
-Date: Tue,  5 Jun 2012 02:46:29 -0700
-Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-Message-ID: <cover.1338889066.git.joe@perches.com>
+Date: Tue,  5 Jun 2012 02:46:32 -0700
+Subject: [PATCH 3/8] arch: Remove direct definitions of KERN_<LEVEL> uses
+In-Reply-To: <cover.1338889066.git.joe@perches.com>
+References: <cover.1338889066.git.joe@perches.com>
+Message-ID: <282f5ce989b713c749966dcefbc4b306f0fa909a.1338889066.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KERN_<LEVEL> currently takes up 3 bytes.
-Shrink the kernel size by using an ASCII SOH and then the level byte.
-Remove the need for KERN_CONT.
-Convert directly embedded uses of <.> to KERN_<LEVEL>
+Add #include <linux/kern_levels.h> so that the #define KERN_<LEVEL>
+macros don't have to be duplicated.
 
-Joe Perches (8):
-  printk: Add generic functions to find KERN_<LEVEL> headers
-  printk: Add kern_levels.h to make KERN_<LEVEL> available for asm use
-  arch: Remove direct definitions of KERN_<LEVEL> uses
-  btrfs: Use printk_get_level and printk_skip_level, add __printf, fix fallout
-  sound: Use printk_get_level and printk_skip_level
-  staging: wlags49_h2: Remove direct declarations of KERN_<LEVEL> prefixes
-  printk: Convert the format for KERN_<LEVEL> to a 2 byte pattern
-  printk: Remove the now unnecessary "C" annotation for KERN_CONT
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/lib/io-acorn.S         |    3 ++-
+ arch/arm/vfp/vfphw.S            |    7 ++++---
+ arch/frv/kernel/kernel_thread.S |    2 +-
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
- arch/arm/lib/io-acorn.S              |    3 +-
- arch/arm/vfp/vfphw.S                 |    7 +++--
- arch/frv/kernel/kernel_thread.S      |    2 +-
- drivers/staging/wlags49_h2/hcf.c     |    8 +++---
- drivers/staging/wlags49_h2/wl_main.c |    4 +-
- fs/btrfs/ctree.h                     |   13 ++++++++++
- fs/btrfs/disk-io.c                   |    2 +-
- fs/btrfs/relocation.c                |    2 +-
- fs/btrfs/super.c                     |   41 +++++++++++++++++++++++++++++-----
- include/linux/kern_levels.h          |   25 ++++++++++++++++++++
- include/linux/printk.h               |   41 +++++++++++++++++++--------------
- kernel/printk.c                      |   14 +++++++----
- sound/core/misc.c                    |   13 +++++++---
- 13 files changed, 130 insertions(+), 45 deletions(-)
- create mode 100644 include/linux/kern_levels.h
-
+diff --git a/arch/arm/lib/io-acorn.S b/arch/arm/lib/io-acorn.S
+index 1b197ea..69719ba 100644
+--- a/arch/arm/lib/io-acorn.S
++++ b/arch/arm/lib/io-acorn.S
+@@ -11,13 +11,14 @@
+  *
+  */
+ #include <linux/linkage.h>
++#include <linux/kern_levels.h>
+ #include <asm/assembler.h>
+ 
+ 		.text
+ 		.align
+ 
+ .Liosl_warning:
+-		.ascii	"<4>insl/outsl not implemented, called from %08lX\0"
++		.ascii	KERN_WARNING "insl/outsl not implemented, called from %08lX\0"
+ 		.align
+ 
+ /*
+diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+index 2d30c7f..d50f0e4 100644
+--- a/arch/arm/vfp/vfphw.S
++++ b/arch/arm/vfp/vfphw.S
+@@ -16,6 +16,7 @@
+  */
+ #include <asm/thread_info.h>
+ #include <asm/vfpmacros.h>
++#include <linux/kern_levels.h>
+ #include "../kernel/entry-header.S"
+ 
+ 	.macro	DBGSTR, str
+@@ -24,7 +25,7 @@
+ 	add	r0, pc, #4
+ 	bl	printk
+ 	b	1f
+-	.asciz  "<7>VFP: \str\n"
++	.asciz  KERN_DEBUG "VFP: \str\n"
+ 	.balign 4
+ 1:	ldmfd	sp!, {r0-r3, ip, lr}
+ #endif
+@@ -37,7 +38,7 @@
+ 	add	r0, pc, #4
+ 	bl	printk
+ 	b	1f
+-	.asciz  "<7>VFP: \str\n"
++	.asciz  KERN_DEBUG "VFP: \str\n"
+ 	.balign 4
+ 1:	ldmfd	sp!, {r0-r3, ip, lr}
+ #endif
+@@ -52,7 +53,7 @@
+ 	add	r0, pc, #4
+ 	bl	printk
+ 	b	1f
+-	.asciz  "<7>VFP: \str\n"
++	.asciz  KERN_DEBUG "VFP: \str\n"
+ 	.balign 4
+ 1:	ldmfd	sp!, {r0-r3, ip, lr}
+ #endif
+diff --git a/arch/frv/kernel/kernel_thread.S b/arch/frv/kernel/kernel_thread.S
+index 4531c83..f0e5294 100644
+--- a/arch/frv/kernel/kernel_thread.S
++++ b/arch/frv/kernel/kernel_thread.S
+@@ -10,10 +10,10 @@
+  */
+ 
+ #include <linux/linkage.h>
++#include <linux/kern_levels.h>
+ #include <asm/unistd.h>
+ 
+ #define CLONE_VM	0x00000100	/* set if VM shared between processes */
+-#define	KERN_ERR	"<3>"
+ 
+ 	.section .rodata
+ kernel_thread_emsg:
 -- 
 1.7.8.111.gad25c.dirty
