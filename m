@@ -1,56 +1,37 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 05 Jun 2012 17:00:59 +0300
-Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
-In-Reply-To: <1337912665-16615-4-git-send-email-richard.zhao@freescale.com>
-References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
- <1337912665-16615-4-git-send-email-richard.zhao@freescale.com>
-Message-ID: <87y5o197tw.fsf@ashishki-desk.ger.corp.intel.com>
+From: kay@vrfy.org (Kay Sievers)
+Date: Tue, 5 Jun 2012 16:20:11 +0200
+Subject: [PATCH] printk: Fix alignment of buf causing crash on ARM EABI
+In-Reply-To: <20120605065918.GA17674@kroah.com>
+References: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
+ <20120605065918.GA17674@kroah.com>
+Message-ID: <CAPXgP10m3M3e7=jchLs1CR2w1-m_=ad-rzcUz-z-YCNeH-sZuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
-
-> It still has below limitations:
-> - it does not work for multi-phy ehci
-> - the best place is after debounce, but I can't get
->   phy there
+On Tue, Jun 5, 2012 at 8:59 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 05, 2012 at 08:52:34AM +0200, Andrew Lunn wrote:
+>> Commit 7ff9554bb578ba02166071d2d487b7fc7d860d62, printk: convert
+>> byte-buffer to variable-length record buffer, causes systems using
+>> EABI to crash very early in the boot cycle. The first entry in struct
+>> log is a u64, which for EABI must be 8 byte aligned.
+>>
+>> Make use of __alignof__() so the compiler to decide the alignment, but
+>> allow it to be overridden using CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS,
+>> for systems which can perform unaligned access and want to save
+>> a few bytes of space.
+>>
+>> Tested on Orion5x and Kirkwood.
+>>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> ---
+>> ?kernel/printk.c | ? ?4 ++--
+>> ?1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Thanks, I think I have a patch in my to-apply queue that fixes this in a
+> bit different way. ?I'll dig that up and compare them in the next few
+> days as I work my way through my pending patch queue.
 
-Alan, are you ok with this?
+This patch looks good to me.
 
-> ---
->  drivers/usb/host/ehci-hcd.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index b100f5f..8c39a7a 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -928,6 +928,20 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
->  			pstatus = ehci_readl(ehci,
->  					 &ehci->regs->port_status[i]);
->  
-> +			/* FIXME:
-> +			 * - it does not work for multi-phy ehci
-> +			 * - the best place is after debounce, but I can't get
-> +			 *   phy there
-> +			 */
-> +			if ((pstatus & PORT_CSC) && ehci->transceiver) {
-> +				if (pstatus & PORT_CONNECT)
-> +					usb_phy_notify_connect(
-> +						ehci->transceiver, i);
-> +				else
-> +					usb_phy_notify_disconnect(
-> +						ehci->transceiver, i);
-> +			}
-> +
->  			if (pstatus & PORT_OWNER)
->  				continue;
->  			if (!(test_bit(i, &ehci->suspended_ports) &&
-> -- 
-> 1.7.5.4
-
-Regards,
---
-Alex
+Thanks,
+Kay
