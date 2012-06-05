@@ -1,39 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Jun 2012 13:40:37 +0100
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <4FCDFD4E.1000906@snapgear.com>
-References: <4FCC3CB4.5030107@snapgear.com>
- <20120604081937.GH30400@pengutronix.de>
- <20120604091616.GA3943@opensource.wolfsonmicro.com>
- <4FCDAD5B.8010106@snapgear.com>
- <20120605094141.GE23408@opensource.wolfsonmicro.com>
- <4FCDF8BE.6010509@snapgear.com>
- <20120605122444.GS23408@opensource.wolfsonmicro.com>
- <4FCDFD4E.1000906@snapgear.com>
-Message-ID: <20120605124037.GT23408@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jun 2012 14:46:18 +0200
+Subject: [PATCH 3/3] gpio: exynos4: skip gpiolib registration if pinctrl
+ driver is used
+In-Reply-To: <1337816857-14694-4-git-send-email-thomas.abraham@linaro.org>
+References: <1337816857-14694-1-git-send-email-thomas.abraham@linaro.org>
+ <1337816857-14694-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkda1iiOFfjWbtJTf=R7qqHkzPbA3oTsWSiC08W_zctaexQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 10:36:30PM +1000, Greg Ungerer wrote:
+On Thu, May 24, 2012 at 1:47 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-> I am pretty sure AHB was bolted on later. This FEC core has progressed
-> from very old Motorola PowerPC platforms to ColdFire/M68k to ARM, over
-> something coming close to a 20 year period. In the earlier uses of it
-> there is quite a few differences (including some quite odd register
-> layout differences).
+> Pinctrl driver, when enabled, registers all the gpio pins and hence the
+> registration of gpio pins by this driver can be skipped.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-> There may be other things that are somewhat like an ahb clock and ipg
-> clock, but really these are things that have come along later with a
-> specific platform implementation.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-For AHB that sounds plausible, but for the IPG clock (assuming I've
-identified the function correctly) I've got a very hard time believing
-that the IP ever didn't need a clock - my understanding is that it's the
-master clock for the IP ("IP gate").
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/25fb6aef/attachment.sig>
+I guess it's already applied... sorry for taking so long time
+to respond.
+
+Yours,
+Linus Walleij
