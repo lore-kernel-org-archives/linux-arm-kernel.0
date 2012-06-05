@@ -1,40 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jun 2012 08:47:14 +0200
-Subject: [PATCH v2 REBASE] ASoC: fsl_ssi: convert to use devm_clk_get
-In-Reply-To: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
-References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120605064714.GL30400@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue,  5 Jun 2012 08:52:34 +0200
+Subject: [PATCH] printk: Fix alignment of buf causing crash on ARM EABI
+Message-ID: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 09:42:53AM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Acked-by: Timur Tabi <timur@freescale.com>
-> ---
-> 
-> Rebase to 3.5rc1.
-> 
->  sound/soc/fsl/fsl_ssi.c |    7 ++-----
->  1 files changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> index 4ed2afd..b10a427 100644
-> --- a/sound/soc/fsl/fsl_ssi.c
-> +++ b/sound/soc/fsl/fsl_ssi.c
-> @@ -725,7 +725,7 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
->  		u32 dma_events[2];
->  		ssi_private->ssi_on_imx = true;
->  
-> -		ssi_private->clk = clk_get(&pdev->dev, NULL);
-> +		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+Commit 7ff9554bb578ba02166071d2d487b7fc7d860d62, printk: convert
+byte-buffer to variable-length record buffer, causes systems using
+EABI to crash very early in the boot cycle. The first entry in struct
+log is a u64, which for EABI must be 8 byte aligned.
 
-Have you tried compiling this on PowerPC? devm_clk_get is only available
-with CONFIG_CLKDEV_LOOKUP, I think on PowerPC this is not the case.
+Make use of __alignof__() so the compiler to decide the alignment, but
+allow it to be overridden using CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS,
+for systems which can perform unaligned access and want to save
+a few bytes of space.
 
-Sascha
+Tested on Orion5x and Kirkwood.
 
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ kernel/printk.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 32462d2..f205c25 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -227,10 +227,10 @@ static u32 clear_idx;
+ #define LOG_LINE_MAX 1024
+ 
+ /* record buffer */
+-#if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
++#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+ #define LOG_ALIGN 4
+ #else
+-#define LOG_ALIGN 8
++#define LOG_ALIGN __alignof__(struct log)
+ #endif
+ #define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
+ static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10
