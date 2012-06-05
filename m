@@ -1,40 +1,49 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 5 Jun 2012 13:30:08 -0400 (EDT)
-Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
-In-Reply-To: <201206051923.09063.marex@denx.de>
-Message-ID: <Pine.LNX.4.44L0.1206051328430.1542-100000@iolanthe.rowland.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 05 Jun 2012 11:12:28 -0700
+Subject: [linux-pm] [PATCH 0/2] bug fixes for coupled cpuidle
+In-Reply-To: <4FC9A9BA.1020904@kernel.org> (Len Brown's message of "Sat, 02
+ Jun 2012 01:50:50 -0400")
+References: <1337364324-12171-1-git-send-email-ccross@android.com>
+ <4FC9A9BA.1020904@kernel.org>
+Message-ID: <878vg1eigj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jun 2012, Marek Vasut wrote:
+Hi Len,
 
-> > > > Do the tests in the opposite order and add "unlikely":
-> > > > 			if (unlikely(ehci->transceiver &&
-> > > > 			
-> > > > 					(pstatus & PORT_CSC)) {
-> > > > 
-> > > > That way it will fail more quickly on systems where it doesn't apply or
-> > > > for unaffected ports.
-> > > 
-> > > Does this unlikely() have any effect on ARM/MIPS/PPC, where this chipidea
-> > > IP is used ? Or is there some x86 device sporting this IP too?
-> > 
-> > I don't know what unlikely() does on architectures other than x86.
-> 
-> It should be optimized out to nothing on anything else but x86. On x86 it is a 
-> hint for the branch predictor. Or that's what I believe it is.
+Len Brown <lenb@kernel.org> writes:
 
-That's right.  Then it should have no effect on ARM/MIPS/PPC.
+> On 05/18/2012 02:05 PM, Colin Cross wrote:
+>
+>> The last modifications made to the coupled cpuidle patches introduced
+>> two bugs that I missed during testing.  The online count was never
+>> initialized, causing coupled idle to always wait and never enter the
+>> ready loop.  That hid the second bug, the ready count could never be
+>> decremented after exiting idle.
+>> 
+>> Len, these two patches could be squashed into patch 3 of the original
+>> set.  If you do squash them, you could also add Rafael's tags to the
+>> set (Reviewed-by on 1 and 2, acked-by on 3).
+>
+>
+> squash & tags update done.
+>
+>> Or I can reupload the
+>> whole stack as v5 if you prefer.
+>
+>
+> no need.
 
-> > And
-> > I haven't heard of any x86 systems that would need to use this code.
-> >
-> > On the other hand, port-status changes don't occur very frequently.  A
-> > little time penalty one way or the other won't make much difference.
-> 
-> I'm not opposed, just curious :)
+Hmm, after the problems with the pull request, it looks like you dropped
+the coupled CPUidle series completely.  It's a shame that this has been
+reviewed, tested and queued for so long only to see it dropped at the
+last minute.
 
-No big deal either way.  But the order of the tests should be switched, 
-because on most systems, ehci->transceiver will be NULL.
+Instead of the squash, could you just queue the original series (that
+has been in linux-next for some time) and then submit the fixes in
+$SUBJECT series for v3.5-rc?  That way we could still get this support
+in for 3.5, which many of us are waiting for.
 
-Alan Stern
+Thanks,
+
+Kevin
