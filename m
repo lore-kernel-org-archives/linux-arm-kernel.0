@@ -1,45 +1,115 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 5 Jun 2012 09:28:41 +0200
-Subject: [PATCH] RFC: ARM: Ensure backtraces console printing in sleep mode
-Message-ID: <1338881321-10728-1-git-send-email-linus.walleij@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 Jun 2012 09:30:02 +0200
+Subject: [PATCH v2] Visstrim M10: fix gpio handling.
+In-Reply-To: <1338536733-11092-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1338536733-11092-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120605073002.GN30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aurelien Gerault <aurelien.gerault-nonst@stericsson.com>
+On Fri, Jun 01, 2012 at 09:45:33AM +0200, Javier Martin wrote:
+> Some GPIOs in Visstrim M10 are used without being registered.
+> This leads to USB and video malfunctions. This patch registers
+> those GPIOs to solve the issue.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 
-Ensuring that oops & panic messages/backtraces will be printed
-in console, even if in sleep mode (i.e. when the console is
-locked).
+Applied, thanks.
 
-So, unlock the console before printing.
+I added a 'ARM i.MX27:' prefix to the subject while applying. Please do
+so next time, upstream gets picky about this.
 
-Signed-off-by: Aurelien Gerault <aurelien.gerault-nonst@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/kernel/traps.c |    4 ++++
- 1 file changed, 4 insertions(+)
+Sascha
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4928d89..42a5057 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -25,6 +25,7 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-+#include <linux/console.h>
- 
- #include <linux/atomic.h>
- #include <asm/cacheflush.h>
-@@ -273,6 +274,9 @@ void die(const char *str, struct pt_regs *regs, int err)
- 	int ret;
- 	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
- 
-+	/* ensure that backtrace will be printed in console */
-+	console_unlock();
-+
- 	oops_enter();
- 
- 	raw_spin_lock_irq(&die_lock);
+> ---
+> Request all gpios using a single gpio_request_array() call.
+> 
+> ---
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   36 ++++++++++++++++++--------
+>  1 files changed, 25 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index e8741f9..f00c0cc 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -116,6 +116,8 @@ static const int visstrim_m10_pins[] __initconst = {
+>  	PB23_PF_USB_PWR,
+>  	PB24_PF_USB_OC,
+>  	/* CSI */
+> +	TVP5150_RSTN | GPIO_GPIO | GPIO_OUT,
+> +	TVP5150_PWDN | GPIO_GPIO | GPIO_OUT,
+>  	PB10_PF_CSI_D0,
+>  	PB11_PF_CSI_D1,
+>  	PB12_PF_CSI_D2,
+> @@ -138,6 +140,24 @@ static const int visstrim_m10_pins[] __initconst = {
+>  	EXPBOARD_BIT0 | GPIO_GPIO | GPIO_IN | GPIO_PUEN,
+>  };
+>  
+> +static const struct gpio visstrim_m10_gpios[] __initconst = {
+> +	{
+> +		.gpio = TVP5150_RSTN,
+> +		.flags = GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
+> +		.label = "tvp5150_rstn",
+> +	},
+> +	{
+> +		.gpio = TVP5150_PWDN,
+> +		.flags = GPIOF_DIR_OUT | GPIOF_INIT_LOW,
+> +		.label = "tvp5150_pwdn",
+> +	},
+> +	{
+> +		.gpio = OTG_PHY_CS_GPIO,
+> +		.flags = GPIOF_DIR_OUT | GPIOF_INIT_LOW,
+> +		.label = "usbotg_cs",
+> +	},
+> +};
+> +
+>  /* Camera */
+>  static int visstrim_camera_power(struct device *dev, int on)
+>  {
+> @@ -181,13 +201,6 @@ static void __init visstrim_camera_init(void)
+>  	struct platform_device *pdev;
+>  	int dma;
+>  
+> -	/* Initialize tvp5150 gpios */
+> -	mxc_gpio_mode(TVP5150_RSTN | GPIO_GPIO | GPIO_OUT);
+> -	mxc_gpio_mode(TVP5150_PWDN | GPIO_GPIO | GPIO_OUT);
+> -	gpio_set_value(TVP5150_RSTN, 1);
+> -	gpio_set_value(TVP5150_PWDN, 0);
+> -	ndelay(1);
+> -
+>  	gpio_set_value(TVP5150_PWDN, 1);
+>  	ndelay(1);
+>  	gpio_set_value(TVP5150_RSTN, 0);
+> @@ -414,10 +427,6 @@ static struct i2c_board_info visstrim_m10_i2c_devices[] = {
+>  /* USB OTG */
+>  static int otg_phy_init(struct platform_device *pdev)
+>  {
+> -	gpio_set_value(OTG_PHY_CS_GPIO, 0);
+> -
+> -	mdelay(10);
+> -
+>  	return mx27_initialize_usb_hw(pdev->id, MXC_EHCI_POWER_PINS_ENABLED);
+>  }
+>  
+> @@ -474,6 +483,11 @@ static void __init visstrim_m10_board_init(void)
+>  	if (ret)
+>  		pr_err("Failed to setup pins (%d)\n", ret);
+>  
+> +	ret = gpio_request_array(visstrim_m10_gpios,
+> +				ARRAY_SIZE(visstrim_m10_gpios));
+> +	if (ret)
+> +		pr_err("Failed to request gpios (%d)\n", ret);
+> +
+>  	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
+>  	imx27_add_imx_uart0(&uart_pdata);
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+
 -- 
-1.7.9.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
