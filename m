@@ -1,7 +1,7 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Jun 2012 16:52:25 -0700
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 5 Jun 2012 16:58:08 -0700
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
+In-Reply-To: <1338940345.11962.9.camel@joe2Laptop>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -12,31 +12,35 @@ References: <cover.1338889066.git.joe@perches.com>
  <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
  <1338939792.11962.4.camel@joe2Laptop>
  <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
-Message-ID: <1338940345.11962.9.camel@joe2Laptop>
+ <1338940345.11962.9.camel@joe2Laptop>
+Message-ID: <20120605165808.cd255b93.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 01:48 +0200, Kay Sievers wrote:
-> On Wed, Jun 6, 2012 at 1:43 AM, Joe Perches <joe@perches.com> wrote:
-> > On Wed, 2012-06-06 at 01:39 +0200, Kay Sievers wrote:
+On Tue, 05 Jun 2012 16:52:25 -0700
+Joe Perches <joe@perches.com> wrote:
+
+> On Wed, 2012-06-06 at 01:48 +0200, Kay Sievers wrote:
+> > On Wed, Jun 6, 2012 at 1:43 AM, Joe Perches <joe@perches.com> wrote:
+> > > On Wed, 2012-06-06 at 01:39 +0200, Kay Sievers wrote:
+> > 
+> > >> > # echo "\001Hello Andrew" > /dev/kmsg
+> > >> > /dev/kmsg has
+> > >> > 12,774,2462339252;\001Hello Andrew
+> > >>
+> > >> Try "echo -e"? The stuff is copied verbatim otherwise.
+> > >
+> > > # echo -e "\001Hello Kay" > /dev/kmsg
+> > > gives
+> > > 12,776,3046752764;\x01Hello Kay
+> > 
+> > Don't you need two bytes to trigger the logic?
 > 
-> >> > # echo "\001Hello Andrew" > /dev/kmsg
-> >> > /dev/kmsg has
-> >> > 12,774,2462339252;\001Hello Andrew
-> >>
-> >> Try "echo -e"? The stuff is copied verbatim otherwise.
-> >
-> > # echo -e "\001Hello Kay" > /dev/kmsg
-> > gives
-> > 12,776,3046752764;\x01Hello Kay
-> 
-> Don't you need two bytes to trigger the logic?
+> Yes.  Angle brackets fore and aft.
 
-Yes.  Angle brackets fore and aft.
+he means
 
-If you use a "<n>" prefix for write to /dev/kmsg,
-then it's supported just like before.
+	echo "\0014Hello Joe" > /dev/kmsg
+	          ^
 
-Otherwise, it's emitted at KERN_DEFAULT.
-
-cheers, Joe
+It needs one of [0-7cd] to trigger the prefix handling.
