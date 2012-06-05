@@ -1,30 +1,51 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 5 Jun 2012 16:15:37 +0800
-Subject: multiple target patterns issue while making kernel
-In-Reply-To: <CAN1soZzFpGPAO8-D9wH18v-fmRR1PDcU2JFiPkWRzbps69knhg@mail.gmail.com>
-References: <CAN1soZzFpGPAO8-D9wH18v-fmRR1PDcU2JFiPkWRzbps69knhg@mail.gmail.com>
-Message-ID: <CAN1soZx2snn6Hqn8rPKF8UfA6zCum8zieaZmkGXFjdN+0+3egg@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 5 Jun 2012 08:23:10 +0000
+Subject: [PATCH-V2 0/4] ARM: OMAP2+: am33xx: Add clocktree and hwmod data
+In-Reply-To: <20120605075952.GJ12766@atomide.com>
+References: <1338285402-11306-1-git-send-email-hvaibhav@ti.com>
+ <20120605075952.GJ12766@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA41629@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tried arm-eabi and arm-none-linux-gnueabi-4.4.1 toolchain on my
-64-bit machine. And I
-always got this error.
+On Tue, Jun 05, 2012 at 13:29:52, Tony Lindgren wrote:
+> * Vaibhav Hiremath <hvaibhav@ti.com> [120529 03:01]:
+> > This patch adds complete clockctree and hwmod data for the
+> > AM33XX family of devices.
+> > 
+> > This patch-series is cleaned up further from Paul's cleanup
+> > activity on AM33xx clocktree, where all leaf nodes have been
+> > removed and now modules enable/disable is controlled only
+> > using hwmod framework interface.
+> > 
+> > There are certain modules, like clkdiv32k, debugss, etc..., for
+> > which we still doesn't have hwmod_data present, so in order to
+> > disable these modules during boot time, we still have to maintain
+> > clk node for them. Comment has been added to highlight this, and
+> > in the future we will cleanup this.
+> > As far as, CLKDIV32K module, in reality is not module but still
+> > we have MODULEMODE to control it, so we may have to keep this node
+> > alone in the clocktree.
+> 
+> Considering that we have the RFC patches available for common
+> clk fwk, we should probably avoid the extra churn and have this
+> use the common clk fwk instead. Of course that is assuming the
+> common clk fwk patches will be mergeable soonish.
+> 
 
-On Tue, Jun 5, 2012 at 3:47 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> Hi all,
->
-> Did you ever meet make this kind of issue on v3.5-rc1?
->
-> hzhuang1 at sh4-dt-906:~/workspace/kernel/linux.git$ make clean
-> /home/hzhuang1/workspace/kernel/linux.git/usr/Makefile:58: ***
-> multiple target patterns. ?Stop.
-> make: *** [_clean_usr] Error 2
->
-> I met this issue while I was executing "make" or "make clean" on
-> pxa/mmp/omap in arch-arm.
->
-> I didn't meet this issue on v3.4.
->
-> Regards
-> Haojian
+Tony,
+
+I am not quite sure how much time it will take to merge common clock changes 
+from Rajendra, since it is still in RFC stage and may take couple merge 
+windows. I would recommend to merge clock-tree and hwmod patches atleast to 
+the linux-next, so that it gets validated for some time and we atleast would 
+be able to boot the BeagleBone (community board) from linux-next/master.
+People can start further development using this on BeagleBone platform.
+
+Based on common-clock migration activity on OMAP, we can certainly make 
+decision on pushing it to Mainline (Linus's) tree. And also I will start 
+basing AM33XX clocktree on Rajendra's patches, so that it will get merged at 
+the same time.
+
+Thanks,
+Vaibhav
