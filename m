@@ -1,41 +1,40 @@
-From: oleg.matcovschi@ti.com (Matcovschi, Oleg)
-Date: Tue, 5 Jun 2012 18:28:24 +0000
-Subject: [PATCH v2] omap: dma: Clear status registers on enable/disable
- irq.
-In-Reply-To: <20120604061357.GV12766@atomide.com>
-References: <1337117708-27215-1-git-send-email-oleg.matcovschi@ti.com>
- <20120604061357.GV12766@atomide.com>
-Message-ID: <E0D6B3D7803B1A49AC7CEA9958379F6303752BF9@DFLE36.ent.ti.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue,  5 Jun 2012 12:27:01 -0700
+Subject: [PATCH][RFC] mm: Don't put CMA pages on per-cpu lists
+Message-ID: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>* Oleg Matcovschi <oleg.matcovschi@ti.com> [120515 14:40]:
->> Use omap_disable_channel_irq() function instead of directly accessing CICR.
->> The omap_disable_chanel_irq() function clears pending interrupts and 
->> disables interrupt on channel.
->> Functions omap2_enable_irq_lch()/omap2_disable_irq_lch() clear 
->> interrupt status register.
+Currently, when freeing 0 order pages, CMA pages are treated
+the same as regular movable pages, which means they end up
+on the per-cpu page list. This means that the CMA pages are
+likely to be allocated for something other than contigous
+memory. This increases the chance that the next alloc_contig_range
+will fail because pages can't be migrated.
 
->Looking at this again, I'll apply this into cleanup-dma instead of fixes.
+Given the size of the CMA region is typically limited, it is best to
+optimize for success of alloc_contig_range as much as possible.
+Do this by freeing CMA pages directly instead of putting them
+on the per-cpu page lists.
 
->If it fixes something that I can't see, please reply with a description what it fixes and I'll move it into fixes.
->Regards,
->Tony
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ mm/page_alloc.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Sure, cleanup-dma sounds ok.
-
-Code covers:
-- my test case for 4460:
-      I could reproduce 2 interrupts @ omap-pcm driver after omap_stop_dma function call.
-         1st irq CSR: 0x42 (half & drop)
-         2nd irq CSR: 0x02 (drop)
-      Only 1 interrupt occurs after applying this patch(overnight test results)
-      Test case was created to reproduce problem reported by customer(without clear description):
-          contiguous playback of 0.5 wav file (frequent start/stop audio transitions)
-          contiguous data transfers on 15 self-linked dma channels.
-
-- omap_request_dma could cause spurious interrupt
-         (enable irq, clear irq status instead of clear irq status, enable irq)
-
-thanks,
- Oleg
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 0e1c6f5..c9a6483 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1310,7 +1310,8 @@ void free_hot_cold_page(struct page *page, int cold)
+ 	 * excessively into the page allocator
+ 	 */
+ 	if (migratetype >= MIGRATE_PCPTYPES) {
+-		if (unlikely(migratetype == MIGRATE_ISOLATE)) {
++		if (unlikely(migratetype == MIGRATE_ISOLATE)
++		   || is_migrate_cma(migratetype)) {
+ 			free_one_page(zone, page, 0, migratetype);
+ 			goto out;
+ 		}
+-- 
+1.7.8.3
