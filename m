@@ -1,82 +1,48 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 5 Jun 2012 09:44:40 +0530
-Subject: [PATCH] ARM: tegra: Remove flow controller programming
-Message-ID: <1338869680-8266-1-git-send-email-pgaikwad@nvidia.com>
+Date: Tue, 5 Jun 2012 09:59:34 +0530
+Subject: [PATCH v3 0/9] Add clk_prepare/clk_unprepare
+Message-ID: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This particular code had no effect on WFI execution. It only
-asserts/de-asserts signal to tegra "legacy" CPU idle stats
-monitor, which we are no longer using (cpufreq is based on
-kernel s/w idle stats instead).
+This patch set adds use of clk_prepare/clk_unprepare as
+required by generic clock framework.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- arch/arm/mach-tegra/cpuidle.c |    6 +++---
- arch/arm/mach-tegra/sleep.S   |   29 -----------------------------
- 2 files changed, 3 insertions(+), 32 deletions(-)
+Tested on Ventana and Cardhu.
 
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index d83a8c0..566e2f8 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -27,9 +27,9 @@
- #include <linux/cpuidle.h>
- #include <linux/hrtimer.h>
- 
--#include <mach/iomap.h>
-+#include <asm/proc-fns.h>
- 
--extern void tegra_cpu_wfi(void);
-+#include <mach/iomap.h>
- 
- static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int index);
-@@ -64,7 +64,7 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
- 
- 	enter = ktime_get();
- 
--	tegra_cpu_wfi();
-+	cpu_do_idle();
- 
- 	exit = ktime_sub(ktime_get(), enter);
- 	us = ktime_to_us(exit);
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 5b20197..d29b156 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -62,32 +62,3 @@
- 	movw	\reg, #:lower16:\val
- 	movt	\reg, #:upper16:\val
- .endm
--
--/*
-- * tegra_cpu_wfi
-- *
-- * puts current CPU in clock-gated wfi using the flow controller
-- *
-- * corrupts r0-r3
-- * must be called with MMU on
-- */
--
--ENTRY(tegra_cpu_wfi)
--	cpu_id	r0
--	cpu_to_halt_reg r1, r0
--	cpu_to_csr_reg r2, r0
--	mov32	r0, TEGRA_FLOW_CTRL_VIRT
--	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
--	str	r3, [r0, r2]	@ clear event & interrupt status
--	mov	r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT | FLOW_CTRL_JTAG_RESUME
--	str	r3, [r0, r1]	@ put flow controller in wait irq mode
--	dsb
--	wfi
--	mov	r3, #0
--	str	r3, [r0, r1]	@ clear flow controller halt status
--	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
--	str	r3, [r0, r2]	@ clear event & interrupt status
--	dsb
--	mov	pc, lr
--ENDPROC(tegra_cpu_wfi)
--
+Please ignore previous versions. Updated commit message and
+maintainers properly in this version. No other change.
+
+Prashant Gaikwad (9):
+  ARM: tegra: add clk_prepare/clk_unprepare
+  i2c: tegra: Add clk_prepare/clk_unprepare
+  mmc: tegra: add clk_prepare/clk_unprepare
+  USB: ehci-tegra: add clk_prepare/clk_unprepare
+  Input: tegra-kbc - add clk_prepare/clk_unprepare
+  spi/tegra: add clk_prepare/clk_unprepare
+  staging: nvec: add clk_prepare/clk_unprepare
+  ASoC: tegra: add clk_prepare/clk_unprepare
+  crypto: add clk_prepare/clk_unprepare
+
+ arch/arm/mach-tegra/cpu-tegra.c    |    6 +++---
+ arch/arm/mach-tegra/dma.c          |    2 +-
+ arch/arm/mach-tegra/pcie.c         |    6 +++---
+ arch/arm/mach-tegra/powergate.c    |    4 ++--
+ arch/arm/mach-tegra/timer.c        |    4 ++--
+ arch/arm/mach-tegra/usb_phy.c      |   16 ++++++++--------
+ drivers/crypto/tegra-aes.c         |   12 ++++++------
+ drivers/i2c/busses/i2c-tegra.c     |   10 +++++-----
+ drivers/input/keyboard/tegra-kbc.c |    4 ++--
+ drivers/mmc/host/sdhci-tegra.c     |    6 +++---
+ drivers/spi/spi-tegra.c            |    4 ++--
+ drivers/staging/nvec/nvec.c        |    8 ++++----
+ drivers/usb/host/ehci-tegra.c      |   20 ++++++++++----------
+ sound/soc/tegra/tegra20_i2s.c      |    4 ++--
+ sound/soc/tegra/tegra20_spdif.c    |    4 ++--
+ sound/soc/tegra/tegra30_ahub.c     |    8 ++++----
+ sound/soc/tegra/tegra30_i2s.c      |    4 ++--
+ sound/soc/tegra/tegra_asoc_utils.c |   12 ++++++------
+ 18 files changed, 67 insertions(+), 67 deletions(-)
+
 -- 
 1.7.4.1
