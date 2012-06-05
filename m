@@ -1,33 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Jun 2012 14:59:29 +0200
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <20120605105249.GK8262@n2100.arm.linux.org.uk>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org>
- <20120604101447.GF8262@n2100.arm.linux.org.uk>
- <4FCDE3D7.9030006@linaro.org>
- <20120605105249.GK8262@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 05 Jun 2012 16:04:17 +0300
+Subject: [PATCH v10 3/3] MTD: at91: atmel_nand: Update driver to support
+ Programmable Multibit ECC controller
+In-Reply-To: <1338545594-18483-4-git-send-email-josh.wu@atmel.com>
+References: <1338545594-18483-1-git-send-email-josh.wu@atmel.com>
+ <1338545594-18483-4-git-send-email-josh.wu@atmel.com>
+Message-ID: <1338901457.2507.53.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2012 at 12:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 05, 2012 at 11:47:51AM +0100, Lee Jones wrote:
->> On 04/06/12 11:14, Russell King - ARM Linux wrote:
->> > So why is this buggy patch now merged in the mainline kernel?
->>
->> I guess Chris took it because you said it was fine?
->
-> Err, no. ?If you re-read the thread, you'll see that I said your
-> subsequent patch posted on Thu, 03 May 2012 16:30:48 +0100 with
-> the devm_kzalloc() was fine.
+On Fri, 2012-06-01 at 18:13 +0800, Josh Wu wrote:
+> +       end_time = jiffies + msecs_to_jiffies(PMECC_MAX_TIMEOUT_MS);
+> +       while ((pmecc_readl_relaxed(host->ecc, SR) & PMECC_SR_BUSY)) {
+> +               if (unlikely(time_after(jiffies, end_time))) {
+> +                       dev_err(host->dev, "PMECC: Timeout to get ECC
+> value.\n");
+> +                       BUG();
+> +               }
+> +               cpu_relax();
+> +       } 
 
-Lee can you provide an incremental fixup that makes the current
-code textually equivalent to what Russell ACKed (devm_kzalloc()),
-and funnel to Chris for the -rc:s ASAP?
+Sorry, but crashing the kernel is the worst thing to do. You should make
+'->write_page()' allow to return an error code, just like
+'->read_page()' does.
 
-Yours,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/64e19bed/attachment.sig>
