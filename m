@@ -1,62 +1,31 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Tue,  5 Jun 2012 16:16:18 +0900
-Subject: [PATCH] [RESEND] ARM: use common utility function in dma
-Message-ID: <1338880578-19242-1-git-send-email-minchan@kernel.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue,  5 Jun 2012 15:16:41 +0800
+Subject: [PATCH 0/2] A couple of imx6q clock patches
+Message-ID: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mm provides alloc_pages_exact so use it instead of open coded hack.
+Hi Sascha,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Minchan Kim <minchan@kernel.org>
----
-It's against next-20120604.
+These two patches are based on v3.5-rc1 + your imx-clk-common-fixes.
+I can wait for your imx-clk-common-fixes hit -rc and then send these
+two.  But I think the better approach would be you rebase
+imx-clk-common-fixes on -rc1 and then pick up these two into your
+fix series.
 
- arch/arm/mm/dma-mapping.c |   23 +++++------------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
+The first one is a small clean up which can be amended into b0286f2
+(ARM: imx6q: prepare and enable init on clks directly instead of
+clk_get first), and the second one fixes a suspend regression.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 106c4c0..86e3084 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -184,20 +184,12 @@ static void __dma_clear_buffer(struct page *page, size_t size)
-  */
- static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gfp)
- {
--	unsigned long order = get_order(size);
--	struct page *page, *p, *e;
--
--	page = alloc_pages(gfp, order);
--	if (!page)
-+	struct page *page;
-+	void *addr = alloc_pages_exact(size, gfp);
-+	if (!addr)
- 		return NULL;
- 
--	/*
--	 * Now split the huge page and free the excess pages
--	 */
--	split_page(page, order);
--	for (p = page + (size >> PAGE_SHIFT), e = page + (1 << order); p < e; p++)
--		__free_page(p);
--
-+	page = virt_to_page(addr);
- 	__dma_clear_buffer(page, size);
- 
- 	return page;
-@@ -208,12 +200,7 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
-  */
- static void __dma_free_buffer(struct page *page, size_t size)
- {
--	struct page *e = page + (size >> PAGE_SHIFT);
--
--	while (page < e) {
--		__free_page(page);
--		page++;
--	}
-+	free_pages_exact(page_address(page), size);
- }
- 
- #ifdef CONFIG_MMU
+Regards,
+Shawn
+
+Shawn Guo (2):
+  ARM: imx6q: remove unneeded clkdev lookups
+  ARM: imx6q: fix suspend regression caused by common clk migration
+
+ arch/arm/mach-imx/clk-imx6q.c |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
+
 -- 
-1.7.9.5
+1.7.5.4
