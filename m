@@ -1,40 +1,53 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  5 Jun 2012 12:27:01 -0700
-Subject: [PATCH][RFC] mm: Don't put CMA pages on per-cpu lists
-Message-ID: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
+From: marc@plastictigers.com (Marc Butler)
+Date: Tue, 5 Jun 2012 16:57:21 -0400
+Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
+In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
+Message-ID: <20120605205721.GA20560@plastictigers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when freeing 0 order pages, CMA pages are treated
-the same as regular movable pages, which means they end up
-on the per-cpu page list. This means that the CMA pages are
-likely to be allocated for something other than contigous
-memory. This increases the chance that the next alloc_contig_range
-will fail because pages can't be migrated.
+The patch below fixes an bug where devices that have not be matched
+to a driver will result in a segv when the bus is shutdown.
 
-Given the size of the CMA region is typically limited, it is best to
-optimize for success of alloc_contig_range as much as possible.
-Do this by freeing CMA pages directly instead of putting them
-on the per-cpu page lists.
+I am not sure what the policy on patches-on-patches is, it just
+doesn't seem workable. So I this will be the first and last. Instead I
+am maintaing a git repository that tracks Linus's tree:
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+git://git.plastictigers.com/slimbus.git
+
+or it can be browsed via the web:
+
+http://git.plastictigers.com/
+
+Currently there are 3 branches:
+
+slimbus-rfc-patch   : the original rfc patch (for reference)
+slimbus-patch       : the current patch (as posted by Sagar)
+slimbus-patch-fixes : slimbus-patch + fixes (like the one below)
+
+There will likely be a couple of new branches in the future.
+
+If anyone has a suggestion on a better way of doing this I am all
+ears.
+
 ---
- mm/page_alloc.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/slimbus/slimbus.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 0e1c6f5..c9a6483 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -1310,7 +1310,8 @@ void free_hot_cold_page(struct page *page, int cold)
- 	 * excessively into the page allocator
- 	 */
- 	if (migratetype >= MIGRATE_PCPTYPES) {
--		if (unlikely(migratetype == MIGRATE_ISOLATE)) {
-+		if (unlikely(migratetype == MIGRATE_ISOLATE)
-+		   || is_migrate_cma(migratetype)) {
- 			free_one_page(zone, page, 0, migratetype);
- 			goto out;
- 		}
+diff --git a/drivers/slimbus/slimbus.c b/drivers/slimbus/slimbus.c
+index 6d20241..673222c 100644
+--- a/drivers/slimbus/slimbus.c
++++ b/drivers/slimbus/slimbus.c
+@@ -125,6 +125,9 @@ static void slim_device_shutdown(struct device *dev)
+ 	struct slim_device *slim_dev;
+ 	struct slim_driver *driver;
+ 
++	if (!dev->driver)
++		return;
++
+ 	if (dev->type == &slim_dev_type)
+ 		slim_dev = to_slim_device(dev);
+ 	else
 -- 
-1.7.8.3
+1.7.7
