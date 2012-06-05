@@ -1,77 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 5 Jun 2012 17:03:17 +0200
-Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
-In-Reply-To: <Pine.LNX.4.44L0.1206051025540.1542-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1206051025540.1542-100000@iolanthe.rowland.org>
-Message-ID: <201206051703.17691.marex@denx.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 5 Jun 2012 18:02:13 +0300
+Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120605150209.GZ28631@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alan Stern,
+Hi,
 
-> On Tue, 5 Jun 2012, Alexander Shishkin wrote:
-> > Richard Zhao <richard.zhao@freescale.com> writes:
-> > > It still has below limitations:
-> > > - it does not work for multi-phy ehci
-> > > - the best place is after debounce, but I can't get
-> > > 
-> > >   phy there
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > 
-> > Alan, are you ok with this?
-> > 
-> > > ---
-> > > 
-> > >  drivers/usb/host/ehci-hcd.c |   14 ++++++++++++++
-> > >  1 files changed, 14 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> > > index b100f5f..8c39a7a 100644
-> > > --- a/drivers/usb/host/ehci-hcd.c
-> > > +++ b/drivers/usb/host/ehci-hcd.c
-> > > @@ -928,6 +928,20 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
-> > > 
-> > >  			pstatus = ehci_readl(ehci,
-> > >  			
-> > >  					 &ehci->regs->port_status[i]);
-> > > 
-> > > +			/* FIXME:
-> > > +			 * - it does not work for multi-phy ehci
-> > > +			 * - the best place is after debounce, but I can't get
-> > > +			 *   phy there
-> > > +			 */
-> > > +			if ((pstatus & PORT_CSC) && ehci->transceiver) {
+On Fri, May 25, 2012 at 10:24:13AM +0800, Richard Zhao wrote:
+> The work is based on  ci13xxx rework done by Alexander Shishkin.
 > 
-> Do the tests in the opposite order and add "unlikely":
+> Status:
+>   - this version only support host
+>   - usbotg controler works at host role
 > 
-> 			if (unlikely(ehci->transceiver &&
-> 					(pstatus & PORT_CSC)) {
+> Changes since V2:
+>   - Rebase to Alex's tree
+>   - Use regulator to control vbus power
+>   - Remove ARCH check in Kconfig, but add OF_DEV check.
+>   - Other changes according laster version comments.
 > 
-> That way it will fail more quickly on systems where it doesn't apply or
-> for unaffected ports.
+> Richard Zhao (12):
+>   usb: otg: add notify_connect/notify_disconnect callback
+>   usb: chipidea: permit driver bindings pass phy pointer
+>   usb: ehci-hcd: notify phy when connect change
+>   usb: otg: add basic mxs phy driver support
+>   usb: chipidea: add imx platform driver
+>   ARM: imx6q: correct device name of usbphy and usb controller clock
+>     export
+>   ARM: imx6q: add config-on-boot gpios
+>   ARM: imx6q: add usbphy clocks
+>   ARM: imx6q: disable usb charger detector
+>   ARM: dts: imx6q-sabrelite: add usb devices
+>   ARM: mxs: clk_register_clkdev mx28 usb clocks
+>   ARM: dts: imx28-evk: add usb devices
 
-Does this unlikely() have any effect on ARM/MIPS/PPC, where this chipidea IP is 
-used ? Or is there some x86 device sporting this IP too?
+how are we going to handle these series ? drivers/usb/otg/* parts are
+mostly ok (I need to look deeper) but if I take drivers/usb/otg/* we
+will have to delay drivers/usb/chipidea I guess...
 
-> > > +				if (pstatus & PORT_CONNECT)
-> > > +					usb_phy_notify_connect(
-> > > +						ehci->transceiver, i);
-> > > +				else
-> > > +					usb_phy_notify_disconnect(
-> > > +						ehci->transceiver, i);
-> > > +			}
-> > > +
-> > > 
-> > >  			if (pstatus & PORT_OWNER)
-> > >  			
-> > >  				continue;
-> > >  			
-> > >  			if (!(test_bit(i, &ehci->suspended_ports) &&
-> 
-> Otherwise it's okay.
-> 
-> Alan Stern
+So someone would have to take the whole series ? Who will be that
+person? Alex, will it be you ?
 
-Best regards,
-Marek Vasut
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/044017be/attachment-0001.sig>
