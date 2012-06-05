@@ -1,38 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jun 2012 14:48:44 +0200
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <4FCDF8BE.6010509@snapgear.com>
-References: <4FCC3CB4.5030107@snapgear.com>
- <20120604081937.GH30400@pengutronix.de>
- <20120604091616.GA3943@opensource.wolfsonmicro.com>
- <4FCDAD5B.8010106@snapgear.com>
- <20120605094141.GE23408@opensource.wolfsonmicro.com>
- <4FCDF8BE.6010509@snapgear.com>
-Message-ID: <20120605124844.GR30400@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Jun 2012 14:59:29 +0200
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <20120605105249.GK8262@n2100.arm.linux.org.uk>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org>
+ <20120604101447.GF8262@n2100.arm.linux.org.uk>
+ <4FCDE3D7.9030006@linaro.org>
+ <20120605105249.GK8262@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 10:17:02PM +1000, Greg Ungerer wrote:
-> 
-> >clkdev
-> >provides an abstraction which can map these onto the platform, even if
-> >you don't use the generic clk API clkdev is still very useful and will
-> >help with a lot of these issues.
-> 
-> In this specific case I don't know what the ipg or ahb clocks are on iMX
-> (Sascha?), but there is nothing equivalent to them in the FEC cores used
-> on existing ColdFire CPUs. They seem to be platform specific (iMX) more
-> than FEC driver specific.
+On Tue, Jun 5, 2012 at 12:52 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jun 05, 2012 at 11:47:51AM +0100, Lee Jones wrote:
+>> On 04/06/12 11:14, Russell King - ARM Linux wrote:
+>> > So why is this buggy patch now merged in the mainline kernel?
+>>
+>> I guess Chris took it because you said it was fine?
+>
+> Err, no. ?If you re-read the thread, you'll see that I said your
+> subsequent patch posted on Thu, 03 May 2012 16:30:48 +0100 with
+> the devm_kzalloc() was fine.
 
-I am sure the Coldfire FEC also needs clocks to work. Just like Mark
-said, they may be not software controllable. The names 'ipg' and 'ahb'
-may be i.MX specific though.
+Lee can you provide an incremental fixup that makes the current
+code textually equivalent to what Russell ACKed (devm_kzalloc()),
+and funnel to Chris for the -rc:s ASAP?
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
