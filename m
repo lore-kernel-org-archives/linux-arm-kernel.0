@@ -1,44 +1,59 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Jun 2012 00:50:41 -0700
-Subject: [RESUBMIT PATCH] ARM: OMAP2+: am33xx: Add low level debugging
- support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA39248@DBDE01.ent.ti.com>
-References: <1336639981-27194-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA39248@DBDE01.ent.ti.com>
-Message-ID: <20120605075040.GG12766@atomide.com>
+Date: Tue, 5 Jun 2012 00:53:44 -0700
+Subject: [PATCH] ARM: OMAP2+: am33xx: Add AM335XEVM machine support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA3923D@DBDE01.ent.ti.com>
+References: <1336676929-28621-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA3923D@DBDE01.ent.ti.com>
+Message-ID: <20120605075344.GH12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Hiremath, Vaibhav <hvaibhav@ti.com> [120528 23:17]:
-> On Thu, May 10, 2012 at 14:23:01, Hiremath, Vaibhav wrote:
+> On Fri, May 11, 2012 at 00:38:49, Hiremath, Vaibhav wrote:
 > > From: Afzal Mohammed <afzal@ti.com>
 > > 
-> > Add support for low level debugging on AM335X EVM (AM33XX family).
-> > Currently only support for UART1 console, which is used on AM335X EVM
-> > is added.
+> > This patch adds minimal support for AM335X machine init.
 > > 
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > During last merge window, two separate patches supporting am33xx
+> > machine init had been submitted,
+> > 
+> > 1. Link to earlier Baseport patch submission (Legacy):
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg59325.html
+> > 2. Link to earlier DT based machine init support patch submission:
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg61398.html
+> > 
+> > And both had got accepted at that time, but got missed during
+> > merge window.
+> > 
+> > But now, since we have taken decision to make am33xx as a separate
+> > class and not to follow omap3 family, these patches needs to changes
+> > accordingly (only changes),
+> > 
+> >  - Combine both the patches, since early init and timer init
+> >    used in board-generic.c file requires them.
+> >  - Remove dependency on AM3517EVM, and only use DT approach
+> >    for machine init.
+> >  - Change the config option (as changed recently)
+> >    CONFIG_SOC_OMAPAM33XX --> CONFIG_SOC_AM33XX
+> > 
 > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Reviewed-by: Kevin Hilman <khilman@ti.com>
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 > > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
 > > Cc: Paul Walmsley <paul@pwsan.com>
 > > ---
-> > This patch had been Reviewed and accepted earlier, but got
-> > missed during last merge window. Resubmitting again, without
-> > code-change.
-> > 
-> >  arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
-> >  arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
-> >  arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
-> >  3 files changed, 26 insertions(+), 1 deletions(-)
+> >  arch/arm/mach-omap2/board-generic.c |   18 ++++++++++++++++++
+> >  arch/arm/mach-omap2/common.h        |    2 ++
+> >  arch/arm/mach-omap2/io.c            |   10 ++++++++++
+> >  arch/arm/mach-omap2/irq.c           |    2 +-
+> >  arch/arm/mach-omap2/timer.c         |    5 +++++
+> >  5 files changed, 36 insertions(+), 1 deletions(-)
 > > 
 > 
 > Tony,
 > 
 > Can this be merged now???
 
-Yes applying into devel-am33xx branch.
-
-Regards,
+Adding this too to devel-am33xx branch.
 
 Tony
