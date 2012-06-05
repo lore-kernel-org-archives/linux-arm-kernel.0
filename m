@@ -1,63 +1,45 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 05 Jun 2012 16:20:10 +0900
-Subject: [PATCH 3/3] ASoC: follow the updated samsung DMA common operations
-Message-ID: <011701cd42eb$a4209940$ec61cbc0$%kim@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 5 Jun 2012 09:28:41 +0200
+Subject: [PATCH] RFC: ARM: Ensure backtraces console printing in sleep mode
+Message-ID: <1338881321-10728-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses config() function to configure DMA transmit options.
+From: Aurelien Gerault <aurelien.gerault-nonst@stericsson.com>
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Ensuring that oops & panic messages/backtraces will be printed
+in console, even if in sleep mode (i.e. when the console is
+locked).
+
+So, unlock the console before printing.
+
+Signed-off-by: Aurelien Gerault <aurelien.gerault-nonst@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- sound/soc/samsung/dma.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/kernel/traps.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index ddc6cde..f3ebc38 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -74,7 +74,7 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
- 	struct runtime_data *prtd = substream->runtime->private_data;
- 	dma_addr_t pos = prtd->dma_pos;
- 	unsigned int limit;
--	struct samsung_dma_prep_info dma_info;
-+	struct samsung_dma_prep dma_info;
-
- 	pr_debug("Entered %s\n", __func__);
-
-@@ -146,7 +146,8 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
- 	unsigned long totbytes = params_buffer_bytes(params);
- 	struct s3c_dma_params *dma =
- 		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
--	struct samsung_dma_info dma_info;
-+	struct samsung_dma_req req;
-+	struct samsung_dma_config config;
-
- 	pr_debug("Entered %s\n", __func__);
-
-@@ -166,16 +167,17 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
-
- 		prtd->params->ops = samsung_dma_get_ops();
-
--		dma_info.cap = (samsung_dma_has_circular() ?
-+		req.cap = (samsung_dma_has_circular() ?
- 			DMA_CYCLIC : DMA_SLAVE);
--		dma_info.client = prtd->params->client;
--		dma_info.direction =
-+		req.client = prtd->params->client;
-+		config.direction =
- 			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
- 			? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
--		dma_info.width = prtd->params->dma_size;
--		dma_info.fifo = prtd->params->dma_addr;
-+		config.width = prtd->params->dma_size;
-+		config.fifo = prtd->params->dma_addr;
- 		prtd->params->ch = prtd->params->ops->request(
--				prtd->params->channel, &dma_info);
-+				prtd->params->channel, &req);
-+		prtd->params->ops->config(prtd->params->ch, &config);
- 	}
-
- 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
---
-1.7.1
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4928d89..42a5057 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -25,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
++#include <linux/console.h>
+ 
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -273,6 +274,9 @@ void die(const char *str, struct pt_regs *regs, int err)
+ 	int ret;
+ 	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
+ 
++	/* ensure that backtrace will be printed in console */
++	console_unlock();
++
+ 	oops_enter();
+ 
+ 	raw_spin_lock_irq(&die_lock);
+-- 
+1.7.9.2
