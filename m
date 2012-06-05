@@ -1,40 +1,89 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Jun 2012 11:20:40 +0100
-Subject: [PATCH v2 REBASE] ASoC: fsl_ssi: convert to use devm_clk_get
-In-Reply-To: <20120605101558.GJ8262@n2100.arm.linux.org.uk>
-References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
- <20120605064714.GL30400@pengutronix.de>
- <20120605100316.GG23408@opensource.wolfsonmicro.com>
- <20120605100851.GI8262@n2100.arm.linux.org.uk>
- <20120605101413.GJ23408@opensource.wolfsonmicro.com>
- <20120605101558.GJ8262@n2100.arm.linux.org.uk>
-Message-ID: <20120605102040.GL23408@opensource.wolfsonmicro.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 05 Jun 2012 11:24:24 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <4FCDDE58.5010501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 11:15:59AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 05, 2012 at 11:14:13AM +0100, Mark Brown wrote:
+Hi Mark,
 
-> > That'd work too, of course (providing everyone has been implementing
-> > clk_put()).  Though getting everyone on the same page with the clock API
-> > seems much more worthwhile if we can do it.
+Are you sending this for -rc2?
 
-> Why wouldn't clk_put() be implemented?  Drivers call it just like clk_get().
+Kind regards,
+Lee
 
-Lazy people who can't be bothered, especially on platforms that do
-things like just return a pointer to a statically allocated clock or
-never really expect their drivers to be unloaded.  Hopefully everyone
-filled in the blank but I've just got a general pessimism about relying
-on things like that.
+On 30/05/12 05:47, Lee Jones wrote:
+> The 'name' field in 'struct of_regulator_match' expects to match with
+> its corresponding regulator device node in the Device Tree. This patch
+> renames each of the regulators in the db8500-prcum regulator driver so
+> this is true.
+>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> ---
+>   drivers/regulator/db8500-prcmu.c |   40 +++++++++++++++++++-------------------
+>   1 file changed, 20 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/regulator/db8500-prcmu.c b/drivers/regulator/db8500-prcmu.c
+> index 968f97f..9dbb491 100644
+> --- a/drivers/regulator/db8500-prcmu.c
+> +++ b/drivers/regulator/db8500-prcmu.c
+> @@ -452,26 +452,26 @@ static __devinit int db8500_regulator_register(struct platform_device *pdev,
+>   }
+>
+>   static struct of_regulator_match db8500_regulator_matches[] = {
+> -	{ .name	= "db8500-vape",          .driver_data = (void *) DB8500_REGULATOR_VAPE, },
+> -	{ .name	= "db8500-varm",          .driver_data = (void *) DB8500_REGULATOR_VARM, },
+> -	{ .name	= "db8500-vmodem",        .driver_data = (void *) DB8500_REGULATOR_VMODEM, },
+> -	{ .name	= "db8500-vpll",          .driver_data = (void *) DB8500_REGULATOR_VPLL, },
+> -	{ .name	= "db8500-vsmps1",        .driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
+> -	{ .name	= "db8500-vsmps2",        .driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
+> -	{ .name	= "db8500-vsmps3",        .driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
+> -	{ .name	= "db8500-vrf1",          .driver_data = (void *) DB8500_REGULATOR_VRF1, },
+> -	{ .name	= "db8500-sva-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
+> -	{ .name	= "db8500-sva-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
+> -	{ .name	= "db8500-sva-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
+> -	{ .name	= "db8500-sia-mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
+> -	{ .name	= "db8500-sia-mmdsp-ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
+> -	{ .name	= "db8500-sia-pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
+> -	{ .name	= "db8500-sga",           .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
+> -	{ .name	= "db8500-b2r2-mcde",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
+> -	{ .name	= "db8500-esram12",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
+> -	{ .name	= "db8500-esram12-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
+> -	{ .name	= "db8500-esram34",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
+> -	{ .name	= "db8500-esram34-ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
+> +	{ .name	= "db8500_vape",          .driver_data = (void *) DB8500_REGULATOR_VAPE, },
+> +	{ .name	= "db8500_varm",          .driver_data = (void *) DB8500_REGULATOR_VARM, },
+> +	{ .name	= "db8500_vmodem",        .driver_data = (void *) DB8500_REGULATOR_VMODEM, },
+> +	{ .name	= "db8500_vpll",          .driver_data = (void *) DB8500_REGULATOR_VPLL, },
+> +	{ .name	= "db8500_vsmps1",        .driver_data = (void *) DB8500_REGULATOR_VSMPS1, },
+> +	{ .name	= "db8500_vsmps2",        .driver_data = (void *) DB8500_REGULATOR_VSMPS2, },
+> +	{ .name	= "db8500_vsmps3",        .driver_data = (void *) DB8500_REGULATOR_VSMPS3, },
+> +	{ .name	= "db8500_vrf1",          .driver_data = (void *) DB8500_REGULATOR_VRF1, },
+> +	{ .name	= "db8500_sva_mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSP, },
+> +	{ .name	= "db8500_sva_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAMMDSPRET, },
+> +	{ .name	= "db8500_sva_pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SVAPIPE, },
+> +	{ .name	= "db8500_sia_mmdsp",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSP, },
+> +	{ .name	= "db8500_sia_mmdsp_ret", .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAMMDSPRET, },
+> +	{ .name	= "db8500_sia_pipe",      .driver_data = (void *) DB8500_REGULATOR_SWITCH_SIAPIPE, },
+> +	{ .name	= "db8500_sga",           .driver_data = (void *) DB8500_REGULATOR_SWITCH_SGA, },
+> +	{ .name	= "db8500_b2r2_mcde",     .driver_data = (void *) DB8500_REGULATOR_SWITCH_B2R2_MCDE, },
+> +	{ .name	= "db8500_esram12",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12, },
+> +	{ .name	= "db8500_esram12_ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM12RET, },
+> +	{ .name	= "db8500_esram34",       .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34, },
+> +	{ .name	= "db8500_esram34_ret",   .driver_data = (void *) DB8500_REGULATOR_SWITCH_ESRAM34RET, },
+>   };
+>
+>   static __devinit int
 
-> The devm*() stuff should just be a layer on top of clk_get()/clk_put() and
-> nothing more.
 
-It is, yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/3e744aea/attachment.sig>
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
