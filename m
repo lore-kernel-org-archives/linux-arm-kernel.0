@@ -1,28 +1,26 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 5 Jun 2012 17:58:17 +0800
-Subject: [GIT PULL] [for 3.5] pull request of fixes branch on arch-pxa tree
-Message-ID: <CAN1soZw-j8urHx1uikeN9eR2BE7+QKk5MNFQitn-7p6CM4Q1hQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 5 Jun 2012 11:03:16 +0100
+Subject: [PATCH v2 REBASE] ASoC: fsl_ssi: convert to use devm_clk_get
+In-Reply-To: <20120605064714.GL30400@pengutronix.de>
+References: <1338774174-3960-1-git-send-email-richard.zhao@freescale.com>
+ <20120605064714.GL30400@pengutronix.de>
+Message-ID: <20120605100316.GG23408@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Tue, Jun 05, 2012 at 08:47:14AM +0200, Sascha Hauer wrote:
 
-Please help to pull fixes branch in arch-pxa git tree.
+> Have you tried compiling this on PowerPC? devm_clk_get is only available
+> with CONFIG_CLKDEV_LOOKUP, I think on PowerPC this is not the case.
 
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes
-
-Haojian Zhuang (2):
-      ARM: dts: update memory size on brownstone
-      ARM: mmp: fix missing cascade_irq in irq handler
-
- arch/arm/boot/dts/mmp2-brownstone.dts |    4 ++--
- arch/arm/mach-mmp/irq.c               |    7 +++++++
- 2 files changed, 9 insertions(+), 2 deletions(-)
-
-Best Regards
-Haojian
+I've not, but I guess there will be an issue.  I'd say the fix here is
+on the PowerPC side - it's not good to have to have Kconfig bodges for
+things like this in individual drivers.  Ideally we'd add clkdev
+support...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/fbe1f581/attachment.sig>
