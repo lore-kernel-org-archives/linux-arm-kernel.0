@@ -1,53 +1,46 @@
-From: marc@plastictigers.com (Marc Butler)
-Date: Tue, 5 Jun 2012 16:57:21 -0400
-Subject: [PATCH] slimbus: Linux driver framework for SLIMbus.
-In-Reply-To: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-References: <1338340310-4473-1-git-send-email-sdharia@codeaurora.org>
-Message-ID: <20120605205721.GA20560@plastictigers.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 5 Jun 2012 14:28:26 -0700
+Subject: [PATCH 0/8] Rework KERN_<LEVEL>
+In-Reply-To: <cover.1338889066.git.joe@perches.com>
+References: <cover.1338889066.git.joe@perches.com>
+Message-ID: <20120605142826.d92316a0.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch below fixes an bug where devices that have not be matched
-to a driver will result in a segv when the bus is shutdown.
+On Tue,  5 Jun 2012 02:46:29 -0700
+Joe Perches <joe@perches.com> wrote:
 
-I am not sure what the policy on patches-on-patches is, it just
-doesn't seem workable. So I this will be the first and last. Instead I
-am maintaing a git repository that tracks Linus's tree:
+> KERN_<LEVEL> currently takes up 3 bytes.
+> Shrink the kernel size by using an ASCII SOH and then the level byte.
+> Remove the need for KERN_CONT.
+> Convert directly embedded uses of <.> to KERN_<LEVEL>
 
-git://git.plastictigers.com/slimbus.git
+What an epic patchset.  I guess that saving a byte per printk does make
+the world a better place, and forcibly ensuring that nothing is
+dependent upon the internal format of the KERN_foo strings is nice.
 
-or it can be browsed via the web:
 
-http://git.plastictigers.com/
+Unfortunately the <n> thing is part of the kernel ABI:
 
-Currently there are 3 branches:
+	echo "<4>foo" > /dev/kmsg
 
-slimbus-rfc-patch   : the original rfc patch (for reference)
-slimbus-patch       : the current patch (as posted by Sagar)
-slimbus-patch-fixes : slimbus-patch + fixes (like the one below)
+devkmsg_writev() does weird and wonderful things with
+facilities/levels.  That function incorrectly returns "success" when
+copy_from_user() faults, btw.  It also babbles on about LOG_USER and
+LOG_KERN without ever defining these things.  I guess they're
+userspace-only concepts and are hardwired to 0 and 1 in the kernel.  Or
+not.
 
-There will likely be a couple of new branches in the future.
+So what to do about /dev/kmsg?  I'd say "nothing": we retain "<n>" as
+the externally-presented kernel format for a facility level, and the
+fact that the kernel internally uses a different encoding is hidden
+from userspace.
 
-If anyone has a suggestion on a better way of doing this I am all
-ears.
+And if the user does
 
----
- drivers/slimbus/slimbus.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+	echo "\0014foo" > /dev/kmsg
 
-diff --git a/drivers/slimbus/slimbus.c b/drivers/slimbus/slimbus.c
-index 6d20241..673222c 100644
---- a/drivers/slimbus/slimbus.c
-+++ b/drivers/slimbus/slimbus.c
-@@ -125,6 +125,9 @@ static void slim_device_shutdown(struct device *dev)
- 	struct slim_device *slim_dev;
- 	struct slim_driver *driver;
- 
-+	if (!dev->driver)
-+		return;
-+
- 	if (dev->type == &slim_dev_type)
- 		slim_dev = to_slim_device(dev);
- 	else
--- 
-1.7.7
+then I guess we should pass it straight through, retaining the \0014. 
+But from my reading of your code, this doesn't work - vprintk_emit()
+will go ahead and strip and interpret the \0014, evading the stuff
+which devkmsg_writev() did.
