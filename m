@@ -1,43 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue,  5 Jun 2012 08:52:34 +0200
-Subject: [PATCH] printk: Fix alignment of buf causing crash on ARM EABI
-Message-ID: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Tue, 5 Jun 2012 16:55:23 +1000
+Subject: Freescale fec.c driver breakage
+In-Reply-To: <20120604091616.GA3943@opensource.wolfsonmicro.com>
+References: <4FCC3CB4.5030107@snapgear.com>
+ <20120604081937.GH30400@pengutronix.de>
+ <20120604091616.GA3943@opensource.wolfsonmicro.com>
+Message-ID: <4FCDAD5B.8010106@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7ff9554bb578ba02166071d2d487b7fc7d860d62, printk: convert
-byte-buffer to variable-length record buffer, causes systems using
-EABI to crash very early in the boot cycle. The first entry in struct
-log is a u64, which for EABI must be 8 byte aligned.
+On 04/06/12 19:16, Mark Brown wrote:
+> On Mon, Jun 04, 2012 at 10:19:37AM +0200, Sascha Hauer wrote:
+>> On Mon, Jun 04, 2012 at 02:42:28PM +1000, Greg Ungerer wrote:
+>
+>>> Trivially we could conditionalize the code block that calls
+>>> devm_clk_get() in the probe routine, but that is kind of ugly.
+>
+>> It's ugly, but the only other solution I see is that you could provide a
+>> dummy devm_clk_get() for coldfire. Added Mark to Cc, maybe he has
+>> another idea?
+>
+> Not really, I think if the clock API is going to be usable we really
+> need the platforms to all be implementing it.  Part of this is getting
+> the stubs for !HAVE_CLK cases implemented (which doesn't seem to have
+> happened :/) ).  We do need to address this at the framework level,
+> having to put ifdefs in all the drivers is obviously awful.
 
-Make use of __alignof__() so the compiler to decide the alignment, but
-allow it to be overridden using CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS,
-for systems which can perform unaligned access and want to save
-a few bytes of space.
+Is this something you intend "fixing" then?
 
-Tested on Orion5x and Kirkwood.
+I don't mind putting a simplistic (but do nothing) place holder for
+this function along with the other stubbed clk functions in the m68k/
+coldfire code.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- kernel/printk.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+But more generally I am wondering does it make sense to be working
+on specific platform clocks in a multi-platform/arch driver?
 
-diff --git a/kernel/printk.c b/kernel/printk.c
-index 32462d2..f205c25 100644
---- a/kernel/printk.c
-+++ b/kernel/printk.c
-@@ -227,10 +227,10 @@ static u32 clear_idx;
- #define LOG_LINE_MAX 1024
- 
- /* record buffer */
--#if !defined(CONFIG_64BIT) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
-+#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
- #define LOG_ALIGN 4
- #else
--#define LOG_ALIGN 8
-+#define LOG_ALIGN __alignof__(struct log)
- #endif
- #define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
- static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
+Regards
+Greg
+
+
 -- 
-1.7.10
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
