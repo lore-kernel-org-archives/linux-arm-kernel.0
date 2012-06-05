@@ -1,64 +1,72 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 5 Jun 2012 09:59:41 +0530
-Subject: [PATCH v3 7/9] staging: nvec: add clk_prepare/clk_unprepare
-In-Reply-To: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
-References: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1338870583-8704-8-git-send-email-pgaikwad@nvidia.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 05 Jun 2012 10:05:34 +0530
+Subject: [RFC 13/24] ARM: omap4: clk: Add 44xx data using common struct clk
+In-Reply-To: <4FCD3357.5090409@ti.com>
+References: <1338552485-31325-1-git-send-email-rnayak@ti.com>
+ <1338552485-31325-14-git-send-email-rnayak@ti.com> <4FCD3357.5090409@ti.com>
+Message-ID: <4FCD8C96.6010405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_prepare/clk_unprepare as required by the generic clk framework.
+Hi Jon,
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
-Please ignore previous versions. Updated commit message and
-maintainers properly in this version. No other change.
+>> +
+>> +static const struct clksel_rate div_1_0_rates[] = {
+>> +	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>> +
+>> +static const struct clksel_rate div_1_1_rates[] = {
+>> +	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>> +
+>> +static const struct clksel_rate div_1_2_rates[] = {
+>> +	{ .div = 1, .val = 2, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>> +
+>> +static const struct clksel_rate div_1_3_rates[] = {
+>> +	{ .div = 1, .val = 3, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>> +
+>> +static const struct clksel_rate div_1_4_rates[] = {
+>> +	{ .div = 1, .val = 4, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>> +
+>> +static const struct clksel_rate div_1_5_rates[] = {
+>> +	{ .div = 1, .val = 5, .flags = RATE_IN_4430 },
+>> +	{ .div = 0 },
+>> +};
+>
+> The above clksel_rate structures could be used by OMAP2/3 devices too
+> (assuming that the flags is set for OMAP2/3/4 devices). Any reason why
+> these cannot be placed in a global header? It could remove quite a bit
+> of repetitive code. I know these are auto-generated, but maybe we should
+> have the auto-generator spit out the clksel_rate structs to another file
+> (ie. a global header).
 
-This patch should go through Tegra tree since other patches to port Tegra
-to generic clock framework are dependent on it. Posting here to get ack from
-the maintainers.
+Well, I did not try doing any further optimizations and tried keeping
+the same layout of data files so its easier to review, given the changes
+already due to using common struct clk movement. We can certainly do
+further optimizations/cleanups on top of this series.
+I would really want to keep cleanups/optimizations separate (unless
+they are cleanups/optimizations done as part of moving to common clk
+itself) from common clk movement series. There are other optimizations
+too like getting rid of some unwanted leaf clocks for omap4, moving
+handling of clkdms for leaf clks into hwmod for OMAP2/3. But all those
+are happening separately and can happen in the existing code without
+having it being moved to common clk.
 
- drivers/staging/nvec/nvec.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+>
+> By the way, div_1_3/4/5_rates don't appear to be used in this file.
 
-diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-index 3c60088..9356886 100644
---- a/drivers/staging/nvec/nvec.c
-+++ b/drivers/staging/nvec/nvec.c
-@@ -675,7 +675,7 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
- {
- 	u32 val;
- 
--	clk_enable(nvec->i2c_clk);
-+	clk_prepare_enable(nvec->i2c_clk);
- 
- 	tegra_periph_reset_assert(nvec->i2c_clk);
- 	udelay(2);
-@@ -695,14 +695,14 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
- 
- 	enable_irq(nvec->irq);
- 
--	clk_disable(nvec->i2c_clk);
-+	clk_disable_unprepare(nvec->i2c_clk);
- }
- 
- static void nvec_disable_i2c_slave(struct nvec_chip *nvec)
- {
- 	disable_irq(nvec->irq);
- 	writel(I2C_SL_NEWSL | I2C_SL_NACK, nvec->base + I2C_SL_CNFG);
--	clk_disable(nvec->i2c_clk);
-+	clk_disable_unprepare(nvec->i2c_clk);
- }
- 
- static void nvec_power_off(void)
-@@ -812,7 +812,7 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
- 
- 	tegra_init_i2c_slave(nvec);
- 
--	clk_enable(i2c_clk);
-+	clk_prepare_enable(i2c_clk);
- 
- 
- 	/* enable event reporting */
--- 
-1.7.4.1
+ok, thanks, will have a look and get rid of it if its really unused.
+
+regards,
+Rajendra
+>
+> Cheers
+> Jon
