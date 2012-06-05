@@ -1,48 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jun 2012 15:42:55 +0200
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <4FCE088D.1060604@snapgear.com>
-References: <4FCC3CB4.5030107@snapgear.com>
- <20120604081937.GH30400@pengutronix.de>
- <20120604091616.GA3943@opensource.wolfsonmicro.com>
- <4FCDAD5B.8010106@snapgear.com>
- <20120605094141.GE23408@opensource.wolfsonmicro.com>
- <4FCDF8BE.6010509@snapgear.com>
- <20120605124844.GR30400@pengutronix.de>
- <4FCE088D.1060604@snapgear.com>
-Message-ID: <20120605134255.GS30400@pengutronix.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 05 Jun 2012 17:00:59 +0300
+Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
+In-Reply-To: <1337912665-16615-4-git-send-email-richard.zhao@freescale.com>
+References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+ <1337912665-16615-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <87y5o197tw.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 11:24:29PM +1000, Greg Ungerer wrote:
-> On 06/05/2012 10:48 PM, Sascha Hauer wrote:
-> >On Tue, Jun 05, 2012 at 10:17:02PM +1000, Greg Ungerer wrote:
-> >>
-> >>>clkdev
-> >>>provides an abstraction which can map these onto the platform, even if
-> >>>you don't use the generic clk API clkdev is still very useful and will
-> >>>help with a lot of these issues.
-> >>
-> >>In this specific case I don't know what the ipg or ahb clocks are on iMX
-> >>(Sascha?), but there is nothing equivalent to them in the FEC cores used
-> >>on existing ColdFire CPUs. They seem to be platform specific (iMX) more
-> >>than FEC driver specific.
-> >
-> >I am sure the Coldfire FEC also needs clocks to work. Just like Mark
-> >said, they may be not software controllable. The names 'ipg' and 'ahb'
-> >may be i.MX specific though.
-> 
-> Well, yeah, of course there are clocks involved. But you pretty much
-> hit the point here. 'ipg' and 'ahb' here are platform specific.
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-Are there any FEC specific names? If yes, we could use these instead,
-otherwise if we have to make up names ourselves I think 'ipg' and 'ahb'
-are fine.
+> It still has below limitations:
+> - it does not work for multi-phy ehci
+> - the best place is after debounce, but I can't get
+>   phy there
+>
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-Sascha
+Alan, are you ok with this?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  drivers/usb/host/ehci-hcd.c |   14 ++++++++++++++
+>  1 files changed, 14 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+> index b100f5f..8c39a7a 100644
+> --- a/drivers/usb/host/ehci-hcd.c
+> +++ b/drivers/usb/host/ehci-hcd.c
+> @@ -928,6 +928,20 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
+>  			pstatus = ehci_readl(ehci,
+>  					 &ehci->regs->port_status[i]);
+>  
+> +			/* FIXME:
+> +			 * - it does not work for multi-phy ehci
+> +			 * - the best place is after debounce, but I can't get
+> +			 *   phy there
+> +			 */
+> +			if ((pstatus & PORT_CSC) && ehci->transceiver) {
+> +				if (pstatus & PORT_CONNECT)
+> +					usb_phy_notify_connect(
+> +						ehci->transceiver, i);
+> +				else
+> +					usb_phy_notify_disconnect(
+> +						ehci->transceiver, i);
+> +			}
+> +
+>  			if (pstatus & PORT_OWNER)
+>  				continue;
+>  			if (!(test_bit(i, &ehci->suspended_ports) &&
+> -- 
+> 1.7.5.4
+
+Regards,
+--
+Alex
