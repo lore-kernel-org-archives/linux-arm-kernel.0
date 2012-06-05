@@ -1,32 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  5 Jun 2012 11:44:45 +0100
-Subject: [PATCH] clkdev: Fix leak in devm_clk_put()
-Message-ID: <1338893085-12376-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 05 Jun 2012 11:47:51 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <20120604101447.GF8262@n2100.arm.linux.org.uk>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120604101447.GF8262@n2100.arm.linux.org.uk>
+Message-ID: <4FCDE3D7.9030006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Surprisingly devres_destroy() doesn't call the destructor for the resource
-it is destroying, causing devm_clk_put() to be ineffectual.
+On 04/06/12 11:14, Russell King - ARM Linux wrote:
+> So why is this buggy patch now merged in the mainline kernel?
 
-Use the newly added devres_release() instead to fix this.
+I guess Chris took it because you said it was fine?
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/clk/clkdev.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 03/05/12 17:30, Russell King - ARM Linux wrote:
+> On Thu, May 03, 2012 at 04:30:48PM +0100, Lee Jones wrote:
+>> From: Lee Jones<lee.jones@linaro.org>
+>> Date: Mon, 16 Apr 2012 10:18:43 +0100
+>> Subject: [PATCH 01/19] MMC: mmci: Enable Device Tree support for ux500
+>>   variants
+>>
+>> Provide a means to collect attributes specific to ST-Ericsson's
+>> ux500 variant series. This patch registers itself as the AMBA
+>> driver to be called during the probe process. Once all
+>> attributes and ux500 specifics are are collected the normal
+>> mmci core probe is called.
+>>
+>> Acked-by: Linus Walleij<linus.walleij@linaro.org>
+>> Acked-by: Arnd Bergmann<arnd@arndb.de>
+>> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> 
+> This looks fine now, thanks.
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index c535cf8..c7a4eee 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -133,7 +133,7 @@ void devm_clk_put(struct device *dev, struct clk *clk)
- {
- 	int ret;
- 
--	ret = devres_destroy(dev, devm_clk_release, devm_clk_match, clk);
-+	ret = devres_release(dev, devm_clk_release, devm_clk_match, clk);
- 
- 	WARN_ON(ret);
- }
 -- 
-1.7.10
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515 
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
