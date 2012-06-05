@@ -1,111 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  4 Jun 2012 22:11:40 -0500
-Subject: [PATCH] ARM: highbank: Add smc calls to enable/disable the L2
-Message-ID: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Tue, 5 Jun 2012 00:06:56 -0400
+Subject: Query about: ARM11 MPCore: preemption/task migration cache
+ coherency
+In-Reply-To: <4FAA34A9.5020708@gmail.com>
+References: <4FAA34A9.5020708@gmail.com>
+Message-ID: <7281E51A-3008-49A5-8388-1F8B788B32A3@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hello,
 
-Linux runs in non-secure mode on highbank, so we need secure monitor calls
-to enable and disable the PL310. Rather than invent new smc calls, the same
-calling convention used by OMAP is used here.
+On May 9, 2012, at 5:11 AM, bill4carson wrote:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/Makefile   |    6 +++++-
- arch/arm/mach-highbank/core.h     |    1 +
- arch/arm/mach-highbank/highbank.c |   14 ++++++++++++++
- arch/arm/mach-highbank/smc.S      |   29 +++++++++++++++++++++++++++++
- 4 files changed, 49 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-highbank/smc.S
+> Hi, All
+> 
+> I'm using ARM11 MPCore on linux-2.6.34, unfortunately I have random
+> panic/segment fault with task migration. I noticed a patch set
+> [ARM11 MPCore: preemption/task migration cache coherency fixups] to fix
+> such issues in here:
+> 
 
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index f8437dd..ded4652 100644
---- a/arch/arm/mach-highbank/Makefile
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -1,4 +1,8 @@
--obj-y					:= clock.o highbank.o system.o
-+obj-y					:= clock.o highbank.o system.o smc.o
-+
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
-+
- obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-index d8e2d0b..141ed51 100644
---- a/arch/arm/mach-highbank/core.h
-+++ b/arch/arm/mach-highbank/core.h
-@@ -8,3 +8,4 @@ extern void highbank_lluart_map_io(void);
- static inline void highbank_lluart_map_io(void) {}
- #endif
- 
-+extern void highbank_smc1(int fn, int arg);
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 410a112..8777612 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -85,10 +85,24 @@ const static struct of_device_id irq_match[] = {
- 	{}
- };
- 
-+#ifdef CONFIG_CACHE_L2X0
-+static void highbank_l2x0_disable(void)
-+{
-+	/* Disable PL310 L2 Cache controller */
-+	highbank_smc1(0x102, 0x0);
-+}
-+#endif
-+
- static void __init highbank_init_irq(void)
- {
- 	of_irq_init(irq_match);
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	/* Enable PL310 L2 Cache controller */
-+	highbank_smc1(0x102, 0x1);
- 	l2x0_of_init(0, ~0UL);
-+	outer_cache.disable = highbank_l2x0_disable;
-+#endif
- }
- 
- static void __init highbank_timer_init(void)
-diff --git a/arch/arm/mach-highbank/smc.S b/arch/arm/mach-highbank/smc.S
-new file mode 100644
-index 0000000..bba369e
---- /dev/null
-+++ b/arch/arm/mach-highbank/smc.S
-@@ -0,0 +1,29 @@
-+/*
-+ * Copied from omap44xx-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ * Copyright 2012 Calxeda, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+/*
-+ * This is common routine to manage secure monitor API
-+ * used to modify the PL310 secure registers.
-+ * 'r0' contains the value to be modified and 'r12' contains
-+ * the monitor API number. It uses few CPU registers
-+ * internally and hence they need be backed up including
-+ * link register "lr".
-+ * Function signature : void highbank_smc1(u32 fn, u32 arg)
-+ */
-+
-+ENTRY(highbank_smc1)
-+	stmfd   sp!, {r2-r12, lr}
-+	mov	r12, r0
-+	mov 	r0, r1
-+	dsb
-+	smc	#0
-+	ldmfd   sp!, {r2-r12, pc}
-+ENDPROC(highbank_smc1)
--- 
-1.7.9.5
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069851.html
+> 
+> It seems there is no follow ups, is there official patch to fix such
+> issues?
+
+Apologies for the delayed reply.  Yes, I believe those patches are still needed
+for ARM11 MPCore, even when not using PREEMPT.  I vaguely recall at least
+two cases where problems occurred w/o those patches, 1) LTP stress would
+randomly fail, and 2) parallel module loading would invariably oops with a
+random fault, with results similar to what you've reported later in this thread.
+The most reliable test case to reproduce the failure was the parallel module
+loading.  LTP stress test runs took a long time to trigger the errors.
+
+I'm dusting off the patches and trying to resurrect the test cases to see if I can
+reproduce the errors on latest kernel.org.  I'll followup with results in a day or
+so.  FWIW,   I've got LTP stress running on latest kernel.org now but probably
+should have resurrected the parallel module loading test case instead, as
+LTP stress may take awhile to reproduce the error, if at all.
+
+--
+Regards,
+George
+
+> 
+> 
+> thanks
+> 
+> -- 
+> Love each day!
+> 
+> --bill
