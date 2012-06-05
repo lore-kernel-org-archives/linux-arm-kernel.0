@@ -1,7 +1,7 @@
-From: kay@vrfy.org (Kay Sievers)
-Date: Wed, 6 Jun 2012 01:48:22 +0200
+From: joe@perches.com (Joe Perches)
+Date: Tue, 05 Jun 2012 16:52:25 -0700
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <1338939792.11962.4.camel@joe2Laptop>
+In-Reply-To: <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -11,23 +11,32 @@ References: <cover.1338889066.git.joe@perches.com>
  <1338939316.11962.3.camel@joe2Laptop>
  <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
  <1338939792.11962.4.camel@joe2Laptop>
-Message-ID: <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
+ <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
+Message-ID: <1338940345.11962.9.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 1:43 AM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2012-06-06 at 01:39 +0200, Kay Sievers wrote:
+On Wed, 2012-06-06 at 01:48 +0200, Kay Sievers wrote:
+> On Wed, Jun 6, 2012 at 1:43 AM, Joe Perches <joe@perches.com> wrote:
+> > On Wed, 2012-06-06 at 01:39 +0200, Kay Sievers wrote:
+> 
+> >> > # echo "\001Hello Andrew" > /dev/kmsg
+> >> > /dev/kmsg has
+> >> > 12,774,2462339252;\001Hello Andrew
+> >>
+> >> Try "echo -e"? The stuff is copied verbatim otherwise.
+> >
+> > # echo -e "\001Hello Kay" > /dev/kmsg
+> > gives
+> > 12,776,3046752764;\x01Hello Kay
+> 
+> Don't you need two bytes to trigger the logic?
 
->> > # echo "\001Hello Andrew" > /dev/kmsg
->> > /dev/kmsg has
->> > 12,774,2462339252;\001Hello Andrew
->>
->> Try "echo -e"? The stuff is copied verbatim otherwise.
->
-> # echo -e "\001Hello Kay" > /dev/kmsg
-> gives
-> 12,776,3046752764;\x01Hello Kay
+Yes.  Angle brackets fore and aft.
 
-Don't you need two bytes to trigger the logic?
+If you use a "<n>" prefix for write to /dev/kmsg,
+then it's supported just like before.
 
-Kay
+Otherwise, it's emitted at KERN_DEFAULT.
+
+cheers, Joe
