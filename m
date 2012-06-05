@@ -1,37 +1,64 @@
-From: kay@vrfy.org (Kay Sievers)
-Date: Tue, 5 Jun 2012 16:20:11 +0200
-Subject: [PATCH] printk: Fix alignment of buf causing crash on ARM EABI
-In-Reply-To: <20120605065918.GA17674@kroah.com>
-References: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
- <20120605065918.GA17674@kroah.com>
-Message-ID: <CAPXgP10m3M3e7=jchLs1CR2w1-m_=ad-rzcUz-z-YCNeH-sZuw@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 05 Jun 2012 17:25:46 +0300
+Subject: [PATCH v3 05/12] usb: chipidea: add imx platform driver
+In-Reply-To: <20120529030505.GA2542@b20223-02.ap.freescale.net>
+References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+ <1337912665-16615-6-git-send-email-richard.zhao@freescale.com>
+ <87k400ac6x.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120525085109.GB18733@b20223-02.ap.freescale.net>
+ <87hav4a8ud.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120529030505.GA2542@b20223-02.ap.freescale.net>
+Message-ID: <87vcj596ol.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 5, 2012 at 8:59 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Tue, Jun 05, 2012 at 08:52:34AM +0200, Andrew Lunn wrote:
->> Commit 7ff9554bb578ba02166071d2d487b7fc7d860d62, printk: convert
->> byte-buffer to variable-length record buffer, causes systems using
->> EABI to crash very early in the boot cycle. The first entry in struct
->> log is a u64, which for EABI must be 8 byte aligned.
->>
->> Make use of __alignof__() so the compiler to decide the alignment, but
->> allow it to be overridden using CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS,
->> for systems which can perform unaligned access and want to save
->> a few bytes of space.
->>
->> Tested on Orion5x and Kirkwood.
->>
->> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> ---
->> ?kernel/printk.c | ? ?4 ++--
->> ?1 file changed, 2 insertions(+), 2 deletions(-)
->
-> Thanks, I think I have a patch in my to-apply queue that fixes this in a
-> bit different way. ?I'll dig that up and compare them in the next few
-> days as I work my way through my pending patch queue.
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-This patch looks good to me.
+> Hi Alex,
 
-Thanks,
-Kay
+Hi,
+
+(overlooked this email somehow)
+
+> On Fri, May 25, 2012 at 12:49:46PM +0300, Alexander Shishkin wrote:
+>> Richard Zhao <richard.zhao@freescale.com> writes:
+>> 
+>> > On Fri, May 25, 2012 at 11:37:26AM +0300, Alexander Shishkin wrote:
+>> >> Richard Zhao <richard.zhao@freescale.com> writes:
+>> >> 
+>> >> > This patch supports only the host-mode functionality so far.
+>> >> >
+>> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> >> > Signed-off-by: Marek Vasut <marex@denx.de>
+>> >> > Cc: Peter Chen <peter.chen@freescale.com>
+>> >> > Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+>> >> > Cc: Felipe Balbi <balbi@ti.com>
+>> >> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> >> > ---
+>> >> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |   20 ++
+>> >> >  drivers/usb/chipidea/Makefile                      |    3 +
+>> >> >  drivers/usb/chipidea/ci13xxx_imx.c                 |  189 ++++++++++++++++++++
+>> >> 
+>> >> One comment: I was going to suggest dropping "13xxx" suffix from
+>> >> everywhere in the driver, maybe module names too, since it doesn't
+>> >> really add any value and people often mistype it, so maybe for the new
+>> >> code it makes sense to avoid it? ci-imx looks better than ci13xxx-imx
+>> >> anyway and same goes for ci_imx_probe() vs ci13xxx_imx_probe().
+>> >> Does this make sense to you?
+>> > I'm not clear with the history. Does Chipidea only have one IP?
+>> 
+>> As far as their USB controllers go, there are several versions with
+>> different features and register layouts, but essentially similar. I want
+>> to support all of them with this driver. As for the other IPs designed
+>> by chipidea -- I have no idea about those, but I don't think we should
+>> care.
+> Cleaning up ci13xxx will touch almost every chipidea driver files. Do
+> you want me to do it or ?
+
+If you have more patches for chipidea driver, you can include the 13xxx
+removal there, otherwise I'll do it as a part of my patchset that I'll
+send after we sort out this one.
+
+Regards,
+--
+Alex
