@@ -1,37 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Jun 2012 01:02:48 -0700
-Subject: [PATCH] ARM: OMAP2+: am33xx: Add AM335XEVM machine support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA415E7@DBDE01.ent.ti.com>
-References: <1336676929-28621-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA3923D@DBDE01.ent.ti.com>
- <20120605075344.GH12766@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EA415E7@DBDE01.ent.ti.com>
-Message-ID: <20120605080248.GK12766@atomide.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 5 Jun 2012 16:15:37 +0800
+Subject: multiple target patterns issue while making kernel
+In-Reply-To: <CAN1soZzFpGPAO8-D9wH18v-fmRR1PDcU2JFiPkWRzbps69knhg@mail.gmail.com>
+References: <CAN1soZzFpGPAO8-D9wH18v-fmRR1PDcU2JFiPkWRzbps69knhg@mail.gmail.com>
+Message-ID: <CAN1soZx2snn6Hqn8rPKF8UfA6zCum8zieaZmkGXFjdN+0+3egg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120605 01:04]:
-> On Tue, Jun 05, 2012 at 13:23:44, Tony Lindgren wrote:
-> > 
-> > Adding this too to devel-am33xx branch.
-> > 
-> 
-> Thanks Tony,
-> Also, request you to add it as part of next pull request to the linux-next, 
-> at early rc cycle itself.
+I tried arm-eabi and arm-none-linux-gnueabi-4.4.1 toolchain on my
+64-bit machine. And I
+always got this error.
 
-Yes it should hit arm-soc and linux-next after -rc2 or so.
- 
-> Paul,
-> 
-> Can you also send a pull request for AM33XX voltagedomain, cm, clockdomain, 
-> prm, powerdomain patches?
-> Also request you to review clock-tree and hwmod changes, so that, they can 
-> also be merged within time.
-> 
-> From clocktree perspective, I believe now I have to migrate to Rajendr's 
-> common-clock framework changes, so let me finish that and send new version.
-> 
-> 
-> Thanks,
-> Vaibhav
+On Tue, Jun 5, 2012 at 3:47 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> Hi all,
+>
+> Did you ever meet make this kind of issue on v3.5-rc1?
+>
+> hzhuang1 at sh4-dt-906:~/workspace/kernel/linux.git$ make clean
+> /home/hzhuang1/workspace/kernel/linux.git/usr/Makefile:58: ***
+> multiple target patterns. ?Stop.
+> make: *** [_clean_usr] Error 2
+>
+> I met this issue while I was executing "make" or "make clean" on
+> pxa/mmp/omap in arch-arm.
+>
+> I didn't meet this issue on v3.4.
+>
+> Regards
+> Haojian
