@@ -1,46 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Jun 2012 10:41:41 +0100
-Subject: Freescale fec.c driver breakage
-In-Reply-To: <4FCDAD5B.8010106@snapgear.com>
-References: <4FCC3CB4.5030107@snapgear.com>
- <20120604081937.GH30400@pengutronix.de>
- <20120604091616.GA3943@opensource.wolfsonmicro.com>
- <4FCDAD5B.8010106@snapgear.com>
-Message-ID: <20120605094141.GE23408@opensource.wolfsonmicro.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue,  5 Jun 2012 02:46:29 -0700
+Subject: [PATCH 0/8] Rework KERN_<LEVEL>
+Message-ID: <cover.1338889066.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 05, 2012 at 04:55:23PM +1000, Greg Ungerer wrote:
-> On 04/06/12 19:16, Mark Brown wrote:
+KERN_<LEVEL> currently takes up 3 bytes.
+Shrink the kernel size by using an ASCII SOH and then the level byte.
+Remove the need for KERN_CONT.
+Convert directly embedded uses of <.> to KERN_<LEVEL>
 
-> >Not really, I think if the clock API is going to be usable we really
-> >need the platforms to all be implementing it.  Part of this is getting
-> >the stubs for !HAVE_CLK cases implemented (which doesn't seem to have
-> >happened :/) ).  We do need to address this at the framework level,
-> >having to put ifdefs in all the drivers is obviously awful.
+Joe Perches (8):
+  printk: Add generic functions to find KERN_<LEVEL> headers
+  printk: Add kern_levels.h to make KERN_<LEVEL> available for asm use
+  arch: Remove direct definitions of KERN_<LEVEL> uses
+  btrfs: Use printk_get_level and printk_skip_level, add __printf, fix fallout
+  sound: Use printk_get_level and printk_skip_level
+  staging: wlags49_h2: Remove direct declarations of KERN_<LEVEL> prefixes
+  printk: Convert the format for KERN_<LEVEL> to a 2 byte pattern
+  printk: Remove the now unnecessary "C" annotation for KERN_CONT
 
-> Is this something you intend "fixing" then?
+ arch/arm/lib/io-acorn.S              |    3 +-
+ arch/arm/vfp/vfphw.S                 |    7 +++--
+ arch/frv/kernel/kernel_thread.S      |    2 +-
+ drivers/staging/wlags49_h2/hcf.c     |    8 +++---
+ drivers/staging/wlags49_h2/wl_main.c |    4 +-
+ fs/btrfs/ctree.h                     |   13 ++++++++++
+ fs/btrfs/disk-io.c                   |    2 +-
+ fs/btrfs/relocation.c                |    2 +-
+ fs/btrfs/super.c                     |   41 +++++++++++++++++++++++++++++-----
+ include/linux/kern_levels.h          |   25 ++++++++++++++++++++
+ include/linux/printk.h               |   41 +++++++++++++++++++--------------
+ kernel/printk.c                      |   14 +++++++----
+ sound/core/misc.c                    |   13 +++++++---
+ 13 files changed, 130 insertions(+), 45 deletions(-)
+ create mode 100644 include/linux/kern_levels.h
 
-No, if I were going to do anything here it'd be converting everything
-over to the common clock API so we didn't have to deal with this sort
-of issue, it really makes the clock API unusable for generic code.
-
-> I don't mind putting a simplistic (but do nothing) place holder for
-> this function along with the other stubbed clk functions in the m68k/
-> coldfire code.
-
-> But more generally I am wondering does it make sense to be working
-> on specific platform clocks in a multi-platform/arch driver?
-
-Yes, if it's a reusable IP then it's going to have a fixed set of clocks
-which go into it regardless of which platform it's hooked up to.  clkdev
-provides an abstraction which can map these onto the platform, even if
-you don't use the generic clk API clkdev is still very useful and will
-help with a lot of these issues.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120605/1231dcd6/attachment.sig>
+-- 
+1.7.8.111.gad25c.dirty
