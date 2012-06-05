@@ -1,28 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Jun 2012 10:03:09 -0600
-Subject: [PATCH] printk: Fix alignment of buf causing crash on ARM EABI
-In-Reply-To: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
-References: <1338879154-6546-1-git-send-email-andrew@lunn.ch>
-Message-ID: <4FCE2DBD.9030609@wwwdotorg.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 05 Jun 2012 09:16:22 -0700
+Subject: Supporting non-device tree consumers with device tree regulator
+ drivers
+Message-ID: <4FCE30D6.7060102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2012 12:52 AM, Andrew Lunn wrote:
-> Commit 7ff9554bb578ba02166071d2d487b7fc7d860d62, printk: convert
-> byte-buffer to variable-length record buffer, causes systems using
-> EABI to crash very early in the boot cycle. The first entry in struct
-> log is a u64, which for EABI must be 8 byte aligned.
-> 
-> Make use of __alignof__() so the compiler to decide the alignment, but
-> allow it to be overridden using CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS,
-> for systems which can perform unaligned access and want to save
-> a few bytes of space.
-> 
-> Tested on Orion5x and Kirkwood.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Hello,
 
-Tested-by: Stephen Warren <swarren@wwwdotorg.org>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+I was wondering if a mechanism currently exists which allows regulator
+devices which have probed via device tree to support regulator consumer
+drivers which have probed via a board file (and thus have no associated
+device tree device_node).  It seems that the current setup is such that if
+a regulator driver probes via a board file device, then it will be passed
+a struct regulator_init_data pointer containing a consumer_supplies list
+via platform_data.  This allows the regulator driver to support consumers
+that are probed via device tree nodes or via a board file.  However, if a
+regulator driver probes via a device tree node, then it will only be
+accessible to consumer drivers which have nodes in device tree and which
+specify their own foo-supply=<&regulator_phandle>; mappings.  When a
+regulator device is probed via device tree, the consumer_supplies pointer
+is left null by of_get_regulator_init_data().  This seems to make
+regulators probed via device tree nodes inaccessible to non-device tree
+consumers.
 
-Indeed, using alignof is a good idea.
+In the long term, this problem should go away of its own accord.  However,
+in the short term, many systems are converting over to using device tree.
+ Therefore, we are left with a situation currently where some regulator
+consumer drivers are being probed via device tree and some are being
+probed via board file devices within a single platform.  If the regulator
+driver supporting the consumer drivers is converted to use device tree and
+probed via device tree, then the non-device tree consumer drivers will not
+be able to make use of the regulator devices.
+
+Would it be possible to add a new binding that is handled inside of
+of_get_regulator_init_data() or of_get_regulation_constraints() that
+provides a means to directly specify regulator_init_data.consumer_supplies
+entries?  Is there some other mechanism that could be used instead to
+handle the mapping?
+
+One potentially binding could be:
+regulator-consumer-supplies = "supply_name1", "device_name1",
+"supply_name2", "device_name2", ...
+
+Thank you,
+David Collins
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
