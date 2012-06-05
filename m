@@ -1,938 +1,622 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 5 Jun 2012 16:47:43 +0200
-Subject: [PATCH 3/4] ARM: at91: enable use of sparse irq
+Date: Tue, 5 Jun 2012 16:47:44 +0200
+Subject: [PATCH 4/4] ARM: at91: add AIC5 support
 In-Reply-To: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1338907664-24646-4-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1338907664-24646-5-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-If we want to have one kernel for all atmel SOCs, nr_irqs has to be set at
-runtime since the number of irqs managed by AIC depends on its version.
+The number of lines of AIC5 has increased from 32 to 128. Due to this
+increase, a source select register has been introduced for the interrupt
+line selection. Moreover, register mapping has been changed. For that reasons,
+we need some dedicated callbacks for AIC5.
+Power management is also concerned by these changes. On suspend, we can't get
+the whole interrupt mask register as before, we have to read this register 128
+times. To reduce this overhead, a snapshot of the whole IMR is maintained.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- arch/arm/mach-at91/Kconfig              |    1 +
- arch/arm/mach-at91/at91rm9200.c         |    1 +
- arch/arm/mach-at91/at91sam9260.c        |    1 +
- arch/arm/mach-at91/at91sam9261.c        |    1 +
- arch/arm/mach-at91/at91sam9263.c        |    1 +
- arch/arm/mach-at91/at91sam9g45.c        |    1 +
- arch/arm/mach-at91/at91sam9rl.c         |    1 +
- arch/arm/mach-at91/at91x40.c            |    1 +
- arch/arm/mach-at91/board-1arm.c         |    2 ++
- arch/arm/mach-at91/board-afeb-9260v1.c  |    2 ++
- arch/arm/mach-at91/board-cam60.c        |    2 ++
- arch/arm/mach-at91/board-carmeva.c      |    2 ++
- arch/arm/mach-at91/board-cpu9krea.c     |    2 ++
- arch/arm/mach-at91/board-cpuat91.c      |    2 ++
- arch/arm/mach-at91/board-csb337.c       |    2 ++
- arch/arm/mach-at91/board-csb637.c       |    2 ++
- arch/arm/mach-at91/board-dt.c           |    1 +
- arch/arm/mach-at91/board-eb01.c         |    2 ++
- arch/arm/mach-at91/board-eb9200.c       |    2 ++
- arch/arm/mach-at91/board-ecbat91.c      |    2 ++
- arch/arm/mach-at91/board-eco920.c       |    2 ++
- arch/arm/mach-at91/board-flexibity.c    |    2 ++
- arch/arm/mach-at91/board-foxg20.c       |    2 ++
- arch/arm/mach-at91/board-gsia18s.c      |    2 ++
- arch/arm/mach-at91/board-kafa.c         |    2 ++
- arch/arm/mach-at91/board-kb9202.c       |    2 ++
- arch/arm/mach-at91/board-neocore926.c   |    2 ++
- arch/arm/mach-at91/board-pcontrol-g20.c |    2 ++
- arch/arm/mach-at91/board-picotux200.c   |    2 ++
- arch/arm/mach-at91/board-qil-a9260.c    |    2 ++
- arch/arm/mach-at91/board-rm9200dk.c     |    2 ++
- arch/arm/mach-at91/board-rm9200ek.c     |    2 ++
- arch/arm/mach-at91/board-rsi-ews.c      |    2 ++
- arch/arm/mach-at91/board-sam9-l9260.c   |    2 ++
- arch/arm/mach-at91/board-sam9260ek.c    |    2 ++
- arch/arm/mach-at91/board-sam9261ek.c    |    2 ++
- arch/arm/mach-at91/board-sam9263ek.c    |    2 ++
- arch/arm/mach-at91/board-sam9g20ek.c    |    2 ++
- arch/arm/mach-at91/board-sam9m10g45ek.c |    2 ++
- arch/arm/mach-at91/board-sam9rlek.c     |    2 ++
- arch/arm/mach-at91/board-snapper9260.c  |    2 ++
- arch/arm/mach-at91/board-stamp9g20.c    |    2 ++
- arch/arm/mach-at91/board-usb-a926x.c    |    2 ++
- arch/arm/mach-at91/board-yl-9200.c      |    2 ++
- arch/arm/mach-at91/gpio.c               |    1 +
- arch/arm/mach-at91/include/mach/irqs.h  |    8 +++++---
- arch/arm/mach-at91/irq.c                |    1 +
- arch/arm/mach-at91/pm.c                 |    1 +
- 48 files changed, 87 insertions(+), 3 deletions(-)
+ arch/arm/mach-at91/generic.h               |    2 +
+ arch/arm/mach-at91/include/mach/at91_aic.h |   24 ++
+ arch/arm/mach-at91/include/mach/irqs.h     |    2 +
+ arch/arm/mach-at91/irq.c                   |  357 +++++++++++++++++++++++-----
+ 4 files changed, 331 insertions(+), 54 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index e401dea..e1382de 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -30,6 +30,7 @@ config SOC_AT91SAM9
- 	bool
- 	select CPU_ARM926T
- 	select MULTI_IRQ_HANDLER
-+	select MAY_HAVE_SPARSE_IRQ
- 	select AT91_SAM9_TIME
- 	select AT91_SAM9_SMC
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 0a60bf8..f496506 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -29,6 +29,8 @@ extern void __init at91x40_init_interrupts(unsigned int priority[]);
+ extern void __init at91_aic_init(unsigned int priority[]);
+ extern int  __init at91_aic_of_init(struct device_node *node,
+ 				    struct device_node *parent);
++extern int  __init at91_aic5_of_init(struct device_node *node,
++				    struct device_node *parent);
  
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 2691768..52e1613 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -20,6 +20,7 @@
- #include <mach/at91_pmc.h>
- #include <mach/at91_st.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
  
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index ddba004..85bb7fa 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -18,6 +18,7 @@
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9260.h>
- #include <mach/at91_pmc.h>
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index c77d503..a8bd397 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -18,6 +18,7 @@
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
- #include <mach/at91sam9261.h>
- #include <mach/at91_pmc.h>
- #include <mach/at91_rstc.h>
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index d7ba530..6d2a0c1 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -17,6 +17,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
-+#include <mach/irqs.h>
- #include <mach/at91sam9263.h>
- #include <mach/at91_pmc.h>
- #include <mach/at91_rstc.h>
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index aa24e82..68365c5 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -20,6 +20,7 @@
- #include <mach/at91sam9g45.h>
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
+  /* Timer */
+diff --git a/arch/arm/mach-at91/include/mach/at91_aic.h b/arch/arm/mach-at91/include/mach/at91_aic.h
+index c1413ed..a014807 100644
+--- a/arch/arm/mach-at91/include/mach/at91_aic.h
++++ b/arch/arm/mach-at91/include/mach/at91_aic.h
+@@ -28,7 +28,11 @@ extern void __iomem *at91_aic_base;
+ .extern at91_aic_base
+ #endif
  
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index e420085..ddd7602 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -17,6 +17,7 @@
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9rl.h>
- #include <mach/at91_pmc.h>
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index d62fe09..323cfd2 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -18,6 +18,7 @@
- #include <asm/mach/arch.h>
- #include <mach/at91x40.h>
- #include <mach/at91_st.h>
-+#include <mach/irqs.h>
- #include <mach/timex.h>
- #include "generic.h"
++#define AT91_AIC5_SSR		0x0			/* Source Select Register [AIC5] */
++#define 	AT91_AIC5_INTSEL_MSK	(0x7f << 0)		/* Interrupt Line Selection Mask */
++
+ #define AT91_AIC_SMR(n)		((n) * 4)		/* Source Mode Registers 0-31 */
++#define AT91_AIC5_SMR		0x4			/* Source Mode Register [AIC5] */
+ #define		AT91_AIC_PRIOR		(7 << 0)		/* Priority Level */
+ #define		AT91_AIC_SRCTYPE	(3 << 5)		/* Interrupt Source Type */
+ #define			AT91_AIC_SRCTYPE_LOW		(0 << 5)
+@@ -37,29 +41,49 @@ extern void __iomem *at91_aic_base;
+ #define			AT91_AIC_SRCTYPE_RISING		(3 << 5)
  
-diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index 8f1a255..d79f250 100644
---- a/arch/arm/mach-at91/board-1arm.c
-+++ b/arch/arm/mach-at91/board-1arm.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
+ #define AT91_AIC_SVR(n)		(0x80 + ((n) * 4))	/* Source Vector Registers 0-31 */
++#define AT91_AIC5_SVR		0x8			/* Source Vector Register [AIC5] */
+ #define AT91_AIC_IVR		0x100			/* Interrupt Vector Register */
++#define AT91_AIC5_IVR		0x10			/* Interrupt Vector Register [AIC5] */
+ #define AT91_AIC_FVR		0x104			/* Fast Interrupt Vector Register */
++#define AT91_AIC5_FVR		0x14			/* Fast Interrupt Vector Register [AIC5] */
+ #define AT91_AIC_ISR		0x108			/* Interrupt Status Register */
++#define AT91_AIC5_ISR		0x18			/* Interrupt Status Register [AIC5] */
+ #define		AT91_AIC_IRQID		(0x1f << 0)		/* Current Interrupt Identifier */
  
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -91,6 +92,7 @@ MACHINE_START(ONEARM, "Ajeco 1ARM single board computer")
- 	/* Maintainer: Lennert Buytenhek <buytenh@wantstofly.org> */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= onearm_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 9ad5ff7..8029508 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -35,6 +35,7 @@
- #include <linux/dma-mapping.h>
+ #define AT91_AIC_IPR		0x10c			/* Interrupt Pending Register */
++#define AT91_AIC5_IPR0		0x20			/* Interrupt Pending Register 0 [AIC5] */
++#define AT91_AIC5_IPR1		0x24			/* Interrupt Pending Register 1 [AIC5] */
++#define AT91_AIC5_IPR2		0x28			/* Interrupt Pending Register 2 [AIC5] */
++#define AT91_AIC5_IPR3		0x2c			/* Interrupt Pending Register 3 [AIC5] */
+ #define AT91_AIC_IMR		0x110			/* Interrupt Mask Register */
++#define AT91_AIC5_IMR		0x30			/* Interrupt Mask Register [AIC5] */
+ #define AT91_AIC_CISR		0x114			/* Core Interrupt Status Register */
++#define AT91_AIC5_CISR		0x34			/* Core Interrupt Status Register [AIC5] */
+ #define		AT91_AIC_NFIQ		(1 << 0)		/* nFIQ Status */
+ #define		AT91_AIC_NIRQ		(1 << 1)		/* nIRQ Status */
  
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -212,6 +213,7 @@ MACHINE_START(AFEB9260, "Custom afeb9260 board")
- 	/* Maintainer: Sergey Lapin <slapin@ossfans.org> */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= afeb9260_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index eebd83b..fd94ca1 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -30,6 +30,7 @@
- #include <linux/spi/flash.h>
+ #define AT91_AIC_IECR		0x120			/* Interrupt Enable Command Register */
++#define AT91_AIC5_IECR		0x40			/* Interrupt Enable Command Register [AIC5] */
+ #define AT91_AIC_IDCR		0x124			/* Interrupt Disable Command Register */
++#define AT91_AIC5_IDCR		0x44			/* Interrupt Disable Command Register [AIC5] */
+ #define AT91_AIC_ICCR		0x128			/* Interrupt Clear Command Register */
++#define AT91_AIC5_ICCR		0x48			/* Interrupt Clear Command Register [AIC5] */
+ #define AT91_AIC_ISCR		0x12c			/* Interrupt Set Command Register */
++#define AT91_AIC5_ISCR		0x4c			/* Interrupt Set Command Register [AIC5] */
+ #define AT91_AIC_EOICR		0x130			/* End of Interrupt Command Register */
++#define AT91_AIC5_EOICR		0x38			/* End of Interrupt Command Register [AIC5] */
+ #define AT91_AIC_SPU		0x134			/* Spurious Interrupt Vector Register */
++#define AT91_AIC5_SPU		0x3c			/* Spurious Interrupt Vector Register [AIC5] */
+ #define AT91_AIC_DCR		0x138			/* Debug Control Register */
++#define AT91_AIC5_DCR		0x6c			/* Debug Control Register [AIC5] */
+ #define		AT91_AIC_DCR_PROT	(1 << 0)		/* Protection Mode */
+ #define		AT91_AIC_DCR_GMSK	(1 << 1)		/* General Mask */
  
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -188,6 +189,7 @@ MACHINE_START(CAM60, "KwikByte CAM60")
- 	/* Maintainer: KwikByte */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= cam60_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index 3f15674..61a358d 100644
---- a/arch/arm/mach-at91/board-carmeva.c
-+++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -35,6 +35,7 @@
- #include <asm/mach/irq.h>
+ #define AT91_AIC_FFER		0x140			/* Fast Forcing Enable Register [SAM9 only] */
++#define AT91_AIC5_FFER		0x50			/* Fast Forcing Enable Register [AIC5] */
+ #define AT91_AIC_FFDR		0x144			/* Fast Forcing Disable Register [SAM9 only] */
++#define AT91_AIC5_FFDR		0x54			/* Fast Forcing Disable Register [AIC5] */
+ #define AT91_AIC_FFSR		0x148			/* Fast Forcing Status Register [SAM9 only] */
++#define AT91_AIC5_FFSR		0x58			/* Fast Forcing Status Register [AIC5] */
  
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- 
- #include "generic.h"
-@@ -158,6 +159,7 @@ MACHINE_START(CARMEVA, "Carmeva")
- 	/* Maintainer: Conitec Datasystems */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= carmeva_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 00bbce0..7a00795 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -40,6 +40,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91sam9260_matrix.h>
-@@ -376,6 +377,7 @@ MACHINE_START(CPUAT9G20, "Eukrea CPU9G20")
- 	/* Maintainer: Eric Benard - EUKREA Electromatique */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= cpu9krea_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index 97afeeb..6c3ee98 100644
---- a/arch/arm/mach-at91/board-cpuat91.c
-+++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -28,6 +28,7 @@
- #include <linux/mtd/plat-ram.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -178,6 +179,7 @@ MACHINE_START(CPUAT91, "Eukrea")
- 	/* Maintainer: Eric Benard - EUKREA Electromatique */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= cpuat91_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index a39f326..d361bd8 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -38,6 +38,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- 
- #include "generic.h"
-@@ -252,6 +253,7 @@ MACHINE_START(CSB337, "Cogent CSB337")
- 	/* Maintainer: Bill Gatliff */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= csb337_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-index 31956b5..9e60e57 100644
---- a/arch/arm/mach-at91/board-csb637.c
-+++ b/arch/arm/mach-at91/board-csb637.c
-@@ -35,6 +35,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- 
- #include "generic.h"
-@@ -133,6 +134,7 @@ MACHINE_START(CSB637, "Cogent CSB637")
- 	/* Maintainer: Bill Gatliff */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= csb637_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index 4ed045b..8a70bfd 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -16,6 +16,7 @@
- #include <linux/of_platform.h>
- 
- #include <mach/board.h>
-+#include <mach/irqs.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-diff --git a/arch/arm/mach-at91/board-eb01.c b/arch/arm/mach-at91/board-eb01.c
-index d2a6d0b..3155460 100644
---- a/arch/arm/mach-at91/board-eb01.c
-+++ b/arch/arm/mach-at91/board-eb01.c
-@@ -25,6 +25,7 @@
- #include <linux/irq.h>
- #include <asm/mach-types.h>
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/board.h>
-@@ -43,6 +44,7 @@ static void __init at91eb01_init_early(void)
- MACHINE_START(AT91EB01, "Atmel AT91 EB01")
- 	/* Maintainer: Greg Ungerer <gerg@snapgear.com> */
- 	.timer		= &at91x40_timer,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= at91eb01_init_early,
- 	.init_irq	= at91eb01_init_irq,
-diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index ef4370e..5f087a1 100644
---- a/arch/arm/mach-at91/board-eb9200.c
-+++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -27,6 +27,7 @@
- #include <linux/device.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -118,6 +119,7 @@ static void __init eb9200_board_init(void)
- MACHINE_START(ATEB9200, "Embest ATEB9200")
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= eb9200_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index a6a863c..1d749ad 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -29,6 +29,7 @@
- #include <linux/spi/flash.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -170,6 +171,7 @@ MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
- 	/* Maintainer: emQbit.com */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ecb_at91init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index 6faa64d..58d7a3b 100644
---- a/arch/arm/mach-at91/board-eco920.c
-+++ b/arch/arm/mach-at91/board-eco920.c
-@@ -28,6 +28,7 @@
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
- #include <mach/cpu.h>
-+#include <mach/irqs.h>
- 
- #include "generic.h"
- 
-@@ -132,6 +133,7 @@ MACHINE_START(ECO920, "eco920")
- 	/* Maintainer: Sascha Hauer */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= eco920_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index e4ed03a..444a142 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -34,6 +34,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/board.h>
-+#include <mach/irqs.h>
- 
- #include "generic.h"
- 
-@@ -159,6 +160,7 @@ static void __init flexibity_board_init(void)
- MACHINE_START(FLEXIBITY, "Flexibity Connect")
- 	/* Maintainer: Maxim Osipov */
- 	.timer		= &at91sam926x_timer,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= flexibity_init_early,
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index 1494e42..2c4b87a 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -33,6 +33,7 @@
- #include <linux/w1-gpio.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -262,6 +263,7 @@ MACHINE_START(ACMENETUSFOXG20, "Acme Systems srl FOX Board G20")
- 	/* Maintainer: Sergio Tanzilli */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= foxg20_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-index 4eec88b..b80d884 100644
---- a/arch/arm/mach-at91/board-gsia18s.c
-+++ b/arch/arm/mach-at91/board-gsia18s.c
-@@ -34,6 +34,7 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/gsia18s.h>
- #include <mach/stamp9g20.h>
-+#include <mach/irqs.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -575,6 +576,7 @@ static void __init gsia18s_board_init(void)
- MACHINE_START(GSIA18S, "GS_IA18_S")
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= gsia18s_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 8215a28..e7b430f 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -93,6 +94,7 @@ MACHINE_START(KAFA, "Sperry-Sun KAFA")
- 	/* Maintainer: Sergei Sharonov */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= kafa_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index 3431fd3..09af9bc 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -133,6 +134,7 @@ MACHINE_START(KB9200, "KB920x")
- 	/* Maintainer: KwikByte, Inc. */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= kb9202_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index 125480b..c475ea8 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -44,6 +44,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- 
-@@ -378,6 +379,7 @@ MACHINE_START(NEOCORE926, "ADENEO NEOCORE 926")
- 	/* Maintainer: ADENEO */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= neocore926_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-index 62330ee..804b6ec 100644
---- a/arch/arm/mach-at91/board-pcontrol-g20.c
-+++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-@@ -32,6 +32,7 @@
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/stamp9g20.h>
-+#include <mach/irqs.h>
- 
- #include "sam9_smc.h"
- #include "generic.h"
-@@ -218,6 +219,7 @@ MACHINE_START(PCONTROL_G20, "PControl G20")
- 	/* Maintainer: pgsellmann at portner-elektronik.at */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= pcontrol_g20_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index 918c28b..e447ac0 100644
---- a/arch/arm/mach-at91/board-picotux200.c
-+++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -29,6 +29,7 @@
- #include <linux/mtd/physmap.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -120,6 +121,7 @@ MACHINE_START(PICOTUX2XX, "picotux 200")
- 	/* Maintainer: Kleinhenz Elektronik GmbH */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= picotux200_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index 92e25b9..7fdd6ff 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -40,6 +40,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -258,6 +259,7 @@ MACHINE_START(QIL_A9260, "CALAO QIL_A9260")
- 	/* Maintainer: calao-systems */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index 7742ff7..dbee95a 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -39,6 +39,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
-@@ -223,6 +224,7 @@ MACHINE_START(AT91RM9200DK, "Atmel AT91RM9200-DK")
- 	/* Maintainer: SAN People/Atmel */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= dk_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index ed48538..f07b3e1 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -39,6 +39,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
-@@ -190,6 +191,7 @@ MACHINE_START(AT91RM9200EK, "Atmel AT91RM9200-EK")
- 	/* Maintainer: SAN People/Atmel */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
-index 4489b23..cdc47e8 100644
---- a/arch/arm/mach-at91/board-rsi-ews.c
-+++ b/arch/arm/mach-at91/board-rsi-ews.c
-@@ -25,6 +25,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- 
- #include <linux/gpio.h>
-@@ -225,6 +226,7 @@ MACHINE_START(RSI_EWS, "RSI EWS")
- 	/* Maintainer: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de> */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= rsi_ews_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index 4abb3f0..89847194 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -29,6 +29,7 @@
- #include <linux/spi/spi.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -202,6 +203,7 @@ MACHINE_START(SAM9_L9260, "Olimex SAM9-L9260")
- 	/* Maintainer: Olimex */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index a9f14c4..2033e75 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -41,6 +41,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -344,6 +345,7 @@ MACHINE_START(AT91SAM9260EK, "Atmel AT91SAM9260-EK")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index ba7fd83..5f7a472 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -45,6 +45,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -615,6 +616,7 @@ MACHINE_START(AT91SAM9G10EK, "Atmel AT91SAM9G10-EK")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index ee6e067..b0a73fc 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -44,6 +44,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -443,6 +444,7 @@ MACHINE_START(AT91SAM9263EK, "Atmel AT91SAM9263-EK")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 002411f..25517b0 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_data/at91_adc.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
- #include <asm/irq.h>
-@@ -422,6 +423,7 @@ MACHINE_START(AT91SAM9G20EK_2MMC, "Atmel AT91SAM9G20-EK 2 MMC Slot Mod")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index c1d6cbf..37a2804 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -30,6 +30,7 @@
- #include <linux/platform_data/at91_adc.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <video/atmel_lcdc.h>
- #include <media/soc_camera.h>
- #include <media/atmel-isi.h>
-@@ -503,6 +504,7 @@ MACHINE_START(AT91SAM9M10G45EK, "Atmel AT91SAM9M10G45-EK")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 87cc912..feb0850 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -30,6 +30,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -319,6 +320,7 @@ MACHINE_START(AT91SAM9RLEK, "Atmel AT91SAM9RL-EK")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 43de463..96c49f1 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -32,6 +32,7 @@
- #include <asm/mach/arch.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- 
-@@ -178,6 +179,7 @@ static void __init snapper9260_board_init(void)
- MACHINE_START(SNAPPER_9260, "Bluewater Systems Snapper 9260/9G20 module")
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= snapper9260_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 996339f..586ed8a 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -25,6 +25,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- 
-@@ -296,6 +297,7 @@ MACHINE_START(STAMP9G20, "taskit Stamp9G20")
- 	/* Maintainer: taskit GmbH */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= stamp9g20_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
-index ff7a56d..12f0f1a 100644
---- a/arch/arm/mach-at91/board-usb-a926x.c
-+++ b/arch/arm/mach-at91/board-usb-a926x.c
-@@ -41,6 +41,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91sam9_smc.h>
- #include <mach/at91_shdwc.h>
-@@ -376,6 +377,7 @@ MACHINE_START(USB_A9G20, "CALAO USB_A92G0")
- 	/* Maintainer: Jean-Christophe PLAGNIOL-VILLARD */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= ek_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index 3fc55ae..da3b380 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -43,6 +43,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <mach/board.h>
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
-@@ -590,6 +591,7 @@ MACHINE_START(YL9200, "uCdragon YL-9200")
- 	/* Maintainer: S.Birtles */
- 	.timer		= &at91rm9200_timer,
- 	.map_io		= at91_map_io,
-+	.nr_irqs	= NR_AIC_IRQS + NR_GPIO_IRQS,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= yl9200_init_early,
- 	.init_irq	= at91_init_irq_default,
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index be42cf0..650bf9a 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -29,6 +29,7 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/hardware.h>
-+#include <mach/at91_aic.h>
- #include <mach/at91_pio.h>
- 
- #include "generic.h"
+ #endif
 diff --git a/arch/arm/mach-at91/include/mach/irqs.h b/arch/arm/mach-at91/include/mach/irqs.h
-index 4605039..5164dc1 100644
+index 5164dc1..fc0b8a9 100644
 --- a/arch/arm/mach-at91/include/mach/irqs.h
 +++ b/arch/arm/mach-at91/include/mach/irqs.h
-@@ -24,8 +24,8 @@
- #include <linux/io.h>
+@@ -25,6 +25,7 @@
  #include <mach/at91_aic.h>
  
--#define NR_AIC_IRQS 32
--
-+#define NR_AIC_IRQS 	32
-+#define NR_GPIO_IRQS	(5 * 32)
+ #define NR_AIC_IRQS 	32
++#define NR_AIC5_IRQS 	128
+ #define NR_GPIO_IRQS	(5 * 32)
  
  /*
-  * IRQ interrupt symbols are the AT91xxx_ID_* symbols
-@@ -33,7 +33,9 @@
-  * symbols in gpio.h for ones handled indirectly as GPIOs.
-  * We make provision for 5 banks of GPIO.
-  */
--#define	NR_IRQS		(NR_AIC_IRQS + (5 * 32))
-+#ifndef NR_IRQS
-+#define NR_IRQS		(NR_AIC_IRQS + NR_GPIO_IRQS)
-+#endif
- 
- /* FIQ is AIC source 0. */
+@@ -41,5 +42,6 @@
  #define FIQ_START AT91_ID_FIQ
+ 
+ void at91_aic_handle_irq(struct pt_regs *regs);
++void at91_aic5_handle_irq(struct pt_regs *regs);
+ 
+ #endif
 diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index e5adee4..b0f83e2 100644
+index b0f83e2..75f8efa 100644
 --- a/arch/arm/mach-at91/irq.c
 +++ b/arch/arm/mach-at91/irq.c
-@@ -32,6 +32,7 @@
+@@ -21,8 +21,10 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/list.h>
+ #include <linux/module.h>
+ #include <linux/mm.h>
++#include <linux/bitmap.h>
+ #include <linux/types.h>
+ #include <linux/irq.h>
+ #include <linux/of.h>
+@@ -30,6 +32,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/irqdomain.h>
  #include <linux/err.h>
++#include <linux/slab.h>
  
  #include <mach/hardware.h>
-+#include <mach/irqs.h>
- #include <asm/irq.h>
- #include <asm/setup.h>
+ #include <mach/irqs.h>
+@@ -44,8 +47,115 @@
+ void __iomem *at91_aic_base;
+ static struct irq_domain *at91_aic_domain;
+ static struct device_node *at91_aic_np;
++static unsigned int n_irqs = NR_AIC_IRQS;
++static unsigned long at91_aic_caps = 0;
  
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 1bfaad6..2c2d865 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -25,6 +25,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
+-asmlinkage void __exception_irq_entry at91_aic_handle_irq(struct pt_regs *regs)
++/* AIC5 introduces a Source Select Register */
++#define AT91_AIC_CAP_AIC5	(1 << 0)
++#define has_aic5()		(at91_aic_caps & AT91_AIC_CAP_AIC5)
++
++#ifdef CONFIG_PM
++
++static unsigned long *wakeups;
++static unsigned long *backups;
++
++#define set_backup(bit) set_bit(bit, backups)
++#define clear_backup(bit) clear_bit(bit, backups)
++
++static int at91_aic_pm_init(void)
++{
++	backups = kzalloc(BITS_TO_LONGS(n_irqs) * sizeof(*backups), GFP_KERNEL);
++	if (!backups)
++		return -ENOMEM;
++
++	wakeups = kzalloc(BITS_TO_LONGS(n_irqs) * sizeof(*backups), GFP_KERNEL);
++	if (!wakeups) {
++		kfree(backups);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static int at91_aic_set_wake(struct irq_data *d, unsigned value)
++{
++	if (unlikely(d->hwirq >= n_irqs))
++		return -EINVAL;
++
++	if (value)
++		set_bit(d->hwirq, wakeups);
++	else
++		clear_bit(d->hwirq, wakeups);
++
++	return 0;
++}
++
++void at91_irq_suspend(void)
++{
++	int i = 0, bit;
++
++	if (has_aic5()) {
++		/* disable enabled irqs */
++		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
++			at91_aic_write(AT91_AIC5_SSR,
++			               bit & AT91_AIC5_INTSEL_MSK);
++			at91_aic_write(AT91_AIC5_IDCR, 1);
++			i = bit;
++		}
++		/* enable wakeup irqs */
++		i = 0;
++		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
++			at91_aic_write(AT91_AIC5_SSR,
++			               bit & AT91_AIC5_INTSEL_MSK);
++			at91_aic_write(AT91_AIC5_IECR, 1);
++			i = bit;
++		}
++	} else {
++		at91_aic_write(AT91_AIC_IDCR, *backups);
++		at91_aic_write(AT91_AIC_IECR, *wakeups);
++	}
++}
++
++void at91_irq_resume(void)
++{
++	int i = 0, bit;
++
++	if (has_aic5()) {
++		/* disable wakeup irqs */
++		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
++			at91_aic_write(AT91_AIC5_SSR,
++			               bit & AT91_AIC5_INTSEL_MSK);
++			at91_aic_write(AT91_AIC5_IDCR, 1);
++			i = bit;
++		}
++		/* enable irqs disabled for suspend */
++		i = 0;
++		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
++			at91_aic_write(AT91_AIC5_SSR,
++			               bit & AT91_AIC5_INTSEL_MSK);
++			at91_aic_write(AT91_AIC5_IECR, 1);
++			i = bit;
++		}
++	} else {
++		at91_aic_write(AT91_AIC_IDCR, *wakeups);
++		at91_aic_write(AT91_AIC_IECR, *backups);
++	}
++}
++
++#else
++static int at91_aic_pm_init(void)
++{
++	return 0;
++}
++
++#define set_backup(bit)
++#define clear_backup(bit)
++#define at91_aic_set_wake	NULL
++
++#endif /* CONFIG_PM */
++
++asmlinkage void __exception_irq_entry
++at91_aic_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
+ 	u32 irqstat;
+@@ -63,16 +173,53 @@ asmlinkage void __exception_irq_entry at91_aic_handle_irq(struct pt_regs *regs)
+ 		handle_IRQ(irqnr, regs);
+ }
  
-+#include <mach/at91_aic.h>
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
++asmlinkage void __exception_irq_entry
++at91_aic5_handle_irq(struct pt_regs *regs)
++{
++	u32 irqnr;
++	u32 irqstat;
++
++	irqnr = at91_aic_read(AT91_AIC5_IVR);
++	irqstat = at91_aic_read(AT91_AIC5_ISR);
++
++	if (!irqstat)
++		at91_aic_write(AT91_AIC5_EOICR, 0);
++	else
++		handle_IRQ(irqnr, regs);
++}
++
+ static void at91_aic_mask_irq(struct irq_data *d)
+ {
+ 	/* Disable interrupt on AIC */
+ 	at91_aic_write(AT91_AIC_IDCR, 1 << d->hwirq);
++	/* Update ISR cache */
++	clear_backup(d->hwirq);
++}
++
++static void at91_aic5_mask_irq(struct irq_data *d)
++{
++	/* Disable interrupt on AIC5 */
++	at91_aic_write(AT91_AIC5_SSR, d->hwirq & AT91_AIC5_INTSEL_MSK);
++	at91_aic_write(AT91_AIC5_IDCR, 1);
++	/* Update ISR cache */
++	clear_backup(d->hwirq);
+ }
  
+ static void at91_aic_unmask_irq(struct irq_data *d)
+ {
+ 	/* Enable interrupt on AIC */
+ 	at91_aic_write(AT91_AIC_IECR, 1 << d->hwirq);
++	/* Update ISR cache */
++	set_backup(d->hwirq);
++}
++
++static void at91_aic5_unmask_irq(struct irq_data *d)
++{
++	/* Enable interrupt on AIC5 */
++	at91_aic_write(AT91_AIC5_SSR, d->hwirq & AT91_AIC5_INTSEL_MSK);
++	at91_aic_write(AT91_AIC5_IECR, 1);
++	/* Update ISR cache */
++	set_backup(d->hwirq);
+ }
+ 
+ static void at91_aic_eoi(struct irq_data *d)
+@@ -84,13 +231,18 @@ static void at91_aic_eoi(struct irq_data *d)
+ 	at91_aic_write(AT91_AIC_EOICR, 0);
+ }
+ 
+-unsigned int at91_extern_irq;
++static void at91_aic5_eoi(struct irq_data *d)
++{
++	at91_aic_write(AT91_AIC5_EOICR, 0);
++}
+ 
+-#define is_extern_irq(hwirq) ((1 << (hwirq)) & at91_extern_irq)
++unsigned long *at91_extern_irq;
+ 
+-static int at91_aic_set_type(struct irq_data *d, unsigned type)
++#define is_extern_irq(hwirq) test_bit(hwirq, at91_extern_irq)
++
++static int at91_aic_compute_srctype(struct irq_data *d, unsigned type)
+ {
+-	unsigned int smr, srctype;
++	int srctype;
+ 
+ 	switch (type) {
+ 	case IRQ_TYPE_LEVEL_HIGH:
+@@ -103,58 +255,44 @@ static int at91_aic_set_type(struct irq_data *d, unsigned type)
+ 		if ((d->hwirq == AT91_ID_FIQ) || is_extern_irq(d->hwirq))		/* only supported on external interrupts */
+ 			srctype = AT91_AIC_SRCTYPE_LOW;
+ 		else
+-			return -EINVAL;
++			srctype = -EINVAL;
+ 		break;
+ 	case IRQ_TYPE_EDGE_FALLING:
+ 		if ((d->hwirq == AT91_ID_FIQ) || is_extern_irq(d->hwirq))		/* only supported on external interrupts */
+ 			srctype = AT91_AIC_SRCTYPE_FALLING;
+ 		else
+-			return -EINVAL;
++			srctype = -EINVAL;
+ 		break;
+ 	default:
+-		return -EINVAL;
++		srctype = -EINVAL;
+ 	}
+ 
+-	smr = at91_aic_read(AT91_AIC_SMR(d->hwirq)) & ~AT91_AIC_SRCTYPE;
+-	at91_aic_write(AT91_AIC_SMR(d->hwirq), smr | srctype);
+-	return 0;
++	return srctype;
+ }
+ 
+-#ifdef CONFIG_PM
+-
+-static u32 wakeups;
+-static u32 backups;
+-
+-static int at91_aic_set_wake(struct irq_data *d, unsigned value)
++static int at91_aic_set_type(struct irq_data *d, unsigned type)
+ {
+-	if (unlikely(d->hwirq >= NR_AIC_IRQS))
+-		return -EINVAL;
+-
+-	if (value)
+-		wakeups |= (1 << d->hwirq);
+-	else
+-		wakeups &= ~(1 << d->hwirq);
++	unsigned int smr;
++	int srctype;
++
++	srctype = at91_aic_compute_srctype(d, type);
++	if (srctype < 0)
++		return srctype;
++
++	if (has_aic5()) {
++		at91_aic_write(AT91_AIC5_SSR,
++		               d->hwirq & AT91_AIC5_INTSEL_MSK);
++		smr = at91_aic_read(AT91_AIC5_SMR) & ~AT91_AIC_SRCTYPE;
++		at91_aic_write(AT91_AIC5_SMR, smr | srctype);
++	} else {
++		smr = at91_aic_read(AT91_AIC_SMR(d->hwirq))
++		      & ~AT91_AIC_SRCTYPE;
++		at91_aic_write(AT91_AIC_SMR(d->hwirq), smr | srctype);
++	}
+ 
+ 	return 0;
+ }
+ 
+-void at91_irq_suspend(void)
+-{
+-	backups = at91_aic_read(AT91_AIC_IMR);
+-	at91_aic_write(AT91_AIC_IDCR, backups);
+-	at91_aic_write(AT91_AIC_IECR, wakeups);
+-}
+-
+-void at91_irq_resume(void)
+-{
+-	at91_aic_write(AT91_AIC_IDCR, wakeups);
+-	at91_aic_write(AT91_AIC_IECR, backups);
+-}
+-
+-#else
+-#define at91_aic_set_wake	NULL
+-#endif
+-
+ static struct irq_chip at91_aic_chip = {
+ 	.name		= "AIC",
+ 	.irq_mask	= at91_aic_mask_irq,
+@@ -190,6 +328,35 @@ static void __init at91_aic_hw_init(unsigned int spu_vector)
+ 	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
+ }
+ 
++static void __init at91_aic5_hw_init(unsigned int spu_vector)
++{
++	int i;
++
++	/*
++	 * Perform 8 End Of Interrupt Command to make sure AIC
++	 * will not Lock out nIRQ
++	 */
++	for (i = 0; i < 8; i++)
++		at91_aic_write(AT91_AIC5_EOICR, 0);
++
++	/*
++	 * Spurious Interrupt ID in Spurious Vector Register.
++	 * When there is no current interrupt, the IRQ Vector Register
++	 * reads the value stored in AIC_SPU
++	 */
++	at91_aic_write(AT91_AIC5_SPU, spu_vector);
++
++	/* No debugging in AIC: Debug (Protect) Control Register */
++	at91_aic_write(AT91_AIC5_DCR, 0);
++
++	/* Disable and clear all interrupts initially */
++	for (i = 0; i < n_irqs; i++) {
++		at91_aic_write(AT91_AIC5_SSR, i & AT91_AIC5_INTSEL_MSK);
++		at91_aic_write(AT91_AIC5_IDCR, 1);
++		at91_aic_write(AT91_AIC5_ICCR, 1);
++	}
++}
++
+ #if defined(CONFIG_OF)
+ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
+ 							irq_hw_number_t hw)
+@@ -206,6 +373,23 @@ static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
++static int at91_aic5_irq_map(struct irq_domain *h, unsigned int virq,
++		irq_hw_number_t hw)
++{
++	at91_aic_write(AT91_AIC5_SSR, hw & AT91_AIC5_INTSEL_MSK);
++
++	/* Put virq number in Source Vector Register */
++	at91_aic_write(AT91_AIC5_SVR, virq);
++
++	/* Active Low interrupt, without priority */
++	at91_aic_write(AT91_AIC5_SMR, AT91_AIC_SRCTYPE_LOW);
++
++	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++
++	return 0;
++}
++
+ static struct irq_domain_ops at91_aic_irq_ops = {
+ 	.map	= at91_aic_irq_map,
+ 	.xlate	= irq_domain_xlate_twocell,
+@@ -230,34 +414,100 @@ static void __init at91_aic_of_priority(struct device_node *node)
+ 		pr_warn("AIC: no valid default irqs priorities\n");
+ }
+ 
+-int __init at91_aic_of_init(struct device_node *node,
+-				     struct device_node *parent)
++static void __init at91_aic5_of_priority(struct device_node *node)
+ {
+ 	struct property *prop;
+ 	const __be32 *p;
+ 	u32 val;
++	int i = 0;
++
++	of_property_for_each_u32(node, "atmel,default-irq-priorities", prop, p, val) {
++		at91_aic_write(AT91_AIC5_SSR, i & AT91_AIC5_INTSEL_MSK);
++		/* Put hardware irq number in Source Vector Register: */
++		at91_aic_write(AT91_AIC5_SVR, i);
++		/* Active Low interrupt, with the specified priority */
++		at91_aic_write(AT91_AIC5_SMR, AT91_AIC_SRCTYPE_LOW | val);
++		i++;
++	}
++
++	if (i < 1)
++		pr_warn("AIC: no valid default irqs priorities\n");
++}
++
++int __init at91_aic_of_common_init(struct device_node *node,
++                                   struct device_node *parent)
++{
++	struct property *prop;
++	const __be32 *p;
++	u32 val;
++
++	at91_extern_irq = kzalloc(BITS_TO_LONGS(n_irqs)
++	                          * sizeof(*at91_extern_irq), GFP_KERNEL);
++	if (!at91_extern_irq)
++		return -ENOMEM;
++
++	if (at91_aic_pm_init()) {
++		kfree(at91_extern_irq);
++		return -ENOMEM;
++	}
+ 
+ 	at91_aic_base = of_iomap(node, 0);
+ 	at91_aic_np = node;
+ 
+-	at91_aic_domain = irq_domain_add_linear(at91_aic_np, NR_AIC_IRQS,
++	at91_aic_domain = irq_domain_add_linear(at91_aic_np, n_irqs,
+ 						&at91_aic_irq_ops, NULL);
+ 	if (!at91_aic_domain)
+ 		panic("Unable to add AIC irq domain (DT)\n");
+ 
+-	at91_extern_irq = 0;
+ 	of_property_for_each_u32(node, "atmel,external-irqs", prop, p, val) {
+-		if (val > 31)
+-			pr_warn("AIC: external irq %d > 31 skip it\n", val);
++		if (val >= n_irqs)
++			pr_warn("AIC: external irq %d >= %d skip it\n",
++			        val, n_irqs);
+ 		else
+-			at91_extern_irq |= (1 << val);
++			set_bit(val, at91_extern_irq);
+ 	}
+ 
++	irq_set_default_host(at91_aic_domain);
++
++	return 0;
++}
++
++int __init at91_aic_of_init(struct device_node *node,
++				     struct device_node *parent)
++{
++	int err;
++
++	err = at91_aic_of_common_init(node, parent);
++	if (err)
++		return err;
++
+ 	at91_aic_of_priority(node);
+ 
+-	irq_set_default_host(at91_aic_domain);
++	at91_aic_hw_init(n_irqs);
+ 
+-	at91_aic_hw_init(NR_AIC_IRQS);
++	return 0;
++}
++
++int __init at91_aic5_of_init(struct device_node *node,
++				     struct device_node *parent)
++{
++	int err;
++
++	at91_aic_caps |= AT91_AIC_CAP_AIC5;
++	n_irqs = NR_AIC5_IRQS;
++	at91_aic_chip.irq_ack           = at91_aic5_mask_irq;
++	at91_aic_chip.irq_mask		= at91_aic5_mask_irq;
++	at91_aic_chip.irq_unmask	= at91_aic5_unmask_irq;
++	at91_aic_chip.irq_eoi		= at91_aic5_eoi;
++	at91_aic_irq_ops.map		= at91_aic5_irq_map;
++
++	err = at91_aic_of_common_init(node, parent);
++	if (err)
++		return err;
++
++	at91_aic5_of_priority(node);
++
++	at91_aic5_hw_init(n_irqs);
+ 
+ 	return 0;
+ }
+@@ -266,7 +516,7 @@ int __init at91_aic_of_init(struct device_node *node,
+ /*
+  * Initialize the AIC interrupt controller.
+  */
+-void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
++void __init at91_aic_init(unsigned int *priority)
+ {
+ 	unsigned int i;
+ 	int irq_base;
+@@ -294,15 +544,14 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+ 	 * The IVR is used by macro get_irqnr_and_base to read and verify.
+ 	 * The irq number is NR_AIC_IRQS when a spurious interrupt has occurred.
+ 	 */
+-	for (i = 0; i < NR_AIC_IRQS; i++) {
++	for (i = 0; i < n_irqs; i++) {
+ 		/* Put hardware irq number in Source Vector Register: */
+ 		at91_aic_write(AT91_AIC_SVR(i), i);
+ 		/* Active Low interrupt, with the specified priority */
+ 		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
+-
+ 		irq_set_chip_and_handler(i, &at91_aic_chip, handle_fasteoi_irq);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+ 	}
+ 
+-	at91_aic_hw_init(NR_AIC_IRQS);
++	at91_aic_hw_init(n_irqs);
+ }
 -- 
 1.7.5.4
