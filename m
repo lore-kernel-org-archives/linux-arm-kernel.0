@@ -1,24 +1,16 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jun 2012 23:07:44 +0100
-Subject: Another CMA build warning
-Message-ID: <20120605220744.GB29782@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 05 Jun 2012 15:11:43 -0700
+Subject: [PATCH 0/8] Rework KERN_<LEVEL>
+In-Reply-To: <20120605142826.d92316a0.akpm@linux-foundation.org>
+References: <cover.1338889066.git.joe@perches.com>
+ <20120605142826.d92316a0.akpm@linux-foundation.org>
+Message-ID: <1338934303.5780.8.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's another build warning, found by the latest OMAP randconfig build
-in my build system.
+On Tue, 2012-06-05 at 14:28 -0700, Andrew Morton wrote:
+> Unfortunately the <n> thing is part of the kernel ABI:
+> 
+> 	echo "<4>foo" > /dev/kmsg
 
-arch/arm/mm/init.c:380: warning: comparison of distinct pointer types lacks a cast
-
-caused by commit c79095092 (ARM: integrate CMA with DMA-mapping subsystem)
-which adds:
-
-+       dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
-
-
-arch/arm/mm/mmu.c:phys_addr_t arm_lowmem_limit __initdata = 0;
-arch/arm/mm/init.c:u32 arm_dma_limit;
-
-Those are two potentially dis-similar types, so min() should not be used.
-Use min_t() instead, or change arm_dma_limit to be phys_addr_t too, which
-might make more sense.
+Which works the same way it did before.
