@@ -1,67 +1,114 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  6 Jun 2012 23:35:26 +0200
-Subject: [PATCH 7/7] ARM: nomadik: register the MMC/SD device
-Message-ID: <1339018526-29223-1-git-send-email-linus.walleij@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  6 Jun 2012 17:20:10 -0500
+Subject: [PATCH v2] ARM: highbank: Add smc calls to enable/disable the L2
+In-Reply-To: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
+References: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1339021210-25970-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers the MMC device for the Nomadik so we can access
-MMC/SD cards, which is pretty nice.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Linux runs in non-secure mode on highbank, so we need secure monitor calls
+to enable and disable the PL310. Rather than invent new smc calls, the same
+calling convention used by OMAP is used here.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-nomadik/board-nhk8815.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+v2:
+ - Only save registers required by ARM ABI
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 029a741..7ff73b4 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/mmci.h>
- #include <linux/interrupt.h>
- #include <linux/gpio.h>
- #include <linux/mtd/mtd.h>
-@@ -32,6 +33,7 @@
- 
- #include <plat/gpio-nomadik.h>
- #include <plat/mtu.h>
-+#include <plat/pincfg.h>
- 
- #include <mach/nand.h>
- #include <mach/fsmc.h>
-@@ -186,6 +188,29 @@ static void __init nhk8815_onenand_init(void)
+ arch/arm/mach-highbank/Makefile   |    6 +++++-
+ arch/arm/mach-highbank/core.h     |    1 +
+ arch/arm/mach-highbank/highbank.c |   14 ++++++++++++++
+ arch/arm/mach-highbank/smc.S      |   27 +++++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-highbank/smc.S
+
+diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+index f8437dd..ded4652 100644
+--- a/arch/arm/mach-highbank/Makefile
++++ b/arch/arm/mach-highbank/Makefile
+@@ -1,4 +1,8 @@
+-obj-y					:= clock.o highbank.o system.o
++obj-y					:= clock.o highbank.o system.o smc.o
++
++plus_sec := $(call as-instr,.arch_extension sec,+sec)
++AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
++
+ obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index d8e2d0b..141ed51 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -8,3 +8,4 @@ extern void highbank_lluart_map_io(void);
+ static inline void highbank_lluart_map_io(void) {}
  #endif
+ 
++extern void highbank_smc1(int fn, int arg);
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 410a112..8777612 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -85,10 +85,24 @@ const static struct of_device_id irq_match[] = {
+ 	{}
+ };
+ 
++#ifdef CONFIG_CACHE_L2X0
++static void highbank_l2x0_disable(void)
++{
++	/* Disable PL310 L2 Cache controller */
++	highbank_smc1(0x102, 0x0);
++}
++#endif
++
+ static void __init highbank_init_irq(void)
+ {
+ 	of_irq_init(irq_match);
++
++#ifdef CONFIG_CACHE_L2X0
++	/* Enable PL310 L2 Cache controller */
++	highbank_smc1(0x102, 0x1);
+ 	l2x0_of_init(0, ~0UL);
++	outer_cache.disable = highbank_l2x0_disable;
++#endif
  }
  
-+static struct mmci_platform_data mmcsd_plat_data = {
-+	.ocr_mask = MMC_VDD_29_30,
-+	.f_max = 48000000,
-+	.gpio_wp = -1,
-+	.gpio_cd = 111,  /* Or 112 for S8815 */
-+	.cd_invert = true,
-+	.capabilities = MMC_CAP_MMC_HIGHSPEED |
-+	MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA,
-+};
+ static void __init highbank_timer_init(void)
+diff --git a/arch/arm/mach-highbank/smc.S b/arch/arm/mach-highbank/smc.S
+new file mode 100644
+index 0000000..407d17b
+--- /dev/null
++++ b/arch/arm/mach-highbank/smc.S
+@@ -0,0 +1,27 @@
++/*
++ * Copied from omap44xx-smc.S Copyright (C) 2010 Texas Instruments, Inc.
++ * Copyright 2012 Calxeda, Inc.
++ *
++ * This program is free software,you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+static int __init nhk8815_mmcsd_init(void)
-+{
-+	int ret;
++#include <linux/linkage.h>
 +
-+	ret = gpio_request(112, "card detect bias");
-+	if (ret)
-+		return ret;
-+	gpio_direction_output(112, 0);
-+	amba_ahb_device_add(NULL, "mmci", NOMADIK_SDI_BASE, SZ_4K, IRQ_SDMMC, 0, &mmcsd_plat_data, 0x10180180);
-+	return 0;
-+}
-+module_init(nhk8815_mmcsd_init);
++/*
++ * This is common routine to manage secure monitor API
++ * used to modify the PL310 secure registers.
++ * 'r0' contains the value to be modified and 'r12' contains
++ * the monitor API number.
++ * Function signature : void highbank_smc1(u32 fn, u32 arg)
++ */
 +
- static struct resource nhk8815_eth_resources[] = {
- 	{
- 		.name = "smc91x-regs",
++ENTRY(highbank_smc1)
++	stmfd   sp!, {r4-r11, lr}
++	mov	r12, r0
++	mov 	r0, r1
++	dsb
++	smc	#0
++	ldmfd   sp!, {r4-r11, pc}
++ENDPROC(highbank_smc1)
 -- 
-1.7.7.6
+1.7.9.5
