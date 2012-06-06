@@ -1,7 +1,7 @@
-From: kay@vrfy.org (Kay Sievers)
-Date: Wed, 6 Jun 2012 02:13:24 +0200
+From: joe@perches.com (Joe Perches)
+Date: Tue, 05 Jun 2012 17:19:31 -0700
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <1338941247.11962.16.camel@joe2Laptop>
+In-Reply-To: <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -15,70 +15,27 @@ References: <cover.1338889066.git.joe@perches.com>
  <1338940345.11962.9.camel@joe2Laptop>
  <20120605165808.cd255b93.akpm@linux-foundation.org>
  <1338941247.11962.16.camel@joe2Laptop>
-Message-ID: <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
+ <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
+Message-ID: <1338941971.11962.20.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 2:07 AM, Joe Perches <joe@perches.com> wrote:
-> On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
->> ?echo "\0014Hello Joe" > /dev/kmsg
->
-> # echo -e "\x014Hello Me" > /dev/kmsg
-> gives:
-> 12,778,4057982669;Hello Me
->
-> #echo -e "\x011Hello Me_2" > /dev/kmsg
-> gives:
-> 12,779,4140452093;Hello Me_2
->
-> I didn't change devkmsg_writev so the
-> original parsing style for "<.>" is
-> unchanged.
->
-> from printk.c:
->
-> static ssize_t devkmsg_writev(struct kiocb *iocb, const struct iovec *iv,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long count, loff_t pos)
-> [...]
-> ? ? ? ?int level = default_message_loglevel;
-> [...]
-> ? ? ? ?if (line[0] == '<') {
-> ? ? ? ? ? ? ? ?char *endp = NULL;
->
-> ? ? ? ? ? ? ? ?i = simple_strtoul(line+1, &endp, 10);
-> ? ? ? ? ? ? ? ?if (endp && endp[0] == '>') {
-> ? ? ? ? ? ? ? ? ? ? ? ?level = i & 7;
-> ? ? ? ? ? ? ? ? ? ? ? ?if (i >> 3)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?facility = i >> 3;
-> ? ? ? ? ? ? ? ? ? ? ? ?endp++;
-> ? ? ? ? ? ? ? ? ? ? ? ?len -= endp - line;
-> ? ? ? ? ? ? ? ? ? ? ? ?line = endp;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
-> ? ? ? ?line[len] = '\0';
->
-> ? ? ? ?printk_emit(facility, level, NULL, 0, "%s", line);
-> []
->
-> level is what matters.
->
-> from dmesg -r
->
-> <12>[ 2462.339252] \001Hello Andrew
-> <9>[ 2516.023444] Hello Andrew
-> <12>[ 3046.752764] \x01Hello Kay
-> <12>[ 3940.871850] \x01Hello Kay
-> <12>[ 4057.982669] Hello Me
-> <12>[ 4140.452093] Hello Me_2
+On Wed, 2012-06-06 at 02:13 +0200, Kay Sievers wrote:
+> The question is what happens if you inject your new binary two-byte
+> prefix, like:
+>   echo -e "\x01\x02Hello" > /dev/kmsg
 
-The question is what happens if you inject your new binary two-byte
-prefix, like:
-  echo -e "\x01\x02Hello" > /dev/kmsg
+It's not a 2 byte binary.
+It's a leading ascii SOH and a standard ascii char
+'0' ... '7' or 'd'.
 
-And if that changes the log-level to "2" instead of the default "4"?
+#define KERN_EMERG	KERN_SOH "0"	/* system is unusable */
+#define KERN_ALERT	KERN_SOH "1"	/* action must be taken immediately */
+etc...
 
-(assuming that I read your patch right, otherwise please correct the
-bytes, but use the full sequence which your patch will recognize as an
-internal level marker; seems your examples are all not triggering that)
+> And if that changes the log-level to "2" instead of the default "4"?
 
-Kay
+No it doesn't.
+
+It's not triggering that because devkmsg_writev does
+prefix parsing only on the old "<n>" form.
