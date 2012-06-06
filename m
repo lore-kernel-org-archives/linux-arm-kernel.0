@@ -1,81 +1,48 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Wed, 06 Jun 2012 19:15:40 +0530
-Subject: [PATCH/RFC 0/2] ARM: DMA-mapping: new extensions for buffer
- sharing (part 2)
-In-Reply-To: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
-References: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4FCF5F04.7030207@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 06 Jun 2012 09:46:35 -0400
+Subject: [PATCH] mmc: omap: Fix NULL pointer dereference if
+ mmc_omap_new_slot() fails
+In-Reply-To: <20120528103641.GA12766@atomide.com> (Tony Lindgren's message of
+ "Mon, 28 May 2012 03:36:42 -0700")
+References: <20120528065347.GR17852@atomide.com>
+ <20120528103641.GA12766@atomide.com>
+Message-ID: <87aa0g4kp0.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+Hi,
 
-Thanks for the patch. We had found below two challenges when using UMM 
-related to the cache invalidate/flush after/before performing the DMA 
-operations:
+On Mon, May 28 2012, Tony Lindgren wrote:
+> Commit b01a4f1c (mmc: omap: convert to per instance workqueue) initializes
+> the workqueue too late causing the following:
+>
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = c0004000
+> [00000000] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0    Not tainted  (3.4.0-08218-gb48b2c3 #158)
+> PC is at __queue_work+0x8/0x46c
+> LR is at queue_work_on+0x38/0x40
+> pc : [<c005bb4c>]    lr : [<c005c00c>]    psr: 60000193
+> sp : c0691e1c  ip : 00000000  fp : c07374ac
+> r10: c7aae400  r9 : c0395700  r8 : 00000100
+> r7 : c0691e70  r6 : 00000000  r5 : 00000000  r4 : c7aae440
+> r3 : 00000001  r2 : c7aae440  r1 : 00000000  r0 : 00000000
+> Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 00c5387d  Table: 80004000  DAC: 00000017
+> Process swapper/0 (pid: 0, stack limit = 0xc06902f8)
+> Stack: (0xc0691e1c to 0xc0692000)
+>
+> Fix this by initializing the workqueue before mmc_omap_remove_slot()
+> get called. Tested on n770, looks like n800 at least still has some
+> other issue with MMC.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-a) when using HIGH_MEM pages, the page-table walk consumed lot of time 
-to get the KVA of each page. Moreover the overhead was from the spinlock 
-we acquire/release for each of the page.
+Thanks, pushed to mmc-next for 3.5.
 
-b) One of my colleague tried to map/unmap the buffers only once instead 
-of every time(which results in this problem) and we didn't find 
-significant performance improvement. The reason is (as per my knowledge) 
-when we give address range to cache controller to invalidate/flush out, 
-the hardware operation is too fast(if there were any cache lines 
-associated with the pages at all) to add any overhead to the CPU operation.
-
-But this patch makes logical flow for dma-mapping one step closer :) I 
-will adopt it as part of pulling all your new patches, and will keep you 
-updated of any new findings.
-
-Regards,
-Subash
-
-On 06/06/2012 06:47 PM, Marek Szyprowski wrote:
-> Hello,
->
-> This is a continuation of the dma-mapping extensions posted in the
-> following thread:
-> http://thread.gmane.org/gmane.linux.kernel.mm/78644
->
-> We noticed that some advanced buffer sharing use cases usually require
-> creating a dma mapping for the same memory buffer for more than one
-> device. Usually also such buffer is never touched with CPU, so the data
-> are processed by the devices.
->
->  From the DMA-mapping perspective this requires to call one of the
-> dma_map_{page,single,sg} function for the given memory buffer a few
-> times, for each of the devices. Each dma_map_* call performs CPU cache
-> synchronization, what might be a time consuming operation, especially
-> when the buffers are large. We would like to avoid any useless and time
-> consuming operations, so that was the main reason for introducing
-> another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
-> which lets dma-mapping core to skip CPU cache synchronization in certain
-> cases.
->
-> The proposed patches have been generated on top of the ARM DMA-mapping
-> redesign patch series on Linux v3.4-rc7. They are also available on the
-> following GIT branch:
->
-> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc7-arm-dma-v10-ext
->
-> with all require patches on top of vanilla v3.4-rc7 kernel. I will
-> resend them rebased onto v3.5-rc1 soon.
->
-> Best regards
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
-> Patch summary:
->
-> Marek Szyprowski (2):
->    common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
->    ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
->
->   Documentation/DMA-attributes.txt |   24 ++++++++++++++++++++++++
->   arch/arm/mm/dma-mapping.c        |   20 +++++++++++---------
->   include/linux/dma-attrs.h        |    1 +
->   3 files changed, 36 insertions(+), 9 deletions(-)
->
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
