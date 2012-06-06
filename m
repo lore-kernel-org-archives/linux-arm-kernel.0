@@ -1,114 +1,111 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  6 Jun 2012 17:20:10 -0500
-Subject: [PATCH v2] ARM: highbank: Add smc calls to enable/disable the L2
-In-Reply-To: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
-References: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1339021210-25970-1-git-send-email-robherring2@gmail.com>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Thu, 7 Jun 2012 07:42:25 +0900
+Subject: Fwd: + clk-add-non-config_have_clk-routines.patch added to -mm
+ tree
+In-Reply-To: <20120606150619.8567afb4.akpm@linux-foundation.org>
+References: <20120606214621.GA8892@localhost>
+ <20120606145113.f0c8ddcf.akpm@linux-foundation.org>
+ <20120606215951.GA9123@localhost>
+ <20120606150619.8567afb4.akpm@linux-foundation.org>
+Message-ID: <20120606224225.GA9435@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+> I didn't merge this patchset because it still has the build error
+> reported by Paul, below.
 
-Linux runs in non-secure mode on highbank, so we need secure monitor calls
-to enable and disable the PL310. Rather than invent new smc calls, the same
-calling convention used by OMAP is used here.
+I see. The arm's redefinitions are mostly empty function stubs that
+are identical to the ones provided by Viresh's patch. Except for this
+one, trying to act smarter:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-v2:
- - Only save registers required by ARM ABI
+arch/arm/mach-netx/fb.c:
 
- arch/arm/mach-highbank/Makefile   |    6 +++++-
- arch/arm/mach-highbank/core.h     |    1 +
- arch/arm/mach-highbank/highbank.c |   14 ++++++++++++++
- arch/arm/mach-highbank/smc.S      |   27 +++++++++++++++++++++++++++
- 4 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-highbank/smc.S
+        struct clk *clk_get(struct device *dev, const char *id)
+        {       
+                return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
+        }
 
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index f8437dd..ded4652 100644
---- a/arch/arm/mach-highbank/Makefile
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -1,4 +1,8 @@
--obj-y					:= clock.o highbank.o system.o
-+obj-y					:= clock.o highbank.o system.o smc.o
-+
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
-+
- obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-index d8e2d0b..141ed51 100644
---- a/arch/arm/mach-highbank/core.h
-+++ b/arch/arm/mach-highbank/core.h
-@@ -8,3 +8,4 @@ extern void highbank_lluart_map_io(void);
- static inline void highbank_lluart_map_io(void) {}
- #endif
- 
-+extern void highbank_smc1(int fn, int arg);
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 410a112..8777612 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -85,10 +85,24 @@ const static struct of_device_id irq_match[] = {
- 	{}
- };
- 
-+#ifdef CONFIG_CACHE_L2X0
-+static void highbank_l2x0_disable(void)
-+{
-+	/* Disable PL310 L2 Cache controller */
-+	highbank_smc1(0x102, 0x0);
-+}
-+#endif
-+
- static void __init highbank_init_irq(void)
- {
- 	of_irq_init(irq_match);
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	/* Enable PL310 L2 Cache controller */
-+	highbank_smc1(0x102, 0x1);
- 	l2x0_of_init(0, ~0UL);
-+	outer_cache.disable = highbank_l2x0_disable;
-+#endif
- }
- 
- static void __init highbank_timer_init(void)
-diff --git a/arch/arm/mach-highbank/smc.S b/arch/arm/mach-highbank/smc.S
-new file mode 100644
-index 0000000..407d17b
---- /dev/null
-+++ b/arch/arm/mach-highbank/smc.S
-@@ -0,0 +1,27 @@
-+/*
-+ * Copied from omap44xx-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ * Copyright 2012 Calxeda, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+/*
-+ * This is common routine to manage secure monitor API
-+ * used to modify the PL310 secure registers.
-+ * 'r0' contains the value to be modified and 'r12' contains
-+ * the monitor API number.
-+ * Function signature : void highbank_smc1(u32 fn, u32 arg)
-+ */
-+
-+ENTRY(highbank_smc1)
-+	stmfd   sp!, {r4-r11, lr}
-+	mov	r12, r0
-+	mov 	r0, r1
-+	dsb
-+	smc	#0
-+	ldmfd   sp!, {r4-r11, pc}
-+ENDPROC(highbank_smc1)
--- 
-1.7.9.5
+The return values are interesting. In this arm, clk_get()
+conditionally returns NULL or -ENOENT. While the clk_get() in clk.c
+always returns -ENOENT on error. Now Viresh comes and defines a
+clk_get() that always returns NULL on !CONFIG_HAVE_CLK.
+
+What would be the difference between NULL and -ENOENT?
+
+In my superficial view, -ENOENT is more error prone than plain NULL.
+If ever clk_get() returns -ENOENT which is passed straight forward to
+clk_disable() (eg. in the below code), we may get a kernel panic. The
+below particular clk_get() might always succeed and hence be safe, but
+such use scenarios look scary.
+
+drivers/char/hw_random/mxc-rnga.c  mxc_rnga_remove():
+
+        struct clk *clk = clk_get(&pdev->dev, "rng");
+
+        [...]
+
+        clk_disable(clk);
+
+where clk_disable() only checks NULL:
+
+        if (!clk)
+                return;
+
+Thanks,
+Fengguang
+
+> 
+> 
+> 
+> Begin forwarded message:
+> 
+> Date: Fri, 25 May 2012 15:07:15 +0530
+> From: viresh kumar <viresh.linux@gmail.com>
+> To: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Cc: linux-arm-kernel at lists.infradead.org, linux-next at vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>, spear-devel at list.st.com
+> Subject: Re: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+> 
+> 
+> On May 23, 2012 5:18 AM, "Paul Gortmaker" <paul.gortmaker@windriver.com>
+> wrote:
+> >
+> > Hi Viresh,
+> >
+> > The above listed commit, in linux-next as:
+> >
+> > commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
+> >
+> >    "clk: add non CONFIG_HAVE_CLK routines"
+> >
+> > shows up as failures in the netx_defconfig, since there
+> > are duplicate stub functions between your changes and the
+> > file below:
+> >
+> >  arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
+> >  include/linux/clk.h:299:51: note: previous definition of 'clk_disable'
+> was here
+> >  arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
+> >  include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate'
+> was here
+> >  arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
+> >  include/linux/clk.h:294:50: note: previous definition of 'clk_enable'
+> was here
+> >  arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
+> >  include/linux/clk.h:280:58: note: previous definition of 'clk_get' was
+> here
+> >  arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
+> >  include/linux/clk.h:290:51: note: previous definition of 'clk_put' was
+> here
+> >  make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
+> >
+> 
+> Hi Paul,
+> 
+> I don't have access to any Linux machine for now as i am on leave.
+> 
+> Actually i have left ST and will join the next company in few weeks.
+> 
+> If you can provide a patch for this, i can review it.
+> 
+> --
+> Viresh
