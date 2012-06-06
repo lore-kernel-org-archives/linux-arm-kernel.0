@@ -1,36 +1,68 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Wed, 06 Jun 2012 19:57:51 +0200
-Subject: [PATCH] ARM: mx35: add WEIM register addresses
-In-Reply-To: <20120509131638.GA2057@lovely.krouter>
-References: <20120509131638.GA2057@lovely.krouter>
-Message-ID: <1339005471.10948.317.camel@mars>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed,  6 Jun 2012 10:58:36 -0700
+Subject: [PATCH REPOST] arm: Don't try to print pud/pmd information unless
+ present
+Message-ID: <1339005516-29544-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-05-09 at 15:16 +0200, Christoph Fritz wrote:
-> This patch adds WEIM register addresses to mx35 platform header file.
-> 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-> ---
->  arch/arm/plat-mxc/include/mach/mx35.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-> index 80965a9..8b8f424 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx35.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx35.h
-> @@ -111,6 +111,11 @@
->  #define MX35_EMI_CTL_BASE_ADDR			(MX35_X_MEMC_BASE_ADDR + 0x4000)
->  #define MX35_PCMCIA_CTL_BASE_ADDR		MX35_EMI_CTL_BASE_ADDR
->  
-> +#define MX35_WEIM_CSCRx_BASE_ADDR(cs)	(MX35_WEIM_BASE_ADDR + (cs) * 0x10)
-> +#define MX35_WEIM_CSCRxU(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs))
-> +#define MX35_WEIM_CSCRxL(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
-> +#define MX35_WEIM_CSCRxA(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
-> +
->  #define MX35_NFC_BASE_ADDR		0xbb000000
->  #define MX35_PCMCIA_MEM_BASE_ADDR	0xbc000000
->  
+Currently in show_pte, there are unconditional checks for
+pud_none/pud_bad/pmd_none/pmd_bad. If pud/pmd are not used,
+this may incorrectly try to interpret entries as pud/pmd
+entries which may print bogus information (e.g. marking a
+pgd as bad when the entry is valid). Only check for pud/pmd
+information if pud/pmd is actually used.
 
-ping
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/mm/fault.c |   26 ++++++++++++++------------
+ 1 files changed, 14 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index d7561bb..f69dee0 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -103,27 +103,29 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 		}
+ 
+ 		pud = pud_offset(pgd, addr);
+-		if (PTRS_PER_PUD != 1)
++		if (PTRS_PER_PUD != 1) {
+ 			printk(", *pud=%08lx", pud_val(*pud));
+ 
+-		if (pud_none(*pud))
+-			break;
++			if (pud_none(*pud))
++				break;
+ 
+-		if (pud_bad(*pud)) {
+-			printk("(bad)");
+-			break;
++			if (pud_bad(*pud)) {
++				printk("(bad)");
++				break;
++			}
+ 		}
+ 
+ 		pmd = pmd_offset(pud, addr);
+-		if (PTRS_PER_PMD != 1)
++		if (PTRS_PER_PMD != 1) {
+ 			printk(", *pmd=%08llx", (long long)pmd_val(*pmd));
+ 
+-		if (pmd_none(*pmd))
+-			break;
++			if (pmd_none(*pmd))
++				break;
+ 
+-		if (pmd_bad(*pmd)) {
+-			printk("(bad)");
+-			break;
++			if (pmd_bad(*pmd)) {
++				printk("(bad)");
++				break;
++			}
+ 		}
+ 
+ 		/* We must not map this if we have highmem enabled */
+-- 
+1.7.8.3
