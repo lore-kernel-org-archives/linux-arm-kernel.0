@@ -1,35 +1,41 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Wed, 6 Jun 2012 14:56:47 +0100
-Subject: [PATCH REPOST 1/2] mmc: tegra: use bus-width property instead
- of support-8bit
-In-Reply-To: <1338834755-6900-1-git-send-email-swarren@wwwdotorg.org>
-References: <1338834755-6900-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120606135647.GA3423@void.printf.net>
+Date: Wed, 06 Jun 2012 10:17:05 -0400
+Subject: [PATCH] mmc: mxs-mmc: Move of_match_table out of CONFIG_PM
+In-Reply-To: <1337574807-8637-1-git-send-email-marex@denx.de> (Marek Vasut's
+ message of "Mon, 21 May 2012 06:33:27 +0200")
+References: <1337574807-8637-1-git-send-email-marex@denx.de>
+Message-ID: <87wr3k34pq.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 04, 2012 at 12:32:34PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Update the driver to parse the new unified bus-width property introduced
-> in commit 7f21779 "mmc: dt: Consolidate DT bindings", instead of the legacy
-> support-8bit property.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Hi,
+
+On Mon, May 21 2012, Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: Chris Ball <cjb@laptop.org>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> Chris, It's probably easiest conflict-wise if I take this through the Tegra
-> tree. (Note: When I posted this series before, I said there shouldn't be any
-> conflicts if you take them through the MMC tree. That's probably still true,
-> but unforseen future conflicts seem more likely in the .dts files in the
-> second patch than sdhci-tegra.c in this patch, so the Tegra tree may make
-> more sense). Since the second patch depends on the first, it's easiest if
-> these go in through the same tree. Does this sound OK?
+>  drivers/mmc/host/mxs-mmc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index 34a9026..277161d 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -894,8 +894,8 @@ static struct platform_driver mxs_mmc_driver = {
+>  		.owner	= THIS_MODULE,
+>  #ifdef CONFIG_PM
+>  		.pm	= &mxs_mmc_pm_ops,
+> -		.of_match_table = mxs_mmc_dt_ids,
+>  #endif
+> +		.of_match_table = mxs_mmc_dt_ids,
+>  	},
+>  };
 
-Yes, makes sense -- taking this via the Tegra tree is fine:
-
-Acked-by: Chris Ball <cjb@laptop.org>
-
-Thanks!
+Thanks, pushed to mmc-next for 3.5.
 
 - Chris.
 -- 
