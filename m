@@ -1,149 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  6 Jun 2012 12:33:13 +0200
-Subject: [PATCH 1/4] mtd nand mxc_nand: Use managed resources
-In-Reply-To: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
-References: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1338978796-26129-2-git-send-email-s.hauer@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 06 Jun 2012 12:35:22 +0200
+Subject: [PATCHv2] ARM: mm: fix type of the arm_dma_limit global variable
+In-Reply-To: <20120606092946.GL8262@n2100.arm.linux.org.uk>
+References: <20120606092946.GL8262@n2100.arm.linux.org.uk>
+Message-ID: <1338978922-30452-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the error path simpler and to make subsequent patches
-easier.
+arm_dma_limit stores physical address of maximal address accessible by DMA,
+so the phys_addr_t type makes much more sense for it instead of u32. This
+patch fixes the following build warning:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+arch/arm/mm/init.c:380: warning: comparison of distinct pointer types lacks a cast
+
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/mtd/nand/mxc_nand.c |   70 ++++++++++++++-----------------------------
- 1 file changed, 23 insertions(+), 47 deletions(-)
+ arch/arm/mm/init.c |    2 +-
+ arch/arm/mm/mm.h   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index c58e6a9..a1136f3 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1323,8 +1323,8 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	int err = 0;
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index c21d06c..f54d592 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -212,7 +212,7 @@ EXPORT_SYMBOL(arm_dma_zone_size);
+  * allocations.  This must be the smallest DMA mask in the system,
+  * so a successful GFP_DMA allocation will always satisfy this.
+  */
+-u32 arm_dma_limit;
++phys_addr_t arm_dma_limit;
  
- 	/* Allocate memory for MTD device structure and private data */
--	host = kzalloc(sizeof(struct mxc_nand_host) + NAND_MAX_PAGESIZE +
--			NAND_MAX_OOBSIZE, GFP_KERNEL);
-+	host = devm_kzalloc(&pdev->dev, sizeof(struct mxc_nand_host) +
-+			NAND_MAX_PAGESIZE + NAND_MAX_OOBSIZE, GFP_KERNEL);
- 	if (!host)
- 		return -ENOMEM;
+ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
+ 	unsigned long dma_size)
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index 93dc0c1..c471436 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -62,7 +62,7 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+ #endif
  
-@@ -1351,26 +1351,17 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	this->read_buf = mxc_nand_read_buf;
- 	this->verify_buf = mxc_nand_verify_buf;
- 
--	host->clk = clk_get(&pdev->dev, "nfc");
--	if (IS_ERR(host->clk)) {
--		err = PTR_ERR(host->clk);
--		goto eclk;
--	}
--
--	clk_prepare_enable(host->clk);
--	host->clk_act = 1;
-+	host->clk = devm_clk_get(&pdev->dev, "nfc");
-+	if (IS_ERR(host->clk))
-+		return PTR_ERR(host->clk);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		err = -ENODEV;
--		goto eres;
--	}
-+	if (!res)
-+		return -ENODEV;
- 
--	host->base = ioremap(res->start, resource_size(res));
--	if (!host->base) {
--		err = -ENOMEM;
--		goto eres;
--	}
-+	host->base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!host->base)
-+		return -ENOMEM;
- 
- 	host->main_area0 = host->base;
- 
-@@ -1378,7 +1369,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	if (err > 0)
- 		err = mxcnd_probe_pdata(host);
- 	if (err < 0)
--		goto eirq;
-+		return err;
- 
- 	if (host->devtype_data->regs_offset)
- 		host->regs = host->base + host->devtype_data->regs_offset;
-@@ -1395,15 +1386,11 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 
- 	if (host->devtype_data->needs_ip) {
- 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--		if (!res) {
--			err = -ENODEV;
--			goto eirq;
--		}
--		host->regs_ip = ioremap(res->start, resource_size(res));
--		if (!host->regs_ip) {
--			err = -ENOMEM;
--			goto eirq;
--		}
-+		if (!res)
-+			return -ENODEV;
-+		host->regs_ip = devm_request_and_ioremap(&pdev->dev, res);
-+		if (!host->regs_ip)
-+			return -ENOMEM;
- 	}
- 
- 	if (host->pdata.hw_ecc) {
-@@ -1437,9 +1424,13 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	 */
- 	host->devtype_data->irq_control(host, 0);
- 
--	err = request_irq(host->irq, mxc_nfc_irq, IRQF_DISABLED, DRIVER_NAME, host);
-+	err = devm_request_irq(&pdev->dev, host->irq, mxc_nfc_irq,
-+			IRQF_DISABLED, DRIVER_NAME, host);
- 	if (err)
--		goto eirq;
-+		return err;
-+
-+	clk_prepare_enable(host->clk);
-+	host->clk_act = 1;
- 
- 	/*
- 	 * Now that we "own" the interrupt make sure the interrupt mask bit is
-@@ -1491,15 +1482,7 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	return 0;
- 
- escan:
--	free_irq(host->irq, host);
--eirq:
--	if (host->regs_ip)
--		iounmap(host->regs_ip);
--	iounmap(host->base);
--eres:
--	clk_put(host->clk);
--eclk:
--	kfree(host);
-+	clk_disable_unprepare(host->clk);
- 
- 	return err;
- }
-@@ -1508,16 +1491,9 @@ static int __devexit mxcnd_remove(struct platform_device *pdev)
- {
- 	struct mxc_nand_host *host = platform_get_drvdata(pdev);
- 
--	clk_put(host->clk);
--
- 	platform_set_drvdata(pdev, NULL);
- 
- 	nand_release(&host->mtd);
--	free_irq(host->irq, host);
--	if (host->regs_ip)
--		iounmap(host->regs_ip);
--	iounmap(host->base);
--	kfree(host);
- 
- 	return 0;
- }
+ #ifdef CONFIG_ZONE_DMA
+-extern u32 arm_dma_limit;
++extern phys_addr_t arm_dma_limit;
+ #else
+ #define arm_dma_limit ((u32)~0)
+ #endif
 -- 
-1.7.10
+1.7.1.569.g6f426
