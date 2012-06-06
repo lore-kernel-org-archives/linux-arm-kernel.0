@@ -1,135 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Jun 2012 02:09:31 -0700
-Subject: [PATCH] arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule
- support
-In-Reply-To: <1337257051-5004-1-git-send-email-uri.y@variscite.com>
-References: <20120509213156.GZ5140@atomide.com>
- <1337257051-5004-1-git-send-email-uri.y@variscite.com>
-Message-ID: <20120606090931.GV12766@atomide.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 6 Jun 2012 14:41:30 +0530
+Subject: [PATCH 1/2] clk: cache parent clocks only for muxes
+In-Reply-To: <1338973891-28719-1-git-send-email-rnayak@ti.com>
+References: <1338973891-28719-1-git-send-email-rnayak@ti.com>
+Message-ID: <1338973891-28719-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+caching parent clocks makes sense only when a clock has more
+than one parent (mux clocks).
+Avoid doing this for every other clock.
 
-* Uri Yosef <uri.y@variscite.com> [120517 05:34]:
-> Hi Tony,
-> 
-> This is the updated DTS patch for Vatiscite OMAP4 SOM support
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ drivers/clk/clk.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Looks OK to me, but can you please repost one more time with
-devicetree-discuss at lists.ozlabs.org in Cc so people have a chance
-to ack this patch there?
-
-Thanks,
-
-Tony
- 
->  arch/arm/boot/dts/omap4-var_som.dts |   96 +++++++++++++++++++++++++++++++++++
->  1 files changed, 96 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
-> 
-> diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var_som.dts
-> new file mode 100644
-> index 0000000..d41161d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4-var_som.dts
-> @@ -0,0 +1,96 @@
-> +/*
-> + * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +/include/ "omap4.dtsi"
-> +
-> +/ {
-> +	model = "Variscite OMAP4 SOM";
-> +	compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x40000000>; /* 1 GB */
-> +	};
-> +
-> +	vdd_eth: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDD_ETH";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		enable-active-high;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <400000>;
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
-> +		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
-> +		interrupt-parent = <&gic>;
-> +	};
-> +};
-> +
-> +/include/ "twl6030.dtsi"
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <400000>;
-> +
-> +	/*
-> +	 * Temperature Sensor
-> +	 * http://www.ti.com/lit/ds/symlink/tmp105.pdf
-> +	 */
-> +	tmp105 at 49 {
-> +		compatible = "ti,tmp105";
-> +		reg = <0x49>;
-> +	};
-> +};
-> +
-> +&i2c4 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&mcspi1 {
-> +	eth at 0 {
-> +		compatible = "ks8851";
-> +		spi-max-frequency = <24000000>;
-> +		reg = <0>;
-> +		interrupt-parent = <&gpio6>;
-> +		interrupts = <11>; /* gpio line 171 */
-> +		vdd-supply = <&vdd_eth>;
-> +	};
-> +};
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&vmmc>;
-> +	ti,bus-width = <8>;
-> +	ti,non-removable;
-> +};
-> +
-> +&mmc2 {
-> +	status = "disable";
-> +};
-> +
-> +&mmc3 {
-> +	status = "disable";
-> +};
-> +
-> +&mmc4 {
-> +	status = "disable";
-> +};
-> +
-> +&mmc5 {
-> +	ti,bus-width = <4>;
-> +};
-> -- 
-> 1.7.5.4
-> 
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 687b00d..40568e9 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1229,7 +1229,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+ 	 * If clk->parents is not NULL we skip this entire block.  This allows
+ 	 * for clock drivers to statically initialize clk->parents.
+ 	 */
+-	if (clk->num_parents && !clk->parents) {
++	if ((clk->num_parents > 1) && !clk->parents) {
+ 		clk->parents = kmalloc((sizeof(struct clk*) * clk->num_parents),
+ 				GFP_KERNEL);
+ 		/*
+-- 
+1.7.1
