@@ -1,36 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 06 Jun 2012 01:22:50 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: Fix compile for CONFIG_TIDSPBRIDGE
- platform init code
-In-Reply-To: <20120606082156.727.42730.stgit@muffinssi.local>
-References: <20120606082156.727.42730.stgit@muffinssi.local>
-Message-ID: <20120606082250.727.88234.stgit@muffinssi.local>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 06 Jun 2012 11:28:38 +0300
+Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
+In-Reply-To: <201206051703.17691.marex@denx.de>
+References: <Pine.LNX.4.44L0.1206051025540.1542-100000@iolanthe.rowland.org>
+ <201206051703.17691.marex@denx.de>
+Message-ID: <87sje89749.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7f28427b (ARM: OMAP2+: Move omap_dsp_reserve_sdram_memblock() to mach-omap2)
-moved DSP platform init code, but failed to include memblock.h causing:
+Marek Vasut <marex@denx.de> writes:
 
-arch/arm/mach-omap2/dsp.c: In function 'omap_dsp_reserve_sdram_memblock':
-arch/arm/mach-omap2/dsp.c:58: error: implicit declaration of function 'arm_memblock_steal'
+> Does this unlikely() have any effect on ARM/MIPS/PPC, where this chipidea IP is 
+> used ? Or is there some x86 device sporting this IP too?
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/dsp.c |    3 +++
- 1 file changed, 3 insertions(+)
+Of course there is. :)
 
-diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
-index 845309f..88ffa1e 100644
---- a/arch/arm/mach-omap2/dsp.c
-+++ b/arch/arm/mach-omap2/dsp.c
-@@ -20,6 +20,9 @@
- 
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+
-+#include <asm/memblock.h>
-+
- #include "cm2xxx_3xxx.h"
- #include "prm2xxx_3xxx.h"
- #ifdef CONFIG_BRIDGE_DVFS
+Regards,
+--
+Alex
