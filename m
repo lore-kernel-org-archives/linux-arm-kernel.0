@@ -1,5 +1,5 @@
 From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Thu, 7 Jun 2012 07:42:25 +0900
+Date: Thu, 7 Jun 2012 07:47:47 +0900
 Subject: Fwd: + clk-add-non-config_have_clk-routines.patch added to -mm
  tree
 In-Reply-To: <20120606150619.8567afb4.akpm@linux-foundation.org>
@@ -7,9 +7,11 @@ References: <20120606214621.GA8892@localhost>
  <20120606145113.f0c8ddcf.akpm@linux-foundation.org>
  <20120606215951.GA9123@localhost>
  <20120606150619.8567afb4.akpm@linux-foundation.org>
-Message-ID: <20120606224225.GA9435@localhost>
+Message-ID: <20120606224747.GA9788@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[resend with corrected email addresses]
 
 > I didn't merge this patchset because it still has the build error
 > reported by Paul, below.
