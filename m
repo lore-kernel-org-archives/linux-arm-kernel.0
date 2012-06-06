@@ -1,52 +1,56 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Wed, 6 Jun 2012 20:40:50 +0530
-Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
-In-Reply-To: <201205312046.14823.arnd@arndb.de>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <201205310922.18550.arnd@arndb.de>
- <CAAe_U6J3p9Lh9g82tSSLxOJ7nqrozdRe11zV_v2rqTuMYPjbyA@mail.gmail.com>
- <201205312046.14823.arnd@arndb.de>
-Message-ID: <CAAe_U6+zi50muNFKXW9ytK0BVki+5wxVK_S0rjEc53M2oc-GeQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 6 Jun 2012 17:37:54 +0200
+Subject: [PATCH] mmc: mxs-mmc: Move of_match_table out of CONFIG_PM
+In-Reply-To: <87wr3k34pq.fsf@octavius.laptop.org>
+References: <1337574807-8637-1-git-send-email-marex@denx.de>
+ <87wr3k34pq.fsf@octavius.laptop.org>
+Message-ID: <201206061737.55260.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Benoit, Paul,
+Dear Chris Ball,
 
-On Fri, Jun 1, 2012 at 2:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 31 May 2012, ABRAHAM, KISHON VIJAY wrote:
->> > I would mark the multiplexed device compatible with "simple-bus", which
->> > results in the child devices automatically getting added.
->>
->> hmm.. ocp2scp has a sysconfig register and it also has a module mode
->> by which it can be enabled/disabled. I was making use of pm_runtime
->> API's to control these registers (Apart from creating child devices,
->> the driver also has a call to pm_runtime_enable).
->
-> I see.
->
->> I'm not sure if with
->> "simple-bus" we'll be able to do those. I have to check on that.
->
-> How about making it compatible with both "simple-bus" and something
-> that handles the pm_runtime requirements?
->
-> I don't understand enough of what needs to be done for pm_runtime
-> across a lot of devices, but I'd hope that it should be possible
-> to do that in a generic way based on the device definition.
+> Hi,
+> 
+> On Mon, May 21 2012, Marek Vasut wrote:
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: linux-mmc at vger.kernel.org
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > 
+> >  drivers/mmc/host/mxs-mmc.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> > index 34a9026..277161d 100644
+> > --- a/drivers/mmc/host/mxs-mmc.c
+> > +++ b/drivers/mmc/host/mxs-mmc.c
+> > @@ -894,8 +894,8 @@ static struct platform_driver mxs_mmc_driver = {
+> > 
+> >  		.owner	= THIS_MODULE,
+> >  
+> >  #ifdef CONFIG_PM
+> >  
+> >  		.pm	= &mxs_mmc_pm_ops,
+> > 
+> > -		.of_match_table = mxs_mmc_dt_ids,
+> > 
+> >  #endif
+> > 
+> > +		.of_match_table = mxs_mmc_dt_ids,
+> > 
+> >  	},
+> >  
+> >  };
+> 
+> Thanks, pushed to mmc-next for 3.5.
 
-Is there already exists a generic way for handling pm_runtime
-requirements (as simple as doing a pm_runtime_enable on a device).
+Thanks!
 
-So the actual problem is we have ocp2scp as parent and usb2phy and
-usb3phy as the child device. ocp2scp has the sysconfig register and it
-can be controlled using module mode bit (both of this can be
-controlled by pm_runtime). Whenever usb controller(dwc3/musb) wants to
-enable a phy, it calls an exported API in usb2/usb3 phy to enable it.
-These API's have pm_runtime_get_sync on usb2/usb3 device which in-turn
-calls pm_runtime_get_sync of ocp2scp because of parent->child
-relationship (For this both usb2/usb3 phy and ocp2scp devices should
-have called pm_runtime_enable). All I'm trying is to find a place to
-have pm_runtime_enable for ocp2scp.
+> - Chris.
 
-Thanks
-Kishon
+Best regards,
+Marek Vasut
