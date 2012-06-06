@@ -1,77 +1,63 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 06 Jun 2012 16:20:40 +0300
-Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
-In-Reply-To: <20120606063030.GA29481@b20223-02.ap.freescale.net>
-References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
- <20120605150209.GZ28631@arwen.pp.htv.fi>
- <20120606022714.GA2667@S2101-09.ap.freescale.net>
- <20120606060348.GD32345@arwen.pp.htv.fi>
- <20120606063030.GA29481@b20223-02.ap.freescale.net>
-Message-ID: <87ehps8tlj.fsf@ashishki-desk.ger.corp.intel.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 06 Jun 2012 16:38:41 +0300
+Subject: [PATCH v6] MTD: LPC32xx SLC NAND driver
+In-Reply-To: <1338974414-5308-1-git-send-email-stigge@antcom.de>
+References: <1338974414-5308-1-git-send-email-stigge@antcom.de>
+Message-ID: <1338989921.6875.50.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+On Wed, 2012-06-06 at 11:20 +0200, Roland Stigge wrote:
+> +#ifdef CONFIG_PM
+> +static int lpc32xx_nand_resume(struct platform_device *pdev)
+> +{
+> +	struct lpc32xx_nand_host *host = platform_get_drvdata(pdev);
+> +
+> +	/* Re-enable NAND clock */
+> +	clk_enable(host->clk);
+> +
+> +	/* Fresh init of NAND controller */
+> +	lpc32xx_nand_setup(host);
+> +
+> +	/* Disable write protect */
+> +	lpc32xx_wp_disable(host);
+> +
+> +	return 0;
+> +}
+> +
+> +static int lpc32xx_nand_suspend(struct platform_device *pdev, pm_message_t pm)
+> +{
+> +	u32 tmp;
+> +	struct lpc32xx_nand_host *host = platform_get_drvdata(pdev);
+> +
+> +	/* Force CE high */
+> +	tmp = readl(SLC_CTRL(host->io_base));
+> +	tmp &= ~SLCCFG_CE_LOW;
+> +	writel(tmp, SLC_CTRL(host->io_base));
+> +
+> +	/* Enable write protect for safety */
+> +	lpc32xx_wp_enable(host);
+> +
+> +	/* Disable clock */
+> +	clk_disable(host->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +#else
+> +#define lpc32xx_nand_resume NULL
+> +#define lpc32xx_nand_suspend NULL
+> +#endif
 
-> On Wed, Jun 06, 2012 at 09:03:50AM +0300, Felipe Balbi wrote:
->> On Wed, Jun 06, 2012 at 10:27:22AM +0800, Shawn Guo wrote:
->> > On Tue, Jun 05, 2012 at 06:02:13PM +0300, Felipe Balbi wrote:
->> > > Hi,
->> > > 
->> > > On Fri, May 25, 2012 at 10:24:13AM +0800, Richard Zhao wrote:
->> > > > The work is based on  ci13xxx rework done by Alexander Shishkin.
->> > > > 
->> > > > Status:
->> > > >   - this version only support host
->> > > >   - usbotg controler works at host role
->> > > > 
->> > > > Changes since V2:
->> > > >   - Rebase to Alex's tree
->> > > >   - Use regulator to control vbus power
->> > > >   - Remove ARCH check in Kconfig, but add OF_DEV check.
->> > > >   - Other changes according laster version comments.
->> > > > 
->> > > > Richard Zhao (12):
->> > > >   usb: otg: add notify_connect/notify_disconnect callback
->> > > >   usb: chipidea: permit driver bindings pass phy pointer
->> > > >   usb: ehci-hcd: notify phy when connect change
->> > > >   usb: otg: add basic mxs phy driver support
->> > > >   usb: chipidea: add imx platform driver
->> > > >   ARM: imx6q: correct device name of usbphy and usb controller clock
->> > > >     export
->> > > >   ARM: imx6q: add config-on-boot gpios
->> > > >   ARM: imx6q: add usbphy clocks
->> > > >   ARM: imx6q: disable usb charger detector
->> > > >   ARM: dts: imx6q-sabrelite: add usb devices
->> > > >   ARM: mxs: clk_register_clkdev mx28 usb clocks
->> > > >   ARM: dts: imx28-evk: add usb devices
->> > > 
->> > > how are we going to handle these series ? drivers/usb/otg/* parts are
->> > > mostly ok (I need to look deeper) but if I take drivers/usb/otg/* we
->> > > will have to delay drivers/usb/chipidea I guess...
->> > > 
->> > > So someone would have to take the whole series ? Who will be that
->> > > person? Alex, will it be you ?
->> > > 
->> > I'm unsure about drivers/usb part, but arch/arm part should go via
->> > arm-soc tree.
->> 
->> Yes, sure but the whole series is very "coupled" together... Maybe
->> Richard could try to split this series into things that can go through
->> arm-soc with no dependency on the other part and things that depend on
->> drivers/usb/*
-> I'm not clear. How does the ARM part depend on drivers/usb?
-> Shawn maybe could pick the ARM platform part. But the usb driver part
-> is divided into three maintainer, Balbi for otg, Alan for ehci-hcd,
-> Alex for Chipidea. Chipidea part depends on ehci-hcd and otg. So I
-> guess Greg could pick up all the driver part and Balbi, Alan and Alex
-> merge them back. Hope it could avoid loop dependency.
+0, not NULL.
 
-I will apply this stuff to my tree as soon as we have an explicit ack
-from Alan on the notifiers patch [1].
-
-[1] http://marc.info/?l=linux-arm-kernel&m=133894640106323&w=2
-
-Regards,
---
-Alex
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/7e9ba702/attachment.sig>
