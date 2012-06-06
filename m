@@ -1,25 +1,33 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 06 Jun 2012 16:41:36 +0300
-Subject: [PATCH v6] MTD: LPC32xx SLC NAND driver
-In-Reply-To: <1338974414-5308-1-git-send-email-stigge@antcom.de>
-References: <1338974414-5308-1-git-send-email-stigge@antcom.de>
-Message-ID: <1338990096.6875.52.camel@sauron.fi.intel.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 06 Jun 2012 09:45:04 -0400
+Subject: [PATCH] mmc: omap: Fix a section warning regression
+In-Reply-To: <20120528082217.GI18918@arwen.pp.htv.fi> (Felipe Balbi's message
+ of "Mon, 28 May 2012 11:22:18 +0300")
+References: <20120528065347.GR17852@atomide.com>
+ <20120528082217.GI18918@arwen.pp.htv.fi>
+Message-ID: <87ehps4krj.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 11:20 +0200, Roland Stigge wrote:
->  drivers/mtd/nand/lpc32xx_nand_slc.c                   | 1060 ++++++++++++++++++
+Hi,
 
-Can you please rename it to lpc32xx_slc.c? It is already in the "nand"
-sub-directory, no need to add "nand" to the file name.
+On Mon, May 28 2012, Felipe Balbi wrote:
+> On Sun, May 27, 2012 at 11:53:47PM -0700, Tony Lindgren wrote:
+>> Commit b6e0703b (mmc: omap: make it behave well as a module) made some
+>> __devinit changes but missed one function causing a section warning:
+>> 
+>> WARNING: vmlinux.o(.devinit.text+0x8604): Section mismatch in reference
+>> from the function mmc_omap_probe)
+>> The function __devinit mmc_omap_probe() references a function
+>> __init mmc_omap_new_slot()
+>> 
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
+Thanks, pushed to mmc-next for 3.5.
+
+- Chris.
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/2bc64097/attachment.sig>
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
