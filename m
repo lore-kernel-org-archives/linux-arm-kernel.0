@@ -1,54 +1,49 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 06 Jun 2012 12:39:55 +0300
-Subject: [PATCH v4] usb: ehci-hcd: notify phy when connect change
-In-Reply-To: <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
-References: <1337912665-16615-4-git-send-email-richard.zhao@freescale.com>
- <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <87mx4g93tg.fsf@ashishki-desk.ger.corp.intel.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  6 Jun 2012 11:49:23 +0200
+Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
+Message-ID: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+The chained handler was set for the platform device with id == 0.
+When the gpio devices are instantiated by a device tree, all have id ==
+-1 and so the handler was unset resulting in unusable gpio irqs on
+i.MX21 and i.MX27 (when using oftree).
 
-> It still has below limitations:
-> - it does not work for multi-phy ehci
-> - the best place is after debounce, but I can't get
->   phy there
->
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  drivers/usb/host/ehci-hcd.c |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index b100f5f..724ac471 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -928,6 +928,21 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
->  			pstatus = ehci_readl(ehci,
->  					 &ehci->regs->port_status[i]);
->  
-> +			/* FIXME:
-> +			 * - it does not work for multi-phy ehci
-> +			 * - the best place is after debounce, but I can't get
-> +			 *   phy there
-> +			 */
-> +			if (unlikely(ehci->transceiver &&
-> +					(pstatus & PORT_CSC))) {
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-I don't think you need parens around (pstatus & PORT_CSC), since it
-should already have higher precedence.
+I'm not sure this is material for stable because it never worked before.
 
-> +				if (pstatus & PORT_CONNECT)
-> +					usb_phy_notify_connect(
-> +						ehci->transceiver, i);
-> +				else
-> +					usb_phy_notify_disconnect(
-> +						ehci->transceiver, i);
-> +			}
-> +
->  			if (pstatus & PORT_OWNER)
->  				continue;
->  			if (!(test_bit(i, &ehci->suspended_ports) &&
-> -- 
-> 1.7.5.4
+Best regards
+Uwe
+
+ drivers/gpio/gpio-mxc.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index e791476..5c42daf 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -398,10 +398,12 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ 	writel(~0, port->base + GPIO_ISR);
+ 
+ 	if (mxc_gpio_hwtype == IMX21_GPIO) {
+-		/* setup one handler for all GPIO interrupts */
+-		if (pdev->id == 0)
+-			irq_set_chained_handler(port->irq,
+-						mx2_gpio_irq_handler);
++		/*
++		 * Setup one handler for all GPIO interrupts. Actually setting
++		 * the handler is needed only once, but doing it for every port
++		 * is more robust and easier.
++		 */
++		irq_set_chained_handler(port->irq, mx2_gpio_irq_handler);
+ 	} else {
+ 		/* setup one handler for each entry */
+ 		irq_set_chained_handler(port->irq, mx3_gpio_irq_handler);
+-- 
+1.7.10
