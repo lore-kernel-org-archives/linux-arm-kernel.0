@@ -1,52 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jun 2012 11:12:53 +0100
-Subject: [PATCH 1/2] Allow constructor name selection by architecture.
-In-Reply-To: <20120529090614.GD12217@n2100.arm.linux.org.uk>
-References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
- <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
- <20120528203005.GA20560@merkur.ravnborg.org>
- <20120529090614.GD12217@n2100.arm.linux.org.uk>
-Message-ID: <20120606101253.GM8262@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 6 Jun 2012 12:16:42 +0200
+Subject: [PATCH 0/2] A couple of imx6q clock patches
+In-Reply-To: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
+References: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120606101642.GX30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2012 at 10:06:14AM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
-> > On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
-> > > From: Vincent Sanders <vince@collabora.co.uk>
-> > > 
-> > > The constructor symbol name is different between platforms. Allow this
-> > > to be selected by configuration and set suitable default values.
-> > > 
-> > > Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
-> > > ---
-> > >  include/asm-generic/vmlinux.lds.h |    6 +++---
-> > >  init/Kconfig                      |    6 ++++++
-> > >  kernel/module.c                   |    2 +-
-> > >  3 files changed, 10 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> > > index 8aeadf6..fd34808 100644
-> > > --- a/include/asm-generic/vmlinux.lds.h
-> > > +++ b/include/asm-generic/vmlinux.lds.h
-> > > @@ -471,9 +471,9 @@
-> > >  	}
-> > >  
-> > >  #ifdef CONFIG_CONSTRUCTORS
-> > > -#define KERNEL_CTORS()	. = ALIGN(8);			   \
-> > > -			VMLINUX_SYMBOL(__ctors_start) = .; \
-> > > -			*(.ctors)			   \
-> > > +#define KERNEL_CTORS()	. = ALIGN(8);					\
-> > > +			VMLINUX_SYMBOL(__ctors_start) = .;		\
-> > > +			*(CONFIG_CONSTRUCTORS_NAME)			\
-> > >  			VMLINUX_SYMBOL(__ctors_end) = .;
-> > 
-> > What is wrong with adding both "standard" names for ctors uncnditionally?
-> > Like this:
-> > > 			*(.ctors)			   \
-> > > +			*(.init_array)			   \
-> 
-> That doesn't get rid of CONFIG_CONSTRUCTORS_NAME, because it's needed
-> in the module code.  Do you have a suggestion to solve that as well?
+Hi Shawn, Olof,
 
-Ping.
+On Tue, Jun 05, 2012 at 03:16:41PM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> These two patches are based on v3.5-rc1 + your imx-clk-common-fixes.
+> I can wait for your imx-clk-common-fixes hit -rc and then send these
+> two.  But I think the better approach would be you rebase
+> imx-clk-common-fixes on -rc1 and then pick up these two into your
+> fix series.
+
+Olof, what do you prefer? Is there still time to update the
+imx-clk-common-fixes you already pulled?
+
+Sascha
+
+
+> 
+> The first one is a small clean up which can be amended into b0286f2
+> (ARM: imx6q: prepare and enable init on clks directly instead of
+> clk_get first), and the second one fixes a suspend regression.
+> 
+> Regards,
+> Shawn
+> 
+> Shawn Guo (2):
+>   ARM: imx6q: remove unneeded clkdev lookups
+>   ARM: imx6q: fix suspend regression caused by common clk migration
+> 
+>  arch/arm/mach-imx/clk-imx6q.c |    9 ++++-----
+>  1 files changed, 4 insertions(+), 5 deletions(-)
+> 
+> -- 
+> 1.7.5.4
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
