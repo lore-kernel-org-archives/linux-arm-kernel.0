@@ -1,21 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 6 Jun 2012 20:42:15 +0800
-Subject: [PATCH 0/2] A couple of imx6q clock patches
-In-Reply-To: <20120606120857.GY30400@pengutronix.de>
-References: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
- <20120606101642.GX30400@pengutronix.de>
- <CAAQ0ZWSKFtWcrLuRCSqNXokAqmijJpyd4P_MbhKDfimH4aHCyg@mail.gmail.com>
- <20120606120857.GY30400@pengutronix.de>
-Message-ID: <CAAQ0ZWT+jSKoMkfh+ghG1QdTATqujFyBpBBF-wDBeHFZsY4GRQ@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 06 Jun 2012 08:52:44 -0400
+Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
+In-Reply-To: <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
+ (ludovic desroches's message of "Wed, 6 Jun 2012 12:19:44 +0200")
+References: <87396869fw.fsf@octavius.laptop.org>
+ <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <87vcj44n6r.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2012 20:08, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> How about the following, it contains your patches plus the ones I sent
-> yesterday, based on imx-clk-common. It should contain all currently
-> pending imx clk fixes.
->
-Sound good to me.  Olof?
+Hi,
 
-Regards,
-Shawn
+On Wed, Jun 06 2012, ludovic.desroches at atmel.com wrote:
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> The use of DMA slave config operation requires that the burst size
+> (aka chunk size) is specified through this interface.
+> Modify atmel-mci slave driver to use this specification on its side.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+> Hi Chris,
+>
+> Sorry for this trouble, this patch should apply well on 3.5-rc1.
+
+Thanks, pushed to mmc-next for 3.5.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
