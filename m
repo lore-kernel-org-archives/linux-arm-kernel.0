@@ -1,66 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 6 Jun 2012 13:39:57 +0800
-Subject: [PATCH] MXS: Enable FLEXCAN for MXS/DT
-In-Reply-To: <1338084709-12043-1-git-send-email-marex@denx.de>
-References: <1338084709-12043-1-git-send-email-marex@denx.de>
-Message-ID: <20120606053955.GE2667@S2101-09.ap.freescale.net>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 6 Jun 2012 08:44:17 +0300
+Subject: [PATCH] remoteproc: block premature rproc booting
+In-Reply-To: <4FCECD8F.8000600@codeaurora.org>
+References: <1337687472-23009-1-git-send-email-ohad@wizery.com>
+ <4FBDFC4A.1060602@codeaurora.org>
+ <CAK=WgbaP5qSso_Eu=Oup4eqLDcorZ-qf=mysMKiEvOS=m7yLmg@mail.gmail.com>
+ <4FCD276A.80505@codeaurora.org>
+ <CAK=WgbZo-8GXY9bVYGk0XZvqKrdaJZWeNkK1FhRWnH5doGYLjA@mail.gmail.com>
+ <4FCECD8F.8000600@codeaurora.org>
+Message-ID: <CAK=WgbakMG5eoSGP3GDFLFjA=z5fc_h_oFdzuC4tL5PcpCdLZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 27, 2012 at 04:11:49AM +0200, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Detlev Zundel <dzu@denx.de>
-> CC: Dong Aisheng <b29396@freescale.com>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-> CC: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Stefano Babic <sbabic@denx.de>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |    2 ++
->  arch/arm/mach-mxs/Kconfig    |    1 +
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 119f183..13c6084 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -278,12 +278,14 @@
->  			};
->  
->  			can0: can at 80032000 {
-> +				compatible = "fsl,p1010-flexcan";
->  				reg = <0x80032000 2000>;
->  				interrupts = <8>;
->  				status = "disabled";
->  			};
->  
->  			can1: can at 80034000 {
-> +				compatible = "fsl,p1010-flexcan";
->  				reg = <0x80034000 2000>;
->  				interrupts = <9>;
->  				status = "disabled";
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 91cf062..0406f37 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -18,6 +18,7 @@ config SOC_IMX28
->  	select CPU_ARM926T
->  	select HAVE_PWM
->  	select PINCTRL_IMX28
-> +	select MXS_HAVE_PLATFORM_FLEXCAN
+On Wed, Jun 6, 2012 at 6:25 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> What if I don't want to boot the device at kernel start-up? Do I have to
+> make it a module then?
 
-This change shouldn't be part of this patch.  Furthermore, this symbol
-and arch/arm/mach-mxs/devices/platform-flexcan.c should be removed
-completely after we covert all these board files that have flexcan
-device enabled over to DT.
+Currently, yeah.
 
-Regards,
-Shawn
+But we can change stuff if needed.
 
->  
->  comment "MXS platforms:"
->  
-> -- 
-> 1.7.10
-> 
+We took that design decision because it was simple and we didn't have
+any reason not to do it, but I'm thinking we can let the users decide
+about this using runtime pm (e.g. calling pm_runtime_get_sync with an
+rpmsg device, which will then be propagated all the way up to the
+remoteproc device and power it up).
