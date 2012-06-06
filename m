@@ -1,24 +1,105 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 6 Jun 2012 08:46:07 +0200
-Subject: [PATCH] clk: SPEAr600: Fix ethernet clock name for DT based
- probing
-In-Reply-To: <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
-References: <1336725678-29327-1-git-send-email-sr@denx.de>
- <CAJOA=zNe0yP5e75=fLTFAZMVZ=DsFF5xxkuear2C7sLD_XrGtA@mail.gmail.com>
- <CAOh2x==qiy7LHd_pyDX67vhcM91obPsVuinhBJ_WxWv+UJBFvw@mail.gmail.com>
-Message-ID: <201206060846.07829.sr@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Jun 2012 15:00:07 +0800
+Subject: [PATCH 1/2] ARM: mx28: add gpmi-nand support
+In-Reply-To: <1337937936-2743-1-git-send-email-b32955@freescale.com>
+References: <1337937936-2743-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120606070004.GA20302@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2012 07:56:49 viresh kumar wrote:
-> > > Acked-by: Viresh Kumar <viresh.kumar@st.com>
-> > 
-> > Do you want me to take this?  Spear didn't originally go through me
-> > but I can take it if that is the intent.
+On Fri, May 25, 2012 at 05:25:35PM +0800, Huang Shijie wrote:
+> add gpmi-nand device tree support.
+> add gpmi-nand pinctrl support.
 > 
-> Sure. Go ahead.
+> Also enable the gpmi support for mx28-evk board.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Ping.
+Applied, thanks.
 
-Thanks,
-Stefan
+Regards,
+Shawn
+
+> ---
+> 
+> add pinctrl for gpmi-nand.
+> 
+> ---
+>  arch/arm/boot/dts/imx28-evk.dts |    6 ++++++
+>  arch/arm/boot/dts/imx28.dtsi    |   35 ++++++++++++++++++++++++++---------
+>  2 files changed, 32 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index ee520a5..e53cf67 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -22,6 +22,12 @@
+>  
+>  	apb at 80000000 {
+>  		apbh at 80000000 {
+> +			gpmi-nand at 8000c000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+> +				status = "okay";
+> +			};
+> +
+>  			ssp0: ssp at 80010000 {
+>  				compatible = "fsl,imx28-mmc";
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 4634cb8..2636339 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -68,15 +68,15 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			bch at 8000a000 {
+> -				reg = <0x8000a000 2000>;
+> -				interrupts = <41>;
+> -				status = "disabled";
+> -			};
+> -
+> -			gpmi at 8000c000 {
+> -				reg = <0x8000c000 2000>;
+> -				interrupts = <42 88>;
+> +			gpmi-nand at 8000c000 {
+> +				compatible = "fsl,imx28-gpmi-nand";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = <0x8000c000 2000>, <0x8000a000 2000>;
+> +				reg-names = "gpmi-nand", "bch";
+> +				interrupts = <88>, <41>;
+> +				interrupt-names = "gpmi-dma", "bch";
+> +				fsl,gpmi-dma-channel = <4>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -167,6 +167,23 @@
+>  					fsl,pull-up = <0>;
+>  				};
+>  
+> +				gpmi_pins_a: gpmi-nand at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <0x0000 0x0010 0x0020
+> +						0x0030 0x0040 0x0050 0x0060
+> +						0x0070 0x0100 0x0110 0x0140
+> +						0x0150 0x0180 0x0190 0x01a0
+> +						0x01b0 0x01c0 >;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+> +
+> +				gpmi_status_cfg: gpmi-status-cfg {
+> +					fsl,pinmux-ids = <0x0180 0x0190 0x01c0>;
+> +					fsl,drive-strength = <2>;
+> +				};
+> +
+>  				mac0_pins_a: mac0 at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <0x4000 0x4010 0x4020
+> -- 
+> 1.7.0.4
+> 
+> 
