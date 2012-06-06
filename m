@@ -1,41 +1,148 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 6 Jun 2012 09:17:07 +0100
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <20120605104201.GR23408@opensource.wolfsonmicro.com>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
- <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
-Message-ID: <CAF2Aj3iSBP=grT+qEVXYN2tVuu=SS7JQ7ECaRsOVhAxbPhDdwA@mail.gmail.com>
+From: uri.y@variscite.com (Uri Yosef)
+Date: Wed, 6 Jun 2012 15:08:54 +0300
+Subject: [PATCH] arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule
+ support
+In-Reply-To: <20120606090931.GV12766@atomide.com>
+References: <20120509213156.GZ5140@atomide.com>
+ <1337257051-5004-1-git-send-email-uri.y@variscite.com>
+ <20120606090931.GV12766@atomide.com>
+Message-ID: <CAHooxd7WG2BrT+dHuuETMUONjbSu3DoVyZ_VW9On-vwCn3rRaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> > >>Are you sending this for -rc2?
->
-> > >No, nothing about this looks like an urgent fix?
->
-> > Well without it all regulator requests from DT will fail.
->
-> Oh, ffs.  Why wasn't this mentioned when the patch was posted, and how
-> were the original patches tested?
->
+CCed devicetree-discuss at lists.ozlabs.org.
 
-All my patches are build and boot tested and patches aren't sent if I see
-anything untoward.
+On Wed, Jun 6, 2012 at 12:09 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-I don't have the time to investigate this at the moment, as I am on Holiday
-until Monday.
+> Hi,
+>
+> * Uri Yosef <uri.y@variscite.com> [120517 05:34]:
+> > Hi Tony,
+> >
+> > This is the updated DTS patch for Vatiscite OMAP4 SOM support
+>
+> Looks OK to me, but can you please repost one more time with
+> devicetree-discuss at lists.ozlabs.org in Cc so people have a chance
+> to ack this patch there?
+>
+>
+Thanks,
+Uri
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+>
+> >  arch/arm/boot/dts/omap4-var_som.dts |   96
+> +++++++++++++++++++++++++++++++++++
+> >  1 files changed, 96 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
+> >
+> > diff --git a/arch/arm/boot/dts/omap4-var_som.dts
+> b/arch/arm/boot/dts/omap4-var_som.dts
+> > new file mode 100644
+> > index 0000000..d41161d
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/omap4-var_som.dts
+> > @@ -0,0 +1,96 @@
+> > +/*
+> > + * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +/dts-v1/;
+> > +
+> > +/include/ "omap4.dtsi"
+> > +
+> > +/ {
+> > +     model = "Variscite OMAP4 SOM";
+> > +     compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
+> > +
+> > +     memory {
+> > +             device_type = "memory";
+> > +             reg = <0x80000000 0x40000000>; /* 1 GB */
+> > +     };
+> > +
+> > +     vdd_eth: fixedregulator at 0 {
+> > +             compatible = "regulator-fixed";
+> > +             regulator-name = "VDD_ETH";
+> > +             regulator-min-microvolt = <3300000>;
+> > +             regulator-max-microvolt = <3300000>;
+> > +             enable-active-high;
+> > +             regulator-boot-on;
+> > +     };
+> > +};
+> > +
+> > +&i2c1 {
+> > +     clock-frequency = <400000>;
+> > +
+> > +     twl: twl at 48 {
+> > +             reg = <0x48>;
+> > +             /* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+> > +             interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+> > +             interrupt-parent = <&gic>;
+> > +     };
+> > +};
+> > +
+> > +/include/ "twl6030.dtsi"
+> > +
+> > +&i2c2 {
+> > +     clock-frequency = <400000>;
+> > +};
+> > +
+> > +&i2c3 {
+> > +     clock-frequency = <400000>;
+> > +
+> > +     /*
+> > +      * Temperature Sensor
+> > +      * http://www.ti.com/lit/ds/symlink/tmp105.pdf
+> > +      */
+> > +     tmp105 at 49 {
+> > +             compatible = "ti,tmp105";
+> > +             reg = <0x49>;
+> > +     };
+> > +};
+> > +
+> > +&i2c4 {
+> > +     clock-frequency = <400000>;
+> > +};
+> > +
+> > +&mcspi1 {
+> > +     eth at 0 {
+> > +             compatible = "ks8851";
+> > +             spi-max-frequency = <24000000>;
+> > +             reg = <0>;
+> > +             interrupt-parent = <&gpio6>;
+> > +             interrupts = <11>; /* gpio line 171 */
+> > +             vdd-supply = <&vdd_eth>;
+> > +     };
+> > +};
+> > +
+> > +&mmc1 {
+> > +     vmmc-supply = <&vmmc>;
+> > +     ti,bus-width = <8>;
+> > +     ti,non-removable;
+> > +};
+> > +
+> > +&mmc2 {
+> > +     status = "disable";
+> > +};
+> > +
+> > +&mmc3 {
+> > +     status = "disable";
+> > +};
+> > +
+> > +&mmc4 {
+> > +     status = "disable";
+> > +};
+> > +
+> > +&mmc5 {
+> > +     ti,bus-width = <4>;
+> > +};
+> > --
+> > 1.7.5.4
+> >
+>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/e2a98029/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/cdc458d7/attachment-0001.html>
