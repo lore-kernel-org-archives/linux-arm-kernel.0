@@ -1,68 +1,36 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  6 Jun 2012 10:58:36 -0700
-Subject: [PATCH REPOST] arm: Don't try to print pud/pmd information unless
- present
-Message-ID: <1339005516-29544-1-git-send-email-lauraa@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 6 Jun 2012 13:28:33 -0700
+Subject: Supporting non-device tree consumers with device tree regulator
+ drivers
+In-Reply-To: <4FCEE5DA.7090403@ti.com>
+References: <4FCE30D6.7060102@codeaurora.org>
+ <4FCEE5DA.7090403@ti.com>
+Message-ID: <20120606202833.GA11202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in show_pte, there are unconditional checks for
-pud_none/pud_bad/pmd_none/pmd_bad. If pud/pmd are not used,
-this may incorrectly try to interpret entries as pud/pmd
-entries which may print bogus information (e.g. marking a
-pgd as bad when the entry is valid). Only check for pud/pmd
-information if pud/pmd is actually used.
+On Wed, Jun 06, 2012 at 10:38:42AM +0530, Rajendra Nayak wrote:
+> On Tuesday 05 June 2012 09:46 PM, David Collins wrote:
+> >In the long term, this problem should go away of its own accord.  However,
+> >in the short term, many systems are converting over to using device tree.
+> >  Therefore, we are left with a situation currently where some regulator
+> >consumer drivers are being probed via device tree and some are being
+> >probed via board file devices within a single platform.
+> 
+> Is this a situation you are facing in your mainline kernel or internal
+> trees? What you explain would need you to work with hybrid board files
+> with some devices created through device tree and some others statically
+> from the board file in the kernel, and that approach was already shot
+> down as unacceptable.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/mm/fault.c |   26 ++++++++++++++------------
- 1 files changed, 14 insertions(+), 12 deletions(-)
+As I understand, this is something being done on our internal kernel.
+I don't think this really applies to the mainline kernel, since none
+of these transitionary drivers are going into the upstream kernel
+without being made to work with device tree.
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index d7561bb..f69dee0 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -103,27 +103,29 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 		}
- 
- 		pud = pud_offset(pgd, addr);
--		if (PTRS_PER_PUD != 1)
-+		if (PTRS_PER_PUD != 1) {
- 			printk(", *pud=%08lx", pud_val(*pud));
- 
--		if (pud_none(*pud))
--			break;
-+			if (pud_none(*pud))
-+				break;
- 
--		if (pud_bad(*pud)) {
--			printk("(bad)");
--			break;
-+			if (pud_bad(*pud)) {
-+				printk("(bad)");
-+				break;
-+			}
- 		}
- 
- 		pmd = pmd_offset(pud, addr);
--		if (PTRS_PER_PMD != 1)
-+		if (PTRS_PER_PMD != 1) {
- 			printk(", *pmd=%08llx", (long long)pmd_val(*pmd));
- 
--		if (pmd_none(*pmd))
--			break;
-+			if (pmd_none(*pmd))
-+				break;
- 
--		if (pmd_bad(*pmd)) {
--			printk("(bad)");
--			break;
-+			if (pmd_bad(*pmd)) {
-+				printk("(bad)");
-+				break;
-+			}
- 		}
- 
- 		/* We must not map this if we have highmem enabled */
+Thanks,
+David
+
 -- 
-1.7.8.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
