@@ -1,92 +1,38 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 6 Jun 2012 12:19:44 +0200
-Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
-In-Reply-To: <87396869fw.fsf@octavius.laptop.org>
-References: <87396869fw.fsf@octavius.laptop.org>
-Message-ID: <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed,  6 Jun 2012 12:33:12 +0200
+Subject: No subject
+Message-ID: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+The following adds i.MX53 nand support and generally devicetree
+based probing for i.MX5 boards. The first three patches should go
+via mtd, the last patch optionally aswell if all agree.
 
-The use of DMA slave config operation requires that the burst size
-(aka chunk size) is specified through this interface.
-Modify atmel-mci slave driver to use this specification on its side.
+Sascha
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
-Hi Chris,
+The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
 
-Sorry for this trouble, this patch should apply well on 3.5-rc1.
+  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
 
-Thanks
+are available in the git repository at:
 
-Regards
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx/nand-mx53
 
-Ludovic
+for you to fetch changes up to d55d1479a3bfaedbb9f0c6c956f4dff6bb6d6d61:
 
+  ARM i.MX5: Add nand oftree support (2012-06-06 12:20:24 +0200)
 
- drivers/mmc/host/atmel-mci-regs.h |   14 ++++++++++++++
- drivers/mmc/host/atmel-mci.c      |    8 +++++---
- 2 files changed, 19 insertions(+), 3 deletions(-)
+----------------------------------------------------------------
+Sascha Hauer (4):
+      mtd nand mxc_nand: Use managed resources
+      mtd nand mxc_nand: swap iomem resource order
+      mtd nand mxc_nand: add i.MX53 support
+      ARM i.MX5: Add nand oftree support
 
-diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
-index 787aba1..ab56f7d 100644
---- a/drivers/mmc/host/atmel-mci-regs.h
-+++ b/drivers/mmc/host/atmel-mci-regs.h
-@@ -140,4 +140,18 @@
- #define atmci_writel(port,reg,value)			\
- 	__raw_writel((value), (port)->regs + reg)
- 
-+/*
-+ * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
-+ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
-+ *
-+ * This can be done by finding most significant bit set.
-+ */
-+static inline unsigned int atmci_convert_chksize(unsigned int maxburst)
-+{
-+	if (maxburst > 1)
-+		return fls(maxburst) - 2;
-+	else
-+		return 0;
-+}
-+
- #endif /* __DRIVERS_MMC_ATMEL_MCI_H__ */
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 420aca6..556d384 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -910,6 +910,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
- 	enum dma_data_direction		direction;
- 	enum dma_transfer_direction	slave_dirn;
- 	unsigned int			sglen;
-+	u32				maxburst;
- 	u32 iflags;
- 
- 	data->error = -EINPROGRESS;
-@@ -943,17 +944,18 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
- 	if (!chan)
- 		return -ENODEV;
- 
--	if (host->caps.has_dma)
--		atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(3) | ATMCI_DMAEN);
--
- 	if (data->flags & MMC_DATA_READ) {
- 		direction = DMA_FROM_DEVICE;
- 		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
-+		maxburst = atmci_convert_chksize(host->dma_conf.src_maxburst);
- 	} else {
- 		direction = DMA_TO_DEVICE;
- 		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
-+		maxburst = atmci_convert_chksize(host->dma_conf.dst_maxburst);
- 	}
- 
-+	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) | ATMCI_DMAEN);
-+
- 	sglen = dma_map_sg(chan->device->dev, data->sg,
- 			data->sg_len, direction);
- 
--- 
-1.7.5.4
+ arch/arm/boot/dts/imx51.dtsi                  |    7 ++
+ arch/arm/boot/dts/imx53.dtsi                  |    7 ++
+ arch/arm/mach-imx/clk-imx51-imx53.c           |    2 +
+ arch/arm/plat-mxc/devices/platform-mxc_nand.c |   11 +-
+ drivers/mtd/nand/mxc_nand.c                   |  137 ++++++++++++++-----------
+ 5 files changed, 97 insertions(+), 67 deletions(-)
