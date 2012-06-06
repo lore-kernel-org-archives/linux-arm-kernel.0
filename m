@@ -1,38 +1,35 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Wed, 06 Jun 2012 09:48:46 -0400
-Subject: [PATCH] mmc: omap: Fix broken reg_shift initialization
-In-Reply-To: <20120530071300.GH12766@atomide.com> (Tony Lindgren's message of
- "Wed, 30 May 2012 00:13:01 -0700")
-References: <20120528132147.GC12766@atomide.com>
- <CAPDyKFrcviT3_Fz13LpFJ+1oKxQ5LKswN7EmzVcWTJkiiDWusA@mail.gmail.com>
- <20120529074047.GE16340@arwen.pp.htv.fi>
- <20120529124732.GD12766@atomide.com>
- <20120529125024.GM9577@arwen.pp.htv.fi>
- <20120529130312.GE12766@atomide.com>
- <20120530071300.GH12766@atomide.com>
-Message-ID: <8762b44kld.fsf@octavius.laptop.org>
+Date: Wed, 6 Jun 2012 14:56:47 +0100
+Subject: [PATCH REPOST 1/2] mmc: tegra: use bus-width property instead
+ of support-8bit
+In-Reply-To: <1338834755-6900-1-git-send-email-swarren@wwwdotorg.org>
+References: <1338834755-6900-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20120606135647.GA3423@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 30 2012, Tony Lindgren wrote:
-> Commit fa550189 (mmc: core: Prevent eMMC VCC supply to be cut from late init)
-> slightly affected timings for how things are done for the omap MMC driver
-> causing the MMC cards not getting detected any longer.
->
-> Turns out this was caused by buggy reg_shift initialization in the omap
-> MMC driver that was happening after mmc_add_host() was being called.
->
-> Fix this by initializing reg_shift before mmc_add_host() is called.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
->
+On Mon, Jun 04, 2012 at 12:32:34PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Update the driver to parse the new unified bus-width property introduced
+> in commit 7f21779 "mmc: dt: Consolidate DT bindings", instead of the legacy
+> support-8bit property.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->
-> Heh found it! Chris, maybe Cc stable on this one?
+> Chris, It's probably easiest conflict-wise if I take this through the Tegra
+> tree. (Note: When I posted this series before, I said there shouldn't be any
+> conflicts if you take them through the MMC tree. That's probably still true,
+> but unforseen future conflicts seem more likely in the .dts files in the
+> second patch than sdhci-tegra.c in this patch, so the Tegra tree may make
+> more sense). Since the second patch depends on the first, it's easiest if
+> these go in through the same tree. Does this sound OK?
 
-Thanks, pushed to mmc-next for 3.5 with a stable@ tag added.
+Yes, makes sense -- taking this via the Tegra tree is fine:
+
+Acked-by: Chris Ball <cjb@laptop.org>
+
+Thanks!
 
 - Chris.
 -- 
