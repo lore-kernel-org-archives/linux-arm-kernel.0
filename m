@@ -1,49 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  6 Jun 2012 11:49:23 +0200
-Subject: [PATCH] gpio/mxc: make irqs work for fsl,imx21-gpio devices
-Message-ID: <1338976163-23001-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: christian.glindkamp@taskit.de (Christian Glindkamp)
+Date: Wed, 6 Jun 2012 11:47:48 +0200
+Subject: [PATCH 1/4] ARM: at91: at91 based machines specify their own irq
+ handler at run time
+In-Reply-To: <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
+ <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20120606094748.GA26504@taskit.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chained handler was set for the platform device with id == 0.
-When the gpio devices are instantiated by a device tree, all have id ==
--1 and so the handler was unset resulting in unusable gpio irqs on
-i.MX21 and i.MX27 (when using oftree).
+On 2012-06-05 16:47, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> SOC_AT91SAM9 selects MULTI_IRQ_HANDLER in order to let machines specify their
+> own IRQ handler at run time.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  arch/arm/mach-at91/board-cpu9krea.c           |    1 +
+>  arch/arm/mach-at91/board-sam9g20ek.c          |    1 +
+>  arch/arm/mach-at91/board-sam9261ek.c          |    1 +
+>  arch/arm/mach-at91/board-stamp9g20.c          |    1 +
+>  arch/arm/mach-at91/board-usb-a926x.c          |    1 +
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+At least these board files contain more than one MACHINE_START, but
+you only update the last one. Same for the third patch.
 
-I'm not sure this is material for stable because it never worked before.
-
-Best regards
-Uwe
-
- drivers/gpio/gpio-mxc.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index e791476..5c42daf 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -398,10 +398,12 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 	writel(~0, port->base + GPIO_ISR);
- 
- 	if (mxc_gpio_hwtype == IMX21_GPIO) {
--		/* setup one handler for all GPIO interrupts */
--		if (pdev->id == 0)
--			irq_set_chained_handler(port->irq,
--						mx2_gpio_irq_handler);
-+		/*
-+		 * Setup one handler for all GPIO interrupts. Actually setting
-+		 * the handler is needed only once, but doing it for every port
-+		 * is more robust and easier.
-+		 */
-+		irq_set_chained_handler(port->irq, mx2_gpio_irq_handler);
- 	} else {
- 		/* setup one handler for each entry */
- 		irq_set_chained_handler(port->irq, mx3_gpio_irq_handler);
--- 
-1.7.10
+I have not looked at the rest of the patch.
