@@ -1,59 +1,53 @@
-From: kay@vrfy.org (Kay Sievers)
-Date: Wed, 6 Jun 2012 03:10:54 +0200
-Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <20120605174638.69bcfa31.akpm@linux-foundation.org>
-References: <cover.1338889066.git.joe@perches.com>
- <20120605142826.d92316a0.akpm@linux-foundation.org>
- <1338934303.5780.8.camel@joe2Laptop>
- <20120605151754.a794ac7c.akpm@linux-foundation.org>
- <1338936572.5780.29.camel@joe2Laptop>
- <20120605162910.caccb0d4.akpm@linux-foundation.org>
- <1338939316.11962.3.camel@joe2Laptop>
- <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
- <1338939792.11962.4.camel@joe2Laptop>
- <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
- <1338940345.11962.9.camel@joe2Laptop>
- <20120605165808.cd255b93.akpm@linux-foundation.org>
- <1338941247.11962.16.camel@joe2Laptop>
- <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
- <1338941971.11962.20.camel@joe2Laptop>
- <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
- <20120605173751.65a2e1ee.akpm@linux-foundation.org>
- <1338943205.11962.28.camel@joe2Laptop>
- <20120605174638.69bcfa31.akpm@linux-foundation.org>
-Message-ID: <CAPXgP11DA2z2y4kR8C+AGtrd_-8=2Cy0jj3GX7T5JqczNke4GQ@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 6 Jun 2012 09:27:44 +0800
+Subject: [PATCH v3 03/12] usb: ehci-hcd: notify phy when connect change
+In-Reply-To: <Pine.LNX.4.44L0.1206051328430.1542-100000@iolanthe.rowland.org>
+References: <201206051923.09063.marex@denx.de>
+ <Pine.LNX.4.44L0.1206051328430.1542-100000@iolanthe.rowland.org>
+Message-ID: <20120606012743.GA16929@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 2:46 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Tue, 05 Jun 2012 17:40:05 -0700 Joe Perches <joe@perches.com> wrote:
->
->> On Tue, 2012-06-05 at 17:37 -0700, Andrew Morton wrote:
->> > On Tue, 05 Jun 2012 17:07:27 -0700 Joe Perches <joe@perches.com> wrote:
->> >
->> > > On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
->> > > > ?echo "\0014Hello Joe" > /dev/kmsg
->> > >
->> > > # echo -e "\x014Hello Me" > /dev/kmsg
->> > > gives:
->> > > 12,778,4057982669;Hello Me
->> >
->> > That's changed behavior.
->>
->> Which is an improvement too.
->
-> No it isn't. ?It exposes internal kernel implementation details in
-> random weird inexplicable ways. ?It doesn't seem at all important
-> though.
->
->> I very much doubt a single app will change
->> because of this.
->
-> I doubt it as well.
+On Tue, Jun 05, 2012 at 01:30:08PM -0400, Alan Stern wrote:
+> On Tue, 5 Jun 2012, Marek Vasut wrote:
+> 
+> > > > > Do the tests in the opposite order and add "unlikely":
+> > > > > 			if (unlikely(ehci->transceiver &&
+> > > > > 			
+> > > > > 					(pstatus & PORT_CSC)) {
+> > > > > 
+> > > > > That way it will fail more quickly on systems where it doesn't apply or
+> > > > > for unaffected ports.
+> > > > 
+> > > > Does this unlikely() have any effect on ARM/MIPS/PPC, where this chipidea
+> > > > IP is used ? Or is there some x86 device sporting this IP too?
+> > > 
+> > > I don't know what unlikely() does on architectures other than x86.
+> > 
+> > It should be optimized out to nothing on anything else but x86. On x86 it is a 
+> > hint for the branch predictor. Or that's what I believe it is.
+> 
+> That's right.  Then it should have no effect on ARM/MIPS/PPC.
+I prefer add the unlikely, we don't need to care about the arch
+implementation. Maybe it'll be implemented some day if it don't. and
+at least the code tell the reader the condition is unlikely.
 
-Yeah, the value of injecting such binary data is kind of questionable. :)
+I'll post a update to this series.
 
-Joe, maybe you can change printk_emit() to skip the prefix
-detection/stripping if a prefix is already passed to the function?
-
-Kay
+Thanks
+Richard
+> 
+> > > And
+> > > I haven't heard of any x86 systems that would need to use this code.
+> > >
+> > > On the other hand, port-status changes don't occur very frequently.  A
+> > > little time penalty one way or the other won't make much difference.
+> > 
+> > I'm not opposed, just curious :)
+> 
+> No big deal either way.  But the order of the tests should be switched, 
+> because on most systems, ehci->transceiver will be NULL.
+> 
+> Alan Stern
+> 
+> 
