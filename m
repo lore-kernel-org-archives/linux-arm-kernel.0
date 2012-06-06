@@ -1,41 +1,41 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Jun 2012 17:19:31 -0700
-Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
-References: <cover.1338889066.git.joe@perches.com>
- <20120605142826.d92316a0.akpm@linux-foundation.org>
- <1338934303.5780.8.camel@joe2Laptop>
- <20120605151754.a794ac7c.akpm@linux-foundation.org>
- <1338936572.5780.29.camel@joe2Laptop>
- <20120605162910.caccb0d4.akpm@linux-foundation.org>
- <1338939316.11962.3.camel@joe2Laptop>
- <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
- <1338939792.11962.4.camel@joe2Laptop>
- <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
- <1338940345.11962.9.camel@joe2Laptop>
- <20120605165808.cd255b93.akpm@linux-foundation.org>
- <1338941247.11962.16.camel@joe2Laptop>
- <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
-Message-ID: <1338941971.11962.20.camel@joe2Laptop>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 5 Jun 2012 18:28:07 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <alpine.DEB.2.00.1206051636080.30737@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1205251546160.25520@utopia.booyaka.com>
+ <4FC4C4FA.1070403@ti.com>
+ <alpine.DEB.2.00.1206051636080.30737@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1206051737000.30737@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 02:13 +0200, Kay Sievers wrote:
-> The question is what happens if you inject your new binary two-byte
-> prefix, like:
->   echo -e "\x01\x02Hello" > /dev/kmsg
+Hello Beno?t
 
-It's not a 2 byte binary.
-It's a leading ascii SOH and a standard ascii char
-'0' ... '7' or 'd'.
+On Tue, 5 Jun 2012, Paul Walmsley wrote:
 
-#define KERN_EMERG	KERN_SOH "0"	/* system is unusable */
-#define KERN_ALERT	KERN_SOH "1"	/* action must be taken immediately */
-etc...
+> On Tue, 29 May 2012, Cousson, Benoit wrote:
+> 
+> > So in fact, I'm wondering if a new flag is needed. We can potentially 
+> > apply that if idlemodes == (SIDLE_FORCE | SIDLE_NO).
+> > 
+> > We need to check which IP will have that to ensure that does not add 
+> > any side-effects.
+> 
+> I guess that means me :-)
 
-> And if that changes the log-level to "2" instead of the default "4"?
+I looked at a few TRMs.  Based on that incomplete survey, the above 
+behavior would probably work for existing chips.
 
-No it doesn't.
+But it seems perverse to assume that it is generally safe to set an IP 
+block to force-idle while it's being used.  That seems really dependent on 
+the IP block's integration.
 
-It's not triggering that because devkmsg_writev does
-prefix parsing only on the old "<n>" form.
+So in terms of a general fix, the flag approach seems safest to me in the 
+long run.
+
+The other advantage of using a flag is that it indicates that this is a 
+hardware workaround; something that it would be nice to fix in future 
+chips.
+
+
+- Paul
