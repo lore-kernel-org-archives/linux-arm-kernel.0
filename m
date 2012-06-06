@@ -1,27 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 6 Jun 2012 08:44:17 +0300
-Subject: [PATCH] remoteproc: block premature rproc booting
-In-Reply-To: <4FCECD8F.8000600@codeaurora.org>
-References: <1337687472-23009-1-git-send-email-ohad@wizery.com>
- <4FBDFC4A.1060602@codeaurora.org>
- <CAK=WgbaP5qSso_Eu=Oup4eqLDcorZ-qf=mysMKiEvOS=m7yLmg@mail.gmail.com>
- <4FCD276A.80505@codeaurora.org>
- <CAK=WgbZo-8GXY9bVYGk0XZvqKrdaJZWeNkK1FhRWnH5doGYLjA@mail.gmail.com>
- <4FCECD8F.8000600@codeaurora.org>
-Message-ID: <CAK=WgbakMG5eoSGP3GDFLFjA=z5fc_h_oFdzuC4tL5PcpCdLZA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Jun 2012 13:54:00 +0800
+Subject: [PATCH] MXS: Add DENX M28 dts file
+In-Reply-To: <CAOMZO5C-XbGqWHxpX24V6X58rcnSeSobuyJNiZTJErQi55tEbQ@mail.gmail.com>
+References: <1338084735-12083-1-git-send-email-marex@denx.de>
+ <CAOMZO5C-XbGqWHxpX24V6X58rcnSeSobuyJNiZTJErQi55tEbQ@mail.gmail.com>
+Message-ID: <20120606055357.GF2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 6:25 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> What if I don't want to boot the device at kernel start-up? Do I have to
-> make it a module then?
+On Mon, May 28, 2012 at 12:27:29PM -0300, Fabio Estevam wrote:
+> Hi Marek,
+> 
+> On Sat, May 26, 2012 at 11:12 PM, Marek Vasut <marex@denx.de> wrote:
+> 
+> > + ? ? ? sound {
+> > + ? ? ? ? ? ? ? compatible = "fsl,imx28-evk-sgtl5000",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ?"fsl,mxs-audio-sgtl5000";
+> > + ? ? ? ? ? ? ? model = "imx28-evk-sgtl5000";
+> > + ? ? ? ? ? ? ? saif-controllers = <&saif0 &saif1>;
+> > + ? ? ? ? ? ? ? audio-codec = <&sgtl5000>;
+> > + ? ? ? };
+> > +};
+> 
+> Shouldn't this be:
+> 
+> sound {
+> 	compatible = "fsl,imx28-m28-sgtl5000",
+> 		     "fsl,mxs-audio-sgtl5000";
+> 	model = "imx28-m28-sgtl5000";
+> 	saif-controllers = <&saif0 &saif1>;
+> 	audio-codec = <&sgtl5000>;
+> };
 
-Currently, yeah.
+Yes, this one looks sane to me.
 
-But we can change stuff if needed.
-
-We took that design decision because it was simple and we didn't have
-any reason not to do it, but I'm thinking we can let the users decide
-about this using runtime pm (e.g. calling pm_runtime_get_sync with an
-rpmsg device, which will then be propagated all the way up to the
-remoteproc device and power it up).
+-- 
+Regards,
+Shawn
