@@ -1,29 +1,53 @@
-From: christian.glindkamp@taskit.de (Christian Glindkamp)
-Date: Wed, 6 Jun 2012 11:47:48 +0200
-Subject: [PATCH 1/4] ARM: at91: at91 based machines specify their own irq
- handler at run time
-In-Reply-To: <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
- <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120606094748.GA26504@taskit.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 06 Jun 2012 06:02:36 -0400
+Subject: [PATCH] mmc: atmel-mci: fix data timeout issue
+In-Reply-To: <1337781135-23722-1-git-send-email-ludovic.desroches@atmel.com>
+ (ludovic desroches's message of "Wed, 23 May 2012 15:52:15 +0200")
+References: <1337781135-23722-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <877gvk69mr.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-06-05 16:47, ludovic.desroches at atmel.com wrote:
+Hi,
+
+On Wed, May 23 2012, ludovic.desroches at atmel.com wrote:
 > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> SOC_AT91SAM9 selects MULTI_IRQ_HANDLER in order to let machines specify their
-> own IRQ handler at run time.
-> 
+>
+> The data timeout timer was configured after mmc_add_host call. So, with bad
+> timings, it was possible to have a mmc request causing mod_timer call on a
+> non setup timer.
+>
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 > ---
->  arch/arm/mach-at91/board-cpu9krea.c           |    1 +
->  arch/arm/mach-at91/board-sam9g20ek.c          |    1 +
->  arch/arm/mach-at91/board-sam9261ek.c          |    1 +
->  arch/arm/mach-at91/board-stamp9g20.c          |    1 +
->  arch/arm/mach-at91/board-usb-a926x.c          |    1 +
+>  drivers/mmc/host/atmel-mci.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 93a1012..a25e23a 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2396,6 +2396,8 @@ static int __init atmci_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, host);
+>  
+> +	setup_timer(&host->timer, atmci_timeout_timer, (unsigned long)host);
+> +
+>  	/* We need at least one slot to succeed */
+>  	nr_slots = 0;
+>  	ret = -ENODEV;
+> @@ -2434,8 +2436,6 @@ static int __init atmci_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	setup_timer(&host->timer, atmci_timeout_timer, (unsigned long)host);
+> -
+>  	dev_info(&pdev->dev,
+>  			"Atmel MCI controller at 0x%08lx irq %d, %u slots\n",
+>  			host->mapbase, irq, nr_slots);
 
-At least these board files contain more than one MACHINE_START, but
-you only update the last one. Same for the third patch.
+Pushed to mmc-next for 3.5, thanks.
 
-I have not looked at the rest of the patch.
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
