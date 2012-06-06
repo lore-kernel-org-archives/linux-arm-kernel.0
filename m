@@ -1,111 +1,47 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 6 Jun 2012 09:21:28 +0200
-Subject: [PATCH] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-In-Reply-To: <alpine.DEB.2.00.1206051636080.30737@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1205251546160.25520@utopia.booyaka.com>
- <4FC4C4FA.1070403@ti.com>
- <alpine.DEB.2.00.1206051636080.30737@utopia.booyaka.com>
-Message-ID: <4FCF04F8.2090305@ti.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 6 Jun 2012 17:41:08 +1000
+Subject: Freescale fec.c driver breakage
+In-Reply-To: <201206050735.00458.sfking@fdwdc.com>
+References: <4FCC3CB4.5030107@snapgear.com> <4FCE088D.1060604@snapgear.com>
+ <20120605134116.GY23408@opensource.wolfsonmicro.com>
+ <201206050735.00458.sfking@fdwdc.com>
+Message-ID: <4FCF0994.4040902@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Paul,
+On 06/06/12 00:35, Steven King wrote:
+> On Tuesday 05 June 2012 6:41:16 am Mark Brown wrote:
+>> On Tue, Jun 05, 2012 at 11:24:29PM +1000, Greg Ungerer wrote:
+>>> Well, yeah, of course there are clocks involved. But you pretty much
+>>> hit the point here. 'ipg' and 'ahb' here are platform specific.
+>>
+>> What should be happening for that is that the driver requests with some
+>> generic name which is referenced to the IP (unfortunately these are
+>> usually not documented for the public...) and then clkdev or some
+>> platform specific code is used to map the names onto the underlying
+>> clocks.
+>>
+>> If 'ahb' isn't suitable how about 'bus', and for 'ipg' how about 'mclk'
+>> or something?
+>
+> Some of the newer Coldfire parts such as the m54455/m5441x do have software
+> controllable clocks; but they keep it simple with one clock per fec, and
+> names in the documentation like 'fec0, fec1' for the m54455
+> and 'macnet0,macnet1' for the m5441x.
 
-On 6/6/2012 12:55 AM, Paul Walmsley wrote:
-> Hello Beno?t
->
-> On Tue, 29 May 2012, Cousson, Benoit wrote:
->
->> On 5/25/2012 11:56 PM, Paul Walmsley wrote:
->>
->>> This patch is effectively a workaround for a hardware oversight.  A
->>> better hardware approach would have been to implement a smart-idle
->>> target idle mode for this IP block.  The smart-idle mode in this case
->>> would behave identically to the force-idle mode.
->>
->> I'm not sure to follow you here :-)
->
-> I should rewrite that paragraph.  It is not as clear as it could be.
->
->> force-idle is almost equivalent to smart-idle, so it is the right
->> workaround when smart-idle is not implemented.
->>
->> In force-idle idleack = idlereq. Whereas in smart-idle idleack = idlereq
->> if internal /OCP activity is completed.
->
-> It would be nice if the hardware people just implemented smart-idle on
-> all IP blocks.  Section 3.1.1.1.2 "Module-Level Clock Management" of The
-> OMAP4430 TRM Rev. vAA states:
->
-> "Smart-idle mode is the preferred mode of operation, while forced-idle and
-> no-idle modes are intended for debugging purposes."
->
-> Then no flags or software workarounds would be needed, except for
-> debugging.
+Most of the older ones don't. Most of the older parts that have a FEC
+core have a single clock-in for the chip, possibly a PLL and often a
+fixed divisor for distribuion to all on-chip peripherals. I have seen it
+named various names, 'bclko', 'mclk', "fsys/2", nothing seems consistent.
 
-I know... I'm dreaming as well of HW that stick to the spec :-)
+I think very generic namse might be the best solution here.
 
->> So in fact, I'm wondering if a new flag is needed. We can potentially apply that if
->> idlemodes == (SIDLE_FORCE | SIDLE_NO).
->>
->> We need to check which IP will have that to ensure that does not add any side-effects.
->
-> I guess that means me :-)
+Regards
+Greg
 
-Hehe, not really, I did it for OMAP4/5. counter_32k is the only IP with 
-that broken mode. GPU and IVA does have some missing modes as well but 
-at least smart_idle is there.
 
-Regards,
-Benoit
-
->> BTW, please note that the current idlemodes flags are wrong for the
->> counter 32k. I've just figured out that fixing the STANDBY flags for
->> some OMAP5 IPs. I'll add that fix in my WIP OMAP4 hwmod data cleanup for
->> 3.6.
->>
->> Something like that:
->
-> Okay will queue up a fix for 3.5-rc.
->
->>>    			.context_offs = OMAP4_RM_WKUP_SYNCTIMER_CONTEXT_OFFSET,
->>>    		},
->>>    	},
->>> +	.flags		= HWMOD_ALWAYS_FORCE_SIDLE,
->>
->> I'm confused by the location and the value, both linus/master and
->> lo/master branches does already have a flag for the counter_32k:
->>
->> /* counter_32k */
->> static struct omap_hwmod omap44xx_counter_32k_hwmod = {
->>          .name           = "counter_32k",
->>          .class          =&omap44xx_counter_hwmod_class,
->>          .clkdm_name     = "l4_wkup_clkdm",
->>          .flags          = HWMOD_SWSUP_SIDLE,
->>          .main_clk       = "sys_32k_ck",
->>          .prcm = {
->>                  .omap4 = {
->>                          .clkctrl_offs = OMAP4_CM_WKUP_SYNCTIMER_CLKCTRL_OFFSET,
->>                          .context_offs = OMAP4_RM_WKUP_SYNCTIMER_CONTEXT_OFFSET,
->>                  },
->>          },
->> };
->>
->> So the patch should be slightly different, I guess ?
->>
->>   	.class          =&omap44xx_counter_hwmod_class,
->>   	.clkdm_name     = "l4_wkup_clkdm",
->> -	.flags          = HWMOD_SWSUP_SIDLE,
->> +	.flags		= HWMOD_ALWAYS_FORCE_SIDLE,
->>   	.main_clk       = "sys_32k_ck",
->>   	.prcm = {
->>
->>
->> This is the same issue for OMAP3 data.
->>
->> What base branch are you using?
->
-> The wrong one, evidently.  Will ensure this is fixed.
->
->
-> - Paul
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
