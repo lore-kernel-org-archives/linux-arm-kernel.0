@@ -1,51 +1,92 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 6 Jun 2012 12:16:42 +0200
-Subject: [PATCH 0/2] A couple of imx6q clock patches
-In-Reply-To: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
-References: <1338880603-24333-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120606101642.GX30400@pengutronix.de>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Wed, 6 Jun 2012 12:19:44 +0200
+Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
+In-Reply-To: <87396869fw.fsf@octavius.laptop.org>
+References: <87396869fw.fsf@octavius.laptop.org>
+Message-ID: <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn, Olof,
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Tue, Jun 05, 2012 at 03:16:41PM +0800, Shawn Guo wrote:
-> Hi Sascha,
-> 
-> These two patches are based on v3.5-rc1 + your imx-clk-common-fixes.
-> I can wait for your imx-clk-common-fixes hit -rc and then send these
-> two.  But I think the better approach would be you rebase
-> imx-clk-common-fixes on -rc1 and then pick up these two into your
-> fix series.
+The use of DMA slave config operation requires that the burst size
+(aka chunk size) is specified through this interface.
+Modify atmel-mci slave driver to use this specification on its side.
 
-Olof, what do you prefer? Is there still time to update the
-imx-clk-common-fixes you already pulled?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+Hi Chris,
 
-Sascha
+Sorry for this trouble, this patch should apply well on 3.5-rc1.
+
+Thanks
+
+Regards
+
+Ludovic
 
 
-> 
-> The first one is a small clean up which can be amended into b0286f2
-> (ARM: imx6q: prepare and enable init on clks directly instead of
-> clk_get first), and the second one fixes a suspend regression.
-> 
-> Regards,
-> Shawn
-> 
-> Shawn Guo (2):
->   ARM: imx6q: remove unneeded clkdev lookups
->   ARM: imx6q: fix suspend regression caused by common clk migration
-> 
->  arch/arm/mach-imx/clk-imx6q.c |    9 ++++-----
->  1 files changed, 4 insertions(+), 5 deletions(-)
-> 
-> -- 
-> 1.7.5.4
-> 
-> 
+ drivers/mmc/host/atmel-mci-regs.h |   14 ++++++++++++++
+ drivers/mmc/host/atmel-mci.c      |    8 +++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+index 787aba1..ab56f7d 100644
+--- a/drivers/mmc/host/atmel-mci-regs.h
++++ b/drivers/mmc/host/atmel-mci-regs.h
+@@ -140,4 +140,18 @@
+ #define atmci_writel(port,reg,value)			\
+ 	__raw_writel((value), (port)->regs + reg)
+ 
++/*
++ * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
++ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
++ *
++ * This can be done by finding most significant bit set.
++ */
++static inline unsigned int atmci_convert_chksize(unsigned int maxburst)
++{
++	if (maxburst > 1)
++		return fls(maxburst) - 2;
++	else
++		return 0;
++}
++
+ #endif /* __DRIVERS_MMC_ATMEL_MCI_H__ */
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 420aca6..556d384 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -910,6 +910,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
+ 	enum dma_data_direction		direction;
+ 	enum dma_transfer_direction	slave_dirn;
+ 	unsigned int			sglen;
++	u32				maxburst;
+ 	u32 iflags;
+ 
+ 	data->error = -EINPROGRESS;
+@@ -943,17 +944,18 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
+ 	if (!chan)
+ 		return -ENODEV;
+ 
+-	if (host->caps.has_dma)
+-		atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(3) | ATMCI_DMAEN);
+-
+ 	if (data->flags & MMC_DATA_READ) {
+ 		direction = DMA_FROM_DEVICE;
+ 		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
++		maxburst = atmci_convert_chksize(host->dma_conf.src_maxburst);
+ 	} else {
+ 		direction = DMA_TO_DEVICE;
+ 		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
++		maxburst = atmci_convert_chksize(host->dma_conf.dst_maxburst);
+ 	}
+ 
++	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) | ATMCI_DMAEN);
++
+ 	sglen = dma_map_sg(chan->device->dev, data->sg,
+ 			data->sg_len, direction);
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.5.4
