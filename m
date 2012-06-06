@@ -1,112 +1,73 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  6 Jun 2012 23:35:13 +0200
-Subject: [PATCH 5/7] ARM: nomadik: register all three I2C busses
-Message-ID: <1339018513-29158-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed,  6 Jun 2012 23:35:19 +0200
+Subject: [PATCH 6/7] ARM: nomadik: register the I2C devices
+Message-ID: <1339018519-29190-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nomadik has two dedicated I2C bus blocks for I2C0 and I2C1,
-and a bitbanged GPIO connection on two pins for the USB portions
-of the STw4811 chip. Register all three as bit-banged GPIO for
-the moment.
+Add board data to register all the Nomadik I2C devices.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-nomadik/i2c-8815nhk.c |   38 ++++++++++++++++++++++++++++------
- 1 files changed, 31 insertions(+), 7 deletions(-)
+ arch/arm/mach-nomadik/board-nhk8815.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-nomadik/i2c-8815nhk.c b/arch/arm/mach-nomadik/i2c-8815nhk.c
-index 0fc2f6f..6d14454 100644
---- a/arch/arm/mach-nomadik/i2c-8815nhk.c
-+++ b/arch/arm/mach-nomadik/i2c-8815nhk.c
-@@ -5,6 +5,7 @@
- #include <linux/i2c-gpio.h>
- #include <linux/platform_device.h>
- #include <plat/gpio-nomadik.h>
-+#include <plat/pincfg.h>
- 
- /*
-  * There are two busses in the 8815NHK.
-@@ -12,19 +13,27 @@
-  * use bit-bang through GPIO by now, to keep things simple
-  */
- 
-+/* I2C0 connected to the STw4811 power management chip */
- static struct i2c_gpio_platform_data nhk8815_i2c_data0 = {
- 	/* keep defaults for timeouts; pins are push-pull bidirectional */
- 	.scl_pin = 62,
- 	.sda_pin = 63,
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 43b844e..029a741 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -20,6 +20,7 @@
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/onenand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/i2c.h>
+ #include <linux/io.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/sizes.h>
+@@ -242,6 +243,30 @@ static struct sys_timer nomadik_timer = {
+ 	.init	= nomadik_timer_init,
  };
  
-+/* I2C1 connected to various sensors */
- static struct i2c_gpio_platform_data nhk8815_i2c_data1 = {
- 	/* keep defaults for timeouts; pins are push-pull bidirectional */
- 	.scl_pin = 53,
- 	.sda_pin = 54,
- };
- 
--/* first bus: GPIO XX and YY */
-+/* I2C2 connected to the USB portions of the STw4811 only */
-+static struct i2c_gpio_platform_data nhk8815_i2c_data2 = {
-+	/* keep defaults for timeouts; pins are push-pull bidirectional */
-+	.scl_pin = 73,
-+	.sda_pin = 74,
-+};
-+
- static struct platform_device nhk8815_i2c_dev0 = {
- 	.name	= "i2c-gpio",
- 	.id	= 0,
-@@ -32,7 +41,7 @@ static struct platform_device nhk8815_i2c_dev0 = {
- 		.platform_data = &nhk8815_i2c_data0,
- 	},
- };
--/* second bus: GPIO XX and YY */
-+
- static struct platform_device nhk8815_i2c_dev1 = {
- 	.name	= "i2c-gpio",
- 	.id	= 1,
-@@ -41,15 +50,29 @@ static struct platform_device nhk8815_i2c_dev1 = {
- 	},
- };
- 
-+static struct platform_device nhk8815_i2c_dev2 = {
-+	.name	= "i2c-gpio",
-+	.id	= 2,
-+	.dev	= {
-+		.platform_data = &nhk8815_i2c_data2,
++static struct i2c_board_info __initdata nhk8815_i2c0_devices[] = {
++	{
++		I2C_BOARD_INFO("stw4811", 0x2d),
 +	},
 +};
 +
-+static pin_cfg_t cpu8815_pins_i2c[] = {
-+	PIN_CFG_INPUT(62, GPIO, PULLUP),
-+	PIN_CFG_INPUT(63, GPIO, PULLUP),
-+	PIN_CFG_INPUT(53, GPIO, PULLUP),
-+	PIN_CFG_INPUT(54, GPIO, PULLUP),
-+	PIN_CFG_INPUT(73, GPIO, PULLUP),
-+	PIN_CFG_INPUT(74, GPIO, PULLUP),
++static struct i2c_board_info __initdata nhk8815_i2c1_devices[] = {
++	{
++		I2C_BOARD_INFO("camera", 0x10),
++	},
++	{
++		I2C_BOARD_INFO("stw5095", 0x1a),
++	},
++	{
++		I2C_BOARD_INFO("lis3lv02dl", 0x1d),
++	},
 +};
 +
- static int __init nhk8815_i2c_init(void)
++static struct i2c_board_info __initdata nhk8815_i2c2_devices[] = {
++	{
++		I2C_BOARD_INFO("stw4811-usb", 0x2d),
++	},
++};
++
+ static void __init nhk8815_platform_init(void)
  {
--	nmk_gpio_set_mode(nhk8815_i2c_data0.scl_pin, NMK_GPIO_ALT_GPIO);
--	nmk_gpio_set_mode(nhk8815_i2c_data0.sda_pin, NMK_GPIO_ALT_GPIO);
-+	nmk_config_pins(cpu8815_pins_i2c, ARRAY_SIZE(cpu8815_pins_i2c));
- 	platform_device_register(&nhk8815_i2c_dev0);
--
--	nmk_gpio_set_mode(nhk8815_i2c_data1.scl_pin, NMK_GPIO_ALT_GPIO);
--	nmk_gpio_set_mode(nhk8815_i2c_data1.sda_pin, NMK_GPIO_ALT_GPIO);
- 	platform_device_register(&nhk8815_i2c_dev1);
-+	platform_device_register(&nhk8815_i2c_dev2);
+ 	cpu8815_platform_init();
+@@ -251,6 +276,13 @@ static void __init nhk8815_platform_init(void)
  
- 	return 0;
- }
-@@ -58,6 +81,7 @@ static void __exit nhk8815_i2c_exit(void)
- {
- 	platform_device_unregister(&nhk8815_i2c_dev0);
- 	platform_device_unregister(&nhk8815_i2c_dev1);
-+	platform_device_unregister(&nhk8815_i2c_dev2);
- 	return;
+ 	amba_apb_device_add(NULL, "uart0", NOMADIK_UART0_BASE, SZ_4K, IRQ_UART0, 0, NULL, 0);
+ 	amba_apb_device_add(NULL, "uart1", NOMADIK_UART1_BASE, SZ_4K, IRQ_UART1, 0, NULL, 0);
++
++	i2c_register_board_info(0, nhk8815_i2c0_devices,
++				ARRAY_SIZE(nhk8815_i2c0_devices));
++	i2c_register_board_info(1, nhk8815_i2c1_devices,
++				ARRAY_SIZE(nhk8815_i2c1_devices));
++	i2c_register_board_info(2, nhk8815_i2c2_devices,
++				ARRAY_SIZE(nhk8815_i2c2_devices));
  }
  
+ MACHINE_START(NOMADIK, "NHK8815")
 -- 
 1.7.7.6
