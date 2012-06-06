@@ -1,75 +1,114 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 6 Jun 2012 13:25:54 +0800
-Subject: [PATCH v2 8/9] ARM: dts: refresh dts file for arch mmp
-In-Reply-To: <4FCEE91F.1030308@firmworks.com>
-References: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
- <1336134626-12262-9-git-send-email-haojian.zhuang@gmail.com>
- <87d35ezkm1.fsf@laptop.org> <201206060128.28167.arnd@arndb.de>
- <4FCEB694.8080904@firmworks.com>
- <CAN1soZykbTFGk=qAmzDe2qyQVVYBJpxcPYh6OzWyPxiBacJ-mg@mail.gmail.com>
- <4FCEE91F.1030308@firmworks.com>
-Message-ID: <CAN1soZx5BiY4kgt1EzbyFqRQOAYxkX9p2sNbrxZ-D=oocZuuRw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Jun 2012 13:29:36 +0800
+Subject: [PATCH] MXS: Add DT binding support into stmp3xxx-rtc
+In-Reply-To: <1338084689-12003-1-git-send-email-marex@denx.de>
+References: <1338084689-12003-1-git-send-email-marex@denx.de>
+Message-ID: <20120606052934.GD2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 1:22 PM, Mitch Bradley <wmb@firmworks.com> wrote:
-> On 6/5/2012 4:35 PM, Haojian Zhuang wrote:
->>
->> On Wed, Jun 6, 2012 at 9:47 AM, Mitch Bradley<wmb@firmworks.com> ?wrote:
->>>
->>> On 6/5/2012 3:28 PM, Arnd Bergmann wrote:
->>>>
->>>>
->>>> On Tuesday 05 June 2012, Chris Ball wrote:
->>>>>
->>>>>
->>>>> Hi Haojian,
->>>>>
->>>>> On Fri, May 04 2012, Haojian Zhuang wrote:
->>>>>>
->>>>>>
->>>>>> Append mmp2 and pxa910 dts files. Update PXA168 dts files for irq,
->>>>>> timer, gpio components.
->>>>>
->>>>>
->>>>>
->>>>> The patch I'm replying to introduced a device tree for MMP2/Brownstone
->>>>> in 3.5-rc1. ?We're looking at adopting the MMP2 device tree for the
->>>>> OLPC
->>>>> XO-1.75 board, and Mitch Bradley has some corrections to the device
->>>>> tree
->>>>> format that we'd like to make, appended below.
->>>>>
->>>>> You can see all of the files Mitch mentions at:
->>>>> http://dev.laptop.org/~wmb/mmp2-devicetree/
->>>>>
->>>>> Here's my proposal for what to do next:
->>>>> ?* First, you choose one of the two forms that Mitch links to.
->>>>> ? ?(Either "mmp2.dtsi" or "mmp2-flat.dtsi"; we have a weak preference
->>>>> ? ?for mmp2-flat.dtsi.)
->>>>
->>>>
->>>>
->>>> My preference would be towards mmp2.dtsi. I've recommended doing it
->>>> that way to other people, too.
->>>
->>>
->>> In most cases, I have found that exposing the full hierarchy is
->>> preferable.
->>> ?For this specific SoC, which I have been working with for quite awhile
->>> now,
->>> I haven't found any instance where exposing the AXI/APB levels buys you
->>> anything. ?The hierarchy just adds clutter.
->>>
->>> That said, I don't feel strongly about it.
->>>
->> mmp2-brownstone.dts is too complex since both apb& ?axi are imported.
->>
->> Could we only use flat structure in mmp2-brownstone.dts?
->
->
-> See http://dev.laptop.org/~wmb/mmp2-devicetree/mmp2-brownstone-flat.dts
-> <http://dev.laptop.org/%7Ewmb/mmp2-devicetree/mmp2-brownstone-flat.dts>
->
+On Sun, May 27, 2012 at 04:11:29AM +0200, Marek Vasut wrote:
+> Add simple binding for the stmp3xxx-rtc.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: rtc-linux at googlegroups.com
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../devicetree/bindings/rtc/stmp3xxx-rtc.txt       |   20 ++++++++++++++++++++
+>  arch/arm/boot/dts/imx28.dtsi                       |    1 +
+>  drivers/rtc/rtc-stmp3xxx.c                         |    8 ++++++++
+>  3 files changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> new file mode 100644
+> index 0000000..a49dd52
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+> @@ -0,0 +1,20 @@
+> +* STMP3xxx/i.MX28 Time Clock controller
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> +    * "fsl,stmp3xxx-rtc"
+> +    * "fsl,imx28-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Two interrupt numbers to the cpu should be specified. First
+> +  interrupt number is the rtc rick interupt and second interrupt number
 
-My meaning is mmp2-brownstone-flat.dts + mmp2.dtsi. Is it acceptable?
+s/rick/tick?
+
+> +  is the rtc alarm interrupt. The number of cells representing a interrupt
+> +  depends on the parent interrupt controller.
+> +
+> +Example:
+> +
+> +	rtc at 80056000 {
+> +		compatible = "fsl,imx28-rtc";
+> +		reg = <0x80056000 2000>;
+> +		interrupts = <28 29>;
+> +	};
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index d470276..119f183 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -370,6 +370,7 @@
+>  			};
+>  
+>  			rtc at 80056000 {
+> +				compatible = "fsl,imx28-rtc";
+>  				reg = <0x80056000 2000>;
+>  				interrupts = <28 29>;
+>  				status = "disabled";
+> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+> index 1028786..dea9764 100644
+> --- a/drivers/rtc/rtc-stmp3xxx.c
+> +++ b/drivers/rtc/rtc-stmp3xxx.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/rtc.h>
+>  #include <linux/slab.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <mach/common.h>
+>  
+> @@ -265,6 +266,12 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
+>  #define stmp3xxx_rtc_resume	NULL
+>  #endif
+>  
+> +static const struct of_device_id rtc_dt_ids[] = {
+> +	{ .compatible = "fsl,stmp3xxx-rtc", },
+> +	{ .compatible = "fsl,imx28-rtc", },
+
+If we do not have any tweaking in the driver between stmp3xxx-rtc and
+imx28-rtc, that means imx28-rtc is compatible with stmp3xxx-rtc.  That
+said, we only need stmp3xxx-rtc in this of_device_id table, and having
+the following line in imx28 dts will just work for imx28.
+
+	compatible = "fsl,imx28-rtc", "stmp3xxx-rtc";
+
+Regards,
+Shawn
+
+> +	{ /* sentinel */ }
+> +};
+> +
+>  static struct platform_driver stmp3xxx_rtcdrv = {
+>  	.probe		= stmp3xxx_rtc_probe,
+>  	.remove		= stmp3xxx_rtc_remove,
+> @@ -273,6 +280,7 @@ static struct platform_driver stmp3xxx_rtcdrv = {
+>  	.driver		= {
+>  		.name	= "stmp3xxx-rtc",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = rtc_dt_ids,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.10
+> 
