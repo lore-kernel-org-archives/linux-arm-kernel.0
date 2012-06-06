@@ -1,57 +1,52 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 06 Jun 2012 17:39:07 +0300
-Subject: 
-In-Reply-To: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
-References: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1338993547.6875.65.camel@sauron.fi.intel.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Wed, 6 Jun 2012 20:40:50 +0530
+Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
+In-Reply-To: <201205312046.14823.arnd@arndb.de>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <201205310922.18550.arnd@arndb.de>
+ <CAAe_U6J3p9Lh9g82tSSLxOJ7nqrozdRe11zV_v2rqTuMYPjbyA@mail.gmail.com>
+ <201205312046.14823.arnd@arndb.de>
+Message-ID: <CAAe_U6+zi50muNFKXW9ytK0BVki+5wxVK_S0rjEc53M2oc-GeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 12:33 +0200, Sascha Hauer wrote:
-> The following adds i.MX53 nand support and generally devicetree
-> based probing for i.MX5 boards. The first three patches should go
-> via mtd, the last patch optionally aswell if all agree.
-> 
-> Sascha
-> 
-> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-> 
->   Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git imx/nand-mx53
-> 
-> for you to fetch changes up to d55d1479a3bfaedbb9f0c6c956f4dff6bb6d6d61:
-> 
->   ARM i.MX5: Add nand oftree support (2012-06-06 12:20:24 +0200)
+Hi Kevin, Benoit, Paul,
 
-Do you want this to go via the MTD tree? Would you be able to collect
-acks for the arch/arm bits? Meanwhile, please, take a look at these
-sparse warnings added by this patch-set and detected by aiaiai:
+On Fri, Jun 1, 2012 at 2:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 31 May 2012, ABRAHAM, KISHON VIJAY wrote:
+>> > I would mark the multiplexed device compatible with "simple-bus", which
+>> > results in the child devices automatically getting added.
+>>
+>> hmm.. ocp2scp has a sysconfig register and it also has a module mode
+>> by which it can be enabled/disabled. I was making use of pm_runtime
+>> API's to control these registers (Apart from creating child devices,
+>> the driver also has a call to pm_runtime_enable).
+>
+> I see.
+>
+>> I'm not sure if with
+>> "simple-bus" we'll be able to do those. I have to check on that.
+>
+> How about making it compatible with both "simple-bus" and something
+> that handles the pm_runtime requirements?
+>
+> I don't understand enough of what needs to be done for pm_runtime
+> across a lot of devices, but I'd hope that it should be possible
+> to do that in a generic way based on the device definition.
 
---------------------------------------------------------------------------------
+Is there already exists a generic way for handling pm_runtime
+requirements (as simple as doing a pm_runtime_enable on a device).
 
-Successfully built configuration "arm-mxc-imx_defconfig,arm,arm-unknown-linux-gnueabi-", results:
+So the actual problem is we have ocp2scp as parent and usb2phy and
+usb3phy as the child device. ocp2scp has the sysconfig register and it
+can be controlled using module mode bit (both of this can be
+controlled by pm_runtime). Whenever usb controller(dwc3/musb) wants to
+enable a phy, it calls an exported API in usb2/usb3 phy to enable it.
+These API's have pm_runtime_get_sync on usb2/usb3 device which in-turn
+calls pm_runtime_get_sync of ocp2scp because of parent->child
+relationship (For this both usb2/usb3 phy and ocp2scp devices should
+have called pm_runtime_enable). All I'm trying is to find a place to
+have pm_runtime_enable for ocp2scp.
 
---- before_patching.log
-+++ after_patching.log
-@@ @@
-+drivers/mtd/nand/mxc_nand.c:1289:26: warning: incorrect type in initializer (different modifiers) [sparse]
-+drivers/mtd/nand/mxc_nand.c:1289:26:    expected void *data [sparse]
-+drivers/mtd/nand/mxc_nand.c:1289:26:    got struct mxc_nand_devtype_data static const [toplevel] *<noident> [sparse]
-+drivers/mtd/nand/mxc_nand.c:1289:3: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
-
---------------------------------------------------------------------------------
-
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/532bd4d9/attachment-0001.sig>
+Thanks
+Kishon
