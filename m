@@ -1,7 +1,7 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 5 Jun 2012 17:46:38 -0700
+From: kay@vrfy.org (Kay Sievers)
+Date: Wed, 6 Jun 2012 03:10:54 +0200
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <1338943205.11962.28.camel@joe2Laptop>
+In-Reply-To: <20120605174638.69bcfa31.akpm@linux-foundation.org>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -20,39 +20,40 @@ References: <cover.1338889066.git.joe@perches.com>
  <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
  <20120605173751.65a2e1ee.akpm@linux-foundation.org>
  <1338943205.11962.28.camel@joe2Laptop>
-Message-ID: <20120605174638.69bcfa31.akpm@linux-foundation.org>
+ <20120605174638.69bcfa31.akpm@linux-foundation.org>
+Message-ID: <CAPXgP11DA2z2y4kR8C+AGtrd_-8=2Cy0jj3GX7T5JqczNke4GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Jun 2012 17:40:05 -0700 Joe Perches <joe@perches.com> wrote:
+On Wed, Jun 6, 2012 at 2:46 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> On Tue, 05 Jun 2012 17:40:05 -0700 Joe Perches <joe@perches.com> wrote:
+>
+>> On Tue, 2012-06-05 at 17:37 -0700, Andrew Morton wrote:
+>> > On Tue, 05 Jun 2012 17:07:27 -0700 Joe Perches <joe@perches.com> wrote:
+>> >
+>> > > On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
+>> > > > ?echo "\0014Hello Joe" > /dev/kmsg
+>> > >
+>> > > # echo -e "\x014Hello Me" > /dev/kmsg
+>> > > gives:
+>> > > 12,778,4057982669;Hello Me
+>> >
+>> > That's changed behavior.
+>>
+>> Which is an improvement too.
+>
+> No it isn't. ?It exposes internal kernel implementation details in
+> random weird inexplicable ways. ?It doesn't seem at all important
+> though.
+>
+>> I very much doubt a single app will change
+>> because of this.
+>
+> I doubt it as well.
 
-> On Tue, 2012-06-05 at 17:37 -0700, Andrew Morton wrote:
-> > On Tue, 05 Jun 2012 17:07:27 -0700 Joe Perches <joe@perches.com> wrote:
-> > 
-> > > On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
-> > > >  echo "\0014Hello Joe" > /dev/kmsg
-> > > 
-> > > # echo -e "\x014Hello Me" > /dev/kmsg
-> > > gives:
-> > > 12,778,4057982669;Hello Me
-> > 
-> > That's changed behavior.
-> 
-> Which is an improvement too.
+Yeah, the value of injecting such binary data is kind of questionable. :)
 
-No it isn't.  It exposes internal kernel implementation details in
-random weird inexplicable ways.  It doesn't seem at all important
-though.
+Joe, maybe you can change printk_emit() to skip the prefix
+detection/stripping if a prefix is already passed to the function?
 
-> I very much doubt a single app will change
-> because of this.
-
-I doubt it as well.
-
-> > printk_emit() does parse the leading \0014, and then skips over it,
-> > removing it from the output stream.  printk_emit() then throws away the
-> > resulting level because devkmsg_writev() did not pass in level==-1.
-> 
-> I'm glad you know how it works now.
-
-It's nice to see you learning about it as well.
+Kay
