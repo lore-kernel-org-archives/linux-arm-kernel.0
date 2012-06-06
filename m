@@ -1,33 +1,81 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 06 Jun 2012 09:45:04 -0400
-Subject: [PATCH] mmc: omap: Fix a section warning regression
-In-Reply-To: <20120528082217.GI18918@arwen.pp.htv.fi> (Felipe Balbi's message
- of "Mon, 28 May 2012 11:22:18 +0300")
-References: <20120528065347.GR17852@atomide.com>
- <20120528082217.GI18918@arwen.pp.htv.fi>
-Message-ID: <87ehps4krj.fsf@octavius.laptop.org>
+From: subashrp@gmail.com (Subash Patel)
+Date: Wed, 06 Jun 2012 19:15:40 +0530
+Subject: [PATCH/RFC 0/2] ARM: DMA-mapping: new extensions for buffer
+ sharing (part 2)
+In-Reply-To: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
+References: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4FCF5F04.7030207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Marek,
 
-On Mon, May 28 2012, Felipe Balbi wrote:
-> On Sun, May 27, 2012 at 11:53:47PM -0700, Tony Lindgren wrote:
->> Commit b6e0703b (mmc: omap: make it behave well as a module) made some
->> __devinit changes but missed one function causing a section warning:
->> 
->> WARNING: vmlinux.o(.devinit.text+0x8604): Section mismatch in reference
->> from the function mmc_omap_probe)
->> The function __devinit mmc_omap_probe() references a function
->> __init mmc_omap_new_slot()
->> 
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Thanks for the patch. We had found below two challenges when using UMM 
+related to the cache invalidate/flush after/before performing the DMA 
+operations:
+
+a) when using HIGH_MEM pages, the page-table walk consumed lot of time 
+to get the KVA of each page. Moreover the overhead was from the spinlock 
+we acquire/release for each of the page.
+
+b) One of my colleague tried to map/unmap the buffers only once instead 
+of every time(which results in this problem) and we didn't find 
+significant performance improvement. The reason is (as per my knowledge) 
+when we give address range to cache controller to invalidate/flush out, 
+the hardware operation is too fast(if there were any cache lines 
+associated with the pages at all) to add any overhead to the CPU operation.
+
+But this patch makes logical flow for dma-mapping one step closer :) I 
+will adopt it as part of pulling all your new patches, and will keep you 
+updated of any new findings.
+
+Regards,
+Subash
+
+On 06/06/2012 06:47 PM, Marek Szyprowski wrote:
+> Hello,
 >
-> Acked-by: Felipe Balbi <balbi@ti.com>
-
-Thanks, pushed to mmc-next for 3.5.
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> This is a continuation of the dma-mapping extensions posted in the
+> following thread:
+> http://thread.gmane.org/gmane.linux.kernel.mm/78644
+>
+> We noticed that some advanced buffer sharing use cases usually require
+> creating a dma mapping for the same memory buffer for more than one
+> device. Usually also such buffer is never touched with CPU, so the data
+> are processed by the devices.
+>
+>  From the DMA-mapping perspective this requires to call one of the
+> dma_map_{page,single,sg} function for the given memory buffer a few
+> times, for each of the devices. Each dma_map_* call performs CPU cache
+> synchronization, what might be a time consuming operation, especially
+> when the buffers are large. We would like to avoid any useless and time
+> consuming operations, so that was the main reason for introducing
+> another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
+> which lets dma-mapping core to skip CPU cache synchronization in certain
+> cases.
+>
+> The proposed patches have been generated on top of the ARM DMA-mapping
+> redesign patch series on Linux v3.4-rc7. They are also available on the
+> following GIT branch:
+>
+> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc7-arm-dma-v10-ext
+>
+> with all require patches on top of vanilla v3.4-rc7 kernel. I will
+> resend them rebased onto v3.5-rc1 soon.
+>
+> Best regards
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+> Patch summary:
+>
+> Marek Szyprowski (2):
+>    common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
+>    ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
+>
+>   Documentation/DMA-attributes.txt |   24 ++++++++++++++++++++++++
+>   arch/arm/mm/dma-mapping.c        |   20 +++++++++++---------
+>   include/linux/dma-attrs.h        |    1 +
+>   3 files changed, 36 insertions(+), 9 deletions(-)
+>
