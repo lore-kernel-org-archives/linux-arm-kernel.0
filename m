@@ -1,32 +1,112 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed,  6 Jun 2012 21:22:57 -0400
-Subject: [PATCH v2 1/3] ARM: imx6q: add DT node for apbh-dma
-Message-ID: <1339032179-2732-1-git-send-email-shijie8@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 06 Jun 2012 15:17:37 +0200
+Subject: [PATCH 2/2] ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC
+ attribute
+In-Reply-To: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
+References: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1338988657-20770-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add DT node for apbh-dma.
+This patch adds support for DMA_ATTR_SKIP_CPU_SYNC attribute for
+dma_(un)map_(single,page,sg) functions family. It lets dma mapping clients
+to create a mapping for the buffer for the given device without performing
+a CPU cache synchronization. CPU cache synchronization can be skipped for
+the buffers which it is known that they are already in 'device' domain (CPU
+caches have been already synchronized or there are only coherent mappings
+for the buffer). For advanced users only, please use it with care.
 
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/boot/dts/imx6q.dtsi |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mm/dma-mapping.c |   20 +++++++++++---------
+ 1 files changed, 11 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 8c90cba..3197744 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -87,6 +87,11 @@
- 		interrupt-parent = <&intc>;
- 		ranges;
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index b140440..62a0023 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -68,7 +68,7 @@ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+ 	     struct dma_attrs *attrs)
+ {
+-	if (!arch_is_coherent())
++	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+ 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
+@@ -91,7 +91,7 @@ static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+ 		struct dma_attrs *attrs)
+ {
+-	if (!arch_is_coherent())
++	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+ 				      handle & ~PAGE_MASK, size, dir);
+ }
+@@ -1077,7 +1077,7 @@ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+  */
+ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 			  size_t size, dma_addr_t *handle,
+-			  enum dma_data_direction dir)
++			  enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+ 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+ 	dma_addr_t iova, iova_base;
+@@ -1096,7 +1096,8 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 		phys_addr_t phys = page_to_phys(sg_page(s));
+ 		unsigned int len = PAGE_ALIGN(s->offset + s->length);
  
-+		dma-apbh at 00110000 {
-+			compatible = "fsl,imx6q-dma-apbh", "fsl,imx28-dma-apbh";
-+			reg = <0x00110000 0x2000>;
-+		};
-+
- 		timer at 00a00600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
+-		if (!arch_is_coherent())
++		if (!arch_is_coherent() &&
++		    !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+ 
+ 		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+@@ -1143,7 +1144,7 @@ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 
+ 		if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
+ 			if (__map_sg_chunk(dev, start, size, &dma->dma_address,
+-			    dir) < 0)
++			    dir, attrs) < 0)
+ 				goto bad_mapping;
+ 
+ 			dma->dma_address += offset;
+@@ -1156,7 +1157,7 @@ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 		}
+ 		size += s->length;
+ 	}
+-	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir) < 0)
++	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir, attrs) < 0)
+ 		goto bad_mapping;
+ 
+ 	dma->dma_address += offset;
+@@ -1190,7 +1191,8 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 		if (sg_dma_len(s))
+ 			__iommu_remove_mapping(dev, sg_dma_address(s),
+ 					       sg_dma_len(s));
+-		if (!arch_is_coherent())
++		if (!arch_is_coherent() &&
++		    !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 			__dma_page_dev_to_cpu(sg_page(s), s->offset,
+ 					      s->length, dir);
+ 	}
+@@ -1252,7 +1254,7 @@ static dma_addr_t arm_iommu_map_page(struct device *dev, struct page *page,
+ 	dma_addr_t dma_addr;
+ 	int ret, len = PAGE_ALIGN(size + offset);
+ 
+-	if (!arch_is_coherent())
++	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+ 
+ 	dma_addr = __alloc_iova(mapping, len);
+@@ -1291,7 +1293,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 	if (!iova)
+ 		return;
+ 
+-	if (!arch_is_coherent())
++	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_dev_to_cpu(page, offset, size, dir);
+ 
+ 	iommu_unmap(mapping->domain, iova, len);
 -- 
-1.7.4.4
+1.7.1.569.g6f426
