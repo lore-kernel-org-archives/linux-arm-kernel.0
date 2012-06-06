@@ -1,31 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 6 Jun 2012 10:19:59 -0400 (EDT)
-Subject: [PATCH v4] usb: ehci-hcd: notify phy when connect change
-In-Reply-To: <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <Pine.LNX.4.44L0.1206061017210.1788-100000@iolanthe.rowland.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 06 Jun 2012 16:27:42 +0200
+Subject: [PATCH v6] MTD: LPC32xx SLC NAND driver
+In-Reply-To: <1338989921.6875.50.camel@sauron.fi.intel.com>
+References: <1338974414-5308-1-git-send-email-stigge@antcom.de>
+ <1338989921.6875.50.camel@sauron.fi.intel.com>
+Message-ID: <4FCF68DE.6000701@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jun 2012, Richard Zhao wrote:
+Hi,
 
-> It still has below limitations:
-> - it does not work for multi-phy ehci
-> - the best place is after debounce, but I can't get
->   phy there
+On 06/06/2012 03:38 PM, Artem Bityutskiy wrote:
+>> +#else +#define lpc32xx_nand_resume NULL +#define
+>> lpc32xx_nand_suspend NULL +#endif
+> 
+> 0, not NULL.
 
-> +			/* FIXME:
-> +			 * - it does not work for multi-phy ehci
-> +			 * - the best place is after debounce, but I can't get
-> +			 *   phy there
-> +			 */
-> +			if (unlikely(ehci->transceiver &&
-> +					(pstatus & PORT_CSC))) {
+Can you please point me to an explanation for this? NULL sounds
+natural here, since it is used as a pointer, and other nand drivers
+are already doing it via NULL:
 
-A new thought...  If you move the transceiver pointer from struct 
-ehci_hcd to struct usb_hcd, then you _will_ be able to get at it from 
-within the debouncing routine.
+bcm_umi_nand.c
+bf5xx_nand.c
+pxa3xx_nand.c
+r852.c
+s3c2410.c
+tmio_nand.c
+txx9ndfmc.c
 
-Or if you prefer, leave the pointer where it is and add a method to 
-struct hc_driver for retrieving the pointer.
+... and none is #defining as 0.
 
-Alan Stern
+Thanks in advance,
+
+Roland
