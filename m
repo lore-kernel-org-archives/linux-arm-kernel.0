@@ -1,7 +1,7 @@
-From: kay@vrfy.org (Kay Sievers)
-Date: Wed, 6 Jun 2012 02:28:39 +0200
+From: joe@perches.com (Joe Perches)
+Date: Tue, 05 Jun 2012 17:37:24 -0700
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <1338941971.11962.20.camel@joe2Laptop>
+In-Reply-To: <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -17,39 +17,75 @@ References: <cover.1338889066.git.joe@perches.com>
  <1338941247.11962.16.camel@joe2Laptop>
  <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
  <1338941971.11962.20.camel@joe2Laptop>
-Message-ID: <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
+ <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
+Message-ID: <1338943044.11962.26.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 2:19 AM, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2012-06-06 at 02:13 +0200, Kay Sievers wrote:
->> The question is what happens if you inject your new binary two-byte
->> prefix, like:
->> ? echo -e "\x01\x02Hello" > /dev/kmsg
->
-> It's not a 2 byte binary.
-> It's a leading ascii SOH and a standard ascii char
-> '0' ... '7' or 'd'.
->
-> #define KERN_EMERG ? ? ?KERN_SOH "0" ? ?/* system is unusable */
-> #define KERN_ALERT ? ? ?KERN_SOH "1" ? ?/* action must be taken immediately */
-> etc...
+On Wed, 2012-06-06 at 02:28 +0200, Kay Sievers wrote:
+> On Wed, Jun 6, 2012 at 2:19 AM, Joe Perches <joe@perches.com> wrote:
+> > On Wed, 2012-06-06 at 02:13 +0200, Kay Sievers wrote:
+> >> The question is what happens if you inject your new binary two-byte
+> >> prefix, like:
+> >>   echo -e "\x01\x02Hello" > /dev/kmsg
+> >
+> > It's not a 2 byte binary.
+> > It's a leading ascii SOH and a standard ascii char
+> > '0' ... '7' or 'd'.
+> >
+> > #define KERN_EMERG      KERN_SOH "0"    /* system is unusable */
+> > #define KERN_ALERT      KERN_SOH "1"    /* action must be taken immediately */
+> > etc...
+> 
+> Ok.
+> 
+> >> And if that changes the log-level to "2" instead of the default "4"?
+> >
+> > No it doesn't.
+> 
+> So:
+>    echo -e "\x012Hello" > /dev/kmsg
+> is still level 4? Sounds all fine then.
 
-Ok.
+Yes.
+# echo -e "\x012Hello again Kay" > /dev/kmsg
+gives:
+12,780,6031964979;Hello again Kay
 
->> And if that changes the log-level to "2" instead of the default "4"?
->
-> No it doesn't.
+> > It's not triggering that because devkmsg_writev does
+> > prefix parsing only on the old "<n>" form.
+> 
+> Yeah, but printk_emit() will not try to parse it? I did not check, but
+> with your change, the prefix parsing in printk_emit() is still skipped
+> if a level is given as a parameter to printk_emit(), right?
 
-So:
-   echo -e "\x012Hello" > /dev/kmsg
-is still level 4? Sounds all fine then.
+If level is not -1, then whatever prefix level the
+string has is ignored by vprintk_emit.
 
-> It's not triggering that because devkmsg_writev does
-> prefix parsing only on the old "<n>" form.
+from vprintk_emit:
 
-Yeah, but printk_emit() will not try to parse it? I did not check, but
-with your change, the prefix parsing in printk_emit() is still skipped
-if a level is given as a parameter to printk_emit(), right?
+	/* strip syslog prefix and extract log level or control flags */
+	kern_level = printk_get_level(text);
+	if (kern_level) {
+		const char *end_of_header = printk_skip_level(text);
+		switch (kern_level) {
+		case '0' ... '7':
+			if (level == -1)
+				level = kern_level - '0';
+		case 'd': /* Strip d KERN_DEFAULT, start new line */
+			plen = 0;
+		default:
+			if (!new_text_line) {
+				log_buf_emit_char('\n');
+				new_text_line = 1;
+			}
+		}
+		text_len -=  end_of_header - text;
+		text = (char *)end_of_header;
+	}
 
-Kay
+Only level == -1 will use the prefix level.
+
+devkmsg_writev always passes a non -1 level.
+
+cheers, Joe
