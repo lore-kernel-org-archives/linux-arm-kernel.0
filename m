@@ -1,64 +1,97 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Jun 2012 19:06:05 -0700
-Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <CAPXgP11DA2z2y4kR8C+AGtrd_-8=2Cy0jj3GX7T5JqczNke4GQ@mail.gmail.com>
-References: <cover.1338889066.git.joe@perches.com>
- <20120605142826.d92316a0.akpm@linux-foundation.org>
- <1338934303.5780.8.camel@joe2Laptop>
- <20120605151754.a794ac7c.akpm@linux-foundation.org>
- <1338936572.5780.29.camel@joe2Laptop>
- <20120605162910.caccb0d4.akpm@linux-foundation.org>
- <1338939316.11962.3.camel@joe2Laptop>
- <CAPXgP13J+8-dPpZkSfh9sM3xXujC2Rb9tJaOvGoEPghgdr8jiw@mail.gmail.com>
- <1338939792.11962.4.camel@joe2Laptop>
- <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
- <1338940345.11962.9.camel@joe2Laptop>
- <20120605165808.cd255b93.akpm@linux-foundation.org>
- <1338941247.11962.16.camel@joe2Laptop>
- <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
- <1338941971.11962.20.camel@joe2Laptop>
- <CAPXgP10VE2huY4gGpeFPe=YKYM+nDBfoMgpHnGmQwn0jdPxhbw@mail.gmail.com>
- <20120605173751.65a2e1ee.akpm@linux-foundation.org>
- <1338943205.11962.28.camel@joe2Laptop>
- <20120605174638.69bcfa31.akpm@linux-foundation.org>
- <CAPXgP11DA2z2y4kR8C+AGtrd_-8=2Cy0jj3GX7T5JqczNke4GQ@mail.gmail.com>
-Message-ID: <1338948365.11962.32.camel@joe2Laptop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed,  6 Jun 2012 10:18:48 +0800
+Subject: [PATCH] ARM: imx6: exit coherency when shutting down a cpu
+Message-ID: <1338949128-18344-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 03:10 +0200, Kay Sievers wrote:
-> On Wed, Jun 6, 2012 at 2:46 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
-> > On Tue, 05 Jun 2012 17:40:05 -0700 Joe Perches <joe@perches.com> wrote:
-> >
-> >> On Tue, 2012-06-05 at 17:37 -0700, Andrew Morton wrote:
-> >> > On Tue, 05 Jun 2012 17:07:27 -0700 Joe Perches <joe@perches.com> wrote:
-> >> >
-> >> > > On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
-> >> > > >  echo "\0014Hello Joe" > /dev/kmsg
-> >> > >
-> >> > > # echo -e "\x014Hello Me" > /dev/kmsg
-> >> > > gives:
-> >> > > 12,778,4057982669;Hello Me
-> >> >
-> >> > That's changed behavior.
-> >>
-> >> Which is an improvement too.
-> >
-> > No it isn't.  It exposes internal kernel implementation details in
-> > random weird inexplicable ways.  It doesn't seem at all important
-> > though.
-> >
-> >> I very much doubt a single app will change
-> >> because of this.
-> >
-> > I doubt it as well.
-> 
-> Yeah, the value of injecting such binary data is kind of questionable. :)
-> 
-> Joe, maybe you can change printk_emit() to skip the prefix
-> detection/stripping if a prefix is already passed to the function?
+There is a system hang issue on imx6q which can easily be seen with
+running a cpu hotplug stress testing (hotplug secondary cores from
+user space via sysfs interface for thousands iterations).
 
-Sure, it's pretty trivial.
+It turns out that the issue is caused by coherency of the cpu that
+is being shut down.  When shutting down a cpu, we need to have the
+cpu exit coherency to prevent it from receiving cache, TLB, or BTB
+maintenance operations broadcast by other CPUs in the cluster.
 
-Perhaps all binary data data should be elided.
-Maybe print . for all non-printable ascii chars.
+Copy cpu_enter_lowpower() and cpu_leave_lowpower() from mach-vexpress
+to have coherency properly handled in platform_cpu_die(), thus fix
+the issue.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: stable at kernel.org
+---
+ arch/arm/mach-imx/hotplug.c |   42 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 41 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 89493ab..20ed2d5 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/errno.h>
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <mach/common.h>
+ 
+ int platform_cpu_kill(unsigned int cpu)
+@@ -19,6 +20,44 @@ int platform_cpu_kill(unsigned int cpu)
+ 	return 1;
+ }
+ 
++static inline void cpu_enter_lowpower(void)
++{
++	unsigned int v;
++
++	flush_cache_all();
++	asm volatile(
++		"mcr	p15, 0, %1, c7, c5, 0\n"
++	"	mcr	p15, 0, %1, c7, c10, 4\n"
++	/*
++	 * Turn off coherency
++	 */
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, %3\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, %2\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
++	  : "cc");
++}
++
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++		"mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, %2\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C), "Ir" (0x40)
++	  : "cc");
++}
++
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+@@ -26,9 +65,10 @@ int platform_cpu_kill(unsigned int cpu)
+  */
+ void platform_cpu_die(unsigned int cpu)
+ {
+-	flush_cache_all();
++	cpu_enter_lowpower();
+ 	imx_enable_cpu(cpu, false);
+ 	cpu_do_idle();
++	cpu_leave_lowpower();
+ 
+ 	/* We should never return from idle */
+ 	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
+-- 
+1.7.5.4
