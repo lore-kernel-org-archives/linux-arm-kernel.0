@@ -1,26 +1,135 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 06 Jun 2012 11:01:44 +0200
-Subject: [PATCH v5] MTD: LPC32xx SLC NAND driver
-In-Reply-To: <1338972168.6875.7.camel@sauron.fi.intel.com>
-References: <1338837901-24075-1-git-send-email-stigge@antcom.de>
- <1338972168.6875.7.camel@sauron.fi.intel.com>
-Message-ID: <4FCF1C78.5000309@antcom.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Jun 2012 02:09:31 -0700
+Subject: [PATCH] arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule
+ support
+In-Reply-To: <1337257051-5004-1-git-send-email-uri.y@variscite.com>
+References: <20120509213156.GZ5140@atomide.com>
+ <1337257051-5004-1-git-send-email-uri.y@variscite.com>
+Message-ID: <20120606090931.GV12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2012 10:42 AM, Artem Bityutskiy wrote:
-> On Mon, 2012-06-04 at 21:25 +0200, Roland Stigge wrote:
->> +config MTD_NAND_SLC_LPC32XX +	bool "NXP LPC32xx SLC Controller"
+Hi,
+
+* Uri Yosef <uri.y@variscite.com> [120517 05:34]:
+> Hi Tony,
 > 
-> Why bool and not tristate here? Why you force this to be
-> compiled-in and make it impossible to be a kernel module like other
-> drivers are?
+> This is the updated DTS patch for Vatiscite OMAP4 SOM support
 
-Right - the solution for both issues you mention (compiling as module
-and linker error) is replacing above "bool" with "tristate".
-
-Will post an updated patch.
+Looks OK to me, but can you please repost one more time with
+devicetree-discuss at lists.ozlabs.org in Cc so people have a chance
+to ack this patch there?
 
 Thanks,
 
-Roland
+Tony
+ 
+>  arch/arm/boot/dts/omap4-var_som.dts |   96 +++++++++++++++++++++++++++++++++++
+>  1 files changed, 96 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
+> 
+> diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var_som.dts
+> new file mode 100644
+> index 0000000..d41161d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap4-var_som.dts
+> @@ -0,0 +1,96 @@
+> +/*
+> + * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap4.dtsi"
+> +
+> +/ {
+> +	model = "Variscite OMAP4 SOM";
+> +	compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x40000000>; /* 1 GB */
+> +	};
+> +
+> +	vdd_eth: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDD_ETH";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		enable-active-high;
+> +		regulator-boot-on;
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <400000>;
+> +
+> +	twl: twl at 48 {
+> +		reg = <0x48>;
+> +		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+> +		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+> +		interrupt-parent = <&gic>;
+> +	};
+> +};
+> +
+> +/include/ "twl6030.dtsi"
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <400000>;
+> +
+> +	/*
+> +	 * Temperature Sensor
+> +	 * http://www.ti.com/lit/ds/symlink/tmp105.pdf
+> +	 */
+> +	tmp105 at 49 {
+> +		compatible = "ti,tmp105";
+> +		reg = <0x49>;
+> +	};
+> +};
+> +
+> +&i2c4 {
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&mcspi1 {
+> +	eth at 0 {
+> +		compatible = "ks8851";
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		interrupt-parent = <&gpio6>;
+> +		interrupts = <11>; /* gpio line 171 */
+> +		vdd-supply = <&vdd_eth>;
+> +	};
+> +};
+> +
+> +&mmc1 {
+> +	vmmc-supply = <&vmmc>;
+> +	ti,bus-width = <8>;
+> +	ti,non-removable;
+> +};
+> +
+> +&mmc2 {
+> +	status = "disable";
+> +};
+> +
+> +&mmc3 {
+> +	status = "disable";
+> +};
+> +
+> +&mmc4 {
+> +	status = "disable";
+> +};
+> +
+> +&mmc5 {
+> +	ti,bus-width = <4>;
+> +};
+> -- 
+> 1.7.5.4
+> 
