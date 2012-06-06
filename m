@@ -1,56 +1,34 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 6 Jun 2012 17:37:54 +0200
-Subject: [PATCH] mmc: mxs-mmc: Move of_match_table out of CONFIG_PM
-In-Reply-To: <87wr3k34pq.fsf@octavius.laptop.org>
-References: <1337574807-8637-1-git-send-email-marex@denx.de>
- <87wr3k34pq.fsf@octavius.laptop.org>
-Message-ID: <201206061737.55260.marex@denx.de>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 06 Jun 2012 06:22:57 -1000
+Subject: [PATCH v2 8/9] ARM: dts: refresh dts file for arch mmp
+In-Reply-To: <CAN1soZx5BiY4kgt1EzbyFqRQOAYxkX9p2sNbrxZ-D=oocZuuRw@mail.gmail.com>
+References: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
+ <1336134626-12262-9-git-send-email-haojian.zhuang@gmail.com>
+ <87d35ezkm1.fsf@laptop.org> <201206060128.28167.arnd@arndb.de>
+ <4FCEB694.8080904@firmworks.com>
+ <CAN1soZykbTFGk=qAmzDe2qyQVVYBJpxcPYh6OzWyPxiBacJ-mg@mail.gmail.com>
+ <4FCEE91F.1030308@firmworks.com>
+ <CAN1soZx5BiY4kgt1EzbyFqRQOAYxkX9p2sNbrxZ-D=oocZuuRw@mail.gmail.com>
+Message-ID: <4FCF83E1.9060000@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Ball,
+On 6/5/2012 7:25 PM, Haojian Zhuang wrote:
+> ...
+>
+>>> mmp2-brownstone.dts is too complex since both apb&    axi are imported.
+>>>
+>>> Could we only use flat structure in mmp2-brownstone.dts?
+>>
+>>
+>> See http://dev.laptop.org/~wmb/mmp2-devicetree/mmp2-brownstone-flat.dts
+>> <http://dev.laptop.org/%7Ewmb/mmp2-devicetree/mmp2-brownstone-flat.dts>
+>>
+>
+> My meaning is mmp2-brownstone-flat.dts + mmp2.dtsi. Is it acceptable?
+>
 
-> Hi,
-> 
-> On Mon, May 21 2012, Marek Vasut wrote:
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > 
-> >  drivers/mmc/host/mxs-mmc.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> > index 34a9026..277161d 100644
-> > --- a/drivers/mmc/host/mxs-mmc.c
-> > +++ b/drivers/mmc/host/mxs-mmc.c
-> > @@ -894,8 +894,8 @@ static struct platform_driver mxs_mmc_driver = {
-> > 
-> >  		.owner	= THIS_MODULE,
-> >  
-> >  #ifdef CONFIG_PM
-> >  
-> >  		.pm	= &mxs_mmc_pm_ops,
-> > 
-> > -		.of_match_table = mxs_mmc_dt_ids,
-> > 
-> >  #endif
-> > 
-> > +		.of_match_table = mxs_mmc_dt_ids,
-> > 
-> >  	},
-> >  
-> >  };
-> 
-> Thanks, pushed to mmc-next for 3.5.
+No, you must use mmp2-brownstone.dts with mmp2.dtsi .  The position of 
+the uart , twsi, and rtc nodes must agree in both cases.
 
-Thanks!
-
-> - Chris.
-
-Best regards,
-Marek Vasut
+Do you have a use case where exposing the AXI and APB bus levels is helpful?
