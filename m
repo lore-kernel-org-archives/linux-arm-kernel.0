@@ -1,258 +1,112 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  6 Jun 2012 23:35:06 +0200
-Subject: [PATCH 4/7] ARM: nomadik: convert to generic clock
-Message-ID: <1339018506-29126-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed,  6 Jun 2012 23:35:13 +0200
+Subject: [PATCH 5/7] ARM: nomadik: register all three I2C busses
+Message-ID: <1339018513-29158-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove more custom stuff by simply converting the Nomadik machine
-to use generic clocks and move the driver to drivers/clk.
+The Nomadik has two dedicated I2C bus blocks for I2C0 and I2C1,
+and a bitbanged GPIO connection on two pins for the USB portions
+of the STw4811 chip. Register all three as bit-banged GPIO for
+the moment.
 
-Cc: Mike Turquette <mturquette@ti.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                          |    2 +-
- arch/arm/mach-nomadik/Makefile            |    2 -
- arch/arm/mach-nomadik/clock.c             |   75 -----------------------------
- arch/arm/mach-nomadik/clock.h             |   15 ------
- arch/arm/mach-nomadik/cpu-8815.c          |    4 +-
- drivers/clk/Makefile                      |    1 +
- drivers/clk/clk-nomadik.c                 |   47 ++++++++++++++++++
- include/linux/platform_data/clk-nomadik.h |    2 +
- 8 files changed, 53 insertions(+), 95 deletions(-)
- delete mode 100644 arch/arm/mach-nomadik/clock.c
- delete mode 100644 arch/arm/mach-nomadik/clock.h
- create mode 100644 drivers/clk/clk-nomadik.c
- create mode 100644 include/linux/platform_data/clk-nomadik.h
+ arch/arm/mach-nomadik/i2c-8815nhk.c |   38 ++++++++++++++++++++++++++++------
+ 1 files changed, 31 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b649c59..e58bda6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -912,7 +912,7 @@ config ARCH_NOMADIK
- 	select ARM_AMBA
- 	select ARM_VIC
- 	select CPU_ARM926T
--	select CLKDEV_LOOKUP
-+	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select PINCTRL
- 	select MIGHT_HAVE_CACHE_L2X0
-diff --git a/arch/arm/mach-nomadik/Makefile b/arch/arm/mach-nomadik/Makefile
-index a6bbd1a..a42c9a3 100644
---- a/arch/arm/mach-nomadik/Makefile
-+++ b/arch/arm/mach-nomadik/Makefile
-@@ -7,8 +7,6 @@
- 
- # Object file lists.
- 
--obj-y			+= clock.o
--
- # Cpu revision
- obj-$(CONFIG_NOMADIK_8815) += cpu-8815.o
- 
-diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
-deleted file mode 100644
-index 48a59f2..0000000
---- a/arch/arm/mach-nomadik/clock.c
-+++ /dev/null
-@@ -1,75 +0,0 @@
--/*
-- *  linux/arch/arm/mach-nomadik/clock.c
-- *
-- *  Copyright (C) 2009 Alessandro Rubini
-- */
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/errno.h>
--#include <linux/clk.h>
--#include <linux/clkdev.h>
--#include "clock.h"
--
--/*
-- * The nomadik board uses generic clocks, but the serial pl011 file
-- * calls clk_enable(), clk_disable(), clk_get_rate(), so we provide them
-- */
--unsigned long clk_get_rate(struct clk *clk)
--{
--	return clk->rate;
--}
--EXPORT_SYMBOL(clk_get_rate);
--
--/* enable and disable do nothing */
--int clk_enable(struct clk *clk)
--{
--	return 0;
--}
--EXPORT_SYMBOL(clk_enable);
--
--void clk_disable(struct clk *clk)
--{
--}
--EXPORT_SYMBOL(clk_disable);
--
--static struct clk clk_24 = {
--	.rate = 2400000,
--};
--
--static struct clk clk_48 = {
--	.rate = 48 * 1000 * 1000,
--};
--
--/*
-- * Catch-all default clock to satisfy drivers using the clk API.  We don't
-- * model the actual hardware clocks yet.
-- */
--static struct clk clk_default;
--
--#define CLK(_clk, dev)				\
--	{					\
--		.clk		= _clk,		\
--		.dev_id		= dev,		\
--	}
--
--static struct clk_lookup lookups[] = {
--	{
--		.con_id		= "apb_pclk",
--		.clk		= &clk_default,
--	},
--	CLK(&clk_24, "mtu0"),
--	CLK(&clk_24, "mtu1"),
--	CLK(&clk_48, "uart0"),
--	CLK(&clk_48, "uart1"),
--	CLK(&clk_default, "gpio.0"),
--	CLK(&clk_default, "gpio.1"),
--	CLK(&clk_default, "gpio.2"),
--	CLK(&clk_default, "gpio.3"),
--	CLK(&clk_default, "rng"),
--};
--
--int __init clk_init(void)
--{
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--	return 0;
--}
-diff --git a/arch/arm/mach-nomadik/clock.h b/arch/arm/mach-nomadik/clock.h
-deleted file mode 100644
-index 78da2e7..0000000
---- a/arch/arm/mach-nomadik/clock.h
-+++ /dev/null
-@@ -1,15 +0,0 @@
--
--/*
-- *  linux/arch/arm/mach-nomadik/clock.h
-- *
-- *  Copyright (C) 2009 Alessandro Rubini
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--struct clk {
--	unsigned long		rate;
--};
--
--int __init clk_init(void);
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 88511fe..6fd8e46 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -25,6 +25,7 @@
- #include <linux/slab.h>
- #include <linux/irq.h>
- #include <linux/dma-mapping.h>
-+#include <linux/platform_data/clk-nomadik.h>
- 
+diff --git a/arch/arm/mach-nomadik/i2c-8815nhk.c b/arch/arm/mach-nomadik/i2c-8815nhk.c
+index 0fc2f6f..6d14454 100644
+--- a/arch/arm/mach-nomadik/i2c-8815nhk.c
++++ b/arch/arm/mach-nomadik/i2c-8815nhk.c
+@@ -5,6 +5,7 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/platform_device.h>
  #include <plat/gpio-nomadik.h>
- #include <mach/hardware.h>
-@@ -35,7 +36,6 @@
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
- 
--#include "clock.h"
- #include "cpu-8815.h"
- 
- /* The 8815 has 4 GPIO blocks, let's register them immediately */
-@@ -123,7 +123,7 @@ void __init cpu8815_init_irq(void)
- 	 * Init clocks here so that they are available for system timer
- 	 * initialization.
- 	 */
--	clk_init();
-+	nomadik_clk_init();
- }
++#include <plat/pincfg.h>
  
  /*
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index b9a5158..26b6b92 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -3,5 +3,6 @@ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
- obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
- 				   clk-mux.o clk-divider.o clk-fixed-factor.o
- # SoCs specific
-+obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
-diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
-new file mode 100644
-index 0000000..517a8ff
---- /dev/null
-+++ b/drivers/clk/clk-nomadik.c
-@@ -0,0 +1,47 @@
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk-provider.h>
+  * There are two busses in the 8815NHK.
+@@ -12,19 +13,27 @@
+  * use bit-bang through GPIO by now, to keep things simple
+  */
+ 
++/* I2C0 connected to the STw4811 power management chip */
+ static struct i2c_gpio_platform_data nhk8815_i2c_data0 = {
+ 	/* keep defaults for timeouts; pins are push-pull bidirectional */
+ 	.scl_pin = 62,
+ 	.sda_pin = 63,
+ };
+ 
++/* I2C1 connected to various sensors */
+ static struct i2c_gpio_platform_data nhk8815_i2c_data1 = {
+ 	/* keep defaults for timeouts; pins are push-pull bidirectional */
+ 	.scl_pin = 53,
+ 	.sda_pin = 54,
+ };
+ 
+-/* first bus: GPIO XX and YY */
++/* I2C2 connected to the USB portions of the STw4811 only */
++static struct i2c_gpio_platform_data nhk8815_i2c_data2 = {
++	/* keep defaults for timeouts; pins are push-pull bidirectional */
++	.scl_pin = 73,
++	.sda_pin = 74,
++};
 +
-+/*
-+ * The Nomadik clock tree is described in the STN8815A12 DB V4.2
-+ * reference manual for the chip, page 94 ff.
-+ */
+ static struct platform_device nhk8815_i2c_dev0 = {
+ 	.name	= "i2c-gpio",
+ 	.id	= 0,
+@@ -32,7 +41,7 @@ static struct platform_device nhk8815_i2c_dev0 = {
+ 		.platform_data = &nhk8815_i2c_data0,
+ 	},
+ };
+-/* second bus: GPIO XX and YY */
 +
-+void __init nomadik_clk_init(void)
-+{
-+	struct clk *clk;
+ static struct platform_device nhk8815_i2c_dev1 = {
+ 	.name	= "i2c-gpio",
+ 	.id	= 1,
+@@ -41,15 +50,29 @@ static struct platform_device nhk8815_i2c_dev1 = {
+ 	},
+ };
+ 
++static struct platform_device nhk8815_i2c_dev2 = {
++	.name	= "i2c-gpio",
++	.id	= 2,
++	.dev	= {
++		.platform_data = &nhk8815_i2c_data2,
++	},
++};
 +
-+	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
-+	clk_register_clkdev(clk, "apb_pclk", NULL);
-+	clk_register_clkdev(clk, NULL, "gpio.0");
-+	clk_register_clkdev(clk, NULL, "gpio.1");
-+	clk_register_clkdev(clk, NULL, "gpio.2");
-+	clk_register_clkdev(clk, NULL, "gpio.3");
-+	clk_register_clkdev(clk, NULL, "rng");
++static pin_cfg_t cpu8815_pins_i2c[] = {
++	PIN_CFG_INPUT(62, GPIO, PULLUP),
++	PIN_CFG_INPUT(63, GPIO, PULLUP),
++	PIN_CFG_INPUT(53, GPIO, PULLUP),
++	PIN_CFG_INPUT(54, GPIO, PULLUP),
++	PIN_CFG_INPUT(73, GPIO, PULLUP),
++	PIN_CFG_INPUT(74, GPIO, PULLUP),
++};
 +
-+	/*
-+	 * The 2.4 MHz TIMCLK reference clock is active at boot time, this is
-+	 * actually the MXTALCLK @19.2 MHz divided by 8. This clock is used
-+	 * by the timers and watchdog. See page 105 ff.
-+	 */
-+	clk = clk_register_fixed_rate(NULL, "TIMCLK", NULL, CLK_IS_ROOT,
-+				      2400000);
-+	clk_register_clkdev(clk, NULL, "mtu0");
-+	clk_register_clkdev(clk, NULL, "mtu1");
-+
-+	/*
-+	 * At boot time, PLL2 is set to generate a set of fixed clocks,
-+	 * one of them is CLK48, the 48 MHz clock, routed to the UART, MMC/SD
-+	 * I2C, IrDA, USB and SSP blocks.
-+	 */
-+	clk = clk_register_fixed_rate(NULL, "CLK48", NULL, CLK_IS_ROOT,
-+				      48000000);
-+	clk_register_clkdev(clk, NULL, "uart0");
-+	clk_register_clkdev(clk, NULL, "uart1");
-+	clk_register_clkdev(clk, NULL, "mmci");
-+	clk_register_clkdev(clk, NULL, "ssp");
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.0");
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.1");
-+}
-diff --git a/include/linux/platform_data/clk-nomadik.h b/include/linux/platform_data/clk-nomadik.h
-new file mode 100644
-index 0000000..5713c87
---- /dev/null
-+++ b/include/linux/platform_data/clk-nomadik.h
-@@ -0,0 +1,2 @@
-+/* Minimal platform data header */
-+void nomadik_clk_init(void);
+ static int __init nhk8815_i2c_init(void)
+ {
+-	nmk_gpio_set_mode(nhk8815_i2c_data0.scl_pin, NMK_GPIO_ALT_GPIO);
+-	nmk_gpio_set_mode(nhk8815_i2c_data0.sda_pin, NMK_GPIO_ALT_GPIO);
++	nmk_config_pins(cpu8815_pins_i2c, ARRAY_SIZE(cpu8815_pins_i2c));
+ 	platform_device_register(&nhk8815_i2c_dev0);
+-
+-	nmk_gpio_set_mode(nhk8815_i2c_data1.scl_pin, NMK_GPIO_ALT_GPIO);
+-	nmk_gpio_set_mode(nhk8815_i2c_data1.sda_pin, NMK_GPIO_ALT_GPIO);
+ 	platform_device_register(&nhk8815_i2c_dev1);
++	platform_device_register(&nhk8815_i2c_dev2);
+ 
+ 	return 0;
+ }
+@@ -58,6 +81,7 @@ static void __exit nhk8815_i2c_exit(void)
+ {
+ 	platform_device_unregister(&nhk8815_i2c_dev0);
+ 	platform_device_unregister(&nhk8815_i2c_dev1);
++	platform_device_unregister(&nhk8815_i2c_dev2);
+ 	return;
+ }
+ 
 -- 
 1.7.7.6
