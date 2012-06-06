@@ -1,97 +1,54 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed,  6 Jun 2012 10:18:48 +0800
-Subject: [PATCH] ARM: imx6: exit coherency when shutting down a cpu
-Message-ID: <1338949128-18344-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 6 Jun 2012 10:27:22 +0800
+Subject: [PATCH v3 00/12] add imx usb driver for mx28/6x
+In-Reply-To: <20120605150209.GZ28631@arwen.pp.htv.fi>
+References: <1337912665-16615-1-git-send-email-richard.zhao@freescale.com>
+ <20120605150209.GZ28631@arwen.pp.htv.fi>
+Message-ID: <20120606022714.GA2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a system hang issue on imx6q which can easily be seen with
-running a cpu hotplug stress testing (hotplug secondary cores from
-user space via sysfs interface for thousands iterations).
+On Tue, Jun 05, 2012 at 06:02:13PM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, May 25, 2012 at 10:24:13AM +0800, Richard Zhao wrote:
+> > The work is based on  ci13xxx rework done by Alexander Shishkin.
+> > 
+> > Status:
+> >   - this version only support host
+> >   - usbotg controler works at host role
+> > 
+> > Changes since V2:
+> >   - Rebase to Alex's tree
+> >   - Use regulator to control vbus power
+> >   - Remove ARCH check in Kconfig, but add OF_DEV check.
+> >   - Other changes according laster version comments.
+> > 
+> > Richard Zhao (12):
+> >   usb: otg: add notify_connect/notify_disconnect callback
+> >   usb: chipidea: permit driver bindings pass phy pointer
+> >   usb: ehci-hcd: notify phy when connect change
+> >   usb: otg: add basic mxs phy driver support
+> >   usb: chipidea: add imx platform driver
+> >   ARM: imx6q: correct device name of usbphy and usb controller clock
+> >     export
+> >   ARM: imx6q: add config-on-boot gpios
+> >   ARM: imx6q: add usbphy clocks
+> >   ARM: imx6q: disable usb charger detector
+> >   ARM: dts: imx6q-sabrelite: add usb devices
+> >   ARM: mxs: clk_register_clkdev mx28 usb clocks
+> >   ARM: dts: imx28-evk: add usb devices
+> 
+> how are we going to handle these series ? drivers/usb/otg/* parts are
+> mostly ok (I need to look deeper) but if I take drivers/usb/otg/* we
+> will have to delay drivers/usb/chipidea I guess...
+> 
+> So someone would have to take the whole series ? Who will be that
+> person? Alex, will it be you ?
+> 
+I'm unsure about drivers/usb part, but arch/arm part should go via
+arm-soc tree.
 
-It turns out that the issue is caused by coherency of the cpu that
-is being shut down.  When shutting down a cpu, we need to have the
-cpu exit coherency to prevent it from receiving cache, TLB, or BTB
-maintenance operations broadcast by other CPUs in the cluster.
-
-Copy cpu_enter_lowpower() and cpu_leave_lowpower() from mach-vexpress
-to have coherency properly handled in platform_cpu_die(), thus fix
-the issue.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: stable at kernel.org
----
- arch/arm/mach-imx/hotplug.c |   42 +++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 41 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
-index 89493ab..20ed2d5 100644
---- a/arch/arm/mach-imx/hotplug.c
-+++ b/arch/arm/mach-imx/hotplug.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/errno.h>
- #include <asm/cacheflush.h>
-+#include <asm/cp15.h>
- #include <mach/common.h>
- 
- int platform_cpu_kill(unsigned int cpu)
-@@ -19,6 +20,44 @@ int platform_cpu_kill(unsigned int cpu)
- 	return 1;
- }
- 
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+	asm volatile(
-+		"mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	mcr	p15, 0, %1, c7, c10, 4\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, %3\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-+	  : "cc");
-+}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+		"mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, %1\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  : "Ir" (CR_C), "Ir" (0x40)
-+	  : "cc");
-+}
-+
- /*
-  * platform-specific code to shutdown a CPU
-  *
-@@ -26,9 +65,10 @@ int platform_cpu_kill(unsigned int cpu)
-  */
- void platform_cpu_die(unsigned int cpu)
- {
--	flush_cache_all();
-+	cpu_enter_lowpower();
- 	imx_enable_cpu(cpu, false);
- 	cpu_do_idle();
-+	cpu_leave_lowpower();
- 
- 	/* We should never return from idle */
- 	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
 -- 
-1.7.5.4
+Regards,
+Shawn
