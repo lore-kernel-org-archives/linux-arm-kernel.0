@@ -1,33 +1,56 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 06 Jun 2012 08:52:44 -0400
-Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
-In-Reply-To: <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
- (ludovic desroches's message of "Wed, 6 Jun 2012 12:19:44 +0200")
-References: <87396869fw.fsf@octavius.laptop.org>
- <1338977984-10888-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <87vcj44n6r.fsf@octavius.laptop.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 06 Jun 2012 15:17:35 +0200
+Subject: [PATCH/RFC 0/2] ARM: DMA-mapping: new extensions for buffer sharing
+ (part 2)
+Message-ID: <1338988657-20770-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Wed, Jun 06 2012, ludovic.desroches at atmel.com wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> The use of DMA slave config operation requires that the burst size
-> (aka chunk size) is specified through this interface.
-> Modify atmel-mci slave driver to use this specification on its side.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
-> Hi Chris,
->
-> Sorry for this trouble, this patch should apply well on 3.5-rc1.
+This is a continuation of the dma-mapping extensions posted in the
+following thread:
+http://thread.gmane.org/gmane.linux.kernel.mm/78644
 
-Thanks, pushed to mmc-next for 3.5.
+We noticed that some advanced buffer sharing use cases usually require
+creating a dma mapping for the same memory buffer for more than one
+device. Usually also such buffer is never touched with CPU, so the data
+are processed by the devices.
 
-- Chris.
+>From the DMA-mapping perspective this requires to call one of the
+dma_map_{page,single,sg} function for the given memory buffer a few
+times, for each of the devices. Each dma_map_* call performs CPU cache
+synchronization, what might be a time consuming operation, especially
+when the buffers are large. We would like to avoid any useless and time
+consuming operations, so that was the main reason for introducing
+another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
+which lets dma-mapping core to skip CPU cache synchronization in certain
+cases.
+
+The proposed patches have been generated on top of the ARM DMA-mapping
+redesign patch series on Linux v3.4-rc7. They are also available on the
+following GIT branch:
+
+git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.4-rc7-arm-dma-v10-ext
+
+with all require patches on top of vanilla v3.4-rc7 kernel. I will
+resend them rebased onto v3.5-rc1 soon.
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (2):
+  common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
+  ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
+
+ Documentation/DMA-attributes.txt |   24 ++++++++++++++++++++++++
+ arch/arm/mm/dma-mapping.c        |   20 +++++++++++---------
+ include/linux/dma-attrs.h        |    1 +
+ 3 files changed, 36 insertions(+), 9 deletions(-)
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.1.569.g6f426
