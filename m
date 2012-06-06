@@ -1,100 +1,52 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 06 Jun 2012 06:06:43 -0400
-Subject: [PATCH] mmc: atmel-mci: fix burst/chunk size modification
-In-Reply-To: <1337176838-24111-2-git-send-email-ludovic.desroches@atmel.com>
- (ludovic desroches's message of "Wed, 16 May 2012 16:00:38 +0200")
-References: <1337176838-24111-1-git-send-email-ludovic.desroches@atmel.com>
- <1337176838-24111-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <87396869fw.fsf@octavius.laptop.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jun 2012 11:12:53 +0100
+Subject: [PATCH 1/2] Allow constructor name selection by architecture.
+In-Reply-To: <20120529090614.GD12217@n2100.arm.linux.org.uk>
+References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
+ <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+ <20120528203005.GA20560@merkur.ravnborg.org>
+ <20120529090614.GD12217@n2100.arm.linux.org.uk>
+Message-ID: <20120606101253.GM8262@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 29, 2012 at 10:06:14AM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
+> > On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
+> > > From: Vincent Sanders <vince@collabora.co.uk>
+> > > 
+> > > The constructor symbol name is different between platforms. Allow this
+> > > to be selected by configuration and set suitable default values.
+> > > 
+> > > Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
+> > > ---
+> > >  include/asm-generic/vmlinux.lds.h |    6 +++---
+> > >  init/Kconfig                      |    6 ++++++
+> > >  kernel/module.c                   |    2 +-
+> > >  3 files changed, 10 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> > > index 8aeadf6..fd34808 100644
+> > > --- a/include/asm-generic/vmlinux.lds.h
+> > > +++ b/include/asm-generic/vmlinux.lds.h
+> > > @@ -471,9 +471,9 @@
+> > >  	}
+> > >  
+> > >  #ifdef CONFIG_CONSTRUCTORS
+> > > -#define KERNEL_CTORS()	. = ALIGN(8);			   \
+> > > -			VMLINUX_SYMBOL(__ctors_start) = .; \
+> > > -			*(.ctors)			   \
+> > > +#define KERNEL_CTORS()	. = ALIGN(8);					\
+> > > +			VMLINUX_SYMBOL(__ctors_start) = .;		\
+> > > +			*(CONFIG_CONSTRUCTORS_NAME)			\
+> > >  			VMLINUX_SYMBOL(__ctors_end) = .;
+> > 
+> > What is wrong with adding both "standard" names for ctors uncnditionally?
+> > Like this:
+> > > 			*(.ctors)			   \
+> > > +			*(.init_array)			   \
+> 
+> That doesn't get rid of CONFIG_CONSTRUCTORS_NAME, because it's needed
+> in the module code.  Do you have a suggestion to solve that as well?
 
-On Wed, May 16 2012, ludovic.desroches at atmel.com wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> The use of DMA slave config operation requires that the burst size
-> (aka chunk size) is specified through this interface.
-> Modify atmel-mci slave driver to use this specification on its side.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com> 
-> ---
->  drivers/mmc/host/atmel-mci-regs.h |   14 ++++++++++++++
->  drivers/mmc/host/atmel-mci.c      |    7 +++++--
->  2 files changed, 19 insertions(+), 2 deletions(-)
-
-This doesn't apply:
-
-> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
-> index 787aba1..ab56f7d 100644
-> --- a/drivers/mmc/host/atmel-mci-regs.h
-> +++ b/drivers/mmc/host/atmel-mci-regs.h
-> @@ -140,4 +140,18 @@
->  #define atmci_writel(port,reg,value)			\
->  	__raw_writel((value), (port)->regs + reg)
->  
-> +/*
-> + * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
-> + * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
-> + *
-> + * This can be done by finding most significant bit set.
-> + */
-> +static inline unsigned int atmci_convert_chksize(unsigned int maxburst)
-> +{
-> +	if (maxburst > 1)
-> +		return fls(maxburst) - 2;
-> +	else
-> +		return 0;
-> +}
-> +
->  #endif /* __DRIVERS_MMC_ATMEL_MCI_H__ */
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 2dbfb28..50e8652 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -834,6 +834,7 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
->  	enum dma_data_direction		direction;
->  	enum dma_transfer_direction	slave_dirn;
->  	unsigned int			sglen;
-> +	u32				maxburst;
->  	u32 iflags;
->  
->  	data->error = -EINPROGRESS;
-> @@ -867,16 +868,18 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
->  	if (!chan)
->  		return -ENODEV;
->  
-> -	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(3) | ATMCI_DMAEN);
-> -
-
-.. because mainline actually looks like:
-
-	if (host->caps.has_dma)
-		atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(3) | ATMCI_DMAEN);
-
-and has done since 2011-08-11.  Maybe this was created against the wrong
-kernel version -- want to resend?
-
->  	if (data->flags & MMC_DATA_READ) {
->  		direction = DMA_FROM_DEVICE;
->  		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
-> +		maxburst = atmci_convert_chksize(host->dma_conf.src_maxburst);
->  	} else {
->  		direction = DMA_TO_DEVICE;
->  		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
-> +		maxburst = atmci_convert_chksize(host->dma_conf.dst_maxburst);
->  	}
->  
-> +	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) | ATMCI_DMAEN);
-> +
->  	sglen = dma_map_sg(chan->device->dev, data->sg,
->  			data->sg_len, direction);
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Ping.
