@@ -1,107 +1,59 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 07 Jun 2012 11:43:05 +0100
-Subject: [CFT 1/2] dmaengine: sa11x0-dma: fix DMA residue support
-In-Reply-To: <20120607104206.GA10488@n2100.arm.linux.org.uk>
-References: <20120607104206.GA10488@n2100.arm.linux.org.uk>
-Message-ID: <E1ScaBF-0003bw-6g@rmk-PC.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 6 Jun 2012 09:09:35 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org>
+ <20120604101447.GF8262@n2100.arm.linux.org.uk>
+ <4FCDE3D7.9030006@linaro.org>
+ <20120605105249.GK8262@n2100.arm.linux.org.uk>
+ <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
+Message-ID: <CAF2Aj3jGkG-qj6DTBQPzRzawyJqcncp662k233pRFH+JVtSm6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The semantics now implemented are:
+>
+> > >> > So why is this buggy patch now merged in the mainline kernel?
+> > >>
+> > >> I guess Chris took it because you said it was fine?
+> > >
+> > > Err, no.  If you re-read the thread, you'll see that I said your
+> > > subsequent patch posted on Thu, 03 May 2012 16:30:48 +0100 with
+> > > the devm_kzalloc() was fine.
+>
 
-- If the cookie has completed successfully, the residue will be zero.
-- If the cookie is in progress or the channel is paused, it will be the
-  number of bytes yet to be transferred. [*]
-- If the cookie is queued, it will be the number of bytes in the
-  descriptor.
+Ah, so the wrong patch was merged?
 
-* - where this is the number of bytes yet to be transferred to/from
-  RAM.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/sa11x0-dma.c |   45 +++++++++++++++++++++++++++++----------------
- 1 files changed, 29 insertions(+), 16 deletions(-)
+> > Lee can you provide an incremental fixup that makes the current
+>
+> > code textually equivalent to what Russell ACKed (devm_kzalloc()),
+> > and funnel to Chris for the -rc:s ASAP?
+>
 
-diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-index 5f1d2e6..db4fcbd 100644
---- a/drivers/dma/sa11x0-dma.c
-+++ b/drivers/dma/sa11x0-dma.c
-@@ -416,27 +416,47 @@ static enum dma_status sa11x0_dma_tx_status(struct dma_chan *chan,
- 	struct sa11x0_dma_chan *c = to_sa11x0_dma_chan(chan);
- 	struct sa11x0_dma_dev *d = to_sa11x0_dma(chan->device);
- 	struct sa11x0_dma_phy *p;
--	struct sa11x0_dma_desc *txd;
-+	struct virt_dma_desc *vd;
- 	unsigned long flags;
- 	enum dma_status ret;
--	size_t bytes = 0;
- 
- 	ret = dma_cookie_status(&c->vc.chan, cookie, state);
- 	if (ret == DMA_SUCCESS)
- 		return ret;
- 
-+	if (!state)
-+		return c->status;
-+
- 	spin_lock_irqsave(&c->vc.lock, flags);
- 	p = c->phy;
--	ret = c->status;
--	if (p) {
--		dma_addr_t addr = sa11x0_dma_pos(p);
- 
--		dev_vdbg(d->slave.dev, "tx_status: addr:%x\n", addr);
-+	/*
-+	 * If the cookie is on our issue queue, then the residue is
-+	 * its total size.
-+	 */
-+	vd = vchan_find_desc(&c->vc, cookie);
-+	if (vd) {
-+		state->residue = container_of(vd, struct sa11x0_dma_desc, vd)->size;
-+	} else if (!p) {
-+		state->residue = 0;
-+	} else {
-+		struct sa11x0_dma_desc *txd;
-+		size_t bytes = 0;
-+
-+		if (p->txd_done && p->txd_done->vd.tx.cookie == cookie)
-+			txd = p->txd_done;
-+		else if (p->txd_load && p->txd_load->vd.tx.cookie == cookie)
-+			txd = p->txd_load;
-+		else
-+			txd = NULL;
- 
--		txd = p->txd_done;
-+		ret = c->status;
- 		if (txd) {
-+			dma_addr_t addr = sa11x0_dma_pos(p);
- 			unsigned i;
- 
-+			dev_vdbg(d->slave.dev, "tx_status: addr:%x\n", addr);
-+
- 			for (i = 0; i < txd->sglen; i++) {
- 				dev_vdbg(d->slave.dev, "tx_status: [%u] %x+%x\n",
- 					i, txd->sg[i].addr, txd->sg[i].len);
-@@ -459,18 +479,11 @@ static enum dma_status sa11x0_dma_tx_status(struct dma_chan *chan,
- 				bytes += txd->sg[i].len;
- 			}
- 		}
--		if (txd != p->txd_load && p->txd_load)
--			bytes += p->txd_load->size;
--	}
--	list_for_each_entry(txd, &c->vc.desc_issued, vd.node) {
--		bytes += txd->size;
-+		state->residue = bytes;
- 	}
- 	spin_unlock_irqrestore(&c->vc.lock, flags);
- 
--	if (state)
--		state->residue = bytes;
--
--	dev_vdbg(d->slave.dev, "tx_status: bytes 0x%zx\n", bytes);
-+	dev_vdbg(d->slave.dev, "tx_status: bytes 0x%zx\n", state->residue);
- 
- 	return ret;
- }
+It turns out that there is no free internet in my hotel, so it will have to
+wait until I'm back from my holiday (Monday).
+
+Kind regards,
+Lee
+
 -- 
-1.7.4.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
+
+
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120606/e6cebc03/attachment-0001.html>
