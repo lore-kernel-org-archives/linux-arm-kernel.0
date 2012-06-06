@@ -1,107 +1,192 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 6 Jun 2012 10:35:35 +0800
-Subject: [PATCH v2 8/9] ARM: dts: refresh dts file for arch mmp
-In-Reply-To: <4FCEB694.8080904@firmworks.com>
-References: <1336134626-12262-1-git-send-email-haojian.zhuang@gmail.com>
- <1336134626-12262-9-git-send-email-haojian.zhuang@gmail.com>
- <87d35ezkm1.fsf@laptop.org> <201206060128.28167.arnd@arndb.de>
- <4FCEB694.8080904@firmworks.com>
-Message-ID: <CAN1soZykbTFGk=qAmzDe2qyQVVYBJpxcPYh6OzWyPxiBacJ-mg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Jun 2012 10:53:32 +0800
+Subject: [PATCH 1/2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1338084656-11961-1-git-send-email-marex@denx.de>
+References: <1338084656-11961-1-git-send-email-marex@denx.de>
+Message-ID: <20120606025328.GB2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 6, 2012 at 9:47 AM, Mitch Bradley <wmb@firmworks.com> wrote:
-> On 6/5/2012 3:28 PM, Arnd Bergmann wrote:
->>
->> On Tuesday 05 June 2012, Chris Ball wrote:
->>>
->>> Hi Haojian,
->>>
->>> On Fri, May 04 2012, Haojian Zhuang wrote:
->>>>
->>>> Append mmp2 and pxa910 dts files. Update PXA168 dts files for irq,
->>>> timer, gpio components.
->>>
->>>
->>> The patch I'm replying to introduced a device tree for MMP2/Brownstone
->>> in 3.5-rc1. ?We're looking at adopting the MMP2 device tree for the OLPC
->>> XO-1.75 board, and Mitch Bradley has some corrections to the device tree
->>> format that we'd like to make, appended below.
->>>
->>> You can see all of the files Mitch mentions at:
->>> http://dev.laptop.org/~wmb/mmp2-devicetree/
->>>
->>> Here's my proposal for what to do next:
->>> ?* First, you choose one of the two forms that Mitch links to.
->>> ? ?(Either "mmp2.dtsi" or "mmp2-flat.dtsi"; we have a weak preference
->>> ? ?for mmp2-flat.dtsi.)
->>
->>
->> My preference would be towards mmp2.dtsi. I've recommended doing it
->> that way to other people, too.
->
-> In most cases, I have found that exposing the full hierarchy is preferable.
-> ?For this specific SoC, which I have been working with for quite awhile now,
-> I haven't found any instance where exposing the AXI/APB levels buys you
-> anything. ?The hierarchy just adds clutter.
->
-> That said, I don't feel strongly about it.
->
-mmp2-brownstone.dts is too complex since both apb & axi are imported.
-Could we only use flat structure in mmp2-brownstone.dts?
+Welcome to mxs device tree, Marek :)
 
->
->>
->>
->>> d) Moved the "intcmux" nodes down a level so they are children of the
->>> top-level interrupt-controller node. ?The problem with having them as
->>> peers of the top-level interrupt-controller is that their "reg"
->>> properties conflict. ?For example:
->>> intcmux4 at d4282150 { ... reg =<0x150 0x4>,<0x168 0x4> ?... }
->>>
->>> This is incorrect in several ways:
->>>
->>> ? ?1) "@d4282150" is inconsistent with "reg =<0x150" . ?The "unit
->>> ? ? ? address" after @ is supposed to be the same as the first component
->>> ? ? ? of the reg property. ?d4282150 is not identical to 150.
->>
->>
->> I thought the rule was that the @... part should be a translated address
->> in the presence of "ranges" translation so we get a unique value in case
->> we have multiple devices of the same name on the same address but on
->> different buses.
->>
->> If we change this here, I suppose it also needs to be changed in a number
->> of other places, and we have to rethink the method for unique device
->> names.
->
->
-> My thinking was that "ranges" is inappropriate in this case (within the
-> top-level interrupt controller node), and I got rid of it. ?That being the
-> case, this is not "in the presence of ranges".
->
->
->>
->>
->>> The solution is to put the intcmux nodes underneath the
->>> interrupt-controller node. ?The interrupt-controller node now has
->>> #address-cells and #size-cells properties so it can have children, but
->>> it does not have a ranges property, so the address space is not passed
->>> through. ?The child (intcmux) reg addresses can then be interpreted
->>> independently, without conflict.
->>
->>
->> Right. The implication for this however is that the driver cannot
->> treat the reg property as a physical address it can do ioremap on,
->> but needs to interface with the driver that provides the address
->> space.
->
->
-> Indeed. ?For this driver, the intcmux subnodes are handled by the same
-> driver as the top-level interrupt controller, and those subordinate
-> registers are accessed via that driver's one mapping of the register block.
->
-Mitch,
+On Sun, May 27, 2012 at 04:10:55AM +0200, Marek Vasut wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> Cc: linux-i2c at vger.kernel.org
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    1 +
+>  arch/arm/boot/dts/imx28.dtsi                      |    2 +
+>  drivers/i2c/busses/i2c-mxs.c                      |   64 +++++++++++++++++++++
+>  3 files changed, 67 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> index 1bfc02d..790b5c6 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>  - compatible: Should be "fsl,<chip>-i2c"
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain ERROR and DMA interrupts
+> +- speed: Speed of the bus in kHz (400 or 100 are supported)
+>  
+>  Examples:
+>  
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 4634cb8..d927155 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -381,6 +381,7 @@
+>  				compatible = "fsl,imx28-i2c";
+>  				reg = <0x80058000 2000>;
+>  				interrupts = <111 68>;
+> +				fsl,speed = <400>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -390,6 +391,7 @@
+>  				compatible = "fsl,imx28-i2c";
+>  				reg = <0x8005a000 2000>;
+>  				interrupts = <110 69>;
+> +				fsl,speed = <400>;
+>  				status = "disabled";
+>  			};
+>  
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index 04eb441..fff0a09 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -46,6 +46,10 @@
+>  #define MXS_I2C_CTRL0_DIRECTION			0x00010000
+>  #define MXS_I2C_CTRL0_XFER_COUNT(v)		((v) & 0x0000FFFF)
+>  
+> +#define MXS_I2C_TIMING0		(0x10)
+> +#define MXS_I2C_TIMING1		(0x20)
+> +#define MXS_I2C_TIMING2		(0x30)
+> +
+>  #define MXS_I2C_CTRL1		(0x40)
+>  #define MXS_I2C_CTRL1_SET	(0x44)
+>  #define MXS_I2C_CTRL1_CLR	(0x48)
+> @@ -97,6 +101,24 @@
+>  #define MXS_CMD_I2C_READ	(MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
+>  				 MXS_I2C_CTRL0_MASTER_MODE)
+>  
+> +struct mxs_i2c_speed_config {
+> +	uint32_t	timing0;
+> +	uint32_t	timing1;
+> +	uint32_t	timing2;
+> +};
+> +
+> +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+> +	.timing0	= 0x00780030,
+> +	.timing1	= 0x00800030,
+> +	.timing2	= 0x0015000d,
+> +};
+> +
+> +const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
+> +	.timing0	= 0x000f0007,
+> +	.timing1	= 0x001f000f,
+> +	.timing2	= 0x0015000d,
+> +};
+> +
+>  /**
+>   * struct mxs_i2c_dev - per device, private MXS-I2C data
+>   *
+> @@ -112,11 +134,17 @@ struct mxs_i2c_dev {
+>  	struct completion cmd_complete;
+>  	u32 cmd_err;
+>  	struct i2c_adapter adapter;
+> +	const struct mxs_i2c_speed_config *speed;
+>  };
+>  
+>  static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+>  {
+>  	stmp_reset_block(i2c->regs);
+> +
+> +	writel(i2c->speed->timing0, i2c->regs + MXS_I2C_TIMING0);
+> +	writel(i2c->speed->timing1, i2c->regs + MXS_I2C_TIMING1);
+> +	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
+> +
+>  	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
+>  	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+>  			i2c->regs + MXS_I2C_QUEUECTRL_SET);
+> @@ -319,6 +347,38 @@ static const struct i2c_algorithm mxs_i2c_algo = {
+>  	.functionality = mxs_i2c_func,
+>  };
+>  
+> +#ifdef CONFIG_OF
 
-Did you test cascade intcmux in DTS? I tried it before and got failure. But I
-didn't dig it yet, so I use parallel intc node instead.
+We already force ARCH_MXS to select USE_OF while I2C_MXS only depends
+on SOC_IMX28, so this #ifdef is not really needed?
+
+> +static int mxs_i2c_get_ofdata(struct platform_device *pdev,
+> +				struct mxs_i2c_dev *i2c)
+> +{
+> +	const __be32 *speed;
+> +	uint32_t speed_khz;
+> +	struct device_node *node = pdev->dev.of_node;
+> +
+> +	if (!node)
+> +		return -EINVAL;
+> +
+> +	i2c->speed = &mxs_i2c_95kHz_config;
+> +	speed = of_get_property(node, "fsl,speed", NULL);
+> +	if (!speed)
+> +		dev_warn(&pdev->dev,
+> +			"No I2C speed selected, using 100kHz\n");
+> +
+> +	speed_khz = be32_to_cpup(speed);
+
+You may want to try of_property_read_u32().
+
+> +	if (speed_khz == 400)
+> +		i2c->speed = &mxs_i2c_400kHz_config;
+> +	else if (speed_khz != 100)
+> +		dev_warn(&pdev->dev,
+> +			"Invalid I2C speed selected, using 100kHz\n");
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int mxs_i2c_get_ofdata(struct platform_device *pdev,
+> +				struct mxs_i2c_dev *i2c)
+> +{ }
+> +#endif /* CONFIG_OF */
+> +
+>  static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -357,6 +417,10 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
+>  	if (err)
+>  		return err;
+>  
+> +	err = mxs_i2c_get_ofdata(pdev, i2c);
+> +	if (err)
+> +		return err;
+> +
+
+If we have this block put after the following line, we can save pdev
+parameter of mxs_i2c_get_ofdata()?
+
+>  	i2c->dev = dev;
+>  	platform_set_drvdata(pdev, i2c);
+>  
+> -- 
+> 1.7.10
+> 
+
+-- 
+Regards,
+Shawn
