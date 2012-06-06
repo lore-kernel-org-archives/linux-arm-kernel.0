@@ -1,7 +1,7 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 05 Jun 2012 17:07:27 -0700
+From: kay@vrfy.org (Kay Sievers)
+Date: Wed, 6 Jun 2012 02:13:24 +0200
 Subject: [PATCH 0/8] Rework KERN_<LEVEL>
-In-Reply-To: <20120605165808.cd255b93.akpm@linux-foundation.org>
+In-Reply-To: <1338941247.11962.16.camel@joe2Laptop>
 References: <cover.1338889066.git.joe@perches.com>
  <20120605142826.d92316a0.akpm@linux-foundation.org>
  <1338934303.5780.8.camel@joe2Laptop>
@@ -14,57 +14,71 @@ References: <cover.1338889066.git.joe@perches.com>
  <CAPXgP10DEsqtz9xbPUQ3xCwdFGTTYyTGSd7yEcU2vUr3SJ83Sw@mail.gmail.com>
  <1338940345.11962.9.camel@joe2Laptop>
  <20120605165808.cd255b93.akpm@linux-foundation.org>
-Message-ID: <1338941247.11962.16.camel@joe2Laptop>
+ <1338941247.11962.16.camel@joe2Laptop>
+Message-ID: <CAPXgP12OFnh6FZO4zFGCw=Ea4U6Ne5OoCg_9BPxRX62x0EVnng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
->  echo "\0014Hello Joe" > /dev/kmsg
+On Wed, Jun 6, 2012 at 2:07 AM, Joe Perches <joe@perches.com> wrote:
+> On Tue, 2012-06-05 at 16:58 -0700, Andrew Morton wrote:
+>> ?echo "\0014Hello Joe" > /dev/kmsg
+>
+> # echo -e "\x014Hello Me" > /dev/kmsg
+> gives:
+> 12,778,4057982669;Hello Me
+>
+> #echo -e "\x011Hello Me_2" > /dev/kmsg
+> gives:
+> 12,779,4140452093;Hello Me_2
+>
+> I didn't change devkmsg_writev so the
+> original parsing style for "<.>" is
+> unchanged.
+>
+> from printk.c:
+>
+> static ssize_t devkmsg_writev(struct kiocb *iocb, const struct iovec *iv,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long count, loff_t pos)
+> [...]
+> ? ? ? ?int level = default_message_loglevel;
+> [...]
+> ? ? ? ?if (line[0] == '<') {
+> ? ? ? ? ? ? ? ?char *endp = NULL;
+>
+> ? ? ? ? ? ? ? ?i = simple_strtoul(line+1, &endp, 10);
+> ? ? ? ? ? ? ? ?if (endp && endp[0] == '>') {
+> ? ? ? ? ? ? ? ? ? ? ? ?level = i & 7;
+> ? ? ? ? ? ? ? ? ? ? ? ?if (i >> 3)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?facility = i >> 3;
+> ? ? ? ? ? ? ? ? ? ? ? ?endp++;
+> ? ? ? ? ? ? ? ? ? ? ? ?len -= endp - line;
+> ? ? ? ? ? ? ? ? ? ? ? ?line = endp;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+> ? ? ? ?line[len] = '\0';
+>
+> ? ? ? ?printk_emit(facility, level, NULL, 0, "%s", line);
+> []
+>
+> level is what matters.
+>
+> from dmesg -r
+>
+> <12>[ 2462.339252] \001Hello Andrew
+> <9>[ 2516.023444] Hello Andrew
+> <12>[ 3046.752764] \x01Hello Kay
+> <12>[ 3940.871850] \x01Hello Kay
+> <12>[ 4057.982669] Hello Me
+> <12>[ 4140.452093] Hello Me_2
 
-# echo -e "\x014Hello Me" > /dev/kmsg
-gives:
-12,778,4057982669;Hello Me
+The question is what happens if you inject your new binary two-byte
+prefix, like:
+  echo -e "\x01\x02Hello" > /dev/kmsg
 
-#echo -e "\x011Hello Me_2" > /dev/kmsg
-gives:
-12,779,4140452093;Hello Me_2
+And if that changes the log-level to "2" instead of the default "4"?
 
-I didn't change devkmsg_writev so the
-original parsing style for "<.>" is
-unchanged.
+(assuming that I read your patch right, otherwise please correct the
+bytes, but use the full sequence which your patch will recognize as an
+internal level marker; seems your examples are all not triggering that)
 
-from printk.c:
-
-static ssize_t devkmsg_writev(struct kiocb *iocb, const struct iovec *iv,
-			      unsigned long count, loff_t pos)
-[...]
-	int level = default_message_loglevel;
-[...]
-	if (line[0] == '<') {
-		char *endp = NULL;
-
-		i = simple_strtoul(line+1, &endp, 10);
-		if (endp && endp[0] == '>') {
-			level = i & 7;
-			if (i >> 3)
-				facility = i >> 3;
-			endp++;
-			len -= endp - line;
-			line = endp;
-		}
-	}
-	line[len] = '\0';
-
-	printk_emit(facility, level, NULL, 0, "%s", line);
-[]
-
-level is what matters.
-
-from dmesg -r
-
-<12>[ 2462.339252] \001Hello Andrew
-<9>[ 2516.023444] Hello Andrew
-<12>[ 3046.752764] \x01Hello Kay
-<12>[ 3940.871850] \x01Hello Kay
-<12>[ 4057.982669] Hello Me
-<12>[ 4140.452093] Hello Me_2
+Kay
