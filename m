@@ -1,36 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 10:10:16 -0700
-Subject: [CFT 09/11] mtd: omap2: add DMA engine support
-In-Reply-To: <1339075683.6875.109.camel@sauron.fi.intel.com>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1Scaaa-0003uB-1l@rmk-PC.arm.linux.org.uk>
- <1339073375.6875.102.camel@sauron.fi.intel.com>
- <20120607131158.GC15973@n2100.arm.linux.org.uk>
- <1339075683.6875.109.camel@sauron.fi.intel.com>
-Message-ID: <20120607171015.GK12766@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Jun 2012 14:35:05 -0300
+Subject: [PATCH] media: mx2_camera: Add YUYV output format.
+In-Reply-To: <CACKLOr1_pOSkMfo7xWMPd4qJvo8MgNa-dswWVKGBx=enaEB2CQ@mail.gmail.com>
+References: <1338905173-5968-1-git-send-email-javier.martin@vista-silicon.com>
+ <CAOMZO5AnR9e9O+A+8zH+W+3pa0=cey=9wL0Oa2z+YrhYadvQ1w@mail.gmail.com>
+ <CACKLOr28+2pQqOKyVP728kiD2BAnCzkMFgNL=059jmTpeFvQHg@mail.gmail.com>
+ <CAOMZO5BA9pT0vwXT1zr+-fjHr5eT6eTYEzsKbrCs8rzxiQCwWg@mail.gmail.com>
+ <CACKLOr1_pOSkMfo7xWMPd4qJvo8MgNa-dswWVKGBx=enaEB2CQ@mail.gmail.com>
+Message-ID: <CAOMZO5CaW+pUmVrgDFT857eyaR8kjzcE89K4ZBwi8TF0f5dxaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Artem Bityutskiy <dedekind1@gmail.com> [120607 06:28]:
-> On Thu, 2012-06-07 at 14:11 +0100, Russell King - ARM Linux wrote:
-> > No, it makes sense to get this stuff via a single tree all together,
-> > because, as you can see from the thread structure, it isn't purely
-> > an OMAP thing.
-> > 
-> > The OMAP stuff depends on a core set, as does a bunch of PL08x and
-> > SA11x0 changes.  We can't stuff all that through the OMAP tree, that
-> > wouldn't make any sense.
-> > 
-> > What probably should happen is that the tip of the OMAP stuff gets
-> > pulled by Tony into his tree, and we share those commits between my
-> > tree and his - and then it doesn't matter what goes in when and by
-> > whom.
-> 
-> Oh, sure, sorry, I actually wanted to say that these to patches should
-> _not_ got via the MTD tree.
+Hi Javier,
 
-What Russell is suggesting works good for me.
+On Thu, Jun 7, 2012 at 5:30 AM, javier Martin
+<javier.martin@vista-silicon.com> wrote:
 
-Regards,
+> As i stated, the driver is still in an early development stage, it
+> doesn't do anything useful yet. But this is the public git repository
+> if you want to take a look:
+>
+> git repo: https://github.com/jmartinc/video_visstrim.git
+> branch: ?mx27-codadx6
 
-Tony
+Thanks, I will take a look at your tree when I am back to the office next week.
+
+I also see that Linaro's tree has support for VPU for mx5/mx6:
+http://git.linaro.org/gitweb?p=landing-teams/working/freescale/kernel.git;a=summary
+
+,so we should probably think in unifying it with mx27 support there too.
+
+>
+> FYI we are only interested on adding support for the encoding path of
+> the VPU, but we are trying our best to make it modular (as it is done
+> in Samsung's [1]), so that anyone can add decoding support later.
+
+Ok, sounds good.
+
+> By the way, you work for Freescale, don't you?
+
+Yes, correct.
+
+> We have a couple of issues with the i.MX27 VPU:
+>
+> 1- Firmware for the VPU is provided as a table of binary values inside
+> a source file which is licensed as GPL, however software is packaged
+> in a .tar.gz file that is marked as NDA. Do we have the right to
+> distribute this firmware with our products?
+> 2- There is a BUG in the firmware that marks P frames as IDR when it
+> should only be done to I frames. Would it be possible to have access
+> to the source code of the firmware in order to fix that problem?
+
+I will need to check this next week when I am back to the office.
+
+Thanks,
+
+Fabio Estevam
