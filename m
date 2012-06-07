@@ -1,51 +1,40 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Jun 2012 17:11:06 -0500
-Subject: [PATCH V2 2/2] arm/dts: OMAP2: Fix interrupt controller binding
-In-Reply-To: <1339107066-10461-1-git-send-email-jon-hunter@ti.com>
-References: <1339107066-10461-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1339107066-10461-3-git-send-email-jon-hunter@ti.com>
+Date: Thu, 7 Jun 2012 18:36:06 -0500
+Subject: [PATCH V2 00/10] ARM: OMAP4: Add PMU Support
+In-Reply-To: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <4FD13AE6.6070206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with device-tree on an OMAP2420 SDP, the kernel is hanging when
-initialising the interrupts and following kernel dumps is seen ...
 
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: at arch/arm/mach-omap2/irq.c:271 omap_intc_of_init+0x50/0xb4()
-[    0.000000] unable to get intc registers
-[    0.000000] Modules linked in:
-[    0.000000] [<c001befc>] (unwind_backtrace+0x0/0xf4) from [<c0040c34>] (warn_slowpath_common+0x4c/0x64)
-[    0.000000] [<c0040c34>] (warn_slowpath_common+0x4c/0x64) from [<c0040ce0>] (warn_slowpath_fmt+0x30/0x40)
-[    0.000000] [<c0040ce0>] (warn_slowpath_fmt+0x30/0x40) from [<c066b8a4>] (omap_intc_of_init+0x50/0xb4)
-[    0.000000] [<c066b8a4>] (omap_intc_of_init+0x50/0xb4) from [<c0688b70>] (of_irq_init+0x144/0x288)
-[    0.000000] [<c0688b70>] (of_irq_init+0x144/0x288) from [<c0663294>] (init_IRQ+0x14/0x1c)
-[    0.000000] [<c0663294>] (init_IRQ+0x14/0x1c) from [<c06607fc>] (start_kernel+0x198/0x304)
-[    0.000000] [<c06607fc>] (start_kernel+0x198/0x304) from [<80008044>] (0x80008044)
-[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-[    0.000000] of_irq_init: children remain, but no parents
+On 06/07/2012 04:22 PM, Jon Hunter wrote:
+> This series adds PMU support for OMAP4 devices. This is based upon Will Deacons
+> series [1]. This series fixes the management of the EMU power domain so that
+> PMU can be enabled at runtime and low-power states are not prevented when PMU
+> is not in-use. The fix is based upon inputs from Benoit, Paul and Kevin [2].
+> 
+> This series also converts OMAP2/3 devices to use HWMOD to create the PMU device
+> and add a new file to mach-omap2 directory called pmu.c where the PMU devices
+> are created.
+> 
+> This series is based upon the latest linux-omap master branch from Tony
+> (3.5-rc1).
+> 
+> Testing:
+> - Verified that PMU is working on OMAP3430 Beagle Board, OMAP4430 Blaze and
+>   4460 Panda.
+> - Tested on the above boards with CPU-idle enabled to ensure that PMU is working
+>   with power management. For OMAP4 boards I have disabled CPU1 so that CPU0 and
+>   hence the MPU power domain is reaching the low-power retention state.
+> - I have booted the kernel on an OMAP2430 SDP but not verified PMU is working.
+> - Unable to verify 4470 Blaze because kernel is not currently booting.
 
-The OMAP2 interrupt controller binding is missing the number of interrupts and
-interrupt controller register address. Adding these fixes the problem.
+Update on the 4470 status. Now I have 4470 booting [1], I have now
+verified that PMU on 4470 is also working with this series (and with
+CPU-idle enabled).
 
-This is based upon latest linux-omap master (3.5-rc1) git tree.
+Cheers
+Jon
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap2.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index f2ab4ea..581cb08 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -44,6 +44,8 @@
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
-+			ti,intc-size = <96>;
-+			reg = <0x480FE000 0x1000>;
- 		};
- 
- 		uart1: serial at 4806a000 {
--- 
-1.7.9.5
+[1] http://marc.info/?l=linux-omap&m=133911023112941&w=2
