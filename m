@@ -1,81 +1,100 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 07 Jun 2012 00:13:03 -0600
-Subject: [PATCH 00/11] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-Message-ID: <20120607060901.25532.68354.stgit@dusk>
+Date: Thu, 07 Jun 2012 00:13:06 -0600
+Subject: [PATCH 01/11] ARM: OMAP2+: hwmod: add setup_preprogram hook
+In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
+References: <20120607060901.25532.68354.stgit@dusk>
+Message-ID: <20120607061303.25532.65533.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+After reset, some IP blocks cannot indicate to the PRCM that they are
+inactive until they are configured.  One example on OMAP4 is the AESS
+IP block.
 
-Here is an initial set of fixes for power management and OMAP core
-infrastructure for 3.5-rc.  Most of these patches address boot
-warnings and power management problems on OMAP4, although a few of
-them address more general issues.
+To fix this cleanly, this patch adds another optional function
+pointer, setup_preprogram, to the IP block's hwmod data.  The function
+that is pointed to is called by the hwmod code immediately after the
+IP block is reset.
 
-Compile-test information is below.  The patches been boot-tested on
-OMAP3530 ES3.0 BeagleBoard and OMAP4430 ES2.0 PandaBoard.  Suspend and
-idle are broken on both of these platforms right now.  Unfortunately
-my board farm is down at the moment, so I'm unable to do further
-testing on other boards.  Boot logs, such as they are, are available
-from:
-
-http://www.pwsan.com/omap/bootlogs/20120606/omap_fixes_a_3.5rc__23a432a1860498d0dfbe36319de3b86d9832c6e7/
-
-These patches are available via git from git://git.pwsan.com/linux-2.6
-in the branch 'omap_fixes_a_3.5rc'.  Will plan to send a pull request
-tomorrow unless there are actionable comments.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c             |   21 ++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 +++++++++
+ 2 files changed, 29 insertions(+), 1 deletion(-)
 
-object size (delta in bytes from v3.5-rc1 (f8f5701bdaf9134b1f90e5044a82c66324d2073f)):
- text 	 data 	  bss 	total 	kernel
-    0 	    0 	    0 	    0 	5912osk_testconfig/vmlinux
- +352 	  +88 	    0 	 +440 	n800_multi_omap2xxx/vmlinux
- +384 	  +96 	    0 	 +480 	n800_testconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1510_defconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1_defconfig/vmlinux
- +352 	 +312 	    0 	 +664 	omap2_4_testconfig/vmlinux
- +384 	 +448 	    0 	 +832 	omap2plus_defconfig/vmlinux
- +384 	 +384 	    0 	 +768 	omap2plus_no_pm/vmlinux
- +320 	 +320 	    0 	 +640 	omap3_4_testconfig/vmlinux
- +320 	  +88 	    0 	 +408 	omap3_testconfig/vmlinux
- +320 	 +256 	    0 	 +576 	omap4_testconfig/vmlinux
-
-
-Djamil Elaidi (1):
-      ARM: OMAP4+: hwmod: fix issue causing IPs not going back to Smart-Standby
-
-Paul Walmsley (8):
-      ARM: OMAP2+: hwmod: add setup_preprogram hook
-      ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
-      ARM: OMAP4: hwmod data: add SL2IF hardreset line
-      ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-      ARM: OMAP2+: CM: increase the module disable timeout
-      ARM: OMAP4: clock data: add clockdomains for clocks used as main clocks
-      ARM: OMAP2+: hwmod: add flag to prevent hwmod code from touching IP block during init
-      ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init
-
-Tero Kristo (1):
-      ARM: OMAP2+: usb_host_fs: add custom reset for usb_host_fs (fsusb)
-
-Todd Poynor (1):
-      ARM: OMAP: PM: Lock clocks list while generating summary
-
-
- arch/arm/mach-omap2/Makefile                 |    6 +--
- arch/arm/mach-omap2/aess.c                   |   55 +++++++++++++++++++++++
- arch/arm/mach-omap2/clock44xx_data.c         |    5 ++
- arch/arm/mach-omap2/cm.h                     |   19 ++++++++
- arch/arm/mach-omap2/cminst44xx.c             |    4 +-
- arch/arm/mach-omap2/common.h                 |    2 +
- arch/arm/mach-omap2/omap_hwmod.c             |   58 +++++++++++++++++++++---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   23 ++++++++++
- arch/arm/mach-omap2/usb-fs.c                 |   62 ++++++++++++++++++++++++++
- arch/arm/plat-omap/clock.c                   |    2 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   15 ++++++
- arch/arm/plat-omap/include/plat/usb.h        |    3 +
- 12 files changed, 238 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/mach-omap2/aess.c
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index bf86f7e..b0d3064 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2103,6 +2103,23 @@ static void __init _setup_iclk_autoidle(struct omap_hwmod *oh)
+ }
+ 
+ /**
++ * _setup_preprogram - Pre-program an IP block during the _setup() process
++ * @oh: struct omap_hwmod *
++ *
++ * Some IP blocks (such as AESS) require some additional programming
++ * after reset before they can enter idle.  If a function pointer to
++ * do so is present in the hwmod data, then call it and pass along the
++ * return value; otherwise, return 0.
++ */
++static int __init _setup_preprogram(struct omap_hwmod *oh)
++{
++	if (!oh->class->setup_preprogram)
++		return 0;
++
++	return oh->class->setup_preprogram(oh);
++}
++
++/**
+  * _setup_reset - reset an IP block during the setup process
+  * @oh: struct omap_hwmod *
+  *
+@@ -2224,8 +2241,10 @@ static int __init _setup(struct omap_hwmod *oh, void *data)
+ 
+ 	_setup_iclk_autoidle(oh);
+ 
+-	if (!_setup_reset(oh))
++	if (!_setup_reset(oh)) {
++		_setup_preprogram(oh);
+ 		_setup_postsetup(oh);
++	}
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index c835b71..fdc4b2a 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -458,6 +458,7 @@ struct omap_hwmod_omap4_prcm {
+  * @rev: revision of the IP class
+  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
+  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
++ * @setup_preprogram: ptr to fn to be executed after the reset in _setup()
+  *
+  * Represent the class of a OMAP hardware "modules" (e.g. timer,
+  * smartreflex, gpio, uart...)
+@@ -474,6 +475,13 @@ struct omap_hwmod_omap4_prcm {
+  * executed in place of the standard hwmod _reset() code in
+  * mach-omap2/omap_hwmod.c.  This is needed for IP blocks which have
+  * unusual reset sequences - usually processor IP blocks like the IVA.
++ *
++ * @setup_preprogram is called between the calls to _setup_reset() and
++ * _setup_postsetup().  It is intended to be used for IP blocks that
++ * require some initial configuration during their first
++ * initialization.  (For example, the AESS IP block on OMAP4+ cannot
++ * enter idle until its internal autogating bit is set.)  Most IP blocks
++ * will not need this.
+  */
+ struct omap_hwmod_class {
+ 	const char				*name;
+@@ -481,6 +489,7 @@ struct omap_hwmod_class {
+ 	u32					rev;
+ 	int					(*pre_shutdown)(struct omap_hwmod *oh);
+ 	int					(*reset)(struct omap_hwmod *oh);
++	int					(*setup_preprogram)(struct omap_hwmod *oh);
+ };
+ 
+ /**
