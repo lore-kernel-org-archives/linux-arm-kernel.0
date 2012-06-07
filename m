@@ -1,79 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 03:52:28 -0700
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Jun 2012 04:52:50 -0600 (MDT)
 Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
  usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
+In-Reply-To: <4FD0602B.9070704@ti.com>
 References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk>
- <20120607073112.GX12766@atomide.com>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
  <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
-Message-ID: <20120607105228.GC12766@atomide.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+ <4FD0602B.9070704@ti.com>
+Message-ID: <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120607 03:24]:
-> On Thu, 7 Jun 2012, Tony Lindgren wrote:
-> 
-> > * Paul Walmsley <paul@pwsan.com> [120607 00:44]:
-> > > On Thu, 7 Jun 2012, Tony Lindgren wrote:
-> > > 
-> > > > Here too I think driver like features like this should live in the
-> > > > driver init for omap OHCI driver. In the likely case that FS OHCI is
-> > > > not in use on the board, the OHCI glue can just reset it.
-> > > 
-> > > What if the driver is not compiled into the kernel, but instead is built 
-> > > as a loadable module?
-> > 
-> > You can still have a core piece of the driver that's always built in, such
-> > as omap-ohci-common. But it should live under drivers, not in the bus level
-> > code. Or you can insmod/rmmod it to reset things properly.
-> 
-> Do you know of any device drivers that do this now, with a core built-in 
-> piece separate from a dynamically loadable part?
+On Thu, 7 Jun 2012, Cousson, Benoit wrote:
 
-Hmm yeah good point, only driver frameworks tend to do that. It would require
-the module registering with the core driver.
- 
-> Seems like it would be tricky to avoid linking in the entire driver, due 
-> to the symbol dependencies.  Either that, or an extra, largely useless, 
-> layer of indirection would be needed in the shim layer.
+> In fact we should delay the reset to the very last moment and 
+> potentially reset the IPs not under driver control later after a couple 
+> of second for example. It will avoid reseting every IP that will be 
+> handled properly by drivers.
 
-Yes probably better approach would be to only build in the reset and idle
-part of the driver in the minimal case. And that too can get messy as the
-makefiles may not even be included.
+We discussed this a couple of years ago on the list and aligned on late 
+and lazy resets, from my recollection.  The main reason why it wasn't 
+implemented was because there were some drivers that were not yet PM 
+runtime-converted.  This would have caused crashes, since the core code 
+would have no idea that the non-PM-runtime drivers had initialized their 
+devices, and so the core just went ahead and reset those anyway.
 
-Until we have something generic in place to deal with stuff like unused driver
-reset and idle, how about we set up the driver specific reset parts as inline
-functions in the driver header?
+It might actually be safe now to switch to the late reset arrangement, 
+depending on whether the rest of the drivers have been PM 
+runtime-converted by now.
 
-That way the hwmod code can include those functions using the driver register
-defines. Something like:
-
-static inline int xyz_driver_reset(void __iomem *base, int flags)
-{
-	...
-}
-
-Then instead of having a separate platform init file for each driver,
-we could just have a list of reset functions:
-
-static int hwmod_xyz_driver_reset(void __iomem *base, int flags)
-{
-	int res;
-
-	/* do bus related reset here */
-	...
-
-	/* call the driver reset */
-	res = xyz_driver_reset(base, flags)
+Of course, it would all be moot if the reset is moved away from the hwmod 
+code into the drivers.
 
 
-	/* do more bus related reset here */
-	...
-}
-
-Regards,
-
-Tony
+- Paul
