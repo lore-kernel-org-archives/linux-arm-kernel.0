@@ -1,49 +1,29 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Thu, 07 Jun 2012 14:56:18 +0530
-Subject: [PATCH v2 3/3] dma: enable mxs-dma for imx6q
-In-Reply-To: <1339032179-2732-3-git-send-email-shijie8@gmail.com>
-References: <1339032179-2732-1-git-send-email-shijie8@gmail.com>
- <1339032179-2732-3-git-send-email-shijie8@gmail.com>
-Message-ID: <1339061178.1927.62.camel@vkoul-udesk3>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 7 Jun 2012 11:43:16 +0200
+Subject: [PATCH 4/4] ARM i.MX5: Add nand oftree support
+In-Reply-To: <20120607022952.GI2667@S2101-09.ap.freescale.net>
+References: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
+ <1338978796-26129-5-git-send-email-s.hauer@pengutronix.de>
+ <20120607022952.GI2667@S2101-09.ap.freescale.net>
+Message-ID: <20120607094316.GG30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-06 at 21:22 -0400, Huang Shijie wrote:
-> enable the mxs-dma for imx6q.
-> Also remove the unused header file.
+On Thu, Jun 07, 2012 at 10:29:54AM +0800, Shawn Guo wrote:
+> On Wed, Jun 06, 2012 at 12:33:16PM +0200, Sascha Hauer wrote:
+> > This adds snippets to the i.MX51/53 devicetrees for the nand
+> > flash controller.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> Signed-off-by: Huang Shijie <shijie8@gmail.com>
-> ---
->  drivers/dma/Kconfig   |    2 +-
->  drivers/dma/mxs-dma.c |    1 -
->  2 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index aadeb5b..c8416d5 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -237,7 +237,7 @@ config IMX_DMA
->  
->  config MXS_DMA
->  	bool "MXS DMA support"
-> -	depends on SOC_IMX23 || SOC_IMX28
-> +	depends on SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q
->  	select STMP_DEVICE
->  	select DMA_ENGINE
->  	help
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index c96ab15..90b980d 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -29,7 +29,6 @@
->  #include <linux/of_device.h>
->  
->  #include <asm/irq.h>
-> -#include <mach/mxs.h>
->  
->  #include "dmaengine.h"
->  
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Applied, Thanks
+Thanks. Will address Artems comments and resend.
+
+Sascha
+
 -- 
-~Vinod
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
