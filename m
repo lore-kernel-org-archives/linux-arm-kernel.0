@@ -1,27 +1,23 @@
 From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 07 Jun 2012 15:45:59 +0300
-Subject: 
-In-Reply-To: <20120607101124.GH30400@pengutronix.de>
-References: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
- <1338993547.6875.65.camel@sauron.fi.intel.com>
- <20120607101124.GH30400@pengutronix.de>
-Message-ID: <1339073159.6875.101.camel@sauron.fi.intel.com>
+Date: Thu, 07 Jun 2012 15:49:35 +0300
+Subject: [CFT 09/11] mtd: omap2: add DMA engine support
+In-Reply-To: <E1Scaaa-0003uB-1l@rmk-PC.arm.linux.org.uk>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1Scaaa-0003uB-1l@rmk-PC.arm.linux.org.uk>
+Message-ID: <1339073375.6875.102.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-06-07 at 12:11 +0200, Sascha Hauer wrote:
-> Fixing these warnings in the nand driver does not seem to be the correct
-> approach. Initializing mxc_nand_devtype_data as const seems sane, the
-> problem is that struct of_device_id expects a void * instead of a const
-> void *. A patch fixing this is outstanding here:
+On Thu, 2012-06-07 at 12:09 +0100, Russell King wrote:
+> Add DMA engine support to the OMAP2 NAND driver.  This supplements the
+> private DMA API implementation contained within this driver, and the
+> driver can be independently switched at build time between using DMA
+> engine and the private DMA API.
 > 
-> http://permalink.gmane.org/gmane.linux.drivers.devicetree/15069
-> 
-> (this will also fix the other sparse warnings from this driver)
-> 
-> I asked Uwe to resend this.
+> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Pushed to l2-mtd.git, thanks!
+I guess it is makes sense to make this stuff to go in via the OMAP tree.
 
 -- 
 Best Regards,
@@ -32,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120607/33d785e7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120607/2a85a927/attachment.sig>
