@@ -1,26 +1,70 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 7 Jun 2012 23:23:43 +0530
-Subject: [CFT 03/11] mmc: omap_hsmmc: remove private DMA API implementation
-In-Reply-To: <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk>
-Message-ID: <CANfBPZ-wWpwf_AoZV1jToFr=44FYPDtoOQCdd+Hzy03u53POeQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  7 Jun 2012 19:57:44 +0200
+Subject: [PATCH 7/7 v2] ARM: nomadik: register the MMC/SD device
+Message-ID: <1339091864-26715-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2012 at 4:37 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Remove the private DMA API implementation from omap_hsmmc, making it
-> use entirely the DMA engine API.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This registers the MMC device for the Nomadik so we can access
+MMC/SD cards, which is pretty nice.
 
-Tested this on 4430SDP with rootfs usage, untarring the kernel source
-and compiling it natively.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Register as an APB device rather than as AHB.
+---
+ arch/arm/mach-nomadik/board-nhk8815.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-Tested-by: Venkatraman S <svenkatr@ti.com>
-
-> ---
-> ?drivers/mmc/host/omap_hsmmc.c | ?265 ++++++++++-------------------------------
-> ?1 files changed, 64 insertions(+), 201 deletions(-)
->
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 029a741..1169a12 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
++#include <linux/amba/mmci.h>
+ #include <linux/interrupt.h>
+ #include <linux/gpio.h>
+ #include <linux/mtd/mtd.h>
+@@ -32,6 +33,7 @@
+ 
+ #include <plat/gpio-nomadik.h>
+ #include <plat/mtu.h>
++#include <plat/pincfg.h>
+ 
+ #include <mach/nand.h>
+ #include <mach/fsmc.h>
+@@ -186,6 +188,29 @@ static void __init nhk8815_onenand_init(void)
+ #endif
+ }
+ 
++static struct mmci_platform_data mmcsd_plat_data = {
++	.ocr_mask = MMC_VDD_29_30,
++	.f_max = 48000000,
++	.gpio_wp = -1,
++	.gpio_cd = 111,  /* Or 112 for S8815 */
++	.cd_invert = true,
++	.capabilities = MMC_CAP_MMC_HIGHSPEED |
++	MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA,
++};
++
++static int __init nhk8815_mmcsd_init(void)
++{
++	int ret;
++
++	ret = gpio_request(112, "card detect bias");
++	if (ret)
++		return ret;
++	gpio_direction_output(112, 0);
++	amba_apb_device_add(NULL, "mmci", NOMADIK_SDI_BASE, SZ_4K, IRQ_SDMMC, 0, &mmcsd_plat_data, 0x10180180);
++	return 0;
++}
++module_init(nhk8815_mmcsd_init);
++
+ static struct resource nhk8815_eth_resources[] = {
+ 	{
+ 		.name = "smc91x-regs",
+-- 
+1.7.7.6
