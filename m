@@ -1,20 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 10:06:32 -0700
-Subject: [CFT 06/11] ARM: omap: remove mmc platform data dma_mask and
- initialization
-In-Reply-To: <E1ScaZa-0003tu-OD@rmk-PC.arm.linux.org.uk>
+Date: Thu, 7 Jun 2012 10:07:05 -0700
+Subject: [CFT 11/11] Add feature removal of old OMAP private DMA
+ implementation
+In-Reply-To: <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk>
 References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaZa-0003tu-OD@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120607170631.GI12766@atomide.com>
+ <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120607170705.GJ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King <rmk+kernel@arm.linux.org.uk> [120607 04:12]:
-> DMAengine uses the DMA engine device structure when mapping/unmapping
-> memory for DMA, so the MMC devices do not need their DMA masks
-> initialized (this reflects hardware: the MMC device is not the device
-> doing DMA.)
-> 
+* Russell King <rmk+kernel@arm.linux.org.uk> [120607 04:14]:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  Documentation/feature-removal-schedule.txt |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
+> index 56000b3..1f7ba35 100644
+> --- a/Documentation/feature-removal-schedule.txt
+> +++ b/Documentation/feature-removal-schedule.txt
+> @@ -612,3 +612,14 @@ When:	June 2013
+>  Why:	Unsupported/unmaintained/unused since 2.6
+>  
+>  ----------------------------
+> +
+> +What:	OMAP private DMA implementation
+> +When:	2013
+> +Why:	We have a DMA engine implementation; all users should be updated
+> +	to use this rather than persisting with the old APIs.  The old APIs
+> +	block merging the old DMA engine implementation into the DMA
+> +	engine driver.
+> +Who:	Russell King <linux@arm.linux.org.uk>,
+> +	Santosh Shilimkar <santosh.shilimkar@ti.com>
+> +
+> +----------------------------
+> -- 
+> 1.7.4.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
