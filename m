@@ -1,40 +1,37 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Jun 2012 21:24:27 +0200
-Subject: [PATCH] ARM: mx35: add WEIM register addresses
-In-Reply-To: <1339093049.4704.192.camel@mars>
-References: <20120509131638.GA2057@lovely.krouter>
- <20120607180738.GM30400@pengutronix.de>
- <1339093049.4704.192.camel@mars>
-Message-ID: <20120607192427.GO30400@pengutronix.de>
+Date: Thu, 7 Jun 2012 22:02:09 +0200
+Subject: [GIT PULL] more i.MX clock fixes
+Message-ID: <20120607200209.GP30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2012 at 08:17:29PM +0200, Christoph Fritz wrote:
-> On Thu, 2012-06-07 at 20:07 +0200, Sascha Hauer wrote:
-> 
-> > The same could be used on i.MX25 aswell. I think we should clean this
-> > up before adding more SoCs.
-> 
-> :) full ack. What would you suggest? A macro?
+Hi Olof, Arnd,
 
-Something like the following should do. We still could do better, but at
-least we have all pieces together.
+Please pull the following i.MX clock fixes for -rc.
 
-imx-weim.h:
+Sascha
 
-#define IMX_WEIM_CSU_BITS	...
+The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
 
-static inline void imx_weim_cs(void __iomem *base, int cs, u32 csu, u32 csl, u32 csa)
-{
-	do_it
-}
+  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
 
-static inline void mx27_weim_cs(int cs, u32 csu, u32 csl, u32 csa)
-{
-	imx_weim_cs(MX27_IO_ADDRESS(MX27_WEIM_BASE), cs, csu, csl, csa));
-}
+are available in the git repository at:
 
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx/clk-fixes
 
+for you to fetch changes up to cdd781ab1906d039c2a93078385645d2d5af8491:
+
+  ARM i.MX53: Fix PLL4 base address (2012-06-04 15:23:57 +0200)
+
+----------------------------------------------------------------
+Sascha Hauer (3):
+      ARM i.MX pllv2: use standard register set unconditionally
+      ARM i.MX pllv2: make round_rate accurate
+      ARM i.MX53: Fix PLL4 base address
+
+ arch/arm/mach-imx/clk-pllv2.c     |   93 ++++++++++++++++++++++---------------
+ arch/arm/mach-imx/crm-regs-imx5.h |    2 +-
+ 2 files changed, 56 insertions(+), 39 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
