@@ -1,62 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 00:48:32 -0700
-Subject: [PATCH 02/11] ARM: OMAP4+: AESS: enable internal auto-gating
- during initial setup
-In-Reply-To: <alpine.DEB.2.00.1206070121150.6684@utopia.booyaka.com>
+Date: Thu, 7 Jun 2012 00:51:58 -0700
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
 References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061306.25532.59488.stgit@dusk>
- <20120607071900.GW12766@atomide.com>
- <alpine.DEB.2.00.1206070121150.6684@utopia.booyaka.com>
-Message-ID: <20120607074831.GY12766@atomide.com>
+ <20120607061308.25532.19767.stgit@dusk>
+ <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+Message-ID: <20120607075158.GZ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120607 00:35]:
+* Paul Walmsley <paul@pwsan.com> [120607 00:44]:
 > On Thu, 7 Jun 2012, Tony Lindgren wrote:
 > 
-> > It seems that most/many IP blocks need their custom reset hacks, and 
-> > it's not limited to just few instances?
+> > Here too I think driver like features like this should live in the
+> > driver init for omap OHCI driver. In the likely case that FS OHCI is
+> > not in use on the board, the OHCI glue can just reset it.
 > 
-> Only four out of the fifty-seven omap_hwmod_classes defined in 
-> mach-omap2/omap_hwmod_44xx_data.c after this series have custom reset 
-> functions used:
-> 
-> $ fgrep 'struct omap_hwmod_class ' arch/arm/mach-omap2/omap_hwmod_44xx_data.c | wc -l
-> 57
-> $ fgrep '.reset' arch/arm/mach-omap2/omap_hwmod_44xx_data.c | wc -l
-> 4
-> 
-> That's 7% of the classes.  In terms of the total number of IP block 
-> instances that use custom reset functions viewed against the total number 
-> of instances on the chip, the percentage is even smaller.
+> What if the driver is not compiled into the kernel, but instead is built 
+> as a loadable module?
 
-OK so that's not too bad then. But there's also the omap2_wd_timer_disable
-pre_shutdown too. And there's also the sysconfig autoidle bit for each driver
-that we're tweaking in the bus level code?
-
-If we can remove the ioremapping and accessing driver registers in the bus
-level code things get much simpler for the bus level code.
-
-> > AFAIK there's no need to reset the IP blocks before the driver init, 
-> > it's really needed for PM. So it's not needed early on, and it's OK to 
-> > require running the driver init for driver modules that are not in use 
-> > to reset them properly. After all, the hardware is on the device, even 
-> > if it's not being used.
-> 
-> I don't think I'm following you.  It's not just PM; the problem is also 
-> with kexec or buggy bootloaders.  If an IP block isn't reset when the 
-> kernel boots, and is doing DMA or anything else that could affect the 
-> reset of the system, it could easily cause unpredictable behavior or 
-> crashes in unrelated kernel code.
-
-Still sounds like the responsibility of the bootloaders and drivers to
-set things up properly, that's the standard behaviour.
- 
-> It's also worth mentioning that many IP blocks, such as AESS, don't have 
-> Linux drivers.
-
-Sounds like it should have a minimal driver then, just to reset it if
-nothing else.
+You can still have a core piece of the driver that's always built in, such
+as omap-ohci-common. But it should live under drivers, not in the bus level
+code. Or you can insmod/rmmod it to reset things properly.
 
 Regards,
 
