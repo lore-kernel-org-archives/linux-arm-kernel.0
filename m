@@ -1,36 +1,35 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 07 Jun 2012 12:09:56 +0100
-Subject: [CFT 11/11] Add feature removal of old OMAP private DMA implementation
-In-Reply-To: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jun 2012 14:11:58 +0100
+Subject: [CFT 09/11] mtd: omap2: add DMA engine support
+In-Reply-To: <1339073375.6875.102.camel@sauron.fi.intel.com>
 References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
-Message-ID: <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk>
+ <E1Scaaa-0003uB-1l@rmk-PC.arm.linux.org.uk>
+ <1339073375.6875.102.camel@sauron.fi.intel.com>
+Message-ID: <20120607131158.GC15973@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- Documentation/feature-removal-schedule.txt |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+On Thu, Jun 07, 2012 at 03:49:35PM +0300, Artem Bityutskiy wrote:
+> On Thu, 2012-06-07 at 12:09 +0100, Russell King wrote:
+> > Add DMA engine support to the OMAP2 NAND driver.  This supplements the
+> > private DMA API implementation contained within this driver, and the
+> > driver can be independently switched at build time between using DMA
+> > engine and the private DMA API.
+> > 
+> > Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> I guess it is makes sense to make this stuff to go in via the OMAP tree.
 
-diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-index 56000b3..1f7ba35 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -612,3 +612,14 @@ When:	June 2013
- Why:	Unsupported/unmaintained/unused since 2.6
- 
- ----------------------------
-+
-+What:	OMAP private DMA implementation
-+When:	2013
-+Why:	We have a DMA engine implementation; all users should be updated
-+	to use this rather than persisting with the old APIs.  The old APIs
-+	block merging the old DMA engine implementation into the DMA
-+	engine driver.
-+Who:	Russell King <linux@arm.linux.org.uk>,
-+	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+
-+----------------------------
--- 
-1.7.4.4
+No, it makes sense to get this stuff via a single tree all together,
+because, as you can see from the thread structure, it isn't purely
+an OMAP thing.
+
+The OMAP stuff depends on a core set, as does a bunch of PL08x and
+SA11x0 changes.  We can't stuff all that through the OMAP tree, that
+wouldn't make any sense.
+
+What probably should happen is that the tip of the OMAP stuff gets
+pulled by Tony into his tree, and we share those commits between my
+tree and his - and then it doesn't matter what goes in when and by
+whom.
