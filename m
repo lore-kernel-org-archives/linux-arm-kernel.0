@@ -1,58 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Jun 2012 20:07:38 +0200
-Subject: [PATCH] ARM: mx35: add WEIM register addresses
-In-Reply-To: <20120509131638.GA2057@lovely.krouter>
-References: <20120509131638.GA2057@lovely.krouter>
-Message-ID: <20120607180738.GM30400@pengutronix.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 7 Jun 2012 18:09:03 +0000
+Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061309.25532.13430.stgit@dusk>
+ <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
-
-On Wed, May 09, 2012 at 03:16:38PM +0200, Christoph Fritz wrote:
+On Thu, Jun 07, 2012 at 12:38:50, Paul Walmsley wrote:
+> Hi
 > 
-> This patch adds WEIM register addresses to mx35 platform header file.
+> On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
 > 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-> ---
->  arch/arm/plat-mxc/include/mach/mx35.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+> > Isn't this impact AM33xx devices, where we do not support smart idle mode???
+> > Anyway, I will also test it on both OMAP3EVM and AM33xx platform now...
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-> index 80965a9..8b8f424 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx35.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx35.h
-> @@ -111,6 +111,11 @@
->  #define MX35_EMI_CTL_BASE_ADDR			(MX35_X_MEMC_BASE_ADDR + 0x4000)
->  #define MX35_PCMCIA_CTL_BASE_ADDR		MX35_EMI_CTL_BASE_ADDR
->  
-> +#define MX35_WEIM_CSCRx_BASE_ADDR(cs)	(MX35_WEIM_BASE_ADDR + (cs) * 0x10)
-> +#define MX35_WEIM_CSCRxU(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs))
-> +#define MX35_WEIM_CSCRxL(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
-> +#define MX35_WEIM_CSCRxA(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
-> +
+> Thanks, please let me know how your tests go.  If it doesn't work, we'll 
+> go back to the flag-based approach in the patch I posted already.  
+> 
 
-Honestly I'm not in the mood of adding another instance of the same
-register defines. Currently we have:
+Paul,
 
-#define MX31_WEIM_CSCRx_BASE_ADDR(cs) (MX31_WEIM_BASE_ADDR + (cs) * 0x10)
-#define MX31_WEIM_CSCRxU(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs))
-#define MX31_WEIM_CSCRxL(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
-#define MX31_WEIM_CSCRxA(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
+I couldn't finish my testing today, got into continuous meetings.
+Tomorrow, I will test it and update you on this.
 
-#define MX27_WEIM_CSCRx_BASE_ADDR(cs) (MX27_WEIM_BASE_ADDR + (cs) * 0x10)
-#define MX27_WEIM_CSCRxU(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs))
-#define MX27_WEIM_CSCRxL(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
-#define MX27_WEIM_CSCRxA(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
-
-The same could be used on i.MX25 aswell. I think we should clean this
-up before adding more SoCs.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Vaibhav
