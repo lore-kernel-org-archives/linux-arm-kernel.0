@@ -1,72 +1,72 @@
 From: paul@pwsan.com (Paul Walmsley)
 Date: Thu, 07 Jun 2012 00:13:14 -0600
-Subject: [PATCH 10/11] ARM: OMAP2+: hwmod: add flag to prevent hwmod code
- from touching IP block during init
+Subject: [PATCH 09/11] ARM: OMAP4: clock data: add clockdomains for clocks
+ used as main clocks
 In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
 References: <20120607060901.25532.68354.stgit@dusk>
-Message-ID: <20120607061314.25532.40563.stgit@dusk>
+Message-ID: <20120607061313.25532.84569.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
-dependent on an off-chip functional clock that is not guaranteed to be
-present during initialization.  IP blocks marked with this flag are
-left in the INITIALIZED state during kernel init.
+Until the OMAP4 code is converted to disable the use of the clock
+framework-based clockdomain enable/disable sequence, any clock used as
+a hwmod main_clk must have a clockdomain associated with it.  This
+patch populates some clock structure clockdomain names to resolve the
+following warnings during kernel init:
 
-This is a workaround for a hardware problem.  It should be possible to
-guarantee that at least one clock source will be present and active
-for any IP block's main functional clock.  This ensures that the hwmod
-code can enable and reset the IP block.  Resetting the IP block during
-kernel init prevents any bogus bootloader, ROM code, or previous OS
-configuration from affecting the kernel.  Hopefully a clock
-multiplexer can be added on future SoCs.
-
-N.B., at some point in the future, it should be possible to query the
-clock framework for this type of information.  Then this flag should
-no longer be needed.
+omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
+omap_hwmod: l3_div_ck: missing clockdomain for l3_div_ck.
+omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
- 2 files changed, 9 insertions(+)
+ arch/arm/mach-omap2/clock44xx_data.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index d3afac5..c8655c0 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2155,6 +2155,9 @@ static int __init _setup_reset(struct omap_hwmod *oh)
- 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
- 		return -EINVAL;
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 2172f66..e2b701e 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -84,6 +84,7 @@ static struct clk slimbus_clk = {
  
-+	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
-+		return -EPERM;
-+
- 	if (oh->rst_lines_cnt == 0) {
- 		r = _enable(oh);
- 		if (r) {
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index fdc4b2a..d117931 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -409,6 +409,11 @@ struct omap_hwmod_omap4_prcm {
-  *     in order to complete the reset. Optional clocks will be disabled
-  *     again after the reset.
-  * HWMOD_16BIT_REG: Module has 16bit registers
-+ * HWMOD_EXT_OPT_MAIN_CLK: The only main functional clock source for
-+ *     this IP block comes from an off-chip source and is not always
-+ *     enabled.  This prevents the hwmod code from being able to
-+ *     enable and reset the IP block early.  XXX Eventually it should
-+ *     be possible to query the clock framework for this information.
-  */
- #define HWMOD_SWSUP_SIDLE			(1 << 0)
- #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
-@@ -419,6 +424,7 @@ struct omap_hwmod_omap4_prcm {
- #define HWMOD_NO_IDLEST				(1 << 6)
- #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
- #define HWMOD_16BIT_REG				(1 << 8)
-+#define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
- 
- /*
-  * omap_hwmod._int_flags definitions
+ static struct clk sys_32k_ck = {
+ 	.name		= "sys_32k_ck",
++	.clkdm_name	= "prm_clkdm",
+ 	.rate		= 32768,
+ 	.ops		= &clkops_null,
+ };
+@@ -512,6 +513,7 @@ static struct clk ddrphy_ck = {
+ 	.name		= "ddrphy_ck",
+ 	.parent		= &dpll_core_m2_ck,
+ 	.ops		= &clkops_null,
++	.clkdm_name	= "l3_emif_clkdm",
+ 	.fixed_div	= 2,
+ 	.recalc		= &omap_fixed_divisor_recalc,
+ };
+@@ -769,6 +771,7 @@ static const struct clksel dpll_mpu_m2_div[] = {
+ static struct clk dpll_mpu_m2_ck = {
+ 	.name		= "dpll_mpu_m2_ck",
+ 	.parent		= &dpll_mpu_ck,
++	.clkdm_name	= "cm_clkdm",
+ 	.clksel		= dpll_mpu_m2_div,
+ 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_MPU,
+ 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
+@@ -1149,6 +1152,7 @@ static const struct clksel l3_div_div[] = {
+ static struct clk l3_div_ck = {
+ 	.name		= "l3_div_ck",
+ 	.parent		= &div_core_ck,
++	.clkdm_name	= "cm_clkdm",
+ 	.clksel		= l3_div_div,
+ 	.clksel_reg	= OMAP4430_CM_CLKSEL_CORE,
+ 	.clksel_mask	= OMAP4430_CLKSEL_L3_MASK,
+@@ -2824,6 +2828,7 @@ static const struct clksel trace_clk_div_div[] = {
+ static struct clk trace_clk_div_ck = {
+ 	.name		= "trace_clk_div_ck",
+ 	.parent		= &pmd_trace_clk_mux_ck,
++	.clkdm_name	= "emu_sys_clkdm",
+ 	.clksel		= trace_clk_div_div,
+ 	.clksel_reg	= OMAP4430_CM_EMU_DEBUGSS_CLKCTRL,
+ 	.clksel_mask	= OMAP4430_CLKSEL_PMD_TRACE_CLK_MASK,
