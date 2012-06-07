@@ -1,39 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Jun 2012 22:02:09 +0200
-Subject: [GIT PULL] more i.MX clock fixes
-Message-ID: <20120607200209.GP30400@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Jun 2012 14:03:46 -0600 (MDT)
+Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061309.25532.13430.stgit@dusk>
+ <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1206071355090.14977@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+Hi
 
-Please pull the following i.MX clock fixes for -rc.
+On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
 
-Sascha
+> I couldn't finish my testing today, got into continuous meetings.
 
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+No worries, I understand.
 
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+> Tomorrow, I will test it and update you on this.
 
-are available in the git repository at:
+That would be great.
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx/clk-fixes
+I took a look at SPRUH73F and sure enough, at least one module (CONTROL) 
+doesn't support smart-idle -- per Table 14-217 "CONTROL Register Field 
+Descriptions".  I'd guess that the PRCM won't idle-req this IP block until 
+the kernel is not running, so we might be able to get away with the 
+existing approach; but the TRM also says:
 
-for you to fetch changes up to cdd781ab1906d039c2a93078385645d2d5af8491:
+"By definition, initiator may generate read/write transaction as long as
+it is out of IDLE state."
 
-  ARM i.MX53: Fix PLL4 base address (2012-06-04 15:23:57 +0200)
+Which pretty much matches my understanding too of the implicit interface 
+contract here.
 
-----------------------------------------------------------------
-Sascha Hauer (3):
-      ARM i.MX pllv2: use standard register set unconditionally
-      ARM i.MX pllv2: make round_rate accurate
-      ARM i.MX53: Fix PLL4 base address
+So I think we'd better go back to the flag approach as implemented in this 
+patch:
 
- arch/arm/mach-imx/clk-pllv2.c     |   93 ++++++++++++++++++++++---------------
- arch/arm/mach-imx/crm-regs-imx5.h |    2 +-
- 2 files changed, 56 insertions(+), 39 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+http://www.spinics.net/lists/arm-kernel/msg176836.html
+
+The WBU 32k sync timer's behavior is what relies on quirks of the 
+integration that are hard to identify via other means, so it seems to be 
+safest to tag it explicitly.
+
+
+- Paul
