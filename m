@@ -1,47 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 01:00:11 -0700
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 7 Jun 2012 10:02:51 +0200
 Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
  usb_host_fs (fsusb)
-In-Reply-To: <20120607073323.GD16342@arwen.pp.htv.fi>
+In-Reply-To: <20120607075541.GF16342@arwen.pp.htv.fi>
 References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk>
- <20120607073112.GX12766@atomide.com>
- <20120607073323.GD16342@arwen.pp.htv.fi>
-Message-ID: <20120607080009.GA12766@atomide.com>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+Message-ID: <4FD0602B.9070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [120607 00:39]:
-> Hi,
-> 
-> On Thu, Jun 07, 2012 at 12:31:13AM -0700, Tony Lindgren wrote:
-> > * Paul Walmsley <paul@pwsan.com> [120606 23:26]:
-> > > From: Tero Kristo <t-kristo@ti.com>
-> > > 
-> > > Add a custom reset function for the usb_host_fs/fsusb IP block, and
-> > > connect it to the OMAP4 FSUSB block.
-> > > 
-> > > This is the first of two fixes required to get rid of the boot
-> > > warning:
-> > > 
-> > > omap_hwmod: usb_host_fs: _wait_target_disable failed
-> > > 
-> > > and to allow the module to idle.
-> > > 
-> > > It may be necessary to use this reset method for OMAP2xxx SoCs as
-> > > well; this is left for a future patch.
-> > 
-> > Here too I think driver like features like this should live in the
-> > driver init for omap OHCI driver. In the likely case that FS OHCI is
-> > not in use on the board, the OHCI glue can just reset it.
-> 
-> this I don't agree. It means we will have to add some OHCI code even
-> when OHCI is disabled.
+On 6/7/2012 9:55 AM, Felipe Balbi wrote:
+> On Thu, Jun 07, 2012 at 12:51:58AM -0700, Tony Lindgren wrote:
+>> * Paul Walmsley<paul@pwsan.com>  [120607 00:44]:
+>>> On Thu, 7 Jun 2012, Tony Lindgren wrote:
+>>>
+>>>> Here too I think driver like features like this should live in the
+>>>> driver init for omap OHCI driver. In the likely case that FS OHCI is
+>>>> not in use on the board, the OHCI glue can just reset it.
+>>>
+>>> What if the driver is not compiled into the kernel, but instead is built
+>>> as a loadable module?
+>>
+>> You can still have a core piece of the driver that's always built in, such
+>> as omap-ohci-common. But it should live under drivers, not in the bus level
+>> code. Or you can insmod/rmmod it to reset things properly.
+>
+> that's such a hack... both solutions are quite hacky. The only problem
+> here is because some bootloaders are leaving controller in an unknown
+> state and I guess to be completely safe, resets should be done before
+> any driver kicks in.
+>
+> But, driver will probably reset again the IP block during probe...
 
-That's because the bus level code alone is not enough for the reset and
-driver features are needed to reset it. Nothing wrong with the code itself,
-it should be just something that's part of the driver rather than the bus
-level code. It could be always built in for sure even if it lives under
-drivers.
+Ideally it should be done only in the probe if needed. In the case of 
+the DSS, the bootloader can init it with a splash screen and we do not 
+want to blindly reset it and thus produce some ugly artifact on the screen.
 
-Tony 
+In fact we should delay the reset to the very last moment and 
+potentially reset the IPs not under driver control later after a couple 
+of second for example.
+It will avoid reseting every IP that will be handled properly by drivers.
+
+Regards,
+Benoit
