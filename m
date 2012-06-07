@@ -1,16 +1,17 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Thu, 7 Jun 2012 16:22:17 +0000
-Subject: how to specify dma_mask and coherent_dma_mask in hwmod
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9AB214@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jun 2012 10:04:58 -0700
+Subject: [CFT 03/11] mmc: omap_hsmmc: remove private DMA API implementation
+In-Reply-To: <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScaYb-0003tZ-Pb@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120607170456.GF12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+* Russell King <rmk+kernel@arm.linux.org.uk> [120607 04:11]:
+> Remove the private DMA API implementation from omap_hsmmc, making it
+> use entirely the DMA engine API.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-While converting platform device registry to Hwmod for CPSW Ethernet driver which is present in AM335X (OMAP2+), I am not finding a way to specify
-dma_mask and coherent_dma_mask.
-Is there a way to specify dma_mask and coherent_dma_mask in hwmod?
-
----
-Regards,
-Mugunthan V N.?
+Tested-by: Tony Lindgren <tony@atomide.com>
