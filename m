@@ -1,44 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 7 Jun 2012 14:30:43 +0200
-Subject: [PATCH] ARM: at91: fix at91_aic_write macro
-In-Reply-To: <1338477965-19581-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1338477965-19581-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <4FD09EF3.8000506@atmel.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 7 Jun 2012 14:30:50 +0200
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+ <4FD0602B.9070704@ti.com>
+ <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
+Message-ID: <4FD09EFA.20304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2012 05:26 PM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Fix at91_aic_write macro to avoid potential issues.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
++ Ohad
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 6/7/2012 12:52 PM, Paul Walmsley wrote:
+> On Thu, 7 Jun 2012, Cousson, Benoit wrote:
+>
+>> In fact we should delay the reset to the very last moment and
+>> potentially reset the IPs not under driver control later after a couple
+>> of second for example. It will avoid reseting every IP that will be
+>> handled properly by drivers.
+>
+> We discussed this a couple of years ago on the list and aligned on late
+> and lazy resets, from my recollection.
 
-And queued in the AT91 branch at91-3.6-cleanup on
-git://github.com/at91linux/linux-at91.git
+Indeed, what I did not mention is that potentially the whole device init 
+should be done ondemand as well. Meaning the whole hwmod setup phase 
+should be done only when the driver will probe the device.
 
-Thanks,
+> The main reason why it wasn't
+> implemented was because there were some drivers that were not yet PM
+> runtime-converted.  This would have caused crashes, since the core code
+> would have no idea that the non-PM-runtime drivers had initialized their
+> devices, and so the core just went ahead and reset those anyway.
+>
+> It might actually be safe now to switch to the late reset arrangement,
+> depending on whether the rest of the drivers have been PM
+> runtime-converted by now.
+>
+> Of course, it would all be moot if the reset is moved away from the hwmod
+> code into the drivers.
 
-> ---
->  arch/arm/mach-at91/include/mach/at91_aic.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/at91_aic.h b/arch/arm/mach-at91/include/mach/at91_aic.h
-> index 3045781..c1413ed 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_aic.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_aic.h
-> @@ -23,7 +23,7 @@ extern void __iomem *at91_aic_base;
->  	__raw_readl(at91_aic_base + field)
->  
->  #define at91_aic_write(field, value) \
-> -	__raw_writel(value, at91_aic_base + field);
-> +	__raw_writel(value, at91_aic_base + field)
->  #else
->  .extern at91_aic_base
->  #endif
+I do think that moving that to driver code seems much better since all 
+these customs reset code (I2C, DSS, USB...) does anyway require access 
+to the device itself. The is driver responsibility to do that.
 
+So ideally it should not be in OMAP architecture code.
 
--- 
-Nicolas Ferre
+Regards,
+Benoit
