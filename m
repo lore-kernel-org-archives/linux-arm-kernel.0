@@ -1,206 +1,256 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  7 Jun 2012 17:09:19 +0100
-Subject: [PATCH v7 02/12] ARM: SoC: Add per SoC SMP and CPU hotplug operations
+Date: Thu,  7 Jun 2012 17:09:24 +0100
+Subject: [PATCH v7 07/12] ARM: SoC: convert MSM SMP to SoC descriptor
 In-Reply-To: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
 References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339085369-26073-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1339085369-26073-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate the SoC descriptor structure with the SMP and CPU hotplug
-operations. To allow the kernel to continue building, the platform
-hooks are defined as weak symbols which are overrided by the
-platform code. Once all platforms are converted, the "weak" attribute
-will be removed and the function made static.
+Convert MSM SMP platforms to use the SoC descriptor to provide
+their SMP and CPU hotplug operations.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/soc.h |   59 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c    |    1 +
- arch/arm/kernel/smp.c      |   75 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 135 insertions(+)
+ arch/arm/mach-msm/Makefile        |    2 +-
+ arch/arm/mach-msm/board-msm8960.c |    3 +++
+ arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
+ arch/arm/mach-msm/core.c          |   17 +++++++++++++++++
+ arch/arm/mach-msm/core.h          |    9 +++++++++
+ arch/arm/mach-msm/hotplug.c       |    8 +++++---
+ arch/arm/mach-msm/platsmp.c       |   20 ++++++++++++++++----
+ 7 files changed, 58 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/mach-msm/core.c
+ create mode 100644 arch/arm/mach-msm/core.h
 
-diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
-index 2d73e35..187e82b 100644
---- a/arch/arm/include/asm/soc.h
-+++ b/arch/arm/include/asm/soc.h
-@@ -12,8 +12,67 @@
- #ifndef __ASM_ARM_SOC_H
- #define __ASM_ARM_SOC_H
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 4ad3969..cba9355 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,5 +1,5 @@
+ obj-y += io.o idle.o timer.o
+-obj-y += clock.o
++obj-y += clock.o core.o
+ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
  
-+struct task_struct;
-+
-+struct arm_soc_smp_init_ops {
-+	/*
-+	 * Setup the set of possible CPUs (via set_cpu_possible)
-+	 */
-+	void (*smp_init_cpus)(void);
-+	/*
-+	 * Initialize cpu_possible map, and enable coherency
-+	 */
-+	void (*smp_prepare_cpus)(unsigned int max_cpus);
-+};
-+
-+struct arm_soc_smp_hotplug_ops {
-+#ifdef CONFIG_HOTPLUG_CPU
-+	int  (*cpu_kill)(unsigned int cpu);
-+	void (*cpu_die)(unsigned int cpu);
-+	int  (*cpu_disable)(unsigned int cpu);
-+#endif
-+};
-+
-+struct arm_soc_smp_ops {
-+	/*
-+	 * Perform platform specific initialisation of the specified CPU.
-+	 */
-+	void (*smp_secondary_init)(unsigned int cpu);
-+	/*
-+	 * Boot a secondary CPU, and assign it the specified idle task.
-+	 * This also gives us the initial stack to use for this CPU.
-+	 */
-+	int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
-+
-+	struct arm_soc_smp_hotplug_ops hotplug_ops;
-+};
-+
- struct arm_soc_desc {
- 	const char			*name;
-+#ifdef CONFIG_SMP
-+	struct arm_soc_smp_init_ops	*smp_init_ops;
-+	struct arm_soc_smp_ops		*smp_ops;
-+#endif
- };
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index 65f4a1d..3b4f98b 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -30,6 +30,7 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
  
-+#ifdef CONFIG_SMP
-+#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
-+#define soc_smp_ops(ops)		.smp_ops = &(ops),
-+#ifdef CONFIG_HOTPLUG_SMP
-+#define soc_hotplug_ops(prefix)		.hotplug_ops = {	\
-+		.cpu_kill	= prefix##_cpu_kill,		\
-+		.cpu_die	= prefix##_cpu_die,		\
-+		.cpu_disable	= prefix##_cpu_disable,		\
-+	},
-+#else
-+#define soc_hotplug_ops(prefix)		.hotplug_ops = {},
-+#endif
-+extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
-+				 struct arm_soc_smp_ops *);
-+#else
-+#define soc_smp_init_ops(ops)		/* empty */
-+#define soc_smp_ops(ops)		/* empty */
-+#define soc_smp_ops_register(a,b)	do {} while(0)
-+#endif
-+
- #endif	/* __ASM_ARM_SOC_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 69c345c..5ff84a5 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -952,6 +952,7 @@ void __init setup_arch(char **cmdline_p)
- 	if (mdesc->soc) {
- 		soc_desc = mdesc->soc;
- 		pr_info("SoC: %s\n", soc_desc->name);
-+		soc_smp_ops_register(soc_desc->smp_init_ops, soc_desc->smp_ops);
- 	} else
- 		soc_desc = NULL;
++#include "core.h"
+ #include "devices.h"
  
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2c7217d..30709df 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -27,6 +27,7 @@
- #include <linux/completion.h>
- 
- #include <linux/atomic.h>
-+#include <asm/soc.h>
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-@@ -100,9 +101,83 @@ int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
+ static void __init msm8960_fixup(struct tag *tag, char **cmdline,
+@@ -99,6 +100,7 @@ static void __init msm8960_init_late(void)
  }
  
-+/* SoC helpers */
-+static const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
-+static const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
-+static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
-+#ifdef CONFIG_HOTPLUG_CPU
-+static const struct arm_soc_smp_hotplug_ops *hotplug_ops;
-+#endif
-+
-+void __init soc_smp_ops_register(struct arm_soc_smp_init_ops *smp_init_ops,
-+				 struct arm_soc_smp_ops *smp_ops)
-+{
-+	if (smp_init_ops)
-+		soc_smp_init_ops = smp_init_ops;
-+
-+	/*
-+	 * Warning: we're copying an __initdata structure into a
-+	 * __cpuinitdata structure. We *know* it is valid because only
-+	 * __cpuinit (or more persistant) functions should be pointed
-+	 * to by soc_smp_ops. Still, this is borderline ugly.
-+	 */
-+	if (smp_ops) {
-+		__soc_smp_ops = *smp_ops;
-+		soc_smp_ops = &__soc_smp_ops;
-+#ifdef CONFIG_HOTPLUG_CPU
-+		hotplug_ops = &__soc_smp_ops.hotplug_ops;
-+#endif
-+	}
-+}
-+
-+void __attribute__((weak)) __init smp_init_cpus(void)
-+{
-+	if (soc_smp_init_ops && soc_smp_init_ops->smp_init_cpus)
-+		soc_smp_init_ops->smp_init_cpus();
-+}
-+
-+void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	if (soc_smp_ops && soc_smp_init_ops->smp_prepare_cpus)
-+		soc_smp_init_ops->smp_prepare_cpus(max_cpus);
-+}
-+
-+void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
-+{
-+	if (soc_smp_ops && soc_smp_ops->smp_secondary_init)
-+		soc_smp_ops->smp_secondary_init(cpu);
-+}
-+
-+int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (soc_smp_ops && soc_smp_ops->smp_boot_secondary)
-+		return soc_smp_ops->smp_boot_secondary(cpu, idle);
-+	return -ENOSYS;
-+}
-+
- #ifdef CONFIG_HOTPLUG_CPU
- static void percpu_timer_stop(void);
+ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8960_fixup,
+ 	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+@@ -110,6 +112,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+ MACHINE_END
  
-+int __attribute__((weak)) platform_cpu_kill(unsigned int cpu)
-+{
-+	if (hotplug_ops && hotplug_ops->cpu_kill)
-+		return hotplug_ops->cpu_kill(cpu);
-+	return 0;
-+}
+ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8960_fixup,
+ 	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index e37a724..4064ce3 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -29,6 +29,8 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+ 
++#include "core.h"
 +
-+void __attribute__((weak)) platform_cpu_die(unsigned int cpu)
-+{
-+	if (hotplug_ops && hotplug_ops->cpu_die)
-+		hotplug_ops->cpu_die(cpu);
-+}
+ static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
+ 		struct meminfo *mi)
+ {
+@@ -110,6 +112,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
+ #endif /* CONFIG_OF */
+ 
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -121,6 +124,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -132,6 +136,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -143,6 +148,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
++	.soc = &msm_soc_desc,
+ 	.fixup = msm8x60_fixup,
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+@@ -156,6 +162,7 @@ MACHINE_END
+ #ifdef CONFIG_OF
+ /* TODO: General device tree support for all MSM. */
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.soc = &msm_soc_desc,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_dt_init,
+diff --git a/arch/arm/mach-msm/core.c b/arch/arm/mach-msm/core.c
+new file mode 100644
+index 0000000..390cde7
+--- /dev/null
++++ b/arch/arm/mach-msm/core.c
+@@ -0,0 +1,17 @@
++/*
++ *  Copyright (C) 2011 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
-+{
-+	if (hotplug_ops && hotplug_ops->cpu_disable)
-+		return hotplug_ops->cpu_disable(cpu);
-+	return -EPERM;
-+}
++#include <linux/init.h>
++#include "core.h"
 +
- /*
-  * __cpu_disable runs on the processor to be shutdown.
++struct arm_soc_desc msm_soc_desc __initdata = {
++	.name		= "Qualcomm MSM",
++	soc_smp_init_ops(msm_soc_smp_init_ops)
++	soc_smp_ops(msm_soc_smp_ops)
++};
+diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
+new file mode 100644
+index 0000000..e8394dd
+--- /dev/null
++++ b/arch/arm/mach-msm/core.h
+@@ -0,0 +1,9 @@
++#include <asm/soc.h>
++
++extern struct arm_soc_smp_init_ops	msm_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		msm_soc_smp_ops;
++extern struct arm_soc_desc		msm_soc_desc;
++
++extern int  msm_cpu_kill(unsigned int cpu);
++extern void msm_cpu_die(unsigned int cpu);
++extern int  msm_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index a446fc1..6ba3602 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -13,6 +13,8 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
++#include "core.h"
++
+ extern volatile int pen_release;
+ 
+ static inline void cpu_enter_lowpower(void)
+@@ -57,7 +59,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ 	}
+ }
+ 
+-int platform_cpu_kill(unsigned int cpu)
++int msm_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
+@@ -67,7 +69,7 @@ int platform_cpu_kill(unsigned int cpu)
+  *
+  * Called with IRQs disabled
   */
+-void platform_cpu_die(unsigned int cpu)
++void msm_cpu_die(unsigned int cpu)
+ {
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+@@ -82,7 +84,7 @@ void platform_cpu_die(unsigned int cpu)
+ 	cpu_leave_lowpower();
+ }
+ 
+-int platform_cpu_disable(unsigned int cpu)
++int msm_cpu_disable(unsigned int cpu)
+ {
+ 	/*
+ 	 * we don't allow CPU 0 to be shutdown (it is still too special
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index db0117e..4e4ebd9 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -25,6 +25,7 @@
+ #include <mach/msm_iomap.h>
+ 
+ #include "scm-boot.h"
++#include "core.h"
+ 
+ #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
+ #define SCSS_CPU1CORE_RESET 0xD80
+@@ -48,7 +49,7 @@ static inline int get_core_count(void)
+ 	return ((read_cpuid_id() >> 4) & 3) + 1;
+ }
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit msm_secondary_init(unsigned int cpu)
+ {
+ 	/* Configure edge-triggered PPIs */
+ 	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+@@ -93,7 +94,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+ 				  "address\n");
+ }
+ 
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 	static int cold_boot_done;
+@@ -153,7 +154,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * does not support the ARM SCU, so just set the possible cpu mask to
+  * NR_CPUS.
+  */
+-void __init smp_init_cpus(void)
++static void __init msm_smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = get_core_count();
+ 
+@@ -169,6 +170,17 @@ void __init smp_init_cpus(void)
+         set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ }
++
++struct arm_soc_smp_init_ops msm_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= msm_smp_init_cpus,
++	.smp_prepare_cpus	= msm_smp_prepare_cpus,
++};
++
++struct arm_soc_smp_ops msm_soc_smp_ops __initdata = {
++	.smp_secondary_init	= msm_secondary_init,
++	.smp_boot_secondary	= msm_boot_secondary,
++	soc_hotplug_ops(msm)
++};
 -- 
 1.7.10.1
