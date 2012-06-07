@@ -1,51 +1,107 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 7 Jun 2012 21:17:30 +0800
-Subject: [alsa-devel] [PATCH v1 2/5] ASoC: mmp: add audio dma support
-In-Reply-To: <1339068025.1927.66.camel@vkoul-udesk3>
-References: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
- <1338791851-21038-3-git-send-email-zhangfei.gao@marvell.com>
- <1339061042.1927.61.camel@vkoul-udesk3>
- <CAMj5Bkj+4qQqoDgz_d7eLK+QuVm41fnN5204tRpJ8NKrNsAjcg@mail.gmail.com>
- <1339063547.1927.63.camel@vkoul-udesk3>
- <CAMj5BkhtHaF=b=VDMoif_RxWR_Wdxc7qMpjH-SBO=yoA4W9LTA@mail.gmail.com>
- <1339068025.1927.66.camel@vkoul-udesk3>
-Message-ID: <CAMj5BkhrxhvGEe3EinSQycb9aBo4rZriU7=Um9z=0mKyBz71HA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 7 Jun 2012 15:21:14 +0200
+Subject: [PATCH v2] ARM: at91: add support for Telit EVK GE863-PRO3
+In-Reply-To: <1338448863-3938-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1338448863-3938-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <4FD0AACA.3020608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2012 at 7:20 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
-> On Thu, 2012-06-07 at 18:44 +0800, zhangfei gao wrote:
->> Only exception is dmaengine_slave_config, since we have some specific config.
-> And why?
->
->> +static bool filter(struct dma_chan *chan, void *param)
->> +{
->> + ? ? struct mmp_dma_data *dma_data = param;
->> + ? ? bool found = false;
->> + ? ? char *devname;
->> +
->> + ? ? devname = kasprintf(GFP_KERNEL, "%s.%d", dma_data->dma_res->name,
->> + ? ? ? ? ? ? dma_data->ssp_id);
->> + ? ? if ((strcmp(dev_name(chan->device->dev), devname) == 0) &&
->> + ? ? ? ? ? ? (chan->chan_id == dma_data->dma_res->start)) {
->> + ? ? ? ? ? ? chan->private = &dma_data->tdma_data;
-> chan->private is deprecated and should not be used
+On 05/31/2012 09:21 AM, Fabio Porcedda :
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 
-Thanks for the info, will update accordingly.
-The concern is DMA_SLAVE_BUSWIDTH_4_BYTES is used for S20, S24, S32.
-And our controller handles differently, though they not seen much.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Besides, dmaengine_slave_config still have to be used for src/dst_addr
-and src/dst_maxburst.
+pushed in at91-3.6-dt branch on
+git://github.com/at91linux/linux-at91.git
 
->> + ? ? ? ? ? ? found = true;
->> + ? ? }
->> +
->> + ? ? kfree(devname);
->> + ? ? return found;
->> +}
->
->
-> --
-> ~Vinod
->
+Thanks,
+
+> ---
+>  - changes for v2
+>    - add empty line before the Signed-off-by line
+> 
+>  arch/arm/boot/dts/evk_ge863_pro3.dts |   57 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/Makefile.boot     |    1 +
+>  2 files changed, 58 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/evk_ge863_pro3.dts
+> 
+> diff --git a/arch/arm/boot/dts/evk_ge863_pro3.dts b/arch/arm/boot/dts/evk_ge863_pro3.dts
+> new file mode 100644
+> index 0000000..bcd5ae1
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/evk_ge863_pro3.dts
+> @@ -0,0 +1,57 @@
+> +/*
+> + * evk_ge863_pro3.dts - Device Tree file for Telit EVK GE863-PRO3
+> + *
+> + * Copyright (C) 2012 Telit,
+> + *               2012 Fabio Porcedda <fabio.porcedda@gmail.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +/include/ "at91sam9260.dtsi"
+> +
+> +/ {
+> +	model = "Telit EVK GE863-PRO3";
+> +	compatible = "telit,evk_ge863-pro3", "atmel,at91sam9260", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 root=ubi0:rootfs ubi.mtd=1 rootfstype=ubifs";
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <6000000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			usb1: gadget at fffa4000 {
+> +				atmel,vbus-gpio = <&pioC 4 0>;
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			root at 07c0000 {
+> +				label = "root";
+> +				reg = <0x7c0000 0x7840000>;
+> +			};
+> +
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+> index 9e84fe4..7bb44f0 100644
+> --- a/arch/arm/mach-at91/Makefile.boot
+> +++ b/arch/arm/mach-at91/Makefile.boot
+> @@ -16,6 +16,7 @@ endif
+>  # Keep dtb files sorted alphabetically for each SoC
+>  # sam9260
+>  dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
+> +dtb-$(CONFIG_MACH_AT91SAM_DT) += evk_ge863_pro3.dtb
+>  dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
+>  dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
+>  # sam9263
+
+
+-- 
+Nicolas Ferre
