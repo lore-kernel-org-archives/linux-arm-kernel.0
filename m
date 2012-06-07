@@ -1,30 +1,23 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 7 Jun 2012 01:07:39 -0600 (MDT)
-Subject: [PATCH] ARM: omap: clock: Get rid of unwanted clkdm assocations
- within clks
-In-Reply-To: <4FD04A2A.4080207@ti.com>
-References: <1337250245-29274-1-git-send-email-rnayak@ti.com>
- <4FD04A2A.4080207@ti.com>
-Message-ID: <alpine.DEB.2.00.1206070104060.6684@utopia.booyaka.com>
+Date: Thu, 7 Jun 2012 01:08:50 -0600 (MDT)
+Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061309.25532.13430.stgit@dusk>
+ <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi
 
-On Thu, 7 Jun 2012, Rajendra Nayak wrote:
+On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
 
-> On Thursday 17 May 2012 03:54 PM, Rajendra Nayak wrote:
-> > clkdm assocations with clocks in the clock framework are useful
-> > only for 'gate' clocks which have enable/disable ops populated.
-> > Get rid of the clkdm_names populated in any other type of clocks.
+> Isn't this impact AM33xx devices, where we do not support smart idle mode???
+> Anyway, I will also test it on both OMAP3EVM and AM33xx platform now...
 
-I don't really see the point in changing this before the common clock 
-conversion.  The design of most of the current low-level OMAP PM layers 
-was predicated on each clock belonging to a clockdomain.  The testing 
-overhead of changing this before the common clock conversion is something 
-that I don't have time for, and almost no one else seems interested in 
-doing.
+Thanks, please let me know how your tests go.  If it doesn't work, we'll 
+go back to the flag-based approach in the patch I posted already.  
 
-Your common clock conversion moots this patch anyway, right?
 
 - Paul
