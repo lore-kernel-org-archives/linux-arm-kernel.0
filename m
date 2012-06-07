@@ -1,70 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  7 Jun 2012 19:57:44 +0200
-Subject: [PATCH 7/7 v2] ARM: nomadik: register the MMC/SD device
-Message-ID: <1339091864-26715-1-git-send-email-linus.walleij@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 7 Jun 2012 20:07:38 +0200
+Subject: [PATCH] ARM: mx35: add WEIM register addresses
+In-Reply-To: <20120509131638.GA2057@lovely.krouter>
+References: <20120509131638.GA2057@lovely.krouter>
+Message-ID: <20120607180738.GM30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers the MMC device for the Nomadik so we can access
-MMC/SD cards, which is pretty nice.
+Hi Christoph,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Register as an APB device rather than as AHB.
----
- arch/arm/mach-nomadik/board-nhk8815.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+On Wed, May 09, 2012 at 03:16:38PM +0200, Christoph Fritz wrote:
+> 
+> This patch adds WEIM register addresses to mx35 platform header file.
+> 
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> ---
+>  arch/arm/plat-mxc/include/mach/mx35.h |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
+> index 80965a9..8b8f424 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx35.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx35.h
+> @@ -111,6 +111,11 @@
+>  #define MX35_EMI_CTL_BASE_ADDR			(MX35_X_MEMC_BASE_ADDR + 0x4000)
+>  #define MX35_PCMCIA_CTL_BASE_ADDR		MX35_EMI_CTL_BASE_ADDR
+>  
+> +#define MX35_WEIM_CSCRx_BASE_ADDR(cs)	(MX35_WEIM_BASE_ADDR + (cs) * 0x10)
+> +#define MX35_WEIM_CSCRxU(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs))
+> +#define MX35_WEIM_CSCRxL(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
+> +#define MX35_WEIM_CSCRxA(cs)		(MX35_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
+> +
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 029a741..1169a12 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/mmci.h>
- #include <linux/interrupt.h>
- #include <linux/gpio.h>
- #include <linux/mtd/mtd.h>
-@@ -32,6 +33,7 @@
- 
- #include <plat/gpio-nomadik.h>
- #include <plat/mtu.h>
-+#include <plat/pincfg.h>
- 
- #include <mach/nand.h>
- #include <mach/fsmc.h>
-@@ -186,6 +188,29 @@ static void __init nhk8815_onenand_init(void)
- #endif
- }
- 
-+static struct mmci_platform_data mmcsd_plat_data = {
-+	.ocr_mask = MMC_VDD_29_30,
-+	.f_max = 48000000,
-+	.gpio_wp = -1,
-+	.gpio_cd = 111,  /* Or 112 for S8815 */
-+	.cd_invert = true,
-+	.capabilities = MMC_CAP_MMC_HIGHSPEED |
-+	MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA,
-+};
-+
-+static int __init nhk8815_mmcsd_init(void)
-+{
-+	int ret;
-+
-+	ret = gpio_request(112, "card detect bias");
-+	if (ret)
-+		return ret;
-+	gpio_direction_output(112, 0);
-+	amba_apb_device_add(NULL, "mmci", NOMADIK_SDI_BASE, SZ_4K, IRQ_SDMMC, 0, &mmcsd_plat_data, 0x10180180);
-+	return 0;
-+}
-+module_init(nhk8815_mmcsd_init);
-+
- static struct resource nhk8815_eth_resources[] = {
- 	{
- 		.name = "smc91x-regs",
+Honestly I'm not in the mood of adding another instance of the same
+register defines. Currently we have:
+
+#define MX31_WEIM_CSCRx_BASE_ADDR(cs) (MX31_WEIM_BASE_ADDR + (cs) * 0x10)
+#define MX31_WEIM_CSCRxU(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs))
+#define MX31_WEIM_CSCRxL(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
+#define MX31_WEIM_CSCRxA(cs) (MX31_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
+
+#define MX27_WEIM_CSCRx_BASE_ADDR(cs) (MX27_WEIM_BASE_ADDR + (cs) * 0x10)
+#define MX27_WEIM_CSCRxU(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs))
+#define MX27_WEIM_CSCRxL(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x4)
+#define MX27_WEIM_CSCRxA(cs) (MX27_WEIM_CSCRx_BASE_ADDR(cs) + 0x8)
+
+The same could be used on i.MX25 aswell. I think we should clean this
+up before adding more SoCs.
+
+Sascha
+
 -- 
-1.7.7.6
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
