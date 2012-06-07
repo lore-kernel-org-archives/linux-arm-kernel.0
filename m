@@ -1,78 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Jun 2012 10:59:51 +0800
-Subject: [PATCH 1/2] ARM i.MX51: setup mipi
-In-Reply-To: <1338888630-25930-2-git-send-email-s.hauer@pengutronix.de>
-References: <1338888630-25930-1-git-send-email-s.hauer@pengutronix.de>
- <1338888630-25930-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120607025949.GM2667@S2101-09.ap.freescale.net>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Thu, 7 Jun 2012 03:14:04 +0000
+Subject: [PATCH v4] usb: ehci-hcd: notify phy when connect change
+In-Reply-To: <20120607024328.GB5566@b20223-02.ap.freescale.net>
+References: <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
+ <Pine.LNX.4.44L0.1206061017210.1788-100000@iolanthe.rowland.org>
+ <F281D0F91ED19E4D8E63A7504E8A649803BDB929@039-SN2MPN1-023.039d.mgd.msft.net>
+ <20120607024328.GB5566@b20223-02.ap.freescale.net>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803BDB9EE@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+> > >
+> > > > +			/* FIXME:
+> > > > +			 * - it does not work for multi-phy ehci
+> > > > +			 * - the best place is after debounce, but I
+> can't get
+> > > > +			 *   phy there
+> > > > +			 */
+> > > > +			if (unlikely(ehci->transceiver &&
+> > > > +					(pstatus & PORT_CSC))) {
+> > >
+> > > A new thought...  If you move the transceiver pointer from struct
+> > > ehci_hcd to struct usb_hcd, then you _will_ be able to get at it from
+> > > within the debouncing routine.
+> > >
+> > Good suggestion, after that the driver can add PHY operation(quirk or
+> not)
+> > during the whole usb host life periods.
+> Since it makes it more generic, I'm considering:
+>  - change variable name from transceiver to phy
+>  - Do we need considering phy on hub? I prefer HCD phy only.
+>  - Do we need supporting multi-phy for one hcd? I don't know multi-phy
+>    case, so I prefer one phy one hcd.
+> 
+I suggest that you can do it at next patchset.
+This patchset is just add phy notify to ehci hcd interrupt handler.
+At next patchset, you can refine and improve PHY operation at the whole hcd.
 
-On Tue, Jun 05, 2012 at 11:30:29AM +0200, Sascha Hauer wrote:
-> The mipi unit has to be brought to a sane default state. This
-> unit is not present on i.MX53, so we add the setup here instead
-> of the ipu driver.
-> 
-Can't we do some detection in IPU driver to have the setup done in
-IPU driver?  To me, this (as well as the reset in patch #2) is not
-really the material for soc specific initialization.  If I'm running
-a system without IPU driver enabled, why do I have to go through these
-setup at all?
+I am not sure Alan's suggestion.
 
-Regards,
-Shawn
-
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-imx/mm-imx5.c |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-> index feeee17..a4cb441 100644
-> --- a/arch/arm/mach-imx/mm-imx5.c
-> +++ b/arch/arm/mach-imx/mm-imx5.c
-> @@ -194,6 +194,26 @@ void __init imx50_soc_init(void)
->  					ARRAY_SIZE(imx50_audmux_res));
->  }
->  
-> +/*
-> + * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
-> + * the Freescale marketing division. However this did not remove the
-> + * hardware from the chip which still needs to be configured for proper
-> + * IPU support.
-> + */
-> +static void __init imx51_ipu_mipi_setup(void)
-> +{
-> +	void __iomem *hsc_addr;
-> +
-> +	hsc_addr = MX51_IO_ADDRESS(MX51_MIPI_HSC_BASE_ADDR);
-> +
-> +	/* setup MIPI module to legacy mode */
-> +	__raw_writel(0xf00, hsc_addr);
-> +
-> +	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
-> +	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
-> +		hsc_addr + 0x800);
-> +}
-> +
->  void __init imx51_soc_init(void)
->  {
->  	/* i.mx51 has the i.mx31 type gpio */
-> @@ -212,6 +232,7 @@ void __init imx51_soc_init(void)
->  	/* i.mx51 has the i.mx31 type audmux */
->  	platform_device_register_simple("imx31-audmux", 0, imx51_audmux_res,
->  					ARRAY_SIZE(imx51_audmux_res));
-> +	imx51_ipu_mipi_setup();
->  }
->  
->  void __init imx53_soc_init(void)
-> -- 
-> 1.7.10
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ 
