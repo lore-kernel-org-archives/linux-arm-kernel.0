@@ -1,74 +1,72 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 07 Jun 2012 00:13:13 -0600
-Subject: [PATCH 08/11] ARM: OMAP2+: CM: increase the module disable timeout
+Date: Thu, 07 Jun 2012 00:13:14 -0600
+Subject: [PATCH 10/11] ARM: OMAP2+: hwmod: add flag to prevent hwmod code
+ from touching IP block during init
 In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
 References: <20120607060901.25532.68354.stgit@dusk>
-Message-ID: <20120607061312.25532.68396.stgit@dusk>
+Message-ID: <20120607061314.25532.40563.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the timeout for disabling an IP block to five milliseconds.
-This is to handle the usb_host_fs idle latency, which takes almost
-four milliseconds after a host controller reset.
+Add HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
+dependent on an off-chip functional clock that is not guaranteed to be
+present during initialization.  IP blocks marked with this flag are
+left in the INITIALIZED state during kernel init.
 
-This is the second of two patches needed to resolve the following
-boot warning:
+This is a workaround for a hardware problem.  It should be possible to
+guarantee that at least one clock source will be present and active
+for any IP block's main functional clock.  This ensures that the hwmod
+code can enable and reset the IP block.  Resetting the IP block during
+kernel init prevents any bogus bootloader, ROM code, or previous OS
+configuration from affecting the kernel.  Hopefully a clock
+multiplexer can be added on future SoCs.
 
-omap_hwmod: usb_host_fs: _wait_target_disable failed
+N.B., at some point in the future, it should be possible to query the
+clock framework for this type of information.  Then this flag should
+no longer be needed.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/cm.h                   |   11 +++++++++++
- arch/arm/mach-omap2/cminst44xx.c           |    4 ++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
- 3 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
-index 99978c7..cf67617 100644
---- a/arch/arm/mach-omap2/cm.h
-+++ b/arch/arm/mach-omap2/cm.h
-@@ -28,4 +28,15 @@
-  */
- #define MAX_MODULE_READY_TIME		2000
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index d3afac5..c8655c0 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2155,6 +2155,9 @@ static int __init _setup_reset(struct omap_hwmod *oh)
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
+ 		return -EINVAL;
  
-+/*
-+ * MAX_MODULE_DISABLE_TIME: max duration in microseconds to wait for
-+ * the PRCM to request that a module enter the inactive state in the
-+ * case of OMAP2 & 3.  In the case of OMAP4 this is the max duration
-+ * in microseconds for the module to reach the inactive state from
-+ * a functional state.
-+ * XXX FSUSB on OMAP4430 takes ~4ms to idle after reset during
-+ * kernel init.
-+ */
-+#define MAX_MODULE_DISABLE_TIME		5000
++	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
++		return -EPERM;
 +
- #endif
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 8c86d29..1a39945 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -313,9 +313,9 @@ int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_off
+ 	if (oh->rst_lines_cnt == 0) {
+ 		r = _enable(oh);
+ 		if (r) {
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index fdc4b2a..d117931 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -409,6 +409,11 @@ struct omap_hwmod_omap4_prcm {
+  *     in order to complete the reset. Optional clocks will be disabled
+  *     again after the reset.
+  * HWMOD_16BIT_REG: Module has 16bit registers
++ * HWMOD_EXT_OPT_MAIN_CLK: The only main functional clock source for
++ *     this IP block comes from an off-chip source and is not always
++ *     enabled.  This prevents the hwmod code from being able to
++ *     enable and reset the IP block early.  XXX Eventually it should
++ *     be possible to query the clock framework for this information.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -419,6 +424,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_IDLEST				(1 << 6)
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
++#define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
  
- 	omap_test_timeout((_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) ==
- 			   CLKCTRL_IDLEST_DISABLED),
--			  MAX_MODULE_READY_TIME, i);
-+			  MAX_MODULE_DISABLE_TIME, i);
- 
--	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
-+	return (i < MAX_MODULE_DISABLE_TIME) ? 0 : -EBUSY;
- }
- 
- /**
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 02daacc..20e45a6 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -30,6 +30,7 @@
- #include <plat/mmc.h>
- #include <plat/dmtimer.h>
- #include <plat/common.h>
-+#include <plat/usb.h>
- 
- #include "omap_hwmod_common_data.h"
- 
+ /*
+  * omap_hwmod._int_flags definitions
