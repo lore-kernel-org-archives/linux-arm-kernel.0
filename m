@@ -1,95 +1,107 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 07 Jun 2012 11:41:23 +0100
-Subject: [CFT 3/3] dmaengine: virt-dma: add support for cyclic DMA periodic
- callbacks
-In-Reply-To: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
-References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
-Message-ID: <E1Sca9b-0003ax-4E@rmk-PC.arm.linux.org.uk>
+Date: Thu, 07 Jun 2012 11:43:05 +0100
+Subject: [CFT 1/2] dmaengine: sa11x0-dma: fix DMA residue support
+In-Reply-To: <20120607104206.GA10488@n2100.arm.linux.org.uk>
+References: <20120607104206.GA10488@n2100.arm.linux.org.uk>
+Message-ID: <E1ScaBF-0003bw-6g@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for cyclic DMA's periodic callbacks.  Drivers are expected
-to call vchan_cyclic_callback() when a period has completed, which will
-schedule the tasklet to make the callback into the driver.
+The semantics now implemented are:
 
-As callbacks are made from tasklet context, it is important to realise
-that we don't guarantee a callback for each completed period, but for
-N completed periods where N may be greater than one.
+- If the cookie has completed successfully, the residue will be zero.
+- If the cookie is in progress or the channel is paused, it will be the
+  number of bytes yet to be transferred. [*]
+- If the cookie is queued, it will be the number of bytes in the
+  descriptor.
+
+* - where this is the number of bytes yet to be transferred to/from
+  RAM.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/virt-dma.c |   19 +++++++++++++++----
- drivers/dma/virt-dma.h |   14 ++++++++++++++
- 2 files changed, 29 insertions(+), 4 deletions(-)
+ drivers/dma/sa11x0-dma.c |   45 +++++++++++++++++++++++++++++----------------
+ 1 files changed, 29 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/dma/virt-dma.c b/drivers/dma/virt-dma.c
-index a8054fc..6f80432 100644
---- a/drivers/dma/virt-dma.c
-+++ b/drivers/dma/virt-dma.c
-@@ -59,17 +59,28 @@ EXPORT_SYMBOL_GPL(vchan_find_desc);
- static void vchan_complete(unsigned long arg)
- {
- 	struct virt_dma_chan *vc = (struct virt_dma_chan *)arg;
+diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+index 5f1d2e6..db4fcbd 100644
+--- a/drivers/dma/sa11x0-dma.c
++++ b/drivers/dma/sa11x0-dma.c
+@@ -416,27 +416,47 @@ static enum dma_status sa11x0_dma_tx_status(struct dma_chan *chan,
+ 	struct sa11x0_dma_chan *c = to_sa11x0_dma_chan(chan);
+ 	struct sa11x0_dma_dev *d = to_sa11x0_dma(chan->device);
+ 	struct sa11x0_dma_phy *p;
+-	struct sa11x0_dma_desc *txd;
 +	struct virt_dma_desc *vd;
-+	dma_async_tx_callback cb = NULL;
-+	void *cb_data = NULL;
- 	LIST_HEAD(head);
+ 	unsigned long flags;
+ 	enum dma_status ret;
+-	size_t bytes = 0;
  
- 	spin_lock_irq(&vc->lock);
- 	list_splice_tail_init(&vc->desc_completed, &head);
-+	vd = vc->cyclic;
+ 	ret = dma_cookie_status(&c->vc.chan, cookie, state);
+ 	if (ret == DMA_SUCCESS)
+ 		return ret;
+ 
++	if (!state)
++		return c->status;
++
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 	p = c->phy;
+-	ret = c->status;
+-	if (p) {
+-		dma_addr_t addr = sa11x0_dma_pos(p);
+ 
+-		dev_vdbg(d->slave.dev, "tx_status: addr:%x\n", addr);
++	/*
++	 * If the cookie is on our issue queue, then the residue is
++	 * its total size.
++	 */
++	vd = vchan_find_desc(&c->vc, cookie);
 +	if (vd) {
-+		vc->cyclic = NULL;
-+		cb = vd->tx.callback;
-+		cb_data = vd->tx.callback_param;
-+	}
- 	spin_unlock_irq(&vc->lock);
- 
-+	if (cb)
-+		cb(cb_data);
++		state->residue = container_of(vd, struct sa11x0_dma_desc, vd)->size;
++	} else if (!p) {
++		state->residue = 0;
++	} else {
++		struct sa11x0_dma_desc *txd;
++		size_t bytes = 0;
 +
- 	while (!list_empty(&head)) {
--		struct virt_dma_desc *vd = list_first_entry(&head,
--				struct virt_dma_desc, node);
--		dma_async_tx_callback cb = vd->tx.callback;
--		void *cb_data = vd->tx.callback_param;
-+		vd = list_first_entry(&head, struct virt_dma_desc, node);
-+		cb = vd->tx.callback;
-+		cb_data = vd->tx.callback_param;
++		if (p->txd_done && p->txd_done->vd.tx.cookie == cookie)
++			txd = p->txd_done;
++		else if (p->txd_load && p->txd_load->vd.tx.cookie == cookie)
++			txd = p->txd_load;
++		else
++			txd = NULL;
  
- 		list_del(&vd->node);
+-		txd = p->txd_done;
++		ret = c->status;
+ 		if (txd) {
++			dma_addr_t addr = sa11x0_dma_pos(p);
+ 			unsigned i;
  
-diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
-index 44ec57e..85c19d6 100644
---- a/drivers/dma/virt-dma.h
-+++ b/drivers/dma/virt-dma.h
-@@ -32,6 +32,8 @@ struct virt_dma_chan {
- 	struct list_head desc_submitted;
- 	struct list_head desc_issued;
- 	struct list_head desc_completed;
++			dev_vdbg(d->slave.dev, "tx_status: addr:%x\n", addr);
 +
-+	struct virt_dma_desc *cyclic;
- };
+ 			for (i = 0; i < txd->sglen; i++) {
+ 				dev_vdbg(d->slave.dev, "tx_status: [%u] %x+%x\n",
+ 					i, txd->sg[i].addr, txd->sg[i].len);
+@@ -459,18 +479,11 @@ static enum dma_status sa11x0_dma_tx_status(struct dma_chan *chan,
+ 				bytes += txd->sg[i].len;
+ 			}
+ 		}
+-		if (txd != p->txd_load && p->txd_load)
+-			bytes += p->txd_load->size;
+-	}
+-	list_for_each_entry(txd, &c->vc.desc_issued, vd.node) {
+-		bytes += txd->size;
++		state->residue = bytes;
+ 	}
+ 	spin_unlock_irqrestore(&c->vc.lock, flags);
  
- static inline struct virt_dma_chan *to_virt_chan(struct dma_chan *chan)
-@@ -92,6 +94,18 @@ static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
+-	if (state)
+-		state->residue = bytes;
+-
+-	dev_vdbg(d->slave.dev, "tx_status: bytes 0x%zx\n", bytes);
++	dev_vdbg(d->slave.dev, "tx_status: bytes 0x%zx\n", state->residue);
+ 
+ 	return ret;
  }
- 
- /**
-+ * vchan_cyclic_callback - report the completion of a period
-+ * vd: virtual descriptor
-+ */
-+static inline void vchan_cyclic_callback(struct virt_dma_desc *vd)
-+{
-+	struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
-+
-+	vc->cyclic = vd;
-+	tasklet_schedule(&vc->task);
-+}
-+
-+/**
-  * vchan_next_desc - peek at the next descriptor to be processed
-  * vc: virtual channel to obtain descriptor from
-  *
 -- 
 1.7.4.4
