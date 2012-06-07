@@ -1,53 +1,26 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 7 Jun 2012 14:30:50 +0200
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
- <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
-Message-ID: <4FD09EFA.20304@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 07 Jun 2012 15:39:08 +0300
+Subject: [PATCH v7] MTD: LPC32xx SLC NAND driver
+In-Reply-To: <1339064536-20553-1-git-send-email-stigge@antcom.de>
+References: <1339064536-20553-1-git-send-email-stigge@antcom.de>
+Message-ID: <1339072748.6875.100.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Ohad
+On Thu, 2012-06-07 at 12:22 +0200, Roland Stigge wrote:
+> This patch adds support for the SLC NAND controller inside the LPC32xx SoC.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-On 6/7/2012 12:52 PM, Paul Walmsley wrote:
-> On Thu, 7 Jun 2012, Cousson, Benoit wrote:
->
->> In fact we should delay the reset to the very last moment and
->> potentially reset the IPs not under driver control later after a couple
->> of second for example. It will avoid reseting every IP that will be
->> handled properly by drivers.
->
-> We discussed this a couple of years ago on the list and aligned on late
-> and lazy resets, from my recollection.
+Pushed to l2-mtd.git, thanks!
 
-Indeed, what I did not mention is that potentially the whole device init 
-should be done ondemand as well. Meaning the whole hwmod setup phase 
-should be done only when the driver will probe the device.
-
-> The main reason why it wasn't
-> implemented was because there were some drivers that were not yet PM
-> runtime-converted.  This would have caused crashes, since the core code
-> would have no idea that the non-PM-runtime drivers had initialized their
-> devices, and so the core just went ahead and reset those anyway.
->
-> It might actually be safe now to switch to the late reset arrangement,
-> depending on whether the rest of the drivers have been PM
-> runtime-converted by now.
->
-> Of course, it would all be moot if the reset is moved away from the hwmod
-> code into the drivers.
-
-I do think that moving that to driver code seems much better since all 
-these customs reset code (I2C, DSS, USB...) does anyway require access 
-to the device itself. The is driver responsibility to do that.
-
-So ideally it should not be in OMAP architecture code.
-
-Regards,
-Benoit
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120607/b7cb0d94/attachment.sig>
