@@ -1,72 +1,67 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 07 Jun 2012 00:13:14 -0600
-Subject: [PATCH 09/11] ARM: OMAP4: clock data: add clockdomains for clocks
- used as main clocks
+Date: Thu, 07 Jun 2012 00:13:15 -0600
+Subject: [PATCH 11/11] ARM: OMAP4: hwmod data: do not enable or reset the
+ McPDM during kernel init
 In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
 References: <20120607060901.25532.68354.stgit@dusk>
-Message-ID: <20120607061313.25532.84569.stgit@dusk>
+Message-ID: <20120607061314.25532.93570.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until the OMAP4 code is converted to disable the use of the clock
-framework-based clockdomain enable/disable sequence, any clock used as
-a hwmod main_clk must have a clockdomain associated with it.  This
-patch populates some clock structure clockdomain names to resolve the
-following warnings during kernel init:
+Resolve this kernel boot message:
 
-omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
-omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
-omap_hwmod: l3_div_ck: missing clockdomain for l3_div_ck.
-omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
+omap_hwmod: mcpdm: cannot be enabled for reset (3)
+
+It appears that the McPDM on OMAP4 can only receive its functional
+clock from an off-chip source.  This source is not guaranteed to be
+present on the board, and when present, it is controlled by I2C.  This
+would introduce a board dependency to the early hwmod code which it
+was not designed to handle.  Also, neither the driver for this
+off-chip clock provider nor the I2C code is available early in boot
+when the hwmod code is attempting to enable and reset IP blocks.  This
+effectively makes it impossible to enable and reset this device during
+hwmod init.
+
+At its core, this patch is a workaround for an OMAP hardware problem.
+It should be possible to configure the OMAP to provide any IP block's
+functional clock from an on-chip source.  (This is true for almost
+every IP block on the chip.  As far as I know, McPDM is the only
+exception.)  If the kernel cannot reset and configure IP blocks, it
+cannot guarantee a sane SoC state.  Relying on an optional off-chip
+clock also creates a board dependency which is beyond the scope of the
+early hwmod code.
+
+This patch works around the issue by marking the McPDM hwmod record
+with the HWMOD_UNKNOWN_MAIN_FCLK_STATE flag.  This prevents the hwmod
+code from touching the device early during boot.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/clock44xx_data.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 2172f66..e2b701e 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -84,6 +84,7 @@ static struct clk slimbus_clk = {
- 
- static struct clk sys_32k_ck = {
- 	.name		= "sys_32k_ck",
-+	.clkdm_name	= "prm_clkdm",
- 	.rate		= 32768,
- 	.ops		= &clkops_null,
- };
-@@ -512,6 +513,7 @@ static struct clk ddrphy_ck = {
- 	.name		= "ddrphy_ck",
- 	.parent		= &dpll_core_m2_ck,
- 	.ops		= &clkops_null,
-+	.clkdm_name	= "l3_emif_clkdm",
- 	.fixed_div	= 2,
- 	.recalc		= &omap_fixed_divisor_recalc,
- };
-@@ -769,6 +771,7 @@ static const struct clksel dpll_mpu_m2_div[] = {
- static struct clk dpll_mpu_m2_ck = {
- 	.name		= "dpll_mpu_m2_ck",
- 	.parent		= &dpll_mpu_ck,
-+	.clkdm_name	= "cm_clkdm",
- 	.clksel		= dpll_mpu_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_MPU,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-@@ -1149,6 +1152,7 @@ static const struct clksel l3_div_div[] = {
- static struct clk l3_div_ck = {
- 	.name		= "l3_div_ck",
- 	.parent		= &div_core_ck,
-+	.clkdm_name	= "cm_clkdm",
- 	.clksel		= l3_div_div,
- 	.clksel_reg	= OMAP4430_CM_CLKSEL_CORE,
- 	.clksel_mask	= OMAP4430_CLKSEL_L3_MASK,
-@@ -2824,6 +2828,7 @@ static const struct clksel trace_clk_div_div[] = {
- static struct clk trace_clk_div_ck = {
- 	.name		= "trace_clk_div_ck",
- 	.parent		= &pmd_trace_clk_mux_ck,
-+	.clkdm_name	= "emu_sys_clkdm",
- 	.clksel		= trace_clk_div_div,
- 	.clksel_reg	= OMAP4430_CM_EMU_DEBUGSS_CLKCTRL,
- 	.clksel_mask	= OMAP4430_CLKSEL_PMD_TRACE_CLK_MASK,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 20e45a6..cc1310a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2090,6 +2090,18 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
+ 	.name		= "mcpdm",
+ 	.class		= &omap44xx_mcpdm_hwmod_class,
+ 	.clkdm_name	= "abe_clkdm",
++	/*
++	 * It's suspected that the McPDM requires an off-chip main
++	 * functional clock, controlled via I2C.  This IP block is
++	 * currently reset very early during boot, before I2C is
++	 * available, so it doesn't seem that we have any choice in
++	 * the kernel other than to avoid resetting it.  XXX This is
++	 * really a hardware issue workaround: every IP block should
++	 * be able to source its main functional clock from either
++	 * on-chip or off-chip sources.  McPDM seems to be the only
++	 * current exception.
++	 */
++	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
+ 	.mpu_irqs	= omap44xx_mcpdm_irqs,
+ 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
+ 	.main_clk	= "mcpdm_fck",
