@@ -1,252 +1,242 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Thu, 07 Jun 2012 17:00:43 +0530
-Subject: [alsa-devel] [PATCH v1 1/5] dmaengine: mmp_tdma: add mmp tdma
- support
-In-Reply-To: <CAMj5BkhLTm1TwR=xDf831jjj9oh32fgiigmxKudZjWLvkmSw1g@mail.gmail.com>
-References: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
- <1338791851-21038-2-git-send-email-zhangfei.gao@marvell.com>
- <1339060961.1927.60.camel@vkoul-udesk3>
- <CAMj5BkhLTm1TwR=xDf831jjj9oh32fgiigmxKudZjWLvkmSw1g@mail.gmail.com>
-Message-ID: <1339068643.1927.88.camel@vkoul-udesk3>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 7 Jun 2012 14:16:03 +0200
+Subject: [PATCH] ARM: at91: remove two unused headers
+In-Reply-To: <1339064326.25798.9.camel@x61.thuisdomein>
+References: <1339064326.25798.9.camel@x61.thuisdomein>
+Message-ID: <4FD09B83.1020306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-06-07 at 18:39 +0800, zhangfei gao wrote:
-> >> +static int mmp_tdma_clear_chan_irq(struct mmp_tdma_chan *tdmac)
-> >> +{
-> >> +     u32 reg = readl(tdmac->reg_base + TDISR);
-> >> +
-> >> +     if (reg & TDISR_COMP) {
-> >> +             /* clear irq */
-> >> +             reg &= ~TDISR_COMP;
-> >> +             writel(reg, tdmac->reg_base + TDISR);
-> >> +
-> >> +             return 1;
-> > hrmm.?
-> This is local function used to check whether this channel has irq then return 1.
-> Used by chan_handler.
-quite linux unlike.
+On 06/07/2012 12:18 PM, Paul Bolle :
+> Commit 82c583e3ae31ffa76d1280197274cc1e1cde3179 ("AT91RM9200 hardware
+> headers") introduced arch/arm/mach-at91/include/mach/at91_spi.h and
+> arch/arm/mach-at91/include/mach/at91_ssc.h. (These files were called
+> at91rm9200_spi.h and at91rm9200_ssc.h then.) That commit was added in
+> the v2.6.18 development cycle.
+> 
+> Nothing includes them now and nothing uses the named constants they
+> provide. (There's no way these named constants could be used unless
+> these files were included somehow.) It actually seems these two headers
+> have never been used since they were added to the tree. They can safely
+> be removed.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-> >> +
-> >> +static dma_cookie_t mmp_tdma_tx_submit(struct dma_async_tx_descriptor *tx)
-> >> +{
-> >> +     struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(tx->chan);
-> >> +
-> >> +     mmp_tdma_chan_set_desc(tdmac, tdmac->desc_arr_phys);
-> > This seems odd. In submit you are supposed to move this to your pending
-> > list. Btw where is the .issue_pending handler?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks for finding this. I will queue it for our at91-3.6-cleanup branch.
+
+> ---
+> Tested with "git grep". I do not have the related hardware (whatever
+> that might be) and don't have the toolchain needed for at91 at hand. But
+> it's hard to imagine how this could break anything.
 > 
-> The driver is specifically for audio.
-> So we make it simple, only support cylic method and no pending list at all.
-> Only support sync mode.
-> tx_submit will directly write dma address with single descriptor chain.
-> .issue_pending will directly start the dma.
-> When dma started, it will keep process data from/to user.
-But then you are putting unnecessary limitation on its use.
-Limiation should be based on h/w caps
+>  arch/arm/mach-at91/include/mach/at91_spi.h |   81 ---------------------
+>  arch/arm/mach-at91/include/mach/at91_ssc.h |  106 ----------------------------
+>  2 files changed, 0 insertions(+), 187 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_spi.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_ssc.h
 > 
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static int mmp_tdma_alloc_chan_resources(struct dma_chan *chan)
-> >> +{
-> >> +     struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-> >> +     int ret;
-> >> +
-> >> +     dev_dbg(tdmac->dev, "%s: enter\n", __func__);
-> >> +
-> >> +     dma_async_tx_descriptor_init(&tdmac->desc, chan);
-> >> +     tdmac->desc.tx_submit = mmp_tdma_tx_submit;
-> >> +
-> >> +     if (tdmac->irq) {
-> >> +             ret = devm_request_irq(tdmac->dev, tdmac->irq,
-> >> +                     mmp_tdma_chan_handler, IRQF_DISABLED, "tdma", tdmac);
-> >> +             if (ret)
-> >> +                     goto err_request_irq;
-> >> +     }
-> >> +
-> >> +     return 0;
-> > NO. This is supposed to return the number of descriptors allocated.
-> Thanks for remainder.
-> 
-> 
-> >> +static void mmp_tdma_free_chan_resources(struct dma_chan *chan)
-> >> +{
-> >> +     struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-> >> +
-> >> +     dev_dbg(tdmac->dev, "%s: enter\n", __func__);
-> >> +
-> >> +     if (tdmac->irq)
-> >> +             devm_free_irq(tdmac->dev, tdmac->irq, tdmac);
-> >> +     mmp_tdma_disable_chan(tdmac);
-> > channel should be already disabled, why do you need this here?
-> 
-> Is there case directly call dma_put_channel without DMA_TERMINATE_ALL?
-in cyclic no, otherwise yes.
-> 
-> >> +     mmp_tdma_free_descriptor(tdmac);
-> >> +     return;
-> >> +}
-> >> +
-> >> +
-> >> +static struct dma_async_tx_descriptor *mmp_tdma_prep_slave_sg(
-> >> +             struct dma_chan *chan, struct scatterlist *sgl,
-> >> +             unsigned int sg_len, enum dma_transfer_direction direction,
-> >> +             unsigned long flags, void *context)
-> >> +{
-> >> +     /*
-> >> +      * This operation is not supported on the TDMA controller
-> >> +      *
-> >> +      * However, we need to provide the function pointer to allow the
-> >> +      * device_control() method to work.
-> >> +      */
-> >> +     return NULL;
-> >> +}
-> > Pls remove if not supported
-> 
-> Got it, my mistake,
-> confused by
-> BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
->                 !device->device_control);
-> 
-> >> +
-> >> +static int mmp_tdma_alloc_descriptor(struct mmp_tdma_chan *tdmac)
-> >> +{
-> >> +     struct gen_pool *gpool;
-> >> +     int size = tdmac->desc_num * sizeof(struct mmp_tdma_desc);
-> >> +
-> >> +     dev_dbg(tdmac->dev, "%s: enter\n", __func__);
-> >> +
-> >> +     gpool = sram_get_gpool("asram");
-> >> +     if (!gpool)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     tdmac->desc_arr = (void *)gen_pool_alloc(gpool, size);
-> >> +     if (!tdmac->desc_arr)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     tdmac->desc_arr_phys = gen_pool_virt_to_phys(gpool,
-> >> +                     (unsigned long)tdmac->desc_arr);
-> >> +
-> >> +     return 0;
-> > this needs fix
-> Could you give more hints?
-return the descriptors allocated
-> 
-> >> +}
-> >> +
-> >> +static struct dma_async_tx_descriptor *mmp_tdma_prep_dma_cyclic(
-> >> +             struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
-> >> +             size_t period_len, enum dma_transfer_direction direction,
-> >> +             void *context)
-> >> +{
-> >> +     struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-> >> +     int num_periods = buf_len / period_len;
-> >> +     int i = 0, buf = 0;
-> >> +     int ret;
-> >> +
-> >> +     if (tdmac->status != DMA_SUCCESS)
-> >> +             return NULL;
-> >> +
-> >> +     if (period_len > TDMA_MAX_XFER_BYTES) {
-> >> +             dev_err(tdmac->dev,
-> >> +                             "maximum period size exceeded: %d > %d\n",
-> >> +                             period_len, TDMA_MAX_XFER_BYTES);
-> >> +             goto err_out;
-> >> +     }
-> >> +
-> >> +     tdmac->status = DMA_IN_PROGRESS;
-> > ???
-> >> +     tdmac->desc_num = num_periods;
-> >> +     ret = mmp_tdma_alloc_descriptor(tdmac);
-> >> +     if (ret < 0)
-> >> +             goto err_out;
-> >> +
-> >> +     while (buf < buf_len) {
-> >> +             struct mmp_tdma_desc *desc = &tdmac->desc_arr[i];
-> > what if i call prepare twice on the same channel?
-> 
-> We use  tdmac->status to prevent calling again during transfering
-> except the resource is freed.
-> Usually once cyclic dma is build, only data comming and out, without
-> rebuild dma chain.
-> Here dma chain is simple, does not support asyn mode.
-> 
-> > Better way would to manage a descriptor list, see other drivers for
-> > examples.
-> >> +
-> >> +             if (i + 1 == num_periods)
-> >> +                     desc->nxt_desc = tdmac->desc_arr_phys;
-> >> +             else
-> >> +                     desc->nxt_desc = tdmac->desc_arr_phys +
-> >> +                             sizeof(*desc) * (i + 1);
-> > pls use kernel link list, it is provided to you so that you dont have to
-> > do above.
-> 
-> We have limitation for hardware.
-> SRAM has to be used for both dma buffer and dma descriptor.
-> While SRAM is very very limited on some platform,
-> as a result link node may not able to be allocated.
-> So we simply organize descriptor physically one by one.
-You can embed your h/w descriptor in your list structure, managing them
-becomes easy.
-> 
-> 
-> >> +
-> >> +static void mmp_tdma_issue_pending(struct dma_chan *chan)
-> >> +{
-> >> +     struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-> >> +
-> >> +     mmp_tdma_enable_chan(tdmac);
-> > can you queue the descriptors here? That was purpose to have separate
-> > issue pending and submit.
-> 
-> Since the SRAM is limited, I am afraid it can not allocate memory for queue.
-> And to make it simple, we just arrange descriptor one by one.
-> 
-> 
-> >> +
-> >> +module_platform_driver(mmp_tdma_driver);
-> >> +
-> >> +MODULE_DESCRIPTION("MMP Two-Channel DMA Driver");
-> >> +MODULE_LICENSE("GPL");
-> > AUTHOR, ALIAS too pls
-> Thanks, got it.
-> 
-> >
-> >> diff --git a/include/linux/platform_data/mmp_dma.h b/include/linux/platform_data/mmp_dma.h
-> >> new file mode 100644
-> >> index 0000000..4e21cf9
-> >> --- /dev/null
-> >> +++ b/include/linux/platform_data/mmp_dma.h
-> >> @@ -0,0 +1,20 @@
-> >> +/*
-> >> + *  MMP Platform DMA Management
-> >> + *
-> >> + *  Copyright (c) 2011 Marvell Semiconductors Inc.
-> >> + *
-> >> + *  This program is free software; you can redistribute it and/or modify
-> >> + *  it under the terms of the GNU General Public License version 2 as
-> >> + *  published by the Free Software Foundation.
-> >> + *
-> >> + */
-> >> +
-> >> +#ifndef MMP_DMA_H
-> >> +#define MMP_DMA_H
-> >> +
-> >> +struct mmp_tdma_data {
-> >> +     u32 bus_size;
-> >> +     u32 pack_mod;
-> >> +};
-> >> +
-> >> +#endif /* MMP_DMA_H */
-> > why do you need separate header for this?
-> 
-> The structure is sharing private config between dma driver and pcm
-> driver under sound.
-> The header file will be expanded for other dma driver.
-Other?
+> diff --git a/arch/arm/mach-at91/include/mach/at91_spi.h b/arch/arm/mach-at91/include/mach/at91_spi.h
+> deleted file mode 100644
+> index 2f6ba0c..0000000
+> --- a/arch/arm/mach-at91/include/mach/at91_spi.h
+> +++ /dev/null
+> @@ -1,81 +0,0 @@
+> -/*
+> - * arch/arm/mach-at91/include/mach/at91_spi.h
+> - *
+> - * Copyright (C) 2005 Ivan Kokshaysky
+> - * Copyright (C) SAN People
+> - *
+> - * Serial Peripheral Interface (SPI) registers.
+> - * Based on AT91RM9200 datasheet revision E.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -
+> -#ifndef AT91_SPI_H
+> -#define AT91_SPI_H
+> -
+> -#define AT91_SPI_CR			0x00		/* Control Register */
+> -#define		AT91_SPI_SPIEN		(1 <<  0)		/* SPI Enable */
+> -#define		AT91_SPI_SPIDIS		(1 <<  1)		/* SPI Disable */
+> -#define		AT91_SPI_SWRST		(1 <<  7)		/* SPI Software Reset */
+> -#define		AT91_SPI_LASTXFER	(1 << 24)		/* Last Transfer [SAM9261 only] */
+> -
+> -#define AT91_SPI_MR			0x04		/* Mode Register */
+> -#define		AT91_SPI_MSTR		(1    <<  0)		/* Master/Slave Mode */
+> -#define		AT91_SPI_PS		(1    <<  1)		/* Peripheral Select */
+> -#define			AT91_SPI_PS_FIXED	(0 << 1)
+> -#define			AT91_SPI_PS_VARIABLE	(1 << 1)
+> -#define		AT91_SPI_PCSDEC		(1    <<  2)		/* Chip Select Decode */
+> -#define		AT91_SPI_DIV32		(1    <<  3)		/* Clock Selection [AT91RM9200 only] */
+> -#define		AT91_SPI_MODFDIS	(1    <<  4)		/* Mode Fault Detection */
+> -#define		AT91_SPI_LLB		(1    <<  7)		/* Local Loopback Enable */
+> -#define		AT91_SPI_PCS		(0xf  << 16)		/* Peripheral Chip Select */
+> -#define		AT91_SPI_DLYBCS		(0xff << 24)		/* Delay Between Chip Selects */
+> -
+> -#define AT91_SPI_RDR		0x08			/* Receive Data Register */
+> -#define		AT91_SPI_RD		(0xffff <<  0)		/* Receive Data */
+> -#define		AT91_SPI_PCS		(0xf	<< 16)		/* Peripheral Chip Select */
+> -
+> -#define AT91_SPI_TDR		0x0c			/* Transmit Data Register */
+> -#define		AT91_SPI_TD		(0xffff <<  0)		/* Transmit Data */
+> -#define		AT91_SPI_PCS		(0xf	<< 16)		/* Peripheral Chip Select */
+> -#define		AT91_SPI_LASTXFER	(1	<< 24)		/* Last Transfer [SAM9261 only] */
+> -
+> -#define AT91_SPI_SR		0x10			/* Status Register */
+> -#define		AT91_SPI_RDRF		(1 <<  0)		/* Receive Data Register Full */
+> -#define		AT91_SPI_TDRE		(1 <<  1)		/* Transmit Data Register Full */
+> -#define		AT91_SPI_MODF		(1 <<  2)		/* Mode Fault Error */
+> -#define		AT91_SPI_OVRES		(1 <<  3)		/* Overrun Error Status */
+> -#define		AT91_SPI_ENDRX		(1 <<  4)		/* End of RX buffer */
+> -#define		AT91_SPI_ENDTX		(1 <<  5)		/* End of TX buffer */
+> -#define		AT91_SPI_RXBUFF		(1 <<  6)		/* RX Buffer Full */
+> -#define		AT91_SPI_TXBUFE		(1 <<  7)		/* TX Buffer Empty */
+> -#define		AT91_SPI_NSSR		(1 <<  8)		/* NSS Rising [SAM9261 only] */
+> -#define		AT91_SPI_TXEMPTY	(1 <<  9)		/* Transmission Register Empty [SAM9261 only] */
+> -#define		AT91_SPI_SPIENS		(1 << 16)		/* SPI Enable Status */
+> -
+> -#define AT91_SPI_IER		0x14			/* Interrupt Enable Register */
+> -#define AT91_SPI_IDR		0x18			/* Interrupt Disable Register */
+> -#define AT91_SPI_IMR		0x1c			/* Interrupt Mask Register */
+> -
+> -#define AT91_SPI_CSR(n)		(0x30 + ((n) * 4))	/* Chip Select Registers 0-3 */
+> -#define		AT91_SPI_CPOL		(1    <<  0)		/* Clock Polarity */
+> -#define		AT91_SPI_NCPHA		(1    <<  1)		/* Clock Phase */
+> -#define		AT91_SPI_CSAAT		(1    <<  3)		/* Chip Select Active After Transfer [SAM9261 only] */
+> -#define		AT91_SPI_BITS		(0xf  <<  4)		/* Bits Per Transfer */
+> -#define			AT91_SPI_BITS_8		(0 << 4)
+> -#define			AT91_SPI_BITS_9		(1 << 4)
+> -#define			AT91_SPI_BITS_10	(2 << 4)
+> -#define			AT91_SPI_BITS_11	(3 << 4)
+> -#define			AT91_SPI_BITS_12	(4 << 4)
+> -#define			AT91_SPI_BITS_13	(5 << 4)
+> -#define			AT91_SPI_BITS_14	(6 << 4)
+> -#define			AT91_SPI_BITS_15	(7 << 4)
+> -#define			AT91_SPI_BITS_16	(8 << 4)
+> -#define		AT91_SPI_SCBR		(0xff <<  8)		/* Serial Clock Baud Rate */
+> -#define		AT91_SPI_DLYBS		(0xff << 16)		/* Delay before SPCK */
+> -#define		AT91_SPI_DLYBCT		(0xff << 24)		/* Delay between Consecutive Transfers */
+> -
+> -#endif
+> diff --git a/arch/arm/mach-at91/include/mach/at91_ssc.h b/arch/arm/mach-at91/include/mach/at91_ssc.h
+> deleted file mode 100644
+> index a81114c..0000000
+> --- a/arch/arm/mach-at91/include/mach/at91_ssc.h
+> +++ /dev/null
+> @@ -1,106 +0,0 @@
+> -/*
+> - * arch/arm/mach-at91/include/mach/at91_ssc.h
+> - *
+> - * Copyright (C) SAN People
+> - *
+> - * Serial Synchronous Controller (SSC) registers.
+> - * Based on AT91RM9200 datasheet revision E.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -
+> -#ifndef AT91_SSC_H
+> -#define AT91_SSC_H
+> -
+> -#define AT91_SSC_CR		0x00	/* Control Register */
+> -#define		AT91_SSC_RXEN		(1 <<  0)	/* Receive Enable */
+> -#define		AT91_SSC_RXDIS		(1 <<  1)	/* Receive Disable */
+> -#define		AT91_SSC_TXEN		(1 <<  8)	/* Transmit Enable */
+> -#define		AT91_SSC_TXDIS		(1 <<  9)	/* Transmit Disable */
+> -#define		AT91_SSC_SWRST		(1 << 15)	/* Software Reset */
+> -
+> -#define AT91_SSC_CMR		0x04	/* Clock Mode Register */
+> -#define		AT91_SSC_CMR_DIV	(0xfff << 0)	/* Clock Divider */
+> -
+> -#define AT91_SSC_RCMR		0x10	/* Receive Clock Mode Register */
+> -#define		AT91_SSC_CKS		(3    <<  0)	/* Clock Selection */
+> -#define			AT91_SSC_CKS_DIV		(0 << 0)
+> -#define			AT91_SSC_CKS_CLOCK		(1 << 0)
+> -#define			AT91_SSC_CKS_PIN		(2 << 0)
+> -#define		AT91_SSC_CKO		(7    <<  2)	/* Clock Output Mode Selection */
+> -#define			AT91_SSC_CKO_NONE		(0 << 2)
+> -#define			AT91_SSC_CKO_CONTINUOUS		(1 << 2)
+> -#define		AT91_SSC_CKI		(1    <<  5)	/* Clock Inversion */
+> -#define			AT91_SSC_CKI_FALLING		(0 << 5)
+> -#define			AT91_SSC_CK_RISING		(1 << 5)
+> -#define		AT91_SSC_CKG		(1    <<  6)	/* Receive Clock Gating Selection [AT91SAM9261 only] */
+> -#define			AT91_SSC_CKG_NONE		(0 << 6)
+> -#define			AT91_SSC_CKG_RFLOW		(1 << 6)
+> -#define			AT91_SSC_CKG_RFHIGH		(2 << 6)
+> -#define		AT91_SSC_START		(0xf  <<  8)	/* Start Selection */
+> -#define			AT91_SSC_START_CONTINUOUS	(0 << 8)
+> -#define			AT91_SSC_START_TX_RX		(1 << 8)
+> -#define			AT91_SSC_START_LOW_RF		(2 << 8)
+> -#define			AT91_SSC_START_HIGH_RF		(3 << 8)
+> -#define			AT91_SSC_START_FALLING_RF	(4 << 8)
+> -#define			AT91_SSC_START_RISING_RF	(5 << 8)
+> -#define			AT91_SSC_START_LEVEL_RF		(6 << 8)
+> -#define			AT91_SSC_START_EDGE_RF		(7 << 8)
+> -#define		AT91_SSC_STOP		(1    << 12)	/* Receive Stop Selection [AT91SAM9261 only] */
+> -#define		AT91_SSC_STTDLY		(0xff << 16)	/* Start Delay */
+> -#define		AT91_SSC_PERIOD		(0xff << 24)	/* Period Divider Selection */
+> -
+> -#define AT91_SSC_RFMR		0x14	/* Receive Frame Mode Register */
+> -#define		AT91_SSC_DATALEN	(0x1f <<  0)	/* Data Length */
+> -#define		AT91_SSC_LOOP		(1    <<  5)	/* Loop Mode */
+> -#define		AT91_SSC_MSBF		(1    <<  7)	/* Most Significant Bit First */
+> -#define		AT91_SSC_DATNB		(0xf  <<  8)	/* Data Number per Frame */
+> -#define		AT91_SSC_FSLEN		(0xf  << 16)	/* Frame Sync Length */
+> -#define		AT91_SSC_FSOS		(7    << 20)	/* Frame Sync Output Selection */
+> -#define			AT91_SSC_FSOS_NONE		(0 << 20)
+> -#define			AT91_SSC_FSOS_NEGATIVE		(1 << 20)
+> -#define			AT91_SSC_FSOS_POSITIVE		(2 << 20)
+> -#define			AT91_SSC_FSOS_LOW		(3 << 20)
+> -#define			AT91_SSC_FSOS_HIGH		(4 << 20)
+> -#define			AT91_SSC_FSOS_TOGGLE		(5 << 20)
+> -#define		AT91_SSC_FSEDGE		(1    << 24)	/* Frame Sync Edge Detection */
+> -#define			AT91_SSC_FSEDGE_POSITIVE	(0 << 24)
+> -#define			AT91_SSC_FSEDGE_NEGATIVE	(1 << 24)
+> -
+> -#define AT91_SSC_TCMR		0x18	/* Transmit Clock Mode Register */
+> -#define AT91_SSC_TFMR		0x1c	/* Transmit Fram Mode Register */
+> -#define		AT91_SSC_DATDEF		(1 <<  5)	/* Data Default Value */
+> -#define		AT91_SSC_FSDEN		(1 << 23)	/* Frame Sync Data Enable */
+> -
+> -#define AT91_SSC_RHR		0x20	/* Receive Holding Register */
+> -#define AT91_SSC_THR		0x24	/* Transmit Holding Register */
+> -#define AT91_SSC_RSHR		0x30	/* Receive Sync Holding Register */
+> -#define AT91_SSC_TSHR		0x34	/* Transmit Sync Holding Register */
+> -
+> -#define AT91_SSC_RC0R		0x38	/* Receive Compare 0 Register [AT91SAM9261 only] */
+> -#define AT91_SSC_RC1R		0x3c	/* Receive Compare 1 Register [AT91SAM9261 only] */
+> -
+> -#define AT91_SSC_SR		0x40	/* Status Register */
+> -#define		AT91_SSC_TXRDY		(1 <<  0)	/* Transmit Ready */
+> -#define		AT91_SSC_TXEMPTY	(1 <<  1)	/* Transmit Empty */
+> -#define		AT91_SSC_ENDTX		(1 <<  2)	/* End of Transmission */
+> -#define		AT91_SSC_TXBUFE		(1 <<  3)	/* Transmit Buffer Empty */
+> -#define		AT91_SSC_RXRDY		(1 <<  4)	/* Receive Ready */
+> -#define		AT91_SSC_OVRUN		(1 <<  5)	/* Receive Overrun */
+> -#define		AT91_SSC_ENDRX		(1 <<  6)	/* End of Reception */
+> -#define		AT91_SSC_RXBUFF		(1 <<  7)	/* Receive Buffer Full */
+> -#define		AT91_SSC_CP0		(1 <<  8)	/* Compare 0 [AT91SAM9261 only] */
+> -#define		AT91_SSC_CP1		(1 <<  9)	/* Compare 1 [AT91SAM9261 only] */
+> -#define		AT91_SSC_TXSYN		(1 << 10)	/* Transmit Sync */
+> -#define		AT91_SSC_RXSYN		(1 << 11)	/* Receive Sync */
+> -#define		AT91_SSC_TXENA		(1 << 16)	/* Transmit Enable */
+> -#define		AT91_SSC_RXENA		(1 << 17)	/* Receive Enable */
+> -
+> -#define AT91_SSC_IER		0x44	/* Interrupt Enable Register */
+> -#define AT91_SSC_IDR		0x48	/* Interrupt Disable Register */
+> -#define AT91_SSC_IMR		0x4c	/* Interrupt Mask Register */
+> -
+> -#endif
+
 
 -- 
-~Vinod
+Nicolas Ferre
