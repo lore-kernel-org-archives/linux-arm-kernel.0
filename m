@@ -1,56 +1,206 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Thu,  7 Jun 2012 17:40:18 +0200
-Subject: [PATCH] ARM: bpf_jit: BPF_S_ANC_ALU_XOR_X support
-Message-ID: <1339083618-15009-1-git-send-email-mgherzan@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  7 Jun 2012 17:09:19 +0100
+Subject: [PATCH v7 02/12] ARM: SoC: Add per SoC SMP and CPU hotplug operations
+In-Reply-To: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1339085369-26073-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JIT support for the XOR operation introduced by the commit
-ffe06c17afbb.
+Populate the SoC descriptor structure with the SMP and CPU hotplug
+operations. To allow the kernel to continue building, the platform
+hooks are defined as weak symbols which are overrided by the
+platform code. Once all platforms are converted, the "weak" attribute
+will be removed and the function made static.
 
-Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/net/bpf_jit_32.c |    5 +++++
- arch/arm/net/bpf_jit_32.h |    4 ++++
- 2 files changed, 9 insertions(+)
+ arch/arm/include/asm/soc.h |   59 ++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c    |    1 +
+ arch/arm/kernel/smp.c      |   75 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 135 insertions(+)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 62135849..c641fb6 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -762,6 +762,11 @@ b_epilogue:
- 			update_on_xread(ctx);
- 			emit(ARM_MOV_R(r_A, r_X), ctx);
- 			break;
-+		case BPF_S_ANC_ALU_XOR_X:
-+			/* A ^= X */
-+			update_on_xread(ctx);
-+			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
-+			break;
- 		case BPF_S_ANC_PROTOCOL:
- 			/* A = ntohs(skb->protocol) */
- 			ctx->seen |= SEEN_SKB;
-diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
-index 99ae5e3..7fa2f7d 100644
---- a/arch/arm/net/bpf_jit_32.h
-+++ b/arch/arm/net/bpf_jit_32.h
-@@ -68,6 +68,8 @@
- #define ARM_INST_CMP_R		0x01500000
- #define ARM_INST_CMP_I		0x03500000
+diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
+index 2d73e35..187e82b 100644
+--- a/arch/arm/include/asm/soc.h
++++ b/arch/arm/include/asm/soc.h
+@@ -12,8 +12,67 @@
+ #ifndef __ASM_ARM_SOC_H
+ #define __ASM_ARM_SOC_H
  
-+#define ARM_INST_EOR_R		0x00200000
++struct task_struct;
 +
- #define ARM_INST_LDRB_I		0x05d00000
- #define ARM_INST_LDRB_R		0x07d00000
- #define ARM_INST_LDRH_I		0x01d000b0
-@@ -132,6 +134,8 @@
- #define ARM_CMP_R(rn, rm)	_AL3_R(ARM_INST_CMP, 0, rn, rm)
- #define ARM_CMP_I(rn, imm)	_AL3_I(ARM_INST_CMP, 0, rn, imm)
++struct arm_soc_smp_init_ops {
++	/*
++	 * Setup the set of possible CPUs (via set_cpu_possible)
++	 */
++	void (*smp_init_cpus)(void);
++	/*
++	 * Initialize cpu_possible map, and enable coherency
++	 */
++	void (*smp_prepare_cpus)(unsigned int max_cpus);
++};
++
++struct arm_soc_smp_hotplug_ops {
++#ifdef CONFIG_HOTPLUG_CPU
++	int  (*cpu_kill)(unsigned int cpu);
++	void (*cpu_die)(unsigned int cpu);
++	int  (*cpu_disable)(unsigned int cpu);
++#endif
++};
++
++struct arm_soc_smp_ops {
++	/*
++	 * Perform platform specific initialisation of the specified CPU.
++	 */
++	void (*smp_secondary_init)(unsigned int cpu);
++	/*
++	 * Boot a secondary CPU, and assign it the specified idle task.
++	 * This also gives us the initial stack to use for this CPU.
++	 */
++	int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
++
++	struct arm_soc_smp_hotplug_ops hotplug_ops;
++};
++
+ struct arm_soc_desc {
+ 	const char			*name;
++#ifdef CONFIG_SMP
++	struct arm_soc_smp_init_ops	*smp_init_ops;
++	struct arm_soc_smp_ops		*smp_ops;
++#endif
+ };
  
-+#define ARM_EOR_R(rd, rn, rm)	_AL3_R(ARM_INST_EOR, rd, rn, rm)
++#ifdef CONFIG_SMP
++#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
++#define soc_smp_ops(ops)		.smp_ops = &(ops),
++#ifdef CONFIG_HOTPLUG_SMP
++#define soc_hotplug_ops(prefix)		.hotplug_ops = {	\
++		.cpu_kill	= prefix##_cpu_kill,		\
++		.cpu_die	= prefix##_cpu_die,		\
++		.cpu_disable	= prefix##_cpu_disable,		\
++	},
++#else
++#define soc_hotplug_ops(prefix)		.hotplug_ops = {},
++#endif
++extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
++				 struct arm_soc_smp_ops *);
++#else
++#define soc_smp_init_ops(ops)		/* empty */
++#define soc_smp_ops(ops)		/* empty */
++#define soc_smp_ops_register(a,b)	do {} while(0)
++#endif
 +
- #define ARM_LDR_I(rt, rn, off)	(ARM_INST_LDR_I | (rt) << 12 | (rn) << 16 \
- 				 | (off))
- #define ARM_LDRB_I(rt, rn, off)	(ARM_INST_LDRB_I | (rt) << 12 | (rn) << 16 \
+ #endif	/* __ASM_ARM_SOC_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 69c345c..5ff84a5 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -952,6 +952,7 @@ void __init setup_arch(char **cmdline_p)
+ 	if (mdesc->soc) {
+ 		soc_desc = mdesc->soc;
+ 		pr_info("SoC: %s\n", soc_desc->name);
++		soc_smp_ops_register(soc_desc->smp_init_ops, soc_desc->smp_ops);
+ 	} else
+ 		soc_desc = NULL;
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2c7217d..30709df 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -27,6 +27,7 @@
+ #include <linux/completion.h>
+ 
+ #include <linux/atomic.h>
++#include <asm/soc.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+@@ -100,9 +101,83 @@ int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 	return ret;
+ }
+ 
++/* SoC helpers */
++static const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
++static const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
++static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
++#ifdef CONFIG_HOTPLUG_CPU
++static const struct arm_soc_smp_hotplug_ops *hotplug_ops;
++#endif
++
++void __init soc_smp_ops_register(struct arm_soc_smp_init_ops *smp_init_ops,
++				 struct arm_soc_smp_ops *smp_ops)
++{
++	if (smp_init_ops)
++		soc_smp_init_ops = smp_init_ops;
++
++	/*
++	 * Warning: we're copying an __initdata structure into a
++	 * __cpuinitdata structure. We *know* it is valid because only
++	 * __cpuinit (or more persistant) functions should be pointed
++	 * to by soc_smp_ops. Still, this is borderline ugly.
++	 */
++	if (smp_ops) {
++		__soc_smp_ops = *smp_ops;
++		soc_smp_ops = &__soc_smp_ops;
++#ifdef CONFIG_HOTPLUG_CPU
++		hotplug_ops = &__soc_smp_ops.hotplug_ops;
++#endif
++	}
++}
++
++void __attribute__((weak)) __init smp_init_cpus(void)
++{
++	if (soc_smp_init_ops && soc_smp_init_ops->smp_init_cpus)
++		soc_smp_init_ops->smp_init_cpus();
++}
++
++void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
++{
++	if (soc_smp_ops && soc_smp_init_ops->smp_prepare_cpus)
++		soc_smp_init_ops->smp_prepare_cpus(max_cpus);
++}
++
++void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	if (soc_smp_ops && soc_smp_ops->smp_secondary_init)
++		soc_smp_ops->smp_secondary_init(cpu);
++}
++
++int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	if (soc_smp_ops && soc_smp_ops->smp_boot_secondary)
++		return soc_smp_ops->smp_boot_secondary(cpu, idle);
++	return -ENOSYS;
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void percpu_timer_stop(void);
+ 
++int __attribute__((weak)) platform_cpu_kill(unsigned int cpu)
++{
++	if (hotplug_ops && hotplug_ops->cpu_kill)
++		return hotplug_ops->cpu_kill(cpu);
++	return 0;
++}
++
++void __attribute__((weak)) platform_cpu_die(unsigned int cpu)
++{
++	if (hotplug_ops && hotplug_ops->cpu_die)
++		hotplug_ops->cpu_die(cpu);
++}
++
++int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
++{
++	if (hotplug_ops && hotplug_ops->cpu_disable)
++		return hotplug_ops->cpu_disable(cpu);
++	return -EPERM;
++}
++
+ /*
+  * __cpu_disable runs on the processor to be shutdown.
+  */
 -- 
-1.7.10
+1.7.10.1
