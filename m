@@ -1,29 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Jun 2012 11:43:16 +0200
-Subject: [PATCH 4/4] ARM i.MX5: Add nand oftree support
-In-Reply-To: <20120607022952.GI2667@S2101-09.ap.freescale.net>
-References: <1338978796-26129-1-git-send-email-s.hauer@pengutronix.de>
- <1338978796-26129-5-git-send-email-s.hauer@pengutronix.de>
- <20120607022952.GI2667@S2101-09.ap.freescale.net>
-Message-ID: <20120607094316.GG30400@pengutronix.de>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 7 Jun 2012 17:59:43 +0800
+Subject: [alsa-devel] [PATCH v1 2/5] ASoC: mmp: add audio dma support
+In-Reply-To: <1339061042.1927.61.camel@vkoul-udesk3>
+References: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
+ <1338791851-21038-3-git-send-email-zhangfei.gao@marvell.com>
+ <1339061042.1927.61.camel@vkoul-udesk3>
+Message-ID: <CAMj5Bkj+4qQqoDgz_d7eLK+QuVm41fnN5204tRpJ8NKrNsAjcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2012 at 10:29:54AM +0800, Shawn Guo wrote:
-> On Wed, Jun 06, 2012 at 12:33:16PM +0200, Sascha Hauer wrote:
-> > This adds snippets to the i.MX51/53 devicetrees for the nand
-> > flash controller.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Thu, Jun 7, 2012 at 5:24 PM, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> On Mon, 2012-06-04 at 14:37 +0800, Zhangfei Gao wrote:
+>> mmp-pcm handle audio dma based on soc-dmaengine
+>> Support mmp and pxa910
+> See soc-dmaengine.c. You sneed to use the library to use dmaengine.
+>
 
-Thanks. Will address Artems comments and resend.
+Thanks Vinod for kind review.
 
-Sascha
+Some confusion, only find sound/soc/soc-dmaengine-pcm.c.
+So the driver base on the library, snd_dmaengine_pcm_open/close etc.
+Replacing dma_request_channel etc.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Is it right direction?
