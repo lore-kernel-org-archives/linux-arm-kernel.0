@@ -1,48 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 7 Jun 2012 14:03:46 -0600 (MDT)
-Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061309.25532.13430.stgit@dusk>
- <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1206071355090.14977@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 7 Jun 2012 22:04:51 +0200
+Subject: [GIT PULL] i.MX fixes
+Message-ID: <20120607200451.GQ30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Olof, Arnd,
 
-On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
+Please pull the following i.MX fixes for -rc.
 
-> I couldn't finish my testing today, got into continuous meetings.
+Sascha
 
-No worries, I understand.
+The following changes since commit 76e10d158efb6d4516018846f60c2ab5501900bc:
 
-> Tomorrow, I will test it and update you on this.
+  Linux 3.4 (2012-05-20 15:29:13 -0700)
 
-That would be great.
+are available in the git repository at:
 
-I took a look at SPRUH73F and sure enough, at least one module (CONTROL) 
-doesn't support smart-idle -- per Table 14-217 "CONTROL Register Field 
-Descriptions".  I'd guess that the PRCM won't idle-req this IP block until 
-the kernel is not running, so we might be able to get away with the 
-existing approach; but the TRM also says:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx/fixes
 
-"By definition, initiator may generate read/write transaction as long as
-it is out of IDLE state."
+for you to fetch changes up to 350ab15bb2ffe7103bc6bf6c634f3c5b286eaf2a:
 
-Which pretty much matches my understanding too of the implicit interface 
-contract here.
+  ARM i.MX imx21ads: Fix overlapping static i/o mappings (2012-06-07 21:34:22 +0200)
 
-So I think we'd better go back to the flag approach as implemented in this 
-patch:
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: mx31_3ds: Fix build due to missing IMX_HAVE_PLATFORM_IMX_SSI
 
-http://www.spinics.net/lists/arm-kernel/msg176836.html
+Jaccon Bastiaansen (1):
+      ARM i.MX imx21ads: Fix overlapping static i/o mappings
 
-The WBU 32k sync timer's behavior is what relies on quirks of the 
-integration that are hard to identify via other means, so it seems to be 
-safest to tag it explicitly.
+Javier Martin (1):
+      ARM i.MX27 Visstrim M10: fix gpio handling.
 
+Uwe Kleine-K?nig (2):
+      ARM: imx: only specify i2c device type once
+      ARM: imx: only call l2x0_init if it's available
 
-- Paul
+ arch/arm/mach-imx/Kconfig                   |    1 +
+ arch/arm/mach-imx/mach-cpuimx35.c           |    1 -
+ arch/arm/mach-imx/mach-cpuimx51sd.c         |    1 -
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   36 +++++++++++++++++++--------
+ arch/arm/mach-imx/mach-mx21ads.c            |    2 +-
+ arch/arm/mach-imx/mm-imx3.c                 |    2 ++
+ 6 files changed, 29 insertions(+), 14 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
