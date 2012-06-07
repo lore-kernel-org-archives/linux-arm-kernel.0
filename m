@@ -1,256 +1,171 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  7 Jun 2012 17:09:24 +0100
-Subject: [PATCH v7 07/12] ARM: SoC: convert MSM SMP to SoC descriptor
-In-Reply-To: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
-References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339085369-26073-8-git-send-email-marc.zyngier@arm.com>
+Date: Thu,  7 Jun 2012 17:09:17 +0100
+Subject: [PATCH v7 00/12] Per SoC descriptor
+Message-ID: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert MSM SMP platforms to use the SoC descriptor to provide
-their SMP and CPU hotplug operations.
+[As per Arnd request, I've updated this patch series, in the hope that
+it could be useful to the single zImage work]
 
-Cc: David Brown <davidb@codeaurora.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-msm/Makefile        |    2 +-
- arch/arm/mach-msm/board-msm8960.c |    3 +++
- arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
- arch/arm/mach-msm/core.c          |   17 +++++++++++++++++
- arch/arm/mach-msm/core.h          |    9 +++++++++
- arch/arm/mach-msm/hotplug.c       |    8 +++++---
- arch/arm/mach-msm/platsmp.c       |   20 ++++++++++++++++----
- 7 files changed, 58 insertions(+), 8 deletions(-)
+This patch series introduces a per-soc descriptor which should, in the
+end, contain most of the SoC specific operations.
+
+This first patch series introduces the arm_soc_desc structure, adds
+per-soc SMP and CPU hotplug operations, and converts all SMP platform
+to this new scheme.
+
+Patches against v3.5-rc1. Tested on VExpress (Cortex A15).
+
+Also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git soc_desc-v3.5-rc1
+
+Changelog:
+
+>From v6:
+- Dropped the dummy_* stuff
+- Support for a number of new platforms
+- Added the soc_hotplug_ops() macro to hide some #ifdef-ery away
+- More exynos[ 45] churn
+- Fixed section mismatches
+
+>From v5:
+- Added support for highbank and imx6q
+- Added support for new shmobile SMP platform
+- Add dummy_cpu_kill, dummy_cpu_disable and cpu_lowpower
+
+>From v4:
+- Added an SMP registration interface and moved all SMP structures to
+  smp.c. The end result is much cleaner.
+- Cleaned up patch 2 (leftovers from a previous rework)
+- NVIDIA/EXYNOS4 naming cleanup.
+
+>From v3:
+- Converted all SMP platforms
+- Added some cleanup as a last patch
+
+>From v2:
+- Split the SMP ops between init and runtime operations in order to
+  have separate lifetimes for the different structures. This is not
+  perfect though, as it still allows an __init function to make it to
+  a runtime structure (all smp_*_ops structures are __initdata in
+  order to be able to discard them). Thanks to Nico for pointing this
+  out.
+- Use macros to hide the #ifdef-ery in the SoC descriptor init,
+  courtesy of Arnd.
+
+>From v1:
+- Move the SMP ops out of the descriptor, which makes the structure
+  init a bit cleaner (thanks to Arnd).
+- Mark all structures __initdata and keep a copy of the used ones.
+- Keep a global pointer for the SMP ops.
+
+
+Marc Zyngier (12):
+  ARM: SoC: Introduce per SoC descriptor
+  ARM: SoC: Add per SoC SMP and CPU hotplug operations
+  ARM: SoC: convert VExpress/RealView to SoC descriptor
+  ARM: SoC: convert OMAP4 to SoC descriptor
+  ARM: SoC: convert Tegra to SoC descriptor
+  ARM: SoC: convert Exynos4 to SoC descriptor
+  ARM: SoC: convert MSM SMP to SoC descriptor
+  ARM: SoC: convert ux500 to SoC descriptor
+  ARM: SoC: convert shmobile SMP to SoC descriptor
+  ARM: SoC: convert highbank to SoC descriptor
+  ARM: SoC: convert imx6q to SoC descriptor
+  ARM: smp: Make SoC descriptor mandatory for SMP platforms
+
+ arch/arm/include/asm/mach/arch.h               |    2 +
+ arch/arm/include/asm/smp.h                     |   14 ----
+ arch/arm/include/asm/soc.h                     |   78 +++++++++++++++++++++
+ arch/arm/kernel/setup.c                        |    8 +++
+ arch/arm/kernel/smp.c                          |   79 +++++++++++++++++++++-
+ arch/arm/mach-exynos/common.c                  |    6 ++
+ arch/arm/mach-exynos/common.h                  |   10 +++
+ arch/arm/mach-exynos/hotplug.c                 |    8 ++-
+ arch/arm/mach-exynos/mach-armlex4210.c         |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c         |    1 +
+ arch/arm/mach-exynos/mach-nuri.c               |    1 +
+ arch/arm/mach-exynos/mach-origen.c             |    1 +
+ arch/arm/mach-exynos/mach-smdk4x12.c           |    2 +
+ arch/arm/mach-exynos/mach-smdkv310.c           |    2 +
+ arch/arm/mach-exynos/mach-universal_c210.c     |    1 +
+ arch/arm/mach-exynos/platsmp.c                 |   21 ++++--
+ arch/arm/mach-highbank/core.h                  |    8 +++
+ arch/arm/mach-highbank/highbank.c              |    7 ++
+ arch/arm/mach-highbank/hotplug.c               |    6 +-
+ arch/arm/mach-highbank/platsmp.c               |   19 ++++--
+ arch/arm/mach-imx/hotplug.c                    |    6 +-
+ arch/arm/mach-imx/mach-imx6q.c                 |    8 +++
+ arch/arm/mach-imx/platsmp.c                    |   20 ++++--
+ arch/arm/mach-msm/Makefile                     |    2 +-
+ arch/arm/mach-msm/board-msm8960.c              |    3 +
+ arch/arm/mach-msm/board-msm8x60.c              |    7 ++
+ arch/arm/mach-msm/core.c                       |   17 +++++
+ arch/arm/mach-msm/core.h                       |    9 +++
+ arch/arm/mach-msm/hotplug.c                    |    8 ++-
+ arch/arm/mach-msm/platsmp.c                    |   20 ++++--
+ arch/arm/mach-omap2/board-4430sdp.c            |    1 +
+ arch/arm/mach-omap2/board-generic.c            |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c         |    1 +
+ arch/arm/mach-omap2/common.h                   |   13 ++++
+ arch/arm/mach-omap2/omap-hotplug.c             |    6 +-
+ arch/arm/mach-omap2/omap-smp.c                 |   20 ++++--
+ arch/arm/mach-omap2/omap4-common.c             |    7 ++
+ arch/arm/mach-realview/core.c                  |    7 ++
+ arch/arm/mach-realview/core.h                  |    9 +++
+ arch/arm/mach-realview/hotplug.c               |    6 +-
+ arch/arm/mach-realview/platsmp.c               |   20 ++++--
+ arch/arm/mach-realview/realview_eb.c           |    1 +
+ arch/arm/mach-realview/realview_pb1176.c       |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c       |    1 +
+ arch/arm/mach-realview/realview_pba8.c         |    1 +
+ arch/arm/mach-realview/realview_pbx.c          |    1 +
+ arch/arm/mach-shmobile/board-ag5evm.c          |    1 +
+ arch/arm/mach-shmobile/board-kota2.c           |    1 +
+ arch/arm/mach-shmobile/board-kzm9d.c           |    1 +
+ arch/arm/mach-shmobile/board-kzm9g.c           |    1 +
+ arch/arm/mach-shmobile/board-marzen.c          |    1 +
+ arch/arm/mach-shmobile/hotplug.c               |   26 +++++--
+ arch/arm/mach-shmobile/include/mach/common.h   |   19 ++----
+ arch/arm/mach-shmobile/include/mach/emev2.h    |   10 +--
+ arch/arm/mach-shmobile/include/mach/r8a7779.h  |    8 +++
+ arch/arm/mach-shmobile/include/mach/sh73a0.h   |    6 ++
+ arch/arm/mach-shmobile/platsmp.c               |   86 +-----------------------
+ arch/arm/mach-shmobile/setup-emev2.c           |    7 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c         |    6 ++
+ arch/arm/mach-shmobile/setup-sh73a0.c          |    6 ++
+ arch/arm/mach-shmobile/smp-emev2.c             |   26 +++++--
+ arch/arm/mach-shmobile/smp-r8a7779.c           |   26 +++++--
+ arch/arm/mach-shmobile/smp-sh73a0.c            |   27 ++++++--
+ arch/arm/mach-tegra/board-dt-tegra20.c         |    2 +
+ arch/arm/mach-tegra/board-dt-tegra30.c         |    2 +
+ arch/arm/mach-tegra/board-harmony.c            |    2 +
+ arch/arm/mach-tegra/board-paz00.c              |    2 +
+ arch/arm/mach-tegra/board-seaboard.c           |    4 ++
+ arch/arm/mach-tegra/board-trimslice.c          |    2 +
+ arch/arm/mach-tegra/common.c                   |    8 +++
+ arch/arm/mach-tegra/common.h                   |   11 +++
+ arch/arm/mach-tegra/hotplug.c                  |    6 +-
+ arch/arm/mach-tegra/platsmp.c                  |   22 ++++--
+ arch/arm/mach-ux500/board-mop500.c             |    4 ++
+ arch/arm/mach-ux500/cpu.c                      |    7 ++
+ arch/arm/mach-ux500/hotplug.c                  |    8 ++-
+ arch/arm/mach-ux500/include/mach/setup.h       |    9 +++
+ arch/arm/mach-ux500/platsmp.c                  |   19 ++++--
+ arch/arm/mach-vexpress/core.h                  |   10 +++
+ arch/arm/mach-vexpress/hotplug.c               |    6 +-
+ arch/arm/mach-vexpress/platsmp.c               |   21 ++++--
+ arch/arm/mach-vexpress/v2m.c                   |   10 +++
+ arch/arm/plat-mxc/include/mach/common.h        |   10 +++
+ arch/arm/plat-versatile/include/plat/platsmp.h |   14 ++++
+ arch/arm/plat-versatile/platsmp.c              |    4 +-
+ 85 files changed, 712 insertions(+), 200 deletions(-)
+ create mode 100644 arch/arm/include/asm/soc.h
  create mode 100644 arch/arm/mach-msm/core.c
  create mode 100644 arch/arm/mach-msm/core.h
+ create mode 100644 arch/arm/mach-tegra/common.h
+ create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 4ad3969..cba9355 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -1,5 +1,5 @@
- obj-y += io.o idle.o timer.o
--obj-y += clock.o
-+obj-y += clock.o core.o
- obj-$(CONFIG_DEBUG_FS) += clock-debug.o
- 
- obj-$(CONFIG_MSM_VIC) += irq-vic.o
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index 65f4a1d..3b4f98b 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -30,6 +30,7 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
- 
-+#include "core.h"
- #include "devices.h"
- 
- static void __init msm8960_fixup(struct tag *tag, char **cmdline,
-@@ -99,6 +100,7 @@ static void __init msm8960_init_late(void)
- }
- 
- MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8960_fixup,
- 	.reserve = msm8960_reserve,
- 	.map_io = msm8960_map_io,
-@@ -110,6 +112,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- MACHINE_END
- 
- MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8960_fixup,
- 	.reserve = msm8960_reserve,
- 	.map_io = msm8960_map_io,
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index e37a724..4064ce3 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -29,6 +29,8 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
- 
-+#include "core.h"
-+
- static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
- 		struct meminfo *mi)
- {
-@@ -110,6 +112,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
- #endif /* CONFIG_OF */
- 
- MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -121,6 +124,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
- MACHINE_END
- 
- MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -132,6 +136,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
- MACHINE_END
- 
- MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -143,6 +148,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
- MACHINE_END
- 
- MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
-+	.soc = &msm_soc_desc,
- 	.fixup = msm8x60_fixup,
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
-@@ -156,6 +162,7 @@ MACHINE_END
- #ifdef CONFIG_OF
- /* TODO: General device tree support for all MSM. */
- DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
-+	.soc = &msm_soc_desc,
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
- 	.init_machine = msm8x60_dt_init,
-diff --git a/arch/arm/mach-msm/core.c b/arch/arm/mach-msm/core.c
-new file mode 100644
-index 0000000..390cde7
---- /dev/null
-+++ b/arch/arm/mach-msm/core.c
-@@ -0,0 +1,17 @@
-+/*
-+ *  Copyright (C) 2011 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include "core.h"
-+
-+struct arm_soc_desc msm_soc_desc __initdata = {
-+	.name		= "Qualcomm MSM",
-+	soc_smp_init_ops(msm_soc_smp_init_ops)
-+	soc_smp_ops(msm_soc_smp_ops)
-+};
-diff --git a/arch/arm/mach-msm/core.h b/arch/arm/mach-msm/core.h
-new file mode 100644
-index 0000000..e8394dd
---- /dev/null
-+++ b/arch/arm/mach-msm/core.h
-@@ -0,0 +1,9 @@
-+#include <asm/soc.h>
-+
-+extern struct arm_soc_smp_init_ops	msm_soc_smp_init_ops;
-+extern struct arm_soc_smp_ops		msm_soc_smp_ops;
-+extern struct arm_soc_desc		msm_soc_desc;
-+
-+extern int  msm_cpu_kill(unsigned int cpu);
-+extern void msm_cpu_die(unsigned int cpu);
-+extern int  msm_cpu_disable(unsigned int cpu);
-diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
-index a446fc1..6ba3602 100644
---- a/arch/arm/mach-msm/hotplug.c
-+++ b/arch/arm/mach-msm/hotplug.c
-@@ -13,6 +13,8 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
-+#include "core.h"
-+
- extern volatile int pen_release;
- 
- static inline void cpu_enter_lowpower(void)
-@@ -57,7 +59,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 	}
- }
- 
--int platform_cpu_kill(unsigned int cpu)
-+int msm_cpu_kill(unsigned int cpu)
- {
- 	return 1;
- }
-@@ -67,7 +69,7 @@ int platform_cpu_kill(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void msm_cpu_die(unsigned int cpu)
- {
- 	/*
- 	 * we're ready for shutdown now, so do it
-@@ -82,7 +84,7 @@ void platform_cpu_die(unsigned int cpu)
- 	cpu_leave_lowpower();
- }
- 
--int platform_cpu_disable(unsigned int cpu)
-+int msm_cpu_disable(unsigned int cpu)
- {
- 	/*
- 	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index db0117e..4e4ebd9 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -25,6 +25,7 @@
- #include <mach/msm_iomap.h>
- 
- #include "scm-boot.h"
-+#include "core.h"
- 
- #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
- #define SCSS_CPU1CORE_RESET 0xD80
-@@ -48,7 +49,7 @@ static inline int get_core_count(void)
- 	return ((read_cpuid_id() >> 4) & 3) + 1;
- }
- 
--void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit msm_secondary_init(unsigned int cpu)
- {
- 	/* Configure edge-triggered PPIs */
- 	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-@@ -93,7 +94,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
- 				  "address\n");
- }
- 
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
- 	static int cold_boot_done;
-@@ -153,7 +154,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-  * does not support the ARM SCU, so just set the possible cpu mask to
-  * NR_CPUS.
-  */
--void __init smp_init_cpus(void)
-+static void __init msm_smp_init_cpus(void)
- {
- 	unsigned int i, ncores = get_core_count();
- 
-@@ -169,6 +170,17 @@ void __init smp_init_cpus(void)
-         set_smp_cross_call(gic_raise_softirq);
- }
- 
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
- {
- }
-+
-+struct arm_soc_smp_init_ops msm_soc_smp_init_ops __initdata = {
-+	.smp_init_cpus		= msm_smp_init_cpus,
-+	.smp_prepare_cpus	= msm_smp_prepare_cpus,
-+};
-+
-+struct arm_soc_smp_ops msm_soc_smp_ops __initdata = {
-+	.smp_secondary_init	= msm_secondary_init,
-+	.smp_boot_secondary	= msm_boot_secondary,
-+	soc_hotplug_ops(msm)
-+};
 -- 
 1.7.10.1
