@@ -1,51 +1,37 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Jun 2012 16:22:09 -0500
-Subject: [PATCH V2 07/10] ARM: OMAP4: CLKDM: Update supported transition modes
+Date: Thu, 7 Jun 2012 16:22:10 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain transitioning
+ to OFF when in-use
 In-Reply-To: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
 References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1339104132-26885-8-git-send-email-jon-hunter@ti.com>
+Message-ID: <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For OMAP3+ devices, the clock domains (CLKDMs) support one or more of the
-following transition modes ...
+On the OMAP4 devices the EMU power domain is configured in hardware so that its
+next power state is OFF. This cannot be overriden by software and this means
+that when ever the EMU clock domain automatically transitions to the idle
+state, the power domain will transition to OFF. Therefore, when the EMU power
+domain is in-use, we need to prevent the clock domain from transitioning to
+the idle state. This can be accomplished by placing the EMU clock domain in the
+SW_WKUP mode versus the HW_AUTO mode.
 
-NO_SLEEP (0x0) - A clock domain sleep transition is never initiated,
-		 irrespective of the hardware conditions.
-SW_SLEEP (0x1) - A software-forced sleep transition. The transition is initiated
-		 when the associated hardware conditions are satisfied
-SW_WKUP  (0x2) - A software-forced clock domain wake-up transition is initiated,
-		 irrespective of the hardware conditions.
-HW_AUTO  (0x3) - Hardware-controlled automatic sleep and wake-up transition is
-		 initiated by the PRCM module when the associated hardware
-		 conditions are satisfied.
+In the current software configuration of the EMU clock domain the flag
+CLKDM_CAN_ENABLE_AUTO is set and this is allowing the clock domain to
+automatically transition to the idle state via hardware control (by enabling
+the HW_AUTO mode). To avoid this, disable the CLKDM_CAN_ENABLE_AUTO flag for
+the EMU clock domain.
 
-For OMAP4 devices, SW_SLEEP is equivalent to HW_AUTO and NO_SLEEP is equivalent
-to SW_WKUP. The only difference between HW_AUTO and SW_SLEEP for OMAP4 devices
-is that the PRM_IRQSTATUS_MPU.TRANSITION_ST interrupt status is set in case of
-SW_SLEEP transition, and not set in case of HW_AUTO transition.
+By removing the CLKDM_CAN_ENABLE_AUTO flag, the EMU clock domain will always
+remain on and hence, this will break low-power modes. The EMU clock domain only
+support the SW_WKUP and HW_AUTO transition modes (for more details refer to the
+OMAP4430 TRM) and power down the EMU power domain we need to place the EMU
+clock domain back into the HW_AUTO mode. This can be accomplished by setting
+the CLKDM_CAN_FORCE_SLEEP flag, which for an OMAP4 device will enable the
+HW_AUTO mode.
 
-For OMAP4 devices, all CLKDMs support HW_AUTO and therefore we can place the
-CLKDMs in the HW_AUTO state instead of the SW_SLEEP mode. Hence, we do not
-need to use the SW_SLEEP mode. With regard to NO_SLEEP and SW_WKUP it is
-preferred to use SW_WKUP mode if the CLKDM supports it and so use this mode
-instead of NO_SLEEP where possible.
-
-For a software perspective the above 4 modes are represented by the following
-flags to indicate what modes are supported by each of the CLKDMs.
-
-CLKDM_CAN_DISABLE_AUTO	--> NO_SLEEP
-CLKDM_CAN_ENABLE_AUTO	--> HW_AUTO
-CLKDM_CAN_FORCE_SLEEP	--> SW_SLEEP
-CLKDM_CAN_FORCE_WAKEUP	--> SW_WKUP
-
-By eliminating the SW_SLEEP mode the the mapping of the flags for OMAP4 devices
-can becomes ...
-
-CLKDM_CAN_DISABLE_AUTO	--> NO_SLEEP
-CLKDM_CAN_ENABLE_AUTO	--> HW_AUTO
-CLKDM_CAN_FORCE_SLEEP	--> HW_AUTO
-CLKDM_CAN_FORCE_WAKEUP	--> SW_WKUP
+Therefore, set the CLKDM_CAN_SWSUP flag for the EMU clock domain, which defined
+as follows.
 
 Cc: Ming Lei <ming.lei@canonical.com>
 Cc: Will Deacon <will.deacon@arm.com>
@@ -53,63 +39,23 @@ Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 
-Reviewed-by: Benoit Cousson <b-cousson@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain44xx.c |    7 +++++--
- arch/arm/mach-omap2/cminst44xx.c      |   14 --------------
- 2 files changed, 5 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain44xx.c b/arch/arm/mach-omap2/clockdomain44xx.c
-index 4f04dd1..99ce556 100644
---- a/arch/arm/mach-omap2/clockdomain44xx.c
-+++ b/arch/arm/mach-omap2/clockdomain44xx.c
-@@ -70,7 +70,7 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index c534258..ba74006 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
+ 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
+-	.flags		  = CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
++	.flags		  = CLKDM_CAN_SWSUP,
+ };
  
- static int omap4_clkdm_sleep(struct clockdomain *clkdm)
- {
--	omap4_cminst_clkdm_force_sleep(clkdm->prcm_partition,
-+	omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
- 					clkdm->cm_inst, clkdm->clkdm_offs);
- 	return 0;
- }
-@@ -90,7 +90,10 @@ static void omap4_clkdm_allow_idle(struct clockdomain *clkdm)
- 
- static void omap4_clkdm_deny_idle(struct clockdomain *clkdm)
- {
--	omap4_cminst_clkdm_disable_hwsup(clkdm->prcm_partition,
-+	if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
-+		omap4_clkdm_wakeup(clkdm);
-+	else
-+		omap4_cminst_clkdm_disable_hwsup(clkdm->prcm_partition,
- 					clkdm->cm_inst, clkdm->clkdm_offs);
- }
- 
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 8c86d29..7990dff 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -235,20 +235,6 @@ void omap4_cminst_clkdm_disable_hwsup(u8 part, s16 inst, u16 cdoffs)
- }
- 
- /**
-- * omap4_cminst_clkdm_force_sleep - try to put a clockdomain into idle
-- * @part: PRCM partition ID that the clockdomain registers exist in
-- * @inst: CM instance register offset (*_INST macro)
-- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
-- *
-- * Put a clockdomain referred to by (@part, @inst, @cdoffs) into idle
-- * No return value.
-- */
--void omap4_cminst_clkdm_force_sleep(u8 part, s16 inst, u16 cdoffs)
--{
--	_clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
--}
--
--/**
-  * omap4_cminst_clkdm_force_sleep - try to take a clockdomain out of idle
-  * @part: PRCM partition ID that the clockdomain registers exist in
-  * @inst: CM instance register offset (*_INST macro)
+ static struct clockdomain l3_dma_44xx_clkdm = {
 -- 
 1.7.9.5
