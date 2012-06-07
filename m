@@ -1,42 +1,51 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 7 Jun 2012 09:25:03 +0200
-Subject: [PATCH 1/4] ARM: at91: at91 based machines specify their own
- irq handler at run time
-In-Reply-To: <20120606094748.GA26504@taskit.de>
-References: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
- <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
- <20120606094748.GA26504@taskit.de>
-Message-ID: <4FD0574F.6000200@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jun 2012 00:31:13 -0700
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <20120607061308.25532.19767.stgit@dusk>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061308.25532.19767.stgit@dusk>
+Message-ID: <20120607073112.GX12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+* Paul Walmsley <paul@pwsan.com> [120606 23:26]:
+> From: Tero Kristo <t-kristo@ti.com>
+> 
+> Add a custom reset function for the usb_host_fs/fsusb IP block, and
+> connect it to the OMAP4 FSUSB block.
+> 
+> This is the first of two fixes required to get rid of the boot
+> warning:
+> 
+> omap_hwmod: usb_host_fs: _wait_target_disable failed
+> 
+> and to allow the module to idle.
+> 
+> It may be necessary to use this reset method for OMAP2xxx SoCs as
+> well; this is left for a future patch.
 
-On 06/06/2012 11:47 AM, Christian Glindkamp wrote:
-> On 2012-06-05 16:47, ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches<ludovic.desroches@atmel.com>
->>
->> SOC_AT91SAM9 selects MULTI_IRQ_HANDLER in order to let machines specify their
->> own IRQ handler at run time.
->>
->> Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
->> ---
->>   arch/arm/mach-at91/board-cpu9krea.c           |    1 +
->>   arch/arm/mach-at91/board-sam9g20ek.c          |    1 +
->>   arch/arm/mach-at91/board-sam9261ek.c          |    1 +
->>   arch/arm/mach-at91/board-stamp9g20.c          |    1 +
->>   arch/arm/mach-at91/board-usb-a926x.c          |    1 +
->
-> At least these board files contain more than one MACHINE_START, but
-> you only update the last one. Same for the third patch.
+Here too I think driver like features like this should live in the
+driver init for omap OHCI driver. In the likely case that FS OHCI is
+not in use on the board, the OHCI glue can just reset it.
+ 
+> +/* HCCOMMANDSTATUS: the register offset of the HCCOMMANDSTATUS register */
+> +#define HCCOMMANDSTATUS			0x0008
+> +
+> +/* HCCOMMANDSTATUS_HCR: the bitmask of the host controller reset flag */
+> +#define HCCOMMANDSTATUS_HCR_MASK	(1 << 0)
 
-Thanks for your feedback, I'll correct it in V2.
+I don't think the bus layer code should need to know anything about driver
+specific registers.
 
->
-> I have not looked at the rest of the patch.
->
->
+> +	omap_hwmod_write(HCCOMMANDSTATUS_HCR_MASK, oh, HCCOMMANDSTATUS);
+> +
+> +	omap_test_timeout(!(omap_hwmod_read(oh, HCCOMMANDSTATUS)
+> +			    & HCCOMMANDSTATUS_HCR_MASK),
+> +			  MAX_MODULE_SOFTRESET_WAIT, c);
+> +
 
-Regards
+These should be accessed by the driver in a standard way after ioremapping
+the device.
 
-Ludovic
+Tony
