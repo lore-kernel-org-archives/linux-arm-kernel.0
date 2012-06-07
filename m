@@ -1,98 +1,52 @@
 From: rubini@gnudd.com (Alessandro Rubini)
-Date: Thu, 7 Jun 2012 15:52:38 +0200
-Subject: [PATCH V2 1/3] i2c-nomadik: move header to
- <linux/platform_data/i2c-nomadik.h>
-In-Reply-To: <cover.1339076448.git.rubini@gnudd.com>
-References: <cover.1339076448.git.rubini@gnudd.com>
-Message-ID: <52f48baafe44690c5bbcd36befb616d3df609e8b.1339076448.git.rubini@gnudd.com>
+Date: Thu, 7 Jun 2012 15:52:24 +0200
+Subject: [PATCH V2 0/3] i2c-nomadik changes
+Message-ID: <cover.1339076448.git.rubini@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header and driver are only used by arm/mach-u8500 (and potentially
-arm/mach-nomadik), but the STA2X11 I/O Hub exports on PCIe a number of
-devices, including i2c-nomadik.  This patch allows compilation of the
-driver under x86.
+V2:
+	- use linux/platform_data/i2c-nomadik.h not linux/i2c-nomadik.h
+	- format patch with -M
+	- added lee jones to the Cc: list (for device tree support)
+	- minor rewording of the commit messages
 
-Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
----
+Slightly edited for typos explanation, otherwise same as V1:
+
+The patch set turns a platform device into an amba device. Its users,
+i.e. mach-ux500, are converted too.  The set has no external
+dependencies, although is has no visible effect until other patches
+are accepted.
+
+Reasoning:
+
+In the STA2X11 I/O hub we are exporting a number of AMBA peripherals
+to the PCI world. By using a generic pci-amba driver there is no further
+code for each device, provided they are already registered under the
+AMBA bus.  I already submitted the generic bridge and I'm waiting for
+feedback on it (https://lkml.org/lkml/2012/5/28/194).
+
+Status of this patch set:
+
+The users of the driver (i.e. mach-ux500) compile properly, but I
+couldn't test on any board.  The driver, as is, works on x86 under the
+PCI bridge, with the not-yet-upstream clock framework and platform
+data for sta2x11 devices.  However, this set is not introducing any
+dead code as it only adds more flexibility.  Most of the patch is
+just two renames: s/platform_device/amba_device/ and s/pdev/adev/ .
+
+Alessandro Rubini (3):
+  i2c-nomadik: move header to <linux/platform_data/i2c-nomadik.h>
+  i2c-nomadik: turn the platform driver to an amba driver
+  i2c-nomadik: depend on ARM_AMBA, not PLAT_NOMADIK
+
  arch/arm/mach-ux500/board-mop500.c                 |    2 +-
- arch/arm/mach-ux500/devices-common.h               |    2 +-
- drivers/i2c/busses/i2c-nomadik.c                   |    3 +--
- .../linux/platform_data/i2c-nomadik.h              |    6 +++---
- 4 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/mach-ux500/devices-common.h               |   23 +---
+ drivers/i2c/busses/Kconfig                         |    5 +-
+ drivers/i2c/busses/i2c-nomadik.c                   |  140 ++++++++++----------
+ .../linux/platform_data/i2c-nomadik.h              |    6 +-
+ 5 files changed, 80 insertions(+), 96 deletions(-)
  rename arch/arm/plat-nomadik/include/plat/i2c.h => include/linux/platform_data/i2c-nomadik.h (91%)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9c74ac5..0bf24bb 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/i2c.h>
-+#include <linux/platform_data/i2c-nomadik.h>
- #include <linux/gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
-@@ -39,7 +40,6 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
- 
--#include <plat/i2c.h>
- #include <plat/ste_dma40.h>
- #include <plat/gpio-nomadik.h>
- 
-diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index 6e47065..23cf734 100644
---- a/arch/arm/mach-ux500/devices-common.h
-+++ b/arch/arm/mach-ux500/devices-common.h
-@@ -12,7 +12,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/sys_soc.h>
- #include <linux/amba/bus.h>
--#include <plat/i2c.h>
-+#include <linux/platform_data/i2c-nomadik.h>
- #include <mach/crypto-ux500.h>
- 
- struct spi_master_cntlr;
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 5267ab9..752f1fd 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -23,8 +23,7 @@
- #include <linux/io.h>
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
--
--#include <plat/i2c.h>
-+#include <linux/platform_data/i2c-nomadik.h>
- 
- #define DRIVER_NAME "nmk-i2c"
- 
-diff --git a/arch/arm/plat-nomadik/include/plat/i2c.h b/include/linux/platform_data/i2c-nomadik.h
-similarity index 91%
-rename from arch/arm/plat-nomadik/include/plat/i2c.h
-rename to include/linux/platform_data/i2c-nomadik.h
-index 8ba70ff..c2303c3 100644
---- a/arch/arm/plat-nomadik/include/plat/i2c.h
-+++ b/include/linux/platform_data/i2c-nomadik.h
-@@ -5,8 +5,8 @@
-  * it under the terms of the GNU General Public License version 2, as
-  * published by the Free Software Foundation.
-  */
--#ifndef __PLAT_I2C_H
--#define __PLAT_I2C_H
-+#ifndef __PDATA_I2C_NOMADIK_H
-+#define __PDATA_I2C_NOMADIK_H
- 
- enum i2c_freq_mode {
- 	I2C_FREQ_MODE_STANDARD,		/* up to 100 Kb/s */
-@@ -36,4 +36,4 @@ struct nmk_i2c_controller {
- 	enum i2c_freq_mode	sm;
- };
- 
--#endif	/* __PLAT_I2C_H */
-+#endif	/* __PDATA_I2C_NOMADIK_H */
 -- 
 1.7.7.2
