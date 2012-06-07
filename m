@@ -1,27 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jun 2012 12:06:10 +0100
-Subject: [CFT] OMAP patches
-In-Reply-To: <E1Sca9b-0003ax-4E@rmk-PC.arm.linux.org.uk>
-References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
-Message-ID: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Jun 2012 13:06:49 +0200
+Subject: [PATCH] pinctrl: sirf: mark of_device_id match table as
+ __devinitconst
+In-Reply-To: <1337569142-18756-1-git-send-email-Barry.Song@csr.com>
+References: <1337569142-18756-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CACRpkdZcnWO3YL2+hVUpuRh-psZHq61oAOh5sp9A91UJ732hAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And the last set - the OMAP patches.
+On Mon, May 21, 2012 at 4:59 AM, Barry Song <Barry.Song@csr.com> wrote:
 
- Documentation/feature-removal-schedule.txt |   11 +
- arch/arm/mach-omap1/board-h2-mmc.c         |    1 -
- arch/arm/mach-omap1/board-h3-mmc.c         |    1 -
- arch/arm/mach-omap1/board-nokia770.c       |    1 -
- arch/arm/mach-omap2/board-n8x0.c           |    1 -
- arch/arm/mach-omap2/hsmmc.c                |    1 -
- arch/arm/plat-omap/include/plat/mmc.h      |    2 -
- drivers/dma/Kconfig                        |    6 +
- drivers/dma/Makefile                       |    1 +
- drivers/dma/omap-dma.c                     |  522 ++++++++++++++++++++++++++++
- drivers/mmc/host/omap.c                    |  368 +++++++++-----------
- drivers/mmc/host/omap_hsmmc.c              |  202 ++++++------
- drivers/mtd/nand/omap2.c                   |  106 +++---
- drivers/spi/spi-omap2-mcspi.c              |  229 +++++++------
- include/linux/omap-dma.h                   |   24 ++
- 15 files changed, 1010 insertions(+), 466 deletions(-)
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+> ?drivers/pinctrl/pinctrl-sirf.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+> index 6b3534c..5816cc3 100644
+> --- a/drivers/pinctrl/pinctrl-sirf.c
+> +++ b/drivers/pinctrl/pinctrl-sirf.c
+> @@ -1192,7 +1192,7 @@ out_no_gpio_remap:
+> ? ? ? ?return ret;
+> ?}
+>
+> -static const struct of_device_id pinmux_ids[] ?= {
+> +static const struct of_device_id pinmux_ids[] __devinitconst = {
+> ? ? ? ?{ .compatible = "sirf,prima2-gpio-pinmux" },
+> ? ? ? ?{}
+> ?};
+
+Hm Uwe poked me about this change, Barry are you sure the DT
+ID table can be __devinitconst? I would think so, but better check
+again.
+
+Yours,
+Linus Walleij
