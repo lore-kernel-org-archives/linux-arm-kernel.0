@@ -1,47 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 00:19:00 -0700
-Subject: [PATCH 02/11] ARM: OMAP4+: AESS: enable internal auto-gating
- during initial setup
-In-Reply-To: <20120607061306.25532.59488.stgit@dusk>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061306.25532.59488.stgit@dusk>
-Message-ID: <20120607071900.GW12766@atomide.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Thu, 7 Jun 2012 09:25:03 +0200
+Subject: [PATCH 1/4] ARM: at91: at91 based machines specify their own
+ irq handler at run time
+In-Reply-To: <20120606094748.GA26504@taskit.de>
+References: <1338907664-24646-1-git-send-email-ludovic.desroches@atmel.com>
+ <1338907664-24646-2-git-send-email-ludovic.desroches@atmel.com>
+ <20120606094748.GA26504@taskit.de>
+Message-ID: <4FD0574F.6000200@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120606 23:26]:
-> Enable the AESS auto-gating control bit during AESS hwmod setup.  This
-> fixes the following boot warning on OMAP4:
-> 
-> omap_hwmod: aess: _wait_target_disable failed
-> 
-> Without this patch, the AESS IP block does not indicate to the PRCM
-> that it is idle after it is reset.  This prevents some types of SoC
-> power management until something sets the auto-gating control bit.
+Hi Christian,
 
-I don't like the idea of having custom platform init code for every driver
-to reset it, let's see if there's some better way to deal with stuff like
-this.
+On 06/06/2012 11:47 AM, Christian Glindkamp wrote:
+> On 2012-06-05 16:47, ludovic.desroches at atmel.com wrote:
+>> From: Ludovic Desroches<ludovic.desroches@atmel.com>
+>>
+>> SOC_AT91SAM9 selects MULTI_IRQ_HANDLER in order to let machines specify their
+>> own IRQ handler at run time.
+>>
+>> Signed-off-by: Ludovic Desroches<ludovic.desroches@atmel.com>
+>> ---
+>>   arch/arm/mach-at91/board-cpu9krea.c           |    1 +
+>>   arch/arm/mach-at91/board-sam9g20ek.c          |    1 +
+>>   arch/arm/mach-at91/board-sam9261ek.c          |    1 +
+>>   arch/arm/mach-at91/board-stamp9g20.c          |    1 +
+>>   arch/arm/mach-at91/board-usb-a926x.c          |    1 +
+>
+> At least these board files contain more than one MACHINE_START, but
+> you only update the last one. Same for the third patch.
 
-It seems that most/many IP blocks need their custom reset hacks, and it's
-not limited to just few instances?
+Thanks for your feedback, I'll correct it in V2.
 
-Maybe we can distribute custom hacks like this to the drivers? If there is
-no generic way to reset some IP block, then the driver should pass it's
-whatever workaround bits/methdod/ to the bus level (hwmod) code during the
-init rather than piling up all the possible hacks to the bus level code.
+>
+> I have not looked at the rest of the patch.
+>
+>
 
-This way the driver init can still do the bus level reset during it's init,
-and bail out after that if the module is not in use for the board in question.
-That is already being flagged in device tree with status = "disable" flag,
-and can also passed in platform data if necessary.
+Regards
 
-AFAIK there's no need to reset the IP blocks before the driver init, it's
-really needed for PM. So it's not needed early on, and it's OK to require
-running  the driver init for driver modules that are not in use to reset
-them properly. After all, the hardware is on the device, even if it's not
-being used.
-
-Regards,
-
-Tony
+Ludovic
