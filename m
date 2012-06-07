@@ -1,135 +1,136 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 07 Jun 2012 00:13:10 -0600
-Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+Date: Thu, 07 Jun 2012 00:13:07 -0600
+Subject: [PATCH 02/11] ARM: OMAP4+: AESS: enable internal auto-gating during
+ initial setup
 In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
 References: <20120607060901.25532.68354.stgit@dusk>
-Message-ID: <20120607061309.25532.13430.stgit@dusk>
+Message-ID: <20120607061306.25532.59488.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin discovered that commit c8d82ff68fb6873691536cf33021977efbf5593c
-("ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod
-database") broke CORE idle on OMAP3.  This prevents device low power
-states.
+Enable the AESS auto-gating control bit during AESS hwmod setup.  This
+fixes the following boot warning on OMAP4:
 
-The root cause is that the 32K sync timer IP block does not support
-smart-idle mode[1], and so the hwmod code keeps the IP block in
-no-idle mode while it is active.  This in turn prevents the WKUP
-clockdomain from transitioning to idle.  There is a hardcoded sleep
-dependency that prevents the CORE_L3 and CORE_CM clockdomains from
-transitioning to idle when the WKUP clockdomain is active[2], so the
-chip cannot enter any device low power states.
+omap_hwmod: aess: _wait_target_disable failed
 
-It turns out that there is no need to take the 32k sync timer out of
-idle.  The IP block itself probably does not have any native idle
-handling at all, due to its simplicity.  Furthermore, the PRCM will
-never request target idle for this IP block while the kernel is
-running, due to the sleep dependency that prevents the WKUP
-clockdomain from idling while the CORE_L3 clockdomain is active.  So
-we can safely leave the 32k sync timer in target-no-idle mode, even
-while we continue to access it.
+Without this patch, the AESS IP block does not indicate to the PRCM
+that it is idle after it is reset.  This prevents some types of SoC
+power management until something sets the auto-gating control bit.
 
-This workaround is implemented by programming the force-idle mode for
-any IP block that only supports the force-idle and no-idle modes.  If
-an IP block is ever released that doesn't support smart-idle and
-requires no-idle mode to be programmed while it's in use, we'll have
-to change this behavior.
-
-Another theoretically clean fix for this problem would be to implement
-PM runtime-based control for 32k sync timer accesses.  These PM
-runtime calls would need to located in a custom clocksource, since the
-32k sync timer is currently used as an MMIO clocksource.  But in
-practice, there would be little benefit to doing so; and there would
-be some cost, due to the addition of unnecessary lines of code and the
-additional CPU overhead of the PM runtime and hwmod code - unnecessary
-in this case.
-
-Another possible fix would have been to modify the pm34xx.c code to
-force the IP block idle before entering WFI.  But this would not have
-been an acceptable approach: we are trying to remove this type of
-centralized IP block idle control from the PM code.
-
-This patch is effectively a workaround for a hardware problem.  A
-better hardware approach would have been to implement a smart-idle
-target idle mode for this IP block.  The smart-idle mode in this case
-would behave identically to the force-idle mode.  We consider the
-force-idle and no-idle target idle mode settings to be intended for
-debugging and automatic idle management bug workarounds only[4].
-
-This patch is a collaboration between Kevin Hilman <khilman@ti.com>
-and Paul Walmsley <paul@pwsan.com>.
-
-References:
-
-1. Table 16-96 "REG_32KSYNCNT_SYSCONFIG" of the OMAP34xx TRM Rev. ZU
-   (SWPU223U), available from:
-   http://www.ti.com/pdfs/wtbu/OMAP34x_ES3.1.x_PUBLIC_TRM_vzU.zip
-
-2. Table 4-72 "Sleep Dependencies" of the OMAP34xx TRM Rev. ZU
-   (SWPU223U)
-
-3. ibid.
-
-4. Section 3.1.1.1.2 "Module-Level Clock Management" of The
-   OMAP4430 TRM Rev. vAA (SWPU231AA).
-
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   32 ++++++++++++++++++++++++++------
- 1 file changed, 26 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/Makefile               |    2 +
+ arch/arm/mach-omap2/aess.c                 |   55 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/common.h               |    2 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +
+ 4 files changed, 60 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-omap2/aess.c
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b0d3064..6b4ae31 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1124,10 +1124,12 @@ static struct omap_hwmod_addr_space * __init _find_mpu_rt_addr_space(struct omap
-  * _enable_sysc - try to bring a module out of idle via OCP_SYSCONFIG
-  * @oh: struct omap_hwmod *
-  *
-- * If module is marked as SWSUP_SIDLE, force the module out of slave
-- * idle; otherwise, configure it for smart-idle.  If module is marked
-- * as SWSUP_MSUSPEND, force the module out of master standby;
-- * otherwise, configure it for smart-standby.  No return value.
-+ * Ensure that the OCP_SYSCONFIG register for the IP block represented
-+ * by @oh is set to indicate to the PRCM that the IP block is active.
-+ * Usually this means placing the module into smart-idle mode and
-+ * smart-standby, but if there is a bug in the automatic idle handling
-+ * for the IP block, it may need to be placed into the force-idle or
-+ * no-idle variants of these modes.  No return value.
-  */
- static void _enable_sysc(struct omap_hwmod *oh)
- {
-@@ -1141,8 +1143,26 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	sf = oh->class->sysc->sysc_flags;
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index fa742f3..bc2ac4f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -4,7 +4,7 @@
  
- 	if (sf & SYSC_HAS_SIDLEMODE) {
--		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
--			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
-+		if (oh->flags & HWMOD_SWSUP_SIDLE) {
-+			/*
-+			 * IP blocks without smart idle should be left
-+			 * in force-idle.  Currently this only applies
-+			 * to 32k sync "timer" which is guaranteed to
-+			 * be accessible when the kernel is running.
-+			 * HWMOD_SWSUP_IDLE must also be set on these
-+			 * IP blocks to indicate a hardware problem.
-+			 * XXX Not an ideal workaround.
-+			 */
-+			if (oh->class->sysc->idlemodes &
-+			    (SIDLE_NO | SIDLE_FORCE) &&
-+			    !(oh->class->sysc->idlemodes &
-+			      (SIDLE_SMART || SIDLE_SMART_WKUP)))
-+				idlemode = HWMOD_IDLEMODE_FORCE;
-+			else
-+				idlemode = HWMOD_IDLEMODE_NO;
-+		} else {
-+			idlemode = HWMOD_IDLEMODE_SMART;
-+		}
- 		_set_slave_idlemode(oh, idlemode, &v);
- 	}
+ # Common support
+ obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
+-	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o
++	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o aess.o
  
+ omap-2-3-common				= irq.o sdrc.o
+ hwmod-common				= omap_hwmod.o \
+diff --git a/arch/arm/mach-omap2/aess.c b/arch/arm/mach-omap2/aess.c
+new file mode 100644
+index 0000000..d5ca3d2
+--- /dev/null
++++ b/arch/arm/mach-omap2/aess.c
+@@ -0,0 +1,55 @@
++/*
++ * AESS IP block integration
++ *
++ * Copyright (C) 2012 Texas Instruments, Inc.
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#include <linux/kernel.h>
++
++#include <plat/omap_hwmod.h>
++
++#include "common.h"
++
++/*
++ * AESS_AUTO_GATING_ENABLE_OFFSET: offset in bytes of the AESS IP
++ *     block's AESS_AUTO_GATING_ENABLE__1 register from the IP block's
++ *     base address
++ */
++#define AESS_AUTO_GATING_ENABLE_OFFSET				0x07c
++
++/* Register bitfields in the AESS_AUTO_GATING_ENABLE__1 register */
++#define AESS_AUTO_GATING_ENABLE_SHIFT				0
++
++/**
++ * omap_aess_preprogram - enable AESS internal autogating
++ * @oh: struct omap_hwmod *
++ *
++ * Since the AESS will not IdleAck to the PRCM until its internal
++ * autogating is enabled, we must enable autogating during the initial
++ * AESS hwmod setup.  Returns 0.
++ */
++int omap_aess_preprogram(struct omap_hwmod *oh)
++{
++	u32 v;
++
++	/* Set AESS_AUTO_GATING_ENABLE__1.ENABLE to allow idle entry */
++	v = 1 << AESS_AUTO_GATING_ENABLE_SHIFT;
++	omap_hwmod_write(v, oh, AESS_AUTO_GATING_ENABLE_OFFSET);
++
++	return 0;
++}
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index be9dfd1..d9b8b06 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -304,5 +304,7 @@ extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ struct omap2_hsmmc_info;
+ extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
+ 
++extern int omap_aess_preprogram(struct omap_hwmod *oh);
++
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 950454a..4a2f2cc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -39,6 +39,7 @@
+ #include "prm44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "wd_timer.h"
++#include "common.h"
+ 
+ /* Base offset for all OMAP4 interrupts external to MPUSS */
+ #define OMAP44XX_IRQ_GIC_START	32
+@@ -313,6 +314,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_aess_sysc = {
+ static struct omap_hwmod_class omap44xx_aess_hwmod_class = {
+ 	.name	= "aess",
+ 	.sysc	= &omap44xx_aess_sysc,
++	.setup_preprogram = omap_aess_preprogram,
+ };
+ 
+ /* aess */
