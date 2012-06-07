@@ -1,15 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jun 2012 11:45:27 +0100
-Subject: [CFT] PL08x patches
-In-Reply-To: <E1Sca9b-0003ax-4E@rmk-PC.arm.linux.org.uk>
-References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
-Message-ID: <20120607104527.GA15973@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jun 2012 03:52:28 -0700
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061308.25532.19767.stgit@dusk>
+ <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com>
+ <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
+Message-ID: <20120607105228.GC12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's the PL08x patches.
+* Paul Walmsley <paul@pwsan.com> [120607 03:24]:
+> On Thu, 7 Jun 2012, Tony Lindgren wrote:
+> 
+> > * Paul Walmsley <paul@pwsan.com> [120607 00:44]:
+> > > On Thu, 7 Jun 2012, Tony Lindgren wrote:
+> > > 
+> > > > Here too I think driver like features like this should live in the
+> > > > driver init for omap OHCI driver. In the likely case that FS OHCI is
+> > > > not in use on the board, the OHCI glue can just reset it.
+> > > 
+> > > What if the driver is not compiled into the kernel, but instead is built 
+> > > as a loadable module?
+> > 
+> > You can still have a core piece of the driver that's always built in, such
+> > as omap-ohci-common. But it should live under drivers, not in the bus level
+> > code. Or you can insmod/rmmod it to reset things properly.
+> 
+> Do you know of any device drivers that do this now, with a core built-in 
+> piece separate from a dynamically loadable part?
 
- drivers/dma/Kconfig        |    1 +
- drivers/dma/amba-pl08x.c   |  941 ++++++++++++++++++++++----------------------
- include/linux/amba/pl08x.h |  156 +-------
- 3 files changed, 482 insertions(+), 616 deletions(-)
+Hmm yeah good point, only driver frameworks tend to do that. It would require
+the module registering with the core driver.
+ 
+> Seems like it would be tricky to avoid linking in the entire driver, due 
+> to the symbol dependencies.  Either that, or an extra, largely useless, 
+> layer of indirection would be needed in the shim layer.
+
+Yes probably better approach would be to only build in the reset and idle
+part of the driver in the minimal case. And that too can get messy as the
+makefiles may not even be included.
+
+Until we have something generic in place to deal with stuff like unused driver
+reset and idle, how about we set up the driver specific reset parts as inline
+functions in the driver header?
+
+That way the hwmod code can include those functions using the driver register
+defines. Something like:
+
+static inline int xyz_driver_reset(void __iomem *base, int flags)
+{
+	...
+}
+
+Then instead of having a separate platform init file for each driver,
+we could just have a list of reset functions:
+
+static int hwmod_xyz_driver_reset(void __iomem *base, int flags)
+{
+	int res;
+
+	/* do bus related reset here */
+	...
+
+	/* call the driver reset */
+	res = xyz_driver_reset(base, flags)
+
+
+	/* do more bus related reset here */
+	...
+}
+
+Regards,
+
+Tony
