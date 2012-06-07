@@ -1,37 +1,21 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Jun 2012 16:22:10 -0500
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain transitioning
- to OFF when in-use
+Date: Thu, 7 Jun 2012 16:22:06 -0500
+Subject: [PATCH V2 04/10] ARM: OMAP4430: Create PMU device via HWMOD
 In-Reply-To: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
 References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+Message-ID: <1339104132-26885-5-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the OMAP4 devices the EMU power domain is configured in hardware so that its
-next power state is OFF. This cannot be overriden by software and this means
-that when ever the EMU clock domain automatically transitions to the idle
-state, the power domain will transition to OFF. Therefore, when the EMU power
-domain is in-use, we need to prevent the clock domain from transitioning to
-the idle state. This can be accomplished by placing the EMU clock domain in the
-SW_WKUP mode versus the HW_AUTO mode.
+From: Ming Lei <ming.lei@canonical.com>
 
-In the current software configuration of the EMU clock domain the flag
-CLKDM_CAN_ENABLE_AUTO is set and this is allowing the clock domain to
-automatically transition to the idle state via hardware control (by enabling
-the HW_AUTO mode). To avoid this, disable the CLKDM_CAN_ENABLE_AUTO flag for
-the EMU clock domain.
+For OMAP4430 PMU events are routed to the CPU via the cross trigger interface
+(CTI) because there are no dedicated interrupts. In order to route the PMU
+events via the CTI IRQs, the following modules must be enabled:
 
-By removing the CLKDM_CAN_ENABLE_AUTO flag, the EMU clock domain will always
-remain on and hence, this will break low-power modes. The EMU clock domain only
-support the SW_WKUP and HW_AUTO transition modes (for more details refer to the
-OMAP4430 TRM) and power down the EMU power domain we need to place the EMU
-clock domain back into the HW_AUTO mode. This can be accomplished by setting
-the CLKDM_CAN_FORCE_SLEEP flag, which for an OMAP4 device will enable the
-HW_AUTO mode.
+        l3_instr, l3_main_3, debugss
 
-Therefore, set the CLKDM_CAN_SWSUP flag for the EMU clock domain, which defined
-as follows.
+Therefore, build the arm-pmu device via these three HWMODs.
 
 Cc: Ming Lei <ming.lei@canonical.com>
 Cc: Will Deacon <will.deacon@arm.com>
@@ -39,23 +23,73 @@ Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/pmu.c |   46 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-index c534258..ba74006 100644
---- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-@@ -390,7 +390,7 @@ static struct clockdomain emu_sys_44xx_clkdm = {
- 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
- 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
- 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
--	.flags		  = CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
- };
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index 329e00c..b3b9306 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -48,10 +48,56 @@ static int __init omap2_init_pmu(void)
+ 	return 0;
+ }
  
- static struct clockdomain l3_dma_44xx_clkdm = {
++/*
++ * omap4430_init_pmu - creates and registers PMU platform device
++ *
++ * Uses OMAP HWMOD framework to create and register an ARM PMU device.
++ * Only supports OMAP4430 devices that require PMU interrupts to be
++ * routed to the interrupt controller via the coresight cross trigger
++ * interface (CTI). To route the interrpts via the coresight CTI module,
++ * the OMAP modules L3_MAIN_3, L3_INSTR and DEBUGSS need to be active.
++ */
++static int __init omap4430_init_pmu(void)
++{
++	int id = -1;
++	struct omap_hwmod *oh[3];
++	char *oh_name;
++	char *dev_name = "arm-pmu";
++
++	oh_name = "l3_main_3";
++	oh[0] = omap_hwmod_lookup(oh_name);
++	if (!oh[0]) {
++		pr_err("Could not look up %s hwmod\n", oh_name);
++		return -ENODEV;
++	}
++	oh_name = "l3_instr";
++	oh[1] = omap_hwmod_lookup(oh_name);
++	if (!oh[1]) {
++		pr_err("Could not look up %s hwmod\n", oh_name);
++		return -ENODEV;
++	}
++	oh_name = "debugss";
++	oh[2] = omap_hwmod_lookup(oh_name);
++	if (!oh[2]) {
++		pr_err("Could not look up %s hwmod\n", oh_name);
++		return -ENODEV;
++	}
++
++	omap_pmu_dev = omap_device_build_ss(dev_name, id, oh, 3, NULL,
++				0, NULL, 0, 0);
++	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
++				dev_name);
++
++	return 0;
++}
++
+ static int __init omap_init_pmu(void)
+ {
++
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return omap2_init_pmu();
++	if (cpu_is_omap443x())
++		return omap4430_init_pmu();
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
