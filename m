@@ -1,87 +1,58 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 7 Jun 2012 18:15:18 +0530
-Subject: [CFT 01/11] dmaengine: add OMAP DMA engine driver
-In-Reply-To: <CANfBPZ_q97M4k8c8+7rBOpuBv99gfzNA1Q-SLesGP8c0AayBpw@mail.gmail.com>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaXw-0003tR-U8@rmk-PC.arm.linux.org.uk>
- <CANfBPZ_q97M4k8c8+7rBOpuBv99gfzNA1Q-SLesGP8c0AayBpw@mail.gmail.com>
-Message-ID: <CANfBPZ-7ideEWFmzSh1HujcLoA+x7GHORx+wBVAMm71Ctt4idg@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 07 Jun 2012 11:41:02 +0100
+Subject: [CFT 2/3] dmaengine: virt-dma: vchan_find_desc()
+In-Reply-To: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
+References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
+Message-ID: <E1Sca9G-0003at-Mj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2012 at 6:10 PM, S, Venkatraman <svenkatr@ti.com> wrote:
-> On Thu, Jun 7, 2012 at 4:36 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
->> Tested-by: Tony Lindgren <tony@atomide.com>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->> ?drivers/dma/Kconfig ? ? ?| ? ?6 +
->> ?drivers/dma/Makefile ? ? | ? ?1 +
->> ?drivers/dma/omap-dma.c ? | ?522 ++++++++++++++++++++++++++++++++++++++++++++++
->> ?include/linux/omap-dma.h | ? 24 ++
->> ?4 files changed, 553 insertions(+), 0 deletions(-)
->> ?create mode 100644 drivers/dma/omap-dma.c
->> ?create mode 100644 include/linux/omap-dma.h
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index eb2b60e..8be3bf6 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -261,6 +261,12 @@ config DMA_SA11X0
->> ? ? ? ? ?SA-1110 SoCs. ?This DMA engine can only be used with on-chip
->> ? ? ? ? ?devices.
->>
->> +config DMA_OMAP
->> + ? ? ? tristate "OMAP DMA support"
->> + ? ? ? depends on ARCH_OMAP
->> + ? ? ? select DMA_ENGINE
->> + ? ? ? select DMA_VIRTUAL_CHANNELS
->> +
->> ?config DMA_ENGINE
->> ? ? ? ?bool
->>
->> diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
->> index fc05f7d..ddc291a 100644
->> --- a/drivers/dma/Makefile
->> +++ b/drivers/dma/Makefile
->> @@ -29,3 +29,4 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
->> ?obj-$(CONFIG_AMBA_PL08X) += amba-pl08x.o
->> ?obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
->> ?obj-$(CONFIG_DMA_SA11X0) += sa11x0-dma.o
->> +obj-$(CONFIG_DMA_OMAP) += omap-dma.o
->> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
->> new file mode 100644
->> index 0000000..500bc71
->> --- /dev/null
->> +++ b/drivers/dma/omap-dma.c
->> @@ -0,0 +1,522 @@
->> +/*
->> + * OMAP DMAengine support
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#include <linux/dmaengine.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/err.h>
->> +#include <linux/init.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/list.h>
->> +#include <linux/module.h>
->> +#include <linux/omap-dma.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/spinlock.h>
->> +
->> +#include "virt-dma.h"
-> Russell,
-> ?I applied your entire series on 3.5-rc1 and build fails as it can't
-> find virt-dma.h
-> Perhaps a missed "git add" ?
->
-Ok I reread your messages again and these 11 are based on the generic
-dma-engine series.
+Add a function to find a descriptor within the depths of the
+virtualized DMA channel support.  Needed for tx_status functionality.
 
->> +#include <plat/dma.h>
->> +
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/virt-dma.c |   13 +++++++++++++
+ drivers/dma/virt-dma.h |    2 +-
+ 2 files changed, 14 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/dma/virt-dma.c b/drivers/dma/virt-dma.c
+index bd85b05..a8054fc 100644
+--- a/drivers/dma/virt-dma.c
++++ b/drivers/dma/virt-dma.c
+@@ -39,6 +39,19 @@ dma_cookie_t vchan_tx_submit(struct dma_async_tx_descriptor *tx)
+ }
+ EXPORT_SYMBOL_GPL(vchan_tx_submit);
+ 
++struct virt_dma_desc *vchan_find_desc(struct virt_dma_chan *vc,
++	dma_cookie_t cookie)
++{
++	struct virt_dma_desc *vd;
++
++	list_for_each_entry(vd, &vc->desc_issued, node)
++		if (vd->tx.cookie == cookie)
++			return vd;
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(vchan_find_desc);
++
+ /*
+  * This tasklet handles the completion of a DMA descriptor by
+  * calling its callback and freeing it.
+diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
+index 825bb96..44ec57e 100644
+--- a/drivers/dma/virt-dma.h
++++ b/drivers/dma/virt-dma.h
+@@ -40,8 +40,8 @@ static inline struct virt_dma_chan *to_virt_chan(struct dma_chan *chan)
+ }
+ 
+ void vchan_dma_desc_free_list(struct virt_dma_chan *vc, struct list_head *head);
+-
+ void vchan_init(struct virt_dma_chan *vc, struct dma_device *dmadev);
++struct virt_dma_desc *vchan_find_desc(struct virt_dma_chan *, dma_cookie_t);
+ 
+ /**
+  * vchan_tx_prep - prepare a descriptor
+-- 
+1.7.4.4
