@@ -1,32 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 7 Jun 2012 22:46:24 +0800
-Subject: [GIT PULL] imx fixes for v3.5-rc
-Message-ID: <20120607144622.GB3750@S2101-09.ap.freescale.net>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Thu,  7 Jun 2012 17:40:18 +0200
+Subject: [PATCH] ARM: bpf_jit: BPF_S_ANC_ALU_XOR_X support
+Message-ID: <1339083618-15009-1-git-send-email-mgherzan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+JIT support for the XOR operation introduced by the commit
+ffe06c17afbb.
 
-Please pull the following fixes for v3.5-rc.  Thanks.
+Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+---
+ arch/arm/net/bpf_jit_32.c |    5 +++++
+ arch/arm/net/bpf_jit_32.h |    4 ++++
+ 2 files changed, 9 insertions(+)
 
-Regards,
-Shawn
-
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
-
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
-
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fixes-for-3.5
-
-Fabio Estevam (2):
-      ARM: mx31: Add pinctrl_provide_dummies()
-      ARM: mx51: Add pinctrl_provide_dummies()
-
-Shawn Guo (1):
-      ARM: imx6: exit coherency when shutting down a cpu
-
- arch/arm/mach-imx/hotplug.c |   42 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-imx/mm-imx3.c |    2 ++
- arch/arm/mach-imx/mm-imx5.c |    2 ++
- 3 files changed, 45 insertions(+), 1 deletions(-)
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 62135849..c641fb6 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -762,6 +762,11 @@ b_epilogue:
+ 			update_on_xread(ctx);
+ 			emit(ARM_MOV_R(r_A, r_X), ctx);
+ 			break;
++		case BPF_S_ANC_ALU_XOR_X:
++			/* A ^= X */
++			update_on_xread(ctx);
++			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
++			break;
+ 		case BPF_S_ANC_PROTOCOL:
+ 			/* A = ntohs(skb->protocol) */
+ 			ctx->seen |= SEEN_SKB;
+diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
+index 99ae5e3..7fa2f7d 100644
+--- a/arch/arm/net/bpf_jit_32.h
++++ b/arch/arm/net/bpf_jit_32.h
+@@ -68,6 +68,8 @@
+ #define ARM_INST_CMP_R		0x01500000
+ #define ARM_INST_CMP_I		0x03500000
+ 
++#define ARM_INST_EOR_R		0x00200000
++
+ #define ARM_INST_LDRB_I		0x05d00000
+ #define ARM_INST_LDRB_R		0x07d00000
+ #define ARM_INST_LDRH_I		0x01d000b0
+@@ -132,6 +134,8 @@
+ #define ARM_CMP_R(rn, rm)	_AL3_R(ARM_INST_CMP, 0, rn, rm)
+ #define ARM_CMP_I(rn, imm)	_AL3_I(ARM_INST_CMP, 0, rn, imm)
+ 
++#define ARM_EOR_R(rd, rn, rm)	_AL3_R(ARM_INST_EOR, rd, rn, rm)
++
+ #define ARM_LDR_I(rt, rn, off)	(ARM_INST_LDR_I | (rt) << 12 | (rn) << 16 \
+ 				 | (off))
+ #define ARM_LDRB_I(rt, rn, off)	(ARM_INST_LDRB_I | (rt) << 12 | (rn) << 16 \
+-- 
+1.7.10
