@@ -1,35 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Jun 2012 16:35:48 +0200
-Subject: mach/io.h cleanup and removal question
-In-Reply-To: <4FD207C9.5010006@gmail.com>
-References: <20120608102040.GA26034@lunn.ch>
- <20120608114316.GC15555@n2100.arm.linux.org.uk>
- <4FD207C9.5010006@gmail.com>
-Message-ID: <20120608143548.GC26034@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  8 Jun 2012 16:12:19 +0100
+Subject: [PATCH v2 2/4] ARM: entry: don't bother with syscall tracing on
+ ret_from_fork path
+In-Reply-To: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1339168341-29850-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
-> > requirement to support a larger IO space.
-> 
-> Agreed. The next step is moving all i/o space to a fixed virtual address
-> and for this we want to make i/o windows 64K.
+ret_from_fork is setup for a freshly spawned child task via copy_thread,
+called from copy_process. The latter function clears TIF_SYSCALL_TRACE
+and also resets the child task's audit_context to NULL, meaning that
+there is little point invoking the system call tracing routines.
+Furthermore, getting hold of the syscall number is a complete pain and
+it looks like the current code doesn't even bother.
 
-O.K. I will submit a patch for this, so Orion5x at least boots. Maybe
-PCI will not work, but booting is a step forward.
+This patch removes the syscall tracing checks from ret_from_fork.
 
-> However, I think you may also have a problem with
-> ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
-> should really be 0 and then the __io() macro should add the virtual i/o
-> base address. However, Russell has mentioned previously that some chips
-> may not work correctly with i/o space at 0 (PCI bus addresses, not host).
-> 
-> Do you have cards with i/o that you can test or know what devices are
-> used with this platform?
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/entry-common.S |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-Humm, not sure. I have a Marvell Orion5x NAS reference design. It has
-a Mini-PCI slot on the bottom. So if i can find a card, i can test. I
-know i have some WiFi cards in my junk box, but i've no idea if these
-have i/o.
-
-     Andrew
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 4afed88..10911c9 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -95,13 +95,7 @@ ENDPROC(ret_to_user)
+ ENTRY(ret_from_fork)
+ 	bl	schedule_tail
+ 	get_thread_info tsk
+-	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
+ 	mov	why, #1
+-	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+-	beq	ret_slow_syscall
+-	mov	r1, sp
+-	mov	r0, #1				@ trace exit [IP = 1]
+-	bl	syscall_trace
+ 	b	ret_slow_syscall
+ ENDPROC(ret_from_fork)
+ 
+-- 
+1.7.4.1
