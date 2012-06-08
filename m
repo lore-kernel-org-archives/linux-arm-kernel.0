@@ -1,50 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jun 2012 10:02:00 +0100
-Subject: [CFT 01/11] dmaengine: add OMAP DMA engine driver
-In-Reply-To: <E1ScaXw-0003tR-U8@rmk-PC.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaXw-0003tR-U8@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120608090200.GA15831@n2100.arm.linux.org.uk>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 8 Jun 2012 11:02:31 +0200
+Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
+In-Reply-To: <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
+References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
+ <20120608072601.GD30137@pengutronix.de>
+ <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
+ <20120608084802.GS30400@pengutronix.de>
+ <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
+Message-ID: <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2012 at 12:06:32PM +0100, Russell King wrote:
-> Tested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/dma/Kconfig      |    6 +
->  drivers/dma/Makefile     |    1 +
->  drivers/dma/omap-dma.c   |  522 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/omap-dma.h |   24 ++
->  4 files changed, 553 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/dma/omap-dma.c
->  create mode 100644 include/linux/omap-dma.h
+Hi,
+I've checked this matter with a colleague and we have several reasons
+to doubt that the i.MX27 and the i.MX53 can share the same driver for
+their Video Processing Units (VPU):
 
-There is a bug in here which no one has spotted... I just noticed it.
+1. The VPU in the i.MX27 is a "codadx6" with support for H.264, H.263
+and MPEG4-Part2 [1]. Provided Freescale is using the same IP provider
+for i.MX53 and looking at the features that the VPU in this SoC
+supports (1080p resolution, VP8) we are probably dealing with a "coda
+9 series" [2].
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 500bc71..02eb2fd 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -130,14 +130,13 @@ static void omap_dma_callback(int ch, u16 status, void *data)
- 
- 	spin_lock_irqsave(&c->vc.lock, flags);
- 	d = c->desc;
--	if (!d)
--		return;
--
--	if (++c->sgidx < d->sglen) {
--		omap_dma_start_sg(c, d, c->sgidx);
--	} else {
--		omap_dma_start_desc(c);
--		vchan_cookie_complete(&d->vd);
-+	if (d) {
-+		if (++c->sgidx < d->sglen) {
-+			omap_dma_start_sg(c, d, c->sgidx);
-+		} else {
-+			omap_dma_start_desc(c);
-+			vchan_cookie_complete(&d->vd);
-+		}
- 	}
- 	spin_unlock_irqrestore(&c->vc.lock, flags);
- }
+2. An important part of the functionality for controlling the
+"codadx6" is implemented using software messages between the main CPU
+and the VPU, this means that a different firmware loaded in the VPU
+can substantially change the way it is handled. As previously stated,
+i.MX27 and i.MX53 have different IP blocks and because of this, those
+messages will be very different.
+
+For these reasons we suggest that we carry on developing different
+drivers for the i.MX27 and the i.MX53. Though it's true that both
+drivers could share some overhead given by the use of mem2mem
+framework, I don't think this is a good enough reason the merge them.
+
+By the way, driver for the VPU in the i.MX27 will be called
+"codadx6"[3], I suggest you call your driver "coda9" to avoid
+confusion.
+
+
+[1] http://www.chipsnmedia.com/product_search/product_view.php?part_idx=30&idx=48
+[2] http://www.chipsnmedia.com/product_search/product_view.php?part_idx=20&idx=53
+[3] https://github.com/jmartinc/video_visstrim/tree/mx27-codadx6/drivers/media/video/codadx6
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
