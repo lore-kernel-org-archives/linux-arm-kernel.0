@@ -1,110 +1,57 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 8 Jun 2012 13:32:27 +0200
-Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
-In-Reply-To: <20120608092343.GU30400@pengutronix.de>
-References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
- <20120608072601.GD30137@pengutronix.de>
- <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
- <20120608084802.GS30400@pengutronix.de>
- <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
- <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
- <20120608092343.GU30400@pengutronix.de>
-Message-ID: <CACKLOr1Q1yxbaMmrFVsw-h-SmS3H4q_R+KY=DgnjM5WjaDW9Cg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jun 2012 12:43:16 +0100
+Subject: mach/io.h cleanup and removal question
+In-Reply-To: <20120608102040.GA26034@lunn.ch>
+References: <20120608102040.GA26034@lunn.ch>
+Message-ID: <20120608114316.GC15555@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2012 11:23, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Jun 08, 2012 at 11:02:31AM +0200, javier Martin wrote:
->> Hi,
->> I've checked this matter with a colleague and we have several reasons
->> to doubt that the i.MX27 and the i.MX53 can share the same driver for
->> their Video Processing Units (VPU):
->>
->> 1. The VPU in the i.MX27 is a "codadx6" with support for H.264, H.263
->> and MPEG4-Part2 [1]. Provided Freescale is using the same IP provider
->> for i.MX53 and looking at the features that the VPU in this SoC
->> supports (1080p resolution, VP8) we are probably dealing with a "coda
->> 9 series" [2].
->>
->> 2. An important part of the functionality for controlling the
->> "codadx6" is implemented using software messages between the main CPU
->> and the VPU, this means that a different firmware loaded in the VPU
->> can substantially change the way it is handled. As previously stated,
->> i.MX27 and i.MX53 have different IP blocks and because of this, those
->> messages will be very different.
->>
->> For these reasons we suggest that we carry on developing different
->> drivers for the i.MX27 and the i.MX53. Though it's true that both
->> drivers could share some overhead given by the use of mem2mem
->> framework, I don't think this is a good enough reason the merge them.
->>
->> By the way, driver for the VPU in the i.MX27 will be called
->> "codadx6"[3], I suggest you call your driver "coda9" to avoid
->> confusion.
->
-> Well, our driver works on i.MX27 and i.MX5. Yes, it needs some
-> abstraction for different register layouts and different features, but
-> the cores behave sufficiently similar that it makes sense to share the
-> code in a single driver.
+On Fri, Jun 08, 2012 at 12:20:40PM +0200, Andrew Lunn wrote:
+> Your patchset for mach/io.h cleanup and remove, causes problems on
+> Orion5x.
+> 
+> mach/io.h for orion5x had a:
+> 
+> #define IO_SPACE_LIMIT		0xffffffff
+> 
+> which got removed. This results in a panic at boot:
+> 
+>         /*
+>          * IORESOURCE_IO
+>          */
+>         sys->io_offset = 0;
+>         res[0].name = "PCIe I/O Space";
+>         res[0].flags = IORESOURCE_IO;
+>         res[0].start = ORION5X_PCIE_IO_BUS_BASE;
+>         res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
+>         if (request_resource(&ioport_resource, &res[0]))
+>                 panic("Request PCIe IO resource failed\n");
+> 
+> ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
+> 64K default.
+> 
+> arch/arm/include/asm/io.h has the comment:
+> 
+> /*
+>  * This is the limit of PC card/PCI/ISA IO space, which is by default
+>  * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
+>  * zero to prevent ISA/PCI drivers claiming IO space (and potentially
+>  * oopsing.)
+>  *
+>  * Only set this larger if you really need inb() et.al. to operate over
+>  * a larger address space.  Note that SOC_COMMON ioremaps each sockets
+>  * IO space area, and so inb() et.al. must be defined to operate as per
+>  * readb() et.al. on such platforms.
+>  */
+> 
+> Now, i know nothing about how PCI works... So i have a question:
+> 
+> Which is better, put back parts of io.h so allowing the 1MB
+> request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
+> the comment it is unlikely an PCI card needs more than 64KB?
 
-Hi Sascha,
+Well, the comment about SOC_COMMON doesn't apply as you're not using that.
 
->From our point of view the current situation is the following:
-We have a very reliable driver for the VPU which is not mainline but
-it's been used for two years in our products. This driver only
-supports encoding in the i.MX27 chip.
-In parallel, you have a a multichip driver in progress which is not
-mainline either, not fully V4L2 compatible and not tested for i.MX27.
-[1]
-At the same time, we have a driver in progress for i.MX27 encoding
-only which follows V4L2 mem2mem framework. [2].
-
-The first thing to decide would be which of both drivers we take as a
-base for final mainline developing.
-In our view, cleaning up driver from Pengutronix [1] would imply a lot
-of effort of maintaining code that we cannot really test (i.MX5,
-i.MX6) whereas if we continue using [2] we would have something valid
-for i.MX27 much faster. Support for decoding and other chips could be
-added later.
-
-The second thing would be whether we keep on developing or whether we
-should wait for you to have something in mainline. We have already
-allocated resources to the development of the driver and long-term
-testing to achieve product level reliability. Pengutronix does not
-seem to be committed to developing the features relevant to our
-product (lack of YUV420 support for i.MX27 camera driver[6]) nor
-committed to any deadline (lack of answers or development on dmaengine
-for i.MX27[4][5]). Moreover, development effort is only 50% of the
-cost and we would still have to spend a lot of time checking the video
-stream manually in different real-rife conditions (only extensive
-testing allowed us to catch the "P frame marked as IDR" bug [7]).
-
-As a conclusion we propose that we keep on developing our driver for
-encoding in the i.MX27 VPU under the following conditions:
-- We will provide a more generic name for the driver than "codadx6",
-maybe something as "imx_vpu".
-- We will do an extra effort and will study your code in [1] in order
-to provide a modular approach that makes adding new functionality (new
-chips or decoding) as easy as possible while making obvious that
-further patches do not break support for encoding in the i.MX27.
-
-Does it sound reasonable for you?
-
-Regards.
-
-[1] git://git.pengutronix.de/git/imx/gst-plugins-fsl-vpu.git
-[2] https://github.com/jmartinc/video_visstrim/tree/mx27-codadx6/drivers/media/video/codadx6
-[3] http://www.spinics.net/lists/linux-media/msg37920.html
-[4] http://www.spinics.net/lists/arm-kernel/msg159196.html
-[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/087842.html
-[6] http://patchwork.linuxtv.org/patch/8826/
-[7] http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/49166
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
+requirement to support a larger IO space.
