@@ -1,44 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Jun 2012 16:12:19 +0100
-Subject: [PATCH v2 2/4] ARM: entry: don't bother with syscall tracing on
- ret_from_fork path
+Date: Fri,  8 Jun 2012 16:12:18 +0100
+Subject: [PATCH v2 1/4] audit: arm: only allow syscall auditing for pure EABI
+ userspace
 In-Reply-To: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
 References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1339168341-29850-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1339168341-29850-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ret_from_fork is setup for a freshly spawned child task via copy_thread,
-called from copy_process. The latter function clears TIF_SYSCALL_TRACE
-and also resets the child task's audit_context to NULL, meaning that
-there is little point invoking the system call tracing routines.
-Furthermore, getting hold of the syscall number is a complete pain and
-it looks like the current code doesn't even bother.
+The audit tools support only EABI userspace and, since there are no
+AUDIT_ARCH_* defines for the ARM OABI, it makes sense to allow syscall
+auditing on ARM only for EABI at the moment.
 
-This patch removes the syscall tracing checks from ret_from_fork.
-
+Cc: Eric Paris <eparis@redhat.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/entry-common.S |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ init/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 4afed88..10911c9 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -95,13 +95,7 @@ ENDPROC(ret_to_user)
- ENTRY(ret_from_fork)
- 	bl	schedule_tail
- 	get_thread_info tsk
--	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
- 	mov	why, #1
--	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
--	beq	ret_slow_syscall
--	mov	r1, sp
--	mov	r0, #1				@ trace exit [IP = 1]
--	bl	syscall_trace
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
+diff --git a/init/Kconfig b/init/Kconfig
+index d07dcf9..b3f55f1 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -357,7 +357,7 @@ config AUDIT
  
+ config AUDITSYSCALL
+ 	bool "Enable system-call auditing support"
+-	depends on AUDIT && (X86 || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || ARM)
++	depends on AUDIT && (X86 || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
+ 	default y if SECURITY_SELINUX
+ 	help
+ 	  Enable low-overhead system-call auditing infrastructure that
 -- 
 1.7.4.1
