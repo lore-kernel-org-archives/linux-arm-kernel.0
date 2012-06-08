@@ -1,28 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Jun 2012 10:32:02 +0200
-Subject: [CFT] PL08x patches
-In-Reply-To: <20120607104527.GA15973@n2100.arm.linux.org.uk>
-References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
- <E1Sca9b-0003ax-4E@rmk-PC.arm.linux.org.uk>
- <20120607104527.GA15973@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdadwL6AvEtHK0RyBKXCvMhc_g8n5im0RjJCHof4-Bs_-Q@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Jun 2012 10:48:02 +0200
+Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
+In-Reply-To: <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
+References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
+ <20120608072601.GD30137@pengutronix.de>
+ <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
+Message-ID: <20120608084802.GS30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2012 at 12:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, Jun 08, 2012 at 09:39:15AM +0200, javier Martin wrote:
+> Hi Robert,
+> 
+> On 8 June 2012 09:26, Robert Schwebel <r.schwebel@pengutronix.de> wrote:
+> > Hi Javier,
+> >
+> > On Fri, Jun 08, 2012 at 09:21:13AM +0200, javier Martin wrote:
+> >> If you refer to driver in [1] I have some concerns: i.MX27 VPU should
+> >> be implemented as a V4L2 mem2mem device since it gets raw pictures
+> >> from memory and outputs encoded frames to memory (some discussion
+> >> about the subject can be fond here [2]), as Exynos driver from Samsung
+> >> does. However, this driver you've mentioned doesn't do that: it just
+> >> creates several mapping regions so that the actual functionality is
+> >> implemented in user space by a library provided by Freescale, which
+> >> regarding i.MX27 it is also GPL.
+> >>
+> >> What we are trying to do is implementing all the functionality in
+> >> kernel space using mem2mem V4L2 framework so that it can be accepted
+> >> in mainline.
+> >
+> > We will work on the VPU driver and it's migration towards a proper
+> > mem2mem device very soon, mainly on MX53, but of course MX27 should be
+> > taken care of by the same driver.
+> >
+> > So I'd suggest that we coordinate that work somehow.
+> 
+> Do you plan to provide both encoding and decoding support or just one of them?
 
-> Here's the PL08x patches.
+We have both encoding and decoding. It works on i.MX51/53, but was
+originally written for i.MX27 aswell. I haven't tested i.MX27 for longer
+now, so it might or might not work. Find the source here:
 
-I've tested the entire set: first the three patches splitting out the virtual
-channels, then the remaining 31 patches on PL08x.
+git://git.pengutronix.de/git/imx/gst-plugins-fsl-vpu.git
 
-The test was performed on a Nomadik S8815 which has a pretty
-much vanilla PL08x block.
+The main difference from the FSL code is that the whole VPU
+functionality is in a kernel module which talks (mostly) v4l2. Our next
+taks is to convert this into a real mem2mem device, right now it only
+works with the included gstreamer plugin. You'll need a small kernel
+patch to register the device and to add the clocks.
 
-The DMAengine memcpy test completes just fine and behave like
-before.
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+The gstreamer plugin is in a horrible state, but with the conversion to
+mem2mem we hope to get rid of this entirely.
 
-Yours,
-Linus Walleij
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
