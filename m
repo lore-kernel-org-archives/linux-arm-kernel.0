@@ -1,40 +1,121 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Jun 2012 18:36:06 -0500
-Subject: [PATCH V2 00/10] ARM: OMAP4: Add PMU Support
-In-Reply-To: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <4FD13AE6.6070206@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 07 Jun 2012 19:33:50 -0500
+Subject: [PATCH v2] ARM: highbank: Add smc calls to enable/disable the L2
+In-Reply-To: <1339021210-25970-1-git-send-email-robherring2@gmail.com>
+References: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
+ <1339021210-25970-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4FD1486E.9080409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/07/2012 04:22 PM, Jon Hunter wrote:
-> This series adds PMU support for OMAP4 devices. This is based upon Will Deacons
-> series [1]. This series fixes the management of the EMU power domain so that
-> PMU can be enabled at runtime and low-power states are not prevented when PMU
-> is not in-use. The fix is based upon inputs from Benoit, Paul and Kevin [2].
+On 06/06/2012 05:20 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> This series also converts OMAP2/3 devices to use HWMOD to create the PMU device
-> and add a new file to mach-omap2 directory called pmu.c where the PMU devices
-> are created.
+> Linux runs in non-secure mode on highbank, so we need secure monitor calls
+> to enable and disable the PL310. Rather than invent new smc calls, the same
+> calling convention used by OMAP is used here.
 > 
-> This series is based upon the latest linux-omap master branch from Tony
-> (3.5-rc1).
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+
+Arnd, Olof,
+
+Can you apply this fix for 3.5. It's needed to enable the L2 on highbank.
+
+Rob
+
+> ---
+> v2:
+>  - Only save registers required by ARM ABI
 > 
-> Testing:
-> - Verified that PMU is working on OMAP3430 Beagle Board, OMAP4430 Blaze and
->   4460 Panda.
-> - Tested on the above boards with CPU-idle enabled to ensure that PMU is working
->   with power management. For OMAP4 boards I have disabled CPU1 so that CPU0 and
->   hence the MPU power domain is reaching the low-power retention state.
-> - I have booted the kernel on an OMAP2430 SDP but not verified PMU is working.
-> - Unable to verify 4470 Blaze because kernel is not currently booting.
-
-Update on the 4470 status. Now I have 4470 booting [1], I have now
-verified that PMU on 4470 is also working with this series (and with
-CPU-idle enabled).
-
-Cheers
-Jon
-
-[1] http://marc.info/?l=linux-omap&m=133911023112941&w=2
+>  arch/arm/mach-highbank/Makefile   |    6 +++++-
+>  arch/arm/mach-highbank/core.h     |    1 +
+>  arch/arm/mach-highbank/highbank.c |   14 ++++++++++++++
+>  arch/arm/mach-highbank/smc.S      |   27 +++++++++++++++++++++++++++
+>  4 files changed, 47 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-highbank/smc.S
+> 
+> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+> index f8437dd..ded4652 100644
+> --- a/arch/arm/mach-highbank/Makefile
+> +++ b/arch/arm/mach-highbank/Makefile
+> @@ -1,4 +1,8 @@
+> -obj-y					:= clock.o highbank.o system.o
+> +obj-y					:= clock.o highbank.o system.o smc.o
+> +
+> +plus_sec := $(call as-instr,.arch_extension sec,+sec)
+> +AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
+> +
+>  obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
+>  obj-$(CONFIG_SMP)			+= platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+> index d8e2d0b..141ed51 100644
+> --- a/arch/arm/mach-highbank/core.h
+> +++ b/arch/arm/mach-highbank/core.h
+> @@ -8,3 +8,4 @@ extern void highbank_lluart_map_io(void);
+>  static inline void highbank_lluart_map_io(void) {}
+>  #endif
+>  
+> +extern void highbank_smc1(int fn, int arg);
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index 410a112..8777612 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -85,10 +85,24 @@ const static struct of_device_id irq_match[] = {
+>  	{}
+>  };
+>  
+> +#ifdef CONFIG_CACHE_L2X0
+> +static void highbank_l2x0_disable(void)
+> +{
+> +	/* Disable PL310 L2 Cache controller */
+> +	highbank_smc1(0x102, 0x0);
+> +}
+> +#endif
+> +
+>  static void __init highbank_init_irq(void)
+>  {
+>  	of_irq_init(irq_match);
+> +
+> +#ifdef CONFIG_CACHE_L2X0
+> +	/* Enable PL310 L2 Cache controller */
+> +	highbank_smc1(0x102, 0x1);
+>  	l2x0_of_init(0, ~0UL);
+> +	outer_cache.disable = highbank_l2x0_disable;
+> +#endif
+>  }
+>  
+>  static void __init highbank_timer_init(void)
+> diff --git a/arch/arm/mach-highbank/smc.S b/arch/arm/mach-highbank/smc.S
+> new file mode 100644
+> index 0000000..407d17b
+> --- /dev/null
+> +++ b/arch/arm/mach-highbank/smc.S
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copied from omap44xx-smc.S Copyright (C) 2010 Texas Instruments, Inc.
+> + * Copyright 2012 Calxeda, Inc.
+> + *
+> + * This program is free software,you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +/*
+> + * This is common routine to manage secure monitor API
+> + * used to modify the PL310 secure registers.
+> + * 'r0' contains the value to be modified and 'r12' contains
+> + * the monitor API number.
+> + * Function signature : void highbank_smc1(u32 fn, u32 arg)
+> + */
+> +
+> +ENTRY(highbank_smc1)
+> +	stmfd   sp!, {r4-r11, lr}
+> +	mov	r12, r0
+> +	mov 	r0, r1
+> +	dsb
+> +	smc	#0
+> +	ldmfd   sp!, {r4-r11, pc}
+> +ENDPROC(highbank_smc1)
