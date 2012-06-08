@@ -1,50 +1,89 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Jun 2012 16:38:53 +0100
-Subject: [RFC PATCH 0/2] Implement word-at-a-time string functions
-Message-ID: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  8 Jun 2012 16:38:55 +0100
+Subject: [RFC PATCH 2/2] ARM: dcache: select DCACHE_WORD_ACCESS for
+ little-endian ARMv6+ CPUs
+In-Reply-To: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
+References: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1339169935-31775-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+DCACHE_WORD_ACCESS uses the word-at-a-time API for optimised string
+comparisons in the vfs layer.
 
-This patch series does two things:
+This patch implements support for load_unaligned_zeropad for ARM CPUs
+with native support for unaligned memory accesses (v6+) when running
+little-endian.
 
-1. Implements the word-at-a-time API for ARM and replaces our user
-   string operations with the generic optimised variants.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/include/asm/word-at-a-time.h |   41 +++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 0 deletions(-)
 
-2. On CPUs with efficient hardware support for unaligned accesses (v6+),
-   select DCACHE_WORD_ACCESS for little-endian configurations.
-
-In standalone tests on a Cortex-A9, this results in a 55% performance
-improvement for name hashing and some simple find operations over a
-tmpfs filesystem show that the relative improvement for per-word hashing
-increases with the length of the pathname (assumedly up to the 55%
-ceiling, although with 1k pathnames the improvement is 10% so I doubt
-we'd be able to hit the maximum speedup in this simple test).
-
-If anybody has some better pathname-lookup-intensive benchmarks, I'd be
-happy to try them out.
-
-All comments welcome,
-
-Will
-
-
-Will Deacon (2):
-  ARM: use generic strnlen_user and strncpy_from_user functions
-  ARM: dcache: select DCACHE_WORD_ACCESS for little-endian ARMv6+ CPUs
-
- arch/arm/Kconfig                      |    3 +
- arch/arm/include/asm/uaccess.h        |   27 ++-------
- arch/arm/include/asm/word-at-a-time.h |   96 +++++++++++++++++++++++++++++++++
- arch/arm/kernel/armksyms.c            |    4 --
- arch/arm/lib/Makefile                 |    1 -
- arch/arm/lib/strncpy_from_user.S      |   43 ---------------
- arch/arm/lib/strnlen_user.S           |   40 --------------
- 7 files changed, 105 insertions(+), 109 deletions(-)
- create mode 100644 arch/arm/include/asm/word-at-a-time.h
- delete mode 100644 arch/arm/lib/strncpy_from_user.S
- delete mode 100644 arch/arm/lib/strnlen_user.S
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b236fd9..9e7b51f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -48,6 +48,7 @@ config ARM
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
++	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+index 74b2d45..4d52f92 100644
+--- a/arch/arm/include/asm/word-at-a-time.h
++++ b/arch/arm/include/asm/word-at-a-time.h
+@@ -48,6 +48,47 @@ static inline unsigned long find_zero(unsigned long mask)
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_DCACHE_WORD_ACCESS
++
++#define zero_bytemask(mask) (mask)
++
++/*
++ * Load an unaligned word from kernel space.
++ *
++ * In the (very unlikely) case of the word being a page-crosser
++ * and the next page not being mapped, take the exception and
++ * return zeroes in the non-existing part.
++ */
++static inline unsigned long load_unaligned_zeropad(const void *addr)
++{
++	unsigned long ret, offset;
++
++	/* Load word from unaligned pointer addr */
++	asm(
++	"1:	ldr	%0, [%2]\n"
++	"2:\n"
++	"	.pushsection .fixup,\"ax\"\n"
++	"	.align 2\n"
++	"3:	and	%1, %2, #0x3\n"
++	"	bic	%2, %2, #0x3\n"
++	"	ldr	%0, [%2]\n"
++	"	lsl	%1, %1, #0x3\n"
++	"	lsr	%0, %0, %1\n"
++	"	b	2b\n"
++	"	.popsection\n"
++	"	.pushsection __ex_table,\"a\"\n"
++	"	.align	3\n"
++	"	.long	1b, 3b\n"
++	"	.popsection"
++	: "=&r" (ret), "=&r" (offset)
++	: "r" (addr), "Qo" (*(unsigned long *)addr));
++
++	return ret;
++}
++
++
++#endif	/* DCACHE_WORD_ACCESS */
++
+ #else	/* __ARMEB__ */
+ #include <asm-generic/word-at-a-time.h>
+ #endif
 -- 
 1.7.4.1
