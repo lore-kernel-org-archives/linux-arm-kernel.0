@@ -1,26 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Jun 2012 10:53:17 +0200
-Subject: [CFT 02/11] mmc: omap_hsmmc: add DMA engine support
-In-Reply-To: <E1ScaYH-0003tV-Bn@rmk-PC.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScaYH-0003tV-Bn@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdaq5AYZapS-YSTXa4atJQESiqKvmpnXBYE_aOD4+PkigQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  8 Jun 2012 10:58:57 +0200
+Subject: [PATCH] ARM: iconnect: Remove include of removed linux/spi/orion_spi.h
+Message-ID: <1339145937-24890-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2012 at 1:06 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
+v3.5-rc1 fails to build when DT and iconnect is enabled because of
+this now none existant include file.
 
-> Add DMA engine support to the OMAP HSMMC driver. ?This supplements the
-> private DMA API implementation contained within this driver, and the
-> driver can be switched at build time between using DMA engine and the
-> private DMA API.
->
-> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-kirkwood/board-iconnect.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-Looks good:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks,
-Linus Walleij
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index 2222c57..fa1cbdb 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -22,7 +22,6 @@
+ #include <linux/leds.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
+-#include <linux/spi/orion_spi.h>
+ #include <linux/i2c.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+-- 
+1.7.10
