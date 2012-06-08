@@ -1,75 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Jun 2012 08:24:16 -0600 (MDT)
-Subject: [PATCH] ARM: omap: clock: Get rid of unwanted clkdm assocations
- within clks
-In-Reply-To: <4FD1B2F9.7050400@ti.com>
-References: <1337250245-29274-1-git-send-email-rnayak@ti.com>
- <4FD04A2A.4080207@ti.com>
- <alpine.DEB.2.00.1206070104060.6684@utopia.booyaka.com>
- <4FD087FD.9040401@ti.com>
- <alpine.DEB.2.00.1206080130570.14977@utopia.booyaka.com>
- <4FD1B2F9.7050400@ti.com>
-Message-ID: <alpine.DEB.2.00.1206080734350.14977@utopia.booyaka.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Jun 2012 16:35:48 +0200
+Subject: mach/io.h cleanup and removal question
+In-Reply-To: <4FD207C9.5010006@gmail.com>
+References: <20120608102040.GA26034@lunn.ch>
+ <20120608114316.GC15555@n2100.arm.linux.org.uk>
+ <4FD207C9.5010006@gmail.com>
+Message-ID: <20120608143548.GC26034@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jun 2012, Rajendra Nayak wrote:
+> > Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
+> > requirement to support a larger IO space.
+> 
+> Agreed. The next step is moving all i/o space to a fixed virtual address
+> and for this we want to make i/o windows 64K.
 
-> This patch only gets rid of clkdm assocation from *non gate* clocks.
-> And what I am trying to say is that, this information in not
-> used at all (for non gate clocks) in any of the frameworks today
-> including clock framework.
-> So why should getting rid of some *unused* data have any testing
-> overhead?
+O.K. I will submit a patch for this, so Orion5x at least boots. Maybe
+PCI will not work, but booting is a step forward.
 
-Your definition of 'unused' seems to be different than mine:
+> However, I think you may also have a problem with
+> ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
+> should really be 0 and then the __io() macro should add the virtual i/o
+> base address. However, Russell has mentioned previously that some chips
+> may not work correctly with i/o space at 0 (PCI bus addresses, not host).
+> 
+> Do you have cards with i/o that you can test or know what devices are
+> used with this platform?
 
-$ egrep -rn 'c(lk|)->clkdm' arch/arm/
-arch/arm/mach-omap2/omap_hwmod.c:560:	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
-arch/arm/mach-omap2/omap_hwmod.c:563:	return clkdm_add_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
-arch/arm/mach-omap2/omap_hwmod.c:584:	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
-arch/arm/mach-omap2/omap_hwmod.c:587:	return clkdm_del_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
-arch/arm/mach-omap2/omap_hwmod.c:612:	if (!oh->_clk->clkdm)
-arch/arm/mach-omap2/omap_hwmod.c:2998:	if (!c->clkdm)
-arch/arm/mach-omap2/omap_hwmod.c:3001:	return c->clkdm->pwrdm.ptr;
-arch/arm/mach-omap2/clock.c:96:	if (!clk->clkdm_name)
-arch/arm/mach-omap2/clock.c:99:	clkdm = clkdm_lookup(clk->clkdm_name);
-arch/arm/mach-omap2/clock.c:102:			 clk->name, clk->clkdm_name);
-arch/arm/mach-omap2/clock.c:103:		clk->clkdm = clkdm;
-arch/arm/mach-omap2/clock.c:106:			 "clkdm %s\n", clk->name, clk->clkdm_name);
-arch/arm/mach-omap2/clock.c:292:	if (clkdm_control && clk->clkdm)
-arch/arm/mach-omap2/clock.c:293:		clkdm_clk_disable(clk->clkdm, clk);
-arch/arm/mach-omap2/clock.c:332:	if (clkdm_control && clk->clkdm) {
-arch/arm/mach-omap2/clock.c:333:		ret = clkdm_clk_enable(clk->clkdm, clk);
-arch/arm/mach-omap2/clock.c:336:			     "%d\n", clk->name, clk->clkdm->name, ret);
-arch/arm/mach-omap2/clock.c:354:	if (clkdm_control && clk->clkdm)
-arch/arm/mach-omap2/clock.c:355:		clkdm_clk_disable(clk->clkdm, clk);
-arch/arm/mach-omap2/clock.c:441:	if (clk->clkdm != NULL)
-arch/arm/mach-omap2/clock.c:442:		pwrdm_state_switch(clk->clkdm->pwrdm.ptr);
+Humm, not sure. I have a Marvell Orion5x NAS reference design. It has
+a Mini-PCI slot on the bottom. So if i can find a card, i can test. I
+know i have some WiFi cards in my junk box, but i've no idea if these
+have i/o.
 
-That is just the result of a casual grep, not even a code analysis.
-
-Removing this data is not like removing some macros where one can get a 
-compiler error if they turn out to be needed.  Problems with this ares 
-only likely to show up at runtime.
-
-By the way, I hope you're testing the patches that you send to the lists, 
-at the very least to the minimal PM testing that I do that is documented 
-e.g. here:
-
-http://www.pwsan.com/omap/bootlogs/20120508/prcm_devel_a_3.5__0135f6a04642c192bdf4b36e06937d3387e174ff/
-
-Otherwise the testing burden is just getting pushed to other people who 
-already have too much to do.
-
-...
-
-So to repeat myself on this:
-
-1. The patch that removes some of the struct clk clkdm_name strings should 
-   be part of or otherwise grouped with the CCF conversion patch series
-
-2. The CCF conversion patch series needs to be fully PM-tested
-
-
-- Paul
+     Andrew
