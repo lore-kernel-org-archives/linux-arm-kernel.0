@@ -1,35 +1,49 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri,  8 Jun 2012 16:24:34 -0600
-Subject: [PATCH 0/6] drivers: randconfig patches for kernel 3.5
-Message-ID: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri,  8 Jun 2012 16:24:35 -0600
+Subject: [PATCH RESEND 1/6] drivers/video: use correct __devexit_p annotation
+In-Reply-To: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1339194280-27475-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+From: Arnd Bergmann <arnd@arndb.de>
 
-These patches fix miscellaneous problems when working
-with make randconfig.  They were discovered on kernel
-3.1-rc4 and sent out during the 3.4 cycle but were not
-ack'ed.  
+__devexit functions are discarded when CONFIG_HOTPLUG
+is not set, so the symbol needs to be referenced carefully.
 
-Sending out again for completeness.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/video/broadsheetfb.c |    2 +-
+ drivers/video/mbx/mbxfb.c    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Arnd Bergmann (6):
-  drivers/video: use correct __devexit_p annotation
-  mg_disk: use readb/writeb instead of inb/outb
-  video/ili9320: do not mark exported functions __devexit
-  video/console: automatically select a font
-  drivers/savagefb: use mdelay instead of udelay
-  drivers/tosa: driver needs I2C and SPI to compile
-
- drivers/block/mg_disk.c                |   78 ++++++++++++++++----------------
- drivers/video/backlight/Kconfig        |    2 +-
- drivers/video/backlight/ili9320.c      |    2 +-
- drivers/video/broadsheetfb.c           |    2 +-
- drivers/video/console/Kconfig          |   14 ++++++
- drivers/video/mbx/mbxfb.c              |    2 +-
- drivers/video/savage/savagefb_driver.c |   10 ++--
- 7 files changed, 62 insertions(+), 48 deletions(-)
-
+diff --git a/drivers/video/broadsheetfb.c b/drivers/video/broadsheetfb.c
+index 377dde3..c95b417 100644
+--- a/drivers/video/broadsheetfb.c
++++ b/drivers/video/broadsheetfb.c
+@@ -1211,7 +1211,7 @@ static int __devexit broadsheetfb_remove(struct platform_device *dev)
+ 
+ static struct platform_driver broadsheetfb_driver = {
+ 	.probe	= broadsheetfb_probe,
+-	.remove = broadsheetfb_remove,
++	.remove = __devexit_p(broadsheetfb_remove),
+ 	.driver	= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "broadsheetfb",
+diff --git a/drivers/video/mbx/mbxfb.c b/drivers/video/mbx/mbxfb.c
+index ab0a8e5..85e4f44 100644
+--- a/drivers/video/mbx/mbxfb.c
++++ b/drivers/video/mbx/mbxfb.c
+@@ -1045,7 +1045,7 @@ static int __devexit mbxfb_remove(struct platform_device *dev)
+ 
+ static struct platform_driver mbxfb_driver = {
+ 	.probe = mbxfb_probe,
+-	.remove = mbxfb_remove,
++	.remove = __devexit_p(mbxfb_remove),
+ 	.suspend = mbxfb_suspend,
+ 	.resume = mbxfb_resume,
+ 	.driver = {
 -- 
 1.7.5.4
