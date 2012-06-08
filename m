@@ -1,40 +1,83 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 8 Jun 2012 21:03:09 +0200
-Subject: [PATCH] MXS: Add DENX M28 dts file
-In-Reply-To: <20120606081726.GG2667@S2101-09.ap.freescale.net>
-References: <1338084735-12083-1-git-send-email-marex@denx.de>
- <20120606081726.GG2667@S2101-09.ap.freescale.net>
-Message-ID: <201206082103.09612.marex@denx.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 8 Jun 2012 14:04:35 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4FBAA64A.200@wwwdotorg.org>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201205190844.03654.arnd@arndb.de> <4FBA7C80.4080801@wwwdotorg.org>
+ <201205211818.45646.arnd@arndb.de> <4FBAA64A.200@wwwdotorg.org>
+Message-ID: <4FD24CC3.50700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Hi Stephen, Arnd,
 
-> On Sun, May 27, 2012 at 04:12:15AM +0200, Marek Vasut wrote:
-> > Missing:
-> > AUART
-> > LCDIF
+Been a while ;-)
 
-[...]
-
-> > +				gpmi_pins_ctrl_m28: gpmi1 at 0 {
-> > +					reg = <0>;
-> > +					fsl,pinmux-ids = <0x180 0x0190
-> > +							  0x01a0 0x01b0>;
-> > +					fsl,drive-strength = <3>;
-> > +					fsl,voltage = <0>;
-> > +					fsl,pull-up = <1>;
-> > +				};
+On 05/21/2012 03:32 PM, Stephen Warren wrote:
+> On 05/21/2012 12:18 PM, Arnd Bergmann wrote:
+>> On Monday 21 May 2012, Stephen Warren wrote:
+>>>>
+>>>> The point with the direction was that it covers most cases and makes
+>>>> them rather simple, while for the rare case where you need more than
+>>>> two channels, you just use the otherwise optional named interface
+>>>> rather than the numbered one. My feeling is that this also makes a
+>>>> lot of sense at the driver API level: most dirvers just ask for the
+>>>> read and write channels using a very simple interface, and those drivers
+>>>> that have more than two will want to name them anyway.
+>>>
+>>> How are you thinking of representing the direction in DT - as part of
+>>> the DMA request specifier, so in a DMAC-specific way?
+>>>
+>>> If so, that seems a little odd; you have to request a DMA channel for
+>>> "TX", but then end up having the common code check all the entries in
+>>> the dmas property since it can't know which are TX, and then have the
+>>> wrong ones almost accidentally fail, since the DMAC will then determine
+>>> that it can't support TX on the RX DMA request IDs.
+>>
+>> I think the direction must be encoded in a way that does not depend on
+>> the binding for the specific controller. There are two ways I can see
+>> how we might do it:
+>>
+>> 1. have separate property names for tx and rx channels, and probably
+>>    one for combined rx/tx channels
 > 
-> I just applied Huang's gpmi changes below.  Can you please rebase the
-> the patch on top of it?  If you have the same pin setup as imx28-evk,
-> we can save above data completely.
+>> 2. define the second cell in each channel specifier to be the direction
+>>    in a predefined format, followed by the other (controller specific)
+>>    attributes, if any.
 > 
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/169351
+> In this option, lets say bit 0 is 0==TX, 1==RX (or perhaps 2 bits if
+> combined TX/RX is needed)
+> 
+> Then, we could reserve say bits 7:1 as client DMA request ID.
+> 
+> And then have bits 31:8 as DMAC specific data.
+> 
+> Wouldn't that allow us to have our cake and eat it?
 
-Well, GPMI NAND doens't work for me (AGAIN). Screw this, I'm not debuging it for 
-the third damn time only to be told to rebase it again and that all I did was 
-for naught. Sorry
+Sorry for not responding sooner.
 
-Best regards,
-Marek Vasut
+It seems to me we were pretty close on alignment. In fact, I was quite
+happy with Steven's 2nd to last proposal of  ...
+
+simple 1 req:
+dmas = <0 &dmac1 xxx>;
+
+simple 2 req:
+dmas = <0 &dmac1 xxx 1 &dmac1 yyy>;
+
+multiple dmacs:
+dmas = <0 &dmac1 xxx 0 &dmac2 zzz 1 &dmac1 yyy>;
+
+Arnd, I know that you had some concerns. However, in the above case I
+would expect that the 3rd parameter be optional and it can be some sort
+of match variable. In other words, we don't care how the 32-bits are
+encoded or what they represent but they would be used appropriately by
+the xlate function being used. So the xlate and this "match" variable
+would have to speak the same language.
+
+I think that I prefer the idea of having a 3rd optional match variable
+than encoding the DMA request ID and match data together in 1 32-bit
+variable. However, not a big deal either way.
+
+Cheers
+Jon
