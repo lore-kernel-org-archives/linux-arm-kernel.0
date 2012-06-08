@@ -1,47 +1,40 @@
-From: rob@landley.net (Rob Landley)
-Date: Fri, 08 Jun 2012 13:37:11 -0500
-Subject: [CFT 11/11] Add feature removal of old OMAP private DMA
- implementation
-In-Reply-To: <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk>
-References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
- <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk>
-Message-ID: <4FD24657.5020207@landley.net>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 8 Jun 2012 21:03:09 +0200
+Subject: [PATCH] MXS: Add DENX M28 dts file
+In-Reply-To: <20120606081726.GG2667@S2101-09.ap.freescale.net>
+References: <1338084735-12083-1-git-send-email-marex@denx.de>
+ <20120606081726.GG2667@S2101-09.ap.freescale.net>
+Message-ID: <201206082103.09612.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2012 06:09 AM, Russell King wrote:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  Documentation/feature-removal-schedule.txt |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+Dear Shawn Guo,
+
+> On Sun, May 27, 2012 at 04:12:15AM +0200, Marek Vasut wrote:
+> > Missing:
+> > AUART
+> > LCDIF
+
+[...]
+
+> > +				gpmi_pins_ctrl_m28: gpmi1 at 0 {
+> > +					reg = <0>;
+> > +					fsl,pinmux-ids = <0x180 0x0190
+> > +							  0x01a0 0x01b0>;
+> > +					fsl,drive-strength = <3>;
+> > +					fsl,voltage = <0>;
+> > +					fsl,pull-up = <1>;
+> > +				};
 > 
-> diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-> index 56000b3..1f7ba35 100644
-> --- a/Documentation/feature-removal-schedule.txt
-> +++ b/Documentation/feature-removal-schedule.txt
-> @@ -612,3 +612,14 @@ When:	June 2013
->  Why:	Unsupported/unmaintained/unused since 2.6
->  
->  ----------------------------
-> +
-> +What:	OMAP private DMA implementation
-> +When:	2013
-> +Why:	We have a DMA engine implementation; all users should be updated
-> +	to use this rather than persisting with the old APIs.  The old APIs
-> +	block merging the old DMA engine implementation into the DMA
-> +	engine driver.
-> +Who:	Russell King <linux@arm.linux.org.uk>,
-> +	Santosh Shilimkar <santosh.shilimkar@ti.com>
-> +
-> +----------------------------
+> I just applied Huang's gpmi changes below.  Can you please rebase the
+> the patch on top of it?  If you have the same pin setup as imx28-evk,
+> we can save above data completely.
+> 
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/169351
 
-Whose tree do feature-removal-schedule patches go in through?
+Well, GPMI NAND doens't work for me (AGAIN). Screw this, I'm not debuging it for 
+the third damn time only to be told to rebase it again and that all I did was 
+for naught. Sorry
 
-(They're not really documentation, they're design coordination/logistics.)
-
-Rob
-
--- 
-GNU/Linux isn't: Linux=GPLv2, GNU=GPLv3+, they can't share code.
-Either it's "mere aggregation", or a license violation.  Pick one.
+Best regards,
+Marek Vasut
