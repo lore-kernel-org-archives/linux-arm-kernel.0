@@ -1,70 +1,43 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Fri, 8 Jun 2012 22:58:50 +0900
-Subject: [PATCH] [RESEND] arm: limit memblock base address for
- early_pte_alloc
-In-Reply-To: <1338880312-17561-1-git-send-email-minchan@kernel.org>
-References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
-Message-ID: <025701cd457e$d5065410$7f12fc30$@lge.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri,  8 Jun 2012 17:01:58 +0300
+Subject: [PATCH 0/7] arm/dts: Audio support for OMAP4 devices (SDP, PandaBoard)
+Message-ID: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Minchan Kim [mailto:minchan at kernel.org]
-> Sent: Tuesday, June 05, 2012 4:12 PM
-> 
-> If we do arm_memblock_steal with a page which is not aligned with section
-> size, panic can happen during boot by page fault in map_lowmem.
-> 
-> Detail:
-> 
-> 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by
-> memblock
->    which prefers tail pages of regions.
-> 2) map_lowmem maps 0x00000000 - 0x1fe00000
-> 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to
-1.
-> 4) calling alloc_init_pte allocates a new page for new pte by
-memblock_alloc
-> 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
-> 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
+Hello,
 
-May I suggest another simple approach? The first continuous couples of
-sections are always safely section-mapped inside alloc_init_section funtion.
-So, by limiting memblock_alloc to the end of the first continuous couples of
-sections at the start of map_lowmem, map_lowmem can safely memblock_alloc &
-memset even if we have one or more section-unaligned memory regions. The
-limit can be extended back to arm_lowmem_limit after the map_lowmem is done.
+The following series enable the audio functionality on OMAP4 based devices using
+twl6040 as audio codec.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e5dad60..edf1e2d 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1094,6 +1094,11 @@ static void __init kmap_init(void)
- static void __init map_lowmem(void)
- {
- 	struct memblock_region *reg;
-+	phys_addr_t pmd_map_end;
-+
-+	pmd_map_end = (memblock.memory.regions[0].base +
-+	               memblock.memory.regions[0].size) & PMD_MASK;
-+	memblock_set_current_limit(pmd_map_end);
- 
- 	/* Map all the lowmem memory banks. */
- 	for_each_memblock(memory, reg) {
-@@ -1113,6 +1118,8 @@ static void __init map_lowmem(void)
- 
- 		create_mapping(&map);
- 	}
-+
-+	memblock_set_current_limit(arm_lowmem_limit);
- }
- 
- /*
-@@ -1123,8 +1130,6 @@ void __init paging_init(struct machine_desc *mdesc)
- {
- 	void *zero_page;
- 
--	memblock_set_current_limit(arm_lowmem_limit);
--
- 	build_mem_type_table();
- 	prepare_page_table();
- 	map_lowmem();
+The series adds the needed bindings in the dts for the OMAP IPs, twl6040 MFD
+device and for the audio connection on the board.
+
+To be able to differentiate between PandaBoard and PandaBoardES (they have a bit
+different audio configuration) a new dts file has been created which only
+changes the audio properties different between the two boards.
+
+Patches for the drivers involved and the documentation related to dts sections
+has been either in 3.5 or heading for 3.6.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  arm/dts: omap4: Add entry for OMAP McPDM IP
+  arm/dts: omap4: Add entry for OMAP DMIC IP
+  arm/dts: omap4-sdp: Add fixed regulator to represent VBAT
+  arm/dts: omap4-sdp: Add support for twl6040
+  arm/dts: omap4-sdp: Enable audio support via device tree
+  arm/dts: omap4-panda: Audio support for PandaBoard 4430
+  arm/dts: New dts file for PandaBoardES (4460)
+
+ arch/arm/boot/dts/omap4-panda.dts   |   37 +++++++++++++++++++
+ arch/arm/boot/dts/omap4-pandaES.dts |   24 ++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts     |   68 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi        |   18 +++++++++
+ 4 files changed, 147 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-pandaES.dts
+
+-- 
+1.7.8.6
