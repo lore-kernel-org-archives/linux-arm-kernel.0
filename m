@@ -1,41 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Jun 2012 01:20:25 -0700
-Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
-In-Reply-To: <CAK5ve-+3rKjeQA-WMQWvT48roFx-3Y-jNLZ3ciyOuH42x4Nu9A@mail.gmail.com>
-References: <CAK5ve-JuZcjdbw_tV8vcriHWxOq1KFHm2mZBm6z3_j7hpPw-eA@mail.gmail.com>
- <CAK5ve-+3rKjeQA-WMQWvT48roFx-3Y-jNLZ3ciyOuH42x4Nu9A@mail.gmail.com>
-Message-ID: <CAOesGMgav2dqvUk623u_1ZuAE82drg2tF7rMpKMCZN4_Oq12_A@mail.gmail.com>
+Date: Fri, 8 Jun 2012 01:21:33 -0700
+Subject: [PATCH v2] ARM: highbank: Add smc calls to enable/disable the L2
+In-Reply-To: <4FD1486E.9080409@gmail.com>
+References: <1338865900-11373-1-git-send-email-robherring2@gmail.com>
+ <1339021210-25970-1-git-send-email-robherring2@gmail.com>
+ <4FD1486E.9080409@gmail.com>
+Message-ID: <CAOesGMihdBbVm7=zDNVCvvX9jUuBVTfcYYctokjez-MuBU0F4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 6, 2012 at 11:12 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> Hi Arnd and Olof,
+On Thu, Jun 7, 2012 at 5:33 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 06/06/2012 05:20 PM, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Linux runs in non-secure mode on highbank, so we need secure monitor calls
+>> to enable and disable the PL310. Rather than invent new smc calls, the same
+>> calling convention used by OMAP is used here.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 >
-> Is there any chance to pull this LED code into ARM SoC tree?
+> Arnd, Olof,
 >
-> Thanks,
-> -Bryan
->
-> On Mon, Jun 4, 2012 at 3:25 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
->> Hi Arnd and Olof,
->>
->> Please consider to pull my branch for LED CPU trigger driver and ARM
->> LED code consolidation, which is based on 3.5-rc1:
->>
->> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
->>
->> ?Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
->>
->> are available in the git repository at:
->>
->> ?git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
->> for-arm-soc
+> Can you apply this fix for 3.5. It's needed to enable the L2 on highbank.
 
-Pulled into arm-soc as devel/led-driver in next/drivers.
+If we were to split hairs, this is a feature addition and not a
+bugfix, so as such it belongs in the next merge window. But I applied
+it anyway, it's well-contained in your platform and we're early in the
+-rc cycle.
 
-
-Thanks,
 
 -Olof
