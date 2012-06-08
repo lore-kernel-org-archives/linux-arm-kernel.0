@@ -1,140 +1,252 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Jun 2012 16:16:46 +0100
-Subject: [PATCH v3] ARM: mm: update CONTEXTIDR register to contain PID of
- current process
-Message-ID: <1339168606-30060-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  8 Jun 2012 16:18:43 +0100
+Subject: [PATCH] ARM: perf: remove arm_perf_pmu_ids global enumeration
+Message-ID: <1339168723-30115-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a new Kconfig option which, when enabled, causes
-the kernel to write the PID of the current task into the PROCID field
-of the CONTEXTIDR on context switch. This is useful when analysing
-hardware trace, since writes to this register can be configured to emit
-an event into the trace stream.
+In order to provide PMU name strings compatible with the OProfile
+user ABI, an enumeration of all PMUs is currently used by perf to
+identify each PMU uniquely. Unfortunately, this does not scale well
+in the presence of multiple PMUs and creates a single, global namespace
+across all PMUs in the system.
 
-The thread notifier for writing the PID is deliberately kept separate
-from the ASID-writing code so that we can support newer processors using
-LPAE, where the ASID is stored in TTBR0. As such, the switch_mm code is
-updated to perform a read-modify-write sequence to ensure that we don't
-clobber the PID on CPUs using the classic 2-level page tables.
+This patch removes the enumeration and instead uses the name string
+for the PMU to map onto the OProfile variant. perf_pmu_name is
+implemented for CPU PMUs, which is all that OProfile cares about anyway.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm/include/asm/perf_event.h   |   17 +-------------
+ arch/arm/include/asm/pmu.h          |    3 +-
+ arch/arm/kernel/perf_event.c        |   15 +++++-------
+ arch/arm/kernel/perf_event_v6.c     |    2 -
+ arch/arm/kernel/perf_event_v7.c     |    5 ----
+ arch/arm/kernel/perf_event_xscale.c |    2 -
+ arch/arm/oprofile/common.c          |   43 ++++++++++++++++++++++-------------
+ 7 files changed, 35 insertions(+), 52 deletions(-)
 
-It's been a while since I posted a version of this patch because I had
-to rewrite most of it to fit with Catalin's changes to the context-switch
-code. The new version is a fair bit cleaner than the old one and works
-for both LPAE and classic MMU configurations.
-
- arch/arm/Kconfig.debug       |    9 +++++++++
- arch/arm/mm/context.c        |   35 +++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v6.S        |    6 ++++++
- arch/arm/mm/proc-v7-2level.S |    5 +++++
- 4 files changed, 55 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 01a1341..521e15b 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -369,4 +369,13 @@ config ARM_KPROBES_TEST
- 	help
- 	  Perform tests of kprobes API and instruction set simulation.
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 00cbe10..e074948 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -12,21 +12,6 @@
+ #ifndef __ARM_PERF_EVENT_H__
+ #define __ARM_PERF_EVENT_H__
  
-+config PID_IN_CONTEXTIDR
-+	bool "Write the current PID to the CONTEXTIDR register"
-+	depends on CPU_COPY_V6
-+	help
-+	  Enabling this option causes the kernel to write the current PID to
-+	  the PROCID field of the CONTEXTIDR register, at the expense of some
-+	  additional instructions during context switch. Say Y here only if you
-+	  are planning to use hardware trace tools with this kernel.
+-/* ARM perf PMU IDs for use by internal perf clients. */
+-enum arm_perf_pmu_ids {
+-	ARM_PERF_PMU_ID_XSCALE1	= 0,
+-	ARM_PERF_PMU_ID_XSCALE2,
+-	ARM_PERF_PMU_ID_V6,
+-	ARM_PERF_PMU_ID_V6MP,
+-	ARM_PERF_PMU_ID_CA8,
+-	ARM_PERF_PMU_ID_CA9,
+-	ARM_PERF_PMU_ID_CA5,
+-	ARM_PERF_PMU_ID_CA15,
+-	ARM_PERF_PMU_ID_CA7,
+-	ARM_NUM_PMU_IDS,
+-};
+-
+-extern enum arm_perf_pmu_ids
+-armpmu_get_pmu_id(void);
++/* Nothing to see here... */
+ 
+ #endif /* __ARM_PERF_EVENT_H__ */
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 90114fa..4432305 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -103,10 +103,9 @@ struct pmu_hw_events {
+ 
+ struct arm_pmu {
+ 	struct pmu	pmu;
+-	enum arm_perf_pmu_ids id;
+ 	enum arm_pmu_type type;
+ 	cpumask_t	active_irqs;
+-	const char	*name;
++	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+ 	void		(*enable)(struct hw_perf_event *evt, int idx);
+ 	void		(*disable)(struct hw_perf_event *evt, int idx);
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 186c8cb..df85eda 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -47,17 +47,14 @@ static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+ /* Set at runtime when we know what CPU type we are. */
+ static struct arm_pmu *cpu_pmu;
+ 
+-enum arm_perf_pmu_ids
+-armpmu_get_pmu_id(void)
++const char *perf_pmu_name(void)
+ {
+-	int id = -ENODEV;
+-
+-	if (cpu_pmu != NULL)
+-		id = cpu_pmu->id;
++	if (!cpu_pmu)
++		return NULL;
+ 
+-	return id;
++	return cpu_pmu->pmu.name;
+ }
+-EXPORT_SYMBOL_GPL(armpmu_get_pmu_id);
++EXPORT_SYMBOL_GPL(perf_pmu_name);
+ 
+ int perf_num_counters(void)
+ {
+@@ -760,7 +757,7 @@ init_hw_perf_events(void)
+ 			cpu_pmu->name, cpu_pmu->num_events);
+ 		cpu_pmu_init(cpu_pmu);
+ 		register_cpu_notifier(&pmu_cpu_notifier);
+-		armpmu_register(cpu_pmu, "cpu", PERF_TYPE_RAW);
++		armpmu_register(cpu_pmu, cpu_pmu->name, PERF_TYPE_RAW);
+ 	} else {
+ 		pr_info("no hardware support available\n");
+ 	}
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index ab627a7..c90fcb2 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -650,7 +650,6 @@ static int armv6_map_event(struct perf_event *event)
+ }
+ 
+ static struct arm_pmu armv6pmu = {
+-	.id			= ARM_PERF_PMU_ID_V6,
+ 	.name			= "v6",
+ 	.handle_irq		= armv6pmu_handle_irq,
+ 	.enable			= armv6pmu_enable_event,
+@@ -685,7 +684,6 @@ static int armv6mpcore_map_event(struct perf_event *event)
+ }
+ 
+ static struct arm_pmu armv6mpcore_pmu = {
+-	.id			= ARM_PERF_PMU_ID_V6MP,
+ 	.name			= "v6mpcore",
+ 	.handle_irq		= armv6pmu_handle_irq,
+ 	.enable			= armv6pmu_enable_event,
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index d3c5360..f04070b 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1258,7 +1258,6 @@ static u32 __init armv7_read_num_pmnc_events(void)
+ 
+ static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ {
+-	armv7pmu.id		= ARM_PERF_PMU_ID_CA8;
+ 	armv7pmu.name		= "ARMv7 Cortex-A8";
+ 	armv7pmu.map_event	= armv7_a8_map_event;
+ 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+@@ -1267,7 +1266,6 @@ static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ {
+-	armv7pmu.id		= ARM_PERF_PMU_ID_CA9;
+ 	armv7pmu.name		= "ARMv7 Cortex-A9";
+ 	armv7pmu.map_event	= armv7_a9_map_event;
+ 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+@@ -1276,7 +1274,6 @@ static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ {
+-	armv7pmu.id		= ARM_PERF_PMU_ID_CA5;
+ 	armv7pmu.name		= "ARMv7 Cortex-A5";
+ 	armv7pmu.map_event	= armv7_a5_map_event;
+ 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+@@ -1285,7 +1282,6 @@ static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a15_pmu_init(void)
+ {
+-	armv7pmu.id		= ARM_PERF_PMU_ID_CA15;
+ 	armv7pmu.name		= "ARMv7 Cortex-A15";
+ 	armv7pmu.map_event	= armv7_a15_map_event;
+ 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+@@ -1295,7 +1291,6 @@ static struct arm_pmu *__init armv7_a15_pmu_init(void)
+ 
+ static struct arm_pmu *__init armv7_a7_pmu_init(void)
+ {
+-	armv7pmu.id		= ARM_PERF_PMU_ID_CA7;
+ 	armv7pmu.name		= "ARMv7 Cortex-A7";
+ 	armv7pmu.map_event	= armv7_a7_map_event;
+ 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index e34e725..f759fe0 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -435,7 +435,6 @@ static int xscale_map_event(struct perf_event *event)
+ }
+ 
+ static struct arm_pmu xscale1pmu = {
+-	.id		= ARM_PERF_PMU_ID_XSCALE1,
+ 	.name		= "xscale1",
+ 	.handle_irq	= xscale1pmu_handle_irq,
+ 	.enable		= xscale1pmu_enable_event,
+@@ -803,7 +802,6 @@ xscale2pmu_write_counter(int counter, u32 val)
+ }
+ 
+ static struct arm_pmu xscale2pmu = {
+-	.id		= ARM_PERF_PMU_ID_XSCALE2,
+ 	.name		= "xscale2",
+ 	.handle_irq	= xscale2pmu_handle_irq,
+ 	.enable		= xscale2pmu_enable_event,
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 4e0a371..99c63d4b 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -23,26 +23,37 @@
+ #include <asm/ptrace.h>
+ 
+ #ifdef CONFIG_HW_PERF_EVENTS
 +
- endmenu
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 806cc4f..119bc52 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -14,6 +14,7 @@
- #include <linux/percpu.h>
- 
- #include <asm/mmu_context.h>
-+#include <asm/thread_notify.h>
- #include <asm/tlbflush.h>
- 
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-@@ -48,6 +49,40 @@ void cpu_set_reserved_ttbr0(void)
++/*
++ * OProfile has a curious naming scheme for the ARM PMUs, but they are
++ * part of the user ABI so we need to map from the perf PMU name for
++ * supported PMUs.
++ */
++static struct op_perf_name {
++	char *perf_name;
++	char *op_name;
++} op_perf_name_map[] = {
++	{ "xscale1",		"arm/xscale1"	},
++	{ "xscale1",		"arm/xscale2"	},
++	{ "v6",			"arm/armv6"	},
++	{ "v6mpcore",		"arm/mpcore"	},
++	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
++	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
++};
++
+ char *op_name_from_perf_id(void)
+ {
+-	enum arm_perf_pmu_ids id = armpmu_get_pmu_id();
+-
+-	switch (id) {
+-	case ARM_PERF_PMU_ID_XSCALE1:
+-		return "arm/xscale1";
+-	case ARM_PERF_PMU_ID_XSCALE2:
+-		return "arm/xscale2";
+-	case ARM_PERF_PMU_ID_V6:
+-		return "arm/armv6";
+-	case ARM_PERF_PMU_ID_V6MP:
+-		return "arm/mpcore";
+-	case ARM_PERF_PMU_ID_CA8:
+-		return "arm/armv7";
+-	case ARM_PERF_PMU_ID_CA9:
+-		return "arm/armv7-ca9";
+-	default:
+-		return NULL;
++	int i;
++	struct op_perf_name names;
++	const char *perf_name = perf_pmu_name();
++
++	for (i = 0; i < ARRAY_SIZE(op_perf_name_map); ++i) {
++		names = op_perf_name_map[i];
++		if (!strcmp(names.perf_name, perf_name))
++			return names.op_name;
+ 	}
++
++	return NULL;
  }
  #endif
  
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
-+			       void *t)
-+{
-+	u32 contextidr;
-+	pid_t pid;
-+	struct thread_info *thread = t;
-+
-+	if (cmd != THREAD_NOTIFY_SWITCH)
-+		return NOTIFY_DONE;
-+
-+	pid = task_pid_nr(thread->task) << ASID_BITS;
-+	asm volatile(
-+	"	mrc	p15, 0, %0, c13, c0, 1\n"
-+	"	bfi	%1, %0, #0, %2\n"
-+	"	mcr	p15, 0, %1, c13, c0, 1\n"
-+	: "=r" (contextidr), "+r" (pid)
-+	: "I" (ASID_BITS));
-+	isb();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block contextidr_notifier_block = {
-+	.notifier_call = contextidr_notifier,
-+};
-+
-+static int __init contextidr_notifier_init(void)
-+{
-+	return thread_register_notifier(&contextidr_notifier_block);
-+}
-+arch_initcall(contextidr_notifier_init);
-+#endif
-+
- /*
-  * We fork()ed a process, and we need a new context for the child
-  * to run in.
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 5900cd5..86b8b48 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -107,6 +107,12 @@ ENTRY(cpu_v6_switch_mm)
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- 	mcr	p15, 0, r2, c7, c10, 4		@ drain write buffer
- 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
-+	bic	r2, r2, #0xff			@ extract the PID
-+	and	r1, r1, #0xff
-+	orr	r1, r1, r2			@ insert into new context ID
-+#endif
- 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
- #endif
- 	mov	pc, lr
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 42ac069..fd045e7 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -46,6 +46,11 @@ ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_ARM_ERRATA_430973
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- #endif
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
-+	lsr	r2, r2, #8			@ extract the PID
-+	bfi	r1, r2, #8, #24			@ insert into new context ID
-+#endif
- #ifdef CONFIG_ARM_ERRATA_754322
- 	dsb
- #endif
 -- 
 1.7.4.1
