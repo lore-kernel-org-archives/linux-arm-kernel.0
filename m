@@ -1,35 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  8 Jun 2012 16:09:42 +0200
-Subject: [PATCH] ARM: Kirkwood: Fix crash when neither NAND nor SPI
-Message-ID: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 08 Jun 2012 09:10:17 -0500
+Subject: mach/io.h cleanup and removal question
+In-Reply-To: <20120608114316.GC15555@n2100.arm.linux.org.uk>
+References: <20120608102040.GA26034@lunn.ch>
+ <20120608114316.GC15555@n2100.arm.linux.org.uk>
+Message-ID: <4FD207C9.5010006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both NAND and SPI make use of the RUNIT clk. However, if neither NAND
-nor SPI is used in the system, RUNIT clock gets turned off, and the
-SoC hard locks. It appears something else in the SoC, which is not
-documented, is also using RUNIT. So prepare and enable RUNIT clock in
-kirkwood_clk_init().
+On 06/08/2012 06:43 AM, Russell King - ARM Linux wrote:
+> On Fri, Jun 08, 2012 at 12:20:40PM +0200, Andrew Lunn wrote:
+>> Your patchset for mach/io.h cleanup and remove, causes problems on
+>> Orion5x.
+>>
+>> mach/io.h for orion5x had a:
+>>
+>> #define IO_SPACE_LIMIT		0xffffffff
+>>
+>> which got removed. This results in a panic at boot:
+>>
+>>         /*
+>>          * IORESOURCE_IO
+>>          */
+>>         sys->io_offset = 0;
+>>         res[0].name = "PCIe I/O Space";
+>>         res[0].flags = IORESOURCE_IO;
+>>         res[0].start = ORION5X_PCIE_IO_BUS_BASE;
+>>         res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
+>>         if (request_resource(&ioport_resource, &res[0]))
+>>                 panic("Request PCIe IO resource failed\n");
+>>
+>> ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
+>> 64K default.
+>>
+>> arch/arm/include/asm/io.h has the comment:
+>>
+>> /*
+>>  * This is the limit of PC card/PCI/ISA IO space, which is by default
+>>  * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
+>>  * zero to prevent ISA/PCI drivers claiming IO space (and potentially
+>>  * oopsing.)
+>>  *
+>>  * Only set this larger if you really need inb() et.al. to operate over
+>>  * a larger address space.  Note that SOC_COMMON ioremaps each sockets
+>>  * IO space area, and so inb() et.al. must be defined to operate as per
+>>  * readb() et.al. on such platforms.
+>>  */
+>>
+>> Now, i know nothing about how PCI works... So i have a question:
+>>
+>> Which is better, put back parts of io.h so allowing the 1MB
+>> request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
+>> the comment it is unlikely an PCI card needs more than 64KB?
+> 
+> Well, the comment about SOC_COMMON doesn't apply as you're not using that.
+> 
+> Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
+> requirement to support a larger IO space.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/common.c |    4 ++++
- 1 file changed, 4 insertions(+)
+Agreed. The next step is moving all i/o space to a fixed virtual address
+and for this we want to make i/o windows 64K.
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 25fb3fd..97f7d36 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -238,6 +238,10 @@ void __init kirkwood_clk_init(void)
- 	orion_clkdev_add("0", "pcie", pex0);
- 	orion_clkdev_add("1", "pcie", pex1);
- 	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
-+
-+	/* Something other than SPI and NAND needs runit, so make sure
-+	   it never gets turned off. */
-+	clk_prepare_enable(runit);
- }
- 
- /*****************************************************************************
--- 
-1.7.10
+However, I think you may also have a problem with
+ORION5X_PCIE_IO_BUS_BASE and the resource start. The i/o resource start
+should really be 0 and then the __io() macro should add the virtual i/o
+base address. However, Russell has mentioned previously that some chips
+may not work correctly with i/o space at 0 (PCI bus addresses, not host).
+
+Do you have cards with i/o that you can test or know what devices are
+used with this platform?
+
+Rob
