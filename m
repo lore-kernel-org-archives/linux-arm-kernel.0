@@ -1,36 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 8 Jun 2012 16:30:55 +0300
-Subject: [PATCH 00/11] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-In-Reply-To: <20120607060901.25532.68354.stgit@dusk>
-References: <20120607060901.25532.68354.stgit@dusk>
-Message-ID: <1339162255.2091.56.camel@sokoban>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 8 Jun 2012 21:33:12 +0800
+Subject: [PATCH 1/1] pinctrl: pinctrl-imx: fix incorrect debug message of maps
+Message-ID: <1339162392-24628-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Tested this set on top of v3.5-rc1 with omap3 / omap4 suspend + my omap4
-core retention / dev-off patches. There are a couple of minor issues,
-like the bug in patch 5, and the fact that counter_32k hwmod data is
-broken for omap4. This fix is needed on omap4 to fix the counter_32k, if
-this is not done, device off does not work:
+After create config map, the new_map pointer becomes point to
+PIN_MAP_TYPE_CONFIGS_PIN map rather than PIN_MAP_TYPE_MUX_GROUP map any more.
+Thus using new_map pointer to display the MUX_GROUP info is not correct.
+Using map pointer instead to show the correct MUX_GROUP map info.
+Original the debug message is:
+imx6q-pinctrl 20e0000.iomuxc: maps: function Yp group MX6Q_PAD_SD3_CMD num 12
+After fix it is:
+imx6q-pinctrl 20e0000.iomuxc: maps: function usdhc3 group usdhc3grp-1 num 11
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 66da92d..6ad64c6 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -397,8 +397,7 @@ static struct omap_hwmod_class_sysconfig
-omap44xx_counter_sysc = {
- 	.rev_offs	= 0x0000,
- 	.sysc_offs	= 0x0004,
- 	.sysc_flags	= SYSC_HAS_SIDLEMODE,
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   SIDLE_SMART_WKUP),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
+Reported-by: Richard Zhao <richard.zhao@freescale.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+---
+ drivers/pinctrl/pinctrl-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index f6e7c67..d8fe1d8 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -193,7 +193,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	}
  
-
-
--Tero
+ 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
+-		new_map->data.mux.function, new_map->data.mux.group, map_num);
++		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
+ 
+ 	return 0;
+ }
+-- 
+1.7.0.4
