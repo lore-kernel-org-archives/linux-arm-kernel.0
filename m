@@ -1,57 +1,195 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jun 2012 12:43:16 +0100
-Subject: mach/io.h cleanup and removal question
-In-Reply-To: <20120608102040.GA26034@lunn.ch>
-References: <20120608102040.GA26034@lunn.ch>
-Message-ID: <20120608114316.GC15555@n2100.arm.linux.org.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 8 Jun 2012 20:32:28 +0800
+Subject: [PATCH 1/2] USB: move transceiver from ehci_hcd and ohci_hcd to hcd
+ and rename it as phy
+In-Reply-To: <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
+References: <1338946190-19105-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1339158749-15634-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 12:20:40PM +0200, Andrew Lunn wrote:
-> Your patchset for mach/io.h cleanup and remove, causes problems on
-> Orion5x.
-> 
-> mach/io.h for orion5x had a:
-> 
-> #define IO_SPACE_LIMIT		0xffffffff
-> 
-> which got removed. This results in a panic at boot:
-> 
->         /*
->          * IORESOURCE_IO
->          */
->         sys->io_offset = 0;
->         res[0].name = "PCIe I/O Space";
->         res[0].flags = IORESOURCE_IO;
->         res[0].start = ORION5X_PCIE_IO_BUS_BASE;
->         res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
->         if (request_resource(&ioport_resource, &res[0]))
->                 panic("Request PCIe IO resource failed\n");
-> 
-> ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
-> 64K default.
-> 
-> arch/arm/include/asm/io.h has the comment:
-> 
-> /*
->  * This is the limit of PC card/PCI/ISA IO space, which is by default
->  * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
->  * zero to prevent ISA/PCI drivers claiming IO space (and potentially
->  * oopsing.)
->  *
->  * Only set this larger if you really need inb() et.al. to operate over
->  * a larger address space.  Note that SOC_COMMON ioremaps each sockets
->  * IO space area, and so inb() et.al. must be defined to operate as per
->  * readb() et.al. on such platforms.
->  */
-> 
-> Now, i know nothing about how PCI works... So i have a question:
-> 
-> Which is better, put back parts of io.h so allowing the 1MB
-> request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
-> the comment it is unlikely an PCI card needs more than 64KB?
+ - to decrease redundant since both ehci_hcd and ohci_hcd have the same variable
+ - it helps access phy in usb core code
+ - phy is more meaningful than transceiver
 
-Well, the comment about SOC_COMMON doesn't apply as you're not using that.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ drivers/usb/host/ehci-fsl.c  |   21 ++++++++++-----------
+ drivers/usb/host/ehci-hub.c  |    2 +-
+ drivers/usb/host/ehci.h      |    4 ----
+ drivers/usb/host/ohci-omap.c |   27 ++++++++++++++-------------
+ drivers/usb/host/ohci.h      |    5 -----
+ include/linux/usb/hcd.h      |    6 ++++++
+ 6 files changed, 31 insertions(+), 34 deletions(-)
 
-Probably shrinking ORION5X_PCIE_IO_SIZE to 64K, unless we really have a
-requirement to support a larger IO space.
+diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
+index 4336257..3379945 100644
+--- a/drivers/usb/host/ehci-fsl.c
++++ b/drivers/usb/host/ehci-fsl.c
+@@ -142,19 +142,19 @@ static int usb_hcd_fsl_probe(const struct hc_driver *driver,
+ 	if (pdata->operating_mode == FSL_USB2_DR_OTG) {
+ 		struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+ 
+-		ehci->transceiver = usb_get_transceiver();
+-		dev_dbg(&pdev->dev, "hcd=0x%p  ehci=0x%p, transceiver=0x%p\n",
+-			hcd, ehci, ehci->transceiver);
++		hcd->phy = usb_get_transceiver();
++		dev_dbg(&pdev->dev, "hcd=0x%p  ehci=0x%p, phy=0x%p\n",
++			hcd, ehci, hcd->phy);
+ 
+-		if (ehci->transceiver) {
+-			retval = otg_set_host(ehci->transceiver->otg,
++		if (hcd->phy) {
++			retval = otg_set_host(hcd->phy->otg,
+ 					      &ehci_to_hcd(ehci)->self);
+ 			if (retval) {
+-				usb_put_transceiver(ehci->transceiver);
++				usb_put_transceiver(hcd->phy);
+ 				goto err4;
+ 			}
+ 		} else {
+-			dev_err(&pdev->dev, "can't find transceiver\n");
++			dev_err(&pdev->dev, "can't find phy\n");
+ 			retval = -ENODEV;
+ 			goto err4;
+ 		}
+@@ -190,11 +190,10 @@ static void usb_hcd_fsl_remove(struct usb_hcd *hcd,
+ 			       struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+-	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+ 
+-	if (ehci->transceiver) {
+-		otg_set_host(ehci->transceiver->otg, NULL);
+-		usb_put_transceiver(ehci->transceiver);
++	if (hcd->phy) {
++		otg_set_host(hcd->phy->otg, NULL);
++		usb_put_transceiver(hcd->phy);
+ 	}
+ 
+ 	usb_remove_hcd(hcd);
+diff --git a/drivers/usb/host/ehci-hub.c b/drivers/usb/host/ehci-hub.c
+index fc9e7cc..dd5eef6 100644
+--- a/drivers/usb/host/ehci-hub.c
++++ b/drivers/usb/host/ehci-hub.c
+@@ -724,7 +724,7 @@ static int ehci_hub_control (
+ #ifdef CONFIG_USB_OTG
+ 			if ((hcd->self.otg_port == (wIndex + 1))
+ 			    && hcd->self.b_hnp_enable) {
+-				otg_start_hnp(ehci->transceiver->otg);
++				otg_start_hnp(hcd->phy->otg);
+ 				break;
+ 			}
+ #endif
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index 2694ed6..85c3572 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -175,10 +175,6 @@ struct ehci_hcd {			/* one per controller */
+ #ifdef DEBUG
+ 	struct dentry		*debug_dir;
+ #endif
+-	/*
+-	 * OTG controllers and transceivers need software interaction
+-	 */
+-	struct usb_phy	*transceiver;
+ };
+ 
+ /* convert between an HCD pointer and the corresponding EHCI_HCD */
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 9ce35d0..eccddb4 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -167,14 +167,15 @@ static int omap_1510_local_bus_init(void)
+ 
+ static void start_hnp(struct ohci_hcd *ohci)
+ {
+-	const unsigned	port = ohci_to_hcd(ohci)->self.otg_port - 1;
++	struct usb_hcd *hcd = ohci_to_hcd(ohci);
++	const unsigned	port = hcd->self.otg_port - 1;
+ 	unsigned long	flags;
+ 	u32 l;
+ 
+-	otg_start_hnp(ohci->transceiver->otg);
++	otg_start_hnp(hcd->phy->otg);
+ 
+ 	local_irq_save(flags);
+-	ohci->transceiver->state = OTG_STATE_A_SUSPEND;
++	hcd->phy->state = OTG_STATE_A_SUSPEND;
+ 	writel (RH_PS_PSS, &ohci->regs->roothub.portstatus [port]);
+ 	l = omap_readl(OTG_CTRL);
+ 	l &= ~OTG_A_BUSREQ;
+@@ -211,18 +212,18 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+ 
+ #ifdef	CONFIG_USB_OTG
+ 	if (need_transceiver) {
+-		ohci->transceiver = usb_get_transceiver();
+-		if (ohci->transceiver) {
+-			int	status = otg_set_host(ohci->transceiver->otg,
++		hcd->phy = usb_get_transceiver();
++		if (hcd->phy) {
++			int	status = otg_set_host(hcd->phy->otg,
+ 						&ohci_to_hcd(ohci)->self);
+-			dev_dbg(hcd->self.controller, "init %s transceiver, status %d\n",
+-					ohci->transceiver->label, status);
++			dev_dbg(hcd->self.controller, "init %s phy, status %d\n",
++					hcd->phy->label, status);
+ 			if (status) {
+-				usb_put_transceiver(ohci->transceiver);
++				usb_put_transceiver(hcd->phy);
+ 				return status;
+ 			}
+ 		} else {
+-			dev_err(hcd->self.controller, "can't find transceiver\n");
++			dev_err(hcd->self.controller, "can't find phy\n");
+ 			return -ENODEV;
+ 		}
+ 		ohci->start_hnp = start_hnp;
+@@ -403,9 +404,9 @@ usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+ 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
+ 
+ 	usb_remove_hcd(hcd);
+-	if (ohci->transceiver) {
+-		(void) otg_set_host(ohci->transceiver->otg, 0);
+-		usb_put_transceiver(ohci->transceiver);
++	if (hcd->phy) {
++		(void) otg_set_host(hcd->phy->otg, 0);
++		usb_put_transceiver(hcd->phy);
+ 	}
+ 	if (machine_is_omap_osk())
+ 		gpio_free(9);
+diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
+index 1b19aea..d329914 100644
+--- a/drivers/usb/host/ohci.h
++++ b/drivers/usb/host/ohci.h
+@@ -372,11 +372,6 @@ struct ohci_hcd {
+ 	struct ed		*ed_controltail;	/* last in ctrl list */
+ 	struct ed		*periodic [NUM_INTS];	/* shadow int_table */
+ 
+-	/*
+-	 * OTG controllers and transceivers need software interaction;
+-	 * other external transceivers should be software-transparent
+-	 */
+-	struct usb_phy	*transceiver;
+ 	void (*start_hnp)(struct ohci_hcd *ohci);
+ 
+ 	/*
+diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
+index 7f855d5..c532cbe 100644
+--- a/include/linux/usb/hcd.h
++++ b/include/linux/usb/hcd.h
+@@ -93,6 +93,12 @@ struct usb_hcd {
+ 	 */
+ 	const struct hc_driver	*driver;	/* hw-specific hooks */
+ 
++	/*
++	 * OTG and some Host controllers need software interaction with phys;
++	 * other external phys should be software-transparent
++	 */
++	struct usb_phy	*phy;
++
+ 	/* Flags that need to be manipulated atomically because they can
+ 	 * change while the host controller is running.  Always use
+ 	 * set_bit() or clear_bit() to change their values.
+-- 
+1.7.9.5
