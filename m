@@ -1,283 +1,79 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Jun 2012 10:24:32 -0500
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <20120608094708.GC19062@mudshark.cambridge.arm.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
- <20120608094708.GC19062@mudshark.cambridge.arm.com>
-Message-ID: <4FD21930.4000800@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Jun 2012 17:25:54 +0200
+Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
+In-Reply-To: <CACKLOr1Q1yxbaMmrFVsw-h-SmS3H4q_R+KY=DgnjM5WjaDW9Cg@mail.gmail.com>
+References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
+ <20120608072601.GD30137@pengutronix.de>
+ <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
+ <20120608084802.GS30400@pengutronix.de>
+ <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
+ <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
+ <20120608092343.GU30400@pengutronix.de>
+ <CACKLOr1Q1yxbaMmrFVsw-h-SmS3H4q_R+KY=DgnjM5WjaDW9Cg@mail.gmail.com>
+Message-ID: <20120608152554.GY30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, Jun 08, 2012 at 01:32:27PM +0200, javier Martin wrote:
+> On 8 June 2012 11:23, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Fri, Jun 08, 2012 at 11:02:31AM +0200, javier Martin wrote:
+> 
+> Hi Sascha,
+> 
+> From our point of view the current situation is the following:
+> We have a very reliable driver for the VPU which is not mainline but
+> it's been used for two years in our products. This driver only
+> supports encoding in the i.MX27 chip.
+> In parallel, you have a a multichip driver in progress which is not
+> mainline either, not fully V4L2 compatible and not tested for i.MX27.
+> [1]
+> At the same time, we have a driver in progress for i.MX27 encoding
+> only which follows V4L2 mem2mem framework. [2].
+> 
+> The first thing to decide would be which of both drivers we take as a
+> base for final mainline developing.
+> In our view, cleaning up driver from Pengutronix [1] would imply a lot
+> of effort of maintaining code that we cannot really test (i.MX5,
+> i.MX6) whereas if we continue using [2] we would have something valid
+> for i.MX27 much faster. Support for decoding and other chips could be
+> added later.
+> 
+> The second thing would be whether we keep on developing or whether we
+> should wait for you to have something in mainline. We have already
+> allocated resources to the development of the driver and long-term
+> testing to achieve product level reliability. Pengutronix does not
+> seem to be committed to developing the features relevant to our
+> product (lack of YUV420 support for i.MX27 camera driver[6]) nor
+> committed to any deadline (lack of answers or development on dmaengine
+> for i.MX27[4][5]). Moreover, development effort is only 50% of the
+> cost and we would still have to spend a lot of time checking the video
+> stream manually in different real-rife conditions (only extensive
+> testing allowed us to catch the "P frame marked as IDR" bug [7]).
+> 
+> As a conclusion we propose that we keep on developing our driver for
+> encoding in the i.MX27 VPU under the following conditions:
+> - We will provide a more generic name for the driver than "codadx6",
+> maybe something as "imx_vpu".
 
-On 06/08/2012 04:47 AM, Will Deacon wrote:
-> Hi Jon,
-> 
-> On Thu, Jun 07, 2012 at 10:22:03PM +0100, Jon Hunter wrote:
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 186c8cb..00adb98 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -20,6 +20,7 @@
->>  #include <linux/platform_device.h>
->>  #include <linux/spinlock.h>
->>  #include <linux/uaccess.h>
->> +#include <linux/pm_runtime.h>
->>  
->>  #include <asm/cputype.h>
->>  #include <asm/irq.h>
->> @@ -367,8 +368,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->>  {
->>  	int i, irq, irqs;
->>  	struct platform_device *pmu_device = armpmu->plat_device;
->> -	struct arm_pmu_platdata *plat =
->> -		dev_get_platdata(&pmu_device->dev);
->>  
->>  	irqs = min(pmu_device->num_resources, num_possible_cpus());
->>  
->> @@ -376,14 +375,12 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->>  		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->>  			continue;
->>  		irq = platform_get_irq(pmu_device, i);
->> -		if (irq >= 0) {
->> -			if (plat && plat->disable_irq)
->> -				plat->disable_irq(irq);
->> +		if (irq >= 0)
->>  			free_irq(irq, armpmu);
->> -		}
->>  	}
->>  
->>  	release_pmu(armpmu->type);
->> +	pm_runtime_put_sync(&armpmu->plat_device->dev);
-> 
-> We probably want to suspend the device before releasing it, otherwise we
-> could race against somebody else trying to initialise the PMU again.
-> 
->>  
->>  static int
->> @@ -403,6 +400,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  		return err;
->>  	}
->>  
->> +	pm_runtime_get_sync(&armpmu->plat_device->dev);
-> 
-> Better pass &pmu_device->dev instead (similarly in release).
-> 
->> +
->>  	plat = dev_get_platdata(&pmu_device->dev);
->>  	if (plat && plat->handle_irq)
->>  		handle_irq = armpmu_platform_irq;
->> @@ -440,8 +439,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  				irq);
->>  			armpmu_release_hardware(armpmu);
->>  			return err;
->> -		} else if (plat && plat->enable_irq)
->> -			plat->enable_irq(irq);
->> +		}
->>  
->>  		cpumask_set_cpu(i, &armpmu->active_irqs);
->>  	}
->> @@ -584,6 +582,28 @@ static void armpmu_disable(struct pmu *pmu)
->>  	armpmu->stop();
->>  }
-> 
-> There are potential failure paths in the reservation code here where we
-> don't `put' the PMU back. Can you move the pm_runtime_get_sync call later in
-> the function, or does it have to called before we enable the IRQ line?
-> 
->> +#ifdef CONFIG_PM_RUNTIME
->> +static int armpmu_runtime_resume(struct device *dev)
->> +{
->> +	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
->> +
->> +	if (plat->runtime_resume)
-> 
-> I think you need to check plat too since it may be NULL on other platforms.
-> 
->> +		return plat->runtime_resume(dev);
->> +
->> +	return 0;
->> +}
->> +
->> +static int armpmu_runtime_suspend(struct device *dev)
->> +{
->> +	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
->> +
->> +	if (plat->runtime_suspend)
-> 
-> Same here.
+Since we already know that this is a codadx6 we should name it codadx
+instead of anything vpu specific. I also suggest codadx instead of
+anything more specific like codadx6 since we should rather motivate
+people to merge other coda cores into this driver.
 
-Here is an updated version. I was going to send out a V3, but I wanted
-to wait to see if others had more comments first.
+> - We will do an extra effort and will study your code in [1] in order
+> to provide a modular approach that makes adding new functionality (new
+> chips or decoding) as easy as possible while making obvious that
+> further patches do not break support for encoding in the i.MX27.
 
-Cheers
-Jon
+This sounds like a plan. I am happy that you are willing to keep an eye
+on our driver. It would be a pity to have unnecessary barriers for
+merging codadx9 stuff later.
 
->From c53dcbe091928d293f14e890c2b38be57692ccca Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 31 May 2012 13:05:20 -0500
-Subject: [PATCH] ARM: PMU: Add runtime PM Support
+Sascha
 
-Add runtime PM support to the ARM PMU driver so that devices such as OMAP
-supporting dynamic PM can use the platform->runtime_* hooks to initialise
-hardware at runtime. Without having these runtime PM hooks in place any
-configuration of the PMU hardware would be lost when low power states are
-entered and hence would prevent PMU from working.
 
-This change also replaces the PMU platform functions enable_irq and disable_irq
-added by Ming Lei with runtime_resume and runtime_suspend funtions. Ming had
-added the enable_irq and disable_irq functions as a method to configure the
-cross trigger interface on OMAP4 for routing the PMU interrupts. By adding
-runtime PM support, we can move the code called by enable_irq and disable_irq
-into the runtime PM callbacks runtime_resume and runtime_suspend.
-
-Cc: Ming Lei <ming.lei@canonical.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/include/asm/pmu.h   |   20 ++++++++++++--------
- arch/arm/kernel/perf_event.c |   41 +++++++++++++++++++++++++++++++++--------
- 2 files changed, 45 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 90114fa..77b023b 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -31,18 +31,22 @@ enum arm_pmu_type {
-  *	interrupt and passed the address of the low level handler,
-  *	and can be used to implement any platform specific handling
-  *	before or after calling it.
-- * @enable_irq: an optional handler which will be called after
-- *	request_irq and be used to handle some platform specific
-- *	irq enablement
-- * @disable_irq: an optional handler which will be called before
-- *	free_irq and be used to handle some platform specific
-- *	irq disablement
-+ * @runtime_resume: an optional handler which will be called by the
-+ *	runtime PM framework following a call to pm_runtime_get().
-+ *	Note that if pm_runtime_get() is called more than once in
-+ *	succession this handler will only be called once.
-+ * @runtime_suspend: an optional handler which will be called by the
-+ *	runtime PM framework following a call to pm_runtime_put().
-+ *	Note that if pm_runtime_get() is called more than once in
-+ *	succession this handler will only be called following the
-+ *	final call to pm_runtime_put() that actually disables the
-+ *	hardware.
-  */
- struct arm_pmu_platdata {
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
--	void (*enable_irq)(int irq);
--	void (*disable_irq)(int irq);
-+	int (*runtime_resume)(struct device *dev);
-+	int (*runtime_suspend)(struct device *dev);
- };
- 
- #ifdef CONFIG_CPU_HAS_PMU
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 186c8cb..2878651 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -20,6 +20,7 @@
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/uaccess.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/cputype.h>
- #include <asm/irq.h>
-@@ -367,8 +368,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
--	struct arm_pmu_platdata *plat =
--		dev_get_platdata(&pmu_device->dev);
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
- 
-@@ -376,13 +375,11 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
- 		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
- 			continue;
- 		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0) {
--			if (plat && plat->disable_irq)
--				plat->disable_irq(irq);
-+		if (irq >= 0)
- 			free_irq(irq, armpmu);
--		}
- 	}
- 
-+	pm_runtime_put_sync(&pmu_device->dev);
- 	release_pmu(armpmu->type);
- }
- 
-@@ -415,6 +412,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
-+	pm_runtime_get_sync(&pmu_device->dev);
-+
- 	for (i = 0; i < irqs; ++i) {
- 		err = 0;
- 		irq = platform_get_irq(pmu_device, i);
-@@ -440,8 +439,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 				irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
--		} else if (plat && plat->enable_irq)
--			plat->enable_irq(irq);
-+		}
- 
- 		cpumask_set_cpu(i, &armpmu->active_irqs);
- 	}
-@@ -584,6 +582,28 @@ static void armpmu_disable(struct pmu *pmu)
- 	armpmu->stop();
- }
- 
-+#ifdef CONFIG_PM_RUNTIME
-+static int armpmu_runtime_resume(struct device *dev)
-+{
-+	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-+
-+	if (plat && plat->runtime_resume)
-+		return plat->runtime_resume(dev);
-+
-+	return 0;
-+}
-+
-+static int armpmu_runtime_suspend(struct device *dev)
-+{
-+	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-+
-+	if (plat && plat->runtime_suspend)
-+		return plat->runtime_suspend(dev);
-+
-+	return 0;
-+}
-+#endif
-+
- static void __init armpmu_init(struct arm_pmu *armpmu)
- {
- 	atomic_set(&armpmu->active_events, 0);
-@@ -650,9 +670,14 @@ static int __devinit armpmu_device_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct dev_pm_ops armpmu_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
-+};
-+
- static struct platform_driver armpmu_driver = {
- 	.driver		= {
- 		.name	= "arm-pmu",
-+		.pm	= &armpmu_dev_pm_ops,
- 		.of_match_table = armpmu_of_device_ids,
- 	},
- 	.probe		= armpmu_device_probe,
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
