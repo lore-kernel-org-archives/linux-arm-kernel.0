@@ -1,107 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jun 2012 10:47:08 +0100
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <20120608094708.GC19062@mudshark.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 8 Jun 2012 15:30:23 +0530
+Subject: [CFT 01/11] dmaengine: add OMAP DMA engine driver
+In-Reply-To: <20120608090200.GA15831@n2100.arm.linux.org.uk>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScaXw-0003tR-U8@rmk-PC.arm.linux.org.uk>
+ <20120608090200.GA15831@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gzGp=eznnXweX=ZN03cxVbbhbHconowigk964ojx99mJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Fri, Jun 8, 2012 at 2:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jun 07, 2012 at 12:06:32PM +0100, Russell King wrote:
+>> Tested-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>> ?drivers/dma/Kconfig ? ? ?| ? ?6 +
+>> ?drivers/dma/Makefile ? ? | ? ?1 +
+>> ?drivers/dma/omap-dma.c ? | ?522 ++++++++++++++++++++++++++++++++++++++++++++++
+>> ?include/linux/omap-dma.h | ? 24 ++
+>> ?4 files changed, 553 insertions(+), 0 deletions(-)
+>> ?create mode 100644 drivers/dma/omap-dma.c
+>> ?create mode 100644 include/linux/omap-dma.h
+>
+> There is a bug in here which no one has spotted... I just noticed it.
+>
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index 500bc71..02eb2fd 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -130,14 +130,13 @@ static void omap_dma_callback(int ch, u16 status, void *data)
+>
+> ? ? ? ?spin_lock_irqsave(&c->vc.lock, flags);
+> ? ? ? ?d = c->desc;
+> - ? ? ? if (!d)
+> - ? ? ? ? ? ? ? return;
+> -
+> - ? ? ? if (++c->sgidx < d->sglen) {
+> - ? ? ? ? ? ? ? omap_dma_start_sg(c, d, c->sgidx);
+> - ? ? ? } else {
+> - ? ? ? ? ? ? ? omap_dma_start_desc(c);
+> - ? ? ? ? ? ? ? vchan_cookie_complete(&d->vd);
+> + ? ? ? if (d) {
+> + ? ? ? ? ? ? ? if (++c->sgidx < d->sglen) {
+> + ? ? ? ? ? ? ? ? ? ? ? omap_dma_start_sg(c, d, c->sgidx);
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? omap_dma_start_desc(c);
+> + ? ? ? ? ? ? ? ? ? ? ? vchan_cookie_complete(&d->vd);
+> + ? ? ? ? ? ? ? }
+> ? ? ? ?}
+> ? ? ? ?spin_unlock_irqrestore(&c->vc.lock, flags);
+> ?}
+>
+You mean the lock release, right ?
 
-On Thu, Jun 07, 2012 at 10:22:03PM +0100, Jon Hunter wrote:
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 186c8cb..00adb98 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -20,6 +20,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/uaccess.h>
-> +#include <linux/pm_runtime.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/irq.h>
-> @@ -367,8 +368,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->  {
->  	int i, irq, irqs;
->  	struct platform_device *pmu_device = armpmu->plat_device;
-> -	struct arm_pmu_platdata *plat =
-> -		dev_get_platdata(&pmu_device->dev);
->  
->  	irqs = min(pmu_device->num_resources, num_possible_cpus());
->  
-> @@ -376,14 +375,12 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->  		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->  			continue;
->  		irq = platform_get_irq(pmu_device, i);
-> -		if (irq >= 0) {
-> -			if (plat && plat->disable_irq)
-> -				plat->disable_irq(irq);
-> +		if (irq >= 0)
->  			free_irq(irq, armpmu);
-> -		}
->  	}
->  
->  	release_pmu(armpmu->type);
-> +	pm_runtime_put_sync(&armpmu->plat_device->dev);
-
-We probably want to suspend the device before releasing it, otherwise we
-could race against somebody else trying to initialise the PMU again.
-
->  
->  static int
-> @@ -403,6 +400,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  		return err;
->  	}
->  
-> +	pm_runtime_get_sync(&armpmu->plat_device->dev);
-
-Better pass &pmu_device->dev instead (similarly in release).
-
-> +
->  	plat = dev_get_platdata(&pmu_device->dev);
->  	if (plat && plat->handle_irq)
->  		handle_irq = armpmu_platform_irq;
-> @@ -440,8 +439,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  				irq);
->  			armpmu_release_hardware(armpmu);
->  			return err;
-> -		} else if (plat && plat->enable_irq)
-> -			plat->enable_irq(irq);
-> +		}
->  
->  		cpumask_set_cpu(i, &armpmu->active_irqs);
->  	}
-> @@ -584,6 +582,28 @@ static void armpmu_disable(struct pmu *pmu)
->  	armpmu->stop();
->  }
-
-There are potential failure paths in the reservation code here where we
-don't `put' the PMU back. Can you move the pm_runtime_get_sync call later in
-the function, or does it have to called before we enable the IRQ line?
-
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int armpmu_runtime_resume(struct device *dev)
-> +{
-> +	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-> +
-> +	if (plat->runtime_resume)
-
-I think you need to check plat too since it may be NULL on other platforms.
-
-> +		return plat->runtime_resume(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int armpmu_runtime_suspend(struct device *dev)
-> +{
-> +	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-> +
-> +	if (plat->runtime_suspend)
-
-Same here.
-
-Will
+Regards
+Santosh
