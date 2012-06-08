@@ -1,39 +1,41 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 8 Jun 2012 15:13:48 +0200
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 8 Jun 2012 16:22:53 +0300
+Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <20120607061309.25532.13430.stgit@dusk>
 References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
- <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
-Message-ID: <4FD1FA8C.1080600@ti.com>
+ <20120607061309.25532.13430.stgit@dusk>
+Message-ID: <1339161773.2091.49.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/8/2012 3:11 AM, Paul Walmsley wrote:
-> On Thu, 7 Jun 2012, Cousson, Benoit wrote:
->
->> Indeed, what I did not mention is that potentially the whole device init
->> should be done ondemand as well. Meaning the whole hwmod setup phase should be
->> done only when the driver will probe the device.
->
-> That means if no driver exists for an IP block, or if the driver isn't
-> using PM runtime, the IP block won't be reset.  And somehow we still are
-> missing drivers in mainline.  We also still have drivers that aren't yet
-> PM runtime converted.
+Hi Paul,
 
-No the point is still the same as before. You let the drivers do the job 
-if they are there, and then do a pass at very late time during the boot 
-process to handle the ones that were not probed by any driver.
+There's a bug in this patch, see below.
 
-At least you will avoid the enable -> reset -> idle -> enable sequence 
-we are doing right now for most of the active drivers when it is not 
-necessary.
+<clip>
 
-Regards,
-Benoit
+>  {
+> @@ -1141,8 +1143,26 @@ static void _enable_sysc(struct omap_hwmod *oh)
+>  	sf = oh->class->sysc->sysc_flags;
+>  
+>  	if (sf & SYSC_HAS_SIDLEMODE) {
+> -		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
+> -			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
+> +		if (oh->flags & HWMOD_SWSUP_SIDLE) {
+> +			/*
+> +			 * IP blocks without smart idle should be left
+> +			 * in force-idle.  Currently this only applies
+> +			 * to 32k sync "timer" which is guaranteed to
+> +			 * be accessible when the kernel is running.
+> +			 * HWMOD_SWSUP_IDLE must also be set on these
+> +			 * IP blocks to indicate a hardware problem.
+> +			 * XXX Not an ideal workaround.
+> +			 */
+> +			if (oh->class->sysc->idlemodes &
+> +			    (SIDLE_NO | SIDLE_FORCE) &&
+> +			    !(oh->class->sysc->idlemodes &
+> +			      (SIDLE_SMART || SIDLE_SMART_WKUP)))
+
+There should by binary or, not logical here.
+
+-Tero
