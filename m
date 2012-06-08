@@ -1,79 +1,26 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Jun 2012 17:25:54 +0200
-Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
-In-Reply-To: <CACKLOr1Q1yxbaMmrFVsw-h-SmS3H4q_R+KY=DgnjM5WjaDW9Cg@mail.gmail.com>
-References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
- <20120608072601.GD30137@pengutronix.de>
- <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
- <20120608084802.GS30400@pengutronix.de>
- <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
- <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
- <20120608092343.GU30400@pengutronix.de>
- <CACKLOr1Q1yxbaMmrFVsw-h-SmS3H4q_R+KY=DgnjM5WjaDW9Cg@mail.gmail.com>
-Message-ID: <20120608152554.GY30400@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Jun 2012 15:34:13 +0000
+Subject: [PATCH] ARM: Kirkwood: Fix crash when neither NAND nor SPI
+In-Reply-To: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
+References: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
+Message-ID: <201206081534.13261.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 01:32:27PM +0200, javier Martin wrote:
-> On 8 June 2012 11:23, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Fri, Jun 08, 2012 at 11:02:31AM +0200, javier Martin wrote:
+On Friday 08 June 2012, Andrew Lunn wrote:
+> Both NAND and SPI make use of the RUNIT clk. However, if neither NAND
+> nor SPI is used in the system, RUNIT clock gets turned off, and the
+> SoC hard locks. It appears something else in the SoC, which is not
+> documented, is also using RUNIT. So prepare and enable RUNIT clock in
+> kirkwood_clk_init().
 > 
-> Hi Sascha,
-> 
-> From our point of view the current situation is the following:
-> We have a very reliable driver for the VPU which is not mainline but
-> it's been used for two years in our products. This driver only
-> supports encoding in the i.MX27 chip.
-> In parallel, you have a a multichip driver in progress which is not
-> mainline either, not fully V4L2 compatible and not tested for i.MX27.
-> [1]
-> At the same time, we have a driver in progress for i.MX27 encoding
-> only which follows V4L2 mem2mem framework. [2].
-> 
-> The first thing to decide would be which of both drivers we take as a
-> base for final mainline developing.
-> In our view, cleaning up driver from Pengutronix [1] would imply a lot
-> of effort of maintaining code that we cannot really test (i.MX5,
-> i.MX6) whereas if we continue using [2] we would have something valid
-> for i.MX27 much faster. Support for decoding and other chips could be
-> added later.
-> 
-> The second thing would be whether we keep on developing or whether we
-> should wait for you to have something in mainline. We have already
-> allocated resources to the development of the driver and long-term
-> testing to achieve product level reliability. Pengutronix does not
-> seem to be committed to developing the features relevant to our
-> product (lack of YUV420 support for i.MX27 camera driver[6]) nor
-> committed to any deadline (lack of answers or development on dmaengine
-> for i.MX27[4][5]). Moreover, development effort is only 50% of the
-> cost and we would still have to spend a lot of time checking the video
-> stream manually in different real-rife conditions (only extensive
-> testing allowed us to catch the "P frame marked as IDR" bug [7]).
-> 
-> As a conclusion we propose that we keep on developing our driver for
-> encoding in the i.MX27 VPU under the following conditions:
-> - We will provide a more generic name for the driver than "codadx6",
-> maybe something as "imx_vpu".
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Since we already know that this is a codadx6 we should name it codadx
-instead of anything vpu specific. I also suggest codadx instead of
-anything more specific like codadx6 since we should rather motivate
-people to merge other coda cores into this driver.
+This looks bogus, because if you really need to enable that clock all
+the time, we don't even need a way to turn it off.
 
-> - We will do an extra effort and will study your code in [1] in order
-> to provide a modular approach that makes adding new functionality (new
-> chips or decoding) as easy as possible while making obvious that
-> further patches do not break support for encoding in the i.MX27.
+Do you need a similar change with the 3.4 kernel before the big
+change to the clock framework? If not, I would guess that there
+is some other problem.
 
-This sounds like a plan. I am happy that you are willing to keep an eye
-on our driver. It would be a pity to have unnecessary barriers for
-merging codadx9 stuff later.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
