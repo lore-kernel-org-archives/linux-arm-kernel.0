@@ -1,33 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 08 Jun 2012 10:31:44 +0100
-Subject: [PATCH v7 03/12] ARM: SoC: convert VExpress/RealView to SoC
- descriptor
-In-Reply-To: <1339085369-26073-4-git-send-email-marc.zyngier@arm.com>
-References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
- <1339085369-26073-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339147904.29543.14.camel@hornet>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  8 Jun 2012 11:36:45 +0200
+Subject: [PATCH v2] ARM: iconnect: Remove include of removed
+ linux/spi/orion_spi.h
+Message-ID: <1339148205-29285-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-06-07 at 17:09 +0100, Marc Zyngier wrote:
-> Convert both Realview and VExpress to use the SoC descriptor to
-> provide their SMP and CPU hotplug operation.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> arch/arm/mach-vexpress/core.h                  |   10 ++++++++++
->  arch/arm/mach-vexpress/hotplug.c               |    6 +++---
->  arch/arm/mach-vexpress/platsmp.c               |   21 +++++++++++++++++----
->  arch/arm/mach-vexpress/v2m.c                   |   10 ++++++++++
->  arch/arm/plat-versatile/include/plat/platsmp.h |   14 ++++++++++++++
->  arch/arm/plat-versatile/platsmp.c              |    4 ++--
->  15 files changed, 96 insertions(+), 16 deletions(-)
->  create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
+v3.5-rc1 fails to build when DT and iconnect is enabled because of
+this now none existant include file.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Also remove the other two SPI include files, which are not needed
+with the move to DT.
 
-Cheers!
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+---
+ arch/arm/mach-kirkwood/board-iconnect.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-Pawe?
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index 2222c57..b0d3cc4 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -20,9 +20,6 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/spi.h>
+-#include <linux/spi/orion_spi.h>
+ #include <linux/i2c.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+-- 
+1.7.10
