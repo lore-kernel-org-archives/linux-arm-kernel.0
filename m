@@ -1,134 +1,140 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Jun 2012 16:12:21 +0100
-Subject: [PATCH v2 4/4] ARM: ptrace: provide separate functions for tracing
- syscall {entry, exit}
-In-Reply-To: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
-References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1339168341-29850-5-git-send-email-will.deacon@arm.com>
+Date: Fri,  8 Jun 2012 16:16:46 +0100
+Subject: [PATCH v3] ARM: mm: update CONTEXTIDR register to contain PID of
+ current process
+Message-ID: <1339168606-30060-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscall_trace on ARM takes a `why' parameter to indicate whether or
-not we are entering or exiting a system call. This can be confusing for
-people looking at the code since (a) it conflicts with the why register
-alias in the entry assembly code and (b) it is not immediately clear
-what it represents.
+This patch introduces a new Kconfig option which, when enabled, causes
+the kernel to write the PID of the current task into the PROCID field
+of the CONTEXTIDR on context switch. This is useful when analysing
+hardware trace, since writes to this register can be configured to emit
+an event into the trace stream.
 
-This patch splits up the syscall_trace function into separate wrappers
-for syscall entry and exit, allowing the low-level syscall handling
-code to branch to the appropriate function.
+The thread notifier for writing the PID is deliberately kept separate
+from the ASID-writing code so that we can support newer processors using
+LPAE, where the ASID is stored in TTBR0. As such, the switch_mm code is
+updated to perform a read-modify-write sequence to ensure that we don't
+clobber the PID on CPUs using the classic 2-level page tables.
 
-Reported-by: Al Viro <viro@zeniv.linux.org.uk>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/entry-common.S |   14 +++++-------
- arch/arm/kernel/ptrace.c       |   46 +++++++++++++++++++++++++++-------------
- 2 files changed, 37 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 10911c9..49d9f93 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -442,10 +442,9 @@ ENDPROC(vector_swi)
- 	 * context switches, and waiting for our parent to respond.
- 	 */
- __sys_trace:
--	mov	r2, scno
--	add	r1, sp, #S_OFF
--	mov	r0, #0				@ trace entry [IP = 0]
--	bl	syscall_trace
-+	mov	r1, scno
-+	add	r0, sp, #S_OFF
-+	bl	syscall_trace_enter
+It's been a while since I posted a version of this patch because I had
+to rewrite most of it to fit with Catalin's changes to the context-switch
+code. The new version is a fair bit cleaner than the old one and works
+for both LPAE and classic MMU configurations.
+
+ arch/arm/Kconfig.debug       |    9 +++++++++
+ arch/arm/mm/context.c        |   35 +++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v6.S        |    6 ++++++
+ arch/arm/mm/proc-v7-2level.S |    5 +++++
+ 4 files changed, 55 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 01a1341..521e15b 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -369,4 +369,13 @@ config ARM_KPROBES_TEST
+ 	help
+ 	  Perform tests of kprobes API and instruction set simulation.
  
- 	adr	lr, BSYM(__sys_trace_return)	@ return address
- 	mov	scno, r0			@ syscall number (possibly new)
-@@ -457,10 +456,9 @@ __sys_trace:
++config PID_IN_CONTEXTIDR
++	bool "Write the current PID to the CONTEXTIDR register"
++	depends on CPU_COPY_V6
++	help
++	  Enabling this option causes the kernel to write the current PID to
++	  the PROCID field of the CONTEXTIDR register, at the expense of some
++	  additional instructions during context switch. Say Y here only if you
++	  are planning to use hardware trace tools with this kernel.
++
+ endmenu
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 806cc4f..119bc52 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -14,6 +14,7 @@
+ #include <linux/percpu.h>
  
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
--	mov	r2, scno
--	mov	r1, sp
--	mov	r0, #1				@ trace exit [IP = 1]
--	bl	syscall_trace
-+	mov	r1, scno
-+	mov	r0, sp
-+	bl	syscall_trace_exit
- 	b	ret_slow_syscall
+ #include <asm/mmu_context.h>
++#include <asm/thread_notify.h>
+ #include <asm/tlbflush.h>
  
- 	.align	5
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 5256068..749899d 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -908,15 +908,18 @@ long arch_ptrace(struct task_struct *child, long request,
- 	return ret;
+ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+@@ -48,6 +49,40 @@ void cpu_set_reserved_ttbr0(void)
  }
+ #endif
  
--asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
-+enum ptrace_syscall_dir {
-+	PTRACE_SYSCALL_ENTER = 0,
-+	PTRACE_SYSCALL_EXIT,
++#ifdef CONFIG_PID_IN_CONTEXTIDR
++static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
++			       void *t)
++{
++	u32 contextidr;
++	pid_t pid;
++	struct thread_info *thread = t;
++
++	if (cmd != THREAD_NOTIFY_SWITCH)
++		return NOTIFY_DONE;
++
++	pid = task_pid_nr(thread->task) << ASID_BITS;
++	asm volatile(
++	"	mrc	p15, 0, %0, c13, c0, 1\n"
++	"	bfi	%1, %0, #0, %2\n"
++	"	mcr	p15, 0, %1, c13, c0, 1\n"
++	: "=r" (contextidr), "+r" (pid)
++	: "I" (ASID_BITS));
++	isb();
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block contextidr_notifier_block = {
++	.notifier_call = contextidr_notifier,
 +};
 +
-+static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
-+				enum ptrace_syscall_dir dir)
- {
- 	unsigned long ip;
- 
--	if (why == 0 && test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
--		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
--
- 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
--		goto out_no_trace;
-+		return scno;
- 
- 	current_thread_info()->syscall = scno;
- 
-@@ -925,21 +928,34 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 	 * IP = 0 -> entry, =1 -> exit
- 	 */
- 	ip = regs->ARM_ip;
--	regs->ARM_ip = why;
-+	regs->ARM_ip = dir;
- 
--	if (why)
-+	if (dir == PTRACE_SYSCALL_EXIT)
- 		tracehook_report_syscall_exit(regs, 0);
- 	else if (tracehook_report_syscall_entry(regs))
- 		current_thread_info()->syscall = -1;
- 
- 	regs->ARM_ip = ip;
--	scno = current_thread_info()->syscall;
-+	return current_thread_info()->syscall;
-+}
- 
--out_no_trace:
--	if (why)
--		audit_syscall_exit(regs);
--	else
--		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
--				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
--	return scno;
-+asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
++static int __init contextidr_notifier_init(void)
 +{
-+	int ret;
-+
-+	if (test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
-+		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
-+
-+	ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
-+	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
-+			    regs->ARM_r2, regs->ARM_r3);
-+
-+	return ret;
++	return thread_register_notifier(&contextidr_notifier_block);
 +}
++arch_initcall(contextidr_notifier_init);
++#endif
 +
-+asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
-+{
-+	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
-+	audit_syscall_exit(regs);
-+	return ret;
- }
+ /*
+  * We fork()ed a process, and we need a new context for the child
+  * to run in.
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 5900cd5..86b8b48 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -107,6 +107,12 @@ ENTRY(cpu_v6_switch_mm)
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+ 	mcr	p15, 0, r2, c7, c10, 4		@ drain write buffer
+ 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
++#ifdef CONFIG_PID_IN_CONTEXTIDR
++	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
++	bic	r2, r2, #0xff			@ extract the PID
++	and	r1, r1, #0xff
++	orr	r1, r1, r2			@ insert into new context ID
++#endif
+ 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
+ #endif
+ 	mov	pc, lr
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 42ac069..fd045e7 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -46,6 +46,11 @@ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_ARM_ERRATA_430973
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+ #endif
++#ifdef CONFIG_PID_IN_CONTEXTIDR
++	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
++	lsr	r2, r2, #8			@ extract the PID
++	bfi	r1, r2, #8, #24			@ insert into new context ID
++#endif
+ #ifdef CONFIG_ARM_ERRATA_754322
+ 	dsb
+ #endif
 -- 
 1.7.4.1
