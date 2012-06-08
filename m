@@ -1,163 +1,96 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri,  8 Jun 2012 20:54:48 +0200
-Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
-Message-ID: <1339181689-22573-1-git-send-email-marex@denx.de>
+Date: Fri,  8 Jun 2012 20:56:44 +0200
+Subject: [PATCH V2] MXS: Add DT binding support into stmp3xxx-rtc
+Message-ID: <1339181804-22822-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch configures the I2C bus timing registers according
-to information passed via DT. Currently, 100kHz and 400kHz
-modes are supported.
+Add simple binding for the stmp3xxx-rtc.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Detlev Zundel <dzu@denx.de>
-CC: Dong Aisheng <b29396@freescale.com>
-CC: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-Cc: linux-i2c at vger.kernel.org
-CC: Sascha Hauer <s.hauer@pengutronix.de>
-CC: Shawn Guo <shawn.guo@linaro.org>
-Cc: Stefano Babic <sbabic@denx.de>
-CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Wolfgang Denk <wd@denx.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: rtc-linux at googlegroups.com
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- Documentation/devicetree/bindings/i2c/i2c-mxs.txt |    1 +
- arch/arm/boot/dts/imx28.dtsi                      |    2 +
- drivers/i2c/busses/i2c-mxs.c                      |   54 +++++++++++++++++++++
- 3 files changed, 57 insertions(+)
+ .../devicetree/bindings/rtc/stmp3xxx-rtc.txt        |   19 +++++++++++++++++++
+ arch/arm/boot/dts/imx28.dtsi                        |    1 +
+ drivers/rtc/rtc-stmp3xxx.c                          |    7 +++++++
+ 3 files changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
 
-V2: Use clock-frequency instead
+V2: Fix typos, remove fsl,imx28-rtc
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-index 1bfc02d..d2bf750 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: Should be "fsl,<chip>-i2c"
- - reg: Should contain registers location and length
- - interrupts: Should contain ERROR and DMA interrupts
-+- clock-frequency: desired I2C bus clock frequency in Hz.
- 
- Examples:
- 
+diff --git a/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+new file mode 100644
+index 0000000..a7a7de5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/stmp3xxx-rtc.txt
+@@ -0,0 +1,19 @@
++* STMP3xxx/i.MX28 Time Clock controller
++
++Required properties:
++- compatible: should be one of the following.
++    * "fsl,stmp3xxx-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: Two interrupt numbers to the cpu should be specified. First
++  interrupt number is the rtc tick interrupt and second interrupt number
++  is the rtc alarm interrupt. The number of cells representing a interrupt
++  depends on the parent interrupt controller.
++
++Example:
++
++	rtc at 80056000 {
++		compatible = "fsl,stmp3xxx-rtc";
++		reg = <0x80056000 2000>;
++		interrupts = <28 29>;
++	};
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index a89da5a..714e63c 100644
+index cabcce8..5053019 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -398,6 +398,7 @@
- 				compatible = "fsl,imx28-i2c";
- 				reg = <0x80058000 2000>;
- 				interrupts = <111 68>;
-+				clock-frequency = <400000>;
- 				status = "disabled";
+@@ -387,6 +387,7 @@
  			};
  
-@@ -407,6 +408,7 @@
- 				compatible = "fsl,imx28-i2c";
- 				reg = <0x8005a000 2000>;
- 				interrupts = <110 69>;
-+				clock-frequency = <400000>;
+ 			rtc at 80056000 {
++				compatible = "fsl,imx28-rtc", "fsl,stmp3xxx-rtc";
+ 				reg = <0x80056000 2000>;
+ 				interrupts = <28 29>;
  				status = "disabled";
- 			};
+diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+index 1028786..3aadb58 100644
+--- a/drivers/rtc/rtc-stmp3xxx.c
++++ b/drivers/rtc/rtc-stmp3xxx.c
+@@ -25,6 +25,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/rtc.h>
+ #include <linux/slab.h>
++#include <linux/of_device.h>
  
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 04eb441..b4d083f 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -46,6 +46,10 @@
- #define MXS_I2C_CTRL0_DIRECTION			0x00010000
- #define MXS_I2C_CTRL0_XFER_COUNT(v)		((v) & 0x0000FFFF)
+ #include <mach/common.h>
  
-+#define MXS_I2C_TIMING0		(0x10)
-+#define MXS_I2C_TIMING1		(0x20)
-+#define MXS_I2C_TIMING2		(0x30)
-+
- #define MXS_I2C_CTRL1		(0x40)
- #define MXS_I2C_CTRL1_SET	(0x44)
- #define MXS_I2C_CTRL1_CLR	(0x48)
-@@ -97,6 +101,24 @@
- #define MXS_CMD_I2C_READ	(MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
- 				 MXS_I2C_CTRL0_MASTER_MODE)
+@@ -265,6 +266,11 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
+ #define stmp3xxx_rtc_resume	NULL
+ #endif
  
-+struct mxs_i2c_speed_config {
-+	uint32_t	timing0;
-+	uint32_t	timing1;
-+	uint32_t	timing2;
++static const struct of_device_id rtc_dt_ids[] = {
++	{ .compatible = "fsl,stmp3xxx-rtc", },
++	{ /* sentinel */ }
 +};
 +
-+const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
-+	.timing0	= 0x00780030,
-+	.timing1	= 0x00800030,
-+	.timing2	= 0x0015000d,
-+};
-+
-+const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
-+	.timing0	= 0x000f0007,
-+	.timing1	= 0x001f000f,
-+	.timing2	= 0x0015000d,
-+};
-+
- /**
-  * struct mxs_i2c_dev - per device, private MXS-I2C data
-  *
-@@ -112,11 +134,17 @@ struct mxs_i2c_dev {
- 	struct completion cmd_complete;
- 	u32 cmd_err;
- 	struct i2c_adapter adapter;
-+	const struct mxs_i2c_speed_config *speed;
+ static struct platform_driver stmp3xxx_rtcdrv = {
+ 	.probe		= stmp3xxx_rtc_probe,
+ 	.remove		= stmp3xxx_rtc_remove,
+@@ -273,6 +279,7 @@ static struct platform_driver stmp3xxx_rtcdrv = {
+ 	.driver		= {
+ 		.name	= "stmp3xxx-rtc",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = rtc_dt_ids,
+ 	},
  };
  
- static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
- {
- 	stmp_reset_block(i2c->regs);
-+
-+	writel(i2c->speed->timing0, i2c->regs + MXS_I2C_TIMING0);
-+	writel(i2c->speed->timing1, i2c->regs + MXS_I2C_TIMING1);
-+	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
-+
- 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
- 	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
- 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
-@@ -319,6 +347,27 @@ static const struct i2c_algorithm mxs_i2c_algo = {
- 	.functionality = mxs_i2c_func,
- };
- 
-+static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
-+{
-+	uint32_t speed;
-+	struct device *dev = i2c->dev;
-+	struct device_node *node = dev->of_node;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	i2c->speed = &mxs_i2c_95kHz_config;
-+	ret = of_property_read_u32(node, "clock-frequency", &speed);
-+	if (ret)
-+		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
-+	else if (speed == 400000)
-+		i2c->speed = &mxs_i2c_400kHz_config;
-+	else if (speed != 100000)
-+		dev_warn(dev, "Invalid I2C speed selected, using 100kHz\n");
-+
-+	return 0;
-+}
-+
- static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -358,6 +407,11 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 		return err;
- 
- 	i2c->dev = dev;
-+
-+	err = mxs_i2c_get_ofdata(i2c);
-+	if (err)
-+		return err;
-+
- 	platform_set_drvdata(pdev, i2c);
- 
- 	/* Do reset to enforce correct startup after pinmuxing */
 -- 
 1.7.10
