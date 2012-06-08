@@ -1,55 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Jun 2012 11:23:43 +0200
-Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
-In-Reply-To: <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
-References: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
- <20120608072601.GD30137@pengutronix.de>
- <CACKLOr1OShoEnLxs8BP6q2TyZrOH0oCnpbKZJqyAo-yXKck9Zw@mail.gmail.com>
- <20120608084802.GS30400@pengutronix.de>
- <CACKLOr2wdF4tnovpnCO+ys7OMhbaKoruorSsj5hPfB26jGzQTA@mail.gmail.com>
- <CACKLOr1G+GBMhRoWSMJ17LoKuiUe0b+BXcuzEKh4OUKNaU_M8A@mail.gmail.com>
-Message-ID: <20120608092343.GU30400@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 08 Jun 2012 10:31:44 +0100
+Subject: [PATCH v7 03/12] ARM: SoC: convert VExpress/RealView to SoC
+ descriptor
+In-Reply-To: <1339085369-26073-4-git-send-email-marc.zyngier@arm.com>
+References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+ <1339085369-26073-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1339147904.29543.14.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 11:02:31AM +0200, javier Martin wrote:
-> Hi,
-> I've checked this matter with a colleague and we have several reasons
-> to doubt that the i.MX27 and the i.MX53 can share the same driver for
-> their Video Processing Units (VPU):
+On Thu, 2012-06-07 at 17:09 +0100, Marc Zyngier wrote:
+> Convert both Realview and VExpress to use the SoC descriptor to
+> provide their SMP and CPU hotplug operation.
 > 
-> 1. The VPU in the i.MX27 is a "codadx6" with support for H.264, H.263
-> and MPEG4-Part2 [1]. Provided Freescale is using the same IP provider
-> for i.MX53 and looking at the features that the VPU in this SoC
-> supports (1080p resolution, VP8) we are probably dealing with a "coda
-> 9 series" [2].
-> 
-> 2. An important part of the functionality for controlling the
-> "codadx6" is implemented using software messages between the main CPU
-> and the VPU, this means that a different firmware loaded in the VPU
-> can substantially change the way it is handled. As previously stated,
-> i.MX27 and i.MX53 have different IP blocks and because of this, those
-> messages will be very different.
-> 
-> For these reasons we suggest that we carry on developing different
-> drivers for the i.MX27 and the i.MX53. Though it's true that both
-> drivers could share some overhead given by the use of mem2mem
-> framework, I don't think this is a good enough reason the merge them.
-> 
-> By the way, driver for the VPU in the i.MX27 will be called
-> "codadx6"[3], I suggest you call your driver "coda9" to avoid
-> confusion.
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> arch/arm/mach-vexpress/core.h                  |   10 ++++++++++
+>  arch/arm/mach-vexpress/hotplug.c               |    6 +++---
+>  arch/arm/mach-vexpress/platsmp.c               |   21 +++++++++++++++++----
+>  arch/arm/mach-vexpress/v2m.c                   |   10 ++++++++++
+>  arch/arm/plat-versatile/include/plat/platsmp.h |   14 ++++++++++++++
+>  arch/arm/plat-versatile/platsmp.c              |    4 ++--
+>  15 files changed, 96 insertions(+), 16 deletions(-)
+>  create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
 
-Well, our driver works on i.MX27 and i.MX5. Yes, it needs some
-abstraction for different register layouts and different features, but
-the cores behave sufficiently similar that it makes sense to share the
-code in a single driver.
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Sascha
+Cheers!
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pawe?
