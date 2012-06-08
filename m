@@ -1,66 +1,39 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri,  8 Jun 2012 14:04:06 +0100
-Subject: [PATCH] clk: Check parent for NULL in clk_change_rate
-Message-ID: <1339160646-32664-1-git-send-email-pawel.moll@arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 8 Jun 2012 15:13:48 +0200
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+ <4FD0602B.9070704@ti.com>
+ <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
+ <4FD09EFA.20304@ti.com>
+ <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
+Message-ID: <4FD1FA8C.1080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_change_rate() is accessing parent's rate without checking
-if the parent exists at all. In case of root clocks this will
-cause NULL pointer dereference.
+On 6/8/2012 3:11 AM, Paul Walmsley wrote:
+> On Thu, 7 Jun 2012, Cousson, Benoit wrote:
+>
+>> Indeed, what I did not mention is that potentially the whole device init
+>> should be done ondemand as well. Meaning the whole hwmod setup phase should be
+>> done only when the driver will probe the device.
+>
+> That means if no driver exists for an IP block, or if the driver isn't
+> using PM runtime, the IP block won't be reset.  And somehow we still are
+> missing drivers in mainline.  We also still have drivers that aren't yet
+> PM runtime converted.
 
-This patch follows what clk_calc_new_rates() does in such
-situation.
+No the point is still the same as before. You let the drivers do the job 
+if they are there, and then do a pass at very late time during the boot 
+process to handle the ones that were not probed by any driver.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
+At least you will avoid the enable -> reset -> idle -> enable sequence 
+we are doing right now for most of the active drivers when it is not 
+necessary.
 
-Hi Mike,
-
-This is something I had to workaround to get Versatile Express
-working with the common clock framework - my root clocks aren't
-are variable (as in: non fixed).
-
-I'm told that this might have been already fixed - if that's the
-case simply ignore this patch. Also I'm not saying it's the best
-way of solving the issue :-)
-
-Cheers!
-
-Pawel
-
- drivers/clk/clk.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 687b00d..cf53069 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -850,18 +850,21 @@ static void clk_change_rate(struct clk *clk)
- {
- 	struct clk *child;
- 	unsigned long old_rate;
-+	unsigned long best_parent_rate = 0;
- 	struct hlist_node *tmp;
- 
- 	old_rate = clk->rate;
- 
-+	if (clk->parent)
-+		best_parent_rate = clk->parent->rate;
-+
- 	if (clk->ops->set_rate)
--		clk->ops->set_rate(clk->hw, clk->new_rate, clk->parent->rate);
-+		clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
- 
- 	if (clk->ops->recalc_rate)
--		clk->rate = clk->ops->recalc_rate(clk->hw,
--				clk->parent->rate);
-+		clk->rate = clk->ops->recalc_rate(clk->hw, best_parent_rate);
- 	else
--		clk->rate = clk->parent->rate;
-+		clk->rate = best_parent_rate;
- 
- 	if (clk->notifier_count && old_rate != clk->rate)
- 		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
--- 
-1.7.9.5
+Regards,
+Benoit
