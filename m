@@ -1,51 +1,197 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 9 Jun 2012 10:05:29 -0600 (MDT)
-Subject: AM335x CPSW reset (was "RE: [PATCH 04/11] ARM: OMAP2+:
- usb_host_fs: add custom reset for usb_host_fs (fsusb)")
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA464C6@DBDE01.ent.ti.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
- <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA46087@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206081659230.17523@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA464C6@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1206091003580.17257@utopia.booyaka.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Fri, 8 Jun 2012 10:13:42 +0530
+Subject: [PATCH v3 8/9] ASoC: tegra: add clk_prepare/clk_unprepare
+In-Reply-To: <1338870583-8704-9-git-send-email-pgaikwad@nvidia.com>
+References: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
+ <1338870583-8704-9-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <CADTbHxr6+h23jBca+egnzuOCOaxRf_OkJsROz_qjrVS-=FZp5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 9 Jun 2012, Hiremath, Vaibhav wrote:
+Hi Prashant,
 
-> On Sat, Jun 09, 2012 at 04:40:03, Paul Walmsley wrote:
-> > On Fri, 8 Jun 2012, Hiremath, Vaibhav wrote:
-> > 
-> > > So the approach I had taken is, I had implemented almost similar 
-> > > function specific to cpsw and introduced flag called 
-> > > HWMOD_SWSUP_RESET_BEFORE_IDLE.
-> > 
-> > Why "SWSUP" ? 
-> 
-> Since it was SW initiated reset assertion so I added this prefix.
+On Tue, Jun 5, 2012 at 9:59 AM, Prashant Gaikwad <pgaikwad@nvidia.com>wrote:
 
-Maybe just use HWMOD_RESET_BEFORE_IDLE.  The code use SWSUP to mean 
-"software-supervised" in the context of idle.
+> Use clk_prepare/clk_unprepare as required by the generic clk framework.
+>
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> ---
+> Please ignore previous versions. Updated commit message and
+> maintainers properly in this version. No other change.
+>
+> This patch should go through Tegra tree since other patches to port Tegra
+> to generic clock framework are dependent on it. Posting here to get ack
+> from
+> the maintainers.
+>
+>  sound/soc/tegra/tegra20_i2s.c      |    4 ++--
+>  sound/soc/tegra/tegra20_spdif.c    |    4 ++--
+>  sound/soc/tegra/tegra30_ahub.c     |    8 ++++----
+>  sound/soc/tegra/tegra30_i2s.c      |    4 ++--
+>  sound/soc/tegra/tegra_asoc_utils.c |   12 ++++++------
+>  5 files changed, 16 insertions(+), 16 deletions(-)
+>
+> diff --git a/sound/soc/tegra/tegra20_i2s.c b/sound/soc/tegra/tegra20_i2s.c
+> index 0c7af63..1647dbf 100644
+> --- a/sound/soc/tegra/tegra20_i2s.c
+> +++ b/sound/soc/tegra/tegra20_i2s.c
+> @@ -62,7 +62,7 @@ static int tegra20_i2s_runtime_suspend(struct device
+> *dev)
+>  {
+>        struct tegra20_i2s *i2s = dev_get_drvdata(dev);
+>
+> -       clk_disable(i2s->clk_i2s);
+> +       clk_disable_unprepare(i2s->clk_i2s);
+>
+>        return 0;
+>  }
+> @@ -72,7 +72,7 @@ static int tegra20_i2s_runtime_resume(struct device *dev)
+>        struct tegra20_i2s *i2s = dev_get_drvdata(dev);
+>        int ret;
+>
+> -       ret = clk_enable(i2s->clk_i2s);
+> +       ret = clk_prepare_enable(i2s->clk_i2s);
+>        if (ret) {
+>                dev_err(dev, "clk_enable failed: %d\n", ret);
+>                return ret;
+> diff --git a/sound/soc/tegra/tegra20_spdif.c
+> b/sound/soc/tegra/tegra20_spdif.c
+> index f9b5741..2262e4f 100644
+> --- a/sound/soc/tegra/tegra20_spdif.c
+> +++ b/sound/soc/tegra/tegra20_spdif.c
+> @@ -54,7 +54,7 @@ static int tegra20_spdif_runtime_suspend(struct device
+> *dev)
+>  {
+>        struct tegra20_spdif *spdif = dev_get_drvdata(dev);
+>
+> -       clk_disable(spdif->clk_spdif_out);
+> +       clk_disable_unprepare(spdif->clk_spdif_out);
+>
+>        return 0;
+>  }
+> @@ -64,7 +64,7 @@ static int tegra20_spdif_runtime_resume(struct device
+> *dev)
+>        struct tegra20_spdif *spdif = dev_get_drvdata(dev);
+>        int ret;
+>
+> -       ret = clk_enable(spdif->clk_spdif_out);
+> +       ret = clk_prepare_enable(spdif->clk_spdif_out);
+>        if (ret) {
+>                dev_err(dev, "clk_enable failed: %d\n", ret);
+>                return ret;
+> diff --git a/sound/soc/tegra/tegra30_ahub.c
+> b/sound/soc/tegra/tegra30_ahub.c
+> index 57cd419..1efb822 100644
+> --- a/sound/soc/tegra/tegra30_ahub.c
+> +++ b/sound/soc/tegra/tegra30_ahub.c
+> @@ -56,8 +56,8 @@ static int tegra30_ahub_runtime_suspend(struct device
+> *dev)
+>        regcache_cache_only(ahub->regmap_apbif, true);
+>        regcache_cache_only(ahub->regmap_ahub, true);
+>
+> -       clk_disable(ahub->clk_apbif);
+> -       clk_disable(ahub->clk_d_audio);
+> +       clk_disable_unprepare(ahub->clk_apbif);
+> +       clk_disable_unprepare(ahub->clk_d_audio);
+>
+>        return 0;
+>  }
+> @@ -77,12 +77,12 @@ static int tegra30_ahub_runtime_resume(struct device
+> *dev)
+>  {
+>        int ret;
+>
+> -       ret = clk_enable(ahub->clk_d_audio);
+> +       ret = clk_prepare_enable(ahub->clk_d_audio);
+>        if (ret) {
+>                dev_err(dev, "clk_enable d_audio failed: %d\n", ret);
+>                return ret;
+>        }
+> -       ret = clk_enable(ahub->clk_apbif);
+> +       ret = clk_prepare_enable(ahub->clk_apbif);
+>        if (ret) {
+>                dev_err(dev, "clk_enable apbif failed: %d\n", ret);
+>                clk_disable(ahub->clk_d_audio);
+>
 
-> > > Now the question here would be, should we consider this IP bug or 
-> > > integration bug? If it is integration bug, then isn't this device issue?
-> > 
-> > I don't know if it's a bug in either place, but it sounds like something 
-> > that needs to be handled in the _am335x_disable_module() code in 
-> > mach-omap2/omap_hwmod.c.
-> 
-> Yes, certainly it should be part of _am335x_disable_module().
-
-Great. Care to send a patch?
+Don't you need to make change here to "clk_disable_unprepare" ??
 
 
-- Paul
+> diff --git a/sound/soc/tegra/tegra30_i2s.c b/sound/soc/tegra/tegra30_i2s.c
+> index 8596032..d308faa 100644
+> --- a/sound/soc/tegra/tegra30_i2s.c
+> +++ b/sound/soc/tegra/tegra30_i2s.c
+> @@ -62,7 +62,7 @@ static int tegra30_i2s_runtime_suspend(struct device
+> *dev)
+>
+>        regcache_cache_only(i2s->regmap, true);
+>
+> -       clk_disable(i2s->clk_i2s);
+> +       clk_disable_unprepare(i2s->clk_i2s);
+>
+>        return 0;
+>  }
+> @@ -72,7 +72,7 @@ static int tegra30_i2s_runtime_resume(struct device *dev)
+>        struct tegra30_i2s *i2s = dev_get_drvdata(dev);
+>        int ret;
+>
+> -       ret = clk_enable(i2s->clk_i2s);
+> +       ret = clk_prepare_enable(i2s->clk_i2s);
+>        if (ret) {
+>                dev_err(dev, "clk_enable failed: %d\n", ret);
+>                return ret;
+> diff --git a/sound/soc/tegra/tegra_asoc_utils.c
+> b/sound/soc/tegra/tegra_asoc_utils.c
+> index 9515ce5..6872c77 100644
+> --- a/sound/soc/tegra/tegra_asoc_utils.c
+> +++ b/sound/soc/tegra/tegra_asoc_utils.c
+> @@ -69,9 +69,9 @@ int tegra_asoc_utils_set_rate(struct
+> tegra_asoc_utils_data *data, int srate,
+>        data->set_baseclock = 0;
+>        data->set_mclk = 0;
+>
+> -       clk_disable(data->clk_cdev1);
+> -       clk_disable(data->clk_pll_a_out0);
+> -       clk_disable(data->clk_pll_a);
+> +       clk_disable_unprepare(data->clk_cdev1);
+> +       clk_disable_unprepare(data->clk_pll_a_out0);
+> +       clk_disable_unprepare(data->clk_pll_a);
+>
+>        err = clk_set_rate(data->clk_pll_a, new_baseclock);
+>        if (err) {
+> @@ -87,19 +87,19 @@ int tegra_asoc_utils_set_rate(struct
+> tegra_asoc_utils_data *data, int srate,
+>
+>        /* Don't set cdev1/extern1 rate; it's locked to pll_a_out0 */
+>
+> -       err = clk_enable(data->clk_pll_a);
+> +       err = clk_prepare_enable(data->clk_pll_a);
+>        if (err) {
+>                dev_err(data->dev, "Can't enable pll_a: %d\n", err);
+>                return err;
+>        }
+>
+> -       err = clk_enable(data->clk_pll_a_out0);
+> +       err = clk_prepare_enable(data->clk_pll_a_out0);
+>        if (err) {
+>                dev_err(data->dev, "Can't enable pll_a_out0: %d\n", err);
+>                return err;
+>        }
+>
+> -       err = clk_enable(data->clk_cdev1);
+> +       err = clk_prepare_enable(data->clk_cdev1);
+>        if (err) {
+>                dev_err(data->dev, "Can't enable cdev1: %d\n", err);
+>                return err;
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120608/17c7576e/attachment.html>
