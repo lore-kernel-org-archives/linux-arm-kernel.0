@@ -1,80 +1,72 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 8 Jun 2012 19:32:38 +0000
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <20120607075541.GF16342@arwen.pp.htv.fi> <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA46087@DBDE01.ent.ti.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 08 Jun 2012 21:48:12 +0200
+Subject: [PATCH v3 7/9] staging: nvec: add clk_prepare/clk_unprepare
+In-Reply-To: <1338870583-8704-8-git-send-email-pgaikwad@nvidia.com>
+References: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
+ <1338870583-8704-8-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <4214308.tKJXbx0ZCv@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 18:58:51, Paul Walmsley wrote:
-> On Fri, 8 Jun 2012, Cousson, Benoit wrote:
+On Tuesday 05 June 2012 09:59:41 Prashant Gaikwad wrote:
+> Use clk_prepare/clk_unprepare as required by the generic clk framework.
 > 
-> > On 6/8/2012 3:11 AM, Paul Walmsley wrote:
-> > > On Thu, 7 Jun 2012, Cousson, Benoit wrote:
-> > > 
-> > > > Indeed, what I did not mention is that potentially the whole device 
-> > > > init should be done ondemand as well. Meaning the whole hwmod setup 
-> > > > phase should be done only when the driver will probe the device.
-> > > 
-> > > That means if no driver exists for an IP block, or if the driver isn't
-> > > using PM runtime, the IP block won't be reset.  And somehow we still are
-> > > missing drivers in mainline.  We also still have drivers that aren't yet
-> > > PM runtime converted.
-> > 
-> > No the point is still the same as before. You let the drivers do the job if
-> > they are there, and then do a pass at very late time during the boot process
-> > to handle the ones that were not probed by any driver.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+
+I think I gave an ack already on the first (or second version), which was 
+identical. Nevertheless, here is one more.
+
+Acked-by: Marc Dietrich <marvin24@gmx.de>
+
+> ---
+> Please ignore previous versions. Updated commit message and
+> maintainers properly in this version. No other change.
 > 
-> Ah, I see what you mean.  Above you wrote that the the hwmod setup phase 
-> would be done only when the driver will probe the device.  But you also 
-> mean that it should also be done for the remaining devices before starting 
-> userspace.
+> This patch should go through Tegra tree since other patches to port Tegra
+> to generic clock framework are dependent on it. Posting here to get ack from
+> the maintainers.
 > 
-> > At least you will avoid the enable -> reset -> idle -> enable sequence 
-> > we are doing right now for most of the active drivers when it is not 
-> > necessary.
+>  drivers/staging/nvec/nvec.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> It must not be widely known, but early reset was implemented 
-> intentionally.  The goal was to keep any configuration damage from 
-> out-of-date or broken bootloaders or previous OSes to a minimum length of 
-> time during the boot process.
+> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
+> index 3c60088..9356886 100644
+> --- a/drivers/staging/nvec/nvec.c
+> +++ b/drivers/staging/nvec/nvec.c
+> @@ -675,7 +675,7 @@ static void tegra_init_i2c_slave(struct nvec_chip *nvec)
+> {
+>  	u32 val;
 > 
-> I don't really have a huge problem with switching to a late reset, 
-> but there are disadvantages to it.
+> -	clk_enable(nvec->i2c_clk);
+> +	clk_prepare_enable(nvec->i2c_clk);
+> 
+>  	tegra_periph_reset_assert(nvec->i2c_clk);
+>  	udelay(2);
+> @@ -695,14 +695,14 @@ static void tegra_init_i2c_slave(struct nvec_chip
+> *nvec)
+> 
+>  	enable_irq(nvec->irq);
+> 
+> -	clk_disable(nvec->i2c_clk);
+> +	clk_disable_unprepare(nvec->i2c_clk);
+>  }
+> 
+>  static void nvec_disable_i2c_slave(struct nvec_chip *nvec)
+>  {
+>  	disable_irq(nvec->irq);
+>  	writel(I2C_SL_NEWSL | I2C_SL_NACK, nvec->base + I2C_SL_CNFG);
+> -	clk_disable(nvec->i2c_clk);
+> +	clk_disable_unprepare(nvec->i2c_clk);
+>  }
+> 
+>  static void nvec_power_off(void)
+> @@ -812,7 +812,7 @@ static int __devinit tegra_nvec_probe(struct
+> platform_device *pdev)
+> 
+>  	tegra_init_i2c_slave(nvec);
+> 
+> -	clk_enable(i2c_clk);
+> +	clk_prepare_enable(i2c_clk);
 > 
 > 
-
-I was reading all these discussion and was holding myself back, so that I 
-digest before adding another flavor to this discussion,
-
-In case of AM33xx, recently I came across similar issue (rather more than this) with CPSW module.
-
-The issue is,
-
-We have observed that, in order to disable the CPSW module (MODULEMODE=0x0),
-We have to assert OCP level reset, before disabling it; else module enters into unknown state, where register status shows, MODULEMODE turns 0x0, but idlests says module is busy.
-
-This has to be done everytime you try to disable the module.
-
-The worst part here is, CPSW has 4 submodules (SS, SL1, SL2, CPDMA),
-We have to assert reset signal to each submodules.
-
-So the approach I had taken is, I had implemented almost similar function specific to cpsw and introduced flag called HWMOD_SWSUP_RESET_BEFORE_IDLE.
-
-
-Now the question here would be, should we consider this IP bug or 
-integration bug? If it is integration bug, then isn't this device issue?
-
-Thanks,
-Vaibhav
+>  	/* enable event reporting */
