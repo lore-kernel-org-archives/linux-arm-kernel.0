@@ -1,92 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jun 2012 23:38:59 -0700
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206071404470.14977@utopia.booyaka.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk>
- <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
- <20120607105228.GC12766@atomide.com>
- <alpine.DEB.2.00.1206071404470.14977@utopia.booyaka.com>
-Message-ID: <20120608063859.GL12766@atomide.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 8 Jun 2012 08:51:10 +0200
+Subject: [PATCH] media: mx2_camera: Add YUYV output format.
+In-Reply-To: <CAOMZO5CaW+pUmVrgDFT857eyaR8kjzcE89K4ZBwi8TF0f5dxaA@mail.gmail.com>
+References: <1338905173-5968-1-git-send-email-javier.martin@vista-silicon.com>
+ <CAOMZO5AnR9e9O+A+8zH+W+3pa0=cey=9wL0Oa2z+YrhYadvQ1w@mail.gmail.com>
+ <CACKLOr28+2pQqOKyVP728kiD2BAnCzkMFgNL=059jmTpeFvQHg@mail.gmail.com>
+ <CAOMZO5BA9pT0vwXT1zr+-fjHr5eT6eTYEzsKbrCs8rzxiQCwWg@mail.gmail.com>
+ <CACKLOr1_pOSkMfo7xWMPd4qJvo8MgNa-dswWVKGBx=enaEB2CQ@mail.gmail.com>
+ <CAOMZO5CaW+pUmVrgDFT857eyaR8kjzcE89K4ZBwi8TF0f5dxaA@mail.gmail.com>
+Message-ID: <CACKLOr083hwix+C+0L+Gh93-j_XkekQZSMANxsXZJeJ4Pxm+Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120607 15:09]:
-> On Thu, 7 Jun 2012, Tony Lindgren wrote:
-> 
-> > Until we have something generic in place to deal with stuff like unused driver
-> > reset and idle, how about we set up the driver specific reset parts as inline
-> > functions in the driver header?
-> 
-> You're referring to the driver integration header files in 
-> arch/arm/plat-omap/include/ and arch/arm/mach-omap2/, right?  That would 
-> avoid the need for "sideways" includes from drivers/.
-> 
-> > That way the hwmod code can include those functions using the driver register
-> > defines. Something like:
-> > 
-> > static inline int xyz_driver_reset(void __iomem *base, int flags)
-> > {
-> > 	...
-> > }
-> > 
-> > Then instead of having a separate platform init file for each driver,
-> > we could just have a list of reset functions:
-> > 
-> > static int hwmod_xyz_driver_reset(void __iomem *base, int flags)
-> 
-> This should probably be passed a struct omap_hwmod * instead of base so 
-> it can call the existing hwmod bus related reset functions like 
-> omap_hwmod_softreset().  Or were you thinking about open-coding those into 
-> this reset function?
+Hi Fabio,
 
-Oh OK yeah makes sense as that's hwmod internal function. Then the driver
-specific part should use just void __iomem *base and use readl/writel and
-live under include/linux/platform_data/omap-usb.h.
+On 7 June 2012 19:35, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Javier,
+>
+> On Thu, Jun 7, 2012 at 5:30 AM, javier Martin
+> <javier.martin@vista-silicon.com> wrote:
+>
+>> As i stated, the driver is still in an early development stage, it
+>> doesn't do anything useful yet. But this is the public git repository
+>> if you want to take a look:
+>>
+>> git repo: https://github.com/jmartinc/video_visstrim.git
+>> branch: ?mx27-codadx6
+>
+> Thanks, I will take a look at your tree when I am back to the office next week.
+>
+> I also see that Linaro's tree has support for VPU for mx5/mx6:
+> http://git.linaro.org/gitweb?p=landing-teams/working/freescale/kernel.git;a=summary
+>
+> ,so we should probably think in unifying it with mx27 support there too.
+>
+>>
+>> FYI we are only interested on adding support for the encoding path of
+>> the VPU, but we are trying our best to make it modular (as it is done
+>> in Samsung's [1]), so that anyone can add decoding support later.
+>
+> Ok, sounds good.
+>
+>> By the way, you work for Freescale, don't you?
+>
+> Yes, correct.
+>
+>> We have a couple of issues with the i.MX27 VPU:
+>>
+>> 1- Firmware for the VPU is provided as a table of binary values inside
+>> a source file which is licensed as GPL, however software is packaged
+>> in a .tar.gz file that is marked as NDA. Do we have the right to
+>> distribute this firmware with our products?
 
-> Just as an aside, this function will probably need to be marked 
-> __maybe_unused, so the compiler doesn't warn when other files include this 
-> header, but don't call the function.
+To address this issue it would be great if you, as a Freescale
+employee, could send VPU firmware binary file to linux-firmware with a
+LICENSE.xxxx file as well:
 
-Yeah probably.
- 
-> > {
-> > 	int res;
-> > 
-> > 	/* do bus related reset here */
-> > 	...
-> >
-> > 	/* call the driver reset */
-> > 	res = xyz_driver_reset(base, flags)
-> > 
-> > 
-> > 	/* do more bus related reset here */
-> > 	...
-> > }
-> 
-> That's fine with me.  It doesn't matter to me where that code lives as 
-> long as it makes technical sense.
+http://git.kernel.org/?p=linux/kernel/git/dwmw2/linux-firmware.git;a=tree
 
-OK good. That way we can separate the driver specific part from the bus
-code. And the driver maintainers can review the driver specific part of the
-idle/reset function. And maybe at some point we'll have device_reset and
-device_idle functions and some generic framework in place for it..
- 
-> I'm hoping that in the near future that we can get rid of these 
-> hwmod_xyz_driver_reset() functions.  Instead it should be possible to have 
-> the hwmod reset code call functions like xyz_driver_reset_pre_wait() and 
-> xyz_driver_reset_post_ocpreset() via optional function pointers at 
-> different points in the reset process.  That should allow us to remove the 
-> omap_hwmod function calls from the I2C, MSDI, etc. reset functions, and 
-> also remove some needlessly duplicated code.
+>> 2- There is a BUG in the firmware that marks P frames as IDR when it
+>> should only be done to I frames. Would it be possible to have access
+>> to the source code of the firmware in order to fix that problem?
+>
+> I will need to check this next week when I am back to the office.
 
-Sounds good to me. Also sounds like that does not need changes to the
-driver specific xyz_driver_reset functions.
 
-Regards,
+Regards.
 
-Tony
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
