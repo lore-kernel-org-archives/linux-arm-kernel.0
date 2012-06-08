@@ -1,22 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Jun 2012 01:23:28 -0700
-Subject: [GIT PULL] omap fixes for v3.5-rc1
-In-Reply-To: <20120608073237.GM12766@atomide.com>
-References: <20120608073237.GM12766@atomide.com>
-Message-ID: <CAOesGMgDsxfp+nY772VCwXvNGneAXBufdeNpptbZQ05pG=ks3A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Jun 2012 10:32:02 +0200
+Subject: [CFT] PL08x patches
+In-Reply-To: <20120607104527.GA15973@n2100.arm.linux.org.uk>
+References: <20120607103434.GQ8262@n2100.arm.linux.org.uk>
+ <E1Sca9b-0003ax-4E@rmk-PC.arm.linux.org.uk>
+ <20120607104527.GA15973@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdadwL6AvEtHK0RyBKXCvMhc_g8n5im0RjJCHof4-Bs_-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 8, 2012 at 12:32 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
->
-> ?Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc1
+On Thu, Jun 7, 2012 at 12:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Thanks, pulled.
+> Here's the PL08x patches.
 
+I've tested the entire set: first the three patches splitting out the virtual
+channels, then the remaining 31 patches on PL08x.
 
--Olof
+The test was performed on a Nomadik S8815 which has a pretty
+much vanilla PL08x block.
+
+The DMAengine memcpy test completes just fine and behave like
+before.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
