@@ -1,37 +1,134 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  8 Jun 2012 16:12:17 +0100
-Subject: [PATCH v2 0/4] syscall_trace fixes and cleanups
-Message-ID: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  8 Jun 2012 16:12:21 +0100
+Subject: [PATCH v2 4/4] ARM: ptrace: provide separate functions for tracing
+ syscall {entry, exit}
+In-Reply-To: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1339168341-29850-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The syscall_trace on ARM takes a `why' parameter to indicate whether or
+not we are entering or exiting a system call. This can be confusing for
+people looking at the code since (a) it conflicts with the why register
+alias in the entry assembly code and (b) it is not immediately clear
+what it represents.
 
-This is version 2 of the patches originally posted here:
+This patch splits up the syscall_trace function into separate wrappers
+for syscall entry and exit, allowing the low-level syscall handling
+code to branch to the appropriate function.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097748.html
+Reported-by: Al Viro <viro@zeniv.linux.org.uk>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/entry-common.S |   14 +++++-------
+ arch/arm/kernel/ptrace.c       |   46 +++++++++++++++++++++++++++-------------
+ 2 files changed, 37 insertions(+), 23 deletions(-)
 
-The only changes are that (a) two of the original patches (fixes) have
-been now been merged into mainline and (b) the remaining patches in the
-series are now rebased onto -rc1, which includes Al's work on the signal
-handling / syscall restarting path.
-
-All comments welcome,
-
-Will
-
-
-Will Deacon (4):
-  audit: arm: only allow syscall auditing for pure EABI userspace
-  ARM: entry: don't bother with syscall tracing on ret_from_fork path
-  ARM: audit: move syscall auditing until after ptrace SIGTRAP handling
-  ARM: ptrace: provide separate functions for tracing syscall
-    {entry,exit}
-
- arch/arm/kernel/entry-common.S |   20 +++++-------------
- arch/arm/kernel/ptrace.c       |   42 ++++++++++++++++++++++++++++-----------
- init/Kconfig                   |    2 +-
- 3 files changed, 37 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 10911c9..49d9f93 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -442,10 +442,9 @@ ENDPROC(vector_swi)
+ 	 * context switches, and waiting for our parent to respond.
+ 	 */
+ __sys_trace:
+-	mov	r2, scno
+-	add	r1, sp, #S_OFF
+-	mov	r0, #0				@ trace entry [IP = 0]
+-	bl	syscall_trace
++	mov	r1, scno
++	add	r0, sp, #S_OFF
++	bl	syscall_trace_enter
+ 
+ 	adr	lr, BSYM(__sys_trace_return)	@ return address
+ 	mov	scno, r0			@ syscall number (possibly new)
+@@ -457,10 +456,9 @@ __sys_trace:
+ 
+ __sys_trace_return:
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+-	mov	r2, scno
+-	mov	r1, sp
+-	mov	r0, #1				@ trace exit [IP = 1]
+-	bl	syscall_trace
++	mov	r1, scno
++	mov	r0, sp
++	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+ 
+ 	.align	5
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 5256068..749899d 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -908,15 +908,18 @@ long arch_ptrace(struct task_struct *child, long request,
+ 	return ret;
+ }
+ 
+-asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
++enum ptrace_syscall_dir {
++	PTRACE_SYSCALL_ENTER = 0,
++	PTRACE_SYSCALL_EXIT,
++};
++
++static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
++				enum ptrace_syscall_dir dir)
+ {
+ 	unsigned long ip;
+ 
+-	if (why == 0 && test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
+-		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
+-
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-		goto out_no_trace;
++		return scno;
+ 
+ 	current_thread_info()->syscall = scno;
+ 
+@@ -925,21 +928,34 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 	 * IP = 0 -> entry, =1 -> exit
+ 	 */
+ 	ip = regs->ARM_ip;
+-	regs->ARM_ip = why;
++	regs->ARM_ip = dir;
+ 
+-	if (why)
++	if (dir == PTRACE_SYSCALL_EXIT)
+ 		tracehook_report_syscall_exit(regs, 0);
+ 	else if (tracehook_report_syscall_entry(regs))
+ 		current_thread_info()->syscall = -1;
+ 
+ 	regs->ARM_ip = ip;
+-	scno = current_thread_info()->syscall;
++	return current_thread_info()->syscall;
++}
+ 
+-out_no_trace:
+-	if (why)
+-		audit_syscall_exit(regs);
+-	else
+-		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
+-				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+-	return scno;
++asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
++{
++	int ret;
++
++	if (test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
++		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
++
++	ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
++	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
++			    regs->ARM_r2, regs->ARM_r3);
++
++	return ret;
++}
++
++asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
++{
++	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
++	audit_syscall_exit(regs);
++	return ret;
+ }
 -- 
 1.7.4.1
