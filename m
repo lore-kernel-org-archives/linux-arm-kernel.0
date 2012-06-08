@@ -1,25 +1,73 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 08 Jun 2012 09:55:11 +0200
-Subject: Overriding/concatenating kernel command-line with bootargs from dtb?
-Message-ID: <2050174.dvvKJHKP0J@flexo>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 08 Jun 2012 13:38:25 +0530
+Subject: [PATCH] ARM: omap: clock: Get rid of unwanted clkdm assocations
+ within clks
+In-Reply-To: <alpine.DEB.2.00.1206080130570.14977@utopia.booyaka.com>
+References: <1337250245-29274-1-git-send-email-rnayak@ti.com>
+ <4FD04A2A.4080207@ti.com>
+ <alpine.DEB.2.00.1206070104060.6684@utopia.booyaka.com>
+ <4FD087FD.9040401@ti.com>
+ <alpine.DEB.2.00.1206080130570.14977@utopia.booyaka.com>
+Message-ID: <4FD1B2F9.7050400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Paul,
 
-I have a specific use case, where two boards using the same SoC have different 
-UART speeds, which is something that I have specified in their corresponding 
-dts files. In order to make sure people don't mess up the configuration, I 
-prefer not to rely on the bootloader-supplied kernel-command line.
+On Friday 08 June 2012 01:10 PM, Paul Walmsley wrote:
+> Hi
+>
+> On Thu, 7 Jun 2012, Rajendra Nayak wrote:
+>
+>> Yes, I can include this as part of the common clock conversion series.
+>> What I was trying to say is that neither the clock framework not any
+>> other OMAP PM layer today makes any use of this information except for
+>> gate clocks. The only 2 places in the clock framework this is used is
+>> in omap2_dflt_clk_enable()/omap2_dflt_clk_disable() functions, which
+>> are nops for non gate clocks.
+>> So I don;t fully understand what you mean by our current low-level PM
+>> design being based on this assumption that every clock belongs to a
+>> clockdomain.
+>> Did I miss anything else our PM frameworks do with the clock<->clkdm
+>> association? The reason I am asking is because I am doing a lot of changes
+>> around based on this assumption and would really like to know
+>> if I am missing something.
+>
+> Well I guess the best thing to do is for you to do PM tests with the
+> converted code and data to make sure it works.  That's what I'm worried
+> most about right now for the CCF conversion; it's the most time-consuming
+> part of what I do.  If the conversion works without them and everything is
+> relatively clean then I probably won't have many issues with it.
 
-I was kind of expecting that ARM_ATAG_DTB_COMPAT + CMDLINE_EXTEND would 
-actually concatenate the kernel command-line with the bootargs provided from 
-dtb.
+The more I read your response, the more I feel you have mistaken what
+this patch is doing and what I am proposing.
+This patch only gets rid of clkdm assocation from *non gate* clocks.
+And what I am trying to say is that, this information in not
+used at all (for non gate clocks) in any of the frameworks today
+including clock framework.
+So why should getting rid of some *unused* data have any testing
+overhead?
+I did propose sometime back about getting rid of *all* clk<-> clkdm
+assocation for OMAP2/3 and my testing also showed some positive
+results, but that was just preliminary testing and I know to be able to
+do that we need to much more testing, so thats definitely not what I am
+doing here.
+All the gate clocks still have the clk<->clkdm association. Even if you
+look at my common clk conversion series, I have retained all
+clk<->clkdm associations for all gate clocks across OMAP2 and OMAP3.
+For any other form of clock it was never used and hence I am getting rid
+of them.
 
-Is this something someone else would need? If so, shall we just make that 
-happen when the two config symbols mentionned above are enabled, or shall we 
-introduce a 4th kernel command line handling strategy?
-
-Thank you for your answers.
--- 
-Florian
+regards,
+Rajendra
+>
+> ...
+>
+> BTW, just to continue on the clk->clkdm topic: while we might be able to
+> get rid of the clk->clkdm association for OMAP4 soon, and maybe someday
+> for OMAP2/3, it looks like we'll need to keep it around for at least one
+> AM335x clock -- this CLKDIV32K clock.  Definitely something to keep in
+> mind...
+>
+>
+> - Paul
