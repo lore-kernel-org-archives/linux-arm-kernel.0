@@ -1,83 +1,58 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Jun 2012 14:04:35 -0500
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4FBAA64A.200@wwwdotorg.org>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201205190844.03654.arnd@arndb.de> <4FBA7C80.4080801@wwwdotorg.org>
- <201205211818.45646.arnd@arndb.de> <4FBAA64A.200@wwwdotorg.org>
-Message-ID: <4FD24CC3.50700@ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 8 Jun 2012 19:10:47 +0000
+Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <alpine.DEB.2.00.1206071355090.14977@utopia.booyaka.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061309.25532.13430.stgit@dusk>
+ <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1206071355090.14977@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA46071@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Arnd,
-
-Been a while ;-)
-
-On 05/21/2012 03:32 PM, Stephen Warren wrote:
-> On 05/21/2012 12:18 PM, Arnd Bergmann wrote:
->> On Monday 21 May 2012, Stephen Warren wrote:
->>>>
->>>> The point with the direction was that it covers most cases and makes
->>>> them rather simple, while for the rare case where you need more than
->>>> two channels, you just use the otherwise optional named interface
->>>> rather than the numbered one. My feeling is that this also makes a
->>>> lot of sense at the driver API level: most dirvers just ask for the
->>>> read and write channels using a very simple interface, and those drivers
->>>> that have more than two will want to name them anyway.
->>>
->>> How are you thinking of representing the direction in DT - as part of
->>> the DMA request specifier, so in a DMAC-specific way?
->>>
->>> If so, that seems a little odd; you have to request a DMA channel for
->>> "TX", but then end up having the common code check all the entries in
->>> the dmas property since it can't know which are TX, and then have the
->>> wrong ones almost accidentally fail, since the DMAC will then determine
->>> that it can't support TX on the RX DMA request IDs.
->>
->> I think the direction must be encoded in a way that does not depend on
->> the binding for the specific controller. There are two ways I can see
->> how we might do it:
->>
->> 1. have separate property names for tx and rx channels, and probably
->>    one for combined rx/tx channels
+On Fri, Jun 08, 2012 at 01:33:46, Paul Walmsley wrote:
+> Hi
 > 
->> 2. define the second cell in each channel specifier to be the direction
->>    in a predefined format, followed by the other (controller specific)
->>    attributes, if any.
+> On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
 > 
-> In this option, lets say bit 0 is 0==TX, 1==RX (or perhaps 2 bits if
-> combined TX/RX is needed)
+> > I couldn't finish my testing today, got into continuous meetings.
 > 
-> Then, we could reserve say bits 7:1 as client DMA request ID.
+> No worries, I understand.
 > 
-> And then have bits 31:8 as DMAC specific data.
+> > Tomorrow, I will test it and update you on this.
 > 
-> Wouldn't that allow us to have our cake and eat it?
+> That would be great.
+> 
+> I took a look at SPRUH73F and sure enough, at least one module (CONTROL) 
+> doesn't support smart-idle -- per Table 14-217 "CONTROL Register Field 
+> Descriptions".  I'd guess that the PRCM won't idle-req this IP block until 
+> the kernel is not running, so we might be able to get away with the 
+> existing approach; but the TRM also says:
+> 
+> "By definition, initiator may generate read/write transaction as long as
+> it is out of IDLE state."
+> 
+> Which pretty much matches my understanding too of the implicit interface 
+> contract here.
+> 
+> So I think we'd better go back to the flag approach as implemented in this 
+> patch:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg176836.html
+> 
+> The WBU 32k sync timer's behavior is what relies on quirks of the 
+> integration that are hard to identify via other means, so it seems to be 
+> safest to tag it explicitly.
+> 
 
-Sorry for not responding sooner.
+Paul,
 
-It seems to me we were pretty close on alignment. In fact, I was quite
-happy with Steven's 2nd to last proposal of  ...
+I tested it on AM335x platform just now, it booted up to the Linux prompt, 
+but I am sure it is going to impact low power state usecases on AM33xx.
 
-simple 1 req:
-dmas = <0 &dmac1 xxx>;
+So, I also feel that, flag based approach should be used here. 
 
-simple 2 req:
-dmas = <0 &dmac1 xxx 1 &dmac1 yyy>;
-
-multiple dmacs:
-dmas = <0 &dmac1 xxx 0 &dmac2 zzz 1 &dmac1 yyy>;
-
-Arnd, I know that you had some concerns. However, in the above case I
-would expect that the 3rd parameter be optional and it can be some sort
-of match variable. In other words, we don't care how the 32-bits are
-encoded or what they represent but they would be used appropriately by
-the xlate function being used. So the xlate and this "match" variable
-would have to speak the same language.
-
-I think that I prefer the idea of having a 3rd optional match variable
-than encoding the DMA request ID and match data together in 1 32-bit
-variable. However, not a big deal either way.
-
-Cheers
-Jon
+Thanks,
+Vaibhav
