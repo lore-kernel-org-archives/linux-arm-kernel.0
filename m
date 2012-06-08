@@ -1,54 +1,115 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Jun 2012 12:20:40 +0200
-Subject: mach/io.h cleanup and removal question
-Message-ID: <20120608102040.GA26034@lunn.ch>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 8 Jun 2012 16:23:00 +0530
+Subject: [RESEND/PATCHv5 2/2] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <1339152780-25301-1-git-send-email-sourav.poddar@ti.com>
+References: <1339152780-25301-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1339152780-25301-2-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Add keypad data node in omap4 device tree file.
+Also fill the device tree binding parameters
+with the required value in "omap4-sdp" dts file.
 
-Your patchset for mach/io.h cleanup and remove, causes problems on
-Orion5x.
+Tested on omap4430 sdp with dmitry's 'next' branch.
 
-mach/io.h for orion5x had a:
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Dmitry Torokhov <dtor@mail.ru>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+ arch/arm/boot/dts/omap4-sdp.dts |   63 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi    |    5 +++
+ 2 files changed, 68 insertions(+), 0 deletions(-)
 
-#define IO_SPACE_LIMIT		0xffffffff
-
-which got removed. This results in a panic at boot:
-
-        /*
-         * IORESOURCE_IO
-         */
-        sys->io_offset = 0;
-        res[0].name = "PCIe I/O Space";
-        res[0].flags = IORESOURCE_IO;
-        res[0].start = ORION5X_PCIE_IO_BUS_BASE;
-        res[0].end = res[0].start + ORION5X_PCIE_IO_SIZE - 1;
-        if (request_resource(&ioport_resource, &res[0]))
-                panic("Request PCIe IO resource failed\n");
-
-ORION5X_PCIE_IO_SIZE is 1MB, so the allocation fails because of the
-64K default.
-
-arch/arm/include/asm/io.h has the comment:
-
-/*
- * This is the limit of PC card/PCI/ISA IO space, which is by default
- * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
- * zero to prevent ISA/PCI drivers claiming IO space (and potentially
- * oopsing.)
- *
- * Only set this larger if you really need inb() et.al. to operate over
- * a larger address space.  Note that SOC_COMMON ioremaps each sockets
- * IO space area, and so inb() et.al. must be defined to operate as per
- * readb() et.al. on such platforms.
- */
-
-Now, i know nothing about how PCI works... So i have a question:
-
-Which is better, put back parts of io.h so allowing the 1MB
-request_resource, or reduce ORION5X_PCIE_IO_SIZE to 64KB, since from
-the comment it is unlikely an PCI card needs more than 64KB?
-
-    Thanks
-	Andrew
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 63c6b2b..0c9b3bf 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -17,4 +17,67 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
++
++	keypad at 4ae1c000 {
++		keypad,num-rows = <8>;
++		keypad,num-columns = <8>;
++		linux,keymap = < 0x00000012
++			0x00010013
++			0x00020014
++			0x00030066
++			0x0004003f
++			0x00060017
++			0x0007002a
++			0x01000020
++			0x01010021
++			0x01020022
++			0x01030054
++			0x01040040
++			0x01060025
++			0x0107001c
++			0x0200002d
++			0x0201002e
++			0x0202002f
++			0x0203006b
++			0x02040041
++			0x02060034
++			0x0207003a
++			0x0300002c
++			0x0301004e
++			0x03020030
++			0x0303003b
++			0x03040042
++			0x03060018
++			0x03070039
++			0x04000011
++			0x04010015
++			0x04020016
++			0x0403003c
++			0x04040073
++			0x04060026
++			0x04070069
++			0x0500001f
++			0x05010023
++			0x05020024
++			0x0503003d
++			0x05040043
++			0x05050072
++			0x05060032
++			0x0507006a
++			0x06000010
++			0x0601001e
++			0x06020031
++			0x0603005c
++			0x0604000e
++			0x06060019
++			0x06070067
++			0x07000094
++			0x07010095
++			0x070200ca
++			0x070300cb
++			0x0704003e
++			0x07060160
++			0x0707006c >;
++		linux,input-no-autorepeat;
++	};
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 3d35559..e0f678a 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -156,4 +156,9 @@
+ 			ti,hwmods = "i2c4";
+ 		};
+ 	};
++
++	keypad at 4ae1c000 {
++		compatible = "ti,omap4-keypad";
++		ti,hwmods = "kbd";
++	};
+ };
+-- 
+1.7.1
