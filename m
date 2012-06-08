@@ -1,132 +1,121 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 8 Jun 2012 20:37:06 +0800
-Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
-In-Reply-To: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
-References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri,  8 Jun 2012 13:50:33 +0100
+Subject: [PATCH 1/2] ARM: vexpress: Check master site in daughterboard's
+ sysctl operations
+Message-ID: <1339159835-32228-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes, the driver bindings may know what phy they use.
-For example, when using device tree, the usb controller may have a
-phandler pointing to usb phy.
+With recent enough motherboard firmware, core tile can be fitted
+in either of the two daughterboard sites. The non-DT tile code for
+V2P-CA9 did not check that when configuring DVI output nor setting
+CLCD pixel clock.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Reviewed-by: Marek Vasut <marex@denx.de>
-Acked-by: Felipe Balbi <balbi@ti.com>
+Fixed now, providing "get master site" API in motherboard's code.
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
-Changes since laster version:
-- hcd transceiver renamed to phy
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   15 ++++++++++++---
+ arch/arm/mach-vexpress/include/mach/motherboard.h |    9 ++++++---
+ arch/arm/mach-vexpress/v2m.c                      |   12 +++++++++---
+ 3 files changed, 27 insertions(+), 9 deletions(-)
 
- drivers/usb/chipidea/ci.h    |    2 ++
- drivers/usb/chipidea/core.c  |    4 ++++
- drivers/usb/chipidea/host.c  |    1 +
- drivers/usb/chipidea/udc.c   |   11 +++++++----
- include/linux/usb/chipidea.h |    3 +++
- 5 files changed, 17 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 9655e35..d738603 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -160,6 +160,8 @@ struct ci13xxx {
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index c65cc3b..11cb248 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -66,8 +66,15 @@ static void __init ct_ca9x4_init_irq(void)
  
- 	struct ci13xxx_platform_data	*platdata;
- 	int				vbus_active;
-+	/* FIXME: some day, we'll not use global phy */
-+	bool				global_phy;
- 	struct usb_phy			*transceiver;
- 	struct usb_hcd			*hcd;
- };
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index c14ce2b..21407e7 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -419,6 +419,10 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
- 
- 	ci->dev = dev;
- 	ci->platdata = dev->platform_data;
-+	if (ci->platdata->phy)
-+		ci->transceiver = ci->platdata->phy;
-+	else
-+		ci->global_phy = true;
- 
- 	ret = hw_device_init(ci, base);
- 	if (ret < 0) {
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 4a4fdb8..ebff9f4 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -117,6 +117,7 @@ static int host_start(struct ci13xxx *ci)
- 	hcd->has_tt = 1;
- 
- 	hcd->power_budget = ci->platdata->power_budget;
-+	hcd->phy = ci->transceiver;
- 
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = ci->hw_bank.cap;
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index ca9b387..b43b29c 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1684,7 +1684,8 @@ static int udc_start(struct ci13xxx *ci)
- 
- 	ci->gadget.ep0 = &ci->ep0in->ep;
- 
--	ci->transceiver = usb_get_transceiver();
-+	if (ci->global_phy) {
-+		ci->transceiver = usb_get_transceiver();
- 
- 	if (ci->platdata->flags & CI13XXX_REQUIRE_TRANSCEIVER) {
- 		if (ci->transceiver == NULL) {
-@@ -1728,7 +1729,8 @@ static int udc_start(struct ci13xxx *ci)
- remove_trans:
- 	if (ci->transceiver) {
- 		otg_set_peripheral(ci->transceiver->otg, &ci->gadget);
--		usb_put_transceiver(ci->transceiver);
-+		if (ci->global_phy)
-+			usb_put_transceiver(ci->transceiver);
- 	}
- 
- 	dev_err(dev, "error = %i\n", retval);
-@@ -1737,7 +1739,7 @@ remove_dbg:
- unreg_device:
- 	device_unregister(&ci->gadget.dev);
- put_transceiver:
--	if (ci->transceiver)
-+	if (ci->transceiver && ci->global_phy)
- 		usb_put_transceiver(ci->transceiver);
- free_pools:
- 	dma_pool_destroy(ci->td_pool);
-@@ -1771,7 +1773,8 @@ static void udc_stop(struct ci13xxx *ci)
- 
- 	if (ci->transceiver) {
- 		otg_set_peripheral(ci->transceiver->otg, NULL);
--		usb_put_transceiver(ci->transceiver);
-+		if (ci->global_phy)
-+			usb_put_transceiver(ci->transceiver);
- 	}
- 	dbg_remove_files(&ci->gadget.dev);
- 	device_unregister(&ci->gadget.dev);
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index be078f0..544825d 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -5,12 +5,15 @@
- #ifndef __LINUX_USB_CHIPIDEA_H
- #define __LINUX_USB_CHIPIDEA_H
- 
-+#include <linux/usb/otg.h>
+ static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
+ {
+-	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
+-	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE_DB1, 2);
++	u32 site = v2m_get_master_site();
 +
- struct ci13xxx;
- struct ci13xxx_platform_data {
- 	const char	*name;
- 	/* offset of the capability registers */
- 	uintptr_t	 capoffset;
- 	unsigned	 power_budget;
-+	struct usb_phy	*phy;
- 	unsigned long	 flags;
- #define CI13XXX_REGS_SHARED		BIT(0)
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
++	/*
++	 * Old firmware was using the "site" component of the command
++	 * to control the DVI muxer (while it should be always 0 ie. MB).
++	 * Newer firmware uses the data register. Keep both for compatibility.
++	 */
++	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE(site), site);
++	v2m_cfg_write(SYS_CFG_DVIMODE, 2);
+ }
+ 
+ static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
+@@ -112,7 +119,9 @@ static long ct_round(struct clk *clk, unsigned long rate)
+ 
+ static int ct_set(struct clk *clk, unsigned long rate)
+ {
+-	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE_DB1 | 1, rate);
++	u32 site = v2m_get_master_site();
++
++	return v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE(site) | 1, rate);
+ }
+ 
+ static const struct clk_ops osc1_clk_ops = {
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index 31a9289..f004ec9 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -104,9 +104,10 @@
+ #define SYS_CFG_REBOOT		(9 << 20)
+ #define SYS_CFG_DVIMODE		(11 << 20)
+ #define SYS_CFG_POWER		(12 << 20)
+-#define SYS_CFG_SITE_MB		(0 << 16)
+-#define SYS_CFG_SITE_DB1	(1 << 16)
+-#define SYS_CFG_SITE_DB2	(2 << 16)
++#define SYS_CFG_SITE(n)		((n) << 16)
++#define SYS_CFG_SITE_MB		0
++#define SYS_CFG_SITE_DB1	1
++#define SYS_CFG_SITE_DB2	2
+ #define SYS_CFG_STACK(n)	((n) << 12)
+ 
+ #define SYS_CFG_ERR		(1 << 1)
+@@ -122,6 +123,8 @@ void v2m_flags_set(u32 data);
+ #define SYS_MISC_MASTERSITE	(1 << 14)
+ #define SYS_PROCIDx_HBI_MASK	0xfff
+ 
++int v2m_get_master_site(void);
++
+ /*
+  * Core tile IDs
+  */
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index fde26ad..aa6f9a6 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -147,6 +147,13 @@ void __init v2m_flags_set(u32 data)
+ 	writel(data, v2m_sysreg_base + V2M_SYS_FLAGSSET);
+ }
+ 
++int __init v2m_get_master_site(void)
++{
++	u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
++
++	return misc & SYS_MISC_MASTERSITE ? SYS_CFG_SITE_DB2 : SYS_CFG_SITE_DB1;
++}
++
+ 
+ static struct resource v2m_pcie_i2c_resource = {
+ 	.start	= V2M_SERIAL_BUS_PCI,
+@@ -413,7 +420,6 @@ static void v2m_restart(char str, const char *cmd)
+ 	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE_MB, 0))
+ 		printk(KERN_EMERG "Unable to reboot\n");
+ }
+-
+ struct ct_desc *ct_desc;
+ 
+ static struct ct_desc *ct_descs[] __initdata = {
+@@ -605,8 +611,8 @@ void __init v2m_dt_init_early(void)
+ 
+ 	/* Confirm board type against DT property, if available */
+ 	if (of_property_read_u32(allnodes, "arm,hbi", &dt_hbi) == 0) {
+-		u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
+-		u32 id = readl(v2m_sysreg_base + (misc & SYS_MISC_MASTERSITE ?
++		int site = v2m_get_master_site();
++		u32 id = readl(v2m_sysreg_base + (site == SYS_CFG_SITE_DB2 ?
+ 				V2M_SYS_PROCID1 : V2M_SYS_PROCID0));
+ 		u32 hbi = id & SYS_PROCIDx_HBI_MASK;
+ 
 -- 
 1.7.9.5
