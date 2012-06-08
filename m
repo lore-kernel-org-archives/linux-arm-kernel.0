@@ -1,40 +1,55 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 8 Jun 2012 21:28:12 +0800
-Subject: [alsa-devel] [PATCH v1 3/5] ASOC: mmp: add sspa support
-In-Reply-To: <20120607221019.GA14525@opensource.wolfsonmicro.com>
-References: <1338791851-21038-1-git-send-email-zhangfei.gao@marvell.com>
- <1338791851-21038-4-git-send-email-zhangfei.gao@marvell.com>
- <20120607221019.GA14525@opensource.wolfsonmicro.com>
-Message-ID: <CAMj5Bkg7cSaEHm+mz-9ah85J83rQFiw1QNxMP5RBa8BiYJhoqw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Jun 2012 07:28:51 -0600 (MDT)
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <4FD1FA8C.1080600@ti.com>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+ <4FD0602B.9070704@ti.com>
+ <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
+ <4FD09EFA.20304@ti.com>
+ <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
+ <4FD1FA8C.1080600@ti.com>
+Message-ID: <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 8, 2012 at 6:10 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jun 04, 2012 at 02:37:29PM +0800, Zhangfei Gao wrote:
->> The SSPA is a configurable multi-channel audio serial (TDM) interface.
->> It's configurable at runtime to support up to 128 channels and the
->> number of bits per sample: 8, 12, 16, 20, 24 and 32 bits. It also
->> support stereo format: I2S, left-justified or right-justified.
->
-> This looks mostly good (though you want to check your indentation a bit)
-> but...
->
->> +static int __init mmp_sspa_modinit(void)
->> +{
->> + ? ? audio_clk = clk_get(NULL, "mmp-audio");
->> + ? ? if (IS_ERR(audio_clk))
->> + ? ? ? ? ? ? return PTR_ERR(audio_clk);
->> +
->> + ? ? sysclk = clk_get(NULL, "mmp-sysclk");
->> + ? ? if (IS_ERR(sysclk))
->> + ? ? ? ? ? ? return PTR_ERR(sysclk);
->> + ? ? clk_enable(audio_clk);
->
-> You should be doing this stuff from the driver, not from the module init
-> (and ideally you'd be managing the audio clock dynamically). ?Even if
-> it's the same clock every time in current silicon it's still a good idea
-> to do this from a quality of implementation point of view.
+On Fri, 8 Jun 2012, Cousson, Benoit wrote:
 
-Thanks, will remove the module init, and move clk staff to probe.
-However, dynamically control audio_clk make audio subsystem works abnormally.
+> On 6/8/2012 3:11 AM, Paul Walmsley wrote:
+> > On Thu, 7 Jun 2012, Cousson, Benoit wrote:
+> > 
+> > > Indeed, what I did not mention is that potentially the whole device 
+> > > init should be done ondemand as well. Meaning the whole hwmod setup 
+> > > phase should be done only when the driver will probe the device.
+> > 
+> > That means if no driver exists for an IP block, or if the driver isn't
+> > using PM runtime, the IP block won't be reset.  And somehow we still are
+> > missing drivers in mainline.  We also still have drivers that aren't yet
+> > PM runtime converted.
+> 
+> No the point is still the same as before. You let the drivers do the job if
+> they are there, and then do a pass at very late time during the boot process
+> to handle the ones that were not probed by any driver.
+
+Ah, I see what you mean.  Above you wrote that the the hwmod setup phase 
+would be done only when the driver will probe the device.  But you also 
+mean that it should also be done for the remaining devices before starting 
+userspace.
+
+> At least you will avoid the enable -> reset -> idle -> enable sequence 
+> we are doing right now for most of the active drivers when it is not 
+> necessary.
+
+It must not be widely known, but early reset was implemented 
+intentionally.  The goal was to keep any configuration damage from 
+out-of-date or broken bootloaders or previous OSes to a minimum length of 
+time during the boot process.
+
+I don't really have a huge problem with switching to a late reset, 
+but there are disadvantages to it.
+
+
+- Paul
