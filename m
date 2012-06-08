@@ -1,73 +1,35 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri,  8 Jun 2012 17:02:04 +0300
-Subject: [PATCH 6/7] arm/dts: omap4-panda: Audio support for PandaBoard 4430
-In-Reply-To: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1339164125-32534-7-git-send-email-peter.ujfalusi@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  8 Jun 2012 16:09:42 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix crash when neither NAND nor SPI
+Message-ID: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PandaBoard uses twl6040 connected via McPDM for audio.
+Both NAND and SPI make use of the RUNIT clk. However, if neither NAND
+nor SPI is used in the system, RUNIT clock gets turned off, and the
+SoC hard locks. It appears something else in the SoC, which is not
+documented, is also using RUNIT. So prepare and enable RUNIT clock in
+kirkwood_clk_init().
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   37 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 37 insertions(+), 0 deletions(-)
+ arch/arm/mach-kirkwood/common.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 1efe0c5..f57f5e8 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -32,6 +32,30 @@
- 			linux,default-trigger = "mmc0";
- 		};
- 	};
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 25fb3fd..97f7d36 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -238,6 +238,10 @@ void __init kirkwood_clk_init(void)
+ 	orion_clkdev_add("0", "pcie", pex0);
+ 	orion_clkdev_add("1", "pcie", pex1);
+ 	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
 +
-+	sound: sound {
-+		compatible = "ti,abe-twl6040";
-+		ti,model = "PandaBoard";
-+
-+		ti,mclk-freq = <38400000>;
-+
-+		ti,mcpdm = <&mcpdm>;
-+
-+		ti,twl6040 = <&twl6040>;
-+
-+		/* Audio routing */
-+		ti,audio-routing =
-+			"Headset Stereophone", "HSOL",
-+			"Headset Stereophone", "HSOR",
-+			"Ext Spk", "HFL",
-+			"Ext Spk", "HFR",
-+			"Line Out", "AUXL",
-+			"Line Out", "AUXR",
-+			"HSMIC", "Headset Mic",
-+			"Headset Mic", "Headset Mic Bias",
-+			"AFML", "Line In",
-+			"AFMR", "Line In";
-+	};
- };
++	/* Something other than SPI and NAND needs runit, so make sure
++	   it never gets turned off. */
++	clk_prepare_enable(runit);
+ }
  
- &i2c1 {
-@@ -43,6 +67,19 @@
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
- 		interrupt-parent = <&gic>;
- 	};
-+
-+	twl6040: twl at 4b {
-+		compatible = "ti,twl6040";
-+		reg = <0x4b>;
-+		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
-+		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
-+		interrupt-parent = <&gic>;
-+		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
-+
-+		vio-supply = <&v1v8>;
-+		v2v1-supply = <&v2v1>;
-+		enable-active-high;
-+	};
- };
- 
- /include/ "twl6030.dtsi"
+ /*****************************************************************************
 -- 
-1.7.8.6
+1.7.10
