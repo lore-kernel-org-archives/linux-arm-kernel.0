@@ -1,60 +1,65 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 8 Jun 2012 09:21:13 +0200
-Subject: [RFC] Support for H.264/MPEG4 encoder (VPU) in i.MX27.
-Message-ID: <CACKLOr2jQMnBPTaTFOcfLN_9J1n39tLx-ffDcVGuZ4ZB-odYfg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jun 2012 00:32:37 -0700
+Subject: [GIT PULL] omap fixes for v3.5-rc1
+Message-ID: <20120608073237.GM12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
+The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
 
-On 8 June 2012 08:51, javier Martin <javier.martin@vista-silicon.com> wrote:
-> Hi Fabio,
->
-> On 7 June 2012 19:35, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi Javier,
->>
->> On Thu, Jun 7, 2012 at 5:30 AM, javier Martin
->> <javier.martin@vista-silicon.com> wrote:
->>
->>> As i stated, the driver is still in an early development stage, it
->>> doesn't do anything useful yet. But this is the public git repository
->>> if you want to take a look:
->>>
->>> git repo: https://github.com/jmartinc/video_visstrim.git
->>> branch: ?mx27-codadx6
->>
->> Thanks, I will take a look at your tree when I am back to the office next week.
->>
->> I also see that Linaro's tree has support for VPU for mx5/mx6:
->> http://git.linaro.org/gitweb?p=landing-teams/working/freescale/kernel.git;a=summary
->>
->> ,so we should probably think in unifying it with mx27 support there too.
+  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
 
-If you refer to driver in [1] I have some concerns: i.MX27 VPU should
-be implemented as a V4L2 mem2mem device since it gets raw pictures
-from memory and outputs encoded frames to memory (some discussion
-about the subject can be fond here [2]), as Exynos driver from Samsung
-does. However, this driver you've mentioned doesn't do that: it just
-creates several mapping regions so that the actual functionality is
-implemented in user space by a library provided by Freescale, which
-regarding i.MX27 it is also GPL.
+are available in the git repository at:
 
-What we are trying to do is implementing all the functionality in
-kernel space using mem2mem V4L2 framework so that it can be accepted
-in mainline.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.5-rc1
 
-Please, correct me if the driver you are talking about is not the one in [1].
+for you to fetch changes up to febe9e02d63ed8a42e7e9c75ea16117821f90f07:
 
-Regards.
+  ARM: OMAP2+: Fix compile for CONFIG_TIDSPBRIDGE platform init code (2012-06-06 01:42:20 -0700)
 
-[1] http://git.linaro.org/gitweb?p=landing-teams/working/freescale/kernel.git;a=blob;f=drivers/mxc/vpu/mxc_vpu.c;h=27b09e56d5a3f6cb7eeba16fe5493cbec46c65cd;hb=d0f289f67f0ff403d92880c410b009f1fd4e69f3
-[2] http://www.mail-archive.com/linux-media at vger.kernel.org/msg36555.html
+----------------------------------------------------------------
+The biggest fix here is the long pending patch mux UART pins so PM
+retention idle works again.
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Also included are few other PM wake-up related fixes, and removal of
+dead cpu detection code.
+
+The other fixes are trivial build and randconfig related fixes.
+
+----------------------------------------------------------------
+Govindraj.R (1):
+      OMAP2+: UART: Add mechanism to probe uart pins and configure rx wakeup
+
+Kevin Hilman (3):
+      ARM: OMAP3: PM: fix shared PRCM interrupts: leave disabled at boot
+      ARM: OMAP3: clock data: cleanup AM3[35]x SoC detection
+      ARM: OMAP: SoC detection: remove unused cpu_is macros
+
+Mark A. Greer (1):
+      arm: omap3: am35x: Don't mark missing features as present
+
+NeilBrown (1):
+      ARM: OMAP2+: INTC: fix suspend abort, set IRQCHIP_SKIP_SET_WAKE
+
+Tony Lindgren (6):
+      Merge branch 'for_3.5/fixes/pm' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes
+      Merge branch 'for_3.5/cleanup/am3xxx-cpu-is-leftovers' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes
+      ARM: OMAP: Fix lis3lv02d accelerometer to use gpio_to_irq
+      ARM: OMAP: Fix MMC_OMAP build when only MMC_OMAP_HS is selected
+      ARM: OMAP3: Fix omap3_l3_block_irq warning when CONFIG_BUG is not set
+      ARM: OMAP2+: Fix compile for CONFIG_TIDSPBRIDGE platform init code
+
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    6 ++-
+ arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
+ arch/arm/mach-omap2/dsp.c                    |    3 ++
+ arch/arm/mach-omap2/id.c                     |   11 +++++
+ arch/arm/mach-omap2/irq.c                    |    1 +
+ arch/arm/mach-omap2/mux.c                    |    3 +-
+ arch/arm/mach-omap2/mux.h                    |   11 +++++
+ arch/arm/mach-omap2/omap_l3_smx.c            |    3 +-
+ arch/arm/mach-omap2/pm34xx.c                 |    1 +
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |   14 ++++--
+ arch/arm/mach-omap2/serial.c                 |   67 ++++++++++++++++++++++++--
+ arch/arm/plat-omap/include/plat/cpu.h        |   33 -------------
+ arch/arm/plat-omap/include/plat/mmc.h        |    4 +-
+ 13 files changed, 110 insertions(+), 49 deletions(-)
