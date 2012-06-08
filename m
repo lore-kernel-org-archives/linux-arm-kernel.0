@@ -1,43 +1,38 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri,  8 Jun 2012 17:01:58 +0300
-Subject: [PATCH 0/7] arm/dts: Audio support for OMAP4 devices (SDP, PandaBoard)
-Message-ID: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri,  8 Jun 2012 17:01:59 +0300
+Subject: [PATCH 1/7] arm/dts: omap4: Add entry for OMAP McPDM IP
+In-Reply-To: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1339164125-32534-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+McPDM is used on OMAP4 based boards to communicate with an external audio
+codec (twl6040).
 
-The following series enable the audio functionality on OMAP4 based devices using
-twl6040 as audio codec.
-
-The series adds the needed bindings in the dts for the OMAP IPs, twl6040 MFD
-device and for the audio connection on the board.
-
-To be able to differentiate between PandaBoard and PandaBoardES (they have a bit
-different audio configuration) a new dts file has been created which only
-changes the audio properties different between the two boards.
-
-Patches for the drivers involved and the documentation related to dts sections
-has been either in 3.5 or heading for 3.6.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (7):
-  arm/dts: omap4: Add entry for OMAP McPDM IP
-  arm/dts: omap4: Add entry for OMAP DMIC IP
-  arm/dts: omap4-sdp: Add fixed regulator to represent VBAT
-  arm/dts: omap4-sdp: Add support for twl6040
-  arm/dts: omap4-sdp: Enable audio support via device tree
-  arm/dts: omap4-panda: Audio support for PandaBoard 4430
-  arm/dts: New dts file for PandaBoardES (4460)
+ arch/arm/boot/dts/omap4.dtsi |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/omap4-panda.dts   |   37 +++++++++++++++++++
- arch/arm/boot/dts/omap4-pandaES.dts |   24 ++++++++++++
- arch/arm/boot/dts/omap4-sdp.dts     |   68 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap4.dtsi        |   18 +++++++++
- 4 files changed, 147 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-pandaES.dts
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 359c497..4c43f3b 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -272,5 +272,14 @@
+ 			ti,hwmods = "mmc5";
+ 			ti,needs-special-reset;
+ 		};
++
++		mcpdm: mcpdm at 40132000 {
++			compatible = "ti,omap4-mcpdm";
++			reg = <0x40132000 0x7f>, /* MPU private access */
++			      <0x49032000 0x7f>; /* L3 Interconnect */
++			interrupts = <0 112 0x4>;
++			interrupt-parent = <&gic>;
++			ti,hwmods = "mcpdm";
++		};
+ 	};
+ };
 -- 
 1.7.8.6
