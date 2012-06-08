@@ -1,59 +1,33 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 8 Jun 2012 15:37:57 -0700
-Subject: [PATCH] clk: validate pointer in __clk_disable()
-In-Reply-To: <20120607045259.GA16232@localhost>
-References: <20120606214621.GA8892@localhost>
- <20120606145113.f0c8ddcf.akpm@linux-foundation.org>
- <20120606215951.GA9123@localhost>
- <20120606150619.8567afb4.akpm@linux-foundation.org>
- <20120606224225.GA9435@localhost>
- <20120606224958.GA20538@n2100.arm.linux.org.uk>
- <20120606230340.GA9990@localhost>
- <20120606235438.GB20538@n2100.arm.linux.org.uk>
- <20120607045259.GA16232@localhost>
-Message-ID: <20120608153757.8df63e6b.akpm@linux-foundation.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 08 Jun 2012 17:49:20 -0400 (EDT)
+Subject: Overriding/concatenating kernel command-line with bootargs from
+ dtb?
+In-Reply-To: <2050174.dvvKJHKP0J@flexo>
+References: <2050174.dvvKJHKP0J@flexo>
+Message-ID: <alpine.LFD.2.02.1206081630170.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 8 Jun 2012, Florian Fainelli wrote:
 
-(cc viresh kumar <viresh.linux@gmail.com>!)
+> Hi all,
+> 
+> I have a specific use case, where two boards using the same SoC have different 
+> UART speeds, which is something that I have specified in their corresponding 
+> dts files. In order to make sure people don't mess up the configuration, I 
+> prefer not to rely on the bootloader-supplied kernel-command line.
+> 
+> I was kind of expecting that ARM_ATAG_DTB_COMPAT + CMDLINE_EXTEND would 
+> actually concatenate the kernel command-line with the bootargs provided from 
+> dtb.
+> 
+> Is this something someone else would need? If so, shall we just make that 
+> happen when the two config symbols mentionned above are enabled, or shall we 
+> introduce a 4th kernel command line handling strategy?
 
-On Thu, 7 Jun 2012 13:52:59 +0900
-Fengguang Wu <fengguang.wu@intel.com> wrote:
+The former please.  The logic in parse_tag_cmdline() needs to be 
+duplicated in early_init_dt_scan_chosen().  CONFIG_CMDLINE_FORCE is 
+already implemented, so only CONFIG_CMDLINE_EXTEND is missing.
 
-> clk_get() returns -ENOENT on error and some careless caller might
-> dereference it without error checking:
-> 
-> In mxc_rnga_remove():
-> 
->         struct clk *clk = clk_get(&pdev->dev, "rng");
-> 
-> 	// ...
-> 
->         clk_disable(clk);
-> 
-> Since it's insane to audit the lots of existing and future clk users,
-> let's add a check in the callee to avoid kernel panic and warn about
-> any buggy user.
-> ---
->  drivers/clk/clk.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 687b00d..7bd795bf9 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -464,6 +464,9 @@ static void __clk_disable(struct clk *clk)
->  	if (!clk)
->  		return;
->  
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		return;
-> +
->  	if (WARN_ON(clk->enable_count == 0))
->  		return;
 
-Fair enough.
-
-But the build breakage reported by Paul remains, and the patchset
-remains unmerged.
+Nicolas
