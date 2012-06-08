@@ -1,39 +1,70 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 8 Jun 2012 21:33:12 +0800
-Subject: [PATCH 1/1] pinctrl: pinctrl-imx: fix incorrect debug message of maps
-Message-ID: <1339162392-24628-1-git-send-email-b29396@freescale.com>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Fri, 8 Jun 2012 22:58:50 +0900
+Subject: [PATCH] [RESEND] arm: limit memblock base address for
+ early_pte_alloc
+In-Reply-To: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+References: <1338880312-17561-1-git-send-email-minchan@kernel.org>
+Message-ID: <025701cd457e$d5065410$7f12fc30$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+> From: Minchan Kim [mailto:minchan at kernel.org]
+> Sent: Tuesday, June 05, 2012 4:12 PM
+> 
+> If we do arm_memblock_steal with a page which is not aligned with section
+> size, panic can happen during boot by page fault in map_lowmem.
+> 
+> Detail:
+> 
+> 1) mdesc->reserve can steal a page which is allocated at 0x1ffff000 by
+> memblock
+>    which prefers tail pages of regions.
+> 2) map_lowmem maps 0x00000000 - 0x1fe00000
+> 3) map_lowmem try to map 0x1fe00000 but it's not aligned by section due to
+1.
+> 4) calling alloc_init_pte allocates a new page for new pte by
+memblock_alloc
+> 5) allocated memory for pte is 0x1fffe000 -> it's not mapped yet.
+> 6) memset(ptr, 0, sz) in early_alloc_aligned got PANICed!
 
-After create config map, the new_map pointer becomes point to
-PIN_MAP_TYPE_CONFIGS_PIN map rather than PIN_MAP_TYPE_MUX_GROUP map any more.
-Thus using new_map pointer to display the MUX_GROUP info is not correct.
-Using map pointer instead to show the correct MUX_GROUP map info.
-Original the debug message is:
-imx6q-pinctrl 20e0000.iomuxc: maps: function Yp group MX6Q_PAD_SD3_CMD num 12
-After fix it is:
-imx6q-pinctrl 20e0000.iomuxc: maps: function usdhc3 group usdhc3grp-1 num 11
+May I suggest another simple approach? The first continuous couples of
+sections are always safely section-mapped inside alloc_init_section funtion.
+So, by limiting memblock_alloc to the end of the first continuous couples of
+sections at the start of map_lowmem, map_lowmem can safely memblock_alloc &
+memset even if we have one or more section-unaligned memory regions. The
+limit can be extended back to arm_lowmem_limit after the map_lowmem is done.
 
-Reported-by: Richard Zhao <richard.zhao@freescale.com>
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
----
- drivers/pinctrl/pinctrl-imx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index f6e7c67..d8fe1d8 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -193,7 +193,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e5dad60..edf1e2d 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1094,6 +1094,11 @@ static void __init kmap_init(void)
+ static void __init map_lowmem(void)
+ {
+ 	struct memblock_region *reg;
++	phys_addr_t pmd_map_end;
++
++	pmd_map_end = (memblock.memory.regions[0].base +
++	               memblock.memory.regions[0].size) & PMD_MASK;
++	memblock_set_current_limit(pmd_map_end);
+ 
+ 	/* Map all the lowmem memory banks. */
+ 	for_each_memblock(memory, reg) {
+@@ -1113,6 +1118,8 @@ static void __init map_lowmem(void)
+ 
+ 		create_mapping(&map);
  	}
- 
- 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
--		new_map->data.mux.function, new_map->data.mux.group, map_num);
-+		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
- 
- 	return 0;
++
++	memblock_set_current_limit(arm_lowmem_limit);
  }
--- 
-1.7.0.4
+ 
+ /*
+@@ -1123,8 +1130,6 @@ void __init paging_init(struct machine_desc *mdesc)
+ {
+ 	void *zero_page;
+ 
+-	memblock_set_current_limit(arm_lowmem_limit);
+-
+ 	build_mem_type_table();
+ 	prepare_page_table();
+ 	map_lowmem();
