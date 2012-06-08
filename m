@@ -1,55 +1,69 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri,  8 Jun 2012 17:02:02 +0300
-Subject: [PATCH 4/7] arm/dts: omap4-sdp: Add support for twl6040
+Date: Fri,  8 Jun 2012 17:02:03 +0300
+Subject: [PATCH 5/7] arm/dts: omap4-sdp: Enable audio support via device tree
 In-Reply-To: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1339164125-32534-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1339164125-32534-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1339164125-32534-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The twl6040 provides the audio and vibra support on OMAP4 SDP boards.
-It is connected to i2c1 bus with 0x4b address.
+On OMAP4 SDP the audio setup includes the twl6040 codec and digital
+microphones.
+
+Since OMAP4 SDP is a reference board it has all possible audio interfaces
+connected. This information is passed via the ti,audio-routing
+property.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap4-sdp.dts |   35 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 4b51611..f09d1f5 100644
+index f09d1f5..964f8ec 100644
 --- a/arch/arm/boot/dts/omap4-sdp.dts
 +++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -99,6 +99,31 @@
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
- 		interrupt-parent = <&gic>;
+@@ -88,6 +88,41 @@
+ 			gpios = <&gpio5 11 0>; /* 139 */
+ 		};
  	};
 +
-+	twl6040: twl at 4b {
-+		compatible = "ti,twl6040";
-+		reg = <0x4b>;
-+		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
-+		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
-+		interrupt-parent = <&gic>;
-+		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
++	sound {
++		compatible = "ti,abe-twl6040";
++		ti,model = "SDP4430";
 +
-+		vio-supply = <&v1v8>;
-+		v2v1-supply = <&v2v1>;
-+		enable-active-high;
++		ti,jack-detection = <1>;
++		ti,mclk-freq = <38400000>;
 +
-+		/* regulators for vibra motor */
-+		vddvibl-supply = <&vbat>;
-+		vddvibr-supply = <&vbat>;
++		ti,mcpdm = <&mcpdm>;
++		ti,dmic = <&dmic>;
 +
-+		vibra {
-+			/* Vibra driver, motor resistance parameters */
-+			ti,vibldrv-res = <8>;
-+			ti,vibrdrv-res = <3>;
-+			ti,viblmotor-res = <10>;
-+			ti,vibrmotor-res = <10>;
-+		};
++		ti,twl6040 = <&twl6040>;
++
++		/* Audio routing */
++		ti,audio-routing =
++			"Headset Stereophone", "HSOL",
++			"Headset Stereophone", "HSOR",
++			"Earphone Spk", "EP",
++			"Ext Spk", "HFL",
++			"Ext Spk", "HFR",
++			"Line Out", "AUXL",
++			"Line Out", "AUXR",
++			"Vibrator", "VIBRAL",
++			"Vibrator", "VIBRAR",
++			"HSMIC", "Headset Mic",
++			"Headset Mic", "Headset Mic Bias",
++			"MAINMIC", "Main Handset Mic",
++			"Main Handset Mic", "Main Mic Bias",
++			"SUBMIC", "Sub Handset Mic",
++			"Sub Handset Mic", "Main Mic Bias",
++			"AFML", "Line In",
++			"AFMR", "Line In",
++			"DMic", "Digital Mic",
++			"Digital Mic", "Digital Mic1 Bias";
 +	};
  };
  
- /include/ "twl6030.dtsi"
+ &i2c1 {
 -- 
 1.7.8.6
