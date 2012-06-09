@@ -1,37 +1,64 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Sat, 9 Jun 2012 18:16:50 +0530
-Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <201206091234.47309.marex@denx.de>
-References: <1339181689-22573-1-git-send-email-marex@denx.de>
- <CAM=Q2cuv0NQTYJH=+d6Na+JK5rGYsLiSmuX7g8T-_Ry7bs3fRQ@mail.gmail.com>
- <201206091234.47309.marex@denx.de>
-Message-ID: <CAM=Q2cvvwXimLY358ET69U6qCsGoxenYMNtApYbhpn4cCC0nUg@mail.gmail.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Sat, 09 Jun 2012 12:57:15 +0000
+Subject: [PATCH 0/6] drivers: randconfig patches for kernel 3.5
+In-Reply-To: <201206090013.27149.arnd@arndb.de>
+References: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
+ <201206090013.27149.arnd@arndb.de>
+Message-ID: <4FD3482B.5050004@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> >
->> > +struct mxs_i2c_speed_config {
->> > + ? ? ? uint32_t ? ? ? ?timing0;
->> > + ? ? ? uint32_t ? ? ? ?timing1;
->> > + ? ? ? uint32_t ? ? ? ?timing2;
->> > +};
->> > +
->> > +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+Hi Arnd, Mathieu,
+
+On 06/09/2012 12:13 AM, Arnd Bergmann wrote:
+> On Friday 08 June 2012, mathieu.poirier at linaro.org wrote:
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>
->> You are using 95k?
->
-> Yes
->
->> Didnt understand this.
->
-> What exactly, it's running (according to the datasheet) at 95kHz.
+>> These patches fix miscellaneous problems when working
+>> with make randconfig.  They were discovered on kernel
+>> 3.1-rc4 and sent out during the 3.4 cycle but were not
+>> ack'ed.  
+>>
+>> Sending out again for completeness.
+> 
+> Hi Mathieu,
+> 
+> I just realized that most of these are for the same subsystem
+> (framebuffer), so you should have kept the respective mailing list
+> and maintainer on Cc (added now). 
+> 
+> The mg_disk driver is not listed in the MAINTAINERS file but
+> has an author email listed in the file itself.
+> 
+> I can take the mg_disk patch into the arm-soc tree as a fix,
+> but I'd prefer the other patches to go through the framebuffer
+> tree.
 
-Did you intend 100k?
-and approximating due to clock ... or some other limitaion?
+Applied all (including the backlight patches which are usually handled
+by Andrew Morton) but the mg_disk patch.
 
-That is what I was trying to understand.
->
->> > + ? ? ? .timing0 ? ? ? ?= 0x00780030,
->> > + ? ? ? .timing1 ? ? ? ?= 0x00800030,
->> > + ? ? ? .timing2 ? ? ? ?= 0x0015000d,
->> > +};
+
+Thanks,
+
+Florian Tobias Schandinat
+
+> 
+> 	Arnd
+> 
+>> Arnd Bergmann (6):
+>>   drivers/video: use correct __devexit_p annotation
+>>   mg_disk: use readb/writeb instead of inb/outb
+>>   video/ili9320: do not mark exported functions __devexit
+>>   video/console: automatically select a font
+>>   drivers/savagefb: use mdelay instead of udelay
+>>   drivers/tosa: driver needs I2C and SPI to compile
+>>
+>>  drivers/block/mg_disk.c                |   78 ++++++++++++++++----------------
+>>  drivers/video/backlight/Kconfig        |    2 +-
+>>  drivers/video/backlight/ili9320.c      |    2 +-
+>>  drivers/video/broadsheetfb.c           |    2 +-
+>>  drivers/video/console/Kconfig          |   14 ++++++
+>>  drivers/video/mbx/mbxfb.c              |    2 +-
+>>  drivers/video/savage/savagefb_driver.c |   10 ++--
+>>  7 files changed, 62 insertions(+), 48 deletions(-)
+> 
