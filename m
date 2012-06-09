@@ -1,41 +1,31 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Jun 2012 19:15:08 -0600 (MDT)
-Subject: [PATCH 00/11] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-In-Reply-To: <1339162255.2091.56.camel@sokoban>
+Date: Fri, 8 Jun 2012 19:31:19 -0600 (MDT)
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <20120608063859.GL12766@atomide.com>
 References: <20120607060901.25532.68354.stgit@dusk>
- <1339162255.2091.56.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1206081907200.23401@utopia.booyaka.com>
+ <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com>
+ <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
+ <20120607105228.GC12766@atomide.com>
+ <alpine.DEB.2.00.1206071404470.14977@utopia.booyaka.com>
+ <20120608063859.GL12766@atomide.com>
+Message-ID: <alpine.DEB.2.00.1206081929000.23401@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Thu, 7 Jun 2012, Tony Lindgren wrote:
 
-On Fri, 8 Jun 2012, Tero Kristo wrote:
+> Oh OK yeah makes sense as that's hwmod internal function. Then the driver
+> specific part should use just void __iomem *base and use readl/writel and
+> live under include/linux/platform_data/omap-usb.h.
 
-> Tested this set on top of v3.5-rc1 with omap3 / omap4 suspend + my omap4
-> core retention / dev-off patches. There are a couple of minor issues,
-> like the bug in patch 5, and the fact that counter_32k hwmod data is
-> broken for omap4. This fix is needed on omap4 to fix the counter_32k, if
-> this is not done, device off does not work:
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 66da92d..6ad64c6 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -397,8 +397,7 @@ static struct omap_hwmod_class_sysconfig
-> omap44xx_counter_sysc = {
->  	.rev_offs	= 0x0000,
->  	.sysc_offs	= 0x0004,
->  	.sysc_flags	= SYSC_HAS_SIDLEMODE,
-> -	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> -			   SIDLE_SMART_WKUP),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
->  	.sysc_fields	= &omap_hwmod_sysc_type1,
->  };
+This sounds like something that might be flame-bait, since these functions 
+aren't platform_data.
 
-Thanks, Beno?t mentioned this too.  Just added a patch for this to the 
-second version of this fixes series.
+How about putting these functions in arch/arm/plat-omap/include/plat?  
+Drivers are able to include those files easily.
 
 
 - Paul
