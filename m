@@ -1,50 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 9 Jun 2012 00:13:27 +0000
-Subject: [PATCH 0/6] drivers: randconfig patches for kernel 3.5
-In-Reply-To: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <201206090013.27149.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Jun 2012 19:15:08 -0600 (MDT)
+Subject: [PATCH 00/11] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
+In-Reply-To: <1339162255.2091.56.camel@sokoban>
+References: <20120607060901.25532.68354.stgit@dusk>
+ <1339162255.2091.56.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1206081907200.23401@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 June 2012, mathieu.poirier at linaro.org wrote:
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Hi Tero,
+
+On Fri, 8 Jun 2012, Tero Kristo wrote:
+
+> Tested this set on top of v3.5-rc1 with omap3 / omap4 suspend + my omap4
+> core retention / dev-off patches. There are a couple of minor issues,
+> like the bug in patch 5, and the fact that counter_32k hwmod data is
+> broken for omap4. This fix is needed on omap4 to fix the counter_32k, if
+> this is not done, device off does not work:
 > 
-> These patches fix miscellaneous problems when working
-> with make randconfig.  They were discovered on kernel
-> 3.1-rc4 and sent out during the 3.4 cycle but were not
-> ack'ed.  
-> 
-> Sending out again for completeness.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 66da92d..6ad64c6 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -397,8 +397,7 @@ static struct omap_hwmod_class_sysconfig
+> omap44xx_counter_sysc = {
+>  	.rev_offs	= 0x0000,
+>  	.sysc_offs	= 0x0004,
+>  	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> -	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> -			   SIDLE_SMART_WKUP),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
+>  	.sysc_fields	= &omap_hwmod_sysc_type1,
+>  };
 
-Hi Mathieu,
+Thanks, Beno?t mentioned this too.  Just added a patch for this to the 
+second version of this fixes series.
 
-I just realized that most of these are for the same subsystem
-(framebuffer), so you should have kept the respective mailing list
-and maintainer on Cc (added now). 
 
-The mg_disk driver is not listed in the MAINTAINERS file but
-has an author email listed in the file itself.
-
-I can take the mg_disk patch into the arm-soc tree as a fix,
-but I'd prefer the other patches to go through the framebuffer
-tree.
-
-	Arnd
-
-> Arnd Bergmann (6):
->   drivers/video: use correct __devexit_p annotation
->   mg_disk: use readb/writeb instead of inb/outb
->   video/ili9320: do not mark exported functions __devexit
->   video/console: automatically select a font
->   drivers/savagefb: use mdelay instead of udelay
->   drivers/tosa: driver needs I2C and SPI to compile
-> 
->  drivers/block/mg_disk.c                |   78 ++++++++++++++++----------------
->  drivers/video/backlight/Kconfig        |    2 +-
->  drivers/video/backlight/ili9320.c      |    2 +-
->  drivers/video/broadsheetfb.c           |    2 +-
->  drivers/video/console/Kconfig          |   14 ++++++
->  drivers/video/mbx/mbxfb.c              |    2 +-
->  drivers/video/savage/savagefb_driver.c |   10 ++--
->  7 files changed, 62 insertions(+), 48 deletions(-)
+- Paul
