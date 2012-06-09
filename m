@@ -1,52 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 9 Jun 2012 13:25:45 +0200
-Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <201206091311.43229.marex@denx.de>
-References: <1339181689-22573-1-git-send-email-marex@denx.de>
- <201206091234.47309.marex@denx.de>
- <20120609105330.GF30400@pengutronix.de>
- <201206091311.43229.marex@denx.de>
-Message-ID: <20120609112545.GH30400@pengutronix.de>
+Date: Sat, 9 Jun 2012 13:32:20 +0200
+Subject: [PATCH 1/2] ARM i.MX51: setup mipi
+In-Reply-To: <20120607133734.GA3750@S2101-09.ap.freescale.net>
+References: <1338888630-25930-1-git-send-email-s.hauer@pengutronix.de>
+ <1338888630-25930-2-git-send-email-s.hauer@pengutronix.de>
+ <20120607025949.GM2667@S2101-09.ap.freescale.net>
+ <20120607081300.7a554215@archvile>
+ <CAAQ0ZWQX60YWvEi-cWtTouMoxg1WxWo_soHf+4gE7oXsPfC_1g@mail.gmail.com>
+ <20120607084336.GE30400@pengutronix.de>
+ <20120607133734.GA3750@S2101-09.ap.freescale.net>
+Message-ID: <20120609113220.GJ30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 09, 2012 at 01:11:42PM +0200, Marek Vasut wrote:
-> Dear Sascha Hauer,
-> 
-> > On Sat, Jun 09, 2012 at 12:34:47PM +0200, Marek Vasut wrote:
-> > > Dear Shubhrajyoti Datta,
-> > > 
-> > > > Didnt understand this.
-> > > 
-> > > What exactly, it's running (according to the datasheet) at 95kHz.
-> > > 
-> > > > > +       .timing0        = 0x00780030,
-> > > > > +       .timing1        = 0x00800030,
-> > > > > +       .timing2        = 0x0015000d,
-> > > > > +};
-> > > > > +
-> > > > > +const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
-> > > > > +       .timing0        = 0x000f0007,
-> > > > > +       .timing1        = 0x001f000f,
-> > > > > +       .timing2        = 0x0015000d,
-> > > > > +};
-> > > > > +
-> > > > 
-> > > > How are these values calculated?
-> > > 
-> > > They're not calculated, they're presented in the datasheet. There's no
-> > > formula, even though I believe one could be derived given enough effort.
+On Thu, Jun 07, 2012 at 09:37:35PM +0800, Shawn Guo wrote:
+> On Thu, Jun 07, 2012 at 10:43:36AM +0200, Sascha Hauer wrote:
+> > On Thu, Jun 07, 2012 at 03:10:05PM +0800, Shawn Guo wrote:
+> > > But why can't we do ipu reset (the second patch) in ipu driver then?
 > > 
-> > Don't these values depend on the input clock of this unit? I don't know,
-> > just asking.
+> > Ok, we might have to come up with something better. I originally had the
+> > IPU reset in the IPU driver (copied from the FSL BSP). There are two
+> > problems with this:
+> > 
+> > - The IPU reset is external to the IPU which means that we have to
+> >   distinguish between SoCs.
+> > - The IPU reset takes quite a long time (about 300ms). Doing this in
+> >   the IPU driver means that the kernel boot delays for this time. Doing
+> >   this in early init means that the 300ms can be spent bringing the rest
+> >   of the system up.
+> > 
+> > As said, there are more clean ways to do this without having the two
+> > mentioned problems, I'm just not sure whether it's worth it to put
+> > significant amount of work into this.
+> > 
+> IMO, it's worth the effort.  Otherwise, we will end up with having
+> such reset functions for IPU, VPU and GPU (maybe more on later SoC)
+> over individual SoC initialization functions.  Well, VPU and GPU may
+> be less concerned by the mainline tree, but from FSL perspective, we
+> have to care about them.
 > 
-> Isn't the i2c block supplied from 24MHz clock source in the mx28?
+> Also, how will you support that for imx6q, considering we already have
+> src.c created as a little "driver" for imx6q System Reset Controller
+> (SRC)?  I feel like that we should extend this little "driver" to
+> support what you need for IPU reset here.
 
-Maybe. Shouldn't this be checked then or at least mentioned that these
-values assume a certain clock frequency?
-
-I wonder that currently the timing registers are not initialized at all.
-Do they depend on reset defaults or bootloader setup?
+Do you have an idea what kind of API such a reset unit should export?
+Are you thinking about some kind of reset_me(struct device *dev) or
+what else?
 
 Sascha
 
