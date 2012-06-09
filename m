@@ -1,39 +1,49 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Sat,  9 Jun 2012 05:13:27 -0300
-Subject: =?UTF-8?q?=5BPATCH=202/6=5D=20arm=3A=20fix=20compiler=20warning=20by=20properly=20inlining=20flat=5Fset=5Fpersistent=28=29?=
-In-Reply-To: <1339229611-2326-1-git-send-email-elezegarcia@gmail.com>
-References: <1339229611-2326-1-git-send-email-elezegarcia@gmail.com>
-Message-ID: <1339229611-2326-2-git-send-email-elezegarcia@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jun 2012 09:32:17 +0100
+Subject: [CFT 11/11] Add feature removal of old OMAP private DMA
+ implementation
+In-Reply-To: <4FD24657.5020207@landley.net>
+References: <20120607110610.GB15973@n2100.arm.linux.org.uk>
+ <E1ScabE-0003uN-JD@rmk-PC.arm.linux.org.uk> <4FD24657.5020207@landley.net>
+Message-ID: <20120609083217.GA11404@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the following warning:
-fs/binfmt_flat.c:752: warning: unused variable ?persistent?
-There is neither change in functionality, nor extra code generated.
+On Fri, Jun 08, 2012 at 01:37:11PM -0500, Rob Landley wrote:
+> On 06/07/2012 06:09 AM, Russell King wrote:
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  Documentation/feature-removal-schedule.txt |   11 +++++++++++
+> >  1 files changed, 11 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
+> > index 56000b3..1f7ba35 100644
+> > --- a/Documentation/feature-removal-schedule.txt
+> > +++ b/Documentation/feature-removal-schedule.txt
+> > @@ -612,3 +612,14 @@ When:	June 2013
+> >  Why:	Unsupported/unmaintained/unused since 2.6
+> >  
+> >  ----------------------------
+> > +
+> > +What:	OMAP private DMA implementation
+> > +When:	2013
+> > +Why:	We have a DMA engine implementation; all users should be updated
+> > +	to use this rather than persisting with the old APIs.  The old APIs
+> > +	block merging the old DMA engine implementation into the DMA
+> > +	engine driver.
+> > +Who:	Russell King <linux@arm.linux.org.uk>,
+> > +	Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > +
+> > +----------------------------
+> 
+> Whose tree do feature-removal-schedule patches go in through?
+> 
+> (They're not really documentation, they're design coordination/logistics.)
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
----
- arch/arm/include/asm/flat.h |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+I don't think there is any specific tree.
 
-diff --git a/arch/arm/include/asm/flat.h b/arch/arm/include/asm/flat.h
-index 59426a4..6ef6cc5 100644
---- a/arch/arm/include/asm/flat.h
-+++ b/arch/arm/include/asm/flat.h
-@@ -11,6 +11,11 @@
- #define	flat_get_addr_from_rp(rp, relval, flags, persistent) get_unaligned(rp)
- #define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
- #define	flat_get_relocate_addr(rel)		(rel)
--#define	flat_set_persistent(relval, p)		0
-+
-+static inline int flat_set_persistent(unsigned long relval,
-+				      unsigned long *persistent)
-+{
-+	return 0;
-+}
- 
- #endif /* __ARM_FLAT_H__ */
--- 
-1.7.3.4
+It would also be silly to split it from this patch set; if it were to be
+split, and there would need to be coordination with the rest of the patch
+set to ensure this change didn't go in without the rest - that would not
+make sense.
