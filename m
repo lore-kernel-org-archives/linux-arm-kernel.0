@@ -1,31 +1,109 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Jun 2012 19:31:19 -0600 (MDT)
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <20120608063859.GL12766@atomide.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
- <20120607105228.GC12766@atomide.com>
- <alpine.DEB.2.00.1206071404470.14977@utopia.booyaka.com>
- <20120608063859.GL12766@atomide.com>
-Message-ID: <alpine.DEB.2.00.1206081929000.23401@utopia.booyaka.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Sat, 9 Jun 2012 09:45:57 +0530
+Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1339181689-22573-1-git-send-email-marex@denx.de>
+References: <1339181689-22573-1-git-send-email-marex@denx.de>
+Message-ID: <CAM=Q2cuv0NQTYJH=+d6Na+JK5rGYsLiSmuX7g8T-_Ry7bs3fRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jun 2012, Tony Lindgren wrote:
+On Sat, Jun 9, 2012 at 12:24 AM, Marek Vasut <marex@denx.de> wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Detlev Zundel <dzu@denx.de>
+> CC: Dong Aisheng <b29396@freescale.com>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
+> Cc: linux-i2c at vger.kernel.org
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stefano Babic <sbabic@denx.de>
+> CC: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+> ?Documentation/devicetree/bindings/i2c/i2c-mxs.txt | ? ?1 +
+> ?arch/arm/boot/dts/imx28.dtsi ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?drivers/i2c/busses/i2c-mxs.c ? ? ? ? ? ? ? ? ? ? ?| ? 54 +++++++++++++++++++++
+> ?3 files changed, 57 insertions(+)
+>
+> V2: Use clock-frequency instead
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> index 1bfc02d..d2bf750 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
+> @@ -4,6 +4,7 @@ Required properties:
+> ?- compatible: Should be "fsl,<chip>-i2c"
+> ?- reg: Should contain registers location and length
+> ?- interrupts: Should contain ERROR and DMA interrupts
+> +- clock-frequency: desired I2C bus clock frequency in Hz.
+>
+> ?Examples:
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index a89da5a..714e63c 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -398,6 +398,7 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?compatible = "fsl,imx28-i2c";
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?reg = <0x80058000 2000>;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <111 68>;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <400000>;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?status = "disabled";
+> ? ? ? ? ? ? ? ? ? ? ? ?};
+>
+> @@ -407,6 +408,7 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?compatible = "fsl,imx28-i2c";
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?reg = <0x8005a000 2000>;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <110 69>;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <400000>;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?status = "disabled";
+> ? ? ? ? ? ? ? ? ? ? ? ?};
+>
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index 04eb441..b4d083f 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -46,6 +46,10 @@
+> ?#define MXS_I2C_CTRL0_DIRECTION ? ? ? ? ? ? ? ? ? ? ? ?0x00010000
+> ?#define MXS_I2C_CTRL0_XFER_COUNT(v) ? ? ? ? ? ?((v) & 0x0000FFFF)
+>
+> +#define MXS_I2C_TIMING0 ? ? ? ? ? ? ? ?(0x10)
+> +#define MXS_I2C_TIMING1 ? ? ? ? ? ? ? ?(0x20)
+> +#define MXS_I2C_TIMING2 ? ? ? ? ? ? ? ?(0x30)
+> +
+> ?#define MXS_I2C_CTRL1 ? ? ? ? ?(0x40)
+> ?#define MXS_I2C_CTRL1_SET ? ? ?(0x44)
+> ?#define MXS_I2C_CTRL1_CLR ? ? ?(0x48)
+> @@ -97,6 +101,24 @@
+> ?#define MXS_CMD_I2C_READ ? ? ? (MXS_I2C_CTRL0_SEND_NAK_ON_LAST | \
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MXS_I2C_CTRL0_MASTER_MODE)
+>
+> +struct mxs_i2c_speed_config {
+> + ? ? ? uint32_t ? ? ? ?timing0;
+> + ? ? ? uint32_t ? ? ? ?timing1;
+> + ? ? ? uint32_t ? ? ? ?timing2;
+> +};
+> +
+> +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+You are using 95k?
+Didnt understand this.
 
-> Oh OK yeah makes sense as that's hwmod internal function. Then the driver
-> specific part should use just void __iomem *base and use readl/writel and
-> live under include/linux/platform_data/omap-usb.h.
 
-This sounds like something that might be flame-bait, since these functions 
-aren't platform_data.
+> + ? ? ? .timing0 ? ? ? ?= 0x00780030,
+> + ? ? ? .timing1 ? ? ? ?= 0x00800030,
+> + ? ? ? .timing2 ? ? ? ?= 0x0015000d,
+> +};
+> +
+> +const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
+> + ? ? ? .timing0 ? ? ? ?= 0x000f0007,
+> + ? ? ? .timing1 ? ? ? ?= 0x001f000f,
+> + ? ? ? .timing2 ? ? ? ?= 0x0015000d,
+> +};
+> +
 
-How about putting these functions in arch/arm/plat-omap/include/plat?  
-Drivers are able to include those files easily.
-
-
-- Paul
+How are these values calculated?
