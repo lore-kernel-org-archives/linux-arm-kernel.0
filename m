@@ -1,32 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 15:07:43 +0100
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <4FD5F3D2.2050500@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
- <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
- <4FD5D49C.6070106@linaro.org>
- <20120611120820.GN11439@opensource.wolfsonmicro.com>
- <4FD5F3D2.2050500@linaro.org>
-Message-ID: <4FD5FBAF.1060002@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 9 Jun 2012 21:28:44 +0000
+Subject: [PATCH 0/6] drivers: randconfig patches for kernel 3.5
+In-Reply-To: <4FD3482B.5050004@gmx.de>
+References: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
+ <201206090013.27149.arnd@arndb.de> <4FD3482B.5050004@gmx.de>
+Message-ID: <201206092128.45064.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Well, I guess I'll end up dulplicating the commits :/
->
-> Duplicating them?
+On Saturday 09 June 2012, Florian Tobias Schandinat wrote:
+> > 
+> > I just realized that most of these are for the same subsystem
+> > (framebuffer), so you should have kept the respective mailing list
+> > and maintainer on Cc (added now). 
+> > 
+> > The mg_disk driver is not listed in the MAINTAINERS file but
+> > has an author email listed in the file itself.
+> > 
+> > I can take the mg_disk patch into the arm-soc tree as a fix,
+> > but I'd prefer the other patches to go through the framebuffer
+> > tree.
+> 
+> Applied all (including the backlight patches which are usually handled
+> by Andrew Morton) but the mg_disk patch.
 
-Ah, you mean that you've already sent them to -next?
+Ok, Thanks a lot!
 
-That's no problem though. Won't Git just sling them out at pull-time?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
