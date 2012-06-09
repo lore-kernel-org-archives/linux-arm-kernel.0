@@ -1,221 +1,24 @@
-From: todorcolov@abv.bg (Todor Colov)
-Date: Sat, 9 Jun 2012 15:37:14 +0300 (EEST)
-Subject: ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE - patch proposal: for ep9302
- i2c support is not enabled in kernel - submit patch to enable it & merge it
- in the newer kernels
-Message-ID: <1621975213.53747.1339245434729.JavaMail.apache@nm41.abv.bg>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jun 2012 13:38:34 +0100
+Subject: [PATCH v2 0/4] syscall_trace fixes and cleanups
+In-Reply-To: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20120609123834.GA11168@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Dear all, 
-
-I'm contacting you as your are the offical maintainers of "ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE " 
-
-
-For ep9302 sub-architecture "i2c" support is not enabled in the recet kernels. i2c support is needed when external RTC are used. 
-
-
- 
-
-Here you can find possibe patch to enable it ( also attached ): Please validate it and submit it for merge in the newer kernels: 
-
-[root at FC9 linux-3.4]# diff -u arch/arm/mach-ep93xx/edb93xx.c arch/arm/mach-ep93xx/edb93xx-i2c-ep9302-enabled.c
---- arch/arm/mach-ep93xx/edb93xx.c
-
-
-
-
- 2012-05-21 01:29:13.000000000 +0300
-+++ arch/arm/mach-ep93xx/edb93xx-i2c-ep9302-enabled.c
-
- 2012-06-09 15:24:23.217996476 +0300
-@@ -91,7 +91,7 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- ep93xx_register_i2c(&amp;edb93xx_i2c_gpio_data,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- edb93xxa_i2c_board_info,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- ARRAY_SIZE(edb93xxa_i2c_board_info));
--
-
-
-
-
-
- } else if (machine_is_edb9307() || machine_is_edb9312() ||
-+
-
-
-
-
-
- } else if (  machine_is_edb9302()   || machine_is_edb9307() || machine_is_edb9312() ||
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- machine_is_edb9315()) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- ep93xx_register_i2c(&amp;edb93xx_i2c_gpio_data,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- edb93xx_i2c_board_info,
- 
-
-Thanks, 
-
-Todor Colov 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120609/6ff216ac/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: edb93xx-i2c-ep9302-enable.patch
-Type: application/octet-stream
-Size: 563 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120609/6ff216ac/attachment.obj>
+On Fri, Jun 08, 2012 at 04:12:17PM +0100, Will Deacon wrote:
+> Hello,
+> 
+> This is version 2 of the patches originally posted here:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/097748.html
+> 
+> The only changes are that (a) two of the original patches (fixes) have
+> been now been merged into mainline and (b) the remaining patches in the
+> series are now rebased onto -rc1, which includes Al's work on the signal
+> handling / syscall restarting path.
+> 
+> All comments welcome,
+
+It may be a good idea to Cc Al on these.
