@@ -1,62 +1,39 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Sat, 9 Jun 2012 08:39:32 +0000
-Subject: AM335x CPSW reset (was "RE: [PATCH 04/11] ARM: OMAP2+:
- usb_host_fs: add custom reset for usb_host_fs (fsusb)")
-In-Reply-To: <alpine.DEB.2.00.1206081659230.17523@utopia.booyaka.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk> <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <20120607075541.GF16342@arwen.pp.htv.fi> <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA46087@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206081659230.17523@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA464C6@DBDE01.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 9 Jun 2012 11:44:25 +0200
+Subject: [GIT PULL] i.MX fixes
+In-Reply-To: <CAOesGMhh68fWWpMfqBg2gyzWOo8x+_rbQkc-hzP-PRcu8jZA3A@mail.gmail.com>
+References: <20120607200451.GQ30400@pengutronix.de>
+ <CAOesGMhh68fWWpMfqBg2gyzWOo8x+_rbQkc-hzP-PRcu8jZA3A@mail.gmail.com>
+Message-ID: <20120609094425.GC30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 09, 2012 at 04:40:03, Paul Walmsley wrote:
-> Hi
+On Fri, Jun 08, 2012 at 01:23:19AM -0700, Olof Johansson wrote:
+> On Thu, Jun 7, 2012 at 1:04 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Hi Olof, Arnd,
+> >
+> > Please pull the following i.MX fixes for -rc.
+> >
+> > Sascha
+> >
+> > The following changes since commit 76e10d158efb6d4516018846f60c2ab5501900bc:
+> >
+> > ?Linux 3.4 (2012-05-20 15:29:13 -0700)
+> >
+> > are available in the git repository at:
+> >
+> > ?git://git.pengutronix.de/git/imx/linux-2.6.git imx/fixes
 > 
-> On Fri, 8 Jun 2012, Hiremath, Vaibhav wrote:
-> 
-> > In case of AM33xx, recently I came across similar issue (rather more 
-> > than this) with CPSW module.
-> > 
-> > The issue is,
-> > 
-> > We have observed that, in order to disable the CPSW module 
-> > (MODULEMODE=0x0), We have to assert OCP level reset, before disabling 
-> > it; else module enters into unknown state, where register status shows, 
-> > MODULEMODE turns 0x0, but idlests says module is busy.
-> > 
-> > This has to be done everytime you try to disable the module.
-> > 
-> > The worst part here is, CPSW has 4 submodules (SS, SL1, SL2, CPDMA),
-> > We have to assert reset signal to each submodules.
-> > 
-> > So the approach I had taken is, I had implemented almost similar 
-> > function specific to cpsw and introduced flag called 
-> > HWMOD_SWSUP_RESET_BEFORE_IDLE.
-> 
-> Why "SWSUP" ? 
-> 
+> Pulled, thanks. In the future, for fixes you can aggregate them in one
+> branch -- we normally just care about topics for merge window staging.
 
-Since it was SW initiated reset assertion so I added this prefix.
+Ok, thanks
 
-> > Now the question here would be, should we consider this IP bug or 
-> > integration bug? If it is integration bug, then isn't this device issue?
-> 
-> I don't know if it's a bug in either place, but it sounds like something 
-> that needs to be handled in the _am335x_disable_module() code in 
-> mach-omap2/omap_hwmod.c.
-> 
+Sascha
 
-Yes, certainly it should be part of _am335x_disable_module().
 
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
