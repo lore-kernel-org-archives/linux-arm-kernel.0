@@ -1,48 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 9 Jun 2012 15:10:31 +0200
-Subject: [PATCH 1/2 V2] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <CAM=Q2cvvwXimLY358ET69U6qCsGoxenYMNtApYbhpn4cCC0nUg@mail.gmail.com>
-References: <1339181689-22573-1-git-send-email-marex@denx.de>
- <201206091234.47309.marex@denx.de>
- <CAM=Q2cvvwXimLY358ET69U6qCsGoxenYMNtApYbhpn4cCC0nUg@mail.gmail.com>
-Message-ID: <201206091510.31232.marex@denx.de>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Sat, 9 Jun 2012 20:26:13 +0530
+Subject: [PATCH] ARM: OMAP2+: cpu: Add am33xx device under cpu_class_is_omap2
+Message-ID: <1339253773-24088-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shubhrajyoti Datta,
+Newly added AM33XX device falls under omap2 class, so
+make cpu_class_is_omap2() true for AM33XX
+(Add soc_is_am33xx() check).
 
-> >> > +struct mxs_i2c_speed_config {
-> >> > +       uint32_t        timing0;
-> >> > +       uint32_t        timing1;
-> >> > +       uint32_t        timing2;
-> >> > +};
-> >> > +
-> >> > +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
-> >> 
-> >> You are using 95k?
-> > 
-> > Yes
-> > 
-> >> Didnt understand this.
-> > 
-> > What exactly, it's running (according to the datasheet) at 95kHz.
-> 
-> Did you intend 100k?
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/plat-omap/include/plat/cpu.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I intended to stick with the datasheet, if you manage to find explanation for 
-why they chose 95kHz, I'd be interested to hear it ... btw. 24MHz/95kHz gives 
-pretty weird divider, which is quite suspicious.
-
-> and approximating due to clock ... or some other limitaion?
-
-Doesn't seem to be the case, see "btw" part above.
-
-> That is what I was trying to understand.
-> 
-> >> > +       .timing0        = 0x00780030,
-> >> > +       .timing1        = 0x00800030,
-> >> > +       .timing2        = 0x0015000d,
-> >> > +};
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 14f050f..5e36564 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -375,7 +375,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define cpu_class_is_omap1()	(cpu_is_omap7xx() || cpu_is_omap15xx() || \
+ 				cpu_is_omap16xx())
+ #define cpu_class_is_omap2()	(cpu_is_omap24xx() || cpu_is_omap34xx() || \
+-				cpu_is_omap44xx())
++				cpu_is_omap44xx() || soc_is_am33xx())
+ 
+ /* Various silicon revisions for omap2 */
+ #define OMAP242X_CLASS		0x24200024
+-- 
+1.7.0.4
