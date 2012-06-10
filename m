@@ -1,71 +1,22 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 10 Jun 2012 21:16:28 +0800
-Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending
- on pinmux APIs
-In-Reply-To: <CACRpkdZuge1vJquaSoYjk+zFEU+yafSG3L4UhRDhAZww73-RZg@mail.gmail.com>
-References: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdZOTZaVp6rfuQvZaQyk0+zxeAjwHryBMYY-C1WVABaLLA@mail.gmail.com>
- <CAGsJ_4zknQjNK6-T7+av1N=7gijZ821keM=qaDEJZ9zOfnLhkw@mail.gmail.com>
- <CACRpkdb=00UP3NaBj4NhVy0wYhwkqqRB5e3Gid5hcpVhxH0wYw@mail.gmail.com>
- <CAGsJ_4yz=-szdaLWgKbTHkZtO+zqZvM35gXCHBprto=odjs41w@mail.gmail.com>
- <CACRpkdZuge1vJquaSoYjk+zFEU+yafSG3L4UhRDhAZww73-RZg@mail.gmail.com>
-Message-ID: <CAGsJ_4y22H-6cZquxYDm40At=sYXvBHnvJ7ZqK9z5no9MLO+Kg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Jun 2012 18:30:10 +0200
+Subject: [PATCH 2/9] SPI: Refactor spi-orion to use SPI framework queue.
+In-Reply-To: <1339324322-29388-3-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-3-git-send-email-andrew@lunn.ch>
+Message-ID: <CACRpkdY+egHAMxwLVOfRPYykeB3=nS=hVmdMDK0Q_6U9PZYbZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sun, Jun 10, 2012 at 12:31 PM, Andrew Lunn <andrew@lunn.ch> wrote:
 
-2012/5/29 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, May 29, 2012 at 8:20 AM, Barry Song <21cnbao@gmail.com> wrote:
->> 2012/5/29 Linus Walleij <linus.walleij@linaro.org>:
->>> On Mon, May 28, 2012 at 11:03 PM, Barry Song <21cnbao@gmail.com> wrote:
->>>>
->>>> here i splitted into two files just for viewing, and at the same time,
->>>> i remap the same memory twice in pinctrl-sirf.c and gpio-sirf.c. they
->>>> share same memory area.
->>>
->>> Hmmmm.... but do they ever write into the same registers?
->>
->> they share the same IOMEM area, but gpio set registers have different
->> offset with pinmux. is there any difference between writing same
->> registers and writing different registers? mainly, they are from the
->> same hardware controller.
+> Replace the deprecated master->transfer with transfer_one_message()
+> and allow the SPI subsystem handle all the queuing of messages.
 >
-> I don't really have an opinion on this, you can do it either way.
->
-> It's nice to split the files into separate drivers for smaller files and
-> cleanly cut devices.
->
-> It's also nice to have it all in one file so you can get the whole picture
-> of how the hardware works.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-i think i'd better to have one driver for both. if i move to
-gpio-generic driver for gpio module, gpio-generic driver will not
-request gpio from pinctrl, but i need. and on the other hand,
-gpio-generic doesn't include irq_chip, but i need.
-so to me, gpio-generic driver is much like just for a single-function
-gpio controller not good for a multi-function pinmux/gpio/irq
-controller.
+Looks good to me:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->
-> Usually the problem has been to cross-reference the GPIO ranges
-> from another driver, like adding the struct gpio_chip * to the ranges,
-> but it seems you don't have this problem in your driver? If you think
-> you will run into this problem, merge it into the pinctrl driver to
-> save yourself from lots of trouble.
-
-for the range issue, basically we have a (pinmux pin, gpio, irq) pair,
-one pinmux pin can be a gpio pin and an external irq source , so
-actually, i need to pinctrl_request_gpio() in my gpio_chip.request().
-i would think prima2 pinctrl driver can be much like pinctrl-nomadik.c
-and pinctrl-coh901.c, which are all of pinmux, gpio and irq chip.  i
-might follow them and improve pinctrl-sirf.c to include gpio/irq too.
-
->
-> Maybe someone else has some ideas?
->
-> Yours,
-> Linus Walleij
-
-Thanks
-barry
+Yours,
+Linus Walleij
