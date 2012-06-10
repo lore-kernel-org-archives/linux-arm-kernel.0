@@ -1,54 +1,67 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 10 Jun 2012 12:31:55 +0200
-Subject: [PATCH 3/9] spi-orion: remove uneeded spi_info
-Message-ID: <1339324322-29388-4-git-send-email-andrew@lunn.ch>
+Date: Sun, 10 Jun 2012 12:31:57 +0200
+Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
+Message-ID: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michael Walle <michael@walle.cc>
 
-This was formerly used to store the tclk value. This is now discovered
-using the clk API, rather than pass it as platform data.
+Populate the devices with auxdata to set the device names which are used by
+clkdev to lookup the clocks.
 
-Signed-off-by: Michael Walle <michael@walle.cc>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Signed-off-by: Michael Walle <micheal@walle.cc>
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- drivers/spi/spi-orion.c |    5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi   |    9 +++++++++
+ arch/arm/mach-kirkwood/board-dt.c |    8 +++++++-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 547d983..8c3d625 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -39,7 +39,6 @@ struct orion_spi {
- 	void __iomem		*base;
- 	unsigned int		max_speed;
- 	unsigned int		min_speed;
--	struct orion_spi_info	*spi_info;
- 	struct clk              *clk;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 8eab7c4..7d282ab 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -42,6 +42,15 @@
+ 			interrupts = <53>;
+ 		};
+ 
++		spi at 10600 {
++			compatible = "marvell,orion-spi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			cell-index = <0>;
++			reg = <0x10600 0x28>;
++			status = "disabled";
++		};
++
+ 		nand at 3000000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index fa51586..0942139 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+ 	{ }
  };
  
-@@ -378,12 +377,9 @@ static int __init orion_spi_probe(struct platform_device *pdev)
- 	struct spi_master *master;
- 	struct orion_spi *spi;
- 	struct resource *r;
--	struct orion_spi_info *spi_info;
- 	unsigned long tclk_hz;
- 	int status = 0;
++struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
++	{},
++};
++
+ static void __init kirkwood_dt_init(void)
+ {
+ 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+@@ -69,7 +74,8 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
+ 		ib62x0_init();
  
--	spi_info = pdev->dev.platform_data;
--
- 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
- 	if (master == NULL) {
- 		dev_dbg(&pdev->dev, "master allocation failed\n");
-@@ -404,7 +400,6 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+-	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
++	of_platform_populate(NULL, kirkwood_dt_match_table,
++			     kirkwood_auxdata_lookup, NULL);
+ }
  
- 	spi = spi_master_get_devdata(master);
- 	spi->master = master;
--	spi->spi_info = spi_info;
- 
- 	spi->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(spi->clk)) {
+ static const char *kirkwood_dt_board_compat[] = {
 -- 
 1.7.10
