@@ -1,115 +1,77 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 10 Jun 2012 18:40:18 +0800
-Subject: [PATCH] pinctrl: sirf: mark of_device_id match table as
- __devinitconst
-In-Reply-To: <CACRpkdZcnWO3YL2+hVUpuRh-psZHq61oAOh5sp9A91UJ732hAw@mail.gmail.com>
-References: <1337569142-18756-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdZcnWO3YL2+hVUpuRh-psZHq61oAOh5sp9A91UJ732hAw@mail.gmail.com>
-Message-ID: <CAGsJ_4wHXMg_kM580xp=iPb+TDGDHvd48wZfNq0EPp=JL=dfnQ@mail.gmail.com>
+Date: Sun, 10 Jun 2012 19:19:47 +0800
+Subject: RFC: changing DMA slave configuration API
+In-Reply-To: <20120610102023.GC11404@n2100.arm.linux.org.uk>
+References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-2012/6/7 Linus Walleij <linus.walleij@linaro.org>:
-> On Mon, May 21, 2012 at 4:59 AM, Barry Song <Barry.Song@csr.com> wrote:
+2012/6/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> Dan, Vinod,
 >
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->> ?drivers/pinctrl/pinctrl-sirf.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
->> index 6b3534c..5816cc3 100644
->> --- a/drivers/pinctrl/pinctrl-sirf.c
->> +++ b/drivers/pinctrl/pinctrl-sirf.c
->> @@ -1192,7 +1192,7 @@ out_no_gpio_remap:
->> ? ? ? ?return ret;
->> ?}
->>
->> -static const struct of_device_id pinmux_ids[] ?= {
->> +static const struct of_device_id pinmux_ids[] __devinitconst = {
->> ? ? ? ?{ .compatible = "sirf,prima2-gpio-pinmux" },
->> ? ? ? ?{}
->> ?};
+> There's a change I would like to do to the DMA slave configuration.
+> It's currently a pain to have the source and destination parameters in
+> the dma_slave_config structure as separate elements; it means when you
+> want to extract them, you end up with code in DMA engine drivers like:
 >
-> Hm Uwe poked me about this change, Barry are you sure the DT
-> ID table can be __devinitconst? I would think so, but better check
-> again.
-
-__devinitconst is defined as __section(.devinit.rodata). at the same
-time, .devinit sections are used for hotplug and __devinit is often
-added as the head of probe() functions.
-
-the devinit/devinitdata will be released after system initilizes when
-the system dose not support HOTPLUG, without HOTPLUG, devinit = init.
-If the system enables CONFIG_HOTPLUG, devinitdata, typical including
-device table, should be useful all the time along.  then it seems
-devinitconst is better for usb_device_id, pci_device_id,
-sdio_device_id.
-
-of_device_id is not too much related with HOTPLUG, so I am not 100%
-sure it is the good place to use devinitconst for of match table, but
-if we grep, lots of drivers have used it:
-
-drivers/amba/tegra-ahb.c	
-272 static const struct of_device_id tegra_ahb_of_match[] __devinitconst = {
-drivers/block/xsysace.c	
-1193 static const struct of_device_id ace_of_match[] __devinitconst = {
-drivers/char/xilinx_hwicap/xilinx_hwicap.c	
-788 static const struct of_device_id __devinitconst hwicap_of_match[];
-832 static const struct of_device_id __devinitconst hwicap_of_match[] = {
-drivers/clocksource/em_sti.c	
-387 static const struct of_device_id em_sti_dt_ids[] __devinitconst = {
-drivers/i2c/busses/i2c-sh_mobile.c	
-717 static const struct of_device_id sh_mobile_i2c_dt_ids[] __devinitconst = {
-drivers/i2c/busses/i2c-sirf.c	
-436 static const struct of_device_id sirfsoc_i2c_of_match[] __devinitconst = {
-drivers/i2c/busses/i2c-tegra.c	
-755 static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
-drivers/i2c/busses/i2c-xiic.c	
-803 static const struct of_device_id xiic_of_match[] __devinitconst = {
-drivers/i2c/muxes/i2c-mux-pinctrl.c	
-258 static const struct of_device_id i2c_mux_pinctrl_of_match[]
-__devinitconst = {
-	
-74 static const struct mpr121_init_register init_reg_table[] __devinitconst = {
-drivers/input/serio/xilinx_ps2.c	
-358 static const struct of_device_id xps2_of_match[] __devinitconst = {
-drivers/input/touchscreen/st1232.c	
-258 static const struct of_device_id st1232_ts_dt_ids[] __devinitconst = {
-drivers/memory/tegra20-mc.c	
-184 static const struct of_device_id tegra20_mc_of_match[] __devinitconst = {
-drivers/memory/tegra30-mc.c	
-306 static const struct of_device_id tegra30_mc_of_match[] __devinitconst = {
-drivers/power/olpc_battery.c	
-616 static const struct of_device_id olpc_battery_ids[] __devinitconst = {
-drivers/regulator/fixed.c	
-294 static const struct of_device_id fixed_of_match[] __devinitconst = {
-drivers/regulator/twl-regulator.c	
-1115 static const struct of_device_id twl_of_match[] __devinitconst = {
-drivers/spi/spi-mpc52xx.c	
-549 static const struct of_device_id mpc52xx_spi_match[] __devinitconst = {
-drivers/staging/nvec/nvec.c	
-914 static const struct of_device_id nvidia_nvec_of_match[] __devinitconst = {
-...
-
-sound/soc/tegra/tegra30_i2s.c	
-510 static const struct of_device_id tegra30_i2s_of_match[] __devinitconst = {
-515 static const struct dev_pm_ops tegra30_i2s_pm_ops __devinitconst = {
-sound/soc/tegra/tegra_alc5632.c	
-250 static const struct of_device_id tegra_alc5632_of_match[] __devinitconst = {
-sound/soc/tegra/tegra_wm8753.c	
-203 static const struct of_device_id tegra_wm8753_of_match[] __devinitconst = {
-sound/soc/tegra/tegra_wm8903.c	
-491 static const struct of_device_id tegra_wm8903_of_match[] __devinitconst = {
-sound/soc/tegra/trimslice.c	
-214 static const struct of_device_id trimslice_of_match[] __devinitconst = {
+> + ? ? ? if (dir == DMA_DEV_TO_MEM) {
+> + ? ? ? ? ? ? ? dev_addr = c->src_addr;
+> + ? ? ? ? ? ? ? dev_width = c->src_addr_width;
+> + ? ? ? ? ? ? ? burst = c->src_maxburst;
+> + ? ? ? } else if (dir == DMA_MEM_TO_DEV) {
+> + ? ? ? ? ? ? ? dev_addr = c->dst_addr;
+> + ? ? ? ? ? ? ? dev_width = c->dst_addr_width;
+> + ? ? ? ? ? ? ? burst = c->dst_maxburst;
+> + ? ? ? }
 >
-> Yours,
-> Linus Walleij
+> If we redefine the structure as below, this all becomes more simple:
+>
+> + ? ? ? if (dir == DMA_DEV_TO_MEM)
+> + ? ? ? ? ? ? ? cfg = &c->dev_src;
+> + ? ? ? else if (dir == DMA_MEM_TO_DEV)
+> + ? ? ? ? ? ? ? cfg = &c->dev_dst;
 
+it seems that might mean an union in your dma_slave_cfg, but not
+co-exitense of both?
+
+struct dma_slave_cfg {
++       union {
+              struct dma_dev_cfg dev_src;
+              struct dma_dev_cfg dev_dst;
+       }
+       bool device_fc;
+};
+
+>
+> and then we can access the data through cfg->{element} rather than having
+> to cache each individual elements value in a local variable.
+>
+> Thoughts?
+>
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 56377df..e6519f7 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -367,6 +367,18 @@ struct dma_slave_config {
+> ? ? ? ?bool device_fc;
+> ?};
+>
+> +struct dma_dev_cfg {
+> + ? ? ? dma_addr_t addr;
+> + ? ? ? enum dma_slave_buswidth width;
+> + ? ? ? u32 maxburst;
+> +};
+> +
+> +struct dma_slave_cfg {
+> + ? ? ? struct dma_dev_cfg dev_src;
+> + ? ? ? struct dma_dev_cfg dev_dst;
+> + ? ? ? bool device_fc;
+> +};
+> +
+> ?static inline const char *dma_chan_name(struct dma_chan *chan)
+> ?{
+> ? ? ? ?return dev_name(&chan->dev->device);
+>
 Thanks
 barry
