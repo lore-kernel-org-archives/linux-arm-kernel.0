@@ -1,31 +1,73 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 10 Jun 2012 22:33:40 +0200
-Subject: [PATCH] ARM: Kirkwood: Fix crash when neither NAND nor SPI
-In-Reply-To: <20120610201310.GB22507@lunn.ch>
-References: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
- <4FD4E2DE.20006@baatz.info> <20120610201310.GB22507@lunn.ch>
-Message-ID: <20120610203340.GB26603@schnuecks.de>
+From: michael@walle.cc (Michael Walle)
+Date: Sun, 10 Jun 2012 23:21:51 +0200
+Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
+ DT boards
+In-Reply-To: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+Message-ID: <201206102321.51637.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 10, 2012 at 10:13:10PM +0200, Andrew Lunn wrote:
-> On Sun, Jun 10, 2012 at 08:09:34PM +0200, Simon Baatz wrote:
-...
-> Do you have any other drivers built as modules? I was conservative and
-> turned the clock on in the probe function, so i expect that most work
-> as modules. However XOR has a similar sort of structure, so might also
-> be broken...
+Am Sonntag 10 Juni 2012, 12:31:53 schrieb Andrew Lunn:
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  .../devicetree/bindings/arm/mrvl/intc.txt          |   20
+> ++++++++++++++++++ arch/arm/boot/dts/kirkwood.dtsi                    |   
+> 9 ++++++++ arch/arm/mach-kirkwood/board-dt.c                  |   22
+> +++++++++++++++++++- 3 files changed, 50 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> b/Documentation/devicetree/bindings/arm/mrvl/intc.txt index
+> 80b9a94..612536e 100644
+> --- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> +++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+> @@ -38,3 +38,23 @@ Example:
+>  		reg-names = "mux status", "mux mask";
+>  		mrvl,intc-nr-irqs = <2>;
+>  	};
+> +
+> +* Marvell Orion Interrupt controller
+> +
+> +Required properties
+> +- compatible :  Should be "marvell,orion-intc"
+> +- #interrupt-cells: Specifies the number of cells needed to encode an
+> +  interrupt source. Supported value is <1>
+> +- interrupt-controller : So that its clear its an interrupt controller.
+> +Optional properties
+> +- reg : Not used yet, but will contain the interrupt mask address
+> +
+> +Example:
+> +
+> +	intc: interrupt-controller {
+> +        	compatible = "marvell,orion-intc", "marvell,intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +                reg = <0xfed20204 0x04>,
+> +		      <0xfed20214 0x04>;
+> +        };
 
-I don't use XOR as module. However, in addition to the Ethernet
-one, I have the following modules that enable clocks:
+please fix whitespaces/tabs
 
-mv_cesa
-sata_mv 
-ehci_hcd
 
-I did not encounter any problem with these so far (with the exception
-of data corruption in mv_cesa, which is completely unrelated (and is
-no problem of mv_cesa, but a problem of the current implementation of
-flush_kernel_dcache_page in my view)).
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi
+> b/arch/arm/boot/dts/kirkwood.dtsi index 926528b..8eab7c4 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -2,6 +2,15 @@
+> 
+>  / {
+>  	compatible = "mrvl,kirkwood";
+> +	interrupt-parent = <&intc>;
+> +
+> +	intc: interrupt-controller {
+> +        	compatible = "marvell,orion-intc", "marvell,intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +                reg = <0xfed20204 0x04>,
+> +		      <0xfed20214 0x04>;
+> +        };
 
-- Simon
+ditto
+
+-- 
+Michael
