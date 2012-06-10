@@ -1,26 +1,71 @@
-From: todorcolov@gmail.com (Todor Colov)
-Date: Sun, 10 Jun 2012 15:44:08 +0300 (EEST)
-Subject: [PATCH] arm: ep93xx: Enable i2c support for ep9302
-Message-ID: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 10 Jun 2012 21:16:28 +0800
+Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending
+ on pinmux APIs
+In-Reply-To: <CACRpkdZuge1vJquaSoYjk+zFEU+yafSG3L4UhRDhAZww73-RZg@mail.gmail.com>
+References: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdZOTZaVp6rfuQvZaQyk0+zxeAjwHryBMYY-C1WVABaLLA@mail.gmail.com>
+ <CAGsJ_4zknQjNK6-T7+av1N=7gijZ821keM=qaDEJZ9zOfnLhkw@mail.gmail.com>
+ <CACRpkdb=00UP3NaBj4NhVy0wYhwkqqRB5e3Gid5hcpVhxH0wYw@mail.gmail.com>
+ <CAGsJ_4yz=-szdaLWgKbTHkZtO+zqZvM35gXCHBprto=odjs41w@mail.gmail.com>
+ <CACRpkdZuge1vJquaSoYjk+zFEU+yafSG3L4UhRDhAZww73-RZg@mail.gmail.com>
+Message-ID: <CAGsJ_4y22H-6cZquxYDm40At=sYXvBHnvJ7ZqK9z5no9MLO+Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
-Enable i2c support for ep9302. i2c support is needed when external RTC is 
-used. 
+2012/5/29 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, May 29, 2012 at 8:20 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> 2012/5/29 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Mon, May 28, 2012 at 11:03 PM, Barry Song <21cnbao@gmail.com> wrote:
+>>>>
+>>>> here i splitted into two files just for viewing, and at the same time,
+>>>> i remap the same memory twice in pinctrl-sirf.c and gpio-sirf.c. they
+>>>> share same memory area.
+>>>
+>>> Hmmmm.... but do they ever write into the same registers?
+>>
+>> they share the same IOMEM area, but gpio set registers have different
+>> offset with pinmux. is there any difference between writing same
+>> registers and writing different registers? mainly, they are from the
+>> same hardware controller.
+>
+> I don't really have an opinion on this, you can do it either way.
+>
+> It's nice to split the files into separate drivers for smaller files and
+> cleanly cut devices.
+>
+> It's also nice to have it all in one file so you can get the whole picture
+> of how the hardware works.
 
-Signed-off-by: Todor Colov <todorcolov@gmail.com>
----
---- linux-3.4/arch/arm/mach-ep93xx/edb93xx.c	2012-05-21 01:29:13.000000000 +0300
-+++ linux-3.4/arch/arm/mach-ep93xx/edb93xx-i2c-ep9302-enabled.c	2012-06-10 14:18:06.977893546 +0300
-@@ -91,8 +91,8 @@
- 		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
- 				    edb93xxa_i2c_board_info,
- 				    ARRAY_SIZE(edb93xxa_i2c_board_info));
--	} else if (machine_is_edb9307() || machine_is_edb9312() ||
--		   machine_is_edb9315()) {
-+	} else if (machine_is_edb9302() || machine_is_edb9307()
-+		|| machine_is_edb9312() || machine_is_edb9315()) {
- 		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
- 				    edb93xx_i2c_board_info,
- 				    ARRAY_SIZE(edb93xx_i2c_board_info));
+i think i'd better to have one driver for both. if i move to
+gpio-generic driver for gpio module, gpio-generic driver will not
+request gpio from pinctrl, but i need. and on the other hand,
+gpio-generic doesn't include irq_chip, but i need.
+so to me, gpio-generic driver is much like just for a single-function
+gpio controller not good for a multi-function pinmux/gpio/irq
+controller.
+
+>
+> Usually the problem has been to cross-reference the GPIO ranges
+> from another driver, like adding the struct gpio_chip * to the ranges,
+> but it seems you don't have this problem in your driver? If you think
+> you will run into this problem, merge it into the pinctrl driver to
+> save yourself from lots of trouble.
+
+for the range issue, basically we have a (pinmux pin, gpio, irq) pair,
+one pinmux pin can be a gpio pin and an external irq source , so
+actually, i need to pinctrl_request_gpio() in my gpio_chip.request().
+i would think prima2 pinctrl driver can be much like pinctrl-nomadik.c
+and pinctrl-coh901.c, which are all of pinmux, gpio and irq chip.  i
+might follow them and improve pinctrl-sirf.c to include gpio/irq too.
+
+>
+> Maybe someone else has some ideas?
+>
+> Yours,
+> Linus Walleij
+
+Thanks
+barry
