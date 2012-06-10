@@ -1,109 +1,54 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 10 Jun 2012 12:31:53 +0200
-Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for DT
- boards
-Message-ID: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
+Date: Sun, 10 Jun 2012 12:31:55 +0200
+Subject: [PATCH 3/9] spi-orion: remove uneeded spi_info
+Message-ID: <1339324322-29388-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Michael Walle <michael@walle.cc>
+
+This was formerly used to store the tclk value. This is now discovered
+using the clk API, rather than pass it as platform data.
+
+Signed-off-by: Michael Walle <michael@walle.cc>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/arm/mrvl/intc.txt          |   20 ++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |    9 ++++++++
- arch/arm/mach-kirkwood/board-dt.c                  |   22 +++++++++++++++++++-
- 3 files changed, 50 insertions(+), 1 deletion(-)
+ drivers/spi/spi-orion.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-index 80b9a94..612536e 100644
---- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-+++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-@@ -38,3 +38,23 @@ Example:
- 		reg-names = "mux status", "mux mask";
- 		mrvl,intc-nr-irqs = <2>;
- 	};
-+
-+* Marvell Orion Interrupt controller
-+
-+Required properties
-+- compatible :  Should be "marvell,orion-intc"
-+- #interrupt-cells: Specifies the number of cells needed to encode an
-+  interrupt source. Supported value is <1>
-+- interrupt-controller : So that its clear its an interrupt controller.
-+Optional properties
-+- reg : Not used yet, but will contain the interrupt mask address
-+
-+Example:
-+
-+	intc: interrupt-controller {
-+        	compatible = "marvell,orion-intc", "marvell,intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+                reg = <0xfed20204 0x04>,
-+		      <0xfed20214 0x04>;
-+        };
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 926528b..8eab7c4 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -2,6 +2,15 @@
- 
- / {
- 	compatible = "mrvl,kirkwood";
-+	interrupt-parent = <&intc>;
-+
-+	intc: interrupt-controller {
-+        	compatible = "marvell,orion-intc", "marvell,intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+                reg = <0xfed20204 0x04>,
-+		      <0xfed20214 0x04>;
-+        };
- 
- 	ocp at f1000000 {
- 		compatible = "simple-bus";
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index edc3f8a..fa51586 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/of_irq.h>
- #include <linux/kexec.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -80,11 +81,30 @@ static const char *kirkwood_dt_board_compat[] = {
- 	NULL
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 547d983..8c3d625 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -39,7 +39,6 @@ struct orion_spi {
+ 	void __iomem		*base;
+ 	unsigned int		max_speed;
+ 	unsigned int		min_speed;
+-	struct orion_spi_info	*spi_info;
+ 	struct clk              *clk;
  };
  
-+static int __init kirkwood_add_irq_domain(struct device_node *np,
-+					  struct device_node *interrupt_parent)
-+{
-+	kirkwood_init_irq();
-+	irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
-+	return 0;
-+}
-+
-+static const struct of_device_id kirkwood_irq_match[] = {
-+	{ .compatible = "marvell,orion-intc",
-+	  .data = kirkwood_add_irq_domain, },
-+	{},
-+};
-+
-+static void __init kirkwood_dt_init_irq(void)
-+{
-+	of_irq_init(kirkwood_irq_match);
-+}
-+
- DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_init_early,
--	.init_irq	= kirkwood_init_irq,
-+	.init_irq	= kirkwood_dt_init_irq,
- 	.timer		= &kirkwood_timer,
- 	.init_machine	= kirkwood_dt_init,
- 	.restart	= kirkwood_restart,
+@@ -378,12 +377,9 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	struct spi_master *master;
+ 	struct orion_spi *spi;
+ 	struct resource *r;
+-	struct orion_spi_info *spi_info;
+ 	unsigned long tclk_hz;
+ 	int status = 0;
+ 
+-	spi_info = pdev->dev.platform_data;
+-
+ 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
+ 	if (master == NULL) {
+ 		dev_dbg(&pdev->dev, "master allocation failed\n");
+@@ -404,7 +400,6 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 
+ 	spi = spi_master_get_devdata(master);
+ 	spi->master = master;
+-	spi->spi_info = spi_info;
+ 
+ 	spi->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(spi->clk)) {
 -- 
 1.7.10
