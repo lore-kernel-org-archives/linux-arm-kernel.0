@@ -1,58 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Jun 2012 12:22:18 +0100
-Subject: RFC: changing DMA slave configuration API
-In-Reply-To: <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
-References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
- <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
-Message-ID: <20120610112217.GD11404@n2100.arm.linux.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 10 Jun 2012 13:53:05 +0200
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1339242351-8797-1-git-send-email-marex@denx.de>
+References: <1339242351-8797-1-git-send-email-marex@denx.de>
+Message-ID: <201206101353.06018.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 10, 2012 at 07:19:47PM +0800, Barry Song wrote:
-> 2012/6/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > Dan, Vinod,
-> >
-> > There's a change I would like to do to the DMA slave configuration.
-> > It's currently a pain to have the source and destination parameters in
-> > the dma_slave_config structure as separate elements; it means when you
-> > want to extract them, you end up with code in DMA engine drivers like:
-> >
-> > + ? ? ? if (dir == DMA_DEV_TO_MEM) {
-> > + ? ? ? ? ? ? ? dev_addr = c->src_addr;
-> > + ? ? ? ? ? ? ? dev_width = c->src_addr_width;
-> > + ? ? ? ? ? ? ? burst = c->src_maxburst;
-> > + ? ? ? } else if (dir == DMA_MEM_TO_DEV) {
-> > + ? ? ? ? ? ? ? dev_addr = c->dst_addr;
-> > + ? ? ? ? ? ? ? dev_width = c->dst_addr_width;
-> > + ? ? ? ? ? ? ? burst = c->dst_maxburst;
-> > + ? ? ? }
-> >
-> > If we redefine the structure as below, this all becomes more simple:
-> >
-> > + ? ? ? if (dir == DMA_DEV_TO_MEM)
-> > + ? ? ? ? ? ? ? cfg = &c->dev_src;
-> > + ? ? ? else if (dir == DMA_MEM_TO_DEV)
-> > + ? ? ? ? ? ? ? cfg = &c->dev_dst;
-> 
-> it seems that might mean an union in your dma_slave_cfg, but not
-> co-exitense of both?
+Dear Marek Vasut,
 
-No, I want both so it's possible to select between the two when preparing
-a DMA slave transfer.
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
 
-> struct dma_slave_cfg {
-> +       union {
->               struct dma_dev_cfg dev_src;
->               struct dma_dev_cfg dev_dst;
->        }
->        bool device_fc;
-> };
+[...]
 
-If you do that, the union becomes pointless, and you might as well have:
+> +struct mxs_i2c_speed_config {
+> +	uint32_t	timing0;
+> +	uint32_t	timing1;
+> +	uint32_t	timing2;
+> +};
+> +
+> +/* Timing values for the default 24MHz clock supplied into the i2c block.
 
-struct dma_slave_cfg {
-	struct dma_dev_cfg dev;
-	bool device_fc;
-};
+Thinking about these further -- does anyone have any idea how these numbers were 
+derived? And possibly even formula for that?
 
-instead.
+And maybe we should somehow make sure the source runs on 24MHz (how?).
+
+> */ +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
+> +	.timing0	= 0x00780030,
+> +	.timing1	= 0x00800030,
+> +	.timing2	= 0x0015000d,
+> +};
+> +
+> +const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
+> +	.timing0	= 0x000f0007,
+> +	.timing1	= 0x001f000f,
+> +	.timing2	= 0x0015000d,
+> +};
+
+[...]
+
+Best regards,
+Marek Vasut
