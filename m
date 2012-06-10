@@ -1,136 +1,257 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 10 Jun 2012 17:39:01 -0500
-Subject: [PATCH] ARM: nomadik: bump all IRQ numbers by one
-In-Reply-To: <1339349778-32729-1-git-send-email-linus.walleij@linaro.org>
-References: <1339349778-32729-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4FD52205.5090509@gmail.com>
+Date: Sun, 10 Jun 2012 17:48:11 -0500
+Subject: [PATCH 8/9] ARM: Kirkwood: Add DT support for GPIO controllers
+In-Reply-To: <1339324322-29388-9-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-9-git-send-email-andrew@lunn.ch>
+Message-ID: <4FD5242B.8060001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2012 12:36 PM, Linus Walleij wrote:
-> Since the VIC was converted to use generic IRQ domains IRQ 0
-> is silently ignored. This IRQ is used on the Nomadik so we're
-> missing it now. Bump all IRQ numbers by one since they are
-> now decoupled from the hardware IRQ numbers.
+On 06/10/2012 05:32 AM, Andrew Lunn wrote:
+> The GPIO controllers can now be described in DT. Origionally GPIO
+> controllers were instantiated during IRQ setup. The origional none-DT
+> code has been split out, and is only called if no DT GPIO controllers
+> are found.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Really, we'd like to skip over 0-15 (legacy ISA irqs) and start at 16,
-but it's not that important and I'd hope all this gets deleted soon anyway.
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/mach-nomadik/include/mach/irqs.h |   85 ++++++++++++++---------------
->  1 files changed, 42 insertions(+), 43 deletions(-)
+>  .../devicetree/bindings/gpio/mrvl-gpio.txt         |   25 +++++++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |   20 ++++++
+>  arch/arm/mach-kirkwood/irq.c                       |   20 ++++--
+>  arch/arm/plat-orion/gpio.c                         |   68 +++++++++++++++++++-
+>  arch/arm/plat-orion/include/plat/gpio.h            |    2 +
+>  5 files changed, 126 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm/mach-nomadik/include/mach/irqs.h b/arch/arm/mach-nomadik/include/mach/irqs.h
-> index 8faabc5..a118e61 100644
-> --- a/arch/arm/mach-nomadik/include/mach/irqs.h
-> +++ b/arch/arm/mach-nomadik/include/mach/irqs.h
-> @@ -22,56 +22,56 @@
+> diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> index 05428f3..d94ebc1 100644
+> --- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> +++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> @@ -27,3 +27,28 @@ Example:
+>  		interrupt-controller;
+>  		#interrupt-cells = <1>;
+>        };
+> +
+> +* Marvell Orion GPIO Controller
+> +
+> +Required properties:
+> +- compatible         : Should be "marvell,orion-gpio"
+> +- reg                : Address and length of the register set for controller.
+> +- gpio-controller    : So we know this is a gpio controller.
+> +- gpio-base          : Number of first gpio pin.
+> +- ngpio              : How many gpios this controller has.
+> +- secondary-irq-base : IRQ number base
+> +
+> +Optional properties:
+> +- mask-offset        : For SMP Orions, offset for Nth CPU
+> +
+> +Example:
+> +
+> +	gpio0: gpio at 10100 {
+> +		compatible = "marvell,orion-gpio";
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +		reg = <0x10100 0x40>;
+> +		gpio-base = <0>;
+> +		ngpio = <32>;
+> +		secondary-irq-base = <64>;
+
+This and gpio-base are wrong. The DT should describe h/w and these are
+Linux gpio and irq numbers. You need to create an irqdomain for the gpio
+controller.
+
+Rob
+
+> +	};
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 3091c01..6de66dc 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -18,6 +18,26 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
 >  
->  #include <mach/hardware.h>
+> +		gpio0: gpio at 10100 {
+> +			compatible = "marvell,orion-gpio";
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +			reg = <0x10100 0x40>;
+> +			gpio-base = <0>;
+> +			ngpio = <32>;
+> +			secondary-irq-base = <64>;
+> +		};
+> +
+> +		gpio1: gpio at 10140 {
+> +			compatible = "marvell,orion-gpio";
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +			reg = <0x10140 0x40>;
+> +			gpio-base = <32>;
+> +			ngpio = <18>;
+> +			secondary-irq-base = <96>;
+> +		};
+> +
+>  		serial at 12000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x12000 0x100>;
+> diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+> index c4c68e5..81340c2 100644
+> --- a/arch/arm/mach-kirkwood/irq.c
+> +++ b/arch/arm/mach-kirkwood/irq.c
+> @@ -24,25 +24,33 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  	orion_gpio_irq_handler((irq - IRQ_KIRKWOOD_GPIO_LOW_0_7) << 3);
+>  }
 >  
-> -#define IRQ_VIC_START		0	/* first VIC interrupt is 0 */
-> +#define IRQ_VIC_START		1	/* first VIC interrupt is 1 */
+> -void __init kirkwood_init_irq(void)
+> +static void __init kirkwood_init_gpio(void)
+>  {
+> -	orion_irq_init(0, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF));
+> -	orion_irq_init(32, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF));
+> -
+>  	/*
+>  	 * Initialize gpiolib for GPIOs 0-49.
+>  	 */
+>  	orion_gpio_init(0, 32, GPIO_LOW_VIRT_BASE, 0,
+>  			IRQ_KIRKWOOD_GPIO_START);
+> +	orion_gpio_init(32, 18, GPIO_HIGH_VIRT_BASE, 0,
+> +			IRQ_KIRKWOOD_GPIO_START + 32);
+> +}
+> +void __init kirkwood_init_irq(void)
+> +{
+> +	orion_irq_init(0, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF));
+> +	orion_irq_init(32, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF));
+> +
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_0_7, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_8_15, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_16_23, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_24_31, gpio_irq_handler);
+>  
+> -	orion_gpio_init(32, 18, GPIO_HIGH_VIRT_BASE, 0,
+> -			IRQ_KIRKWOOD_GPIO_START + 32);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_0_7, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_8_15, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_16_23,
+>  				gpio_irq_handler);
+> +
+> +	/* Try initializing the GPIO controllers via DT.  If zero
+> +	   controllers are found, fall back to hard coded values */
+> +	if (orion_gpio_init_dt() == 0)
+> +		kirkwood_init_gpio();
+>  }
+> diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> index af95af2..cc29367 100644
+> --- a/arch/arm/plat-orion/gpio.c
+> +++ b/arch/arm/plat-orion/gpio.c
+> @@ -17,6 +17,9 @@
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/leds.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <plat/gpio.h>
 >  
 >  /*
->   * Interrupt numbers generic for all Nomadik Chip cuts
+>   * GPIO unit register offsets.
+> @@ -401,8 +404,9 @@ static int gpio_irq_set_type(struct irq_data *d, u32 type)
+>  	return 0;
+>  }
+>  
+> -void __init orion_gpio_init(int gpio_base, int ngpio,
+> -			    u32 base, int mask_offset, int secondary_irq_base)
+> +void __init _orion_gpio_init(int gpio_base, int ngpio,
+> +			    void __iomem *base, int mask_offset,
+> +			     int secondary_irq_base, struct device_node *np)
+>  {
+>  	struct orion_gpio_chip *ochip;
+>  	struct irq_chip_generic *gc;
+> @@ -426,8 +430,11 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
+>  	ochip->chip.base = gpio_base;
+>  	ochip->chip.ngpio = ngpio;
+>  	ochip->chip.can_sleep = 0;
+> +#ifdef CONFIG_OF
+> +	ochip->chip.of_node = np;
+> +#endif
+>  	spin_lock_init(&ochip->lock);
+> -	ochip->base = (void __iomem *)base;
+> +	ochip->base = base;
+>  	ochip->valid_input = 0;
+>  	ochip->valid_output = 0;
+>  	ochip->mask_offset = mask_offset;
+> @@ -469,6 +476,15 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
+>  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>  }
+>  
+> +/* None DT version */
+> +void __init orion_gpio_init(int gpio_base, int ngpio,
+> +			    u32 base, int mask_offset, int secondary_irq_base)
+> +
+> +{
+> +	_orion_gpio_init(gpio_base, ngpio, (void __iomem *)base,
+> +			 mask_offset, secondary_irq_base, NULL);
+> +}
+> +
+>  void orion_gpio_irq_handler(int pinoff)
+>  {
+>  	struct orion_gpio_chip *ochip;
+> @@ -502,3 +518,49 @@ void orion_gpio_irq_handler(int pinoff)
+>  		generic_handle_irq(irq);
+>  	}
+>  }
+> +
+> +/* Configure all the gpio chips we can find. Return the number
+> + * actually configured, so that we can fall back to the old way,
+> + * for none-DT platforms.*/
+> +#ifdef CONFIG_OF
+> +int __init orion_gpio_init_dt(void)
+> +{
+> +	int chips = 0;
+> +
+> +	struct device_node *np = NULL;
+> +	int gpio_base, ngpio, mask_offset, secondary_irq_base;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	for_each_compatible_node(np, NULL, "marvell,orion-gpio") {
+> +		ret = of_property_read_u32(np, "gpio-base", &gpio_base);
+> +		if (ret)
+> +			continue;
+> +		ret = of_property_read_u32(np, "ngpio", &ngpio);
+> +		if (ret)
+> +			continue;
+> +		ret = of_property_read_u32(np, "mask-offset", &mask_offset);
+> +		if (ret == -EINVAL)
+> +			mask_offset = 0;
+> +		else
+> +			continue;
+> +		ret = of_property_read_u32(np, "secondary-irq-base",
+> +					   &secondary_irq_base);
+> +		if (ret)
+> +			continue;
+> +		base = of_iomap(np, 0);
+> +		if (!base)
+> +			continue;
+> +
+> +		_orion_gpio_init(gpio_base, ngpio, base, mask_offset,
+> +				 secondary_irq_base, np);
+> +		chips++;
+> +	}
+> +	return chips;
+> +}
+> +#else
+> +int __init orion_gpio_init_dt(void)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> diff --git a/arch/arm/plat-orion/include/plat/gpio.h b/arch/arm/plat-orion/include/plat/gpio.h
+> index bec0c98..68039de 100644
+> --- a/arch/arm/plat-orion/include/plat/gpio.h
+> +++ b/arch/arm/plat-orion/include/plat/gpio.h
+> @@ -30,6 +30,8 @@ void orion_gpio_set_valid(unsigned pin, int mode);
+>  void __init orion_gpio_init(int gpio_base, int ngpio,
+>  			    u32 base, int mask_offset, int secondary_irq_base);
+>  
+> +/* Initialize gpiolib using DT. */
+> +int __init orion_gpio_init_dt(void);
+>  /*
+>   * GPIO interrupt handling.
 >   */
-> -#define IRQ_WATCHDOG			0
-> -#define IRQ_SOFTINT			1
-> -#define IRQ_CRYPTO			2
-> -#define IRQ_OWM				3
-> -#define IRQ_MTU0			4
-> -#define IRQ_MTU1			5
-> -#define IRQ_GPIO0			6
-> -#define IRQ_GPIO1			7
-> -#define IRQ_GPIO2			8
-> -#define IRQ_GPIO3			9
-> -#define IRQ_RTC_RTT			10
-> -#define IRQ_SSP				11
-> -#define IRQ_UART0			12
-> -#define IRQ_DMA1			13
-> -#define IRQ_CLCD_MDIF			14
-> -#define IRQ_DMA0			15
-> -#define IRQ_PWRFAIL			16
-> -#define IRQ_UART1			17
-> -#define IRQ_FIRDA			18
-> -#define IRQ_MSP0			19
-> -#define IRQ_I2C0			20
-> -#define IRQ_I2C1			21
-> -#define IRQ_SDMMC			22
-> -#define IRQ_USBOTG			23
-> -#define IRQ_SVA_IT0			24
-> -#define IRQ_SVA_IT1			25
-> -#define IRQ_SAA_IT0			26
-> -#define IRQ_SAA_IT1			27
-> -#define IRQ_UART2			28
-> -#define IRQ_MSP2			31
-> -#define IRQ_L2CC			48
-> -#define IRQ_HPI				49
-> -#define IRQ_SKE				50
-> -#define IRQ_KP				51
-> -#define IRQ_MEMST			54
-> -#define IRQ_SGA_IT			58
-> -#define IRQ_USBM			60
-> -#define IRQ_MSP1			62
-> +#define IRQ_WATCHDOG			1
-> +#define IRQ_SOFTINT			2
-> +#define IRQ_CRYPTO			3
-> +#define IRQ_OWM				4
-> +#define IRQ_MTU0			5
-> +#define IRQ_MTU1			6
-> +#define IRQ_GPIO0			7
-> +#define IRQ_GPIO1			8
-> +#define IRQ_GPIO2			9
-> +#define IRQ_GPIO3			10
-> +#define IRQ_RTC_RTT			11
-> +#define IRQ_SSP				12
-> +#define IRQ_UART0			13
-> +#define IRQ_DMA1			14
-> +#define IRQ_CLCD_MDIF			15
-> +#define IRQ_DMA0			16
-> +#define IRQ_PWRFAIL			17
-> +#define IRQ_UART1			18
-> +#define IRQ_FIRDA			19
-> +#define IRQ_MSP0			20
-> +#define IRQ_I2C0			21
-> +#define IRQ_I2C1			22
-> +#define IRQ_SDMMC			23
-> +#define IRQ_USBOTG			24
-> +#define IRQ_SVA_IT0			25
-> +#define IRQ_SVA_IT1			26
-> +#define IRQ_SAA_IT0			27
-> +#define IRQ_SAA_IT1			28
-> +#define IRQ_UART2			29
-> +#define IRQ_MSP2			30
-> +#define IRQ_L2CC			49
-> +#define IRQ_HPI				50
-> +#define IRQ_SKE				51
-> +#define IRQ_KP				52
-> +#define IRQ_MEMST			55
-> +#define IRQ_SGA_IT			59
-> +#define IRQ_USBM			61
-> +#define IRQ_MSP1			63
->  
-> -#define NOMADIK_SOC_NR_IRQS		64
-> +#define NOMADIK_GPIO_OFFSET		(IRQ_VIC_START+64)
->  
->  /* After chip-specific IRQ numbers we have the GPIO ones */
->  #define NOMADIK_NR_GPIO			128 /* last 4 not wired to pins */
-> -#define NOMADIK_GPIO_TO_IRQ(gpio)	((gpio) + NOMADIK_SOC_NR_IRQS)
-> -#define NOMADIK_IRQ_TO_GPIO(irq)	((irq) - NOMADIK_SOC_NR_IRQS)
-> +#define NOMADIK_GPIO_TO_IRQ(gpio)	((gpio) + NOMADIK_GPIO_OFFSET)
-> +#define NOMADIK_IRQ_TO_GPIO(irq)	((irq) - NOMADIK_GPIO_OFFSET)
->  #define NR_IRQS				NOMADIK_GPIO_TO_IRQ(NOMADIK_NR_GPIO)
->  
->  /* Following two are used by entry_macro.S, to access our dual-vic */
-> @@ -79,4 +79,3 @@
->  #define VIC_REG_IRQSR1		0x20
->  
->  #endif /* __ASM_ARCH_IRQS_H */
-> -
