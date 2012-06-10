@@ -1,28 +1,26 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Sun, 10 Jun 2012 20:23:08 +0800
-Subject: When switch_mm with thread migration, Why flush instruction cache ?
-In-Reply-To: <CAFNq8R590f8ePVE6pO6-xAnuJ_OZMx1g96Wj6DA7=QRwu562BQ@mail.gmail.com>
-References: <CAFNq8R590f8ePVE6pO6-xAnuJ_OZMx1g96Wj6DA7=QRwu562BQ@mail.gmail.com>
-Message-ID: <CAFNq8R4D2FMXyTuBmW=iV41XOLNLVPWcvXsqiRbp_14yPZCOjw@mail.gmail.com>
+From: todorcolov@gmail.com (Todor Colov)
+Date: Sun, 10 Jun 2012 15:44:08 +0300 (EEST)
+Subject: [PATCH] arm: ep93xx: Enable i2c support for ep9302
+Message-ID: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can someone tell me why flush instruction cache @118 Line below, when
-switch_mm with thread migration from other ARM core.
 
-107 static inline void
-108 switch_mm(struct mm_struct *prev, struct mm_struct *next,
-109 ? ? ? ? ? struct task_struct *tsk)
-110 {
-111 #ifdef CONFIG_MMU
-112 ? ? ? ? unsigned int cpu = smp_processor_id();
-113
-114 #ifdef CONFIG_SMP
-115 ? ? ? ? /* check for possible thread migration */
-116 ? ? ? ? if (!cpumask_empty(mm_cpumask(next)) &&
-117 ? ? ? ? ? ? !cpumask_test_cpu(cpu, mm_cpumask(next)))
-118 ? ? ? ? ? ? ? ? __flush_icache_all();
-119 #endif
-...
-130 #endif
-131 }
+Enable i2c support for ep9302. i2c support is needed when external RTC is 
+used. 
+
+Signed-off-by: Todor Colov <todorcolov@gmail.com>
+---
+--- linux-3.4/arch/arm/mach-ep93xx/edb93xx.c	2012-05-21 01:29:13.000000000 +0300
++++ linux-3.4/arch/arm/mach-ep93xx/edb93xx-i2c-ep9302-enabled.c	2012-06-10 14:18:06.977893546 +0300
+@@ -91,8 +91,8 @@
+ 		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
+ 				    edb93xxa_i2c_board_info,
+ 				    ARRAY_SIZE(edb93xxa_i2c_board_info));
+-	} else if (machine_is_edb9307() || machine_is_edb9312() ||
+-		   machine_is_edb9315()) {
++	} else if (machine_is_edb9302() || machine_is_edb9307()
++		|| machine_is_edb9312() || machine_is_edb9315()) {
+ 		ep93xx_register_i2c(&edb93xx_i2c_gpio_data,
+ 				    edb93xx_i2c_board_info,
+ 				    ARRAY_SIZE(edb93xx_i2c_board_info));
