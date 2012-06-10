@@ -1,206 +1,259 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 10 Jun 2012 13:11:50 -0400
-Subject: [PATCH 7/9] I2C: MV64XXX: Add Device Tree support
-In-Reply-To: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
-References: <1339324322-29388-8-git-send-email-andrew@lunn.ch>
-Message-ID: <20120610171150.GY14756@titan.lakedaemon.net>
+Date: Sun, 10 Jun 2012 13:18:49 -0400
+Subject: [PATCH 8/9] ARM: Kirkwood: Add DT support for GPIO controllers
+In-Reply-To: <1339324322-29388-9-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-9-git-send-email-andrew@lunn.ch>
+Message-ID: <20120610171848.GZ14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 10, 2012 at 12:31:59PM +0200, Andrew Lunn wrote:
-> Extends the driver to get properties from device tree. Also extend the
-> kirkwood DT support to supply the needed properties.
+On Sun, Jun 10, 2012 at 12:32:00PM +0200, Andrew Lunn wrote:
+> The GPIO controllers can now be described in DT. Origionally GPIO
+> controllers were instantiated during IRQ setup. The origional none-DT
+
+nit.  "non-DT"
+
+> code has been split out, and is only called if no DT GPIO controllers
+> are found.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
 > ---
->  Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   35 +++++++++++++++++-
->  arch/arm/boot/dts/kirkwood.dtsi                    |   13 +++++++
->  arch/arm/mach-kirkwood/board-dt.c                  |    2 ++
->  drivers/i2c/busses/i2c-mv64xxx.c                   |   38 +++++++++++++++++---
->  4 files changed, 82 insertions(+), 6 deletions(-)
+>  .../devicetree/bindings/gpio/mrvl-gpio.txt         |   25 +++++++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |   20 ++++++
+>  arch/arm/mach-kirkwood/irq.c                       |   20 ++++--
+>  arch/arm/plat-orion/gpio.c                         |   68 +++++++++++++++++++-
+>  arch/arm/plat-orion/include/plat/gpio.h            |    2 +
+>  5 files changed, 126 insertions(+), 9 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> index b891ee2..89ef899 100644
-> --- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> +++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> @@ -1,4 +1,4 @@
-> -* I2C
-> +* Marvell MMP I2C controller
->  
->  Required properties :
->  
-> @@ -32,3 +32,36 @@ Examples:
->  		interrupts = <58>;
->  	};
->  
-> +* Marvell MV64XXX I2C controller
+> diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> index 05428f3..d94ebc1 100644
+> --- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> +++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> @@ -27,3 +27,28 @@ Example:
+>  		interrupt-controller;
+>  		#interrupt-cells = <1>;
+>        };
 > +
-> +Required properties :
+> +* Marvell Orion GPIO Controller
 > +
-> + - reg         : Offset and length of the register set for the device
-> + - compatible  : should be "marvell,mv64xxx-i2c"
-> + - interrupts  : the interrupt number
-> + - frequency-m : m factor in baud rate calculation
+> +Required properties:
+> +- compatible         : Should be "marvell,orion-gpio"
+> +- reg                : Address and length of the register set for controller.
+> +- gpio-controller    : So we know this is a gpio controller.
+> +- gpio-base          : Number of first gpio pin.
+> +- ngpio              : How many gpios this controller has.
+> +- secondary-irq-base : IRQ number base
 > +
-> +Recommended properties :
+> +Optional properties:
+> +- mask-offset        : For SMP Orions, offset for Nth CPU
 > +
-> + - frequency-n : n factor in baud rate calculation
-> + - timeout-ms  : How long to wait for a transaction to complete
+> +Example:
 > +
-> +Baud Rate:
-> +
-> +The baud rate is calculated thus:
-> +
-> +Fscl =          Ftclk
-> +       ------------------------------------------
-> +                                (frequency-n + 1)
-> +       10 *(frequency-m + 1) * 2
-> +
-> +Examples:
-> +
-> +	i2c at 11000 {
-> +		compatible = "marvell,mv64xxx-i2c";
-> +		reg = <0x11000 0x20>;
-> +		interrupts = <29>;
-> +		frequency-m = <4>;
-> +		frequency-n = <4>;
-> +		timeout-ms = <1000>;
+> +	gpio0: gpio at 10100 {
+> +		compatible = "marvell,orion-gpio";
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +		reg = <0x10100 0x40>;
+> +		gpio-base = <0>;
+> +		ngpio = <32>;
+> +		secondary-irq-base = <64>;
 > +	};
 > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 7d282ab..3091c01 100644
+> index 3091c01..6de66dc 100644
 > --- a/arch/arm/boot/dts/kirkwood.dtsi
 > +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -63,5 +63,18 @@
->  			/* set partition map and/or chip-delay in board dts */
->  			status = "disabled";
->  		};
-> +
-> +		i2c at 11000 {
-> +			compatible = "marvell,mv64xxx-i2c";
-> +			reg = <0x11000 0x20>;
-> +			interrupt = <29>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			interrupts = <29>;
-> +			frequency-m = <8>;
-> +			frequency-n = <3>;
-> +			timeout-ms = <1000>;
-> +			status = "disable";
+> @@ -18,6 +18,26 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  
+> +		gpio0: gpio at 10100 {
+> +			compatible = "marvell,orion-gpio";
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +			reg = <0x10100 0x40>;
+> +			gpio-base = <0>;
+> +			ngpio = <32>;
+> +			secondary-irq-base = <64>;
 > +		};
->  	};
->  };
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 0942139..5aa025d 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -28,6 +28,8 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
->  
->  struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
-> +	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
-> +		       NULL),
-
-Same comment as before regarding magic register addresses...
-
-thx,
-
-Jason.
-
->  	{},
->  };
->  
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 4f44a33..2146984 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -18,6 +18,9 @@
->  #include <linux/mv643xx_i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_i2c.h>
->  
->  /* Register defines */
->  #define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
-> @@ -528,7 +531,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  	struct mv64xxx_i2c_pdata	*pdata = pd->dev.platform_data;
->  	int	rc;
->  
-> -	if ((pd->id != 0) || !pdata)
-> +	if ((!pdata && !pd->dev.of_node) || (pdata && (pd->id != 0)))
->  		return -ENODEV;
->  
->  	drv_data = kzalloc(sizeof(struct mv64xxx_i2c_data), GFP_KERNEL);
-> @@ -546,19 +549,35 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  	init_waitqueue_head(&drv_data->waitq);
->  	spin_lock_init(&drv_data->lock);
->  
-> -	drv_data->freq_m = pdata->freq_m;
-> -	drv_data->freq_n = pdata->freq_n;
-> -	drv_data->irq = platform_get_irq(pd, 0);
-> +	if (pd->dev.of_node) {
-> +		of_property_read_u32(pd->dev.of_node, "frequency-m",
-> +				     &drv_data->freq_m);
-> +		of_property_read_u32(pd->dev.of_node, "frequency-n",
-> +				     &drv_data->freq_n);
-> +		drv_data->irq = irq_of_parse_and_map(pd->dev.of_node, 0);
-> +	} else {
-> +		drv_data->freq_m = pdata->freq_m;
-> +		drv_data->freq_n = pdata->freq_n;
-> +		drv_data->irq = platform_get_irq(pd, 0);
-> +	}
 > +
->  	if (drv_data->irq < 0) {
->  		rc = -ENXIO;
->  		goto exit_unmap_regs;
->  	}
+> +		gpio1: gpio at 10140 {
+> +			compatible = "marvell,orion-gpio";
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +			reg = <0x10140 0x40>;
+> +			gpio-base = <32>;
+> +			ngpio = <18>;
+> +			secondary-irq-base = <96>;
+> +		};
 > +
->  	drv_data->adapter.dev.parent = &pd->dev;
->  	drv_data->adapter.algo = &mv64xxx_i2c_algo;
->  	drv_data->adapter.owner = THIS_MODULE;
->  	drv_data->adapter.class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-> -	drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-> +	if (pd->dev.of_node)
-> +		drv_data->adapter.timeout = msecs_to_jiffies(
-> +			of_property_read_u32(pd->dev.of_node, "timeout-ms",
-> +					     &drv_data->freq_n));
-> +	else
-> +		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
->  	drv_data->adapter.nr = pd->id;
-> +	drv_data->adapter.dev.of_node = pd->dev.of_node;
->  	platform_set_drvdata(pd, drv_data);
->  	i2c_set_adapdata(&drv_data->adapter, drv_data);
->  
-> @@ -577,6 +596,8 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  		goto exit_free_irq;
->  	}
->  
-> +	of_i2c_register_devices(&drv_data->adapter);
-> +
->  	return 0;
->  
->  	exit_free_irq:
-> @@ -602,12 +623,19 @@ mv64xxx_i2c_remove(struct platform_device *dev)
->  	return rc;
+>  		serial at 12000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x12000 0x100>;
+> diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+> index c4c68e5..81340c2 100644
+> --- a/arch/arm/mach-kirkwood/irq.c
+> +++ b/arch/arm/mach-kirkwood/irq.c
+> @@ -24,25 +24,33 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  	orion_gpio_irq_handler((irq - IRQ_KIRKWOOD_GPIO_LOW_0_7) << 3);
 >  }
 >  
-> +static const struct of_device_id mv64xxx_i2c_of_match_table[] __devinitdata = {
-> +	{ .compatible = "marvell,mv64xxx-i2c", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
+> -void __init kirkwood_init_irq(void)
+> +static void __init kirkwood_init_gpio(void)
+>  {
+> -	orion_irq_init(0, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF));
+> -	orion_irq_init(32, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF));
+> -
+>  	/*
+>  	 * Initialize gpiolib for GPIOs 0-49.
+>  	 */
+>  	orion_gpio_init(0, 32, GPIO_LOW_VIRT_BASE, 0,
+>  			IRQ_KIRKWOOD_GPIO_START);
+> +	orion_gpio_init(32, 18, GPIO_HIGH_VIRT_BASE, 0,
+> +			IRQ_KIRKWOOD_GPIO_START + 32);
+> +}
+> +void __init kirkwood_init_irq(void)
+> +{
+> +	orion_irq_init(0, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF));
+> +	orion_irq_init(32, (void __iomem *)(IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF));
 > +
->  static struct platform_driver mv64xxx_i2c_driver = {
->  	.probe	= mv64xxx_i2c_probe,
->  	.remove	= __devexit_p(mv64xxx_i2c_remove),
->  	.driver	= {
->  		.owner	= THIS_MODULE,
->  		.name	= MV64XXX_I2C_CTLR_NAME,
-> +		.of_match_table = of_match_ptr(mv64xxx_i2c_of_match_table),
->  	},
->  };
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_0_7, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_8_15, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_16_23, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_LOW_24_31, gpio_irq_handler);
 >  
+> -	orion_gpio_init(32, 18, GPIO_HIGH_VIRT_BASE, 0,
+> -			IRQ_KIRKWOOD_GPIO_START + 32);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_0_7, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_8_15, gpio_irq_handler);
+>  	irq_set_chained_handler(IRQ_KIRKWOOD_GPIO_HIGH_16_23,
+>  				gpio_irq_handler);
+> +
+> +	/* Try initializing the GPIO controllers via DT.  If zero
+> +	   controllers are found, fall back to hard coded values */
+> +	if (orion_gpio_init_dt() == 0)
+> +		kirkwood_init_gpio();
+>  }
+> diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> index af95af2..cc29367 100644
+> --- a/arch/arm/plat-orion/gpio.c
+> +++ b/arch/arm/plat-orion/gpio.c
+> @@ -17,6 +17,9 @@
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/leds.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <plat/gpio.h>
+>  
+>  /*
+>   * GPIO unit register offsets.
+> @@ -401,8 +404,9 @@ static int gpio_irq_set_type(struct irq_data *d, u32 type)
+>  	return 0;
+>  }
+>  
+> -void __init orion_gpio_init(int gpio_base, int ngpio,
+> -			    u32 base, int mask_offset, int secondary_irq_base)
+> +void __init _orion_gpio_init(int gpio_base, int ngpio,
+> +			    void __iomem *base, int mask_offset,
+> +			     int secondary_irq_base, struct device_node *np)
+>  {
+>  	struct orion_gpio_chip *ochip;
+>  	struct irq_chip_generic *gc;
+> @@ -426,8 +430,11 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
+>  	ochip->chip.base = gpio_base;
+>  	ochip->chip.ngpio = ngpio;
+>  	ochip->chip.can_sleep = 0;
+> +#ifdef CONFIG_OF
+> +	ochip->chip.of_node = np;
+> +#endif
+>  	spin_lock_init(&ochip->lock);
+> -	ochip->base = (void __iomem *)base;
+> +	ochip->base = base;
+>  	ochip->valid_input = 0;
+>  	ochip->valid_output = 0;
+>  	ochip->mask_offset = mask_offset;
+> @@ -469,6 +476,15 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
+>  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>  }
+>  
+> +/* None DT version */
+> +void __init orion_gpio_init(int gpio_base, int ngpio,
+> +			    u32 base, int mask_offset, int secondary_irq_base)
+> +
+> +{
+> +	_orion_gpio_init(gpio_base, ngpio, (void __iomem *)base,
+> +			 mask_offset, secondary_irq_base, NULL);
+> +}
+> +
+>  void orion_gpio_irq_handler(int pinoff)
+>  {
+>  	struct orion_gpio_chip *ochip;
+> @@ -502,3 +518,49 @@ void orion_gpio_irq_handler(int pinoff)
+>  		generic_handle_irq(irq);
+>  	}
+>  }
+> +
+> +/* Configure all the gpio chips we can find. Return the number
+> + * actually configured, so that we can fall back to the old way,
+> + * for none-DT platforms.*/
+> +#ifdef CONFIG_OF
+> +int __init orion_gpio_init_dt(void)
+> +{
+> +	int chips = 0;
+> +
+> +	struct device_node *np = NULL;
+> +	int gpio_base, ngpio, mask_offset, secondary_irq_base;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	for_each_compatible_node(np, NULL, "marvell,orion-gpio") {
+> +		ret = of_property_read_u32(np, "gpio-base", &gpio_base);
+> +		if (ret)
+> +			continue;
+> +		ret = of_property_read_u32(np, "ngpio", &ngpio);
+> +		if (ret)
+> +			continue;
+> +		ret = of_property_read_u32(np, "mask-offset", &mask_offset);
+> +		if (ret == -EINVAL)
+> +			mask_offset = 0;
+> +		else
+> +			continue;
+> +		ret = of_property_read_u32(np, "secondary-irq-base",
+> +					   &secondary_irq_base);
+> +		if (ret)
+> +			continue;
+> +		base = of_iomap(np, 0);
+> +		if (!base)
+> +			continue;
+> +
+> +		_orion_gpio_init(gpio_base, ngpio, base, mask_offset,
+> +				 secondary_irq_base, np);
+> +		chips++;
+> +	}
+> +	return chips;
+> +}
+> +#else
+> +int __init orion_gpio_init_dt(void)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> diff --git a/arch/arm/plat-orion/include/plat/gpio.h b/arch/arm/plat-orion/include/plat/gpio.h
+> index bec0c98..68039de 100644
+> --- a/arch/arm/plat-orion/include/plat/gpio.h
+> +++ b/arch/arm/plat-orion/include/plat/gpio.h
+> @@ -30,6 +30,8 @@ void orion_gpio_set_valid(unsigned pin, int mode);
+>  void __init orion_gpio_init(int gpio_base, int ngpio,
+>  			    u32 base, int mask_offset, int secondary_irq_base);
+>  
+> +/* Initialize gpiolib using DT. */
+> +int __init orion_gpio_init_dt(void);
+>  /*
+>   * GPIO interrupt handling.
+>   */
 > -- 
 > 1.7.10
 > 
