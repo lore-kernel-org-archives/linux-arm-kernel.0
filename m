@@ -1,77 +1,81 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 10 Jun 2012 12:51:02 -0400
-Subject: [PATCH 4/9] spi-orion: add device tree binding
-In-Reply-To: <1339324322-29388-5-git-send-email-andrew@lunn.ch>
-References: <1339324322-29388-5-git-send-email-andrew@lunn.ch>
-Message-ID: <20120610165102.GV14756@titan.lakedaemon.net>
+Date: Sun, 10 Jun 2012 13:06:20 -0400
+Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
+In-Reply-To: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+Message-ID: <20120610170620.GW14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 10, 2012 at 12:31:56PM +0200, Andrew Lunn wrote:
+On Sun, Jun 10, 2012 at 12:31:57PM +0200, Andrew Lunn wrote:
 > From: Michael Walle <michael@walle.cc>
 > 
-> Signed-off-by: Michael Walle <michael@walle.cc>
+> Populate the devices with auxdata to set the device names which are used by
+> clkdev to lookup the clocks.
+> 
+> Signed-off-by: Michael Walle <micheal@walle.cc>
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi   |    9 +++++++++
+>  arch/arm/mach-kirkwood/board-dt.c |    8 +++++++-
+>  2 files changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 8eab7c4..7d282ab 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -42,6 +42,15 @@
+>  			interrupts = <53>;
+>  		};
+>  
+> +		spi at 10600 {
+> +			compatible = "marvell,orion-spi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			cell-index = <0>;
+> +			reg = <0x10600 0x28>;
+> +			status = "disabled";
+> +		};
+> +
+>  		nand at 3000000 {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index fa51586..0942139 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
 
-Looks good.
+Isn't this ---------------------------------^^^^^^^^^^ defined somewhere?
+
+This is done about 1/4 of the time (56 / 187) in the kernel.  But
+honestly, I'd prefer it to be named.
+
+Other than that,
 
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> ---
->  Documentation/devicetree/bindings/spi/spi-orion.txt |    5 +++++
->  drivers/spi/spi-orion.c                             |    9 +++++++++
->  2 files changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-orion.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-> new file mode 100644
-> index 0000000..e68597a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-> @@ -0,0 +1,5 @@
-> +Marvell Orion SPI device
-> +
-> +Required properties:
-> +- compatible : should be "marvell,orion-spi".
-> +- reg : offset and length of the register set for the device
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index 8c3d625..b16db3d 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -17,6 +17,7 @@
->  #include <linux/io.h>
->  #include <linux/spi/spi.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
->  #include <linux/clk.h>
->  #include <asm/unaligned.h>
->  
-> @@ -429,6 +430,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
->  	if (orion_spi_reset(spi) < 0)
->  		goto out_rel_mem;
->  
-> +	master->dev.of_node = pdev->dev.of_node;
->  	status = spi_register_master(master);
->  	if (status < 0)
->  		goto out_rel_mem;
-> @@ -468,10 +470,17 @@ static int __exit orion_spi_remove(struct platform_device *pdev)
->  
->  MODULE_ALIAS("platform:" DRIVER_NAME);
->  
-> +static const struct of_device_id orion_spi_of_match_table[] __devinitdata = {
-> +	{ .compatible = "marvell,orion-spi", },
-> +	{}
+> +	{},
 > +};
-> +MODULE_DEVICE_TABLE(of, orion_spi_of_match_table);
 > +
->  static struct platform_driver orion_spi_driver = {
->  	.driver = {
->  		.name	= DRIVER_NAME,
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(orion_spi_of_match_table),
->  	},
->  	.remove		= __exit_p(orion_spi_remove),
->  };
+>  static void __init kirkwood_dt_init(void)
+>  {
+>  	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+> @@ -69,7 +74,8 @@ static void __init kirkwood_dt_init(void)
+>  	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
+>  		ib62x0_init();
+>  
+> -	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, kirkwood_dt_match_table,
+> +			     kirkwood_auxdata_lookup, NULL);
+>  }
+>  
+>  static const char *kirkwood_dt_board_compat[] = {
 > -- 
 > 1.7.10
 > 
