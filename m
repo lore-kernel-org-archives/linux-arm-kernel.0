@@ -1,46 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 10 Jun 2012 13:53:05 +0200
-Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <1339242351-8797-1-git-send-email-marex@denx.de>
-References: <1339242351-8797-1-git-send-email-marex@denx.de>
-Message-ID: <201206101353.06018.marex@denx.de>
+From: omycle@gmail.com (Li Haifeng)
+Date: Sun, 10 Jun 2012 18:42:59 +0800
+Subject: When switch_mm with thread migration, Why flush instruction cache ?
+Message-ID: <CAFNq8R590f8ePVE6pO6-xAnuJ_OZMx1g96Wj6DA7=QRwu562BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
+Can someone tell me why flush instruction cache @118 Line below, when
+switch_mm with thread migration from other ARM core.
 
-> This patch configures the I2C bus timing registers according
-> to information passed via DT. Currently, 100kHz and 400kHz
-> modes are supported.
-
-[...]
-
-> +struct mxs_i2c_speed_config {
-> +	uint32_t	timing0;
-> +	uint32_t	timing1;
-> +	uint32_t	timing2;
-> +};
-> +
-> +/* Timing values for the default 24MHz clock supplied into the i2c block.
-
-Thinking about these further -- does anyone have any idea how these numbers were 
-derived? And possibly even formula for that?
-
-And maybe we should somehow make sure the source runs on 24MHz (how?).
-
-> */ +const struct mxs_i2c_speed_config mxs_i2c_95kHz_config = {
-> +	.timing0	= 0x00780030,
-> +	.timing1	= 0x00800030,
-> +	.timing2	= 0x0015000d,
-> +};
-> +
-> +const struct mxs_i2c_speed_config mxs_i2c_400kHz_config = {
-> +	.timing0	= 0x000f0007,
-> +	.timing1	= 0x001f000f,
-> +	.timing2	= 0x0015000d,
-> +};
-
-[...]
-
-Best regards,
-Marek Vasut
+107 static inline void
+108 switch_mm(struct mm_struct *prev, struct mm_struct *next,
+109           struct task_struct *tsk)
+110 {
+111 #ifdef CONFIG_MMU
+112         unsigned int cpu = smp_processor_id();
+113
+114 #ifdef CONFIG_SMP
+115         /* check for possible thread migration */
+116         if (!cpumask_empty(mm_cpumask(next)) &&
+117             !cpumask_test_cpu(cpu, mm_cpumask(next)))
+118                 __flush_icache_all();
+119 #endif
+...
+130 #endif
+131 }
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120610/bf2ccd4d/attachment.html>
