@@ -1,90 +1,44 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Sun, 10 Jun 2012 11:10:47 +0530
-Subject: [PATCHv10 00/11] I2C fixes
-In-Reply-To: <87obp4x8gs.fsf@ti.com>
-References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
- <87obp4x8gs.fsf@ti.com>
-Message-ID: <CAM=Q2ctZmOFdroUw5qywwGU_4ResB9RKqag4-+qh3nHeKHWzKQ@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 10 Jun 2012 11:57:15 +0200
+Subject: arch/arm/mach-s3c2410/Kconfig is unsourced
+In-Reply-To: <4F973FB2.1050004@samsung.com>
+References: <1335090082.1814.27.camel@x61.thuisdomein>
+ <4F973FB2.1050004@samsung.com>
+Message-ID: <1339322235.30984.35.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 1, 2012 at 4:29 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Shubhrajyoti D <shubhrajyoti@ti.com> writes:
->
->> The patch series does the following
->>
->> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
->> - In case of i2c remove register access was done without any
->> ?get_sync fix the same.
->> - Folds a patch from Tasslehoff to prevent any merge conflicts.
->> - Prevents the XDUF flag to be set if the underflow condition is not met.
->> - As per discussion in [1] .Adds a patch to rename the 1p153 errata and
->> ?use the unique id instead as the section number in the recent errata
->> ?docs has changed.
->>
->> v9:
->> Fix the comments from Wolfram Sang
->>
->> v10:
->> Add a patch from Neil to the series.
->> Fix kevin comments
->> update the patches with comments.
->
-> Shubhrajyoti, thanks for the updates.
->
-> Wolfgang, with these updates and testing a bit better described, I'm OK
-> with you merging it. ?Merging it now will give it plenty of time to
-> bake in linux-next and get more test exposure.
+On Tue, 2012-04-24 at 17:05 -0700, Kukjin Kim wrote:
+> Paul Bolle wrote:
+> > 0) commit 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
+> > mach-s3c2410/* into mach-s3c24xx/") orphaned
+> > arch/arm/mach-s3c2410/Kconfig: currently nothing sources that file in
+> > Linus' tree.
+> >
+> Oops, you're right.
+> 
+> > 1) I haven't looked in depth at this, but this made S3C2410_PLLTABLE
+> > disappear from the build system (ie, arch/arm/mach-s3c2410/pll.c is dead
+> > code now). Moreover, this basically turned both "select S3C2410_CPUFREQ
+> > if CPU_FREQ_S3C24XX", under "config CPU_S3C2410", and "select
+> > S3C2410_IOTIMING if S3C2410_CPUFREQ", under "config ARCH_BAST", into
+> > nops (both in arch/arm/mach-s3c24xx/Kconfig).
+> >
+> > 2) So to me it seems the move has only been done half: either more
+> > things needs to be moved or those things can be removed entirely. But
+> > perhaps arch/arm/mach-s3c2410/Kconfig should just be sourced again.
+> >
+> Yes, I think, would be better right now, if we could add just sourcing 
+> mach-s3c2410/Kconfig but as you said, I need to remove entire mach-s3c24 
+> stuff.
+> 
+> Thanks for your pointing out and let me fix it.
 
-Agree,
-These are only fixes can it be considered for rc3?
+I reported this issue just after v3.4-rc4 was released. We're now at
+v3.5-rc2 and arch/arm/mach-s3c2410/Kconfig is still unsourced. I'm
+tempted to submit a clean up patch (though I haven't checked what
+currently can be removed because that Kconfig file is still unsourced).
+But perhaps there's a fix pending in some development branch.
 
-Thanks and Regards,
-Shubhrajyoti
->
-> Thanks,
->
-> Kevin
->
->
->> [1] http://www.spinics.net/lists/linux-i2c/msg07607.html
->>
->> Tested on omap4sdp and omap3sdp.
->> - Did functional tests read write on both the platforms.
->> - Off mode and retention on OMAP3
->> - On OMAP4 just did echo mem > /sys/power/state and wakeup.
->> Did see.
->> [ 1360.595855] Successfully put all powerdomains to target state
->> However didnt see the ret count for other than mpu_pwrdm increase.
->> I think power support for omap4 is minimal.
->>
->> The following changes since commit b48b2c3e50433ff6f7e46186daa7f986bd960215:
->>
->> ? openrisc: use generic strnlen_user() function (2012-05-27 21:00:32 -0700)
->>
->> are available in the git repository at:
->> ? git://gitorious.org/linus-tree/linus-tree.git i2c_omap-fixes
->>
->> Neil Brown (1):
->> ? ? ? OMAP/I2C - Fix timeout problem during suspend.
->>
->> Shubhrajyoti D (9):
->> ? ? ? I2C: OMAP: make omap_i2c_unidle/idle functions depend on CONFIG_PM_RUNTIME
->> ? ? ? I2C: OMAP: Fix the mismatch of pm_runtime enable and disable
->> ? ? ? I2C: OMAP: Fix the interrupt clearing in OMAP4
->> ? ? ? I2C: OMAP: Prevent the register access after pm_runtime_put in probe
->> ? ? ? I2C: OMAP: Don't check if wait_for_completion_timeout() returns less than zero
->> ? ? ? I2C: OMAP: Fix the crash in i2c remove
->> ? ? ? I2C: OMAP: Handle error check for pm runtime
->> ? ? ? I2C: OMAP: Do not set the XUDF(Transmit underflow) if the underflow is not reached
->> ? ? ? I2C: OMAP: Rename the 1p153 to the erratum id i462
->>
->> Tasslehoff Kjappfot (1):
->> ? ? ? I2C: OMAP: prevent the overwrite of the errata flags
->>
->> ?drivers/i2c/busses/i2c-omap.c | ?129 ++++++++++++++++++++---------------------
->> ?1 files changed, 63 insertions(+), 66 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+
+Paul Bolle
