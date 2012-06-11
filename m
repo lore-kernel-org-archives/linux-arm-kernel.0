@@ -1,46 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jun 2012 02:04:20 -0600 (MDT)
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <20120611061546.GQ12766@atomide.com>
-References: <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
- <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
- <20120611061546.GQ12766@atomide.com>
-Message-ID: <alpine.DEB.2.00.1206110154170.16974@utopia.booyaka.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 11 Jun 2012 01:10:26 -0700 (PDT)
+Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
+ pr_warn()
+In-Reply-To: <1339401793-12258-1-git-send-email-stigge@antcom.de>
+References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120611.011026.1545016970136342488.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 10 Jun 2012, Tony Lindgren wrote:
+From: Roland Stigge <stigge@antcom.de>
+Date: Mon, 11 Jun 2012 10:03:11 +0200
 
-> * Paul Walmsley <paul@pwsan.com> [120608 06:33]:
->  
-> > I don't really have a huge problem with switching to a late reset, 
-> > but there are disadvantages to it.
+> A WARN() trace indicating a "BUG!" was identified as a "normal" case in the
+> xmit function in case all TX descriptors are occupied already. In this case,
+> NETDEV_TX_BUSY is returned, nothing buggy at all.
 > 
-> I think the early reset actually has more disadvantages to it compared
-> to driver reset. We don't see any errors when things go wrong, and we
-> may even kill the only debug console in the reset process.
-> 
-> We are already doing what Benoit describes with clocks where we only
-> reset the unclaimed ones at late_initcall level, and that has proven
-> to work well.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Tested-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-The difference though between the clock and the IP block init is that 
-leaving the clocks on until later has no effect on system stability.  The 
-chip simply consumes more energy.
+This is not normal.
 
-But if the IP blocks are reset later, and the bootloader or previous OS 
-gets some register settings wrong, there's a greater risk of system 
-instability or unpredictable behavior during the boot process.
+Read the comment above this code you are changing.  If we are
+out of TX descriptors, the queue must be stopped, and therefore
+if the queue is stopped this transmit method should not be
+invoked.
 
-I agree that it is probably easier to debug a late reset approach.
-
-
-- Paul
+It is a hard error condition, should never occur, and indicates
+a very serious error condition in the driver.
