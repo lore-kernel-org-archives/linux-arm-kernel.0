@@ -1,54 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 11:03:26 +0100
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org> <20120604101447.GF8262@n2100.arm.linux.org.uk>
- <4FCDE3D7.9030006@linaro.org> <20120605105249.GK8262@n2100.arm.linux.org.uk>
- <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
-Message-ID: <4FD5C26E.9080902@linaro.org>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Mon, 11 Jun 2012 18:04:36 +0800
+Subject: [PATCH v2 0/5] mmp audio support 
+Message-ID: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Lee can you provide an incremental fixup that makes the current
-> code textually equivalent to what Russell ACKed (devm_kzalloc()),
-> and funnel to Chris for the -rc:s ASAP?
+v1->v2:
+modify accroingly with suggestion from Vinod and Mark
+remove deprecated chan->private and dma.h
+remove prep_slave_sg
+remove module_init and move operation to probe
+misc change
 
-Your wish is my command:
+v0->v1: 
+dmaengine -> soc-dmaengine.
+update according to Mark's suggestion
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Mon, 11 Jun 2012 10:41:00 +0100
-Subject: [PATCH] mmc: mmci: Allocate platform memory during Device Tree boot
+These patches provide mmp audio support under alsa via dmaengine
+Support platfrom pxa688 and pxa910
+mmp_tdma.c and mmp-pcm.c is shared for pxa688 and pxa910
+pxa688 (mmp2) use mmp2-sspa.c
+pxa910 directly use pxa-ssp.c
+mmp_tdma.c is under dmaengine framework
 
-When booting with Device Tree enabled, platform specific information
-is gathered by parsing the DT binary. Platform data is subsequently
-populated with the result. The memory required for this is not
-automatically allocated during Device Tree boot, so we'll do it here
-instead.
+Verified on brownstone (pxa688) and ttc-dkb
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mmc/host/mmci.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+Qiao Zhou (1):
+  ASoC: add ttc-dkb machine support
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index f0fcce4..0045ee0 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1276,6 +1276,12 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 		return -EINVAL;
- 	}
- 
-+	if (!plat) {
-+		plat = devm_kzalloc(&dev->dev, sizeof(*plat), GFP_KERNEL);
-+		if (!plat)
-+			return -ENOMEM;
-+	}
-+
- 	if (np)
- 		mmci_dt_populate_generic_pdata(np, plat);
- 
--- 
-1.7.9.5
+Zhangfei Gao (4):
+  dmaengine: mmp_tdma: add mmp tdma support
+  ASoC: mmp: add audio dma support
+  ASOC: mmp: add sspa support
+  ASoC: add mmp brownstone support
+
+ drivers/dma/Kconfig                     |   10 +
+ drivers/dma/Makefile                    |    1 +
+ drivers/dma/mmp_tdma.c                  |  610 +++++++++++++++++++++++++++++++
+ include/linux/platform_data/mmp_audio.h |   22 ++
+ sound/soc/pxa/Kconfig                   |   42 +++
+ sound/soc/pxa/Makefile                  |    8 +
+ sound/soc/pxa/brownstone.c              |  174 +++++++++
+ sound/soc/pxa/mmp-pcm.c                 |  297 +++++++++++++++
+ sound/soc/pxa/mmp-sspa.c                |  480 ++++++++++++++++++++++++
+ sound/soc/pxa/mmp-sspa.h                |   92 +++++
+ sound/soc/pxa/ttc-dkb.c                 |  173 +++++++++
+ 11 files changed, 1909 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/dma/mmp_tdma.c
+ create mode 100644 include/linux/platform_data/mmp_audio.h
+ create mode 100644 sound/soc/pxa/brownstone.c
+ create mode 100644 sound/soc/pxa/mmp-pcm.c
+ create mode 100644 sound/soc/pxa/mmp-sspa.c
+ create mode 100644 sound/soc/pxa/mmp-sspa.h
+ create mode 100644 sound/soc/pxa/ttc-dkb.c
