@@ -1,70 +1,101 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 11 Jun 2012 17:05:08 +0200
-Subject: [PATCH v2 00/10] ARM: tegra: Add PCIe device tree support
-Message-ID: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+Date: Mon, 11 Jun 2012 17:05:17 +0200
+Subject: [PATCH v2 09/10] ARM: tegra: harmony: Initialize PCIe from DT
+In-Reply-To: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for device tree based probing of the PCIe
-controller found on Tegra SoCs.
+With the device tree support in place, probe the PCIe controller from
+the device tree and remove the corresponding workaround in the board
+file.
 
-Patches 1 and 2 keep the pci_fixup_irqs() and ARM-specific pci_common_init()
-functions around after init. This is required to support driver probe
-deferral, which may cause built-in drivers to be probed after __init data has
-already been freed.
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Patch 3 allows a driver's probe function to pass per-controller private data
-when calling the pci_common_init() function.
+---
+Changes in v2:
+- new patch
+---
+ arch/arm/boot/dts/tegra-harmony.dts    |   19 +++++++++++++++++--
+ arch/arm/mach-tegra/board-dt-tegra20.c |   14 --------------
+ 2 files changed, 17 insertions(+), 16 deletions(-)
 
-Patch 4 is trivial and has already been Acked-by: Stephen Warren before.
-
-Patch 5 rewrites PCIe support as a driver and switches the Harmony and
-TrimSlice boards to add the proper platform device instead of calling the
-tegra_pcie_init() function. Patch 6 adds MSI support as an IRQ domain.
-
-Patch 7 finally implements device tree support and patches 8, 9 and 10 move
-the Harmony and TrimSlice boards over to use information provided in the DTS
-to probe the PCIe controller.
-
-Thierry
-
-Thierry Reding (10):
-  PCI: Keep pci_fixup_irqs() around after init
-  ARM: pci: Keep pci_common_init() around after init
-  ARM: pci: Allow passing per-controller private data
-  ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
-  ARM: tegra: Rewrite PCIe support as a driver
-  ARM: tegra: pcie: Add MSI support
-  ARM: tegra: pcie: Add device tree support
-  ARM: tegra: harmony: Initialize regulators from DT
-  ARM: tegra: harmony: Initialize PCIe from DT
-  ARM: tegra: trimslice: Initialize PCIe from DT
-
- .../devicetree/bindings/pci/tegra-pcie.txt         |   23 +
- arch/arm/boot/dts/tegra-harmony.dts                |   98 +++
- arch/arm/boot/dts/tegra-trimslice.dts              |   20 +
- arch/arm/boot/dts/tegra20.dtsi                     |    9 +
- arch/arm/include/asm/mach/pci.h                    |    1 +
- arch/arm/kernel/bios32.c                           |    7 +-
- arch/arm/mach-tegra/Kconfig                        |    1 +
- arch/arm/mach-tegra/board-dt-tegra20.c             |   35 +-
- arch/arm/mach-tegra/board-harmony-pcie.c           |   38 +-
- arch/arm/mach-tegra/board-harmony.c                |    1 +
- arch/arm/mach-tegra/board-harmony.h                |    1 +
- arch/arm/mach-tegra/board-trimslice.c              |   18 +-
- arch/arm/mach-tegra/board.h                        |    2 +-
- arch/arm/mach-tegra/devices.c                      |   32 +
- arch/arm/mach-tegra/devices.h                      |    1 +
- arch/arm/mach-tegra/include/mach/iomap.h           |    6 +
- arch/arm/mach-tegra/include/mach/irqs.h            |    5 +-
- arch/arm/mach-tegra/include/mach/pci-tegra.h       |   29 +
- arch/arm/mach-tegra/pcie.c                         |  926 +++++++++++++++-----
- arch/arm/mach-tegra/pmc.c                          |   16 +
- arch/arm/mach-tegra/pmc.h                          |    1 +
- drivers/pci/setup-irq.c                            |    4 +-
- 22 files changed, 983 insertions(+), 291 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/tegra-pcie.txt
- create mode 100644 arch/arm/mach-tegra/include/mach/pci-tegra.h
-
+diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+index c98aa2a..1dc907f 100644
+--- a/arch/arm/boot/dts/tegra-harmony.dts
++++ b/arch/arm/boot/dts/tegra-harmony.dts
+@@ -276,7 +276,7 @@
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+ 
+-		tps6586x at 34 {
++		pmu: tps6586x at 34 {
+ 			compatible = "ti,tps6586x";
+ 			reg = <0x34>;
+ 			interrupts = <0 88 0x4>;
+@@ -306,7 +306,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo0 {
++				pci_clk_reg: ldo0 {
+ 					regulator-name = "PCIE CLK";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+@@ -364,6 +364,21 @@
+ 		nvidia,invert-interrupt;
+ 	};
+ 
++	pci_vdd_reg: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "PCIE VDD";
++		regulator-min-microvolt = <1050000>;
++		regulator-max-microvolt = <1050000>;
++		enable-active-high;
++		gpio = <&pmu 2 0>;
++	};
++
++	pci {
++		pex-clk-supply = <&pci_clk_reg>;
++		vdd-supply = <&pci_vdd_reg>;
++		status = "okay";
++	};
++
+ 	usb at c5000000 {
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index a9a54e6..c7b6ae2 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -131,17 +131,6 @@ static void __init trimslice_init(void)
+ }
+ #endif
+ 
+-#ifdef CONFIG_MACH_HARMONY
+-static void __init harmony_init(void)
+-{
+-	int ret;
+-
+-	ret = harmony_pcie_init();
+-	if (ret)
+-		pr_err("harmony_pcie_init() failed: %d\n", ret);
+-}
+-#endif
+-
+ #ifdef CONFIG_MACH_PAZ00
+ static void __init paz00_init(void)
+ {
+@@ -156,9 +145,6 @@ static struct {
+ #ifdef CONFIG_MACH_TRIMSLICE
+ 	{ "compulab,trimslice", trimslice_init },
+ #endif
+-#ifdef CONFIG_MACH_HARMONY
+-	{ "nvidia,harmony", harmony_init },
+-#endif
+ #ifdef CONFIG_MACH_PAZ00
+ 	{ "compal,paz00", paz00_init },
+ #endif
 -- 
 1.7.10.4
