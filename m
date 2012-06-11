@@ -1,41 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:24:58 +0100
-Subject: [PATCH 05/14] mfd: Enable DT probing of the DB8500 PRCMU
+Date: Mon, 11 Jun 2012 16:24:59 +0100
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
 In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1339428307-3850-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the correct compatible string for use during Device Tree
-population. Without it the DB8500 PRCMU will not be probed.
+Now the AB8500 has its own IRQ domain it needs to be initialised earlier
+in the boot sequence. As the AB8500 relies on the DB8500 PRCMU we need to
+reflect this change for the PRCMU driver too.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mfd/db8500-prcmu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 50e83dc5..c702f18 100644
+index c702f18..1aa0bb7 100644
 --- a/drivers/mfd/db8500-prcmu.c
 +++ b/drivers/mfd/db8500-prcmu.c
-@@ -3004,11 +3004,16 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
- no_irq_return:
- 	return err;
+@@ -3023,7 +3023,7 @@ static int __init db8500_prcmu_init(void)
+ 	return platform_driver_register(&db8500_prcmu_driver);
  }
-+static const struct of_device_id db8500_prcmu_match[] = {
-+	{ .compatible = "stericsson,db8500-prcmu", },
-+	{ },
-+};
  
- static struct platform_driver db8500_prcmu_driver = {
- 	.driver = {
- 		.name = "db8500-prcmu",
- 		.owner = THIS_MODULE,
-+		.of_match_table = db8500_prcmu_match,
- 	},
- 	.probe = db8500_prcmu_probe,
- };
+-arch_initcall(db8500_prcmu_init);
++core_initcall(db8500_prcmu_init);
+ 
+ MODULE_AUTHOR("Mattias Nilsson <mattias.i.nilsson@stericsson.com>");
+ MODULE_DESCRIPTION("DB8500 PRCM Unit driver");
 -- 
 1.7.9.5
