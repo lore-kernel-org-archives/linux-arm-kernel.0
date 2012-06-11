@@ -1,27 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jun 2012 11:31:45 -0600 (MDT)
-Subject: [PATCH 2/2] Revert "ARM: OMAP2+: clockdomains: make {prm,
- cm}_clkdm common"
-In-Reply-To: <1339433225-30042-3-git-send-email-b-cousson@ti.com>
-References: <1339433225-30042-1-git-send-email-b-cousson@ti.com>
- <1339433225-30042-3-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1206111126521.5849@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Jun 2012 18:39:30 +0100
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <4FD21930.4000800@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
+ <20120608094708.GC19062@mudshark.cambridge.arm.com>
+ <4FD21930.4000800@ti.com>
+Message-ID: <20120611173930.GD28235@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Benoit Cousson wrote:
+On Fri, Jun 08, 2012 at 04:24:32PM +0100, Jon Hunter wrote:
+> Hi Will,
 
-> Neither prm_clkdm nor cm_clkdm does exist on OMAP4.
-> Remove the common definition that does not make sense anymore
-> since it is not common for OMAP2+ platforms.
-> 
-> Please note that these clock domains are probably non existant
-> on OMAP 2 & 3 and thus should be removed in all the
-> clockdomain files.
+Hi Jon,
 
-For the archives:
+> Here is an updated version. I was going to send out a V3, but I wanted
+> to wait to see if others had more comments first.
 
-http://marc.info/?l=linux-omap&m=133943578712129&w=2
+This looks better to me, so I took it for a spin on my 4460 (thanks Nicolas!)
+and noticed that only the cycle counter seems to tick -- the event counters
+always return 0 deltas (that is, they don't increment). Booting the same SD
+card on a 4430 (same MLO, u-boot, kernel and filesystem) I see that the
+event counters function correctly there.
 
+It also seems that we can remove the dependency on CONFIG_OMAP3_EMU with these
+patches but I don't have any OMAP3 hardware to check if we get any regressions
+on older platforms. Do your patches only deal with OMAP4?
 
-- Paul
+Cheers,
+
+Will
