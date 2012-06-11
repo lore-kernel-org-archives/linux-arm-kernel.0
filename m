@@ -1,48 +1,65 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 15:22:04 -0600
-Subject: [PATCH v2 05/10] ARM: tegra: Rewrite PCIe support as a driver
-In-Reply-To: <1339427118-32263-6-git-send-email-thierry.reding@avionic-design.de>
+Date: Mon, 11 Jun 2012 15:33:04 -0600
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
 References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-6-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4FD6617C.4090805@wwwdotorg.org>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4FD66410.7090001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> This commit adds a platform device driver for the PCIe controller on
-> Tegra SOCs. Current users of the old code (TrimSlice and Harmony) are
-> converted and now initialize and register a corresponding platform
-> device.
+> This commit adds support for instantiating the Tegra PCIe controller
+> from a device tree.
 
-> -static int tegra_pcie_clocks_get(void)
-> +static int tegra_pcie_clocks_get(struct tegra_pcie_info *pcie)
->  {
->  	int err;
->  
-> -	tegra_pcie.pex_clk = clk_get(NULL, "pex");
-> -	if (IS_ERR(tegra_pcie.pex_clk))
-> -		return PTR_ERR(tegra_pcie.pex_clk);
-> +	pcie->pex_clk = clk_get(NULL, "pex");
-> +	if (IS_ERR(pcie->pex_clk))
-> +		return PTR_ERR(pcie->pex_clk);
+> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
 
-While we're changing this, can we convert this to devm_clk_get(), and ...
+Can we please name this nvidia,tegra20-pcie.txt to match the naming of
+all the other Tegra bindings.
 
-> -	tegra_pcie.regs = ioremap_nocache(TEGRA_PCIE_BASE, PCIE_IOMAP_SZ);
-> -	if (tegra_pcie.regs == NULL) {
-> -		pr_err("PCIE: Failed to map PCI/AFI registers\n");
-> +	regs = request_mem_region(regs->start, resource_size(regs), "PCI/AFI");
-> +	if (regs == NULL) {
-> +		dev_err(&pdev->dev, "failed to request PCI/AFI region: %d\n", err);
-> +		goto err_req_reg;
-> +	}
-> +
-> +	pcie->regs = ioremap_nocache(regs->start, resource_size(regs));
-> +	if (pcie->regs == NULL) {
-> +		dev_err(&pdev->dev, "failed to map PCI/AFI registers\n");
->  		err = -ENOMEM;
->  		goto err_map_reg;
->  	}
+> +Required properties:
+> +- compatible: "nvidia,tegra20-pcie"
+> +- reg: physical base address and length of the controller's registers
 
-... that to devm_request_and_ioremap(). That would allow a bunch of the
-cleanup code to be deleted rather than just modified.
+Since there's more than one range now, that should specify how many
+entries are required and what they represent.
+
+> +Optional properties:
+> +- pex-clk-supply: supply voltage for internal reference clock
+> +- vdd-supply: power supply for controller (1.05V)
+
+Those shouldn't be optional. If the board has no regulator, the board's
+.dts should provide a fixed always-on regulator that those properties
+can refer to, so that the driver can always get() those regulators.
+
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+
+> +	pci {
+...
+> +		status = "disable";
+
+That should be "disabled"; sorry for providing a bad example.
+
+> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+
+> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct platform_device *pdev)
+
+> +	if (of_find_property(node, "vdd-supply", NULL)) {
+
+As mentioned above, that if statement should be removed, since the
+regulators shouldn't be optional.
+
+> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
+
+Those could be devm_regulator_get(). Then tegra_pcie_remove() wouldn't
+have to put() them.
+
+> +	for (i = 0; i < TEGRA_PCIE_MAX_PORTS; i++)
+> +		pdata->enable_ports[i] = true;
+
+Shouldn't the DT indicate which ports are used? I assume there's some
+reason that the existing driver allows that to be configured, rather
+than always enabling all ports. At least, enumeration time wasted on
+non-existent ports springs to mind, and perhaps attempting to enable
+port 1 when port 0 is x4 and using all the lanes would cause errors in
+port 0?
