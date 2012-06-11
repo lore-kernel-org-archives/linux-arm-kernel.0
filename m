@@ -1,34 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:24:56 +0100
-Subject: [PATCH 03/14] mfd: ab8500-gpadc: Enable IRQF_ONESHOT when requesting
- a threaded IRQ
+Date: Mon, 11 Jun 2012 16:24:57 +0100
+Subject: [PATCH 04/14] mfd: Remove redundant Kconfig entry
 In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1339428307-3850-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
+During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
+was left remnant. This patch simply removes it.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-gpadc.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mfd/Kconfig |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index b86fd8e..b6cbc3ba 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -599,7 +599,8 @@ static int __devinit ab8500_gpadc_probe(struct platform_device *pdev)
- 	/* Register interrupt  - SwAdcComplete */
- 	ret = request_threaded_irq(gpadc->irq, NULL,
- 		ab8500_bm_gpswadcconvend_handler,
--		IRQF_NO_SUSPEND | IRQF_SHARED, "ab8500-gpadc", gpadc);
-+		IRQF_ONESHOT | IRQF_NO_SUSPEND | IRQF_SHARED,
-+				"ab8500-gpadc", gpadc);
- 	if (ret < 0) {
- 		dev_err(gpadc->dev, "Failed to register interrupt, irq: %d\n",
- 			gpadc->irq);
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index e129c82..170072e 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -703,16 +703,6 @@ config AB8500_CORE
+ 	  the irq_chip parts for handling the Mixed Signal chip events.
+ 	  This chip embeds various other multimedia funtionalities as well.
+ 
+-config AB8500_I2C_CORE
+-	bool "AB8500 register access via PRCMU I2C"
+-	depends on AB8500_CORE && MFD_DB8500_PRCMU
+-	default y
+-	help
+-	  This enables register access to the AB8500 chip via PRCMU I2C.
+-	  The AB8500 chip can be accessed via SPI or I2C. On DB8500 hardware
+-	  the I2C bus is connected to the Power Reset
+-	  and Mangagement Unit, PRCMU.
+-
+ config AB8500_DEBUG
+        bool "Enable debug info via debugfs"
+        depends on AB8500_CORE && DEBUG_FS
 -- 
 1.7.9.5
