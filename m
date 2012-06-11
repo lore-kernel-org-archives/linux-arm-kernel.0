@@ -1,644 +1,670 @@
 From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Mon, 11 Jun 2012 18:04:39 +0800
-Subject: [PATCH v2 3/5] ASOC: mmp: add sspa support
+Date: Mon, 11 Jun 2012 18:04:37 +0800
+Subject: [PATCH v2 1/5] dmaengine: mmp_tdma: add mmp tdma support
 In-Reply-To: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
 References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1339409081-10097-4-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1339409081-10097-2-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SSPA is a configurable multi-channel audio serial (TDM) interface.
-It's configurable at runtime to support up to 128 channels and the
-number of bits per sample: 8, 12, 16, 20, 24 and 32 bits. It also
-support stereo format: I2S, left-justified or right-justified.
+Add support for two-channel dma under dmaengine
+support: mmp-adma and pxa910-squ
 
 Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
 Signed-off-by: Leo Yan <leoy@marvell.com>
+Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
 ---
- sound/soc/pxa/Kconfig    |    3 +
- sound/soc/pxa/Makefile   |    2 +
- sound/soc/pxa/mmp-sspa.c |  480 ++++++++++++++++++++++++++++++++++++++++++++++
- sound/soc/pxa/mmp-sspa.h |   92 +++++++++
- 4 files changed, 577 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/pxa/mmp-sspa.c
- create mode 100644 sound/soc/pxa/mmp-sspa.h
+ drivers/dma/Kconfig    |   10 +
+ drivers/dma/Makefile   |    1 +
+ drivers/dma/mmp_tdma.c |  610 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 621 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/dma/mmp_tdma.c
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 5d76e29..6c3d00b 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -35,6 +35,9 @@ config SND_PXA_SOC_SSP
- 	tristate
- 	select PXA_SSP
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index aadeb5b..75c5434 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -260,6 +260,16 @@ config DMA_SA11X0
+ 	  SA-1110 SoCs.  This DMA engine can only be used with on-chip
+ 	  devices.
  
-+config SND_MMP_SOC_SSPA
-+	tristate
++config MMP_TDMA
++	bool "MMP Two-Channel DMA support"
++	default ARCH_MMP
++	select DMA_ENGINE
++	help
++	  Support the MMP Two-Channel DMA engine.
++	  This engine used for MMP Audio DMA and pxa910 SQU.
 +
- config SND_PXA2XX_SOC_CORGI
- 	tristate "SoC Audio support for Sharp Zaurus SL-C7x0"
- 	depends on SND_PXA2XX_SOC && PXA_SHARP_C7xx
-diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
-index f913e9b..07b8417 100644
---- a/sound/soc/pxa/Makefile
-+++ b/sound/soc/pxa/Makefile
-@@ -4,12 +4,14 @@ snd-soc-pxa2xx-ac97-objs := pxa2xx-ac97.o
- snd-soc-pxa2xx-i2s-objs := pxa2xx-i2s.o
- snd-soc-pxa-ssp-objs := pxa-ssp.o
- snd-soc-mmp-objs := mmp-pcm.o
-+snd-soc-mmp-sspa-objs := mmp-sspa.o
++	  Say Y here if you enabled MMP ADMA, otherwise say N.
++
+ config DMA_ENGINE
+ 	bool
  
- obj-$(CONFIG_SND_PXA2XX_SOC) += snd-soc-pxa2xx.o
- obj-$(CONFIG_SND_PXA2XX_SOC_AC97) += snd-soc-pxa2xx-ac97.o
- obj-$(CONFIG_SND_PXA2XX_SOC_I2S) += snd-soc-pxa2xx-i2s.o
- obj-$(CONFIG_SND_PXA_SOC_SSP) += snd-soc-pxa-ssp.o
- obj-$(CONFIG_SND_MMP_SOC) += snd-soc-mmp.o
-+obj-$(CONFIG_SND_MMP_SOC_SSPA) += snd-soc-mmp-sspa.o
- 
- # PXA Machine Support
- snd-soc-corgi-objs := corgi.o
-diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 86b795b..37e9258 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -28,3 +28,4 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
+ obj-$(CONFIG_AMBA_PL08X) += amba-pl08x.o
+ obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+ obj-$(CONFIG_DMA_SA11X0) += sa11x0-dma.o
++obj-$(CONFIG_MMP_TDMA) += mmp_tdma.o
+diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
 new file mode 100644
-index 0000000..4d6cb8a
+index 0000000..23f0445
 --- /dev/null
-+++ b/sound/soc/pxa/mmp-sspa.c
-@@ -0,0 +1,480 @@
++++ b/drivers/dma/mmp_tdma.c
+@@ -0,0 +1,610 @@
 +/*
-+ * linux/sound/soc/pxa/mmp-sspa.c
-+ * Base on pxa2xx-ssp.c
++ * Driver For Marvell Two-channel DMA Engine
 + *
-+ * Copyright (C) 2011 Marvell International Ltd.
++ * Copyright: Marvell International Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + *
 + */
-+#include <linux/init.h>
++
 +#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/delay.h>
-+#include <linux/clk.h>
++#include <linux/init.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/dma-mapping.h>
 +#include <linux/slab.h>
-+#include <linux/pxa2xx_ssp.h>
-+#include <linux/io.h>
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/initval.h>
-+#include <sound/pcm_params.h>
-+#include <sound/soc.h>
-+#include <sound/pxa2xx-lib.h>
-+#include "mmp-sspa.h"
++#include <linux/dmaengine.h>
++#include <linux/platform_device.h>
++#include <linux/device.h>
++#include <mach/regs-icu.h>
++#include <mach/sram.h>
++
++#include "dmaengine.h"
 +
 +/*
-+ * SSPA audio private data
++ * Two-Channel DMA registers
 + */
-+struct sspa_priv {
-+	struct ssp_device *sspa;
-+	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct clk *audio_clk;
-+	struct clk *sysclk;
-+	int dai_fmt;
-+	int running_cnt;
++#define TDBCR		0x00	/* Byte Count */
++#define TDSAR		0x10	/* Src Addr */
++#define TDDAR		0x20	/* Dst Addr */
++#define TDNDPR		0x30	/* Next Desc */
++#define TDCR		0x40	/* Control */
++#define TDCP		0x60	/* Priority*/
++#define TDCDPR		0x70	/* Current Desc */
++#define TDIMR		0x80	/* Int Mask */
++#define TDISR		0xa0	/* Int Status */
++
++/* Two-Channel DMA Control Register */
++#define TDCR_SSZ_8_BITS		(0x0 << 22)	/* Sample Size */
++#define TDCR_SSZ_12_BITS	(0x1 << 22)
++#define TDCR_SSZ_16_BITS	(0x2 << 22)
++#define TDCR_SSZ_20_BITS	(0x3 << 22)
++#define TDCR_SSZ_24_BITS	(0x4 << 22)
++#define TDCR_SSZ_32_BITS	(0x5 << 22)
++#define TDCR_SSZ_SHIFT		(0x1 << 22)
++#define TDCR_SSZ_MASK		(0x7 << 22)
++#define TDCR_SSPMOD		(0x1 << 21)	/* SSP MOD */
++#define TDCR_ABR		(0x1 << 20)	/* Channel Abort */
++#define TDCR_CDE		(0x1 << 17)	/* Close Desc Enable */
++#define TDCR_PACKMOD		(0x1 << 16)	/* Pack Mode (ADMA Only) */
++#define TDCR_CHANACT		(0x1 << 14)	/* Channel Active */
++#define TDCR_FETCHND		(0x1 << 13)	/* Fetch Next Desc */
++#define TDCR_CHANEN		(0x1 << 12)	/* Channel Enable */
++#define TDCR_INTMODE		(0x1 << 10)	/* Interrupt Mode */
++#define TDCR_CHAINMOD		(0x1 << 9)	/* Chain Mode */
++#define TDCR_BURSTSZ_MSK	(0x7 << 6)	/* Burst Size */
++#define TDCR_BURSTSZ_4B		(0x0 << 6)
++#define TDCR_BURSTSZ_8B		(0x1 << 6)
++#define TDCR_BURSTSZ_16B	(0x3 << 6)
++#define TDCR_BURSTSZ_32B	(0x6 << 6)
++#define TDCR_BURSTSZ_64B	(0x7 << 6)
++#define TDCR_BURSTSZ_SQU_32B	(0x7 << 6)
++#define TDCR_BURSTSZ_128B	(0x5 << 6)
++#define TDCR_DSTDIR_MSK		(0x3 << 4)	/* Dst Direction */
++#define TDCR_DSTDIR_ADDR_HOLD	(0x2 << 4)	/* Dst Addr Hold */
++#define TDCR_DSTDIR_ADDR_INC	(0x0 << 4)	/* Dst Addr Increment */
++#define TDCR_SRCDIR_MSK		(0x3 << 2)	/* Src Direction */
++#define TDCR_SRCDIR_ADDR_HOLD	(0x2 << 2)	/* Src Addr Hold */
++#define TDCR_SRCDIR_ADDR_INC	(0x0 << 2)	/* Src Addr Increment */
++#define TDCR_DSTDESCCONT	(0x1 << 1)
++#define TDCR_SRCDESTCONT	(0x1 << 0)
++
++/* Two-Channel DMA Int Mask Register */
++#define TDIMR_COMP		(0x1 << 0)
++
++/* Two-Channel DMA Int Status Register */
++#define TDISR_COMP		(0x1 << 0)
++
++/*
++ * Two-Channel DMA Descriptor Struct
++ * NOTE: desc's buf must be aligned to 16 bytes.
++ */
++struct mmp_tdma_desc {
++	u32 byte_cnt;
++	u32 src_addr;
++	u32 dst_addr;
++	u32 nxt_desc;
 +};
 +
-+static void mmp_sspa_write_reg(struct ssp_device *sspa, u32 reg, u32 val)
++enum mmp_tdma_type {
++	MMP_AUD_TDMA = 0,
++	PXA910_SQU,
++};
++
++#define TDMA_ALIGNMENT		3
++#define TDMA_MAX_XFER_BYTES    SZ_64K
++
++struct mmp_tdma_chan {
++	struct device			*dev;
++	struct dma_chan			chan;
++	struct dma_async_tx_descriptor	desc;
++	struct tasklet_struct		tasklet;
++
++	struct mmp_tdma_desc		*desc_arr;
++	phys_addr_t			desc_arr_phys;
++	int				desc_num;
++	enum dma_transfer_direction	dir;
++	dma_addr_t			dev_addr;
++	u32				burst_sz;
++	enum dma_slave_buswidth		buswidth;
++	enum dma_status			status;
++
++	int				idx;
++	enum mmp_tdma_type		type;
++	int				irq;
++	unsigned long			reg_base;
++
++	size_t				buf_len;
++	size_t				period_len;
++	size_t				pos;
++};
++
++#define TDMA_CHANNEL_NUM 2
++struct mmp_tdma_device {
++	struct device			*dev;
++	void __iomem			*base;
++	struct dma_device		device;
++	struct mmp_tdma_chan		*tdmac[TDMA_CHANNEL_NUM];
++	int				irq;
++};
++
++#define to_mmp_tdma_chan(dchan) container_of(dchan, struct mmp_tdma_chan, chan)
++
++static void mmp_tdma_chan_set_desc(struct mmp_tdma_chan *tdmac, dma_addr_t phys)
 +{
-+	__raw_writel(val, sspa->mmio_base + reg);
++	writel(phys, tdmac->reg_base + TDNDPR);
++	writel(readl(tdmac->reg_base + TDCR) | TDCR_FETCHND,
++					tdmac->reg_base + TDCR);
 +}
 +
-+static u32 mmp_sspa_read_reg(struct ssp_device *sspa, u32 reg)
++static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
 +{
-+	return __raw_readl(sspa->mmio_base + reg);
++	/* enable irq */
++	writel(TDIMR_COMP, tdmac->reg_base + TDIMR);
++	/* enable dma chan */
++	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
++					tdmac->reg_base + TDCR);
++	tdmac->status = DMA_IN_PROGRESS;
 +}
 +
-+static void mmp_sspa_tx_enable(struct ssp_device *sspa)
++static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
 +{
-+	unsigned int sspa_sp;
-+
-+	sspa_sp = mmp_sspa_read_reg(sspa, SSPA_TXSP);
-+	sspa_sp |= SSPA_SP_S_EN;
-+	sspa_sp |= SSPA_SP_WEN;
-+	mmp_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp);
++	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
++					tdmac->reg_base + TDCR);
++	tdmac->status = DMA_SUCCESS;
 +}
 +
-+static void mmp_sspa_tx_disable(struct ssp_device *sspa)
++static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
 +{
-+	unsigned int sspa_sp;
-+
-+	sspa_sp = mmp_sspa_read_reg(sspa, SSPA_TXSP);
-+	sspa_sp &= ~SSPA_SP_S_EN;
-+	sspa_sp |= SSPA_SP_WEN;
-+	mmp_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp);
++	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
++					tdmac->reg_base + TDCR);
++	tdmac->status = DMA_IN_PROGRESS;
 +}
 +
-+static void mmp_sspa_rx_enable(struct ssp_device *sspa)
++static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
 +{
-+	unsigned int sspa_sp;
-+
-+	sspa_sp = mmp_sspa_read_reg(sspa, SSPA_RXSP);
-+	sspa_sp |= SSPA_SP_S_EN;
-+	sspa_sp |= SSPA_SP_WEN;
-+	mmp_sspa_write_reg(sspa, SSPA_RXSP, sspa_sp);
++	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
++					tdmac->reg_base + TDCR);
++	tdmac->status = DMA_PAUSED;
 +}
 +
-+static void mmp_sspa_rx_disable(struct ssp_device *sspa)
++static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
 +{
-+	unsigned int sspa_sp;
++	unsigned int tdcr;
 +
-+	sspa_sp = mmp_sspa_read_reg(sspa, SSPA_RXSP);
-+	sspa_sp &= ~SSPA_SP_S_EN;
-+	sspa_sp |= SSPA_SP_WEN;
-+	mmp_sspa_write_reg(sspa, SSPA_RXSP, sspa_sp);
-+}
++	mmp_tdma_disable_chan(tdmac);
 +
-+static int mmp_sspa_startup(struct snd_pcm_substream *substream,
-+	struct snd_soc_dai *dai)
-+{
-+	struct sspa_priv *priv = snd_soc_dai_get_drvdata(dai);
++	if (tdmac->dir == DMA_MEM_TO_DEV)
++		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
++	else if (tdmac->dir == DMA_DEV_TO_MEM)
++		tdcr = TDCR_SRCDIR_ADDR_HOLD | TDCR_DSTDIR_ADDR_INC;
 +
-+	clk_enable(priv->sysclk);
-+	clk_enable(priv->sspa->clk);
++	if (tdmac->type == MMP_AUD_TDMA) {
++		tdcr |= TDCR_PACKMOD;
 +
++		switch (tdmac->burst_sz) {
++		case 4:
++			tdcr |= TDCR_BURSTSZ_4B;
++			break;
++		case 8:
++			tdcr |= TDCR_BURSTSZ_8B;
++			break;
++		case 16:
++			tdcr |= TDCR_BURSTSZ_16B;
++			break;
++		case 32:
++			tdcr |= TDCR_BURSTSZ_32B;
++			break;
++		case 64:
++			tdcr |= TDCR_BURSTSZ_64B;
++			break;
++		case 128:
++			tdcr |= TDCR_BURSTSZ_128B;
++			break;
++		default:
++			dev_err(tdmac->dev, "mmp_tdma: unknown burst size.\n");
++			return -EINVAL;
++		}
++
++		switch (tdmac->buswidth) {
++		case DMA_SLAVE_BUSWIDTH_1_BYTE:
++			tdcr |= TDCR_SSZ_8_BITS;
++			break;
++		case DMA_SLAVE_BUSWIDTH_2_BYTES:
++			tdcr |= TDCR_SSZ_16_BITS;
++			break;
++		case DMA_SLAVE_BUSWIDTH_4_BYTES:
++			tdcr |= TDCR_SSZ_32_BITS;
++			break;
++		default:
++			dev_err(tdmac->dev, "mmp_tdma: unknown bus size.\n");
++			return -EINVAL;
++		}
++	} else if (tdmac->type == PXA910_SQU) {
++		tdcr |= TDCR_BURSTSZ_SQU_32B;
++		tdcr |= TDCR_SSPMOD;
++	}
++
++	writel(tdcr, tdmac->reg_base + TDCR);
 +	return 0;
 +}
 +
-+static void mmp_sspa_shutdown(struct snd_pcm_substream *substream,
-+	struct snd_soc_dai *dai)
++static int mmp_tdma_clear_chan_irq(struct mmp_tdma_chan *tdmac)
 +{
-+	struct sspa_priv *priv = snd_soc_dai_get_drvdata(dai);
++	u32 reg = readl(tdmac->reg_base + TDISR);
 +
-+	clk_disable(priv->sspa->clk);
-+	clk_disable(priv->sysclk);
++	if (reg & TDISR_COMP) {
++		/* clear irq */
++		reg &= ~TDISR_COMP;
++		writel(reg, tdmac->reg_base + TDISR);
++
++		return 0;
++	}
++	return -1;
++}
++
++static irqreturn_t mmp_tdma_chan_handler(int irq, void *dev_id)
++{
++	struct mmp_tdma_chan *tdmac = dev_id;
++
++	if (mmp_tdma_clear_chan_irq(tdmac) == 0) {
++		tdmac->pos = (tdmac->pos + tdmac->period_len) % tdmac->buf_len;
++		tasklet_schedule(&tdmac->tasklet);
++		return IRQ_HANDLED;
++	} else
++		return IRQ_NONE;
++}
++
++static irqreturn_t mmp_tdma_int_handler(int irq, void *dev_id)
++{
++	struct mmp_tdma_device *tdev = dev_id;
++	int i, ret;
++	int irq_num = 0;
++
++	for (i = 0; i < TDMA_CHANNEL_NUM; i++) {
++		struct mmp_tdma_chan *tdmac = tdev->tdmac[i];
++
++		ret = mmp_tdma_chan_handler(irq, tdmac);
++		if (ret == IRQ_HANDLED)
++			irq_num++;
++	}
++
++	if (irq_num)
++		return IRQ_HANDLED;
++	else
++		return IRQ_NONE;
++}
++
++static void dma_do_tasklet(unsigned long data)
++{
++	struct mmp_tdma_chan *tdmac = (struct mmp_tdma_chan *)data;
++
++	if (tdmac->desc.callback)
++		tdmac->desc.callback(tdmac->desc.callback_param);
++
++}
++
++static void mmp_tdma_free_descriptor(struct mmp_tdma_chan *tdmac)
++{
++	struct gen_pool *gpool;
++	int size = tdmac->desc_num * sizeof(struct mmp_tdma_desc);
++
++	gpool = sram_get_gpool("asram");
++	if (tdmac->desc_arr)
++		gen_pool_free(gpool, (unsigned long)tdmac->desc_arr,
++				size);
++	tdmac->desc_arr = NULL;
 +
 +	return;
 +}
 +
-+/*
-+ * Set the SSP ports SYSCLK.
-+ */
-+static int mmp_sspa_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
-+				    int clk_id, unsigned int freq, int dir)
++static dma_cookie_t mmp_tdma_tx_submit(struct dma_async_tx_descriptor *tx)
 +{
-+	struct sspa_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
-+	int ret = 0;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(tx->chan);
 +
-+	switch (clk_id) {
-+	case MMP_SSPA_CLK_AUDIO:
-+		ret = clk_set_rate(priv->audio_clk, freq);
++	mmp_tdma_chan_set_desc(tdmac, tdmac->desc_arr_phys);
++
++	return 0;
++}
++
++static int mmp_tdma_alloc_chan_resources(struct dma_chan *chan)
++{
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	int ret;
++
++	dma_async_tx_descriptor_init(&tdmac->desc, chan);
++	tdmac->desc.tx_submit = mmp_tdma_tx_submit;
++
++	if (tdmac->irq) {
++		ret = devm_request_irq(tdmac->dev, tdmac->irq,
++			mmp_tdma_chan_handler, IRQF_DISABLED, "tdma", tdmac);
 +		if (ret)
 +			return ret;
-+		break;
-+	case MMP_SSPA_CLK_PLL:
-+	case MMP_SSPA_CLK_VCXO:
-+		/* not support yet */
-+		return -EINVAL;
-+	default:
-+		return -EINVAL;
 +	}
-+
-+	return 0;
++	return 1;
 +}
 +
-+static int mmp_sspa_set_dai_pll(struct snd_soc_dai *cpu_dai, int pll_id,
-+				 int source, unsigned int freq_in,
-+				 unsigned int freq_out)
++static void mmp_tdma_free_chan_resources(struct dma_chan *chan)
 +{
-+	struct sspa_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
-+	int ret = 0;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
 +
-+	switch (pll_id) {
-+	case MMP_SYSCLK:
-+		ret = clk_set_rate(priv->sysclk, freq_out);
-+		if (ret)
-+			return ret;
-+		break;
-+	case MMP_SSPA_CLK:
-+		ret = clk_set_rate(priv->sspa->clk, freq_out);
-+		if (ret)
-+			return ret;
-+		break;
-+	default:
-+		return -ENODEV;
-+	}
-+
-+	return 0;
++	if (tdmac->irq)
++		devm_free_irq(tdmac->dev, tdmac->irq, tdmac);
++	mmp_tdma_free_descriptor(tdmac);
++	return;
 +}
 +
-+/*
-+ * Set up the sspa dai format. The sspa port must be inactive
-+ * before calling this function as the physical
-+ * interface format is changed.
-+ */
-+static int mmp_sspa_set_dai_fmt(struct snd_soc_dai *cpu_dai,
-+				 unsigned int fmt)
++struct mmp_tdma_desc *mmp_tdma_alloc_descriptor(struct mmp_tdma_chan *tdmac)
 +{
-+	struct sspa_priv *sspa_priv = snd_soc_dai_get_drvdata(cpu_dai);
-+	struct ssp_device *sspa = sspa_priv->sspa;
-+	u32 sspa_sp, sspa_ctrl;
++	struct gen_pool *gpool;
++	int size = tdmac->desc_num * sizeof(struct mmp_tdma_desc);
 +
-+	/* check if we need to change anything at all */
-+	if (sspa_priv->dai_fmt == fmt)
-+		return 0;
++	gpool = sram_get_gpool("asram");
++	if (!gpool)
++		return NULL;
 +
-+	/* we can only change the settings if the port is not in use */
-+	if ((mmp_sspa_read_reg(sspa, SSPA_TXSP) & SSPA_SP_S_EN) ||
-+	    (mmp_sspa_read_reg(sspa, SSPA_RXSP) & SSPA_SP_S_EN)) {
-+		dev_err(&sspa->pdev->dev,
-+			"can't change hardware dai format: stream is in use\n");
-+		return -EINVAL;
-+	}
++	tdmac->desc_arr = (void *)gen_pool_alloc(gpool, size);
++	if (!tdmac->desc_arr)
++		return NULL;
 +
-+	/* reset port settings */
-+	sspa_sp   = SSPA_SP_WEN | SSPA_SP_S_RST | SSPA_SP_FFLUSH;
-+	sspa_ctrl = 0;
++	tdmac->desc_arr_phys = gen_pool_virt_to_phys(gpool,
++			(unsigned long)tdmac->desc_arr);
 +
-+	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-+	case SND_SOC_DAIFMT_CBS_CFS:
-+		sspa_sp |= SSPA_SP_MSL;
-+		break;
-+	case SND_SOC_DAIFMT_CBM_CFM:
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
-+	case SND_SOC_DAIFMT_NB_NF:
-+		sspa_sp |= SSPA_SP_FSP;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-+	case SND_SOC_DAIFMT_I2S:
-+		sspa_sp |= SSPA_TXSP_FPER(63);
-+		sspa_sp |= SSPA_SP_FWID(31);
-+		sspa_ctrl |= SSPA_CTL_XDATDLY(1);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	mmp_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp);
-+	mmp_sspa_write_reg(sspa, SSPA_RXSP, sspa_sp);
-+
-+	sspa_sp &= ~(SSPA_SP_S_RST | SSPA_SP_FFLUSH);
-+	mmp_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp);
-+	mmp_sspa_write_reg(sspa, SSPA_RXSP, sspa_sp);
-+
-+	/*
-+	 * FIXME: hw issue, for the tx serial port,
-+	 * can not config the master/slave mode;
-+	 * so must clean this bit.
-+	 * The master/slave mode has been set in the
-+	 * rx port.
-+	 */
-+	sspa_sp &= ~SSPA_SP_MSL;
-+	mmp_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp);
-+
-+	mmp_sspa_write_reg(sspa, SSPA_TXCTL, sspa_ctrl);
-+	mmp_sspa_write_reg(sspa, SSPA_RXCTL, sspa_ctrl);
-+
-+	/* Since we are configuring the timings for the format by hand
-+	 * we have to defer some things until hw_params() where we
-+	 * know parameters like the sample size.
-+	 */
-+	sspa_priv->dai_fmt = fmt;
-+	return 0;
++	return tdmac->desc_arr;
 +}
 +
-+/*
-+ * Set the SSPA audio DMA parameters and sample size.
-+ * Can be called multiple times by oss emulation.
-+ */
-+static int mmp_sspa_hw_params(struct snd_pcm_substream *substream,
-+			       struct snd_pcm_hw_params *params,
-+			       struct snd_soc_dai *dai)
++static struct dma_async_tx_descriptor *mmp_tdma_prep_dma_cyclic(
++		struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
++		size_t period_len, enum dma_transfer_direction direction,
++		void *context)
 +{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	struct sspa_priv *sspa_priv = snd_soc_dai_get_drvdata(dai);
-+	struct ssp_device *sspa = sspa_priv->sspa;
-+	struct pxa2xx_pcm_dma_params *dma_params;
-+	u32 sspa_ctrl;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	struct mmp_tdma_desc *desc;
++	int num_periods = buf_len / period_len;
++	int i = 0, buf = 0;
 +
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		sspa_ctrl = mmp_sspa_read_reg(sspa, SSPA_TXCTL);
-+	else
-+		sspa_ctrl = mmp_sspa_read_reg(sspa, SSPA_RXCTL);
++	if (tdmac->status != DMA_SUCCESS)
++		return NULL;
 +
-+	sspa_ctrl &= ~SSPA_CTL_XFRLEN1_MASK;
-+	sspa_ctrl |= SSPA_CTL_XFRLEN1(params_channels(params) - 1);
-+	sspa_ctrl &= ~SSPA_CTL_XWDLEN1_MASK;
-+	sspa_ctrl |= SSPA_CTL_XWDLEN1(SSPA_CTL_32_BITS);
-+	sspa_ctrl &= ~SSPA_CTL_XSSZ1_MASK;
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S8:
-+		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_8_BITS);
-+		break;
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_16_BITS);
-+		break;
-+	case SNDRV_PCM_FORMAT_S20_3LE:
-+		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_20_BITS);
-+		break;
-+	case SNDRV_PCM_FORMAT_S24_3LE:
-+		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_24_BITS);
-+		break;
-+	case SNDRV_PCM_FORMAT_S32_LE:
-+		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_32_BITS);
-+		break;
-+	default:
-+		return -EINVAL;
++	if (period_len > TDMA_MAX_XFER_BYTES) {
++		dev_err(tdmac->dev,
++				"maximum period size exceeded: %d > %d\n",
++				period_len, TDMA_MAX_XFER_BYTES);
++		goto err_out;
 +	}
 +
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		mmp_sspa_write_reg(sspa, SSPA_TXCTL, sspa_ctrl);
-+		mmp_sspa_write_reg(sspa, SSPA_TXFIFO_LL, 0x1);
-+	} else {
-+		mmp_sspa_write_reg(sspa, SSPA_RXCTL, sspa_ctrl);
-+		mmp_sspa_write_reg(sspa, SSPA_RXFIFO_UL, 0x0);
++	tdmac->status = DMA_IN_PROGRESS;
++	tdmac->desc_num = num_periods;
++	desc = mmp_tdma_alloc_descriptor(tdmac);
++	if (!desc)
++		goto err_out;
++
++	while (buf < buf_len) {
++		desc = &tdmac->desc_arr[i];
++
++		if (i + 1 == num_periods)
++			desc->nxt_desc = tdmac->desc_arr_phys;
++		else
++			desc->nxt_desc = tdmac->desc_arr_phys +
++				sizeof(*desc) * (i + 1);
++
++		if (direction == DMA_MEM_TO_DEV) {
++			desc->src_addr = dma_addr;
++			desc->dst_addr = tdmac->dev_addr;
++		} else {
++			desc->src_addr = tdmac->dev_addr;
++			desc->dst_addr = dma_addr;
++		}
++		desc->byte_cnt = period_len;
++		dma_addr += period_len;
++		buf += period_len;
++		i++;
 +	}
 +
-+	dma_params = &sspa_priv->dma_params[substream->stream];
-+	dma_params->dev_addr = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+				(sspa->phys_base + SSPA_TXD) :
-+				(sspa->phys_base + SSPA_RXD);
-+	snd_soc_dai_set_dma_data(cpu_dai, substream, dma_params);
-+	return 0;
++	tdmac->buf_len = buf_len;
++	tdmac->period_len = period_len;
++	tdmac->pos = 0;
++
++	return &tdmac->desc;
++
++err_out:
++	tdmac->status = DMA_ERROR;
++	return NULL;
 +}
 +
-+static int mmp_sspa_trigger(struct snd_pcm_substream *substream, int cmd,
-+			     struct snd_soc_dai *dai)
++static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
++		unsigned long arg)
 +{
-+	struct sspa_priv *sspa_priv = snd_soc_dai_get_drvdata(dai);
-+	struct ssp_device *sspa = sspa_priv->sspa;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	struct dma_slave_config *dmaengine_cfg = (void *)arg;
 +	int ret = 0;
 +
 +	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		/*
-+		 * whatever playback or capture, must enable rx.
-+		 * this is a hw issue, so need check if rx has been
-+		 * enabled or not; if has been enabled by another
-+		 * stream, do not enable again.
-+		 */
-+		if (!sspa_priv->running_cnt)
-+			mmp_sspa_rx_enable(sspa);
-+
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+			mmp_sspa_tx_enable(sspa);
-+
-+		sspa_priv->running_cnt++;
++	case DMA_TERMINATE_ALL:
++		mmp_tdma_disable_chan(tdmac);
 +		break;
-+
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		sspa_priv->running_cnt--;
-+
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+			mmp_sspa_tx_disable(sspa);
-+
-+		/* have no capture stream, disable rx port */
-+		if (!sspa_priv->running_cnt)
-+			mmp_sspa_rx_disable(sspa);
++	case DMA_PAUSE:
++		mmp_tdma_pause_chan(tdmac);
 +		break;
-+
++	case DMA_RESUME:
++		mmp_tdma_resume_chan(tdmac);
++		break;
++	case DMA_SLAVE_CONFIG:
++		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
++			tdmac->dev_addr = dmaengine_cfg->src_addr;
++			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
++			tdmac->buswidth = dmaengine_cfg->src_addr_width;
++		} else {
++			tdmac->dev_addr = dmaengine_cfg->dst_addr;
++			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
++			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
++		}
++		tdmac->dir = dmaengine_cfg->direction;
++		return mmp_tdma_config_chan(tdmac);
 +	default:
-+		ret = -EINVAL;
++		ret = -ENOSYS;
 +	}
 +
 +	return ret;
 +}
 +
-+static int mmp_sspa_probe(struct snd_soc_dai *dai)
++static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
++			dma_cookie_t cookie, struct dma_tx_state *txstate)
 +{
-+	struct sspa_priv *priv = dev_get_drvdata(dai->dev);
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
 +
-+	snd_soc_dai_set_drvdata(dai, priv);
-+	return 0;
++	dma_set_residue(txstate, tdmac->buf_len - tdmac->pos);
 +
++	return tdmac->status;
 +}
 +
-+#define MMP_SSPA_RATES SNDRV_PCM_RATE_8000_192000
-+#define MMP_SSPA_FORMATS (SNDRV_PCM_FMTBIT_S8 | \
-+		SNDRV_PCM_FMTBIT_S16_LE | \
-+		SNDRV_PCM_FMTBIT_S24_LE | \
-+		SNDRV_PCM_FMTBIT_S24_LE | \
-+		SNDRV_PCM_FMTBIT_S32_LE)
-+
-+static struct snd_soc_dai_ops mmp_sspa_dai_ops = {
-+	.startup	= mmp_sspa_startup,
-+	.shutdown	= mmp_sspa_shutdown,
-+	.trigger	= mmp_sspa_trigger,
-+	.hw_params	= mmp_sspa_hw_params,
-+	.set_sysclk	= mmp_sspa_set_dai_sysclk,
-+	.set_pll	= mmp_sspa_set_dai_pll,
-+	.set_fmt	= mmp_sspa_set_dai_fmt,
-+};
-+
-+struct snd_soc_dai_driver mmp_sspa_dai = {
-+	.probe = mmp_sspa_probe,
-+	.playback = {
-+		.channels_min = 1,
-+		.channels_max = 128,
-+		.rates = MMP_SSPA_RATES,
-+		.formats = MMP_SSPA_FORMATS,
-+	},
-+	.capture = {
-+		.channels_min = 1,
-+		.channels_max = 2,
-+		.rates = MMP_SSPA_RATES,
-+		.formats = MMP_SSPA_FORMATS,
-+	},
-+	.ops = &mmp_sspa_dai_ops,
-+};
-+
-+static __devinit int asoc_mmp_sspa_probe(struct platform_device *pdev)
++static void mmp_tdma_issue_pending(struct dma_chan *chan)
 +{
-+	struct sspa_priv *priv;
-+	struct resource *res;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
 +
-+	priv = devm_kzalloc(&pdev->dev,
-+				sizeof(struct sspa_priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
++	mmp_tdma_enable_chan(tdmac);
++}
 +
-+	priv->sspa = devm_kzalloc(&pdev->dev,
-+				sizeof(struct ssp_device), GFP_KERNEL);
-+	if (priv->sspa == NULL)
-+		return -ENOMEM;
++static int __devexit mmp_tdma_remove(struct platform_device *pdev)
++{
++	struct mmp_tdma_device *tdev = platform_get_drvdata(pdev);
 +
-+	priv->dma_params = devm_kzalloc(&pdev->dev,
-+			2 * sizeof(struct pxa2xx_pcm_dma_params), GFP_KERNEL);
-+	if (priv->dma_params == NULL)
-+		return -ENOMEM;
++	dma_async_device_unregister(&tdev->device);
++	return 0;
++}
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res == NULL)
-+		return -ENOMEM;
++static int __devinit mmp_tdma_chan_init(struct mmp_tdma_device *tdev,
++						int idx, int irq, int type)
++{
++	struct mmp_tdma_chan *tdmac;
 +
-+	priv->sspa->mmio_base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (priv->sspa->mmio_base == NULL)
-+		return -ENODEV;
-+
-+	priv->sspa->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->sspa->clk))
-+		return PTR_ERR(priv->sspa->clk);
-+
-+	priv->audio_clk = clk_get(NULL, "mmp-audio");
-+	if (IS_ERR(priv->audio_clk))
-+		return PTR_ERR(priv->audio_clk);
-+
-+	priv->sysclk = clk_get(NULL, "mmp-sysclk");
-+	if (IS_ERR(priv->sysclk)) {
-+		clk_put(priv->audio_clk);
-+		return PTR_ERR(priv->sysclk);
++	if (idx >= TDMA_CHANNEL_NUM) {
++		dev_err(tdev->dev, "too many channels for device!\n");
++		return -EINVAL;
 +	}
-+	clk_enable(priv->audio_clk);
-+	priv->dai_fmt = (unsigned int) -1;
-+	platform_set_drvdata(pdev, priv);
 +
-+	return snd_soc_register_dai(&pdev->dev, &mmp_sspa_dai);
-+}
++	/* alloc channel */
++	tdmac = devm_kzalloc(tdev->dev, sizeof(*tdmac), GFP_KERNEL);
++	if (!tdmac) {
++		dev_err(tdev->dev, "no free memory for DMA channels!\n");
++		return -ENOMEM;
++	}
++	if (irq)
++		tdmac->irq = irq + idx;
++	tdmac->dev	   = tdev->dev;
++	tdmac->chan.device = &tdev->device;
++	tdmac->idx	   = idx;
++	tdmac->type	   = type;
++	tdmac->reg_base	   = (unsigned long)tdev->base + idx * 4;
++	tdmac->status = DMA_SUCCESS;
++	tdev->tdmac[tdmac->idx] = tdmac;
++	tasklet_init(&tdmac->tasklet, dma_do_tasklet, (unsigned long)tdmac);
 +
-+static int __devexit asoc_mmp_sspa_remove(struct platform_device *pdev)
-+{
-+	struct sspa_priv *priv = platform_get_drvdata(pdev);
++	/* add the channel to tdma_chan list */
++	list_add_tail(&tdmac->chan.device_node,
++			&tdev->device.channels);
 +
-+	clk_disable(priv->audio_clk);
-+	clk_put(priv->audio_clk);
-+	clk_put(priv->sysclk);
-+	snd_soc_unregister_dai(&pdev->dev);
 +	return 0;
 +}
 +
-+static struct platform_driver asoc_mmp_sspa_driver = {
-+	.driver = {
-+		.name = "mmp-sspa-dai",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = asoc_mmp_sspa_probe,
-+	.remove = __devexit_p(asoc_mmp_sspa_remove),
++static int __devinit mmp_tdma_probe(struct platform_device *pdev)
++{
++	const struct platform_device_id *id = platform_get_device_id(pdev);
++	enum mmp_tdma_type type = id->driver_data;
++	struct mmp_tdma_device *tdev;
++	struct resource *iores;
++	int i, ret;
++	int irq = 0;
++	int chan_num = TDMA_CHANNEL_NUM;
++
++	/* always have couple channels */
++	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
++	if (!tdev)
++		return -ENOMEM;
++
++	tdev->dev = &pdev->dev;
++	iores = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!iores)
++		return -EINVAL;
++
++	if (resource_size(iores) != chan_num)
++		tdev->irq = iores->start;
++	else
++		irq = iores->start;
++
++	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!iores)
++		return -EINVAL;
++
++	tdev->base = devm_request_and_ioremap(&pdev->dev, iores);
++	if (!tdev->base)
++		return -EADDRNOTAVAIL;
++
++	if (tdev->irq) {
++		ret = devm_request_irq(&pdev->dev, tdev->irq,
++			mmp_tdma_int_handler, IRQF_DISABLED, "tdma", tdev);
++		if (ret)
++			return ret;
++	}
++
++	dma_cap_set(DMA_SLAVE, tdev->device.cap_mask);
++	dma_cap_set(DMA_CYCLIC, tdev->device.cap_mask);
++
++	INIT_LIST_HEAD(&tdev->device.channels);
++
++	/* initialize channel parameters */
++	for (i = 0; i < chan_num; i++) {
++		ret = mmp_tdma_chan_init(tdev, i, irq, type);
++		if (ret)
++			return ret;
++	}
++
++	tdev->device.dev = &pdev->dev;
++	tdev->device.device_alloc_chan_resources =
++					mmp_tdma_alloc_chan_resources;
++	tdev->device.device_free_chan_resources =
++					mmp_tdma_free_chan_resources;
++	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
++	tdev->device.device_tx_status = mmp_tdma_tx_status;
++	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
++	tdev->device.device_control = mmp_tdma_control;
++	tdev->device.copy_align = TDMA_ALIGNMENT;
++
++	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
++	platform_set_drvdata(pdev, tdev);
++
++	ret = dma_async_device_register(&tdev->device);
++	if (ret) {
++		dev_err(tdev->device.dev, "unable to register\n");
++		return ret;
++	}
++
++	dev_info(tdev->device.dev, "initialized\n");
++	return 0;
++}
++
++static const struct platform_device_id mmp_tdma_id_table[] = {
++	{ "mmp-adma",	MMP_AUD_TDMA },
++	{ "pxa910-squ",	PXA910_SQU },
++	{ },
 +};
 +
-+module_platform_driver(asoc_mmp_sspa_driver);
++static struct platform_driver mmp_tdma_driver = {
++	.driver		= {
++		.name	= "mmp-tdma",
++		.owner  = THIS_MODULE,
++	},
++	.id_table	= mmp_tdma_id_table,
++	.probe		= mmp_tdma_probe,
++	.remove		= __devexit_p(mmp_tdma_remove),
++};
 +
-+MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
-+MODULE_DESCRIPTION("MMP SSPA SoC Interface");
++module_platform_driver(mmp_tdma_driver);
++
 +MODULE_LICENSE("GPL");
-diff --git a/sound/soc/pxa/mmp-sspa.h b/sound/soc/pxa/mmp-sspa.h
-new file mode 100644
-index 0000000..ea365cb
---- /dev/null
-+++ b/sound/soc/pxa/mmp-sspa.h
-@@ -0,0 +1,92 @@
-+/*
-+ * linux/sound/soc/pxa/mmp-sspa.h
-+ *
-+ * Copyright (C) 2011 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ *
-+ */
-+#ifndef _MMP_SSPA_H
-+#define _MMP_SSPA_H
-+
-+/*
-+ * SSPA Registers
-+ */
-+#define SSPA_RXD		(0x00)
-+#define SSPA_RXID		(0x04)
-+#define SSPA_RXCTL		(0x08)
-+#define SSPA_RXSP		(0x0c)
-+#define SSPA_RXFIFO_UL		(0x10)
-+#define SSPA_RXINT_MASK		(0x14)
-+#define SSPA_RXC		(0x18)
-+#define SSPA_RXFIFO_NOFS	(0x1c)
-+#define SSPA_RXFIFO_SIZE	(0x20)
-+
-+#define SSPA_TXD		(0x80)
-+#define SSPA_TXID		(0x84)
-+#define SSPA_TXCTL		(0x88)
-+#define SSPA_TXSP		(0x8c)
-+#define SSPA_TXFIFO_LL		(0x90)
-+#define SSPA_TXINT_MASK		(0x94)
-+#define SSPA_TXC		(0x98)
-+#define SSPA_TXFIFO_NOFS	(0x9c)
-+#define SSPA_TXFIFO_SIZE	(0xa0)
-+
-+/* SSPA Control Register */
-+#define	SSPA_CTL_XPH		(1 << 31)	/* Read Phase */
-+#define	SSPA_CTL_XFIG		(1 << 15)	/* Transmit Zeros when FIFO Empty */
-+#define	SSPA_CTL_JST		(1 << 3)	/* Audio Sample Justification */
-+#define	SSPA_CTL_XFRLEN2_MASK	(7 << 24)
-+#define	SSPA_CTL_XFRLEN2(x)	((x) << 24)	/* Transmit Frame Length in Phase 2 */
-+#define	SSPA_CTL_XWDLEN2_MASK	(7 << 21)
-+#define	SSPA_CTL_XWDLEN2(x)	((x) << 21)	/* Transmit Word Length in Phase 2 */
-+#define	SSPA_CTL_XDATDLY(x)	((x) << 19)	/* Tansmit Data Delay */
-+#define	SSPA_CTL_XSSZ2_MASK	(7 << 16)
-+#define	SSPA_CTL_XSSZ2(x)	((x) << 16)	/* Transmit Sample Audio Size */
-+#define	SSPA_CTL_XFRLEN1_MASK	(7 << 8)
-+#define	SSPA_CTL_XFRLEN1(x)	((x) << 8)	/* Transmit Frame Length in Phase 1 */
-+#define	SSPA_CTL_XWDLEN1_MASK	(7 << 5)
-+#define	SSPA_CTL_XWDLEN1(x)	((x) << 5)	/* Transmit Word Length in Phase 1 */
-+#define	SSPA_CTL_XSSZ1_MASK	(7 << 0)
-+#define	SSPA_CTL_XSSZ1(x)	((x) << 0)	/* XSSZ1 */
-+
-+#define SSPA_CTL_8_BITS		(0x0)		/* Sample Size */
-+#define SSPA_CTL_12_BITS	(0x1)
-+#define SSPA_CTL_16_BITS	(0x2)
-+#define SSPA_CTL_20_BITS	(0x3)
-+#define SSPA_CTL_24_BITS	(0x4)
-+#define SSPA_CTL_32_BITS	(0x5)
-+
-+/* SSPA Serial Port Register */
-+#define	SSPA_SP_WEN		(1 << 31)	/* Write Configuration Enable */
-+#define	SSPA_SP_MSL		(1 << 18)	/* Master Slave Configuration */
-+#define	SSPA_SP_CLKP		(1 << 17)	/* CLKP Polarity Clock Edge Select */
-+#define	SSPA_SP_FSP		(1 << 16)	/* FSP Polarity Clock Edge Select */
-+#define	SSPA_SP_FFLUSH		(1 << 2)	/* FIFO Flush */
-+#define	SSPA_SP_S_RST		(1 << 1)	/* Active High Reset Signal */
-+#define	SSPA_SP_S_EN		(1 << 0)	/* Serial Clock Domain Enable */
-+#define	SSPA_SP_FWID(x)		((x) << 20)	/* Frame-Sync Width */
-+#define	SSPA_TXSP_FPER(x)	((x) << 4)	/* Frame-Sync Active */
-+
-+/* sspa clock sources */
-+#define MMP_SSPA_CLK_PLL	0
-+#define MMP_SSPA_CLK_VCXO	1
-+#define MMP_SSPA_CLK_AUDIO	3
-+
-+/* sspa pll id */
-+#define MMP_SYSCLK		0
-+#define MMP_SSPA_CLK		1
-+
-+#endif /* _MMP_SSPA_H */
++MODULE_DESCRIPTION("MMP Two-Channel DMA Driver");
++MODULE_ALIAS("platform:mmp-tdma");
++MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
++MODULE_AUTHOR("Zhangfei Gao <zhangfei.gao@marvell.com>");
 -- 
 1.7.1
