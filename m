@@ -1,43 +1,155 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jun 2012 20:08:27 +0800
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <4FD5D49C.6070106@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
- <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
- <4FD5D49C.6070106@linaro.org>
-Message-ID: <20120611120820.GN11439@opensource.wolfsonmicro.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Mon, 11 Jun 2012 17:41:08 +0530
+Subject: [PATCH] regulator: Add ramp_delay to regulator constraints to get
+ used as a configurable parameter.
+Message-ID: <1339416668-17028-1-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 12:21:00PM +0100, Lee Jones wrote:
-> On 05/06/12 11:42, Mark Brown wrote:
-> >On Tue, Jun 05, 2012 at 11:34:12AM +0100, Lee Jones wrote:
+For some hardwares ramp_delay for BUCKs is a configurable parameter which can
+be configured through DT or board file.This patch adds ramp_delay to regulator
+constraints and allow user to configure it for regulators which supports this
+feature, through DT or board file. It will provide two ways of setting the
+ramp_delay for a regulator:
+	First, by setting it as constraints in board file(for configurable
+regulators) and set_machine_constraints() will take care of setting it on
+hardware by calling(the provided) .set_ramp_delay() operation(callback).
+	Second, by setting it as data in regulator_desc(as fixed/default
+ramp_delay rate) for a regulator in driver.
 
-> >>Well without it all regulator requests from DT will fail.
+regulator_set_voltage_time_sel() will give preference to
+constraints->ramp_delay while reading ramp_delay rate for regulator. Similarly
+users should also take care accordingly while refering ramp_delay rate(in case
+of implementing their private .set_voltage_time_sel() callbacks for different
+regulators).
 
-> >Oh, ffs.  Why wasn't this mentioned when the patch was posted,
+Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+---
+ .../devicetree/bindings/regulator/regulator.txt    |    1 +
+ drivers/regulator/core.c                           |   23 ++++++++++++++++---
+ drivers/regulator/of_regulator.c                   |    6 ++++-
+ include/linux/regulator/driver.h                   |    3 ++
+ include/linux/regulator/machine.h                  |    3 ++
+ 5 files changed, 31 insertions(+), 5 deletions(-)
 
-> I did. My 00 patch mentioned that these were all clean-ups/bug fixes
-> destined for the for RCs.
-
-You didn't CC me on that as far as I can tell so I never saw it, and
-even if you had it's rather burying the lead with a large series of what
-mostly looks like random cleanups from the bits I see in my archive.  I
-think I assumed another patch in the series changed the names in the
-device tree or added the device tree.
-
-> Nevertheless, these two patches are required for a decent boot.
-
-Fail.  Well, I guess I'll end up dulplicating the commits :/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/99cf29ce/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+index 5b7a408..d0a7b12 100644
+--- a/Documentation/devicetree/bindings/regulator/regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -10,6 +10,7 @@ Optional properties:
+ - regulator-always-on: boolean, regulator should never be disabled
+ - regulator-boot-on: bootloader/firmware enabled regulator
+ - <name>-supply: phandle to the parent supply/regulator node
++- regulator-ramp-delay: ramp delay for regulator(in mV/uS)
+ 
+ Example:
+ 
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 63507a5..0ffd917 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -967,6 +967,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 		}
+ 	}
+ 
++	if (rdev->constraints->ramp_delay && ops->set_ramp_delay) {
++		ret = ops->set_ramp_delay(rdev, rdev->constraints->ramp_delay);
++		if (ret < 0) {
++			rdev_err(rdev, "failed to set ramp_delay\n");
++			goto out;
++		}
++	}
++
+ 	print_constraints(rdev);
+ 	return 0;
+ out:
+@@ -2305,10 +2313,17 @@ int regulator_set_voltage_time_sel(struct regulator_dev *rdev,
+ 				   unsigned int old_selector,
+ 				   unsigned int new_selector)
+ {
+-	if (rdev->desc->ramp_delay && rdev->desc->uV_step)
+-		return DIV_ROUND_UP(rdev->desc->uV_step *
+-			abs(new_selector - old_selector),
+-			rdev->desc->ramp_delay * 1000);
++	if (rdev->desc->uV_step) {
++		if (rdev->constraints->ramp_delay)
++			return DIV_ROUND_UP(rdev->desc->uV_step *
++				abs(new_selector - old_selector),
++				rdev->constraints->ramp_delay * 1000);
++		if (rdev->desc->ramp_delay)
++			return DIV_ROUND_UP(rdev->desc->uV_step *
++				abs(new_selector - old_selector),
++				rdev->desc->ramp_delay * 1000);
++		rdev_warn(rdev, "ramp_delay not set\n");
++	}
+ 	return 0;
+ }
+ 
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index 56593b7..e2a7310 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -20,7 +20,7 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 					struct regulator_init_data **init_data)
+ {
+ 	const __be32 *min_uV, *max_uV, *uV_offset;
+-	const __be32 *min_uA, *max_uA;
++	const __be32 *min_uA, *max_uA, *ramp_delay;
+ 	struct regulation_constraints *constraints = &(*init_data)->constraints;
+ 
+ 	constraints->name = of_get_property(np, "regulator-name", NULL);
+@@ -60,6 +60,10 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 		constraints->always_on = true;
+ 	else /* status change should be possible if not always on. */
+ 		constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
++
++	ramp_delay = of_get_property(np, "regulator-ramp-delay", NULL);
++	if (ramp_delay)
++		constraints->min_uV = be32_to_cpu(*ramp_delay);
+ }
+ 
+ /**
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index ae5c253..ddc155d 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -67,6 +67,8 @@ enum regulator_status {
+  *
+  * @enable_time: Time taken for the regulator voltage output voltage to
+  *               stabilise after being enabled, in microseconds.
++ * @set_ramp_delay: Set the ramp delay for the regulator. The driver should
++ *		select ramp delay equal to or less than(closest) ramp_delay.
+  * @set_voltage_time_sel: Time taken for the regulator voltage output voltage
+  *               to stabilise after being set to a new value, in microseconds.
+  *               The function provides the from and to voltage selector, the
+@@ -113,6 +115,7 @@ struct regulator_ops {
+ 
+ 	/* Time taken to enable or set voltage on the regulator */
+ 	int (*enable_time) (struct regulator_dev *);
++	int (*set_ramp_delay) (struct regulator_dev *, int ramp_delay);
+ 	int (*set_voltage_time_sel) (struct regulator_dev *,
+ 				     unsigned int old_selector,
+ 				     unsigned int new_selector);
+diff --git a/include/linux/regulator/machine.h b/include/linux/regulator/machine.h
+index b021084..5f37ad3 100644
+--- a/include/linux/regulator/machine.h
++++ b/include/linux/regulator/machine.h
+@@ -92,6 +92,7 @@ struct regulator_state {
+  *                 mode.
+  * @initial_state: Suspend state to set by default.
+  * @initial_mode: Mode to set at startup.
++ * @ramp_delay: Time to settle down after voltage change (unit: mV/us)
+  */
+ struct regulation_constraints {
+ 
+@@ -125,6 +126,8 @@ struct regulation_constraints {
+ 	/* mode to set on startup */
+ 	unsigned int initial_mode;
+ 
++	unsigned int ramp_delay;
++
+ 	/* constraint flags */
+ 	unsigned always_on:1;	/* regulator never off when system is on */
+ 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
+-- 
+1.7.0.4
