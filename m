@@ -1,40 +1,44 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 11 Jun 2012 12:44:34 -0400 (EDT)
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <20120611155716.GA18267@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 11 Jun 2012 09:44:41 -0700
+Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
+In-Reply-To: <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
+ <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+Message-ID: <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
+Hi,
 
-> On Mon, Jun 11, 2012 at 11:54:03AM -0400, Nicolas Pitre wrote:
-> > 
-> > Many CPUs are implementing power saving states via the WFI mode.
-> > In some cases, WFI must be entered in order to suspend, or even reset,
-> > a CPU.
-> > 
-> > Whether a CPU needs to be awaken, brought out of WFI during secondary
-> > boot, or to cancel a reset state before it is effective, the CPU must
-> > receive an interrupt to exit its WFI state.
-> > 
-> > Let's formalize an IPI number for this purpose, and move over existing
-> > users over to a convenience function for it.
-> > 
-> > This also has the side effect of removing the spurious "Unknown IPI
-> > message 1" each time a CPU is awaken.
-> 
-> I want people to move over to using IPI 0 for wakeup.
-> 
-> The problem is, as ever, no one bloody well listens and they all continue
-> on copying Realview.
+On Sun, Jun 10, 2012 at 9:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Hi Arnd, Olof,
+>
+> Here are a couple of imx6q clk patches missed from Sascha's
+> imx-common-clk-fixes pull-request. ?So I rebase them on arm-soc/fixes
+> (they depends on one patch in Sascha's pull-request) and send them
+> here. ?Please pull. ?Thanks.
+>
+> Regards,
+> Shawn
+>
+> The following changes since commit f9c15a1b7d60b69f42b2808140a4713808a3bec1:
+>
+> ?Merge tag 'omap-fixes-for-v3.5-rc1' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
+> fixes (2012-06-08 00:43:39 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fixes-for-3.5
+>
+> Shawn Guo (2):
+> ? ? ?ARM: imx6q: remove unneeded clkdev lookups
 
-No problem -- with this patch the actual IPI number is abstracted away 
-and we can modify it as we see fit in a single location.
+This is looking more like a cleanup, if it is, please hold off until
+3.6. If it isn't please explain in the commit message what bug it
+fixes.
 
-I can provide a follow-up patch doing just that.  What do you think?
 
+Thanks!
 
-Nicolas
+-Olof
