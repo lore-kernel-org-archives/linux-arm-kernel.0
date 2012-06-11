@@ -1,41 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jun 2012 23:38:17 -0700
-Subject: [PATCH] ARM: OMAP2+: cpu: Add am33xx device under
- cpu_class_is_omap2
-In-Reply-To: <1339253773-24088-1-git-send-email-hvaibhav@ti.com>
-References: <1339253773-24088-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20120611063816.GU12766@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Jun 2012 14:39:05 +0800
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <1339242351-8797-1-git-send-email-marex@denx.de>
+References: <1339242351-8797-1-git-send-email-marex@denx.de>
+Message-ID: <20120611063903.GD2552@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120609 08:00]:
-> Newly added AM33XX device falls under omap2 class, so
-> make cpu_class_is_omap2() true for AM33XX
-> (Add soc_is_am33xx() check).
+On Sat, Jun 09, 2012 at 01:45:50PM +0200, Marek Vasut wrote:
+> This patch configures the I2C bus timing registers according
+> to information passed via DT. Currently, 100kHz and 400kHz
+> modes are supported.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> ---
->  arch/arm/plat-omap/include/plat/cpu.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-> index 14f050f..5e36564 100644
-> --- a/arch/arm/plat-omap/include/plat/cpu.h
-> +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> @@ -375,7 +375,7 @@ IS_OMAP_TYPE(3430, 0x3430)
->  #define cpu_class_is_omap1()	(cpu_is_omap7xx() || cpu_is_omap15xx() || \
->  				cpu_is_omap16xx())
->  #define cpu_class_is_omap2()	(cpu_is_omap24xx() || cpu_is_omap34xx() || \
-> -				cpu_is_omap44xx())
-> +				cpu_is_omap44xx() || soc_is_am33xx())
->  
->  /* Various silicon revisions for omap2 */
->  #define OMAP242X_CLASS		0x24200024
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
-I think this can be now simply !cpu_class_is_omap1() as there is
-a very slim chance that we'll ever be compiling omap1 and omap2+ together
-because of the different compiler flags needed.
+I gave it a test on imx28-evk board with audio playback.  It seems
+the patch makes the first time playback non-functional, but the later
+playback is still working.
 
+> +static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
+> +{
+> +	uint32_t speed;
+> +	struct device *dev = i2c->dev;
+> +	struct device_node *node = dev->of_node;
+> +
+> +	if (!node)
+> +		return -EINVAL;
+> +
+> +	i2c->speed = &mxs_i2c_95kHz_config;
+> +	ret = of_property_read_u32(node, "clock-frequency", &speed);
+
+"ret" is undeclared.
+
+> +	if (ret)
+> +		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
+> +	else if (speed == 400000)
+> +		i2c->speed = &mxs_i2c_400kHz_config;
+> +	else if (speed != 100000)
+> +		dev_warn(dev, "Invalid I2C speed selected, using 100kHz\n");
+> +
+> +	return 0;
+> +}
+> +
+
+-- 
 Regards,
-
-Tony
+Shawn
