@@ -1,38 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jun 2012 22:27:53 +0800
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <4FD5FBAF.1060002@linaro.org>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
- <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
- <4FD5D49C.6070106@linaro.org>
- <20120611120820.GN11439@opensource.wolfsonmicro.com>
- <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
-Message-ID: <20120611142752.GS11439@opensource.wolfsonmicro.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 11 Jun 2012 16:28:38 +0200
+Subject: [PATCH 11/14] ARM: LPC32xx: DTS adjustment for using pl18x
+ primecell
+In-Reply-To: <201206111414.14264.arnd@arndb.de>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <1339412537-24485-12-git-send-email-stigge@antcom.de>
+ <201206111414.14264.arnd@arndb.de>
+Message-ID: <4FD60096.7050603@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 03:07:43PM +0100, Lee Jones wrote:
-> >>Well, I guess I'll end up dulplicating the commits :/
+On 06/11/2012 04:14 PM, Arnd Bergmann wrote:
+> On Monday 11 June 2012, Roland Stigge wrote:
+>>                         sd at 20098000 {
+>> -                               compatible = "arm,pl180", "arm,primecell";
+>> +                               compatible = "arm,pl18x", "arm,primecell";
+>>                                 reg = <0x20098000 0x1000>;
+>>                                 interrupts = <0x0f 0>, <0x0d 0>;
+>> +                               status = "disable";
+>>                         };
+>>  
+> 
+> The proper way to write this is 'status = "disabled";', with a 'd' at
+> the end.
 
-> >Duplicating them?
+Thanks for the note!
 
-> Ah, you mean that you've already sent them to -next?
+Funnily, I always did it this way. Looks like initially, I copied from
+somewhere else (wrongly). Indeed, we have lots of "disable", see also:
 
-Yeah, I've already got them on a branch I don't really want to rebase.
+omap3-beagle.dts
+omap4-panda.dts
+omap4-sdp.dts
+tegra20.dtsi
+tegra30.dtsi
 
-> That's no problem though. Won't Git just sling them out at pull-time?
-
-It'll merge out fine, it's just icky having the same thing appear twice
-in history.  Not the end of the world.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/aefcfd09/attachment.sig>
+Roland
