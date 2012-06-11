@@ -1,53 +1,52 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 13:02:05 +0200
-Subject: [PATCH 2/14] ARM: LPC32xx: Clock initialization for NAND controllers
-In-Reply-To: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339412537-24485-3-git-send-email-stigge@antcom.de>
+Date: Mon, 11 Jun 2012 13:02:03 +0200
+Subject: [PATCH 0/14] ARM: LPC32xx specific updates for next
+Message-ID: <1339412537-24485-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock initialization for the MLC NAND controller of the LPC32xx
-SoC and adjusts it for the SLC controller.
+This patch set includes various updates for mach-lpc32xx, including DT binding
+for serial and dts updates. A new reference board is supported (EA3250). The
+board support file phy3250.c is updated to become more general, useable for
+other boards also. There is still board specific stuff in it, though (some
+devicetree auxdata).
+
+Further, clock updates, DMA support, MMC support and a defconfig update for
+LPC32xx is included.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
----
 
- arch/arm/mach-lpc32xx/clock.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+--
+Applies to v3.5-rc2
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -691,10 +691,21 @@ static struct clk clk_nand = {
- 	.parent		= &clk_hclk,
- 	.enable		= local_onoff_enable,
- 	.enable_reg	= LPC32XX_CLKPWR_NAND_CLK_CTRL,
--	.enable_mask	= LPC32XX_CLKPWR_NANDCLK_SLCCLK_EN,
-+	.enable_mask	= LPC32XX_CLKPWR_NANDCLK_SLCCLK_EN |
-+			  LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
- 	.get_rate	= local_return_parent_rate,
- };
- 
-+static struct clk clk_nand_mlc = {
-+	.parent         = &clk_hclk,
-+	.enable         = local_onoff_enable,
-+	.enable_reg     = LPC32XX_CLKPWR_NAND_CLK_CTRL,
-+	.enable_mask    = LPC32XX_CLKPWR_NANDCLK_MLCCLK_EN |
-+			  LPC32XX_CLKPWR_NANDCLK_DMA_INT |
-+			  LPC32XX_CLKPWR_NANDCLK_INTSEL_MLC,
-+	.get_rate       = local_return_parent_rate,
-+};
-+
- static struct clk clk_i2s0 = {
- 	.parent		= &clk_hclk,
- 	.enable		= local_onoff_enable,
-@@ -1121,7 +1132,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
- 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
- 	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
--	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
-+	CLKDEV_INIT("20020000.flash", NULL, &clk_nand),
-+	CLKDEV_INIT("200a8000.flash", NULL, &clk_nand_mlc),
- 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
- 	CLKDEV_INIT(NULL, "i2s0_ck", &clk_i2s0),
- 	CLKDEV_INIT(NULL, "i2s1_ck", &clk_i2s1),
+You can also pull from
+
+  git://git.antcom.de/linux-2.6.git lpc32xx-next
+
+Roland Stigge (14):
+ ARM: LPC32xx: Add NAND flash timing to PHY3250 board dts
+ ARM: LPC32xx: Clock initialization for NAND controllers
+ ARM: LPC32xx: Remove SLC controller initialization from platform init
+ ARM: LPC32xx: Add DMA configuration to platform data
+ ARM: LPC32xx: Adjust dtsi file for MLC controller configuration
+ ARM: LPC32xx: Add dts for EA3250 reference board
+ ARM: LPC32xx: DTS adjustment for key matrix controller
+ ARM: LPC32xx: Clock adjustment for key matrix controller
+ ARM: LPC32xx: Defconfig update
+ ARM: LPC32xx: Add MMC controller support
+ ARM: LPC32xx: DTS adjustment for using pl18x primecell
+ ARM: LPC32xx: DT conversion of Standard UARTs
+ ARM: LPC32xx: High Speed UART configuration via DT
+ ARM: LPC32xx: Remove mach specific ARCH_NR_GPIOS, use default
+
+ arch/arm/Kconfig                          |    2 
+ arch/arm/boot/dts/ea3250.dts              |  157 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/lpc32xx.dtsi            |   60 ++++++++---
+ arch/arm/boot/dts/phy3250.dts             |   40 +++++++
+ arch/arm/configs/lpc32xx_defconfig        |   22 +++-
+ arch/arm/mach-lpc32xx/Kconfig             |   32 ------
+ arch/arm/mach-lpc32xx/clock.c             |   18 ++-
+ arch/arm/mach-lpc32xx/include/mach/gpio.h |    2 
+ arch/arm/mach-lpc32xx/phy3250.c           |   77 +++++++++++++-
+ arch/arm/mach-lpc32xx/serial.c            |   85 ----------------
+ 10 files changed, 343 insertions(+), 152 deletions(-)
