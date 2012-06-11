@@ -1,56 +1,33 @@
-From: zkabelac@redhat.com (Zdenek Kabelac)
-Date: Mon, 11 Jun 2012 15:06:13 +0200
-Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
- allocate memory
-In-Reply-To: <20120610201625.GA26603@schnuecks.de>
-References: <1338401183.22894.11.camel@hactar>
- <20120610201625.GA26603@schnuecks.de>
-Message-ID: <4FD5ED45.50208@redhat.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 11 Jun 2012 18:52:54 +0530
+Subject: [PATCH] ARM: OMAP2+: cpu: Make cpu_class_is_omap2 true for all
+ non-omap1 platforms
+Message-ID: <1339420974-23695-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 10.6.2012 22:16, Simon Baatz napsal(a):
-> Hi,
->
-> [cross posted to linux-lvm, because I think it is a lvm problem]
->
-> On Wed, May 30, 2012 at 03:06:23PM -0300, Thiago Jung Bauermann wrote:
->> I have just upgraded my Dreamplug to the 3.4 kernel, and when creating
->> an LVM snapshot volume, I see errors for which I didn't find any report
->> yet:
->>
->> # lvcreate -s -L 80M -n root-fsck-snapshot marv2-vg/root
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
->>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
->>    Logical volume "root-fsck-snapshot" created
->>
->> Ironically, the main reason I upgraded the kernel from 3.0.0 was to get
->
-> I see similar errors on an IB-NAS6210 box. Apparently, lvm2 tries to
-> mlock/munlock all readable maps it finds in "proc/self/maps", i.e
-> also the "[vectors]" page.  Between 3.0 and 3.4 there has been the
-> change f9d4861f "ARM: 7294/1: vectors: use gate_vma for vectors user
-> mapping", which might have changed the behaviour when mlocking
-> vectors.
->
-> In LVM2, there is a list in lib/mm/memlock.c of maps to ignore:
->
-> /* list of maps, that are unconditionaly ignored */
-> static const char * const _ignore_maps[] = {
->      "[vdso]",
->      "[vsyscall]",
-> };
->
-> "[vdso]" seem to be based on gate_vma as well. Thus, I think
-> "[vectors]" needs to be added to this list.
+As omap1 and omap2 will never be compiled together, due to
+different compiler flags, so we can simply make
+cpu_class_is_omap2() = true, for all non-omap1 platforms.
 
-Opps - missed multilist posting - so again with all copies...
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/plat-omap/include/plat/cpu.h |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-Yep, looks like simple patch to add.
-Is there any other area which is missing ?
-
-Zdenek
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 14f050f..6a42558 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -374,8 +374,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+ /* Macros to detect if we have OMAP1 or OMAP2 */
+ #define cpu_class_is_omap1()	(cpu_is_omap7xx() || cpu_is_omap15xx() || \
+ 				cpu_is_omap16xx())
+-#define cpu_class_is_omap2()	(cpu_is_omap24xx() || cpu_is_omap34xx() || \
+-				cpu_is_omap44xx())
++#define cpu_class_is_omap2()	!cpu_class_is_omap1()
+ 
+ /* Various silicon revisions for omap2 */
+ #define OMAP242X_CLASS		0x24200024
+-- 
+1.7.0.4
