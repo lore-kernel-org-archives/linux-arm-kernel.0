@@ -1,32 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 11 Jun 2012 08:51:28 -0700
-Subject: [PATCH 01/14] rtc: ab8500-rtc: IRQF_ONESHOT when requesting a
- threaded IRQ
-In-Reply-To: <4FD610AE.7010001@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-2-git-send-email-lee.jones@linaro.org>
- <201206111531.20468.arnd@arndb.de> <4FD610AE.7010001@linaro.org>
-Message-ID: <20120611155128.GA18005@kroah.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 16:59:38 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <20120611153927.GY11439@opensource.wolfsonmicro.com>
+References: <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+ <20120611120820.GN11439@opensource.wolfsonmicro.com>
+ <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
+ <20120611142752.GS11439@opensource.wolfsonmicro.com>
+ <4FD605B5.2060300@linaro.org>
+ <20120611151459.GV11439@opensource.wolfsonmicro.com>
+ <4FD60C3A.1070703@linaro.org>
+ <20120611153927.GY11439@opensource.wolfsonmicro.com>
+Message-ID: <4FD615EA.2070002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 04:37:18PM +0100, Lee Jones wrote:
-> On 11/06/12 16:31, Arnd Bergmann wrote:
-> >On Monday 11 June 2012, Lee Jones wrote:
-> >>The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
-> >>
-> >>Cc: Alessandro Zummo<a.zummo@towertech.it>
-> >>Cc: rtc-linux at googlegroups.com
-> >>Signed-off-by: Lee Jones<lee.jones@linaro.org>
-> >
-> >Isn't this a bug fix that should be applied to the stable kernels too?
+On 11/06/12 16:39, Mark Brown wrote:
+> On Mon, Jun 11, 2012 at 04:18:18PM +0100, Lee Jones wrote:
 > 
-> Possibly. Should we alert Greg (CC'ed - alerted)?
+>> Were you happy with my answer on the other email too?
+> 
+> Not sure which e-mail you mean?
 
-<formletter>
+[PATCH 08/22] regulator: Change ab8500 match names to reflect Device Tree
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
-
-</formletter>
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515 
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
