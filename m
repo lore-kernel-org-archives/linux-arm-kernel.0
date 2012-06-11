@@ -1,9 +1,9 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 Jun 2012 18:53:00 +0200
-Subject: [PATCH v2 3/8] arm: mach-mvebu: add compilation/configuration change
+Date: Mon, 11 Jun 2012 18:52:58 +0200
+Subject: [PATCH v2 1/8] arm: mach-mvebu: add header
 In-Reply-To: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1339433585-28087-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1339433585-28087-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,54 +11,139 @@ Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/Kconfig  |   15 +++++++++++++++
- arch/arm/Makefile |    1 +
- 2 files changed, 16 insertions(+)
+ arch/arm/mach-mvebu/include/mach/debug-macro.S |   24 ++++++++++++++
+ arch/arm/mach-mvebu/include/mach/mvebu.h       |   22 +++++++++++++
+ arch/arm/mach-mvebu/include/mach/timex.h       |   13 ++++++++
+ arch/arm/mach-mvebu/include/mach/uncompress.h  |   41 ++++++++++++++++++++++++
+ 4 files changed, 100 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-mvebu/include/mach/mvebu.h
+ create mode 100644 arch/arm/mach-mvebu/include/mach/timex.h
+ create mode 100644 arch/arm/mach-mvebu/include/mach/uncompress.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 23289d2..2ff9f40 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -533,6 +533,19 @@ config ARCH_IXP4XX
- 	help
- 	  Support for Intel's IXP4XX (XScale) family of processors.
- 
-+config ARCH_MVEBU
-+	bool "Marvell SOCs with Device Tree support"
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
-+	select SPARSE_IRQ
-+	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
-+	select COMMON_CLK
-+	help
-+	  Support for the Marvell SoC Family with device tree support
+diff --git a/arch/arm/mach-mvebu/include/mach/debug-macro.S b/arch/arm/mach-mvebu/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..6da4fa1
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/debug-macro.S
+@@ -0,0 +1,24 @@
++/*
++ * Early serial output macro for Marvell  SoC
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select CPU_V7
-@@ -986,6 +999,8 @@ endchoice
- # Kconfigs may be included either alphabetically (according to the
- # plat- suffix) or along side the corresponding mach-* source.
- #
-+source "arch/arm/mach-mvebu/Kconfig"
++#include <mach/mvebu.h>
 +
- source "arch/arm/mach-at91/Kconfig"
- 
- source "arch/arm/mach-bcmring/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0298b00..f1a1a71 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -157,6 +157,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
- machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
- machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
- machine-$(CONFIG_ARCH_MXS)		:= mxs
-+machine-$(CONFIG_ARCH_MVEBU)		:= mvebu
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
- machine-$(CONFIG_ARCH_OMAP1)		:= omap1
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =MVEBU_REGS_PHYS_BASE
++	ldr	\rv, =MVEBU_REGS_VIRT_BASE
++	orr	\rp, \rp, #0x00012000
++	orr	\rv, \rv, #0x00012000
++	.endm
++
++#define UART_SHIFT	2
++#include <asm/hardware/debug-8250.S>
+diff --git a/arch/arm/mach-mvebu/include/mach/mvebu.h b/arch/arm/mach-mvebu/include/mach/mvebu.h
+new file mode 100644
+index 0000000..3496471
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/mvebu.h
+@@ -0,0 +1,22 @@
++/*
++ * Generic definitions for Marvell SoCs
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_MVEBU_H
++#define __MACH_MVEBU_H
++
++#define MVEBU_REGS_PHYS_BASE		0xd0000000
++#define MVEBU_REGS_VIRT_BASE		0xfeb00000
++#define MVEBU_REGS_SIZE		SZ_1M
++
++#endif /* __MACH_MVEBU_H */
+diff --git a/arch/arm/mach-mvebu/include/mach/timex.h b/arch/arm/mach-mvebu/include/mach/timex.h
+new file mode 100644
+index 0000000..ab324a3
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/timex.h
+@@ -0,0 +1,13 @@
++/*
++ * Marvell Armada SoC time definitions
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#define CLOCK_TICK_RATE		(100 * HZ)
+diff --git a/arch/arm/mach-mvebu/include/mach/uncompress.h b/arch/arm/mach-mvebu/include/mach/uncompress.h
+new file mode 100644
+index 0000000..3642997
+--- /dev/null
++++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
+@@ -0,0 +1,41 @@
++/*
++ * Marvell Armada SoC kernel uncompression UART routines
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <mach/mvebu.h>
++
++#define UART_THR ((volatile unsigned char *)(MVEBU_REGS_PHYS_BASE + 0x12000))
++#define UART_LSR ((volatile unsigned char *)(MVEBU_REGS_PHYS_BASE + 0x12014))
++
++#define LSR_THRE	0x20
++
++static void putc(const char c)
++{
++	int i;
++
++	for (i = 0; i < 0x1000; i++) {
++		/* Transmit fifo not full? */
++		if (*UART_LSR & LSR_THRE)
++			break;
++	}
++
++	*UART_THR = c;
++}
++
++static void flush(void)
++{
++}
++
++/*
++ * nothing to do
++ */
++#define arch_decomp_setup()
++#define arch_decomp_wdog()
 -- 
 1.7.9.5
