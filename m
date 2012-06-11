@@ -1,23 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 11:30:18 -0600
-Subject: [PATCH] ARM: Fix dts files w/ status property: "disable" ->
- "disabled"
-In-Reply-To: <1339427460-23007-1-git-send-email-stigge@antcom.de>
-References: <1339427460-23007-1-git-send-email-stigge@antcom.de>
-Message-ID: <4FD62B2A.2030600@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 11 Jun 2012 11:31:45 -0600 (MDT)
+Subject: [PATCH 2/2] Revert "ARM: OMAP2+: clockdomains: make {prm,
+ cm}_clkdm common"
+In-Reply-To: <1339433225-30042-3-git-send-email-b-cousson@ti.com>
+References: <1339433225-30042-1-git-send-email-b-cousson@ti.com>
+ <1339433225-30042-3-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1206111126521.5849@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 09:11 AM, Roland Stigge wrote:
-> This patches fixes some status = "disable" strings to "disabled", the correct
-> way of disabling nodes in the devicetree.
+On Mon, 11 Jun 2012, Benoit Cousson wrote:
+
+> Neither prm_clkdm nor cm_clkdm does exist on OMAP4.
+> Remove the common definition that does not make sense anymore
+> since it is not common for OMAP2+ platforms.
 > 
-> lpc32xx.dtsi is fixed separately in the LPC32xx patch set due to the many
-> changes there.
+> Please note that these clock domains are probably non existant
+> on OMAP 2 & 3 and thus should be removed in all the
+> clockdomain files.
 
-The Tegra parts,
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+For the archives:
 
-Are you intending this to be applied for 3.5? If so, that's fine. If
-not, splitting it up so I can take the Tegra parts through the Tegra
-tree would reduce the possibility of conflicts.
+http://marc.info/?l=linux-omap&m=133943578712129&w=2
+
+
+- Paul
