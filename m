@@ -1,225 +1,172 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 15:43:22 -0500
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
-Message-ID: <4FD6586A.9060706@ti.com>
+From: dmarlin@redhat.com (David Marlin)
+Date: Mon, 11 Jun 2012 15:44:50 -0500
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <4FD658C2.4030503@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
-> Create a minimal driver out of gpmc code.
-> Responsibilities handled by earlier gpmc
-> initialization is now achieved in probe.
+I noticed that you are using mach-mvebu in these patches.  I have seen 
+these machines referred to as 'armada', 'axp', 'armadaxp', etc.  Will 
+'mvebu' be the official machine name to use for these systems?  I'm 
+looking for a 'name' to identify the common kernel for these systems. 
+For reference, the names of the ARM kernels we are currently building in 
+Fedora include: 'highbank', 'imx', 'kirkwood', 'omap', and 'tegra'.
+
+
+Thank you,
+
+d.marlin
+===========
+
+
+Gregory CLEMENT wrote:
+> Arnd, Olof,
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |  170 ++++++++++++++++++++++++++++++++------------
->  1 file changed, 123 insertions(+), 47 deletions(-)
+> You'll find in this patch set the new version of the initial support for a
+> new family of ARMv7-compatible Marvell SoCs initially submitted by my
+> colleague Thomas Petazzoni. Following the conclusion of the discussion when
+> we submitted our first version we have chosen to add this support for this
+> SoC family in the to support in the arch/arm/mach-mvebu/ directory.
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 6dbddb9..a91f40f 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -24,6 +24,7 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
->  
->  #include <asm/mach-types.h>
->  #include <plat/gpmc.h>
-> @@ -31,6 +32,8 @@
->  
->  #include <plat/sdrc.h>
->  
-> +#define	DRIVER_NAME		"omap-gpmc"
-> +
->  /* GPMC register offsets */
->  #define GPMC_REVISION		0x00
->  #define GPMC_SYSCONFIG		0x10
-> @@ -115,6 +118,21 @@ struct omap3_gpmc_regs {
->  	struct gpmc_cs_config cs_context[GPMC_CS_NUM];
->  };
->  
-> +struct gpmc_peripheral {
-> +	char			*name;
-> +	int			id;
-> +	void			*pdata;
-> +	unsigned		pdata_size;
-> +	struct resource		*per_res;
-> +	unsigned		per_res_cnt;
-> +	struct resource		*gpmc_res;
-> +	unsigned		gpmc_res_cnt;
-> +	bool			have_waitpin;
-> +	bool			waitpin_polarity;
-> +	unsigned		waitpin;
-> +	struct platform_device	*pdev;
-> +};
-> +
->  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
->  static struct irq_chip gpmc_irq_chip;
->  static unsigned gpmc_irq_start;
-> @@ -124,6 +142,10 @@ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
->  static DEFINE_SPINLOCK(gpmc_mem_lock);
->  static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
->  static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
-> +static struct device *gpmc_dev;
-> +static u32 gpmc_revision;
-> +static int gpmc_irq;
-> +static resource_size_t phys_base, mem_size;
->  
->  static void __iomem *gpmc_base;
->  
-> @@ -433,6 +455,19 @@ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
->  	return r;
->  }
->  
-> +static int gpmc_cs_delete_mem(int cs)
-> +{
-> +	struct resource	*res = &gpmc_cs_mem[cs];
-> +	int r;
-> +
-> +	spin_lock(&gpmc_mem_lock);
-> +	r = release_resource(&gpmc_cs_mem[cs]);
-> +	res->start = res->end = 0;
-> +	spin_unlock(&gpmc_mem_lock);
-> +
-> +	return r;
-> +}
-> +
->  int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
->  {
->  	struct resource *res = &gpmc_cs_mem[cs];
-> @@ -769,7 +804,7 @@ static void gpmc_irq_noop(struct irq_data *data) { }
->  
->  static unsigned int gpmc_irq_noop_ret(struct irq_data *data) { return 0; }
->  
-> -static int gpmc_setup_irq(int gpmc_irq)
-> +static int gpmc_setup_irq(void)
->  {
->  	int i;
->  	u32 regval;
-> @@ -813,7 +848,37 @@ static int gpmc_setup_irq(int gpmc_irq)
->  	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
->  }
->  
-> -static void __init gpmc_mem_init(void)
-> +static __exit int gpmc_free_irq(void)
-> +{
-> +	int i;
-> +
-> +	if (gpmc_irq)
-> +		free_irq(gpmc_irq, NULL);
-> +
-> +	for (i = 0; i < GPMC_NR_IRQ; i++) {
-> +		irq_set_handler(gpmc_client_irq[i].irq, NULL);
-> +		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
-> +		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
-> +	}
-> +
-> +	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __devexit gpmc_mem_exit(void)
-> +{
-> +	int cs;
-> +
-> +	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
-> +		if (!gpmc_cs_mem_enabled(cs))
-> +			continue;
-> +		gpmc_cs_delete_mem(cs);
-> +	}
-> +
-> +}
-> +
-> +static void __devinit gpmc_mem_init(void)
->  {
->  	int cs;
->  	unsigned long boot_rom_space = 0;
-> @@ -840,64 +905,75 @@ static void __init gpmc_mem_init(void)
->  	}
->  }
->  
-> -static int __init gpmc_init(void)
-> +static __devinit int gpmc_probe(struct platform_device *pdev)
->  {
->  	u32 l;
-> -	int ret = -EINVAL;
-> -	int gpmc_irq;
-> -	char *ck = NULL;
-> -
-> -	if (cpu_is_omap24xx()) {
-> -		ck = "core_l3_ck";
-> -		if (cpu_is_omap2420())
-> -			l = OMAP2420_GPMC_BASE;
-> -		else
-> -			l = OMAP34XX_GPMC_BASE;
-> -		gpmc_irq = INT_34XX_GPMC_IRQ;
-> -	} else if (cpu_is_omap34xx()) {
-> -		ck = "gpmc_fck";
-> -		l = OMAP34XX_GPMC_BASE;
-> -		gpmc_irq = INT_34XX_GPMC_IRQ;
-> -	} else if (cpu_is_omap44xx()) {
-> -		ck = "gpmc_ck";
-> -		l = OMAP44XX_GPMC_BASE;
-> -		gpmc_irq = OMAP44XX_IRQ_GPMC;
-> -	}
-> +	struct resource *res;
->  
-> -	if (WARN_ON(!ck))
-> -		return ret;
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (res == NULL)
-> +		return -ENOENT;
->  
-> -	gpmc_l3_clk = clk_get(NULL, ck);
-> -	if (IS_ERR(gpmc_l3_clk)) {
-> -		printk(KERN_ERR "Could not get GPMC clock %s\n", ck);
-> -		BUG();
-> -	}
-> +	phys_base = res->start;
-> +	mem_size = resource_size(res);
->  
-> -	gpmc_base = ioremap(l, SZ_4K);
-> -	if (!gpmc_base) {
-> -		clk_put(gpmc_l3_clk);
-> -		printk(KERN_ERR "Could not get GPMC register memory\n");
-> -		BUG();
-> -	}
-> +	gpmc_base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!gpmc_base)
-> +		return -EADDRNOTAVAIL;
-> +
-> +	gpmc_dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (res == NULL)
-> +		dev_warn(gpmc_dev, "Failed to get resource: irq\n");
-> +	else
-> +		gpmc_irq = res->start;
->  
->  	clk_enable(gpmc_l3_clk);
->  
->  	l = gpmc_read_reg(GPMC_REVISION);
-> -	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
-> -	/* Set smart idle mode and automatic L3 clock gating */
-> -	l = gpmc_read_reg(GPMC_SYSCONFIG);
-> -	l &= 0x03 << 3;
-> -	l |= (0x02 << 3) | (1 << 0);
-> -	gpmc_write_reg(GPMC_SYSCONFIG, l);
-> +	gpmc_revision = (l >> 4) & 0xf;
-
-Why are you only storing the major part of the rev? Why not keep both parts?
-
-> +	dev_info(gpmc_dev, "GPMC revision %d.%d\n", gpmc_revision, l & 0x0f);
-
-Nit-pick, please add a mask and shift definition for the revision
-register major and minor fields and use these above.
-
-Thanks
-Jon
+> As for the previous release, both the Armada 370 and the Armada XP SoCs are
+> supported in this directory, and we are able to build a single kernel image
+> that boots on both SoCs. Both SoCs use the PJ4B processor, a
+> Marvell-developed ARM core that implements the ARMv7 instruction set. We are
+> currently using Marvell evaluation boards for both of those SoCs, and the
+> support for those boards is added in this patch set.
+> 
+> We remained focused on a limited preliminary support which only includes the
+> necessary code for timer and IRQ support, the serial controller is a
+> standard 16550-compatible one. The diffstat looks like:
+> 
+>  Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt  |   23 +
+>  Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt |   11 +
+>  Documentation/devicetree/bindings/arm/armada_370_xp.txt       |   24 +
+>  MAINTAINERS                                                   |    8 +
+>  arch/arm/Kconfig                                              |   15 +
+>  arch/arm/Makefile                                             |    1 +
+>  arch/arm/boot/dts/armada-370-db.dts                           |   41 ++
+>  arch/arm/boot/dts/armada-370-xp.dtsi                          |   66 +++
+>  arch/arm/boot/dts/armada-370.dtsi                             |   29 +
+>  arch/arm/boot/dts/armada-xp-db.dts                            |   40 ++
+>  arch/arm/boot/dts/armada-xp.dtsi                              |   49 ++
+>  arch/arm/configs/mvebu_defconfig                              |   47 ++
+>  arch/arm/mach-mvebu/Kconfig                                   |   14 +
+>  arch/arm/mach-mvebu/Makefile                                  |    2 +
+>  arch/arm/mach-mvebu/Makefile.boot                             |    1 +
+>  arch/arm/mach-mvebu/armada-370-xp-dt.c                        |   65 +++
+>  arch/arm/mach-mvebu/common.c                                  |   36 ++
+>  arch/arm/mach-mvebu/common.h                                  |   24 +
+>  arch/arm/mach-mvebu/include/mach/armada-370-xp.h              |   22 +
+>  arch/arm/mach-mvebu/include/mach/debug-macro.S                |   24 +
+>  arch/arm/mach-mvebu/include/mach/mvebu.h                      |   22 +
+>  arch/arm/mach-mvebu/include/mach/timex.h                      |   13 +
+>  arch/arm/mach-mvebu/include/mach/uncompress.h                 |   41 ++
+>  arch/arm/mach-mvebu/irq-armada-370-xp.c                       |  133 +++++
+>  arch/arm/mach-mvebu/time-armada-370-xp.c                      |  244 +++++++++
+>  25 files changed, 995 insertions(+)
+> 
+> This patch set, and the support for those SoCs, started as a collaborative
+> effort from Marvell engineers (who have done the initial development work)
+> and Free Electrons engineers (who are reshaping the code for mainline
+> submission, adding device tree support, etc.). And for this new version we
+> got contributions from Ben Dooks from Codethink.
+> 
+> The patch set is based on your arm-soc/for-next branch (updated on Monday
+> 11th June).
+> 
+> The main change between V1 and V2 is the use of a new mach-mvebu directory
+> as this directory is aimed to receive most of the Marvell SOC converted to
+> the device tree, we intended to make the code less specific. The other main
+> part was to remove all the unnecessary code or even files.
+> 
+> Here comes a pretty exhaustive list of the changes:
+> 
+> * Created a new mach- directory called mach-mvebu as suggested on the
+>  mainling-list. Converted most the "armada" word by the "mvebu", but as some
+>  code remains specific to the armada 370 and armada XP SOC, then created
+>  also the aramada_370_xp suffix for this part. This suffix was dedicated for
+>  the irq and timer part. It was also used for the register related to the
+>  reset part. And of course it was also used for the device tree part.
+> 
+> * Merged axp-dt.c and a370-dt.c files in one single armada_370_xp-dt.c file.
+> 
+> * Deleted most of the mapping address in include/mach/armada.h and split it
+>   in two headers file:
+> 
+>   - mvebu.h which contains the virtual and physical mapping for the internal
+>     registers of the mvebu SOC. This ones are mainly used for the early
+>     print during boot.
+> 
+>   - armada_370_xp which contains the registers offset and mask for resetting
+>     the CPU.
+> 
+> * Removed unused headers such as
+>   - hardware.h by directly including accurate header when needed
+>   - gpio.h by removing the dependencies to PLAT-ORION
+>   - io.h no more needed for CPI
+>   - irqs.h by using SPARSE_IRQ
+>   - system.h no more needed for new SOC
+> 
+> * Removed the PCI related code as it was not necessary for the initial
+>   submission
+> 
+> * Removed all the PLAT-ORION dependencies remaining
+> 
+> * Ensured property reading checks for error when getting data from device
+>   tree in the timer file. This was a patch from Ben Dooks with the following
+>   comments:
+> 
+>   "The call to of_property_read_u32() only checks for the value that the clk
+>    variable is set to being non-zero, and not the return value of the call
+>    itself.
+> 
+>    This caused a system without the clock-frequency attribute to fail to
+>    boot as it used a random value on the stack to setup the system timers
+>    and thus cause an interrupt storm.
+> 
+>    Also ensure clk is set to zero, to avoid warnings."
+> 
+> * Converted irq.c to use SPARSE_IRQ
+> 
+> * Added the following bug fixes and improvements in irq.c from Ben Dooks
+>   
+>   - MPIC: BUG_ON() if the of_iomap() fails: Ensure that if either resource
+>     is missing, we stop the kernel in a reasonably fatal way.
+> 
+>   - MPIC: Move main register base to base of MPIC registers: The current
+>     kernel driver had the MPIC base at the base of the block containing the
+>     MPIC and not the MPIC itself. Change this value in the driver and the
+>     .dtsi file
+> 
+> 	Also change the register size in the .dtsi to be the size of the
+> 	register range for the MIPC and not the block it is in.
+> 
+>   - MPIC: Move per-cpu register base: The current kernel driver had the MPIC
+>   	per-cpu register base at the base of the per-cpu register block and not
+>   	at the base of the specific per-cpu interrupt registers.
+> 
+> 	Move the driver and .dtsi to use the correct base and size.
+> 
+>   - MPIC: number fetch should use irqd_to_hwirq(): The mask and unmask
+>   	routines are assuming that d->irq is a 1:1 mapping with the interrupt
+>   	hardware. Use the irqd_to_hwirq() call to map the irq_data to the
+>   	hardware irq number directly.
+> 
+>   - MPIC: read number of interrupts from control register: Read the number
+>    	of MPIC interrupts from the controller and only register that many.
+> 
+> Andrew Lunn asked for refactoring the _restart() function to being used by
+> any MVEBU SOC, but we didn't find a nice way to do it. Indeed the registers
+> mapping differs between the SOC and the bit mask too. A solution could be to
+> get this mapping through the device tree, but we are not sure it was a good
+> usage of the device tree.
+> 
+> 
+> Best regards,
+> 
+> Gregory Clement
