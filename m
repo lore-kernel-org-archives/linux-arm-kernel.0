@@ -1,34 +1,126 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jun 2012 23:15:00 +0800
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <4FD605B5.2060300@linaro.org>
-References: <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
- <4FD5D49C.6070106@linaro.org>
- <20120611120820.GN11439@opensource.wolfsonmicro.com>
- <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
- <20120611142752.GS11439@opensource.wolfsonmicro.com>
- <4FD605B5.2060300@linaro.org>
-Message-ID: <20120611151459.GV11439@opensource.wolfsonmicro.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 11 Jun 2012 20:29:52 +0530
+Subject: [PATCH 7/9] ARM: OMAP2+: gpmc-smsc911x: runtime time calculation
+In-Reply-To: <cover.1339419379.git.afzal@ti.com>
+References: <cover.1339419379.git.afzal@ti.com>
+Message-ID: <54a062928c5018dfe1613d8247ab79e9d688e138.1339419379.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 03:50:29PM +0100, Lee Jones wrote:
-> On 11/06/12 15:27, Mark Brown wrote:
+OMAP Peripherals using SMSC911X driver were not configured
+in Kernel. Here timing has been calculated so that it is
+runtime configurable. As different SMSC devices like 9115,
+9220, 9221 can be used with smsc911x driver, option has been
+given for the boards to provide timing as per the part used,
+if it is not provided, default one used is that of 9220.
 
-> >It'll merge out fine, it's just icky having the same thing appear twice
-> >in history.  Not the end of the world.
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/gpmc-smsc911x.c             |   53 +++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   14 ++++++
+ 2 files changed, 67 insertions(+)
 
-> Understood. So does this mean you will to push them into the -rcs?
-
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/cca0d1ca/attachment-0001.sig>
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index 93a534e..4bfe721 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -100,6 +100,53 @@ free1:
+ 	pr_err("Could not initialize smsc911x device\n");
+ }
+ 
++static void gpmc_smsc911x_timing(struct gpmc_time_ctrl *time_ctrl,
++					struct smsc911x_timing *timing)
++{
++	struct gpmc_timings t;
++	/* SMSC 9220 timings */
++	unsigned tcycle_r = 165;
++	unsigned tcsl_r = 32;
++	unsigned tcsh_r = 133;
++	unsigned tcsdv_r = 30;
++	unsigned tdoff_r = 9;
++	unsigned tcycle_w = 165;
++	unsigned tcsl_w = 32;
++	unsigned tcsh_w = 133;
++	unsigned tdsu_w = 7;
++
++	/* take timings from board, else use default */
++	if (timing) {
++		tcycle_r = timing->tcycle_r;
++		tcsl_r = timing->tcsl_r;
++		tcsh_r = timing->tcsh_r;
++		tcsdv_r = timing->tcsdv_r;
++		tdoff_r = tdoff_r;
++		tcycle_w = timing->tcycle_r;
++		tcsl_w = timing->tcsl_w;
++		tcsh_w = timing->tcsh_w;
++		tdsu_w = timing->tdsu_w;
++	}
++
++	memset(&t, sizeof(t), 0);
++
++	t.cs_on = 0;
++	t.oe_on = 0;
++	t.access = tcsdv_r;
++	t.oe_off = max_t(unsigned, t.access + gpmc_ticks_to_ns(1), tcsl_r);
++	t.cs_rd_off = t.oe_off;
++	t.rd_cycle = tcsl_r + max(tcsh_r, tdoff_r);
++	t.rd_cycle = max_t(unsigned, tcycle_r, t.rd_cycle);
++
++	t.we_on = 0;
++	t.we_off = max(tcsl_w, tdsu_w);
++	t.cs_wr_off = t.we_off;
++	t.wr_cycle = max_t(unsigned, t.we_off + gpmc_ticks_to_ns(1), tcycle_w);
++
++	time_ctrl->type = has_period;
++	time_ctrl->timings = t;
++}
++
+ struct gpmc_device_pdata *
+ __init gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
+ {
+@@ -127,6 +174,12 @@ __init gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
+ 	gpmc_cs->cs = gpmc_cfg->cs;
+ 	gpmc_cs->mem_size = 0x100;
+ 
++	gpmc_cs->have_config = true;
++	gpmc_cs->config = GPMC_CONFIG1_DEVICESIZE_16 |
++		GPMC_CONFIG1_DEVICETYPE_NOR;
++
++	gpmc_smsc911x_timing(&gpmc_cs->time_ctrl, gpmc_cfg->timing);
++
+ 	gpmc_pdev->per_res = gpmc_smsc911x_resources + 1;
+ 	gpmc_pdev->per_res_cnt = 1;
+ 
+diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+index 50af49e..8be3343 100644
+--- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
++++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
+@@ -13,12 +13,26 @@
+ 
+ #ifndef __ASM_ARCH_OMAP_GPMC_SMSC911X_H__
+ 
++/* timing in ns */
++struct smsc911x_timing {
++	unsigned tcycle_r;
++	unsigned tcsl_r;
++	unsigned tcsh_r;
++	unsigned tcsdv_r;
++	unsigned tdoff_r;
++	unsigned tcycle_w;
++	unsigned tcsl_w;
++	unsigned tcsh_w;
++	unsigned tdsu_w;
++};
++
+ struct omap_smsc911x_platform_data {
+ 	int	id;
+ 	int	cs;
+ 	int	gpio_irq;
+ 	int	gpio_reset;
+ 	u32	flags;
++	struct smsc911x_timing *timing;
+ };
+ 
+ #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+-- 
+1.7.10.2
