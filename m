@@ -1,24 +1,55 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Mon, 11 Jun 2012 14:19:52 +0200
-Subject: am33xx: pin modes
-Message-ID: <4FD5E268.7030105@visionsystems.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 11 Jun 2012 14:27:34 +0200
+Subject: [PATCH 1/1] ARM: dma-mapping: Add missing static storage class
+ specifier
+In-Reply-To: <1338805092-892-1-git-send-email-sachin.kamat@linaro.org>
+References: <1338805092-892-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <03f301cd47cd$969aaf40$c3d00dc0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm working with Koen's repo (https://github.com/koenkooi/linux.git) and have a question. There are two places, where pin's function is defined:
+Hi,
 
+On Monday, June 04, 2012 12:18 PM Sachin Kamat wrote:
 
-arch/arm/mach-omap2/mux33xx.c:
-static struct omap_mux __initdata am33xx_muxmodes[] = {
-/**/    _AM33XX_MUXENTRY(GPMC_AD0, 0,
-                "gpmc_ad0", "mmc1_dat0", NULL, NULL,
-                NULL, NULL, NULL, "gpio1_0"),
+> Fixes the following sparse warnings:
+> arch/arm/mm/dma-mapping.c:231:15: warning: symbol 'consistent_base' was not declared. Should
+> it be static?
+> arch/arm/mm/dma-mapping.c:326:8: warning: symbol 'coherent_pool_size' was not declared. Should
+> it be static?
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 
+Thanks for the patch. I've applied it to my dma-mapping fixes branch.
 
-arch/arm/mach-omap2/board-am335xevm.c:
-{"mdio_data.mdio_data", OMAP_MUX_MODE0 | AM33XX_PIN_INPUT_PULLUP},
+> ---
+>  arch/arm/mm/dma-mapping.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index ea6b431..788acb7 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -228,7 +228,7 @@ static pte_t **consistent_pte;
+> 
+>  #define DEFAULT_CONSISTENT_DMA_SIZE SZ_2M
+> 
+> -unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
+> +static unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
+> 
+>  void __init init_consistent_dma_size(unsigned long size)
+>  {
+> @@ -323,7 +323,7 @@ static struct arm_vmregion_head coherent_head = {
+>  	.vm_list	= LIST_HEAD_INIT(coherent_head.vm_list),
+>  };
+> 
+> -size_t coherent_pool_size = DEFAULT_CONSISTENT_DMA_SIZE / 8;
+> +static size_t coherent_pool_size = DEFAULT_CONSISTENT_DMA_SIZE / 8;
+> 
+>  static int __init early_coherent_pool(char *p)
+>  {
 
-Is it redundant or OMAP_MUX_x is the only one that changes pins function?
-
-Regards,
-Yegor
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
