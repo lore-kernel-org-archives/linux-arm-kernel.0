@@ -1,128 +1,144 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 21:44:51 +0200
-Subject: [PATCH RESEND v4] input: keyboard: Add keys driver for the LPC32xx SoC
-Message-ID: <1339443891-15197-1-git-send-email-stigge@antcom.de>
+Date: Mon, 11 Jun 2012 21:51:50 +0200
+Subject: [PATCH v7] MTD: LPC32xx MLC NAND driver
+Message-ID: <1339444310-15281-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a driver for the key scan interface of the LPC32xx SoC
+This patch adds a driver for the MLC NAND controller of the LPC32xx SoC.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-For the DT binding: Acked-by: Rob Herring <rob.herring@calxeda.con>
+Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
 ---
-Applies to v3.5-rc2
+Applies to v3.5-rc2 + LPC32xx SLC NAND driver (Kconfig + Makefile)
+
+Changes since v6:
+* Kconfig: select amba dma driver
+* Make wp_gpio optional by ignoring gpio if property is missing
+
+Changes since v5:
+* Renamed: lpc32xx_nand_mlc.c -> lpc32xx_mlc.c
+
+Changes since v4:
+* This patch erroneously changed Kconfig of the _other_ NAND (SLC) driver from
+  "bool" to "tristate". Moved this fix to the actual SLC driver patch.
 
 Changes since v3:
-* Make driver DT-only since LPC32xx is converted to DT anyway now.
-* Use MATRIX_SCAN_CODE()
-* Use matrix_keypad_build_keymap()
-* Emit MSC_SCAN also
-* Use PTR_ERR() on error handling
-* Rename return value to error
-* Removed unnecessary '&' on initializations with function pointers
-* Use CONFIG_PM_SLEEP, dev_pm_ops, SIMPLE_DEV_PM_OPS instead of CONFIG_PM
-* Removed devm_*() management
-* Re-enabled clock for period of probe()
+* Dropped superfluous error handling of dmaengine_submit()
+* Added unmapping of dma sg buffers
 
 Changes since v2:
-* Fixed case of lpc32XX_* -> lpc32xx_*
-* Removed unnecessary casts
-* Removed unnecessary unlikely()
-* Use unsigned for key bits
-* Included Russell's lpc32xx_mod_states() algorithm change suggestion
-* Replaced (res == NULL) with (!res)
-* clk_enable() -> clk_prepare_enable()
-* Moved clk_prepare_enable() and clk_disable_unprepare() to input's
-  open()/close() callbacks to save power
-* Handle clk_prepare_enable() return value appropriately
-* DT: Use "keypad,num-rows", "keypad,num-columns" and "linux,keymap" properties
+* Adjusted to mtd API changes
 
 Changes since v1:
-* Removed devm_kfree(), lpc32XX_free_dt(), iounmap(), release_mem_region()
-* Changed __raw_writel()+__raw_readl() to writel()+readl()
+* Factored out dmaengine_slave_config() to dma_setup() function in probe()
+* Fixed dma data direction and dma transfer direction differences
+* Removed dma_sync_sg_for_cpu() - not necessary due to unmap
+* Removed dma_set_mask()
 
-Thanks to Axel Lin, Russell King, Rob Herring and Dmitry Torokhov for
-reviewing!
+Thanks to Alexandre Pereira da Silva and Russell King for reviewing and testing!
 
- Documentation/devicetree/bindings/input/lpc32xx-key.txt |   28 +
- drivers/input/keyboard/Kconfig                          |   10 
- drivers/input/keyboard/Makefile                         |    1 
- drivers/input/keyboard/lpc32xx-keys.c                   |  377 ++++++++++++++++
- 4 files changed, 416 insertions(+)
+ Documentation/devicetree/bindings/mtd/lpc32xx-mlc.txt |   50 
+ drivers/mtd/nand/Kconfig                              |   12 
+ drivers/mtd/nand/Makefile                             |    1 
+ drivers/mtd/nand/lpc32xx_mlc.c                        |  966 ++++++++++++++++++
+ 4 files changed, 1029 insertions(+)
 
 --- /dev/null
-+++ linux-2.6/Documentation/devicetree/bindings/input/lpc32xx-key.txt
-@@ -0,0 +1,28 @@
-+NXP LPC32xx Key Scan Interface
++++ linux-2.6/Documentation/devicetree/bindings/mtd/lpc32xx-mlc.txt
+@@ -0,0 +1,50 @@
++NXP LPC32xx SoC NAND MLC controller
 +
-+Required Properties:
-+- compatible: Should be "nxp,lpc3220-key"
-+- reg: Physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: The interrupt number to the cpu.
-+- keypad,num-rows: Number of rows and columns, e.g. 1: 1x1, 6: 6x6
-+- keypad,num-columns: Must be equal to keypad,num-rows since LPC32xx only
-+  supports square matrices
-+- nxp,debounce-delay-ms: Debounce delay in ms
-+- nxp,scan-delay-ms: Repeated scan period in ms
-+- linux,keymap: the key-code to be reported when the key is pressed
-+  and released, see also
-+  Documentation/devicetree/bindings/input/matrix-keymap.txt
++Required properties:
++- compatible: "nxp,lpc3220-mlc"
++- reg: Address and size of the controller
++- interrupts: The NAND interrupt specification
++- gpios: GPIO specification for NAND write protect
++
++The following required properties are very controller specific. See the LPC32xx
++User Manual 7.5.14 MLC NAND Timing Register (the values here are specified in
++Hz, to make them independent of actual clock speed and to provide for good
++accuracy:)
++- nxp,tcea_delay: TCEA_DELAY
++- nxp,busy_delay: BUSY_DELAY
++- nxp,nand_ta: NAND_TA
++- nxp,rd_high: RD_HIGH
++- nxp,rd_low: RD_LOW
++- nxp,wr_high: WR_HIGH
++- nxp,wr_low: WR_LOW
++
++Optional subnodes:
++- Partitions, see Documentation/devicetree/bindings/mtd/partition.txt
 +
 +Example:
 +
-+	key at 40050000 {
-+		compatible = "nxp,lpc3220-key";
-+		reg = <0x40050000 0x1000>;
-+		interrupts = <54 0>;
-+		keypad,num-rows = <1>;
-+		keypad,num-columns = <1>;
-+		nxp,debounce-delay-ms = <3>;
-+		nxp,scan-delay-ms = <34>;
-+		linux,keymap = <0x00000002>;
++	mlc: flash at 200A8000 {
++		compatible = "nxp,lpc3220-mlc";
++		reg = <0x200A8000 0x11000>;
++		interrupts = <11 0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		nxp,tcea-delay = <333333333>;
++		nxp,busy-delay = <10000000>;
++		nxp,nand-ta = <18181818>;
++		nxp,rd-high = <31250000>;
++		nxp,rd-low = <45454545>;
++		nxp,wr-high = <40000000>;
++		nxp,wr-low = <83333333>;
++		gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
++
++		mtd0 at 00000000 {
++			label = "boot";
++			reg = <0x00000000 0x00064000>;
++			read-only;
++		};
++
++		...
++
 +	};
---- linux-2.6.orig/drivers/input/keyboard/Kconfig
-+++ linux-2.6/drivers/input/keyboard/Kconfig
-@@ -332,6 +332,16 @@ config KEYBOARD_LOCOMO
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called locomokbd.
+--- linux-2.6.orig/drivers/mtd/nand/Kconfig
++++ linux-2.6/drivers/mtd/nand/Kconfig
+@@ -465,6 +465,18 @@ config MTD_NAND_SLC_LPC32XX
+ 	  Please check the actual NAND chip connected and its support
+ 	  by the SLC NAND controller.
  
-+config KEYBOARD_LPC32XX
-+	tristate "LPC32XX matrix key scanner support"
-+	depends on ARCH_LPC32XX && OF
-+	help
-+	  Say Y here if you want to use NXP LPC32XX SoC key scanner interface,
-+	  connected to a key matrix.
++config MTD_NAND_MLC_LPC32XX
++       tristate "NXP LPC32xx MLC Controller"
++       depends on ARCH_LPC32XX
++       select AMBA_PL08X
++       help
++         Uses the LPC32XX MLC (i.e. for Multi Level Cell chips) NAND
++         controller. This is the default for the WORK92105 controller
++         board.
 +
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called lpc32xx-keys.
++         Please check the actual NAND chip connected and its support
++         by the MLC NAND controller.
 +
- config KEYBOARD_MAPLE
- 	tristate "Maple bus keyboard"
- 	depends on SH_DREAMCAST && MAPLE
---- linux-2.6.orig/drivers/input/keyboard/Makefile
-+++ linux-2.6/drivers/input/keyboard/Makefile
-@@ -26,6 +26,7 @@ obj-$(CONFIG_KEYBOARD_LKKBD)		+= lkkbd.o
- obj-$(CONFIG_KEYBOARD_LM8323)		+= lm8323.o
- obj-$(CONFIG_KEYBOARD_LM8333)		+= lm8333.o
- obj-$(CONFIG_KEYBOARD_LOCOMO)		+= locomokbd.o
-+obj-$(CONFIG_KEYBOARD_LPC32XX)		+= lpc32xx-keys.o
- obj-$(CONFIG_KEYBOARD_MAPLE)		+= maple_keyb.o
- obj-$(CONFIG_KEYBOARD_MATRIX)		+= matrix_keypad.o
- obj-$(CONFIG_KEYBOARD_MAX7359)		+= max7359_keypad.o
+ config MTD_NAND_CM_X270
+ 	tristate "Support for NAND Flash on CM-X270 modules"
+ 	depends on MACH_ARMCORE
+--- linux-2.6.orig/drivers/mtd/nand/Makefile
++++ linux-2.6/drivers/mtd/nand/Makefile
+@@ -41,6 +41,7 @@ obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_
+ obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
+ obj-$(CONFIG_MTD_NAND_SLC_LPC32XX)      += lpc32xx_slc.o
++obj-$(CONFIG_MTD_NAND_MLC_LPC32XX)      += lpc32xx_mlc.o
+ obj-$(CONFIG_MTD_NAND_SH_FLCTL)		+= sh_flctl.o
+ obj-$(CONFIG_MTD_NAND_MXC)		+= mxc_nand.o
+ obj-$(CONFIG_MTD_NAND_SOCRATES)		+= socrates_nand.o
 --- /dev/null
-+++ linux-2.6/drivers/input/keyboard/lpc32xx-keys.c
-@@ -0,0 +1,377 @@
++++ linux-2.6/drivers/mtd/nand/lpc32xx_mlc.c
+@@ -0,0 +1,966 @@
 +/*
-+ * NXP LPC32xx SoC Key Scan Interface
++ * Driver for NAND MLC Controller in LPC32xx
 + *
-+ * Authors:
-+ *    Kevin Wells <kevin.wells@nxp.com>
-+ *    Roland Stigge <stigge@antcom.de>
++ * Author: Roland Stigge <stigge@antcom.de>
 + *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ * Copyright (C) 2012 Roland Stigge
++ * Copyright (C) 2011 WORK Microwave GmbH
++ * Copyright (C) 2011, 2012 Roland Stigge
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -135,359 +151,950 @@ reviewing!
 + * GNU General Public License for more details.
 + *
 + *
-+ * This controller supports square key matrices from 1x1 up to 8x8
++ * NAND Flash Controller Operation:
++ * - Read: Auto Decode
++ * - Write: Auto Encode
++ * - Page Size: Large Page (2112 Bytes) only for now
 + */
 +
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
 +#include <linux/slab.h>
-+#include <linux/irq.h>
-+#include <linux/pm.h>
++#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/input.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
 +#include <linux/clk.h>
-+#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/completion.h>
++#include <linux/interrupt.h>
 +#include <linux/of.h>
-+#include <linux/input/matrix_keypad.h>
++#include <linux/of_mtd.h>
++#include <linux/of_gpio.h>
++#include <linux/amba/pl08x.h>
++#include <linux/io.h>
++#include <linux/mm.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++#include <linux/mtd/nand_ecc.h>
 +
-+#define DRV_NAME				"lpc32xx_keys"
++#define DRV_NAME "lpc32xx_mlc"
 +
-+/*
-+ * Key scanner register offsets
-+ */
-+#define LPC32XX_KS_DEB(x)			((x) + 0x00)
-+#define LPC32XX_KS_STATE_COND(x)		((x) + 0x04)
-+#define LPC32XX_KS_IRQ(x)			((x) + 0x08)
-+#define LPC32XX_KS_SCAN_CTL(x)			((x) + 0x0C)
-+#define LPC32XX_KS_FAST_TST(x)			((x) + 0x10)
-+#define LPC32XX_KS_MATRIX_DIM(x)		((x) + 0x14) /* 1..8 */
-+#define LPC32XX_KS_DATA(x, y)			((x) + 0x40 + ((y) << 2))
++#define NAND_LARGE_BLOCK_PAGE_SIZE      2048
++#define NAND_SMALL_BLOCK_PAGE_SIZE      512
 +
-+#define LPC32XX_KSCAN_DEB_NUM_DEB_PASS(n)	((n) & 0xFF)
++#define NAND_ERASED_BLOCK_ECC_VALUE	0xFFFFFFFF
 +
-+#define LPC32XX_KSCAN_SCOND_IN_IDLE		0x0
-+#define LPC32XX_KSCAN_SCOND_IN_SCANONCE		0x1
-+#define LPC32XX_KSCAN_SCOND_IN_IRQGEN		0x2
-+#define LPC32XX_KSCAN_SCOND_IN_SCAN_MATRIX	0x3
++/**********************************************************************
++* MLC NAND controller register offsets
++**********************************************************************/
 +
-+#define LPC32XX_KSCAN_IRQ_PENDING_CLR		0x1
++#define MLC_BUFF(x)			(x + 0x00000)
++#define MLC_DATA(x)			(x + 0x08000)
++#define MLC_CMD(x)			(x + 0x10000)
++#define MLC_ADDR(x)			(x + 0x10004)
++#define MLC_ECC_ENC_REG(x)		(x + 0x10008)
++#define MLC_ECC_DEC_REG(x)		(x + 0x1000C)
++#define MLC_ECC_AUTO_ENC_REG(x)		(x + 0x10010)
++#define MLC_ECC_AUTO_DEC_REG(x)		(x + 0x10014)
++#define MLC_RPR(x)			(x + 0x10018)
++#define MLC_WPR(x)			(x + 0x1001C)
++#define MLC_RUBP(x)			(x + 0x10020)
++#define MLC_ROBP(x)			(x + 0x10024)
++#define MLC_SW_WP_ADD_LOW(x)		(x + 0x10028)
++#define MLC_SW_WP_ADD_HIG(x)		(x + 0x1002C)
++#define MLC_ICR(x)			(x + 0x10030)
++#define MLC_TIME_REG(x)			(x + 0x10034)
++#define MLC_IRQ_MR(x)			(x + 0x10038)
++#define MLC_IRQ_SR(x)			(x + 0x1003C)
++#define MLC_LOCK_PR(x)			(x + 0x10044)
++#define MLC_ISR(x)			(x + 0x10048)
++#define MLC_CEH(x)			(x + 0x1004C)
 +
-+#define LPC32XX_KSCAN_SCTRL_SCAN_DELAY(n)	((n) & 0xFF)
++/**********************************************************************
++* MLC_CMD bit definitions
++**********************************************************************/
++#define MLCCMD_RESET			0xFF
 +
-+#define LPC32XX_KSCAN_FTST_FORCESCANONCE	0x1
-+#define LPC32XX_KSCAN_FTST_USE32K_CLK		0x2
++/**********************************************************************
++* MLC_ICR bit definitions
++**********************************************************************/
++#define MLCICR_WPROT			(1 << 3)
++#define MLCICR_LARGEBLOCK		(1 << 2)
++#define MLCICR_LONGADDR			(1 << 1)
++#define MLCICR_16BIT			(1 << 0)  /* unsupported by LPC32x0! */
 +
-+#define LPC32XX_KSCAN_MSEL_SELECT(n)		((n) & 0xF)
++/**********************************************************************
++* MLC_TIME_REG bit definitions
++**********************************************************************/
++#define MLCTIMEREG_TCEA_DELAY(n)	(((n) & 0x03) << 24)
++#define MLCTIMEREG_BUSY_DELAY(n)	(((n) & 0x1F) << 19)
++#define MLCTIMEREG_NAND_TA(n)		(((n) & 0x07) << 16)
++#define MLCTIMEREG_RD_HIGH(n)		(((n) & 0x0F) << 12)
++#define MLCTIMEREG_RD_LOW(n)		(((n) & 0x0F) << 8)
++#define MLCTIMEREG_WR_HIGH(n)		(((n) & 0x0F) << 4)
++#define MLCTIMEREG_WR_LOW(n)		(((n) & 0x0F) << 0)
 +
-+/*
-+ * Key scanner configuration structure
-+ */
-+struct lpc32xx_kscan_cfg {
-+	u32 matrix_sz;		/* Size of matrix in XxY, ie. 3 = 3x3 */
-+	unsigned short *keymap;	/* Pointer to key map for the scan matrix */
-+	u32 deb_clks;		/* Debounce clocks (based on 32KHz clock) */
-+	u32 scan_delay;		/* Scan delay (based on 32KHz clock) */
-+	int row_shift;
++/**********************************************************************
++* MLC_IRQ_MR and MLC_IRQ_SR bit definitions
++**********************************************************************/
++#define MLCIRQ_NAND_READY		(1 << 5)
++#define MLCIRQ_CONTROLLER_READY		(1 << 4)
++#define MLCIRQ_DECODE_FAILURE		(1 << 3)
++#define MLCIRQ_DECODE_ERROR		(1 << 2)
++#define MLCIRQ_ECC_READY		(1 << 1)
++#define MLCIRQ_WRPROT_FAULT		(1 << 0)
++
++/**********************************************************************
++* MLC_LOCK_PR bit definitions
++**********************************************************************/
++#define MLCLOCKPR_MAGIC			0xA25E
++
++/**********************************************************************
++* MLC_ISR bit definitions
++**********************************************************************/
++#define MLCISR_DECODER_FAILURE		(1 << 6)
++#define MLCISR_ERRORS			((1 << 4) | (1 << 5))
++#define MLCISR_ERRORS_DETECTED		(1 << 3)
++#define MLCISR_ECC_READY		(1 << 2)
++#define MLCISR_CONTROLLER_READY		(1 << 1)
++#define MLCISR_NAND_READY		(1 << 0)
++
++/**********************************************************************
++* MLC_CEH bit definitions
++**********************************************************************/
++#define MLCCEH_NORMAL			(1 << 0)
++
++struct lpc32xx_nand_cfg_mlc {
++	u32 tcea_delay;
++	u32 busy_delay;
++	u32 nand_ta;
++	u32 rd_high;
++	u32 rd_low;
++	u32 wr_high;
++	u32 wr_low;
++	unsigned wp_gpio;
++	struct mtd_partition *parts;
++	unsigned num_parts;
 +};
 +
-+struct lpc32xx_kscan_drv {
-+	struct input_dev *input;
-+	struct lpc32xx_kscan_cfg *kscancfg;
-+	struct clk *clk;
-+	void __iomem *kscan_base;
-+	int irq;
-+	u8 lastkeystates[8];
-+	u32 io_p_start;
-+	u32 io_p_size;
++static struct nand_ecclayout lpc32xx_nand_oob = {
++	.eccbytes = 40,
++	.eccpos = { 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
++		   22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
++		   38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
++		   54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
++	.oobfree = {
++		{ .offset = 0,
++		  .length = 6, },
++		{ .offset = 16,
++		  .length = 6, },
++		{ .offset = 32,
++		  .length = 6, },
++		{ .offset = 48,
++		  .length = 6, },
++		},
 +};
 +
-+static void lpc32xx_mod_states(struct lpc32xx_kscan_drv *kscandat, int col)
++static struct nand_bbt_descr lpc32xx_nand_bbt = {
++	.options = NAND_BBT_ABSPAGE | NAND_BBT_2BIT | NAND_BBT_NO_OOB |
++		   NAND_BBT_WRITE,
++	.pages = { 524224, 0, 0, 0, 0, 0, 0, 0 },
++};
++
++static struct nand_bbt_descr lpc32xx_nand_bbt_mirror = {
++	.options = NAND_BBT_ABSPAGE | NAND_BBT_2BIT | NAND_BBT_NO_OOB |
++		   NAND_BBT_WRITE,
++	.pages = { 524160, 0, 0, 0, 0, 0, 0, 0 },
++};
++
++struct lpc32xx_nand_host {
++	struct nand_chip	nand_chip;
++	struct clk		*clk;
++	struct mtd_info		mtd;
++	void __iomem		*io_base;
++	int			irq;
++	struct lpc32xx_nand_cfg_mlc	*ncfg;
++	struct completion       comp_nand;
++	struct completion       comp_controller;
++	uint32_t llptr;
++	/*
++	 * Physical addresses of ECC buffer, DMA data buffers, OOB data buffer
++	 */
++	dma_addr_t		oob_buf_phy;
++	/*
++	 * Virtual addresses of ECC buffer, DMA data buffers, OOB data buffer
++	 */
++	uint8_t			*oob_buf;
++	/* Physical address of DMA base address */
++	dma_addr_t		io_base_phy;
++
++	struct completion	comp_dma;
++	struct dma_chan		*dma_chan;
++	struct dma_slave_config	dma_slave_config;
++	struct scatterlist	sgl;
++	u8			*dma_buf;
++};
++
++/*
++ * Activate/Deactivate DMA Operation:
++ *
++ * Using the PL080 DMA Controller for transferring the 512 byte subpages
++ * instead of doing readl() / writel() in a loop slows it down significantly.
++ * Measurements via getnstimeofday() upon 512 byte subpage reads reveal:
++ *
++ * - readl() of 128 x 32 bits in a loop: ~20us
++ * - DMA read of 512 bytes (32 bit, 4...128 words bursts): ~60us
++ * - DMA read of 512 bytes (32 bit, no bursts): ~100us
++ *
++ * This applies to the transfer itself. In the DMA case: only the
++ * wait_for_completion() (DMA setup _not_ included).
++ *
++ * Note that the 512 bytes subpage transfer is done directly from/to a
++ * FIFO/buffer inside the NAND controller. Most of the time (~400-800us for a
++ * 2048 bytes page) is spent waiting for the NAND IRQ, anyway. (The NAND
++ * controller transferring data between its internal buffer to/from the NAND
++ * chip.)
++ *
++ * Therefore, using the PL080 DMA is disabled by default, for now.
++ *
++ */
++static int use_dma = 0;
++
++static void lpc32xx_nand_setup(struct lpc32xx_nand_host *host)
 +{
-+	u8 key;
-+	int row;
-+	unsigned changed, scancode, keycode;
++	u32 clkrate, tmp;
 +
-+	key = readl(LPC32XX_KS_DATA(kscandat->kscan_base, col));
-+	changed = key ^ kscandat->lastkeystates[col];
-+	if (changed) {
-+		for (row = 0; row < kscandat->kscancfg->matrix_sz; row++) {
-+			if (changed & (1 << row)) {
-+				/* Key state changed, signal an event */
-+				scancode = MATRIX_SCAN_CODE(
-+				    row, col, kscandat->kscancfg->row_shift);
-+				keycode = kscandat->kscancfg->keymap[scancode];
-+				input_event(kscandat->input, EV_MSC, MSC_SCAN,
-+					    scancode);
-+				input_report_key(kscandat->input, keycode,
-+						 key & (1 << row));
-+			}
-+		}
++	/* Reset MLC controller */
++	writel(MLCCMD_RESET, MLC_CMD(host->io_base));
++	udelay(1000);
 +
-+		kscandat->lastkeystates[col] = key;
++	/* Get base clock for MLC block */
++	clkrate = clk_get_rate(host->clk);
++	if (clkrate == 0)
++		clkrate = 104000000;
++
++	/* Unlock MLC_ICR
++	 * (among others, will be locked again automatically) */
++	writew(MLCLOCKPR_MAGIC, MLC_LOCK_PR(host->io_base));
++
++	/* Configure MLC Controller: Large Block, 5 Byte Address */
++	tmp = MLCICR_LARGEBLOCK | MLCICR_LONGADDR;
++	writel(tmp, MLC_ICR(host->io_base));
++
++	/* Unlock MLC_TIME_REG
++	 * (among others, will be locked again automatically) */
++	writew(MLCLOCKPR_MAGIC, MLC_LOCK_PR(host->io_base));
++
++	/* Compute clock setup values, see LPC and NAND manual */
++	tmp = 0;
++	tmp |= MLCTIMEREG_TCEA_DELAY(clkrate / host->ncfg->tcea_delay + 1);
++	tmp |= MLCTIMEREG_BUSY_DELAY(clkrate / host->ncfg->busy_delay + 1);
++	tmp |= MLCTIMEREG_NAND_TA(clkrate / host->ncfg->nand_ta + 1);
++	tmp |= MLCTIMEREG_RD_HIGH(clkrate / host->ncfg->rd_high + 1);
++	tmp |= MLCTIMEREG_RD_LOW(clkrate / host->ncfg->rd_low);
++	tmp |= MLCTIMEREG_WR_HIGH(clkrate / host->ncfg->wr_high + 1);
++	tmp |= MLCTIMEREG_WR_LOW(clkrate / host->ncfg->wr_low);
++	writel(tmp, MLC_TIME_REG(host->io_base));
++
++	/* Enable IRQ for CONTROLLER_READY and NAND_READY */
++	writeb(MLCIRQ_CONTROLLER_READY | MLCIRQ_NAND_READY,
++			MLC_IRQ_MR(host->io_base));
++
++	/* Normal nCE operation: nCE controlled by controller */
++	writel(MLCCEH_NORMAL, MLC_CEH(host->io_base));
++}
++
++/*
++ * Hardware specific access to control lines
++ */
++static void lpc32xx_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
++				  unsigned int ctrl)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct lpc32xx_nand_host *host = nand_chip->priv;
++
++	if (cmd != NAND_CMD_NONE) {
++		if (ctrl & NAND_CLE)
++			writel(cmd, MLC_CMD(host->io_base));
++		else
++			writel(cmd, MLC_ADDR(host->io_base));
 +	}
 +}
 +
-+static irqreturn_t lpc32xx_kscan_irq(int irq, void *dev_id)
++/*
++ * Read Device Ready (NAND device _and_ controller ready)
++ */
++static int lpc32xx_nand_device_ready(struct mtd_info *mtd)
 +{
-+	int i;
-+	struct lpc32xx_kscan_drv *kscandat = dev_id;
++	struct nand_chip *nand_chip = mtd->priv;
++	struct lpc32xx_nand_host *host = nand_chip->priv;
 +
-+	for (i = 0; i < kscandat->kscancfg->matrix_sz; i++)
-+		lpc32xx_mod_states(kscandat, i);
++	if ((readb(MLC_ISR(host->io_base)) &
++	     (MLCISR_CONTROLLER_READY | MLCISR_NAND_READY)) ==
++	    (MLCISR_CONTROLLER_READY | MLCISR_NAND_READY))
++		return  1;
 +
-+	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
++	return 0;
++}
 +
-+	input_sync(kscandat->input);
++static irqreturn_t lpc3xxx_nand_irq(int irq, struct lpc32xx_nand_host *host)
++{
++	uint8_t sr;
++
++	/* Clear interrupt flag by reading status */
++	sr = readb(MLC_IRQ_SR(host->io_base));
++	if (sr & MLCIRQ_NAND_READY)
++		complete(&host->comp_nand);
++	if (sr & MLCIRQ_CONTROLLER_READY)
++		complete(&host->comp_controller);
 +
 +	return IRQ_HANDLED;
 +}
 +
-+static int lpc32xx_kscan_open(struct input_dev *dev)
++static int lpc32xx_waitfunc_nand(struct mtd_info *mtd, struct nand_chip *chip)
 +{
-+	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
++	struct lpc32xx_nand_host *host = chip->priv;
 +
-+	return clk_prepare_enable(kscandat->clk);
++	if (readb(MLC_ISR(host->io_base)) & MLCISR_NAND_READY)
++		goto exit;
++
++	wait_for_completion(&host->comp_nand);
++
++	while (!(readb(MLC_ISR(host->io_base)) & MLCISR_NAND_READY)) {
++		/* Seems to be delayed sometimes by controller */
++		dev_dbg(&mtd->dev, "Warning: NAND not ready.\n");
++		cpu_relax();
++	}
++
++exit:
++	return NAND_STATUS_READY;
 +}
 +
-+static void lpc32xx_kscan_close(struct input_dev *dev)
++static int lpc32xx_waitfunc_controller(struct mtd_info *mtd,
++				       struct nand_chip *chip)
 +{
-+	struct lpc32xx_kscan_drv *kscandat = input_get_drvdata(dev);
++	struct lpc32xx_nand_host *host = chip->priv;
 +
-+	clk_disable_unprepare(kscandat->clk);
++	if (readb(MLC_ISR(host->io_base)) & MLCISR_CONTROLLER_READY)
++		goto exit;
++
++	wait_for_completion(&host->comp_controller);
++
++	while (!(readb(MLC_ISR(host->io_base)) &
++		 MLCISR_CONTROLLER_READY)) {
++		dev_dbg(&mtd->dev, "Warning: Controller not ready.\n");
++		cpu_relax();
++	}
++
++exit:
++	return NAND_STATUS_READY;
 +}
 +
-+static struct lpc32xx_kscan_cfg *lpc32xx_parse_dt(struct device *dev)
++static int lpc32xx_waitfunc(struct mtd_info *mtd, struct nand_chip *chip)
 +{
-+	struct lpc32xx_kscan_cfg *pdata;
++	lpc32xx_waitfunc_nand(mtd, chip);
++	lpc32xx_waitfunc_controller(mtd, chip);
++
++	return NAND_STATUS_READY;
++}
++
++/*
++ * Enable NAND write protect
++ */
++static void lpc32xx_wp_enable(struct lpc32xx_nand_host *host)
++{
++	if (gpio_is_valid(host->ncfg->wp_gpio))
++		gpio_set_value(host->ncfg->wp_gpio, 0);
++}
++
++/*
++ * Disable NAND write protect
++ */
++static void lpc32xx_wp_disable(struct lpc32xx_nand_host *host)
++{
++	if (gpio_is_valid(host->ncfg->wp_gpio))
++		gpio_set_value(host->ncfg->wp_gpio, 1);
++}
++
++static uint8_t lpc32xx_read_byte(struct mtd_info *mtd)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct lpc32xx_nand_host *host = nand_chip->priv;
++
++	return readb(MLC_DATA(host->io_base));
++}
++
++static void lpc32xx_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
++{
++	int i;
++	struct nand_chip *nand_chip = mtd->priv;
++	struct lpc32xx_nand_host *host = nand_chip->priv;
++
++	/* We are supposed to write only via the buffered auto encode */
++	dev_warn(&mtd->dev,
++		 "Warning: %s(): Writing %d bytes. This shouldn't happen!\n",
++		 __func__, len);
++
++	for (i = 0; i < len; i++)
++		writeb(buf[i], MLC_DATA(host->io_base));
++}
++
++static void lpc32xx_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
++{
++	int i;
++	struct nand_chip *nand_chip = mtd->priv;
++	struct lpc32xx_nand_host *host = nand_chip->priv;
++
++	dev_warn(&mtd->dev,
++		 "Warning: %s(): Reading %d bytes. This shouldn't happen!\n",
++		 __func__, len);
++
++	for (i = 0; i < len; i++)
++		buf[i] = readb(MLC_DATA(host->io_base));
++}
++
++static void lpc32xx_dma_complete_func(void *completion)
++{
++	complete(completion);
++}
++
++static int lpc32xx_xmit_dma(struct mtd_info *mtd, void *mem, int len,
++			    enum dma_transfer_direction dir)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct lpc32xx_nand_host *host = chip->priv;
++	struct dma_async_tx_descriptor *desc;
++	int flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
++	int res;
++
++	sg_init_one(&host->sgl, mem, len);
++
++	res = dma_map_sg(host->dma_chan->device->dev, &host->sgl, 1,
++			 DMA_BIDIRECTIONAL);
++	if (res != 1) {
++		dev_err(mtd->dev.parent, "Failed to map sg list\n");
++		return -ENXIO;
++	}
++	desc = dmaengine_prep_slave_sg(host->dma_chan, &host->sgl, 1, dir,
++				       flags);
++	if (!desc) {
++		dev_err(mtd->dev.parent, "Failed to prepare slave sg\n");
++		goto out1;
++	}
++
++	init_completion(&host->comp_dma);
++	desc->callback = lpc32xx_dma_complete_func;
++	desc->callback_param = &host->comp_dma;
++
++	dmaengine_submit(desc);
++	dma_async_issue_pending(host->dma_chan);
++
++	wait_for_completion_timeout(&host->comp_dma, msecs_to_jiffies(1000));
++
++	dma_unmap_sg(host->dma_chan->device->dev, &host->sgl, 1,
++		     DMA_BIDIRECTIONAL);
++	return 0;
++out1:
++	dma_unmap_sg(host->dma_chan->device->dev, &host->sgl, 1,
++		     DMA_BIDIRECTIONAL);
++	return -ENXIO;
++}
++
++static int lpc32xx_read_page(struct mtd_info *mtd, struct nand_chip *chip,
++			     uint8_t *buf, int oob_required, int page)
++{
++	struct lpc32xx_nand_host *host = chip->priv;
++	int i, j;
++	uint8_t *oobbuf = chip->oob_poi;
++	u32 mlc_isr;
++	int res;
++	u8 *dma_buf;
++	bool dma_mapped;
++
++	if ((void *)buf <= high_memory) {
++		dma_buf = buf;
++		dma_mapped = true;
++	} else {
++		dma_buf = host->dma_buf;
++		dma_mapped = false;
++	}
++
++	/* Writing Command and Address */
++	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
++
++	/* For all sub-pages */
++	for (i = 0; i < 4; i++) {
++		/* Start Auto Decode Command */
++		writeb(0x00, MLC_ECC_AUTO_DEC_REG(host->io_base));
++
++		/* Wait for Controller Ready */
++		lpc32xx_waitfunc_controller(mtd, chip);
++
++		/* Check ECC Error status */
++		mlc_isr = readl(MLC_ISR(host->io_base));
++		if (mlc_isr & MLCISR_DECODER_FAILURE) {
++			mtd->ecc_stats.failed++;
++			dev_warn(&mtd->dev, "%s: DECODER_FAILURE\n", __func__);
++		} else if (mlc_isr & MLCISR_ERRORS_DETECTED) {
++			mtd->ecc_stats.corrected += ((mlc_isr >> 4) & 0x3) + 1;
++		}
++
++		/* Read 512 + 16 Bytes */
++		if (use_dma) {
++			res = lpc32xx_xmit_dma(mtd, dma_buf + i * 512, 512,
++					       DMA_DEV_TO_MEM);
++			if (res)
++				return res;
++		} else {
++			for (j = 0; j < (512 >> 2); j++) {
++				*((uint32_t *)(buf)) =
++					readl(MLC_BUFF(host->io_base));
++				buf += 4;
++			}
++		}
++		for (j = 0; j < (16 >> 2); j++) {
++			*((uint32_t *)(oobbuf)) =
++				readl(MLC_BUFF(host->io_base));
++			oobbuf += 4;
++		}
++	}
++
++	if (use_dma && !dma_mapped)
++		memcpy(buf, dma_buf, NAND_LARGE_BLOCK_PAGE_SIZE);
++
++	return 0;
++}
++
++static void lpc32xx_write_page_lowlevel(struct mtd_info *mtd,
++					struct nand_chip *chip,
++					const uint8_t *buf, int oob_required)
++{
++	struct lpc32xx_nand_host *host = chip->priv;
++	const uint8_t *oobbuf = chip->oob_poi;
++	u8 *dma_buf;
++	int res;
++	int i, j;
++
++	if (use_dma) {
++		if ((void *)buf <= high_memory) {
++			dma_buf = (u8 *)buf;
++		} else {
++			dma_buf = host->dma_buf;
++			memcpy(dma_buf, buf, NAND_LARGE_BLOCK_PAGE_SIZE);
++		}
++	}
++
++	for (i = 0; i < 4; i++) {
++		/* Start Encode */
++		writeb(0x00, MLC_ECC_ENC_REG(host->io_base));
++
++		/* Write 512 + 6 Bytes to Buffer */
++		if (use_dma) {
++			res = lpc32xx_xmit_dma(mtd, dma_buf + i * 512, 512,
++					       DMA_MEM_TO_DEV);
++			if (res)
++				return;
++		} else {
++			for (j = 0; j < (512 >> 2); j++) {
++				writel(*((uint32_t *)(buf)),
++				       MLC_BUFF(host->io_base));
++				buf += 4;
++			}
++		}
++		writel(*((uint32_t *)(oobbuf)), MLC_BUFF(host->io_base));
++		oobbuf += 4;
++		writew(*((uint16_t *)(oobbuf)), MLC_BUFF(host->io_base));
++		oobbuf += 12;
++
++		/* Auto Encode w/ Bit 8 = 0 (see LPC MLC Controller manual) */
++		writeb(0x00, MLC_ECC_AUTO_ENC_REG(host->io_base));
++
++		/* Wait for Controller Ready */
++		lpc32xx_waitfunc_controller(mtd, chip);
++	}
++}
++
++static int lpc32xx_write_page(struct mtd_info *mtd, struct nand_chip *chip,
++			      const uint8_t *buf, int oob_required, int page,
++			      int cached, int raw)
++{
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
++	lpc32xx_write_page_lowlevel(mtd, chip, buf, oob_required);
++	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
++	lpc32xx_waitfunc(mtd, chip);
++
++	return 0;
++}
++
++static int lpc32xx_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
++			    int page)
++{
++	uint8_t buf[NAND_LARGE_BLOCK_PAGE_SIZE];
++
++	/* Read whole page - necessary with MLC controller! */
++	lpc32xx_read_page(mtd, chip, buf, 1, page);
++
++	return 0;
++}
++
++static int lpc32xx_write_oob(struct mtd_info *mtd, struct nand_chip *chip,
++			      int page)
++{
++	/* None, write_oob conflicts with the automatic LPC MLC ECC decoder! */
++	return 0;
++}
++
++/* Prepares MLC for transfers with H/W ECC enabled: always enabled anyway */
++static void lpc32xx_ecc_enable(struct mtd_info *mtd, int mode)
++{
++	/* Always enabled! */
++}
++
++static bool lpc32xx_dma_filter(struct dma_chan *chan, void *param)
++{
++	struct pl08x_dma_chan *ch =
++		container_of(chan, struct pl08x_dma_chan, chan);
++
++	/* In LPC32xx's PL080 DMA wiring, the MLC NAND DMA signal is #12 */
++	if (ch->cd->min_signal == 12)
++		return true;
++	return false;
++}
++
++static int lpc32xx_dma_setup(struct lpc32xx_nand_host *host)
++{
++	struct mtd_info *mtd = &host->mtd;
++	dma_cap_mask_t mask;
++
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++	host->dma_chan = dma_request_channel(mask, lpc32xx_dma_filter, NULL);
++	if (!host->dma_chan) {
++		dev_err(mtd->dev.parent, "Failed to request DMA channel\n");
++		return -EBUSY;
++	}
++
++	/*
++	 * Set direction to a sensible value even if the dmaengine driver
++	 * should ignore it. With the default (DMA_MEM_TO_MEM), the amba-pl08x
++	 * driver criticizes it as "alien transfer direction".
++	 */
++	host->dma_slave_config.direction = DMA_DEV_TO_MEM;
++	host->dma_slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_slave_config.src_maxburst = 128;
++	host->dma_slave_config.dst_maxburst = 128;
++	/* DMA controller does flow control: */
++	host->dma_slave_config.device_fc = false;
++	host->dma_slave_config.src_addr = MLC_BUFF(host->io_base_phy);
++	host->dma_slave_config.dst_addr = MLC_BUFF(host->io_base_phy);
++	if (dmaengine_slave_config(host->dma_chan, &host->dma_slave_config)) {
++		dev_err(mtd->dev.parent, "Failed to setup DMA slave\n");
++		goto out1;
++	}
++
++	return 0;
++out1:
++	dma_release_channel(host->dma_chan);
++	return -ENXIO;
++}
++
++#ifdef CONFIG_OF
++static struct lpc32xx_nand_cfg_mlc *lpc32xx_parse_dt(struct device *dev)
++{
++	struct lpc32xx_nand_cfg_mlc *pdata;
 +	struct device_node *np = dev->of_node;
-+	u32 rows, columns;
 +
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
++	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 +	if (!pdata) {
 +		dev_err(dev, "could not allocate memory for platform data\n");
 +		return NULL;
 +	}
 +
-+	of_property_read_u32(np, "keypad,num-rows", &rows);
-+	of_property_read_u32(np, "keypad,num-columns", &columns);
-+	if (!rows || rows != columns) {
-+		dev_err(dev, "rows and columns must be specified and be equal!\n");
-+		goto out1;
++	of_property_read_u32(np, "nxp,tcea-delay", &pdata->tcea_delay);
++	of_property_read_u32(np, "nxp,busy-delay", &pdata->busy_delay);
++	of_property_read_u32(np, "nxp,nand-ta", &pdata->nand_ta);
++	of_property_read_u32(np, "nxp,rd-high", &pdata->rd_high);
++	of_property_read_u32(np, "nxp,rd-low", &pdata->rd_low);
++	of_property_read_u32(np, "nxp,wr-high", &pdata->wr_high);
++	of_property_read_u32(np, "nxp,wr-low", &pdata->wr_low);
++
++	if (!pdata->tcea_delay || !pdata->busy_delay || !pdata->nand_ta ||
++	    !pdata->rd_high || !pdata->rd_low || !pdata->wr_high ||
++	    !pdata->wr_low) {
++		dev_err(dev, "chip parameters not specified correctly\n");
++		return NULL;
 +	}
 +
-+	pdata->matrix_sz = rows;
-+	pdata->row_shift = get_count_order(columns);
-+
-+	of_property_read_u32(np, "nxp,debounce-delay-ms", &pdata->deb_clks);
-+	of_property_read_u32(np, "nxp,scan-delay-ms", &pdata->scan_delay);
-+	if (!pdata->deb_clks || !pdata->scan_delay) {
-+		dev_err(dev, "debounce or scan delay not specified\n");
-+		goto out1;
-+	}
-+
-+	pdata->keymap = kzalloc(sizeof(pdata->keymap[0]) *
-+				(rows << pdata->row_shift), GFP_KERNEL);
-+	if (!pdata->keymap) {
-+		dev_err(dev, "could not allocate memory for keymap\n");
-+		goto out1;
-+	}
++	pdata->wp_gpio = of_get_named_gpio_flags(np, "gpios", 0, NULL);
 +
 +	return pdata;
-+out1:
-+	kfree(pdata);
++}
++#else
++static struct lpc32xx_nand_cfg_mlc *lpc32xx_parse_dt(struct device *dev)
++{
 +	return NULL;
-+}
-+
-+static int __devinit lpc32xx_kscan_probe(struct platform_device *pdev)
-+{
-+	struct lpc32xx_kscan_drv *kscandat;
-+	struct resource *res;
-+	int error;
-+
-+	kscandat = kzalloc(sizeof(struct lpc32xx_kscan_drv), GFP_KERNEL);
-+	if (!kscandat) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to get platform I/O memory\n");
-+		error = -EBUSY;
-+		goto out1;
-+	}
-+
-+	res = request_mem_region(res->start, resource_size(res), pdev->name);
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to request I/O memory\n");
-+		error = -EBUSY;
-+		goto out1;
-+	}
-+	kscandat->io_p_start = res->start;
-+	kscandat->io_p_size = resource_size(res);
-+
-+	kscandat->kscan_base = ioremap(res->start, resource_size(res));
-+	if (!kscandat->kscan_base) {
-+		dev_err(&pdev->dev, "failed to remap I/O memory\n");
-+		error = -EBUSY;
-+		goto out2;
-+	}
-+
-+	/* Get the key scanner clock */
-+	kscandat->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(kscandat->clk)) {
-+		dev_err(&pdev->dev, "failed to get clock\n");
-+		error = PTR_ERR(kscandat->clk);
-+		goto out3;
-+	}
-+	clk_enable(kscandat->clk);
-+
-+	kscandat->irq = platform_get_irq(pdev, 0);
-+	if ((kscandat->irq < 0) || (kscandat->irq >= NR_IRQS)) {
-+		dev_err(&pdev->dev, "failed to get platform irq\n");
-+		error = -EINVAL;
-+		goto out4;
-+	}
-+	error = request_irq(kscandat->irq, lpc32xx_kscan_irq,
-+			    0, pdev->name, kscandat);
-+	if (error) {
-+		dev_err(&pdev->dev, "failed to request irq\n");
-+		goto out4;
-+	}
-+
-+	kscandat->input = input_allocate_device();
-+	if (kscandat->input == NULL) {
-+		dev_err(&pdev->dev, "failed to allocate device\n");
-+		error = -ENOMEM;
-+		goto out5;
-+	}
-+
-+	kscandat->kscancfg = lpc32xx_parse_dt(&pdev->dev);
-+	if (!kscandat->kscancfg) {
-+		dev_err(&pdev->dev, "failed to get platform data\n");
-+		error = -EINVAL;
-+		goto out6;
-+	}
-+
-+	/* Setup key input */
-+	kscandat->input->evbit[0]	= BIT_MASK(EV_KEY);
-+	kscandat->input->name		= pdev->name;
-+	kscandat->input->phys		= "matrix-keys/input0";
-+	kscandat->input->id.vendor	= 0x0001;
-+	kscandat->input->id.product	= 0x0001;
-+	kscandat->input->id.version	= 0x0100;
-+	kscandat->input->open		= lpc32xx_kscan_open;
-+	kscandat->input->close		= lpc32xx_kscan_close;
-+	kscandat->input->dev.parent	= &pdev->dev;
-+
-+	matrix_keypad_build_keymap(NULL, NULL, kscandat->kscancfg->matrix_sz,
-+				   kscandat->kscancfg->matrix_sz,
-+				   kscandat->kscancfg->keymap, kscandat->input);
-+
-+	platform_set_drvdata(pdev, kscandat);
-+
-+	input_set_drvdata(kscandat->input, kscandat);
-+	input_set_capability(kscandat->input, EV_MSC, MSC_SCAN);
-+
-+	error = input_register_device(kscandat->input);
-+	if (error) {
-+		dev_err(&pdev->dev, "failed to register input device\n");
-+		goto out6;
-+	}
-+
-+	/* Configure the key scanner */
-+	writel(kscandat->kscancfg->deb_clks,
-+	       LPC32XX_KS_DEB(kscandat->kscan_base));
-+	writel(kscandat->kscancfg->scan_delay,
-+	       LPC32XX_KS_SCAN_CTL(kscandat->kscan_base));
-+	writel(LPC32XX_KSCAN_FTST_USE32K_CLK,
-+	       LPC32XX_KS_FAST_TST(kscandat->kscan_base));
-+	writel(kscandat->kscancfg->matrix_sz,
-+	       LPC32XX_KS_MATRIX_DIM(kscandat->kscan_base));
-+	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-+	clk_disable(kscandat->clk);
-+	return 0;
-+
-+out6:
-+	input_free_device(kscandat->input);
-+out5:
-+	free_irq(kscandat->irq, pdev);
-+out4:
-+	clk_disable(kscandat->clk);
-+	clk_put(kscandat->clk);
-+out3:
-+	iounmap(kscandat->kscan_base);
-+out2:
-+	release_mem_region(kscandat->io_p_start, kscandat->io_p_size);
-+out1:
-+	kfree(kscandat);
-+
-+	return error;
-+}
-+
-+static int __devexit lpc32xx_kscan_remove(struct platform_device *pdev)
-+{
-+	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-+
-+	input_unregister_device(kscandat->input);
-+	free_irq(kscandat->irq, pdev);
-+	clk_put(kscandat->clk);
-+	iounmap(kscandat->kscan_base);
-+	release_mem_region(kscandat->io_p_start, kscandat->io_p_size);
-+	kfree(kscandat);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int lpc32xx_kscan_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-+
-+	/* Clear IRQ and disable clock */
-+	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-+	clk_disable_unprepare(kscandat->clk);
-+
-+	return 0;
-+}
-+
-+static int lpc32xx_kscan_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
-+
-+	/* Enable clock and clear IRQ */
-+	clk_prepare_enable(kscandat->clk);
-+	writel(1, LPC32XX_KS_IRQ(kscandat->kscan_base));
-+
-+	return 0;
 +}
 +#endif
 +
-+static SIMPLE_DEV_PM_OPS(lpc32xx_kscan_pm_ops, lpc32xx_kscan_suspend,
-+			 lpc32xx_kscan_resume);
++/*
++ * Probe for NAND controller
++ */
++static int __devinit lpc32xx_nand_probe(struct platform_device *pdev)
++{
++	struct lpc32xx_nand_host *host;
++	struct mtd_info *mtd;
++	struct nand_chip *nand_chip;
++	struct resource *rc;
++	int res;
++	uint8_t sr;
++	struct mtd_part_parser_data ppdata = {};
 +
-+static const struct of_device_id lpc32xx_kscan_match[] = {
-+	{ .compatible = "nxp,lpc3220-key" },
-+	{},
++	/* Allocate memory for the device structure (and zero it) */
++	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
++	if (!host) {
++		dev_err(&pdev->dev, "failed to allocate device structure.\n");
++		return -ENOMEM;
++	}
++
++	rc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (rc == NULL) {
++		dev_err(&pdev->dev, "No memory resource found for device!\r\n");
++		return -ENXIO;
++	}
++
++	host->io_base = devm_request_and_ioremap(&pdev->dev, rc);
++	if (host->io_base == NULL) {
++		dev_err(&pdev->dev, "ioremap failed\n");
++		return -EIO;
++	}
++	host->io_base_phy = rc->start;
++
++	mtd = &host->mtd;
++	nand_chip = &host->nand_chip;
++	if (pdev->dev.of_node)
++		host->ncfg = lpc32xx_parse_dt(&pdev->dev);
++	else
++		host->ncfg = pdev->dev.platform_data;
++	if (!host->ncfg) {
++		dev_err(&pdev->dev, "Missing platform data\n");
++		return -ENOENT;
++	}
++	if (gpio_is_valid(host->ncfg->wp_gpio) &&
++			gpio_request(host->ncfg->wp_gpio, "NAND WP")) {
++		dev_err(&pdev->dev, "GPIO not available\n");
++		return -EBUSY;
++	}
++	lpc32xx_wp_disable(host);
++
++	nand_chip->priv = host;		/* link the private data structures */
++	mtd->priv = nand_chip;
++	mtd->owner = THIS_MODULE;
++	mtd->dev.parent = &pdev->dev;
++
++	/* Get NAND clock */
++	host->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(host->clk)) {
++		dev_err(&pdev->dev, "Clock initialization failure\n");
++		res = -ENOENT;
++		goto err_exit1;
++	}
++	clk_enable(host->clk);
++
++	nand_chip->cmd_ctrl = lpc32xx_nand_cmd_ctrl;
++	nand_chip->dev_ready = lpc32xx_nand_device_ready;
++	nand_chip->chip_delay = 25; /* us */
++
++	/* Init NAND controller */
++	lpc32xx_nand_setup(host);
++
++	platform_set_drvdata(pdev, host);
++
++	/* Initialize function pointers */
++	nand_chip->read_byte = lpc32xx_read_byte;
++	nand_chip->read_buf = lpc32xx_read_buf;
++	nand_chip->write_buf = lpc32xx_write_buf;
++	nand_chip->ecc.hwctl = lpc32xx_ecc_enable;
++	nand_chip->ecc.read_page_raw = lpc32xx_read_page;
++	nand_chip->ecc.read_page = lpc32xx_read_page;
++	nand_chip->ecc.write_page_raw = lpc32xx_write_page_lowlevel;
++	nand_chip->ecc.write_page = lpc32xx_write_page_lowlevel;
++	nand_chip->ecc.write_oob = lpc32xx_write_oob;
++	nand_chip->ecc.read_oob = lpc32xx_read_oob;
++	nand_chip->ecc.strength = 4;
++	nand_chip->write_page = lpc32xx_write_page;
++	nand_chip->waitfunc = lpc32xx_waitfunc;
++
++	nand_chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
++	nand_chip->bbt_td = &lpc32xx_nand_bbt;
++	nand_chip->bbt_md = &lpc32xx_nand_bbt_mirror;
++
++	/* bitflip_threshold's default is defined as ecc_strength anyway.
++	 * Unfortunately, it is set only later at add_mtd_device(). Meanwhile
++	 * being 0, it causes bad block table scanning errors in
++	 * nand_scan_tail(), so preparing it here. */
++	mtd->bitflip_threshold = nand_chip->ecc.strength;
++
++	host->dma_buf = devm_kzalloc(&pdev->dev, NAND_LARGE_BLOCK_PAGE_SIZE,
++				     GFP_KERNEL);
++	if (!host->dma_buf) {
++		dev_err(&pdev->dev, "Error allocating memory\n");
++		res = -ENOMEM;
++		goto err_exit2;
++	}
++
++	res = lpc32xx_dma_setup(host);
++	if (res) {
++		res = -EIO;
++		goto err_exit2;
++	}
++
++	/*
++	 * Scan to find existance of the device and
++	 * Get the type of NAND device SMALL block or LARGE block
++	 */
++	if (nand_scan_ident(mtd, 1, NULL)) {
++		res = -ENXIO;
++		goto err_exit3;
++	}
++
++	nand_chip->ecc.mode = NAND_ECC_HW;
++	nand_chip->ecc.size = mtd->writesize;
++	nand_chip->ecc.layout = &lpc32xx_nand_oob;
++
++	/* initially clear interrupt status */
++	sr = readb(MLC_IRQ_SR(host->io_base));
++
++	init_completion(&host->comp_nand);
++	init_completion(&host->comp_controller);
++
++	host->irq = platform_get_irq(pdev, 0);
++	if ((host->irq < 0) || (host->irq >= NR_IRQS)) {
++		dev_err(&pdev->dev, "failed to get platform irq\n");
++		res = -EINVAL;
++		goto err_exit3;
++	}
++
++	if (request_irq(host->irq, (irq_handler_t)&lpc3xxx_nand_irq,
++			IRQF_TRIGGER_HIGH, DRV_NAME, host)) {
++		dev_err(&pdev->dev, "Error requesting NAND IRQ\n");
++		res = -ENXIO;
++		goto err_exit3;
++	}
++
++	/*
++	 * Fills out all the uninitialized function pointers with the defaults
++	 * And scans for a bad block table if appropriate.
++	 */
++	if (nand_scan_tail(mtd)) {
++		res = -ENXIO;
++		goto err_exit4;
++	}
++
++	mtd->name = DRV_NAME;
++
++	ppdata.of_node = pdev->dev.of_node;
++	res = mtd_device_parse_register(mtd, NULL, &ppdata, host->ncfg->parts,
++					host->ncfg->num_parts);
++	if (!res)
++		return res;
++
++	nand_release(mtd);
++
++err_exit4:
++	free_irq(host->irq, host);
++err_exit3:
++	dma_release_channel(host->dma_chan);
++err_exit2:
++	clk_disable(host->clk);
++	clk_put(host->clk);
++	platform_set_drvdata(pdev, NULL);
++err_exit1:
++	lpc32xx_wp_enable(host);
++	gpio_free(host->ncfg->wp_gpio);
++
++	return res;
++}
++
++/*
++ * Remove NAND device
++ */
++static int __devexit lpc32xx_nand_remove(struct platform_device *pdev)
++{
++	struct lpc32xx_nand_host *host = platform_get_drvdata(pdev);
++	struct mtd_info *mtd = &host->mtd;
++
++	nand_release(mtd);
++	free_irq(host->irq, host);
++	dma_release_channel(host->dma_chan);
++
++	clk_disable(host->clk);
++	clk_put(host->clk);
++	platform_set_drvdata(pdev, NULL);
++
++	lpc32xx_wp_enable(host);
++	gpio_free(host->ncfg->wp_gpio);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int lpc32xx_nand_resume(struct platform_device *pdev)
++{
++	struct lpc32xx_nand_host *host = platform_get_drvdata(pdev);
++
++	/* Re-enable NAND clock */
++	clk_enable(host->clk);
++
++	/* Fresh init of NAND controller */
++	lpc32xx_nand_setup(host);
++
++	/* Disable write protect */
++	lpc32xx_wp_disable(host);
++
++	return 0;
++}
++
++static int lpc32xx_nand_suspend(struct platform_device *pdev, pm_message_t pm)
++{
++	struct lpc32xx_nand_host *host = platform_get_drvdata(pdev);
++
++	/* Enable write protect for safety */
++	lpc32xx_wp_enable(host);
++
++	/* Disable clock */
++	clk_disable(host->clk);
++	return 0;
++}
++
++#else
++#define lpc32xx_nand_resume NULL
++#define lpc32xx_nand_suspend NULL
++#endif
++
++#if defined(CONFIG_OF)
++static const struct of_device_id lpc32xx_nand_match[] = {
++	{ .compatible = "nxp,lpc3220-mlc" },
++	{ /* sentinel */ },
 +};
-+MODULE_DEVICE_TABLE(of, lpc32xx_kscan_match);
++MODULE_DEVICE_TABLE(of, lpc32xx_nand_match);
++#endif
 +
-+static struct platform_driver lpc32xx_kscan_driver = {
-+	.probe		= lpc32xx_kscan_probe,
-+	.remove		= __devexit_p(lpc32xx_kscan_remove),
++static struct platform_driver lpc32xx_nand_driver = {
++	.probe		= lpc32xx_nand_probe,
++	.remove		= __devexit_p(lpc32xx_nand_remove),
++	.resume		= lpc32xx_nand_resume,
++	.suspend	= lpc32xx_nand_suspend,
 +	.driver		= {
 +		.name	= DRV_NAME,
 +		.owner	= THIS_MODULE,
-+		.pm	= &lpc32xx_kscan_pm_ops,
-+		.of_match_table = of_match_ptr(lpc32xx_kscan_match),
-+	}
++		.of_match_table = of_match_ptr(lpc32xx_nand_match),
++	},
 +};
 +
-+module_platform_driver(lpc32xx_kscan_driver);
++module_platform_driver(lpc32xx_nand_driver);
 +
 +MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Kevin Wells <kevin.wells@nxp.com>");
 +MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
-+MODULE_DESCRIPTION("Key scanner driver for LPC32XX devices");
++MODULE_DESCRIPTION("NAND driver for the NXP LPC32XX MLC controller");
