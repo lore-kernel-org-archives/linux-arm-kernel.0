@@ -1,62 +1,24 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 15:57:09 -0500
-Subject: [PATCH v5 05/14] ARM: OMAP2+: gpmc: resource creation helpers
-In-Reply-To: <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
-Message-ID: <4FD65BA5.4020205@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Jun 2012 22:57:27 +0200
+Subject: [PATCH 04/14] mfd: Remove redundant Kconfig entry
+In-Reply-To: <1339428307-3850-5-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZpf_+VJSxSsvTQ6t-ALx8Gzv=Jf2-o3cK-CHxWJs6sPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 11, 2012 at 5:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
-> Helpers for propulating given resource structure
-> with memory & interrupt information.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   45 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index a91f40f..652b245 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -905,6 +905,51 @@ static void __devinit gpmc_mem_init(void)
->  	}
->  }
->  
-> +static __devinit int gpmc_setup_cs_mem(struct gpmc_cs_data *cs,
-> +						struct resource *res)
-> +{
-> +	unsigned long start;
-> +	int ret;
-> +
-> +	ret = gpmc_cs_request(cs->cs, cs->mem_size, &start);
-> +	if (IS_ERR_VALUE(ret)) {
-> +		dev_err(gpmc_dev, "error: gpmc request on CS: %d\n", cs->cs);
-> +		return ret;
-> +	}
-> +
-> +	res->start = start + cs->mem_offset;
-> +	res->end = res->start + cs->mem_size - 1;
-> +	res->flags = IORESOURCE_MEM;
-> +
-> +	dev_info(gpmc_dev, "memory 0x%x-0x%x on CS %d\n", res->start,
-> +							res->end, cs->cs);
-> +
-> +	return 1;
-> +}
+> During ab8500-core clean-up the Kconfig entry for AB8500_I2C_CORE
+> was left remnant. This patch simply removes it.
+>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Nit-pick, CodingStyle chapter 16 states that 0 should be used for
-success when returning from a function.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> +
-> +static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
-> +{
-> +	return bitmask;
-> +}
+Sam, will you pick this patch for the -rc series?
 
-I have to ask what is the value in this helper function? ;-)
-
-Jon
+Yours,
+Linus Walleij
