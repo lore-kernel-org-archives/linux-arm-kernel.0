@@ -1,68 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jun 2012 23:15:47 -0700
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
-References: <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <20120607075541.GF16342@arwen.pp.htv.fi> <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
-Message-ID: <20120611061546.GQ12766@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Jun 2012 14:19:28 +0800
+Subject: [PATCH RESEND] mfd: anatop: permit adata be NULL when access
+ register
+In-Reply-To: <20120604021315.GB2857@b20223-02.ap.freescale.net>
+References: <1338774989-4416-1-git-send-email-richard.zhao@freescale.com>
+ <20120604021315.GB2857@b20223-02.ap.freescale.net>
+Message-ID: <20120611061925.GC2552@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120608 06:33]:
-> On Fri, 8 Jun 2012, Cousson, Benoit wrote:
+On Mon, Jun 04, 2012 at 10:13:16AM +0800, Richard Zhao wrote:
+> Cc Paul's other mail address.
 > 
-> > On 6/8/2012 3:11 AM, Paul Walmsley wrote:
-> > > On Thu, 7 Jun 2012, Cousson, Benoit wrote:
-> > > 
-> > > > Indeed, what I did not mention is that potentially the whole device 
-> > > > init should be done ondemand as well. Meaning the whole hwmod setup 
-> > > > phase should be done only when the driver will probe the device.
-> > > 
-> > > That means if no driver exists for an IP block, or if the driver isn't
-> > > using PM runtime, the IP block won't be reset.  And somehow we still are
-> > > missing drivers in mainline.  We also still have drivers that aren't yet
-> > > PM runtime converted.
+> On Mon, Jun 04, 2012 at 09:56:29AM +0800, Richard Zhao wrote:
+> > From: Richard Zhao <richard.zhao@linaro.org>
 > > 
-> > No the point is still the same as before. You let the drivers do the job if
-> > they are there, and then do a pass at very late time during the boot process
-> > to handle the ones that were not probed by any driver.
-> 
-> Ah, I see what you mean.  Above you wrote that the the hwmod setup phase 
-> would be done only when the driver will probe the device.  But you also 
-> mean that it should also be done for the remaining devices before starting 
-> userspace.
-> 
-> > At least you will avoid the enable -> reset -> idle -> enable sequence 
-> > we are doing right now for most of the active drivers when it is not 
-> > necessary.
-> 
-> It must not be widely known, but early reset was implemented 
-> intentionally.  The goal was to keep any configuration damage from 
-> out-of-date or broken bootloaders or previous OSes to a minimum length of 
-> time during the boot process.
+> > It makes anatop register access easier. Anatop has many misc registers,
+> > which may not be a specific driver.
+> > 
+> > There's only one anatop device for a running system, so we use a global
+> > variable to store struct anatop.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > Cc: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
 
-These devices should get reset as the device drivers initialize. Some parts
-of course need to be initialized properly early like caches and DMA controller.
- 
-> I don't really have a huge problem with switching to a late reset, 
-> but there are disadvantages to it.
-
-I think the early reset actually has more disadvantages to it compared
-to driver reset. We don't see any errors when things go wrong, and we
-may even kill the only debug console in the reset process.
-
-We are already doing what Benoit describes with clocks where we only
-reset the unclaimed ones at late_initcall level, and that has proven
-to work well.
-
-Regards,
-
-Tony
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
