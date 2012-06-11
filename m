@@ -1,46 +1,38 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 11 Jun 2012 13:40:57 +0000
-Subject: am33xx: pin modes
-In-Reply-To: <4FD5E268.7030105@visionsystems.de>
-References: <4FD5E268.7030105@visionsystems.de>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA1E6F0@DBDE01.ent.ti.com>
+From: jkridner@gmail.com (Jason Kridner)
+Date: Mon, 11 Jun 2012 09:51:21 -0400
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FD5BA4C.9070706@gmail.com>
+Message-ID: <CBFB6F19.95320%jkridner@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 17:49:52, Yegor Yefremov wrote:
-> I'm working with Koen's repo (https://github.com/koenkooi/linux.git) and have a question. There are two places, where pin's function is defined:
-> 
-> 
-> arch/arm/mach-omap2/mux33xx.c:
-> static struct omap_mux __initdata am33xx_muxmodes[] = {
-> /**/    _AM33XX_MUXENTRY(GPMC_AD0, 0,
->                 "gpmc_ad0", "mmc1_dat0", NULL, NULL,
->                 NULL, NULL, NULL, "gpio1_0"),
-> 
+From: Daniel Mack <zonque@gmail.com>
+>Hey,
+>
+>can anybody give me a quick wrap-up about the current state of AM33xx
+>based SoCs in mainline? What are the next steps to get things merged?
 
-This is the big AM33XX pin mux super set table. Here, Entire Mux entries for AM335x SOC
-are defined.
+There is a wiki page [1] that is intended to provide a summary, but I'm
+confident it is not up-to-date.  There is also some automated testing, but
+I'm not aware if any of the test results are public and I believe the
+coverage is fairly limited.  Hopefully Carlos can chime in with any
+information about that.
 
-> 
-> arch/arm/mach-omap2/board-am335xevm.c:
-> {"mdio_data.mdio_data", OMAP_MUX_MODE0 | AM33XX_PIN_INPUT_PULLUP},
-
-This is where the actual board pin-mux is "defined". Later this structure is passed 
-to setup_pin_mux() which calls omap_mux_init_signal() where the actual pin-mux
-registers are written.
-
-> 
-> Is it redundant or OMAP_MUX_x is the only one that changes pins function?
-> 
-> Regards,
-> Yegor
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+[1] 
+http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status#AM335x
+_Status 
 
 
-Regards, 
-Gururaja
+>
+>I'm getting involved in a project that is based on a AM3352 and would
+>like to provide help where necessary and wanted.
+
+Your help is really appreciated, so thanks in advance.  Hopefully Vaibhav
+or Chase can reply with info about any particular subsystems that need
+either review or coding.  Conversion to Device Tree is an on-going complex
+area where Vaibhav is contributing.
+
+>
+>
+>Thanks,
+>Daniel
