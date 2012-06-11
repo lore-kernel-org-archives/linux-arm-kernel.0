@@ -1,49 +1,43 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jun 2012 19:42:40 +0800
-Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
- Device Tree
-In-Reply-To: <4FD5D679.1070000@linaro.org>
-References: <20120530151119.GN9947@opensource.wolfsonmicro.com>
- <4FC63B39.6040905@linaro.org>
- <20120530164152.GP9947@opensource.wolfsonmicro.com>
- <4FC846CC.20801@linaro.org>
- <20120601084850.GJ24139@opensource.wolfsonmicro.com>
- <4FCDDFFC.3000902@linaro.org>
- <20120605103846.GQ23408@opensource.wolfsonmicro.com>
- <4FD5C829.2090408@linaro.org>
- <20120611103606.GG11439@opensource.wolfsonmicro.com>
- <4FD5D679.1070000@linaro.org>
-Message-ID: <20120611114239.GL11439@opensource.wolfsonmicro.com>
+Date: Mon, 11 Jun 2012 20:08:27 +0800
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <4FD5D49C.6070106@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+ <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+Message-ID: <20120611120820.GN11439@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 12:28:57PM +0100, Lee Jones wrote:
-> On 11/06/12 11:36, Mark Brown wrote:
+On Mon, Jun 11, 2012 at 12:21:00PM +0100, Lee Jones wrote:
+> On 05/06/12 11:42, Mark Brown wrote:
+> >On Tue, Jun 05, 2012 at 11:34:12AM +0100, Lee Jones wrote:
 
-> >Suppose you have two devices of the same type with an array of name
-> >based regulators, meaning the nodes with constraints have to have a
-> >particular name in order to be matched to the regulator.  How would a
-> >consumer reference a node to specify a supply?
+> >>Well without it all regulator requests from DT will fail.
 
-> some-regulators {
->     compatible = "protect_me_from_similarly_named_regulators";
-> 
->     regulator_node_name_reg: regulator_node_name {
->         <blah>
->     };
-> };
+> >Oh, ffs.  Why wasn't this mentioned when the patch was posted,
 
-> [supply_name]-supply = <&regulator_node_name>;
+> I did. My 00 patch mentioned that these were all clean-ups/bug fixes
+> destined for the for RCs.
 
-I'm not 100% sure you read what I wrote above or in all the previous
-mails about having two devices of the same type?  The case where we have
-only one regulator of a given type obviously works otherwise people
-would have noticed, the problem starts when you have two of the same
-regulator device down.
+You didn't CC me on that as far as I can tell so I never saw it, and
+even if you had it's rather burying the lead with a large series of what
+mostly looks like random cleanups from the bits I see in my archive.  I
+think I assumed another patch in the series changed the names in the
+device tree or added the device tree.
+
+> Nevertheless, these two patches are required for a decent boot.
+
+Fail.  Well, I guess I'll end up dulplicating the commits :/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/1ece3d2b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/99cf29ce/attachment.sig>
