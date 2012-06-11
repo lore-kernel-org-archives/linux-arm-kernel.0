@@ -1,50 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jun 2012 23:48:55 -0700
-Subject: [PATCH] ARM: OMAP2+: cpu: Add am33xx device under
- cpu_class_is_omap2
-In-Reply-To: <4FD593E9.402@ti.com>
-References: <1339253773-24088-1-git-send-email-hvaibhav@ti.com>
- <20120611063816.GU12766@atomide.com> <4FD593E9.402@ti.com>
-Message-ID: <20120611064855.GW12766@atomide.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 11 Jun 2012 09:41:15 +0300
+Subject: [PATCH 0/3] ARM: OMAP2/3: DSS HWMOD fixes
+In-Reply-To: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1336645264-909-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1339396875.3632.1.camel@lappyti>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [120610 23:49]:
-> On 6/11/2012 12:08 PM, Tony Lindgren wrote:
-> >* Vaibhav Hiremath <hvaibhav@ti.com> [120609 08:00]:
-> >>Newly added AM33XX device falls under omap2 class, so
-> >>make cpu_class_is_omap2() true for AM33XX
-> >>(Add soc_is_am33xx() check).
-> >>
-> >>Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> >>---
-> >>  arch/arm/plat-omap/include/plat/cpu.h |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >>diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-> >>index 14f050f..5e36564 100644
-> >>--- a/arch/arm/plat-omap/include/plat/cpu.h
-> >>+++ b/arch/arm/plat-omap/include/plat/cpu.h
-> >>@@ -375,7 +375,7 @@ IS_OMAP_TYPE(3430, 0x3430)
-> >>  #define cpu_class_is_omap1()	(cpu_is_omap7xx() || cpu_is_omap15xx() || \
-> >>  				cpu_is_omap16xx())
-> >>  #define cpu_class_is_omap2()	(cpu_is_omap24xx() || cpu_is_omap34xx() || \
-> >>-				cpu_is_omap44xx())
-> >>+				cpu_is_omap44xx() || soc_is_am33xx())
-> >>  /* Various silicon revisions for omap2 */
-> >>  #define OMAP242X_CLASS		0x24200024
-> >I think this can be now simply !cpu_class_is_omap1() as there is
-> >a very slim chance that we'll ever be compiling omap1 and omap2+ together
-> >because of the different compiler flags needed.
-> >
-> >Regards,
-> >
-> >Tony
-> 
-> Ok...
-> 
-> Shall I submit patch with this change?
+Paul,
 
-Yes thanks.
+Ping. These could be queued for the next merge window.
 
-Tony
+ Tomi
+
+On Thu, 2012-05-10 at 13:21 +0300, Tomi Valkeinen wrote:
+> Hi,
+> 
+> These patches fix DSS hwmod data related to sysc flags. I haven't seen any
+> problem produced by these missing bits, but by looking at the TRM it's clear
+> that they should be defined.
+> 
+> However, applying these will cause additional warnings to show during boot:
+> 
+> omap_hwmod: dss_dispc: softreset failed (waited 10000 usec)
+> omap_hwmod: dss_rfbi: softreset failed (waited 10000 usec)
+> 
+> Most likely the softreset fails even now, but as there's no check to verify it,
+> no warnings are visible.
+> 
+> I think the reason for the failing softreset is the same problem as we have on
+> OMAP4: dss_core hwmod should be enabled before other dss hwmods can be enabled
+> (and reset).
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (3):
+>   ARM: OMAP2/3: HWMOD: Add missing flags for dispc class
+>   ARM: OMAP2/3: HWMOD: Add missing flag for rfbi class
+>   ARM: OMAP3: HWMOD: Add omap_hwmod_class_sysconfig for dsi
+> 
+>  .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 +-
+>  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 ++-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   15 ++++++++++++++-
+>  3 files changed, 17 insertions(+), 3 deletions(-)
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/340d416a/attachment-0001.sig>
