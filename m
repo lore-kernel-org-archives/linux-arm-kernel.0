@@ -1,35 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Jun 2012 09:34:33 -0500
-Subject: Overriding/concatenating kernel command-line with bootargs from
- dtb?
-In-Reply-To: <2050174.dvvKJHKP0J@flexo>
-References: <2050174.dvvKJHKP0J@flexo>
-Message-ID: <4FD601F9.8020201@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 11 Jun 2012 16:34:43 +0200
+Subject: [PATCH 8/14] ARM: LPC32xx: Clock adjustment for key matrix
+ controller
+In-Reply-To: <201206111416.19251.arnd@arndb.de>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <1339412537-24485-9-git-send-email-stigge@antcom.de>
+ <201206111416.19251.arnd@arndb.de>
+Message-ID: <4FD60203.8010103@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2012 02:55 AM, Florian Fainelli wrote:
-> Hi all,
-> 
-> I have a specific use case, where two boards using the same SoC have different 
-> UART speeds, which is something that I have specified in their corresponding 
-> dts files. In order to make sure people don't mess up the configuration, I 
-> prefer not to rely on the bootloader-supplied kernel-command line.
-> 
-> I was kind of expecting that ARM_ATAG_DTB_COMPAT + CMDLINE_EXTEND would 
-> actually concatenate the kernel command-line with the bootargs provided from 
-> dtb.
-> 
-> Is this something someone else would need? If so, shall we just make that 
-> happen when the two config symbols mentionned above are enabled, or shall we 
-> introduce a 4th kernel command line handling strategy?
-> 
-> Thank you for your answers.
+Hi,
 
-There was a patch to do this:
+On 06/11/2012 04:16 PM, Arnd Bergmann wrote:
+> On Monday 11 June 2012, Roland Stigge wrote:
+>> The clock.c file needs to be changed to match the automatic device name to its
+>> clock.
+>>
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>
+> 
+> Should this not be in the same patch as the one that moves the device over
+> to DT probing? Otherwise you have a non-working setup if only one patch
+> is applied.
 
-http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg10448.html
+The actual driver is new for v3.6 (hopefully), DT-only.
 
-Please comment if this works for you.
+Rather than merging the patches, I'd let the key driver go in via input,
+and the clock.c adjustment via arm-soc.
 
-Rob
+Roland
