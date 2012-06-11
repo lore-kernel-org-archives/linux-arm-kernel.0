@@ -1,42 +1,36 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 10:43:45 -0500
-Subject: [PATCH 1/3] ARM: OMAP2+: nand: unify init functions
-In-Reply-To: <95b5dece2f0b06ba1242f5af4c14fe1696950101.1339419244.git.afzal@ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <95b5dece2f0b06ba1242f5af4c14fe1696950101.1339419244.git.afzal@ti.com>
-Message-ID: <4FD61231.6020605@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 11 Jun 2012 10:45:26 -0500
+Subject: [PATCH] arm: ep93xx: Enable i2c support for ep9302
+In-Reply-To: <4FD534A5.1030301@gmail.com>
+References: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
+ <4FD534A5.1030301@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020698D1354E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On Sunday, June 10, 2012 4:58 PM, Ryan Mallon wrote:
+> On 10/06/12 22:44, Todor Colov wrote:
+>> 
+>> Enable i2c support for ep9302. i2c support is needed when external RTC is 
+>> used. 
+>> 
+>> Signed-off-by: Todor Colov <todorcolov@gmail.com>
+>
+> Thanks. Applied to ep93xx-fixes.
 
-On 06/11/2012 09:01 AM, Afzal Mohammed wrote:
-> Helper function for updating nand platform data has been
-> added the capability to take timing structure arguement.
-> Usage of omap_nand_flash_init() has been replaced by modifed
-> one, omap_nand_flash_init was doing things similar to
-> board_nand_init except that NAND CS# were being acquired
-> based on bootloader setting. As CS# is hardwired for a given
-> board, acquiring gpmc CS# has been removed, and updated with
-> the value on board.
-> 
-> NAND CS# used in beagle board was found to be CS0.
-> Thomas Weber <thomas.weber.linux@googlemail.com> reported
-> that value of devkit8000 to be CS0. Overo board was found
-> to be using CS0 based on u-boot, while google grep says
-> omap3touchbook too has CS0.
+Ryan,
 
-[1] also confirms the omap3-touchbook uses CS0.
+I'm not sure about this patch...
 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+The EDB9302 does not have a built-on external RTC connected to the I2C
+bus. The EECLK and EEDAT pins are simply routed to two headers. They are
+not connected to any I2C devices built onto the board.
 
-Which boards have been tested with this change?
+This patch will cause _all_ edb9302 boards to bind the ds1337 driver to the
+I2C bus but that device will only exist if a user has connected the part
+externally to the board.
 
-Otherwise, looks good.
+Just my 2 cents...
 
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
-
-Cheers
-Jon
-
-[1] http://www.alwaysinnovating.com/wiki/index.php/Booting
+Regards,
+Hartley
