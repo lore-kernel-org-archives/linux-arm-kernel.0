@@ -1,11 +1,11 @@
 From: zkabelac@redhat.com (Zdenek Kabelac)
-Date: Mon, 11 Jun 2012 15:04:14 +0200
+Date: Mon, 11 Jun 2012 15:06:13 +0200
 Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
  allocate memory
 In-Reply-To: <20120610201625.GA26603@schnuecks.de>
 References: <1338401183.22894.11.camel@hactar>
  <20120610201625.GA26603@schnuecks.de>
-Message-ID: <4FD5ECCE.2050403@redhat.com>
+Message-ID: <4FD5ED45.50208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -47,7 +47,8 @@ Dne 10.6.2012 22:16, Simon Baatz napsal(a):
 >
 > "[vdso]" seem to be based on gate_vma as well. Thus, I think
 > "[vectors]" needs to be added to this list.
->
+
+Opps - missed multilist posting - so again with all copies...
 
 Yep, looks like simple patch to add.
 Is there any other area which is missing ?
