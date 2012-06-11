@@ -1,46 +1,73 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:25:04 +0100
-Subject: [PATCH 11/14] usb: otg: Enable probing of the ab8500 during a Device
- Tree boot
+Date: Mon, 11 Jun 2012 16:25:05 +0100
+Subject: [PATCH 12/14] ARM: ux500: Correctly reference IRQs supplied by the
+ AB8500 from Device Tree
 In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1339428307-3850-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch, if Device Tree is enabled the AB8500 USB OTG driver
-wouldn't get probed at all, as there is no reference to it from platform
-code. This patch ensures the driver is probed during normal DT start-up.
+The AB8500 driver has now been provided with IRQ domain support. This
+means we can request IRQs from any of it's uses via Device Tree. This
+patch advertises the AB8500 as an Interrupt Controller and provides the
+correct calls in the format the driver expects.
 
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/usb/otg/ab8500-usb.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/db8500.dtsi |   24 +++++++++++++-----------
+ 1 file changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/usb/otg/ab8500-usb.c b/drivers/usb/otg/ab8500-usb.c
-index a84af67..9799ac6 100644
---- a/drivers/usb/otg/ab8500-usb.c
-+++ b/drivers/usb/otg/ab8500-usb.c
-@@ -569,12 +569,18 @@ static int __devexit ab8500_usb_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+index 01f9a9d..55a36ae 100644
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ b/arch/arm/boot/dts/db8500.dtsi
+@@ -312,24 +312,26 @@
+ 				compatible = "stericsson,ab8500";
+ 				reg = <5>; /* mailbox 5 is i2c */
+ 				interrupts = <0 40 0x4>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
  
-+static const struct of_device_id ab8500_usb_match[] = {
-+	{ .compatible = "stericsson,ab8500-usb", },
-+	{},
-+};
-+
- static struct platform_driver ab8500_usb_driver = {
- 	.probe		= ab8500_usb_probe,
- 	.remove		= __devexit_p(ab8500_usb_remove),
- 	.driver		= {
- 		.name	= "ab8500-usb",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = ab8500_usb_match,
- 	},
- };
+ 				ab8500-gpadc {
+ 					compatible = "stericsson,ab8500-gpadc";
+-					interrupts = <0 32 0x4
+-						      0 39 0x4>;
++					interrupts = <32 0x4
++						      39 0x4>;
+ 					interrupt-names = "HW_CONV_END", "SW_CONV_END";
+ 					vddadc-supply = <&ab8500_ldo_tvout_reg>;
+ 				};
+ 
+ 				ab8500-usb {
+ 					compatible = "stericsson,ab8500-usb";
+-					interrupts = < 0 90 0x4
+-						       0 96 0x4
+-						       0 14 0x4
+-						       0 15 0x4
+-						       0 79 0x4
+-						       0 74 0x4
+-						       0 75 0x4>;
++					interrupts = < 90 0x4
++						       96 0x4
++						       14 0x4
++						       15 0x4
++						       79 0x4
++						       74 0x4
++						       75 0x4>;
+ 					interrupt-names = "ID_WAKEUP_R",
+ 							  "ID_WAKEUP_F",
+ 							  "VBUS_DET_F",
+@@ -344,8 +346,8 @@
+ 
+ 				ab8500-ponkey {
+ 					compatible = "stericsson,ab8500-ponkey";
+-					interrupts = <0 6 0x4
+-						      0 7 0x4>;
++					interrupts = <6 0x4
++						      7 0x4>;
+ 					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
+ 				};
  
 -- 
 1.7.9.5
