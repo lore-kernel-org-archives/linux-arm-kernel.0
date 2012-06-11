@@ -1,155 +1,61 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Mon, 11 Jun 2012 17:41:08 +0530
-Subject: [PATCH] regulator: Add ramp_delay to regulator constraints to get
- used as a configurable parameter.
-Message-ID: <1339416668-17028-1-git-send-email-yadi.brar@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Jun 2012 14:17:58 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix crash when neither NAND nor SPI
+In-Reply-To: <4FD4E2DE.20006@baatz.info>
+References: <1339164583-11596-1-git-send-email-andrew@lunn.ch>
+ <4FD4E2DE.20006@baatz.info>
+Message-ID: <20120611121758.GA3221@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some hardwares ramp_delay for BUCKs is a configurable parameter which can
-be configured through DT or board file.This patch adds ramp_delay to regulator
-constraints and allow user to configure it for regulators which supports this
-feature, through DT or board file. It will provide two ways of setting the
-ramp_delay for a regulator:
-	First, by setting it as constraints in board file(for configurable
-regulators) and set_machine_constraints() will take care of setting it on
-hardware by calling(the provided) .set_ramp_delay() operation(callback).
-	Second, by setting it as data in regulator_desc(as fixed/default
-ramp_delay rate) for a regulator in driver.
+On Sun, Jun 10, 2012 at 08:09:34PM +0200, Simon Baatz wrote:
+> Hi Andrew,
+> 
+> Am 08.06.2012 16:09, schrieb Andrew Lunn:
+> > Both NAND and SPI make use of the RUNIT clk. However, if neither NAND
+> > nor SPI is used in the system, RUNIT clock gets turned off, and the
+> > SoC hard locks. It appears something else in the SoC, which is not
+> > documented, is also using RUNIT. So prepare and enable RUNIT clock in
+> > kirkwood_clk_init().
+> >
+> > +
+> > +	/* Something other than SPI and NAND needs runit, so make sure
+> > +	   it never gets turned off. */
+> > +	clk_prepare_enable(runit);
+> >
+> 
+> I am experiencing another type of crash caused by the GE0 clock (on a
+> IB-NAS 6210). I am compiling mv643xx_eth as a module. Thus, GE0 and GE1
+> get turned off first since they are unused.
+> 
+> When the module loads and it should enable GE0, the box hangs.
 
-regulator_set_voltage_time_sel() will give preference to
-constraints->ramp_delay while reading ramp_delay rate for regulator. Similarly
-users should also take care accordingly while refering ramp_delay rate(in case
-of implementing their private .set_voltage_time_sel() callbacks for different
-regulators).
+I debugged this further. As i guessed, it is interesting, but not how
+i expected.
 
-Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
----
- .../devicetree/bindings/regulator/regulator.txt    |    1 +
- drivers/regulator/core.c                           |   23 ++++++++++++++++---
- drivers/regulator/of_regulator.c                   |    6 ++++-
- include/linux/regulator/driver.h                   |    3 ++
- include/linux/regulator/machine.h                  |    3 ++
- 5 files changed, 31 insertions(+), 5 deletions(-)
+By enabling a clock while performing shared_probe, i stopped it
+locking up. I also needed to add a short delay in the individual
+interface probe, otherwise it locked up there.
 
-diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-index 5b7a408..d0a7b12 100644
---- a/Documentation/devicetree/bindings/regulator/regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-@@ -10,6 +10,7 @@ Optional properties:
- - regulator-always-on: boolean, regulator should never be disabled
- - regulator-boot-on: bootloader/firmware enabled regulator
- - <name>-supply: phandle to the parent supply/regulator node
-+- regulator-ramp-delay: ramp delay for regulator(in mV/uS)
- 
- Example:
- 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 63507a5..0ffd917 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -967,6 +967,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
- 		}
- 	}
- 
-+	if (rdev->constraints->ramp_delay && ops->set_ramp_delay) {
-+		ret = ops->set_ramp_delay(rdev, rdev->constraints->ramp_delay);
-+		if (ret < 0) {
-+			rdev_err(rdev, "failed to set ramp_delay\n");
-+			goto out;
-+		}
-+	}
-+
- 	print_constraints(rdev);
- 	return 0;
- out:
-@@ -2305,10 +2313,17 @@ int regulator_set_voltage_time_sel(struct regulator_dev *rdev,
- 				   unsigned int old_selector,
- 				   unsigned int new_selector)
- {
--	if (rdev->desc->ramp_delay && rdev->desc->uV_step)
--		return DIV_ROUND_UP(rdev->desc->uV_step *
--			abs(new_selector - old_selector),
--			rdev->desc->ramp_delay * 1000);
-+	if (rdev->desc->uV_step) {
-+		if (rdev->constraints->ramp_delay)
-+			return DIV_ROUND_UP(rdev->desc->uV_step *
-+				abs(new_selector - old_selector),
-+				rdev->constraints->ramp_delay * 1000);
-+		if (rdev->desc->ramp_delay)
-+			return DIV_ROUND_UP(rdev->desc->uV_step *
-+				abs(new_selector - old_selector),
-+				rdev->desc->ramp_delay * 1000);
-+		rdev_warn(rdev, "ramp_delay not set\n");
-+	}
- 	return 0;
- }
- 
-diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-index 56593b7..e2a7310 100644
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -20,7 +20,7 @@ static void of_get_regulation_constraints(struct device_node *np,
- 					struct regulator_init_data **init_data)
- {
- 	const __be32 *min_uV, *max_uV, *uV_offset;
--	const __be32 *min_uA, *max_uA;
-+	const __be32 *min_uA, *max_uA, *ramp_delay;
- 	struct regulation_constraints *constraints = &(*init_data)->constraints;
- 
- 	constraints->name = of_get_property(np, "regulator-name", NULL);
-@@ -60,6 +60,10 @@ static void of_get_regulation_constraints(struct device_node *np,
- 		constraints->always_on = true;
- 	else /* status change should be possible if not always on. */
- 		constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
-+
-+	ramp_delay = of_get_property(np, "regulator-ramp-delay", NULL);
-+	if (ramp_delay)
-+		constraints->min_uV = be32_to_cpu(*ramp_delay);
- }
- 
- /**
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index ae5c253..ddc155d 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -67,6 +67,8 @@ enum regulator_status {
-  *
-  * @enable_time: Time taken for the regulator voltage output voltage to
-  *               stabilise after being enabled, in microseconds.
-+ * @set_ramp_delay: Set the ramp delay for the regulator. The driver should
-+ *		select ramp delay equal to or less than(closest) ramp_delay.
-  * @set_voltage_time_sel: Time taken for the regulator voltage output voltage
-  *               to stabilise after being set to a new value, in microseconds.
-  *               The function provides the from and to voltage selector, the
-@@ -113,6 +115,7 @@ struct regulator_ops {
- 
- 	/* Time taken to enable or set voltage on the regulator */
- 	int (*enable_time) (struct regulator_dev *);
-+	int (*set_ramp_delay) (struct regulator_dev *, int ramp_delay);
- 	int (*set_voltage_time_sel) (struct regulator_dev *,
- 				     unsigned int old_selector,
- 				     unsigned int new_selector);
-diff --git a/include/linux/regulator/machine.h b/include/linux/regulator/machine.h
-index b021084..5f37ad3 100644
---- a/include/linux/regulator/machine.h
-+++ b/include/linux/regulator/machine.h
-@@ -92,6 +92,7 @@ struct regulator_state {
-  *                 mode.
-  * @initial_state: Suspend state to set by default.
-  * @initial_mode: Mode to set at startup.
-+ * @ramp_delay: Time to settle down after voltage change (unit: mV/us)
-  */
- struct regulation_constraints {
- 
-@@ -125,6 +126,8 @@ struct regulation_constraints {
- 	/* mode to set on startup */
- 	unsigned int initial_mode;
- 
-+	unsigned int ramp_delay;
-+
- 	/* constraint flags */
- 	unsigned always_on:1;	/* regulator never off when system is on */
- 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
--- 
-1.7.0.4
+However, this leads to another problem. It appears to forget its MAC
+address, as set by u-boot, while the clock is off :-(
+
+I'm not sure how to handle this. One option is simply to not allow the
+two clocks to be turned off. The module can then be loaded/unloaded at
+any time, and the MAC address set by u-boot will still be available.
+
+Or i could enable_prepare() the clock in kirkwood_ge00_init() and
+kirkwood_ge01_init() when the platform device structure is
+created. These functions indicate at some time in the future, the
+driver might be loaded to driver one or the other interface, so
+keeping the clk ticking to preserve the MAC address is a good idea.
+This will however not work for DT boards, since they won't in the
+future call these functions. We would need additional code to look
+into the DT during boot, see if there are nodes for the ethernet
+interfaces, and if so, enable_prepare() the clocks.
+
+I'm tempted to go with this last solution, since it is more in keeping
+with the way it was done before i replaced the code with the generic
+clock framework.
+
+      Andrew
