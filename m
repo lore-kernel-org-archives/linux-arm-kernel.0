@@ -1,66 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jun 2012 10:44:23 +0100
-Subject: [PATCH] ARM: EXYNOS: Add smc call to support trustzone feature
-In-Reply-To: <20120611090440.GA27207@july>
-References: <20120611090440.GA27207@july>
-Message-ID: <20120611094423.GC11168@n2100.arm.linux.org.uk>
+Date: Mon, 11 Jun 2012 10:51:02 +0100
+Subject: [PATCH 1/3] mx3fb: do not support panning with fb blanked
+In-Reply-To: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
+References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20120611095102.GD11168@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 06:04:40PM +0900, Kyungmin Park wrote:
-> +/*
-> + * Read registers
-> + * Function signature: u32 exynos_smc_readsfr(u32 addr, u32 *val)
+On Mon, Jun 11, 2012 at 09:06:48AM +0800, Liu Ying wrote:
+> This patch checks if framebuffer is unblanked before
+> we actually trigger panning in custom pan display
+> function.
+> 
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+>  drivers/video/mx3fb.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> index e3406ab..d53db60 100644
+> --- a/drivers/video/mx3fb.c
+> +++ b/drivers/video/mx3fb.c
+> @@ -1063,6 +1063,11 @@ static int mx3fb_pan_display(struct fb_var_screeninfo *var,
+>  	dev_dbg(fbi->device, "%s [%c]\n", __func__,
+>  		list_empty(&mx3_fbi->idmac_channel->queue) ? '-' : '+');
+>  
+> +	if (mx3_fbi->blank != FB_BLANK_UNBLANK) {
+> +		dev_dbg(fbi->device, "panning with fb blanked not supported\n");
+> +		return -EFAULT;
+> +	}
 
-What address space is 'addr' in?
-
-> + */
-> +ENTRY(exynos_smc_readsfr)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	mov	r2, #0
-> +	lsr	r0, r0, #2
-> +	mov	ip, r1
-> +	mov	r3, r2
-> +	orr	r1, r0, #0xC0000000
-
-I assume this is not PAGE_OFFSET.
-
-> +	mvn	r0, #100
-
-Hmm.  The compiler will automatically use mvn instead of a normal mov with
-negative numbers.  It may be clearer to write:
-
-	mov	r0, #-101
-
-> +	dsb
-> +	smc	#0
-> +	cmn	r0, #101
-
-Same here:
-	cmp	r0, #-101
-
-Notice that writing it this way means it's obvious that you're checking
-for -101, the original value passed in.
-
-> +	beq	1f
-> +	cmp	r0, #0
-> +	streq	r2, [ip]
-> +	ldmfd	sp!, {r4-r11, pc}
-> +1:	subs	r0, r1, #0
-
-Isn't this just a normal:
-	movs	r0, r1
-
-?
-
-> +	streq	r2, [ip]
-> +	ldmfd	sp!, {r4-r11, pc}
-> +ENDPROC(exynos_smc_readsfr)
-
-In any case, can't this end part be written:
-
-	cmp	r0, #-101
-	moveq	r0, r1
-	teq	r0, #0		@ I prefer teq over cmp to test equality
-	streq	r2, [ip]
-	ldmfd	sp!, {r4 - r11, pc}
+Why is this an error, and why return -EFAULT?  What userspace access
+failed?
