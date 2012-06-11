@@ -1,25 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jun 2012 23:41:31 +0200
-Subject: [PATCH 12/14] ARM: ux500: Correctly reference IRQs supplied by
- the AB8500 from Device Tree
-In-Reply-To: <1339428307-3850-13-git-send-email-lee.jones@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbJ_3Br=RbfbNRBrtz6zc3MH_B6f9E-2aQk=XhMHPnnrA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Jun 2012 15:41:46 -0600
+Subject: [PATCH v2 09/10] ARM: tegra: harmony: Initialize PCIe from DT
+In-Reply-To: <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4FD6661A.1060407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 06/11/2012 09:05 AM, Thierry Reding wrote:
+> With the device tree support in place, probe the PCIe controller from
+> the device tree and remove the corresponding workaround in the board
+> file.
 
-> The AB8500 driver has now been provided with IRQ domain support. This
-> means we can request IRQs from any of it's uses via Device Tree. This
-> patch advertises the AB8500 as an Interrupt Controller and provides the
-> correct calls in the format the driver expects.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
 
-Looks good to me,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> +	pci_vdd_reg: fixedregulator at 0 {
 
-Yours,
-Linus Walleij
+I think that'd usually just be "regulator at 0".
+
+If you need the "@0" part to differentiate between multiple regulators,
+the node needs a reg property too:
+
+	reg = <0 0>;
+
+although then I wonder about putting the regulator under the root node,
+since the address wouldn't really make sense...
