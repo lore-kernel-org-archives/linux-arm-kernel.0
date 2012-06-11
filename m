@@ -1,30 +1,57 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 13:02:17 +0200
-Subject: [PATCH 14/14] ARM: LPC32xx: Remove mach specific ARCH_NR_GPIOS,
- use default
-In-Reply-To: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339412537-24485-15-git-send-email-stigge@antcom.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jun 2012 12:05:17 +0100
+Subject: [PATCH 1/3] mx3fb: do not support panning with fb blanked
+In-Reply-To: <CA+8Hj81L9-NC=08_dvV2u_eM0NdssJsjduAgTbH37nusu56Avw@mail.gmail.com>
+References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
+ <20120611095102.GD11168@n2100.arm.linux.org.uk>
+ <CA+8Hj81L9-NC=08_dvV2u_eM0NdssJsjduAgTbH37nusu56Avw@mail.gmail.com>
+Message-ID: <20120611110517.GE11168@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARCH_NR_GPIOS was defined statically to include exactly all SoC specific GPIOs.
-Now if additional GPIOs need to be added dynamically, e.g. via DT, none are
-available. Removing the mach specific setting, leaving ARCH_NR_GPIOS to the
-default of 256 (currently in include/asm-generic/gpio.h).
+On Mon, Jun 11, 2012 at 06:46:14PM +0800, Liu Ying wrote:
+> 2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Jun 11, 2012 at 09:06:48AM +0800, Liu Ying wrote:
+> >> This patch checks if framebuffer is unblanked before
+> >> we actually trigger panning in custom pan display
+> >> function.
+> >>
+> >> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> >> ---
+> >>  drivers/video/mx3fb.c |    5 +++++
+> >>  1 files changed, 5 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> >> index e3406ab..d53db60 100644
+> >> --- a/drivers/video/mx3fb.c
+> >> +++ b/drivers/video/mx3fb.c
+> >> @@ -1063,6 +1063,11 @@ static int mx3fb_pan_display(struct
+> >> fb_var_screeninfo *var,
+> >>  	dev_dbg(fbi->device, "%s [%c]\n", __func__,
+> >>  		list_empty(&mx3_fbi->idmac_channel->queue) ? '-' : '+');
+> >>
+> >> +	if (mx3_fbi->blank != FB_BLANK_UNBLANK) {
+> >> +		dev_dbg(fbi->device, "panning with fb blanked not supported\n");
+> >> +		return -EFAULT;
+> >> +	}
+> >
+> > Why is this an error, and why return -EFAULT?  What userspace access
+> > failed?
+> >
+> Hi, Russell,
+> 
+> IMHO, panning with framebuffer blanked is meaningless, at least, it is
+> not a common usecase.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Yes, but why should anything in userspace care whether the display is
+blanked or not?
 
----
- arch/arm/mach-lpc32xx/include/mach/gpio.h |    2 --
- 1 file changed, 2 deletions(-)
+For example, we may pan the display when a user program produces output,
+and we're on the last line of the display.  We don't fail that just
+because the screen happens to be blank.  So I don't see why we should
+actively fail an explicit userspace pan request just because the console
+happened to be blanked.
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/gpio.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/gpio.h
-@@ -3,6 +3,4 @@
- 
- #include "gpio-lpc32xx.h"
- 
--#define ARCH_NR_GPIOS (LPC32XX_GPO_P3_GRP + LPC32XX_GPO_P3_MAX)
--
- #endif /* __MACH_GPIO_H */
+What I'm basically saying is that as far as _userspace_ is concerned,
+all the standard APIs should just work as normal whether the display is
+blanked or not.
