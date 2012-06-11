@@ -1,37 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jun 2012 12:34:53 +0200
-Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
-In-Reply-To: <4FD5C26E.9080902@linaro.org>
-References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
- <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
- <4F8BE5B0.4000900@linaro.org>
- <20120604101447.GF8262@n2100.arm.linux.org.uk>
- <4FCDE3D7.9030006@linaro.org>
- <20120605105249.GK8262@n2100.arm.linux.org.uk>
- <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
- <4FD5C26E.9080902@linaro.org>
-Message-ID: <CACRpkdZbSpXhg+m8MzOTrB=sGbYW9MDrXyRd_afAExogkgE5-Q@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Jun 2012 18:36:07 +0800
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <4FD5C829.2090408@linaro.org>
+References: <20120530121547.GJ9947@opensource.wolfsonmicro.com>
+ <4FC63632.4030504@linaro.org>
+ <20120530151119.GN9947@opensource.wolfsonmicro.com>
+ <4FC63B39.6040905@linaro.org>
+ <20120530164152.GP9947@opensource.wolfsonmicro.com>
+ <4FC846CC.20801@linaro.org>
+ <20120601084850.GJ24139@opensource.wolfsonmicro.com>
+ <4FCDDFFC.3000902@linaro.org>
+ <20120605103846.GQ23408@opensource.wolfsonmicro.com>
+ <4FD5C829.2090408@linaro.org>
+Message-ID: <20120611103606.GG11439@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 12:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, Jun 11, 2012 at 11:27:53AM +0100, Lee Jones wrote:
+> On 05/06/12 11:38, Mark Brown wrote:
 
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Mon, 11 Jun 2012 10:41:00 +0100
-> Subject: [PATCH] mmc: mmci: Allocate platform memory during Device Tree boot
->
-> When booting with Device Tree enabled, platform specific information
-> is gathered by parsing the DT binary. Platform data is subsequently
-> populated with the result. The memory required for this is not
-> automatically allocated during Device Tree boot, so we'll do it here
-> instead.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >You're missing something - note what I say above about the direction the
+> >mapping is done in, and consider what happens if we've got two of the
+> >same PMIC down in a system.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> I'm still not seeing how this would cause an issue. The only Device
+> Tree nodes which will be parsed are the ones which are specified by
+> a particular driver's compatible string, meaning that any other
+> nodes referencing similar regulator/supply names would be ignored.
 
-Pls put this in Russell's patch tracker.
-
-Yours,
-Linus Walleij
+Suppose you have two devices of the same type with an array of name
+based regulators, meaning the nodes with constraints have to have a
+particular name in order to be matched to the regulator.  How would a
+consumer reference a node to specify a supply?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/8237c5c6/attachment.sig>
