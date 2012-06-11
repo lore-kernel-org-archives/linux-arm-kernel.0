@@ -1,55 +1,37 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Mon, 11 Jun 2012 18:46:14 +0800
-Subject: [PATCH 1/3] mx3fb: do not support panning with fb blanked
-In-Reply-To: <20120611095102.GD11168@n2100.arm.linux.org.uk>
-References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
- <20120611095102.GD11168@n2100.arm.linux.org.uk>
-Message-ID: <CA+8Hj81L9-NC=08_dvV2u_eM0NdssJsjduAgTbH37nusu56Avw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 11 Jun 2012 12:53:17 +0200
+Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
+In-Reply-To: <20120611073036.GG2552@S2101-09.ap.freescale.net>
+References: <1339242351-8797-1-git-send-email-marex@denx.de>
+ <201206101353.06018.marex@denx.de>
+ <20120611073036.GG2552@S2101-09.ap.freescale.net>
+Message-ID: <201206111253.17314.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jun 11, 2012 at 09:06:48AM +0800, Liu Ying wrote:
->> This patch checks if framebuffer is unblanked before
->> we actually trigger panning in custom pan display
->> function.
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->>  drivers/video/mx3fb.c |    5 +++++
->>  1 files changed, 5 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
->> index e3406ab..d53db60 100644
->> --- a/drivers/video/mx3fb.c
->> +++ b/drivers/video/mx3fb.c
->> @@ -1063,6 +1063,11 @@ static int mx3fb_pan_display(struct
->> fb_var_screeninfo *var,
->>  	dev_dbg(fbi->device, "%s [%c]\n", __func__,
->>  		list_empty(&mx3_fbi->idmac_channel->queue) ? '-' : '+');
->>
->> +	if (mx3_fbi->blank != FB_BLANK_UNBLANK) {
->> +		dev_dbg(fbi->device, "panning with fb blanked not supported\n");
->> +		return -EFAULT;
->> +	}
->
-> Why is this an error, and why return -EFAULT?  What userspace access
-> failed?
->
-Hi, Russell,
+Dear Shawn Guo,
 
-IMHO, panning with framebuffer blanked is meaningless, at least, it is
-not a common usecase. Most users use pan display to swap front buffer
-and back buffer when framebuffer is unblanked/active. So, I choose to
-take the in question case as an error. Pan display may let user select
-a buffer address to be active on display  and I saw the head file
-'errno-base.h' comments EFAULT macro to be 'Bad address', so I use
-this return value. Perhaps, this return value is not good enough.
-Maybe, EIO is better? Would you please help to give some advice on
-this?
+> On Sun, Jun 10, 2012 at 01:53:05PM +0200, Marek Vasut wrote:
+> > > +struct mxs_i2c_speed_config {
+> > > +	uint32_t	timing0;
+> > > +	uint32_t	timing1;
+> > > +	uint32_t	timing2;
+> > > +};
+> > > +
+> > > +/* Timing values for the default 24MHz clock supplied into the i2c
+> > > block.
+> > 
+> > Thinking about these further -- does anyone have any idea how these
+> > numbers were derived? And possibly even formula for that?
+> > 
+> > And maybe we should somehow make sure the source runs on 24MHz (how?).
+> 
+> There is nothing about I2C clock mentioned in CLKCTRL chapter.  I just
+> contacted design team and was told that I2C clock sources from APBX
+> (xbus) clock and always runs at the same frequency there.
 
-Thanks.
+Ok, then can you please try asking them how to exactly compute the values in 
+timing0-timing2 registers? So we don't have to hardcode them like it's done now?
 
--- 
-Best Regards,
-Liu Ying
+Best regards,
+Marek Vasut
