@@ -1,414 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Jun 2012 11:24:50 -0500
-Subject: [PATCH] ARM: Fix dts files w/ status property: "disable" ->
- "disabled"
-In-Reply-To: <1339427460-23007-1-git-send-email-stigge@antcom.de>
-References: <1339427460-23007-1-git-send-email-stigge@antcom.de>
-Message-ID: <4FD61BD2.8050802@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 11 Jun 2012 18:28:04 +0200
+Subject: [PATCHv2 11/12] ARM: OMAP4: clock data: add clockdomains for
+ clocks used as main clocks
+In-Reply-To: <20120611004623.20034.52760.stgit@dusk>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004623.20034.52760.stgit@dusk>
+Message-ID: <4FD61C94.4030004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 10:11 AM, Roland Stigge wrote:
-> This patches fixes some status = "disable" strings to "disabled", the correct
-> way of disabling nodes in the devicetree.
-> 
-> lpc32xx.dtsi is fixed separately in the LPC32xx patch set due to the many
-> changes there.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+Hi Paul,
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+On 6/11/2012 2:46 AM, Paul Walmsley wrote:
+> Until the OMAP4 code is converted to disable the use of the clock
+> framework-based clockdomain enable/disable sequence, any clock used as
+> a hwmod main_clk must have a clockdomain associated with it.
 
-> 
+But why? The clock domain information is already present in every hwmod 
+nodes for OMAP4.
+
+> This
+> patch populates some clock structure clockdomain names to resolve the
+> following warnings during kernel init:
+>
+> omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+> omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
+> omap_hwmod: l3_div_ck: missing clockdomain for l3_div_ck.
+> omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
 > ---
-> Applies to v3.5-rc2
-> 
->  arch/arm/boot/dts/omap3-beagle.dts |    4 +--
->  arch/arm/boot/dts/omap4-panda.dts  |    6 ++---
->  arch/arm/boot/dts/omap4-sdp.dts    |    4 +--
->  arch/arm/boot/dts/tegra20.dtsi     |   36 +++++++++++++++++------------------
->  arch/arm/boot/dts/tegra30.dtsi     |   38 ++++++++++++++++++-------------------
->  5 files changed, 44 insertions(+), 44 deletions(-)
-> 
-> --- linux-2.6.orig/arch/arm/boot/dts/omap3-beagle.dts
-> +++ linux-2.6/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -61,9 +61,9 @@
->  };
->  
->  &mmc2 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc3 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
-> --- linux-2.6.orig/arch/arm/boot/dts/omap4-panda.dts
-> +++ linux-2.6/arch/arm/boot/dts/omap4-panda.dts
-> @@ -74,15 +74,15 @@
->  };
->  
->  &mmc2 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc3 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc4 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc5 {
-> --- linux-2.6.orig/arch/arm/boot/dts/omap4-sdp.dts
-> +++ linux-2.6/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -147,11 +147,11 @@
->  };
->  
->  &mmc3 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc4 {
-> -	status = "disable";
-> +	status = "disabled";
->  };
->  
->  &mmc5 {
-> --- linux-2.6.orig/arch/arm/boot/dts/tegra20.dtsi
-> +++ linux-2.6/arch/arm/boot/dts/tegra20.dtsi
-> @@ -72,7 +72,7 @@
->  		reg = <0x70002800 0x200>;
->  		interrupts = <0 13 0x04>;
->  		nvidia,dma-request-selector = <&apbdma 2>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	tegra_i2s2: i2s at 70002a00 {
-> @@ -80,7 +80,7 @@
->  		reg = <0x70002a00 0x200>;
->  		interrupts = <0 3 0x04>;
->  		nvidia,dma-request-selector = <&apbdma 1>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006000 {
-> @@ -88,7 +88,7 @@
->  		reg = <0x70006000 0x40>;
->  		reg-shift = <2>;
->  		interrupts = <0 36 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006040 {
-> @@ -96,7 +96,7 @@
->  		reg = <0x70006040 0x40>;
->  		reg-shift = <2>;
->  		interrupts = <0 37 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006200 {
-> @@ -104,7 +104,7 @@
->  		reg = <0x70006200 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 46 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006300 {
-> @@ -112,7 +112,7 @@
->  		reg = <0x70006300 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 90 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006400 {
-> @@ -120,7 +120,7 @@
->  		reg = <0x70006400 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 91 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c000 {
-> @@ -129,7 +129,7 @@
->  		interrupts = <0 38 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c400 {
-> @@ -138,7 +138,7 @@
->  		interrupts = <0 84 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c500 {
-> @@ -147,7 +147,7 @@
->  		interrupts = <0 92 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000d000 {
-> @@ -156,7 +156,7 @@
->  		interrupts = <0 53 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	pmc {
-> @@ -190,7 +190,7 @@
->  		interrupts = <0 20 0x04>;
->  		phy_type = "utmi";
->  		nvidia,has-legacy-mode;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	usb at c5004000 {
-> @@ -198,7 +198,7 @@
->  		reg = <0xc5004000 0x4000>;
->  		interrupts = <0 21 0x04>;
->  		phy_type = "ulpi";
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	usb at c5008000 {
-> @@ -206,35 +206,35 @@
->  		reg = <0xc5008000 0x4000>;
->  		interrupts = <0 97 0x04>;
->  		phy_type = "utmi";
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at c8000000 {
->  		compatible = "nvidia,tegra20-sdhci";
->  		reg = <0xc8000000 0x200>;
->  		interrupts = <0 14 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at c8000200 {
->  		compatible = "nvidia,tegra20-sdhci";
->  		reg = <0xc8000200 0x200>;
->  		interrupts = <0 15 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at c8000400 {
->  		compatible = "nvidia,tegra20-sdhci";
->  		reg = <0xc8000400 0x200>;
->  		interrupts = <0 19 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at c8000600 {
->  		compatible = "nvidia,tegra20-sdhci";
->  		reg = <0xc8000600 0x200>;
->  		interrupts = <0 31 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	pmu {
-> --- linux-2.6.orig/arch/arm/boot/dts/tegra30.dtsi
-> +++ linux-2.6/arch/arm/boot/dts/tegra30.dtsi
-> @@ -82,7 +82,7 @@
->  		reg = <0x70006000 0x40>;
->  		reg-shift = <2>;
->  		interrupts = <0 36 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006040 {
-> @@ -90,7 +90,7 @@
->  		reg = <0x70006040 0x40>;
->  		reg-shift = <2>;
->  		interrupts = <0 37 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006200 {
-> @@ -98,7 +98,7 @@
->  		reg = <0x70006200 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 46 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006300 {
-> @@ -106,7 +106,7 @@
->  		reg = <0x70006300 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 90 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	serial at 70006400 {
-> @@ -114,7 +114,7 @@
->  		reg = <0x70006400 0x100>;
->  		reg-shift = <2>;
->  		interrupts = <0 91 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c000 {
-> @@ -123,7 +123,7 @@
->  		interrupts = <0 38 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c400 {
-> @@ -132,7 +132,7 @@
->  		interrupts = <0 84 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c500 {
-> @@ -141,7 +141,7 @@
->  		interrupts = <0 92 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000c700 {
-> @@ -150,7 +150,7 @@
->  		interrupts = <0 120 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	i2c at 7000d000 {
-> @@ -159,7 +159,7 @@
->  		interrupts = <0 53 0x04>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	pmc {
-> @@ -201,35 +201,35 @@
->  			compatible = "nvidia,tegra30-i2s";
->  			reg = <0x70080300 0x100>;
->  			nvidia,ahub-cif-ids = <4 4>;
-> -			status = "disable";
-> +			status = "disabled";
->  		};
->  
->  		tegra_i2s1: i2s at 70080400 {
->  			compatible = "nvidia,tegra30-i2s";
->  			reg = <0x70080400 0x100>;
->  			nvidia,ahub-cif-ids = <5 5>;
-> -			status = "disable";
-> +			status = "disabled";
->  		};
->  
->  		tegra_i2s2: i2s at 70080500 {
->  			compatible = "nvidia,tegra30-i2s";
->  			reg = <0x70080500 0x100>;
->  			nvidia,ahub-cif-ids = <6 6>;
-> -			status = "disable";
-> +			status = "disabled";
->  		};
->  
->  		tegra_i2s3: i2s at 70080600 {
->  			compatible = "nvidia,tegra30-i2s";
->  			reg = <0x70080600 0x100>;
->  			nvidia,ahub-cif-ids = <7 7>;
-> -			status = "disable";
-> +			status = "disabled";
->  		};
->  
->  		tegra_i2s4: i2s at 70080700 {
->  			compatible = "nvidia,tegra30-i2s";
->  			reg = <0x70080700 0x100>;
->  			nvidia,ahub-cif-ids = <8 8>;
-> -			status = "disable";
-> +			status = "disabled";
->  		};
->  	};
->  
-> @@ -237,28 +237,28 @@
->  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->  		reg = <0x78000000 0x200>;
->  		interrupts = <0 14 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at 78000200 {
->  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->  		reg = <0x78000200 0x200>;
->  		interrupts = <0 15 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at 78000400 {
->  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->  		reg = <0x78000400 0x200>;
->  		interrupts = <0 19 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	sdhci at 78000600 {
->  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
->  		reg = <0x78000600 0x200>;
->  		interrupts = <0 31 0x04>;
-> -		status = "disable";
-> +		status = "disabled";
->  	};
->  
->  	pmu {
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   arch/arm/mach-omap2/clock44xx_data.c |    5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+> index 2172f66..e2b701e 100644
+> --- a/arch/arm/mach-omap2/clock44xx_data.c
+> +++ b/arch/arm/mach-omap2/clock44xx_data.c
+> @@ -84,6 +84,7 @@ static struct clk slimbus_clk = {
+>
+>   static struct clk sys_32k_ck = {
+>   	.name		= "sys_32k_ck",
+> +	.clkdm_name	= "prm_clkdm",
+
+In fact, neither prm_clkdm not cm_clkdm are valid clock domain on OMAP4 :-(.
+
+I've just realized that you introduced that for 3.5, but this is wrong. 
+We should not start adding some fake clock domains just because the fmwk 
+is not smart enough to allow a NULL clock domain.
+
+The clkdomain should be optional, at least for clock nodes.
+There is no need to enforce the presence of the clock domain in the 
+structure. We should remove the warning and test the clkdm attribute 
+before de-referencing it inside the clock core code.
+
+This is the only proper fix for that issue for my point of view.
+
+In a period of data size reduction, adding some fake information does 
+not seems to be the right approach.
+Don't you think so?
+
+Regards,
+Benoit
+
+
+PS: I think we should revert 6ba5a69ee92c29c2ffc814dad6ac61c4cd49090c 
+(ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common) and fix the 
+OMAP4 hwmod data.
