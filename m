@@ -1,52 +1,117 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 11 Jun 2012 18:26:26 +0300
-Subject: [PATCHv6 6/7] ARM: OMAP4: suspend: Program all domains to retention
+Date: Mon, 11 Jun 2012 18:26:25 +0300
+Subject: [PATCHv6 5/7] ARM: OMAP4: pwrdm: add support for reading prev logic
+ and mem states
 In-Reply-To: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
 References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1339428387-4800-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1339428387-4800-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+On OMAP4, there is no support to read previous logic state
+or previous memory state achieved when a power domain transitions
+to RET. Instead there are module level context registers.
 
-Remove the FIXME's in the suspend sequence since
-we now intend to support system level RET support.
+In order to support the powerdomain level logic/mem_off_counters
+on OMAP4, instead use the previous power state achieved (RET) and
+the *programmed* logic/mem RET state to derive if a powerdomain lost
+logic or did not.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+If the powerdomain is programmed to enter RET state and lose logic
+in RET state, knowing that the powerdomain entered RET is good enough
+to derive that the logic was lost as well, in such cases.
+
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-[Jean Pihet <j-pihet@ti.com>: ported on top of the functional power
-states]
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/powerdomain44xx.c |   59 +++++++++++++++++++++++++++++++++
+ 1 files changed, 59 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 3a484b1..1e845e8 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -97,19 +97,15 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!strncmp(pwrdm->name, "cpu", 3))
- 		return 0;
+diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+index 030d10c..ab93f08 100644
+--- a/arch/arm/mach-omap2/powerdomain44xx.c
++++ b/arch/arm/mach-omap2/powerdomain44xx.c
+@@ -151,6 +151,34 @@ static int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
+ 	return v;
+ }
  
--	/*
--	 * FIXME: Remove this check when core retention is supported
--	 * Only MPUSS power domain is added in the list.
--	 */
--	if (strcmp(pwrdm->name, "mpu_pwrdm"))
--		return 0;
++/**
++ * omap4_pwrdm_read_prev_logic_pwrst - read the previous logic powerstate
++ * @pwrdm: struct powerdomain * to read the state for
++ *
++ * Reads the previous logic powerstate for a powerdomain. This function
++ * must determine the previous logic powerstate by first checking the
++ * previous powerstate for the domain. If that was OFF, then logic has
++ * been lost. If previous state was RETENTION, the function reads the
++ * setting for the next retention logic state to see the actual value.
++ * In every other case, the logic is retained. Returns either
++ * PWRDM_LOGIC_MEM_PWRST_OFF or PWRDM_LOGIC_MEM_PWRST_RET depending
++ * whether the logic was retained or not.
++ */
++static int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
++{
++	int state;
++
++	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
++
++	if (state == PWRDM_POWER_OFF)
++		return PWRDM_LOGIC_MEM_PWRST_OFF;
++
++	if (state != PWRDM_POWER_RET)
++		return PWRDM_LOGIC_MEM_PWRST_RET;
++
++	return omap4_pwrdm_read_logic_retst(pwrdm);
++}
++
+ static int omap4_pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+ {
+ 	u32 m, v;
+@@ -179,6 +207,35 @@ static int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
+ 	return v;
+ }
  
- 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
- 	if (!pwrst)
- 		return -ENOMEM;
- 
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_FUNC_PWRST_CSWR;
-+	pwrst->next_state = pwrdm_get_achievable_func_pwrst(
-+						pwrdm,
-+						PWRDM_FUNC_PWRST_CSWR);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
++/**
++ * omap4_pwrdm_read_prev_mem_pwrst - reads the previous memory powerstate
++ * @pwrdm: struct powerdomain * to read mem powerstate for
++ * @bank: memory bank index
++ *
++ * Reads the previous memory powerstate for a powerdomain. This function
++ * must determine the previous memory powerstate by first checking the
++ * previous powerstate for the domain. If that was OFF, then logic has
++ * been lost. If previous state was RETENTION, the function reads the
++ * setting for the next memory retention state to see the actual value.
++ * In every other case, the logic is retained. Returns either
++ * PWRDM_LOGIC_MEM_PWRST_OFF or PWRDM_LOGIC_MEM_PWRST_RET depending
++ * whether logic was retained or not.
++ */
++static int omap4_pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
++{
++	int state;
++
++	state = omap4_pwrdm_read_prev_pwrst(pwrdm);
++
++	if (state == PWRDM_POWER_OFF)
++		return PWRDM_LOGIC_MEM_PWRST_OFF;
++
++	if (state != PWRDM_POWER_RET)
++		return PWRDM_LOGIC_MEM_PWRST_RET;
++
++	return omap4_pwrdm_read_mem_retst(pwrdm, bank);
++}
++
+ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+ {
+ 	u32 c = 0;
+@@ -220,9 +277,11 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+ 	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+ 	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+ 	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
++	.pwrdm_read_prev_logic_pwrst	= omap4_pwrdm_read_prev_logic_pwrst,
+ 	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+ 	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+ 	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
++	.pwrdm_read_prev_mem_pwrst	= omap4_pwrdm_read_prev_mem_pwrst,
+ 	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+ 	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+ 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
 -- 
 1.7.4.1
