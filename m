@@ -1,89 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 11 Jun 2012 12:19:34 +0200
-Subject: [PATCH] ARM: EXYNOS: Add smc call to support trustzone feature
-In-Reply-To: <20120611094423.GC11168@n2100.arm.linux.org.uk>
-References: <20120611090440.GA27207@july>
- <20120611094423.GC11168@n2100.arm.linux.org.uk>
-Message-ID: <03bb01cd47bb$b531f920$1f95eb60$%szyprowski@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 11:27:53 +0100
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <20120605103846.GQ23408@opensource.wolfsonmicro.com>
+References: <20120530100302.GD9947@opensource.wolfsonmicro.com>
+ <CAF2Aj3gZMF9ev9B46rBM+aY-srwthef09ad2CWfuXXFHmqqAjA@mail.gmail.com>
+ <20120530121547.GJ9947@opensource.wolfsonmicro.com>
+ <4FC63632.4030504@linaro.org>
+ <20120530151119.GN9947@opensource.wolfsonmicro.com>
+ <4FC63B39.6040905@linaro.org>
+ <20120530164152.GP9947@opensource.wolfsonmicro.com>
+ <4FC846CC.20801@linaro.org>
+ <20120601084850.GJ24139@opensource.wolfsonmicro.com>
+ <4FCDDFFC.3000902@linaro.org>
+ <20120605103846.GQ23408@opensource.wolfsonmicro.com>
+Message-ID: <4FD5C829.2090408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 05/06/12 11:38, Mark Brown wrote:
+> On Tue, Jun 05, 2012 at 11:31:24AM +0100, Lee Jones wrote:
+>> On 01/06/12 09:48, Mark Brown wrote:
+>
+>>> What makes you say the two are equivalent?  The former is a reference
+>> >from a consumer device to a named regulator while the latter is a
+>>> reference from a regulator to a named consumer.
+>
+>> I mean they both link regulator<->consumer and apply the name "vmmc"
+>> to the supply, or am I missing something / getting confused?
+>
+> You're missing something - note what I say above about the direction the
+> mapping is done in, and consider what happens if we've got two of the
+> same PMIC down in a system.
 
-This is a forwarded message originally posted by Kyungmin Park [kyungmin.park at samsung.com]:
+I'm still not seeing how this would cause an issue. The only Device Tree 
+nodes which will be parsed are the ones which are specified by a 
+particular driver's compatible string, meaning that any other nodes 
+referencing similar regulator/supply names would be ignored. In case I 
+am still missing a critical point here, would you be kind enough to 
+provide an example that we can work though together?
 
-On 6/11/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 11, 2012 at 06:04:40PM +0900, Kyungmin Park wrote:
->> +/*
->> + * Read registers
->> + * Function signature: u32 exynos_smc_readsfr(u32 addr, u32 *val)
-> 
-> What address space is 'addr' in?
-
-It's Memory Controller address with physical address space. I don't know why this
-address is required. It's vendor specific address. If exynos_smc_readsfr is ambiguous,
-then it will drop at this time.
-
->> + */
->> +ENTRY(exynos_smc_readsfr)
->> +    stmfd    sp!, {r4-r11, lr}
->> +    mov      r2, #0
->> +    lsr        r0, r0, #2
->> +    mov      ip, r1
->> +    mov      r3, r2
->> +    orr       r1, r0, #0xC0000000
-> 
-> I assume this is not PAGE_OFFSET.
-
-Right, it's also vendor specific command.
-
-To read SFR, it send r0 = -101, r1 =  (0x3 << 30) | ((addr) >> 2), r2 = r3 = 0;
-
-> 
->> +    mvn      r0, #100
-> 
-> Hmm.  The compiler will automatically use mvn instead of a normal mov with
-> negative numbers.  It may be clearer to write:
-> 
->         mov      r0, #-101
-
-exactly. I refered the compiled generated codes. I'll change it.
-
-> 
->> +    dsb
->> +    smc      #0
->> +    cmn      r0, #101
-> 
-> Same here:
->         cmp      r0, #-101
-> 
-> Notice that writing it this way means it's obvious that you're checking
-> for -101, the original value passed in.
-> 
->> +    beq      1f
->> +    cmp      r0, #0
->> +    streq    r2, [ip]
->> +    ldmfd    sp!, {r4-r11, pc}
->> +1:  subs     r0, r1, #0
-> 
-> Isn't this just a normal:
->         movs    r0, r1
-> 
-> ?
-> 
->> +    streq    r2, [ip]
->> +    ldmfd    sp!, {r4-r11, pc}
->> +ENDPROC(exynos_smc_readsfr)
-> 
-> In any case, can't this end part be written:
-> 
->         cmp      r0, #-101
->         moveq   r0, r1
->         teq       r0, #0              @ I prefer teq over cmp to test equality
->         streq    r2, [ip]
->         ldmfd    sp!, {r4 - r11, pc}
-
-I'll change it.
-
-Thank you,
-Kyungmin Park
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
