@@ -1,68 +1,49 @@
-From: liu.y.victor@gmail.com (Liu Ying)
-Date: Mon, 11 Jun 2012 19:18:00 +0800
-Subject: [PATCH 1/3] mx3fb: do not support panning with fb blanked
-In-Reply-To: <20120611110517.GE11168@n2100.arm.linux.org.uk>
-References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
- <20120611095102.GD11168@n2100.arm.linux.org.uk>
- <CA+8Hj81L9-NC=08_dvV2u_eM0NdssJsjduAgTbH37nusu56Avw@mail.gmail.com>
- <20120611110517.GE11168@n2100.arm.linux.org.uk>
-Message-ID: <CA+8Hj83+Jqv3Bs0mTKYpdsH4ZbOMEQkRpsiCUPVwpeqvWg8jyA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 12:21:00 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <20120605104201.GR23408@opensource.wolfsonmicro.com>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+ <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+Message-ID: <4FD5D49C.6070106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jun 11, 2012 at 06:46:14PM +0800, Liu Ying wrote:
->> 2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Mon, Jun 11, 2012 at 09:06:48AM +0800, Liu Ying wrote:
->> >> This patch checks if framebuffer is unblanked before
->> >> we actually trigger panning in custom pan display
->> >> function.
->> >>
->> >> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> >> ---
->> >>  drivers/video/mx3fb.c |    5 +++++
->> >>  1 files changed, 5 insertions(+), 0 deletions(-)
->> >>
->> >> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
->> >> index e3406ab..d53db60 100644
->> >> --- a/drivers/video/mx3fb.c
->> >> +++ b/drivers/video/mx3fb.c
->> >> @@ -1063,6 +1063,11 @@ static int mx3fb_pan_display(struct
->> >> fb_var_screeninfo *var,
->> >>  	dev_dbg(fbi->device, "%s [%c]\n", __func__,
->> >>  		list_empty(&mx3_fbi->idmac_channel->queue) ? '-' : '+');
->> >>
->> >> +	if (mx3_fbi->blank != FB_BLANK_UNBLANK) {
->> >> +		dev_dbg(fbi->device, "panning with fb blanked not supported\n");
->> >> +		return -EFAULT;
->> >> +	}
->> >
->> > Why is this an error, and why return -EFAULT?  What userspace access
->> > failed?
->> >
->> Hi, Russell,
->>
->> IMHO, panning with framebuffer blanked is meaningless, at least, it is
->> not a common usecase.
+On 05/06/12 11:42, Mark Brown wrote:
+> On Tue, Jun 05, 2012 at 11:34:12AM +0100, Lee Jones wrote:
 >
-> Yes, but why should anything in userspace care whether the display is
-> blanked or not?
+>>>> Are you sending this for -rc2?
 >
-> For example, we may pan the display when a user program produces output,
-> and we're on the last line of the display.  We don't fail that just
-> because the screen happens to be blank.  So I don't see why we should
-> actively fail an explicit userspace pan request just because the console
-> happened to be blanked.
+>>> No, nothing about this looks like an urgent fix?
 >
-> What I'm basically saying is that as far as _userspace_ is concerned,
-> all the standard APIs should just work as normal whether the display is
-> blanked or not.
+>> Well without it all regulator requests from DT will fail.
 >
+> Oh, ffs.  Why wasn't this mentioned when the patch was posted,
 
-Ok, understand your point. I am ok to drop this patch.
+I did. My 00 patch mentioned that these were all clean-ups/bug fixes 
+destined for the for RCs.
 
-Thanks.
+> and how were the original patches tested?
+
+So it looks like this may have been my fault when testing the patch-set 
+before this one. There are some hacks required to test Device Tree with 
+Snowball at the moment, as the u-boot we use isn't DT compatible yet. I 
+_may_ have (i.e. my best guess is that I) tested the patch-set in it's 
+purest form, thus omitting the ARM_APPENDED_DTB_FILE hack required to 
+append the DTB onto the kernel. Without it, the kernel just boots using 
+the original platform code.
+
+A genuine mistake on my part for which I unreservedly apologise.
+
+Nevertheless, these two patches are required for a decent boot.
 
 -- 
-Best Regards,
-Liu Ying
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
