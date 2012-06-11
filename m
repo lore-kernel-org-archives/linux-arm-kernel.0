@@ -1,98 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:25:02 +0100
-Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C driver
+Date: Mon, 11 Jun 2012 16:25:03 +0100
+Subject: [PATCH 10/14] Input: Add Device Tree support to the ab8500-ponkey
+ driver
 In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we move the i2c-nomadik's default settings into the driver
-rather than specifying them from platform code. At the time of
-this writing we only have one user, the u8500. As new users are
-added, it is expected that they will be Device Tree compliant.
-If this is the case, we will look up their initialisation values
-by compatible entry, then apply them forthwith.
+This patch will allow the ab8500-ponkey driver to be probed during
+boot when Device Tree is enabled.
 
-Cc: linux-i2c at vger.kernel.org
+Cc: linux-input at vger.kernel.org
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/busses/i2c-nomadik.c |   40 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 39 insertions(+), 1 deletion(-)
+ drivers/input/misc/ab8500-ponkey.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index a92440d..1ffdf67 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of_device.h>
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 350fd0c..394aa1f 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -131,10 +131,16 @@ static int __devexit ab8500_ponkey_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- #include <plat/i2c.h>
- 
-@@ -899,15 +900,51 @@ static const struct i2c_algorithm nmk_i2c_algo = {
- 	.functionality	= nmk_i2c_functionality
- };
- 
-+static struct nmk_i2c_controller u8500_i2c = {
-+       /*
-+        * slave data setup time, which is
-+        * 250 ns,100ns,10ns which is 14,6,2
-+        * respectively for a 48 Mhz
-+        * i2c clock
-+        */
-+       .slsu           = 0xe,
-+       /* Tx FIFO threshold */
-+       .tft            = 1,
-+       /* Rx FIFO threshold */
-+       .rft            = 8,
-+       /* std. mode operation */
-+       .clk_freq       = 100000,
-+       /* Slave response timeout(ms) */
-+       .timeout        = 200,
-+       .sm             = I2C_FREQ_MODE_FAST,
-+};
-+
-+
-+static const struct of_device_id nmk_gpio_match[] = {
-+	{ .compatible = "st,nomadik-i2c", .data = &u8500_i2c, },
++static const struct of_device_id ab8500_ponkey_match[] = {
++	{ .compatible = "stericsson,ab8500-ponkey", },
 +	{}
 +};
 +
- static int __devinit nmk_i2c_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
--	struct nmk_i2c_controller *pdata =
-+	const struct nmk_i2c_controller *pdata =
- 			pdev->dev.platform_data;
-+        const struct of_device_id *of_id =
-+                        of_match_device(nmk_gpio_match, &pdev->dev);
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
-+	if (!pdata) {
-+		if (of_id && of_id->data)
-+			/* Looks like we're booting via Device Tree. */
-+			pdata = of_id->data;
-+		else
-+			/* No i2c configuration found, using the default. */
-+			pdata = &u8500_i2c;
-+	}
-+
- 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
- 		dev_err(&pdev->dev, "cannot allocate memory\n");
-@@ -1043,6 +1080,7 @@ static struct platform_driver nmk_i2c_driver = {
- 		.owner = THIS_MODULE,
- 		.name = DRIVER_NAME,
- 		.pm = &nmk_i2c_pm,
-+		.of_match_table = nmk_gpio_match,
+ static struct platform_driver ab8500_ponkey_driver = {
+ 	.driver		= {
+ 		.name	= "ab8500-poweron-key",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = ab8500_ponkey_match,
  	},
- 	.probe = nmk_i2c_probe,
- 	.remove = __devexit_p(nmk_i2c_remove),
+ 	.probe		= ab8500_ponkey_probe,
+ 	.remove		= __devexit_p(ab8500_ponkey_remove),
 -- 
 1.7.9.5
