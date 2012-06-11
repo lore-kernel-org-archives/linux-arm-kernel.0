@@ -1,46 +1,57 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 11 Jun 2012 14:49:58 +0530
-Subject: [PATCH 2/6] ARM: OMAP AM33xx: voltagedomain: Add voltage domain
- data
-In-Reply-To: <alpine.DEB.2.00.1206101916480.20674@utopia.booyaka.com>
-References: <20120521184053.22565.90037.stgit@dusk>
- <20120521184156.22565.87926.stgit@dusk>
- <alpine.DEB.2.00.1206101916480.20674@utopia.booyaka.com>
-Message-ID: <4FD5B83E.6020807@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 11 Jun 2012 12:12:58 +0300
+Subject: [PATCHv2 09/12] ARM: OMAP2+: usb_host_fs: add custom
+ setup_preprogram for usb_host_fs (fsusb)
+In-Reply-To: <20120611080341.GA12766@atomide.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004617.20034.21714.stgit@dusk>
+ <20120611063416.GT12766@atomide.com>
+ <20120611071301.GC6845@arwen.pp.htv.fi>
+ <20120611074133.GZ12766@atomide.com>
+ <20120611074854.GG6845@arwen.pp.htv.fi>
+ <20120611080341.GA12766@atomide.com>
+Message-ID: <20120611091257.GP6845@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 6/11/2012 6:50 AM, Paul Walmsley wrote:
-> Hi Vaibhav, Afzal, Tony,
+On Mon, Jun 11, 2012 at 01:03:42AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [120611 00:55]:
+> > Hi,
+> > 
+> > On Mon, Jun 11, 2012 at 12:41:33AM -0700, Tony Lindgren wrote:
+> > > > > This should be "static inline int fsusb_reset_host_controller" as it's
+> > > > > in a header.
+> > > > 
+> > > > why is it even in a header ? Only hwmod_fsusb_preprogram() will use it
+> > > > anyway.
+> > > 
+> > > Well ideally it would be something that any OHCI driver can use for
+> > > it's reset, and whatever bus code can also call to reset and idle
+> > > for the unused devices that don't have the driver compiled in. Got
+> > > any better suggestions where to place it? I could be a generic
+> > > ohci_reset function in some header?
+> > 
+> > maybe create <linux/usb/ohci.h> ? Then, while doing that, move register
+> > definitions to this new header too... Something like:
+> > 
+> > $ mv drivers/usb/host/ohci.h include/linux/usb/
+> > $ sed -i 's/\"ohci.h\"/<linux/usb/ohci.h>/g' $(git ls-files)
+> > 
+> > then add your ohci_reset() function...
 > 
-> On Mon, 21 May 2012, Paul Walmsley wrote:
-> 
->> From: Vaibhav Hiremath <hvaibhav@ti.com>
->>
->> Currently dummy voltage domain data is being created
->> in order to succeed boot process, nothing has been done
->> w.r.t actual hardware (voltage control).
->>
->> Also, hook up the AM33XX voltage domain to OMAP framework.
-> 
-> I had to update this patch again for v3.5 to account for the lack of 
-> am33xx_init_early().  So now this patch has to add it (updated patch 
-> below). 
-> 
+> Hmm but then again it's pointless to export the all the ohci registers
+> as that will lead to misuse outside drivers/usb.. Sounds like just
+> defining the reset register is safest option here.
 
-Paul,
+could be as well, but looks like we need to create <linux/usb/ohci.h>
+anyway...
 
-I think this is not required, since Tony has already accepted the patch
-which has this implementation (available on linux-omap/master).
-Please refer to the commit,
-
-commit 08f3098928c991560408e8c71d4af8b1a3ff2d67
-Author: Afzal Mohammed <afzal@ti.com>
-Date:   Fri May 11 00:38:49 2012 +0530
-
-    ARM: OMAP2+: am33xx: Add AM335XEVM machine support
-
-Thanks,
-Vaibhav
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/520ef1f8/attachment.sig>
