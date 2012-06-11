@@ -1,57 +1,24 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 11 Jun 2012 19:45:58 +0530
-Subject: Current state of AM33xx patches
-In-Reply-To: <4FD5BA4C.9070706@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com>
-Message-ID: <4FD5FD9E.5040203@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jun 2012 14:16:19 +0000
+Subject: [PATCH 8/14] ARM: LPC32xx: Clock adjustment for key matrix
+ controller
+In-Reply-To: <1339412537-24485-9-git-send-email-stigge@antcom.de>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <1339412537-24485-9-git-send-email-stigge@antcom.de>
+Message-ID: <201206111416.19251.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 6/11/2012 2:58 PM, Daniel Mack wrote:
-> Hey,
+On Monday 11 June 2012, Roland Stigge wrote:
+> The clock.c file needs to be changed to match the automatic device name to its
+> clock.
 > 
-> can anybody give me a quick wrap-up about the current state of AM33xx
-> based SoCs in mainline? What are the next steps to get things merged?
-> 
-
-Daniel,
-
-We are in the process of submitting all baseport patches to the
-upstream, summary would be,
-
-Accepted:
-	- Machine and low-level init code
-	- Basic DT required for boot.
-	- Voltagedomain, Powerdomain, clockdomain implementation
-
-Currently under work (already submitted multiple versions):
-	- Clock Tree
-	- HWMOD
-
-I do maintain wiki page which you should refer for any updates:
-http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status
-
-In order to get latest and greatest kernel to boot, you can use my repo:
-https://github.com/hvaibhav/am335x-linux
-
-
-Also, note that, currently there will be very minimal feature-set
-supported in the kernel, so not sure how much can be leveraged for
-production use-cases.
-
-
-> I'm getting involved in a project that is based on a AM3352 and would
-> like to provide help where necessary and wanted.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 > 
 
-That's great, help is always required and appreciated.
+Should this not be in the same patch as the one that moves the device over
+to DT probing? Otherwise you have a non-working setup if only one patch
+is applied.
 
-Thanks,
-Vaibhav
-
-> 
-> Thanks,
-> Daniel
-> 
+	Arnd
