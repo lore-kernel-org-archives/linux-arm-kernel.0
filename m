@@ -1,27 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:24:53 +0100
-Subject: [PATCH 00/14] Final (large) batch of Snowball Device Tree Enablement
-Message-ID: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+Date: Mon, 11 Jun 2012 16:24:54 +0100
+Subject: [PATCH 01/14] rtc: ab8500-rtc: IRQF_ONESHOT when requesting a
+ threaded IRQ
+In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hopefully, this will be the last lot of enablement patches for Snowball.
-The only thing to follow this patch-set is clean-ups and enablement of
-drivers/power.
+The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
 
-Some of these patches have been on the MLs before, but are yet
-to be reviewed/SOB the correct people.
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/rtc/rtc-ab8500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-In-Reply-To: 
- arch/arm/boot/dts/db8500.dtsi      |   33 +++++++----
- arch/arm/mach-ux500/cpu-db8500.c   |    1 -
- drivers/i2c/busses/i2c-nomadik.c   |   40 ++++++++++++-
- drivers/input/misc/ab8500-ponkey.c |    6 ++
- drivers/mfd/Kconfig                |   11 +---
- drivers/mfd/ab8500-core.c          |  114 +++++++++++++++++++++---------------
- drivers/mfd/ab8500-gpadc.c         |    3 +-
- drivers/mfd/db8500-prcmu.c         |    7 ++-
- drivers/rtc/rtc-ab8500.c           |   10 +++-
- drivers/usb/otg/ab8500-usb.c       |    6 ++
- include/linux/mfd/abx500/ab8500.h  |    4 ++
- 11 files changed, 159 insertions(+), 76 deletions(-)
+diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+index 4bcf9ca..b11a2ec 100644
+--- a/drivers/rtc/rtc-ab8500.c
++++ b/drivers/rtc/rtc-ab8500.c
+@@ -422,7 +422,7 @@ static int __devinit ab8500_rtc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	err = request_threaded_irq(irq, NULL, rtc_alarm_handler,
+-		IRQF_NO_SUSPEND, "ab8500-rtc", rtc);
++		IRQF_NO_SUSPEND | IRQF_ONESHOT, "ab8500-rtc", rtc);
+ 	if (err < 0) {
+ 		rtc_device_unregister(rtc);
+ 		return err;
+-- 
+1.7.9.5
