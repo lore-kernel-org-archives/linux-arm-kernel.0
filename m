@@ -1,44 +1,414 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jun 2012 10:20:02 -0600 (MDT)
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <4FD5B951.7010607@ti.com>
-References: <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
- <4FD0602B.9070704@ti.com>
- <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
- <4FD09EFA.20304@ti.com>
- <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
- <4FD1FA8C.1080600@ti.com>
- <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
- <20120611061546.GQ12766@atomide.com>
- <alpine.DEB.2.00.1206110154170.16974@utopia.booyaka.com>
- <4FD5B951.7010607@ti.com>
-Message-ID: <alpine.DEB.2.00.1206111011230.5849@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 11 Jun 2012 11:24:50 -0500
+Subject: [PATCH] ARM: Fix dts files w/ status property: "disable" ->
+ "disabled"
+In-Reply-To: <1339427460-23007-1-git-send-email-stigge@antcom.de>
+References: <1339427460-23007-1-git-send-email-stigge@antcom.de>
+Message-ID: <4FD61BD2.8050802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Cousson, Benoit wrote:
-
-> On 6/11/2012 10:04 AM, Paul Walmsley wrote:
+On 06/11/2012 10:11 AM, Roland Stigge wrote:
+> This patches fixes some status = "disable" strings to "disabled", the correct
+> way of disabling nodes in the devicetree.
 > 
-> > But if the IP blocks are reset later, and the bootloader or previous OS
-> > gets some register settings wrong, there's a greater risk of system
-> > instability or unpredictable behavior during the boot process.
+> lpc32xx.dtsi is fixed separately in the LPC32xx patch set due to the many
+> changes there.
 > 
-> Mmm, I'm not convince by that. If we delay the PM init at the very last 
-> time, at least after the modules are properly reset and init, I do not 
-> think we will have more issues than today.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-My intent was not to convince, but to explain.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Certainly back in the OMAP3 days there were bootloaders that got SDRAM and 
-GPMC timings wrong.  No way did I want to be chasing down kernel "bugs" 
-based on those.
-
-Anyway, once people finish fixing the drivers, then we should be able to 
-switch to late hwmod reset.
-
-
-- Paul
+> 
+> ---
+> Applies to v3.5-rc2
+> 
+>  arch/arm/boot/dts/omap3-beagle.dts |    4 +--
+>  arch/arm/boot/dts/omap4-panda.dts  |    6 ++---
+>  arch/arm/boot/dts/omap4-sdp.dts    |    4 +--
+>  arch/arm/boot/dts/tegra20.dtsi     |   36 +++++++++++++++++------------------
+>  arch/arm/boot/dts/tegra30.dtsi     |   38 ++++++++++++++++++-------------------
+>  5 files changed, 44 insertions(+), 44 deletions(-)
+> 
+> --- linux-2.6.orig/arch/arm/boot/dts/omap3-beagle.dts
+> +++ linux-2.6/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -61,9 +61,9 @@
+>  };
+>  
+>  &mmc2 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc3 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+> --- linux-2.6.orig/arch/arm/boot/dts/omap4-panda.dts
+> +++ linux-2.6/arch/arm/boot/dts/omap4-panda.dts
+> @@ -74,15 +74,15 @@
+>  };
+>  
+>  &mmc2 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc3 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc4 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc5 {
+> --- linux-2.6.orig/arch/arm/boot/dts/omap4-sdp.dts
+> +++ linux-2.6/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -147,11 +147,11 @@
+>  };
+>  
+>  &mmc3 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc4 {
+> -	status = "disable";
+> +	status = "disabled";
+>  };
+>  
+>  &mmc5 {
+> --- linux-2.6.orig/arch/arm/boot/dts/tegra20.dtsi
+> +++ linux-2.6/arch/arm/boot/dts/tegra20.dtsi
+> @@ -72,7 +72,7 @@
+>  		reg = <0x70002800 0x200>;
+>  		interrupts = <0 13 0x04>;
+>  		nvidia,dma-request-selector = <&apbdma 2>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	tegra_i2s2: i2s at 70002a00 {
+> @@ -80,7 +80,7 @@
+>  		reg = <0x70002a00 0x200>;
+>  		interrupts = <0 3 0x04>;
+>  		nvidia,dma-request-selector = <&apbdma 1>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006000 {
+> @@ -88,7 +88,7 @@
+>  		reg = <0x70006000 0x40>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 36 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006040 {
+> @@ -96,7 +96,7 @@
+>  		reg = <0x70006040 0x40>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 37 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006200 {
+> @@ -104,7 +104,7 @@
+>  		reg = <0x70006200 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 46 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006300 {
+> @@ -112,7 +112,7 @@
+>  		reg = <0x70006300 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 90 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006400 {
+> @@ -120,7 +120,7 @@
+>  		reg = <0x70006400 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 91 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c000 {
+> @@ -129,7 +129,7 @@
+>  		interrupts = <0 38 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c400 {
+> @@ -138,7 +138,7 @@
+>  		interrupts = <0 84 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c500 {
+> @@ -147,7 +147,7 @@
+>  		interrupts = <0 92 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000d000 {
+> @@ -156,7 +156,7 @@
+>  		interrupts = <0 53 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	pmc {
+> @@ -190,7 +190,7 @@
+>  		interrupts = <0 20 0x04>;
+>  		phy_type = "utmi";
+>  		nvidia,has-legacy-mode;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	usb at c5004000 {
+> @@ -198,7 +198,7 @@
+>  		reg = <0xc5004000 0x4000>;
+>  		interrupts = <0 21 0x04>;
+>  		phy_type = "ulpi";
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	usb at c5008000 {
+> @@ -206,35 +206,35 @@
+>  		reg = <0xc5008000 0x4000>;
+>  		interrupts = <0 97 0x04>;
+>  		phy_type = "utmi";
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at c8000000 {
+>  		compatible = "nvidia,tegra20-sdhci";
+>  		reg = <0xc8000000 0x200>;
+>  		interrupts = <0 14 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at c8000200 {
+>  		compatible = "nvidia,tegra20-sdhci";
+>  		reg = <0xc8000200 0x200>;
+>  		interrupts = <0 15 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at c8000400 {
+>  		compatible = "nvidia,tegra20-sdhci";
+>  		reg = <0xc8000400 0x200>;
+>  		interrupts = <0 19 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at c8000600 {
+>  		compatible = "nvidia,tegra20-sdhci";
+>  		reg = <0xc8000600 0x200>;
+>  		interrupts = <0 31 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	pmu {
+> --- linux-2.6.orig/arch/arm/boot/dts/tegra30.dtsi
+> +++ linux-2.6/arch/arm/boot/dts/tegra30.dtsi
+> @@ -82,7 +82,7 @@
+>  		reg = <0x70006000 0x40>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 36 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006040 {
+> @@ -90,7 +90,7 @@
+>  		reg = <0x70006040 0x40>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 37 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006200 {
+> @@ -98,7 +98,7 @@
+>  		reg = <0x70006200 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 46 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006300 {
+> @@ -106,7 +106,7 @@
+>  		reg = <0x70006300 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 90 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	serial at 70006400 {
+> @@ -114,7 +114,7 @@
+>  		reg = <0x70006400 0x100>;
+>  		reg-shift = <2>;
+>  		interrupts = <0 91 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c000 {
+> @@ -123,7 +123,7 @@
+>  		interrupts = <0 38 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c400 {
+> @@ -132,7 +132,7 @@
+>  		interrupts = <0 84 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c500 {
+> @@ -141,7 +141,7 @@
+>  		interrupts = <0 92 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000c700 {
+> @@ -150,7 +150,7 @@
+>  		interrupts = <0 120 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	i2c at 7000d000 {
+> @@ -159,7 +159,7 @@
+>  		interrupts = <0 53 0x04>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	pmc {
+> @@ -201,35 +201,35 @@
+>  			compatible = "nvidia,tegra30-i2s";
+>  			reg = <0x70080300 0x100>;
+>  			nvidia,ahub-cif-ids = <4 4>;
+> -			status = "disable";
+> +			status = "disabled";
+>  		};
+>  
+>  		tegra_i2s1: i2s at 70080400 {
+>  			compatible = "nvidia,tegra30-i2s";
+>  			reg = <0x70080400 0x100>;
+>  			nvidia,ahub-cif-ids = <5 5>;
+> -			status = "disable";
+> +			status = "disabled";
+>  		};
+>  
+>  		tegra_i2s2: i2s at 70080500 {
+>  			compatible = "nvidia,tegra30-i2s";
+>  			reg = <0x70080500 0x100>;
+>  			nvidia,ahub-cif-ids = <6 6>;
+> -			status = "disable";
+> +			status = "disabled";
+>  		};
+>  
+>  		tegra_i2s3: i2s at 70080600 {
+>  			compatible = "nvidia,tegra30-i2s";
+>  			reg = <0x70080600 0x100>;
+>  			nvidia,ahub-cif-ids = <7 7>;
+> -			status = "disable";
+> +			status = "disabled";
+>  		};
+>  
+>  		tegra_i2s4: i2s at 70080700 {
+>  			compatible = "nvidia,tegra30-i2s";
+>  			reg = <0x70080700 0x100>;
+>  			nvidia,ahub-cif-ids = <8 8>;
+> -			status = "disable";
+> +			status = "disabled";
+>  		};
+>  	};
+>  
+> @@ -237,28 +237,28 @@
+>  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>  		reg = <0x78000000 0x200>;
+>  		interrupts = <0 14 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at 78000200 {
+>  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>  		reg = <0x78000200 0x200>;
+>  		interrupts = <0 15 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at 78000400 {
+>  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>  		reg = <0x78000400 0x200>;
+>  		interrupts = <0 19 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	sdhci at 78000600 {
+>  		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+>  		reg = <0x78000600 0x200>;
+>  		interrupts = <0 31 0x04>;
+> -		status = "disable";
+> +		status = "disabled";
+>  	};
+>  
+>  	pmu {
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
