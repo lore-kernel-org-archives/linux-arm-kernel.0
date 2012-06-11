@@ -1,29 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 11 Jun 2012 18:26:27 +0300
-Subject: [PATCHv6 7/7] ARM: OMAP4: PM: put all domains to OSWR during suspend
-In-Reply-To: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
-References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1339428387-4800-8-git-send-email-t-kristo@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jun 2012 15:28:22 +0000
+Subject: [PATCH V2 0/6] Bridging PCI to amba
+In-Reply-To: <CACRpkdbPtR5MDjd1YZ5GhOdp61HQe2PJusudNPOhDQHUAt1kJA@mail.gmail.com>
+References: <cover.1338220457.git.rubini@gnudd.com>
+ <CACRpkdbPtR5MDjd1YZ5GhOdp61HQe2PJusudNPOhDQHUAt1kJA@mail.gmail.com>
+Message-ID: <201206111528.23034.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/pm44xx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Sunday 10 June 2012, Linus Walleij wrote:
+> On Mon, May 28, 2012 at 6:36 PM, Alessandro Rubini <rubini@gnudd.com> wrote:
+> 
+> > V2: accepted comments I got on V1; rewritten the driver to be generic;
+> >    made it tristate instead of boolean. Rebased on new next.
+> 
+> This looks good to me.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I think this patch set could go through Arnd as arch maintainer?
+> It's fun with these cross-arch things. You'll need an ACK from
+> Russell first.
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 1e845e8..eb3e073 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -105,7 +105,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	pwrst->pwrdm = pwrdm;
- 	pwrst->next_state = pwrdm_get_achievable_func_pwrst(
- 						pwrdm,
--						PWRDM_FUNC_PWRST_CSWR);
-+						PWRDM_FUNC_PWRST_OSWR);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
--- 
-1.7.4.1
+I don't think it has much to do with code I maintain. Russell
+as the Primecell maintainer is the right person to take it through
+his tree.
+
+	Arnd
