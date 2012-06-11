@@ -1,108 +1,292 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 13:02:13 +0200
-Subject: [PATCH 10/14] ARM: LPC32xx: Add MMC controller support
+Date: Mon, 11 Jun 2012 13:02:15 +0200
+Subject: [PATCH 12/14] ARM: LPC32xx: DT conversion of Standard UARTs
 In-Reply-To: <1339412537-24485-1-git-send-email-stigge@antcom.de>
 References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339412537-24485-11-git-send-email-stigge@antcom.de>
+Message-ID: <1339412537-24485-13-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the MMC controller of the LPC32xx SoC to the
-platform initialization via the pl08x primecell driver. Lacking more complete
-DT support, done via DT auxdata.
+This patch switches from static serial driver initialization to devicetree
+configuration. This way, the Standard UARTs of the LPC32xx SoC can be enabled
+individually via DT.
+
+E.g., instead of Kconfig configuration, the phy3250.dts activates
+UARTs 3 and 5.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+ 
 ---
- arch/arm/mach-lpc32xx/phy3250.c |   43 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 39 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig               |    2 
+ arch/arm/boot/dts/lpc32xx.dtsi |   34 ++++++++++++----
+ arch/arm/boot/dts/phy3250.dts  |    8 +++
+ arch/arm/mach-lpc32xx/Kconfig  |   32 ---------------
+ arch/arm/mach-lpc32xx/serial.c |   85 -----------------------------------------
+ 5 files changed, 35 insertions(+), 126 deletions(-)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -30,12 +30,13 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
- #include <linux/amba/pl022.h>
-+#include <linux/amba/pl08x.h>
-+#include <linux/amba/mmci.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/clk.h>
--#include <linux/amba/pl08x.h>
+--- linux-2.6.orig/arch/arm/Kconfig
++++ linux-2.6/arch/arm/Kconfig
+@@ -1019,8 +1019,6 @@ source "arch/arm/mach-kirkwood/Kconfig"
  
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -50,9 +51,12 @@
- /*
-  * Mapped GPIOLIB GPIOs
-  */
--#define SPI0_CS_GPIO	LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
--#define LCD_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
--#define BKL_POWER_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
-+#define SPI0_CS_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
-+#define LCD_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 0)
-+#define BKL_POWER_GPIO		LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 4)
-+#define MMC_PWR_ENABLE_GPIO	LPC32XX_GPIO(LPC32XX_GPO_P3_GRP, 5)
-+#define MMC_CD_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 1)
-+#define MMC_WP_GPIO		LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 0)
+ source "arch/arm/mach-ks8695/Kconfig"
  
- /*
-  * AMBA LCD controller
-@@ -259,11 +263,32 @@ static struct pl08x_platform_data pl08x_
- 	.mem_buses = PL08X_AHB1,
+-source "arch/arm/mach-lpc32xx/Kconfig"
+-
+ source "arch/arm/mach-msm/Kconfig"
+ 
+ source "arch/arm/mach-mv78xx0/Kconfig"
+--- linux-2.6.orig/arch/arm/boot/dts/lpc32xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -126,24 +126,42 @@
+ 				reg = <0x2009C000 0x1000>;
+ 			};
+ 
++			/* UART5 first since it is the default console, ttyS0 */
++			uart5: serial at 40090000 {
++				/* actually, ns16550a w/ 64 byte fifos! */
++				compatible = "nxp,lpc3220-uart";
++				reg = <0x40090000 0x1000>;
++				interrupts = <9 0>;
++				clock-frequency = <13000000>;
++				reg-shift = <2>;
++				status = "disable";
++			};
++
+ 			uart3: serial at 40080000 {
+-				compatible = "nxp,serial";
++				compatible = "nxp,lpc3220-uart";
+ 				reg = <0x40080000 0x1000>;
++				interrupts = <7 0>;
++				clock-frequency = <13000000>;
++				reg-shift = <2>;
++				status = "disable";
+ 			};
+ 
+ 			uart4: serial at 40088000 {
+-				compatible = "nxp,serial";
++				compatible = "nxp,lpc3220-uart";
+ 				reg = <0x40088000 0x1000>;
+-			};
+-
+-			uart5: serial at 40090000 {
+-				compatible = "nxp,serial";
+-				reg = <0x40090000 0x1000>;
++				interrupts = <8 0>;
++				clock-frequency = <13000000>;
++				reg-shift = <2>;
++				status = "disable";
+ 			};
+ 
+ 			uart6: serial at 40098000 {
+-				compatible = "nxp,serial";
++				compatible = "nxp,lpc3220-uart";
+ 				reg = <0x40098000 0x1000>;
++				interrupts = <10 0>;
++				clock-frequency = <13000000>;
++				reg-shift = <2>;
++				status = "disable";
+ 			};
+ 
+ 			i2c1: i2c at 400A0000 {
+--- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
++++ linux-2.6/arch/arm/boot/dts/phy3250.dts
+@@ -94,6 +94,14 @@
+ 		};
+ 
+ 		apb {
++			uart5: serial at 40090000 {
++				status = "okay";
++			};
++
++			uart3: serial at 40080000 {
++				status = "okay";
++			};
++
+ 			i2c1: i2c at 400A0000 {
+ 				clock-frequency = <100000>;
+ 
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
++++ /dev/null
+@@ -1,32 +0,0 @@
+-if ARCH_LPC32XX
+-
+-menu "Individual UART enable selections"
+-
+-config ARCH_LPC32XX_UART3_SELECT
+-	bool "Add support for standard UART3"
+-	help
+-	 Adds support for standard UART 3 when the 8250 serial support
+-	 is enabled.
+-
+-config ARCH_LPC32XX_UART4_SELECT
+-	bool "Add support for standard UART4"
+-	help
+-	 Adds support for standard UART 4 when the 8250 serial support
+-	 is enabled.
+-
+-config ARCH_LPC32XX_UART5_SELECT
+-	bool "Add support for standard UART5"
+-	default y
+-	help
+-	 Adds support for standard UART 5 when the 8250 serial support
+-	 is enabled.
+-
+-config ARCH_LPC32XX_UART6_SELECT
+-	bool "Add support for standard UART6"
+-	help
+-	 Adds support for standard UART 6 when the 8250 serial support
+-	 is enabled.
+-
+-endmenu
+-
+-endif
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/serial.c
++++ linux-2.6/arch/arm/mach-lpc32xx/serial.c
+@@ -31,59 +31,6 @@
+ 
+ #define LPC32XX_SUART_FIFO_SIZE	64
+ 
+-/* Standard 8250/16550 compatible serial ports */
+-static struct plat_serial8250_port serial_std_platform_data[] = {
+-#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
+-	{
+-		.membase        = io_p2v(LPC32XX_UART5_BASE),
+-		.mapbase        = LPC32XX_UART5_BASE,
+-		.irq		= IRQ_LPC32XX_UART_IIR5,
+-		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM32,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
+-					UPF_SKIP_TEST,
+-	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
+-	{
+-		.membase	= io_p2v(LPC32XX_UART3_BASE),
+-		.mapbase        = LPC32XX_UART3_BASE,
+-		.irq		= IRQ_LPC32XX_UART_IIR3,
+-		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM32,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
+-					UPF_SKIP_TEST,
+-	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
+-	{
+-		.membase	= io_p2v(LPC32XX_UART4_BASE),
+-		.mapbase        = LPC32XX_UART4_BASE,
+-		.irq		= IRQ_LPC32XX_UART_IIR4,
+-		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM32,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
+-					UPF_SKIP_TEST,
+-	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
+-	{
+-		.membase	= io_p2v(LPC32XX_UART6_BASE),
+-		.mapbase        = LPC32XX_UART6_BASE,
+-		.irq		= IRQ_LPC32XX_UART_IIR6,
+-		.uartclk	= LPC32XX_MAIN_OSC_FREQ,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM32,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_BUGGY_UART |
+-					UPF_SKIP_TEST,
+-	},
+-#endif
+-	{ },
+-};
+-
+ struct uartinit {
+ 	char *uart_ck_name;
+ 	u32 ck_mode_mask;
+@@ -92,7 +39,6 @@ struct uartinit {
  };
  
-+static int mmc_handle_ios(struct device *dev, struct mmc_ios *ios)
-+{
-+	/* Only on and off are supported */
-+	if (ios->power_mode == MMC_POWER_OFF)
-+		gpio_set_value(MMC_PWR_ENABLE_GPIO, 0);
-+	else
-+		gpio_set_value(MMC_PWR_ENABLE_GPIO, 1);
-+	return 0;
-+}
-+
-+static struct mmci_platform_data lpc32xx_mmci_data = {
-+	.ocr_mask	= MMC_VDD_30_31 | MMC_VDD_31_32 |
-+			  MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.ios_handler	= mmc_handle_ios,
-+	.dma_filter	= NULL,
-+	/* No DMA for now since AMBA PL080 dmaengine driver only does scatter
-+	 * gather, and the MMCI driver doesn't do it this way */
-+};
-+
- static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", &lpc32xx_ssp0_data),
- 	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", &lpc32xx_ssp1_data),
- 	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
- 	OF_DEV_AUXDATA("arm,pl080", 0x31000000, "pl08xdmac", &pl08x_pd),
-+	OF_DEV_AUXDATA("arm,pl18x", 0x20098000, "20098000.sd",
-+		       &lpc32xx_mmci_data),
- 	{ }
+ static struct uartinit uartinit_data[] __initdata = {
+-#ifdef CONFIG_ARCH_LPC32XX_UART5_SELECT
+ 	{
+ 		.uart_ck_name = "uart5_ck",
+ 		.ck_mode_mask =
+@@ -100,8 +46,6 @@ static struct uartinit uartinit_data[] _
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL,
+ 		.mapbase = LPC32XX_UART5_BASE,
+ 	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
+ 	{
+ 		.uart_ck_name = "uart3_ck",
+ 		.ck_mode_mask =
+@@ -109,8 +53,6 @@ static struct uartinit uartinit_data[] _
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL,
+ 		.mapbase = LPC32XX_UART3_BASE,
+ 	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
+ 	{
+ 		.uart_ck_name = "uart4_ck",
+ 		.ck_mode_mask =
+@@ -118,8 +60,6 @@ static struct uartinit uartinit_data[] _
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL,
+ 		.mapbase = LPC32XX_UART4_BASE,
+ 	},
+-#endif
+-#ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
+ 	{
+ 		.uart_ck_name = "uart6_ck",
+ 		.ck_mode_mask =
+@@ -127,19 +67,6 @@ static struct uartinit uartinit_data[] _
+ 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL,
+ 		.mapbase = LPC32XX_UART6_BASE,
+ 	},
+-#endif
+-};
+-
+-static struct platform_device serial_std_platform_device = {
+-	.name			= "serial8250",
+-	.id			= 0,
+-	.dev			= {
+-		.platform_data	= serial_std_platform_data,
+-	},
+-};
+-
+-static struct platform_device *lpc32xx_serial_devs[] __initdata = {
+-	&serial_std_platform_device,
  };
  
-@@ -307,6 +332,11 @@ static void __init lpc3250_machine_init(
- 	 * detection or a data fault will occur, so enable the clocks
- 	 * here.
- 	 */
-+	tmp = __raw_readl(LPC32XX_CLKPWR_MS_CTRL);
-+	tmp |= LPC32XX_CLKPWR_MSCARD_SDCARD_EN |
-+		LPC32XX_CLKPWR_MSCARD_MSDIO_PU_EN;
-+	__raw_writel(tmp, LPC32XX_CLKPWR_MS_CTRL);
-+
- 	tmp = __raw_readl(LPC32XX_CLKPWR_LCDCLK_CTRL);
- 	__raw_writel((tmp | LPC32XX_CLKPWR_LCDCTRL_CLK_EN),
- 		LPC32XX_CLKPWR_LCDCLK_CTRL);
-@@ -334,6 +364,11 @@ static void __init lpc3250_machine_init(
- 	else if (gpio_direction_output(SPI0_CS_GPIO, 1))
- 		printk(KERN_ERR "Error setting gpio %u to output",
- 			SPI0_CS_GPIO);
-+
-+	if (gpio_request(MMC_PWR_ENABLE_GPIO, "mmc_power_en"))
-+		pr_err("Error requesting gpio %u", MMC_PWR_ENABLE_GPIO);
-+	else if (gpio_direction_output(MMC_PWR_ENABLE_GPIO, 1))
-+		pr_err("Error setting gpio %u to output", MMC_PWR_ENABLE_GPIO);
+ void __init lpc32xx_serial_init(void)
+@@ -156,15 +83,8 @@ void __init lpc32xx_serial_init(void)
+ 		clk = clk_get(NULL, uartinit_data[i].uart_ck_name);
+ 		if (!IS_ERR(clk)) {
+ 			clk_enable(clk);
+-			serial_std_platform_data[i].uartclk =
+-				clk_get_rate(clk);
+ 		}
+ 
+-		/* Fall back on main osc rate if clock rate return fails */
+-		if (serial_std_platform_data[i].uartclk == 0)
+-			serial_std_platform_data[i].uartclk =
+-				LPC32XX_MAIN_OSC_FREQ;
+-
+ 		/* Setup UART clock modes for all UARTs, disable autoclock */
+ 		clkmodes |= uartinit_data[i].ck_mode_mask;
+ 
+@@ -189,7 +109,7 @@ void __init lpc32xx_serial_init(void)
+ 	__raw_writel(clkmodes, LPC32XX_UARTCTL_CLKMODE);
+ 	for (i = 0; i < ARRAY_SIZE(uartinit_data); i++) {
+ 		/* Force a flush of the RX FIFOs to work around a HW bug */
+-		puart = serial_std_platform_data[i].mapbase;
++		puart = uartinit_data[i].mapbase;
+ 		__raw_writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
+ 		__raw_writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
+ 		j = LPC32XX_SUART_FIFO_SIZE;
+@@ -202,7 +122,4 @@ void __init lpc32xx_serial_init(void)
+ 	tmp = __raw_readl(LPC32XX_UARTCTL_CTRL);
+ 	tmp &= ~LPC32XX_UART_U5_ROUTE_TO_USB;
+ 	__raw_writel(tmp, LPC32XX_UARTCTL_CTRL);
+-
+-	platform_add_devices(lpc32xx_serial_devs,
+-		ARRAY_SIZE(lpc32xx_serial_devs));
  }
- 
- static char const *lpc32xx_dt_compat[] __initdata = {
