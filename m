@@ -1,46 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jun 2012 23:21:11 -0700
-Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
- usb_host_fs (fsusb)
-In-Reply-To: <alpine.DEB.2.00.1206081929000.23401@utopia.booyaka.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061308.25532.19767.stgit@dusk>
- <20120607073112.GX12766@atomide.com>
- <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
- <20120607075158.GZ12766@atomide.com>
- <alpine.DEB.2.00.1206070406050.6684@utopia.booyaka.com>
- <20120607105228.GC12766@atomide.com>
- <alpine.DEB.2.00.1206071404470.14977@utopia.booyaka.com>
- <20120608063859.GL12766@atomide.com>
- <alpine.DEB.2.00.1206081929000.23401@utopia.booyaka.com>
-Message-ID: <20120611062109.GR12766@atomide.com>
+From: paulliu@debian.org (Ying-Chun Liu (PaulLiu))
+Date: Mon, 11 Jun 2012 14:28:10 +0800
+Subject: [PATCH RESEND] mfd: anatop: permit adata be NULL when access
+ register
+In-Reply-To: <20120611061925.GC2552@S2101-09.ap.freescale.net>
+References: <1338774989-4416-1-git-send-email-richard.zhao@freescale.com>
+ <20120604021315.GB2857@b20223-02.ap.freescale.net>
+ <20120611061925.GC2552@S2101-09.ap.freescale.net>
+Message-ID: <4FD58FFA.9020408@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120608 18:35]:
-> On Thu, 7 Jun 2012, Tony Lindgren wrote:
+(2012?06?11? 14:19), Shawn Guo wrote:
+> On Mon, Jun 04, 2012 at 10:13:16AM +0800, Richard Zhao wrote:
+>> Cc Paul's other mail address.
+>>
+>> On Mon, Jun 04, 2012 at 09:56:29AM +0800, Richard Zhao wrote:
+>>> From: Richard Zhao <richard.zhao@linaro.org>
+>>>
+>>> It makes anatop register access easier. Anatop has many misc registers,
+>>> which may not be a specific driver.
+>>>
+>>> There's only one anatop device for a running system, so we use a global
+>>> variable to store struct anatop.
+>>>
+>>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>>> Cc: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
 > 
-> > Oh OK yeah makes sense as that's hwmod internal function. Then the driver
-> > specific part should use just void __iomem *base and use readl/writel and
-> > live under include/linux/platform_data/omap-usb.h.
-> 
-> This sounds like something that might be flame-bait, since these functions 
-> aren't platform_data.
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
 
-They at least should be as both platform init code and the driver will
-potentially use these functions.
- 
-> How about putting these functions in arch/arm/plat-omap/include/plat?  
-> Drivers are able to include those files easily.
+-- 
+                                PaulLiu (???)
+E-mail: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
 
-We need to pretty much get rid of all those headers and make them driver
-specific for the multi-zimage support. Drivers should be arch independent,
-and whatever parts need to be shared between platform init code and drivers
-should follow the standard platform driver stuff.
-
-The other place would be just the standard driver include at somewhere
-like include/linux/usb/omap-usb.h etc.
-
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 900 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/5170a3a9/attachment-0001.sig>
