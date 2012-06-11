@@ -1,28 +1,23 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 15:41:46 -0600
-Subject: [PATCH v2 09/10] ARM: tegra: harmony: Initialize PCIe from DT
-In-Reply-To: <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4FD6661A.1060407@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Jun 2012 23:42:24 +0200
+Subject: [PATCH 13/14] ARM: ux500: Enable the AB8500 RTC for all DT:ed
+ DB8500 based devices
+In-Reply-To: <1339428307-3850-14-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-14-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdb56UA0-uxKFYQ+fZmJf9Y26NwWLdKc5x-ZBfqUK0cTFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> With the device tree support in place, probe the PCIe controller from
-> the device tree and remove the corresponding workaround in the board
-> file.
+On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> Here we add a node for the AB8500 Real Time Clock in all devices
+> supporting the DB8500. The AB8500 RTC driver makes use of named
+> interrupts we provide support for this too.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> +	pci_vdd_reg: fixedregulator at 0 {
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I think that'd usually just be "regulator at 0".
-
-If you need the "@0" part to differentiate between multiple regulators,
-the node needs a reg property too:
-
-	reg = <0 0>;
-
-although then I wonder about putting the regulator under the root node,
-since the address wouldn't really make sense...
+Yours,
+Linus Walleij
