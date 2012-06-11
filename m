@@ -1,41 +1,54 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 11 Jun 2012 09:15:20 +0100
-Subject: v3.4 boot failure on qemu-system-arm -M versatilepb
-In-Reply-To: <XNM1$5$0$1$$3$9$0$A$8005415U4fc63e90@hitachi.com>
-References: <XNM1$5$0$1$$3$9$0$A$8005401U4fc38a01@hitachi.com>
- <4FC52B61.2000604@gmail.com>
- <XNM1$5$0$1$$3$9$0$A$8005413U4fc5e967@hitachi.com>
- <XNM1$5$0$1$$3$9$0$A$8005415U4fc63e90@hitachi.com>
-Message-ID: <4FD5A918.7040200@codethink.co.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 11 Jun 2012 10:16:21 +0200
+Subject: [PATCH][RFC] mm: Don't put CMA pages on per-cpu lists
+In-Reply-To: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
+References: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <039901cd47aa$7e846270$7b8d2750$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/12 16:37, takuo.koguchi.sw at hitachi.com wrote:
-> Hi Rob,
->
-> I am sorry that it seems I gave you wrong information.
->
-> It turned out that the config I used was not versatile_defconfig.
-> I have tried to reproduce with versatile_defconfig and found that IO_SPACE_LIMIT modification has no effect, ie. it cannot mount root=/dev/sdb even if IO_SPACE_LIMIT is 0xffffffff. I suppose it misses the driver to read /dev/sdb.
->
-> Actual config I used derived from buildroot tool's board/qemu/arm-versatile/linux-3.3.config. ( It works fine for linux-3.3 )
-> I attached my .config.
-> As for this config, #define IO_SPACE_LIMIT ((resource_size_t)0xffffffff) works for linux-3.4 to mount /dev/sdb as rootfs.
->
-> The command line I used was as follows,
-> $ sudo qemu-system-arm -M versatilepb -kernel ~/linux/arch/arm/boot/zImage -net nic,vlan=0 -net tap,vlan=0,ifname=tap0,script=no,downscript=no -hda output/images/rootfs.ext2 -append "console=ttyAMA0 root=/dev/sda ip=192.168.7.3::192.168.7.1:255.255.255.0"
->
-> Best Regards,
->
-> Takuo Koguchi
+Hi Laura,
 
-We've seen the same problem. Limiting the __io() to the IO_SPACE_LIMIT
-will not fix the problem as the previous code was using a 1:1 CPU to
-PCI space view (which is why it was allocating space at 0x44000000).
+On Tuesday, June 05, 2012 9:27 PM Laura Abbott wrote:
 
-Either the __io() macro needs to add the base of PCI space, or the
-limit needs to be restored.
+> Currently, when freeing 0 order pages, CMA pages are treated
+> the same as regular movable pages, which means they end up
+> on the per-cpu page list. This means that the CMA pages are
+> likely to be allocated for something other than contigous
+> memory. This increases the chance that the next alloc_contig_range
+> will fail because pages can't be migrated.
+> 
+> Given the size of the CMA region is typically limited, it is best to
+> optimize for success of alloc_contig_range as much as possible.
+> Do this by freeing CMA pages directly instead of putting them
+> on the per-cpu page lists.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  mm/page_alloc.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 0e1c6f5..c9a6483 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1310,7 +1310,8 @@ void free_hot_cold_page(struct page *page, int cold)
+>  	 * excessively into the page allocator
+>  	 */
+>  	if (migratetype >= MIGRATE_PCPTYPES) {
+> -		if (unlikely(migratetype == MIGRATE_ISOLATE)) {
+> +		if (unlikely(migratetype == MIGRATE_ISOLATE)
+> +		   || is_migrate_cma(migratetype)) {
+>  			free_one_page(zone, page, 0, migratetype);
+>  			goto out;
+>  		}
+> --
 
+Well this patch has some side effects, in some cases it might force kernel to consume regular
+movable pages which should be left as a fallback for critical non-movable allocations. Do you
+have any statistics for the change introduced by this patch?
+
+Best regards
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Marek Szyprowski
+Samsung Poland R&D Center
