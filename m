@@ -1,76 +1,110 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 11 Jun 2012 10:20:49 +0530
-Subject: RFC: changing DMA slave configuration API
-In-Reply-To: <20120610112217.GD11404@n2100.arm.linux.org.uk>
-References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
- <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
- <20120610112217.GD11404@n2100.arm.linux.org.uk>
-Message-ID: <1339390249.1927.1623.camel@vkoul-udesk3>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 11 Jun 2012 14:15:02 +0900
+Subject: [RFC PATCH] ARM: Make a compile trustzone conditionally
+Message-ID: <20120611051502.GA24030@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-06-10 at 12:22 +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 10, 2012 at 07:19:47PM +0800, Barry Song wrote:
-> > 2012/6/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > > Dan, Vinod,
-> > >
-> > > There's a change I would like to do to the DMA slave configuration.
-> > > It's currently a pain to have the source and destination parameters in
-> > > the dma_slave_config structure as separate elements; it means when you
-> > > want to extract them, you end up with code in DMA engine drivers like:
-> > >
-> > > +       if (dir == DMA_DEV_TO_MEM) {
-> > > +               dev_addr = c->src_addr;
-> > > +               dev_width = c->src_addr_width;
-> > > +               burst = c->src_maxburst;
-> > > +       } else if (dir == DMA_MEM_TO_DEV) {
-> > > +               dev_addr = c->dst_addr;
-> > > +               dev_width = c->dst_addr_width;
-> > > +               burst = c->dst_maxburst;
-> > > +       }
-> > >
-> > > If we redefine the structure as below, this all becomes more simple:
-> > >
-> > > +       if (dir == DMA_DEV_TO_MEM)
-> > > +               cfg = &c->dev_src;
-> > > +       else if (dir == DMA_MEM_TO_DEV)
-> > > +               cfg = &c->dev_dst;
-> > 
-> > it seems that might mean an union in your dma_slave_cfg, but not
-> > co-exitense of both?
-> 
-> No, I want both so it's possible to select between the two when preparing
-> a DMA slave transfer.
-> 
-> > struct dma_slave_cfg {
-> > +       union {
-> >               struct dma_dev_cfg dev_src;
-> >               struct dma_dev_cfg dev_dst;
-> >        }
-> >        bool device_fc;
-> > };
-> 
-> If you do that, the union becomes pointless, and you might as well have:
-> 
-> struct dma_slave_cfg {
-> 	struct dma_dev_cfg dev;
-> 	bool device_fc;
-> };
-> 
-> instead.
-Hi Russell,
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-I think it is a good idea. And I would like to extend it even a little
-bit. Do we have any users of peripheral to peripheral slave dma?
-IIRC  that is not the case, or does anyone know of existence or plans
-for such a h/w?
+Some boards can use the trustzone but others can't use trustzone.
+However we need to build it simultaneously. To address this issue,
+introduce arm trustzone support and use it at each board files.
 
-If not, lets junk the src/dst fields and keep burst, length, addr fields
-which point to the peripheral values.
+e.g., In boot_secondary at mach-exynos/platsmp.c
 
-Alternatively if we need both, then we can't have union and Russell's
-idea seems good one :)
+	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+		CPU1_BOOT_REG);
 
+	if (trustzone_enabled()) {
+		/* Call Exynos specific smc call */
+		/* exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0); */
+	}
 
--- 
-~Vinod
+	gic_raise_softirq(cpumask_of(cpu), 1);
+
+	if (pen_release == -1)
+
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 283fa1d..16b7047 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -21,6 +21,9 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
+ 
++config ARM_TRUSTZONE
++	bool
++
+ config ICST
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e8a4e58..5820e49 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -4,6 +4,7 @@
+ 
+ obj-$(CONFIG_ARM_GIC)		+= gic.o
+ obj-$(CONFIG_ARM_VIC)		+= vic.o
++obj-$(CONFIG_ARM_TRUSTZONE)	+= trustzone.o
+ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
+diff --git a/arch/arm/common/trustzone.c b/arch/arm/common/trustzone.c
+new file mode 100644
+index 0000000..5104a1f
+--- /dev/null
++++ b/arch/arm/common/trustzone.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++
++#include <asm/cache.h>
++
++static bool trustzone_enable __read_mostly = false;
++
++bool trustzone_enabled(void)
++{
++	return trustzone_enable;
++}
++
++void trustzone_set_enable(void)
++{
++	trustzone_enable = true;
++}
+diff --git a/arch/arm/include/asm/trustzone.h b/arch/arm/include/asm/trustzone.h
+new file mode 100644
+index 0000000..126dd22
+--- /dev/null
++++ b/arch/arm/include/asm/trustzone.h
+@@ -0,0 +1,20 @@
++/*
++ *  Copyright (C) 2012 Samsung Electronics.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_TRUSTZONE_H
++#define __ASM_ARM_TRUSTZONE_H
++
++#ifdef CONFIG_ARM_TRUSTZONE
++extern bool trustzone_enabled(void);
++extern void trustzone_set_enable(void);
++#else
++#define trustzone_enabled()		(0)
++#define trustzone_set_enable()		do { } while (0)
++#endif
++
++#endif
