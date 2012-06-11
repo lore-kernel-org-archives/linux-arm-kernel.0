@@ -1,26 +1,34 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 11 Jun 2012 09:58:29 +1000
-Subject: [PATCH] arm: ep93xx: Enable i2c support for ep9302
-In-Reply-To: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
-References: <alpine.LFD.2.00.1206101542100.21012@FC9.localdomain>
-Message-ID: <4FD534A5.1030301@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Jun 2012 18:46:02 -0600
+Subject: [PATCHv2 03/12] ARM: OMAP4+: hwmod: fix issue causing IPs not going
+ back to Smart-Standby
+In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
+References: <20120611004502.20034.8840.stgit@dusk>
+Message-ID: <20120611004559.20034.69230.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/12 22:44, Todor Colov wrote:
+From: Djamil Elaidi <d-elaidi@ti.com>
 
-> 
-> Enable i2c support for ep9302. i2c support is needed when external RTC is 
-> used. 
-> 
-> Signed-off-by: Todor Colov <todorcolov@gmail.com>
+If an IP is configured in Smart-Standby-Wakeup, when disabling wakeup feature the
+IP will not go back to Smart-Standby, but will remain in Smart-Standby-Wakeup.
 
-Thanks. Applied to ep93xx-fixes.
+Signed-off-by: Djamil Elaidi <d-elaidi@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> --- linux-3.4/arch/arm/mach-ep93xx/edb93xx.c	2012-05-21 01:29:13.000000000 +0300
-> +++ linux-3.4/arch/arm/mach-ep93xx/edb93xx-i2c-ep9302-enabled.c	2012-06-10 14:18:06.977893546 +0300
-
-
-Please use git diff in future. This wouldn't directly apply with git am.
-
-~Ryan
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 096474c..2d1111d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -530,7 +530,7 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
+ 	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+ 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART, v);
+ 	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
+-		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, v);
++		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART, v);
+ 
+ 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
+ 
