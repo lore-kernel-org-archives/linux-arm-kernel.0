@@ -1,23 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jun 2012 23:42:24 +0200
-Subject: [PATCH 13/14] ARM: ux500: Enable the AB8500 RTC for all DT:ed
- DB8500 based devices
-In-Reply-To: <1339428307-3850-14-git-send-email-lee.jones@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-14-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdb56UA0-uxKFYQ+fZmJf9Y26NwWLdKc5x-ZBfqUK0cTFg@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 16:43:02 -0500
+Subject: [PATCH v5 06/14] ARM: OMAP2+: gpmc: CS configuration helper
+In-Reply-To: <9dd458171d6a68ea4f97a4ba19dbacc0d6b5ba35.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <9dd458171d6a68ea4f97a4ba19dbacc0d6b5ba35.1339419492.git.afzal@ti.com>
+Message-ID: <4FD66666.8060002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Here we add a node for the AB8500 Real Time Clock in all devices
-> supporting the DB8500. The AB8500 RTC driver makes use of named
-> interrupts we provide support for this too.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
+> Helper for configuring given CS based on flags.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c             |   33 ++++++++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/gpmc.h |    5 +++++
+>  2 files changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 652b245..4e19010 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -927,6 +927,39 @@ static __devinit int gpmc_setup_cs_mem(struct gpmc_cs_data *cs,
+>  	return 1;
+>  }
+>  
+> +static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
+> +{
+> +	u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Why is it necessary to read the register first? I thought you wanted to
+get away from relying on bootloader settings?
 
-Yours,
-Linus Walleij
+> +	l &= ~(GPMC_CONFIG1_MUXADDDATA |
+> +		GPMC_CONFIG1_WRITETYPE_SYNC |
+> +		GPMC_CONFIG1_WRITEMULTIPLE_SUPP |
+> +		GPMC_CONFIG1_READTYPE_SYNC |
+> +		GPMC_CONFIG1_READMULTIPLE_SUPP |
+> +		GPMC_CONFIG1_WRAPBURST_SUPP |
+> +		GPMC_CONFIG1_DEVICETYPE(~0) |
+> +		GPMC_CONFIG1_DEVICESIZE(~0) |
+> +		GPMC_CONFIG1_PAGE_LEN(~0));
+> +
+> +	l |= conf & GPMC_CONFIG1_DEVICETYPE_NAND;
+> +	l |= conf & GPMC_CONFIG1_DEVICESIZE_16;
+
+I can see that it works to use the above definitions as masks because of
+the possible values that can be programmed into these fields. However,
+from a read-ability standpoint this is unclear and requires people to
+review the documentation to understand what you are doing here.
+Furthermore, if any new device-types or sizes were added in the future
+this could lead to bugs. Hence, it would be better to define a mask for
+these fields.
+
+Now you may say what happens if someone pass a bad device-type or
+device-size that would equate to a reserved value being programmed. Well
+if someone passes a bad value we don't know what they intended to
+program and that raises the question should we be checking the conf
+value of bad device types, size, and page lengths here?
+
+Jon
