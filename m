@@ -1,24 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jun 2012 14:16:19 +0000
-Subject: [PATCH 8/14] ARM: LPC32xx: Clock adjustment for key matrix
- controller
-In-Reply-To: <1339412537-24485-9-git-send-email-stigge@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <1339412537-24485-9-git-send-email-stigge@antcom.de>
-Message-ID: <201206111416.19251.arnd@arndb.de>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 11 Jun 2012 19:31:01 +0530
+Subject: [PATCH 0/3] Prepare for GPMC driver conversion
+Message-ID: <cover.1339419244.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 June 2012, Roland Stigge wrote:
-> The clock.c file needs to be changed to match the automatic device name to its
-> clock.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> 
+Hi,
 
-Should this not be in the same patch as the one that moves the device over
-to DT probing? Otherwise you have a non-working setup if only one patch
-is applied.
+Objective of this series is to make things easy for GPMC driver
+conversion series by separating out more things from driver
+conversion series.
 
-	Arnd
+This series,
+1. Unifies NAND platform initialization functions
+2. Cleans up OneNAND platform code a little
+3. Handles additional timings in Kernel
+
+This series is based on 3.5-rc1 & made on top of
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69501.html
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69881.html
+
+Regards
+Afzal
+
+Afzal Mohammed (3):
+  ARM: OMAP2+: nand: unify init functions
+  ARM: OMAP2+: onenand: cleanup for gpmc driver conversion
+  ARM: OMAP2+: gpmc: handle additional timings
+
+ arch/arm/mach-omap2/board-devkit8000.c     |    8 +++--
+ arch/arm/mach-omap2/board-flash.c          |   45 ++++++++++++++-------------
+ arch/arm/mach-omap2/board-flash.h          |    6 ++--
+ arch/arm/mach-omap2/board-igep0020.c       |    2 +-
+ arch/arm/mach-omap2/board-ldp.c            |    4 +--
+ arch/arm/mach-omap2/board-omap3beagle.c    |    8 +++--
+ arch/arm/mach-omap2/board-omap3touchbook.c |    8 +++--
+ arch/arm/mach-omap2/board-overo.c          |    7 +++--
+ arch/arm/mach-omap2/board-zoom.c           |    5 +--
+ arch/arm/mach-omap2/common-board-devices.c |   46 ----------------------------
+ arch/arm/mach-omap2/common-board-devices.h |    1 -
+ arch/arm/mach-omap2/gpmc-onenand.c         |   24 ++++++---------
+ arch/arm/mach-omap2/gpmc.c                 |    6 ++++
+ arch/arm/plat-omap/include/plat/gpmc.h     |    6 ++++
+ 14 files changed, 77 insertions(+), 99 deletions(-)
+
+-- 
+1.7.10.2
