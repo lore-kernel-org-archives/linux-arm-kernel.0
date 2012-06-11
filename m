@@ -1,38 +1,58 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 13:02:04 +0200
-Subject: [PATCH 1/14] ARM: LPC32xx: Add NAND flash timing to PHY3250 board dts
+Date: Mon, 11 Jun 2012 13:02:07 +0200
+Subject: [PATCH 4/14] ARM: LPC32xx: Add DMA configuration to platform data
 In-Reply-To: <1339412537-24485-1-git-send-email-stigge@antcom.de>
 References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339412537-24485-2-git-send-email-stigge@antcom.de>
+Message-ID: <1339412537-24485-5-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds necessary NAND flash timings to the board specific dts file of
-the PHY3250 reference board of the LPC32xx SoC.
+This patch adds DMA channel configuration to the LPC32xx platform file.  The
+configured DMA signalling is generic for LPC32xx SoC and is not board specific.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- arch/arm/boot/dts/phy3250.dts |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-lpc32xx/phy3250.c |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
---- linux-2.6.orig/arch/arm/boot/dts/phy3250.dts
-+++ linux-2.6/arch/arm/boot/dts/phy3250.dts
-@@ -54,6 +54,17 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -226,7 +226,37 @@ static int __init phy3250_spi_board_regi
+ }
+ arch_initcall(phy3250_spi_board_register);
  
-+			nxp,wdr-clks = <14>;
-+			nxp,wwidth = <40000000>;
-+			nxp,whold = <100000000>;
-+			nxp,wsetup = <100000000>;
-+			nxp,rdr-clks = <14>;
-+			nxp,rwidth = <40000000>;
-+			nxp,rhold = <66666666>;
-+			nxp,rsetup = <100000000>;
-+			nand-on-flash-bbt;
-+			gpios = <&gpio 5 19 1>; /* GPO_P3 19, active low */
++static struct pl08x_channel_data pl08x_slave_channels[] = {
++	{
++		.bus_id = "nand-slc",
++		.min_signal = 1, /* SLC NAND Flash */
++		.max_signal = 1,
++		.periph_buses = PL08X_AHB1,
++	},
++	{
++		.bus_id = "nand-mlc",
++		.min_signal = 12, /* MLC NAND Flash */
++		.max_signal = 12,
++		.periph_buses = PL08X_AHB1,
++	},
++};
 +
- 			mtd0 at 00000000 {
- 				label = "phy3250-boot";
- 				reg = <0x00000000 0x00064000>;
++static int pl08x_get_signal(struct pl08x_dma_chan *ch)
++{
++	return ch->cd->min_signal;
++}
++
++static void pl08x_put_signal(struct pl08x_dma_chan *ch)
++{
++}
++
+ static struct pl08x_platform_data pl08x_pd = {
++	.slave_channels = &pl08x_slave_channels[0],
++	.num_slave_channels = ARRAY_SIZE(pl08x_slave_channels),
++	.get_signal = &pl08x_get_signal,
++	.put_signal = &pl08x_put_signal,
++	.lli_buses = PL08X_AHB1,
++	.mem_buses = PL08X_AHB1,
+ };
+ 
+ static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
