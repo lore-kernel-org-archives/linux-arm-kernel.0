@@ -1,35 +1,51 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 11 Jun 2012 18:26:20 +0300
-Subject: [PATCHv6 0/7] ARM: OMAP4: core retention support
-Message-ID: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+Date: Mon, 11 Jun 2012 18:26:21 +0300
+Subject: [PATCHv6 1/7] ARM: OMAP4: PM: add errata support
+In-Reply-To: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+References: <1339428387-4800-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1339428387-4800-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Added similar PM errata flag support as omap3 has. This should be used
+in similar manner, set the flags during init time, and check the flag
+values during runtime.
 
-Changes compared to previous version:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/pm.h     |    7 +++++++
+ arch/arm/mach-omap2/pm44xx.c |    1 +
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-- moved basic omap4 pm errata support from dev-off set to this one
-- changed ordering of patches a bit (core ret enabled at last patch)
-- dropped DSP reset hack patch from set, as it is no longer needed
-- added arch specific hwmod_ops support, needed for proper functioning
-  of the context loss support
-- context offset register invalidity is now marked with USHRT_MAX
-  instead of a separate flag
-- patches rebased on top of Jean Pihet's functional power state code
-- patches rebased on top of 3.5-rc2
-- dropped debug option for enabling OSWR mode for suspend, this is now
-  enabled by default
-
-Tested with omap4 panda board + omap3 beagle (just to verify nothing
-gets broken.)
-
-Fully functioning branch available here:
-tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-branch: mainline-3.5-rc2-omap4-ret-v6
-
-Branch contains also hwmod fixes from Paul Walmsley, functional power
-state code from Jean Pihet, IO chain set and a few other needed misc
-fixes to make suspend to core retention + wakeup to work properly.
-
--Tero
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 7856489..46ab9d9 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -88,6 +88,13 @@ extern void enable_omap3630_toggle_l2_on_restore(void);
+ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #endif		/* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
+ 
++#if defined(CONFIG_ARCH_OMAP4)
++extern u16 pm44xx_errata;
++#define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
++#else
++#define IS_PM44XX_ERRATUM(id)		0
++#endif
++
+ #ifdef CONFIG_OMAP_SMARTREFLEX
+ extern int omap_devinit_smartreflex(void);
+ extern void omap_enable_smartreflex_on_init(void);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index c234733..3a484b1 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -33,6 +33,7 @@ struct power_state {
+ };
+ 
+ static LIST_HEAD(pwrst_list);
++u16 pm44xx_errata;
+ 
+ #ifdef CONFIG_SUSPEND
+ static int omap4_pm_suspend(void)
+-- 
+1.7.4.1
