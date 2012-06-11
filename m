@@ -1,33 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jun 2012 12:10:29 +0100
-Subject: [PATCH 4/14] ARM: LPC32xx: Add DMA configuration to platform data
-In-Reply-To: <1339412537-24485-5-git-send-email-stigge@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <1339412537-24485-5-git-send-email-stigge@antcom.de>
-Message-ID: <20120611111029.GF11168@n2100.arm.linux.org.uk>
+From: liu.y.victor@gmail.com (Liu Ying)
+Date: Mon, 11 Jun 2012 19:18:00 +0800
+Subject: [PATCH 1/3] mx3fb: do not support panning with fb blanked
+In-Reply-To: <20120611110517.GE11168@n2100.arm.linux.org.uk>
+References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
+ <20120611095102.GD11168@n2100.arm.linux.org.uk>
+ <CA+8Hj81L9-NC=08_dvV2u_eM0NdssJsjduAgTbH37nusu56Avw@mail.gmail.com>
+ <20120611110517.GE11168@n2100.arm.linux.org.uk>
+Message-ID: <CA+8Hj83+Jqv3Bs0mTKYpdsH4ZbOMEQkRpsiCUPVwpeqvWg8jyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 01:02:07PM +0200, Roland Stigge wrote:
-> +static int pl08x_get_signal(struct pl08x_dma_chan *ch)
-> +{
-> +	return ch->cd->min_signal;
-> +}
-> +
-> +static void pl08x_put_signal(struct pl08x_dma_chan *ch)
-> +{
-> +}
+2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jun 11, 2012 at 06:46:14PM +0800, Liu Ying wrote:
+>> 2012/6/11, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > On Mon, Jun 11, 2012 at 09:06:48AM +0800, Liu Ying wrote:
+>> >> This patch checks if framebuffer is unblanked before
+>> >> we actually trigger panning in custom pan display
+>> >> function.
+>> >>
+>> >> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> >> ---
+>> >>  drivers/video/mx3fb.c |    5 +++++
+>> >>  1 files changed, 5 insertions(+), 0 deletions(-)
+>> >>
+>> >> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+>> >> index e3406ab..d53db60 100644
+>> >> --- a/drivers/video/mx3fb.c
+>> >> +++ b/drivers/video/mx3fb.c
+>> >> @@ -1063,6 +1063,11 @@ static int mx3fb_pan_display(struct
+>> >> fb_var_screeninfo *var,
+>> >>  	dev_dbg(fbi->device, "%s [%c]\n", __func__,
+>> >>  		list_empty(&mx3_fbi->idmac_channel->queue) ? '-' : '+');
+>> >>
+>> >> +	if (mx3_fbi->blank != FB_BLANK_UNBLANK) {
+>> >> +		dev_dbg(fbi->device, "panning with fb blanked not supported\n");
+>> >> +		return -EFAULT;
+>> >> +	}
+>> >
+>> > Why is this an error, and why return -EFAULT?  What userspace access
+>> > failed?
+>> >
+>> Hi, Russell,
+>>
+>> IMHO, panning with framebuffer blanked is meaningless, at least, it is
+>> not a common usecase.
+>
+> Yes, but why should anything in userspace care whether the display is
+> blanked or not?
+>
+> For example, we may pan the display when a user program produces output,
+> and we're on the last line of the display.  We don't fail that just
+> because the screen happens to be blank.  So I don't see why we should
+> actively fail an explicit userspace pan request just because the console
+> happened to be blanked.
+>
+> What I'm basically saying is that as far as _userspace_ is concerned,
+> all the standard APIs should just work as normal whether the display is
+> blanked or not.
+>
 
-These change in my unstable/dma-pl08x branch, patches have been posted
-already, but I don't deem them to be totally stable yet.  Waiting on
-OMAP people to get their mainline kernel restored to a buildable state
-so I can continue my DMA engine work.
+Ok, understand your point. I am ok to drop this patch.
 
-> +
->  static struct pl08x_platform_data pl08x_pd = {
-> +	.slave_channels = &pl08x_slave_channels[0],
-> +	.num_slave_channels = ARRAY_SIZE(pl08x_slave_channels),
-> +	.get_signal = &pl08x_get_signal,
-> +	.put_signal = &pl08x_put_signal,
+Thanks.
 
-No need to take the address of a function here.
+-- 
+Best Regards,
+Liu Ying
