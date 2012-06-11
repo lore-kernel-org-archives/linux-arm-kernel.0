@@ -1,25 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jun 2012 14:14:14 +0000
-Subject: [PATCH 11/14] ARM: LPC32xx: DTS adjustment for using pl18x
- primecell
-In-Reply-To: <1339412537-24485-12-git-send-email-stigge@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <1339412537-24485-12-git-send-email-stigge@antcom.de>
-Message-ID: <201206111414.14264.arnd@arndb.de>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 11 Jun 2012 19:45:58 +0530
+Subject: Current state of AM33xx patches
+In-Reply-To: <4FD5BA4C.9070706@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com>
+Message-ID: <4FD5FD9E.5040203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 June 2012, Roland Stigge wrote:
->                         sd at 20098000 {
-> -                               compatible = "arm,pl180", "arm,primecell";
-> +                               compatible = "arm,pl18x", "arm,primecell";
->                                 reg = <0x20098000 0x1000>;
->                                 interrupts = <0x0f 0>, <0x0d 0>;
-> +                               status = "disable";
->                         };
->  
 
-The proper way to write this is 'status = "disabled";', with a 'd' at
-the end.
 
-	Arnd
+On 6/11/2012 2:58 PM, Daniel Mack wrote:
+> Hey,
+> 
+> can anybody give me a quick wrap-up about the current state of AM33xx
+> based SoCs in mainline? What are the next steps to get things merged?
+> 
+
+Daniel,
+
+We are in the process of submitting all baseport patches to the
+upstream, summary would be,
+
+Accepted:
+	- Machine and low-level init code
+	- Basic DT required for boot.
+	- Voltagedomain, Powerdomain, clockdomain implementation
+
+Currently under work (already submitted multiple versions):
+	- Clock Tree
+	- HWMOD
+
+I do maintain wiki page which you should refer for any updates:
+http://processors.wiki.ti.com/index.php/Sitara_Linux_Upstream_Status
+
+In order to get latest and greatest kernel to boot, you can use my repo:
+https://github.com/hvaibhav/am335x-linux
+
+
+Also, note that, currently there will be very minimal feature-set
+supported in the kernel, so not sure how much can be leveraged for
+production use-cases.
+
+
+> I'm getting involved in a project that is based on a AM3352 and would
+> like to provide help where necessary and wanted.
+> 
+
+That's great, help is always required and appreciated.
+
+Thanks,
+Vaibhav
+
+> 
+> Thanks,
+> Daniel
+> 
