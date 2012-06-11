@@ -1,97 +1,74 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jun 2012 18:45:51 -0600
-Subject: [PATCHv2 00/12] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
-Message-ID: <20120611004502.20034.8840.stgit@dusk>
+Date: Sun, 10 Jun 2012 18:46:23 -0600
+Subject: [PATCHv2 10/12] ARM: OMAP2+: CM: increase the module disable timeout
+In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
+References: <20120611004502.20034.8840.stgit@dusk>
+Message-ID: <20120611004620.20034.4341.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Increase the timeout for disabling an IP block to five milliseconds.
+This is to handle the usb_host_fs idle latency, which takes almost
+four milliseconds after a host controller reset.
 
-Here is an initial set of fixes for power management and OMAP core
-infrastructure for 3.5-rc.  Most of these patches address boot
-warnings and power management problems on OMAP4, although a few of
-them address more general issues.
+This is the second of two patches needed to resolve the following
+boot warning:
 
-Thanks to (in alphabetical order) Beno?t Cousson, Tero Kristo, Kevin
-Hilman, Vaibhav Hiremath, and Tony Lindgren for help with this series.
+omap_hwmod: usb_host_fs: _wait_target_disable failed
 
-Compile-test information is below.  The patches been boot-tested on
-OMAP3530 ES3.0 BeagleBoard and OMAP4430 ES2.0 PandaBoard.  Suspend and
-idle are broken on both of these platforms right now.  Unfortunately
-my board farm is down at the moment, so I'm unable to do further
-testing on other boards.  Boot logs, such as they are, are available
-from:
-
-http://www.pwsan.com/omap/bootlogs/20120610/omap_fixes_a_3.5rc__1869336b045e205b874e178443213815a8561cd1/
-
-These patches are available via git from git://git.pwsan.com/linux-2.6
-in the branch 'omap_fixes_a_3.5rc'.
-
-This second version contains several changes:
-
-- Rebased on v3.5-rc2.
-
-- A new patch has been added to change the 32k sync timer
-  SIDLEMODE flags ("ARM: OMAP4: hwmod data: fix 32k sync timer
-  idle modes").
-
-- A bug has been fixed ("ARM: OMAP2+: hwmod code/data: fix 32K
-  sync timer").
-
-- setup_preprogram code for the AESS and FSUSB IP blocks has been
-  moved to include/linux/platform_data at Tony's request
-  ("ARM: OMAP4+: AESS: enable internal auto-gating during initial
-   setup" and "ARM: OMAP2+: usb_host_fs: add custom
-   setup_preprogram for usb_host_fs (fsusb)")
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tero Kristo <t-kristo@ti.com>
 ---
+ arch/arm/mach-omap2/cm.h                   |   11 +++++++++++
+ arch/arm/mach-omap2/cminst44xx.c           |    4 ++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-object size (delta in bytes from v3.5-rc2 (cfaf025112d3856637ff34a767ef785ef5cf2ca9)):
- text 	 data 	  bss 	total 	kernel
-    0 	    0 	    0 	    0 	5912osk_testconfig/vmlinux
-  +64 	  +96 	    0 	 +160 	n800_multi_omap2xxx/vmlinux
-  +96 	  +96 	    0 	 +192 	n800_testconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1510_defconfig/vmlinux
-    0 	    0 	    0 	    0 	omap1_defconfig/vmlinux
- +304 	 +320 	    0 	 +624 	omap2_4_testconfig/vmlinux
- +304 	 +448 	    0 	 +752 	omap2plus_defconfig/vmlinux
- +240 	 +384 	    0 	 +624 	omap2plus_no_pm/vmlinux
-+4404 	 +312 	    0 	+4716 	omap3_4_testconfig/vmlinux
- +100 	  +56 	    0 	 +156 	omap3_testconfig/vmlinux
- +308 	 +280 	    0 	 +588 	omap4_testconfig/vmlinux
-
-Djamil Elaidi (1):
-      ARM: OMAP4+: hwmod: fix issue causing IPs not going back to Smart-Standby
-
-Paul Walmsley (10):
-      ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-      ARM: OMAP4: hwmod data: fix 32k sync timer idle modes
-      ARM: OMAP2+: hwmod: add setup_preprogram hook
-      ARM: OMAP2+: hwmod: add flag to prevent hwmod code from touching IP block during init
-      ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
-      ARM: OMAP4: hwmod data: add SL2IF hardreset line
-      ARM: OMAP2+: usb_host_fs: add custom setup_preprogram for usb_host_fs (fsusb)
-      ARM: OMAP2+: CM: increase the module disable timeout
-      ARM: OMAP4: clock data: add clockdomains for clocks used as main clocks
-      ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init
-
-Todd Poynor (1):
-      ARM: OMAP: PM: Lock clocks list while generating summary
-
-
- arch/arm/mach-omap2/clock44xx_data.c         |    5 +
- arch/arm/mach-omap2/cm.h                     |   11 +++
- arch/arm/mach-omap2/cminst44xx.c             |    4 -
- arch/arm/mach-omap2/omap_hwmod.c             |   43 +++++++++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    2 
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   30 +++++++
- arch/arm/plat-omap/clock.c                   |    2 
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   24 ++++++
- include/linux/platform_data/aess.h           |   76 +++++++++++++++++++
- include/linux/platform_data/fsusb.h          |  105 ++++++++++++++++++++++++++
- 10 files changed, 288 insertions(+), 14 deletions(-)
- create mode 100644 include/linux/platform_data/aess.h
- create mode 100644 include/linux/platform_data/fsusb.h
+diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
+index a7bc096..f24e3f7 100644
+--- a/arch/arm/mach-omap2/cm.h
++++ b/arch/arm/mach-omap2/cm.h
+@@ -22,4 +22,15 @@
+  */
+ #define MAX_MODULE_READY_TIME		2000
+ 
++/*
++ * MAX_MODULE_DISABLE_TIME: max duration in microseconds to wait for
++ * the PRCM to request that a module enter the inactive state in the
++ * case of OMAP2 & 3.  In the case of OMAP4 this is the max duration
++ * in microseconds for the module to reach the inactive state from
++ * a functional state.
++ * XXX FSUSB on OMAP4430 takes ~4ms to idle after reset during
++ * kernel init.
++ */
++#define MAX_MODULE_DISABLE_TIME		5000
++
+ #endif
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 8c86d29..1a39945 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -313,9 +313,9 @@ int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_off
+ 
+ 	omap_test_timeout((_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) ==
+ 			   CLKCTRL_IDLEST_DISABLED),
+-			  MAX_MODULE_READY_TIME, i);
++			  MAX_MODULE_DISABLE_TIME, i);
+ 
+-	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
++	return (i < MAX_MODULE_DISABLE_TIME) ? 0 : -EBUSY;
+ }
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index b8b28be..3613054 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -33,6 +33,7 @@
+ #include <plat/mmc.h>
+ #include <plat/dmtimer.h>
+ #include <plat/common.h>
++#include <plat/usb.h>
+ 
+ #include "omap_hwmod_common_data.h"
+ 
