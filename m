@@ -1,123 +1,69 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 11 Jun 2012 19:57:21 +0530
-Subject: [PATCH v5 10/14] ARM: OMAP2+: gpmc: waitpin helper
+Date: Mon, 11 Jun 2012 19:57:28 +0530
+Subject: [PATCH v5 11/14] ARM: OMAP2+: gpmc: handle connected peripherals
 In-Reply-To: <cover.1339419492.git.afzal@ti.com>
 References: <cover.1339419492.git.afzal@ti.com>
-Message-ID: <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
+Message-ID: <5b3939381db2b7ac29d9df1e817af2ce80016007.1339419492.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Helper for configuring waitpin. There are two parts to it;
-configuring at CS level and the other at device level.
-A device embedding multiple CS has been provided the
-capability to use same waitpin (different waitpins has not
-been supported as presently there are no GPMC peripherals
-doing so)
+Platform will provide driver with configuration details for
+each CS like configuration, timing, interrupts. Setup GPMC
+based on it. Platform data also provides platform data &
+resources used for connected peripheral (eg. gpio irq).
+GPMC driver tunnels those information to respective driver.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c             |  122 ++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/gpmc.h |    9 +++
- 2 files changed, 131 insertions(+)
+ arch/arm/mach-omap2/gpmc.c |  146 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 146 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 5a6f708..9073a8a 100644
+index 9073a8a..281bd23 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -75,6 +75,8 @@
- #define	GPMC_CONFIG6_CYCLE2CYCLEDIFFCSEN	BIT(6)
- #define	GPMC_CONFIG6_CYCLE2CYCLESAMECSEN	BIT(7)
- 
-+#define	GPMC_CONFIG_WAITPIN_POLARITY_SHIFT	0x8
-+
- #define GPMC_CS0_OFFSET		0x60
- #define GPMC_CS_SIZE		0x30
- 
-@@ -93,6 +95,19 @@
-  */
- #define	GPMC_NR_IRQ		2
- 
-+enum {
-+	GPMC_WAITPIN_IDX0,
-+	GPMC_WAITPIN_IDX1,
-+	GPMC_WAITPIN_IDX2,
-+	GPMC_WAITPIN_IDX3,
-+	GPMC_NR_WAITPIN
-+};
-+
-+enum {
-+	LOW,
-+	HIGH
-+};
-+
- struct gpmc_client_irq	{
- 	unsigned		irq;
- 	u32			bitmask;
-@@ -140,6 +155,8 @@ struct gpmc_peripheral {
+@@ -155,6 +155,8 @@ struct gpmc_peripheral {
  	struct platform_device	*pdev;
  };
  
-+static unsigned gpmc_waitpin_map;
-+
++static struct gpmc_peripheral gpmc_peripheral[GPMC_CS_NUM];
++static unsigned gpmc_num_peripheral;
+ static unsigned gpmc_waitpin_map;
+ 
  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
- static struct irq_chip gpmc_irq_chip;
- static unsigned gpmc_irq_start;
-@@ -1162,6 +1179,62 @@ static void gpmc_print_cs_timings(int cs)
- 			gpmc_get_one_timing(cs, GPMC_CS_CONFIG6, 7, 7));
+@@ -1235,6 +1237,39 @@ static int gpmc_setup_cs_waitpin(struct gpmc_peripheral *g_per, unsigned cs,
+ 	return 0;
  }
  
-+static int gpmc_setup_cs_waitpin(struct gpmc_peripheral *g_per, unsigned cs,
-+							unsigned conf)
++static int gpmc_setup_cs_config_timing(struct gpmc_peripheral *g_per,
++						struct gpmc_cs_data *cs)
 +{
-+	unsigned idx;
-+	bool polarity = 0;
-+	u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
++	int ret;
 +
-+	switch (conf & GPMC_WAITPIN_MASK) {
-+	case GPMC_WAITPIN_0:
-+		idx =  GPMC_WAITPIN_IDX0;
-+		break;
-+	case GPMC_WAITPIN_1:
-+		idx =  GPMC_WAITPIN_IDX1;
-+		break;
-+	case GPMC_WAITPIN_2:
-+		idx =  GPMC_WAITPIN_IDX2;
-+		break;
-+	case GPMC_WAITPIN_3:
-+		idx =  GPMC_WAITPIN_IDX3;
-+		break;
-+	/* no waitpin */
-+	case 0:
-+		return 0;
-+		break;
-+	default:
-+		dev_err(gpmc_dev, "multiple waitpins selected on CS:%u\n", cs);
-+		return -EINVAL;
-+		break;
-+	}
-+
-+	polarity = !!(conf & GPMC_WAITPIN_ACTIVE_HIGH);
-+
-+	if (g_per->have_waitpin) {
-+		if (g_per->waitpin != idx ||
-+				g_per->waitpin_polarity != polarity) {
-+			dev_err(gpmc_dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
-+				g_per->waitpin, g_per->waitpin_polarity,
-+				g_per->name, g_per->id);
-+			return -EBUSY;
++	/* some boards rely on bootloader for configuration */
++	if (cs->have_config) {
++		gpmc_setup_cs_config(cs->cs, cs->config);
++		ret = gpmc_setup_cs_waitpin(g_per, cs->cs, cs->config);
++		if (IS_ERR_VALUE(ret)) {
++			dev_err(gpmc_dev, "error: waitpin on CS %d\n", cs->cs);
++			return ret;
 +		}
-+	} else {
-+		g_per->have_waitpin = true;
-+		g_per->waitpin = idx;
-+		g_per->waitpin_polarity = polarity;
-+	}
++	} else
++		gpmc_print_cs_config(cs->cs);
 +
-+	l |= conf & GPMC_CONFIG1_WAIT_WRITE_MON;
-+	l |= conf & GPMC_CONFIG1_WAIT_READ_MON;
-+	l &= ~GPMC_CONFIG1_WAIT_PIN_SEL_MASK;
-+	l |= GPMC_CONFIG1_WAIT_PIN_SEL(idx);
-+
-+	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, l);
++	/* some boards rely on bootloader for timing */
++	if (cs->time_ctrl.type == has_period) {
++		ret = gpmc_cs_set_timings(cs->cs, &cs->time_ctrl.timings);
++		if (IS_ERR_VALUE(ret)) {
++			dev_err(gpmc_dev, "error: timing on CS: %d\n", cs->cs);
++			return ret;
++		}
++		gpmc_cs_misc_timings(cs->cs, &cs->time_ctrl.bool_timings);
++	} else if (cs->time_ctrl.type == has_clock) {
++		gpmc_cs_set_register_timings(cs->cs, &cs->time_ctrl.timings);
++		gpmc_cs_misc_timings(cs->cs, &cs->time_ctrl.bool_timings);
++	} else
++		gpmc_print_cs_timings(cs->cs);
 +
 +	return 0;
 +}
@@ -125,88 +71,139 @@ index 5a6f708..9073a8a 100644
  static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
  {
  	return bitmask;
-@@ -1185,6 +1258,55 @@ static __devinit int gpmc_setup_cs_irq(struct gpmc_cs_data *cs,
- 	return n;
+@@ -1307,10 +1342,100 @@ static int gpmc_setup_waitpin(struct gpmc_peripheral *g_per)
+ 	return 0;
  }
  
-+static inline int gpmc_waitpin_is_reserved(unsigned waitpin)
++static __devinit int gpmc_setup_cs(struct gpmc_peripheral *g_per,
++				struct gpmc_cs_data *cs, struct resource *res)
 +{
-+	return gpmc_waitpin_map & (0x1 << waitpin);
-+}
++	int num, ret;
 +
-+static inline void gpmc_reserve_waitpin(unsigned waitpin)
-+{
-+	gpmc_waitpin_map &= ~(0x1 << waitpin);
-+	gpmc_waitpin_map |= (0x1 << waitpin);
-+}
++	num = gpmc_setup_cs_mem(cs, res);
++	if (IS_ERR_VALUE(num))
++		return num;
 +
-+static int gpmc_waitpin_request(unsigned waitpin)
-+{
-+	if (!(waitpin < GPMC_NR_WAITPIN))
-+		return -ENODEV;
-+
-+	if (gpmc_waitpin_is_reserved(waitpin))
-+		return -EBUSY;
-+	else
-+		gpmc_reserve_waitpin(waitpin);
-+
-+	return 0;
-+}
-+
-+static int gpmc_setup_waitpin(struct gpmc_peripheral *g_per)
-+{
-+	int ret;
-+	u32 l, shift;
-+
-+	if (!g_per->have_waitpin)
-+		return 0;
-+
-+	ret = gpmc_waitpin_request(g_per->waitpin);
-+	if (IS_ERR_VALUE(ret)) {
-+		dev_err(gpmc_dev, "waitpin %u reserved\n", g_per->waitpin);
++	ret = gpmc_setup_cs_config_timing(g_per, cs);
++	if (IS_ERR_VALUE(ret))
 +		return ret;
++
++	num += gpmc_setup_cs_irq(cs, res + num);
++
++	return num;
++}
++
++static __devinit int gpmc_setup_device(struct gpmc_peripheral *g_per,
++					struct gpmc_device_pdata *gdp)
++{
++	int i, n, ret;
++	struct gpmc_cs_data *cs;
++
++	for (i = 0, n = gdp->num_cs, cs = gdp->cs_data;
++				i < gdp->num_cs; i++, cs++)
++		n += hweight32(cs->irq_config);
++
++	g_per->gpmc_res = devm_kzalloc(gpmc_dev, sizeof(*g_per->gpmc_res) * n,
++								GFP_KERNEL);
++	if (g_per->gpmc_res == NULL) {
++		dev_err(gpmc_dev, "error: memory allocation\n");
++		return -ENOMEM;
 +	}
 +
-+	l = gpmc_read_reg(GPMC_CONFIG);
-+	shift = g_per->waitpin + GPMC_CONFIG_WAITPIN_POLARITY_SHIFT;
-+	if (g_per->waitpin_polarity == HIGH)
-+		l |= 1 << shift;
-+	else
-+		l &= ~(1 << shift);
-+	gpmc_write_reg(GPMC_CONFIG, l);
++	for (i = 0, cs = gdp->cs_data, g_per->gpmc_res_cnt = 0;
++			i < gdp->num_cs; cs++, i++) {
++		ret = gpmc_setup_cs(g_per, cs,
++					g_per->gpmc_res + g_per->gpmc_res_cnt);
++		if (IS_ERR_VALUE(ret) ||
++				IS_ERR_VALUE(gpmc_setup_waitpin(g_per))) {
++			dev_err(gpmc_dev, "error: setup for %s\n", gdp->name);
++			devm_kfree(gpmc_dev, g_per->gpmc_res);
++			g_per->gpmc_res = NULL;
++			g_per->gpmc_res_cnt = 0;
++			return -EINVAL;
++		} else
++			g_per->gpmc_res_cnt += ret;
++	}
++
++	g_per->name = gdp->name;
++	g_per->id = gdp->id;
++	g_per->pdata = gdp->pdata;
++	g_per->pdata_size = gdp->pdata_size;
++	g_per->per_res = gdp->per_res;
++	g_per->per_res_cnt = gdp->per_res_cnt;
 +
 +	return 0;
++}
++
++static __devinit
++struct platform_device *gpmc_create_device(struct gpmc_peripheral *p)
++{
++	int num = p->per_res_cnt + p->gpmc_res_cnt;
++	struct resource *res;
++	struct platform_device *pdev;
++
++	res = devm_kzalloc(gpmc_dev, sizeof(struct resource) * num,
++								GFP_KERNEL);
++	if (!res) {
++		dev_err(gpmc_dev, "error: allocating memory\n");
++		return NULL;
++	}
++
++	memcpy((char *)res, (const char *) p->gpmc_res,
++				sizeof(struct resource) * p->gpmc_res_cnt);
++	memcpy((char *)(res + p->gpmc_res_cnt), (const char *)p->per_res,
++				sizeof(struct resource) * p->per_res_cnt);
++
++	p->pdev = platform_device_register_resndata(gpmc_dev, p->name, p->id,
++					res, num, p->pdata, p->pdata_size);
++
++	devm_kfree(gpmc_dev, res);
++
++	return pdev;
 +}
 +
  static __devinit int gpmc_probe(struct platform_device *pdev)
  {
  	u32 l;
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index ff3f32c..e1b130c 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -64,6 +64,7 @@
- #define GPMC_CONFIG1_WAIT_WRITE_MON     (1 << 21)
- #define GPMC_CONFIG1_WAIT_MON_IIME(val) ((val & 3) << 18)
- #define GPMC_CONFIG1_WAIT_PIN_SEL(val)  ((val & 3) << 16)
-+#define	GPMC_CONFIG1_WAIT_PIN_SEL_MASK	GPMC_CONFIG1_WAIT_PIN_SEL(3)
- #define GPMC_CONFIG1_DEVICESIZE(val)    ((val & 3) << 12)
- #define	GPMC_CONFIG1_DEVICESIZE_8	GPMC_CONFIG1_DEVICESIZE(0)
- #define GPMC_CONFIG1_DEVICESIZE_16      GPMC_CONFIG1_DEVICESIZE(1)
-@@ -78,6 +79,14 @@
- #define GPMC_CONFIG1_FCLK_DIV4          (GPMC_CONFIG1_FCLK_DIV(3))
- #define GPMC_CONFIG7_CSVALID		(1 << 6)
+ 	struct resource *res;
++	struct gpmc_pdata *gp = dev_get_platdata(&pdev->dev);
++	struct gpmc_device_pdata **gdq = NULL;
++	struct gpmc_peripheral *g_per = NULL;
  
-+#define	GPMC_WAITPIN_ACTIVE_HIGH	(1 << 4)
-+#define	GPMC_WAITPIN_ACTIVE_LOW		(0 << 4)
-+#define	GPMC_WAITPIN_0			(1 << 0)
-+#define	GPMC_WAITPIN_1			(1 << 1)
-+#define	GPMC_WAITPIN_2			(1 << 2)
-+#define	GPMC_WAITPIN_3			(1 << 3)
-+#define	GPMC_WAITPIN_MASK		(GPMC_WAITPIN_0 | GPMC_WAITPIN_1 | \
-+					GPMC_WAITPIN_2 | GPMC_WAITPIN_3)
- #define GPMC_DEVICETYPE_NOR		0
- #define GPMC_DEVICETYPE_NAND		2
- #define GPMC_CONFIG_WRITEPROTECT	0x00000010
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL)
+@@ -1342,11 +1467,32 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
+ 	if (IS_ERR_VALUE(gpmc_setup_irq()))
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+ 
++	/* Traverse NULL terminated array of peripheral pointers and setup */
++	for (gdq = gp->device_pdata, g_per = gpmc_peripheral; *gdq; gdq++)
++		if (IS_ERR_VALUE(gpmc_setup_device(g_per, *gdq)))
++			dev_err(gpmc_dev, "gpmc setup on %s failed\n",
++								(*gdq)->name);
++		else
++			g_per++;
++	gpmc_num_peripheral = g_per - gpmc_peripheral;
++
++	for (l = 0, g_per = gpmc_peripheral;
++			l < gpmc_num_peripheral; l++, g_per++)
++		if (IS_ERR(gpmc_create_device(g_per)))
++			dev_err(gpmc_dev, "device creation on %s failed\n",
++								g_per->name);
++
+ 	return 0;
+ }
+ 
+ static __exit int gpmc_remove(struct platform_device *pdev)
+ {
++	struct gpmc_peripheral *g_per = gpmc_peripheral;
++
++	for (; gpmc_num_peripheral; g_per++, gpmc_num_peripheral--)
++		platform_device_unregister(g_per->pdev);
++
++	gpmc_waitpin_map = 0;
+ 	gpmc_free_irq();
+ 	gpmc_mem_exit();
+ 	gpmc_dev = NULL;
 -- 
 1.7.10.2
