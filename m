@@ -1,39 +1,62 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Mon, 11 Jun 2012 22:56:49 +0200
-Subject: [PATCH V3 3/3] i2c-nomadik: depend on ARM_AMBA, not PLAT_NOMADIK
-In-Reply-To: <cover.1339447570.git.rubini@gnudd.com>
-References: <cover.1339447570.git.rubini@gnudd.com>
-Message-ID: <794b7978d90653d3481956bc365ce46e6fde69fa.1339447570.git.rubini@gnudd.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 15:57:09 -0500
+Subject: [PATCH v5 05/14] ARM: OMAP2+: gpmc: resource creation helpers
+In-Reply-To: <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
+Message-ID: <4FD65BA5.4020205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gateware device has been used outside of the Nomadik world, using
-the pci-amba bridge driver, so loosen the dependencies.
 
-Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/i2c/busses/Kconfig |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
+> Helpers for propulating given resource structure
+> with memory & interrupt information.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |   45 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index a91f40f..652b245 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -905,6 +905,51 @@ static void __devinit gpmc_mem_init(void)
+>  	}
+>  }
+>  
+> +static __devinit int gpmc_setup_cs_mem(struct gpmc_cs_data *cs,
+> +						struct resource *res)
+> +{
+> +	unsigned long start;
+> +	int ret;
+> +
+> +	ret = gpmc_cs_request(cs->cs, cs->mem_size, &start);
+> +	if (IS_ERR_VALUE(ret)) {
+> +		dev_err(gpmc_dev, "error: gpmc request on CS: %d\n", cs->cs);
+> +		return ret;
+> +	}
+> +
+> +	res->start = start + cs->mem_offset;
+> +	res->end = res->start + cs->mem_size - 1;
+> +	res->flags = IORESOURCE_MEM;
+> +
+> +	dev_info(gpmc_dev, "memory 0x%x-0x%x on CS %d\n", res->start,
+> +							res->end, cs->cs);
+> +
+> +	return 1;
+> +}
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 7244c8b..e9f9c5d 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -479,10 +479,11 @@ config I2C_MXS
- 
- config I2C_NOMADIK
- 	tristate "ST-Ericsson Nomadik/Ux500 I2C Controller"
--	depends on PLAT_NOMADIK
-+	depends on ARM_AMBA
- 	help
- 	  If you say yes to this option, support will be included for the
--	  I2C interface from ST-Ericsson's Nomadik and Ux500 architectures.
-+	  I2C interface from ST-Ericsson's Nomadik and Ux500 architectures,
-+	  as well as the STA2X11 PCIe I/O HUB.
- 
- config I2C_NUC900
- 	tristate "NUC900 I2C Driver"
--- 
-1.7.7.2
+Nit-pick, CodingStyle chapter 16 states that 0 should be used for
+success when returning from a function.
+
+> +
+> +static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
+> +{
+> +	return bitmask;
+> +}
+
+I have to ask what is the value in this helper function? ;-)
+
+Jon
