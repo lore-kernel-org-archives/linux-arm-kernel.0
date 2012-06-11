@@ -1,53 +1,128 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 12:28:29 -0600
-Subject: [PATCH] ARM: tegra: enable I2C mux in defconfig
-Message-ID: <1339439309-12994-1-git-send-email-swarren@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 13:36:30 -0500
+Subject: [PATCH 2/3] ARM: OMAP2+: onenand: cleanup for gpmc driver
+ conversion
+In-Reply-To: <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
+Message-ID: <4FD63AAE.90008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi Afzal,
 
-Add the following, to enable the pinctrl-based I2C mux on Seaboard:
-* CONFIG_I2C_MUX
-* CONFIG_I2C_MUX_PINCTRL
+On 06/11/2012 09:01 AM, Afzal Mohammed wrote:
+> Reorganize gpmc-onenand initialization so that changes
+> required for gpmc driver migration can be made smooth.
+> 
+> Ensuring sync read/write are disabled in onenand cannot be
+> expect to work properly unless GPMC is setup, this has been
+> removed. 
 
-Some timer options were moved due to unrelated Kconfig changes.
+So I think I see what you are saying, but the above is not 100% clear. I
+think that what you are saying is that omap2_onenand_set_async_mode() is
+attempting to configure the onenand registers before configuring the
+gpmc interface and hence this is not correct.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I'll squash this into the existing defconfig update patch.
+> Two instances of doing the same has been clubbed
+> into one as onenand driver always calls indirectly
+> "omap2_onenand_set_sync_mode", and has placed such that
+> configuring onenand for async read/write would happen once
+> GPMC is setup for async mode (which happens even for sync
+> mode, before configuring to sync mode).
 
- arch/arm/configs/tegra_defconfig |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+It may be clearer to say that _set_sync_mode is always called during
+onenand setup and this will call _set_async_mode. So instead of calling
+_set_async_mode from _set_sync_mode, just call it directly during the
+gpmc_onenand_init().
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 42fdcf7..4be9c1e 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -1,4 +1,6 @@
- CONFIG_EXPERIMENTAL=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_CGROUPS=y
-@@ -28,8 +30,6 @@ CONFIG_MACH_HARMONY=y
- CONFIG_MACH_PAZ00=y
- CONFIG_MACH_TRIMSLICE=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-@@ -100,6 +100,8 @@ CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_MUX=y
-+CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_TEGRA=y
--- 
-1.7.0.4
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc-onenand.c |   24 +++++++++---------------
+>  1 file changed, 9 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> index 71d7c07..fd4c48d 100644
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -38,10 +38,9 @@ static struct platform_device gpmc_onenand_device = {
+>  	.resource	= &gpmc_onenand_resource,
+>  };
+>  
+> -static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
+> +static int omap2_onenand_set_async_mode(int cs)
+>  {
+>  	struct gpmc_timings t;
+> -	u32 reg;
+>  	int err;
+>  
+>  	const int t_cer = 15;
+> @@ -55,11 +54,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
+>  	const int t_wpl = 40;
+>  	const int t_wph = 30;
+>  
+> -	/* Ensure sync read and sync write are disabled */
+> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> -
+>  	memset(&t, 0, sizeof(t));
+>  	t.sync_clk = 0;
+>  	t.cs_on = 0;
+> @@ -95,10 +89,6 @@ static int omap2_onenand_set_async_mode(int cs, void __iomem *onenand_base)
+>  	if (err)
+>  		return err;
+>  
+> -	/* Ensure sync read and sync write are disabled */
+> -	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> -	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> -	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+
+I agree with getting rid of the first instance at the beginning of
+_set_async_mode, but why get rid of the above one? Are you assuming that
+by default it is in async mode? Could be nice to keep it to be explicit.
+
+>  	return 0;
+>  }
+> @@ -191,19 +181,21 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+>  	u32 reg;
+>  	bool clk_dep = false;
+>  
+> +	/* Ensure sync read and sync write are disabled */
+> +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> +
+
+Should we only set these after we have checked the flags and depending
+on which flags are set?
+
+>  	if (cfg->flags & ONENAND_SYNC_READ) {
+>  		sync_read = 1;
+>  	} else if (cfg->flags & ONENAND_SYNC_READWRITE) {
+>  		sync_read = 1;
+>  		sync_write = 1;
+>  	} else
+> -		return omap2_onenand_set_async_mode(cs, onenand_base);
+> +		return 0;
+>  
+>  	if (!freq) {
+>  		/* Very first call freq is not known */
+> -		err = omap2_onenand_set_async_mode(cs, onenand_base);
+> -		if (err)
+> -			return err;
+>  		freq = omap2_onenand_get_freq(cfg, onenand_base, &clk_dep);
+>  		first_time = 1;
+>  	}
+> @@ -421,6 +413,8 @@ void __init gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
+>  	gpmc_onenand_resource.end = gpmc_onenand_resource.start +
+>  							ONENAND_IO_SIZE - 1;
+>  
+> +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
+> +
+
+What about putting this in the gpmc_onenand_setup() function before the
+call to _set_sync_mode? Seems nice to have these together.
+
+Cheers
+Jon
