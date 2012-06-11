@@ -1,27 +1,59 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 11 Jun 2012 13:36:07 -0700
-Subject: RFC: changing DMA slave configuration API
-In-Reply-To: <1339390249.1927.1623.camel@vkoul-udesk3>
-References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
- <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
- <20120610112217.GD11404@n2100.arm.linux.org.uk>
- <1339390249.1927.1623.camel@vkoul-udesk3>
-Message-ID: <20120611203607.GA16899@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Jun 2012 22:37:14 +0200
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 10:20:49AM +0530, Vinod Koul wrote:
+On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> I think it is a good idea. And I would like to extend it even a little
-> bit. Do we have any users of peripheral to peripheral slave dma?
-> IIRC  that is not the case, or does anyone know of existence or plans
-> for such a h/w?
+> As new users are
+> added, it is expected that they will be Device Tree compliant.
+> If this is the case, we will look up their initialisation values
+> by compatible entry, then apply them forthwith.
+(...)
+> +static struct nmk_i2c_controller u8500_i2c = {
+> + ? ? ? /*
+> + ? ? ? ?* slave data setup time, which is
+> + ? ? ? ?* 250 ns,100ns,10ns which is 14,6,2
+> + ? ? ? ?* respectively for a 48 Mhz
+> + ? ? ? ?* i2c clock
+> + ? ? ? ?*/
+> + ? ? ? .slsu ? ? ? ? ? = 0xe,
+> + ? ? ? /* Tx FIFO threshold */
+> + ? ? ? .tft ? ? ? ? ? ?= 1,
+> + ? ? ? /* Rx FIFO threshold */
+> + ? ? ? .rft ? ? ? ? ? ?= 8,
+> + ? ? ? /* std. mode operation */
+> + ? ? ? .clk_freq ? ? ? = 100000,
+> + ? ? ? /* Slave response timeout(ms) */
+> + ? ? ? .timeout ? ? ? ?= 200,
+> + ? ? ? .sm ? ? ? ? ? ? = I2C_FREQ_MODE_FAST,
+> +};
 
-We have hardware that supports this, and I suspect it will become more
-common in our future chips.
+So why don't we create proper device tree bindings for the above platform
+data?
 
-David
+For example several driver under
+Documentation/devicetree/bindings/i2c/*
+define the .clk_freq above as "clock-frequency"
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+samsung-i2c even has this:
+samsung,i2c-sda-delay = <100>;
+samsung,i2c-max-bus-freq = <100000>;
+
+Where i2c-sda-delay corresponds to slsu above.
+
+I suspect .sm can be derived from the frequency so it
+is "FAST" whenever the frequency > 100000.
+
+This looks to me like a way to push the burden of doing the real
+device tree binding for the above to the next user.
+(Which will likely be me, so therefore I care a bit ...)
+
+Yours,
+Linus Walleij
