@@ -1,67 +1,183 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jun 2012 18:46:41 -0600
-Subject: [PATCHv2 12/12] ARM: OMAP4: hwmod data: do not enable or reset the
- McPDM during kernel init
+Date: Sun, 10 Jun 2012 18:45:59 -0600
+Subject: [PATCHv2 02/12] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
 In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
 References: <20120611004502.20034.8840.stgit@dusk>
-Message-ID: <20120611004626.20034.42995.stgit@dusk>
+Message-ID: <20120611004555.20034.87035.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolve this kernel boot message:
+Kevin discovered that commit c8d82ff68fb6873691536cf33021977efbf5593c
+("ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod
+database") broke CORE idle on OMAP3.  This prevents device low power
+states.
 
-omap_hwmod: mcpdm: cannot be enabled for reset (3)
+The root cause is that the 32K sync timer IP block does not support
+smart-idle mode[1], and so the hwmod code keeps the IP block in
+no-idle mode while it is active.  This in turn prevents the WKUP
+clockdomain from transitioning to idle.  There is a hardcoded sleep
+dependency that prevents the CORE_L3 and CORE_CM clockdomains from
+transitioning to idle when the WKUP clockdomain is active[2], so the
+chip cannot enter any device low power states.
 
-It appears that the McPDM on OMAP4 can only receive its functional
-clock from an off-chip source.  This source is not guaranteed to be
-present on the board, and when present, it is controlled by I2C.  This
-would introduce a board dependency to the early hwmod code which it
-was not designed to handle.  Also, neither the driver for this
-off-chip clock provider nor the I2C code is available early in boot
-when the hwmod code is attempting to enable and reset IP blocks.  This
-effectively makes it impossible to enable and reset this device during
-hwmod init.
+It turns out that there is no need to take the 32k sync timer out of
+idle.  The IP block itself probably does not have any native idle
+handling at all, due to its simplicity.  Furthermore, the PRCM will
+never request target idle for this IP block while the kernel is
+running, due to the sleep dependency that prevents the WKUP
+clockdomain from idling while the CORE_L3 clockdomain is active.  So
+we can safely leave the 32k sync timer in target-no-idle mode, even
+while we continue to access it.
 
-At its core, this patch is a workaround for an OMAP hardware problem.
-It should be possible to configure the OMAP to provide any IP block's
-functional clock from an on-chip source.  (This is true for almost
-every IP block on the chip.  As far as I know, McPDM is the only
-exception.)  If the kernel cannot reset and configure IP blocks, it
-cannot guarantee a sane SoC state.  Relying on an optional off-chip
-clock also creates a board dependency which is beyond the scope of the
-early hwmod code.
+This workaround is implemented by defining a new hwmod flag,
+HWMOD_ALWAYS_FORCE_SIDLE, that places the IP block into target
+force-idle mode even when enabled.  The 32k sync timer hwmods are
+marked with this flag for OMAP3 and OMAP4 SoCs.  (On OMAP2xxx, no OCP
+header existed on the 32k sync timer.)
 
-This patch works around the issue by marking the McPDM hwmod record
-with the HWMOD_EXT_OPT_MAIN_CLK flag.  This prevents the hwmod
-code from touching the device early during boot.
+Another theoretically clean fix for this problem would be to implement
+PM runtime-based control for 32k sync timer accesses.  These PM
+runtime calls would need to located in a custom clocksource, since the
+32k sync timer is currently used as an MMIO clocksource.  But in
+practice, there would be little benefit to doing so; and there would
+be some cost, due to the addition of unnecessary lines of code and the
+additional CPU overhead of the PM runtime and hwmod code - unnecessary
+in this case.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
+Another possible fix would have been to modify the pm34xx.c code to
+force the IP block idle before entering WFI.  But this would not have
+been an acceptable approach: we are trying to remove this type of
+centralized IP block idle control from the PM code.
+
+This patch is effectively a workaround for a hardware problem.  A
+better hardware approach would have been to implement a smart-idle
+target idle mode for this IP block.  The smart-idle mode in this case
+would behave identically to the force-idle mode.  We consider the
+force-idle and no-idle target idle mode settings to be intended for
+debugging and automatic idle management bug workarounds only[4].
+
+This patch is a collaboration between Kevin Hilman <khilman@ti.com>
+and Paul Walmsley <paul@pwsan.com>.
+
+Thanks to Vaibhav Hiremath <hvaibhav@ti.com> for providing comments on
+an earlier version of this patch.  Thanks to Tero Kristo
+<t-kristo@ti.com> for identifying a bug in an earlier version of this
+patch.  Thanks to Beno?t Cousson <b-cousson@ti.com> for identifying a
+bug in an earlier version of this patch and for implementation comments.
+
+References:
+
+1. Table 16-96 "REG_32KSYNCNT_SYSCONFIG" of the OMAP34xx TRM Rev. ZU
+   (SWPU223U), available from:
+   http://www.ti.com/pdfs/wtbu/OMAP34x_ES3.1.x_PUBLIC_TRM_vzU.zip
+
+2. Table 4-72 "Sleep Dependencies" of the OMAP34xx TRM Rev. ZU
+   (SWPU223U)
+
+3. ibid.
+
+4. Section 3.1.1.1.2 "Module-Level Clock Management" of the OMAP4430
+   TRM Rev. vAA (SWPU231AA).
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod.c             |   17 +++++++++++------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    2 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 +++++++++
+ 4 files changed, 22 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index bf86f7e..096474c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1124,10 +1124,12 @@ static struct omap_hwmod_addr_space * __init _find_mpu_rt_addr_space(struct omap
+  * _enable_sysc - try to bring a module out of idle via OCP_SYSCONFIG
+  * @oh: struct omap_hwmod *
+  *
+- * If module is marked as SWSUP_SIDLE, force the module out of slave
+- * idle; otherwise, configure it for smart-idle.  If module is marked
+- * as SWSUP_MSUSPEND, force the module out of master standby;
+- * otherwise, configure it for smart-standby.  No return value.
++ * Ensure that the OCP_SYSCONFIG register for the IP block represented
++ * by @oh is set to indicate to the PRCM that the IP block is active.
++ * Usually this means placing the module into smart-idle mode and
++ * smart-standby, but if there is a bug in the automatic idle handling
++ * for the IP block, it may need to be placed into the force-idle or
++ * no-idle variants of these modes.  No return value.
+  */
+ static void _enable_sysc(struct omap_hwmod *oh)
+ {
+@@ -1141,8 +1143,11 @@ static void _enable_sysc(struct omap_hwmod *oh)
+ 	sf = oh->class->sysc->sysc_flags;
+ 
+ 	if (sf & SYSC_HAS_SIDLEMODE) {
+-		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
+-			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
++		if (oh->flags & HWMOD_ALWAYS_FORCE_SIDLE)
++			idlemode = HWMOD_IDLEMODE_FORCE;
++		else
++			idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
++				HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
+ 		_set_slave_idlemode(oh, idlemode, &v);
+ 	}
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index b26d3c9..f8ac9e7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -2018,7 +2018,7 @@ static struct omap_hwmod omap3xxx_counter_32k_hwmod = {
+ 	.name		= "counter_32k",
+ 	.class		= &omap3xxx_counter_hwmod_class,
+ 	.clkdm_name	= "wkup_clkdm",
+-	.flags		= HWMOD_SWSUP_SIDLE,
++	.flags		= HWMOD_ALWAYS_FORCE_SIDLE | HWMOD_SWSUP_SIDLE,
+ 	.main_clk	= "wkup_32k_fck",
+ 	.prcm		= {
+ 		.omap2	= {
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 3613054..86fc513 100644
+index 950454a..4aaaa84 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2091,6 +2091,18 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
- 	.name		= "mcpdm",
- 	.class		= &omap44xx_mcpdm_hwmod_class,
- 	.clkdm_name	= "abe_clkdm",
-+	/*
-+	 * It's suspected that the McPDM requires an off-chip main
-+	 * functional clock, controlled via I2C.  This IP block is
-+	 * currently reset very early during boot, before I2C is
-+	 * available, so it doesn't seem that we have any choice in
-+	 * the kernel other than to avoid resetting it.  XXX This is
-+	 * really a hardware issue workaround: every IP block should
-+	 * be able to source its main functional clock from either
-+	 * on-chip or off-chip sources.  McPDM seems to be the only
-+	 * current exception.
-+	 */
-+	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
- 	.mpu_irqs	= omap44xx_mcpdm_irqs,
- 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
- 	.main_clk	= "mcpdm_fck",
+@@ -408,7 +408,7 @@ static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+ 	.name		= "counter_32k",
+ 	.class		= &omap44xx_counter_hwmod_class,
+ 	.clkdm_name	= "l4_wkup_clkdm",
+-	.flags		= HWMOD_SWSUP_SIDLE,
++	.flags		= HWMOD_ALWAYS_FORCE_SIDLE | HWMOD_SWSUP_SIDLE,
+ 	.main_clk	= "sys_32k_ck",
+ 	.prcm = {
+ 		.omap4 = {
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index c835b71..038c0d7 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -409,6 +409,14 @@ struct omap_hwmod_omap4_prcm {
+  *     in order to complete the reset. Optional clocks will be disabled
+  *     again after the reset.
+  * HWMOD_16BIT_REG: Module has 16bit registers
++ * HWMOD_ALWAYS_FORCE_SIDLE: Always program this module's SIDLEMODE to
++ *     force-idle mode, even when enabled.  This is needed for IP blocks
++ *     which do not support smart idle, which do not have a software
++ *     controllable functional or interface clock, and which the PRCM
++ *     will not assert SIdleReq until the kernel is not currently
++ *     running on the chip (e.g., the MPU is in idle).  For such modules,
++ *     fine-grained PM runtime-based idle control is simply a waste of
++ *     CPU cycles.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -419,6 +427,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_IDLEST				(1 << 6)
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
++#define HWMOD_ALWAYS_FORCE_SIDLE		(1 << 9)
+ 
+ /*
+  * omap_hwmod._int_flags definitions
