@@ -1,63 +1,95 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 11 Jun 2012 10:53:55 +0200
-Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
- pr_warn()
-In-Reply-To: <4FD5AE1D.9030807@antcom.de>
-References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
- <1339403108.6001.1697.camel@edumazet-glaptop>  <4FD5AE1D.9030807@antcom.de>
-Message-ID: <1339404835.6001.1788.camel@edumazet-glaptop>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 11 Jun 2012 18:04:40 +0900
+Subject: [PATCH] ARM: EXYNOS: Add smc call to support trustzone feature
+Message-ID: <20120611090440.GA27207@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-06-11 at 10:36 +0200, Roland Stigge wrote:
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-> I encountered cases where this happened for me on a custom board under
-> heavy load.
-> 
-> I discussed this with Kevin Wells, the original driver author. We
-> identified the case of xmit()'s TX request (from .ndo_start_xmit) with
-> full TX driver buffers as valid when ethernet is busy.
-> 
-> But maybe this is wrong. Can you please give me a hint how the net
-> subsystem makes sure that this doesn't happen under normal circumstances?
+Linux runs in non-secure mode on some boards, so we need secure monitor calls
 
-When TX ring is about to be filler, driver lpc_eth_hard_start_xmit()
-calls netif_stop_queue(ndev);
-
-So network stack should not call again lpc_eth_hard_start_xmit().
-
-I would say the bug(s) come from __lpc_handle_xmit(), since it does :
-
-if (netif_queue_stopped(ndev))
-	netif_wake_queue(ndev);
-
-without making sure some room is available in TX ring.
-
-cumulative patch :
-
-diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
-index 8d2666f..59b37c8 100644
---- a/drivers/net/ethernet/nxp/lpc_eth.c
-+++ b/drivers/net/ethernet/nxp/lpc_eth.c
-@@ -946,16 +946,16 @@ static void __lpc_handle_xmit(struct net_device *ndev)
- 			/* Update stats */
- 			ndev->stats.tx_packets++;
- 			ndev->stats.tx_bytes += skb->len;
--
--			/* Free buffer */
--			dev_kfree_skb_irq(skb);
- 		}
-+		dev_kfree_skb_irq(skb);
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 9b58024..d3ec71c 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
  
- 		txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
- 	}
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
  
--	if (netif_queue_stopped(ndev))
--		netif_wake_queue(ndev);
-+	if (pldat->num_used_tx_buffs <= ENET_TX_DESC/2) { 
-+		if (netif_queue_stopped(ndev))
-+			netif_wake_queue(ndev);
-+	}
- }
++obj-$(CONFIG_ARM_TRUSTZONE)	+= exynos-smc.o
++
++plus_sec := $(call as-instr,.arch_extension sec,+sec)
++AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
++
+ # machine support
  
- static int __lpc_handle_recv(struct net_device *ndev, int budget)
+ obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index aed2eeb..d3e2f29 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -21,6 +21,9 @@ void exynos4_restart(char mode, const char *cmd);
+ void exynos5_restart(char mode, const char *cmd);
+ void exynos_init_late(void);
+ 
++extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
++extern u32 exynos_smc_readsfr(u32 addr, u32 *val);
++
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
+ int exynos_pm_late_initcall(void);
+ #else
+diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
+new file mode 100644
+index 0000000..2ef8f59
+--- /dev/null
++++ b/arch/arm/mach-exynos/exynos-smc.S
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics.
++ *
++ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
++ *
++ * This program is free software,you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++/*
++ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
++ */
++
++ENTRY(exynos_smc)
++	stmfd	sp!, {r4-r11, lr}
++	dsb
++	smc	#0
++	ldmfd	sp!, {r4-r11, pc}
++ENDPROC(exynos_smc)
++
++/*
++ * Read registers
++ * Function signature: u32 exynos_smc_readsfr(u32 addr, u32 *val)
++ */
++ENTRY(exynos_smc_readsfr)
++	stmfd	sp!, {r4-r11, lr}
++	mov	r2, #0
++	lsr	r0, r0, #2
++	mov	ip, r1
++	mov	r3, r2
++	orr	r1, r0, #0xC0000000
++	mvn	r0, #100
++	dsb
++	smc	#0
++	cmn	r0, #101
++	beq	1f
++	cmp	r0, #0
++	streq	r2, [ip]
++	ldmfd	sp!, {r4-r11, pc}
++1:	subs	r0, r1, #0
++	streq	r2, [ip]
++	ldmfd	sp!, {r4-r11, pc}
++ENDPROC(exynos_smc_readsfr)
