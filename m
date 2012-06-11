@@ -1,30 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jun 2012 23:39:28 +0800
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <4FD60C3A.1070703@linaro.org>
-References: <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
- <4FD5D49C.6070106@linaro.org>
- <20120611120820.GN11439@opensource.wolfsonmicro.com>
- <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
- <20120611142752.GS11439@opensource.wolfsonmicro.com>
- <4FD605B5.2060300@linaro.org>
- <20120611151459.GV11439@opensource.wolfsonmicro.com>
- <4FD60C3A.1070703@linaro.org>
-Message-ID: <20120611153927.GY11439@opensource.wolfsonmicro.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 10:43:45 -0500
+Subject: [PATCH 1/3] ARM: OMAP2+: nand: unify init functions
+In-Reply-To: <95b5dece2f0b06ba1242f5af4c14fe1696950101.1339419244.git.afzal@ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <95b5dece2f0b06ba1242f5af4c14fe1696950101.1339419244.git.afzal@ti.com>
+Message-ID: <4FD61231.6020605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 04:18:18PM +0100, Lee Jones wrote:
+Hi Afzal,
 
-> Were you happy with my answer on the other email too?
+On 06/11/2012 09:01 AM, Afzal Mohammed wrote:
+> Helper function for updating nand platform data has been
+> added the capability to take timing structure arguement.
+> Usage of omap_nand_flash_init() has been replaced by modifed
+> one, omap_nand_flash_init was doing things similar to
+> board_nand_init except that NAND CS# were being acquired
+> based on bootloader setting. As CS# is hardwired for a given
+> board, acquiring gpmc CS# has been removed, and updated with
+> the value on board.
+> 
+> NAND CS# used in beagle board was found to be CS0.
+> Thomas Weber <thomas.weber.linux@googlemail.com> reported
+> that value of devkit8000 to be CS0. Overo board was found
+> to be using CS0 based on u-boot, while google grep says
+> omap3touchbook too has CS0.
 
-Not sure which e-mail you mean?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/b206b3ba/attachment.sig>
+[1] also confirms the omap3-touchbook uses CS0.
+
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+
+Which boards have been tested with this change?
+
+Otherwise, looks good.
+
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+
+Cheers
+Jon
+
+[1] http://www.alwaysinnovating.com/wiki/index.php/Booting
