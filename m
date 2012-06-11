@@ -1,27 +1,38 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 11 Jun 2012 10:47:55 +0800
-Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
-Message-ID: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Jun 2012 11:47:53 +0800
+Subject: [PATCH v7 02/12] ARM: SoC: Add per SoC SMP and CPU hotplug
+ operations
+In-Reply-To: <1339085369-26073-3-git-send-email-marc.zyngier@arm.com>
+References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+ <1339085369-26073-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120611034750.GA2344@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 07, 2012 at 05:09:19PM +0100, Marc Zyngier wrote:
+> +#ifdef CONFIG_SMP
+> +#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
+> +#define soc_smp_ops(ops)		.smp_ops = &(ops),
+> +#ifdef CONFIG_HOTPLUG_SMP
 
-After bisecting, I found that the commit below can ruin the mmc card data
-(writing incorrect file, or fs is corrupt) on my beagle-xm revB, and reverting
-the commit below will fix the problem.
+s/CONFIG_HOTPLUG_SMP/CONFIG_HOTPLUG_CPU
 
+> +#define soc_hotplug_ops(prefix)		.hotplug_ops = {	\
+> +		.cpu_kill	= prefix##_cpu_kill,		\
+> +		.cpu_die	= prefix##_cpu_die,		\
+> +		.cpu_disable	= prefix##_cpu_disable,		\
+> +	},
+> +#else
+> +#define soc_hotplug_ops(prefix)		.hotplug_ops = {},
+> +#endif
+> +extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
+> +				 struct arm_soc_smp_ops *);
+> +#else
+> +#define soc_smp_init_ops(ops)		/* empty */
+> +#define soc_smp_ops(ops)		/* empty */
+> +#define soc_smp_ops_register(a,b)	do {} while(0)
+> +#endif
 
-commit dba3c29ea4a1d5d544f59b94fd8a41662135e071
-Author: Balaji T K <balajitk@ti.com>
-Date:   Mon Apr 9 12:08:32 2012 +0530
-
-    mmc: omap_hsmmc: Enable Auto CMD12
-
-    Enable Auto-CMD12 for multi block read/write on HSMMC.
-    Tested on OMAP4430, OMAP3430 and OMAP2430 SDP
-
-
-Thanks,
---
-Ming Lei
+-- 
+Regards,
+Shawn
