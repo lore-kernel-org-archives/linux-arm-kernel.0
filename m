@@ -1,57 +1,97 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jun 2012 18:46:17 -0600
-Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
-In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
-References: <20120611004502.20034.8840.stgit@dusk>
-Message-ID: <20120611004614.20034.50895.stgit@dusk>
+Date: Sun, 10 Jun 2012 18:45:51 -0600
+Subject: [PATCHv2 00/12] ARM: OMAP: core/hwmod: first set of fixes for 3.5-rc
+Message-ID: <20120611004502.20034.8840.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On boot, the sl2if module can't be enabled.  The following message is
-logged:
+Hi,
 
-omap_hwmod: sl2if: cannot be enabled for reset (3)
+Here is an initial set of fixes for power management and OMAP core
+infrastructure for 3.5-rc.  Most of these patches address boot
+warnings and power management problems on OMAP4, although a few of
+them address more general issues.
 
-This is probably because the SL2IF is still being held in hardreset.
-The SL2IF's hardreset line is shared with one of the IVAHD's hardreset
-lines; see for example Table 3-536 "RM_IVAHD_RSTCTRL" in the OMAP4430
-TRM Rev. AA (SWPU231AA).  To work around this, add the SL2IF's
-hardreset line to the hwmod data.  This is correct from a hardware
-perspective and also will prevent the hwmod from attempting to enable
-the SL2IF during reset.  The driver for this IP block will need to
-handle its integration until the appropriate way to handle the IVAHD
-integration can be elucidated.
+Thanks to (in alphabetical order) Beno?t Cousson, Tero Kristo, Kevin
+Hilman, Vaibhav Hiremath, and Tony Lindgren for help with this series.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
+Compile-test information is below.  The patches been boot-tested on
+OMAP3530 ES3.0 BeagleBoard and OMAP4430 ES2.0 PandaBoard.  Suspend and
+idle are broken on both of these platforms right now.  Unfortunately
+my board farm is down at the moment, so I'm unable to do further
+testing on other boards.  Boot logs, such as they are, are available
+from:
+
+http://www.pwsan.com/omap/bootlogs/20120610/omap_fixes_a_3.5rc__1869336b045e205b874e178443213815a8561cd1/
+
+These patches are available via git from git://git.pwsan.com/linux-2.6
+in the branch 'omap_fixes_a_3.5rc'.
+
+This second version contains several changes:
+
+- Rebased on v3.5-rc2.
+
+- A new patch has been added to change the 32k sync timer
+  SIDLEMODE flags ("ARM: OMAP4: hwmod data: fix 32k sync timer
+  idle modes").
+
+- A bug has been fixed ("ARM: OMAP2+: hwmod code/data: fix 32K
+  sync timer").
+
+- setup_preprogram code for the AESS and FSUSB IP blocks has been
+  moved to include/linux/platform_data at Tony's request
+  ("ARM: OMAP4+: AESS: enable internal auto-gating during initial
+   setup" and "ARM: OMAP2+: usb_host_fs: add custom
+   setup_preprogram for usb_host_fs (fsusb)")
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 7700d6d..037424f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2597,15 +2597,22 @@ static struct omap_hwmod_class omap44xx_sl2if_hwmod_class = {
- 	.name	= "sl2if",
- };
- 
-+static struct omap_hwmod_rst_info omap44xx_sl2if_resets[] = {
-+	{ .name = "logic", .rst_shift = 2 },
-+};
-+
- /* sl2if */
- static struct omap_hwmod omap44xx_sl2if_hwmod = {
- 	.name		= "sl2if",
- 	.class		= &omap44xx_sl2if_hwmod_class,
- 	.clkdm_name	= "ivahd_clkdm",
-+	.rst_lines	= omap44xx_sl2if_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_sl2if_resets),
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_IVAHD_SL2_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_IVAHD_SL2_CONTEXT_OFFSET,
-+			.rstctrl_offs = OMAP4_RM_IVAHD_RSTCTRL_OFFSET,
- 			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
+object size (delta in bytes from v3.5-rc2 (cfaf025112d3856637ff34a767ef785ef5cf2ca9)):
+ text 	 data 	  bss 	total 	kernel
+    0 	    0 	    0 	    0 	5912osk_testconfig/vmlinux
+  +64 	  +96 	    0 	 +160 	n800_multi_omap2xxx/vmlinux
+  +96 	  +96 	    0 	 +192 	n800_testconfig/vmlinux
+    0 	    0 	    0 	    0 	omap1510_defconfig/vmlinux
+    0 	    0 	    0 	    0 	omap1_defconfig/vmlinux
+ +304 	 +320 	    0 	 +624 	omap2_4_testconfig/vmlinux
+ +304 	 +448 	    0 	 +752 	omap2plus_defconfig/vmlinux
+ +240 	 +384 	    0 	 +624 	omap2plus_no_pm/vmlinux
++4404 	 +312 	    0 	+4716 	omap3_4_testconfig/vmlinux
+ +100 	  +56 	    0 	 +156 	omap3_testconfig/vmlinux
+ +308 	 +280 	    0 	 +588 	omap4_testconfig/vmlinux
+
+Djamil Elaidi (1):
+      ARM: OMAP4+: hwmod: fix issue causing IPs not going back to Smart-Standby
+
+Paul Walmsley (10):
+      ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+      ARM: OMAP4: hwmod data: fix 32k sync timer idle modes
+      ARM: OMAP2+: hwmod: add setup_preprogram hook
+      ARM: OMAP2+: hwmod: add flag to prevent hwmod code from touching IP block during init
+      ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
+      ARM: OMAP4: hwmod data: add SL2IF hardreset line
+      ARM: OMAP2+: usb_host_fs: add custom setup_preprogram for usb_host_fs (fsusb)
+      ARM: OMAP2+: CM: increase the module disable timeout
+      ARM: OMAP4: clock data: add clockdomains for clocks used as main clocks
+      ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init
+
+Todd Poynor (1):
+      ARM: OMAP: PM: Lock clocks list while generating summary
+
+
+ arch/arm/mach-omap2/clock44xx_data.c         |    5 +
+ arch/arm/mach-omap2/cm.h                     |   11 +++
+ arch/arm/mach-omap2/cminst44xx.c             |    4 -
+ arch/arm/mach-omap2/omap_hwmod.c             |   43 +++++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    2 
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   30 +++++++
+ arch/arm/plat-omap/clock.c                   |    2 
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   24 ++++++
+ include/linux/platform_data/aess.h           |   76 +++++++++++++++++++
+ include/linux/platform_data/fsusb.h          |  105 ++++++++++++++++++++++++++
+ 10 files changed, 288 insertions(+), 14 deletions(-)
+ create mode 100644 include/linux/platform_data/aess.h
+ create mode 100644 include/linux/platform_data/fsusb.h
