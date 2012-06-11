@@ -1,33 +1,68 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 16:34:43 +0200
-Subject: [PATCH 8/14] ARM: LPC32xx: Clock adjustment for key matrix
- controller
-In-Reply-To: <201206111416.19251.arnd@arndb.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <1339412537-24485-9-git-send-email-stigge@antcom.de>
- <201206111416.19251.arnd@arndb.de>
-Message-ID: <4FD60203.8010103@antcom.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 11 Jun 2012 17:37:33 +0300
+Subject: [PATCH 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <1339423216-1323-6-git-send-email-zumeng.chen@gmail.com>
+References: <zumeng.chen@gmail.com>
+ <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
+ <1339423216-1323-6-git-send-email-zumeng.chen@gmail.com>
+Message-ID: <4FD602AD.1060304@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 06/11/2012 04:16 PM, Arnd Bergmann wrote:
-> On Monday 11 June 2012, Roland Stigge wrote:
->> The clock.c file needs to be changed to match the automatic device name to its
->> clock.
->>
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->>
+This is input subsystem, add Dmitry and linux-input.
+
+On 06/11/12 17:00, Zumeng Chen wrote:
+> If we don't set proper debouce time for ads7846, then there are
+> flooded interrupt counters of ads7846 responding to one time
+> touch on screen, so the driver couldn't work well.
 > 
-> Should this not be in the same patch as the one that moves the device over
-> to DT probing? Otherwise you have a non-working setup if only one patch
-> is applied.
+> And since most OMAP3 series boards pass NULL pointer of board_pdata
+> to omap_ads7846_init, so it's more proper to set it in driver level
+> after having gpio_request done.
 
-The actual driver is new for v3.6 (hopefully), DT-only.
+What about other non-OMAP platforms?
 
-Rather than merging the patches, I'd let the key driver go in via input,
-and the clock.c adjustment via arm-soc.
+NULL pointer for board_pdata, only means that the default pdata is used.
+Please, see the common-board-devices.c file more closely.
 
-Roland
+> 
+> This patch has been validated on 3530evm.
+> 
+> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
+> Signed-off-by: Syed Mohammed Khasim <khasim@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/input/touchscreen/ads7846.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+> index f02028e..a82a5fb 100644
+> --- a/drivers/input/touchscreen/ads7846.c
+> +++ b/drivers/input/touchscreen/ads7846.c
+> @@ -61,6 +61,7 @@
+>  
+>  /* this driver doesn't aim at the peak continuous sample rate */
+>  #define	SAMPLE_BITS	(8 /*cmd*/ + 16 /*sample*/ + 2 /* before, after */)
+> +#define	DEBOUNCE_TIME	310 /* About 10 ms */
+
+I think hard coding this value is wrong.
+Can't it be derived from the pdata->debounce_* fields?
+
+>  
+>  struct ts_event {
+>  	/*
+> @@ -980,6 +981,7 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+>  		}
+>  
+>  		ts->gpio_pendown = pdata->gpio_pendown;
+> +		gpio_set_debounce(pdata->gpio_pendown, DEBOUNCE_TIME);
+>  
+>  	} else {
+>  		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+
+-- 
+Regards,
+Igor.
