@@ -1,29 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 9 Jun 2012 21:28:44 +0000
-Subject: [PATCH 0/6] drivers: randconfig patches for kernel 3.5
-In-Reply-To: <4FD3482B.5050004@gmx.de>
-References: <1339194280-27475-1-git-send-email-mathieu.poirier@linaro.org>
- <201206090013.27149.arnd@arndb.de> <4FD3482B.5050004@gmx.de>
-Message-ID: <201206092128.45064.arnd@arndb.de>
+Date: Mon, 11 Jun 2012 14:14:14 +0000
+Subject: [PATCH 11/14] ARM: LPC32xx: DTS adjustment for using pl18x
+ primecell
+In-Reply-To: <1339412537-24485-12-git-send-email-stigge@antcom.de>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <1339412537-24485-12-git-send-email-stigge@antcom.de>
+Message-ID: <201206111414.14264.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 June 2012, Florian Tobias Schandinat wrote:
-> > 
-> > I just realized that most of these are for the same subsystem
-> > (framebuffer), so you should have kept the respective mailing list
-> > and maintainer on Cc (added now). 
-> > 
-> > The mg_disk driver is not listed in the MAINTAINERS file but
-> > has an author email listed in the file itself.
-> > 
-> > I can take the mg_disk patch into the arm-soc tree as a fix,
-> > but I'd prefer the other patches to go through the framebuffer
-> > tree.
-> 
-> Applied all (including the backlight patches which are usually handled
-> by Andrew Morton) but the mg_disk patch.
+On Monday 11 June 2012, Roland Stigge wrote:
+>                         sd at 20098000 {
+> -                               compatible = "arm,pl180", "arm,primecell";
+> +                               compatible = "arm,pl18x", "arm,primecell";
+>                                 reg = <0x20098000 0x1000>;
+>                                 interrupts = <0x0f 0>, <0x0d 0>;
+> +                               status = "disable";
+>                         };
+>  
 
-Ok, Thanks a lot!
+The proper way to write this is 'status = "disabled";', with a 'd' at
+the end.
 
 	Arnd
