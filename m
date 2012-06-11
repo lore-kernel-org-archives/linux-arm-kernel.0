@@ -1,40 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jun 2012 19:26:40 +0100
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
-Message-ID: <20120611182640.GC18267@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Jun 2012 12:28:12 -0600
+Subject: [PATCH] ARM: dt: tegra seaboard: move battery monitor to mux'd I2C
+ bus.
+Message-ID: <1339439292-12958-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 01:18:28PM -0400, Nicolas Pitre wrote:
-> And that message certainly has to go as it may be triggered multiple 
-> times per second in some use cases here.
+From: Stephen Warren <swarren@nvidia.com>
 
-That, I interpret, as an attempt to use CPU hotplugging for power
-saving.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This depends on the previous posted
+http://www.spinics.net/lists/linux-tegra/msg05043.html
+which actually creates the I2C mux.
 
-No.  Do not do that.  Under any circumstances.  Not only is the CPU
-hotplugging code racy in places, it also totally destroys the ability
-to have threads bound to CPUs, or even interrupts to CPUs.
+ arch/arm/boot/dts/tegra-seaboard.dts |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-It's also racy with userspace.  Think of an application which wants to
-know how many CPUs are online to create a number of threads, then you
-take a CPU offline.  There's no way for it to be notified about that.
-Or, conversely you bring a CPU online.  Again, no way for userspace to
-be properly notified.
-
-Then there's issues with reading /proc/interrupts while CPUs come and
-go, especially when you have large numbers of interrupts which have to
-be read across multiple reads.
-
-Then there's all the driver model events sent into userspace when the
-sysfs nodes for CPUs come and go.
-
-So no, I'd point out that the message you get is the _least_ of your
-problems if you're playing this idiotic game.  Don't do it.  Use CPU
-idle instead.  That's what it's there for.
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index 1e1939f..85e621a 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -331,13 +331,6 @@
+ 	i2c at 7000c400 {
+ 		status = "okay";
+ 		clock-frequency = <100000>;
+-
+-		smart-battery at b {
+-			compatible = "ti,bq20z75", "smart-battery-1.1";
+-			reg = <0xb>;
+-			ti,i2c-retry-count = <2>;
+-			ti,poll-retry-count = <10>;
+-		};
+ 	};
+ 
+ 	i2cmux {
+@@ -362,6 +355,13 @@
+ 			reg = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++
++			smart-battery at b {
++				compatible = "ti,bq20z75", "smart-battery-1.1";
++				reg = <0xb>;
++				ti,i2c-retry-count = <2>;
++				ti,poll-retry-count = <10>;
++			};
+ 		};
+ 	};
+ 
+-- 
+1.7.0.4
