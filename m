@@ -1,44 +1,53 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 10:03:33 -0500
-Subject: [PATCH 4/5] MFD: OMAP3EVM: USB: cosmetic fix to failed parent
- clk set
-In-Reply-To: <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
-References: <zumeng.chen@gmail.com>
- <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
- <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
-Message-ID: <4FD608C5.9000900@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 11 Jun 2012 17:05:11 +0200
+Subject: [PATCH v2 03/10] ARM: pci: Allow passing per-controller private data
+In-Reply-To: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1339427118-32263-4-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to allow drivers to specify private data for each controller,
+this commit adds a private_data field to the struct hw_pci. This field
+is an array of nr_controllers pointers that will be used to initialize
+the private_data field of the corresponding controller's pci_sys_data
+structure.
 
-On 06/11/2012 09:00 AM, Zumeng Chen wrote:
-> A typo fix for this cosmetic change and mute a failed message from
-> a unnecessary setting of some parent clk for usbhs_omap on OMAP3EVM.
-> 
-> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
-> ---
->  drivers/mfd/omap-usb-host.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 7e96bb2..9aaaf3c 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -698,8 +698,9 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
->  		goto err_usbtll_p2_fck;
->  	}
->  
-> +#ifndef CONFIG_MACH_OMAP3EVM
-> +	/* for OMAP3 , the clk set parent fails */
->  	if (is_ehci_phy_mode(pdata->port_mode[0])) {
-> -		/* for OMAP3 , the clk set paretn fails */
->  		ret = clk_set_parent(omap->utmi_p1_fck,
->  					omap->xclk60mhsp1_ck);
->  		if (ret != 0)
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-This begs the question, why is port_mode[0] set to ehci phy mode if this
-is failing? Something does not seem right here but this does not look
-like the right fix.
+---
+Changes in v2:
+- new patch
+---
+ arch/arm/include/asm/mach/pci.h |    1 +
+ arch/arm/kernel/bios32.c        |    3 +++
+ 2 files changed, 4 insertions(+)
 
-Cheers
-Jon
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 26c511f..736cb8d 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -21,6 +21,7 @@ struct hw_pci {
+ #endif
+ 	struct pci_ops	*ops;
+ 	int		nr_controllers;
++	void		**private_data;
+ 	int		(*setup)(int nr, struct pci_sys_data *);
+ 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
+ 	void		(*preinit)(void);
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index c9d28dd..04858c6 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -442,6 +442,9 @@ static void __devinit pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		sys->map_irq = hw->map_irq;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
++		if (hw->private_data)
++			sys->private_data = hw->private_data[nr];
++
+ 		ret = hw->setup(nr, sys);
+ 
+ 		if (ret > 0) {
+-- 
+1.7.10.4
