@@ -1,25 +1,28 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 09:51:01 -0500
-Subject: [PATCH 0/5] OMAP3530evm misc fixes for linux-omap
-In-Reply-To: <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
-References: <zumeng.chen@gmail.com>
- <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
-Message-ID: <4FD605D5.10108@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jun 2012 14:57:00 +0000
+Subject: [PATCH 11/14] ARM: LPC32xx: DTS adjustment for using pl18x
+ primecell
+In-Reply-To: <4FD60096.7050603@antcom.de>
+References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
+ <201206111414.14264.arnd@arndb.de> <4FD60096.7050603@antcom.de>
+Message-ID: <201206111457.00845.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/11/2012 09:00 AM, Zumeng Chen wrote:
-> These patches fix misc problems when reflash ti-omap3530evm for
-> master branch on Linux-omap. Currently they have been tested on
-> 3530evm but were not ack'ed.
+On Monday 11 June 2012, Roland Stigge wrote:
+> Thanks for the note!
 > 
-> Most of them are the leftovers from the great original developers
-> with my the latest updates for adapting to the current kernel, so
-> I add you directly into SOB(If not proper, please let me know).
+> Funnily, I always did it this way. Looks like initially, I copied from
+> somewhere else (wrongly). Indeed, we have lots of "disable", see also:
+> 
+> omap3-beagle.dts
+> omap4-panda.dts
+> omap4-sdp.dts
+> tegra20.dtsi
+> tegra30.dtsi
 
-I don't see any references to the original patches in the changelogs. If
-you have references you may wish to add them for historical purposes.
+Ah, right. Note that the kernel checks only for "ok" and "okay" strings,
+anything else is interpreted as "disabled". We should use the correct
+string anyway of course.
 
-Cheers
-Jon
+	Arnd
