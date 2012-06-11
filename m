@@ -1,355 +1,65 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 11 Jun 2012 21:09:45 +0200
-Subject: [PATCH] ARM: tegra: Fix dts files w/ status property: "disable" ->
- "disabled"
-In-Reply-To: <1339441785-14641-1-git-send-email-stigge@antcom.de>
-References: <1339441785-14641-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339441785-14641-2-git-send-email-stigge@antcom.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Jun 2012 15:11:05 -0400 (EDT)
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <20120611184148.GD18267@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <20120611182640.GC18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111430300.23555@xanadu.home>
+ <20120611184148.GD18267@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1206111458310.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches fixes some status = "disable" strings to "disabled", the correct
-way of disabling nodes in the devicetree.
+On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
 
-Just the tegra part here. Everything else goes via other patches and trees.
+> On Mon, Jun 11, 2012 at 02:40:24PM -0400, Nicolas Pitre wrote:
+> > On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
+> > 
+> > > On Mon, Jun 11, 2012 at 01:18:28PM -0400, Nicolas Pitre wrote:
+> > > > And that message certainly has to go as it may be triggered multiple 
+> > > > times per second in some use cases here.
+> > > 
+> > > That, I interpret, as an attempt to use CPU hotplugging for power
+> > > saving.
+> > > 
+> > > No.  Do not do that.  Under any circumstances.  Not only is the CPU
+> > > hotplugging code racy in places, it also totally destroys the ability
+> > > to have threads bound to CPUs, or even interrupts to CPUs.
+> > 
+> > [ more comments ommitted ]
+> > 
+> > Russell, let me suggest you take the time to read this:
+> > 
+> > 	http://lwn.net/Articles/481055/
+> > 
+> > then let's restart this conversation if you please.
+> 
+> Same comments apply for exactly the reasons I stated.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+No they don't.  They can't. The generic kernel code doesn't know what is 
+happening behind the scene and may not even care if at the low level a 
+complete CPU replacement happened.  Trust me, I happen to know one thing 
+or two about those issues you mentioned and the code I'm working on will 
+be posted in due course.
 
----
-Applies to v3.5-rc2
+But that is not the point of this thread.  The point I want to bring 
+forward is:
 
- arch/arm/boot/dts/omap3-beagle.dts |    4 +--
- arch/arm/boot/dts/omap4-panda.dts  |    6 ++---
- arch/arm/boot/dts/omap4-sdp.dts    |    4 +--
- arch/arm/boot/dts/tegra20.dtsi     |   36 +++++++++++++++++------------------
- arch/arm/boot/dts/tegra30.dtsi     |   38 ++++++++++++++++++-------------------
- 5 files changed, 44 insertions(+), 44 deletions(-)
+- IPIs are needed to wake up remote CPUs
 
---- linux-2.6.orig/arch/arm/boot/dts/tegra20.dtsi
-+++ linux-2.6/arch/arm/boot/dts/tegra20.dtsi
-@@ -72,7 +72,7 @@
- 		reg = <0x70002800 0x200>;
- 		interrupts = <0 13 0x04>;
- 		nvidia,dma-request-selector = <&apbdma 2>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	tegra_i2s2: i2s at 70002a00 {
-@@ -80,7 +80,7 @@
- 		reg = <0x70002a00 0x200>;
- 		interrupts = <0 3 0x04>;
- 		nvidia,dma-request-selector = <&apbdma 1>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006000 {
-@@ -88,7 +88,7 @@
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 36 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006040 {
-@@ -96,7 +96,7 @@
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 37 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006200 {
-@@ -104,7 +104,7 @@
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 46 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006300 {
-@@ -112,7 +112,7 @@
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 90 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006400 {
-@@ -120,7 +120,7 @@
- 		reg = <0x70006400 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 91 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c000 {
-@@ -129,7 +129,7 @@
- 		interrupts = <0 38 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c400 {
-@@ -138,7 +138,7 @@
- 		interrupts = <0 84 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c500 {
-@@ -147,7 +147,7 @@
- 		interrupts = <0 92 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000d000 {
-@@ -156,7 +156,7 @@
- 		interrupts = <0 53 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	pmc {
-@@ -190,7 +190,7 @@
- 		interrupts = <0 20 0x04>;
- 		phy_type = "utmi";
- 		nvidia,has-legacy-mode;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	usb at c5004000 {
-@@ -198,7 +198,7 @@
- 		reg = <0xc5004000 0x4000>;
- 		interrupts = <0 21 0x04>;
- 		phy_type = "ulpi";
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	usb at c5008000 {
-@@ -206,35 +206,35 @@
- 		reg = <0xc5008000 0x4000>;
- 		interrupts = <0 97 0x04>;
- 		phy_type = "utmi";
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at c8000000 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000000 0x200>;
- 		interrupts = <0 14 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at c8000200 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000200 0x200>;
- 		interrupts = <0 15 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at c8000400 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000400 0x200>;
- 		interrupts = <0 19 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at c8000600 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000600 0x200>;
- 		interrupts = <0 31 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	pmu {
---- linux-2.6.orig/arch/arm/boot/dts/tegra30.dtsi
-+++ linux-2.6/arch/arm/boot/dts/tegra30.dtsi
-@@ -82,7 +82,7 @@
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 36 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006040 {
-@@ -90,7 +90,7 @@
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 37 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006200 {
-@@ -98,7 +98,7 @@
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 46 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006300 {
-@@ -106,7 +106,7 @@
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 90 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	serial at 70006400 {
-@@ -114,7 +114,7 @@
- 		reg = <0x70006400 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 91 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c000 {
-@@ -123,7 +123,7 @@
- 		interrupts = <0 38 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c400 {
-@@ -132,7 +132,7 @@
- 		interrupts = <0 84 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c500 {
-@@ -141,7 +141,7 @@
- 		interrupts = <0 92 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000c700 {
-@@ -150,7 +150,7 @@
- 		interrupts = <0 120 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	i2c at 7000d000 {
-@@ -159,7 +159,7 @@
- 		interrupts = <0 53 0x04>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	pmc {
-@@ -201,35 +201,35 @@
- 			compatible = "nvidia,tegra30-i2s";
- 			reg = <0x70080300 0x100>;
- 			nvidia,ahub-cif-ids = <4 4>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		tegra_i2s1: i2s at 70080400 {
- 			compatible = "nvidia,tegra30-i2s";
- 			reg = <0x70080400 0x100>;
- 			nvidia,ahub-cif-ids = <5 5>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		tegra_i2s2: i2s at 70080500 {
- 			compatible = "nvidia,tegra30-i2s";
- 			reg = <0x70080500 0x100>;
- 			nvidia,ahub-cif-ids = <6 6>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		tegra_i2s3: i2s at 70080600 {
- 			compatible = "nvidia,tegra30-i2s";
- 			reg = <0x70080600 0x100>;
- 			nvidia,ahub-cif-ids = <7 7>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 
- 		tegra_i2s4: i2s at 70080700 {
- 			compatible = "nvidia,tegra30-i2s";
- 			reg = <0x70080700 0x100>;
- 			nvidia,ahub-cif-ids = <8 8>;
--			status = "disable";
-+			status = "disabled";
- 		};
- 	};
- 
-@@ -237,28 +237,28 @@
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000000 0x200>;
- 		interrupts = <0 14 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at 78000200 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000200 0x200>;
- 		interrupts = <0 15 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at 78000400 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000400 0x200>;
- 		interrupts = <0 19 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	sdhci at 78000600 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000600 0x200>;
- 		interrupts = <0 31 0x04>;
--		status = "disable";
-+		status = "disabled";
- 	};
- 
- 	pmu {
+- we should formalize a number for it and the actual number is the least 
+  of my concern
+
+- the warning must go
+
+- and we shouldn't wait until the entire world comes forth to confirm 
+  any arbitrary SGI number works for them or nothing will ever happen.
+
+Can we make some progress with this please?
+
+
+Nicolas
