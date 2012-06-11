@@ -1,57 +1,34 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 14:01:23 -0500
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <20120611173930.GD28235@mudshark.cambridge.arm.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
- <20120608094708.GC19062@mudshark.cambridge.arm.com> <4FD21930.4000800@ti.com>
- <20120611173930.GD28235@mudshark.cambridge.arm.com>
-Message-ID: <4FD64083.3020800@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 11 Jun 2012 21:02:15 +0200
+Subject: [PATCH] ARM: Fix dts files w/ status property: "disable" ->
+ "disabled"
+In-Reply-To: <4FD62B2A.2030600@wwwdotorg.org>
+References: <1339427460-23007-1-git-send-email-stigge@antcom.de>
+ <4FD62B2A.2030600@wwwdotorg.org>
+Message-ID: <4FD640B7.90106@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 06/11/2012 12:39 PM, Will Deacon wrote:
-> On Fri, Jun 08, 2012 at 04:24:32PM +0100, Jon Hunter wrote:
->> Hi Will,
+On 11/06/12 19:30, Stephen Warren wrote:
+> On 06/11/2012 09:11 AM, Roland Stigge wrote:
+>> This patches fixes some status = "disable" strings to "disabled", the correct
+>> way of disabling nodes in the devicetree.
+>>
+>> lpc32xx.dtsi is fixed separately in the LPC32xx patch set due to the many
+>> changes there.
 > 
-> Hi Jon,
+> The Tegra parts,
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 > 
->> Here is an updated version. I was going to send out a V3, but I wanted
->> to wait to see if others had more comments first.
-> 
-> This looks better to me, so I took it for a spin on my 4460 (thanks Nicolas!)
-> and noticed that only the cycle counter seems to tick -- the event counters
-> always return 0 deltas (that is, they don't increment). Booting the same SD
-> card on a 4430 (same MLO, u-boot, kernel and filesystem) I see that the
-> event counters function correctly there.
+> Are you intending this to be applied for 3.5? If so, that's fine. If
+> not, splitting it up so I can take the Tegra parts through the Tegra
+> tree would reduce the possibility of conflicts.
 
-Thanks for the feedback. Being somewhat new to PMU, I was mainly using
-PERF to test and verify that with "perf top" I was seeing interrupts.
-How do I check what the event counters are returning? Any perf tests I
-could use?
+I would only put it into v3.6. Everything works fine without it (as Arnd
+described), it just confused amateurs like me. :-)
 
-By the way, as a quick test you could modify the code in omap_init_pmu()
-to call omap4430_init_pmu() for all omap4 devices as follows ...
+Therefore, splitting it up.
 
-	if (cpu_is_omap44xx())
- 		return omap4430_init_pmu();
+Thanks,
 
-I was hoping for 4460/70 we would not need to keep the debugss and other
-domains on and hence, I called the above function omap4430_init_pmu().
-However this function works for all omap4 devices, it just turns on more
-power domains.
-
-> It also seems that we can remove the dependency on CONFIG_OMAP3_EMU with these
-> patches but I don't have any OMAP3 hardware to check if we get any regressions
-> on older platforms. Do your patches only deal with OMAP4?
-
-It *should* work for all omap2+. So far I have tested an omap3 beagle
-but I have not tested an omap2 device. Again the extent of my testing
-was to run "perf top" and verify interrupts we being generated. I
-realise that this may not be sufficient and so if you have a more
-exhaustive test you recommend let me know.
-
-Cheers
-Jon
+Roland
