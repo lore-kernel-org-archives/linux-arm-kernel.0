@@ -1,237 +1,89 @@
-From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Mon, 11 Jun 2012 18:04:40 +0800
-Subject: [PATCH v2 4/5] ASoC: add mmp brownstone support
-In-Reply-To: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1339409081-10097-5-git-send-email-zhangfei.gao@marvell.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 11 Jun 2012 12:19:34 +0200
+Subject: [PATCH] ARM: EXYNOS: Add smc call to support trustzone feature
+In-Reply-To: <20120611094423.GC11168@n2100.arm.linux.org.uk>
+References: <20120611090440.GA27207@july>
+ <20120611094423.GC11168@n2100.arm.linux.org.uk>
+Message-ID: <03bb01cd47bb$b531f920$1f95eb60$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds Alsa audio platform driver for mmp brownstone machine
+Hello,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- sound/soc/pxa/Kconfig      |   10 +++
- sound/soc/pxa/Makefile     |    2 +
- sound/soc/pxa/brownstone.c |  174 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 186 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/pxa/brownstone.c
+This is a forwarded message originally posted by Kyungmin Park [kyungmin.park at samsung.com]:
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 6c3d00b..d389fd5 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -206,3 +206,13 @@ config SND_PXA2XX_SOC_IMOTE2
-        help
-          Say Y if you want to add support for SoC audio on the
- 	 IMote 2.
-+
-+config SND_MMP_SOC_BROWNSTONE
-+	tristate "SoC Audio support for Marvell Brownstone"
-+	depends on SND_MMP_SOC && MACH_BROWNSTONE
-+	select SND_MMP_SOC_SSPA
-+	select MFD_WM8994
-+	select SND_SOC_WM8994
-+	help
-+	  Say Y if you want to add support for SoC audio on the
-+	  Marvell Brownstone reference platform.
-diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
-index 07b8417..c12aa2a 100644
---- a/sound/soc/pxa/Makefile
-+++ b/sound/soc/pxa/Makefile
-@@ -32,6 +32,7 @@ snd-soc-mioa701-objs := mioa701_wm9713.o
- snd-soc-z2-objs := z2.o
- snd-soc-imote2-objs := imote2.o
- snd-soc-raumfeld-objs := raumfeld.o
-+snd-soc-brownstone-objs := brownstone.o
- 
- obj-$(CONFIG_SND_PXA2XX_SOC_CORGI) += snd-soc-corgi.o
- obj-$(CONFIG_SND_PXA2XX_SOC_POODLE) += snd-soc-poodle.o
-@@ -51,3 +52,4 @@ obj-$(CONFIG_SND_SOC_TAVOREVB3) += snd-soc-tavorevb3.o
- obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
- obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
- obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
-+obj-$(CONFIG_SND_MMP_SOC_BROWNSTONE) += snd-soc-brownstone.o
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
-new file mode 100644
-index 0000000..5e666e0
---- /dev/null
-+++ b/sound/soc/pxa/brownstone.c
-@@ -0,0 +1,174 @@
-+/*
-+ * linux/sound/soc/pxa/brownstone.c
-+ *
-+ * Copyright (C) 2011 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/soc.h>
-+#include <sound/jack.h>
-+
-+#include "../codecs/wm8994.h"
-+#include "mmp-sspa.h"
-+
-+static const struct snd_kcontrol_new brownstone_dapm_control[] = {
-+	SOC_DAPM_PIN_SWITCH("Ext Spk"),
-+};
-+
-+static const struct snd_soc_dapm_widget brownstone_dapm_widgets[] = {
-+	SND_SOC_DAPM_SPK("Ext Spk", NULL),
-+	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+	SND_SOC_DAPM_MIC("Main Mic", NULL),
-+};
-+
-+static const struct snd_soc_dapm_route brownstone_audio_map[] = {
-+	{"Ext Spk", NULL, "SPKOUTLP"},
-+	{"Ext Spk", NULL, "SPKOUTLN"},
-+	{"Ext Spk", NULL, "SPKOUTRP"},
-+	{"Ext Spk", NULL, "SPKOUTRN"},
-+
-+	{"Headset Stereophone", NULL, "HPOUT1L"},
-+	{"Headset Stereophone", NULL, "HPOUT1R"},
-+
-+	{"IN1RN", NULL, "Headset Mic"},
-+
-+	{"DMIC1DAT", NULL, "MICBIAS1"},
-+	{"MICBIAS1", NULL, "Main Mic"},
-+};
-+
-+static int brownstone_wm8994_init(struct snd_soc_pcm_runtime *rtd)
-+{
-+	struct snd_soc_codec *codec = rtd->codec;
-+	struct snd_soc_dapm_context *dapm = &codec->dapm;
-+
-+	snd_soc_dapm_enable_pin(dapm, "Ext Spk");
-+	snd_soc_dapm_enable_pin(dapm, "Headset Stereophone");
-+	snd_soc_dapm_enable_pin(dapm, "Headset Mic");
-+	snd_soc_dapm_enable_pin(dapm, "Main Mic");
-+
-+	/* set endpoints to not connected */
-+	snd_soc_dapm_nc_pin(dapm, "HPOUT2P");
-+	snd_soc_dapm_nc_pin(dapm, "HPOUT2N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT1N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT1P");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT2N");
-+	snd_soc_dapm_nc_pin(dapm, "LINEOUT2P");
-+	snd_soc_dapm_nc_pin(dapm, "IN1LN");
-+	snd_soc_dapm_nc_pin(dapm, "IN1LP");
-+	snd_soc_dapm_nc_pin(dapm, "IN1RP");
-+	snd_soc_dapm_nc_pin(dapm, "IN2LP:VXRN");
-+	snd_soc_dapm_nc_pin(dapm, "IN2RN");
-+	snd_soc_dapm_nc_pin(dapm, "IN2RP:VXRP");
-+	snd_soc_dapm_nc_pin(dapm, "IN2LN");
-+
-+	snd_soc_dapm_sync(dapm);
-+
-+	return 0;
-+}
-+
-+static int brownstone_wm8994_hw_params(struct snd_pcm_substream *substream,
-+				       struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	int freq_out, sspa_mclk, sysclk;
-+	int sspa_div;
-+
-+	if (params_rate(params) > 11025) {
-+		freq_out  = params_rate(params) * 512;
-+		sysclk    = params_rate(params) * 256;
-+		sspa_mclk = params_rate(params) * 64;
-+	} else {
-+		freq_out  = params_rate(params) * 1024;
-+		sysclk    = params_rate(params) * 512;
-+		sspa_mclk = params_rate(params) * 64;
-+	}
-+	sspa_div = freq_out;
-+	do_div(sspa_div, sspa_mclk);
-+
-+	snd_soc_dai_set_sysclk(cpu_dai, MMP_SSPA_CLK_AUDIO, freq_out, 0);
-+	snd_soc_dai_set_pll(cpu_dai, MMP_SYSCLK, 0, freq_out, sysclk);
-+	snd_soc_dai_set_pll(cpu_dai, MMP_SSPA_CLK, 0, freq_out, sspa_mclk);
-+
-+	/* set wm8994 sysclk */
-+	snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_MCLK1, sysclk, 0);
-+
-+	return 0;
-+}
-+
-+/* machine stream operations */
-+static struct snd_soc_ops brownstone_ops = {
-+	.hw_params = brownstone_wm8994_hw_params,
-+};
-+
-+static struct snd_soc_dai_link brownstone_wm8994_dai[] = {
-+{
-+	.name		= "WM8994",
-+	.stream_name	= "WM8994 HiFi",
-+	.cpu_dai_name	= "mmp-sspa-dai.0",
-+	.codec_dai_name	= "wm8994-aif1",
-+	.platform_name	= "mmp-pcm-audio",
-+	.codec_name	= "wm8994-codec",
-+	.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				SND_SOC_DAIFMT_CBS_CFS,
-+	.ops		= &brownstone_ops,
-+	.init		= brownstone_wm8994_init,
-+},
-+};
-+
-+/* audio machine driver */
-+static struct snd_soc_card brownstone = {
-+	.name         = "brownstone",
-+	.dai_link     = brownstone_wm8994_dai,
-+	.num_links    = ARRAY_SIZE(brownstone_wm8994_dai),
-+
-+	.controls = brownstone_dapm_control,
-+	.num_controls = ARRAY_SIZE(brownstone_dapm_control),
-+	.dapm_widgets = brownstone_dapm_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(brownstone_dapm_widgets),
-+	.dapm_routes = brownstone_audio_map,
-+	.num_dapm_routes = ARRAY_SIZE(brownstone_audio_map),
-+};
-+
-+static int __devinit brownstone_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	brownstone.dev = &pdev->dev;
-+	ret = snd_soc_register_card(&brownstone);
-+	if (ret)
-+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-+				ret);
-+	return ret;
-+}
-+
-+static int __devexit brownstone_remove(struct platform_device *pdev)
-+{
-+	snd_soc_unregister_card(&brownstone);
-+	return 0;
-+}
-+
-+static struct platform_driver mmp_driver = {
-+	.driver		= {
-+		.name	= "brownstone-audio",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= brownstone_probe,
-+	.remove		= __devexit_p(brownstone_remove),
-+};
-+
-+module_platform_driver(mmp_driver);
-+
-+MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
-+MODULE_DESCRIPTION("ALSA SoC Brownstone");
-+MODULE_LICENSE("GPL");
--- 
-1.7.1
+On 6/11/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 11, 2012 at 06:04:40PM +0900, Kyungmin Park wrote:
+>> +/*
+>> + * Read registers
+>> + * Function signature: u32 exynos_smc_readsfr(u32 addr, u32 *val)
+> 
+> What address space is 'addr' in?
+
+It's Memory Controller address with physical address space. I don't know why this
+address is required. It's vendor specific address. If exynos_smc_readsfr is ambiguous,
+then it will drop at this time.
+
+>> + */
+>> +ENTRY(exynos_smc_readsfr)
+>> +    stmfd    sp!, {r4-r11, lr}
+>> +    mov      r2, #0
+>> +    lsr        r0, r0, #2
+>> +    mov      ip, r1
+>> +    mov      r3, r2
+>> +    orr       r1, r0, #0xC0000000
+> 
+> I assume this is not PAGE_OFFSET.
+
+Right, it's also vendor specific command.
+
+To read SFR, it send r0 = -101, r1 =  (0x3 << 30) | ((addr) >> 2), r2 = r3 = 0;
+
+> 
+>> +    mvn      r0, #100
+> 
+> Hmm.  The compiler will automatically use mvn instead of a normal mov with
+> negative numbers.  It may be clearer to write:
+> 
+>         mov      r0, #-101
+
+exactly. I refered the compiled generated codes. I'll change it.
+
+> 
+>> +    dsb
+>> +    smc      #0
+>> +    cmn      r0, #101
+> 
+> Same here:
+>         cmp      r0, #-101
+> 
+> Notice that writing it this way means it's obvious that you're checking
+> for -101, the original value passed in.
+> 
+>> +    beq      1f
+>> +    cmp      r0, #0
+>> +    streq    r2, [ip]
+>> +    ldmfd    sp!, {r4-r11, pc}
+>> +1:  subs     r0, r1, #0
+> 
+> Isn't this just a normal:
+>         movs    r0, r1
+> 
+> ?
+> 
+>> +    streq    r2, [ip]
+>> +    ldmfd    sp!, {r4-r11, pc}
+>> +ENDPROC(exynos_smc_readsfr)
+> 
+> In any case, can't this end part be written:
+> 
+>         cmp      r0, #-101
+>         moveq   r0, r1
+>         teq       r0, #0              @ I prefer teq over cmp to test equality
+>         streq    r2, [ip]
+>         ldmfd    sp!, {r4 - r11, pc}
+
+I'll change it.
+
+Thank you,
+Kyungmin Park
