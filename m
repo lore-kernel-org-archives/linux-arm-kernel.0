@@ -1,73 +1,55 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 14:56:29 -0500
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
-Message-ID: <4FD64D6D.3020401@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Jun 2012 15:56:50 -0400 (EDT)
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <20120611192003.GE18267@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <20120611182640.GC18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111430300.23555@xanadu.home>
+ <20120611184148.GD18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111458310.23555@xanadu.home>
+ <20120611192003.GE18267@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1206111535100.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
 
-On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
-> Create API for platforms to adapt gpmc to HWMOD
+> On Mon, Jun 11, 2012 at 03:11:05PM -0400, Nicolas Pitre wrote:
+> > On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
+> > 
+> > > Same comments apply for exactly the reasons I stated.
+> > 
+> > No they don't.  They can't. The generic kernel code doesn't know what is 
+> > happening behind the scene and may not even care if at the low level a 
+> > complete CPU replacement happened.  Trust me, I happen to know one thing 
+> > or two about those issues you mentioned and the code I'm working on will 
+> > be posted in due course.
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c             |   31 +++++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/gpmc.h |    2 ++
->  2 files changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 517953f..b471c2f 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -27,6 +27,7 @@
->  
->  #include <asm/mach-types.h>
->  #include <plat/gpmc.h>
-> +#include <plat/omap_device.h>
->  
->  #include <plat/sdrc.h>
->  
-> @@ -898,6 +899,36 @@ static int __init gpmc_init(void)
->  }
->  postcore_initcall(gpmc_init);
->  
-> +__init int omap_gpmc_init(struct gpmc_pdata *pdata)
-> +{
-> +	struct omap_hwmod *oh;
-> +	struct platform_device *pdev;
-> +	char *name = "omap-gpmc";
-> +	char *oh_name = "gpmc";
-> +
-> +	oh = omap_hwmod_lookup(oh_name);
-> +	if (!oh) {
-> +		pr_err("Could not look up %s\n", oh_name);
-> +		return -ENODEV;
-> +	}
-> +
-> +	pdev = omap_device_build(name, -1, oh, pdata,
-> +					sizeof(*pdata), NULL, 0, 0);
-> +	if (IS_ERR(pdev)) {
-> +		WARN(1, "Can't build omap_device for %s:%s.\n",
-> +						name, oh->name);
-> +		return PTR_ERR(pdev);
-> +	}
-> +
-> +	gpmc_l3_clk = clk_get(NULL, oh->main_clk);
-> +	if (IS_ERR(gpmc_l3_clk)) {
-> +		pr_err("Could not get GPMC clock\n");
-> +		return PTR_ERR(gpmc_l3_clk);
-> +	}
+> Stop being bitchy.  Look, the information I have on bigLittle is limited
+> to what has been discussed, and what is in the specs.  That's it.  I don't
+> know what the hell you're doing with this.  I'm not a part of that effort.
 
-My preference would be to store gpmc_l3_clk in the pdata and pass to
-probe via the pdata. The aim would be to remove the global gpmc_l3_clk
-altogether.
+My intention is not to bitch.  I merely want to give you a heads up on a 
+legitimate usage for multiple IPIs which are currently using SGI #1 and 
+for which the kernel is generating unwanted warnings.  The actual SGI 
+number is unimportant as long as it can be defined as no-op in the 
+handle_IPI() context.
 
-Also we should attempt to get the clk before calling omap_device_build
-which is registering the driver.
+> I'm totally out of the loop (as seems to be per bloody normal with ARM Ltd.)
 
-Cheers
-Jon
+In this case this is a Linaro project, not ARM Ltd.  If you are 
+interested by the details before they become public, we can discuss this 
+offline.
+
+> So please don't expect me to know what you're working on, or how your code
+> works.  I don't.  I don't have that information.
+
+I would expect that you know me well enough to trust me when I tell you 
+that my code works.  Or at least give me the benefit of the doubt.
+
+
+Nicolas
