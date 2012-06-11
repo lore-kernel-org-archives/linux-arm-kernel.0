@@ -1,125 +1,40 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 11 Jun 2012 20:29:46 +0530
-Subject: [PATCH 6/9] ARM: OMAP2+: gpmc-smsc911x: Adapt to use gpmc driver
-In-Reply-To: <cover.1339419379.git.afzal@ti.com>
-References: <cover.1339419379.git.afzal@ti.com>
-Message-ID: <fa4fd074305f914d38603443b857422f95680725.1339419379.git.afzal@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 16:18:18 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <20120611151459.GV11439@opensource.wolfsonmicro.com>
+References: <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+ <20120611120820.GN11439@opensource.wolfsonmicro.com>
+ <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
+ <20120611142752.GS11439@opensource.wolfsonmicro.com>
+ <4FD605B5.2060300@linaro.org>
+ <20120611151459.GV11439@opensource.wolfsonmicro.com>
+Message-ID: <4FD60C3A.1070703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently gpmc is configured in platform for smsc911x. As
-gpmc driver is now present, populate details needed for the
-driver to configure gpmc, gpmc driver would configure based
-on this information. Old interface has been left as is so
-that platforms can continue configuring gpmc using old
-interface too. This is done so that driver conversion can
-be done gradually without breaking any.
+On 11/06/12 16:15, Mark Brown wrote:
+> On Mon, Jun 11, 2012 at 03:50:29PM +0100, Lee Jones wrote:
+>> On 11/06/12 15:27, Mark Brown wrote:
+>
+>>> It'll merge out fine, it's just icky having the same thing appear twice
+>>> in history.  Not the end of the world.
+>
+>> Understood. So does this mean you will to push them into the -rcs?
+>
+> Yes.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc-smsc911x.c             |   66 +++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   11 ++--
- 2 files changed, 73 insertions(+), 4 deletions(-)
+Thanks Mark. Appreciate it.
 
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index b6c77be..93a534e 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -99,3 +99,69 @@ free1:
- 
- 	pr_err("Could not initialize smsc911x device\n");
- }
-+
-+struct gpmc_device_pdata *
-+__init gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
-+{
-+	int ret;
-+	struct gpmc_device_pdata *gpmc_pdev;
-+	struct gpmc_cs_data *gpmc_cs;
-+
-+	gpmc_pdev = kzalloc(sizeof(*gpmc_pdev), GFP_KERNEL);
-+	if (gpmc_pdev == NULL)
-+		return gpmc_pdev;
-+
-+	gpmc_cs = kzalloc(sizeof(*gpmc_cs), GFP_KERNEL);
-+	if (gpmc_pdev == NULL) {
-+		kfree(gpmc_pdev);
-+		return NULL;
-+	}
-+
-+	gpmc_pdev->cs_data = gpmc_cs;
-+	gpmc_pdev->num_cs = 1;
-+	gpmc_pdev->name = "smsc911x";
-+	gpmc_pdev->id = gpmc_cfg->id;
-+	gpmc_pdev->pdata = &gpmc_smsc911x_config;
-+	gpmc_pdev->pdata_size = sizeof(gpmc_smsc911x_config);
-+
-+	gpmc_cs->cs = gpmc_cfg->cs;
-+	gpmc_cs->mem_size = 0x100;
-+
-+	gpmc_pdev->per_res = gpmc_smsc911x_resources + 1;
-+	gpmc_pdev->per_res_cnt = 1;
-+
-+	if (gpio_request_one(gpmc_cfg->gpio_irq, GPIOF_IN, "smsc911x irq")) {
-+		pr_err("Failed to request IRQ GPIO%d\n", gpmc_cfg->gpio_irq);
-+		goto free1;
-+	}
-+
-+	gpmc_smsc911x_resources[1].start = gpio_to_irq(gpmc_cfg->gpio_irq);
-+
-+	if (gpio_is_valid(gpmc_cfg->gpio_reset)) {
-+		ret = gpio_request_one(gpmc_cfg->gpio_reset,
-+				       GPIOF_OUT_INIT_HIGH, "smsc911x reset");
-+		if (ret) {
-+			pr_err("Failed to request reset GPIO%d\n",
-+			       gpmc_cfg->gpio_reset);
-+			goto free2;
-+		}
-+
-+		gpio_set_value(gpmc_cfg->gpio_reset, 0);
-+		msleep(100);
-+		gpio_set_value(gpmc_cfg->gpio_reset, 1);
-+	}
-+
-+	gpmc_smsc911x_config.flags = gpmc_cfg->flags ? : SMSC911X_USE_16BIT;
-+
-+	return gpmc_pdev;
-+
-+free2:
-+	gpio_free(gpmc_cfg->gpio_irq);
-+free1:
-+	kfree(gpmc_cs);
-+	kfree(gpmc_pdev);
-+
-+	pr_err("Could not initialize smsc911x device\n");
-+
-+	return NULL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-index ea6c9c8..50af49e 100644
---- a/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
-@@ -22,14 +22,17 @@ struct omap_smsc911x_platform_data {
- };
- 
- #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
--
- extern void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d);
--
-+extern struct gpmc_device_pdata *
-+gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg);
- #else
--
- static inline void gpmc_smsc911x_init(struct omap_smsc911x_platform_data *d)
- {
- }
--
-+static inline struct gpmc_device_pdata *
-+gpmc_smsc911x_update(struct omap_smsc911x_platform_data *gpmc_cfg)
-+{
-+	return NULL;
-+}
- #endif
- #endif
+Were you happy with my answer on the other email too?
+
 -- 
-1.7.10.2
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
