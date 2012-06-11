@@ -1,80 +1,44 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 11 Jun 2012 19:57:53 +0530
-Subject: [PATCH v5 14/14] ARM: OMAP2+: gpmc: writeprotect helper
-In-Reply-To: <cover.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
-Message-ID: <85c5dc5fa3203cc60a12d4b2350e45da07d7f5fd.1339419492.git.afzal@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 15:50:29 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <20120611142752.GS11439@opensource.wolfsonmicro.com>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+ <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+ <20120611120820.GN11439@opensource.wolfsonmicro.com>
+ <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
+ <20120611142752.GS11439@opensource.wolfsonmicro.com>
+Message-ID: <4FD605B5.2060300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC has a writeprotect pin that can be connected to
-peripherals. If any CS wants to enable writeprotect,
-writeprotect will be enabled, once CS configurations
-are finished.
+On 11/06/12 15:27, Mark Brown wrote:
+> On Mon, Jun 11, 2012 at 03:07:43PM +0100, Lee Jones wrote:
+>>>> Well, I guess I'll end up dulplicating the commits :/
+>
+>>> Duplicating them?
+>
+>> Ah, you mean that you've already sent them to -next?
+>
+> Yeah, I've already got them on a branch I don't really want to rebase.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Ah I see. Makes sense.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 98b52c3..eec011a 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -159,6 +159,7 @@ struct gpmc_peripheral {
- static struct gpmc_peripheral gpmc_peripheral[GPMC_CS_NUM];
- static unsigned gpmc_num_peripheral;
- static unsigned gpmc_waitpin_map;
-+static bool gpmc_writeprotect;
- 
- static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
- static struct irq_chip gpmc_irq_chip;
-@@ -976,6 +977,9 @@ static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
- 	else if (conf & GPMC_CONFIG1_PAGE_LEN_16)
- 		l |= GPMC_CONFIG1_PAGE_LEN_16;
- 
-+	if (conf & GPMC_CONFIG_WRITEPROTECT)
-+		gpmc_writeprotect = true;
-+
- 	conf &= (GPMC_CONFIG1_MUXADDDATA |
- 			GPMC_CONFIG1_WRITETYPE_SYNC |
- 			GPMC_CONFIG1_WRITEMULTIPLE_SUPP |
-@@ -1462,6 +1466,19 @@ int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *c)
- }
- EXPORT_SYMBOL_GPL(gpmc_cs_reconfigure);
- 
-+static inline void gpmc_setup_writeprotect(void)
-+{
-+	u32 l;
-+
-+	l = gpmc_read_reg(GPMC_CONFIG);
-+	if (gpmc_writeprotect == true) {
-+		l &= ~GPMC_CONFIG_WRITEPROTECT;
-+		dev_info(gpmc_dev, "write protect enabled\n");
-+	} else
-+		l |= GPMC_CONFIG_WRITEPROTECT;
-+	gpmc_write_reg(GPMC_CONFIG, l);
-+}
-+
- static __devinit int gpmc_probe(struct platform_device *pdev)
- {
- 	u32 l;
-@@ -1521,6 +1538,8 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
- 			dev_err(gpmc_dev, "device creation on %s failed\n",
- 								g_per->name);
- 
-+	gpmc_setup_writeprotect();
-+
- 	return 0;
- }
- 
-@@ -1531,6 +1550,7 @@ static __exit int gpmc_remove(struct platform_device *pdev)
- 	for (; gpmc_num_peripheral; g_per++, gpmc_num_peripheral--)
- 		platform_device_unregister(g_per->pdev);
- 
-+	gpmc_writeprotect = false;
- 	gpmc_waitpin_map = 0;
- 	gpmc_free_irq();
- 	gpmc_mem_exit();
+>> That's no problem though. Won't Git just sling them out at pull-time?
+>
+> It'll merge out fine, it's just icky having the same thing appear twice
+> in history.  Not the end of the world.
+
+Understood. So does this mean you will to push them into the -rcs?
+
 -- 
-1.7.10.2
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
