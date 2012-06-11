@@ -1,48 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Jun 2012 14:39:05 +0800
-Subject: [PATCH 1/2 V3] MXS: Set I2C timing registers for mxs-i2c
-In-Reply-To: <1339242351-8797-1-git-send-email-marex@denx.de>
-References: <1339242351-8797-1-git-send-email-marex@denx.de>
-Message-ID: <20120611063903.GD2552@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 10 Jun 2012 23:42:28 -0700
+Subject: [PATCH] arm: omap: drop unused IRQ defines
+In-Reply-To: <1339164612-24402-1-git-send-email-balbi@ti.com>
+References: <1339164612-24402-1-git-send-email-balbi@ti.com>
+Message-ID: <20120611064228.GV12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 09, 2012 at 01:45:50PM +0200, Marek Vasut wrote:
-> This patch configures the I2C bus timing registers according
-> to information passed via DT. Currently, 100kHz and 400kHz
-> modes are supported.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+* Felipe Balbi <balbi@ti.com> [120608 07:16]:
+> twl[46]030 have been converted to sparse IRQ
+> already, so we can remove the unused defines
+> and drop some code from board-files.
 
-I gave it a test on imx28-evk board with audio playback.  It seems
-the patch makes the first time playback non-functional, but the later
-playback is still working.
+Nice :)
 
-> +static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
-> +{
-> +	uint32_t speed;
-> +	struct device *dev = i2c->dev;
-> +	struct device_node *node = dev->of_node;
-> +
-> +	if (!node)
-> +		return -EINVAL;
-> +
-> +	i2c->speed = &mxs_i2c_95kHz_config;
-> +	ret = of_property_read_u32(node, "clock-frequency", &speed);
+> drivers/mtd/chips/cfi_cmdset_0001.c: In function 'cfi_intelext_write_words':
+> include/linux/mtd/map.h:331:11: warning: 'r$x$0' may be used uninitialized in this function
 
-"ret" is undeclared.
+This one I don't know if it's been fixed.
 
-> +	if (ret)
-> +		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
-> +	else if (speed == 400000)
-> +		i2c->speed = &mxs_i2c_400kHz_config;
-> +	else if (speed != 100000)
-> +		dev_warn(dev, "Invalid I2C speed selected, using 100kHz\n");
-> +
-> +	return 0;
-> +}
-> +
+> WARNING: drivers/mmc/host/built-in.o(.devinit.text+0x2fc): Section mismatch in reference from the function mmc_omap_probe() to the function .init.text:mmc_omap_new_slot()
+> The function __devinit mmc_omap_probe() references
+> a function __init mmc_omap_new_slot().
+> If mmc_omap_new_slot is only used by mmc_omap_probe then
+> annotate mmc_omap_new_slot with a matching annotation.
 
--- 
+The MMC related should be fixed and queued up.
+ 
+> fs/ubifs/dir.c: In function 'ubifs_rename':
+> fs/ubifs/dir.c:972:15: warning: 'saved_nlink' may be used uninitialized in this function
+> net/mac80211/mlme.c: In function 'ieee80211_prep_connection':
+> net/mac80211/mlme.c:3017:19: warning: 'sta' may be used uninitialized in this function
+
+No idea about these.
+
 Regards,
-Shawn
+
+Tony
