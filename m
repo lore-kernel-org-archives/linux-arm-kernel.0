@@ -1,22 +1,33 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Mon, 11 Jun 2012 23:09:34 +0530
-Subject: [PATCHv10 00/11] I2C fixes
-In-Reply-To: <20120611160034.GA3887@pengutronix.de>
-References: <1338288983-15026-1-git-send-email-shubhrajyoti@ti.com>
- <87obp4x8gs.fsf@ti.com>
- <CAM=Q2ctZmOFdroUw5qywwGU_4ResB9RKqag4-+qh3nHeKHWzKQ@mail.gmail.com>
- <20120611160034.GA3887@pengutronix.de>
-Message-ID: <4FD62D56.2020500@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Jun 2012 10:41:15 -0700
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+Message-ID: <4FD62DBB.8070407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 June 2012 09:30 PM, Wolfram Sang wrote:
->> Agree,
->> > These are only fixes can it be considered for rc3?
-> "Baking in linux-next" and "considering rc3" don't match; baking needs
-> time, rc3 is soon. I've put the patches now into my -next branch for
-> more exposure.
-Thanks.
->  I am still uncertain if they should be in 3.5 already;
-> there seem to be worhty fixes in there, but they do depend on stuff
-> which don't really qualify as bugfixes...
+On 06/11/12 10:18, Nicolas Pitre wrote:
+>
+> It certainly works for all the targets I'm looking at right now.  In 
+> those cases the boot protocol couldn't care less about the IPI number as 
+> the point is only to kick the target CPU out of WFI.
+>
+> And that message certainly has to go as it may be triggered multiple 
+> times per second in some use cases here.
+>
+>
+
+Last time this came up I thought we covered most of the platforms?
+
+OMAP, Realview, Versatile Express, and MSM are covered by this thread
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/039275.html
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
