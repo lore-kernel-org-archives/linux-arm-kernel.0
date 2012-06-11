@@ -1,29 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jun 2012 16:57:16 +0100
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
-Message-ID: <20120611155716.GA18267@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 11 Jun 2012 08:51:28 -0700
+Subject: [PATCH 01/14] rtc: ab8500-rtc: IRQF_ONESHOT when requesting a
+ threaded IRQ
+In-Reply-To: <4FD610AE.7010001@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-2-git-send-email-lee.jones@linaro.org>
+ <201206111531.20468.arnd@arndb.de> <4FD610AE.7010001@linaro.org>
+Message-ID: <20120611155128.GA18005@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 11:54:03AM -0400, Nicolas Pitre wrote:
+On Mon, Jun 11, 2012 at 04:37:18PM +0100, Lee Jones wrote:
+> On 11/06/12 16:31, Arnd Bergmann wrote:
+> >On Monday 11 June 2012, Lee Jones wrote:
+> >>The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
+> >>
+> >>Cc: Alessandro Zummo<a.zummo@towertech.it>
+> >>Cc: rtc-linux at googlegroups.com
+> >>Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> >
+> >Isn't this a bug fix that should be applied to the stable kernels too?
 > 
-> Many CPUs are implementing power saving states via the WFI mode.
-> In some cases, WFI must be entered in order to suspend, or even reset,
-> a CPU.
-> 
-> Whether a CPU needs to be awaken, brought out of WFI during secondary
-> boot, or to cancel a reset state before it is effective, the CPU must
-> receive an interrupt to exit its WFI state.
-> 
-> Let's formalize an IPI number for this purpose, and move over existing
-> users over to a convenience function for it.
-> 
-> This also has the side effect of removing the spurious "Unknown IPI
-> message 1" each time a CPU is awaken.
+> Possibly. Should we alert Greg (CC'ed - alerted)?
 
-I want people to move over to using IPI 0 for wakeup.
+<formletter>
 
-The problem is, as ever, no one bloody well listens and they all continue
-on copying Realview.
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+for how to do this properly.
+
+</formletter>
