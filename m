@@ -1,91 +1,54 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 11 Jun 2012 11:54:23 +0200
-Subject: [PATCHv2 12/12] ARM: OMAP4: hwmod data: do not enable or reset
- the McPDM during kernel init
-In-Reply-To: <20120611004626.20034.42995.stgit@dusk>
-References: <20120611004502.20034.8840.stgit@dusk>
- <20120611004626.20034.42995.stgit@dusk>
-Message-ID: <4FD5C04F.2040509@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 11:03:26 +0100
+Subject: [PATCH 6.2/7] MMC: mmci: Enable Device Tree support for ux500
+In-Reply-To: <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
+References: <1334325909-5779-1-git-send-email-lee.jones@linaro.org>
+ <1334325909-5779-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyP=V=aXtDuo_W4oDxH0UkQKq1x1HKG_z=zWHoWng6JQ@mail.gmail.com>
+ <4F8BE5B0.4000900@linaro.org> <20120604101447.GF8262@n2100.arm.linux.org.uk>
+ <4FCDE3D7.9030006@linaro.org> <20120605105249.GK8262@n2100.arm.linux.org.uk>
+ <CACRpkdY=os8B2JEVijHzdfqUN_Q075MLoVsk3U=owAPhmcNUHg@mail.gmail.com>
+Message-ID: <4FD5C26E.9080902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/11/2012 2:46 AM, Paul Walmsley wrote:
-> Resolve this kernel boot message:
->
-> omap_hwmod: mcpdm: cannot be enabled for reset (3)
->
-> It appears that the McPDM on OMAP4 can only receive its functional
-> clock from an off-chip source.  This source is not guaranteed to be
-> present on the board, and when present, it is controlled by I2C.  This
-> would introduce a board dependency to the early hwmod code which it
-> was not designed to handle.  Also, neither the driver for this
-> off-chip clock provider nor the I2C code is available early in boot
-> when the hwmod code is attempting to enable and reset IP blocks.  This
-> effectively makes it impossible to enable and reset this device during
-> hwmod init.
->
-> At its core, this patch is a workaround for an OMAP hardware problem.
-> It should be possible to configure the OMAP to provide any IP block's
-> functional clock from an on-chip source.  (This is true for almost
-> every IP block on the chip.  As far as I know, McPDM is the only
-> exception.)  If the kernel cannot reset and configure IP blocks, it
-> cannot guarantee a sane SoC state.  Relying on an optional off-chip
-> clock also creates a board dependency which is beyond the scope of the
-> early hwmod code.
+> Lee can you provide an incremental fixup that makes the current
+> code textually equivalent to what Russell ACKed (devm_kzalloc()),
+> and funnel to Chris for the -rc:s ASAP?
 
-And I guess, that's a good reason as well to let the driver managing the 
-reset during the probe for such IPs.
+Your wish is my command:
 
-> This patch works around the issue by marking the McPDM hwmod record
-> with the HWMOD_EXT_OPT_MAIN_CLK flag.  This prevents the hwmod
-> code from touching the device early during boot.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   12 ++++++++++++
->   1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 3613054..86fc513 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -2091,6 +2091,18 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
->   	.name		= "mcpdm",
->   	.class		= &omap44xx_mcpdm_hwmod_class,
->   	.clkdm_name	= "abe_clkdm",
-> +	/*
-> +	 * It's suspected that the McPDM requires an off-chip main
-> +	 * functional clock, controlled via I2C.
+From: Lee Jones <lee.jones@linaro.org>
+Date: Mon, 11 Jun 2012 10:41:00 +0100
+Subject: [PATCH] mmc: mmci: Allocate platform memory during Device Tree boot
 
-Nit: Is it not suspected, it is a fact. The clock tree clearly indicate 
-that the mcpdm fclk is generated from the pad_clks.
-The IP is a custom link for the Audio IC control / data. using the Audio 
-IC as a source clock is standard. Since that IP is done only for that 
-purpose, there is no optional clock path from the PRCM like it is the 
-case for the McASP / McBSP.
+When booting with Device Tree enabled, platform specific information
+is gathered by parsing the DT binary. Platform data is subsequently
+populated with the result. The memory required for this is not
+automatically allocated during Device Tree boot, so we'll do it here
+instead.
 
->  This IP block is
-> +	 * currently reset very early during boot, before I2C is
-> +	 * available, so it doesn't seem that we have any choice in
-> +	 * the kernel other than to avoid resetting it.  XXX This is
-> +	 * really a hardware issue workaround: every IP block should
-> +	 * be able to source its main functional clock from either
-> +	 * on-chip or off-chip sources.  McPDM seems to be the only
-> +	 * current exception.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-I do not think this is the right place to put some complaint about the 
-HW :-).
-I guess we should just describe the facts.
-
-> +	 */
-> +	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
-
-Could you please update the hints for this IP in the autogen scripts?
-I added a comment attribute to add a custom comment on top of the flags 
-entry.
-The latest branch is "omap5430_for_3.6".
-
-Thanks,
-Benoit
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index f0fcce4..0045ee0 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1276,6 +1276,12 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 		return -EINVAL;
+ 	}
+ 
++	if (!plat) {
++		plat = devm_kzalloc(&dev->dev, sizeof(*plat), GFP_KERNEL);
++		if (!plat)
++			return -ENOMEM;
++	}
++
+ 	if (np)
+ 		mmci_dt_populate_generic_pdata(np, plat);
+ 
+-- 
+1.7.9.5
