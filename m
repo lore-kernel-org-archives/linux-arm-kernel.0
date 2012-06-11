@@ -1,81 +1,156 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Jun 2012 13:40:56 +0800
-Subject: [PATCH] MXS: Add DENX M28 dts file
-In-Reply-To: <201206082032.22940.marex@denx.de>
-References: <1338084735-12083-1-git-send-email-marex@denx.de>
- <20120606081726.GG2667@S2101-09.ap.freescale.net>
- <201206082032.22940.marex@denx.de>
-Message-ID: <20120611054053.GA2552@S2101-09.ap.freescale.net>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Mon, 11 Jun 2012 11:13:04 +0530
+Subject: [PATCH] ARM: update die handler from x86
+Message-ID: <1339393384-28877-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 08, 2012 at 08:32:22PM +0200, Marek Vasut wrote:
-> Ok, I see ... FSL patches get merged with priority?
-> 
-If I'm not mistaken, Huang's patches hit list earlier than yours.
-That's the only reason I applied his patches with priority.  Anything
-wrong with this approach?
+Robustify ARM's die() handling with improvements from x86:
 
-> I see ... so if I need to configure two set of pins, how do I do that? Or it's 
-> not possible with DT too?
-> 
-It's possible.  You already did that with ethernet pins, one set of
-mac function pins and another phy reset gpio, didn't you?
+ - Fix for a deadlock (before panic in the case of panic_on_oops) if we
+   oops under a spinlock which is also used from interrupt handler,
+   since the old code was unconditionally enabling interrupts.
 
-> > > +
-> > > +				auart0_pins_m28: auart0 at 0 {
-> > > +					reg = <0>;
-> > > +					fsl,pinmux-ids = <0x3000 0x3010>;
-> > > +					fsl,drive-strength = <2>;
-> > > +					fsl,voltage = <1>;
-> > > +					fsl,pull-up = <0>;
-> > > +				};
-> > > +
-> > > +				auart3_pins_m28: auart3 at 0 {
-> > > +					reg = <0>;
-> > > +					fsl,pinmux-ids = <0x30c0 0x30d0
-> > > +							  0x30e0 0x30f0>;
-> > > +					fsl,drive-strength = <2>;
-> > > +					fsl,voltage = <1>;
-> > > +					fsl,pull-up = <0>;
-> > > +				};
-> > 
-> > Should be defined in imx28.dtsi, so that other boards can refer to
-> > them too.
-> 
-> It's specific to our platform, why would it?
-> 
-Which pins can be mux-ed on auart function is never specific to your
-platform, it's determined by SoC design.  Different platforms may need
-different pad configuration though.  That's can be done by defining
-config node in <board>.dts.
+ - Usage of arch spinlock so lockdep etc doesn't get involved while
+   we're trying to dump out oopses.
 
-> > > +
-> > > +				mac_pin_reset: mac at 0 {
-> > > +					reg = <0>;
-> > > +					fsl,pinmux-ids = <0x30b3>;
-> > > +					fsl,drive-strength = <2>;
-> > > +					fsl,voltage = <1>;
-> > > +					fsl,pull-up = <0>;
-> > > +				};
-> > 
-> > gpio, let's wait for pinctrl core support.
-> 
-> Hm, how long do you intend to block all possible platforms from mainline other 
-> than FSL EVK ones?
+ - Deadlock prevention in the unlikely event that die() recurses.
 
-Would you mind giving an example that I block your platform support
-for some reason while give it pass on FSL EVK?
+The changes all touch the same few lines of code, so they're done
+together in one patch.
 
-> I consider having stuff in mainline much better, as it helps 
-> testing it, but it seems you don't share this opinion.
-> 
-I do share this opinion.  I was thinking that the gpio range support
-in pinctrl is close to get it.  Now, it seems not the case and more
-importantly I just found one problem with that, the pad configuration
-for gpio is not covered by gpio range support.  So we may not be able
-to use that support anyway, so go ahead with your approach.
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/kernel/traps.c |   78 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 55 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4928d89..2df8715 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -233,9 +233,9 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
+ #define S_ISA " ARM"
+ #endif
+ 
+-static int __die(const char *str, int err, struct thread_info *thread, struct pt_regs *regs)
++static int __die(const char *str, int err, struct pt_regs *regs)
+ {
+-	struct task_struct *tsk = thread->task;
++	struct task_struct *tsk = current;
+ 	static int die_counter;
+ 	int ret;
+ 
+@@ -245,12 +245,12 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
+ 	/* trap and error numbers are mostly meaningless on ARM */
+ 	ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
+ 	if (ret == NOTIFY_STOP)
+-		return ret;
++		return 1;
+ 
+ 	print_modules();
+ 	__show_regs(regs);
+ 	printk(KERN_EMERG "Process %.*s (pid: %d, stack limit = 0x%p)\n",
+-		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
++		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), end_of_stack(tsk));
+ 
+ 	if (!user_mode(regs) || in_interrupt()) {
+ 		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
+@@ -259,45 +259,77 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
+ 		dump_instr(KERN_EMERG, regs);
+ 	}
+ 
+-	return ret;
++	return 0;
+ }
+ 
+-static DEFINE_RAW_SPINLOCK(die_lock);
++static arch_spinlock_t die_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++static int die_owner = -1;
++static unsigned int die_nest_count;
+ 
+-/*
+- * This function is protected against re-entrancy.
+- */
+-void die(const char *str, struct pt_regs *regs, int err)
++static unsigned long oops_begin(void)
+ {
+-	struct thread_info *thread = current_thread_info();
+-	int ret;
+-	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
++	int cpu;
++	unsigned long flags;
+ 
+ 	oops_enter();
+ 
+-	raw_spin_lock_irq(&die_lock);
++	/* racy, but better than risking deadlock. */
++	raw_local_irq_save(flags);
++	cpu = smp_processor_id();
++	if (!arch_spin_trylock(&die_lock)) {
++		if (cpu == die_owner)
++			/* nested oops. should stop eventually */;
++		else
++			arch_spin_lock(&die_lock);
++	}
++	die_nest_count++;
++	die_owner = cpu;
+ 	console_verbose();
+ 	bust_spinlocks(1);
+-	if (!user_mode(regs))
+-		bug_type = report_bug(regs->ARM_pc, regs);
+-	if (bug_type != BUG_TRAP_TYPE_NONE)
+-		str = "Oops - BUG";
+-	ret = __die(str, err, thread, regs);
++	return flags;
++}
+ 
+-	if (regs && kexec_should_crash(thread->task))
++static void oops_end(unsigned long flags, struct pt_regs *regs, int signr)
++{
++	if (regs && kexec_should_crash(current))
+ 		crash_kexec(regs);
+ 
+ 	bust_spinlocks(0);
++	die_owner = -1;
+ 	add_taint(TAINT_DIE);
+-	raw_spin_unlock_irq(&die_lock);
++	die_nest_count--;
++	if (!die_nest_count)
++		/* Nest count reaches zero, release the lock. */
++		arch_spin_unlock(&die_lock);
++	raw_local_irq_restore(flags);
+ 	oops_exit();
+ 
+ 	if (in_interrupt())
+ 		panic("Fatal exception in interrupt");
+ 	if (panic_on_oops)
+ 		panic("Fatal exception");
+-	if (ret != NOTIFY_STOP)
+-		do_exit(SIGSEGV);
++	if (signr)
++		do_exit(signr);
++}
++
++/*
++ * This function is protected against re-entrancy.
++ */
++void die(const char *str, struct pt_regs *regs, int err)
++{
++	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
++	unsigned long flags = oops_begin();
++	int sig = SIGSEGV;
++
++	if (!user_mode(regs))
++		bug_type = report_bug(regs->ARM_pc, regs);
++	if (bug_type != BUG_TRAP_TYPE_NONE)
++		str = "Oops - BUG";
++
++	if (__die(str, err, regs))
++		sig = 0;
++
++	oops_end(flags, regs, sig);
+ }
+ 
+ void arm_notify_die(const char *str, struct pt_regs *regs,
 -- 
-Regards,
-Shawn
+1.7.9.5
