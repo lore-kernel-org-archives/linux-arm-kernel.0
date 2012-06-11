@@ -1,33 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jun 2012 14:58:05 +0000
-Subject: [PATCH 8/14] ARM: LPC32xx: Clock adjustment for key matrix
- controller
-In-Reply-To: <4FD60203.8010103@antcom.de>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <201206111416.19251.arnd@arndb.de> <4FD60203.8010103@antcom.de>
-Message-ID: <201206111458.05546.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 10:03:33 -0500
+Subject: [PATCH 4/5] MFD: OMAP3EVM: USB: cosmetic fix to failed parent
+ clk set
+In-Reply-To: <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
+References: <zumeng.chen@gmail.com>
+ <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
+ <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
+Message-ID: <4FD608C5.9000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 June 2012, Roland Stigge wrote:
-> On 06/11/2012 04:16 PM, Arnd Bergmann wrote:
-> > On Monday 11 June 2012, Roland Stigge wrote:
-> >> The clock.c file needs to be changed to match the automatic device name to its
-> >> clock.
-> >>
-> >> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> >> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> >>
-> > 
-> > Should this not be in the same patch as the one that moves the device over
-> > to DT probing? Otherwise you have a non-working setup if only one patch
-> > is applied.
-> 
-> The actual driver is new for v3.6 (hopefully), DT-only.
-> 
-> Rather than merging the patches, I'd let the key driver go in via input,
-> and the clock.c adjustment via arm-soc.
 
-Ok, makes sense.
+On 06/11/2012 09:00 AM, Zumeng Chen wrote:
+> A typo fix for this cosmetic change and mute a failed message from
+> a unnecessary setting of some parent clk for usbhs_omap on OMAP3EVM.
+> 
+> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
+> ---
+>  drivers/mfd/omap-usb-host.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 7e96bb2..9aaaf3c 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -698,8 +698,9 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+>  		goto err_usbtll_p2_fck;
+>  	}
+>  
+> +#ifndef CONFIG_MACH_OMAP3EVM
+> +	/* for OMAP3 , the clk set parent fails */
+>  	if (is_ehci_phy_mode(pdata->port_mode[0])) {
+> -		/* for OMAP3 , the clk set paretn fails */
+>  		ret = clk_set_parent(omap->utmi_p1_fck,
+>  					omap->xclk60mhsp1_ck);
+>  		if (ret != 0)
 
-	Arnd
+This begs the question, why is port_mode[0] set to ehci phy mode if this
+is failing? Something does not seem right here but this does not look
+like the right fix.
+
+Cheers
+Jon
