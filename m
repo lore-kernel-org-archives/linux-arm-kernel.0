@@ -1,39 +1,38 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Mon, 11 Jun 2012 16:27:41 +0200
-Subject: am33xx: pin modes
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA1E6F0@DBDE01.ent.ti.com>
-References: <4FD5E268.7030105@visionsystems.de>
- <1BAFE6F6C881BF42822005164F1491C33EA1E6F0@DBDE01.ent.ti.com>
-Message-ID: <4FD6005D.8070503@visionsystems.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Jun 2012 22:27:53 +0800
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <4FD5FBAF.1060002@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+ <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+ <20120611120820.GN11439@opensource.wolfsonmicro.com>
+ <4FD5F3D2.2050500@linaro.org> <4FD5FBAF.1060002@linaro.org>
+Message-ID: <20120611142752.GS11439@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.06.2012 15:40, schrieb Hebbar, Gururaja:
-> On Mon, Jun 11, 2012 at 17:49:52, Yegor Yefremov wrote:
->> I'm working with Koen's repo (https://github.com/koenkooi/linux.git) and have a question. There are two places, where pin's function is defined:
->>
->>
->> arch/arm/mach-omap2/mux33xx.c:
->> static struct omap_mux __initdata am33xx_muxmodes[] = {
->> /**/    _AM33XX_MUXENTRY(GPMC_AD0, 0,
->>                 "gpmc_ad0", "mmc1_dat0", NULL, NULL,
->>                 NULL, NULL, NULL, "gpio1_0"),
->>
-> This is the big AM33XX pin mux super set table. Here, Entire Mux entries for AM335x SOC
-> are defined.
->
->> arch/arm/mach-omap2/board-am335xevm.c:
->> {"mdio_data.mdio_data", OMAP_MUX_MODE0 | AM33XX_PIN_INPUT_PULLUP},
-> This is where the actual board pin-mux is "defined". Later this structure is passed 
-> to setup_pin_mux() which calls omap_mux_init_signal() where the actual pin-mux
-> registers are written.
+On Mon, Jun 11, 2012 at 03:07:43PM +0100, Lee Jones wrote:
+> >>Well, I guess I'll end up dulplicating the commits :/
 
-I understand this, but I see here two redundant definitions:
+> >Duplicating them?
 
- {"mii1_txd2.rgmii1_td2", OMAP_MUX_MODE2 | AM33XX_PIN_OUTPUT},
+> Ah, you mean that you've already sent them to -next?
 
-Here both "rgmii1_td2" and "OMAP_MUX_MODE2" are defined. If I misspell "rgmii1_td2"
-will the pin have OMAP_MUX_MODE2 or not?
+Yeah, I've already got them on a branch I don't really want to rebase.
 
-Best regards,
-Yegor 
+> That's no problem though. Won't Git just sling them out at pull-time?
+
+It'll merge out fine, it's just icky having the same thing appear twice
+in history.  Not the end of the world.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120611/aefcfd09/attachment.sig>
