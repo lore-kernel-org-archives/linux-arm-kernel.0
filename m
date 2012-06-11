@@ -1,41 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Jun 2012 10:59:03 -0600 (MDT)
-Subject: [PATCHv2 11/12] ARM: OMAP4: clock data: add clockdomains for
- clocks used as main clocks
-In-Reply-To: <4FD61C94.4030004@ti.com>
-References: <20120611004502.20034.8840.stgit@dusk>
- <20120611004623.20034.52760.stgit@dusk> <4FD61C94.4030004@ti.com>
-Message-ID: <alpine.DEB.2.00.1206111050430.5849@utopia.booyaka.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Jun 2012 19:11:56 +0200
+Subject: [PATCH v2 1/8] arm: mach-mvebu: add header
+In-Reply-To: <1339433585-28087-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <1339433585-28087-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20120611171156.GA19927@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Cousson, Benoit wrote:
+> diff --git a/arch/arm/mach-mvebu/include/mach/uncompress.h b/arch/arm/mach-mvebu/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..3642997
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/include/mach/uncompress.h
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Marvell Armada SoC kernel uncompression UART routines
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Lior Amsalem <alior@marvell.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <mach/mvebu.h>
+> +
+> +#define UART_THR ((volatile unsigned char *)(MVEBU_REGS_PHYS_BASE + 0x12000))
+> +#define UART_LSR ((volatile unsigned char *)(MVEBU_REGS_PHYS_BASE + 0x12014))
 
-> In fact, neither prm_clkdm not cm_clkdm are valid clock domain on OMAP4 
-> :-(.
-> 
-> I've just realized that you introduced that for 3.5, but this is wrong. 
-> We should not start adding some fake clock domains just because the fmwk 
-> is not smart enough to allow a NULL clock domain.
-> 
+All Orion's place the UART at the same physical address. So i've got
+this on my TODO list, to have one implementation in plat-orion.
 
-...
+However, you have moved away from plat-orion, so i wounder were would
+be a good place to have this?
 
-> In a period of data size reduction, adding some fake information does 
-> not seems to be the right approach. Don't you think so?
-
-No, I do not.
-
-These clockdomains are clearly documented in both the OMAP4 TRM[1]
-and the NDA OMAP4 PRCM functional specifications.
-
-I continue to be baffled as to why you assert that they are fake, given 
-how clearly they are documented.
-
-
-- Paul
-
-1. See for example sections 3.6.6.1 "Overview", Figure 3-58 "CD_L4_PER 
-Overview", Figure 3-59 "CD_L3_INIT Overview", Figure 3-62 "CD_EMU 
-Overview", Figure 3-63 "CD_DSS Overview", Figure 3-74 "CD_L4_ALWON_CORE 
-Overview" in the OMAP4 TRM Rev. AA (SWPU231AA).
+   Andrew
