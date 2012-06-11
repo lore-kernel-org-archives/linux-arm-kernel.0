@@ -1,670 +1,251 @@
 From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Mon, 11 Jun 2012 18:04:37 +0800
-Subject: [PATCH v2 1/5] dmaengine: mmp_tdma: add mmp tdma support
+Date: Mon, 11 Jun 2012 18:04:41 +0800
+Subject: [PATCH v2 5/5] ASoC: add ttc-dkb machine support
 In-Reply-To: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
 References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1339409081-10097-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1339409081-10097-6-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for two-channel dma under dmaengine
-support: mmp-adma and pxa910-squ
+From: Qiao Zhou <zhouqiao@marvell.com>
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-Signed-off-by: Leo Yan <leoy@marvell.com>
+add ttc-dkb machine support for pxa910. It uses 88pm8607 as codec
+dai, mmp-pcm as platform and pxa-ssp as cpu dai.
+
 Signed-off-by: Qiao Zhou <zhouqiao@marvell.com>
 ---
- drivers/dma/Kconfig    |   10 +
- drivers/dma/Makefile   |    1 +
- drivers/dma/mmp_tdma.c |  610 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 621 insertions(+), 0 deletions(-)
- create mode 100644 drivers/dma/mmp_tdma.c
+ sound/soc/pxa/Kconfig   |   20 ++++++
+ sound/soc/pxa/Makefile  |    2 +
+ sound/soc/pxa/ttc-dkb.c |  173 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 195 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/pxa/ttc-dkb.c
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index aadeb5b..75c5434 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -260,6 +260,16 @@ config DMA_SA11X0
- 	  SA-1110 SoCs.  This DMA engine can only be used with on-chip
- 	  devices.
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index d389fd5..4d2e46f 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -150,6 +150,26 @@ config SND_SOC_TAVOREVB3
+ 	  Say Y if you want to add support for SoC audio on the
+ 	  Marvell Saarb reference platform.
  
-+config MMP_TDMA
-+	bool "MMP Two-Channel DMA support"
-+	default ARCH_MMP
-+	select DMA_ENGINE
++config SND_PXA910_SOC
++	tristate "SoC Audio for Marvell PXA910 chip"
++	depends on ARCH_MMP && SND
++	select SND_PCM
 +	help
-+	  Support the MMP Two-Channel DMA engine.
-+	  This engine used for MMP Audio DMA and pxa910 SQU.
++	  Say Y if you want to add support for SoC audio on the
++	  Marvell PXA910 reference platform.
 +
-+	  Say Y here if you enabled MMP ADMA, otherwise say N.
++config SND_SOC_TTC_DKB
++	bool "SoC Audio support for TTC DKB"
++	depends on SND_PXA910_SOC && MACH_TTC_DKB
++	select PXA_SSP
++	select SND_PXA_SOC_SSP
++	select SND_MMP_SOC
++	select MFD_88PM860X
++	select SND_SOC_88PM860X
++	help
++	  Say Y if you want to add support for SoC audio on TTC DKB
 +
- config DMA_ENGINE
- 	bool
++
+ config SND_SOC_ZYLONITE
+ 	tristate "SoC Audio support for Marvell Zylonite"
+ 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
+diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
+index c12aa2a..d8a265d 100644
+--- a/sound/soc/pxa/Makefile
++++ b/sound/soc/pxa/Makefile
+@@ -33,6 +33,7 @@ snd-soc-z2-objs := z2.o
+ snd-soc-imote2-objs := imote2.o
+ snd-soc-raumfeld-objs := raumfeld.o
+ snd-soc-brownstone-objs := brownstone.o
++snd-soc-ttc-dkb-objs := ttc-dkb.o
  
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 86b795b..37e9258 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -28,3 +28,4 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
- obj-$(CONFIG_AMBA_PL08X) += amba-pl08x.o
- obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
- obj-$(CONFIG_DMA_SA11X0) += sa11x0-dma.o
-+obj-$(CONFIG_MMP_TDMA) += mmp_tdma.o
-diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+ obj-$(CONFIG_SND_PXA2XX_SOC_CORGI) += snd-soc-corgi.o
+ obj-$(CONFIG_SND_PXA2XX_SOC_POODLE) += snd-soc-poodle.o
+@@ -53,3 +54,4 @@ obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
+ obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
+ obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
+ obj-$(CONFIG_SND_MMP_SOC_BROWNSTONE) += snd-soc-brownstone.o
++obj-$(CONFIG_SND_SOC_TTC_DKB) += snd-soc-ttc-dkb.o
+diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
 new file mode 100644
-index 0000000..23f0445
+index 0000000..935491a
 --- /dev/null
-+++ b/drivers/dma/mmp_tdma.c
-@@ -0,0 +1,610 @@
++++ b/sound/soc/pxa/ttc-dkb.c
+@@ -0,0 +1,173 @@
 +/*
-+ * Driver For Marvell Two-channel DMA Engine
++ * linux/sound/soc/pxa/ttc_dkb.c
 + *
-+ * Copyright: Marvell International Ltd.
++ * Copyright (C) 2012 Marvell International Ltd.
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 + *
 + */
-+
 +#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/slab.h>
-+#include <linux/dmaengine.h>
-+#include <linux/platform_device.h>
-+#include <linux/device.h>
-+#include <mach/regs-icu.h>
-+#include <mach/sram.h>
++#include <linux/moduleparam.h>
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/jack.h>
++#include <asm/mach-types.h>
++#include <sound/pcm_params.h>
++#include "../codecs/88pm860x-codec.h"
 +
-+#include "dmaengine.h"
++static struct snd_soc_jack hs_jack, mic_jack;
 +
-+/*
-+ * Two-Channel DMA registers
-+ */
-+#define TDBCR		0x00	/* Byte Count */
-+#define TDSAR		0x10	/* Src Addr */
-+#define TDDAR		0x20	/* Dst Addr */
-+#define TDNDPR		0x30	/* Next Desc */
-+#define TDCR		0x40	/* Control */
-+#define TDCP		0x60	/* Priority*/
-+#define TDCDPR		0x70	/* Current Desc */
-+#define TDIMR		0x80	/* Int Mask */
-+#define TDISR		0xa0	/* Int Status */
-+
-+/* Two-Channel DMA Control Register */
-+#define TDCR_SSZ_8_BITS		(0x0 << 22)	/* Sample Size */
-+#define TDCR_SSZ_12_BITS	(0x1 << 22)
-+#define TDCR_SSZ_16_BITS	(0x2 << 22)
-+#define TDCR_SSZ_20_BITS	(0x3 << 22)
-+#define TDCR_SSZ_24_BITS	(0x4 << 22)
-+#define TDCR_SSZ_32_BITS	(0x5 << 22)
-+#define TDCR_SSZ_SHIFT		(0x1 << 22)
-+#define TDCR_SSZ_MASK		(0x7 << 22)
-+#define TDCR_SSPMOD		(0x1 << 21)	/* SSP MOD */
-+#define TDCR_ABR		(0x1 << 20)	/* Channel Abort */
-+#define TDCR_CDE		(0x1 << 17)	/* Close Desc Enable */
-+#define TDCR_PACKMOD		(0x1 << 16)	/* Pack Mode (ADMA Only) */
-+#define TDCR_CHANACT		(0x1 << 14)	/* Channel Active */
-+#define TDCR_FETCHND		(0x1 << 13)	/* Fetch Next Desc */
-+#define TDCR_CHANEN		(0x1 << 12)	/* Channel Enable */
-+#define TDCR_INTMODE		(0x1 << 10)	/* Interrupt Mode */
-+#define TDCR_CHAINMOD		(0x1 << 9)	/* Chain Mode */
-+#define TDCR_BURSTSZ_MSK	(0x7 << 6)	/* Burst Size */
-+#define TDCR_BURSTSZ_4B		(0x0 << 6)
-+#define TDCR_BURSTSZ_8B		(0x1 << 6)
-+#define TDCR_BURSTSZ_16B	(0x3 << 6)
-+#define TDCR_BURSTSZ_32B	(0x6 << 6)
-+#define TDCR_BURSTSZ_64B	(0x7 << 6)
-+#define TDCR_BURSTSZ_SQU_32B	(0x7 << 6)
-+#define TDCR_BURSTSZ_128B	(0x5 << 6)
-+#define TDCR_DSTDIR_MSK		(0x3 << 4)	/* Dst Direction */
-+#define TDCR_DSTDIR_ADDR_HOLD	(0x2 << 4)	/* Dst Addr Hold */
-+#define TDCR_DSTDIR_ADDR_INC	(0x0 << 4)	/* Dst Addr Increment */
-+#define TDCR_SRCDIR_MSK		(0x3 << 2)	/* Src Direction */
-+#define TDCR_SRCDIR_ADDR_HOLD	(0x2 << 2)	/* Src Addr Hold */
-+#define TDCR_SRCDIR_ADDR_INC	(0x0 << 2)	/* Src Addr Increment */
-+#define TDCR_DSTDESCCONT	(0x1 << 1)
-+#define TDCR_SRCDESTCONT	(0x1 << 0)
-+
-+/* Two-Channel DMA Int Mask Register */
-+#define TDIMR_COMP		(0x1 << 0)
-+
-+/* Two-Channel DMA Int Status Register */
-+#define TDISR_COMP		(0x1 << 0)
-+
-+/*
-+ * Two-Channel DMA Descriptor Struct
-+ * NOTE: desc's buf must be aligned to 16 bytes.
-+ */
-+struct mmp_tdma_desc {
-+	u32 byte_cnt;
-+	u32 src_addr;
-+	u32 dst_addr;
-+	u32 nxt_desc;
++static struct snd_soc_jack_pin hs_jack_pins[] = {
++	{ .pin = "Headset Stereophone",	.mask = SND_JACK_HEADPHONE, },
 +};
 +
-+enum mmp_tdma_type {
-+	MMP_AUD_TDMA = 0,
-+	PXA910_SQU,
++static struct snd_soc_jack_pin mic_jack_pins[] = {
++	{ .pin = "Headset Mic 2",	.mask = SND_JACK_MICROPHONE, },
 +};
 +
-+#define TDMA_ALIGNMENT		3
-+#define TDMA_MAX_XFER_BYTES    SZ_64K
-+
-+struct mmp_tdma_chan {
-+	struct device			*dev;
-+	struct dma_chan			chan;
-+	struct dma_async_tx_descriptor	desc;
-+	struct tasklet_struct		tasklet;
-+
-+	struct mmp_tdma_desc		*desc_arr;
-+	phys_addr_t			desc_arr_phys;
-+	int				desc_num;
-+	enum dma_transfer_direction	dir;
-+	dma_addr_t			dev_addr;
-+	u32				burst_sz;
-+	enum dma_slave_buswidth		buswidth;
-+	enum dma_status			status;
-+
-+	int				idx;
-+	enum mmp_tdma_type		type;
-+	int				irq;
-+	unsigned long			reg_base;
-+
-+	size_t				buf_len;
-+	size_t				period_len;
-+	size_t				pos;
++/* ttc machine dapm widgets */
++static const struct snd_soc_dapm_widget ttc_dapm_widgets[] = {
++	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
++	SND_SOC_DAPM_LINE("Lineout Out 1", NULL),
++	SND_SOC_DAPM_LINE("Lineout Out 2", NULL),
++	SND_SOC_DAPM_SPK("Ext Speaker", NULL),
++	SND_SOC_DAPM_MIC("Ext Mic 1", NULL),
++	SND_SOC_DAPM_MIC("Headset Mic 2", NULL),
++	SND_SOC_DAPM_MIC("Ext Mic 3", NULL),
 +};
 +
-+#define TDMA_CHANNEL_NUM 2
-+struct mmp_tdma_device {
-+	struct device			*dev;
-+	void __iomem			*base;
-+	struct dma_device		device;
-+	struct mmp_tdma_chan		*tdmac[TDMA_CHANNEL_NUM];
-+	int				irq;
++/* ttc machine audio map */
++static const struct snd_soc_dapm_route ttc_audio_map[] = {
++	{"Headset Stereophone", NULL, "HS1"},
++	{"Headset Stereophone", NULL, "HS2"},
++
++	{"Ext Speaker", NULL, "LSP"},
++	{"Ext Speaker", NULL, "LSN"},
++
++	{"Lineout Out 1", NULL, "LINEOUT1"},
++	{"Lineout Out 2", NULL, "LINEOUT2"},
++
++	{"MIC1P", NULL, "Mic1 Bias"},
++	{"MIC1N", NULL, "Mic1 Bias"},
++	{"Mic1 Bias", NULL, "Ext Mic 1"},
++
++	{"MIC2P", NULL, "Mic1 Bias"},
++	{"MIC2N", NULL, "Mic1 Bias"},
++	{"Mic1 Bias", NULL, "Headset Mic 2"},
++
++	{"MIC3P", NULL, "Mic3 Bias"},
++	{"MIC3N", NULL, "Mic3 Bias"},
++	{"Mic3 Bias", NULL, "Ext Mic 3"},
 +};
 +
-+#define to_mmp_tdma_chan(dchan) container_of(dchan, struct mmp_tdma_chan, chan)
-+
-+static void mmp_tdma_chan_set_desc(struct mmp_tdma_chan *tdmac, dma_addr_t phys)
++static int ttc_pm860x_init(struct snd_soc_pcm_runtime *rtd)
 +{
-+	writel(phys, tdmac->reg_base + TDNDPR);
-+	writel(readl(tdmac->reg_base + TDCR) | TDCR_FETCHND,
-+					tdmac->reg_base + TDCR);
-+}
++	struct snd_soc_codec *codec = rtd->codec;
++	struct snd_soc_dapm_context *dapm = &codec->dapm;
 +
-+static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
-+{
-+	/* enable irq */
-+	writel(TDIMR_COMP, tdmac->reg_base + TDIMR);
-+	/* enable dma chan */
-+	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
-+					tdmac->reg_base + TDCR);
-+	tdmac->status = DMA_IN_PROGRESS;
-+}
++	/* connected pins */
++	snd_soc_dapm_enable_pin(dapm, "Ext Speaker");
++	snd_soc_dapm_enable_pin(dapm, "Ext Mic 1");
++	snd_soc_dapm_enable_pin(dapm, "Ext Mic 3");
++	snd_soc_dapm_disable_pin(dapm, "Headset Mic 2");
++	snd_soc_dapm_disable_pin(dapm, "Headset Stereophone");
 +
-+static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
-+{
-+	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
-+					tdmac->reg_base + TDCR);
-+	tdmac->status = DMA_SUCCESS;
-+}
++	/* Headset jack detection */
++	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE
++			| SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
++			&hs_jack);
++	snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
++			      hs_jack_pins);
++	snd_soc_jack_new(codec, "Microphone Jack", SND_JACK_MICROPHONE,
++			 &mic_jack);
++	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
++			      mic_jack_pins);
 +
-+static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
-+{
-+	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
-+					tdmac->reg_base + TDCR);
-+	tdmac->status = DMA_IN_PROGRESS;
-+}
-+
-+static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
-+{
-+	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
-+					tdmac->reg_base + TDCR);
-+	tdmac->status = DMA_PAUSED;
-+}
-+
-+static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
-+{
-+	unsigned int tdcr;
-+
-+	mmp_tdma_disable_chan(tdmac);
-+
-+	if (tdmac->dir == DMA_MEM_TO_DEV)
-+		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
-+	else if (tdmac->dir == DMA_DEV_TO_MEM)
-+		tdcr = TDCR_SRCDIR_ADDR_HOLD | TDCR_DSTDIR_ADDR_INC;
-+
-+	if (tdmac->type == MMP_AUD_TDMA) {
-+		tdcr |= TDCR_PACKMOD;
-+
-+		switch (tdmac->burst_sz) {
-+		case 4:
-+			tdcr |= TDCR_BURSTSZ_4B;
-+			break;
-+		case 8:
-+			tdcr |= TDCR_BURSTSZ_8B;
-+			break;
-+		case 16:
-+			tdcr |= TDCR_BURSTSZ_16B;
-+			break;
-+		case 32:
-+			tdcr |= TDCR_BURSTSZ_32B;
-+			break;
-+		case 64:
-+			tdcr |= TDCR_BURSTSZ_64B;
-+			break;
-+		case 128:
-+			tdcr |= TDCR_BURSTSZ_128B;
-+			break;
-+		default:
-+			dev_err(tdmac->dev, "mmp_tdma: unknown burst size.\n");
-+			return -EINVAL;
-+		}
-+
-+		switch (tdmac->buswidth) {
-+		case DMA_SLAVE_BUSWIDTH_1_BYTE:
-+			tdcr |= TDCR_SSZ_8_BITS;
-+			break;
-+		case DMA_SLAVE_BUSWIDTH_2_BYTES:
-+			tdcr |= TDCR_SSZ_16_BITS;
-+			break;
-+		case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+			tdcr |= TDCR_SSZ_32_BITS;
-+			break;
-+		default:
-+			dev_err(tdmac->dev, "mmp_tdma: unknown bus size.\n");
-+			return -EINVAL;
-+		}
-+	} else if (tdmac->type == PXA910_SQU) {
-+		tdcr |= TDCR_BURSTSZ_SQU_32B;
-+		tdcr |= TDCR_SSPMOD;
-+	}
-+
-+	writel(tdcr, tdmac->reg_base + TDCR);
-+	return 0;
-+}
-+
-+static int mmp_tdma_clear_chan_irq(struct mmp_tdma_chan *tdmac)
-+{
-+	u32 reg = readl(tdmac->reg_base + TDISR);
-+
-+	if (reg & TDISR_COMP) {
-+		/* clear irq */
-+		reg &= ~TDISR_COMP;
-+		writel(reg, tdmac->reg_base + TDISR);
-+
-+		return 0;
-+	}
-+	return -1;
-+}
-+
-+static irqreturn_t mmp_tdma_chan_handler(int irq, void *dev_id)
-+{
-+	struct mmp_tdma_chan *tdmac = dev_id;
-+
-+	if (mmp_tdma_clear_chan_irq(tdmac) == 0) {
-+		tdmac->pos = (tdmac->pos + tdmac->period_len) % tdmac->buf_len;
-+		tasklet_schedule(&tdmac->tasklet);
-+		return IRQ_HANDLED;
-+	} else
-+		return IRQ_NONE;
-+}
-+
-+static irqreturn_t mmp_tdma_int_handler(int irq, void *dev_id)
-+{
-+	struct mmp_tdma_device *tdev = dev_id;
-+	int i, ret;
-+	int irq_num = 0;
-+
-+	for (i = 0; i < TDMA_CHANNEL_NUM; i++) {
-+		struct mmp_tdma_chan *tdmac = tdev->tdmac[i];
-+
-+		ret = mmp_tdma_chan_handler(irq, tdmac);
-+		if (ret == IRQ_HANDLED)
-+			irq_num++;
-+	}
-+
-+	if (irq_num)
-+		return IRQ_HANDLED;
-+	else
-+		return IRQ_NONE;
-+}
-+
-+static void dma_do_tasklet(unsigned long data)
-+{
-+	struct mmp_tdma_chan *tdmac = (struct mmp_tdma_chan *)data;
-+
-+	if (tdmac->desc.callback)
-+		tdmac->desc.callback(tdmac->desc.callback_param);
-+
-+}
-+
-+static void mmp_tdma_free_descriptor(struct mmp_tdma_chan *tdmac)
-+{
-+	struct gen_pool *gpool;
-+	int size = tdmac->desc_num * sizeof(struct mmp_tdma_desc);
-+
-+	gpool = sram_get_gpool("asram");
-+	if (tdmac->desc_arr)
-+		gen_pool_free(gpool, (unsigned long)tdmac->desc_arr,
-+				size);
-+	tdmac->desc_arr = NULL;
-+
-+	return;
-+}
-+
-+static dma_cookie_t mmp_tdma_tx_submit(struct dma_async_tx_descriptor *tx)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(tx->chan);
-+
-+	mmp_tdma_chan_set_desc(tdmac, tdmac->desc_arr_phys);
++	/* headphone, microphone detection & headset short detection */
++	pm860x_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADPHONE,
++			      SND_JACK_BTN_0, SND_JACK_BTN_1, SND_JACK_BTN_2);
++	pm860x_mic_jack_detect(codec, &hs_jack, SND_JACK_MICROPHONE);
 +
 +	return 0;
 +}
 +
-+static int mmp_tdma_alloc_chan_resources(struct dma_chan *chan)
++/* ttc/td-dkb digital audio interface glue - connects codec <--> CPU */
++static struct snd_soc_dai_link ttc_pm860x_hifi_dai[] = {
 +{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	 .name = "88pm860x i2s",
++	 .stream_name = "audio playback",
++	 .codec_name = "88pm860x-codec",
++	 .platform_name = "mmp-pcm-audio",
++	 .cpu_dai_name = "pxa-ssp-dai.1",
++	 .codec_dai_name = "88pm860x-i2s",
++	 .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBM_CFM,
++	 .init = ttc_pm860x_init,
++},
++};
++
++/* ttc/td audio machine driver */
++static struct snd_soc_card ttc_dkb_card = {
++	.name = "ttc-dkb-hifi",
++	.dai_link = ttc_pm860x_hifi_dai,
++	.num_links = ARRAY_SIZE(ttc_pm860x_hifi_dai),
++
++	.dapm_widgets = ttc_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(ttc_dapm_widgets),
++	.dapm_routes = ttc_audio_map,
++	.num_dapm_routes = ARRAY_SIZE(ttc_audio_map),
++};
++
++static int __devinit ttc_dkb_probe(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = &ttc_dkb_card;
 +	int ret;
 +
-+	dma_async_tx_descriptor_init(&tdmac->desc, chan);
-+	tdmac->desc.tx_submit = mmp_tdma_tx_submit;
++	card->dev = &pdev->dev;
 +
-+	if (tdmac->irq) {
-+		ret = devm_request_irq(tdmac->dev, tdmac->irq,
-+			mmp_tdma_chan_handler, IRQF_DISABLED, "tdma", tdmac);
-+		if (ret)
-+			return ret;
-+	}
-+	return 1;
-+}
-+
-+static void mmp_tdma_free_chan_resources(struct dma_chan *chan)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
-+	if (tdmac->irq)
-+		devm_free_irq(tdmac->dev, tdmac->irq, tdmac);
-+	mmp_tdma_free_descriptor(tdmac);
-+	return;
-+}
-+
-+struct mmp_tdma_desc *mmp_tdma_alloc_descriptor(struct mmp_tdma_chan *tdmac)
-+{
-+	struct gen_pool *gpool;
-+	int size = tdmac->desc_num * sizeof(struct mmp_tdma_desc);
-+
-+	gpool = sram_get_gpool("asram");
-+	if (!gpool)
-+		return NULL;
-+
-+	tdmac->desc_arr = (void *)gen_pool_alloc(gpool, size);
-+	if (!tdmac->desc_arr)
-+		return NULL;
-+
-+	tdmac->desc_arr_phys = gen_pool_virt_to_phys(gpool,
-+			(unsigned long)tdmac->desc_arr);
-+
-+	return tdmac->desc_arr;
-+}
-+
-+static struct dma_async_tx_descriptor *mmp_tdma_prep_dma_cyclic(
-+		struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
-+		size_t period_len, enum dma_transfer_direction direction,
-+		void *context)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+	struct mmp_tdma_desc *desc;
-+	int num_periods = buf_len / period_len;
-+	int i = 0, buf = 0;
-+
-+	if (tdmac->status != DMA_SUCCESS)
-+		return NULL;
-+
-+	if (period_len > TDMA_MAX_XFER_BYTES) {
-+		dev_err(tdmac->dev,
-+				"maximum period size exceeded: %d > %d\n",
-+				period_len, TDMA_MAX_XFER_BYTES);
-+		goto err_out;
-+	}
-+
-+	tdmac->status = DMA_IN_PROGRESS;
-+	tdmac->desc_num = num_periods;
-+	desc = mmp_tdma_alloc_descriptor(tdmac);
-+	if (!desc)
-+		goto err_out;
-+
-+	while (buf < buf_len) {
-+		desc = &tdmac->desc_arr[i];
-+
-+		if (i + 1 == num_periods)
-+			desc->nxt_desc = tdmac->desc_arr_phys;
-+		else
-+			desc->nxt_desc = tdmac->desc_arr_phys +
-+				sizeof(*desc) * (i + 1);
-+
-+		if (direction == DMA_MEM_TO_DEV) {
-+			desc->src_addr = dma_addr;
-+			desc->dst_addr = tdmac->dev_addr;
-+		} else {
-+			desc->src_addr = tdmac->dev_addr;
-+			desc->dst_addr = dma_addr;
-+		}
-+		desc->byte_cnt = period_len;
-+		dma_addr += period_len;
-+		buf += period_len;
-+		i++;
-+	}
-+
-+	tdmac->buf_len = buf_len;
-+	tdmac->period_len = period_len;
-+	tdmac->pos = 0;
-+
-+	return &tdmac->desc;
-+
-+err_out:
-+	tdmac->status = DMA_ERROR;
-+	return NULL;
-+}
-+
-+static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+		unsigned long arg)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+	struct dma_slave_config *dmaengine_cfg = (void *)arg;
-+	int ret = 0;
-+
-+	switch (cmd) {
-+	case DMA_TERMINATE_ALL:
-+		mmp_tdma_disable_chan(tdmac);
-+		break;
-+	case DMA_PAUSE:
-+		mmp_tdma_pause_chan(tdmac);
-+		break;
-+	case DMA_RESUME:
-+		mmp_tdma_resume_chan(tdmac);
-+		break;
-+	case DMA_SLAVE_CONFIG:
-+		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
-+			tdmac->dev_addr = dmaengine_cfg->src_addr;
-+			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
-+			tdmac->buswidth = dmaengine_cfg->src_addr_width;
-+		} else {
-+			tdmac->dev_addr = dmaengine_cfg->dst_addr;
-+			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
-+			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
-+		}
-+		tdmac->dir = dmaengine_cfg->direction;
-+		return mmp_tdma_config_chan(tdmac);
-+	default:
-+		ret = -ENOSYS;
-+	}
++	ret = snd_soc_register_card(card);
++	if (ret)
++		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
++			ret);
 +
 +	return ret;
 +}
 +
-+static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
-+			dma_cookie_t cookie, struct dma_tx_state *txstate)
++static int __devexit ttc_dkb_remove(struct platform_device *pdev)
 +{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
 +
-+	dma_set_residue(txstate, tdmac->buf_len - tdmac->pos);
-+
-+	return tdmac->status;
-+}
-+
-+static void mmp_tdma_issue_pending(struct dma_chan *chan)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
-+	mmp_tdma_enable_chan(tdmac);
-+}
-+
-+static int __devexit mmp_tdma_remove(struct platform_device *pdev)
-+{
-+	struct mmp_tdma_device *tdev = platform_get_drvdata(pdev);
-+
-+	dma_async_device_unregister(&tdev->device);
-+	return 0;
-+}
-+
-+static int __devinit mmp_tdma_chan_init(struct mmp_tdma_device *tdev,
-+						int idx, int irq, int type)
-+{
-+	struct mmp_tdma_chan *tdmac;
-+
-+	if (idx >= TDMA_CHANNEL_NUM) {
-+		dev_err(tdev->dev, "too many channels for device!\n");
-+		return -EINVAL;
-+	}
-+
-+	/* alloc channel */
-+	tdmac = devm_kzalloc(tdev->dev, sizeof(*tdmac), GFP_KERNEL);
-+	if (!tdmac) {
-+		dev_err(tdev->dev, "no free memory for DMA channels!\n");
-+		return -ENOMEM;
-+	}
-+	if (irq)
-+		tdmac->irq = irq + idx;
-+	tdmac->dev	   = tdev->dev;
-+	tdmac->chan.device = &tdev->device;
-+	tdmac->idx	   = idx;
-+	tdmac->type	   = type;
-+	tdmac->reg_base	   = (unsigned long)tdev->base + idx * 4;
-+	tdmac->status = DMA_SUCCESS;
-+	tdev->tdmac[tdmac->idx] = tdmac;
-+	tasklet_init(&tdmac->tasklet, dma_do_tasklet, (unsigned long)tdmac);
-+
-+	/* add the channel to tdma_chan list */
-+	list_add_tail(&tdmac->chan.device_node,
-+			&tdev->device.channels);
++	snd_soc_unregister_card(card);
 +
 +	return 0;
 +}
 +
-+static int __devinit mmp_tdma_probe(struct platform_device *pdev)
-+{
-+	const struct platform_device_id *id = platform_get_device_id(pdev);
-+	enum mmp_tdma_type type = id->driver_data;
-+	struct mmp_tdma_device *tdev;
-+	struct resource *iores;
-+	int i, ret;
-+	int irq = 0;
-+	int chan_num = TDMA_CHANNEL_NUM;
-+
-+	/* always have couple channels */
-+	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
-+	if (!tdev)
-+		return -ENOMEM;
-+
-+	tdev->dev = &pdev->dev;
-+	iores = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!iores)
-+		return -EINVAL;
-+
-+	if (resource_size(iores) != chan_num)
-+		tdev->irq = iores->start;
-+	else
-+		irq = iores->start;
-+
-+	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!iores)
-+		return -EINVAL;
-+
-+	tdev->base = devm_request_and_ioremap(&pdev->dev, iores);
-+	if (!tdev->base)
-+		return -EADDRNOTAVAIL;
-+
-+	if (tdev->irq) {
-+		ret = devm_request_irq(&pdev->dev, tdev->irq,
-+			mmp_tdma_int_handler, IRQF_DISABLED, "tdma", tdev);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	dma_cap_set(DMA_SLAVE, tdev->device.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, tdev->device.cap_mask);
-+
-+	INIT_LIST_HEAD(&tdev->device.channels);
-+
-+	/* initialize channel parameters */
-+	for (i = 0; i < chan_num; i++) {
-+		ret = mmp_tdma_chan_init(tdev, i, irq, type);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	tdev->device.dev = &pdev->dev;
-+	tdev->device.device_alloc_chan_resources =
-+					mmp_tdma_alloc_chan_resources;
-+	tdev->device.device_free_chan_resources =
-+					mmp_tdma_free_chan_resources;
-+	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
-+	tdev->device.device_tx_status = mmp_tdma_tx_status;
-+	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
-+	tdev->device.device_control = mmp_tdma_control;
-+	tdev->device.copy_align = TDMA_ALIGNMENT;
-+
-+	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
-+	platform_set_drvdata(pdev, tdev);
-+
-+	ret = dma_async_device_register(&tdev->device);
-+	if (ret) {
-+		dev_err(tdev->device.dev, "unable to register\n");
-+		return ret;
-+	}
-+
-+	dev_info(tdev->device.dev, "initialized\n");
-+	return 0;
-+}
-+
-+static const struct platform_device_id mmp_tdma_id_table[] = {
-+	{ "mmp-adma",	MMP_AUD_TDMA },
-+	{ "pxa910-squ",	PXA910_SQU },
-+	{ },
-+};
-+
-+static struct platform_driver mmp_tdma_driver = {
++static struct platform_driver ttc_dkb_driver = {
 +	.driver		= {
-+		.name	= "mmp-tdma",
-+		.owner  = THIS_MODULE,
++		.name	= "ttc-dkb-audio",
++		.owner	= THIS_MODULE,
 +	},
-+	.id_table	= mmp_tdma_id_table,
-+	.probe		= mmp_tdma_probe,
-+	.remove		= __devexit_p(mmp_tdma_remove),
++	.probe		= ttc_dkb_probe,
++	.remove		= __devexit_p(ttc_dkb_remove),
 +};
 +
-+module_platform_driver(mmp_tdma_driver);
++module_platform_driver(ttc_dkb_driver);
 +
++/* Module information */
++MODULE_AUTHOR("Qiao Zhou, <zhouqiao@marvell.com>");
++MODULE_DESCRIPTION("ALSA SoC TTC DKB");
 +MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("MMP Two-Channel DMA Driver");
-+MODULE_ALIAS("platform:mmp-tdma");
-+MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
-+MODULE_AUTHOR("Zhangfei Gao <zhangfei.gao@marvell.com>");
++MODULE_ALIAS("platform:ttc-dkb-audio");
 -- 
 1.7.1
