@@ -1,45 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 12:21:00 +0100
-Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
- reflect Device Tree
-In-Reply-To: <20120605104201.GR23408@opensource.wolfsonmicro.com>
-References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
- <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
- <4FCDDE58.5010501@linaro.org>
- <20120605102900.GP23408@opensource.wolfsonmicro.com>
- <4FCDE0A4.8070107@linaro.org>
- <20120605104201.GR23408@opensource.wolfsonmicro.com>
-Message-ID: <4FD5D49C.6070106@linaro.org>
+Date: Mon, 11 Jun 2012 12:28:57 +0100
+Subject: [PATCH 08/22] regulator: Change ab8500 match names to reflect
+ Device Tree
+In-Reply-To: <20120611103606.GG11439@opensource.wolfsonmicro.com>
+References: <20120530121547.GJ9947@opensource.wolfsonmicro.com>
+ <4FC63632.4030504@linaro.org>
+ <20120530151119.GN9947@opensource.wolfsonmicro.com>
+ <4FC63B39.6040905@linaro.org>
+ <20120530164152.GP9947@opensource.wolfsonmicro.com>
+ <4FC846CC.20801@linaro.org>
+ <20120601084850.GJ24139@opensource.wolfsonmicro.com>
+ <4FCDDFFC.3000902@linaro.org>
+ <20120605103846.GQ23408@opensource.wolfsonmicro.com>
+ <4FD5C829.2090408@linaro.org>
+ <20120611103606.GG11439@opensource.wolfsonmicro.com>
+Message-ID: <4FD5D679.1070000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/12 11:42, Mark Brown wrote:
-> On Tue, Jun 05, 2012 at 11:34:12AM +0100, Lee Jones wrote:
+On 11/06/12 11:36, Mark Brown wrote:
+> On Mon, Jun 11, 2012 at 11:27:53AM +0100, Lee Jones wrote:
+>> On 05/06/12 11:38, Mark Brown wrote:
 >
->>>> Are you sending this for -rc2?
+>>> You're missing something - note what I say above about the direction the
+>>> mapping is done in, and consider what happens if we've got two of the
+>>> same PMIC down in a system.
 >
->>> No, nothing about this looks like an urgent fix?
+>> I'm still not seeing how this would cause an issue. The only Device
+>> Tree nodes which will be parsed are the ones which are specified by
+>> a particular driver's compatible string, meaning that any other
+>> nodes referencing similar regulator/supply names would be ignored.
 >
->> Well without it all regulator requests from DT will fail.
->
-> Oh, ffs.  Why wasn't this mentioned when the patch was posted,
+> Suppose you have two devices of the same type with an array of name
+> based regulators, meaning the nodes with constraints have to have a
+> particular name in order to be matched to the regulator.  How would a
+> consumer reference a node to specify a supply?
 
-I did. My 00 patch mentioned that these were all clean-ups/bug fixes 
-destined for the for RCs.
+some-regulators {
+     compatible = "protect_me_from_similarly_named_regulators";
 
-> and how were the original patches tested?
+     regulator_node_name_reg: regulator_node_name {
+         <blah>
+     };
+};
 
-So it looks like this may have been my fault when testing the patch-set 
-before this one. There are some hacks required to test Device Tree with 
-Snowball at the moment, as the u-boot we use isn't DT compatible yet. I 
-_may_ have (i.e. my best guess is that I) tested the patch-set in it's 
-purest form, thus omitting the ARM_APPENDED_DTB_FILE hack required to 
-append the DTB onto the kernel. Without it, the kernel just boots using 
-the original platform code.
-
-A genuine mistake on my part for which I unreservedly apologise.
-
-Nevertheless, these two patches are required for a decent boot.
+[supply_name]-supply = <&regulator_node_name>;
 
 -- 
 Lee Jones
