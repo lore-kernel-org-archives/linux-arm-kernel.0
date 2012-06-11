@@ -1,55 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 11 Jun 2012 15:56:50 -0400 (EDT)
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <20120611192003.GE18267@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <20120611182640.GC18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111430300.23555@xanadu.home>
- <20120611184148.GD18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111458310.23555@xanadu.home>
- <20120611192003.GE18267@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1206111535100.23555@xanadu.home>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 11 Jun 2012 21:57:13 +0200
+Subject: [PATCH RESEND 1/2] serial/8250: Add LPC3220 standard UART type
+Message-ID: <1339444634-15475-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
+LPC32xx has "Standard" UARTs that are actually 16550A compatible but have
+bigger FIFOs. Since the already supported 16X50 line still doesn't match here,
+we agreed on adding a new type.
 
-> On Mon, Jun 11, 2012 at 03:11:05PM -0400, Nicolas Pitre wrote:
-> > On Mon, 11 Jun 2012, Russell King - ARM Linux wrote:
-> > 
-> > > Same comments apply for exactly the reasons I stated.
-> > 
-> > No they don't.  They can't. The generic kernel code doesn't know what is 
-> > happening behind the scene and may not even care if at the low level a 
-> > complete CPU replacement happened.  Trust me, I happen to know one thing 
-> > or two about those issues you mentioned and the code I'm working on will 
-> > be posted in due course.
-> 
-> Stop being bitchy.  Look, the information I have on bigLittle is limited
-> to what has been discussed, and what is in the specs.  That's it.  I don't
-> know what the hell you're doing with this.  I'm not a part of that effort.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Alan Cox <alan@linux.intel.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-My intention is not to bitch.  I merely want to give you a heads up on a 
-legitimate usage for multiple IPIs which are currently using SGI #1 and 
-for which the kernel is generating unwanted warnings.  The actual SGI 
-number is unimportant as long as it can be defined as no-op in the 
-handle_IPI() context.
+---
+Applies to v3.5-rc2
 
-> I'm totally out of the loop (as seems to be per bloody normal with ARM Ltd.)
+ drivers/tty/serial/8250/8250.c |    8 ++++++++
+ include/linux/serial_core.h    |    3 ++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-In this case this is a Linaro project, not ARM Ltd.  If you are 
-interested by the details before they become public, we can discuss this 
-offline.
-
-> So please don't expect me to know what you're working on, or how your code
-> works.  I don't.  I don't have that information.
-
-I would expect that you know me well enough to trust me when I tell you 
-that my code works.  Or at least give me the benefit of the doubt.
-
-
-Nicolas
+--- linux-2.6.orig/drivers/tty/serial/8250/8250.c
++++ linux-2.6/drivers/tty/serial/8250/8250.c
+@@ -282,6 +282,14 @@ static const struct serial8250_config ua
+ 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+ 		.flags		= UART_CAP_FIFO | UART_CAP_AFE | UART_CAP_EFR,
+ 	},
++	[PORT_LPC3220] = {
++		.name		= "LPC3220",
++		.fifo_size	= 64,
++		.tx_loadsz	= 32,
++		.fcr		= UART_FCR_DMA_SELECT | UART_FCR_ENABLE_FIFO |
++				  UART_FCR_R_TRIG_00 | UART_FCR_T_TRIG_00,
++		.flags		= UART_CAP_FIFO,
++	},
+ };
+ 
+ /* Uart divisor latch read */
+--- linux-2.6.orig/include/linux/serial_core.h
++++ linux-2.6/include/linux/serial_core.h
+@@ -47,7 +47,8 @@
+ #define PORT_U6_16550A	19	/* ST-Ericsson U6xxx internal UART */
+ #define PORT_TEGRA	20	/* NVIDIA Tegra internal UART */
+ #define PORT_XR17D15X	21	/* Exar XR17D15x UART */
+-#define PORT_MAX_8250	21	/* max port ID */
++#define PORT_LPC3220	22	/* NXP LPC32xx SoC "Standard" UART */
++#define PORT_MAX_8250	22	/* max port ID */
+ 
+ /*
+  * ARM specific type numbers.  These are not currently guaranteed
