@@ -1,82 +1,232 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 16:44:35 -0600
-Subject: [PATCH] ARM: dt: tegra: rename board files to match SoC
-Message-ID: <1339454675-927-1-git-send-email-swarren@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Jun 2012 17:59:09 -0500
+Subject: [PATCH v5 10/14] ARM: OMAP2+: gpmc: waitpin helper
+In-Reply-To: <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
+Message-ID: <4FD6783D.9030208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
 
-Most ARM ${board}.dts files are already named ${soc}-${board}.dts. This
-change modifies the Tegra board files to be named the same way for
-consistency.
+On 06/11/2012 09:27 AM, Afzal Mohammed wrote:
+> Helper for configuring waitpin. There are two parts to it;
+> configuring at CS level and the other at device level.
+> A device embedding multiple CS has been provided the
+> capability to use same waitpin (different waitpins has not
+> been supported as presently there are no GPMC peripherals
+> doing so)
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c             |  122 ++++++++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/gpmc.h |    9 +++
+>  2 files changed, 131 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 5a6f708..9073a8a 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -75,6 +75,8 @@
+>  #define	GPMC_CONFIG6_CYCLE2CYCLEDIFFCSEN	BIT(6)
+>  #define	GPMC_CONFIG6_CYCLE2CYCLESAMECSEN	BIT(7)
+>  
+> +#define	GPMC_CONFIG_WAITPIN_POLARITY_SHIFT	0x8
+> +
+>  #define GPMC_CS0_OFFSET		0x60
+>  #define GPMC_CS_SIZE		0x30
+>  
+> @@ -93,6 +95,19 @@
+>   */
+>  #define	GPMC_NR_IRQ		2
+>  
+> +enum {
+> +	GPMC_WAITPIN_IDX0,
+> +	GPMC_WAITPIN_IDX1,
+> +	GPMC_WAITPIN_IDX2,
+> +	GPMC_WAITPIN_IDX3,
+> +	GPMC_NR_WAITPIN
+> +};
 
-Once a related change is made in U-Boot, this will cause both U-Boot and
-the kernel to use the same names for the .dts files and SoC identifiers,
-thus allowing U-Boot's recently added "soc" and "board" environment
-variables to be used to construct the name of Tegra .dtb files, and hence
-allow board-generic U-Boot bootcmd scripts to be written.
+Max number of wait pins is 3 for omap4/5. I know that we discussed this
+in the past, but are you not supporting these devices are the moment? I
+know that you have not done the hwmod for these, but still I was hoping
+that you would take these into account.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- .../dts/{tegra-harmony.dts => tegra20-harmony.dts} |    0
- .../dts/{tegra-paz00.dts => tegra20-paz00.dts}     |    0
- .../{tegra-seaboard.dts => tegra20-seaboard.dts}   |    0
- .../{tegra-trimslice.dts => tegra20-trimslice.dts} |    0
- .../dts/{tegra-ventana.dts => tegra20-ventana.dts} |    0
- .../dts/{tegra-cardhu.dts => tegra30-cardhu.dts}   |    0
- arch/arm/mach-tegra/Makefile.boot                  |   12 ++++++------
- 7 files changed, 6 insertions(+), 6 deletions(-)
- rename arch/arm/boot/dts/{tegra-harmony.dts => tegra20-harmony.dts} (100%)
- rename arch/arm/boot/dts/{tegra-paz00.dts => tegra20-paz00.dts} (100%)
- rename arch/arm/boot/dts/{tegra-seaboard.dts => tegra20-seaboard.dts} (100%)
- rename arch/arm/boot/dts/{tegra-trimslice.dts => tegra20-trimslice.dts} (100%)
- rename arch/arm/boot/dts/{tegra-ventana.dts => tegra20-ventana.dts} (100%)
- rename arch/arm/boot/dts/{tegra-cardhu.dts => tegra30-cardhu.dts} (100%)
+> +
+> +enum {
+> +	LOW,
+> +	HIGH
+> +};
 
-diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-harmony.dts
-rename to arch/arm/boot/dts/tegra20-harmony.dts
-diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-paz00.dts
-rename to arch/arm/boot/dts/tegra20-paz00.dts
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-seaboard.dts
-rename to arch/arm/boot/dts/tegra20-seaboard.dts
-diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-trimslice.dts
-rename to arch/arm/boot/dts/tegra20-trimslice.dts
-diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-ventana.dts
-rename to arch/arm/boot/dts/tegra20-ventana.dts
-diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra30-cardhu.dts
-similarity index 100%
-rename from arch/arm/boot/dts/tegra-cardhu.dts
-rename to arch/arm/boot/dts/tegra30-cardhu.dts
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index 9a82094..8040345 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -2,9 +2,9 @@ zreladdr-$(CONFIG_ARCH_TEGRA_2x_SOC)	+= 0x00008000
- params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
- initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
- 
--dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
--dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
--dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
--dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
--dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
--dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra-cardhu.dtb
-+dtb-$(CONFIG_MACH_HARMONY) += tegra20-harmony.dtb
-+dtb-$(CONFIG_MACH_PAZ00) += tegra20-paz00.dtb
-+dtb-$(CONFIG_MACH_SEABOARD) += tegra20-seaboard.dtb
-+dtb-$(CONFIG_MACH_TRIMSLICE) += tegra20-trimslice.dtb
-+dtb-$(CONFIG_MACH_VENTANA) += tegra20-ventana.dtb
-+dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
--- 
-1.7.0.4
+To be honest, I don't see the point in either of the above enums when
+you have the definitions at the bottom. Seems that one set of
+definitions should be enough.
+
+>  struct gpmc_client_irq	{
+>  	unsigned		irq;
+>  	u32			bitmask;
+> @@ -140,6 +155,8 @@ struct gpmc_peripheral {
+>  	struct platform_device	*pdev;
+>  };
+>  
+> +static unsigned gpmc_waitpin_map;
+> +
+>  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
+>  static struct irq_chip gpmc_irq_chip;
+>  static unsigned gpmc_irq_start;
+> @@ -1162,6 +1179,62 @@ static void gpmc_print_cs_timings(int cs)
+>  			gpmc_get_one_timing(cs, GPMC_CS_CONFIG6, 7, 7));
+>  }
+>  
+> +static int gpmc_setup_cs_waitpin(struct gpmc_peripheral *g_per, unsigned cs,
+> +							unsigned conf)
+> +{
+> +	unsigned idx;
+> +	bool polarity = 0;
+> +	u32 l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+> +
+> +	switch (conf & GPMC_WAITPIN_MASK) {
+> +	case GPMC_WAITPIN_0:
+> +		idx =  GPMC_WAITPIN_IDX0;
+
+For example, here you could have ...
+
+		idx = GPMC_WAITPIN_0 - 1;
+> +		break;
+> +	case GPMC_WAITPIN_1:
+> +		idx =  GPMC_WAITPIN_IDX1;
+> +		break;
+> +	case GPMC_WAITPIN_2:
+> +		idx =  GPMC_WAITPIN_IDX2;
+> +		break;
+> +	case GPMC_WAITPIN_3:
+> +		idx =  GPMC_WAITPIN_IDX3;
+> +		break;
+> +	/* no waitpin */
+> +	case 0:
+> +		return 0;
+> +		break;
+> +	default:
+> +		dev_err(gpmc_dev, "multiple waitpins selected on CS:%u\n", cs);
+> +		return -EINVAL;
+> +		break;
+> +	}
+> +
+> +	polarity = !!(conf & GPMC_WAITPIN_ACTIVE_HIGH);
+> +
+> +	if (g_per->have_waitpin) {
+> +		if (g_per->waitpin != idx ||
+> +				g_per->waitpin_polarity != polarity) {
+> +			dev_err(gpmc_dev, "error: conflict: waitpin %u with polarity %d on device %s.%d\n",
+> +				g_per->waitpin, g_per->waitpin_polarity,
+> +				g_per->name, g_per->id);
+> +			return -EBUSY;
+> +		}
+> +	} else {
+> +		g_per->have_waitpin = true;
+> +		g_per->waitpin = idx;
+> +		g_per->waitpin_polarity = polarity;
+> +	}
+> +
+> +	l |= conf & GPMC_CONFIG1_WAIT_WRITE_MON;
+> +	l |= conf & GPMC_CONFIG1_WAIT_READ_MON;
+> +	l &= ~GPMC_CONFIG1_WAIT_PIN_SEL_MASK;
+> +	l |= GPMC_CONFIG1_WAIT_PIN_SEL(idx);
+> +
+> +	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, l);
+> +
+> +	return 0;
+> +}
+> +
+>  static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
+>  {
+>  	return bitmask;
+> @@ -1185,6 +1258,55 @@ static __devinit int gpmc_setup_cs_irq(struct gpmc_cs_data *cs,
+>  	return n;
+>  }
+>  
+> +static inline int gpmc_waitpin_is_reserved(unsigned waitpin)
+> +{
+> +	return gpmc_waitpin_map & (0x1 << waitpin);
+> +}
+> +
+> +static inline void gpmc_reserve_waitpin(unsigned waitpin)
+> +{
+> +	gpmc_waitpin_map &= ~(0x1 << waitpin);
+> +	gpmc_waitpin_map |= (0x1 << waitpin);
+> +}
+> +
+> +static int gpmc_waitpin_request(unsigned waitpin)
+> +{
+> +	if (!(waitpin < GPMC_NR_WAITPIN))
+> +		return -ENODEV;
+> +
+> +	if (gpmc_waitpin_is_reserved(waitpin))
+> +		return -EBUSY;
+> +	else
+> +		gpmc_reserve_waitpin(waitpin);
+> +
+> +	return 0;
+> +}
+> +
+> +static int gpmc_setup_waitpin(struct gpmc_peripheral *g_per)
+> +{
+> +	int ret;
+> +	u32 l, shift;
+> +
+> +	if (!g_per->have_waitpin)
+> +		return 0;
+> +
+> +	ret = gpmc_waitpin_request(g_per->waitpin);
+> +	if (IS_ERR_VALUE(ret)) {
+> +		dev_err(gpmc_dev, "waitpin %u reserved\n", g_per->waitpin);
+> +		return ret;
+> +	}
+> +
+> +	l = gpmc_read_reg(GPMC_CONFIG);
+> +	shift = g_per->waitpin + GPMC_CONFIG_WAITPIN_POLARITY_SHIFT;
+> +	if (g_per->waitpin_polarity == HIGH)
+> +		l |= 1 << shift;
+> +	else
+> +		l &= ~(1 << shift);
+> +	gpmc_write_reg(GPMC_CONFIG, l);
+
+Looks like another good place for a _gpmc_cs_set_bit() function.
+
+Jon
+
+> +
+> +	return 0;
+> +}
+> +
+>  static __devinit int gpmc_probe(struct platform_device *pdev)
+>  {
+>  	u32 l;
+> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
+> index ff3f32c..e1b130c 100644
+> --- a/arch/arm/plat-omap/include/plat/gpmc.h
+> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
+> @@ -64,6 +64,7 @@
+>  #define GPMC_CONFIG1_WAIT_WRITE_MON     (1 << 21)
+>  #define GPMC_CONFIG1_WAIT_MON_IIME(val) ((val & 3) << 18)
+>  #define GPMC_CONFIG1_WAIT_PIN_SEL(val)  ((val & 3) << 16)
+> +#define	GPMC_CONFIG1_WAIT_PIN_SEL_MASK	GPMC_CONFIG1_WAIT_PIN_SEL(3)
+>  #define GPMC_CONFIG1_DEVICESIZE(val)    ((val & 3) << 12)
+>  #define	GPMC_CONFIG1_DEVICESIZE_8	GPMC_CONFIG1_DEVICESIZE(0)
+>  #define GPMC_CONFIG1_DEVICESIZE_16      GPMC_CONFIG1_DEVICESIZE(1)
+> @@ -78,6 +79,14 @@
+>  #define GPMC_CONFIG1_FCLK_DIV4          (GPMC_CONFIG1_FCLK_DIV(3))
+>  #define GPMC_CONFIG7_CSVALID		(1 << 6)
+>  
+> +#define	GPMC_WAITPIN_ACTIVE_HIGH	(1 << 4)
+> +#define	GPMC_WAITPIN_ACTIVE_LOW		(0 << 4)
+> +#define	GPMC_WAITPIN_0			(1 << 0)
+> +#define	GPMC_WAITPIN_1			(1 << 1)
+> +#define	GPMC_WAITPIN_2			(1 << 2)
+> +#define	GPMC_WAITPIN_3			(1 << 3)
+> +#define	GPMC_WAITPIN_MASK		(GPMC_WAITPIN_0 | GPMC_WAITPIN_1 | \
+> +					GPMC_WAITPIN_2 | GPMC_WAITPIN_3)
+>  #define GPMC_DEVICETYPE_NOR		0
+>  #define GPMC_DEVICETYPE_NAND		2
+>  #define GPMC_CONFIG_WRITEPROTECT	0x00000010
