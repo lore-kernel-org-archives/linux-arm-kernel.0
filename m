@@ -1,53 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jun 2012 18:15:39 +0200
-Subject: [GIT PULL] Nomadik updates
-Message-ID: <CACRpkdZtT72EoZTZzu2Ww7Z0CwzdV6EXp_UT+aMeKknSFzKt7g@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 11 Jun 2012 10:20:02 -0600 (MDT)
+Subject: [PATCH 04/11] ARM: OMAP2+: usb_host_fs: add custom reset for
+ usb_host_fs (fsusb)
+In-Reply-To: <4FD5B951.7010607@ti.com>
+References: <20120607073112.GX12766@atomide.com>
+ <alpine.DEB.2.00.1206070136550.6684@utopia.booyaka.com>
+ <20120607075158.GZ12766@atomide.com> <20120607075541.GF16342@arwen.pp.htv.fi>
+ <4FD0602B.9070704@ti.com>
+ <alpine.DEB.2.00.1206070446070.6684@utopia.booyaka.com>
+ <4FD09EFA.20304@ti.com>
+ <alpine.DEB.2.00.1206071657160.14977@utopia.booyaka.com>
+ <4FD1FA8C.1080600@ti.com>
+ <alpine.DEB.2.00.1206080722040.14977@utopia.booyaka.com>
+ <20120611061546.GQ12766@atomide.com>
+ <alpine.DEB.2.00.1206110154170.16974@utopia.booyaka.com>
+ <4FD5B951.7010607@ti.com>
+Message-ID: <alpine.DEB.2.00.1206111011230.5849@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Mon, 11 Jun 2012, Cousson, Benoit wrote:
 
-could you please pull these Nomadik updates to the ARM SoC tree for
-testing in -next. All patches have been reviewed and ACKed. This
-alters Nomadik so we:
-- Get rid of statically declared devices
-- Support PL031 RTC
-- Support MMC/SD card
-- Convert to use common/generic clock
-- Register the full set of I2C devices on the board
-- Bump IRQs by one avoiding to use IRQ 0 which is now NO_IRQ
+> On 6/11/2012 10:04 AM, Paul Walmsley wrote:
+> 
+> > But if the IP blocks are reset later, and the bootloader or previous OS
+> > gets some register settings wrong, there's a greater risk of system
+> > instability or unpredictable behavior during the boot process.
+> 
+> Mmm, I'm not convince by that. If we delay the PM init at the very last 
+> time, at least after the modules are properly reset and init, I do not 
+> think we will have more issues than today.
 
-The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+My intent was not to convince, but to explain.
 
-  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+Certainly back in the OMAP3 days there were bootloaders that got SDRAM and 
+GPMC timings wrong.  No way did I want to be chasing down kernel "bugs" 
+based on those.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-nomadik-for-arm-soc
+Anyway, once people finish fixing the drivers, then we should be able to 
+switch to late hwmod reset.
 
-Linus Walleij (8):
-      ARM: nomadik: register GPIOs dynamically
-      ARM: nomadik: register AMBA devices dynamically
-      ARM: nomadik: register PL031 RTC
-      ARM: nomadik: convert to generic clock
-      ARM: nomadik: register all three I2C busses
-      ARM: nomadik: register the I2C devices
-      ARM: nomadik: register the MMC/SD device
-      ARM: nomadik: bump all IRQ numbers by one
 
- arch/arm/Kconfig                          |    2 +-
- arch/arm/mach-nomadik/Makefile            |    2 -
- arch/arm/mach-nomadik/board-nhk8815.c     |   67 +++++++++++++---
- arch/arm/mach-nomadik/clock.c             |   75 -----------------
- arch/arm/mach-nomadik/clock.h             |   15 ----
- arch/arm/mach-nomadik/cpu-8815.c          |  126 ++++++++++++-----------------
- arch/arm/mach-nomadik/i2c-8815nhk.c       |   38 +++++++--
- arch/arm/mach-nomadik/include/mach/irqs.h |   85 ++++++++++----------
- drivers/clk/Makefile                      |    1 +
- drivers/clk/clk-nomadik.c                 |   47 +++++++++++
- include/linux/platform_data/clk-nomadik.h |    2 +
- 11 files changed, 230 insertions(+), 230 deletions(-)
- delete mode 100644 arch/arm/mach-nomadik/clock.c
- delete mode 100644 arch/arm/mach-nomadik/clock.h
- create mode 100644 drivers/clk/clk-nomadik.c
- create mode 100644 include/linux/platform_data/clk-nomadik.h
+- Paul
