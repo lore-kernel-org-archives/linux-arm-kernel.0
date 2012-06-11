@@ -1,65 +1,86 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jun 2012 15:33:04 -0600
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4FD66410.7090001@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Jun 2012 23:33:10 +0200
+Subject: [PATCH 08/14] mfd: Add IRQ domain support for the AB8500
+In-Reply-To: <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaZ1OZdaqo=_YvQpyYazpcmhLT8QF4jz1WUQMSAsTM8Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> This commit adds support for instantiating the Tegra PCIe controller
-> from a device tree.
+On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
+> As the AB8500 is an IRQ controller in its own right, here we provide
+> the AB8500 driver with IRQ domain support. This is required if we wish
+> to reference any of its IRQs from a platform's Device Tree.
 
-Can we please name this nvidia,tegra20-pcie.txt to match the naming of
-all the other Tegra bindings.
+OK..
 
-> +Required properties:
-> +- compatible: "nvidia,tegra20-pcie"
-> +- reg: physical base address and length of the controller's registers
+> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+(...)
+> -static int ab8500_irq_init(struct ab8500 *ab8500)
+> +/**
+> + * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
+> + *
+> + * Useful for drivers to request their own IRQs.
 
-Since there's more than one range now, that should specify how many
-entries are required and what they represent.
+Check style against Documentation/kernel-doc-nano-HOWTO.txt
+verbos explanation follows argument documentation.
 
-> +Optional properties:
-> +- pex-clk-supply: supply voltage for internal reference clock
-> +- vdd-supply: power supply for controller (1.05V)
+> + *
+> + * @ab8500: ab8500_irq controller to operate on.
+> + * @irq: index of the interrupt requested in the chip IRQs
+> + */
+> +int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
+> ?{
+> - ? ? ? int base = ab8500->irq_base;
+> - ? ? ? int irq;
+> - ? ? ? int num_irqs;
+> + ? ? ? if (!ab8500)
+> + ? ? ? ? ? ? ? return -EINVAL;
+>
+> - ? ? ? if (is_ab9540(ab8500))
+> - ? ? ? ? ? ? ? num_irqs = AB9540_NR_IRQS;
+> - ? ? ? else if (is_ab8505(ab8500))
+> - ? ? ? ? ? ? ? num_irqs = AB8505_NR_IRQS;
+> - ? ? ? else
+> - ? ? ? ? ? ? ? num_irqs = AB8500_NR_IRQS;
+> + ? ? ? return irq_create_mapping(ab8500->domain, irq);
+> +}
+> +EXPORT_SYMBOL_GPL(ab8500_irq_get_virq);
+(...)
+> @@ -1233,11 +1256,9 @@ static int __devinit ab8500_probe(struct platform_device *pdev)
+>
+> ? ? ? ?if (plat)
+> ? ? ? ? ? ? ? ?ab8500->irq_base = plat->irq_base;
+> - ? ? ? else if (np)
+> - ? ? ? ? ? ? ? ret = of_property_read_u32(np, "stericsson,irq-base", &ab8500->irq_base);
 
-Those shouldn't be optional. If the board has no regulator, the board's
-.dts should provide a fixed always-on regulator that those properties
-can refer to, so that the driver can always get() those regulators.
+So if we're not using the irq base thing anymore, should you also
+delete it from the binding document too? (If there is no binding
+doc something is wrong and you need to create it I guess...)
 
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+> index 91dd3ef..48f126c 100644
+> --- a/include/linux/mfd/abx500/ab8500.h
+> +++ b/include/linux/mfd/abx500/ab8500.h
+> @@ -227,6 +227,7 @@ enum ab8500_version {
+> ?* @irq_lock: genirq bus lock
+> ?* @transfer_ongoing: 0 if no transfer ongoing
+> ?* @irq: irq line
+> + * @irq_domain: irq domain
+> ?* @version: chip version id (e.g. ab8500 or ab9540)
+> ?* @chip_id: chip revision id
+> ?* @write: register write
+> @@ -247,6 +248,7 @@ struct ab8500 {
+> ? ? ? ?atomic_t ? ? ? ?transfer_ongoing;
+> ? ? ? ?int ? ? ? ? ? ? irq_base;
+> ? ? ? ?int ? ? ? ? ? ? irq;
+> + ? ? ? struct irq_domain ?*domain;
 
-> +	pci {
-...
-> +		status = "disable";
+Don't you need to forward-declare struct irq_domain?
+I think you're just lucky to have it compiling... (Something
+else included  <linux/irqdomain.h> on the way here.)
 
-That should be "disabled"; sorry for providing a bad example.
-
-> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-
-> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct platform_device *pdev)
-
-> +	if (of_find_property(node, "vdd-supply", NULL)) {
-
-As mentioned above, that if statement should be removed, since the
-regulators shouldn't be optional.
-
-> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
-
-Those could be devm_regulator_get(). Then tegra_pcie_remove() wouldn't
-have to put() them.
-
-> +	for (i = 0; i < TEGRA_PCIE_MAX_PORTS; i++)
-> +		pdata->enable_ports[i] = true;
-
-Shouldn't the DT indicate which ports are used? I assume there's some
-reason that the existing driver allows that to be configured, rather
-than always enabling all ports. At least, enumeration time wasted on
-non-existent ports springs to mind, and perhaps attempting to enable
-port 1 when port 0 is x4 and using all the lanes would cause errors in
-port 0?
+Yours,
+Linus Walleij
