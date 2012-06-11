@@ -1,44 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Jun 2012 09:44:41 -0700
-Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
-In-Reply-To: <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
-References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
- <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
-Message-ID: <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 11 Jun 2012 18:47:03 +0200
+Subject: [PATCH 0/2] ARM: OMAP2+: Fix errors in PRCM hwmods + wrong clkdm
+Message-ID: <1339433225-30042-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-On Sun, Jun 10, 2012 at 9:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Arnd, Olof,
->
-> Here are a couple of imx6q clk patches missed from Sascha's
-> imx-common-clk-fixes pull-request. ?So I rebase them on arm-soc/fixes
-> (they depends on one patch in Sascha's pull-request) and send them
-> here. ?Please pull. ?Thanks.
->
-> Regards,
-> Shawn
->
-> The following changes since commit f9c15a1b7d60b69f42b2808140a4713808a3bec1:
->
-> ?Merge tag 'omap-fixes-for-v3.5-rc1' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
-> fixes (2012-06-08 00:43:39 -0700)
->
-> are available in the git repository at:
->
-> ?git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fixes-for-3.5
->
-> Shawn Guo (2):
-> ? ? ?ARM: imx6q: remove unneeded clkdev lookups
+Here is the serie to fix wrong clkdm for the PRCM hwmods.
 
-This is looking more like a cleanup, if it is, please hold off until
-3.6. If it isn't please explain in the commit message what bug it
-fixes.
+I did revert as well the patch to make the cm_clkdm and prm_clkdm
+common since it does not exist on OMAP4.
+I do not thinks it exists in OMAP2 and 3 either, and thus that series should
+probably be extended with the total removal of these fake clkdm.
+I'd like to get your feedback first on this one to go further for OMAP2 & 3.
+
+This series is based on 3.5-rc2 and should target -rc3.
+
+Regards,
+Benoit
 
 
-Thanks!
+Benoit Cousson (2):
+  ARM: OMAP2+: hwmod data: Fix the wrong clkdm assigned to PRCM modules
+  Revert "ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common"
 
--Olof
+ arch/arm/mach-omap2/Makefile                     |    1 -
+ arch/arm/mach-omap2/clockdomain44xx.c            |    6 ---
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10 ++++
+ arch/arm/mach-omap2/clockdomains44xx_data.c      |    2 -
+ arch/arm/mach-omap2/clockdomains_common_data.c   |   24 ----------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c       |   52 +++++++++++-----------
+ 6 files changed, 36 insertions(+), 59 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
