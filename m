@@ -1,121 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Jun 2012 07:49:17 -0500
-Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
- DT boards
-In-Reply-To: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
-References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
-Message-ID: <4FD5E94D.1010700@gmail.com>
+From: zkabelac@redhat.com (Zdenek Kabelac)
+Date: Mon, 11 Jun 2012 15:04:14 +0200
+Subject: Kernel 3.4 error on Dreamplug: [vectors]: mlock failed: Cannot
+ allocate memory
+In-Reply-To: <20120610201625.GA26603@schnuecks.de>
+References: <1338401183.22894.11.camel@hactar>
+ <20120610201625.GA26603@schnuecks.de>
+Message-ID: <4FD5ECCE.2050403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2012 05:31 AM, Andrew Lunn wrote:
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  .../devicetree/bindings/arm/mrvl/intc.txt          |   20 ++++++++++++++++++
->  arch/arm/boot/dts/kirkwood.dtsi                    |    9 ++++++++
->  arch/arm/mach-kirkwood/board-dt.c                  |   22 +++++++++++++++++++-
->  3 files changed, 50 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-> index 80b9a94..612536e 100644
-> --- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-> +++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
-> @@ -38,3 +38,23 @@ Example:
->  		reg-names = "mux status", "mux mask";
->  		mrvl,intc-nr-irqs = <2>;
->  	};
-> +
-> +* Marvell Orion Interrupt controller
-> +
-> +Required properties
-> +- compatible :  Should be "marvell,orion-intc"
-> +- #interrupt-cells: Specifies the number of cells needed to encode an
-> +  interrupt source. Supported value is <1>
-> +- interrupt-controller : So that its clear its an interrupt controller.
-> +Optional properties
-> +- reg : Not used yet, but will contain the interrupt mask address
-> +
-> +Example:
-> +
-> +	intc: interrupt-controller {
-> +        	compatible = "marvell,orion-intc", "marvell,intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +                reg = <0xfed20204 0x04>,
-> +		      <0xfed20214 0x04>;
-> +        };
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 926528b..8eab7c4 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -2,6 +2,15 @@
->  
->  / {
->  	compatible = "mrvl,kirkwood";
-> +	interrupt-parent = <&intc>;
-> +
-> +	intc: interrupt-controller {
-> +        	compatible = "marvell,orion-intc", "marvell,intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +                reg = <0xfed20204 0x04>,
-> +		      <0xfed20214 0x04>;
-> +        };
->  
->  	ocp at f1000000 {
->  		compatible = "simple-bus";
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index edc3f8a..fa51586 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -14,6 +14,7 @@
->  #include <linux/init.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/of_irq.h>
->  #include <linux/kexec.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -80,11 +81,30 @@ static const char *kirkwood_dt_board_compat[] = {
->  	NULL
->  };
->  
-> +static int __init kirkwood_add_irq_domain(struct device_node *np,
-> +					  struct device_node *interrupt_parent)
-> +{
-> +	kirkwood_init_irq();
-> +	irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
+Dne 10.6.2012 22:16, Simon Baatz napsal(a):
+> Hi,
+>
+> [cross posted to linux-lvm, because I think it is a lvm problem]
+>
+> On Wed, May 30, 2012 at 03:06:23PM -0300, Thiago Jung Bauermann wrote:
+>> I have just upgraded my Dreamplug to the 3.4 kernel, and when creating
+>> an LVM snapshot volume, I see errors for which I didn't find any report
+>> yet:
+>>
+>> # lvcreate -s -L 80M -n root-fsck-snapshot marv2-vg/root
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: mlock failed: Cannot allocate memory
+>>    ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]: munlock failed: Cannot allocate memory
+>>    Logical volume "root-fsck-snapshot" created
+>>
+>> Ironically, the main reason I upgraded the kernel from 3.0.0 was to get
+>
+> I see similar errors on an IB-NAS6210 box. Apparently, lvm2 tries to
+> mlock/munlock all readable maps it finds in "proc/self/maps", i.e
+> also the "[vectors]" page.  Between 3.0 and 3.4 there has been the
+> change f9d4861f "ARM: 7294/1: vectors: use gate_vma for vectors user
+> mapping", which might have changed the behaviour when mlocking
+> vectors.
+>
+> In LVM2, there is a list in lib/mm/memlock.c of maps to ignore:
+>
+> /* list of maps, that are unconditionaly ignored */
+> static const char * const _ignore_maps[] = {
+>      "[vdso]",
+>      "[vsyscall]",
+> };
+>
+> "[vdso]" seem to be based on gate_vma as well. Thus, I think
+> "[vectors]" needs to be added to this list.
+>
 
-The irqdomain should really be integrated into the interrupt controller
-itself rather than bolted on top and doesn't need to be DT only. In the
-process, use irq_data.hwirq rather than fixed Linux virq to hwirq
-conversion.
+Yep, looks like simple patch to add.
+Is there any other area which is missing ?
 
-Once all interrupts are bound using DT, a linear domain should be used.
-But that may take some time.
-
-Rob
-
-> +	return 0;
-> +}rob.herring at calxeda.com
-> +
-> +static const struct of_device_id kirkwood_irq_match[] = {
-> +	{ .compatible = "marvell,orion-intc",
-> +	  .data = kirkwood_add_irq_domain, },
-> +	{},
-> +};
-> +
-> +static void __init kirkwood_dt_init_irq(void)
-> +{
-> +	of_irq_init(kirkwood_irq_match);
-> +}
-> +
->  DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
->  	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
->  	.map_io		= kirkwood_map_io,
->  	.init_early	= kirkwood_init_early,
-> -	.init_irq	= kirkwood_init_irq,
-> +	.init_irq	= kirkwood_dt_init_irq,
->  	.timer		= &kirkwood_timer,
->  	.init_machine	= kirkwood_dt_init,
->  	.restart	= kirkwood_restart,
+Zdenek
