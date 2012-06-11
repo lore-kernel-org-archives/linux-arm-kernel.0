@@ -1,26 +1,76 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 11 Jun 2012 12:55:43 +0900
-Subject: [PATCH 00/08] mach-shmobile: Emma Mobile EV2 support V3
-In-Reply-To: <20120516064449.32286.77941.sendpatchset@w520>
-References: <20120516064449.32286.77941.sendpatchset@w520>
-Message-ID: <20120611035543.GD10170@linux-sh.org>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 11 Jun 2012 10:20:49 +0530
+Subject: RFC: changing DMA slave configuration API
+In-Reply-To: <20120610112217.GD11404@n2100.arm.linux.org.uk>
+References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
+ <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
+ <20120610112217.GD11404@n2100.arm.linux.org.uk>
+Message-ID: <1339390249.1927.1623.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2012 at 03:44:49PM +0900, Magnus Damm wrote:
-> mach-shmobile: Emma Mobile EV2 support V3
+On Sun, 2012-06-10 at 12:22 +0100, Russell King - ARM Linux wrote:
+> On Sun, Jun 10, 2012 at 07:19:47PM +0800, Barry Song wrote:
+> > 2012/6/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > > Dan, Vinod,
+> > >
+> > > There's a change I would like to do to the DMA slave configuration.
+> > > It's currently a pain to have the source and destination parameters in
+> > > the dma_slave_config structure as separate elements; it means when you
+> > > want to extract them, you end up with code in DMA engine drivers like:
+> > >
+> > > +       if (dir == DMA_DEV_TO_MEM) {
+> > > +               dev_addr = c->src_addr;
+> > > +               dev_width = c->src_addr_width;
+> > > +               burst = c->src_maxburst;
+> > > +       } else if (dir == DMA_MEM_TO_DEV) {
+> > > +               dev_addr = c->dst_addr;
+> > > +               dev_width = c->dst_addr_width;
+> > > +               burst = c->dst_maxburst;
+> > > +       }
+> > >
+> > > If we redefine the structure as below, this all becomes more simple:
+> > >
+> > > +       if (dir == DMA_DEV_TO_MEM)
+> > > +               cfg = &c->dev_src;
+> > > +       else if (dir == DMA_MEM_TO_DEV)
+> > > +               cfg = &c->dev_dst;
+> > 
+> > it seems that might mean an union in your dma_slave_cfg, but not
+> > co-exitense of both?
 > 
-> [PATCH 01/08] mach-shmobile: Emma Mobile EV2 SoC base support V3
-> [PATCH 02/08] ARM: Undelete KZM9D mach-type V3
-> [PATCH 03/08] mach-shmobile: KZM9D board support V3
-> [PATCH 04/08] mach-shmobile: Emma Mobile EV2 SMP support V3
-> [PATCH 05/08] mach-shmobile: Emma Mobile EV2 GPIO support V3
-> [PATCH 06/08] mach-shmobile: KZM9D board Ethernet support V3
-> [PATCH 07/08] mach-shmobile: Emma Mobile EV2 DT support V3
-> [PATCH 08/08] mach-shmobile: Use DT_MACHINE for KZM9D V3
+> No, I want both so it's possible to select between the two when preparing
+> a DMA slave transfer.
 > 
-Now that this series has hit mainline I notice that no defconfig is
-available for the board, so there's no way to have any coverage in it in
--next. When we're at a point where multiple boards are enabled in one
-config then they can be consolidated, but it's not acceptable to have a
-platform upstream that people have no way of building.
+> > struct dma_slave_cfg {
+> > +       union {
+> >               struct dma_dev_cfg dev_src;
+> >               struct dma_dev_cfg dev_dst;
+> >        }
+> >        bool device_fc;
+> > };
+> 
+> If you do that, the union becomes pointless, and you might as well have:
+> 
+> struct dma_slave_cfg {
+> 	struct dma_dev_cfg dev;
+> 	bool device_fc;
+> };
+> 
+> instead.
+Hi Russell,
+
+I think it is a good idea. And I would like to extend it even a little
+bit. Do we have any users of peripheral to peripheral slave dma?
+IIRC  that is not the case, or does anyone know of existence or plans
+for such a h/w?
+
+If not, lets junk the src/dst fields and keep burst, length, addr fields
+which point to the peripheral values.
+
+Alternatively if we need both, then we can't have union and Russell's
+idea seems good one :)
+
+
+-- 
+~Vinod
