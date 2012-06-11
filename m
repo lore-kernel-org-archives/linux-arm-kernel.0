@@ -1,54 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 11 Jun 2012 10:16:21 +0200
-Subject: [PATCH][RFC] mm: Don't put CMA pages on per-cpu lists
-In-Reply-To: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
-References: <1338924421-7942-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <039901cd47aa$7e846270$7b8d2750$%szyprowski@samsung.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Mon, 11 Jun 2012 13:48:52 +0530
+Subject: [PATCH] ARM: kprobes: run t32_simulate_ldr_literal() without insn slot
+Message-ID: <1339402732-20849-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+t32_simulate_ldr_literal() can be run without an instruction slot, so it
+should be using DECODE_SIMULATEX instead of DECODE_EMULATEX.
 
-On Tuesday, June 05, 2012 9:27 PM Laura Abbott wrote:
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/kernel/kprobes-thumb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Currently, when freeing 0 order pages, CMA pages are treated
-> the same as regular movable pages, which means they end up
-> on the per-cpu page list. This means that the CMA pages are
-> likely to be allocated for something other than contigous
-> memory. This increases the chance that the next alloc_contig_range
-> will fail because pages can't be migrated.
-> 
-> Given the size of the CMA region is typically limited, it is best to
-> optimize for success of alloc_contig_range as much as possible.
-> Do this by freeing CMA pages directly instead of putting them
-> on the per-cpu page lists.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  mm/page_alloc.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 0e1c6f5..c9a6483 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1310,7 +1310,8 @@ void free_hot_cold_page(struct page *page, int cold)
->  	 * excessively into the page allocator
->  	 */
->  	if (migratetype >= MIGRATE_PCPTYPES) {
-> -		if (unlikely(migratetype == MIGRATE_ISOLATE)) {
-> +		if (unlikely(migratetype == MIGRATE_ISOLATE)
-> +		   || is_migrate_cma(migratetype)) {
->  			free_one_page(zone, page, 0, migratetype);
->  			goto out;
->  		}
-> --
-
-Well this patch has some side effects, in some cases it might force kernel to consume regular
-movable pages which should be left as a fallback for critical non-movable allocations. Do you
-have any statistics for the change introduced by this patch?
-
-Best regards
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index 8f96ec7..6123daf 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -660,7 +660,7 @@ static const union decode_item t32_table_1111_100x[] = {
+ 	/* LDRSB (literal)	1111 1001 x001 1111 xxxx xxxx xxxx xxxx */
+ 	/* LDRH (literal)	1111 1000 x011 1111 xxxx xxxx xxxx xxxx */
+ 	/* LDRSH (literal)	1111 1001 x011 1111 xxxx xxxx xxxx xxxx */
+-	DECODE_EMULATEX	(0xfe5f0000, 0xf81f0000, t32_simulate_ldr_literal,
++	DECODE_SIMULATEX(0xfe5f0000, 0xf81f0000, t32_simulate_ldr_literal,
+ 						 REGS(PC, NOSPPCX, 0, 0, 0)),
+ 
+ 	/* STRB (immediate)	1111 1000 0000 xxxx xxxx 1xxx xxxx xxxx */
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.9.5
