@@ -1,10 +1,9 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 Jun 2012 18:53:02 +0200
-Subject: [PATCH v2 5/8] arm: mach-mvebu: add documentation for new device tree
- bindings
+Date: Mon, 11 Jun 2012 18:53:04 +0200
+Subject: [PATCH v2 7/8] arm: mach-mvebu: add entry to MAINTAINERS
 In-Reply-To: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1339433585-28087-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1339433585-28087-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,89 +11,27 @@ Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- .../devicetree/bindings/arm/armada_370_xp-mpic.txt |   23 +++++++++++++++++++
- .../bindings/arm/armada_370_xp-timer.txt           |   11 +++++++++
- .../devicetree/bindings/arm/armada_370_xp.txt      |   24 ++++++++++++++++++++
- 3 files changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt
- create mode 100644 Documentation/devicetree/bindings/arm/armada_370_xp.txt
+ MAINTAINERS |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt b/Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt
-new file mode 100644
-index 0000000..70c0dc5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada_370_xp-mpic.txt
-@@ -0,0 +1,23 @@
-+Marvell Armada 370 and Armada XP Interrupt Controller
-+-----------------------------------------------------
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 55f0fda..afd1673f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -894,6 +894,14 @@ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
+ 
++ARM/Marvell Armada 370 and Armada XP SOC support
++M:	Gregory Clement <gregory.clement@free-electrons.com>
++M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++M:	Lior Amsalem <alior@marvell.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-mvebu/
 +
-+Required properties:
-+- compatible: Should be "marvell,mpic"
-+- interrupt-controller: Identifies the node as an interrupt controller.
-+- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
-+  The cell is the IRQ number
-+- reg: Should contain PMIC registers location and length. First pair
-+  for the main interrupt registers, second pair for the per-CPU
-+  interrupt registers
-+
-+Example:
-+
-+        mpic: interrupt-controller at d0020000 {
-+              compatible = "marvell,mpic";
-+              #interrupt-cells = <1>;
-+              #address-cells = <1>;
-+              #size-cells = <1>;
-+              interrupt-controller;
-+              reg = <0xd0020000 0x1000>,
-+                    <0xd0021000 0x1000>;
-+        };
-diff --git a/Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt b/Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt
-new file mode 100644
-index 0000000..d14dc7f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada_370_xp-timer.txt
-@@ -0,0 +1,11 @@
-+Marvell Armada 370 and Armada XP Global Timers
-+----------------------------------------------
-+
-+Required properties:
-+- compatible: Should be "marvell,timer"
-+- interrupts: Should contain the list of Global Timer interrupts
-+- reg: Should contain the base address of the Global Timer registers
-+
-+Optional properties:
-+- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-+  Mhz fixed mode (available on Armada XP and not on Armada 370)
-diff --git a/Documentation/devicetree/bindings/arm/armada_370_xp.txt b/Documentation/devicetree/bindings/arm/armada_370_xp.txt
-new file mode 100644
-index 0000000..3cdd793
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada_370_xp.txt
-@@ -0,0 +1,24 @@
-+Marvell Armada 370 and Armada XP Platforms Device Tree Bindings
-+---------------------------------------------------------------
-+
-+Boards with a SoC of the Marvell Armada 370 and Armada XP families
-+shall have the following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada_370_xp"
-+
-+In addition, boards using the Marvell Armada 370 SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada370"
-+
-+In addition, boards using the Marvell Armada XP SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armadaxp"
-+
+ ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
 -- 
 1.7.9.5
