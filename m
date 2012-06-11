@@ -1,101 +1,72 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jun 2012 18:46:08 -0600
-Subject: [PATCHv2 05/12] ARM: OMAP2+: hwmod: add setup_preprogram hook
+Date: Sun, 10 Jun 2012 18:46:11 -0600
+Subject: [PATCHv2 06/12] ARM: OMAP2+: hwmod: add flag to prevent hwmod code
+ from touching IP block during init
 In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
 References: <20120611004502.20034.8840.stgit@dusk>
-Message-ID: <20120611004605.20034.37067.stgit@dusk>
+Message-ID: <20120611004608.20034.55965.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After reset, some IP blocks cannot indicate to the PRCM that they are
-inactive until they are configured.  Some examples on OMAP4 include
-the AESS and FSUSB IP blocks.
+Add HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
+dependent on an off-chip functional clock that is not guaranteed to be
+present during initialization.  IP blocks marked with this flag are
+left in the INITIALIZED state during kernel init.
 
-To fix this cleanly, this patch adds another optional function
-pointer, setup_preprogram, to the IP block's hwmod data.  The function
-that is pointed to is called by the hwmod code immediately after the
-IP block is reset.
+This is a workaround for a hardware problem.  It should be possible to
+guarantee that at least one clock source will be present and active
+for any IP block's main functional clock.  This ensures that the hwmod
+code can enable and reset the IP block.  Resetting the IP block during
+kernel init prevents any bogus bootloader, ROM code, or previous OS
+configuration from affecting the kernel.  Hopefully a clock
+multiplexer can be added on future SoCs.
+
+N.B., at some point in the future, it should be possible to query the
+clock framework for this type of information.  Then this flag should
+no longer be needed.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   21 ++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 +++++++++
- 2 files changed, 29 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
+ 2 files changed, 9 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 2d1111d..d27bf48 100644
+index d27bf48..e0b8131 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2108,6 +2108,23 @@ static void __init _setup_iclk_autoidle(struct omap_hwmod *oh)
- }
+@@ -2140,6 +2140,9 @@ static int __init _setup_reset(struct omap_hwmod *oh)
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
+ 		return -EINVAL;
  
- /**
-+ * _setup_preprogram - Pre-program an IP block during the _setup() process
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Some IP blocks (such as AESS) require some additional programming
-+ * after reset before they can enter idle.  If a function pointer to
-+ * do so is present in the hwmod data, then call it and pass along the
-+ * return value; otherwise, return 0.
-+ */
-+static int __init _setup_preprogram(struct omap_hwmod *oh)
-+{
-+	if (!oh->class->setup_preprogram)
-+		return 0;
++	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
++		return -EPERM;
 +
-+	return oh->class->setup_preprogram(oh);
-+}
-+
-+/**
-  * _setup_reset - reset an IP block during the setup process
-  * @oh: struct omap_hwmod *
-  *
-@@ -2229,8 +2246,10 @@ static int __init _setup(struct omap_hwmod *oh, void *data)
- 
- 	_setup_iclk_autoidle(oh);
- 
--	if (!_setup_reset(oh))
-+	if (!_setup_reset(oh)) {
-+		_setup_preprogram(oh);
- 		_setup_postsetup(oh);
-+	}
- 
- 	return 0;
- }
+ 	if (oh->rst_lines_cnt == 0) {
+ 		r = _enable(oh);
+ 		if (r) {
 diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 038c0d7..2c53648 100644
+index 2c53648..b5f3efc 100644
 --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
 +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -467,6 +467,7 @@ struct omap_hwmod_omap4_prcm {
-  * @rev: revision of the IP class
-  * @pre_shutdown: ptr to fn to be executed immediately prior to device shutdown
-  * @reset: ptr to fn to be executed in place of the standard hwmod reset fn
-+ * @setup_preprogram: ptr to fn to be executed after the reset in _setup()
-  *
-  * Represent the class of a OMAP hardware "modules" (e.g. timer,
-  * smartreflex, gpio, uart...)
-@@ -483,6 +484,13 @@ struct omap_hwmod_omap4_prcm {
-  * executed in place of the standard hwmod _reset() code in
-  * mach-omap2/omap_hwmod.c.  This is needed for IP blocks which have
-  * unusual reset sequences - usually processor IP blocks like the IVA.
-+ *
-+ * @setup_preprogram is called between the calls to _setup_reset() and
-+ * _setup_postsetup().  It is intended to be used for IP blocks that
-+ * require some initial configuration during their first
-+ * initialization.  (For example, the AESS IP block on OMAP4+ cannot
-+ * enter idle until its internal autogating bit is set.)  Most IP blocks
-+ * will not need this.
+@@ -417,6 +417,11 @@ struct omap_hwmod_omap4_prcm {
+  *     running on the chip (e.g., the MPU is in idle).  For such modules,
+  *     fine-grained PM runtime-based idle control is simply a waste of
+  *     CPU cycles.
++ * HWMOD_EXT_OPT_MAIN_CLK: The only main functional clock source for
++ *     this IP block comes from an off-chip source and is not always
++ *     enabled.  This prevents the hwmod code from being able to
++ *     enable and reset the IP block early.  XXX Eventually it should
++ *     be possible to query the clock framework for this information.
   */
- struct omap_hwmod_class {
- 	const char				*name;
-@@ -490,6 +498,7 @@ struct omap_hwmod_class {
- 	u32					rev;
- 	int					(*pre_shutdown)(struct omap_hwmod *oh);
- 	int					(*reset)(struct omap_hwmod *oh);
-+	int					(*setup_preprogram)(struct omap_hwmod *oh);
- };
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -428,6 +433,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
+ #define HWMOD_ALWAYS_FORCE_SIDLE		(1 << 9)
++#define HWMOD_EXT_OPT_MAIN_CLK			(1 << 10)
  
- /**
+ /*
+  * omap_hwmod._int_flags definitions
