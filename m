@@ -1,37 +1,23 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 11 Jun 2012 10:25:08 +0200
-Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
- pr_warn()
-In-Reply-To: <1339401793-12258-1-git-send-email-stigge@antcom.de>
-References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339403108.6001.1697.camel@edumazet-glaptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jun 2012 09:28:52 +0100
+Subject: v3.4 boot failure on qemu-system-arm -M versatilepb
+In-Reply-To: <4FD5A918.7040200@codethink.co.uk>
+References: <XNM1$5$0$1$$3$9$0$A$8005401U4fc38a01@hitachi.com>
+ <4FC52B61.2000604@gmail.com>
+ <XNM1$5$0$1$$3$9$0$A$8005413U4fc5e967@hitachi.com>
+ <XNM1$5$0$1$$3$9$0$A$8005415U4fc63e90@hitachi.com>
+ <4FD5A918.7040200@codethink.co.uk>
+Message-ID: <20120611082852.GB11168@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-06-11 at 10:03 +0200, Roland Stigge wrote:
-> A WARN() trace indicating a "BUG!" was identified as a "normal" case in the
-> xmit function in case all TX descriptors are occupied already. In this case,
-> NETDEV_TX_BUSY is returned, nothing buggy at all.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Tested-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> 
-> ---
->  drivers/net/ethernet/nxp/lpc_eth.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-2.6.orig/drivers/net/ethernet/nxp/lpc_eth.c
-> +++ linux-2.6/drivers/net/ethernet/nxp/lpc_eth.c
-> @@ -1114,7 +1114,7 @@ static int lpc_eth_hard_start_xmit(struc
->  		   buffers */
->  		netif_stop_queue(ndev);
->  		spin_unlock_irq(&pldat->lock);
-> -		WARN(1, "BUG! TX request when no free TX buffers!\n");
-> +		pr_warn("Note: TX request when no free TX buffers.\n");
->  		return NETDEV_TX_BUSY;
->  	}
->  
+On Mon, Jun 11, 2012 at 09:15:20AM +0100, Ben Dooks wrote:
+> We've seen the same problem. Limiting the __io() to the IO_SPACE_LIMIT
+> will not fix the problem as the previous code was using a 1:1 CPU to
+> PCI space view (which is why it was allocating space at 0x44000000).
+>
+> Either the __io() macro needs to add the base of PCI space, or the
+> limit needs to be restored.
 
-Entering this path is a bug, don't hide it...
-
-Please share with us how this bug was identified as a "normal case" ?
+Or the bus setup needs to be fixed to be more conventional, which is
+something I always did for the PCI platforms I had hardware for.
