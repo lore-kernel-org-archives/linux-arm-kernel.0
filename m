@@ -1,74 +1,61 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 13:49:35 -0500
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
-Message-ID: <4FD63DBF.9000200@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 11 Jun 2012 20:58:40 +0200
+Subject: [PATCH] net: lpc_eth: fix tx completion
+In-Reply-To: <1339435296.6001.2484.camel@edumazet-glaptop>
+References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
+ <1339403108.6001.1697.camel@edumazet-glaptop> <4FD5AE1D.9030807@antcom.de>
+ <1339404835.6001.1788.camel@edumazet-glaptop>
+ <1339435296.6001.2484.camel@edumazet-glaptop>
+Message-ID: <4FD63FE0.9020609@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
-
-On 06/11/2012 09:02 AM, Afzal Mohammed wrote:
-> Configure busturnaround, cycle2cycledelay, waitmonitoringtime,
-> clkactivationtime in gpmc_cs_set_timings(). This is done so
-> that boards can configure these parameters of gpmc in Kernel
-> instead of relying on bootloader.
-
-What boards have been tested with this change?
-
-Tony is going to want to know what we have tested with such changes to
-avoid any regressions.
-
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c             |    6 ++++++
->  arch/arm/plat-omap/include/plat/gpmc.h |    6 ++++++
->  2 files changed, 12 insertions(+)
+On 11/06/12 19:21, Eric Dumazet wrote:
+> From: Eric Dumazet <edumazet@google.com>
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 578fd4c..517953f 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -313,6 +313,12 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
->  
->  	GPMC_SET_ONE(GPMC_CS_CONFIG5, 24, 27, page_burst_access);
->  
-> +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 0, 3, bus_turnaround);
-> +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 8, 11, cycle2cycle_delay);
-> +
-> +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
-> +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
-> +
->  	if (cpu_is_omap34xx()) {
->  		GPMC_SET_ONE(GPMC_CS_CONFIG6, 16, 19, wr_data_mux_bus);
->  		GPMC_SET_ONE(GPMC_CS_CONFIG6, 24, 28, wr_access);
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-> index 2e6e259..802fb22 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-> @@ -128,6 +128,12 @@ struct gpmc_timings {
->  	u16 rd_cycle;		/* Total read cycle time */
->  	u16 wr_cycle;		/* Total write cycle time */
->  
-> +	u16 bus_turnaround;
-> +	u16 cycle2cycle_delay;
-> +
-> +	u16 wait_monitoring;
-> +	u16 clk_activation;
-> +
->  	/* The following are only on OMAP3430 */
->  	u16 wr_access;		/* WRACCESSTIME */
->  	u16 wr_data_mux_bus;	/* WRDATAONADMUXBUS */
+> __lpc_handle_xmit() has two bugs :
+> 
+> 1) It can leak skbs in case TXSTATUS_ERROR is set
+> 
+> 2) It can wake up txqueue while no slot was freed.
+> 
+> Signed-off-by: Eric Dumazet <edumazet@google.com>
+> Reported-by: Roland Stigge <stigge@antcom.de>
+> Tested-by: Roland Stigge <stigge@antcom.de>
+> Cc: Kevin Wells <kevin.wells@nxp.com>
 
-In general, I agree with this, but if we apply this today, it seems that
-we *may* be clearing these fields if they have been configured by the
-bootloader and hence this could introduce a regression (potentially).
+Thanks!
 
-So we ever need to test boards that this change impacts or at least
-verify that this change would not impact these boards because these
-fields have not been configured.
+Would be good for v3.5 and for stable v3.4 also.
 
-Cheers
-Jon
+> ---
+>  drivers/net/ethernet/nxp/lpc_eth.c |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
+> index 8d2666f..ff76c21 100644
+> --- a/drivers/net/ethernet/nxp/lpc_eth.c
+> +++ b/drivers/net/ethernet/nxp/lpc_eth.c
+> @@ -946,16 +946,16 @@ static void __lpc_handle_xmit(struct net_device *ndev)
+>  			/* Update stats */
+>  			ndev->stats.tx_packets++;
+>  			ndev->stats.tx_bytes += skb->len;
+> -
+> -			/* Free buffer */
+> -			dev_kfree_skb_irq(skb);
+>  		}
+> +		dev_kfree_skb_irq(skb);
+>  
+>  		txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+>  	}
+>  
+> -	if (netif_queue_stopped(ndev))
+> -		netif_wake_queue(ndev);
+> +	if (pldat->num_used_tx_buffs <= ENET_TX_DESC/2) {
+> +		if (netif_queue_stopped(ndev))
+> +			netif_wake_queue(ndev);
+> +	}
+>  }
+>  
+>  static int __lpc_handle_recv(struct net_device *ndev, int budget)
+> 
