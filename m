@@ -1,34 +1,98 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Jun 2012 16:25:00 +0100
-Subject: [PATCH 07/14] mfd: Initialise the AB8500 driver at core_initcall time
+Date: Mon, 11 Jun 2012 16:25:02 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C driver
 In-Reply-To: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1339428307-3850-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AB8500 is soon to have its own IRQ domain. For this to be useful
-the driver needs to be initialised earlier in the boot sequence. Here
-we move initialisation forward from arch_initcall to core_initcall time.
+Here we move the i2c-nomadik's default settings into the driver
+rather than specifying them from platform code. At the time of
+this writing we only have one user, the u8500. As new users are
+added, it is expected that they will be Device Tree compliant.
+If this is the case, we will look up their initialisation values
+by compatible entry, then apply them forthwith.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: linux-i2c at vger.kernel.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-nomadik.c |   40 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index dac0e29..4dc5024 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1484,7 +1484,7 @@ static void __exit ab8500_core_exit(void)
- {
- 	platform_driver_unregister(&ab8500_core_driver);
- }
--arch_initcall(ab8500_core_init);
-+core_initcall(ab8500_core_init);
- module_exit(ab8500_core_exit);
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index a92440d..1ffdf67 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of_device.h>
  
- MODULE_AUTHOR("Mattias Wallin, Srinidhi Kasagar, Rabin Vincent");
+ #include <plat/i2c.h>
+ 
+@@ -899,15 +900,51 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+ 	.functionality	= nmk_i2c_functionality
+ };
+ 
++static struct nmk_i2c_controller u8500_i2c = {
++       /*
++        * slave data setup time, which is
++        * 250 ns,100ns,10ns which is 14,6,2
++        * respectively for a 48 Mhz
++        * i2c clock
++        */
++       .slsu           = 0xe,
++       /* Tx FIFO threshold */
++       .tft            = 1,
++       /* Rx FIFO threshold */
++       .rft            = 8,
++       /* std. mode operation */
++       .clk_freq       = 100000,
++       /* Slave response timeout(ms) */
++       .timeout        = 200,
++       .sm             = I2C_FREQ_MODE_FAST,
++};
++
++
++static const struct of_device_id nmk_gpio_match[] = {
++	{ .compatible = "st,nomadik-i2c", .data = &u8500_i2c, },
++	{}
++};
++
+ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct resource *res;
+-	struct nmk_i2c_controller *pdata =
++	const struct nmk_i2c_controller *pdata =
+ 			pdev->dev.platform_data;
++        const struct of_device_id *of_id =
++                        of_match_device(nmk_gpio_match, &pdev->dev);
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
+ 
++	if (!pdata) {
++		if (of_id && of_id->data)
++			/* Looks like we're booting via Device Tree. */
++			pdata = of_id->data;
++		else
++			/* No i2c configuration found, using the default. */
++			pdata = &u8500_i2c;
++	}
++
+ 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&pdev->dev, "cannot allocate memory\n");
+@@ -1043,6 +1080,7 @@ static struct platform_driver nmk_i2c_driver = {
+ 		.owner = THIS_MODULE,
+ 		.name = DRIVER_NAME,
+ 		.pm = &nmk_i2c_pm,
++		.of_match_table = nmk_gpio_match,
+ 	},
+ 	.probe = nmk_i2c_probe,
+ 	.remove = __devexit_p(nmk_i2c_remove),
 -- 
 1.7.9.5
