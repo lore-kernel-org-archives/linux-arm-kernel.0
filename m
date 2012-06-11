@@ -1,32 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jun 2012 07:04:17 -0700
-Subject: am33xx: pin modes
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA1E6F0@DBDE01.ent.ti.com>
-References: <4FD5E268.7030105@visionsystems.de>
- <1BAFE6F6C881BF42822005164F1491C33EA1E6F0@DBDE01.ent.ti.com>
-Message-ID: <20120611140417.GC12766@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Jun 2012 15:07:43 +0100
+Subject: [PATCH 09/22] regulator: Change db8500-prcmu match names to
+ reflect Device Tree
+In-Reply-To: <4FD5F3D2.2050500@linaro.org>
+References: <1338353260-10097-1-git-send-email-lee.jones@linaro.org>
+ <1338353260-10097-10-git-send-email-lee.jones@linaro.org>
+ <4FCDDE58.5010501@linaro.org>
+ <20120605102900.GP23408@opensource.wolfsonmicro.com>
+ <4FCDE0A4.8070107@linaro.org>
+ <20120605104201.GR23408@opensource.wolfsonmicro.com>
+ <4FD5D49C.6070106@linaro.org>
+ <20120611120820.GN11439@opensource.wolfsonmicro.com>
+ <4FD5F3D2.2050500@linaro.org>
+Message-ID: <4FD5FBAF.1060002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hebbar, Gururaja <gururaja.hebbar@ti.com> [120611 06:48]:
-> On Mon, Jun 11, 2012 at 17:49:52, Yegor Yefremov wrote:
-> > I'm working with Koen's repo (https://github.com/koenkooi/linux.git) and have a question. There are two places, where pin's function is defined:
-> > 
-> > 
-> > arch/arm/mach-omap2/mux33xx.c:
-> > static struct omap_mux __initdata am33xx_muxmodes[] = {
-> > /**/    _AM33XX_MUXENTRY(GPMC_AD0, 0,
-> >                 "gpmc_ad0", "mmc1_dat0", NULL, NULL,
-> >                 NULL, NULL, NULL, "gpio1_0"),
-> > 
-> 
-> This is the big AM33XX pin mux super set table. Here, Entire Mux entries for AM335x SOC
-> are defined.
+>> Well, I guess I'll end up dulplicating the commits :/
+>
+> Duplicating them?
 
-Please note that we're moving to the generic pinctrl framework,
-and using device tree and pinctrl-single driver. So the old style
-pinmux data or board-*.c files will not get merged upstream.
+Ah, you mean that you've already sent them to -next?
 
-Regards,
+That's no problem though. Won't Git just sling them out at pull-time?
 
-Tony
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
