@@ -1,70 +1,30 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 11 Jun 2012 09:06:50 +0800
-Subject: [PATCH 3/3] mx3fb: avoid screen flash when panning with fb_set_var
-In-Reply-To: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
-References: <1339376810-8247-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1339376810-8247-3-git-send-email-Ying.Liu@freescale.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 11 Jun 2012 10:13:31 +0800
+Subject: [PATCH] serial/imx: enable the clock when we really use the uart
+ port
+In-Reply-To: <CAOMZO5DtC3yK7RgtbjefepQXk2jE+tODmivw+CC_hd5TCCe-oA@mail.gmail.com>
+References: <1335946770-17120-1-git-send-email-b32955@freescale.com>	<20120502081902.GT4141@pengutronix.de>
+ <CAOMZO5DtC3yK7RgtbjefepQXk2jE+tODmivw+CC_hd5TCCe-oA@mail.gmail.com>
+Message-ID: <4FD5544B.5090200@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Users may call FBIOPUT_VSCREENINFO ioctrl to do pan display.
-This ioctrl relies on fb_set_var() to do the job. fb_set_var()
-calls custom fb_set_par() method and then calls custom
-fb_pan_display() method. The current implementation of mx3fb
-reinitializes IPU display controller every time the custom
-fb_set_par() method is called, which makes the screen flash
-if fb_set_var() is called to do panning frequently. This patch
-compares the new var info with the cached old one to decide
-whether we really need to reinitialize IPU display controller.
-We ignore xoffset and yoffset update because it doesn't require
-to reinitialize the controller. Users may specify activate field
-of var info with FB_ACTIVATE_NOW and FB_ACTIVATE_FORCE to
-reinialize the controller by force.
+? 2012?06?11? 01:31, Fabio Estevam ??:
+> Huang,
+>
+> On Wed, May 2, 2012 at 5:19 AM, Sascha Hauer<s.hauer@pengutronix.de>  wrote:
+>> On Wed, May 02, 2012 at 04:19:30PM +0800, Huang Shijie wrote:
+>>> The current code keeps the clock enabled even when we do not really
+>>> use the uart port. But keep the clock enabled will consume some power.
+>>>
+>>> In order to save more power, disable the clock when we do not use
+>>> the uart, and enable the clock when we really use the uart port.
+>>>
+>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> This conflicts with my series converting i.MX to the common clock
+>> framework. Please lets delay this until this has been merged.
+> I think it is OK to resubmit this patch now.
+>
+ok, thanks.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- drivers/video/mx3fb.c |   22 +++++++++++++++++++++-
- 1 files changed, 21 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index 2dd11c4..7d0aa7b 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -721,6 +721,26 @@ static void mx3fb_dma_done(void *arg)
- 	complete(&mx3_fbi->flip_cmpl);
- }
- 
-+static bool mx3fb_must_set_par(struct fb_info *fbi)
-+{
-+	struct mx3fb_info *mx3_fbi = fbi->par;
-+	struct fb_var_screeninfo old_var = mx3_fbi->cur_var;
-+	struct fb_var_screeninfo new_var = fbi->var;
-+
-+	if ((fbi->var.activate & FB_ACTIVATE_FORCE) &&
-+	    (fbi->var.activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW)
-+		return true;
-+
-+	/*
-+	 * Ignore xoffset and yoffset update,
-+	 * because pan display handles this case.
-+	 */
-+	old_var.xoffset = new_var.xoffset;
-+	old_var.yoffset = new_var.yoffset;
-+
-+	return !!memcmp(&old_var, &new_var, sizeof(struct fb_var_screeninfo));
-+}
-+
- static int __set_par(struct fb_info *fbi, bool lock)
- {
- 	u32 mem_len, cur_xoffset, cur_yoffset;
-@@ -844,7 +864,7 @@ static int mx3fb_set_par(struct fb_info *fbi)
- 
- 	mutex_lock(&mx3_fbi->mutex);
- 
--	ret = __set_par(fbi, true);
-+	ret = mx3fb_must_set_par(fbi) ? __set_par(fbi, true) : 0;
- 
- 	mutex_unlock(&mx3_fbi->mutex);
- 
--- 
-1.7.1
+Huang Shijie
