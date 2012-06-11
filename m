@@ -1,183 +1,186 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jun 2012 18:45:59 -0600
-Subject: [PATCHv2 02/12] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-In-Reply-To: <20120611004502.20034.8840.stgit@dusk>
-References: <20120611004502.20034.8840.stgit@dusk>
-Message-ID: <20120611004555.20034.87035.stgit@dusk>
+Date: Sun, 10 Jun 2012 19:20:17 -0600 (MDT)
+Subject: [PATCH 2/6] ARM: OMAP AM33xx: voltagedomain: Add voltage domain
+ data
+In-Reply-To: <20120521184156.22565.87926.stgit@dusk>
+References: <20120521184053.22565.90037.stgit@dusk>
+ <20120521184156.22565.87926.stgit@dusk>
+Message-ID: <alpine.DEB.2.00.1206101916480.20674@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin discovered that commit c8d82ff68fb6873691536cf33021977efbf5593c
-("ARM: OMAP2/3: hwmod data: Add 32k-sync timer data to hwmod
-database") broke CORE idle on OMAP3.  This prevents device low power
-states.
+Hi Vaibhav, Afzal, Tony,
 
-The root cause is that the 32K sync timer IP block does not support
-smart-idle mode[1], and so the hwmod code keeps the IP block in
-no-idle mode while it is active.  This in turn prevents the WKUP
-clockdomain from transitioning to idle.  There is a hardcoded sleep
-dependency that prevents the CORE_L3 and CORE_CM clockdomains from
-transitioning to idle when the WKUP clockdomain is active[2], so the
-chip cannot enter any device low power states.
+On Mon, 21 May 2012, Paul Walmsley wrote:
 
-It turns out that there is no need to take the 32k sync timer out of
-idle.  The IP block itself probably does not have any native idle
-handling at all, due to its simplicity.  Furthermore, the PRCM will
-never request target idle for this IP block while the kernel is
-running, due to the sleep dependency that prevents the WKUP
-clockdomain from idling while the CORE_L3 clockdomain is active.  So
-we can safely leave the 32k sync timer in target-no-idle mode, even
-while we continue to access it.
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
+> 
+> Currently dummy voltage domain data is being created
+> in order to succeed boot process, nothing has been done
+> w.r.t actual hardware (voltage control).
+> 
+> Also, hook up the AM33XX voltage domain to OMAP framework.
 
-This workaround is implemented by defining a new hwmod flag,
-HWMOD_ALWAYS_FORCE_SIDLE, that places the IP block into target
-force-idle mode even when enabled.  The 32k sync timer hwmods are
-marked with this flag for OMAP3 and OMAP4 SoCs.  (On OMAP2xxx, no OCP
-header existed on the 32k sync timer.)
+I had to update this patch again for v3.5 to account for the lack of 
+am33xx_init_early().  So now this patch has to add it (updated patch 
+below). 
 
-Another theoretically clean fix for this problem would be to implement
-PM runtime-based control for 32k sync timer accesses.  These PM
-runtime calls would need to located in a custom clocksource, since the
-32k sync timer is currently used as an MMIO clocksource.  But in
-practice, there would be little benefit to doing so; and there would
-be some cost, due to the addition of unnecessary lines of code and the
-additional CPU overhead of the PM runtime and hwmod code - unnecessary
-in this case.
+But it seems to me that I must be missing something.  Are we missing a 
+prerequisite patch for this series from mainline?  Or is this some 
+casualty of kicking out the board file?
 
-Another possible fix would have been to modify the pm34xx.c code to
-force the IP block idle before entering WFI.  But this would not have
-been an acceptable approach: we are trying to remove this type of
-centralized IP block idle control from the PM code.
+If the latter, how do we make sure that am33xx_init_early() is called at 
+the right time?
 
-This patch is effectively a workaround for a hardware problem.  A
-better hardware approach would have been to implement a smart-idle
-target idle mode for this IP block.  The smart-idle mode in this case
-would behave identically to the force-idle mode.  We consider the
-force-idle and no-idle target idle mode settings to be intended for
-debugging and automatic idle management bug workarounds only[4].
+Once we get this sorted out, I'll send the pull request.
 
-This patch is a collaboration between Kevin Hilman <khilman@ti.com>
-and Paul Walmsley <paul@pwsan.com>.
+Branch on git://git.pwsan.com/linux-2.6 in 'am33xx_prcm_devel_3.6'
 
-Thanks to Vaibhav Hiremath <hvaibhav@ti.com> for providing comments on
-an earlier version of this patch.  Thanks to Tero Kristo
-<t-kristo@ti.com> for identifying a bug in an earlier version of this
-patch.  Thanks to Beno?t Cousson <b-cousson@ti.com> for identifying a
-bug in an earlier version of this patch and for implementation comments.
 
-References:
+- Paul
 
-1. Table 16-96 "REG_32KSYNCNT_SYSCONFIG" of the OMAP34xx TRM Rev. ZU
-   (SWPU223U), available from:
-   http://www.ti.com/pdfs/wtbu/OMAP34x_ES3.1.x_PUBLIC_TRM_vzU.zip
+>From 127240db05c0d381a50712a320439c5679fb22da Mon Sep 17 00:00:00 2001
+From: Vaibhav Hiremath <hvaibhav@ti.com>
+Date: Sun, 10 Jun 2012 18:56:14 -0600
+Subject: [PATCH] ARM: OMAP AM33xx: voltagedomain: Add voltage domain data
 
-2. Table 4-72 "Sleep Dependencies" of the OMAP34xx TRM Rev. ZU
-   (SWPU223U)
+Currently dummy voltage domain data is being created
+in order to succeed boot process, nothing has been done
+w.r.t actual hardware (voltage control).
 
-3. ibid.
+Also, hook up the AM33XX voltage domain to OMAP framework.
 
-4. Section 3.1.1.1.2 "Module-Level Clock Management" of the OMAP4430
-   TRM Rev. vAA (SWPU231AA).
-
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Acked-by: Kevin Hilman <khilman@ti.com>
+[paul at pwsan.com: updated for 3.5]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   17 +++++++++++------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    2 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 +++++++++
- 4 files changed, 22 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/Makefile                  |    1 +
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/io.c                      |   13 +++++++-
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 +++++++++++++++++++++++++
+ 5 files changed, 58 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index bf86f7e..096474c 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1124,10 +1124,12 @@ static struct omap_hwmod_addr_space * __init _find_mpu_rt_addr_space(struct omap
-  * _enable_sysc - try to bring a module out of idle via OCP_SYSCONFIG
-  * @oh: struct omap_hwmod *
-  *
-- * If module is marked as SWSUP_SIDLE, force the module out of slave
-- * idle; otherwise, configure it for smart-idle.  If module is marked
-- * as SWSUP_MSUSPEND, force the module out of master standby;
-- * otherwise, configure it for smart-standby.  No return value.
-+ * Ensure that the OCP_SYSCONFIG register for the IP block represented
-+ * by @oh is set to indicate to the PRCM that the IP block is active.
-+ * Usually this means placing the module into smart-idle mode and
-+ * smart-standby, but if there is a bug in the automatic idle handling
-+ * for the IP block, it may need to be placed into the force-idle or
-+ * no-idle variants of these modes.  No return value.
-  */
- static void _enable_sysc(struct omap_hwmod *oh)
- {
-@@ -1141,8 +1143,11 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	sf = oh->class->sysc->sysc_flags;
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index fa742f3..6a3aef6 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -99,6 +99,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common)
+ obj-$(CONFIG_ARCH_OMAP3)		+= voltagedomains3xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common)
+ obj-$(CONFIG_ARCH_OMAP4)		+= voltagedomains44xx_data.o
++obj-$(CONFIG_SOC_AM33XX)                += voltagedomains33xx_data.o
  
- 	if (sf & SYSC_HAS_SIDLEMODE) {
--		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
--			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
-+		if (oh->flags & HWMOD_ALWAYS_FORCE_SIDLE)
-+			idlemode = HWMOD_IDLEMODE_FORCE;
-+		else
-+			idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
-+				HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
- 		_set_slave_idlemode(oh, idlemode, &v);
- 	}
+ # OMAP powerdomain framework
+ powerdomain-common			+= powerdomain.o powerdomain-common.o
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index be9dfd1..dad91e2 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -128,6 +128,7 @@ void omap3430_init_early(void);
+ void omap35xx_init_early(void);
+ void omap3630_init_early(void);
+ void omap3_init_early(void);	/* Do not use this one */
++void am33xx_init_early(void);
+ void am35xx_init_early(void);
+ void ti81xx_init_early(void);
+ void omap4430_init_early(void);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 8d014ba..37ecc71 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -381,11 +381,22 @@ void __init omap2430_init_late(void)
+ }
+ #endif
  
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index b26d3c9..f8ac9e7 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -2018,7 +2018,7 @@ static struct omap_hwmod omap3xxx_counter_32k_hwmod = {
- 	.name		= "counter_32k",
- 	.class		= &omap3xxx_counter_hwmod_class,
- 	.clkdm_name	= "wkup_clkdm",
--	.flags		= HWMOD_SWSUP_SIDLE,
-+	.flags		= HWMOD_ALWAYS_FORCE_SIDLE | HWMOD_SWSUP_SIDLE,
- 	.main_clk	= "wkup_32k_fck",
- 	.prcm		= {
- 		.omap2	= {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 950454a..4aaaa84 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -408,7 +408,7 @@ static struct omap_hwmod omap44xx_counter_32k_hwmod = {
- 	.name		= "counter_32k",
- 	.class		= &omap44xx_counter_hwmod_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
--	.flags		= HWMOD_SWSUP_SIDLE,
-+	.flags		= HWMOD_ALWAYS_FORCE_SIDLE | HWMOD_SWSUP_SIDLE,
- 	.main_clk	= "sys_32k_ck",
- 	.prcm = {
- 		.omap4 = {
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index c835b71..038c0d7 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -409,6 +409,14 @@ struct omap_hwmod_omap4_prcm {
-  *     in order to complete the reset. Optional clocks will be disabled
-  *     again after the reset.
-  * HWMOD_16BIT_REG: Module has 16bit registers
-+ * HWMOD_ALWAYS_FORCE_SIDLE: Always program this module's SIDLEMODE to
-+ *     force-idle mode, even when enabled.  This is needed for IP blocks
-+ *     which do not support smart idle, which do not have a software
-+ *     controllable functional or interface clock, and which the PRCM
-+ *     will not assert SIdleReq until the kernel is not currently
-+ *     running on the chip (e.g., the MPU is in idle).  For such modules,
-+ *     fine-grained PM runtime-based idle control is simply a waste of
-+ *     CPU cycles.
-  */
- #define HWMOD_SWSUP_SIDLE			(1 << 0)
- #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
-@@ -419,6 +427,7 @@ struct omap_hwmod_omap4_prcm {
- #define HWMOD_NO_IDLEST				(1 << 6)
- #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
- #define HWMOD_16BIT_REG				(1 << 8)
-+#define HWMOD_ALWAYS_FORCE_SIDLE		(1 << 9)
- 
++#ifdef CONFIG_SOC_AM33XX
++void __init am33xx_init_early(void)
++{
++	omap2_set_globals_am33xx();
++	omap3xxx_check_revision();
++	ti81xx_check_features();
++	omap_common_init_early();
++	am33xx_voltagedomains_init();
++}
++#endif
++
  /*
-  * omap_hwmod._int_flags definitions
+  * Currently only board-omap3beagle.c should call this because of the
+  * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
+  */
+-#ifdef CONFIG_ARCH_OMAP3
++#ifdef CONFIG_SOC_OMAP3430
+ void __init omap3_init_early(void)
+ {
+ 	omap2_set_globals_3xxx();
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 16a1b09..a7c43c1 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -156,6 +156,7 @@ int omap_voltage_late_init(void);
+ 
+ extern void omap2xxx_voltagedomains_init(void);
+ extern void omap3xxx_voltagedomains_init(void);
++extern void am33xx_voltagedomains_init(void);
+ extern void omap44xx_voltagedomains_init(void);
+ 
+ struct voltagedomain *voltdm_lookup(const char *name);
+diff --git a/arch/arm/mach-omap2/voltagedomains33xx_data.c b/arch/arm/mach-omap2/voltagedomains33xx_data.c
+new file mode 100644
+index 0000000..965458d
+--- /dev/null
++++ b/arch/arm/mach-omap2/voltagedomains33xx_data.c
+@@ -0,0 +1,43 @@
++/*
++ * AM33XX voltage domain data
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "voltage.h"
++
++static struct voltagedomain am33xx_voltdm_mpu = {
++	.name		= "mpu",
++};
++
++static struct voltagedomain am33xx_voltdm_core = {
++	.name		= "core",
++};
++
++static struct voltagedomain am33xx_voltdm_rtc = {
++	.name		= "rtc",
++};
++
++static struct voltagedomain *voltagedomains_am33xx[] __initdata = {
++	&am33xx_voltdm_mpu,
++	&am33xx_voltdm_core,
++	&am33xx_voltdm_rtc,
++	NULL,
++};
++
++void __init am33xx_voltagedomains_init(void)
++{
++	voltdm_init(voltagedomains_am33xx);
++}
+-- 
+1.7.10
