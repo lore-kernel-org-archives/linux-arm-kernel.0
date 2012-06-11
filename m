@@ -1,68 +1,46 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 11 Jun 2012 11:12:42 +0200
-Subject: [PATCH 05/11] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA46071@DBDE01.ent.ti.com>
-References: <20120607060901.25532.68354.stgit@dusk>
- <20120607061309.25532.13430.stgit@dusk>
- <79CD15C6BA57404B839C016229A409A83EA43E0F@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206070107530.6684@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA44DD9@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1206071355090.14977@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA46071@DBDE01.ent.ti.com>
-Message-ID: <4FD5B68A.40908@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 11 Jun 2012 14:49:58 +0530
+Subject: [PATCH 2/6] ARM: OMAP AM33xx: voltagedomain: Add voltage domain
+ data
+In-Reply-To: <alpine.DEB.2.00.1206101916480.20674@utopia.booyaka.com>
+References: <20120521184053.22565.90037.stgit@dusk>
+ <20120521184156.22565.87926.stgit@dusk>
+ <alpine.DEB.2.00.1206101916480.20674@utopia.booyaka.com>
+Message-ID: <4FD5B83E.6020807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/8/2012 9:10 PM, Hiremath, Vaibhav wrote:
-> On Fri, Jun 08, 2012 at 01:33:46, Paul Walmsley wrote:
->> Hi
->>
->> On Thu, 7 Jun 2012, Hiremath, Vaibhav wrote:
->>
->>> I couldn't finish my testing today, got into continuous meetings.
->>
->> No worries, I understand.
->>
->>> Tomorrow, I will test it and update you on this.
->>
->> That would be great.
->>
->> I took a look at SPRUH73F and sure enough, at least one module (CONTROL)
->> doesn't support smart-idle -- per Table 14-217 "CONTROL Register Field
->> Descriptions".  I'd guess that the PRCM won't idle-req this IP block until
->> the kernel is not running, so we might be able to get away with the
->> existing approach; but the TRM also says:
->>
->> "By definition, initiator may generate read/write transaction as long as
->> it is out of IDLE state."
->>
->> Which pretty much matches my understanding too of the implicit interface
->> contract here.
->>
->> So I think we'd better go back to the flag approach as implemented in this
->> patch:
->>
->> http://www.spinics.net/lists/arm-kernel/msg176836.html
->>
->> The WBU 32k sync timer's behavior is what relies on quirks of the
->> integration that are hard to identify via other means, so it seems to be
->> safest to tag it explicitly.
->>
->
-> Paul,
->
-> I tested it on AM335x platform just now, it booted up to the Linux prompt,
-> but I am sure it is going to impact low power state usecases on AM33xx.
 
-Why are you sure about that? As explained to Paul, using the force-idle 
-will do the same as smart-idle most of the time.
 
-So what power impact are you expecting?
+On 6/11/2012 6:50 AM, Paul Walmsley wrote:
+> Hi Vaibhav, Afzal, Tony,
+> 
+> On Mon, 21 May 2012, Paul Walmsley wrote:
+> 
+>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>
+>> Currently dummy voltage domain data is being created
+>> in order to succeed boot process, nothing has been done
+>> w.r.t actual hardware (voltage control).
+>>
+>> Also, hook up the AM33XX voltage domain to OMAP framework.
+> 
+> I had to update this patch again for v3.5 to account for the lack of 
+> am33xx_init_early().  So now this patch has to add it (updated patch 
+> below). 
+> 
 
-> So, I also feel that, flag based approach should be used here.
+Paul,
 
-Why? Why adding a new flag to detect a condition that is already 
-captured somewhere else?
+I think this is not required, since Tony has already accepted the patch
+which has this implementation (available on linux-omap/master).
+Please refer to the commit,
 
-Regards,
-Benoit
+commit 08f3098928c991560408e8c71d4af8b1a3ff2d67
+Author: Afzal Mohammed <afzal@ti.com>
+Date:   Fri May 11 00:38:49 2012 +0530
+
+    ARM: OMAP2+: am33xx: Add AM335XEVM machine support
+
+Thanks,
+Vaibhav
