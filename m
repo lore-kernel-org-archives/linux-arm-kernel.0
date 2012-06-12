@@ -1,33 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jun 2012 12:08:38 +0100
-Subject: [PATCH] pinctrl: nomadik: fix up typo
-In-Reply-To: <1339498592-1435-1-git-send-email-linus.walleij@stericsson.com>
-References: <1339498592-1435-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4FD72336.9040803@linaro.org>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Tue, 12 Jun 2012 19:09:29 +0800
+Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+In-Reply-To: <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
+References: <20120522234621.GA3610@windriver.com>
+ <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
+Message-ID: <20120612110929.GA16511@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/12 11:56, Linus Walleij wrote:
-> Commit a60b57eddaa8af6c02cf7bbeb58ebf82881f08ac
-> "drivers/gpio: gpio-nomadik: Add support for irqdomains"
-> changed GPIO offset calculations to have this form:
-> (gpio % NMK_GPIO_PER_CHIP) except in this one place for
-> setting sleep mode, where the conversion was all wrong, and
-> instead mod:ing the GPIO with the IRQ base which does not
-> make any sense.
->
-> So fix this up so we can use sleepmode.
->
-> Cc: Lee Jones<lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij<linus.walleij@stericsson.com>
+> Following are present in mach-netx/fb.c:
+[snip]
+> struct clk *clk_get(struct device *dev, const char *id)
+> {
+> 	return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
+> }
+> 
+> I can remove first four without any issues, but just can't remove the last one.
+> The dummy clk_get() always returns NULL, whereas this one returns NULL only for
+> fb device.
+> 
+> How should I fix this?
 
-Makes sense.
+Another thing I'm not sure is that the typical clk_get() callers only
+tests IS_ERR() on the returned value. As a clk newbie, I don't know
+whether there will be lots of clk users seeing this (new) NULL value
+on !CONFIG_HAVE_CLK and whether the current behavior is correct..
 
-Reviewed-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Fengguang
