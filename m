@@ -1,74 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 12 Jun 2012 15:56:03 +0200
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <201206121349.27696.arnd@arndb.de>
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <201206121349.27696.arnd@arndb.de>
-Message-ID: <4FD74A73.8000101@free-electrons.com>
+From: hare@suse.de (Hannes Reinecke)
+Date: Tue, 12 Jun 2012 15:59:45 +0200
+Subject: [PATCH] mach-dove: Fixup ge00 initialisation
+Message-ID: <1339509585-62405-1-git-send-email-hare@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2012 03:49 PM, Arnd Bergmann wrote:
-> On Monday 11 June 2012, Gregory CLEMENT wrote:
->> You'll find in this patch set the new version of the initial support for a
->> new family of ARMv7-compatible Marvell SoCs initially submitted by my
->> colleague Thomas Petazzoni. Following the conclusion of the discussion when
->> we submitted our first version we have chosen to add this support for this
->> SoC family in the to support in the arch/arm/mach-mvebu/ directory.
->>
->> As for the previous release, both the Armada 370 and the Armada XP SoCs are
->> supported in this directory, and we are able to build a single kernel image
->> that boots on both SoCs. Both SoCs use the PJ4B processor, a
->> Marvell-developed ARM core that implements the ARMv7 instruction set. We are
->> currently using Marvell evaluation boards for both of those SoCs, and the
->> support for those boards is added in this patch set.
-> 
-> Ok, very good.
-> 
->> Andrew Lunn asked for refactoring the _restart() function to being used by
->> any MVEBU SOC, but we didn't find a nice way to do it. Indeed the registers
->> mapping differs between the SOC and the bit mask too. A solution could be to
->> get this mapping through the device tree, but we are not sure it was a good
->> usage of the device tree.
-> 
-> As I suggested in my reply to patch 4/8, I think this can be encapsulated
-> in one file that acts as a driver for the generic ("bridge regs") registers
-> and provides functions for that based on the "compatible" property.
-> 
-> On a more general note, I'd prefer to have the patches renaming the existing
-> files first for the mach-mvebu directory first, and then adding your patches
-> on top.
-> 
-> I can provide a new version of the patch I did once we have agreement on what
-> goes where. I've put some more thought into it and the best I could come up
-> with is now.
+The last argument of orion_ge00_init() is actually the error
+interrupt, so we should be using the correct value here.
 
-OK we wait for your new version of this patch to rebase our work on top of it.
+Signed-off-by: Hannes Reinecke <hare@suse.de>
+---
+ arch/arm/mach-dove/common.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> 
-> arch/arm/mach-{orion5x,dove,kirkwood,mv78xx0}/include/mach/*
-> 	-> arch/arm/mach-mvebu/include/mach/
-> arch/arm/plat-orion/include/plat/*
-> 	-> arch/arm/mach-mvebu/include/mach/
-> arch/arm/plat-orion/*
-> 	-> arch/arm/mach-mvebu/
-> arch/arm/mach-{orion5x,dove,kirkwood,mv78xx0}/{add-map,common,irq,mpp,pci}.*
-> 	-> arch/arm/mach-mvebu/
-> arch/arm/mach-kirkwood/board-* (DT files)
-> 	-> arch/arm/mach-mvebu/
-> 
-> This is basically the same as the patch I sent out before, but with the
-> new machine name, and leaving all the *-setup.c files in their existing
-> locations, where they can either get removed after being converted to DT
-> or after being assumed dead.
-> 
-> 	Arnd
-
-
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index f7d639b..a9d0708 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -101,8 +101,8 @@ void __init dove_ehci1_init(void)
+  ****************************************************************************/
+ void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
+ {
+-	orion_ge00_init(eth_data,
+-			DOVE_GE00_PHYS_BASE, IRQ_DOVE_GE00_SUM, 0);
++	orion_ge00_init(eth_data, DOVE_GE00_PHYS_BASE,
++			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR);
+ }
+ 
+ /*****************************************************************************
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
-+33 602 196 044
+1.7.4.2
