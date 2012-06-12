@@ -1,546 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jun 2012 13:30:51 +0100
-Subject: [PATCH v8 08/13] ARM: convert shmobile SMP to smp_ops
+Date: Tue, 12 Jun 2012 13:30:55 +0100
+Subject: [PATCH v8 12/13] ARM: smp: Make smp_ops mandatory for SMP platforms
 In-Reply-To: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
 References: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339504256-11266-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1339504256-11266-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert shmobile SMP platforms to use the smp_ops to provide
-their SMP and CPU hotplug operations.
+Now that all SMP platforms have been converted to smp_ops, remove
+the "weak" attribute from the hooks in smp.c, and make the functions
+static wherever possible.
 
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/board-ag5evm.c         |    1 +
- arch/arm/mach-shmobile/board-kota2.c          |    1 +
- arch/arm/mach-shmobile/board-kzm9d.c          |    1 +
- arch/arm/mach-shmobile/board-kzm9g.c          |    1 +
- arch/arm/mach-shmobile/board-marzen.c         |    1 +
- arch/arm/mach-shmobile/hotplug.c              |   26 ++++++--
- arch/arm/mach-shmobile/include/mach/common.h  |   19 ++----
- arch/arm/mach-shmobile/include/mach/emev2.h   |    8 +--
- arch/arm/mach-shmobile/include/mach/r8a7779.h |    6 ++
- arch/arm/mach-shmobile/include/mach/sh73a0.h  |    4 ++
- arch/arm/mach-shmobile/platsmp.c              |   86 +------------------------
- arch/arm/mach-shmobile/setup-emev2.c          |    1 +
- arch/arm/mach-shmobile/smp-emev2.c            |   21 ++++--
- arch/arm/mach-shmobile/smp-r8a7779.c          |   21 ++++--
- arch/arm/mach-shmobile/smp-sh73a0.c           |   22 +++++--
- 15 files changed, 101 insertions(+), 118 deletions(-)
+ arch/arm/include/asm/smp.h |   14 --------------
+ arch/arm/kernel/smp.c      |   18 +++++++++---------
+ 2 files changed, 9 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index 5a6f22f..9098124 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -574,6 +574,7 @@ static void __init ag5evm_init(void)
- }
- 
- MACHINE_START(AG5EVM, "ag5evm")
-+	smp_ops(sh73a0_smp_ops)
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
-index f60f1b2..656a767 100644
---- a/arch/arm/mach-shmobile/board-kota2.c
-+++ b/arch/arm/mach-shmobile/board-kota2.c
-@@ -515,6 +515,7 @@ static void __init kota2_init(void)
- }
- 
- MACHINE_START(KOTA2, "kota2")
-+	smp_ops(sh73a0_smp_ops)
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-diff --git a/arch/arm/mach-shmobile/board-kzm9d.c b/arch/arm/mach-shmobile/board-kzm9d.c
-index 7bc5e7d..9b38fb7 100644
---- a/arch/arm/mach-shmobile/board-kzm9d.c
-+++ b/arch/arm/mach-shmobile/board-kzm9d.c
-@@ -74,6 +74,7 @@ static const char *kzm9d_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(KZM9D_DT, "kzm9d")
-+	smp_ops(emev2_smp_ops)
- 	.map_io		= emev2_map_io,
- 	.init_early	= emev2_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index d8e33b6..26f93e6 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -449,6 +449,7 @@ static const char *kzm9g_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(KZM9G_DT, "kzm9g")
-+	smp_ops(sh73a0_smp_ops)
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 14de378..bd85a39 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -92,6 +92,7 @@ static void __init marzen_init(void)
- }
- 
- MACHINE_START(MARZEN, "marzen")
-+	smp_ops(r8a7779_smp_ops)
- 	.map_io		= r8a7779_map_io,
- 	.init_early	= r8a7779_add_early_devices,
- 	.nr_irqs	= NR_IRQS_LEGACY,
-diff --git a/arch/arm/mach-shmobile/hotplug.c b/arch/arm/mach-shmobile/hotplug.c
-index 828d22f..dd854fb 100644
---- a/arch/arm/mach-shmobile/hotplug.c
-+++ b/arch/arm/mach-shmobile/hotplug.c
-@@ -14,12 +14,21 @@
- #include <linux/smp.h>
- #include <linux/cpumask.h>
- #include <linux/delay.h>
-+#include <linux/of.h>
- #include <mach/common.h>
-+#include <mach/r8a7779.h>
-+#include <mach/emev2.h>
- #include <asm/cacheflush.h>
-+#include <asm/mach-types.h>
- 
- static cpumask_t dead_cpus;
- 
--int platform_cpu_kill(unsigned int cpu)
-+#include <mach/common.h>
-+
-+#define is_r8a7779() machine_is_marzen()
-+#define is_emev2() of_machine_is_compatible("renesas,emev2")
-+
-+int shmobile_cpu_kill(unsigned int cpu)
- {
- 	int k;
- 
-@@ -28,8 +37,15 @@ int platform_cpu_kill(unsigned int cpu)
- 	 * finish before asking SoC-specific code to power off the CPU core.
- 	 */
- 	for (k = 0; k < 1000; k++) {
--		if (cpumask_test_cpu(cpu, &dead_cpus))
--			return shmobile_platform_cpu_kill(cpu);
-+		if (cpumask_test_cpu(cpu, &dead_cpus)) {
-+			if (is_r8a7779())
-+				return r8a7779_platform_cpu_kill(cpu);
-+
-+			if (is_emev2())
-+				return emev2_platform_cpu_kill(cpu);
-+
-+			return 1;
-+		}
- 
- 		mdelay(1);
- 	}
-@@ -37,7 +53,7 @@ int platform_cpu_kill(unsigned int cpu)
- 	return 0;
- }
- 
--void platform_cpu_die(unsigned int cpu)
-+void shmobile_cpu_die(unsigned int cpu)
- {
- 	/* hardware shutdown code running on the CPU that is being offlined */
- 	flush_cache_all();
-@@ -60,7 +76,7 @@ void platform_cpu_die(unsigned int cpu)
- 	}
- }
- 
--int platform_cpu_disable(unsigned int cpu)
-+int shmobile_cpu_disable(unsigned int cpu)
- {
- 	cpumask_clear_cpu(cpu, &dead_cpus);
- 	/*
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 01e2bc0..cdc4b86 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -4,11 +4,10 @@
- extern void shmobile_earlytimer_init(void);
- extern struct sys_timer shmobile_timer;
- extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
--				 unsigned int mult, unsigned int div);
-+			 unsigned int mult, unsigned int div);
- struct twd_local_timer;
- extern void shmobile_setup_console(void);
- extern void shmobile_secondary_vector(void);
--extern int shmobile_platform_cpu_kill(unsigned int cpu);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
-@@ -58,11 +57,6 @@ extern struct clk sh73a0_extal2_clk;
- extern struct clk sh73a0_extcki_clk;
- extern struct clk sh73a0_extalr_clk;
- 
--extern unsigned int sh73a0_get_core_count(void);
--extern void sh73a0_secondary_init(unsigned int cpu);
--extern int sh73a0_boot_secondary(unsigned int cpu);
--extern void sh73a0_smp_prepare_cpus(void);
--
- extern void r8a7740_init_irq(void);
- extern void r8a7740_map_io(void);
- extern void r8a7740_add_early_devices(void);
-@@ -78,11 +72,6 @@ extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
- 
--extern unsigned int r8a7779_get_core_count(void);
--extern int r8a7779_platform_cpu_kill(unsigned int cpu);
--extern void r8a7779_secondary_init(unsigned int cpu);
--extern int r8a7779_boot_secondary(unsigned int cpu);
--extern void r8a7779_smp_prepare_cpus(void);
- extern void r8a7779_register_twd(void);
- 
- extern void shmobile_init_late(void);
-@@ -99,4 +88,10 @@ int shmobile_cpuidle_init(void);
- static inline int shmobile_cpuidle_init(void) { return 0; }
- #endif
- 
-+extern int shmobile_cpu_kill(unsigned int cpu);
-+extern void shmobile_cpu_die(unsigned int cpu);
-+extern int shmobile_cpu_disable(unsigned int cpu);
-+
-+extern void shmobile_smp_init_cpus(unsigned int ncores);
-+
- #endif /* __ARCH_MACH_COMMON_H */
-diff --git a/arch/arm/mach-shmobile/include/mach/emev2.h b/arch/arm/mach-shmobile/include/mach/emev2.h
-index e6b0c1b..122ed11 100644
---- a/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ b/arch/arm/mach-shmobile/include/mach/emev2.h
-@@ -7,13 +7,13 @@ extern void emev2_add_early_devices(void);
- extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
- extern void emev2_set_boot_vector(unsigned long value);
--extern unsigned int emev2_get_core_count(void);
- extern int emev2_platform_cpu_kill(unsigned int cpu);
--extern void emev2_secondary_init(unsigned int cpu);
--extern int emev2_boot_secondary(unsigned int cpu);
--extern void emev2_smp_prepare_cpus(void);
- 
- #define EMEV2_GPIO_BASE 200
- #define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
- 
-+#include <asm/smp_ops.h>
-+
-+extern struct smp_ops emev2_smp_ops;
-+
- #endif /* __ASM_EMEV2_H__ */
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index b07ad31..a2e17ab 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -360,4 +360,10 @@ extern void r8a7779_add_device_to_domain(struct r8a7779_pm_domain *r8a7779_pd,
- #define r8a7779_add_device_to_domain(pd, pdev) do { } while (0)
- #endif /* CONFIG_PM */
- 
-+extern int r8a7779_platform_cpu_kill(unsigned int cpu);
-+
-+#include <asm/smp_ops.h>
-+
-+extern struct smp_ops r8a7779_smp_ops;
-+
- #endif /* __ASM_R8A7779_H__ */
-diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-index 398e2c1..56a3127 100644
---- a/arch/arm/mach-shmobile/include/mach/sh73a0.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-@@ -550,4 +550,8 @@ enum {
- #define SH73A0_PINT0_IRQ(irq) ((irq) + 700)
- #define SH73A0_PINT1_IRQ(irq) ((irq) + 732)
- 
-+#include <asm/smp_ops.h>
-+
-+extern struct smp_ops sh73a0_smp_ops;
-+
- #endif /* __ASM_SH73A0_H__ */
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index bacdd66..ed8d235 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -11,90 +11,11 @@
-  * published by the Free Software Foundation.
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index ae29293..873d297 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -60,15 +60,6 @@ extern int boot_secondary(unsigned int cpu, struct task_struct *);
   */
- #include <linux/init.h>
--#include <linux/errno.h>
--#include <linux/delay.h>
--#include <linux/device.h>
- #include <linux/smp.h>
--#include <linux/io.h>
--#include <linux/of.h>
- #include <asm/hardware/gic.h>
--#include <asm/mach-types.h>
--#include <mach/common.h>
--#include <mach/emev2.h>
+ asmlinkage void secondary_start_kernel(void);
  
--#define is_sh73a0() (machine_is_ag5evm() || machine_is_kota2() || \
--			of_machine_is_compatible("renesas,sh73a0"))
--#define is_r8a7779() machine_is_marzen()
--#define is_emev2() of_machine_is_compatible("renesas,emev2")
+-/*
+- * Perform platform specific initialisation of the specified CPU.
+- */
+-extern void platform_secondary_init(unsigned int cpu);
 -
--static unsigned int __init shmobile_smp_get_core_count(void)
--{
--	if (is_sh73a0())
--		return sh73a0_get_core_count();
+-/*
+- * Initialize cpu_possible map, and enable coherency
+- */
+-extern void platform_smp_prepare_cpus(unsigned int);
+ 
+ /*
+  * Initial data for bringing up a secondary CPU.
+@@ -81,15 +72,10 @@ struct secondary_data {
+ extern struct secondary_data secondary_data;
+ 
+ extern int __cpu_disable(void);
+-extern int platform_cpu_disable(unsigned int cpu);
+ 
+ extern void __cpu_die(unsigned int cpu);
+ extern void cpu_die(void);
+ 
+-extern void platform_cpu_die(unsigned int cpu);
+-extern int platform_cpu_kill(unsigned int cpu);
+-extern void platform_cpu_enable(unsigned int cpu);
 -
--	if (is_r8a7779())
--		return r8a7779_get_core_count();
--
--	if (is_emev2())
--		return emev2_get_core_count();
--
--	return 1;
--}
--
--static void __init shmobile_smp_prepare_cpus(void)
--{
--	if (is_sh73a0())
--		sh73a0_smp_prepare_cpus();
--
--	if (is_r8a7779())
--		r8a7779_smp_prepare_cpus();
--
--	if (is_emev2())
--		emev2_smp_prepare_cpus();
--}
--
--int shmobile_platform_cpu_kill(unsigned int cpu)
--{
--	if (is_r8a7779())
--		return r8a7779_platform_cpu_kill(cpu);
--
--	if (is_emev2())
--		return emev2_platform_cpu_kill(cpu);
--
--	return 1;
--}
--
--void __cpuinit platform_secondary_init(unsigned int cpu)
--{
--	trace_hardirqs_off();
--
--	if (is_sh73a0())
--		sh73a0_secondary_init(cpu);
--
--	if (is_r8a7779())
--		r8a7779_secondary_init(cpu);
--
--	if (is_emev2())
--		emev2_secondary_init(cpu);
--}
--
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	if (is_sh73a0())
--		return sh73a0_boot_secondary(cpu);
--
--	if (is_r8a7779())
--		return r8a7779_boot_secondary(cpu);
--
--	if (is_emev2())
--		return emev2_boot_secondary(cpu);
--
--	return -ENOSYS;
--}
--
--void __init smp_init_cpus(void)
-+void __init shmobile_smp_init_cpus(unsigned int ncores)
+ extern void arch_send_call_function_single_ipi(int cpu);
+ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 6d69e1e..c49c0b8 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -131,25 +131,25 @@ void __init smp_ops_register(struct smp_ops *smp_ops)
+ #endif
+ }
+ 
+-void __attribute__((weak)) __init smp_init_cpus(void)
++void __init smp_init_cpus(void)
  {
--	unsigned int ncores = shmobile_smp_get_core_count();
- 	unsigned int i;
- 
- 	if (ncores > nr_cpu_ids) {
-@@ -108,8 +29,3 @@ void __init smp_init_cpus(void)
- 
- 	set_smp_cross_call(gic_raise_softirq);
- }
--
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
--{
--	shmobile_smp_prepare_cpus();
--}
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index dae9aa6..bcd03bb 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -440,6 +440,7 @@ void __init emev2_init_irq_dt(void)
+ 	if (smp_init_ops && smp_init_ops->smp_init_cpus)
+ 		smp_init_ops->smp_init_cpus();
  }
  
- DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
-+	smp_ops(emev2_smp_ops)
- 	.init_early	= emev2_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= emev2_init_irq_dt,
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index 6a35c4a..582b2da 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -50,7 +50,7 @@ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- 
- }
- 
--unsigned int __init emev2_get_core_count(void)
-+static unsigned int __init emev2_get_core_count(void)
+-void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init platform_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	if (!scu_base) {
- 		scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
-@@ -67,12 +67,12 @@ int emev2_platform_cpu_kill(unsigned int cpu)
- 	return 0; /* not supported yet */
+ 	if (smp_init_ops && smp_init_ops->smp_prepare_cpus)
+ 		smp_init_ops->smp_prepare_cpus(max_cpus);
  }
  
--void __cpuinit emev2_secondary_init(unsigned int cpu)
-+static void __cpuinit emev2_secondary_init(unsigned int cpu)
+-void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit platform_secondary_init(unsigned int cpu)
  {
- 	gic_secondary_init(0);
+ 	if (smp_secondary_ops && smp_secondary_ops->smp_secondary_init)
+ 		smp_secondary_ops->smp_secondary_init(cpu);
  }
  
--int __cpuinit emev2_boot_secondary(unsigned int cpu)
-+static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+-int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	cpu = cpu_logical_map(cpu);
+ 	if (smp_secondary_ops && smp_secondary_ops->smp_boot_secondary)
+ 		return smp_secondary_ops->smp_boot_secondary(cpu, idle);
+@@ -159,20 +159,20 @@ int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void percpu_timer_stop(void);
  
-@@ -86,7 +86,7 @@ int __cpuinit emev2_boot_secondary(unsigned int cpu)
+-int __attribute__((weak)) platform_cpu_kill(unsigned int cpu)
++static int platform_cpu_kill(unsigned int cpu)
+ {
+ 	if (smp_hotplug_ops && smp_hotplug_ops->cpu_kill)
+ 		return smp_hotplug_ops->cpu_kill(cpu);
  	return 0;
  }
  
--void __init emev2_smp_prepare_cpus(void)
-+static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+-void __attribute__((weak)) platform_cpu_die(unsigned int cpu)
++static void platform_cpu_die(unsigned int cpu)
  {
- 	int cpu = cpu_logical_map(0);
- 
-@@ -95,3 +95,16 @@ void __init emev2_smp_prepare_cpus(void)
- 	/* enable cache coherency on CPU0 */
- 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
- }
-+
-+static void __init emev2_smp_init_cpus(void)
-+{
-+	unsigned int ncores = emev2_get_core_count();
-+
-+	shmobile_smp_init_cpus(ncores);
-+}
-+
-+struct smp_ops emev2_smp_ops __initdata = {
-+	smp_init_ops(emev2)
-+	smp_secondary_ops(emev2)
-+	smp_hotplug_ops(shmobile)
-+};
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 6d1d023..857e983 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -87,7 +87,7 @@ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- 	__raw_writel(tmp, scu_base + 8);
+ 	if (smp_hotplug_ops && smp_hotplug_ops->cpu_die)
+ 		smp_hotplug_ops->cpu_die(cpu);
  }
  
--unsigned int __init r8a7779_get_core_count(void)
-+static unsigned int __init r8a7779_get_core_count(void)
+-int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
++static int platform_cpu_disable(unsigned int cpu)
  {
- 	void __iomem *scu_base = scu_base_addr();
- 
-@@ -113,12 +113,12 @@ int r8a7779_platform_cpu_kill(unsigned int cpu)
- 	return ret ? ret : 1;
- }
- 
--void __cpuinit r8a7779_secondary_init(unsigned int cpu)
-+static void __cpuinit r8a7779_secondary_init(unsigned int cpu)
+ 	if (smp_hotplug_ops && smp_hotplug_ops->cpu_disable)
+ 		return smp_hotplug_ops->cpu_disable(cpu);
+@@ -182,7 +182,7 @@ int __attribute__((weak)) platform_cpu_disable(unsigned int cpu)
+ /*
+  * __cpu_disable runs on the processor to be shutdown.
+  */
+-int __cpu_disable(void)
++int __cpuinit __cpu_disable(void)
  {
- 	gic_secondary_init(0);
- }
- 
--int __cpuinit r8a7779_boot_secondary(unsigned int cpu)
-+static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	unsigned int cpu = smp_processor_id();
+ 	int ret;
+@@ -225,7 +225,7 @@ static DECLARE_COMPLETION(cpu_died);
+  * called on the thread which is asking for a CPU to be shutdown -
+  * waits until shutdown has completed, or it is timed out.
+  */
+-void __cpu_die(unsigned int cpu)
++void __cpuinit __cpu_die(unsigned int cpu)
  {
- 	struct r8a7779_pm_ch *ch = NULL;
- 	int ret = -EIO;
-@@ -137,7 +137,7 @@ int __cpuinit r8a7779_boot_secondary(unsigned int cpu)
- 	return ret;
- }
- 
--void __init r8a7779_smp_prepare_cpus(void)
-+static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu = cpu_logical_map(0);
- 
-@@ -156,3 +156,16 @@ void __init r8a7779_smp_prepare_cpus(void)
- 	r8a7779_platform_cpu_kill(2);
- 	r8a7779_platform_cpu_kill(3);
- }
-+
-+static void __init r8a7779_smp_init_cpus(void)
-+{
-+	unsigned int ncores = r8a7779_get_core_count();
-+
-+	shmobile_smp_init_cpus(ncores);
-+}
-+
-+struct smp_ops r8a7779_smp_ops __initdata = {
-+	smp_init_ops(r8a7779)
-+	smp_secondary_ops(r8a7779)
-+	smp_hotplug_ops(shmobile)
-+};
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index e36c41c..6c26ef9 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <mach/common.h>
- #include <asm/smp_plat.h>
-+#include <mach/sh73a0.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
-@@ -64,19 +65,19 @@ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- 	__raw_writel(tmp, scu_base + 8);
- }
- 
--unsigned int __init sh73a0_get_core_count(void)
-+static unsigned int __init sh73a0_get_core_count(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
- 
- 	return scu_get_core_count(scu_base);
- }
- 
--void __cpuinit sh73a0_secondary_init(unsigned int cpu)
-+static void __cpuinit sh73a0_secondary_init(unsigned int cpu)
- {
- 	gic_secondary_init(0);
- }
- 
--int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
-+static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	cpu = cpu_logical_map(cpu);
- 
-@@ -91,7 +92,7 @@ int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
- 	return 0;
- }
- 
--void __init sh73a0_smp_prepare_cpus(void)
-+static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu = cpu_logical_map(0);
- 
-@@ -104,3 +105,16 @@ void __init sh73a0_smp_prepare_cpus(void)
- 	/* enable cache coherency on CPU0 */
- 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
- }
-+
-+static void __init sh73a0_smp_init_cpus(void)
-+{
-+	unsigned int ncores = sh73a0_get_core_count();
-+
-+	shmobile_smp_init_cpus(ncores);
-+}
-+
-+struct smp_ops sh73a0_smp_ops __initdata = {
-+	smp_init_ops(sh73a0)
-+	smp_secondary_ops(sh73a0)
-+	smp_hotplug_ops(shmobile)
-+};
+ 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
 -- 
 1.7.10.3
