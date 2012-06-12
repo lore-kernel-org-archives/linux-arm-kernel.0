@@ -1,51 +1,33 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 12 Jun 2012 19:06:26 +0800
-Subject: [RFC PATCH] MTD: nand: add return value for write_page() function
- in structure of nand_ecc_ctrl.
-In-Reply-To: <1339498176.2401.27.camel@sauron.fi.intel.com>
-References: <1339153855-3761-1-git-send-email-josh.wu@atmel.com>
- <1339498176.2401.27.camel@sauron.fi.intel.com>
-Message-ID: <4FD722B2.3080407@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jun 2012 12:08:38 +0100
+Subject: [PATCH] pinctrl: nomadik: fix up typo
+In-Reply-To: <1339498592-1435-1-git-send-email-linus.walleij@stericsson.com>
+References: <1339498592-1435-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4FD72336.9040803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Artem
-
-Thanks for the review.
-
-On 6/12/2012 6:49 PM, Artem Bityutskiy wrote:
-> On Fri, 2012-06-08 at 19:10 +0800, Josh Wu wrote:
->>   /**
->> + * nand_write_page_none - [INTERN] raw page writen function with return value
->> + * @mtd: mtd info structure
->> + * @chip: nand chip info structure
->> + * @buf: data buffer
->> + * @oob_required: must write chip->oob_poi to OOB
->> + */
->> +static inline int nand_write_page_none(struct mtd_info *mtd,
->> +                               struct nand_chip *chip,
->> +                               const uint8_t *buf, int oob_required)
->> +{
->> +       nand_write_page_raw(mtd, chip, buf, oob_required);
->> +
->> +       return 0;
->> +}
-> Thanks!
+On 12/06/12 11:56, Linus Walleij wrote:
+> Commit a60b57eddaa8af6c02cf7bbeb58ebf82881f08ac
+> "drivers/gpio: gpio-nomadik: Add support for irqdomains"
+> changed GPIO offset calculations to have this form:
+> (gpio % NMK_GPIO_PER_CHIP) except in this one place for
+> setting sleep mode, where the conversion was all wrong, and
+> instead mod:ing the GPIO with the IRQ base which does not
+> make any sense.
 >
-> Would you please also make the wrtite_page_raw call-back return an error
-> code - it is just strange to change '->write_page' and avoid changing
-> '->write_page_raw'...
-
-Ok. I'll do a version 2 patch that makes write_page_raw return an error 
-code too.
-
+> So fix this up so we can use sleepmode.
 >
-> P.S. Not sure we still want these baroque header comments, but this is
-> just a side note and separate issue.
->
+> Cc: Lee Jones<lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij<linus.walleij@stericsson.com>
 
-If change the write_page_raw call back with return value. then I will 
-remove all the function and comments.
+Makes sense.
 
-Best Regards,
-Josh Wu
+Reviewed-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
