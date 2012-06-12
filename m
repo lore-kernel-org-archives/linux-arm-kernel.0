@@ -1,43 +1,99 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 12 Jun 2012 14:49:46 +0200
-Subject: [PATCH] ARM: pxa: remove eseries.h
-Message-ID: <1339505386.30984.123.camel@x61.thuisdomein>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Tue, 12 Jun 2012 18:26:05 +0530
+Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
+In-Reply-To: <20120423201131.GG31244@redhat.com>
+References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
+ <20120423201131.GG31244@redhat.com>
+Message-ID: <4FD73C65.3050409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e478fe4cd50b86e95fadc415438b63fa94060b7d ("[ARM] pxa: merge all
-eseries board code into eseries.c") removed all six files that included
-eseries.h. Everything that this header provides is now either local to
-eseries.c or entirely unused. It was apparently just an oversight to
-keep this header. This header can safely be removed.
+On 4/24/2012 1:41 AM, Jarod Wilson wrote:
+> On Tue, Feb 28, 2012 at 11:21:40AM +0530, Ravi Kumar V wrote:
+>> Adds GPIO based IR Receiver driver. It decodes signals using decoders
+>> available in rc framework.
+>
+> Been meaning to look at this, but it looks like its already merged
+> upstream. Just one question though, inlined below.
+>
+>> --- /dev/null
+>> +++ b/drivers/media/rc/gpio-ir-recv.c
+>> @@ -0,0 +1,205 @@
+>> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/init.h>
+>> +#include<linux/module.h>
+>> +#include<linux/interrupt.h>
+>> +#include<linux/gpio.h>
+>> +#include<linux/slab.h>
+>> +#include<linux/platform_device.h>
+>> +#include<linux/irq.h>
+>> +#include<media/rc-core.h>
+>> +#include<media/gpio-ir-recv.h>
+>> +
+>> +#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
+>> +#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+>> +
+>> +struct gpio_rc_dev {
+>> +	struct rc_dev *rcdev;
+>> +	unsigned int gpio_nr;
+>> +	bool active_low;
+>> +};
+>> +
+>> +static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
+>> +{
+>> +	struct gpio_rc_dev *gpio_dev = dev_id;
+>> +	unsigned int gval;
+>> +	int rc = 0;
+>> +	enum raw_event_type type = IR_SPACE;
+>> +
+>> +	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
+>> +
+>> +	if (gval<  0)
+>> +		goto err_get_value;
+>> +
+>> +	if (gpio_dev->active_low)
+>> +		gval = !gval;
+>> +
+>> +	if (gval == 1)
+>> +		type = IR_PULSE;
+>
+> What happens if gval is>  1?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Testing with "git grep" for various things in the (history of the) tree.
+gpio_get_value_cansleep() can return
+bool for low/high.
+negative for error.
 
- arch/arm/mach-pxa/eseries.h |   14 --------------
- 1 files changed, 0 insertions(+), 14 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/eseries.h
+so i think we dont get value> 1
 
-diff --git a/arch/arm/mach-pxa/eseries.h b/arch/arm/mach-pxa/eseries.h
-deleted file mode 100644
-index b96949d..0000000
---- a/arch/arm/mach-pxa/eseries.h
-+++ /dev/null
-@@ -1,14 +0,0 @@
--void __init eseries_fixup(struct tag *tags, char **cmdline, struct meminfo *mi);
--
--extern struct pxa2xx_udc_mach_info e7xx_udc_mach_info;
--extern struct pxaficp_platform_data e7xx_ficp_platform_data;
--extern int e7xx_irda_init(void);
--
--extern int eseries_tmio_enable(struct platform_device *dev);
--extern int eseries_tmio_disable(struct platform_device *dev);
--extern int eseries_tmio_suspend(struct platform_device *dev);
--extern int eseries_tmio_resume(struct platform_device *dev);
--extern void eseries_get_tmio_gpios(void);
--extern struct resource eseries_tmio_resources[];
--extern struct platform_device e300_tc6387xb_device;
--
+>
+>> +	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
+>> +	if (rc<  0)
+>> +		goto err_get_value;
+>> +
+>> +	ir_raw_event_handle(gpio_dev->rcdev);
+>> +
+>> +err_get_value:
+>> +	return IRQ_HANDLED;
+>> +}
+>
+> Looks like you'll store a space any time you get gval>  1, which may or
+> may not be intended here...
+>
+>
+
+
 -- 
-1.7.7.6
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
