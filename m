@@ -1,153 +1,43 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 19:20:41 +0200
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4FD763C5.3090500@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
- <4FD66410.7090001@wwwdotorg.org>
- <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
- <4FD763C5.3090500@wwwdotorg.org>
-Message-ID: <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 12 Jun 2012 19:21:52 +0200 (CEST)
+Subject: [PATCH 1/2] clockevents: add an optional frequency update function
+In-Reply-To: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
+References: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <alpine.LFD.2.02.1206121852310.3086@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 06/12/2012 12:21 AM, Thierry Reding wrote:
-> > * Stephen Warren wrote:
-> >> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> >>> This commit adds support for instantiating the Tegra PCIe
-> >>> controller from a device tree.
-> >> 
-> >>> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
-> >> 
-> >> Can we please name this nvidia,tegra20-pcie.txt to match the
-> >> naming of all the other Tegra bindings.
-> > 
-> > Yes, will do.
-> > 
-> >>> +Required properties: +- compatible: "nvidia,tegra20-pcie" +-
-> >>> reg: physical base address and length of the controller's
-> >>> registers
-> >> 
-> >> Since there's more than one range now, that should specify how
-> >> many entries are required and what they represent.
-> > 
-> > Okay.
-> > 
-> >>> +Optional properties: +- pex-clk-supply: supply voltage for
-> >>> internal reference clock +- vdd-supply: power supply for
-> >>> controller (1.05V)
-> >> 
-> >> Those shouldn't be optional. If the board has no regulator, the
-> >> board's .dts should provide a fixed always-on regulator that
-> >> those properties can refer to, so that the driver can always
-> >> get() those regulators.
-> > 
-> > That'll add more dummy regulators and I don't think sprinkling them
-> > across the DTS is going to work very well. Maybe collecting them
-> > under a top-level "regulators" node is a good option. If you have a
-> > better alternative, I'm all open for it.
-> > 
-> >>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
-> >>> b/arch/arm/boot/dts/tegra20.dtsi
-> >> 
-> >>> +	pci {
-> >> ...
-> >>> +		status = "disable";
-> >> 
-> >> That should be "disabled"; sorry for providing a bad example.
-> > 
-> > Yes.
-> > 
-> >>> diff --git a/arch/arm/mach-tegra/pcie.c
-> >>> b/arch/arm/mach-tegra/pcie.c
-> >> 
-> >>> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct
-> >>> platform_device *pdev)
-> >> 
-> >>> +	if (of_find_property(node, "vdd-supply", NULL)) {
-> >> 
-> >> As mentioned above, that if statement should be removed, since
-> >> the regulators shouldn't be optional.
-> > 
-> > Okay.
-> > 
-> >>> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
-> >> 
-> >> Those could be devm_regulator_get(). Then tegra_pcie_remove()
-> >> wouldn't have to put() them.
-> > 
-> > Okay.
-> > 
-> >>> +	for (i = 0; i < TEGRA_PCIE_MAX_PORTS; i++) +
-> >>> pdata->enable_ports[i] = true;
-> >> 
-> >> Shouldn't the DT indicate which ports are used? I assume there's
-> >> some reason that the existing driver allows that to be
-> >> configured, rather than always enabling all ports. At least,
-> >> enumeration time wasted on non-existent ports springs to mind,
-> >> and perhaps attempting to enable port 1 when port 0 is x4 and
-> >> using all the lanes would cause errors in port 0?
-> > 
-> > Yes, that's been on my mind as well. I'm not sure about the best
-> > binding for this. Perhaps something like:
-> > 
-> > pci { enable-ports = <0 1 2>; };
-> > 
-> > Would do?
-> 
-> That seems reasonable, although since the property is presumably
-> something specific to the Tegra PCIe binding, not generic, I think it
-> should be nvidia,enable-ports.
+On Tue, 8 May 2012, Linus Walleij wrote:
 
-I came up with the following alternative:
+Sorry for answering late and thanks for the reminder.
 
-	pci {
-		compatible = "nvidia,tegra20-pcie";
-		reg = <0x80003000 0x00000800   /* PADS registers */
-		       0x80003800 0x00000200   /* AFI registers */
-		       0x80004000 0x00100000   /* configuration space */
-		       0x80104000 0x00100000   /* extended configuration space */
-		       0x80400000 0x00010000   /* downstream I/O */
-		       0x90000000 0x10000000   /* non-prefetchable memory */
-		       0xa0000000 0x10000000>; /* prefetchable memory */
-		interrupts = <0 98 0x04   /* controller interrupt */
-		              0 99 0x04>; /* MSI interrupt */
-		status = "disabled";
+>  int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
+>  {
+> +	/* Call down to the driver to reconfigure for new frequency */
+> +	if (dev->update_freq)
+> +		dev->update_freq(dev->mode, dev);
 
-		ranges = <0x80000000 0x80000000 0x00002000   /* 2 root ports */
-			  0x80004000 0x80004000 0x00100000   /* configuration space */
-			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
-			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
-			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
-			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+This shouldn't be unconditional. If the device is not used or shut
+down or in oneshot mode this call is pointless. So this wants to go
+below.
 
-		#address-cells = <1>;
-		#size-cells = <1>;
+>  	clockevents_config(dev, freq);
 
-		port at 80000000 {
-			reg = <0x80000000 0x00001000>;
-			status = "disabled";
-		};
+Shouldn't we store the frequency in the clock_event_device structure, so
+the driver has it handy when either the set_mode, reprogram or
+update_freq() function is called ?
 
-		port at 80001000 {
-			reg = <0x80001000 0x00001000>;
-			status = "disabled";
-		};
-	};
+>  	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
 
-The "ranges" property can probably be cleaned up a bit, but the most
-interesting part is the port@ children, which can simply be enabled in board
-DTS files by setting the status property to "okay". I find that somewhat more
-intuitive to the variant with an "enable-ports" property.
+	switch (dev->mode) {
+	case CLOCK_EVT_MODE_ONESHOT:
+		return clockevents_program_event(dev, dev->next_event, false);
+	case CLOCK_EVT_MODE_PERIODIC:
+		if (dev->update_freq)
+			dev->update_freq(dev->mode, dev);
+	}
+	return 0;
 
-What do you think of this?
+Thanks,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/9af0c2bb/attachment-0001.sig>
+	tglx
