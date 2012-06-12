@@ -1,31 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jun 2012 18:37:48 +0200
-Subject: [PATCH 1/2] clockevents: add an optional frequency update function
-In-Reply-To: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
-References: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdYUJzhHVhYyzM-PVz41tbUv7=gF2h-4xePh3uryLu8CYg@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 12 Jun 2012 10:03:06 -0700
+Subject: [PATCH 2/5] ARM: at91: Implementation of PMC clks using the
+ common clk framework.
+In-Reply-To: <1336812838-3649-3-git-send-email-linux-arm@overkiz.com>
+References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
+ <1336812838-3649-3-git-send-email-linux-arm@overkiz.com>
+Message-ID: <20120612170306.GD19410@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 2:17 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+On 20120512-10:53, Boris BREZILLON wrote:
+> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> index 79d0f60..29f8812 100644
+> --- a/arch/arm/mach-at91/Makefile
+> +++ b/arch/arm/mach-at91/Makefile
+> @@ -6,8 +6,11 @@ obj-y		:= irq.o gpio.o setup.o
+>  obj-m		:=
+>  obj-n		:=
+>  obj-		:=
+> -
+> +ifeq ($(CONFIG_COMMON_CLK),y)
+> +obj-$(CONFIG_AT91_PMC_UNIT)	+= pmc-osc.o pmc-pll.o pmc-master.o pmc-sys.o pmc-periph.o pmc-prog.o pmc.o
+> +else
+>  obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
+> +endif
 
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> For some clockevents, especially for periodic ones, we get a
-> problem when the frequency of the clock driving the event
-> changes. We previously have a solution for one-shot events
-> that will simply reprogram the next event. This introduces
-> an optional callback so that drivers can update constant
-> timer latch values derived from HZ.
->
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Boris,
 
-Poke Thomas on this - are you happy with this patch?
-If you ACK it I can try to submit it to Russell's patch tracker
-with 2/2 for v3.6.
+Looks like the old platform clock code is not removed in this series.
+Is this just a work in progress or do you want to merge in AT91 support
+for common clk while leaving the old clock code merged in?
 
-Yours,
-Linus Walleij
+Regards,
+Mike
