@@ -1,90 +1,20 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 13:42:27 -0500
-Subject: [PATCH v5 14/14] ARM: OMAP2+: gpmc: writeprotect helper
-In-Reply-To: <85c5dc5fa3203cc60a12d4b2350e45da07d7f5fd.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <85c5dc5fa3203cc60a12d4b2350e45da07d7f5fd.1339419492.git.afzal@ti.com>
-Message-ID: <4FD78D93.9080906@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 12 Jun 2012 15:53:02 -0300
+Subject: ARM: iMX: lockup with irqs disabled in drivers/tty/imx.c
+In-Reply-To: <4FB8CFBB.2020004@cs.bris.ac.uk>
+References: <4FB8CFBB.2020004@cs.bris.ac.uk>
+Message-ID: <CAOMZO5CDoJm8QgeA=r6k+hcZ-Z8sGZ19AgA1d8wWTGh3PaXmoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Michael,
 
-On 06/11/2012 09:27 AM, Afzal Mohammed wrote:
-> GPMC has a writeprotect pin that can be connected to
-> peripherals. If any CS wants to enable writeprotect,
-> writeprotect will be enabled, once CS configurations
-> are finished.
+On Sun, May 20, 2012 at 8:04 AM, Michael McTernan
+<Michael.McTernan.2001@cs.bris.ac.uk> wrote:
 
-I am still wondering if we should warn against multiple devices using
-the wait pin. I see that if could be valid to have multiple memory
-devices of the same type using the WP pin spanning multiple CS. However,
-in that case would/should the memory devices be registered as a single
-child? If so then we could still impose a policy of only one child
-device using the WP.
+> I can then trigger the lockup by simply booting the unit and issuing "echo >
+> /dev/ttymxc1". ?The same can be done on the other ports too. Once locked,
+> magic sys-req appears not to work, pinging the target is dead etc...
 
-Jon
-
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 98b52c3..eec011a 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -159,6 +159,7 @@ struct gpmc_peripheral {
->  static struct gpmc_peripheral gpmc_peripheral[GPMC_CS_NUM];
->  static unsigned gpmc_num_peripheral;
->  static unsigned gpmc_waitpin_map;
-> +static bool gpmc_writeprotect;
->  
->  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
->  static struct irq_chip gpmc_irq_chip;
-> @@ -976,6 +977,9 @@ static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
->  	else if (conf & GPMC_CONFIG1_PAGE_LEN_16)
->  		l |= GPMC_CONFIG1_PAGE_LEN_16;
->  
-> +	if (conf & GPMC_CONFIG_WRITEPROTECT)
-> +		gpmc_writeprotect = true;
-> +
->  	conf &= (GPMC_CONFIG1_MUXADDDATA |
->  			GPMC_CONFIG1_WRITETYPE_SYNC |
->  			GPMC_CONFIG1_WRITEMULTIPLE_SUPP |
-> @@ -1462,6 +1466,19 @@ int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *c)
->  }
->  EXPORT_SYMBOL_GPL(gpmc_cs_reconfigure);
->  
-> +static inline void gpmc_setup_writeprotect(void)
-> +{
-> +	u32 l;
-> +
-> +	l = gpmc_read_reg(GPMC_CONFIG);
-> +	if (gpmc_writeprotect == true) {
-> +		l &= ~GPMC_CONFIG_WRITEPROTECT;
-> +		dev_info(gpmc_dev, "write protect enabled\n");
-> +	} else
-> +		l |= GPMC_CONFIG_WRITEPROTECT;
-> +	gpmc_write_reg(GPMC_CONFIG, l);
-> +}
-> +
->  static __devinit int gpmc_probe(struct platform_device *pdev)
->  {
->  	u32 l;
-> @@ -1521,6 +1538,8 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
->  			dev_err(gpmc_dev, "device creation on %s failed\n",
->  								g_per->name);
->  
-> +	gpmc_setup_writeprotect();
-> +
->  	return 0;
->  }
->  
-> @@ -1531,6 +1550,7 @@ static __exit int gpmc_remove(struct platform_device *pdev)
->  	for (; gpmc_num_peripheral; g_per++, gpmc_num_peripheral--)
->  		platform_device_unregister(g_per->pdev);
->  
-> +	gpmc_writeprotect = false;
->  	gpmc_waitpin_map = 0;
->  	gpmc_free_irq();
->  	gpmc_mem_exit();
+I did a 'echo "hello" > /dev/ttymxc1' and I am not able to see the
+lockup on a mx31pdk running 3.5-rc1.
