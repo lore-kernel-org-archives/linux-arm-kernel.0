@@ -1,35 +1,60 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 12 Jun 2012 10:03:06 -0700
-Subject: [PATCH 2/5] ARM: at91: Implementation of PMC clks using the
- common clk framework.
-In-Reply-To: <1336812838-3649-3-git-send-email-linux-arm@overkiz.com>
-References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
- <1336812838-3649-3-git-send-email-linux-arm@overkiz.com>
-Message-ID: <20120612170306.GD19410@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 12 Jun 2012 10:07:35 -0700
+Subject: [RFC PATCH 0/5] omap: add ocp2scp as a misc driver
+In-Reply-To: <CAAe_U6+zi50muNFKXW9ytK0BVki+5wxVK_S0rjEc53M2oc-GeQ@mail.gmail.com>
+ (KISHON VIJAY ABRAHAM's message of "Wed, 6 Jun 2012 20:40:50 +0530")
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <201205310922.18550.arnd@arndb.de>
+ <CAAe_U6J3p9Lh9g82tSSLxOJ7nqrozdRe11zV_v2rqTuMYPjbyA@mail.gmail.com>
+ <201205312046.14823.arnd@arndb.de>
+ <CAAe_U6+zi50muNFKXW9ytK0BVki+5wxVK_S0rjEc53M2oc-GeQ@mail.gmail.com>
+Message-ID: <87fwa01mso.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120512-10:53, Boris BREZILLON wrote:
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 79d0f60..29f8812 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -6,8 +6,11 @@ obj-y		:= irq.o gpio.o setup.o
->  obj-m		:=
->  obj-n		:=
->  obj-		:=
-> -
-> +ifeq ($(CONFIG_COMMON_CLK),y)
-> +obj-$(CONFIG_AT91_PMC_UNIT)	+= pmc-osc.o pmc-pll.o pmc-master.o pmc-sys.o pmc-periph.o pmc-prog.o pmc.o
-> +else
->  obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
-> +endif
+"ABRAHAM, KISHON VIJAY" <kishon@ti.com> writes:
 
-Hi Boris,
+> Hi Kevin, Benoit, Paul,
+>
+> On Fri, Jun 1, 2012 at 2:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thursday 31 May 2012, ABRAHAM, KISHON VIJAY wrote:
+>>> > I would mark the multiplexed device compatible with "simple-bus", which
+>>> > results in the child devices automatically getting added.
+>>>
+>>> hmm.. ocp2scp has a sysconfig register and it also has a module mode
+>>> by which it can be enabled/disabled. I was making use of pm_runtime
+>>> API's to control these registers (Apart from creating child devices,
+>>> the driver also has a call to pm_runtime_enable).
+>>
+>> I see.
+>>
+>>> I'm not sure if with
+>>> "simple-bus" we'll be able to do those. I have to check on that.
+>>
+>> How about making it compatible with both "simple-bus" and something
+>> that handles the pm_runtime requirements?
+>>
+>> I don't understand enough of what needs to be done for pm_runtime
+>> across a lot of devices, but I'd hope that it should be possible
+>> to do that in a generic way based on the device definition.
+>
+> Is there already exists a generic way for handling pm_runtime
+> requirements (as simple as doing a pm_runtime_enable on a device).
 
-Looks like the old platform clock code is not removed in this series.
-Is this just a work in progress or do you want to merge in AT91 support
-for common clk while leaving the old clock code merged in?
+As you've discovered, the runtime PM core handles the parent/child
+relationships already.
 
-Regards,
-Mike
+> So the actual problem is we have ocp2scp as parent and usb2phy and
+> usb3phy as the child device. ocp2scp has the sysconfig register and it
+> can be controlled using module mode bit (both of this can be
+> controlled by pm_runtime). Whenever usb controller(dwc3/musb) wants to
+> enable a phy, it calls an exported API in usb2/usb3 phy to enable it.
+> These API's have pm_runtime_get_sync on usb2/usb3 device which in-turn
+> calls pm_runtime_get_sync of ocp2scp because of parent->child
+> relationship (For this both usb2/usb3 phy and ocp2scp devices should
+> have called pm_runtime_enable). All I'm trying is to find a place to
+> have pm_runtime_enable for ocp2scp.
+
+Maybe I'm not following, but why can't it be in the driver?
+
+Kevin
