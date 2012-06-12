@@ -1,21 +1,37 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 08:44:12 +0000
-Subject: [PATCH v5 09/14] ARM: OMAP2+: gpmc: holler if no configuration
-In-Reply-To: <4FD6717C.6080101@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <66dd8cb20cd46e68e43f4a56f49d040ad993e976.1339419492.git.afzal@ti.com>
- <4FD6717C.6080101@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997F4F@DBDE01.ent.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 12 Jun 2012 10:44:55 +0200
+Subject: [PATCH] dmaengine: at_hdmac: trivial: fix comment in header
+Message-ID: <1339490695-28796-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Not all Atmel SoCs were pointed out in header comment which was bringing
+confusion. Remove the truncated list of supported devices, replace by the
+only one that is not supported.
 
-On Tue, Jun 12, 2012 at 04:00:20, Hunter, Jon wrote:
+Reported-by: Elen Song <elen.song@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-> Nit, "holler" is slang. Just say WARN.
-
-It was a deliberate attempt to add human (or read humorous) touch
-
-Regards
-Afzal
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 7292aa8..bb16013 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -9,10 +9,9 @@
+  * (at your option) any later version.
+  *
+  *
+- * This supports the Atmel AHB DMA Controller,
+- *
+- * The driver has currently been tested with the Atmel AT91SAM9RL
+- * and AT91SAM9G45 series.
++ * This supports the Atmel AHB DMA Controller found in several Atmel SoCs.
++ * The only Atmel DMA Controller that is not covered by this driver is the one
++ * found on AT91SAM9263.
+  */
+ 
+ #include <linux/clk.h>
+-- 
+1.7.10
