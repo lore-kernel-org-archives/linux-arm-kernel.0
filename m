@@ -1,73 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jun 2012 10:28:42 +0100
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <4FD64083.3020800@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-2-git-send-email-jon-hunter@ti.com>
- <20120608094708.GC19062@mudshark.cambridge.arm.com>
- <4FD21930.4000800@ti.com>
- <20120611173930.GD28235@mudshark.cambridge.arm.com>
- <4FD64083.3020800@ti.com>
-Message-ID: <20120612092842.GA2991@mudshark.cambridge.arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 12 Jun 2012 12:04:29 +0200
+Subject: [PATCH] ARM: remove linkup-l1110.h
+Message-ID: <1339495469.30984.115.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 08:01:23PM +0100, Jon Hunter wrote:
-> Hi Will,
+No file includes this header. Nothing seems interested in the things
+this header provides. It appears that it has never been included since
+at least v2.6.12-rc2. It can safely be removed.
 
-Hello,
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested by "git grepping" the (history of) the tree for a few things.
 
-> On 06/11/2012 12:39 PM, Will Deacon wrote:
-> > This looks better to me, so I took it for a spin on my 4460 (thanks Nicolas!)
-> > and noticed that only the cycle counter seems to tick -- the event counters
-> > always return 0 deltas (that is, they don't increment). Booting the same SD
-> > card on a 4430 (same MLO, u-boot, kernel and filesystem) I see that the
-> > event counters function correctly there.
-> 
-> Thanks for the feedback. Being somewhat new to PMU, I was mainly using
-> PERF to test and verify that with "perf top" I was seeing interrupts.
-> How do I check what the event counters are returning? Any perf tests I
-> could use?
+ arch/arm/include/asm/hardware/linkup-l1110.h |   48 --------------------------
+ 1 files changed, 0 insertions(+), 48 deletions(-)
+ delete mode 100644 arch/arm/include/asm/hardware/linkup-l1110.h
 
-You can continue to use perf top, just specify an event other than cycles:
-
-# perf top -e instructions
-
-for example. You can also use perf stat, but that probably won't be
-triggering irqs.
-
-> By the way, as a quick test you could modify the code in omap_init_pmu()
-> to call omap4430_init_pmu() for all omap4 devices as follows ...
-> 
-> 	if (cpu_is_omap44xx())
->  		return omap4430_init_pmu();
-> 
-> I was hoping for 4460/70 we would not need to keep the debugss and other
-> domains on and hence, I called the above function omap4430_init_pmu().
-> However this function works for all omap4 devices, it just turns on more
-> power domains.
-
-Well, I tried that and the results are pretty whacky: the event counters do
-indeed tick but interrupts only fire if I pin the perf task to CPU1! What's
-more, the interrupts do fire on both cores when they're working...
-
-Without the above change, I can generate cycle counter interrupts regardless
-of which CPU I run execute perf.
-
-> > It also seems that we can remove the dependency on CONFIG_OMAP3_EMU with these
-> > patches but I don't have any OMAP3 hardware to check if we get any regressions
-> > on older platforms. Do your patches only deal with OMAP4?
-> 
-> It *should* work for all omap2+. So far I have tested an omap3 beagle
-> but I have not tested an omap2 device. Again the extent of my testing
-> was to run "perf top" and verify interrupts we being generated. I
-> realise that this may not be sufficient and so if you have a more
-> exhaustive test you recommend let me know.
-
-Well, try the above as well as what you're currently doing and that should
-test the basics. If that works, I'll happily drop the Kconfig dependency on
-OMAP3_EMU (which has been a regular source of confusion).
-
-Cheers,
-
-Will
+diff --git a/arch/arm/include/asm/hardware/linkup-l1110.h b/arch/arm/include/asm/hardware/linkup-l1110.h
+deleted file mode 100644
+index 7ec9116..0000000
+--- a/arch/arm/include/asm/hardware/linkup-l1110.h
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/*
+-*
+-* Definitions for H3600 Handheld Computer
+-*
+-* Copyright 2001 Compaq Computer Corporation.
+-*
+-* Use consistent with the GNU GPL is permitted,
+-* provided that this copyright notice is
+-* preserved in its entirety in all copies and derived works.
+-*
+-* COMPAQ COMPUTER CORPORATION MAKES NO WARRANTIES, EXPRESSED OR IMPLIED,
+-* AS TO THE USEFULNESS OR CORRECTNESS OF THIS CODE OR ITS
+-* FITNESS FOR ANY PARTICULAR PURPOSE.
+-*
+-* Author: Jamey Hicks.
+-*
+-*/
+-
+-/* LinkUp Systems PCCard/CompactFlash Interface for SA-1100 */
+-
+-/* PC Card Status Register */
+-#define LINKUP_PRS_S1	(1 << 0) /* voltage control bits S1-S4 */
+-#define LINKUP_PRS_S2	(1 << 1)
+-#define LINKUP_PRS_S3	(1 << 2)
+-#define LINKUP_PRS_S4	(1 << 3)
+-#define LINKUP_PRS_BVD1	(1 << 4)
+-#define LINKUP_PRS_BVD2	(1 << 5)
+-#define LINKUP_PRS_VS1	(1 << 6)
+-#define LINKUP_PRS_VS2	(1 << 7)
+-#define LINKUP_PRS_RDY	(1 << 8)
+-#define LINKUP_PRS_CD1	(1 << 9)
+-#define LINKUP_PRS_CD2	(1 << 10)
+-
+-/* PC Card Command Register */
+-#define LINKUP_PRC_S1	(1 << 0)
+-#define LINKUP_PRC_S2	(1 << 1)
+-#define LINKUP_PRC_S3	(1 << 2)
+-#define LINKUP_PRC_S4	(1 << 3)
+-#define LINKUP_PRC_RESET (1 << 4)
+-#define LINKUP_PRC_APOE	(1 << 5) /* Auto Power Off Enable: clears S1-S4 when either nCD goes high */
+-#define LINKUP_PRC_CFE	(1 << 6) /* CompactFlash mode Enable: addresses A[10:0] only, A[25:11] high */
+-#define LINKUP_PRC_SOE	(1 << 7) /* signal output driver enable */
+-#define LINKUP_PRC_SSP	(1 << 8) /* sock select polarity: 0 for socket 0, 1 for socket 1 */
+-#define LINKUP_PRC_MBZ	(1 << 15) /* must be zero */
+-
+-struct linkup_l1110 {
+-	volatile short prc;
+-};
+-- 
+1.7.7.6
