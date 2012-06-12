@@ -1,21 +1,54 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 12 Jun 2012 11:08:10 -0700
-Subject: [PATCH 4/7] ARM: nomadik: convert to generic clock
-In-Reply-To: <1339018506-29126-1-git-send-email-linus.walleij@linaro.org>
-References: <1339018506-29126-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120612180810.GG19410@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Jun 2012 13:09:32 -0500
+Subject: [PATCH v5 06/14] ARM: OMAP2+: gpmc: CS configuration helper
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998201@DBDE01.ent.ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <9dd458171d6a68ea4f97a4ba19dbacc0d6b5ba35.1339419492.git.afzal@ti.com>
+ <4FD66666.8060002@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997F1F@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998201@DBDE01.ent.ti.com>
+Message-ID: <4FD785DC.2000106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120606-23:35, Linus Walleij wrote:
-> Remove more custom stuff by simply converting the Nomadik machine
-> to use generic clocks and move the driver to drivers/clk.
+
+On 06/12/2012 07:58 AM, Mohammed, Afzal wrote:
+> Hi Jon,
 > 
-> Cc: Mike Turquette <mturquette@ti.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> On Tue, Jun 12, 2012 at 14:10:08, Mohammed, Afzal wrote:
+> 
+>>>> +	l |= conf & GPMC_CONFIG1_DEVICETYPE_NAND;
+>>>> +	l |= conf & GPMC_CONFIG1_DEVICESIZE_16;
+>>>
+>>> I can see that it works to use the above definitions as masks because of
+>>> the possible values that can be programmed into these fields. However,
+>>> from a read-ability standpoint this is unclear and requires people to
+>>> review the documentation to understand what you are doing here.
+>>> Furthermore, if any new device-types or sizes were added in the future
+>>> this could lead to bugs. Hence, it would be better to define a mask for
+>>> these fields.
+>>
+>> I had thought about it initially, but then it was felt it will
+>> lead to a less simple code, that path was not taken, let me
+>> revisit this.
+> 
+> Thinking again over it, I am feeling above is sufficient, reason same as
+> said earlier, to keep code simple & currently this is sufficient to
+> handle GPMC bit patterns for IPs presently available. What you are
+> suggesting is to take care of the imaginary case when new GPMC IP happens
+> with new device type or size, I think that should be handled when such a
+> scenario happens. Probably, it is better here to add a comment to make
+> intention clear.
 
-Looks like you've already sent a pull request for this to arm-soc.  FWIW
-you can add my Acked-by for this patch.
+That is one possibility but I think that more important reasons are ...
 
-Regards,
-Mike
+1. Readability, at first it appears that we are always configuring the
+CS for NAND. However, this is not the case. Maybe a comment here can
+help as you mentioned.
+
+2. A bad setting in the configuration passed. Hopefully, people will
+stick to the flags but we know that we expect the device type to be a 0
+or 2 and so should we check?
+
+Cheers
+Jon
