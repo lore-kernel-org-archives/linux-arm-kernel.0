@@ -1,51 +1,60 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 12 Jun 2012 21:19:25 +0800
-Subject: [PATCH] ARM: pxa: remove eseries.h
-In-Reply-To: <1339505386.30984.123.camel@x61.thuisdomein>
-References: <1339505386.30984.123.camel@x61.thuisdomein>
-Message-ID: <CAMPhdO99maVhhpzLC_v9ZBdt=2=KNAg4oEn+wbQYmhYTEtTGgw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jun 2012 14:23:21 +0100
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
+In-Reply-To: <201206121259.38807.arnd@arndb.de>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYoQFhBfRaPMBiVTiD979b+8708oS1qCPm+iyy5OZe2bw@mail.gmail.com>
+ <4FD6FF6C.6040500@linaro.org> <201206121259.38807.arnd@arndb.de>
+Message-ID: <4FD742C9.7090603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 8:49 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Commit e478fe4cd50b86e95fadc415438b63fa94060b7d ("[ARM] pxa: merge all
-> eseries board code into eseries.c") removed all six files that included
-> eseries.h. Everything that this header provides is now either local to
-> eseries.c or entirely unused. It was apparently just an oversight to
-> keep this header. This header can safely be removed.
+On 12/06/12 13:59, Arnd Bergmann wrote:
+> On Tuesday 12 June 2012, Lee Jones wrote:
+>> On 11/06/12 22:01, Linus Walleij wrote:
+>>> Hm what shall we do when we run out of initlevels? I think this was the
+>>> kind of thing that deferred probe should solve. Usually changing this kind
+>>> of thing has side effects so I'm a bit hesitant.
+>>
+>> Ah yes, I remember now. The IRQ domain needs to be in place before the
+>> Device Tree is parsed by the Open Firmware subsystem. If it's not the
+>> error "no irq domain found" is triggered and the IRQs are never mapped.
+>>
+>> I'd be happy to take a second opinion, but I believe this (and the other
+>> core_initcall patch) is required.
 >
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> It's still just a hack. The real solution that we discussed last time it
+> came up is to defer the translation of irq numbers until device driver
+> probe time, and bail out with -EPROBE_DEFER if you try to use a device
+> whose interrupt is not available yet.
 
-That was long time ago. I'm basically good with the removal. Haojian, could
-you give a simple test maybe?
+Ah yes, this:
 
-> ---
-> Testing with "git grep" for various things in the (history of the) tree.
->
-> ?arch/arm/mach-pxa/eseries.h | ? 14 --------------
-> ?1 files changed, 0 insertions(+), 14 deletions(-)
-> ?delete mode 100644 arch/arm/mach-pxa/eseries.h
->
-> diff --git a/arch/arm/mach-pxa/eseries.h b/arch/arm/mach-pxa/eseries.h
-> deleted file mode 100644
-> index b96949d..0000000
-> --- a/arch/arm/mach-pxa/eseries.h
-> +++ /dev/null
-> @@ -1,14 +0,0 @@
-> -void __init eseries_fixup(struct tag *tags, char **cmdline, struct meminfo *mi);
-> -
-> -extern struct pxa2xx_udc_mach_info e7xx_udc_mach_info;
-> -extern struct pxaficp_platform_data e7xx_ficp_platform_data;
-> -extern int e7xx_irda_init(void);
-> -
-> -extern int eseries_tmio_enable(struct platform_device *dev);
-> -extern int eseries_tmio_disable(struct platform_device *dev);
-> -extern int eseries_tmio_suspend(struct platform_device *dev);
-> -extern int eseries_tmio_resume(struct platform_device *dev);
-> -extern void eseries_get_tmio_gpios(void);
-> -extern struct resource eseries_tmio_resources[];
-> -extern struct platform_device e300_tc6387xb_device;
-> -
-> --
-> 1.7.7.6
->
+> /*
+>  * FIXME: Should we set up the GPIO domain here?
+>  *
+>  * The problem is that we cannot put the interrupt resources into the platform
+>  * device until the irqdomain has been added. Right now, we set the GIC interrupt
+>  * domain from init_irq(), then load the gpio driver from
+>  * core_initcall(nmk_gpio_init) and add the platform devices from
+>  * arch_initcall(customize_machine).
+>  *
+>  * This feels fragile because it depends on the gpio device getting probed
+>  * _before_ any device uses the gpio interrupts.
+> */
+
+But your suggestion above involves some heavy refactoring of how Device 
+Tree works. Meanwhile the ab8500 will not work as an IRQ controller 
+until we either complete the work or use the same solution as we did for 
+the Nomadik GPIO controller. I think for now at least we should continue 
+to work on enablement and leave the 'nice to have's until last. We are 
+doing nothing new here, just bringing the ab8500 IRQ controller into 
+line with the Nomadik one.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
