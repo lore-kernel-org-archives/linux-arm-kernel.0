@@ -1,39 +1,52 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 08:10:03 +0200
-Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
-In-Reply-To: <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
- <4FD660F9.7030807@wwwdotorg.org>
- <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Tue, 12 Jun 2012 11:34:39 +0530
+Subject: RFC: changing DMA slave configuration API
+In-Reply-To: <20120611082424.GE11404@n2100.arm.linux.org.uk>
+References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
+ <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
+ <20120610112217.GD11404@n2100.arm.linux.org.uk>
+ <1339390249.1927.1623.camel@vkoul-udesk3>
+ <20120611082424.GE11404@n2100.arm.linux.org.uk>
+Message-ID: <1339481079.1927.1635.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding wrote:
-> * Stephen Warren wrote:
-> > On 06/11/2012 09:05 AM, Thierry Reding wrote:
-[...]
-> > > +static int tegra_pcie_disable_msi(struct platform_device *pdev)
+On Mon, 2012-06-11 at 09:24 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 11, 2012 at 10:20:49AM +0530, Vinod Koul wrote:
+> > I think it is a good idea. And I would like to extend it even a little
+> > bit. Do we have any users of peripheral to peripheral slave dma?
+> > IIRC  that is not the case, or does anyone know of existence or plans
+> > for such a h/w?
 > > 
-> > Should this free pcie->msi->pages?
+> > If not, lets junk the src/dst fields and keep burst, length, addr fields
+> > which point to the peripheral values.
+> > 
+> > Alternatively if we need both, then we can't have union and Russell's
+> > idea seems good one :)
 > 
-> Yes it should. I actually mention making that change in the changelog but
-> in fact didn't.
+> We don't need the union whatever way that goes.
+Based on comment we need to support both.
 
-This is really moot because the driver cannot be built as a module currently
-because arch_setup_msi_irq() and arch_teardown_msi_irq() need to be built-in
-so tegra_pcie_disable_msi() will be called only just before the machine is
-shut down.
+> 
+> The question over whether we have the src/dst fields is whether we want
+> to support a different configuration for DMA_DEV_TO_MEM/DMA_MEM_TO_DEV
+> without having to reconfigure the channel each time its direction is
+> switched.
+The biggest issue here is the design of the API. IMO the slave_config
+should be passed along with respective prepare API for slave and not
+thru separate slave config. That will remove the unnecessary limitation
+and allow the same channel to be used for tx for one transfer and rx for
+subsequent etc.
 
-Perhaps this is something that should be addressed? Or is it just not worth
-the effort?
+In the .device_prep_slave_sg() we should add the struct slave_config as
+an argument. Obviously the slave_config will have _one_ pair of members
+(not both src/dstn fields then).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/92722551/attachment.sig>
+For DMA_DEV_TO_DEV, anyway we need a new API, which can have both src
+and dstn slave_config
+
+Thoughts..?
+
+
+-- 
+~Vinod
