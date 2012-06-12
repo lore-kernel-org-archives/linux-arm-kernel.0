@@ -1,40 +1,32 @@
-From: viresh.kumar2@arm.com (viresh kumar)
-Date: Tue, 12 Jun 2012 15:21:20 +0100
-Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
-In-Reply-To: <20120612140801.GA7918@n2100.arm.linux.org.uk>
-References: <20120522234621.GA3610@windriver.com>
- <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
- <20120612140801.GA7918@n2100.arm.linux.org.uk>
-Message-ID: <4FD75060.9020805@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Jun 2012 10:24:12 -0400
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <20120612140616.GC17893@lunn.ch>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <201206121349.27696.arnd@arndb.de> <20120612140616.GC17893@lunn.ch>
+Message-ID: <20120612142412.GD14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/12 15:08, Russell King - ARM Linux wrote:
-> On Tue, Jun 12, 2012 at 11:57:07AM +0100, viresh kumar wrote:
->> struct clk *clk_get(struct device *dev, const char *id)
->> {
->>      return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
->> }
->>
->> I can remove first four without any issues, but just can't remove the
->> last one.  The dummy clk_get() always returns NULL, whereas this one
->> returns NULL only for fb device.
->
-> This isn't a totally dummy clk implementation.  What it's doing is returning
-> a dummy clock for the framebuffer, and explicitly failing everything else
-> (because we have no need to support any other clocks.)
->
-> If we want to use the dummy clk stuff in its entirety, and just return the
-> dummy clock for all clk_get()s on this platform, then there isn't a problem.
-> If we want to keep this behaviour, we need to use clkdev with the dummy
-> clk implementation.
+On Tue, Jun 12, 2012 at 04:06:16PM +0200, Andrew Lunn wrote:
+> > arch/arm/mach-kirkwood/board-* (DT files)
+> > 	-> arch/arm/mach-mvebu/
+> 
+> I know of work being done to make orion5x and dove also support DT.
+> Should we consider some sort of prefix or midfix indicating which SoC
+> a board file is for? It will not be easy to mentally keep track of
+> board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
 
-First one is easier and I would go with that, if maintainer of that file/module
-accepts it.
+The board-BOARD.c files are transitional files, and will disappear once
+the DT conversion is done.  All that will remain is board-dt.c.  So,
+there is no long-term issue.  Since it's a short term issue, and we're
+moving/renaming anyway, how about kirkwood-dreamplug.c, orion5x-ts209.c,
+etc?
 
-@Sascha: Are you maintaining this module?
+I personally don't think it's needed, but I have no strong opinion on
+it.
 
---
-Viresh
+thx,
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+Jason.
