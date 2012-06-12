@@ -1,44 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 12 Jun 2012 13:48:05 +0300
-Subject: [RFC PATCH 0/3] usb: musb: add new phy driver
-In-Reply-To: <1338388466-3565-1-git-send-email-kishon@ti.com>
-References: <1338388466-3565-1-git-send-email-kishon@ti.com>
-Message-ID: <20120612104803.GD10901@arwen.pp.htv.fi>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 12 Jun 2012 12:56:32 +0200
+Subject: [PATCH] pinctrl: nomadik: fix up typo
+Message-ID: <1339498592-1435-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 30, 2012 at 08:04:23PM +0530, Kishon Vijay Abraham I wrote:
-> This series adds a new usb2 phy driver. The device for which is created
-> by the ocp2scp driver. This also uses control module driver.
-> 
-> This series converts twl6030 as a comparator driver (previously it was
-> also the phy driver) and makes use of omap-usb2 as the phy driver.
-> 
-> Instead of notification mechanism by power chip to omap glue to pass detection
-> of any events, an export API has been added in omap glue. Both twl4030 and
-> twl6030 will call to this API to pass any event. (twl6030 is used in omap4 and
-> twl4030 is used in omap3).
-> 
-> This series depends on:
-> *[RFC PATCH 00/11] OMAP System Control Module* patch series
-> However System Control Module driver has only dt support, so wouldn't
-> be able to test this patch series. However I'll adapt omap usb2 phy
-> driver and musb driver for dt and send it asap to the list.
-> 
-> This series also depends on:
-> *[PATCH v3 0/3] usb: multi-phy support* patch series
-> *[RFC PATCH 0/5] omap: add ocp2scp as a misc driver* patch series
-> 
-> Compile tested only.
+Commit a60b57eddaa8af6c02cf7bbeb58ebf82881f08ac
+"drivers/gpio: gpio-nomadik: Add support for irqdomains"
+changed GPIO offset calculations to have this form:
+(gpio % NMK_GPIO_PER_CHIP) except in this one place for
+setting sleep mode, where the conversion was all wrong, and
+instead mod:ing the GPIO with the IRQ base which does not
+make any sense.
 
-are we getting new version of this series ?
+So fix this up so we can use sleepmode.
 
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/pinctrl/pinctrl-nomadik.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index ba7122f..e8937e7 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -673,7 +673,7 @@ static void __nmk_gpio_set_wake(struct nmk_gpio_chip *nmk_chip,
+ 	 * wakeup is anyhow controlled by the RIMSC and FIMSC registers.
+ 	 */
+ 	if (nmk_chip->sleepmode && on) {
+-		__nmk_gpio_set_slpm(nmk_chip, gpio % nmk_chip->chip.base,
++		__nmk_gpio_set_slpm(nmk_chip, gpio % NMK_GPIO_PER_CHIP,
+ 				    NMK_GPIO_SLPM_WAKEUP_ENABLE);
+ 	}
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/702f7f0b/attachment.sig>
+1.7.9.2
