@@ -1,168 +1,174 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jun 2012 13:30:50 +0100
-Subject: [PATCH v8 07/13] ARM: convert ux500 to smp_ops
-In-Reply-To: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
-References: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339504256-11266-8-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 12 Jun 2012 13:30:43 +0100
+Subject: [PATCH v8 00/13] Per sub-architecture SMP operations
+Message-ID: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert ux500 platforms to use the smp_ops to provide
-their SMP and CPU hotplug operations.
+This patch series is a small departure from the earlier series, which
+was trying to introduce a SoC descriptor. Instead, this one focusses
+on SMP operations, and only this, as per Arnd's request.
 
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-ux500/board-mop500.c       |    4 ++++
- arch/arm/mach-ux500/hotplug.c            |    8 +++++---
- arch/arm/mach-ux500/include/mach/setup.h |    7 +++++++
- arch/arm/mach-ux500/platsmp.c            |   14 ++++++++++----
- 4 files changed, 26 insertions(+), 7 deletions(-)
+Each platforms exports a "struct smp_ops" that is pointed to by their
+mach_desc. The last patch consolidates the definition of pen_release
+into the SMP code, though this is arguably wrong (most platforms
+shouldn't need the whole pen_release thing at all).
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9c74ac5..86258fa 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -788,6 +788,7 @@ static void __init hrefv60_init_machine(void)
- 
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
-+	smp_ops(ux500_smp_ops)
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
-@@ -799,6 +800,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- MACHINE_END
- 
- MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
-+	smp_ops(ux500_smp_ops)
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
-@@ -809,6 +811,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
- MACHINE_END
- 
- MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
-+	smp_ops(ux500_smp_ops)
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
-@@ -939,6 +942,7 @@ static const char * u8500_dt_board_compat[] = {
- 
- 
- DT_MACHINE_START(U8500_DT, "ST-Ericsson U8500 platform (Device Tree Support)")
-+	smp_ops(ux500_smp_ops)
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-index c76f0f4..ae1a8eb 100644
---- a/arch/arm/mach-ux500/hotplug.c
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -15,6 +15,8 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
-+#include <mach/setup.h>
-+
- extern volatile int pen_release;
- 
- static inline void platform_do_lowpower(unsigned int cpu)
-@@ -34,7 +36,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 	}
- }
- 
--int platform_cpu_kill(unsigned int cpu)
-+int ux500_cpu_kill(unsigned int cpu)
- {
- 	return 1;
- }
-@@ -44,13 +46,13 @@ int platform_cpu_kill(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void ux500_cpu_die(unsigned int cpu)
- {
- 	/* directly enter low power state, skipping secure registers */
- 	platform_do_lowpower(cpu);
- }
- 
--int platform_cpu_disable(unsigned int cpu)
-+int ux500_cpu_disable(unsigned int cpu)
- {
- 	/*
- 	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
-index 8b7ed82..3fcd58b 100644
---- a/arch/arm/mach-ux500/include/mach/setup.h
-+++ b/arch/arm/mach-ux500/include/mach/setup.h
-@@ -11,6 +11,7 @@
- #ifndef __ASM_ARCH_SETUP_H
- #define __ASM_ARCH_SETUP_H
- 
-+#include <asm/smp_ops.h>
- #include <asm/mach/time.h>
- #include <linux/init.h>
- 
-@@ -44,4 +45,10 @@ extern struct sys_timer ux500_timer;
- 	.type		= MT_MEMORY,		\
- }
- 
-+extern struct smp_ops ux500_smp_ops;
-+
-+extern int  ux500_cpu_kill(unsigned int cpu);
-+extern void ux500_cpu_die(unsigned int cpu);
-+extern int  ux500_cpu_disable(unsigned int cpu);
-+
- #endif /*  __ASM_ARCH_SETUP_H */
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index da1d5ad..9afd9d7 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -58,7 +58,7 @@ static void __iomem *scu_base_addr(void)
- 
- static DEFINE_SPINLOCK(boot_lock);
- 
--void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit ux500_secondary_init(unsigned int cpu)
- {
- 	/*
- 	 * if any interrupts are already enabled for the primary
-@@ -80,7 +80,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
- }
- 
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
- 
-@@ -145,7 +145,7 @@ static void __init wakeup_secondary(void)
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
--void __init smp_init_cpus(void)
-+static void __init ux500_smp_init_cpus(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
- 	unsigned int i, ncores;
-@@ -165,9 +165,15 @@ void __init smp_init_cpus(void)
- 	set_smp_cross_call(gic_raise_softirq);
- }
- 
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
- {
- 
- 	scu_enable(scu_base_addr());
- 	wakeup_secondary();
- }
-+
-+struct smp_ops ux500_smp_ops __initdata = {
-+	smp_init_ops(ux500)
-+	smp_secondary_ops(ux500)
-+	smp_hotplug_ops(ux500)
-+};
+Patches against v3.5-rc2. Tested on VExpress (Cortex A15).
+
+Also available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git smp_ops-v3.5-rc2
+
+Changelog:
+
+>From v7:
+- Dropped soc_desc, and focussed only on smp_ops
+- Fixed CONFIG_HOTPLUG_CPU typo (courtesy of Shawn Guo)
+- Marked {realview,vexpress}_cpu_die() as __cpuinit
+- Added support for spear13xx
+- Added pen_release consolidation (based on Arnd Bergman's patch)
+
+>From v6:
+- Dropped the dummy_* stuff
+- Support for a number of new platforms
+- Added the soc_hotplug_ops() macro to hide some #ifdef-ery away
+- More exynos[ 45] churn
+- Fixed section mismatches
+
+>From v5:
+- Added support for highbank and imx6q
+- Added support for new shmobile SMP platform
+- Add dummy_cpu_kill, dummy_cpu_disable and cpu_lowpower
+
+>From v4:
+- Added an SMP registration interface and moved all SMP structures to
+  smp.c. The end result is much cleaner.
+- Cleaned up patch 2 (leftovers from a previous rework)
+- NVIDIA/EXYNOS4 naming cleanup.
+
+>From v3:
+- Converted all SMP platforms
+- Added some cleanup as a last patch
+
+>From v2:
+- Split the SMP ops between init and runtime operations in order to
+  have separate lifetimes for the different structures. This is not
+  perfect though, as it still allows an __init function to make it to
+  a runtime structure (all smp_*_ops structures are __initdata in
+  order to be able to discard them). Thanks to Nico for pointing this
+  out.
+- Use macros to hide the #ifdef-ery in the SoC descriptor init,
+  courtesy of Arnd.
+
+>From v1:
+- Move the SMP ops out of the descriptor, which makes the structure
+  init a bit cleaner (thanks to Arnd).
+- Mark all structures __initdata and keep a copy of the used ones.
+- Keep a global pointer for the SMP ops.
+
+Marc Zyngier (13):
+  ARM: Add per-platform SMP/CPU-hotplug operations
+  ARM: convert VExpress/RealView to smp_ops
+  ARM: convert OMAP4 to smp_ops
+  ARM: convert Tegra to smp_ops
+  ARM: convert Exynos to smp_ops
+  ARM: convert MSM SMP to smp_ops
+  ARM: convert ux500 to smp_ops
+  ARM: convert shmobile SMP to smp_ops
+  ARM: convert highbank to smp_ops
+  ARM: convert imx6q to smp_ops
+  ARM: convert spear13xx to smp_ops
+  ARM: smp: Make smp_ops mandatory for SMP platforms
+  ARM: consolidate pen_release instead of having per platform
+    definitions
+
+ arch/arm/include/asm/mach/arch.h               |   10 +++
+ arch/arm/include/asm/smp.h                     |   15 +---
+ arch/arm/include/asm/smp_ops.h                 |   87 ++++++++++++++++++++++++
+ arch/arm/kernel/setup.c                        |    2 +
+ arch/arm/kernel/smp.c                          |   86 ++++++++++++++++++++++-
+ arch/arm/mach-exynos/common.h                  |    8 +++
+ arch/arm/mach-exynos/hotplug.c                 |    8 +--
+ arch/arm/mach-exynos/mach-armlex4210.c         |    1 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c         |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c         |    1 +
+ arch/arm/mach-exynos/mach-nuri.c               |    1 +
+ arch/arm/mach-exynos/mach-origen.c             |    1 +
+ arch/arm/mach-exynos/mach-smdk4x12.c           |    2 +
+ arch/arm/mach-exynos/mach-smdkv310.c           |    2 +
+ arch/arm/mach-exynos/mach-universal_c210.c     |    1 +
+ arch/arm/mach-exynos/platsmp.c                 |   23 ++++---
+ arch/arm/mach-highbank/core.h                  |    7 ++
+ arch/arm/mach-highbank/highbank.c              |    1 +
+ arch/arm/mach-highbank/hotplug.c               |    6 +-
+ arch/arm/mach-highbank/platsmp.c               |   14 ++--
+ arch/arm/mach-imx/hotplug.c                    |    6 +-
+ arch/arm/mach-imx/mach-imx6q.c                 |    2 +
+ arch/arm/mach-imx/platsmp.c                    |   15 ++--
+ arch/arm/mach-msm/board-msm8960.c              |    3 +
+ arch/arm/mach-msm/board-msm8x60.c              |    7 ++
+ arch/arm/mach-msm/core.h                       |    7 ++
+ arch/arm/mach-msm/hotplug.c                    |    8 +--
+ arch/arm/mach-msm/platsmp.c                    |   20 +++---
+ arch/arm/mach-omap2/board-4430sdp.c            |    1 +
+ arch/arm/mach-omap2/board-generic.c            |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c         |    1 +
+ arch/arm/mach-omap2/common.h                   |   10 +++
+ arch/arm/mach-omap2/omap-hotplug.c             |    6 +-
+ arch/arm/mach-omap2/omap-smp.c                 |   15 ++--
+ arch/arm/mach-realview/core.c                  |    1 +
+ arch/arm/mach-realview/core.h                  |    7 ++
+ arch/arm/mach-realview/hotplug.c               |    8 +--
+ arch/arm/mach-realview/platsmp.c               |   15 ++--
+ arch/arm/mach-realview/realview_eb.c           |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c       |    1 +
+ arch/arm/mach-realview/realview_pbx.c          |    1 +
+ arch/arm/mach-shmobile/board-ag5evm.c          |    1 +
+ arch/arm/mach-shmobile/board-kota2.c           |    1 +
+ arch/arm/mach-shmobile/board-kzm9d.c           |    1 +
+ arch/arm/mach-shmobile/board-kzm9g.c           |    1 +
+ arch/arm/mach-shmobile/board-marzen.c          |    1 +
+ arch/arm/mach-shmobile/hotplug.c               |   26 +++++--
+ arch/arm/mach-shmobile/include/mach/common.h   |   19 ++----
+ arch/arm/mach-shmobile/include/mach/emev2.h    |    8 +--
+ arch/arm/mach-shmobile/include/mach/r8a7779.h  |    6 ++
+ arch/arm/mach-shmobile/include/mach/sh73a0.h   |    4 ++
+ arch/arm/mach-shmobile/platsmp.c               |   86 +----------------------
+ arch/arm/mach-shmobile/setup-emev2.c           |    1 +
+ arch/arm/mach-shmobile/smp-emev2.c             |   21 ++++--
+ arch/arm/mach-shmobile/smp-r8a7779.c           |   21 ++++--
+ arch/arm/mach-shmobile/smp-sh73a0.c            |   22 ++++--
+ arch/arm/mach-spear13xx/hotplug.c              |    8 +--
+ arch/arm/mach-spear13xx/include/mach/generic.h |    7 ++
+ arch/arm/mach-spear13xx/platsmp.c              |   21 +++---
+ arch/arm/mach-spear13xx/spear1310.c            |    1 +
+ arch/arm/mach-spear13xx/spear1340.c            |    1 +
+ arch/arm/mach-tegra/board-dt-tegra20.c         |    2 +
+ arch/arm/mach-tegra/board-dt-tegra30.c         |    2 +
+ arch/arm/mach-tegra/board-harmony.c            |    2 +
+ arch/arm/mach-tegra/board-paz00.c              |    2 +
+ arch/arm/mach-tegra/board-seaboard.c           |    4 ++
+ arch/arm/mach-tegra/board-trimslice.c          |    2 +
+ arch/arm/mach-tegra/common.c                   |    2 +
+ arch/arm/mach-tegra/common.h                   |    6 ++
+ arch/arm/mach-tegra/hotplug.c                  |    6 +-
+ arch/arm/mach-tegra/platsmp.c                  |   17 +++--
+ arch/arm/mach-ux500/board-mop500.c             |    4 ++
+ arch/arm/mach-ux500/hotplug.c                  |    8 +--
+ arch/arm/mach-ux500/include/mach/setup.h       |    7 ++
+ arch/arm/mach-ux500/platsmp.c                  |   20 +++---
+ arch/arm/mach-vexpress/core.h                  |    8 +++
+ arch/arm/mach-vexpress/hotplug.c               |    8 +--
+ arch/arm/mach-vexpress/platsmp.c               |   16 +++--
+ arch/arm/mach-vexpress/v2m.c                   |    4 ++
+ arch/arm/plat-mxc/include/mach/common.h        |    8 +++
+ arch/arm/plat-versatile/include/plat/platsmp.h |   14 ++++
+ arch/arm/plat-versatile/platsmp.c              |   10 +--
+ 82 files changed, 578 insertions(+), 244 deletions(-)
+ create mode 100644 arch/arm/include/asm/smp_ops.h
+ create mode 100644 arch/arm/mach-msm/core.h
+ create mode 100644 arch/arm/mach-tegra/common.h
+ create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
+
 -- 
 1.7.10.3
