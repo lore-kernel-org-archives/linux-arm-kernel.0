@@ -1,31 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jun 2012 12:59:38 +0000
-Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
- core_initcall time
-In-Reply-To: <4FD6FF6C.6040500@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdYoQFhBfRaPMBiVTiD979b+8708oS1qCPm+iyy5OZe2bw@mail.gmail.com>
- <4FD6FF6C.6040500@linaro.org>
-Message-ID: <201206121259.38807.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 12 Jun 2012 15:01:23 +0200
+Subject: [PATCH v2 3/8] arm: mach-mvebu: add compilation/configuration
+ change
+In-Reply-To: <201206120839.02915.arnd@arndb.de>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <1339433585-28087-4-git-send-email-gregory.clement@free-electrons.com>
+ <201206120839.02915.arnd@arndb.de>
+Message-ID: <4FD73DA3.2060505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 June 2012, Lee Jones wrote:
-> On 11/06/12 22:01, Linus Walleij wrote:
-> > Hm what shall we do when we run out of initlevels? I think this was the
-> > kind of thing that deferred probe should solve. Usually changing this kind
-> > of thing has side effects so I'm a bit hesitant.
+On 06/12/2012 10:39 AM, Arnd Bergmann wrote:
+> On Monday 11 June 2012, Gregory CLEMENT wrote:
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Lior Amsalem <alior@marvell.com>
 > 
-> Ah yes, I remember now. The IRQ domain needs to be in place before the 
-> Device Tree is parsed by the Open Firmware subsystem. If it's not the 
-> error "no irq domain found" is triggered and the IRQs are never mapped.
+> Please always keep this patch last in the series, as soon as it is applied,
+> one can build a kernel for mvebu, which ends up not working. Each step
+> in a patch series needs to provide a working, incremental improvement
+> over the previous one, so when adding a new feature in parts, you can
+> only enable it once you have something that actually builds.
 > 
-> I'd be happy to take a second opinion, but I believe this (and the other 
-> core_initcall patch) is required.
 
-It's still just a hack. The real solution that we discussed last time it
-came up is to defer the translation of irq numbers until device driver
-probe time, and bail out with -EPROBE_DEFER if you try to use a device
-whose interrupt is not available yet.
+Ok I will move this patch at the end of the serie for the next version.
 
-	Arnd
+
+> 	Arnd
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
++33 602 196 044
