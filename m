@@ -1,43 +1,26 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 06:53:06 +0000
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <4FD64D6D.3020401@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jun 2012 00:04:31 -0700
+Subject: [PATCH v7 04/12] ARM: SoC: convert OMAP4 to SoC descriptor
+In-Reply-To: <1339085369-26073-5-git-send-email-marc.zyngier@arm.com>
+References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+ <1339085369-26073-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120612070431.GF12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, Jun 12, 2012 at 01:26:29, Hunter, Jon wrote:
-
-> > +	pdev = omap_device_build(name, -1, oh, pdata,
-> > +					sizeof(*pdata), NULL, 0, 0);
-> > +	if (IS_ERR(pdev)) {
-> > +		WARN(1, "Can't build omap_device for %s:%s.\n",
-> > +						name, oh->name);
-> > +		return PTR_ERR(pdev);
-> > +	}
-> > +
-> > +	gpmc_l3_clk = clk_get(NULL, oh->main_clk);
-> > +	if (IS_ERR(gpmc_l3_clk)) {
-> > +		pr_err("Could not get GPMC clock\n");
-> > +		return PTR_ERR(gpmc_l3_clk);
-> > +	}
+* Marc Zyngier <marc.zyngier@arm.com> [120607 09:21]:
+> Convert OMAP4 to use the SoC descriptor to provide its SMP
+> and CPU hotplug operations.
 > 
-> My preference would be to store gpmc_l3_clk in the pdata and pass to
-> probe via the pdata. The aim would be to remove the global gpmc_l3_clk
-> altogether.
+> Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
+> 
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-For timing calculation by platform outside of driver, we need clk rate
+FYI, I got some whitespace error on the ux500 patch while
+applying this series.
 
-> Also we should attempt to get the clk before calling omap_device_build
-> which is registering the driver.
+Gave this series a quick boot test on 2430/omap3/omap4
+and it works just fine:
 
-omap_device_build registers only device, but I agree that clk should
-be obtained before it as driver can get probed at that point
-
-Regards,
-Afzal
+Tested-by: Tony Lindgren <tony@atomide.com>
