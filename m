@@ -1,57 +1,100 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 06:16:14 +0000
-Subject: [PATCH 2/3] ARM: OMAP2+: onenand: cleanup for gpmc driver
- conversion
-In-Reply-To: <4FD63AAE.90008@ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
- <4FD63AAE.90008@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997D47@DBDE01.ent.ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 12 Jun 2012 08:21:24 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FD66410.7090001@wwwdotorg.org>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+Message-ID: <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, Jun 12, 2012 at 00:06:30, Hunter, Jon wrote:
-
-> I agree with getting rid of the first instance at the beginning of
-> _set_async_mode, but why get rid of the above one? Are you assuming that
-> by default it is in async mode? Could be nice to keep it to be explicit.
-
-Second one is achieved below
-
-> > @@ -191,19 +181,21 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
-> >  	u32 reg;
-> >  	bool clk_dep = false;
-> >  
-> > +	/* Ensure sync read and sync write are disabled */
-> > +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
-> > +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
-> > +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
-> > +
+* Stephen Warren wrote:
+> On 06/11/2012 09:05 AM, Thierry Reding wrote:
+> > This commit adds support for instantiating the Tegra PCIe controller
+> > from a device tree.
 > 
-> Should we only set these after we have checked the flags and depending
-> on which flags are set?
-
-Even for sync mode, setting async mode initially is required
-
-> > @@ -421,6 +413,8 @@ void __init gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
-> >  	gpmc_onenand_resource.end = gpmc_onenand_resource.start +
-> >  							ONENAND_IO_SIZE - 1;
-> >  
-> > +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
-> > +
+> > +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
 > 
-> What about putting this in the gpmc_onenand_setup() function before the
-> call to _set_sync_mode? Seems nice to have these together.
+> Can we please name this nvidia,tegra20-pcie.txt to match the naming of
+> all the other Tegra bindings.
 
-Intention of this patch is to setup GPMC async mode before driver starts
-its job so that reconfiguring GPMC needs to be to be done only once (this
-helps in avoiding issues when it has to work with gpmc driver).
+Yes, will do.
 
-With the existing code, set_async was done as part of set_sync, hence
-requiring GPMC to be configured twice after driver takes control, with
-your suggestion too, GPMC would have to be configured twice.
+> > +Required properties:
+> > +- compatible: "nvidia,tegra20-pcie"
+> > +- reg: physical base address and length of the controller's registers
+> 
+> Since there's more than one range now, that should specify how many
+> entries are required and what they represent.
 
-Regards
-Afzal
+Okay.
+
+> > +Optional properties:
+> > +- pex-clk-supply: supply voltage for internal reference clock
+> > +- vdd-supply: power supply for controller (1.05V)
+> 
+> Those shouldn't be optional. If the board has no regulator, the board's
+> .dts should provide a fixed always-on regulator that those properties
+> can refer to, so that the driver can always get() those regulators.
+
+That'll add more dummy regulators and I don't think sprinkling them across
+the DTS is going to work very well. Maybe collecting them under a top-level
+"regulators" node is a good option. If you have a better alternative, I'm all
+open for it.
+
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> 
+> > +	pci {
+> ...
+> > +		status = "disable";
+> 
+> That should be "disabled"; sorry for providing a bad example.
+
+Yes.
+
+> > diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+> 
+> > +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct platform_device *pdev)
+> 
+> > +	if (of_find_property(node, "vdd-supply", NULL)) {
+> 
+> As mentioned above, that if statement should be removed, since the
+> regulators shouldn't be optional.
+
+Okay.
+
+> > +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
+> 
+> Those could be devm_regulator_get(). Then tegra_pcie_remove() wouldn't
+> have to put() them.
+
+Okay.
+
+> > +	for (i = 0; i < TEGRA_PCIE_MAX_PORTS; i++)
+> > +		pdata->enable_ports[i] = true;
+> 
+> Shouldn't the DT indicate which ports are used? I assume there's some
+> reason that the existing driver allows that to be configured, rather
+> than always enabling all ports. At least, enumeration time wasted on
+> non-existent ports springs to mind, and perhaps attempting to enable
+> port 1 when port 0 is x4 and using all the lanes would cause errors in
+> port 0?
+
+Yes, that's been on my mind as well. I'm not sure about the best binding for
+this. Perhaps something like:
+
+	pci {
+		enable-ports = <0 1 2>;
+	};
+
+Would do?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/525d5b8b/attachment.sig>
