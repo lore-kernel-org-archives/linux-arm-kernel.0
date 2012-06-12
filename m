@@ -1,52 +1,47 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 19:23:01 +0200
-Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
-In-Reply-To: <4FD762E6.2080906@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
- <4FD660F9.7030807@wwwdotorg.org>
- <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
- <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
- <4FD762E6.2080906@wwwdotorg.org>
-Message-ID: <20120612172301.GB28010@avionic-0098.adnet.avionic-design.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Jun 2012 13:26:22 -0400 (EDT)
+Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
+ functions
+In-Reply-To: <20120612191804.4211462a@tukaani.org>
+References: <1339470307-28223-1-git-send-email-tmac@hp.com>
+ <20120612191804.4211462a@tukaani.org>
+Message-ID: <alpine.LFD.2.02.1206121316190.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 06/12/2012 12:10 AM, Thierry Reding wrote:
-> > * Thierry Reding wrote:
-> >> * Stephen Warren wrote:
-> >>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> > [...]
-> >>>> +static int tegra_pcie_disable_msi(struct platform_device
-> >>>> *pdev)
-> >>> 
-> >>> Should this free pcie->msi->pages?
-> >> 
-> >> Yes it should. I actually mention making that change in the
-> >> changelog but in fact didn't.
-> > 
-> > This is really moot because the driver cannot be built as a module
-> > currently because arch_setup_msi_irq() and arch_teardown_msi_irq()
-> > need to be built-in so tegra_pcie_disable_msi() will be called only
-> > just before the machine is shut down.
-> > 
-> > Perhaps this is something that should be addressed? Or is it just
-> > not worth the effort?
+On Tue, 12 Jun 2012, Lasse Collin wrote:
+
+> On 2012-06-11 T Makphaibulchoke wrote:
+> > +#ifndef __HAVE_PREBOOT_ARCH_MEMMOVE
+> > +void *memmove(void *__dest, __const void *__src, size_t count)
+> > +{
+> > +	unsigned char *d = __dest;
+> > +	const unsigned char *s = __src;
+> > +
+> > +	if (__dest == __src)
+> > +		return __dest;
+> > +
+> > +	if (__dest < __src)
+> > +		return memcpy(__dest, __src, count);
+> > +
+> > +	while (count--)
+> > +		d[count] = s[count];
+> > +	return __dest;
+> > +}
+> > +#endif
 > 
-> Well, if the driver provides a shutdown/removal path at all, it seems
-> like it should be complete. I assume it's trivial to free those pages?
+> The use of memcpy when __dest < __src is OK with some memcpy
+> implementations, but in a generic case it isn't guaranteed to work.
 
-Yes, it's trivial and I'll definitely add it. What I was saying is that
-it doesn't matter really, unless something is done to allow the driver
-to be built as a module. It is also tedious to test the shutdown/removal
-for built-in drivers.
+Of course, if the memcpy implementation is also provided along with this 
+memmove code, as it was the case on ARM before this patch, then you can 
+guarantee it.  And if that memcpy() happens to be slightly more 
+optimized then this is a win.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/7b6113bc/attachment.sig>
+> I think it would be better to just copy memmove from lib/string.c.
+
+Instead of copying, maybe this would be much better to make the content 
+of lib/string.c usable in a pre-boot environment.
+
+
+Nicolas
