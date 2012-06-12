@@ -1,28 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jun 2012 16:32:10 +0200
-Subject: [PATCH 14/14] ARM: ux500: Move rtc-pl031 registration to Device
- Tree when enabled
-In-Reply-To: <4FD6F7C6.80002@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdbJdA8rgcXX4Xc3sMrx==5jd-Scu1Xy0UKz0ot3_bbNzw@mail.gmail.com>
- <4FD6F7C6.80002@linaro.org>
-Message-ID: <CACRpkdYiZkRT-XLbEBRzCBKJ+721OBVKmUF+v17seFiWxmndnw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jun 2012 15:32:49 +0100
+Subject: [PATCH] ARM: two possible fixes for the KALLSYMS build problem
+In-Reply-To: <20120611203748.GA16967@codeaurora.org>
+References: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
+ <20120611203748.GA16967@codeaurora.org>
+Message-ID: <20120612143249.GB7918@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 10:03 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On 11/06/12 22:43, Linus Walleij wrote:
+On Mon, Jun 11, 2012 at 01:37:48PM -0700, David Brown wrote:
+> On Fri, Jun 01, 2012 at 09:21:59AM -0700, David Brown wrote:
+> 
+> > David Brown (1):
+> >   ARM: Prevent KALLSYM size mismatch on ARM.
+> > 
+> >  arch/arm/kernel/vmlinux.lds.S |    3 +++
+> >  1 file changed, 3 insertions(+)
+> 
+> Just wondering if anyone has had a chance to look at either of these,
+> or try them.  I haven't seen any KALLSYMS mismatch build errors with
+> either of these patches applied.
 
->> Oh this is a bug fix really, well it's in the device tree so nevermind.
->
-> It is? How so?
-
-That the device tree was declaring a compatible node for something
-that never existed (stericsson,db8500-rtc) while the real node is
-"arm,rtc-pl031", "arm,primecell".
-
-Without this fix 3.4 will not have an PL031 RTC I guess?
-
-Yours,
-Linus Walleij
+I think variant 2 is the better approach out of either as it doesn't add
+to the size of the resulting kernel image.
