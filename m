@@ -1,41 +1,31 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 12:58:10 +0000
-Subject: [PATCH v5 06/14] ARM: OMAP2+: gpmc: CS configuration helper
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E997F1F@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <9dd458171d6a68ea4f97a4ba19dbacc0d6b5ba35.1339419492.git.afzal@ti.com>
- <4FD66666.8060002@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997F1F@DBDE01.ent.ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998201@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jun 2012 12:59:38 +0000
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
+In-Reply-To: <4FD6FF6C.6040500@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYoQFhBfRaPMBiVTiD979b+8708oS1qCPm+iyy5OZe2bw@mail.gmail.com>
+ <4FD6FF6C.6040500@linaro.org>
+Message-ID: <201206121259.38807.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, Jun 12, 2012 at 14:10:08, Mohammed, Afzal wrote:
-
-> > > +	l |= conf & GPMC_CONFIG1_DEVICETYPE_NAND;
-> > > +	l |= conf & GPMC_CONFIG1_DEVICESIZE_16;
-> > 
-> > I can see that it works to use the above definitions as masks because of
-> > the possible values that can be programmed into these fields. However,
-> > from a read-ability standpoint this is unclear and requires people to
-> > review the documentation to understand what you are doing here.
-> > Furthermore, if any new device-types or sizes were added in the future
-> > this could lead to bugs. Hence, it would be better to define a mask for
-> > these fields.
+On Tuesday 12 June 2012, Lee Jones wrote:
+> On 11/06/12 22:01, Linus Walleij wrote:
+> > Hm what shall we do when we run out of initlevels? I think this was the
+> > kind of thing that deferred probe should solve. Usually changing this kind
+> > of thing has side effects so I'm a bit hesitant.
 > 
-> I had thought about it initially, but then it was felt it will
-> lead to a less simple code, that path was not taken, let me
-> revisit this.
+> Ah yes, I remember now. The IRQ domain needs to be in place before the 
+> Device Tree is parsed by the Open Firmware subsystem. If it's not the 
+> error "no irq domain found" is triggered and the IRQs are never mapped.
+> 
+> I'd be happy to take a second opinion, but I believe this (and the other 
+> core_initcall patch) is required.
 
-Thinking again over it, I am feeling above is sufficient, reason same as
-said earlier, to keep code simple & currently this is sufficient to
-handle GPMC bit patterns for IPs presently available. What you are
-suggesting is to take care of the imaginary case when new GPMC IP happens
-with new device type or size, I think that should be handled when such a
-scenario happens. Probably, it is better here to add a comment to make
-intention clear.
+It's still just a hack. The real solution that we discussed last time it
+came up is to defer the translation of irq numbers until device driver
+probe time, and bail out with -EPROBE_DEFER if you try to use a device
+whose interrupt is not available yet.
 
-Regards
-Afzal
+	Arnd
