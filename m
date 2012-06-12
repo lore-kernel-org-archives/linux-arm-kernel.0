@@ -1,29 +1,300 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 12 Jun 2012 09:16:08 +0800
-Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
-In-Reply-To: <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
-References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
- <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
- <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
-Message-ID: <20120612011606.GJ2552@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Jun 2012 22:53:56 -0400 (EDT)
+Subject: [RFC PATCH 1/2] ARM: use generic strnlen_user and
+ strncpy_from_user functions
+In-Reply-To: <1339169935-31775-2-git-send-email-will.deacon@arm.com>
+References: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
+ <1339169935-31775-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1206112253040.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 09:44:41AM -0700, Olof Johansson wrote:
-> > Shawn Guo (2):
-> > ? ? ?ARM: imx6q: remove unneeded clkdev lookups
-> 
-> This is looking more like a cleanup, if it is, please hold off until
-> 3.6. If it isn't please explain in the commit message what bug it
-> fixes.
-> 
-Yes, it is a cleanup.  It cleans up some left-over from commit b0286f2
-(ARM: imx6q: prepare and enable init on clks directly instead of
-clk_get first) which is currently sitting on arm-soc/fixes.  I
-originally sent the patch to Sascha and somehow expect him amend the
-patch to that commit.  Anyway, it does not really matter, and we can
-have it held off until 3.6.
+On Fri, 8 Jun 2012, Will Deacon wrote:
 
--- 
-Regards,
-Shawn
+> This patch implements the word-at-a-time interface for ARM using the
+> same algorithm as x86. Although we have a clz instruction from ARMv5,
+> this only saves us one mov instruction when building with Thumb-2 and
+> makes no difference when targetting ARM, so we use the magic 0x0ff0001
+> constant for all CPUs. For big-endian configurations, we use the
+> implementation from asm-generic.
+> 
+> With this implemented, we can replace our byte-at-a-time strnlen_user
+> and strncpy_from_user functions with the optimised generic versions.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+With the updated patch comment...
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+>  arch/arm/Kconfig                      |    2 +
+>  arch/arm/include/asm/uaccess.h        |   27 +++------------
+>  arch/arm/include/asm/word-at-a-time.h |   55 +++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/armksyms.c            |    4 --
+>  arch/arm/lib/Makefile                 |    1 -
+>  arch/arm/lib/strncpy_from_user.S      |   43 -------------------------
+>  arch/arm/lib/strnlen_user.S           |   40 ------------------------
+>  7 files changed, 63 insertions(+), 109 deletions(-)
+>  create mode 100644 arch/arm/include/asm/word-at-a-time.h
+>  delete mode 100644 arch/arm/lib/strncpy_from_user.S
+>  delete mode 100644 arch/arm/lib/strnlen_user.S
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b649c59..b236fd9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -46,6 +46,8 @@ config ARM
+>  	select GENERIC_SMP_IDLE_THREAD
+>  	select KTIME_SCALAR
+>  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+> +	select GENERIC_STRNCPY_FROM_USER
+> +	select GENERIC_STRNLEN_USER
+>  	help
+>  	  The ARM series is a line of low-power-consumption RISC chip designs
+>  	  licensed by ARM Ltd and targeted at embedded applications and
+> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+> index 71f6536..479a635 100644
+> --- a/arch/arm/include/asm/uaccess.h
+> +++ b/arch/arm/include/asm/uaccess.h
+> @@ -189,6 +189,9 @@ static inline void set_fs(mm_segment_t fs)
+>  
+>  #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
+>  
+> +#define user_addr_max() \
+> +	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
+> +
+>  /*
+>   * The "__xxx" versions of the user access functions do not verify the
+>   * address space - it must have been done previously with a separate
+> @@ -398,9 +401,6 @@ extern unsigned long __must_check __clear_user_std(void __user *addr, unsigned l
+>  #define __clear_user(addr,n)		(memset((void __force *)addr, 0, n), 0)
+>  #endif
+>  
+> -extern unsigned long __must_check __strncpy_from_user(char *to, const char __user *from, unsigned long count);
+> -extern unsigned long __must_check __strnlen_user(const char __user *s, long n);
+> -
+>  static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+>  {
+>  	if (access_ok(VERIFY_READ, from, n))
+> @@ -427,24 +427,9 @@ static inline unsigned long __must_check clear_user(void __user *to, unsigned lo
+>  	return n;
+>  }
+>  
+> -static inline long __must_check strncpy_from_user(char *dst, const char __user *src, long count)
+> -{
+> -	long res = -EFAULT;
+> -	if (access_ok(VERIFY_READ, src, 1))
+> -		res = __strncpy_from_user(dst, src, count);
+> -	return res;
+> -}
+> -
+> -#define strlen_user(s)	strnlen_user(s, ~0UL >> 1)
+> +extern long strncpy_from_user(char *dest, const char __user *src, long count);
+>  
+> -static inline long __must_check strnlen_user(const char __user *s, long n)
+> -{
+> -	unsigned long res = 0;
+> -
+> -	if (__addr_ok(s))
+> -		res = __strnlen_user(s, n);
+> -
+> -	return res;
+> -}
+> +extern __must_check long strlen_user(const char __user *str);
+> +extern __must_check long strnlen_user(const char __user *str, long n);
+>  
+>  #endif /* _ASMARM_UACCESS_H */
+> diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+> new file mode 100644
+> index 0000000..74b2d45
+> --- /dev/null
+> +++ b/arch/arm/include/asm/word-at-a-time.h
+> @@ -0,0 +1,55 @@
+> +#ifndef __ASM_ARM_WORD_AT_A_TIME_H
+> +#define __ASM_ARM_WORD_AT_A_TIME_H
+> +
+> +#ifndef __ARMEB__
+> +
+> +/*
+> + * Little-endian word-at-a-time zero byte handling.
+> + * Heavily based on the x86 algorithm.
+> + */
+> +#include <linux/kernel.h>
+> +
+> +struct word_at_a_time {
+> +	const unsigned long one_bits, high_bits;
+> +};
+> +
+> +#define WORD_AT_A_TIME_CONSTANTS { REPEAT_BYTE(0x01), REPEAT_BYTE(0x80) }
+> +
+> +static inline unsigned long has_zero(unsigned long a, unsigned long *bits,
+> +				     const struct word_at_a_time *c)
+> +{
+> +	unsigned long mask = ((a - c->one_bits) & ~a) & c->high_bits;
+> +	*bits = mask;
+> +	return mask;
+> +}
+> +
+> +#define prep_zero_mask(a, bits, c) (bits)
+> +
+> +static inline unsigned long create_zero_mask(unsigned long bits)
+> +{
+> +	bits = (bits - 1) & ~bits;
+> +	return bits >> 7;
+> +}
+> +
+> +static inline unsigned long find_zero(unsigned long mask)
+> +{
+> +	unsigned long ret;
+> +
+> +#if __LINUX_ARM_ARCH__ >= 5
+> +	/* We have clz available. */
+> +	ret = fls(mask) >> 3;
+> +#else
+> +	/* (000000 0000ff 00ffff ffffff) -> ( 1 1 2 3 ) */
+> +	ret = (0x0ff0001 + mask) >> 23;
+> +	/* Fix the 1 for 00 case */
+> +	ret &= mask;
+> +#endif
+> +
+> +	return ret;
+> +}
+> +
+> +#else	/* __ARMEB__ */
+> +#include <asm-generic/word-at-a-time.h>
+> +#endif
+> +
+> +#endif /* __ASM_ARM_WORD_AT_A_TIME_H */
+> diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+> index b57c75e..c3dff6a 100644
+> --- a/arch/arm/kernel/armksyms.c
+> +++ b/arch/arm/kernel/armksyms.c
+> @@ -87,10 +87,6 @@ EXPORT_SYMBOL(memmove);
+>  EXPORT_SYMBOL(memchr);
+>  EXPORT_SYMBOL(__memzero);
+>  
+> -	/* user mem (segment) */
+> -EXPORT_SYMBOL(__strnlen_user);
+> -EXPORT_SYMBOL(__strncpy_from_user);
+> -
+>  #ifdef CONFIG_MMU
+>  EXPORT_SYMBOL(copy_page);
+>  
+> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+> index 992769a..d5060da 100644
+> --- a/arch/arm/lib/Makefile
+> +++ b/arch/arm/lib/Makefile
+> @@ -8,7 +8,6 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+>  		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
+>  		   delay.o findbit.o memchr.o memcpy.o		      \
+>  		   memmove.o memset.o memzero.o setbit.o              \
+> -		   strncpy_from_user.o strnlen_user.o                 \
+>  		   strchr.o strrchr.o                                 \
+>  		   testchangebit.o testclearbit.o testsetbit.o        \
+>  		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+> diff --git a/arch/arm/lib/strncpy_from_user.S b/arch/arm/lib/strncpy_from_user.S
+> deleted file mode 100644
+> index f202d7b..0000000
+> --- a/arch/arm/lib/strncpy_from_user.S
+> +++ /dev/null
+> @@ -1,43 +0,0 @@
+> -/*
+> - *  linux/arch/arm/lib/strncpy_from_user.S
+> - *
+> - *  Copyright (C) 1995-2000 Russell King
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -#include <linux/linkage.h>
+> -#include <asm/assembler.h>
+> -#include <asm/errno.h>
+> -
+> -	.text
+> -	.align	5
+> -
+> -/*
+> - * Copy a string from user space to kernel space.
+> - *  r0 = dst, r1 = src, r2 = byte length
+> - * returns the number of characters copied (strlen of copied string),
+> - *  -EFAULT on exception, or "len" if we fill the whole buffer
+> - */
+> -ENTRY(__strncpy_from_user)
+> -	mov	ip, r1
+> -1:	subs	r2, r2, #1
+> -	ldrusr	r3, r1, 1, pl
+> -	bmi	2f
+> -	strb	r3, [r0], #1
+> -	teq	r3, #0
+> -	bne	1b
+> -	sub	r1, r1, #1	@ take NUL character out of count
+> -2:	sub	r0, r1, ip
+> -	mov	pc, lr
+> -ENDPROC(__strncpy_from_user)
+> -
+> -	.pushsection .fixup,"ax"
+> -	.align	0
+> -9001:	mov	r3, #0
+> -	strb	r3, [r0, #0]	@ null terminate
+> -	mov	r0, #-EFAULT
+> -	mov	pc, lr
+> -	.popsection
+> -
+> diff --git a/arch/arm/lib/strnlen_user.S b/arch/arm/lib/strnlen_user.S
+> deleted file mode 100644
+> index 0ecbb45..0000000
+> --- a/arch/arm/lib/strnlen_user.S
+> +++ /dev/null
+> @@ -1,40 +0,0 @@
+> -/*
+> - *  linux/arch/arm/lib/strnlen_user.S
+> - *
+> - *  Copyright (C) 1995-2000 Russell King
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -#include <linux/linkage.h>
+> -#include <asm/assembler.h>
+> -#include <asm/errno.h>
+> -
+> -	.text
+> -	.align	5
+> -
+> -/* Prototype: unsigned long __strnlen_user(const char *str, long n)
+> - * Purpose  : get length of a string in user memory
+> - * Params   : str - address of string in user memory
+> - * Returns  : length of string *including terminator*
+> - *	      or zero on exception, or n + 1 if too long
+> - */
+> -ENTRY(__strnlen_user)
+> -	mov	r2, r0
+> -1:
+> -	ldrusr	r3, r0, 1
+> -	teq	r3, #0
+> -	beq	2f
+> -	subs	r1, r1, #1
+> -	bne	1b
+> -	add	r0, r0, #1
+> -2:	sub	r0, r0, r2
+> -	mov	pc, lr
+> -ENDPROC(__strnlen_user)
+> -
+> -	.pushsection .fixup,"ax"
+> -	.align	0
+> -9001:	mov	r0, #0
+> -	mov	pc, lr
+> -	.popsection
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
