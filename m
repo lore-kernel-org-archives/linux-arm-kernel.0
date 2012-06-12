@@ -1,28 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jun 2012 13:04:54 +0200
-Subject: [PATCH 1/1] pinctrl: pinctrl-imx: fix incorrect debug message of
- maps
-In-Reply-To: <1339162392-24628-1-git-send-email-b29396@freescale.com>
-References: <1339162392-24628-1-git-send-email-b29396@freescale.com>
-Message-ID: <CACRpkdYU=r80KXA-dqhzQDOTvDXH2Ydx7jJosD_UZy6CFaGjBQ@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 12 Jun 2012 19:06:26 +0800
+Subject: [RFC PATCH] MTD: nand: add return value for write_page() function
+ in structure of nand_ecc_ctrl.
+In-Reply-To: <1339498176.2401.27.camel@sauron.fi.intel.com>
+References: <1339153855-3761-1-git-send-email-josh.wu@atmel.com>
+ <1339498176.2401.27.camel@sauron.fi.intel.com>
+Message-ID: <4FD722B2.3080407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 8, 2012 at 3:33 PM, Dong Aisheng <b29396@freescale.com> wrote:
+Hi, Artem
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
->
-> After create config map, the new_map pointer becomes point to
-> PIN_MAP_TYPE_CONFIGS_PIN map rather than PIN_MAP_TYPE_MUX_GROUP map any more.
-> Thus using new_map pointer to display the MUX_GROUP info is not correct.
-> Using map pointer instead to show the correct MUX_GROUP map info.
-> Original the debug message is:
-> imx6q-pinctrl 20e0000.iomuxc: maps: function Yp group MX6Q_PAD_SD3_CMD num 12
-> After fix it is:
-> imx6q-pinctrl 20e0000.iomuxc: maps: function usdhc3 group usdhc3grp-1 num 11
->
-> Reported-by: Richard Zhao <richard.zhao@freescale.com>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Thanks for the review.
 
-Thanks, applied.
-Linus Walleij
+On 6/12/2012 6:49 PM, Artem Bityutskiy wrote:
+> On Fri, 2012-06-08 at 19:10 +0800, Josh Wu wrote:
+>>   /**
+>> + * nand_write_page_none - [INTERN] raw page writen function with return value
+>> + * @mtd: mtd info structure
+>> + * @chip: nand chip info structure
+>> + * @buf: data buffer
+>> + * @oob_required: must write chip->oob_poi to OOB
+>> + */
+>> +static inline int nand_write_page_none(struct mtd_info *mtd,
+>> +                               struct nand_chip *chip,
+>> +                               const uint8_t *buf, int oob_required)
+>> +{
+>> +       nand_write_page_raw(mtd, chip, buf, oob_required);
+>> +
+>> +       return 0;
+>> +}
+> Thanks!
+>
+> Would you please also make the wrtite_page_raw call-back return an error
+> code - it is just strange to change '->write_page' and avoid changing
+> '->write_page_raw'...
+
+Ok. I'll do a version 2 patch that makes write_page_raw return an error 
+code too.
+
+>
+> P.S. Not sure we still want these baroque header comments, but this is
+> just a side note and separate issue.
+>
+
+If change the write_page_raw call back with return value. then I will 
+remove all the function and comments.
+
+Best Regards,
+Josh Wu
