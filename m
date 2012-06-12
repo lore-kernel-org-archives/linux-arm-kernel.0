@@ -1,7 +1,7 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 12 Jun 2012 10:44:55 +0200
+Date: Tue, 12 Jun 2012 10:45:26 +0200
 Subject: [PATCH] dmaengine: at_hdmac: trivial: fix comment in header
-Message-ID: <1339490695-28796-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1339490726-28836-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
