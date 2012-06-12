@@ -1,45 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 12 Jun 2012 14:04:33 +0200
-Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
-In-Reply-To: <20120610170620.GW14756@titan.lakedaemon.net>
-References: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
- <20120610170620.GW14756@titan.lakedaemon.net>
-Message-ID: <20120612120433.GA17893@lunn.ch>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Tue, 12 Jun 2012 17:37:54 +0530
+Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
+Message-ID: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +		spi at 10600 {
-> > +			compatible = "marvell,orion-spi";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			cell-index = <0>;
-> > +			reg = <0x10600 0x28>;
-> > +			status = "disabled";
-> > +		};
-> > +
+'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
 
-> > index fa51586..0942139 100644
-> > --- a/arch/arm/mach-kirkwood/board-dt.c
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
-> >  	{ }
-> >  };
-> >  
-> > +struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
-> > +	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
-> 
-> Isn't this ---------------------------------^^^^^^^^^^ defined somewhere?
+sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
+(BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
+versions.
 
-Hi Jason
+In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
 
-Yes, there is a #define for this. However, in this case, i think the
-number actually tells you more. The dtsi file has the number, not some
-symbolic representation. Also, some platforms, e.g. Dove, have more
-than one spi controller. Having the number there makes it easier to
-see the mapping between the node in DT and the name used in the
-platform device. If we use the #define it means making an indirection
-via kirkwood.h for a human to see the mapping.
+In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
+ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
 
-However, i can change it...
+So the instruction is UNPREDICTABLE both before and after v6.
 
-	 Andrew
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+---
+ arch/arm/kernel/kprobes-test-arm.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index ba32b39..6c926d5 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
+ 	TEST_BF_R ("mov	pc, r",0,2f,"")
+ 	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
+ 	TEST_BB(   "sub	pc, pc, #1b-2b+8")
+-#if __LINUX_ARM_ARCH__ >= 6
+-	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
++#if __LINUX_ARM_ARCH__ == 6
++	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and after ARMv6 */
+ #endif
+ 	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
+ 	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
+-- 
+1.7.9.5
