@@ -1,36 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Jun 2012 09:40:22 -0600
-Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
-In-Reply-To: <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
- <4FD660F9.7030807@wwwdotorg.org>
- <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
- <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
-Message-ID: <4FD762E6.2080906@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Jun 2012 11:40:20 -0400
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201206121459.14114.arnd@arndb.de>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <20120612140616.GC17893@lunn.ch>
+ <20120612142412.GD14756@titan.lakedaemon.net>
+ <201206121459.14114.arnd@arndb.de>
+Message-ID: <20120612154020.GF14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2012 12:10 AM, Thierry Reding wrote:
-> * Thierry Reding wrote:
->> * Stephen Warren wrote:
->>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> [...]
->>>> +static int tegra_pcie_disable_msi(struct platform_device
->>>> *pdev)
->>> 
->>> Should this free pcie->msi->pages?
->> 
->> Yes it should. I actually mention making that change in the
->> changelog but in fact didn't.
+On Tue, Jun 12, 2012 at 02:59:13PM +0000, Arnd Bergmann wrote:
+> On Tuesday 12 June 2012, Jason Cooper wrote:
+> > On Tue, Jun 12, 2012 at 04:06:16PM +0200, Andrew Lunn wrote:
+> > > > arch/arm/mach-kirkwood/board-* (DT files)
+> > > >     -> arch/arm/mach-mvebu/
+> > > 
+> > > I know of work being done to make orion5x and dove also support DT.
+> > > Should we consider some sort of prefix or midfix indicating which SoC
+> > > a board file is for? It will not be easy to mentally keep track of
+> > > board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
+> > 
+> > The board-BOARD.c files are transitional files, and will disappear once
+> > the DT conversion is done.  All that will remain is board-dt.c.  So,
+> > there is no long-term issue.  Since it's a short term issue, and we're
+> > moving/renaming anyway, how about kirkwood-dreamplug.c, orion5x-ts209.c,
+> > etc?
 > 
-> This is really moot because the driver cannot be built as a module
-> currently because arch_setup_msi_irq() and arch_teardown_msi_irq()
-> need to be built-in so tegra_pcie_disable_msi() will be called only
-> just before the machine is shut down.
-> 
-> Perhaps this is something that should be addressed? Or is it just
-> not worth the effort?
+> FWIW, the board-dt.c from mach-kirkwood should just become kirkwood.c
+> and we might want to merge it with the kirkwood common.c file in the long
+> run, if any contents from that file remain for the dt version.
 
-Well, if the driver provides a shutdown/removal path at all, it seems
-like it should be complete. I assume it's trivial to free those pages?
+So, there would be an orion5x.c, dove.c as well?  Or, should it be
+mvebu.c to encompass all of them?
+
+thx,
+
+Jason.
