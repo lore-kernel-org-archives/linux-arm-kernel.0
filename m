@@ -1,41 +1,46 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 10:39:56 +0000
-Subject: [PATCH v5 00/14] GPMC driver conversion
-In-Reply-To: <cover.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998065@DBDE01.ent.ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 12 Jun 2012 13:49:36 +0300
+Subject: [RFC PATCH] MTD: nand: add return value for write_page()
+ function in structure of nand_ecc_ctrl.
+In-Reply-To: <1339153855-3761-1-git-send-email-josh.wu@atmel.com>
+References: <1339153855-3761-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1339498176.2401.27.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, 2012-06-08 at 19:10 +0800, Josh Wu wrote:
+>  /**
+> + * nand_write_page_none - [INTERN] raw page writen function with return value
+> + * @mtd: mtd info structure
+> + * @chip: nand chip info structure
+> + * @buf: data buffer
+> + * @oob_required: must write chip->oob_poi to OOB
+> + */
+> +static inline int nand_write_page_none(struct mtd_info *mtd,
+> +                               struct nand_chip *chip,
+> +                               const uint8_t *buf, int oob_required)
+> +{
+> +       nand_write_page_raw(mtd, chip, buf, oob_required);
+> +
+> +       return 0;
+> +} 
 
-On Mon, Jun 11, 2012 at 19:55:02, Mohammed, Afzal wrote:
-> Hi,
-> 
-> This series is based on 3.5-rc1, and is dependent on [1,2,3]
-> 
-> This series has been tested on omap3evm (smsc911x) rev G & C and
-> beagle board(nand) using patch series which is going to be posted
-> shortly (this series only creates a driver out of GPMC code)
-> 
-> Also using private patches, nand & onenand was tested on omap3evm,
-> rev G & C respectively (as support for these were not in mainline)
-> 
-> Many of GPMC peripherals depend on bootloader for configuration.
-> This is going to be deprecated. feature-removal-schedule.txt will be
-> updated in one of the upcoming patch series regarding the same.
-> 
-> 
-> [PATCH 03/13] ARM: OMAP2+: gpmc: driver migration helper, is to be
-> reverted once all GPMC peripherals are migrated to use driver
-> interface.
+Thanks!
 
-Please let me know your comments on this series. I had tried to
-go as per your requirements.
+Would you please also make the wrtite_page_raw call-back return an error
+code - it is just strange to change '->write_page' and avoid changing
+'->write_page_raw'...
 
-This series keeps old interface while providing a new driver interface.
-Old interface will work (to the best of my knowledge; omap3evm &
-beagle are the ones available here to test) at each of the commits.
+P.S. Not sure we still want these baroque header comments, but this is
+just a side note and separate issue.
 
-Regards
-Afzal
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/e17906fc/attachment.sig>
