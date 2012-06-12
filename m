@@ -1,32 +1,20 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Tue, 12 Jun 2012 15:59:45 +0200
-Subject: [PATCH] mach-dove: Fixup ge00 initialisation
-Message-ID: <1339509585-62405-1-git-send-email-hare@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Jun 2012 16:06:16 +0200
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <201206121349.27696.arnd@arndb.de>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <201206121349.27696.arnd@arndb.de>
+Message-ID: <20120612140616.GC17893@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last argument of orion_ge00_init() is actually the error
-interrupt, so we should be using the correct value here.
+> arch/arm/mach-kirkwood/board-* (DT files)
+> 	-> arch/arm/mach-mvebu/
 
-Signed-off-by: Hannes Reinecke <hare@suse.de>
----
- arch/arm/mach-dove/common.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I know of work being done to make orion5x and dove also support DT.
+Should we consider some sort of prefix or midfix indicating which SoC
+a board file is for? It will not be easy to mentally keep track of
+board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index f7d639b..a9d0708 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -101,8 +101,8 @@ void __init dove_ehci1_init(void)
-  ****************************************************************************/
- void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
- {
--	orion_ge00_init(eth_data,
--			DOVE_GE00_PHYS_BASE, IRQ_DOVE_GE00_SUM, 0);
-+	orion_ge00_init(eth_data, DOVE_GE00_PHYS_BASE,
-+			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR);
- }
- 
- /*****************************************************************************
--- 
-1.7.4.2
+      Andrew
