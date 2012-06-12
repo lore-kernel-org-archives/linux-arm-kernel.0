@@ -1,37 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jun 2012 09:03:18 +0100
-Subject: [PATCH 14/14] ARM: ux500: Move rtc-pl031 registration to Device
- Tree when enabled
-In-Reply-To: <CACRpkdbJdA8rgcXX4Xc3sMrx==5jd-Scu1Xy0UKz0ot3_bbNzw@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdbJdA8rgcXX4Xc3sMrx==5jd-Scu1Xy0UKz0ot3_bbNzw@mail.gmail.com>
-Message-ID: <4FD6F7C6.80002@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Jun 2012 10:04:18 +0200
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <4FD6F15E.4080000@free-electrons.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <4FD658C2.4030503@redhat.com> <4FD6F15E.4080000@free-electrons.com>
+Message-ID: <20120612080418.GC3221@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/12 22:43, Linus Walleij wrote:
-> On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> During a Device Tree boot, all probing will now be completed on parse
->> of the Device Tree binary. In the same patch we remove platform
->> registration of the Real Time Clock.
->>
->> Signed-off-by: Lee Jones<lee.jones@linaro.org>
->
-> Oh this is a bug fix really, well it's in the device tree so nevermind.
+On Tue, Jun 12, 2012 at 09:35:58AM +0200, Gregory CLEMENT wrote:
+> On 06/11/2012 10:44 PM, David Marlin wrote:
+> > 
+> > I noticed that you are using mach-mvebu in these patches.  I have seen 
+> > these machines referred to as 'armada', 'axp', 'armadaxp', etc.  Will 
+> > 'mvebu' be the official machine name to use for these systems?  I'm 
+> > looking for a 'name' to identify the common kernel for these systems. 
+> > For reference, the names of the ARM kernels we are currently building in 
+> > Fedora include: 'highbank', 'imx', 'kirkwood', 'omap', and 'tegra'.
+> > 
+> > 
+> > Thank you,
+> > 
+> > d.marlin
+> > ===========
+> > 
+> 
+> Hello David,
+> 
+> Mvebu is aimed to be the official name for the all the SOC with device tree
+> support coming out of Marvell's EBU division. As stated Nicolas Pitre: "One
+> thing that is common to Orion/Kirkwood/Dove/(insert some Armada flavours
+> here)/etc though is that they came out of Marvell's EBU division."
+> 
+> For the beginning only Armada XP and Armada 370 are in this directory but as
+> son as the other Marvell architectures will be converted to device tree they
+> will be moved to mach-mvebu.
 
-It is? How so?
+So it still seems like we have a naming issue. We have given a usable
+name to the directory. But what do we call the kernel? This is what
+David wants to know. When we have moved the DT enabled architectures
+into mach-mvebu, they are still likely to build a ARMv5 kernel for
+Kirkwood and Orion5x, and a ARMv7 kernel for Dove plus these two new
+SoCs. But what do we call this new kernel?
 
-> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->
-> Yours,
-> Linus Walleij
-
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+      Andrew
