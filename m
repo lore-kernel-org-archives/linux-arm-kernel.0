@@ -1,86 +1,44 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 13:58:15 -0500
-Subject: [PATCH v5 01/14] ARM: OMAP2+: gpmc: platform definitions
-In-Reply-To: <139eb951817b4bee8ea91083b0d572c7421078f0.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <139eb951817b4bee8ea91083b0d572c7421078f0.1339419492.git.afzal@ti.com>
-Message-ID: <4FD79147.9060501@ti.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 12 Jun 2012 12:04:49 -0700
+Subject: [PATCH 1/2] clk: cache parent clocks only for muxes
+In-Reply-To: <20120606104759.GN8262@n2100.arm.linux.org.uk>
+References: <1338973891-28719-1-git-send-email-rnayak@ti.com>
+ <1338973891-28719-2-git-send-email-rnayak@ti.com>
+ <20120606104759.GN8262@n2100.arm.linux.org.uk>
+Message-ID: <20120612190449.GH19410@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
-> gpmc driver platform definitions
+On 20120606-11:47, Russell King - ARM Linux wrote:
+> On Wed, Jun 06, 2012 at 02:41:30PM +0530, Rajendra Nayak wrote:
+> > caching parent clocks makes sense only when a clock has more
+> > than one parent (mux clocks).
+> > Avoid doing this for every other clock.
+> > 
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > ---
+> >  drivers/clk/clk.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 687b00d..40568e9 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1229,7 +1229,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+> >  	 * If clk->parents is not NULL we skip this entire block.  This allows
+> >  	 * for clock drivers to statically initialize clk->parents.
+> >  	 */
+> > -	if (clk->num_parents && !clk->parents) {
+> > +	if ((clk->num_parents > 1) && !clk->parents) {
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/plat-omap/include/plat/gpmc.h |   49 ++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-> index 802fb22..21a8cce 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-> @@ -139,6 +139,55 @@ struct gpmc_timings {
->  	u16 wr_data_mux_bus;	/* WRDATAONADMUXBUS */
->  };
->  
-> +/* bool type time settings */
-> +struct gpmc_misc_timings {
-> +	bool cycle2cyclediffcsen;
-> +	bool cycle2cyclesamecsen;
-> +	bool we_extra_delay;
-> +	bool oe_extra_delay;
-> +	bool adv_extra_delay;
-> +	bool cs_extra_delay;
-> +	bool time_para_granularity;
-> +};
-> +
-> +enum {
-> +	has_none,
-> +	has_period,
-> +	has_clock
-> +};
-> +
-> +struct gpmc_time_ctrl {
-> +	int type;
-> +	struct gpmc_timings timings;
-> +	struct gpmc_misc_timings bool_timings;
-> +};
+> You don't need the additional parens here.  Please learn the C precedence
+> rules.  Additional unnecessary parens can make expressions much harder
+> to read.
 
-Why not combine misc_timings and the original timings? I don't see why
-these need to be kept separate. Even if combined it can still be
-backward compatible for legacy boards as they will not specify the misc
-timing fields. I am also not convinced we need this type member.
+Rajendra,
 
-Jon
+I've taken this patch into clk-next for testing.  I've fixed up the
+extra parens locally, so no need for a resend.
 
-> +struct gpmc_cs_data {
-> +	unsigned		cs;
-> +	unsigned long		mem_size;
-> +	unsigned long		mem_offset;
-> +	bool			have_config;
-> +	unsigned		config;
-> +	struct gpmc_time_ctrl	time_ctrl;
-> +	unsigned		irq_config;
-> +};
-> +
-> +struct gpmc_device_pdata {
-> +	char			*name;
-> +	int			id;
-> +	void			*pdata;
-> +	unsigned		pdata_size;
-> +	struct resource		*per_res;
-> +	unsigned		per_res_cnt;
-> +	struct gpmc_cs_data	*cs_data;
-> +	unsigned		num_cs;
-> +};
-> +
-> +struct gpmc_pdata {
-> +	unsigned			num_device;
-> +	struct gpmc_device_pdata	**device_pdata;
-> +};
-> +
->  struct gpmc_nand_regs {
->  	void __iomem	*gpmc_status;
->  	void __iomem	*gpmc_nand_command;
+Regards,
+Mike
