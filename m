@@ -1,36 +1,70 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 09:24:44 +0200
-Subject: [PATCH v2 05/10] ARM: tegra: Rewrite PCIe support as a driver
-In-Reply-To: <20120612064124.GF4040@avionic-0098.adnet.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-6-git-send-email-thierry.reding@avionic-design.de>
- <4FD65E98.4070200@wwwdotorg.org>
- <20120612064124.GF4040@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20120612072444.GA8577@avionic-0098.mockup.avionic-design.de>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 12 Jun 2012 16:27:20 +0900
+Subject: [PATCH v2] ARM: EXYNOS: Add smc call to support trustzone feature
+Message-ID: <20120612072720.GA3211@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding wrote:
-> AFAICT the even partitioning of the non-prefetchable and prefetchable
-> memory regions is arbitrary and it could potentially be useful to make
-> it configurable via the DT.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-So it turns out that this isn't true. But apart from the comments in the
-driver I couldn't find any reference to how the prefetch and non-prefetch
-ranges are partitioned. Judging by the code for Tegra2 this is evenly
-partitioned among ports 0 and 1 but it would be interesting to know this is
-done on Tegra3. Is there any way you can find out?
+Linux runs in non-secure mode on some boards, so we need secure monitor calls
 
-It'd also be nice if some better documentation for the PCIe controller could
-be made available. The Tegra2 TRM doesn't contain any of the AFI or PADS
-registers and while the Tegra3 TRM documents more registers, their offsets
-are completely missing.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/0a21f4a7/attachment.sig>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 9b58024..d3ec71c 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+ 
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ 
++obj-$(CONFIG_ARM_TRUSTZONE)	+= exynos-smc.o
++
++plus_sec := $(call as-instr,.arch_extension sec,+sec)
++AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
++
+ # machine support
+ 
+ obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index aed2eeb..dc69705 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -21,6 +21,8 @@ void exynos4_restart(char mode, const char *cmd);
+ void exynos5_restart(char mode, const char *cmd);
+ void exynos_init_late(void);
+ 
++extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
++
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
+ int exynos_pm_late_initcall(void);
+ #else
+diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
+new file mode 100644
+index 0000000..2e27aa3
+--- /dev/null
++++ b/arch/arm/mach-exynos/exynos-smc.S
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics.
++ *
++ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
++ *
++ * This program is free software,you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++/*
++ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
++ */
++
++ENTRY(exynos_smc)
++	stmfd	sp!, {r4-r11, lr}
++	dsb
++	smc	#0
++	ldmfd	sp!, {r4-r11, pc}
++ENDPROC(exynos_smc)
