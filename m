@@ -1,26 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Jun 2012 00:04:31 -0700
-Subject: [PATCH v7 04/12] ARM: SoC: convert OMAP4 to SoC descriptor
-In-Reply-To: <1339085369-26073-5-git-send-email-marc.zyngier@arm.com>
-References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
- <1339085369-26073-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20120612070431.GF12766@atomide.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Tue, 12 Jun 2012 08:08:26 +0100
+Subject: [PATCH] ARM: kprobes: run t32_simulate_ldr_literal() without
+ insn slot
+In-Reply-To: <1339402732-20849-1-git-send-email-rabin.vincent@stericsson.com>
+References: <1339402732-20849-1-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1339484906.2912.2.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [120607 09:21]:
-> Convert OMAP4 to use the SoC descriptor to provide its SMP
-> and CPU hotplug operations.
+On Mon, 2012-06-11 at 13:48 +0530, Rabin Vincent wrote:
+> t32_simulate_ldr_literal() can be run without an instruction slot, so it
+> should be using DECODE_SIMULATEX instead of DECODE_EMULATEX.
 > 
-> Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+
+Acked-by: Jon Medhurst <tixy@yxit.co.uk>
+
+> ---
+>  arch/arm/kernel/kprobes-thumb.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-FYI, I got some whitespace error on the ux500 patch while
-applying this series.
-
-Gave this series a quick boot test on 2430/omap3/omap4
-and it works just fine:
-
-Tested-by: Tony Lindgren <tony@atomide.com>
+> diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+> index 8f96ec7..6123daf 100644
+> --- a/arch/arm/kernel/kprobes-thumb.c
+> +++ b/arch/arm/kernel/kprobes-thumb.c
+> @@ -660,7 +660,7 @@ static const union decode_item t32_table_1111_100x[] = {
+>  	/* LDRSB (literal)	1111 1001 x001 1111 xxxx xxxx xxxx xxxx */
+>  	/* LDRH (literal)	1111 1000 x011 1111 xxxx xxxx xxxx xxxx */
+>  	/* LDRSH (literal)	1111 1001 x011 1111 xxxx xxxx xxxx xxxx */
+> -	DECODE_EMULATEX	(0xfe5f0000, 0xf81f0000, t32_simulate_ldr_literal,
+> +	DECODE_SIMULATEX(0xfe5f0000, 0xf81f0000, t32_simulate_ldr_literal,
+>  						 REGS(PC, NOSPPCX, 0, 0, 0)),
+>  
+>  	/* STRB (immediate)	1111 1000 0000 xxxx xxxx 1xxx xxxx xxxx */
