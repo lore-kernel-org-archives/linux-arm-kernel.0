@@ -1,54 +1,58 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Jun 2012 23:06:15 +0530
-Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
-In-Reply-To: <4FC919C9.6070107@ti.com>
-References: <1338373143-7467-1-git-send-email-hs@denx.de>
- <1338373143-7467-2-git-send-email-hs@denx.de> <4FC919C9.6070107@ti.com>
-Message-ID: <4FD77E0F.8050907@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Jun 2012 12:36:53 -0500
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+ <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+Message-ID: <4FD77E35.3050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
 
-On 6/2/2012 1:06 AM, Sekhar Nori wrote:
-> Hi Heiko,
+On 06/12/2012 01:37 AM, Mohammed, Afzal wrote:
+> Hi Jon,
 > 
-> On 5/30/2012 3:48 PM, Heiko Schocher wrote:
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Wolfgang Denk <wd@denx.de>
->> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+> On Tue, Jun 12, 2012 at 00:19:35, Hunter, Jon wrote:
+>  
+>> What boards have been tested with this change?
+> 
+> Beagle board, after applying all 5 series of patches, without all
+> patch series it can't be tested for beagle board as it depended on
+> bootloader, not this API
+> 
+>>> +	u16 bus_turnaround;
+>>> +	u16 cycle2cycle_delay;
+>>> +
+>>> +	u16 wait_monitoring;
+>>> +	u16 clk_activation;
+>>> +
+>>>  	/* The following are only on OMAP3430 */
+>>>  	u16 wr_access;		/* WRACCESSTIME */
+>>>  	u16 wr_data_mux_bus;	/* WRDATAONADMUXBUS */
 >>
->> ---
+>> In general, I agree with this, but if we apply this today, it seems that
+>> we *may* be clearing these fields if they have been configured by the
+>> bootloader and hence this could introduce a regression (potentially).
+>>
+>> So we ever need to test boards that this change impacts or at least
+>> verify that this change would not impact these boards because these
+>> fields have not been configured.
 > 
-> On AM18x EVM, with this patch applied and CONFIG_KEYBOARD_GPIO_POLLED=y,
-> I get warnings of type:
+> Yes, it is the exactly the reason this patch has been splitted out
+> of gpmc driver conversion series. To find out whether enhancing
+> existing API cause any regression and if so, then it can be easily
+> root caused and would not be confused with driver conversion.
 > 
-> irq 0, desc: c0372950, depth: 1, count: 0, unhandled: 0
-> 
-> ->handle_irq():  c00552f8, handle_bad_irq+0x0/0x23c
-> 
-> ->irq_data.chip(): c03794e8, 0xc03794e8
-> 
-> ->action():   (null)
-> 
->    IRQ_NOPROBE set
-> 
->  IRQ_NOREQUEST set
-> 
-> 
-> They do not come when CONFIG_KEYBOARD_GPIO_POLLED=n. I am yet to debug
-> this, but wanted to point out now in case there is anything obvious.
+> This was the only change required w.r.t old interface, need to make
+> sure that this won't causes breakage on any of the boards (the boards
+> which were unknowingly depending on bootloader for these settings).
+> I have only beagle board & omap3evm (both would not get affected
+> by this change with existing code) and others can't be validated.
+> Once this is in lo tree or mainline, this change can be validated
+> for different boards.
 
-I debugged this a bit more and the good news for you is that spurious
-IRQ messages have got nothing to do with your patch. Looks like the
-spurious interrupts on interrupt line 0 were always there - just that
-they were getting silently ignored earlier. I am still debugging what is
-causing these spurious interrupts.
+Should you at least warn, if you are going to over-write a value?
 
-Thanks,
-Sekhar
+Jon
