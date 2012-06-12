@@ -1,69 +1,99 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 12 Jun 2012 18:41:07 +0300
-Subject: [PATCHv3 20/20] ARM: OMAP4430: PM: errata i625,
- WUGEN lost for GP devices after OFF mode
-In-Reply-To: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
-References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1339515667-10270-1-git-send-email-t-kristo@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Jun 2012 09:44:05 -0600
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+Message-ID: <4FD763C5.3090500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements errata i625.
+On 06/12/2012 12:21 AM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
+>>> This commit adds support for instantiating the Tegra PCIe
+>>> controller from a device tree.
+>> 
+>>> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
+>> 
+>> Can we please name this nvidia,tegra20-pcie.txt to match the
+>> naming of all the other Tegra bindings.
+> 
+> Yes, will do.
+> 
+>>> +Required properties: +- compatible: "nvidia,tegra20-pcie" +-
+>>> reg: physical base address and length of the controller's
+>>> registers
+>> 
+>> Since there's more than one range now, that should specify how
+>> many entries are required and what they represent.
+> 
+> Okay.
+> 
+>>> +Optional properties: +- pex-clk-supply: supply voltage for
+>>> internal reference clock +- vdd-supply: power supply for
+>>> controller (1.05V)
+>> 
+>> Those shouldn't be optional. If the board has no regulator, the
+>> board's .dts should provide a fixed always-on regulator that
+>> those properties can refer to, so that the driver can always
+>> get() those regulators.
+> 
+> That'll add more dummy regulators and I don't think sprinkling them
+> across the DTS is going to work very well. Maybe collecting them
+> under a top-level "regulators" node is a good option. If you have a
+> better alternative, I'm all open for it.
+> 
+>>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
+>>> b/arch/arm/boot/dts/tegra20.dtsi
+>> 
+>>> +	pci {
+>> ...
+>>> +		status = "disable";
+>> 
+>> That should be "disabled"; sorry for providing a bad example.
+> 
+> Yes.
+> 
+>>> diff --git a/arch/arm/mach-tegra/pcie.c
+>>> b/arch/arm/mach-tegra/pcie.c
+>> 
+>>> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct
+>>> platform_device *pdev)
+>> 
+>>> +	if (of_find_property(node, "vdd-supply", NULL)) {
+>> 
+>> As mentioned above, that if statement should be removed, since
+>> the regulators shouldn't be optional.
+> 
+> Okay.
+> 
+>>> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
+>> 
+>> Those could be devm_regulator_get(). Then tegra_pcie_remove()
+>> wouldn't have to put() them.
+> 
+> Okay.
+> 
+>>> +	for (i = 0; i < TEGRA_PCIE_MAX_PORTS; i++) +
+>>> pdata->enable_ports[i] = true;
+>> 
+>> Shouldn't the DT indicate which ports are used? I assume there's
+>> some reason that the existing driver allows that to be
+>> configured, rather than always enabling all ports. At least,
+>> enumeration time wasted on non-existent ports springs to mind,
+>> and perhaps attempting to enable port 1 when port 0 is x4 and
+>> using all the lanes would cause errors in port 0?
+> 
+> Yes, that's been on my mind as well. I'm not sure about the best
+> binding for this. Perhaps something like:
+> 
+> pci { enable-ports = <0 1 2>; };
+> 
+> Would do?
 
-When coming back from device off mode, the Cortex-A9 WUGEN enable registers
-are not restored by ROM code. The work around disables device power OFF
-to maintain the proper register settings.
-The affected devices are OMAP4430GP ES2.0 to ES2.2.
-
-Based on work done by Mykola Oleksiienko and Konstantin Shlyakhovoy.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/pm.h     |    1 +
- arch/arm/mach-omap2/pm44xx.c |   12 +++++++++++-
- 2 files changed, 12 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 63af57e..f85ef2d 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -92,6 +92,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
- #define PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM_xxx	(1 << 1)
- #define PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx	(1 << 2)
- #define PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx	(1 << 3)
-+#define PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625	(1 << 4)
- 
- #if defined(CONFIG_ARCH_OMAP4)
- extern u16 pm44xx_errata;
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 8054afc..c1dc0d9 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -116,7 +116,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 						pwrdm,
- 						PWRDM_FUNC_PWRST_OFF);
- 
--	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE)
-+	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE &&
-+	    !IS_PM44XX_ERRATUM(PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625))
- 		pwrst->next_state = PWRDM_FUNC_PWRST_OFF;
- 
- 	list_add(&pwrst->node, &pwrst_list);
-@@ -276,6 +277,15 @@ int __init omap4_pm_init(void)
- 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
- 		pm44xx_errata |= PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx;
- 
-+	/*
-+	 * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
-+	 * due to errata i625
-+	 * On ES1.0 OFF mode is not supported due to errata i498
-+	 */
-+	if (cpu_is_omap443x() && omap_type() == OMAP2_DEVICE_TYPE_GP &&
-+	    omap_rev() < OMAP4430_REV_ES2_3)
-+		pm44xx_errata |= PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625;
-+
- #ifdef CONFIG_SUSPEND
- 	omap_pm_suspend = omap4_pm_suspend;
- #endif
--- 
-1.7.4.1
+That seems reasonable, although since the property is presumably
+something specific to the Tegra PCIe binding, not generic, I think it
+should be nvidia,enable-ports.
