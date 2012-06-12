@@ -1,62 +1,58 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 12 Jun 2012 18:31:20 +0300
-Subject: [PATCHv3 05/20] OMAP4: PM: clockdomain: workaround for
- l4_secure_clkdm HWSUP
+Date: Tue, 12 Jun 2012 18:31:23 +0300
+Subject: [PATCHv3 08/20] ARM: OMAP4: PM: add MPUSS power domain device off
+ support
 In-Reply-To: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
 References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1339515095-9908-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1339515095-9908-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+This patch adds device off support for MPUSS power domain. Device off
+support is overloaded on top of core pwrdm functional OFF powerstate,
+so the code must check the next core powerstate and set the save_state
+status accordingly.
 
-On HS/EMU devices the modules from l4_secure_clkdm are used. Few modules from
-L4_SEC clockdomain are not accessible without putting l4_secure_clkdm in
-force software wakeup.
-
-Follow the recommended sequence across secure API calls.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap-secure.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-index 36ec5a5..eeb8114 100644
---- a/arch/arm/mach-omap2/omap-secure.c
-+++ b/arch/arm/mach-omap2/omap-secure.c
-@@ -24,7 +24,10 @@
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 0e5f81b..0155242 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -72,7 +72,7 @@ struct omap4_cpu_pm_info {
+ };
  
- #include "common.h"
+ static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+-static struct powerdomain *mpuss_pd;
++static struct powerdomain *mpuss_pd, *core_pd;
+ static void __iomem *sar_base;
  
-+#include "clockdomain.h"
-+
- static phys_addr_t omap_secure_memblock_base;
-+static struct clockdomain *l4_secure_clkdm;
+ /*
+@@ -265,7 +265,9 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	 * In MPUSS OSWR or device OFF, interrupt controller context is lost.
+ 	 */
+ 	mpuss_clear_prev_logic_pwrst();
+-	if (pwrdm_read_next_func_pwrst(mpuss_pd) == PWRDM_FUNC_PWRST_OSWR)
++	if (pwrdm_read_next_func_pwrst(core_pd) == PWRDM_FUNC_PWRST_OFF)
++		save_state = 3;
++	else if (pwrdm_read_next_func_pwrst(mpuss_pd) == PWRDM_FUNC_PWRST_OSWR)
+ 		save_state = 2;
  
- /**
-  * omap_sec_dispatcher: Routine to dispatch low power secure
-@@ -48,6 +51,11 @@ u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
- 	param[3] = arg3;
- 	param[4] = arg4;
- 
-+	if (!l4_secure_clkdm)
-+		l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
-+
-+	clkdm_wakeup(l4_secure_clkdm);
-+
- 	/*
- 	 * Secure API needs physical address
- 	 * pointer for the parameters
-@@ -56,6 +64,8 @@ u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
- 	outer_clean_range(__pa(param), __pa(param + 5));
- 	ret = omap_smc2(idx, flag, __pa(param));
- 
-+	clkdm_allow_idle(l4_secure_clkdm);
-+
- 	return ret;
- }
+ 	cpu_clear_prev_logic_pwrst(cpu);
+@@ -386,6 +388,11 @@ int __init omap4_mpuss_init(void)
+ 		pr_err("Failed to lookup MPUSS power domain\n");
+ 		return -ENODEV;
+ 	}
++	core_pd = pwrdm_lookup("core_pwrdm");
++	if (!core_pd) {
++		pr_err("Failed to lookup CORE power domain\n");
++		return -ENODEV;
++	}
+ 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+ 	mpuss_clear_prev_logic_pwrst();
  
 -- 
 1.7.4.1
