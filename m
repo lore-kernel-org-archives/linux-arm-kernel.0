@@ -1,30 +1,39 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 12 Jun 2012 11:24:44 +0530
-Subject: RFC: changing DMA slave configuration API
-In-Reply-To: <20120611093332.GC26681@shlinux2.ap.freescale.net>
-References: <20120610102023.GC11404@n2100.arm.linux.org.uk>
- <CAGsJ_4xHNdEcfsmtypDHcJ0uyhtFz43xBojgHw2RSvrH8ohRcA@mail.gmail.com>
- <20120610112217.GD11404@n2100.arm.linux.org.uk>
- <1339390249.1927.1623.camel@vkoul-udesk3>
- <20120611093332.GC26681@shlinux2.ap.freescale.net>
-Message-ID: <1339480484.1927.1625.camel@vkoul-udesk3>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 12 Jun 2012 08:10:03 +0200
+Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
+In-Reply-To: <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
+ <4FD660F9.7030807@wwwdotorg.org>
+ <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-06-11 at 17:33 +0800, Dong Aisheng wrote:
-> > I think it is a good idea. And I would like to extend it even a
-> little
-> > bit. Do we have any users of peripheral to peripheral slave dma?
-> Yes, IMX sdma does support such kind of transfer.
-> The driver still does not support it currently.
-> 
-> > IIRC  that is not the case, or does anyone know of existence or
-> plans
-> > for such a h/w?
+* Thierry Reding wrote:
+> * Stephen Warren wrote:
+> > On 06/11/2012 09:05 AM, Thierry Reding wrote:
+[...]
+> > > +static int tegra_pcie_disable_msi(struct platform_device *pdev)
 > > 
-> i.MX5 and i.MX6. 
+> > Should this free pcie->msi->pages?
+> 
+> Yes it should. I actually mention making that change in the changelog but
+> in fact didn't.
 
-Thanks for confirming, lets keep both.
+This is really moot because the driver cannot be built as a module currently
+because arch_setup_msi_irq() and arch_teardown_msi_irq() need to be built-in
+so tegra_pcie_disable_msi() will be called only just before the machine is
+shut down.
 
--- 
-~Vinod
+Perhaps this is something that should be addressed? Or is it just not worth
+the effort?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/92722551/attachment.sig>
