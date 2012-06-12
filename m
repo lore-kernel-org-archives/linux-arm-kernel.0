@@ -1,23 +1,59 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 12 Jun 2012 14:02:00 +0200
-Subject: [RFC 0/4] ARM: topology: set the capacity of each cores for big.LITTLE
-Message-ID: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 12 Jun 2012 20:03:44 +0800
+Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending
+ on pinmux APIs
+In-Reply-To: <CACRpkdZfAcYiREryW=EXgxvZ1R8Adts8mb42gcnwkuiMP3T2mg@mail.gmail.com>
+References: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdZfAcYiREryW=EXgxvZ1R8Adts8mb42gcnwkuiMP3T2mg@mail.gmail.com>
+Message-ID: <CAGsJ_4wxiS4kR2R=EbEDmzP7nhRdaHDKmejhkDDSrC8vhbVL=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset creates an arch_scale_freq_power function for ARM, which is used 
-to set the relative capacity of each core of a big.LITTLE system. 
+2012/6/12 Linus Walleij <linus.walleij@linaro.org>
+>
+> On Tue, May 22, 2012 at 9:14 AM, Barry Song <Barry.Song@csr.com> wrote:
+>
+> > +static inline struct sirfsoc_gpio_bank *sirfsoc_irq_to_bank(unsigned
+> > int irq)
+> > +{
+> > + ? ? ? return &sgpio_bank[(irq - SIRFSOC_GPIO_IRQ_START) /
+> > SIRFSOC_GPIO_BANK_SIZE];
+> > +}
+> > +
+> > +static inline int sirfsoc_gpio_to_irq(struct gpio_chip *chip, unsigned
+> > offset)
+> > +{
+> > + ? ? ? return SIRFSOC_GPIO_IRQ_START + (chip->base + offset);
+> > +}
+> > +
+> > +static inline int sirfsoc_irq_to_offset(unsigned int irq)
+> > +{
+> > + ? ? ? return (irq - SIRFSOC_GPIO_IRQ_START) % SIRFSOC_GPIO_BANK_SIZE;
+> > +}
+> > +
+> > +static inline int sirfsoc_gpio_to_offset(unsigned int gpio)
+> > +{
+> > + ? ? ? return gpio % SIRFSOC_GPIO_BANK_SIZE;
+> > +}
+>
+> Some of this is doing the work of irqdomain, which is supposed to map a
+> certain
+> local IRQ number to the global space (I guess that is what is denoted by
+> SIRFSOC_GPIO_IRQ_START.)
+>
+> Can you please look into using irqdomain for this?
 
-Vincent Guittot (4):
-  ARM: topology: Add arch_scale_freq_power function
-  ARM: topology: factorize the update of sibling masks
-  ARM: topology: Update cpu_power according to DT information
-  sched: cpu_power: enable ARCH_POWER
+yes. sure. Thanks!
 
- arch/arm/include/asm/topology.h |    2 +
- arch/arm/kernel/topology.c      |  203 +++++++++++++++++++++++++++++++++++----
- kernel/sched/features.h         |    2 +-
- 3 files changed, 185 insertions(+), 22 deletions(-)
+>
+> There are several examples in drivers/gpio/* and drivers/pinctrl/*
+> for example:
+>
+> drivers/gpio/gpio-pxa.c
+> drivers/pinctrl/pinctrl-nomadik.c
+>
+>
+> Yours,
+> Linus Walleij
 
--- 
-1.7.9.5
+-barry
