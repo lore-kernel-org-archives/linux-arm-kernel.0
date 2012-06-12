@@ -1,71 +1,25 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 12 Jun 2012 13:09:46 +0200
-Subject: [PATCH] MXS: Add DENX M28 dts file
-In-Reply-To: <4FD6DF01.4000809@freescale.com>
-References: <1338084735-12083-1-git-send-email-marex@denx.de>
- <201206111259.36917.marex@denx.de> <4FD6DF01.4000809@freescale.com>
-Message-ID: <201206121309.46921.marex@denx.de>
+From: viresh.kumar2@arm.com (viresh kumar)
+Date: Tue, 12 Jun 2012 12:13:23 +0100
+Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
+In-Reply-To: <20120612110929.GA16511@localhost>
+References: <20120522234621.GA3610@windriver.com>
+ <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
+ <20120612110929.GA16511@localhost>
+Message-ID: <4FD72453.1040602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+On 12/06/12 12:09, Fengguang Wu wrote:
+> Another thing I'm not sure is that the typical clk_get() callers only
+> tests IS_ERR() on the returned value. As a clk newbie, I don't know
+> whether there will be lots of clk users seeing this (new) NULL value
+> on !CONFIG_HAVE_CLK and whether the current behavior is correct..
 
-> ? 2012?06?11? 18:59, Marek Vasut ??:
-> > Dear Huang Shijie,
-> > 
-> >> ? 2012?06?11? 13:45, Shawn Guo ??:
-> >>> On Fri, Jun 08, 2012 at 09:03:09PM +0200, Marek Vasut wrote:
-> >>>>> I just applied Huang's gpmi changes below.  Can you please rebase the
-> >>>>> the patch on top of it?  If you have the same pin setup as imx28-evk,
-> >>>>> we can save above data completely.
-> >>>>> 
-> >>>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/169351
-> >>>> 
-> >>>> Well, GPMI NAND doens't work for me (AGAIN). Screw this, I'm not
-> >>>> debuging it for the third damn time only to be told to rebase it again
-> >>>> and that all I did was for naught. Sorry
-> >>> 
-> >>> Hmm, I was told by Huang that GPMI NAND works for him.  As I do not
-> >> 
-> >> sorry. It can not works now. :(
-> >> 
-> >> There is a bug in the GPMI-NAND driver( i guess).
-> >> 
-> >> The pinmux, clocks, IO resources are all correct.
-> >> And the ECC read page/ ECC write page are ok too.
-> >> 
-> >> But the UBIFS can not works.
-> > 
-> > I sent you that link ... it might be the problem you're facing. And if it
-> > isn't, then you should fix that too, since you're depending on undefined
-> > behavior there.
-> 
-> thanks for your link. But it's not the root cause.
+There have been long discussions over it in past, check this thread
 
-But that doesn't quite change the fact that it is also a bug which should be 
-fixed, right? Will you please investigate and fix it?
+https://lkml.org/lkml/2012/4/24/389
 
-> The ECC read-page/write-page are _NOT_ stable. They can fail in some
-> unknown cases.
+--
+Viresh
 
-Rant: I think I've said it multiple times already, but Linux is a community 
-effort. That's why the quality is so high and bug count so low. It was complete 
-flub to have GPMI NAND driver in mainline linux for almost 6 months without 
-merging the actual code that'd let anyone else test it and wait for the DT 
-bindings. Maybe if you did merge it, this and many other bugs would already be 
-fixed.
-
-> Best Regards
-> Huang Shijie
-> 
-> >> I am debugging it now.
-> >> 
-> >> Huang Shijie
-> >> 
-> >>> have NAND device to play, can you guys aligned here?
-> > 
-> > Best regards,
-> > Marek Vasut
-
-Best regards,
-Marek Vasut
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
