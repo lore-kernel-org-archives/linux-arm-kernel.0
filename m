@@ -1,100 +1,172 @@
-From: zumeng.chen@gmail.com (Zumeng Chen)
-Date: Wed, 13 Jun 2012 00:54:45 +0800
-Subject: [PATCH 4/5] MFD: OMAP3EVM: USB: cosmetic fix to failed parent clk
- set
-In-Reply-To: <4FD76DEF.7090309@ti.com>
-References: <zumeng.chen@gmail.com>
- <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
- <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
- <4FD608C5.9000900@ti.com>
- <CA+Y31wfHiKEWFbwkec_fFHS3kKms_OccTKGQcetuE9F132vbDQ@mail.gmail.com>
- <4FD76DEF.7090309@ti.com>
-Message-ID: <CA+Y31wdgFmjbWyfgo1Q5m=8iYujWy0m4jB_X7W5G-xOXrnFdZA@mail.gmail.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Tue, 12 Jun 2012 09:10:54 -1000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+Message-ID: <4FD7943E.60302@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/13 Jon Hunter <jon-hunter@ti.com>
+On 6/12/2012 7:20 AM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+>> On 06/12/2012 12:21 AM, Thierry Reding wrote:
+>>> * Stephen Warren wrote:
+>>>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
+>>>>> This commit adds support for instantiating the Tegra PCIe
+>>>>> controller from a device tree.
+>>>>
+>>>>> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
+>>>>
+>>>> Can we please name this nvidia,tegra20-pcie.txt to match the
+>>>> naming of all the other Tegra bindings.
+>>>
+>>> Yes, will do.
+>>>
+>>>>> +Required properties: +- compatible: "nvidia,tegra20-pcie" +-
+>>>>> reg: physical base address and length of the controller's
+>>>>> registers
+>>>>
+>>>> Since there's more than one range now, that should specify how
+>>>> many entries are required and what they represent.
+>>>
+>>> Okay.
+>>>
+>>>>> +Optional properties: +- pex-clk-supply: supply voltage for
+>>>>> internal reference clock +- vdd-supply: power supply for
+>>>>> controller (1.05V)
+>>>>
+>>>> Those shouldn't be optional. If the board has no regulator, the
+>>>> board's .dts should provide a fixed always-on regulator that
+>>>> those properties can refer to, so that the driver can always
+>>>> get() those regulators.
+>>>
+>>> That'll add more dummy regulators and I don't think sprinkling them
+>>> across the DTS is going to work very well. Maybe collecting them
+>>> under a top-level "regulators" node is a good option. If you have a
+>>> better alternative, I'm all open for it.
+>>>
+>>>>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
+>>>>> b/arch/arm/boot/dts/tegra20.dtsi
+>>>>
+>>>>> +	pci {
+>>>> ...
+>>>>> +		status = "disable";
+>>>>
+>>>> That should be "disabled"; sorry for providing a bad example.
+>>>
+>>> Yes.
+>>>
+>>>>> diff --git a/arch/arm/mach-tegra/pcie.c
+>>>>> b/arch/arm/mach-tegra/pcie.c
+>>>>
+>>>>> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct
+>>>>> platform_device *pdev)
+>>>>
+>>>>> +	if (of_find_property(node, "vdd-supply", NULL)) {
+>>>>
+>>>> As mentioned above, that if statement should be removed, since
+>>>> the regulators shouldn't be optional.
+>>>
+>>> Okay.
+>>>
+>>>>> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
+>>>>
+>>>> Those could be devm_regulator_get(). Then tegra_pcie_remove()
+>>>> wouldn't have to put() them.
+>>>
+>>> Okay.
+>>>
+>>>>> +	for (i = 0; i<  TEGRA_PCIE_MAX_PORTS; i++) +
+>>>>> pdata->enable_ports[i] = true;
+>>>>
+>>>> Shouldn't the DT indicate which ports are used? I assume there's
+>>>> some reason that the existing driver allows that to be
+>>>> configured, rather than always enabling all ports. At least,
+>>>> enumeration time wasted on non-existent ports springs to mind,
+>>>> and perhaps attempting to enable port 1 when port 0 is x4 and
+>>>> using all the lanes would cause errors in port 0?
+>>>
+>>> Yes, that's been on my mind as well. I'm not sure about the best
+>>> binding for this. Perhaps something like:
+>>>
+>>> pci { enable-ports =<0 1 2>; };
+>>>
+>>> Would do?
+>>
+>> That seems reasonable, although since the property is presumably
+>> something specific to the Tegra PCIe binding, not generic, I think it
+>> should be nvidia,enable-ports.
+>
+> I came up with the following alternative:
+>
+> 	pci {
+> 		compatible = "nvidia,tegra20-pcie";
+> 		reg =<0x80003000 0x00000800   /* PADS registers */
+> 		       0x80003800 0x00000200   /* AFI registers */
+> 		       0x80004000 0x00100000   /* configuration space */
+> 		       0x80104000 0x00100000   /* extended configuration space */
+> 		       0x80400000 0x00010000   /* downstream I/O */
+> 		       0x90000000 0x10000000   /* non-prefetchable memory */
+> 		       0xa0000000 0x10000000>; /* prefetchable memory */
+> 		interrupts =<0 98 0x04   /* controller interrupt */
+> 		              0 99 0x04>; /* MSI interrupt */
+> 		status = "disabled";
+>
+> 		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
+> 			  0x80004000 0x80004000 0x00100000   /* configuration space */
+> 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
+> 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
+> 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
+> 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+>
+> 		#address-cells =<1>;
+> 		#size-cells =<1>;
+>
+> 		port at 80000000 {
+> 			reg =<0x80000000 0x00001000>;
+> 			status = "disabled";
+> 		};
+>
+> 		port at 80001000 {
+> 			reg =<0x80001000 0x00001000>;
+> 			status = "disabled";
+> 		};
+> 	};
+>
+> The "ranges" property can probably be cleaned up a bit, but the most
+> interesting part is the port@ children, which can simply be enabled in board
+> DTS files by setting the status property to "okay". I find that somewhat more
+> intuitive to the variant with an "enable-ports" property.
+>
+> What do you think of this?
+
+The problem is that children of a PCI-ish bus have specific expectations 
+about the parent address format - the standard 3-address-cell PCI 
+addressing.  So making a PCI bus node - even if it is PCIe - with 1 
+address cell is a problem.
+
+Also, if a given address range is listed in "reg", it should not also be 
+listed in "ranges".  A block of addresses is either "claimed" by the 
+parent node (reg property) or passed through to its children (ranges 
+property), but not both.  "reg" entries are appropriate for entities 
+that pertain to the overall control of the bus interface itself, while 
+"ranges" entries are for chunks of address space that are overlaid onto 
+child devices.
 
 >
-> On 06/11/2012 09:30 PM, Zumeng Chen wrote:
-> >
-> >
-> > 2012/6/11 Jon Hunter <jon-hunter at ti.com <mailto:jon-hunter@ti.com>>
-> >
-> >
-> >     On 06/11/2012 09:00 AM, Zumeng Chen wrote:
-> >     > A typo fix for this cosmetic change and mute a failed message from
-> >     > a unnecessary setting of some parent clk for usbhs_omap on
-> OMAP3EVM.
-> >     >
-> >     > Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com
-> >     <mailto:zumeng.chen@gmail.com>>
-> >     > ---
-> >     >  drivers/mfd/omap-usb-host.c |    4 +++-
-> >     >  1 files changed, 3 insertions(+), 1 deletions(-)
-> >     >
-> >     > diff --git a/drivers/mfd/omap-usb-host.c
-> b/drivers/mfd/omap-usb-host.c
-> >     > index 7e96bb2..9aaaf3c 100644
-> >     > --- a/drivers/mfd/omap-usb-host.c
-> >     > +++ b/drivers/mfd/omap-usb-host.c
-> >     > @@ -698,8 +698,9 @@ static int __devinit usbhs_omap_probe(struct
-> >     platform_device *pdev)
-> >     >               goto err_usbtll_p2_fck;
-> >     >       }
-> >     >
-> >     > +#ifndef CONFIG_MACH_OMAP3EVM
-> >     > +     /* for OMAP3 , the clk set parent fails */
-> >     >       if (is_ehci_phy_mode(pdata->port_mode[0])) {
-> >     > -             /* for OMAP3 , the clk set paretn fails */
-> >     >               ret = clk_set_parent(omap->utmi_p1_fck,
-> >     >                                       omap->xclk60mhsp1_ck);
-> >     >               if (ret != 0)
-> >
-> >     This begs the question, why is port_mode[0] set to ehci phy mode if
-> this
-> >     is failing? Something does not seem right here but this does not look
-> >     like the right fix.
-> >
-> > Actually, for omap3530evm, there is only port-mode[1] is valid, so
-> > port_mode[0]
-> > will be skipped by "if". And it will report "xclk60mhsp2_ck set parent
-> > failed"
-> >
-> > But why I bracket both of them, because, both xclk60mhsp2_ck and
-> > xclk60mhsp1_ck
-> > have dummy_ck clk for omap3530evm. So we can skip them directly.
 >
-> How about something like this ...
+> Thierry
 >
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index 62ec5c4..c1335f1 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -149,6 +149,10 @@ int clk_set_parent(struct clk *clk, struct clk
-> *parent)
->        if (!arch_clock || !arch_clock->clk_set_parent)
->                return ret;
 >
-> +       /* If the clock is a dummy clock just return */
-> +       if (!strcmp(clk->name, dummy_ck.name))
-> +               return 0;
-> +
->
-Yes, this is a good fixes, thanks I'll try it.
-
-Regards,
-Zumeng
-
->        spin_lock_irqsave(&clockfw_lock, flags);
->        if (clk->usecount == 0) {
->                ret = arch_clock->clk_set_parent(clk, parent);
->
-> Can you give this a try?
->
-> Cheers
-> Jon
->
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120613/a564cd36/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/f97d2ef4/attachment-0001.html>
