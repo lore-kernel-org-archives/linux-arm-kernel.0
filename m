@@ -1,32 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jun 2012 09:13:52 +0100
-Subject: [PATCH 07/14] mfd: Initialise the AB8500 driver at core_initcall
- time
-In-Reply-To: <CACRpkdY8aD1djSdPoeKYDdFVbf3E84ZWw2Q5CCLsPmoD66Hf7A@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdY8aD1djSdPoeKYDdFVbf3E84ZWw2Q5CCLsPmoD66Hf7A@mail.gmail.com>
-Message-ID: <4FD6FA40.3010204@linaro.org>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 12 Jun 2012 08:30:57 +0000
+Subject: [PATCH v5 05/14] ARM: OMAP2+: gpmc: resource creation helpers
+In-Reply-To: <4FD65BA5.4020205@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
+ <4FD65BA5.4020205@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997EE1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/12 22:03, Linus Walleij wrote:
-> On Mon, Jun 11, 2012 at 5:25 PM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> The AB8500 is soon to have its own IRQ domain. For this to be useful
->> the driver needs to be initialised earlier in the boot sequence. Here
->> we move initialisation forward from arch_initcall to core_initcall time.
->
-> I don't understand why using IRQ domain makes it necessary to
-> initialize the driver earlier in the init process. Please explain to me,
-> I need tutoring here.
+Hi Jon,
 
-Perhaps I need to invest some time into deferring each user's probe()s 
-instead. Leave it with me I'll do some investigation.
+On Tue, Jun 12, 2012 at 02:27:09, Hunter, Jon wrote:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > +static __devinit int gpmc_setup_cs_mem(struct gpmc_cs_data *cs,
+> > +						struct resource *res)
+
+> > +	return 1;
+> > +}
+> 
+> Nit-pick, CodingStyle chapter 16 states that 0 should be used for
+> success when returning from a function.
+
+I doubt whether this falls to the category you are referring.
+This function returns number of resources setup, please see
+similar for irq too, there it can be 2 also, success or failure
+is not sufficient for the other, and with this we have both
+functions returning values similar way.
+
+> > +static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
+> > +{
+> > +	return bitmask;
+> > +}
+> 
+> I have to ask what is the value in this helper function? ;-)
+
+It is to stress the fact that flag user is passing need not be
+same as irq bit (here both have same value), this kind of an
+arrangement would be required later if waitpin interrupt also
+has to be handled, do you still prefer removing it now ?
+
+Regards
+Afzal
