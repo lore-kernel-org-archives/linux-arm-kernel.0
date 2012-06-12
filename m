@@ -1,26 +1,49 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 13:11:00 -0500
-Subject: [PATCH v5 09/14] ARM: OMAP2+: gpmc: holler if no configuration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E997F4F@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <66dd8cb20cd46e68e43f4a56f49d040ad993e976.1339419492.git.afzal@ti.com>
- <4FD6717C.6080101@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997F4F@DBDE01.ent.ti.com>
-Message-ID: <4FD78634.3090401@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Jun 2012 14:13:43 -0400
+Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
+In-Reply-To: <20120612120433.GA17893@lunn.ch>
+References: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+ <20120610170620.GW14756@titan.lakedaemon.net>
+ <20120612120433.GA17893@lunn.ch>
+Message-ID: <20120612181343.GG14756@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/12/2012 03:44 AM, Mohammed, Afzal wrote:
-> Hi Jon,
+On Tue, Jun 12, 2012 at 02:04:33PM +0200, Andrew Lunn wrote:
+> > > +		spi at 10600 {
+> > > +			compatible = "marvell,orion-spi";
+> > > +			#address-cells = <1>;
+> > > +			#size-cells = <0>;
+> > > +			cell-index = <0>;
+> > > +			reg = <0x10600 0x28>;
+> > > +			status = "disabled";
+> > > +		};
+> > > +
 > 
-> On Tue, Jun 12, 2012 at 04:00:20, Hunter, Jon wrote:
+> > > index fa51586..0942139 100644
+> > > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > > @@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+> > >  	{ }
+> > >  };
+> > >  
+> > > +struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> > > +	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+> > 
+> > Isn't this ---------------------------------^^^^^^^^^^ defined somewhere?
 > 
->> Nit, "holler" is slang. Just say WARN.
+> Yes, there is a #define for this. However, in this case, i think the
+> number actually tells you more. The dtsi file has the number, not some
+> symbolic representation. Also, some platforms, e.g. Dove, have more
+> than one spi controller. Having the number there makes it easier to
+> see the mapping between the node in DT and the name used in the
+> platform device. If we use the #define it means making an indirection
+> via kirkwood.h for a human to see the mapping.
 > 
-> It was a deliberate attempt to add human (or read humorous) touch
+> However, i can change it...
 
-I like that, but I wonder if it could confuse some :-)
+Nope, good point.  If no one else pipes up, leave it as is.
 
-Jon
+thx,
+
+Jason.
