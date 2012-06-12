@@ -1,42 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Jun 2012 11:23:18 -0500
-Subject: [PATCH v3 0/4] DT clock bindings
-In-Reply-To: <20120612154735.GB19410@gmail.com>
-References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
- <20120612154735.GB19410@gmail.com>
-Message-ID: <4FD76CF6.8090801@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Jun 2012 11:27:27 -0500
+Subject: [PATCH 4/5] MFD: OMAP3EVM: USB: cosmetic fix to failed parent
+ clk set
+In-Reply-To: <CA+Y31wfHiKEWFbwkec_fFHS3kKms_OccTKGQcetuE9F132vbDQ@mail.gmail.com>
+References: <zumeng.chen@gmail.com>
+ <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
+ <1339423216-1323-5-git-send-email-zumeng.chen@gmail.com>
+ <4FD608C5.9000900@ti.com>
+ <CA+Y31wfHiKEWFbwkec_fFHS3kKms_OccTKGQcetuE9F132vbDQ@mail.gmail.com>
+Message-ID: <4FD76DEF.7090309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2012 10:47 AM, Mike Turquette wrote:
-> On 20120612-09:41, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This series defines clock bindings for Device-Tree and adds kernel
->> support using the common clock infrastructure. The last patch enables
->> DT clock support for the Calxeda Highbank platform.
->>
->> I'm posting this again to solicit further review. There has been some
->> discussion[1], but no definite path forward. This series is not changed
->> from the last post other than rebasing to v3.5-rc2.
->>
+
+On 06/11/2012 09:30 PM, Zumeng Chen wrote:
 > 
-> Hi Rob,
 > 
-> Just FYI, I was following the first thread but it did not seem to reach
-> resolution.  Namely Saravana seemed to have some lingering concerns.
-> But I'm definitely not ignoring this series.  I assume you still want
-> this to go through me once everyone is on board?
+> 2012/6/11 Jon Hunter <jon-hunter at ti.com <mailto:jon-hunter@ti.com>>
+> 
+> 
+>     On 06/11/2012 09:00 AM, Zumeng Chen wrote:
+>     > A typo fix for this cosmetic change and mute a failed message from
+>     > a unnecessary setting of some parent clk for usbhs_omap on OMAP3EVM.
+>     >
+>     > Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com
+>     <mailto:zumeng.chen@gmail.com>>
+>     > ---
+>     >  drivers/mfd/omap-usb-host.c |    4 +++-
+>     >  1 files changed, 3 insertions(+), 1 deletions(-)
+>     >
+>     > diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>     > index 7e96bb2..9aaaf3c 100644
+>     > --- a/drivers/mfd/omap-usb-host.c
+>     > +++ b/drivers/mfd/omap-usb-host.c
+>     > @@ -698,8 +698,9 @@ static int __devinit usbhs_omap_probe(struct
+>     platform_device *pdev)
+>     >               goto err_usbtll_p2_fck;
+>     >       }
+>     >
+>     > +#ifndef CONFIG_MACH_OMAP3EVM
+>     > +     /* for OMAP3 , the clk set parent fails */
+>     >       if (is_ehci_phy_mode(pdata->port_mode[0])) {
+>     > -             /* for OMAP3 , the clk set paretn fails */
+>     >               ret = clk_set_parent(omap->utmi_p1_fck,
+>     >                                       omap->xclk60mhsp1_ck);
+>     >               if (ret != 0)
+> 
+>     This begs the question, why is port_mode[0] set to ehci phy mode if this
+>     is failing? Something does not seem right here but this does not look
+>     like the right fix.
+> 
+> Actually, for omap3530evm, there is only port-mode[1] is valid, so
+> port_mode[0]
+> will be skipped by "if". And it will report "xclk60mhsp2_ck set parent
+> failed"
+> 
+> But why I bracket both of them, because, both xclk60mhsp2_ck and
+> xclk60mhsp1_ck
+> have dummy_ck clk for omap3530evm. So we can skip them directly.
 
-Right. This is why I have reposted and copied those whom commented on my
-pull request. I think at least some of Saravana's concerns boiled down
-to not requiring using DT clock bindings and not requiring driver
-changes to move to DT bindings. Both of these are met with this series.
-A platform can still use clkdev tables for binding clocks to devices and
-does not have to use DT for clocks. Drivers generally should not require
-any changes that I'm aware of, but if there are any concrete examples
-I'd like to know.
+How about something like this ...
 
-Yes, I think this should go thru you.
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 62ec5c4..c1335f1 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -149,6 +149,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+        if (!arch_clock || !arch_clock->clk_set_parent)
+                return ret;
 
-Rob
++       /* If the clock is a dummy clock just return */
++       if (!strcmp(clk->name, dummy_ck.name))
++               return 0;
++
+        spin_lock_irqsave(&clockfw_lock, flags);
+        if (clk->usecount == 0) {
+                ret = arch_clock->clk_set_parent(clk, parent);
+
+Can you give this a try?
+
+Cheers
+Jon
