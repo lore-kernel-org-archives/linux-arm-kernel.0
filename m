@@ -1,74 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jun 2012 11:39:01 +0100
-Subject: [PATCH v7 00/12] Per SoC descriptor
-In-Reply-To: <201206081454.46422.arnd@arndb.de>
-References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
- <201206081454.46422.arnd@arndb.de>
-Message-ID: <4FD71C45.3010206@arm.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 12 Jun 2012 10:39:56 +0000
+Subject: [PATCH v5 00/14] GPMC driver conversion
+In-Reply-To: <cover.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998065@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/12 15:54, Arnd Bergmann wrote:
-> On Thursday 07 June 2012, Marc Zyngier wrote:
->> [As per Arnd request, I've updated this patch series, in the hope that
->> it could be useful to the single zImage work]
->>
->> This patch series introduces a per-soc descriptor which should, in the
->> end, contain most of the SoC specific operations.
->>
->> This first patch series introduces the arm_soc_desc structure, adds
->> per-soc SMP and CPU hotplug operations, and converts all SMP platform
->> to this new scheme.
->>
->> Patches against v3.5-rc1. Tested on VExpress (Cortex A15).
->>
->> Also available at:
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git soc_desc-v3.5-rc1
+Hi Tony,
+
+On Mon, Jun 11, 2012 at 19:55:02, Mohammed, Afzal wrote:
+> Hi,
 > 
-> With my experimental multiplatform kernel tree, it let me actually build
-> an allyesconfig including SMP enabled, so just for that you get an
+> This series is based on 3.5-rc1, and is dependent on [1,2,3]
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks.
-
-> Two comments though:
+> This series has been tested on omap3evm (smsc911x) rev G & C and
+> beagle board(nand) using patch series which is going to be posted
+> shortly (this series only creates a driver out of GPMC code)
 > 
-> 1. I needed the patch below to avoid conflicting pen_release symbols.
-> I was not sure if any of the platforms rely on the pen_release variable
-> being located in the same cache line or page as the code accessing it,
-> or why else it is defined in assembly. If we don't have a reason for that,
-> we should probably pick the simpler approach and just have a single
-> definition for this in common ARM SMP code.
+> Also using private patches, nand & onenand was tested on omap3evm,
+> rev G & C respectively (as support for these were not in mainline)
+> 
+> Many of GPMC peripherals depend on bootloader for configuration.
+> This is going to be deprecated. feature-removal-schedule.txt will be
+> updated in one of the upcoming patch series regarding the same.
+> 
+> 
+> [PATCH 03/13] ARM: OMAP2+: gpmc: driver migration helper, is to be
+> reverted once all GPMC peripherals are migrated to use driver
+> interface.
 
-I have mixed feelings about this. On most hardware, CPU power management
-should make the use of pen_release obsolete (it only makes sense if you
-cannot turn off the power).
+Please let me know your comments on this series. I had tried to
+go as per your requirements.
 
-On the other hand, given how "popular" the versatile implementation is,
-we might as well consolidate it. I've queued a patch to that effect, but
-I'd really like platform maintainers to realize how wrong they are.
+This series keeps old interface while providing a new driver interface.
+Old interface will work (to the best of my knowledge; omap3evm &
+beagle are the ones available here to test) at each of the commits.
 
-> 2. Sorry for having to bring it up yet again, but it still feels silly
-> to have the split data structures when nothing in the code actually
-> checks whether the functions are __init or __cpuinit, which was the
-> intention for splitting the struct in the first place according to
-> Nico. If people still like the split, I'll just shut up, but I would
-> prefer if this could be converted (back) into a single 'struct smp_ops'
-> with function pointers and no "name" field or the ambition to add
-> stuff other than SMP callbacks.
-
-Right. I now have a slightly simpler/smaller series, which only cares
-about SMP and have a single structure approach (though it still uses
-split structures internally):
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-smp_ops-v3.5-rc2
-
-I'll post it later today.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards
+Afzal
