@@ -1,24 +1,32 @@
-From: johnhlinn@gmail.com (John Linn)
-Date: Tue, 12 Jun 2012 16:12:20 -0700
-Subject: problems with external initramfs passed to device tree kernel
-Message-ID: <CAB9O=CMADa26benQCkEoLOKKTGNeExjvFeVkFe4HLVi-W=o=Jg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 12 Jun 2012 16:14:38 -0700
+Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
+In-Reply-To: <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
+References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
+ <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120612231438.GA6177@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm not sure this is specific to ARM, but that's what I'm on so I
-thought I'd ask.  I'm also running a device tree kernel.  I've tried
-it on 3.0 and 3.3 kernels.
+On Fri, Jun 08, 2012 at 08:37:06PM +0800, Richard Zhao wrote:
+> Sometimes, the driver bindings may know what phy they use.
+> For example, when using device tree, the usb controller may have a
+> phandler pointing to usb phy.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> ---
+> Changes since laster version:
+> - hcd transceiver renamed to phy
 
-I'm seeing where I have to remove CONFIG_BLK_DEV_RAM from the kernel
-to get it to boot with an external initramfs image. It says the image
-is not?good (junk in it), but it boots.  The same image boots fine
-when built into the kernel using INITRAMFS_SOURCE, even with
-BLK_DEV_RAM in the kernel.
+Ick, I see patches all over this thread, and other threads, and I have
+no idea what to apply anywhere...
 
-I've done quite a bit of digging at the init/initramfs.c and it's not
-obvious to me where the issue lies (user error probably).
+So, consider all chipidea patches dropped from my queue now, can you
+please resend them to me, with the accumulated acks and reviewed-by
+line, so that I can queue them up?
 
-Any thoughts would be appreciated.
+thanks,
 
-Thanks,
-John
+greg k-h
