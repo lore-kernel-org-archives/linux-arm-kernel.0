@@ -1,33 +1,24 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 12 Jun 2012 16:06:30 -0700
-Subject: [PATCH 2/3] clk: add ICST307 driver
-In-Reply-To: <1339429196-32584-1-git-send-email-linus.walleij@linaro.org>
-References: <1339429196-32584-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120612230630.GK19410@gmail.com>
+From: johnhlinn@gmail.com (John Linn)
+Date: Tue, 12 Jun 2012 16:12:20 -0700
+Subject: problems with external initramfs passed to device tree kernel
+Message-ID: <CAB9O=CMADa26benQCkEoLOKKTGNeExjvFeVkFe4HLVi-W=o=Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20120611-17:39, Linus Walleij wrote:
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index b9a5158..a7a7cf8 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -5,3 +5,4 @@ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
->  # SoCs specific
->  obj-$(CONFIG_ARCH_MXS)		+= mxs/
->  obj-$(CONFIG_PLAT_SPEAR)	+= spear/
-> +obj-$(CONFIG_CLK_ICST)		+= clk-icst.o
+I'm not sure this is specific to ARM, but that's what I'm on so I
+thought I'd ask.  I'm also running a device tree kernel.  I've tried
+it on 3.0 and 3.3 kernels.
 
-Is there a better place to put this than the top-level directory?
+I'm seeing where I have to remove CONFIG_BLK_DEV_RAM from the kernel
+to get it to boot with an external initramfs image. It says the image
+is not?good (junk in it), but it boots.  The same image boots fine
+when built into the kernel using INITRAMFS_SOURCE, even with
+BLK_DEV_RAM in the kernel.
 
-> +struct clk * __init icst_clk_init(struct device *dev, const struct clk_icst_desc *desc)
+I've done quite a bit of digging at the init/initramfs.c and it's not
+obvious to me where the issue lies (user error probably).
 
-Nitpick: icst_clk_init should be renamed icst_clk_register to more
-closely resemble other clock registration functions which allocate
-memory dynamically.
+Any thoughts would be appreciated.
 
-So far the "_init" suffix has been used by functions which operate on
-statically initialized data.
-
-Regards,
-Mike
+Thanks,
+John
