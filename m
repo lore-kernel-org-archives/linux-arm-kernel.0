@@ -1,47 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jun 2012 20:54:17 +0200
-Subject: [PATCH] serial/amba-pl011: move custom pin control to driver
-In-Reply-To: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
-References: <1337800726-4076-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdahoqUEc74eEcf=KcYRoUMEYQ456nZ85qGViLGBxUpdbw@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Jun 2012 13:55:23 -0500
+Subject: [PATCH v5 07/14] ARM: OMAP2+: gpmc: time setting (register#)
+ helper
+In-Reply-To: <aafc6bc498e303be0bc86ce1ae395148fdca5c3d.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <aafc6bc498e303be0bc86ce1ae395148fdca5c3d.1339419492.git.afzal@ti.com>
+Message-ID: <4FD7909B.4040304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 23, 2012 at 9:18 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
 
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> We had a boot regression in Ux500 in the merge window because
-> two orthogonal pin control schemes for the PL011 were merged
-> at the same time:
->
-> - One using the .init() and .exit() hooks into the platform
-> ?for Ux500 putting the pins into default vs sleep state
-> ?respectively as the port was started/stopped.
-> ?commit a09806607fd20bed2f8c41fe22793386790a14aa
-> ?"ARM: ux500: switch to using pinctrl for uart0"
->
-> - One hogging the default setting at PL011 probe()
-> ?commit 258e055111d3cde2607e0d04eb91da2f7a59b591
-> ?"serial: amba-pl011: adopt pinctrl support"
->
-> To get a solution that works for both let's scrap the stuff
-> in the platform callbacks, instead have the driver itself
-> select default and sleep states when the port is
-> started/stopped. Hopefully this works for all clients.
-> Platform callbacks are bad for device tree migration anyway,
-> so this rids us of another problem in Ux500.
->
-> Cc: linux-serial at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Reported-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On 06/11/2012 09:27 AM, Afzal Mohammed wrote:
+> Helper for setting GPMC timing by taking input as register values.
 
-A friendly poke at Greg to push this for the -rc series whenever
-time permits (if OK) as it's regressing Ux500 for the moment.
+When are the timings calculated? Why not just use the existing
+gpmc_cs_set_timings()?
 
-Yours,
-Linus Walleij
+I guess I am not convinced that we need to have multiple formats to pass
+timings such as clock, period, etc.
+
+I think that it is sufficient to pass the timings as time (period) as is
+currently done and have the driver convert to clocks based upon the gpmc
+fclk rate.
+
+Jon
+
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |   43 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 4e19010..e60076e3 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -960,6 +960,49 @@ static void gpmc_setup_cs_config(unsigned cs, unsigned conf)
+>  	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, l);
+>  }
+>  
+> +static inline void gpmc_set_one_timing(int cs, int reg, int start,
+> +							int end, u32 val)
+> +{
+> +	u32 l;
+> +	unsigned mask;
+> +
+> +	mask = (1 << (end - start + 1)) - 1;
+> +	l = gpmc_cs_read_reg(cs, reg);
+> +	l &= ~(mask << start);
+> +	l |= val << start;
+> +	gpmc_cs_write_reg(cs, reg, l);
+> +}
+> +
+> +static void gpmc_cs_set_register_timings(int cs, const struct gpmc_timings *t)
+> +{
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG1, 0, 1, t->sync_clk);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG1, 18, 19, t->wait_monitoring);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG1, 25, 26, t->clk_activation);
+> +
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG2, 0, 3, t->cs_on);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG2, 8, 12, t->cs_rd_off);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG2, 16, 20, t->cs_wr_off);
+> +
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG3, 0, 3, t->adv_on);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG3, 8, 12, t->adv_rd_off);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG3, 16, 20, t->adv_wr_off);
+> +
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG4, 0, 3, t->oe_on);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG4, 8, 12, t->oe_off);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG4, 16, 19, t->we_on);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG4, 24, 28, t->we_off);
+> +
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG5, 24, 27, t->page_burst_access);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG6, 0, 3, t->bus_turnaround);
+> +	gpmc_set_one_timing(cs, GPMC_CS_CONFIG6, 8, 11,	t->cycle2cycle_delay);
+> +
+> +	if (gpmc_revision >= 4) {
+> +		gpmc_set_one_timing(cs, GPMC_CS_CONFIG6, 16, 19,
+> +						t->wr_data_mux_bus);
+> +		gpmc_set_one_timing(cs, GPMC_CS_CONFIG6, 24, 28, t->wr_access);
+> +	}
+> +}
+> +
+>  static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
+>  {
+>  	return bitmask;
