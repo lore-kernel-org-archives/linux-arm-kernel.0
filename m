@@ -1,60 +1,42 @@
-From: lasse.collin@tukaani.org (Lasse Collin)
-Date: Tue, 12 Jun 2012 19:18:04 +0300
-Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <1339470307-28223-1-git-send-email-tmac@hp.com>
-References: <1339470307-28223-1-git-send-email-tmac@hp.com>
-Message-ID: <20120612191804.4211462a@tukaani.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Jun 2012 11:23:18 -0500
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <20120612154735.GB19410@gmail.com>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+ <20120612154735.GB19410@gmail.com>
+Message-ID: <4FD76CF6.8090801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-06-11 T Makphaibulchoke wrote:
-> --- /dev/null
-> +++ b/lib/boot/mem.c
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Small subset of simple memory helper functions required by different
-> + * compressors for preboot environment.
-> + */
-> +
-> +#include <linux/string.h>
-> +
-> +#ifndef __HAVE_PREBOOT_ARCH_MEMCPY
-> +void *memcpy(void *__dest, __const void *__src, size_t __n)
-> +{
-> +	return __builtin_memcpy(__dest, __src, __n);
-> +}
-> +#endif
+On 06/12/2012 10:47 AM, Mike Turquette wrote:
+> On 20120612-09:41, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This series defines clock bindings for Device-Tree and adds kernel
+>> support using the common clock infrastructure. The last patch enables
+>> DT clock support for the Calxeda Highbank platform.
+>>
+>> I'm posting this again to solicit further review. There has been some
+>> discussion[1], but no definite path forward. This series is not changed
+>> from the last post other than rebasing to v3.5-rc2.
+>>
+> 
+> Hi Rob,
+> 
+> Just FYI, I was following the first thread but it did not seem to reach
+> resolution.  Namely Saravana seemed to have some lingering concerns.
+> But I'm definitely not ignoring this series.  I assume you still want
+> this to go through me once everyone is on board?
 
-GCC will replace __builtin_memcpy above with a call to memcpy, creating
-an infinite loop. I confirmed this on x86_64 by first uncommenting the
-memcpy from arch/x86/boot/compressed/string.c.
+Right. This is why I have reposted and copied those whom commented on my
+pull request. I think at least some of Saravana's concerns boiled down
+to not requiring using DT clock bindings and not requiring driver
+changes to move to DT bindings. Both of these are met with this series.
+A platform can still use clkdev tables for binding clocks to devices and
+does not have to use DT for clocks. Drivers generally should not require
+any changes that I'm aware of, but if there are any concrete examples
+I'd like to know.
 
-You need to provide a memcpy implementation yourself without using
-__builtin functions. For example, copy the memcpy implementation from
-lib/string.c.
+Yes, I think this should go thru you.
 
-> +#ifndef __HAVE_PREBOOT_ARCH_MEMMOVE
-> +void *memmove(void *__dest, __const void *__src, size_t count)
-> +{
-> +	unsigned char *d = __dest;
-> +	const unsigned char *s = __src;
-> +
-> +	if (__dest == __src)
-> +		return __dest;
-> +
-> +	if (__dest < __src)
-> +		return memcpy(__dest, __src, count);
-> +
-> +	while (count--)
-> +		d[count] = s[count];
-> +	return __dest;
-> +}
-> +#endif
-
-The use of memcpy when __dest < __src is OK with some memcpy
-implementations, but in a generic case it isn't guaranteed to work.
-I think it would be better to just copy memmove from lib/string.c.
-
--- 
-Lasse Collin  |  IRC: Larhzu @ IRCnet & Freenode
+Rob
