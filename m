@@ -1,129 +1,58 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 08:41:24 +0200
-Subject: [PATCH v2 05/10] ARM: tegra: Rewrite PCIe support as a driver
-In-Reply-To: <4FD65E98.4070200@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-6-git-send-email-thierry.reding@avionic-design.de>
- <4FD65E98.4070200@wwwdotorg.org>
-Message-ID: <20120612064124.GF4040@avionic-0098.adnet.avionic-design.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jun 2012 23:47:57 -0700
+Subject: [PATCH 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <1339423216-1323-6-git-send-email-zumeng.chen@gmail.com>
+References: <zumeng.chen@gmail.com>
+ <1339423216-1323-1-git-send-email-zumeng.chen@gmail.com>
+ <1339423216-1323-6-git-send-email-zumeng.chen@gmail.com>
+Message-ID: <20120612064757.GE12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> > This commit adds a platform device driver for the PCIe controller on
-> > Tegra SOCs. Current users of the old code (TrimSlice and Harmony) are
-> > converted and now initialize and register a corresponding platform
-> > device.
+* Zumeng Chen <zumeng.chen@gmail.com> [120611 07:05]:
+> If we don't set proper debouce time for ads7846, then there are
+> flooded interrupt counters of ads7846 responding to one time
+> touch on screen, so the driver couldn't work well.
 > 
-> > diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+> And since most OMAP3 series boards pass NULL pointer of board_pdata
+> to omap_ads7846_init, so it's more proper to set it in driver level
+> after having gpio_request done.
 > 
-> > +static struct resource tegra_pcie_resources[] = {
-> > +	[0] = {
-> > +		.start = TEGRA_PCIE_BASE,
-> > +		.end = TEGRA_PCIE_BASE + TEGRA_PCIE_SIZE - 1,
-> > +		.flags = IORESOURCE_MEM,
-> > +	},
-> > +	[1] = {
-> > +		.start = TEGRA_PCIE_MMIO_BASE,
-> > +		.end = TEGRA_PCIE_MMIO_BASE + TEGRA_PCIE_MMIO_SIZE - 1,
-> > +		.flags = IORESOURCE_MEM,
-> > +	},
-> > +	[2] = {
-> > +		.start = INT_PCIE_INTR,
-> > +		.end = INT_PCIE_INTR,
-> > +		.flags = IORESOURCE_IRQ,
-> > +	},
-> > +};
+> This patch has been validated on 3530evm.
 > 
-> I'm not sure those resources either cover all the necessary regions, nor
-> are as fine-grained as they should be ...
+> Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
+> Signed-off-by: Syed Mohammed Khasim <khasim@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Please remove my Signed-off-by, where does that come from?
+
+Tony
+
+
+>  drivers/input/touchscreen/ads7846.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> In particular, in pcie.c, I see separate afi_writel() and pads_writel()
-> implying those are separate regions.
+> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+> index f02028e..a82a5fb 100644
+> --- a/drivers/input/touchscreen/ads7846.c
+> +++ b/drivers/input/touchscreen/ads7846.c
+> @@ -61,6 +61,7 @@
+>  
+>  /* this driver doesn't aim at the peak continuous sample rate */
+>  #define	SAMPLE_BITS	(8 /*cmd*/ + 16 /*sample*/ + 2 /* before, after */)
+> +#define	DEBOUNCE_TIME	310 /* About 10 ms */
+>  
+>  struct ts_event {
+>  	/*
+> @@ -980,6 +981,7 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+>  		}
+>  
+>  		ts->gpio_pendown = pdata->gpio_pendown;
+> +		gpio_set_debounce(pdata->gpio_pendown, DEBOUNCE_TIME);
+>  
+>  	} else {
+>  		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+> -- 
+> 1.7.5.4
 > 
-> Also, I see the following hard-code specific addresses, and are still
-> used by the driver after conversion:
-> 
-> > #define MEM_BASE_0              (TEGRA_PCIE_BASE + SZ_256M)
-> > #define MEM_SIZE_0              SZ_128M
-> > #define MEM_BASE_1              (MEM_BASE_0 + MEM_SIZE_0)
-> > #define MEM_SIZE_1              SZ_128M
-> > #define PREFETCH_MEM_BASE_0     (MEM_BASE_1 + MEM_SIZE_1)
-> > #define PREFETCH_MEM_SIZE_0     SZ_128M
-> > #define PREFETCH_MEM_BASE_1     (PREFETCH_MEM_BASE_0 + PREFETCH_MEM_SIZE_0)
-> > #define PREFETCH_MEM_SIZE_1     SZ_128M
-> 
-> Also, there's a comment describing the register layout in terms of a
-> number of separate regions:
-> 
-> > /*
-> >  * Tegra2 defines 1GB in the AXI address map for PCIe.
-> >  *
-> >  * That address space is split into different regions, with sizes and
-> >  * offsets as follows:
-> >  *
-> >  * 0x80000000 - 0x80003fff - PCI controller registers
-> >  * 0x80004000 - 0x80103fff - PCI configuration space
-> >  * 0x80104000 - 0x80203fff - PCI extended configuration space
-> >  * 0x80203fff - 0x803fffff - unused
-> >  * 0x80400000 - 0x8040ffff - downstream IO
-> >  * 0x80410000 - 0x8fffffff - unused
-> >  * 0x90000000 - 0x9fffffff - non-prefetchable memory
-> >  * 0xa0000000 - 0xbfffffff - prefetchable memory
-> >  */
-> 
-> (the latter 2 regions at least being also split in half for each of the
-> 2 host ports)
-
-I was thinking that maybe each port should be represented as a child node,
-but I'm not sure that's going to work too well because the children of the
-pci node are supposed to be PCI busses/devices. I'll have to check whether
-they could just as well be children of the PCIe port nodes.
-
-That way each port could get an own set of register ranges to better describe
-the actual layout. AFAICT the even partitioning of the non-prefetchable and
-prefetchable memory regions is arbitrary and it could potentially be useful
-to make it configurable via the DT.
-
-> Shouldn't each of these regions be a separate entry in the platform
-> device resources.
-> 
-> This perhaps isn't that relevant for Tegra20 alone, but Tegra30 supports
-> 3 host ports instead of 2 (hence I presume alters the internal layout of
-> the 1G chunk of physical memory space allocated to PCIe), and moves the
-> PCIe area from 2G..3G to 0G..1G (so invalidates the hard-coded
-> *_MEM_BASE_* above).
-
-> That said, I'm not sure whether Tegra20's and Tegra30's PCIe controllers
-> are similar enough to make a shared driver worthwhile/possible.
-> (Although our downstream Android driver appears to handle both with a
-> very small number of ifdefs).
-
-> If they are similar, then I think my comments above should be addressed.
-> If they are not similar, then I think you can just have a single 1G
-> memory region in the resources, and split it up internally, rather than
-> needing separate resources for different parts of the address space.
-
-Unfortunately the PCIe controller is very badly documented in the TRM, so
-this information is hard to locate (I guess the best source is one of the
-downstream drivers).
-
-Last time I looked they seemed to be simple enough to handle the differences
-using OF compatible matches. I believe apart from the PCIe area changes there
-were some differences in how the MSI were setup.
-
-> While we can easily fix this kind of driver internals so this doesn't
-> seem like a big deal, this kind of change would impact the device tree
-> binding, so it seems that we need to sort it out before DT conversion.
-
-Yes, we should at least try to get it right from the start.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/bc94282d/attachment-0001.sig>
