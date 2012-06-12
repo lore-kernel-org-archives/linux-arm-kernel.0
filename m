@@ -1,51 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jun 2012 15:35:45 +0100
-Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <4FD6B472.7040609@zytor.com>
-References: <1339470307-28223-1-git-send-email-tmac@hp.com>
- <4FD6B472.7040609@zytor.com>
-Message-ID: <20120612143545.GC7918@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Jun 2012 09:41:47 -0500
+Subject: [PATCH v3 0/4] DT clock bindings
+Message-ID: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 08:16:02PM -0700, H. Peter Anvin wrote:
-> On 06/11/2012 08:05 PM, T Makphaibulchoke wrote:
-> > Cleaning up the file lib/decompress_unxz.c, moving all memory helper functions,
-> > e.g. memmove, to a new common source file, lib/boot/mem.c.
-> > 
-> > In additon to including the decompressor, any architecture supporting the XZ
-> > decompression needs to also include this new source file.
-> > 
-> > Also moving some other duplicated memory helper functions to this new source
-> > file from the arm, s390, sh and x86 preboot environments.  All 4 architectures
-> > build without error when using any compression.
-> > 
-> > Adding a new file lib/boot/mem.c, containing memory helper functions required
-> > by different compression types.
-> > 
-> > Adding memcmp declaration workaround and removing the memmove and memcpy
-> > defines workaround from arch/arm/boot/compressed/decompress.c
-> > 
-> > Removing the common functions, memmove, memcmp and memset, and adding the new
-> > source file include to arch/arm/boot/compressed/string.c.
-> > 
-> > Removing the memcpy and memmove functions and adding the new source file
-> > include to arch/s390/boot/compressed/misc.c.
-> > 
-> > Removing the memset function and adding the new source file include to
-> > arch/sh/boot/compressed/misc.c
-> > 
-> > Removing the memset function from arch/x86/boot/compressed/misc.c and move
-> > the memcpy function to the file arch/x86/boot/compressed/string.c
-> > 
-> > Adding the memcpy function and the new source file include to
-> > arch/x86/boot/compressed/string.c
-> > 
-> 
-> I can take this if Russell, Martin or Heiko, and Paul are willing to ack it.
+From: Rob Herring <rob.herring@calxeda.com>
 
-I'd like to toss this into my kautobuild+boot, but at the moment that's
-rather pointless because OMAP has been broken since towards the end of
-the merge window, and so far no sign of the fix hitting mainline any
-time soon...
+This series defines clock bindings for Device-Tree and adds kernel
+support using the common clock infrastructure. The last patch enables
+DT clock support for the Calxeda Highbank platform.
+
+I'm posting this again to solicit further review. There has been some
+discussion[1], but no definite path forward. This series is not changed
+from the last post other than rebasing to v3.5-rc2.
+
+Rob
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100932.html
+
+Grant Likely (2):
+  clk: add DT clock binding support
+  clk: add DT fixed-clock binding support
+
+Rob Herring (2):
+  dt: add clock binding doc to primecell bindings
+  clk: add highbank clock support
+
+ .../devicetree/bindings/arm/primecell.txt          |    6 +
+ .../devicetree/bindings/clock/calxeda.txt          |   17 +
+ .../devicetree/bindings/clock/clock-bindings.txt   |  117 +++++++
+ .../devicetree/bindings/clock/fixed-clock.txt      |   21 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/highbank.dts                     |   91 +++++-
+ arch/arm/mach-highbank/Makefile                    |    2 +-
+ arch/arm/mach-highbank/clock.c                     |   62 ----
+ arch/arm/mach-highbank/highbank.c                  |    7 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-fixed-rate.c                       |   23 ++
+ drivers/clk/clk-highbank.c                         |  345 ++++++++++++++++++++
+ drivers/clk/clk.c                                  |  140 ++++++++
+ drivers/clk/clkdev.c                               |   77 +++++
+ include/linux/clk-provider.h                       |   16 +
+ include/linux/clk.h                                |   19 ++
+ 16 files changed, 881 insertions(+), 64 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/calxeda.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
+ delete mode 100644 arch/arm/mach-highbank/clock.c
+ create mode 100644 drivers/clk/clk-highbank.c
+
+-- 
+1.7.9.5
