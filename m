@@ -1,34 +1,122 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 12 Jun 2012 18:31:15 +0300
-Subject: [PATCHv3 00/20] ARM: OMAP4: device off support
-Message-ID: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+Date: Tue, 12 Jun 2012 18:31:16 +0300
+Subject: [PATCHv3 01/20] ARM: OMAP4: PM: powerdomain: Add HWSAR flag to L3INIT
+In-Reply-To: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1339515095-9908-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-V3 consists of following changes:
+L3INIT powerdomain has USB HOST and USB TLL modules which support
+hardware save-and-restore (HW SAR) mechanism.
+This patch updates the L3INIT power domain to mark them as capable
+of doing H/w save and restore and provides functions to do them
+explicitly.
 
-- ordering of patches changed (enable off-mode as last patch)
-- rebased on top of 3.5-rc2
-- rebased on top of Jean Pihet's functional power state code
-- omap-secure driver has now its own CPU PM notifier:
-  * moved dummy wakeup dispatcher call from omap-mpuss-lowpower.c
-  * moved secure dispatcher calls from omap-wakeupgen.c
-- device off mode is now enabled (in addition to previously just been
-  traced) as a functional OFF state for core power domain
-- added lots of kerneldoc comments
-- dropped dpll_dump functionality from dpll44xx.c
-- disabled device-off mode for early omap4430 GP chips (due to bugs
-  impossible to support this mode on them)
-- a number of other minor changes
+Note: Eventually, these custom function implementation will be
+abstracted and might be done in hwmod or in other layer.
 
-Working tree available here:
-tree: git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-branch: mainline-3.5-rc2-omap4-dev-off-v3
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain44xx.c       |   57 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    2 +-
+ 2 files changed, 58 insertions(+), 1 deletions(-)
 
-This tree is based on top of omap4 core retention tree.
-
-Tested with omap4 panda es board (4460 GP) and omap4 blaze board (4430 EMU.)
-
--Tero
+diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+index ab93f08..c63d580 100644
+--- a/arch/arm/mach-omap2/powerdomain44xx.c
++++ b/arch/arm/mach-omap2/powerdomain44xx.c
+@@ -23,6 +23,10 @@
+ #include "prm44xx.h"
+ #include "prminst44xx.h"
+ #include "prm-regbits-44xx.h"
++#include "cm-regbits-44xx.h"
++#include "prcm44xx.h"
++#include "cm2_44xx.h"
++#include "cminst44xx.h"
+ 
+ static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ {
+@@ -265,6 +269,57 @@ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+ 	return 0;
+ }
+ 
++/**
++ * omap4_pwrdm_enable_hdwr_sar - enable hardware save / restore for pwrdm
++ * @pwrdm: struct powerdomain * to enable HW SAR for
++ *
++ * Enables hardware save / restore for a powerdomain. This is needed by
++ * some power domains to properly support off mode. Currently supports
++ * only L3INIT powerdomain on OMAP4. Called from powerdomain core code.
++ * Returns 0 always.
++ */
++static int omap4_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
++{
++	/*
++	 * FIXME: This should be fixed right way by moving it into HWMOD
++	 * or clock framework since sar control is moved to module level
++	 */
++	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
++		1 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_PARTITION,
++		OMAP4430_CM2_L3INIT_INST,
++		OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
++	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
++		1 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_PARTITION,
++		OMAP4430_CM2_L3INIT_INST,
++		OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
++	return 0;
++}
++
++/**
++ * omap4_pwrdm_disable_hdwr_sar - disable hardware save / restore for pwrdm
++ * @pwrdm: struct powerdomain * to enable HW SAR for
++ *
++ * Disables hardware save / restore for a powerdomain. For OMAP4, supports
++ * currently only L3INIT powerdomain. Returns 0 always.
++ */
++static int omap4_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
++{
++	/*
++	 * FIXME: This should be fixed right way by moving it into HWMOD
++	 * or clock framework since sar control is moved to module level
++	 */
++	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
++		0 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_PARTITION,
++		OMAP4430_CM2_L3INIT_INST,
++		OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
++	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
++		0 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_PARTITION,
++		OMAP4430_CM2_L3INIT_INST,
++		OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
++
++	return 0;
++}
++
+ struct pwrdm_ops omap4_pwrdm_operations = {
+ 	.pwrdm_func_to_pwrst	= omap2_pwrdm_func_to_pwrst,
+ 	.pwrdm_func_to_logic_pwrst	= omap2_pwrdm_func_to_logic_pwrst,
+@@ -285,4 +340,6 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+ 	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+ 	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+ 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
++	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
++	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
+ };
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index 704664c..d8701ce 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -276,7 +276,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* l3init_bank1 */
+ 	},
+-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE | PWRDM_HAS_HDWR_SAR,
+ };
+ 
+ /* l4per_44xx_pwrdm: Target peripherals power domain */
+-- 
+1.7.4.1
