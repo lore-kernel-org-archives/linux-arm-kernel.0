@@ -1,266 +1,297 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jun 2012 13:30:48 +0100
-Subject: [PATCH v8 05/13] ARM: convert Exynos to smp_ops
+Date: Tue, 12 Jun 2012 13:30:47 +0100
+Subject: [PATCH v8 04/13] ARM: convert Tegra to smp_ops
 In-Reply-To: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
 References: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1339504256-11266-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1339504256-11266-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert Exynos to use the smp_ops to provide its SMP and CPU hotplug
+Convert Tegra to use the smp_ios to provide its SMP and CPU hotplug
 operations.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+Tested on Harmony.
+
+Cc: Colin Cross <ccross@android.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos/common.h              |    8 ++++++++
- arch/arm/mach-exynos/hotplug.c             |    8 +++++---
- arch/arm/mach-exynos/mach-armlex4210.c     |    1 +
- arch/arm/mach-exynos/mach-exynos4-dt.c     |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c     |    1 +
- arch/arm/mach-exynos/mach-nuri.c           |    1 +
- arch/arm/mach-exynos/mach-origen.c         |    1 +
- arch/arm/mach-exynos/mach-smdk4x12.c       |    2 ++
- arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
- arch/arm/mach-exynos/mach-universal_c210.c |    1 +
- arch/arm/mach-exynos/platsmp.c             |   16 ++++++++++++----
- 11 files changed, 35 insertions(+), 7 deletions(-)
+ arch/arm/mach-tegra/board-dt-tegra20.c |    2 ++
+ arch/arm/mach-tegra/board-dt-tegra30.c |    2 ++
+ arch/arm/mach-tegra/board-harmony.c    |    2 ++
+ arch/arm/mach-tegra/board-paz00.c      |    2 ++
+ arch/arm/mach-tegra/board-seaboard.c   |    4 ++++
+ arch/arm/mach-tegra/board-trimslice.c  |    2 ++
+ arch/arm/mach-tegra/common.c           |    2 ++
+ arch/arm/mach-tegra/common.h           |    6 ++++++
+ arch/arm/mach-tegra/hotplug.c          |    6 +++---
+ arch/arm/mach-tegra/platsmp.c          |   17 +++++++++++++----
+ 10 files changed, 38 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/common.h
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index aed2eeb..216321a 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -12,6 +12,8 @@
- #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
- #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index eb7249d..11bf7fb 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -45,6 +45,7 @@
+ #include "board-harmony.h"
+ #include "clock.h"
+ #include "devices.h"
++#include "common.h"
+ 
+ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", TEGRA_SDMMC1_BASE, "sdhci-tegra.0", NULL),
+@@ -104,6 +105,7 @@ static const char *tegra20_dt_board_compat[] = {
+ };
+ 
+ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
++	smp_ops(tegra_smp_ops)
+ 	.map_io		= tegra_map_common_io,
+ 	.init_early	= tegra20_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 4f76fa7..9b8e434 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -35,6 +35,7 @@
+ 
+ #include "board.h"
+ #include "clock.h"
++#include "common.h"
+ 
+ static struct of_device_id tegra_dt_match_table[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+@@ -84,6 +85,7 @@ static const char *tegra30_dt_board_compat[] = {
+ };
+ 
+ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
++	smp_ops(tegra_smp_ops)
+ 	.map_io		= tegra_map_common_io,
+ 	.init_early	= tegra30_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index e65e837..7eafd1c 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -45,6 +45,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -184,6 +185,7 @@ static void __init tegra_harmony_init(void)
+ }
+ 
+ MACHINE_START(HARMONY, "harmony")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_harmony_fixup,
+ 	.map_io         = tegra_map_common_io,
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index bbc1907..c2aaac3 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -47,6 +47,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -217,6 +218,7 @@ static void __init tegra_paz00_init(void)
+ }
+ 
+ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_paz00_fixup,
+ 	.map_io         = tegra_map_common_io,
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index 71e9f3f..8888591 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -43,6 +43,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -270,6 +271,7 @@ static void __init tegra_wario_init(void)
+ 
+ 
+ MACHINE_START(SEABOARD, "seaboard")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+@@ -282,6 +284,7 @@ MACHINE_START(SEABOARD, "seaboard")
+ MACHINE_END
+ 
+ MACHINE_START(KAEN, "kaen")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+@@ -294,6 +297,7 @@ MACHINE_START(KAEN, "kaen")
+ MACHINE_END
+ 
+ MACHINE_START(WARIO, "wario")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index 776aa95..afb9587 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -40,6 +40,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ #include "board-trimslice.h"
+ 
+@@ -170,6 +171,7 @@ static void __init tegra_trimslice_init(void)
+ }
+ 
+ MACHINE_START(TRIMSLICE, "trimslice")
++	smp_ops(tegra_smp_ops)
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_trimslice_fixup,
+ 	.map_io         = tegra_map_common_io,
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 204a5c8..9b9f183 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/of_irq.h>
  
 +#include <asm/smp_ops.h>
-+
- extern struct sys_timer exynos4_timer;
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
  
- void exynos_init_io(struct map_desc *mach_desc, int size);
-@@ -59,4 +61,10 @@ void exynos4212_register_clocks(void);
- #define exynos4212_register_clocks()
- #endif
+@@ -31,6 +32,7 @@
  
-+extern struct smp_ops		exynos_smp_ops;
-+
-+extern int  exynos_cpu_kill(unsigned int cpu);
-+extern void exynos_cpu_die(unsigned int cpu);
-+extern int  exynos_cpu_disable(unsigned int cpu);
-+
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 9c17a0a..8cd02f8 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -21,6 +21,8 @@
- 
- #include <mach/regs-pmu.h>
- 
+ #include "board.h"
+ #include "clock.h"
 +#include "common.h"
-+
- extern volatile int pen_release;
+ #include "fuse.h"
+ #include "pmc.h"
  
- static inline void cpu_enter_lowpower(void)
-@@ -95,7 +97,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
+new file mode 100644
+index 0000000..191e765
+--- /dev/null
++++ b/arch/arm/mach-tegra/common.h
+@@ -0,0 +1,6 @@
++struct smp_ops;
++extern struct smp_ops		tegra_smp_ops;
++
++extern int  tegra_cpu_kill(unsigned int cpu);
++extern void tegra_cpu_die(unsigned int cpu);
++extern int  tegra_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index d8dc9dd..c4fd658 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -87,7 +87,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
  	}
  }
  
 -int platform_cpu_kill(unsigned int cpu)
-+int exynos_cpu_kill(unsigned int cpu)
++int tegra_cpu_kill(unsigned int cpu)
  {
  	return 1;
  }
-@@ -105,7 +107,7 @@ int platform_cpu_kill(unsigned int cpu)
+@@ -97,7 +97,7 @@ int platform_cpu_kill(unsigned int cpu)
   *
   * Called with IRQs disabled
   */
 -void platform_cpu_die(unsigned int cpu)
-+void __cpuinit exynos_cpu_die(unsigned int cpu)
++void tegra_cpu_die(unsigned int cpu)
  {
  	int spurious = 0;
  
-@@ -125,7 +127,7 @@ void platform_cpu_die(unsigned int cpu)
+@@ -117,7 +117,7 @@ void platform_cpu_die(unsigned int cpu)
  		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
  }
  
 -int platform_cpu_disable(unsigned int cpu)
-+int exynos_cpu_disable(unsigned int cpu)
++int tegra_cpu_disable(unsigned int cpu)
  {
  	/*
  	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
-index 5a3daa0..ae816ed 100644
---- a/arch/arm/mach-exynos/mach-armlex4210.c
-+++ b/arch/arm/mach-exynos/mach-armlex4210.c
-@@ -198,6 +198,7 @@ static void __init armlex4210_machine_init(void)
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 1a208db..59aa9a0 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -23,6 +23,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
++#include <asm/smp_ops.h>
  
- MACHINE_START(ARMLEX4210, "ARMLEX4210")
- 	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= armlex4210_map_io,
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index e7e9743..8331a25 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -79,6 +79,7 @@ static char const *exynos4210_dt_compat[] __initdata = {
- 
- DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
- 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
-+	smp_ops(exynos_smp_ops)
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= exynos4210_dt_map_io,
- 	.handle_irq	= gic_handle_irq,
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 7b1e11a..6aab5a8 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -72,6 +72,7 @@ static char const *exynos5250_dt_compat[] __initdata = {
- 
- DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.init_irq	= exynos5_init_irq,
- 	.map_io		= exynos5250_dt_map_io,
- 	.handle_irq	= gic_handle_irq,
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 656f8fc..3c442d7 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -1388,6 +1388,7 @@ static void __init nuri_machine_init(void)
- 
- MACHINE_START(NURI, "NURI")
- 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= nuri_map_io,
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index f5572be..718aec3 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -765,6 +765,7 @@ static void __init origen_machine_init(void)
- 
- MACHINE_START(ORIGEN, "ORIGEN")
- 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= origen_map_io,
-diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
-index fb09c70..5e40760 100644
---- a/arch/arm/mach-exynos/mach-smdk4x12.c
-+++ b/arch/arm/mach-exynos/mach-smdk4x12.c
-@@ -298,6 +298,7 @@ static void __init smdk4x12_machine_init(void)
- 
- MACHINE_START(SMDK4212, "SMDK4212")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdk4x12_map_io,
-@@ -311,6 +312,7 @@ MACHINE_END
- MACHINE_START(SMDK4412, "SMDK4412")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
- 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdk4x12_map_io,
-diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-index 262e9e4..346f98d 100644
---- a/arch/arm/mach-exynos/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos/mach-smdkv310.c
-@@ -398,6 +398,7 @@ static void __init smdkv310_machine_init(void)
- MACHINE_START(SMDKV310, "SMDKV310")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
- 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdkv310_map_io,
-@@ -410,6 +411,7 @@ MACHINE_END
- 
- MACHINE_START(SMDKC210, "SMDKC210")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= smdkv310_map_io,
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index cd92fa8..d7cc0bf 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -1156,6 +1156,7 @@ static void __init universal_machine_init(void)
- 
- MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
-+	smp_ops(exynos_smp_ops)
- 	.atag_offset	= 0x100,
- 	.init_irq	= exynos4_init_irq,
- 	.map_io		= universal_map_io,
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..2dfca9b 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -32,6 +32,8 @@
- 
- #include <plat/cpu.h>
+ #include <mach/clk.h>
+ #include <mach/iomap.h>
+@@ -32,6 +33,8 @@
+ #include "flowctrl.h"
+ #include "reset.h"
  
 +#include "common.h"
 +
- extern void exynos4_secondary_startup(void);
+ extern void tegra_secondary_startup(void);
  
- #define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-@@ -64,7 +66,7 @@ static void __iomem *scu_base_addr(void)
- 
- static DEFINE_SPINLOCK(boot_lock);
+ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+@@ -50,7 +53,7 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+ #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
+ #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
  
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit exynos_secondary_init(unsigned int cpu)
++static void __cpuinit tegra_secondary_init(unsigned int cpu)
  {
  	/*
  	 * if any interrupts are already enabled for the primary
-@@ -86,7 +88,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
+@@ -117,7 +120,7 @@ static int tegra30_power_up_cpu(unsigned int cpu)
+ 	return 0;
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit tegra_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	unsigned long timeout;
+ 	int status;
  
-@@ -161,7 +163,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -165,7 +168,7 @@ done:
+  * Initialise the CPU possible map early - this describes the CPUs
   * which may be present or become present in the system.
   */
- 
 -void __init smp_init_cpus(void)
-+static void __init exynos_smp_init_cpus(void)
++static void __init tegra_smp_init_cpus(void)
  {
- 	void __iomem *scu_base = scu_base_addr();
- 	unsigned int i, ncores;
-@@ -184,7 +186,7 @@ void __init smp_init_cpus(void)
+ 	unsigned int i, ncores = scu_get_core_count(scu_base);
+ 
+@@ -181,8 +184,14 @@ void __init smp_init_cpus(void)
  	set_smp_cross_call(gic_raise_softirq);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
++static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	if (!soc_is_exynos5250())
- 		scu_enable(scu_base_addr());
-@@ -198,3 +200,9 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 			CPU1_BOOT_REG);
+ 	tegra_cpu_reset_handler_init();
+ 	scu_enable(scu_base);
  }
 +
-+struct smp_ops exynos_smp_ops __initdata = {
-+	smp_init_ops(exynos)
-+	smp_secondary_ops(exynos)
-+	smp_hotplug_ops(exynos)
++struct smp_ops tegra_smp_ops __initdata = {
++	smp_init_ops(tegra)
++	smp_secondary_ops(tegra)
++	smp_hotplug_ops(tegra)
 +};
 -- 
 1.7.10.3
