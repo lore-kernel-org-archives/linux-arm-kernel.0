@@ -1,67 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 12 Jun 2012 14:38:31 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: hwmod data: Fix the wrong clkdm assigned
- to PRCM modules
-In-Reply-To: <4FD65F12.2050805@ti.com>
-References: <1339433225-30042-1-git-send-email-b-cousson@ti.com>
- <1339433225-30042-2-git-send-email-b-cousson@ti.com>
- <alpine.DEB.2.00.1206111100130.5849@utopia.booyaka.com>
- <4FD65F12.2050805@ti.com>
-Message-ID: <4FD73847.5050205@ti.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 12 Jun 2012 14:49:46 +0200
+Subject: [PATCH] ARM: pxa: remove eseries.h
+Message-ID: <1339505386.30984.123.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Commit e478fe4cd50b86e95fadc415438b63fa94060b7d ("[ARM] pxa: merge all
+eseries board code into eseries.c") removed all six files that included
+eseries.h. Everything that this header provides is now either local to
+eseries.c or entirely unused. It was apparently just an oversight to
+keep this header. This header can safely be removed.
 
-On 6/11/2012 11:11 PM, Cousson, Benoit wrote:
-> On 6/11/2012 7:26 PM, Paul Walmsley wrote:
->> On Mon, 11 Jun 2012, Benoit Cousson wrote:
->>
->>> The following commit (794b480a37e3d284d6ee7344d8a737ef60476ed5) was
->>> adding
->>> the PRCM IPs data for PRCM, CM, PRCM_MPU and SCRM.
->>> The clkdm entry are not the correct ones and does not exist in the
->>> system.
->>>
->>> Replace them with the proper wkup, l4_ao and l4_cfg.
->>
->> This does not match either the publicly avaiable documentation and the
->> internal NDA hardware specifications[1].
->
-> That's almost true, until I realized that the clock domain modules list
-> contain this information (clock.py/clock_domain['l4_wkup']['modules']).
-> Now, I'm wondering as well why this is not documented better. I'll check
-> that tomorrow.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Testing with "git grep" for various things in the (history of the) tree.
 
-OK, I've just spent 2 hours with HW folks trying to get the real truth...
+ arch/arm/mach-pxa/eseries.h |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
+ delete mode 100644 arch/arm/mach-pxa/eseries.h
 
-In fact, this information is not even accurate :-(
-
-There is no such thing as clock domain for PRCM IPs. These IPs are 
-considered as clock generator or reset generator and thus does not 
-belong to any clock domain.
-This information was used to capture the power domain where they belong 
-and thus the closest clock domain was used for that, but this is purely 
-artificial.
-
-Their first question was, why do you guys need that at the first place???
-
-I guess this question is valid. Since we do not have any SW control, 
-this information is completely useless except to potentially avoid 
-de-referencing null clkdm.
-
-So I guess it is much better to just take care of that and avoid 
-populating with wrong or fake clock domains.
-
-Going a little bit further, these IPs do not even have modulemode, or 
-whatever SW control. Even the hwmod it not applicable for them. It 
-should just be a regular platform_device and thus deserve a simple entry 
-in DT without any hwmod attribute.
-
-Bottom-line, I think we should simply get rid of these PRCM hwmod 
-entries and the corresponding fake clock domains.
-
-Does that make sense to you?
-
-Regards,
-Benoit
+diff --git a/arch/arm/mach-pxa/eseries.h b/arch/arm/mach-pxa/eseries.h
+deleted file mode 100644
+index b96949d..0000000
+--- a/arch/arm/mach-pxa/eseries.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-void __init eseries_fixup(struct tag *tags, char **cmdline, struct meminfo *mi);
+-
+-extern struct pxa2xx_udc_mach_info e7xx_udc_mach_info;
+-extern struct pxaficp_platform_data e7xx_ficp_platform_data;
+-extern int e7xx_irda_init(void);
+-
+-extern int eseries_tmio_enable(struct platform_device *dev);
+-extern int eseries_tmio_disable(struct platform_device *dev);
+-extern int eseries_tmio_suspend(struct platform_device *dev);
+-extern int eseries_tmio_resume(struct platform_device *dev);
+-extern void eseries_get_tmio_gpios(void);
+-extern struct resource eseries_tmio_resources[];
+-extern struct platform_device e300_tc6387xb_device;
+-
+-- 
+1.7.7.6
