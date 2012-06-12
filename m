@@ -1,40 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Jun 2012 11:40:20 -0400
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <201206121459.14114.arnd@arndb.de>
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <20120612140616.GC17893@lunn.ch>
- <20120612142412.GD14756@titan.lakedaemon.net>
- <201206121459.14114.arnd@arndb.de>
-Message-ID: <20120612154020.GF14756@titan.lakedaemon.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 Jun 2012 18:41:07 +0300
+Subject: [PATCHv3 20/20] ARM: OMAP4430: PM: errata i625,
+ WUGEN lost for GP devices after OFF mode
+In-Reply-To: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1339515667-10270-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 02:59:13PM +0000, Arnd Bergmann wrote:
-> On Tuesday 12 June 2012, Jason Cooper wrote:
-> > On Tue, Jun 12, 2012 at 04:06:16PM +0200, Andrew Lunn wrote:
-> > > > arch/arm/mach-kirkwood/board-* (DT files)
-> > > >     -> arch/arm/mach-mvebu/
-> > > 
-> > > I know of work being done to make orion5x and dove also support DT.
-> > > Should we consider some sort of prefix or midfix indicating which SoC
-> > > a board file is for? It will not be easy to mentally keep track of
-> > > board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
-> > 
-> > The board-BOARD.c files are transitional files, and will disappear once
-> > the DT conversion is done.  All that will remain is board-dt.c.  So,
-> > there is no long-term issue.  Since it's a short term issue, and we're
-> > moving/renaming anyway, how about kirkwood-dreamplug.c, orion5x-ts209.c,
-> > etc?
-> 
-> FWIW, the board-dt.c from mach-kirkwood should just become kirkwood.c
-> and we might want to merge it with the kirkwood common.c file in the long
-> run, if any contents from that file remain for the dt version.
+This patch implements errata i625.
 
-So, there would be an orion5x.c, dove.c as well?  Or, should it be
-mvebu.c to encompass all of them?
+When coming back from device off mode, the Cortex-A9 WUGEN enable registers
+are not restored by ROM code. The work around disables device power OFF
+to maintain the proper register settings.
+The affected devices are OMAP4430GP ES2.0 to ES2.2.
 
-thx,
+Based on work done by Mykola Oleksiienko and Konstantin Shlyakhovoy.
 
-Jason.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/pm.h     |    1 +
+ arch/arm/mach-omap2/pm44xx.c |   12 +++++++++++-
+ 2 files changed, 12 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 63af57e..f85ef2d 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -92,6 +92,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #define PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM_xxx	(1 << 1)
+ #define PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx	(1 << 2)
+ #define PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx	(1 << 3)
++#define PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625	(1 << 4)
+ 
+ #if defined(CONFIG_ARCH_OMAP4)
+ extern u16 pm44xx_errata;
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 8054afc..c1dc0d9 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -116,7 +116,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+ 						pwrdm,
+ 						PWRDM_FUNC_PWRST_OFF);
+ 
+-	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE)
++	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE &&
++	    !IS_PM44XX_ERRATUM(PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625))
+ 		pwrst->next_state = PWRDM_FUNC_PWRST_OFF;
+ 
+ 	list_add(&pwrst->node, &pwrst_list);
+@@ -276,6 +277,15 @@ int __init omap4_pm_init(void)
+ 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+ 		pm44xx_errata |= PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx;
+ 
++	/*
++	 * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
++	 * due to errata i625
++	 * On ES1.0 OFF mode is not supported due to errata i498
++	 */
++	if (cpu_is_omap443x() && omap_type() == OMAP2_DEVICE_TYPE_GP &&
++	    omap_rev() < OMAP4430_REV_ES2_3)
++		pm44xx_errata |= PM_OMAP4_ROM_WUGEN_LOST_ERRATUM_i625;
++
+ #ifdef CONFIG_SUSPEND
+ 	omap_pm_suspend = omap4_pm_suspend;
+ #endif
+-- 
+1.7.4.1
