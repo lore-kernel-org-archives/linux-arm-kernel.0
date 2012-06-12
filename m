@@ -1,32 +1,24 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 07:16:26 +0000
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <4FD6586A.9060706@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
- <4FD6586A.9060706@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jun 2012 00:20:26 -0700
+Subject: [PATCH V2 1/2] arm/dts: OMAP2: Add support for OMAP2420 SDP
+In-Reply-To: <1339107066-10461-2-git-send-email-jon-hunter@ti.com>
+References: <1339107066-10461-1-git-send-email-jon-hunter@ti.com>
+ <1339107066-10461-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20120612072025.GG12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, Jun 12, 2012 at 02:13:22, Hunter, Jon wrote:
-
-> > +	gpmc_revision = (l >> 4) & 0xf;
+* Jon Hunter <jon-hunter@ti.com> [120607 15:15]:
+> Simple DTS file for OMAP2420 SDP adding memory information to allow device-tree
+> testing on an OMAP2420 SDP.
 > 
-> Why are you only storing the major part of the rev? Why not keep both parts?
+> Verified that kernel boots with DT using a simple RAMDISK file-system on
+> OMAP2420 SDP.
 
-Does having minor revision add any value ?, at least as of now,
-I do not see any.
+I suspect this is the H4 board? If so, please rename it to H4 as it shares
+the "debug board" with H2 and H3 so in theory we may at some point have
+some common .dtsi for the debug board devices..
 
-> 
-> > +	dev_info(gpmc_dev, "GPMC revision %d.%d\n", gpmc_revision, l & 0x0f);
-> 
-> Nit-pick, please add a mask and shift definition for the revision
-> register major and minor fields and use these above.
+Regards,
 
-Yes, right
-
-Regards
-Afzal
+Tony
