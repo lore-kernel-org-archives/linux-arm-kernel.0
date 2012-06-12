@@ -1,50 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jun 2012 13:35:29 +0000
-Subject: [PATCH v2 2/8] arm: mach-mvebu: add source files
-In-Reply-To: <4FD73C99.6070908@free-electrons.com>
+Date: Tue, 12 Jun 2012 13:49:27 +0000
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <201206120845.48902.arnd@arndb.de> <4FD73C99.6070908@free-electrons.com>
-Message-ID: <201206121335.29298.arnd@arndb.de>
+Message-ID: <201206121349.27696.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 June 2012, Gregory CLEMENT wrote:
-> On 06/12/2012 10:45 AM, Arnd Bergmann wrote:
-> > On Monday 11 June 2012, Gregory CLEMENT wrote:
-> >> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> >> new file mode 100644
-> >> index 0000000..72d39e5
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-mvebu/Kconfig
-> >> @@ -0,0 +1,7 @@
-> >> +if ARCH_MVEBU
-> >> +
-> >> +menu "Marvell SOC with device tree"
-> >> +
-> >> +endmenu
-> >> +
-> >> +endif
-> >
-> > The "with device tree" part is implied here, so you should not need to
-> > mention it, but it would be good if you could say which SOC this
-> > relates to, i.e. not the pxa/mmp series but the other line, in whatever
-> > way you want to name it.
+On Monday 11 June 2012, Gregory CLEMENT wrote:
+> You'll find in this patch set the new version of the initial support for a
+> new family of ARMv7-compatible Marvell SoCs initially submitted by my
+> colleague Thomas Petazzoni. Following the conclusion of the discussion when
+> we submitted our first version we have chosen to add this support for this
+> SoC family in the to support in the arch/arm/mach-mvebu/ directory.
 > 
-> Do you mean to name all the SOC aimed to be supported ?
-> and write something like that:
-> 
-> menu "Marvell SOC from EBU division (Orion, Kirkwood, Dove, MV78xx0,
-> Armada 370/XP, ...)"
-> 
-> Or for now just the currently supported SOC ? :
-> menu "Marvell SOC from EBU division (Armada 370, Armada XP, ...)"
+> As for the previous release, both the Armada 370 and the Armada XP SoCs are
+> supported in this directory, and we are able to build a single kernel image
+> that boots on both SoCs. Both SoCs use the PJ4B processor, a
+> Marvell-developed ARM core that implements the ARMv7 instruction set. We are
+> currently using Marvell evaluation boards for both of those SoCs, and the
+> support for those boards is added in this patch set.
 
-Either way is fine for me.
+Ok, very good.
 
-> OK I will drop common.* files. We will see later to introduce them
-> again when we find common features with the other SOC.
+> Andrew Lunn asked for refactoring the _restart() function to being used by
+> any MVEBU SOC, but we didn't find a nice way to do it. Indeed the registers
+> mapping differs between the SOC and the bit mask too. A solution could be to
+> get this mapping through the device tree, but we are not sure it was a good
+> usage of the device tree.
 
-Ok. We might just name them after the specific feature that gets
-implemented then.
+As I suggested in my reply to patch 4/8, I think this can be encapsulated
+in one file that acts as a driver for the generic ("bridge regs") registers
+and provides functions for that based on the "compatible" property.
+
+On a more general note, I'd prefer to have the patches renaming the existing
+files first for the mach-mvebu directory first, and then adding your patches
+on top.
+
+I can provide a new version of the patch I did once we have agreement on what
+goes where. I've put some more thought into it and the best I could come up
+with is now.
+
+arch/arm/mach-{orion5x,dove,kirkwood,mv78xx0}/include/mach/*
+	-> arch/arm/mach-mvebu/include/mach/
+arch/arm/plat-orion/include/plat/*
+	-> arch/arm/mach-mvebu/include/mach/
+arch/arm/plat-orion/*
+	-> arch/arm/mach-mvebu/
+arch/arm/mach-{orion5x,dove,kirkwood,mv78xx0}/{add-map,common,irq,mpp,pci}.*
+	-> arch/arm/mach-mvebu/
+arch/arm/mach-kirkwood/board-* (DT files)
+	-> arch/arm/mach-mvebu/
+
+This is basically the same as the patch I sent out before, but with the
+new machine name, and leaving all the *-setup.c files in their existing
+locations, where they can either get removed after being converted to DT
+or after being assumed dead.
 
 	Arnd
