@@ -1,41 +1,59 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Tue, 12 Jun 2012 16:40:18 -0400
-Subject: [RFC/PATCH v5 7/7] ARM: ARM11 MPCore: Make cpu_v6_set_pte_ext preempt
- safe
-In-Reply-To: <1339533618-15969-1-git-send-email-gdavis@mvista.com>
-References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
- <1339533618-15969-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1339533618-15969-8-git-send-email-gdavis@mvista.com>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Tue, 12 Jun 2012 23:07:47 +0200 (CEST)
+Subject: [PATCH] ARM: mxc-rnga: fix data_present API
+Message-ID: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
-
-If preemption and subsequent task migration occurs during calls to
-cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable interrupts in cpu_v6_set_pte_ext.
-
-Signed-off-by: George G. Davis <gdavis@mvista.com>
+Cc: Matt Mackall <mpm@selenic.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Alan Carvalho de Assis <acassis@gmail.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
 ---
- arch/arm/mm/proc-macros.S |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ .../drivers/char/hw_random/mxc-rnga.c              |   22 +++++++++++++-------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 2d8ff3a..7e32603 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -168,8 +168,11 @@
- 	tstne	r1, #L_PTE_PRESENT
- 	moveq	r3, #0
+diff --git linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
+index 187c6be..2924253 100644
+--- linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c
++++ linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
+@@ -24,6 +24,7 @@
+ #include <linux/ioport.h>
+ #include <linux/platform_device.h>
+ #include <linux/hw_random.h>
++#include <linux/delay.h>
+ #include <linux/io.h>
  
-+	mrs	r2, cpsr
-+	cpsid	i
- 	str	r3, [r0]
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	msr	cpsr_c, r2
- 	.endm
+ /* RNGA Registers */
+@@ -60,16 +61,21 @@
  
+ static struct platform_device *rng_dev;
  
--- 
-1.7.4.4
+-static int mxc_rnga_data_present(struct hwrng *rng)
++static int mxc_rnga_data_present(struct hwrng *rng, int wait)
+ {
+-	int level;
+ 	void __iomem *rng_base = (void __iomem *)rng->priv;
+-
+-	/* how many random numbers is in FIFO? [0-16] */
+-	level = ((__raw_readl(rng_base + RNGA_STATUS) &
+-			RNGA_STATUS_LEVEL_MASK) >> 8);
+-
+-	return level > 0 ? 1 : 0;
++	int level, data, i;
++
++	for (i = 0; i < 20; i++) {
++		/* how many random numbers is in FIFO? [0-16] */
++		level = ((__raw_readl(rng_base + RNGA_STATUS) &
++				RNGA_STATUS_LEVEL_MASK) >> 8);
++		data = level > 0 ? 1 : 0;
++		if (data || !wait)
++			break;
++		udelay(10);
++	}
++	return data;
+ }
+ 
+ static int mxc_rnga_data_read(struct hwrng *rng, u32 * data)
