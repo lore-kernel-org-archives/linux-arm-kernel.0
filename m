@@ -1,128 +1,133 @@
 From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Tue, 12 Jun 2012 16:40:14 -0400
-Subject: [RFC/PATCH v5 3/7] ARM: ARM11 MPCore: Make {clean,
- flush}_pmd_entry preempt safe
+Date: Tue, 12 Jun 2012 16:40:15 -0400
+Subject: [RFC/PATCH v5 4/7] ARM: Move get_thread_info macro definition to
+ <asm/assembler.h>
 In-Reply-To: <1339533618-15969-1-git-send-email-gdavis@mvista.com>
 References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
  <1339533618-15969-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1339533618-15969-4-git-send-email-gdavis@mvista.com>
+Message-ID: <1339533618-15969-5-git-send-email-gdavis@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: George G. Davis <gdavis@mvista.com>
 
-If preemption and subsequent task migration occurs during calls to
-{clean,flush}_pmd_entry on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption in callers of these functions around
-PMD modifications and subsequent {clean,flush}_pmd_entry calls.
+The get_thread_info assembler macro is currently defined in
+arch/arm/kernel/entry-header.S and used in the following
+files:
+
+	arch/arm/kernel/entry-armv.S
+	arch/arm/kernel/entry-common.S
+	arch/arm/vfp/vfphw.S
+	arch/arm/vfp/entry.S
+
+The first two cases above use #include "entry-header.S" while
+the later two cases use #include "../kernel/entry-header.S"
+to obtain the get_thread_info assembler macro definition.
+
+Move the get_thread_info assembler macro definition into
+arch/arm/include/asm/assember.h and clean up inclusion
+of this macro definition to use #include <asm/assember.h>.
+
+This change facilitates use of the get_thread_info assembler
+macro in other assembler functions without more of the same
+path relative include directives.
 
 Signed-off-by: George G. Davis <gdavis@mvista.com>
 ---
- arch/arm/include/asm/pgalloc.h        |    4 ++++
- arch/arm/include/asm/pgtable-2level.h |    8 ++++++++
- arch/arm/include/asm/pgtable.h        |    1 +
- arch/arm/include/asm/smp_plat.h       |    2 ++
- arch/arm/mm/idmap.c                   |    4 ++++
- 5 files changed, 19 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/assembler.h |   13 +++++++++++++
+ arch/arm/kernel/entry-header.S   |   11 -----------
+ arch/arm/vfp/entry.S             |    5 ++++-
+ arch/arm/vfp/vfphw.S             |    5 ++++-
+ 4 files changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index c290b42..0dc9a81 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -144,11 +144,15 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
- 				  pmdval_t prot)
- {
- 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
-+	if (cache_ops_need_broadcast())
-+		preempt_disable();
- 	pmdp[0] = __pmd(pmdval);
- #ifndef CONFIG_ARM_LPAE
- 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
- #endif
- 	flush_pmd_entry(pmdp);
-+	if (cache_ops_need_broadcast())
-+		preempt_enable();
- }
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 03fb936..5fd570d 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -23,6 +23,19 @@
+ #include <asm/ptrace.h>
+ #include <asm/domain.h>
+ 
++#ifndef CONFIG_THUMB2_KERNEL
++	.macro	get_thread_info, rd
++	mov	\rd, sp, lsr #13
++	mov	\rd, \rd, lsl #13
++	.endm
++#else   /* CONFIG_THUMB2_KERNEL */
++	.macro	get_thread_info, rd
++	mov	\rd, sp
++	lsr	\rd, \rd, #13
++	mov	\rd, \rd, lsl #13
++	.endm
++#endif  /* !CONFIG_THUMB2_KERNEL */
++
+ #define IOMEM(x)	(x)
  
  /*
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 2317a71..93ad948 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -162,16 +162,24 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 9a8531e..d03b6a9 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -108,11 +108,6 @@
+ 	movs	pc, lr				@ return & move spsr_svc into cpsr
+ 	.endm
  
- #define copy_pmd(pmdpd,pmdps)		\
- 	do {				\
-+		if (cache_ops_need_broadcast())	\
-+			preempt_disable();	\
- 		pmdpd[0] = pmdps[0];	\
- 		pmdpd[1] = pmdps[1];	\
- 		flush_pmd_entry(pmdpd);	\
-+		if (cache_ops_need_broadcast())	\
-+			preempt_enable();	\
- 	} while (0)
+-	.macro	get_thread_info, rd
+-	mov	\rd, sp, lsr #13
+-	mov	\rd, \rd, lsl #13
+-	.endm
+-
+ 	@
+ 	@ 32-bit wide "mov pc, reg"
+ 	@
+@@ -148,12 +143,6 @@
+ 	movs	pc, lr				@ return & move spsr_svc into cpsr
+ 	.endm
  
- #define pmd_clear(pmdp)			\
- 	do {				\
-+		if (cache_ops_need_broadcast())	\
-+			preempt_disable();	\
- 		pmdp[0] = __pmd(0);	\
- 		pmdp[1] = __pmd(0);	\
- 		clean_pmd_entry(pmdp);	\
-+		if (cache_ops_need_broadcast())	\
-+			preempt_enable();	\
- 	} while (0)
+-	.macro	get_thread_info, rd
+-	mov	\rd, sp
+-	lsr	\rd, \rd, #13
+-	mov	\rd, \rd, lsl #13
+-	.endm
+-
+ 	@
+ 	@ 32-bit wide "mov pc, reg"
+ 	@
+diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
+index 4fa9903..e475a5a 100644
+--- a/arch/arm/vfp/entry.S
++++ b/arch/arm/vfp/entry.S
+@@ -15,9 +15,12 @@
+  *  r10 = thread_info structure
+  *  lr  = failure return
+  */
++#include <linux/init.h>
++#include <linux/linkage.h>
+ #include <asm/thread_info.h>
+ #include <asm/vfpmacros.h>
+-#include "../kernel/entry-header.S"
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
  
- /* we don't need complex calculations here as the pmd is folded into the pgd */
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index f66626d..b511fcf 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -12,6 +12,7 @@
+ ENTRY(do_vfp)
+ #ifdef CONFIG_PREEMPT
+diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+index 2d30c7f..68ca5af 100644
+--- a/arch/arm/vfp/vfphw.S
++++ b/arch/arm/vfp/vfphw.S
+@@ -14,9 +14,12 @@
+  * r10 points at the start of the private FP workspace in the thread structure
+  * sp points to a struct pt_regs (as defined in include/asm/proc/ptrace.h)
+  */
++#include <linux/init.h>
++#include <linux/linkage.h>
+ #include <asm/thread_info.h>
+ #include <asm/vfpmacros.h>
+-#include "../kernel/entry-header.S"
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
  
- #include <linux/const.h>
- #include <asm/proc-fns.h>
-+#include <asm/smp_plat.h>
- 
- #ifndef CONFIG_MMU
- 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 558d6c8..bd419d5 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -5,6 +5,7 @@
- #ifndef __ASMARM_SMP_PLAT_H
- #define __ASMARM_SMP_PLAT_H
- 
-+#ifndef	__ASSEMBLY__
- #include <asm/cputype.h>
- 
- /*
-@@ -50,3 +51,4 @@ extern int __cpu_logical_map[];
- #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
- 
- #endif
-+#endif
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index ab88ed4..2846ce7 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -39,11 +39,15 @@ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- {
- 	pmd_t *pmd = pmd_offset(pud, addr);
- 
-+	if (cache_ops_need_broadcast())
-+		preempt_disable();
- 	addr = (addr & PMD_MASK) | prot;
- 	pmd[0] = __pmd(addr);
- 	addr += SECTION_SIZE;
- 	pmd[1] = __pmd(addr);
- 	flush_pmd_entry(pmd);
-+	if (cache_ops_need_broadcast())
-+		preempt_enable();
- }
- #endif	/* CONFIG_ARM_LPAE */
- 
+ 	.macro	DBGSTR, str
+ #ifdef DEBUG
 -- 
 1.7.4.4
