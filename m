@@ -1,35 +1,32 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 12 Jun 2012 10:27:53 +0000
-Subject: [PATCH 0/3] Prepare for GPMC driver conversion
-In-Reply-To: <cover.1339419244.git.afzal@ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99803F@DBDE01.ent.ti.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 12 Jun 2012 12:37:39 +0200
+Subject: [PATCH] ARM: remove old SA-1111.h
+Message-ID: <1339497459.30984.118.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+All (in tree) users of old mach/SA-1111.h were already updated to
+include asm/hardware/sa1111.h in v2.6.12-rc2. The old header can safely
+be removed now.
 
-On Mon, Jun 11, 2012 at 19:31:01, Mohammed, Afzal wrote:
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested only by "git grepping" the (history of) the tree.
 
-> Objective of this series is to make things easy for GPMC driver
-> conversion series by separating out more things from driver
-> conversion series.
-> 
-> This series,
-> 1. Unifies NAND platform initialization functions
-> 2. Cleans up OneNAND platform code a little
-> 3. Handles additional timings in Kernel
-> 
-> This series is based on 3.5-rc1 & made on top of
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69501.html
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69881.html
+ arch/arm/mach-sa1100/include/mach/SA-1111.h |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/SA-1111.h
 
-
-Please let me know your comments on this series.
-
-gpmc driver conversion series [1] is dependent on this.
-
-Regards
-Afzal
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69897.html
+diff --git a/arch/arm/mach-sa1100/include/mach/SA-1111.h b/arch/arm/mach-sa1100/include/mach/SA-1111.h
+deleted file mode 100644
+index c38f609..0000000
+--- a/arch/arm/mach-sa1100/include/mach/SA-1111.h
++++ /dev/null
+@@ -1,5 +0,0 @@
+-/*
+- * Moved to new location
+- */
+-#warning using old SA-1111.h - update to <asm/hardware/sa1111.h>
+-#include <asm/hardware/sa1111.h>
+-- 
+1.7.7.6
