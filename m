@@ -1,70 +1,60 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 12 Jun 2012 16:27:20 +0900
-Subject: [PATCH v2] ARM: EXYNOS: Add smc call to support trustzone feature
-Message-ID: <20120612072720.GA3211@july>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 12 Jun 2012 00:30:06 -0700
+Subject: [PATCH v3 5/9] Input: tegra-kbc - add clk_prepare/clk_unprepare
+In-Reply-To: <1338870583-8704-6-git-send-email-pgaikwad@nvidia.com>
+References: <1338870583-8704-1-git-send-email-pgaikwad@nvidia.com>
+ <1338870583-8704-6-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20120612073006.GB9766@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+On Tue, Jun 05, 2012 at 09:59:39AM +0530, Prashant Gaikwad wrote:
+> Use clk_prepare/clk_unprepare as required by the generic clk framework.
+> 
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-Linux runs in non-secure mode on some boards, so we need secure monitor calls
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 9b58024..d3ec71c 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
- 
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
-+obj-$(CONFIG_ARM_TRUSTZONE)	+= exynos-smc.o
-+
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-+
- # machine support
- 
- obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index aed2eeb..dc69705 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -21,6 +21,8 @@ void exynos4_restart(char mode, const char *cmd);
- void exynos5_restart(char mode, const char *cmd);
- void exynos_init_late(void);
- 
-+extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
-+
- #ifdef CONFIG_PM_GENERIC_DOMAINS
- int exynos_pm_late_initcall(void);
- #else
-diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
-new file mode 100644
-index 0000000..2e27aa3
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-smc.S
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics.
-+ *
-+ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+/*
-+ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
-+ */
-+
-+ENTRY(exynos_smc)
-+	stmfd	sp!, {r4-r11, lr}
-+	dsb
-+	smc	#0
-+	ldmfd	sp!, {r4-r11, pc}
-+ENDPROC(exynos_smc)
+> ---
+> Please ignore previous versions. Updated commit message and
+> maintainers properly in this version. No other change.
+> 
+> This patch should go through Tegra tree since other patches to port tegra
+> to generic clock framework are dependent on it. Posting here to get ack from
+> the maintainers.
+> 
+>  drivers/input/keyboard/tegra-kbc.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
+> index 4ffe64d..2c1c9ed 100644
+> --- a/drivers/input/keyboard/tegra-kbc.c
+> +++ b/drivers/input/keyboard/tegra-kbc.c
+> @@ -492,7 +492,7 @@ static int tegra_kbc_start(struct tegra_kbc *kbc)
+>  	unsigned int debounce_cnt;
+>  	u32 val = 0;
+>  
+> -	clk_enable(kbc->clk);
+> +	clk_prepare_enable(kbc->clk);
+>  
+>  	/* Reset the KBC controller to clear all previous status.*/
+>  	tegra_periph_reset_assert(kbc->clk);
+> @@ -556,7 +556,7 @@ static void tegra_kbc_stop(struct tegra_kbc *kbc)
+>  	disable_irq(kbc->irq);
+>  	del_timer_sync(&kbc->timer);
+>  
+> -	clk_disable(kbc->clk);
+> +	clk_disable_unprepare(kbc->clk);
+>  }
+>  
+>  static int tegra_kbc_open(struct input_dev *dev)
+> -- 
+> 1.7.4.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-input" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Dmitry
