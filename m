@@ -1,38 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jun 2012 22:17:39 +0100
-Subject: [RFC PATCH 1/2] ARM: use generic strnlen_user and
- strncpy_from_user functions
-In-Reply-To: <alpine.LFD.2.02.1206112253040.23555@xanadu.home>
-References: <1339169935-31775-1-git-send-email-will.deacon@arm.com>
- <1339169935-31775-2-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1206112253040.23555@xanadu.home>
-Message-ID: <20120612211738.GB24380@mudshark.cambridge.arm.com>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Tue, 12 Jun 2012 23:25:24 +0200 (CEST)
+Subject: [PATCH] ARM: mxc-rnga: fix data_present API
+In-Reply-To: <CAOMZO5BMWJ4fad+YvJskkRLRiOJn1YRMUnCQ5OWen9SSvTc7Jw@mail.gmail.com>
+Message-ID: <1990208746.2534297.1339536324720.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 03:53:56AM +0100, Nicolas Pitre wrote:
-> On Fri, 8 Jun 2012, Will Deacon wrote:
+On Tue, Jun 12, 2012 at 11:12 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Jun 12, 2012 at 6:07 PM, Beno?t Th?baudeau
+> <benoit.thebaudeau@advansee.com> wrote:
+> > +
+> > + ? ? ? for (i = 0; i < 20; i++) {
 > 
-> > This patch implements the word-at-a-time interface for ARM using the
-> > same algorithm as x86. Although we have a clz instruction from ARMv5,
-> > this only saves us one mov instruction when building with Thumb-2 and
-> > makes no difference when targetting ARM, so we use the magic 0x0ff0001
-> > constant for all CPUs. For big-endian configurations, we use the
-> > implementation from asm-generic.
-> > 
-> > With this implemented, we can replace our byte-at-a-time strnlen_user
-> > and strncpy_from_user functions with the optimised generic versions.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> With the updated patch comment...
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> Where does this magic 20 comes from?
 
-Thanks Nicolas. I'll post a v2 with the updated change log and your
-reviewed-bys. I may also CC lkml in case somebody over there has some
-better benchmarks for this stuff.
+>From the other hw_random drivers. Most use this value, and it works fine on i.MX
+too.
 
-Cheers,
-
-Will
+Regards,
+Beno?t
