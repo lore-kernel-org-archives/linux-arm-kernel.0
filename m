@@ -1,42 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jun 2012 15:44:51 +0100
-Subject: [PATCH 14/14] ARM: ux500: Move rtc-pl031 registration to Device
- Tree when enabled
-In-Reply-To: <CACRpkdYiZkRT-XLbEBRzCBKJ+721OBVKmUF+v17seFiWxmndnw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jun 2012 14:49:22 +0000
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
+In-Reply-To: <4FD742C9.7090603@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdbJdA8rgcXX4Xc3sMrx==5jd-Scu1Xy0UKz0ot3_bbNzw@mail.gmail.com>
- <4FD6F7C6.80002@linaro.org>
- <CACRpkdYiZkRT-XLbEBRzCBKJ+721OBVKmUF+v17seFiWxmndnw@mail.gmail.com>
-Message-ID: <4FD755E3.5080504@linaro.org>
+ <201206121259.38807.arnd@arndb.de> <4FD742C9.7090603@linaro.org>
+Message-ID: <201206121449.22978.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/12 15:32, Linus Walleij wrote:
-> On Tue, Jun 12, 2012 at 10:03 AM, Lee Jones<lee.jones@linaro.org>  wrote:
->> On 11/06/12 22:43, Linus Walleij wrote:
->
->>> Oh this is a bug fix really, well it's in the device tree so nevermind.
->>
->> It is? How so?
->
-> That the device tree was declaring a compatible node for something
-> that never existed (stericsson,db8500-rtc) while the real node is
-> "arm,rtc-pl031", "arm,primecell".
->
-> Without this fix 3.4 will not have an PL031 RTC I guess?
+On Tuesday 12 June 2012, Lee Jones wrote:
+> But your suggestion above involves some heavy refactoring of how Device 
+> Tree works. Meanwhile the ab8500 will not work as an IRQ controller 
+> until we either complete the work or use the same solution as we did for 
+> the Nomadik GPIO controller. I think for now at least we should continue 
+> to work on enablement and leave the 'nice to have's until last. We are 
+> doing nothing new here, just bringing the ab8500 IRQ controller into 
+> line with the Nomadik one.
 
-Think of the old entry as a dummy one, a stub if you will. Quite a few 
-of the entries were initially loaded into the Device Tree as a best 
-effort first attempt and had to be changed at a later date. This is no 
-different. I see this as an enablement patch rather than a bug-fix. In 
-fact, there would have been a bug if this worked when it was initially 
-written, as the driver would have probed twice on a DT boot. Once by DT 
-and once by platform code.
+Right, I didn't say we should not take your patch, but we should be
+aware that it's not the solution we want to use in the long run.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
