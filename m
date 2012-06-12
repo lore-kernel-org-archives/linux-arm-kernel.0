@@ -1,32 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Jun 2012 10:24:12 -0400
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <20120612140616.GC17893@lunn.ch>
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <201206121349.27696.arnd@arndb.de> <20120612140616.GC17893@lunn.ch>
-Message-ID: <20120612142412.GD14756@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Jun 2012 16:32:10 +0200
+Subject: [PATCH 14/14] ARM: ux500: Move rtc-pl031 registration to Device
+ Tree when enabled
+In-Reply-To: <4FD6F7C6.80002@linaro.org>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-15-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbJdA8rgcXX4Xc3sMrx==5jd-Scu1Xy0UKz0ot3_bbNzw@mail.gmail.com>
+ <4FD6F7C6.80002@linaro.org>
+Message-ID: <CACRpkdYiZkRT-XLbEBRzCBKJ+721OBVKmUF+v17seFiWxmndnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 04:06:16PM +0200, Andrew Lunn wrote:
-> > arch/arm/mach-kirkwood/board-* (DT files)
-> > 	-> arch/arm/mach-mvebu/
-> 
-> I know of work being done to make orion5x and dove also support DT.
-> Should we consider some sort of prefix or midfix indicating which SoC
-> a board file is for? It will not be easy to mentally keep track of
-> board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
+On Tue, Jun 12, 2012 at 10:03 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 11/06/12 22:43, Linus Walleij wrote:
 
-The board-BOARD.c files are transitional files, and will disappear once
-the DT conversion is done.  All that will remain is board-dt.c.  So,
-there is no long-term issue.  Since it's a short term issue, and we're
-moving/renaming anyway, how about kirkwood-dreamplug.c, orion5x-ts209.c,
-etc?
+>> Oh this is a bug fix really, well it's in the device tree so nevermind.
+>
+> It is? How so?
 
-I personally don't think it's needed, but I have no strong opinion on
-it.
+That the device tree was declaring a compatible node for something
+that never existed (stericsson,db8500-rtc) while the real node is
+"arm,rtc-pl031", "arm,primecell".
 
-thx,
+Without this fix 3.4 will not have an PL031 RTC I guess?
 
-Jason.
+Yours,
+Linus Walleij
