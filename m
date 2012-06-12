@@ -1,47 +1,69 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 12 Jun 2012 13:26:22 -0400 (EDT)
-Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <20120612191804.4211462a@tukaani.org>
-References: <1339470307-28223-1-git-send-email-tmac@hp.com>
- <20120612191804.4211462a@tukaani.org>
-Message-ID: <alpine.LFD.2.02.1206121316190.23555@xanadu.home>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Jun 2012 12:30:48 -0500
+Subject: [PATCH 2/3] ARM: OMAP2+: onenand: cleanup for gpmc driver
+ conversion
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E997D47@DBDE01.ent.ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
+ <4FD63AAE.90008@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D47@DBDE01.ent.ti.com>
+Message-ID: <4FD77CC8.4000003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jun 2012, Lasse Collin wrote:
 
-> On 2012-06-11 T Makphaibulchoke wrote:
-> > +#ifndef __HAVE_PREBOOT_ARCH_MEMMOVE
-> > +void *memmove(void *__dest, __const void *__src, size_t count)
-> > +{
-> > +	unsigned char *d = __dest;
-> > +	const unsigned char *s = __src;
-> > +
-> > +	if (__dest == __src)
-> > +		return __dest;
-> > +
-> > +	if (__dest < __src)
-> > +		return memcpy(__dest, __src, count);
-> > +
-> > +	while (count--)
-> > +		d[count] = s[count];
-> > +	return __dest;
-> > +}
-> > +#endif
+
+On 06/12/2012 01:16 AM, Mohammed, Afzal wrote:
+> Hi Jon,
 > 
-> The use of memcpy when __dest < __src is OK with some memcpy
-> implementations, but in a generic case it isn't guaranteed to work.
+> On Tue, Jun 12, 2012 at 00:06:30, Hunter, Jon wrote:
+> 
+>> I agree with getting rid of the first instance at the beginning of
+>> _set_async_mode, but why get rid of the above one? Are you assuming that
+>> by default it is in async mode? Could be nice to keep it to be explicit.
+> 
+> Second one is achieved below
 
-Of course, if the memcpy implementation is also provided along with this 
-memmove code, as it was the case on ARM before this patch, then you can 
-guarantee it.  And if that memcpy() happens to be slightly more 
-optimized then this is a win.
+Hmmm ... it seems odd to put the commands for setting async in the set
+sync. I see what you are doing but surely someone should call set async
+and the set sync.
 
-> I think it would be better to just copy memmove from lib/string.c.
+>>> @@ -191,19 +181,21 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+>>>  	u32 reg;
+>>>  	bool clk_dep = false;
+>>>  
+>>> +	/* Ensure sync read and sync write are disabled */
+>>> +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+>>> +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+>>> +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+>>> +
+>>
+>> Should we only set these after we have checked the flags and depending
+>> on which flags are set?
+> 
+> Even for sync mode, setting async mode initially is required
+> 
+>>> @@ -421,6 +413,8 @@ void __init gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
+>>>  	gpmc_onenand_resource.end = gpmc_onenand_resource.start +
+>>>  							ONENAND_IO_SIZE - 1;
+>>>  
+>>> +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
+>>> +
+>>
+>> What about putting this in the gpmc_onenand_setup() function before the
+>> call to _set_sync_mode? Seems nice to have these together.
+> 
+> Intention of this patch is to setup GPMC async mode before driver starts
+> its job so that reconfiguring GPMC needs to be to be done only once (this
+> helps in avoiding issues when it has to work with gpmc driver).
+> 
+> With the existing code, set_async was done as part of set_sync, hence
+> requiring GPMC to be configured twice after driver takes control, with
+> your suggestion too, GPMC would have to be configured twice.
 
-Instead of copying, maybe this would be much better to make the content 
-of lib/string.c usable in a pre-boot environment.
+I am just suggesting that you place the call to set_async_mode in the
+gpmc_onenand_setup() instead of the gpmc_onenand_init() and remove the
+calls from set_sync (like you have done). So I don't see that these
+would configure the GPMC twice.
 
-
-Nicolas
+Jon
