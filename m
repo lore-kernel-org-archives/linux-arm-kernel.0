@@ -1,50 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Jun 2012 09:38:44 -0600
-Subject: [PATCH v2 09/10] ARM: tegra: harmony: Initialize PCIe from DT
-In-Reply-To: <20120612054811.GB4040@avionic-0098.adnet.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-10-git-send-email-thierry.reding@avionic-design.de>
- <4FD6661A.1060407@wwwdotorg.org>
- <20120612054811.GB4040@avionic-0098.adnet.avionic-design.de>
-Message-ID: <4FD76284.5000506@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jun 2012 16:39:38 +0100
+Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
+ core_initcall time
+In-Reply-To: <201206121449.22978.arnd@arndb.de>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <201206121259.38807.arnd@arndb.de> <4FD742C9.7090603@linaro.org>
+ <201206121449.22978.arnd@arndb.de>
+Message-ID: <4FD762BA.2060408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2012 11:48 PM, Thierry Reding wrote:
-> * Stephen Warren wrote:
->> On 06/11/2012 09:05 AM, Thierry Reding wrote:
->>> With the device tree support in place, probe the PCIe
->>> controller from the device tree and remove the corresponding
->>> workaround in the board file.
->> 
->>> diff --git a/arch/arm/boot/dts/tegra-harmony.dts
->>> b/arch/arm/boot/dts/tegra-harmony.dts
->> 
->>> +	pci_vdd_reg: fixedregulator at 0 {
->> 
->> I think that'd usually just be "regulator at 0".
->> 
->> If you need the "@0" part to differentiate between multiple
->> regulators, the node needs a reg property too:
->> 
->> reg = <0 0>;
->> 
->> although then I wonder about putting the regulator under the root
->> node, since the address wouldn't really make sense...
-> 
-> Perhaps we should add a new "regulators" node under the root node
-> to collect this kind of regulators that don't fit anywhere else.
-> Looking at the code, something like this should work:
-> 
-> / { ...
-> 
-> regulators { compatible = "simple-bus"; #address-cells = <1>; 
-> #size-cells = <0>;
-> 
-> pci_vdd_reg: regulator at 0 { reg = <0>; }; }; };
+On 12/06/12 15:49, Arnd Bergmann wrote:
+> On Tuesday 12 June 2012, Lee Jones wrote:
+>> But your suggestion above involves some heavy refactoring of how Device
+>> Tree works. Meanwhile the ab8500 will not work as an IRQ controller
+>> until we either complete the work or use the same solution as we did for
+>> the Nomadik GPIO controller. I think for now at least we should continue
+>> to work on enablement and leave the 'nice to have's until last. We are
+>> doing nothing new here, just bringing the ab8500 IRQ controller into
+>> line with the Nomadik one.
+>
+> Right, I didn't say we should not take your patch, but we should be
+> aware that it's not the solution we want to use in the long run.
 
-That seems like a good idea, and there's certainly precedent for doing
-exactly that in other ARM .dts files already.
+I agree with you completely.
 
-To maintain .dts alphabetical sorting of non-addressed nodes, this new
-node should slot in just before the sound node, near the end of the file.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
