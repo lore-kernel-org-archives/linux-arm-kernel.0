@@ -1,40 +1,60 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 12 Jun 2012 09:02:29 -0700
-Subject: [PATCH] ARM: two possible fixes for the KALLSYMS build problem
-In-Reply-To: <20120612143249.GB7918@n2100.arm.linux.org.uk>
-References: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
- <20120611203748.GA16967@codeaurora.org>
- <20120612143249.GB7918@n2100.arm.linux.org.uk>
-Message-ID: <20120612160229.GA21389@codeaurora.org>
+From: lasse.collin@tukaani.org (Lasse Collin)
+Date: Tue, 12 Jun 2012 19:18:04 +0300
+Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
+ functions
+In-Reply-To: <1339470307-28223-1-git-send-email-tmac@hp.com>
+References: <1339470307-28223-1-git-send-email-tmac@hp.com>
+Message-ID: <20120612191804.4211462a@tukaani.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 03:32:49PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 11, 2012 at 01:37:48PM -0700, David Brown wrote:
-> > On Fri, Jun 01, 2012 at 09:21:59AM -0700, David Brown wrote:
-> > 
-> > > David Brown (1):
-> > >   ARM: Prevent KALLSYM size mismatch on ARM.
-> > > 
-> > >  arch/arm/kernel/vmlinux.lds.S |    3 +++
-> > >  1 file changed, 3 insertions(+)
-> > 
-> > Just wondering if anyone has had a chance to look at either of these,
-> > or try them.  I haven't seen any KALLSYMS mismatch build errors with
-> > either of these patches applied.
-> 
-> I think variant 2 is the better approach out of either as it doesn't add
-> to the size of the resulting kernel image.
+On 2012-06-11 T Makphaibulchoke wrote:
+> --- /dev/null
+> +++ b/lib/boot/mem.c
+> @@ -0,0 +1,58 @@
+> +/*
+> + * Small subset of simple memory helper functions required by different
+> + * compressors for preboot environment.
+> + */
+> +
+> +#include <linux/string.h>
+> +
+> +#ifndef __HAVE_PREBOOT_ARCH_MEMCPY
+> +void *memcpy(void *__dest, __const void *__src, size_t __n)
+> +{
+> +	return __builtin_memcpy(__dest, __src, __n);
+> +}
+> +#endif
 
-The first variant doesn't ever increase the size of the kernel,
-either.  Variant two actually makes it a little smaller, since a few
-symbols are eliminated.
+GCC will replace __builtin_memcpy above with a call to memcpy, creating
+an infinite loop. I confirmed this on x86_64 by first uncommenting the
+memcpy from arch/x86/boot/compressed/string.c.
 
-The second variant is cleaner, though as long as it is safe in every
-configuration.
+You need to provide a memcpy implementation yourself without using
+__builtin functions. For example, copy the memcpy implementation from
+lib/string.c.
 
-David
+> +#ifndef __HAVE_PREBOOT_ARCH_MEMMOVE
+> +void *memmove(void *__dest, __const void *__src, size_t count)
+> +{
+> +	unsigned char *d = __dest;
+> +	const unsigned char *s = __src;
+> +
+> +	if (__dest == __src)
+> +		return __dest;
+> +
+> +	if (__dest < __src)
+> +		return memcpy(__dest, __src, count);
+> +
+> +	while (count--)
+> +		d[count] = s[count];
+> +	return __dest;
+> +}
+> +#endif
+
+The use of memcpy when __dest < __src is OK with some memcpy
+implementations, but in a generic case it isn't guaranteed to work.
+I think it would be better to just copy memmove from lib/string.c.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Lasse Collin  |  IRC: Larhzu @ IRCnet & Freenode
