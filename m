@@ -1,32 +1,74 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 12 Jun 2012 12:37:39 +0200
-Subject: [PATCH] ARM: remove old SA-1111.h
-Message-ID: <1339497459.30984.118.camel@x61.thuisdomein>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 12 Jun 2012 11:39:01 +0100
+Subject: [PATCH v7 00/12] Per SoC descriptor
+In-Reply-To: <201206081454.46422.arnd@arndb.de>
+References: <1339085369-26073-1-git-send-email-marc.zyngier@arm.com>
+ <201206081454.46422.arnd@arndb.de>
+Message-ID: <4FD71C45.3010206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All (in tree) users of old mach/SA-1111.h were already updated to
-include asm/hardware/sa1111.h in v2.6.12-rc2. The old header can safely
-be removed now.
+On 08/06/12 15:54, Arnd Bergmann wrote:
+> On Thursday 07 June 2012, Marc Zyngier wrote:
+>> [As per Arnd request, I've updated this patch series, in the hope that
+>> it could be useful to the single zImage work]
+>>
+>> This patch series introduces a per-soc descriptor which should, in the
+>> end, contain most of the SoC specific operations.
+>>
+>> This first patch series introduces the arm_soc_desc structure, adds
+>> per-soc SMP and CPU hotplug operations, and converts all SMP platform
+>> to this new scheme.
+>>
+>> Patches against v3.5-rc1. Tested on VExpress (Cortex A15).
+>>
+>> Also available at:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git soc_desc-v3.5-rc1
+> 
+> With my experimental multiplatform kernel tree, it let me actually build
+> an allyesconfig including SMP enabled, so just for that you get an
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Tested only by "git grepping" the (history of) the tree.
+Thanks.
 
- arch/arm/mach-sa1100/include/mach/SA-1111.h |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/SA-1111.h
+> Two comments though:
+> 
+> 1. I needed the patch below to avoid conflicting pen_release symbols.
+> I was not sure if any of the platforms rely on the pen_release variable
+> being located in the same cache line or page as the code accessing it,
+> or why else it is defined in assembly. If we don't have a reason for that,
+> we should probably pick the simpler approach and just have a single
+> definition for this in common ARM SMP code.
 
-diff --git a/arch/arm/mach-sa1100/include/mach/SA-1111.h b/arch/arm/mach-sa1100/include/mach/SA-1111.h
-deleted file mode 100644
-index c38f609..0000000
---- a/arch/arm/mach-sa1100/include/mach/SA-1111.h
-+++ /dev/null
-@@ -1,5 +0,0 @@
--/*
-- * Moved to new location
-- */
--#warning using old SA-1111.h - update to <asm/hardware/sa1111.h>
--#include <asm/hardware/sa1111.h>
+I have mixed feelings about this. On most hardware, CPU power management
+should make the use of pen_release obsolete (it only makes sense if you
+cannot turn off the power).
+
+On the other hand, given how "popular" the versatile implementation is,
+we might as well consolidate it. I've queued a patch to that effect, but
+I'd really like platform maintainers to realize how wrong they are.
+
+> 2. Sorry for having to bring it up yet again, but it still feels silly
+> to have the split data structures when nothing in the code actually
+> checks whether the functions are __init or __cpuinit, which was the
+> intention for splitting the struct in the first place according to
+> Nico. If people still like the split, I'll just shut up, but I would
+> prefer if this could be converted (back) into a single 'struct smp_ops'
+> with function pointers and no "name" field or the ambition to add
+> stuff other than SMP callbacks.
+
+Right. I now have a slightly simpler/smaller series, which only cares
+about SMP and have a single structure approach (though it still uses
+split structures internally):
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+smp_ops-v3.5-rc2
+
+I'll post it later today.
+
+Thanks,
+
+	M.
 -- 
-1.7.7.6
+Jazz is not dead. It just smells funny...
