@@ -1,57 +1,61 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 06:59:37 +0200
-Subject: [PATCH v2 05/10] ARM: tegra: Rewrite PCIe support as a driver
-In-Reply-To: <4FD6617C.4090805@wwwdotorg.org>
+Date: Tue, 12 Jun 2012 07:07:13 +0200
+Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
+In-Reply-To: <4FD660F9.7030807@wwwdotorg.org>
 References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-6-git-send-email-thierry.reding@avionic-design.de>
- <4FD6617C.4090805@wwwdotorg.org>
-Message-ID: <20120612045937.GA3669@avionic-0098.mockup.avionic-design.de>
+ <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
+ <4FD660F9.7030807@wwwdotorg.org>
+Message-ID: <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Stephen Warren wrote:
 > On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> > This commit adds a platform device driver for the PCIe controller on
-> > Tegra SOCs. Current users of the old code (TrimSlice and Harmony) are
-> > converted and now initialize and register a corresponding platform
-> > device.
+> > This commit adds support for message signaled interrupts to the Tegra
+> > PCIe controller. Based on code by Krishna Kishore <kthota@nvidia.com>.
 > 
-> > -static int tegra_pcie_clocks_get(void)
-> > +static int tegra_pcie_clocks_get(struct tegra_pcie_info *pcie)
-> >  {
-> >  	int err;
-> >  
-> > -	tegra_pcie.pex_clk = clk_get(NULL, "pex");
-> > -	if (IS_ERR(tegra_pcie.pex_clk))
-> > -		return PTR_ERR(tegra_pcie.pex_clk);
-> > +	pcie->pex_clk = clk_get(NULL, "pex");
-> > +	if (IS_ERR(pcie->pex_clk))
-> > +		return PTR_ERR(pcie->pex_clk);
+> > diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
 > 
-> While we're changing this, can we convert this to devm_clk_get(), and ...
-
-Will do.
-
-> > -	tegra_pcie.regs = ioremap_nocache(TEGRA_PCIE_BASE, PCIE_IOMAP_SZ);
-> > -	if (tegra_pcie.regs == NULL) {
-> > -		pr_err("PCIE: Failed to map PCI/AFI registers\n");
-> > +	regs = request_mem_region(regs->start, resource_size(regs), "PCI/AFI");
-> > +	if (regs == NULL) {
-> > +		dev_err(&pdev->dev, "failed to request PCI/AFI region: %d\n", err);
-> > +		goto err_req_reg;
-> > +	}
-> > +
-> > +	pcie->regs = ioremap_nocache(regs->start, resource_size(regs));
-> > +	if (pcie->regs == NULL) {
-> > +		dev_err(&pdev->dev, "failed to map PCI/AFI registers\n");
-> >  		err = -ENOMEM;
-> >  		goto err_map_reg;
-> >  	}
+> > +static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
+> ...
+> > +			irq = irq_find_mapping(pcie->msi->domain, index);
+> > +			if (irq) {
+> > +				if (test_bit(index, pcie->msi->used))
+> > +					generic_handle_irq(irq);
 > 
-> ... that to devm_request_and_ioremap(). That would allow a bunch of the
-> cleanup code to be deleted rather than just modified.
+> This invokes the handler first ...
+> 
+> ...
+> > +			/* clear the interrupt */
+> > +			afi_writel(pcie, 1 << offset, AFI_MSI_VEC0 + i * 4);
+> > +			/* see if there's any more pending in this vector */
+> > +			reg = afi_readl(pcie, AFI_MSI_VEC0 + i * 4);
+> 
+> ... then clears the interrupt status in the PCIe controller. Won't that
+> lose interrupts if one is raised between when the handler clears the
+> root-cause, and when this code clears the received interrupt status?
 
-Yes, I'll fix that up as well.
+It certainly doesn't follow the conventional way of clearing the interrupt
+first. I carried this from the original MSI patch, but I'll move the
+interrupt clearing up and retest.
+
+> > +static int tegra_pcie_disable_msi(struct platform_device *pdev)
+> 
+> Should this free pcie->msi->pages?
+
+Yes it should. I actually mention making that change in the changelog but
+in fact didn't.
+
+> Why allocate pcie->msi separately; why not include the fields directly
+> into struct tegra_pcie_info *pcie?
+
+For one I find this easier to read. If this wasn't a separate structure, each
+of the individual fields would get an msi_ prefix anyway so there isn't much
+to be gained from keeping them directly in tegra_pcie_info.
+
+Second, and more importantly, this will keep the size of struct
+tegra_pcie_info smaller if PCI_MSI is not selected because there is just one
+unused pointer instead of five unused fields.
 
 Thierry
 -------------- next part --------------
@@ -60,4 +64,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/4cfb6a75/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/ca927330/attachment.sig>
