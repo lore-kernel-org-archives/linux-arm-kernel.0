@@ -1,58 +1,67 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Tue, 12 Jun 2012 21:40:31 +0200
-Subject: [PATCH v2] usb: fsl_udc: errata - postpone freeing current dTD
-In-Reply-To: <CAOMZO5B7+Qy06m7O=v1M3vt7to7ciKOhQOihVgAEf+utntvw4w@mail.gmail.com>
-References: <20120410021151.GB23044@lovely.krouter>
- <20120411073918.GA9180@lovely.krouter>
- <CAOMZO5C729Ki0Bequ+s1nnrgt4NZWvwg3Wnjk4kHp=d9BtkeXw@mail.gmail.com>
- <20120509000221.GA19525@lovely.krouter>
- <20120513225126.GA3683@lovely.krouter> <20120514042142.GD9750@kroah.com>
- <20120520231724.GA7941@mars>
- <F281D0F91ED19E4D8E63A7504E8A649803BB1E25@039-SN2MPN1-023.039d.mgd.msft.net>
- <1337583221.3394.21.camel@mars> <20120521065722.GA4363@mars>
- <20120521190450.GA27492@arwen.pp.htv.fi> <1338809424.3371.20.camel@mars>
- <1338809853.3371.31.camel@mars>
- <CAOMZO5B7+Qy06m7O=v1M3vt7to7ciKOhQOihVgAEf+utntvw4w@mail.gmail.com>
-Message-ID: <1339530031.3454.16.camel@mars>
+From: thavatchai.makpahibulchoke@hp.com (Thavatchai Makphaibulcboke)
+Date: Tue, 12 Jun 2012 13:45:29 -0600
+Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
+ functions
+In-Reply-To: <1339522812.2404.4.camel@joe2Laptop>
+References: <1339470307-28223-1-git-send-email-tmac@hp.com>
+ <20120612191804.4211462a@tukaani.org>
+ <alpine.LFD.2.02.1206121316190.23555@xanadu.home>
+ <4FD77CAF.1020402@zytor.com> <1339522812.2404.4.camel@joe2Laptop>
+Message-ID: <4FD79C59.80205@hp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio
-
-On Sun, 2012-06-10 at 15:41 -0300, Fabio Estevam wrote:
-> Hi Christoph,
+On 06/12/2012 11:40 AM, Joe Perches wrote:
+> On Tue, 2012-06-12 at 10:30 -0700, H. Peter Anvin wrote:
+>> On 06/12/2012 10:26 AM, Nicolas Pitre wrote:
+>>>
+>>> Instead of copying, maybe this would be much better to make the content 
+>>> of lib/string.c usable in a pre-boot environment.
 > 
-> On Mon, Jun 4, 2012 at 8:37 AM, Christoph Fritz
-> <chf.fritz@googlemail.com> wrote:
+>> Not sure about that... a lot of it is #ifndef __HAVE_ARCH_* and you
+>> *really* want those optimizations on some arches.
 > 
-> > After that, I stumbled upon this dmesg:
-> >
-> > Freescale High-Speed USB SOC Device Controller driver (Apr 20, 2007)
-> > fsl-usb2-udc fsl-usb2-udc: clk_get("usb") failed
-> > fsl-usb2-udc: probe of fsl-usb2-udc failed with error -2
-> >
-> > Sascha, could you give me a hint?
+> Can __weak be used?
 > 
-> Does the patch below fix your problem?
 
-Thanks for your patch. It does indeed load
-"Freescale High-Speed USB SOC Device Controller driver (Apr 20, 2007)"
-fine - but now when I want to use it:
+lib/string.c contains a lot of stuff that are not needed in preboot, and
+would increase the kernel image size.  I'm not sure if we will be able
+to make it usable in pre-boot and only bringing in what is needed by
+preboot, withtut unnecessarily complicated lib/string.c.
 
-modprobe g_ether
-[   17.099363] g_ether gadget: using random self ethernet address
-[   17.105316] g_ether gadget: using random host ethernet address
-[   17.111974] usb0: MAC 1a:c7:9e:76:cc:45
-[   17.115866] usb0: HOST MAC 66:a2:4a:0a:46:17
-[   17.120199] g_ether gadget: Ethernet Gadget, version: Memorial Day 2008
-[   17.126861] g_ether gadget: g_ether ready
+Thanks Joe for the suggestion.  I guess we could remove the #ifndef by
+renaming all arch specific mem helper functions to arch_<name>, and
+declaring them with a weak attribute in mem.c and let the mem.c check to
+see if it is provided, Here is an example for memcpy
 
-these are "the last words": System hangs completely. Same behavior with
-g_serial (these two I've tested).
+Architecture specific,
 
-Currently I can't investigate this further, not because of a bug - but a
-flu.
+void *arch_memcpy(void *__dest, __const void *__src, size_t __n)
+{
+...
+}
 
+
+lib/mem.c
+
+extern void *arch_memcpy(void *__dest, __const void *__src, size_t __n)
+__attribute __((weak));
+
+void *memcpy(void *__dest, __const void *__src, size_t __n)
+{
+        if (arch_memcpy) {
+		arch_memcpgoogly();
+		return;	
+	}
+
+}
+
+But this does not solve the memmove issue. Could we always trust
+arch_memcpy in all architectures?  I guess the safest way would be to
+use memmove in string.c.  Please let me know if you have any thoughts or
+suggestions.
 
 Thanks,
- -- Christoph
+Mak.
+
+.
