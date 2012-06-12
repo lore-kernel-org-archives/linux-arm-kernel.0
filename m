@@ -1,75 +1,53 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 12 Jun 2012 12:04:29 +0200
-Subject: [PATCH] ARM: remove linkup-l1110.h
-Message-ID: <1339495469.30984.115.camel@x61.thuisdomein>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 12 Jun 2012 10:23:48 +0000
+Subject: [PATCH v2] ARM: OMAP2/3: hwmod data: add gpmc
+In-Reply-To: <1339420503-7920-1-git-send-email-afzal@ti.com>
+References: <1339420503-7920-1-git-send-email-afzal@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998025@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No file includes this header. Nothing seems interested in the things
-this header provides. It appears that it has never been included since
-at least v2.6.12-rc2. It can safely be removed.
+Hi Paul,
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Tested by "git grepping" the (history of) the tree for a few things.
+On Mon, Jun 11, 2012 at 18:45:03, Mohammed, Afzal wrote:
+> Add gpmc hwmod and associated interconnect data
+> 
+> HWMOD_INIT_NO_RESET can be removed once kernel is updated to
+> configure GPMC for all peripherals. Currently many depend on
+> bootloader, this facility will be removed.
+> (feature-removal-schedule.txt will get updated in upcoming
+> gpmc series).
+> 
+> No reset is also required for smooth migration to gpmc driver;
+> approach being taken is to hold old interface until boards are
+> converted to use driver interface one-by-one. Till that time,
+> this flag is a must as old interface rely on bootloader
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+> 
+> v2: rebased to 3.5-rc1
 
- arch/arm/include/asm/hardware/linkup-l1110.h |   48 --------------------------
- 1 files changed, 0 insertions(+), 48 deletions(-)
- delete mode 100644 arch/arm/include/asm/hardware/linkup-l1110.h
+Please let me know your comments on this. I am proceeding as you
+have suggested; beagle board, omap3evm had been made to configure
+in Kernel at runtime [1] and provision has been given in gpmc
+driver to cry loud if no configuration in Kernel [2]
 
-diff --git a/arch/arm/include/asm/hardware/linkup-l1110.h b/arch/arm/include/asm/hardware/linkup-l1110.h
-deleted file mode 100644
-index 7ec9116..0000000
---- a/arch/arm/include/asm/hardware/linkup-l1110.h
-+++ /dev/null
-@@ -1,48 +0,0 @@
--/*
--*
--* Definitions for H3600 Handheld Computer
--*
--* Copyright 2001 Compaq Computer Corporation.
--*
--* Use consistent with the GNU GPL is permitted,
--* provided that this copyright notice is
--* preserved in its entirety in all copies and derived works.
--*
--* COMPAQ COMPUTER CORPORATION MAKES NO WARRANTIES, EXPRESSED OR IMPLIED,
--* AS TO THE USEFULNESS OR CORRECTNESS OF THIS CODE OR ITS
--* FITNESS FOR ANY PARTICULAR PURPOSE.
--*
--* Author: Jamey Hicks.
--*
--*/
--
--/* LinkUp Systems PCCard/CompactFlash Interface for SA-1100 */
--
--/* PC Card Status Register */
--#define LINKUP_PRS_S1	(1 << 0) /* voltage control bits S1-S4 */
--#define LINKUP_PRS_S2	(1 << 1)
--#define LINKUP_PRS_S3	(1 << 2)
--#define LINKUP_PRS_S4	(1 << 3)
--#define LINKUP_PRS_BVD1	(1 << 4)
--#define LINKUP_PRS_BVD2	(1 << 5)
--#define LINKUP_PRS_VS1	(1 << 6)
--#define LINKUP_PRS_VS2	(1 << 7)
--#define LINKUP_PRS_RDY	(1 << 8)
--#define LINKUP_PRS_CD1	(1 << 9)
--#define LINKUP_PRS_CD2	(1 << 10)
--
--/* PC Card Command Register */
--#define LINKUP_PRC_S1	(1 << 0)
--#define LINKUP_PRC_S2	(1 << 1)
--#define LINKUP_PRC_S3	(1 << 2)
--#define LINKUP_PRC_S4	(1 << 3)
--#define LINKUP_PRC_RESET (1 << 4)
--#define LINKUP_PRC_APOE	(1 << 5) /* Auto Power Off Enable: clears S1-S4 when either nCD goes high */
--#define LINKUP_PRC_CFE	(1 << 6) /* CompactFlash mode Enable: addresses A[10:0] only, A[25:11] high */
--#define LINKUP_PRC_SOE	(1 << 7) /* signal output driver enable */
--#define LINKUP_PRC_SSP	(1 << 8) /* sock select polarity: 0 for socket 0, 1 for socket 1 */
--#define LINKUP_PRC_MBZ	(1 << 15) /* must be zero */
--
--struct linkup_l1110 {
--	volatile short prc;
--};
--- 
-1.7.7.6
+Updating feature-removal-schedule.txt will be done as part of
+another series (yet to be posted, that series depends on gpmc
+driver conversion series [3], needs to know Tony's comments on
+driver series first and if fine, it will be posted). Right now
+it won't make sense to post a patch on feature-removal as first
+all boards that depend on bootloader has to modified to make use
+of driver interface. So patch on feature-removal-schedule.txt
+will be posted along with migration of remaining boards to use
+driver interface.
+
+And this patch is necessary for gpmc driver conversion [3] to proceed.
+
+Regards
+Afzal
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69917.html
+[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69906.html
+[3] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69897.html
