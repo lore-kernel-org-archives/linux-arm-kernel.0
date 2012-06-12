@@ -1,59 +1,45 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 12 Jun 2012 20:03:44 +0800
-Subject: [PATCH] PINCTRL: SiRF: add CSR SiRFprimaII GPIO driver depending
- on pinmux APIs
-In-Reply-To: <CACRpkdZfAcYiREryW=EXgxvZ1R8Adts8mb42gcnwkuiMP3T2mg@mail.gmail.com>
-References: <1337670845-14572-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdZfAcYiREryW=EXgxvZ1R8Adts8mb42gcnwkuiMP3T2mg@mail.gmail.com>
-Message-ID: <CAGsJ_4wxiS4kR2R=EbEDmzP7nhRdaHDKmejhkDDSrC8vhbVL=Q@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Jun 2012 14:04:33 +0200
+Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
+In-Reply-To: <20120610170620.GW14756@titan.lakedaemon.net>
+References: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+ <20120610170620.GW14756@titan.lakedaemon.net>
+Message-ID: <20120612120433.GA17893@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/6/12 Linus Walleij <linus.walleij@linaro.org>
->
-> On Tue, May 22, 2012 at 9:14 AM, Barry Song <Barry.Song@csr.com> wrote:
->
-> > +static inline struct sirfsoc_gpio_bank *sirfsoc_irq_to_bank(unsigned
-> > int irq)
-> > +{
-> > + ? ? ? return &sgpio_bank[(irq - SIRFSOC_GPIO_IRQ_START) /
-> > SIRFSOC_GPIO_BANK_SIZE];
-> > +}
+> > +		spi at 10600 {
+> > +			compatible = "marvell,orion-spi";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			cell-index = <0>;
+> > +			reg = <0x10600 0x28>;
+> > +			status = "disabled";
+> > +		};
 > > +
-> > +static inline int sirfsoc_gpio_to_irq(struct gpio_chip *chip, unsigned
-> > offset)
-> > +{
-> > + ? ? ? return SIRFSOC_GPIO_IRQ_START + (chip->base + offset);
-> > +}
-> > +
-> > +static inline int sirfsoc_irq_to_offset(unsigned int irq)
-> > +{
-> > + ? ? ? return (irq - SIRFSOC_GPIO_IRQ_START) % SIRFSOC_GPIO_BANK_SIZE;
-> > +}
-> > +
-> > +static inline int sirfsoc_gpio_to_offset(unsigned int gpio)
-> > +{
-> > + ? ? ? return gpio % SIRFSOC_GPIO_BANK_SIZE;
-> > +}
->
-> Some of this is doing the work of irqdomain, which is supposed to map a
-> certain
-> local IRQ number to the global space (I guess that is what is denoted by
-> SIRFSOC_GPIO_IRQ_START.)
->
-> Can you please look into using irqdomain for this?
 
-yes. sure. Thanks!
+> > index fa51586..0942139 100644
+> > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > @@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+> >  	{ }
+> >  };
+> >  
+> > +struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> > +	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+> 
+> Isn't this ---------------------------------^^^^^^^^^^ defined somewhere?
 
->
-> There are several examples in drivers/gpio/* and drivers/pinctrl/*
-> for example:
->
-> drivers/gpio/gpio-pxa.c
-> drivers/pinctrl/pinctrl-nomadik.c
->
->
-> Yours,
-> Linus Walleij
+Hi Jason
 
--barry
+Yes, there is a #define for this. However, in this case, i think the
+number actually tells you more. The dtsi file has the number, not some
+symbolic representation. Also, some platforms, e.g. Dove, have more
+than one spi controller. Having the number there makes it easier to
+see the mapping between the node in DT and the name used in the
+platform device. If we use the #define it means making an indirection
+via kirkwood.h for a human to see the mapping.
+
+However, i can change it...
+
+	 Andrew
