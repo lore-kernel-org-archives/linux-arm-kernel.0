@@ -1,68 +1,51 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 13:15:36 -0500
-Subject: [PATCH v5 10/14] ARM: OMAP2+: gpmc: waitpin helper
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E997F7C@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <bba49a35f81f33fbdfeda78a71cbe4aa3417d6a2.1339419492.git.afzal@ti.com>
- <4FD6783D.9030208@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997F7C@DBDE01.ent.ti.com>
-Message-ID: <4FD78748.2080504@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jun 2012 19:20:36 +0100
+Subject: [PATCH] ARM: two possible fixes for the KALLSYMS build problem
+In-Reply-To: <20120612160229.GA21389@codeaurora.org>
+References: <1338567721-19514-1-git-send-email-davidb@codeaurora.org>
+ <20120611203748.GA16967@codeaurora.org>
+ <20120612143249.GB7918@n2100.arm.linux.org.uk>
+ <20120612160229.GA21389@codeaurora.org>
+Message-ID: <20120612182036.GE7918@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/12/2012 04:00 AM, Mohammed, Afzal wrote:
-> Hi Jon,
+On Tue, Jun 12, 2012 at 09:02:29AM -0700, David Brown wrote:
+> On Tue, Jun 12, 2012 at 03:32:49PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jun 11, 2012 at 01:37:48PM -0700, David Brown wrote:
+> > > On Fri, Jun 01, 2012 at 09:21:59AM -0700, David Brown wrote:
+> > > 
+> > > > David Brown (1):
+> > > >   ARM: Prevent KALLSYM size mismatch on ARM.
+> > > > 
+> > > >  arch/arm/kernel/vmlinux.lds.S |    3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > 
+> > > Just wondering if anyone has had a chance to look at either of these,
+> > > or try them.  I haven't seen any KALLSYMS mismatch build errors with
+> > > either of these patches applied.
+> > 
+> > I think variant 2 is the better approach out of either as it doesn't add
+> > to the size of the resulting kernel image.
 > 
-> On Tue, Jun 12, 2012 at 04:29:09, Hunter, Jon wrote:
-> 
->>> +enum {
->>> +	GPMC_WAITPIN_IDX0,
->>> +	GPMC_WAITPIN_IDX1,
->>> +	GPMC_WAITPIN_IDX2,
->>> +	GPMC_WAITPIN_IDX3,
->>> +	GPMC_NR_WAITPIN
->>> +};
->>
->> Max number of wait pins is 3 for omap4/5. I know that we discussed this
->> in the past, but are you not supporting these devices are the moment? I
->> know that you have not done the hwmod for these, but still I was hoping
->> that you would take these into account.
-> 
-> I don't see reason for omap4/5 not to work with this
+> The first variant doesn't ever increase the size of the kernel,
+> either.  Variant two actually makes it a little smaller, since a few
+> symbols are eliminated.
 
-Well, GPMC_NR_WAITPIN will be 4 and this is not accurate for OMAP4/5.
+Ok.
 
->>
->>> +
->>> +enum {
->>> +	LOW,
->>> +	HIGH
->>> +};
->>
->> To be honest, I don't see the point in either of the above enums when
->> you have the definitions at the bottom. Seems that one set of
->> definitions should be enough.
-> 
-> Thanks for catching that, it will be removed
-> 
->>> +	case GPMC_WAITPIN_0:
->>> +		idx =  GPMC_WAITPIN_IDX0;
->>
->> For example, here you could have ...
->>
->> 		idx = GPMC_WAITPIN_0 - 1;
-> 
-> Sorry, not sure whether I follow you, can you please clarify
+> The second variant is cleaner, though as long as it is safe in every
+> configuration.
 
+Well, we don't have any per-CPU data unless we're building for SMP.
+See:
 
-GPMC_WAITPIN_IDX0 = 0
-GPMC_WAITPIN_0 = 1
+#ifndef PER_CPU_BASE_SECTION
+#ifdef CONFIG_SMP
+#define PER_CPU_BASE_SECTION ".data..percpu"
+#else
+#define PER_CPU_BASE_SECTION ".data"
+#endif
+#endif
 
-So, GPMC_WAITPIN_IDX0 = GPMC_WAITPIN_0 - 1, assuming that you want idx =
-0 and not 1. Or you could change you shift value too. I was just
-highlighting that they are not equal but one set of definitions could be
-used.
-
-Jon
+in include/asm-generic/percpu.h.
