@@ -1,81 +1,29 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Jun 2012 18:04:33 -0500
-Subject: [PATCH v5 12/14] ARM: OMAP2+: gpmc: cs reconfigure helper
-In-Reply-To: <8882ae964a4034d58953e743cf35664d3a107823.1339419492.git.afzal@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <8882ae964a4034d58953e743cf35664d3a107823.1339419492.git.afzal@ti.com>
-Message-ID: <4FD67981.7070508@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 12 Jun 2012 09:16:08 +0800
+Subject: [GIT PULL] imx fixes for v3.5-rc (part 2)
+In-Reply-To: <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
+References: <20120611044359.GD2344@S2101-09.ap.freescale.net>
+ <CAAQ0ZWQ1D38onzk0aMaCTEQ-NSyCgEEUNwK3PfWbE2VUSG2ckQ@mail.gmail.com>
+ <CAOesGMgJsSWh3QCNTDarGR7PPmO3_NMsueDun8o=igkt9a0_AA@mail.gmail.com>
+Message-ID: <20120612011606.GJ2552@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/11/2012 09:27 AM, Afzal Mohammed wrote:
-> Helper for reconfiguring CS, peripheral that necessitated
-> it was OneNAND.
-
-Why? I think you need to add more about why this was needed.
-
-Jon
-
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c             |   32 ++++++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/gpmc.h |    2 ++
->  2 files changed, 34 insertions(+)
+On Mon, Jun 11, 2012 at 09:44:41AM -0700, Olof Johansson wrote:
+> > Shawn Guo (2):
+> > ? ? ?ARM: imx6q: remove unneeded clkdev lookups
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 281bd23..d493a4c 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -1429,6 +1429,38 @@ struct platform_device *gpmc_create_device(struct gpmc_peripheral *p)
->  	return pdev;
->  }
->  
-> +static int gpmc_match_device(char *name, int id)
-> +{
-> +	int i;
-> +	struct gpmc_peripheral *g_per = gpmc_peripheral;
-> +
-> +	for (i = 0; i < gpmc_num_peripheral; i++, g_per++)
-> +		if (!strcmp(g_per->name, name) && g_per->id == id)
-> +			return i;
-> +
-> +	return -ENOENT;
-> +}
-> +
-> +int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *c)
-> +{
-> +	int i;
-> +
-> +	i = gpmc_match_device(name, id);
-> +	if (IS_ERR_VALUE(i)) {
-> +		dev_err(gpmc_dev, "no device %s.%d to configure\n", name, id);
-> +		return i;
-> +	}
-> +
-> +	if (IS_ERR_VALUE(gpmc_setup_cs_config_timing(gpmc_peripheral + i, c))) {
-> +		dev_err(gpmc_dev, "error: configure device %s.%d\n", name, id);
-> +		return i;
-> +	}
-> +
-> +	return gpmc_setup_waitpin(gpmc_peripheral + i);
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(gpmc_cs_reconfigure);
-> +
->  static __devinit int gpmc_probe(struct platform_device *pdev)
->  {
->  	u32 l;
-> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-> index e1b130c..32017a1 100644
-> --- a/arch/arm/plat-omap/include/plat/gpmc.h
-> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-> @@ -247,6 +247,8 @@ extern int gpmc_cs_configure(int cs, int cmd, int wval);
->  extern int gpmc_nand_read(int cs, int cmd);
->  extern int gpmc_nand_write(int cs, int cmd, int wval);
->  
-> +extern int gpmc_cs_reconfigure(char *name, int id, struct gpmc_cs_data *c);
-> +
->  int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size);
->  int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code);
->  
+> This is looking more like a cleanup, if it is, please hold off until
+> 3.6. If it isn't please explain in the commit message what bug it
+> fixes.
+> 
+Yes, it is a cleanup.  It cleans up some left-over from commit b0286f2
+(ARM: imx6q: prepare and enable init on clks directly instead of
+clk_get first) which is currently sitting on arm-soc/fixes.  I
+originally sent the patch to Sascha and somehow expect him amend the
+patch to that commit.  Anyway, it does not really matter, and we can
+have it held off until 3.6.
+
+-- 
+Regards,
+Shawn
