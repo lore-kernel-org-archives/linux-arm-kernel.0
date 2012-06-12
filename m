@@ -1,24 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jun 2012 14:49:22 +0000
-Subject: [PATCH 06/14] mfd: Initialise the DB8500 PRCMU driver at
- core_initcall time
-In-Reply-To: <4FD742C9.7090603@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <201206121259.38807.arnd@arndb.de> <4FD742C9.7090603@linaro.org>
-Message-ID: <201206121449.22978.arnd@arndb.de>
+Date: Tue, 12 Jun 2012 14:59:13 +0000
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <20120612142412.GD14756@titan.lakedaemon.net>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <20120612140616.GC17893@lunn.ch>
+ <20120612142412.GD14756@titan.lakedaemon.net>
+Message-ID: <201206121459.14114.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 June 2012, Lee Jones wrote:
-> But your suggestion above involves some heavy refactoring of how Device 
-> Tree works. Meanwhile the ab8500 will not work as an IRQ controller 
-> until we either complete the work or use the same solution as we did for 
-> the Nomadik GPIO controller. I think for now at least we should continue 
-> to work on enablement and leave the 'nice to have's until last. We are 
-> doing nothing new here, just bringing the ab8500 IRQ controller into 
-> line with the Nomadik one.
+On Tuesday 12 June 2012, Jason Cooper wrote:
+> On Tue, Jun 12, 2012 at 04:06:16PM +0200, Andrew Lunn wrote:
+> > > arch/arm/mach-kirkwood/board-* (DT files)
+> > >     -> arch/arm/mach-mvebu/
+> > 
+> > I know of work being done to make orion5x and dove also support DT.
+> > Should we consider some sort of prefix or midfix indicating which SoC
+> > a board file is for? It will not be easy to mentally keep track of
+> > board-ts209.c is an orion5x and board-ts219.c is kirkwood etc.
+> 
+> The board-BOARD.c files are transitional files, and will disappear once
+> the DT conversion is done.  All that will remain is board-dt.c.  So,
+> there is no long-term issue.  Since it's a short term issue, and we're
+> moving/renaming anyway, how about kirkwood-dreamplug.c, orion5x-ts209.c,
+> etc?
 
-Right, I didn't say we should not take your patch, but we should be
-aware that it's not the solution we want to use in the long run.
+I was going to suggest the same.
+
+FWIW, the board-dt.c from mach-kirkwood should just become kirkwood.c
+and we might want to merge it with the kirkwood common.c file in the long
+run, if any contents from that file remain for the dt version.
 
 	Arnd
