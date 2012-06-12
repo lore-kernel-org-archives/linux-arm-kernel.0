@@ -1,71 +1,28 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Tue, 12 Jun 2012 11:57:07 +0100
-Subject: [linux-next] "clk: add non CONFIG_HAVE_CLK routines" commit
-In-Reply-To: <20120522234621.GA3610@windriver.com>
-References: <20120522234621.GA3610@windriver.com>
-Message-ID: <CAOh2x=mFOPKbzuY__k0RVpFHTdPfa-iN1e3Lpa3iWt9iP6FzFw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Jun 2012 13:04:54 +0200
+Subject: [PATCH 1/1] pinctrl: pinctrl-imx: fix incorrect debug message of
+ maps
+In-Reply-To: <1339162392-24628-1-git-send-email-b29396@freescale.com>
+References: <1339162392-24628-1-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdYU=r80KXA-dqhzQDOTvDXH2Ydx7jJosD_UZy6CFaGjBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul/Russell,
+On Fri, Jun 8, 2012 at 3:33 PM, Dong Aisheng <b29396@freescale.com> wrote:
 
-On Wed, May 23, 2012 at 12:46 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> Hi Viresh,
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 >
-> The above listed commit, in linux-next as:
+> After create config map, the new_map pointer becomes point to
+> PIN_MAP_TYPE_CONFIGS_PIN map rather than PIN_MAP_TYPE_MUX_GROUP map any more.
+> Thus using new_map pointer to display the MUX_GROUP info is not correct.
+> Using map pointer instead to show the correct MUX_GROUP map info.
+> Original the debug message is:
+> imx6q-pinctrl 20e0000.iomuxc: maps: function Yp group MX6Q_PAD_SD3_CMD num 12
+> After fix it is:
+> imx6q-pinctrl 20e0000.iomuxc: maps: function usdhc3 group usdhc3grp-1 num 11
 >
-> commit ebbf0cb5d39cc3e22ef4c425475e76b7f45027de
->
-> ? ?"clk: add non CONFIG_HAVE_CLK routines"
->
-> shows up as failures in the netx_defconfig, since there
-> are duplicate stub functions between your changes and the
-> file below:
->
-> ?arch/arm/mach-netx/fb.c:72:6: error: redefinition of 'clk_disable'
-> ?include/linux/clk.h:299:51: note: previous definition of 'clk_disable' was here
-> ?arch/arm/mach-netx/fb.c:76:5: error: redefinition of 'clk_set_rate'
-> ?include/linux/clk.h:306:50: note: previous definition of 'clk_set_rate' was here
-> ?arch/arm/mach-netx/fb.c:81:5: error: redefinition of 'clk_enable'
-> ?include/linux/clk.h:294:50: note: previous definition of 'clk_enable' was here
-> ?arch/arm/mach-netx/fb.c:86:13: error: redefinition of 'clk_get'
-> ?include/linux/clk.h:280:58: note: previous definition of 'clk_get' was here
-> ?arch/arm/mach-netx/fb.c:91:6: error: redefinition of 'clk_put'
-> ?include/linux/clk.h:290:51: note: previous definition of 'clk_put' was here
-> ?make[2]: *** [arch/arm/mach-netx/fb.o] Error 1
+> Reported-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Following are present in mach-netx/fb.c:
-
-
-void clk_disable(struct clk *clk)
-{
-}
-
-int clk_set_rate(struct clk *clk, unsigned long rate)
-{
-	return 0;
-}
-
-int clk_enable(struct clk *clk)
-{
-	return 0;
-}
-
-void clk_put(struct clk *clk)
-{
-}
-
-struct clk *clk_get(struct device *dev, const char *id)
-{
-	return dev && strcmp(dev_name(dev), "fb") == 0 ? NULL : ERR_PTR(-ENOENT);
-}
-
-I can remove first four without any issues, but just can't remove the last one.
-The dummy clk_get() always returns NULL, whereas this one returns NULL only for
-fb device.
-
-How should I fix this?
-
---
-Viresh
+Thanks, applied.
+Linus Walleij
