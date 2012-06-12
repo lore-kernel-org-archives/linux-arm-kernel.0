@@ -1,99 +1,81 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Tue, 12 Jun 2012 18:26:05 +0530
-Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
-In-Reply-To: <20120423201131.GG31244@redhat.com>
-References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
- <20120423201131.GG31244@redhat.com>
-Message-ID: <4FD73C65.3050409@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 12 Jun 2012 14:56:57 +0200
+Subject: [PATCH v2 2/8] arm: mach-mvebu: add source files
+In-Reply-To: <201206120845.48902.arnd@arndb.de>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <1339433585-28087-3-git-send-email-gregory.clement@free-electrons.com>
+ <201206120845.48902.arnd@arndb.de>
+Message-ID: <4FD73C99.6070908@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2012 1:41 AM, Jarod Wilson wrote:
-> On Tue, Feb 28, 2012 at 11:21:40AM +0530, Ravi Kumar V wrote:
->> Adds GPIO based IR Receiver driver. It decodes signals using decoders
->> available in rc framework.
->
-> Been meaning to look at this, but it looks like its already merged
-> upstream. Just one question though, inlined below.
->
+On 06/12/2012 10:45 AM, Arnd Bergmann wrote:
+> On Monday 11 June 2012, Gregory CLEMENT wrote:
+>> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+>> new file mode 100644
+>> index 0000000..72d39e5
 >> --- /dev/null
->> +++ b/drivers/media/rc/gpio-ir-recv.c
->> @@ -0,0 +1,205 @@
->> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
+>> +++ b/arch/arm/mach-mvebu/Kconfig
+>> @@ -0,0 +1,7 @@
+>> +if ARCH_MVEBU
 >> +
->> +#include<linux/kernel.h>
->> +#include<linux/init.h>
->> +#include<linux/module.h>
->> +#include<linux/interrupt.h>
->> +#include<linux/gpio.h>
->> +#include<linux/slab.h>
->> +#include<linux/platform_device.h>
->> +#include<linux/irq.h>
->> +#include<media/rc-core.h>
->> +#include<media/gpio-ir-recv.h>
+>> +menu "Marvell SOC with device tree"
 >> +
->> +#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
->> +#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+>> +endmenu
 >> +
->> +struct gpio_rc_dev {
->> +	struct rc_dev *rcdev;
->> +	unsigned int gpio_nr;
->> +	bool active_low;
+>> +endif
+>
+> The "with device tree" part is implied here, so you should not need to
+> mention it, but it would be good if you could say which SOC this
+> relates to, i.e. not the pxa/mmp series but the other line, in whatever
+> way you want to name it.
+
+Do you mean to name all the SOC aimed to be supported ?
+and write something like that:
+
+menu "Marvell SOC from EBU division (Orion, Kirkwood, Dove, MV78xx0,
+Armada 370/XP, ...)"
+
+Or for now just the currently supported SOC ? :
+menu "Marvell SOC from EBU division (Armada 370, Armada XP, ...)"
+
+
+>
+>> +static struct map_desc mvebu_io_desc[] __initdata = {
+>> +	{
+>> +		.virtual	= MVEBU_REGS_VIRT_BASE,
+>> +		.pfn		= __phys_to_pfn(MVEBU_REGS_PHYS_BASE),
+>> +		.length		= MVEBU_REGS_SIZE,
+>> +		.type		= MT_DEVICE,
+>> +	},
 >> +};
 >> +
->> +static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
+>> +void __init mvebu_map_io(void)
 >> +{
->> +	struct gpio_rc_dev *gpio_dev = dev_id;
->> +	unsigned int gval;
->> +	int rc = 0;
->> +	enum raw_event_type type = IR_SPACE;
->> +
->> +	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
->> +
->> +	if (gval<  0)
->> +		goto err_get_value;
->> +
->> +	if (gpio_dev->active_low)
->> +		gval = !gval;
->> +
->> +	if (gval == 1)
->> +		type = IR_PULSE;
->
-> What happens if gval is>  1?
-
-gpio_get_value_cansleep() can return
-bool for low/high.
-negative for error.
-
-so i think we dont get value> 1
-
->
->> +	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
->> +	if (rc<  0)
->> +		goto err_get_value;
->> +
->> +	ir_raw_event_handle(gpio_dev->rcdev);
->> +
->> +err_get_value:
->> +	return IRQ_HANDLED;
+>> +	iotable_init(mvebu_io_desc, ARRAY_SIZE(mvebu_io_desc));
 >> +}
 >
-> Looks like you'll store a space any time you get gval>  1, which may or
-> may not be intended here...
->
->
+> It looks like MVEBU_REGS_PHYS_BASE is common between Armada XP and
+> Armada 370, but is different for the other ones we want to support
+> here (kirkwood, orion5x, mv78xx0, dove), so the name seems to be
+> inappropriate. I would recommend dropping the entire file and just
+> leaving the map_desc in the individual soc specific files, even
+> thouth that means you have two identical calls here.
 
+OK I will drop common.* files. We will see later to introduce them
+again when we find common features with the other SOC.
+
+>
+> 	Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
++33 602 196 044
