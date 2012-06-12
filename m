@@ -1,23 +1,26 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 12 Jun 2012 10:40:12 -0700
-Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <4FD77CAF.1020402@zytor.com>
-References: <1339470307-28223-1-git-send-email-tmac@hp.com>
- <20120612191804.4211462a@tukaani.org>
- <alpine.LFD.2.02.1206121316190.23555@xanadu.home>
- <4FD77CAF.1020402@zytor.com>
-Message-ID: <1339522812.2404.4.camel@joe2Laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jun 2012 17:39:22 +0000
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <20120612154020.GF14756@titan.lakedaemon.net>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <201206121459.14114.arnd@arndb.de>
+ <20120612154020.GF14756@titan.lakedaemon.net>
+Message-ID: <201206121739.22705.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-12 at 10:30 -0700, H. Peter Anvin wrote:
-> On 06/12/2012 10:26 AM, Nicolas Pitre wrote:
+On Tuesday 12 June 2012, Jason Cooper wrote:
 > > 
-> > Instead of copying, maybe this would be much better to make the content 
-> > of lib/string.c usable in a pre-boot environment.
+> > FWIW, the board-dt.c from mach-kirkwood should just become kirkwood.c
+> > and we might want to merge it with the kirkwood common.c file in the long
+> > run, if any contents from that file remain for the dt version.
+> 
+> So, there would be an orion5x.c, dove.c as well?  Or, should it be
+> mvebu.c to encompass all of them?
 
-> Not sure about that... a lot of it is #ifndef __HAVE_ARCH_* and you
-> *really* want those optimizations on some arches.
+Yes, I think we should have one of those files contain the DT_MACHINE
+definition for that soc type, unless they are unified to the point where
+we only need one.
 
-Can __weak be used?
+	Arnd
