@@ -1,59 +1,131 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Tue, 12 Jun 2012 23:07:47 +0200 (CEST)
-Subject: [PATCH] ARM: mxc-rnga: fix data_present API
-Message-ID: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Tue, 12 Jun 2012 11:11:33 -1000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FD7A36B.9090409@wwwdotorg.org>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+ <4FD7A36B.9090409@wwwdotorg.org>
+Message-ID: <4FD7B085.1020006@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Matt Mackall <mpm@selenic.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Alan Carvalho de Assis <acassis@gmail.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../drivers/char/hw_random/mxc-rnga.c              |   22 +++++++++++++-------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+On 6/12/2012 10:15 AM, Stephen Warren wrote:
+> On 06/12/2012 11:20 AM, Thierry Reding wrote:
+> ...
+>> I came up with the following alternative:
+>>
+>> 	pci {
+>> 		compatible = "nvidia,tegra20-pcie";
+>> 		reg =<0x80003000 0x00000800   /* PADS registers */
+>> 		       0x80003800 0x00000200   /* AFI registers */
+>> 		       0x80004000 0x00100000   /* configuration space */
+>> 		       0x80104000 0x00100000   /* extended configuration space */
+>> 		       0x80400000 0x00010000   /* downstream I/O */
+>> 		       0x90000000 0x10000000   /* non-prefetchable memory */
+>> 		       0xa0000000 0x10000000>; /* prefetchable memory */
+>> 		interrupts =<0 98 0x04   /* controller interrupt */
+>> 		              0 99 0x04>; /* MSI interrupt */
+>> 		status = "disabled";
+>>
+>> 		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
+>> 			  0x80004000 0x80004000 0x00100000   /* configuration space */
+>> 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
+>> 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
+>> 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
+>> 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+>>
+>> 		#address-cells =<1>;
+>> 		#size-cells =<1>;
+>>
+>> 		port at 80000000 {
+>> 			reg =<0x80000000 0x00001000>;
+>> 			status = "disabled";
+>> 		};
+>>
+>> 		port at 80001000 {
+>> 			reg =<0x80001000 0x00001000>;
+>> 			status = "disabled";
+>> 		};
+>> 	};
+>>
+>> The "ranges" property can probably be cleaned up a bit, but the most
+>> interesting part is the port@ children, which can simply be enabled in board
+>> DTS files by setting the status property to "okay". I find that somewhat more
+>> intuitive to the variant with an "enable-ports" property.
+>>
+>> What do you think of this?
+>
+> As a general concept, this kind of design seems OK to me.
+>
+> The "port" child nodes I think should be named "pci at ..." given Mitch's
+> comments, I think.
+>
+> The port nodes probably need two entries in reg, given the following in
+> our downstream driver:
+>
+>>          int rp_offset = 0;
+>>          int ctrl_offset = AFI_PEX0_CTRL;
+> ...
+>>          for (port = 0; port<  MAX_PCIE_SUPPORTED_PORTS; port++) {
+>>                  ctrl_offset += (port * 8);
+>>                  rp_offset = (rp_offset + 0x1000) * port;
+>>                  if (tegra_pcie.plat_data->port_status[port])
+>>                          tegra_pcie_add_port(port, rp_offset, ctrl_offset);
+>>          }
+>
+> (which actually looks likely to be horribly buggy for port>1 and only
+> accidentally correct for port==1, but anyway...)
+>
+> But instead, I'd be tempted to make the top-level node say:
+>
+> 	#address-cells =<1>;
+> 	#size-cells =<0>;
+>
+> ... so that the child nodes' reg is just the port ID. The parent node
+> can calculate the addresses/offsets of the per-port registers within the
+> PCIe controller's register space based on the ID using code roughly like
+> what I quoted above:
+>
+> 	pci at 0 {
+> 		reg =<0>;
+> 		status = "disabled";
+> 	};
+>
+> 	pci at 1 {
+> 		reg =<0>;
+> 		status = "disabled";
+> 	};
+reg = <1> ?
 
-diff --git linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
-index 187c6be..2924253 100644
---- linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c
-+++ linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
-@@ -24,6 +24,7 @@
- #include <linux/ioport.h>
- #include <linux/platform_device.h>
- #include <linux/hw_random.h>
-+#include <linux/delay.h>
- #include <linux/io.h>
- 
- /* RNGA Registers */
-@@ -60,16 +61,21 @@
- 
- static struct platform_device *rng_dev;
- 
--static int mxc_rnga_data_present(struct hwrng *rng)
-+static int mxc_rnga_data_present(struct hwrng *rng, int wait)
- {
--	int level;
- 	void __iomem *rng_base = (void __iomem *)rng->priv;
--
--	/* how many random numbers is in FIFO? [0-16] */
--	level = ((__raw_readl(rng_base + RNGA_STATUS) &
--			RNGA_STATUS_LEVEL_MASK) >> 8);
--
--	return level > 0 ? 1 : 0;
-+	int level, data, i;
-+
-+	for (i = 0; i < 20; i++) {
-+		/* how many random numbers is in FIFO? [0-16] */
-+		level = ((__raw_readl(rng_base + RNGA_STATUS) &
-+				RNGA_STATUS_LEVEL_MASK) >> 8);
-+		data = level > 0 ? 1 : 0;
-+		if (data || !wait)
-+			break;
-+		udelay(10);
-+	}
-+	return data;
- }
- 
- static int mxc_rnga_data_read(struct hwrng *rng, u32 * data)
+>
+>
+> That would save having to put 2 entries in the reg, and perhaps remove
+> the need for any ranges property.
+
+ISTM that having two reg entries, specifying the rp and ctrl registers, 
+is preferable to having code to calculate the addresses.  That makes the 
+code simpler and the device tree more directly descriptive of the 
+hardware layout.  The less "magic" (in this case, the register address 
+calculation), the better.
+
+>
+>
+> I think you also need a property to specify the exact port layout; the
+> Tegra20 controller supports:
+>
+> 1 x4 port
+> 2 x2 ports (you can choose to use only 1 of these I assume)
+>
+> So just because only 1 of the ports is enabled, doesn't imply it's x4;
+> it could still be x2.
+>
+> Tegra30 has more options.
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>
