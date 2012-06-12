@@ -1,42 +1,52 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 12 Jun 2012 17:37:54 +0530
-Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
-Message-ID: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jun 2012 08:45:48 +0000
+Subject: [PATCH v2 2/8] arm: mach-mvebu: add source files
+In-Reply-To: <1339433585-28087-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <1339433585-28087-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201206120845.48902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
+On Monday 11 June 2012, Gregory CLEMENT wrote:
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> new file mode 100644
+> index 0000000..72d39e5
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -0,0 +1,7 @@
+> +if ARCH_MVEBU
+> +
+> +menu "Marvell SOC with device tree"
+> +
+> +endmenu
+> +
+> +endif
 
-sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
-(BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
-versions.
+The "with device tree" part is implied here, so you should not need to
+mention it, but it would be good if you could say which SOC this
+relates to, i.e. not the pxa/mmp series but the other line, in whatever
+way you want to name it.
 
-In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
+> +static struct map_desc mvebu_io_desc[] __initdata = {
+> +	{
+> +		.virtual	= MVEBU_REGS_VIRT_BASE,
+> +		.pfn		= __phys_to_pfn(MVEBU_REGS_PHYS_BASE),
+> +		.length		= MVEBU_REGS_SIZE,
+> +		.type		= MT_DEVICE,
+> +	},
+> +};
+> +
+> +void __init mvebu_map_io(void)
+> +{
+> +	iotable_init(mvebu_io_desc, ARRAY_SIZE(mvebu_io_desc));
+> +}
 
-In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
-ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
+It looks like MVEBU_REGS_PHYS_BASE is common between Armada XP and
+Armada 370, but is different for the other ones we want to support
+here (kirkwood, orion5x, mv78xx0, dove), so the name seems to be
+inappropriate. I would recommend dropping the entire file and just
+leaving the map_desc in the individual soc specific files, even
+thouth that means you have two identical calls here.
 
-So the instruction is UNPREDICTABLE both before and after v6.
-
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/kernel/kprobes-test-arm.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index ba32b39..6c926d5 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
- 	TEST_BF_R ("mov	pc, r",0,2f,"")
- 	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
- 	TEST_BB(   "sub	pc, pc, #1b-2b+8")
--#if __LINUX_ARM_ARCH__ >= 6
--	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
-+#if __LINUX_ARM_ARCH__ == 6
-+	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and after ARMv6 */
- #endif
- 	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
- 	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
--- 
-1.7.9.5
+	Arnd
