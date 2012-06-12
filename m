@@ -1,63 +1,57 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Jun 2012 08:13:31 +0200
-Subject: [PATCH v2 08/10] ARM: tegra: harmony: Initialize regulators from
- DT
-In-Reply-To: <4FD664F8.4030800@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-9-git-send-email-thierry.reding@avionic-design.de>
- <4FD664F8.4030800@wwwdotorg.org>
-Message-ID: <20120612061330.GD4040@avionic-0098.adnet.avionic-design.de>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 12 Jun 2012 06:16:14 +0000
+Subject: [PATCH 2/3] ARM: OMAP2+: onenand: cleanup for gpmc driver
+ conversion
+In-Reply-To: <4FD63AAE.90008@ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <2d6f0fb31cde98cd700d7a4268683b4aeeee87f2.1339419244.git.afzal@ti.com>
+ <4FD63AAE.90008@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E997D47@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 06/11/2012 09:05 AM, Thierry Reding wrote:
-> > Device tree support for the TPS6586x PMU used on Harmony has recently
-> > been added. This commit adds the required device tree nodes to probe the
-> > PMU from the device tree.
-> 
-> > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-> 
-> > +		tps6586x at 34 {
-> > +			compatible = "ti,tps6586x";
-> > +			reg = <0x34>;
-> > +			interrupts = <0 88 0x4>;
-> > +
-> > +			#gpio-cells = <2>;
-> > +			gpio-controller;
-> > +
-> > +			regulators {
-> 
-> Per the TPS65911 discussion on regulator bindings, this node should have:
-> 
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 
-> > +				sm0 {
-> 
-> Each of these nodes should be named regulator at 0, regulator at 1, etc.
-> 
-> Within each of these nodes, you need a matching reg property.
-> 
-> 	reg = <0>;
-> 
-> and something to identify which regulator within the chip this node
-> configurations, although I don't think we've reached a final decision on
-> the property name.
-> 
-> See the the following for details:
-> 
-> http://www.spinics.net/lists/linux-tegra/msg05577.html
+Hi Jon,
 
-Okay, I'll monitor that discussion and see what you end up with. I guess I'll
-have to update the tps6586x binding when that decision has been reached and
-add a patch to this series.
+On Tue, Jun 12, 2012 at 00:06:30, Hunter, Jon wrote:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/d3908777/attachment.sig>
+> I agree with getting rid of the first instance at the beginning of
+> _set_async_mode, but why get rid of the above one? Are you assuming that
+> by default it is in async mode? Could be nice to keep it to be explicit.
+
+Second one is achieved below
+
+> > @@ -191,19 +181,21 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+> >  	u32 reg;
+> >  	bool clk_dep = false;
+> >  
+> > +	/* Ensure sync read and sync write are disabled */
+> > +	reg = readw(onenand_base + ONENAND_REG_SYS_CFG1);
+> > +	reg &= ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE;
+> > +	writew(reg, onenand_base + ONENAND_REG_SYS_CFG1);
+> > +
+> 
+> Should we only set these after we have checked the flags and depending
+> on which flags are set?
+
+Even for sync mode, setting async mode initially is required
+
+> > @@ -421,6 +413,8 @@ void __init gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
+> >  	gpmc_onenand_resource.end = gpmc_onenand_resource.start +
+> >  							ONENAND_IO_SIZE - 1;
+> >  
+> > +	omap2_onenand_set_async_mode(gpmc_onenand_data->cs);
+> > +
+> 
+> What about putting this in the gpmc_onenand_setup() function before the
+> call to _set_sync_mode? Seems nice to have these together.
+
+Intention of this patch is to setup GPMC async mode before driver starts
+its job so that reconfiguring GPMC needs to be to be done only once (this
+helps in avoiding issues when it has to work with gpmc driver).
+
+With the existing code, set_async was done as part of set_sync, hence
+requiring GPMC to be configured twice after driver takes control, with
+your suggestion too, GPMC would have to be configured twice.
+
+Regards
+Afzal
