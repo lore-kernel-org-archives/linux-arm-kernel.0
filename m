@@ -1,15 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jun 2012 18:12:32 -0300
-Subject: [PATCH] ARM: mxc-rnga: fix data_present API
-In-Reply-To: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
-References: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
-Message-ID: <CAOMZO5BMWJ4fad+YvJskkRLRiOJn1YRMUnCQ5OWen9SSvTc7Jw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jun 2012 22:15:10 +0100
+Subject: [PATCH v2 0/4] syscall_trace fixes and cleanups
+In-Reply-To: <20120609123834.GA11168@n2100.arm.linux.org.uk>
+References: <1339168341-29850-1-git-send-email-will.deacon@arm.com>
+ <20120609123834.GA11168@n2100.arm.linux.org.uk>
+Message-ID: <20120612211510.GA24380@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 6:07 PM, Beno?t Th?baudeau
-<benoit.thebaudeau@advansee.com> wrote:
-> +
-> + ? ? ? for (i = 0; i < 20; i++) {
+Hi Russell,
 
-Where does this magic 20 comes from?
+On Sat, Jun 09, 2012 at 01:38:34PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 08, 2012 at 04:12:17PM +0100, Will Deacon wrote:
+> > The only changes are that (a) two of the original patches (fixes) have
+> > been now been merged into mainline and (b) the remaining patches in the
+> > series are now rebased onto -rc1, which includes Al's work on the signal
+> > handling / syscall restarting path.
+> > 
+> > All comments welcome,
+> 
+> It may be a good idea to Cc Al on these.
+
+Sure. Since I've not received any other comments on this series, I'll
+repost this week with Al on CC.
+
+Will
