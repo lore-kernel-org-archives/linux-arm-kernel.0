@@ -1,43 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 12 Jun 2012 19:21:52 +0200 (CEST)
-Subject: [PATCH 1/2] clockevents: add an optional frequency update function
-In-Reply-To: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
-References: <1336479469-9246-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <alpine.LFD.2.02.1206121852310.3086@ionos>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 12 Jun 2012 19:23:01 +0200
+Subject: [PATCH v2 06/10] ARM: tegra: pcie: Add MSI support
+In-Reply-To: <4FD762E6.2080906@wwwdotorg.org>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-7-git-send-email-thierry.reding@avionic-design.de>
+ <4FD660F9.7030807@wwwdotorg.org>
+ <20120612050713.GB3669@avionic-0098.mockup.avionic-design.de>
+ <20120612061003.GC4040@avionic-0098.adnet.avionic-design.de>
+ <4FD762E6.2080906@wwwdotorg.org>
+Message-ID: <20120612172301.GB28010@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 May 2012, Linus Walleij wrote:
+* Stephen Warren wrote:
+> On 06/12/2012 12:10 AM, Thierry Reding wrote:
+> > * Thierry Reding wrote:
+> >> * Stephen Warren wrote:
+> >>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
+> > [...]
+> >>>> +static int tegra_pcie_disable_msi(struct platform_device
+> >>>> *pdev)
+> >>> 
+> >>> Should this free pcie->msi->pages?
+> >> 
+> >> Yes it should. I actually mention making that change in the
+> >> changelog but in fact didn't.
+> > 
+> > This is really moot because the driver cannot be built as a module
+> > currently because arch_setup_msi_irq() and arch_teardown_msi_irq()
+> > need to be built-in so tegra_pcie_disable_msi() will be called only
+> > just before the machine is shut down.
+> > 
+> > Perhaps this is something that should be addressed? Or is it just
+> > not worth the effort?
+> 
+> Well, if the driver provides a shutdown/removal path at all, it seems
+> like it should be complete. I assume it's trivial to free those pages?
 
-Sorry for answering late and thanks for the reminder.
+Yes, it's trivial and I'll definitely add it. What I was saying is that
+it doesn't matter really, unless something is done to allow the driver
+to be built as a module. It is also tedious to test the shutdown/removal
+for built-in drivers.
 
->  int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
->  {
-> +	/* Call down to the driver to reconfigure for new frequency */
-> +	if (dev->update_freq)
-> +		dev->update_freq(dev->mode, dev);
-
-This shouldn't be unconditional. If the device is not used or shut
-down or in oneshot mode this call is pointless. So this wants to go
-below.
-
->  	clockevents_config(dev, freq);
-
-Shouldn't we store the frequency in the clock_event_device structure, so
-the driver has it handy when either the set_mode, reprogram or
-update_freq() function is called ?
-
->  	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-
-	switch (dev->mode) {
-	case CLOCK_EVT_MODE_ONESHOT:
-		return clockevents_program_event(dev, dev->next_event, false);
-	case CLOCK_EVT_MODE_PERIODIC:
-		if (dev->update_freq)
-			dev->update_freq(dev->mode, dev);
-	}
-	return 0;
-
-Thanks,
-
-	tglx
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/7b6113bc/attachment.sig>
