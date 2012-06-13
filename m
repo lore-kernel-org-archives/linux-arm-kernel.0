@@ -1,33 +1,36 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 13 Jun 2012 10:39:28 -0300
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Allow booting from MMC card 
-Message-ID: <1339594768-20847-1-git-send-email-fabio.estevam@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Jun 2012 06:40:32 -0700
+Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
+ <4FD6586A.9060706@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
+ <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
+Message-ID: <20120613134032.GW12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow booting from MMC card.
+* Mohammed, Afzal <afzal@ti.com> [120613 06:16]:
+> Hi Tony,
+> 
+> On Wed, Jun 13, 2012 at 17:37:17, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [120612 11:01]:
+> > > 
+> > > On 06/12/2012 02:16 AM, Mohammed, Afzal wrote:
+> 
+> > > > Does having minor revision add any value ?, at least as of now,
+> > > > I do not see any.
+> > > 
+> > > May be not but it does not hurt either.
+> > 
+> > Yeah might as well show the full revision.
+> 
+> We are already showing full version, but only storing major, it seems you
+> want to store minor version along with major version in the same variable,
+> right ?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Ah OK, yeah might as well just store the minor version.
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e05a2f1..5afc108 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -160,6 +160,12 @@ CONFIG_USB_EHCI_MXC=y
- CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_MXC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_ESDHC_IMX=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT4_FS=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
--- 
-1.7.1
+Tony
