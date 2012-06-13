@@ -1,37 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 13 Jun 2012 12:32:09 +0200
-Subject: [PATCH] mach-dove: Fixup ge00 initialisation
-In-Reply-To: <1339509585-62405-1-git-send-email-hare@suse.de>
-References: <1339509585-62405-1-git-send-email-hare@suse.de>
-Message-ID: <20120613103209.GA23018@lunn.ch>
+From: wni@nvidia.com (Wei Ni)
+Date: Wed, 13 Jun 2012 18:40:52 +0800
+Subject: Where to power on the wifi device before loading the driver.
+Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 03:59:45PM +0200, Hannes Reinecke wrote:
-> The last argument of orion_ge00_init() is actually the error
-> interrupt, so we should be using the correct value here.
-> 
-> Signed-off-by: Hannes Reinecke <hare@suse.de>
-> ---
->  arch/arm/mach-dove/common.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index f7d639b..a9d0708 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -101,8 +101,8 @@ void __init dove_ehci1_init(void)
->   ****************************************************************************/
->  void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
->  {
-> -	orion_ge00_init(eth_data,
-> -			DOVE_GE00_PHYS_BASE, IRQ_DOVE_GE00_SUM, 0);
-> +	orion_ge00_init(eth_data, DOVE_GE00_PHYS_BASE,
-> +			IRQ_DOVE_GE00_SUM, IRQ_DOVE_GE00_ERR);
->  }
->  
->  /***************************************************************************
+Hi, all
+I'm working on the tegra30 wifi upstream issue.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
 
-	  Andrew
+In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
+
+On the Cardhu, the wifi's power is controlled by two gpios (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
+This power on sequence is: 
+set power-gpio to 1 ;
+mdelay(100) ;
+set reset-gpio to 1 ;
+mdelay(200);
+
+My question is where to power on the wifi. We may have three places to power on it:
+1. power on it in the brcmfmac driver before calling sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
+2. power on it in the mmc driver. In our tegra SD driver, it has power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
+3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
+
+I have no good idea for it, does anyone has suggestion?
+
+Thanks.
+Wei.
+
+---
+nvpublic
