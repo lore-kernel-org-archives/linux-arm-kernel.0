@@ -1,343 +1,91 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 Jun 2012 09:03:54 +0200
-Subject: [PATCH] ARM: imx: cleanup otg_mode
-In-Reply-To: <1417597871.2526557.1339523203564.JavaMail.root@advansee.com>
-References: <1417597871.2526557.1339523203564.JavaMail.root@advansee.com>
-Message-ID: <20120613070354.GV30400@pengutronix.de>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Tue, 12 Jun 2012 21:04:10 -1000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120613055437.GB31001@avionic-0098.mockup.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+ <4FD7943E.60302@firmworks.com> <4FD79CAE.9090006@wwwdotorg.org>
+ <4FD79DE8.90603@firmworks.com>
+ <20120613055437.GB31001@avionic-0098.mockup.avionic-design.de>
+Message-ID: <4FD83B6A.4020804@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 07:46:43PM +0200, Beno?t Th?baudeau wrote:
-> Cleanup the code for the otg_mode command line param:
-> * Use the bool type as it applies here.
-> * Qualify otg_mode_host with __initdata since this variable is only used in this
->   context.
-> * The __setup functions are not supposed to return a status code, but a boolean
->   indicating whether the param has been handled. See obsolete_checksetup() in
->   init/main.c.
-> 
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+On 6/12/2012 7:54 PM, Thierry Reding wrote:
+> * Mitch Bradley wrote:
+>> On 6/12/2012 9:46 AM, Stephen Warren wrote:
+>>> On 06/12/2012 01:10 PM, Mitch Bradley wrote:
+>>>> On 6/12/2012 7:20 AM, Thierry Reding wrote:
+>>> ...
+>>>>> I came up with the following alternative:
+>>>>>
+>>>>> 	pci {
+>>>>> 		compatible = "nvidia,tegra20-pcie";
+>>>>> 		reg =<0x80003000 0x00000800   /* PADS registers */
+>>>>> 		       0x80003800 0x00000200   /* AFI registers */
+>>>>> 		       0x80004000 0x00100000   /* configuration space */
+>>>>> 		       0x80104000 0x00100000   /* extended configuration space */
+>>>>> 		       0x80400000 0x00010000   /* downstream I/O */
+>>>>> 		       0x90000000 0x10000000   /* non-prefetchable memory */
+>>>>> 		       0xa0000000 0x10000000>; /* prefetchable memory */
+>>>>> 		interrupts =<0 98 0x04   /* controller interrupt */
+>>>>> 		              0 99 0x04>; /* MSI interrupt */
+>>>>> 		status = "disabled";
+>>>>>
+>>>>> 		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
+>>>>> 			  0x80004000 0x80004000 0x00100000   /* configuration space */
+>>>>> 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
+>>>>> 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
+>>>>> 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
+>>>>> 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+>>>>>
+>>>>> 		#address-cells =<1>;
+>>>>> 		#size-cells =<1>;
+>>>>>
+>>>>> 		port at 80000000 {
+>>>>> 			reg =<0x80000000 0x00001000>;
+>>>>> 			status = "disabled";
+>>>>> 		};
+>>>>>
+>>>>> 		port at 80001000 {
+>>>>> 			reg =<0x80001000 0x00001000>;
+>>>>> 			status = "disabled";
+>>>>> 		};
+>>>>> 	};
+>>>>>
+>>>>> The "ranges" property can probably be cleaned up a bit, but the most
+>>>>> interesting part is the port@ children, which can simply be enabled in board
+>>>>> DTS files by setting the status property to "okay". I find that somewhat more
+>>>>> intuitive to the variant with an "enable-ports" property.
+>>>>>
+>>>>> What do you think of this?
+>>>>
+>>>> The problem is that children of a PCI-ish bus have specific expectations
+>>>> about the parent address format - the standard 3-address-cell PCI
+>>>> addressing.  So making a PCI bus node - even if it is PCIe - with 1
+>>>> address cell is a problem.
+>>>
+>>> Couldn't you put the #address-cells=<3>   underneath each port node, and
+>>> put any PCIe devices there rather than under the main PCIe controller
+>>> node? I'm not sure how the interrupt mapping table etc. would work in
+>>> that case, but that seems to solve the addressing issue.
+>>
+>> Yes, that would work just fine, and in fact would be preferable, if
+>> a "root port" is essentially an independent PCI bus.  The parent of
+>> those root ports should not be named "pci", though, as it is not in
+>> itself a PCI bus.  It could be called "pcis".
+>
+> Yes, on Tegra each of the ports provides a separate PCI bus. How about naming
+> the parent "pcie-controller"?
 
-Applied as cleanup.
+That seems like a fine name.
 
-Thanks
- Sascha
-
-> ---
->  .../arch/arm/mach-imx/mach-cpuimx27.c              |    8 ++++----
->  .../arch/arm/mach-imx/mach-cpuimx35.c              |    8 ++++----
->  .../arch/arm/mach-imx/mach-cpuimx51sd.c            |    8 ++++----
->  .../arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    8 ++++----
->  .../arch/arm/mach-imx/mach-mx27_3ds.c              |    8 ++++----
->  .../arch/arm/mach-imx/mach-mx31_3ds.c              |    8 ++++----
->  .../arch/arm/mach-imx/mach-mx35_3ds.c              |    8 ++++----
->  .../arch/arm/mach-imx/mach-mx51_babbage.c          |    8 ++++----
->  .../arch/arm/mach-imx/mach-pca100.c                |    8 ++++----
->  .../arch/arm/mach-imx/mach-pcm037.c                |    8 ++++----
->  .../arch/arm/mach-imx/mach-pcm043.c                |    8 ++++----
->  11 files changed, 44 insertions(+), 44 deletions(-)
-> 
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx27.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx27.c
-> index d085aea..dbbb970 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx27.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx27.c
-> @@ -233,18 +233,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.phy_mode       = FSL_USB2_PHY_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init eukrea_cpuimx27_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", eukrea_cpuimx27_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx35.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx35.c
-> index 6450303..7d4dc14 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx35.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx35.c
-> @@ -141,18 +141,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init eukrea_cpuimx35_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", eukrea_cpuimx35_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx51sd.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx51sd.c
-> index 1e09de5..cd40bab 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx51sd.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx51sd.c
-> @@ -217,18 +217,18 @@ static const struct mxc_usbh_platform_data usbh1_config __initconst = {
->  	.portsc	= MXC_EHCI_MODE_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init eukrea_cpuimx51sd_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", eukrea_cpuimx51sd_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-eukrea_cpuimx25.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-> index d1e04e6..77a9edd 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
-> @@ -109,18 +109,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.workaround     = FLS_USB2_WORKAROUND_ENGCM09152,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init eukrea_cpuimx25_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", eukrea_cpuimx25_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx27_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx27_3ds.c
-> index c6d385c..cc4f83c 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -241,18 +241,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.phy_mode       = FSL_USB2_PHY_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init mx27_3ds_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", mx27_3ds_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx31_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx31_3ds.c
-> index 4eafdf2..ebcadd2 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx31_3ds.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx31_3ds.c
-> @@ -671,18 +671,18 @@ static const struct fsl_usb2_platform_data usbotg_pdata __initconst = {
->  	.phy_mode	= FSL_USB2_PHY_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init mx31_3ds_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", mx31_3ds_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx35_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx35_3ds.c
-> index 28aa194..af92e5e 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx35_3ds.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx35_3ds.c
-> @@ -540,18 +540,18 @@ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
->  	.portsc		= MXC_EHCI_MODE_SERIAL,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init mx35_3ds_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", mx35_3ds_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx51_babbage.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx51_babbage.c
-> index dde3970..3ca6902 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx51_babbage.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx51_babbage.c
-> @@ -307,18 +307,18 @@ static const struct mxc_usbh_platform_data usbh1_config __initconst = {
->  	.portsc	= MXC_EHCI_MODE_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init babbage_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", babbage_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pca100.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pca100.c
-> index 541152e..9fe7a1b 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pca100.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pca100.c
-> @@ -298,18 +298,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.phy_mode       = FSL_USB2_PHY_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init pca100_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", pca100_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm037.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm037.c
-> index 0a40004..debc286 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm037.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm037.c
-> @@ -557,18 +557,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.phy_mode       = FSL_USB2_PHY_ULPI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init pcm037_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", pcm037_otg_mode);
->  
-> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm043.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm043.c
-> index 73585f5..a8f4a00 100644
-> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm043.c
-> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm043.c
-> @@ -330,18 +330,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  	.phy_mode       = FSL_USB2_PHY_UTMI,
->  };
->  
-> -static int otg_mode_host;
-> +static bool otg_mode_host __initdata;
->  
->  static int __init pcm043_otg_mode(char *options)
->  {
->  	if (!strcmp(options, "host"))
-> -		otg_mode_host = 1;
-> +		otg_mode_host = true;
->  	else if (!strcmp(options, "device"))
-> -		otg_mode_host = 0;
-> +		otg_mode_host = false;
->  	else
->  		pr_info("otg_mode neither \"host\" nor \"device\". "
->  			"Defaulting to device\n");
-> -	return 0;
-> +	return 1;
->  }
->  __setup("otg_mode=", pcm043_otg_mode);
->  
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> IMO that reflects the nature of the device
+> better, whereas "pcis" would seem more like a "virtual" node for collecting
+> similar children.
+>
+> Thierry
