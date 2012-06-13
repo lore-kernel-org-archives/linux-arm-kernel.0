@@ -1,62 +1,48 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 13 Jun 2012 18:12:57 +0200
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-In-Reply-To: <20120613154829.GH14756@titan.lakedaemon.net> (Jason Cooper's
- message of "Wed, 13 Jun 2012 11:48:29 -0400")
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <4FD8AC5E.1060804@redhat.com>
- <20120613154829.GH14756@titan.lakedaemon.net>
-Message-ID: <87d353xkae.fsf@lebrac.rtp-net.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Jun 2012 10:20:04 -0600
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120613063422.GC31001@avionic-0098.mockup.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+ <4FD7A36B.9090409@wwwdotorg.org>
+ <20120613063422.GC31001@avionic-0098.mockup.avionic-design.de>
+Message-ID: <4FD8BDB4.5070000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
-
-> On Wed, Jun 13, 2012 at 11:06:06AM -0400, Jon Masters wrote:
->> On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
+On 06/13/2012 12:34 AM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+...
+>> I think you also need a property to specify the exact port
+>> layout; the Tegra20 controller supports:
 >> 
->> > You'll find in this patch set the new version of the initial support for a
->> > new family of ARMv7-compatible Marvell SoCs initially submitted by my
->> > colleague Thomas Petazzoni. Following the conclusion of the discussion when
->> > we submitted our first version we have chosen to add this support for this
->> > SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+>> 1 x4 port 2 x2 ports (you can choose to use only 1 of these I
+>> assume)
 >> 
->> Pardon my silly question. I know that there's an effort to reconcile the
->> two different SoCs so you're picking a neutral name, but what does
->> "mvebu" mean, and will you be persistently keeping this name? 
->
-> As persistent as anything else is in life ;-P  It covers all the SoCs that
-> have come out of Marvell's EBU division.  This includes orion5x,
-> kirkwood, dove, mv78xxx, the new armada xp, etc.
->
-> We're placing all boards under that umbrella with DT support into
-> mach-mvebu/.  Eventually, once DT conversion is complete, the other
-> directories will empty out and mach-mvebu/ will hold all support for
-> those SoCs.
->
-> Currently, the only boards with DT support are in mach-kirkwood/: the
-> dreamplug, iconnect, and a few others.  Before it gets too out of hand,
-> Arnd has a patch series which consolidates it all into mach-mvebu/.
->
->> Our guys want to know what this new platform will entail for Fedora
->> support in terms of the platform name being used in various non-kernel
->> places.
->
-> I'm not familiar with how Fedora does it, but debian has five
-> different
+>> So just because only 1 of the ports is enabled, doesn't imply
+>> it's x4; it could still be x2.
+>> 
+>> Tegra30 has more options.
+> 
+> Both the upstream and downstream drivers currently hard-code this
+> to dual and 411 (I assume that means 1x4, 2x1?) configurations for
+> Tegra20 and Tegra30 respectively. Unfortunately the register
+> AFI_PCIE_CONFIG isn't documented on Tegra20 at all and for Tegra30
+> lists only the valid configurations (see 28.4.1.5 PCIe CONFIG) but
+> not the corresponding encodings.
+> 
+> Maybe a good name for the new property would be "num-lanes". I also
+> wonder if this property would be better off in the parent node,
+> which would make it easier to check for valid configurations.
+> Otherwise the code would have to collect the settings of all the
+> ports and check if the combination is valid. Then again, having
+> num-lanes in the parent with one cell for each controller isn't
+> very nice if each controller can be individually disabled.
 
-nitpick: 6 different
-
-> armel kernels, each supporting a range of boards.
->
-> linux-image-iop32x
-> linux-image-ixp4xx
-> linux-image-kirkwood
-> linux-image-orion5x
-> linux-image-versatile
-
-there's also linux-image-mv78xx0.
-
-Regards,
-Arnaud
+Indeed, since the register that controls this is in the main register
+set rather than the per-port register set, it does seem like a good
+idea to put the property in the main node, not the per-port node.
