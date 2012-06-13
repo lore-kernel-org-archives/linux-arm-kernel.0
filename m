@@ -1,105 +1,80 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 13 Jun 2012 16:16:34 +0800
-Subject: [PATCH V2 1/5] ARM: OMAP3EVM: Add NAND flash definition
-In-Reply-To: <4FD84803.2090006@compulab.co.il>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-2-git-send-email-zumeng.chen@gmail.com>
- <4FD84803.2090006@compulab.co.il>
-Message-ID: <4FD84C62.1060206@windriver.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 13 Jun 2012 10:19:10 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4FD849CF.4030009@firmworks.com>
+References: <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+ <4FD7A36B.9090409@wwwdotorg.org> <4FD7B085.1020006@firmworks.com>
+ <20120613064519.GD31001@avionic-0098.mockup.avionic-design.de>
+ <4FD84133.4060401@firmworks.com>
+ <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
+ <4FD849CF.4030009@firmworks.com>
+Message-ID: <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?13? 15:57, Igor Grinberg ??:
-> On 06/13/12 04:44, Zumeng Chen wrote:
->> From: Zumeng Chen<zumeng.chen@windriver.com>
->>
->> Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
->> Tested-by: Zumeng Chen<zumeng.chen@windriver.com>
->> ---
->>   arch/arm/mach-omap2/board-omap3evm.c |   39 ++++++++++++++++++++++++++++++++++
->>   1 files changed, 39 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
->> index 639bd07..0b83d0e 100644
->> --- a/arch/arm/mach-omap2/board-omap3evm.c
->> +++ b/arch/arm/mach-omap2/board-omap3evm.c
->> @@ -24,6 +24,10 @@
->>   #include<linux/leds.h>
->>   #include<linux/interrupt.h>
->>
->> +#include<linux/mtd/mtd.h>
->> +#include<linux/mtd/partitions.h>
->> +#include<linux/mtd/nand.h>
->> +
->>   #include<linux/spi/spi.h>
->>   #include<linux/spi/ads7846.h>
->>   #include<linux/i2c/twl.h>
->> @@ -43,6 +47,7 @@
->>
->>   #include<plat/board.h>
->>   #include<plat/usb.h>
->> +#include<plat/nand.h>
->>   #include "common.h"
->>   #include<plat/mcspi.h>
->>   #include<video/omapdss.h>
->> @@ -607,6 +612,37 @@ static struct regulator_consumer_supply dummy_supplies[] = {
->>   	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
->>   };
->>
->> +static struct mtd_partition omap3evm_nand_partitions[] = {
->> +	/* All the partition sizes are listed in terms of NAND block size */
->> +	{
->> +		.name           = "X-Loader",
->> +		.offset         = 0,
->> +		.size           = 4*(SZ_128K),
->> +		.mask_flags     = MTD_WRITEABLE
->> +	},
->> +	{
->> +		.name           = "U-Boot",
->> +		.offset         = MTDPART_OFS_APPEND,
->> +		.size           = 14*(SZ_128K),
->> +		.mask_flags     = MTD_WRITEABLE
->> +	},
->> +	{
->> +		.name           = "U-Boot Env",
->> +		.offset         = MTDPART_OFS_APPEND,
->> +		.size           = 2*(SZ_128K)
->> +	},
->> +	{
->> +		.name           = "Kernel",
->> +		.offset         = MTDPART_OFS_APPEND,
->> +		.size           = 40*(SZ_128K)
->> +	},
->> +	{
->> +		.name           = "File system",
->> +		.size           = MTDPART_SIZ_FULL,
->> +		.offset         = MTDPART_OFS_APPEND,
->> +	},
->> +};
->> +
->>   static void __init omap3_evm_init(void)
->>   {
->>   	struct omap_board_mux *obm;
->> @@ -656,6 +692,9 @@ static void __init omap3_evm_init(void)
->>   	}
->>   	usb_musb_init(&musb_board_data);
->>   	usbhs_init(&usbhs_bdata);
->> +	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
->> +			     ARRAY_SIZE(omap3evm_nand_partitions));
->> +
-> I think, this will interfere with Afzal's patches [1]?
-Yes, Igor, thanks for your kind reminder, I have already
-noticed Afzal's GPMC patches when at [PATCH v4 00/39]
+On Tue, Jun 12, 2012 at 10:05:35PM -1000, Mitch Bradley wrote:
+> On 6/12/2012 9:52 PM, Thierry Reding wrote:
+> >I think the configuration spaces and downstream I/O ranges need to be in the
+> >pcie-controller's reg property because they are remapped and used by the
+> >controller driver, not by the individual ports.
+> >
+> >That's probably not really necessary but rather a result of how the driver
+> >was written. Perhaps the driver should handle them differently instead,
+> >listing the regions in the ranges property of the parent and listing the
+> >corresponding partitions in the ranges properties of the pci child nodes.
+> >
+> >Like in the following, where the ranges property of the ports partition the
+> >ranges passed from the parent evenly:
+> >
+> >	pcie-controller {
+> >		compatible = "nvidia,tegra20-pcie";
+> >		reg =<0x80003000 0x00000800   /* PADS registers */
+> >		       0x80003800 0x00000200>; /* AFI registers */
+> >		interrupts =<0 98 0x04   /* controller interrupt */
+> >			      0 99 0x04>; /* MSI interrupt */
+> >		status = "disabled";
+> >
+> >		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
+> >			  0x80004000 0x80004000 0x00100000   /* configuration space */
+> >			  0x80104000 0x80100000 0x00100000   /* extended configuration space */
+> >			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
+> >			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
+> >			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+> >
+> >		#address-cells =<1>;
+> >		#size-cells =<1>;
+> >
+> >		pci at 80000000 {
+> >			reg =<0x80000000 0x00001000>;
+> >			status = "disabled";
+> >
+> >			#address-cells =<3>;
+> >			#size-cells =<2>;
+> >
+> >			ranges =<0x80400000 0x80400000 0x00008000   /* I/O */
+> >				  0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
+> >				  0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
+> 
+> You are on the right track here, but the format of the child-address
+> portion of the above ranges property is incorrect.  Since the child
+> address space is the PCI address space, the child-address portion
+> needs to be 3 cells.  It's not a linear address but rather a triple.
+> The first cell identifies the address type (config, I/O, memory..)
+> and the second and third cells are offsets within that subspace.
+> The second and third cells will typically be 0.  The PCI binding has
+> details.
 
-But I didn't read recently, I'll check them again to see if they
-have been in Tony's queue :-)
+Okay, I'll need to read up some more.
 
-Regards,
-Zumeng
-
->>   	omap_ads7846_init(1, OMAP3_EVM_TS_GPIO, 310, NULL);
->>   	omap3evm_init_smsc911x();
->>   	omap3_evm_display_init();
-> [1] http://www.spinics.net/lists/arm-kernel/msg178664.html
->
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120613/5013e334/attachment-0001.sig>
