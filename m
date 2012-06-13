@@ -1,143 +1,100 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Wed, 13 Jun 2012 23:28:43 +0800
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <4FD8AD42.6010702@gmail.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
- <4FD8AD42.6010702@gmail.com>
-Message-ID: <20120613152841.GA23590@richard-laptop>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 13 Jun 2012 10:31:08 -0500
+Subject: [PATCH v5 11/14] ARM: OMAP2+: gpmc: handle connected peripherals
+In-Reply-To: <5b3939381db2b7ac29d9df1e817af2ce80016007.1339419492.git.afzal@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <5b3939381db2b7ac29d9df1e817af2ce80016007.1339419492.git.afzal@ti.com>
+Message-ID: <4FD8B23C.4020900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 10:09:54AM -0500, Rob Herring wrote:
-> On 06/13/2012 07:34 AM, Richard Zhao wrote:
-> > Sometimes, boards have gpios that don't own by any driver or owner
-> > by a generic driver that don't like hacks. Such gpios is normally
-> > output and need setup once on boot. So I introduce the config-on-boot
-> > gpios.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> >  .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
-> >  arch/arm/mach-imx/mach-imx6q.c                     |   35 ++++++++++++++++++++
-> >  3 files changed, 54 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt b/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > new file mode 100644
-> > index 0000000..f98ed74
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > @@ -0,0 +1,12 @@
-> > +* Configure on Boot
-> > +
-> > +Node name: config-on-boot
-> > +  It must be in root node. config-on-boot means to describe settings that needs
-> > +  to be set one time on boot but aren't owned by any driver, or the owned driver
-> > +  is too generic to handle such settings. For example, usb hub uses generic
-> > +  driver in usb core code, a on-board usb may need deassert reset pin.
-> 
-> NAK. This is not a h/w description
-It's misc things, but is hw description.
-> and should be solved within the
-> kernel or bootloader. Either fix this in u-boot,
-Kernel might be better not to depend on uboot.
-> the platform code, or
-How do I get gpio in platfrom code without dts description?
-> make the generic driver support this in a generic way.
-It's called just after populate devices. It's hard for generic driver to
-decide when it's called.
+Hi Afzal,
 
-Thanks
-Richard
+On 06/11/2012 09:27 AM, Afzal Mohammed wrote:
+> Platform will provide driver with configuration details for
+> each CS like configuration, timing, interrupts. Setup GPMC
+> based on it. Platform data also provides platform data &
+> resources used for connected peripheral (eg. gpio irq).
+> GPMC driver tunnels those information to respective driver.
 > 
-> Rob
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |  146 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 146 insertions(+)
 > 
-> > +
-> > +Optional properties:
-> > +- output-gpios: Output gpio array that needs to set.
-> > +- output-gpio-values: This property is required if output-gpios is set.
-> > +  The value is a array of 0 or 1. Total count eaquals the number of gpios.
-> > diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > index e0ec929..1dd2261 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -17,6 +17,13 @@
-> >  	model = "Freescale i.MX6 Quad SABRE Lite Board";
-> >  	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
-> >  
-> > +	config-on-boot {
-> > +		output-gpios = <
-> > +				&gpio3 22 0>;	/* vbus reset */
-> > +		output-gpio-values = <
-> > +				1>;		/* vbus reset */
-> > +	};
-> > +
-> >  	memory {
-> >  		reg = <0x10000000 0x40000000>;
-> >  	};
-> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> > index b47e98b..577cf19 100644
-> > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/irqdomain.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_address.h>
-> > +#include <linux/of_gpio.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/pinctrl/machine.h>
-> > @@ -113,6 +114,38 @@ static void __init imx6q_sabrelite_init(void)
-> >  	imx6q_sabrelite_cko1_setup();
-> >  }
-> >  
-> > +static void __init imx6q_config_on_boot(void)
-> > +{
-> > +	struct device_node *np;
-> > +	struct property *pp;
-> > +	int cnt, len, i;
-> > +	int gpio;
-> > +
-> > +	np = of_find_node_by_path("/config-on-boot");
-> > +	if (!np)
-> > +		return;
-> > +	cnt = of_gpio_named_count(np, "output-gpios");
-> > +	pp = of_find_property(np, "output-gpio-values", &len);
-> > +	if (!pp || cnt != len / sizeof(u32)) {
-> > +		pr_err("Invalid config-on-boot gpios!\n");
-> > +		of_node_put(np);
-> > +		return;
-> > +	}
-> > +	for (i = 0; i < cnt; i++) {
-> > +		gpio = of_get_named_gpio(np, "output-gpios", i);
-> > +		if (gpio_is_valid(gpio))
-> > +			gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH,
-> > +					"config-on-boot");
-> > +	}
-> > +
-> > +	of_node_put(np);
-> > +}
-> > +
-> > +static void __init imx6q_post_populate(void)
-> > +{
-> > +	imx6q_config_on_boot();
-> > +}
-> > +
-> >  static void __init imx6q_init_machine(void)
-> >  {
-> >  	/*
-> > @@ -126,6 +159,8 @@ static void __init imx6q_init_machine(void)
-> >  
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >  
-> > +	imx6q_post_populate();
-> > +
-> >  	imx6q_pm_init();
-> >  }
-> >  
-> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 9073a8a..281bd23 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -155,6 +155,8 @@ struct gpmc_peripheral {
+>  	struct platform_device	*pdev;
+>  };
+>  
+> +static struct gpmc_peripheral gpmc_peripheral[GPMC_CS_NUM];
+> +static unsigned gpmc_num_peripheral;
+>  static unsigned gpmc_waitpin_map;
+>  
+>  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
+> @@ -1235,6 +1237,39 @@ static int gpmc_setup_cs_waitpin(struct gpmc_peripheral *g_per, unsigned cs,
+>  	return 0;
+>  }
+>  
+> +static int gpmc_setup_cs_config_timing(struct gpmc_peripheral *g_per,
+> +						struct gpmc_cs_data *cs)
+> +{
+> +	int ret;
+> +
+> +	/* some boards rely on bootloader for configuration */
+> +	if (cs->have_config) {
+> +		gpmc_setup_cs_config(cs->cs, cs->config);
+> +		ret = gpmc_setup_cs_waitpin(g_per, cs->cs, cs->config);
+> +		if (IS_ERR_VALUE(ret)) {
+> +			dev_err(gpmc_dev, "error: waitpin on CS %d\n", cs->cs);
+> +			return ret;
+> +		}
+> +	} else
+> +		gpmc_print_cs_config(cs->cs);
+> +
+> +	/* some boards rely on bootloader for timing */
+> +	if (cs->time_ctrl.type == has_period) {
+> +		ret = gpmc_cs_set_timings(cs->cs, &cs->time_ctrl.timings);
+> +		if (IS_ERR_VALUE(ret)) {
+> +			dev_err(gpmc_dev, "error: timing on CS: %d\n", cs->cs);
+> +			return ret;
+> +		}
+> +		gpmc_cs_misc_timings(cs->cs, &cs->time_ctrl.bool_timings);
+> +	} else if (cs->time_ctrl.type == has_clock) {
+> +		gpmc_cs_set_register_timings(cs->cs, &cs->time_ctrl.timings);
+> +		gpmc_cs_misc_timings(cs->cs, &cs->time_ctrl.bool_timings);
+> +	} else
+> +		gpmc_print_cs_timings(cs->cs);
+> +
+> +	return 0;
+> +}
+> +
+>  static inline unsigned gpmc_bit_to_irq(unsigned bitmask)
+>  {
+>  	return bitmask;
+> @@ -1307,10 +1342,100 @@ static int gpmc_setup_waitpin(struct gpmc_peripheral *g_per)
+>  	return 0;
+>  }
+>  
+> +static __devinit int gpmc_setup_cs(struct gpmc_peripheral *g_per,
+> +				struct gpmc_cs_data *cs, struct resource *res)
+> +{
+> +	int num, ret;
+> +
+> +	num = gpmc_setup_cs_mem(cs, res);
+> +	if (IS_ERR_VALUE(num))
+> +		return num;
+> +
+> +	ret = gpmc_setup_cs_config_timing(g_per, cs);
+> +	if (IS_ERR_VALUE(ret))
+> +		return ret;
+> +
+> +	num += gpmc_setup_cs_irq(cs, res + num);
+
+
+What happens if the above function returns an error?
+
+Jon
