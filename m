@@ -1,216 +1,39 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 13 Jun 2012 17:21:45 +0200
-Subject: [PATCHv3 03/20] ARM: OMAP4: PM: add support for device off
-In-Reply-To: <1339515095-9908-4-git-send-email-t-kristo@ti.com>
-References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
- <1339515095-9908-4-git-send-email-t-kristo@ti.com>
-Message-ID: <CAORVsuUJOpQu1qE7qmK9PS79JZJ065egqcpfgmsWNHwnhLUdvw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jun 2012 15:24:26 +0000
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <4FD8AC5E.1060804@redhat.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <4FD8AC5E.1060804@redhat.com>
+Message-ID: <201206131524.26653.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Wednesday 13 June 2012, Jon Masters wrote:
+> On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
+> 
+> > You'll find in this patch set the new version of the initial support for a
+> > new family of ARMv7-compatible Marvell SoCs initially submitted by my
+> > colleague Thomas Petazzoni. Following the conclusion of the discussion when
+> > we submitted our first version we have chosen to add this support for this
+> > SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+> 
+> Pardon my silly question. I know that there's an effort to reconcile the
+> two different SoCs so you're picking a neutral name, but what does
+> "mvebu" mean, and will you be persistently keeping this name? Our guys
+> want to know what this new platform will entail for Fedora support in
+> terms of the platform name being used in various non-kernel places.
 
-I have a few remarks regarding the genericity of this code. I think it
-is better if the code in powerdomain.c stays generic and that the
-platform specific checks and operations be moved in the specific
-functions (via the pwrdm_ops struct).
+We've had an extended discussion about the name when the patches
+were posted for the first time. It was just the best thing that anyone
+suggested so far given the alternatives.
 
-On Tue, Jun 12, 2012 at 5:31 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> On OMAP4+, device wide off-mode has its own enable mechanism in addition
-> to powerdomain target states. This patch adds support for this on top
-> of functional power states by overloading the OFF state for core pwrdm.
-> On pwrdm level, the deepest power state supported by core pwrdm is OSWR.
-> When user (e.g. suspend) programs core pwrdm target as OFF, the functional
-> power state for the domain will be OSWR with the additional device off
-> enabled. Previous power state information will reflect this also.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ? | ? 17 +++++++++
-> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ? | ? 13 +++++++-
-> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ? | ? 48 +++++++++++++++++++++++++++
-> ?arch/arm/mach-omap2/powerdomains44xx_data.c | ? ?3 +-
-> ?4 files changed, 79 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index ac63f86..78a9308 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -677,6 +677,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
-> ? ? ? ?int sleep_switch = -1, ret = 0, hwsup = 0;
-> ? ? ? ?int new_func_pwrst, next_func_pwrst, pwrst, logic;
-> ? ? ? ?u8 curr_pwrst;
-> + ? ? ? bool extra_off_enable = false;
-> + ? ? ? bool has_extra_off = false;
->
-> ? ? ? ?if (!pwrdm || IS_ERR(pwrdm)) {
-> ? ? ? ? ? ? ? ?pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
-> @@ -687,6 +689,13 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
->
-> ? ? ? ?mutex_lock(&pwrdm->lock);
->
-> + ? ? ? /* Check if powerdomain has extra off mode handling */
-> + ? ? ? if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
-> + ? ? ? ? ? ? ? has_extra_off = true;
-> + ? ? ? ? ? ? ? if (func_pwrst == PWRDM_FUNC_PWRST_OFF)
-> + ? ? ? ? ? ? ? ? ? ? ? extra_off_enable = true;
-> + ? ? ? }
-Could those checks be moved in the OMAP4 specific functions, so that
-the power domain code stays generic?
+"EBU" is the business unit that makes all the SoCs in this family
+(orion, kirkwood, armadaxp, dove, ...) and no other name that was
+suggested covers all of these but not also at least some of the other
+Marvell SoCs (pxa, mmp, armada1000, ...).
 
-> +
-> ? ? ? ?new_func_pwrst = pwrdm_get_achievable_func_pwrst(pwrdm, func_pwrst);
-> ? ? ? ?pwrst = pwrdm_func_to_pwrst(pwrdm, new_func_pwrst);
-> ? ? ? ?logic = pwrdm_func_to_logic_pwrst(pwrdm, new_func_pwrst);
-> @@ -741,6 +750,9 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
-> ? ? ? ? ? ? ? ?break;
-> ? ? ? ?}
->
-> + ? ? ? if (has_extra_off && arch_pwrdm->pwrdm_enable_off)
-> + ? ? ? ? ? ? ? arch_pwrdm->pwrdm_enable_off(pwrdm, extra_off_enable);
-> +
-> ?out:
-> ? ? ? ?mutex_unlock(&pwrdm->lock);
-> ? ? ? ?return ret;
-> @@ -810,6 +822,11 @@ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm)
-> ? ? ? ?int next_pwrst = pwrdm_read_next_pwrst(pwrdm);
-> ? ? ? ?int next_logic = pwrdm_read_logic_retst(pwrdm);
->
-> + ? ? ? if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE &&
-> + ? ? ? ? ? arch_pwrdm->pwrdm_read_next_off &&
-> + ? ? ? ? ? arch_pwrdm->pwrdm_read_next_off(pwrdm))
-> + ? ? ? ? ? ? ? return PWRDM_FUNC_PWRST_OFF;
-> +
-Same comment here. The OMAP4 specific function for
-pwrdm_read_next_pwrst could return PWRDM_FUNC_PWRST_OFF.
+Just "ebu" would not be very clear, and other variations (mv-ebu,
+mrvl-ebu) were considered to be too long.
 
-> ? ? ? ?return pwrdm_pwrst_to_func(pwrdm, next_pwrst, next_logic);
-> ?}
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index 0729d91..cc30b94 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -75,6 +75,13 @@
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* state without waking up the
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* powerdomain
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
-> +/*
-> + * OMAP4+ has device off feature, which must be enabled separately in
-> + * addition to power domain next state setup. This feature is overloaded
-> + * as EXTRA_OFF_ENABLE for core_pwrdm, and is implemented on top of
-> + * functional power state
-> + */
-> +#define PWRDM_HAS_EXTRA_OFF_ENABLE ? ? (1 << 3)
->
-> ?/*
-> ?* Number of memory banks that are power-controllable. On OMAP4430, the
-> @@ -173,7 +180,9 @@ struct powerdomain {
-> ?* @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
-> ?* @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
-> ?* @pwrdm_wait_transition: Wait for a pd state transition to complete
-> - * @pwrdm_lost_context_rff: Check if pd has lost RFF context (entered off)
-> + * @pwrdm_lost_context_rff: Check if pd has lost RFF context (omap4+ device off)
-> + * @pwrdm_enable_off: Extra off mode enable for pd (omap4+ device off)
-> + * @pwrdm_read_next_off: Check if pd next state is off (omap4+ device off)
-> ?*/
-> ?struct pwrdm_ops {
-> ? ? ? ?int ? ? (*pwrdm_func_to_pwrst)(struct powerdomain *pwrdm, u8 func_pwrst);
-> @@ -199,6 +208,8 @@ struct pwrdm_ops {
-> ? ? ? ?int ? ? (*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
-> ? ? ? ?int ? ? (*pwrdm_wait_transition)(struct powerdomain *pwrdm);
-> ? ? ? ?bool ? ?(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
-> + ? ? ? void ? ?(*pwrdm_enable_off)(struct powerdomain *pwrdm, bool enable);
-> + ? ? ? bool ? ?(*pwrdm_read_next_off)(struct powerdomain *pwrdm);
-> ?};
->
-> ?int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
-> diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
-> index 562f78a..b2bdc0f 100644
-> --- a/arch/arm/mach-omap2/powerdomain44xx.c
-> +++ b/arch/arm/mach-omap2/powerdomain44xx.c
-> @@ -358,6 +358,52 @@ bool omap4_pwrdm_lost_context_rff(struct powerdomain *pwrdm)
-> ? ? ? ?return false;
-> ?}
->
-> +/**
-> + * omap4_device_set_next_state_off - setup device off state
-> + * @pwrdm: struct powerdomain * to target powerdomain
-> + * @enable: true if off-mode should be enabled
-> + *
-> + * When Device OFF is enabled, Device is allowed to perform
-> + * transition to off mode as soon as all power domains in MPU, IVA
-> + * and CORE voltage are in OFF or OSWR state (open switch retention)
-> + */
-> +void omap4_device_set_next_state_off(struct powerdomain *pwrdm, bool enable)
-> +{
-> + ? ? ? u8 val = enable ? 0x1 : 0x0;
-> +
-> + ? ? ? if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? omap4_prminst_write_inst_reg(val << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4430_PRM_PARTITION,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4430_PRM_DEVICE_INST,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
-> +}
-> +
-> +
-> +/**
-> + * omap4_device_read_next_state_off - read device off state
-> + * @pwrdm: struct powerdomain * to target powerdomain
-> + *
-> + * Checks if device off is enabled or not.
-> + * Returns true if enabled, false otherwise.
-> + */
-> +bool omap4_device_read_next_state_off(struct powerdomain *pwrdm)
-> +{
-> + ? ? ? u32 val;
-> +
-> + ? ? ? if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
-> + ? ? ? ? ? ? ? return false;
-> +
-> + ? ? ? val = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
-> +
-> + ? ? ? val &= OMAP4430_DEVICE_OFF_ENABLE_MASK;
-> +
-> + ? ? ? return val ? true : false;
-> +}
-> +
-> ?struct pwrdm_ops omap4_pwrdm_operations = {
-> ? ? ? ?.pwrdm_func_to_pwrst ? ?= omap2_pwrdm_func_to_pwrst,
-> ? ? ? ?.pwrdm_func_to_logic_pwrst ? ? ?= omap2_pwrdm_func_to_logic_pwrst,
-> @@ -381,4 +427,6 @@ struct pwrdm_ops omap4_pwrdm_operations = {
-> ? ? ? ?.pwrdm_enable_hdwr_sar ?= omap4_pwrdm_enable_hdwr_sar,
-> ? ? ? ?.pwrdm_disable_hdwr_sar = omap4_pwrdm_disable_hdwr_sar,
-> ? ? ? ?.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
-> + ? ? ? .pwrdm_enable_off ? ? ? = omap4_device_set_next_state_off,
-> + ? ? ? .pwrdm_read_next_off ? ?= omap4_device_read_next_state_off,
-> ?};
-> diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-> index c4de02f..13db876 100644
-> --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-> @@ -54,7 +54,8 @@ static struct powerdomain core_44xx_pwrdm = {
-> ? ? ? ? ? ? ? ?[3] = PWRSTS_ON, ? ? ? ?/* ducati_l2ram */
-> ? ? ? ? ? ? ? ?[4] = PWRSTS_ON, ? ? ? ?/* ducati_unicache */
-> ? ? ? ?},
-> - ? ? ? .flags ? ? ? ? ? ?= PWRDM_HAS_LOWPOWERSTATECHANGE,
-> + ? ? ? .flags ? ? ? ? ? ?= PWRDM_HAS_LOWPOWERSTATECHANGE |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? PWRDM_HAS_EXTRA_OFF_ENABLE,
-> ?};
->
-> ?/* gfx_44xx_pwrdm: 3D accelerator power domain */
-
-Regards,
-Jean
-
-> --
-> 1.7.4.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+	Arnd
