@@ -1,32 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 05:07:17 -0700
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <4FD782F7.9010003@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
- <4FD6586A.9060706@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
- <4FD782F7.9010003@ti.com>
-Message-ID: <20120613120717.GP12766@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 13 Jun 2012 14:14:09 +0200
+Subject: [PATCH] ARM: dma-mapping: fix debug messages in dmabounce code
+Message-ID: <1339589649-31970-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [120612 11:01]:
-> 
-> On 06/12/2012 02:16 AM, Mohammed, Afzal wrote:
-> > Hi Jon,
-> > 
-> > On Tue, Jun 12, 2012 at 02:13:22, Hunter, Jon wrote:
-> > 
-> >>> +	gpmc_revision = (l >> 4) & 0xf;
-> >>
-> >> Why are you only storing the major part of the rev? Why not keep both parts?
-> > 
-> > Does having minor revision add any value ?, at least as of now,
-> > I do not see any.
-> 
-> May be not but it does not hurt either.
+This patch fixes the usage of uninitialized variables in dmabounce code
+intoduced by commit a227fb92 ('ARM: dma-mapping: remove offset parameter
+to prepare for generic dma_ops'):
+arch/arm/common/dmabounce.c: In function ?dmabounce_sync_for_device?:
+arch/arm/common/dmabounce.c:409: warning: ?off? may be used uninitialized in this function
+arch/arm/common/dmabounce.c:407: note: ?off? was declared here
+arch/arm/common/dmabounce.c: In function ?dmabounce_sync_for_cpu?:
+arch/arm/common/dmabounce.c:369: warning: ?off? may be used uninitialized in this function
+arch/arm/common/dmabounce.c:367: note: ?off? was declared here
 
-Yeah might as well show the full revision.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/common/dmabounce.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-Tony
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 9d7eb53..aa07f59 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -366,8 +366,8 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 	struct safe_buffer *buf;
+ 	unsigned long off;
+ 
+-	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
+-		__func__, addr, off, sz, dir);
++	dev_dbg(dev, "%s(dma=%#x,sz=%zx,dir=%x)\n",
++		__func__, addr, sz, dir);
+ 
+ 	buf = find_safe_buffer_dev(dev, addr, __func__);
+ 	if (!buf)
+@@ -377,8 +377,8 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 
+ 	BUG_ON(buf->direction != dir);
+ 
+-	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+-		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
++	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
++		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+ 		buf->safe, buf->safe_dma_addr);
+ 
+ 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
+@@ -406,8 +406,8 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+ 	struct safe_buffer *buf;
+ 	unsigned long off;
+ 
+-	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
+-		__func__, addr, off, sz, dir);
++	dev_dbg(dev, "%s(dma=%#x,sz=%zx,dir=%x)\n",
++		__func__, addr, sz, dir);
+ 
+ 	buf = find_safe_buffer_dev(dev, addr, __func__);
+ 	if (!buf)
+@@ -417,8 +417,8 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+ 
+ 	BUG_ON(buf->direction != dir);
+ 
+-	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+-		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
++	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
++		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
+ 		buf->safe, buf->safe_dma_addr);
+ 
+ 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
+-- 
+1.7.1.569.g6f426
