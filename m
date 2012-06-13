@@ -1,61 +1,38 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 13 Jun 2012 17:03:55 +0800
-Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
- level
-In-Reply-To: <4FD8467E.4010302@compulab.co.il>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
- <4FD8467E.4010302@compulab.co.il>
-Message-ID: <4FD8577B.1010408@windriver.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 13 Jun 2012 10:06:12 +0100
+Subject: [PATCH V2 00/22] watchdog: ARM watchdogs: sp805 & mpcore updates
+ & fixes
+In-Reply-To: <4F8E4C4C.5030702@st.com>
+References: <cover.1331524811.git.viresh.kumar@st.com>
+ <4F83FEE0.8020709@st.com> <4F8E4C4C.5030702@st.com>
+Message-ID: <CAOh2x=kFZ8KemoqyczBqObwk=+qx0XL_FMQ-qwJvWK++631K_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?13? 15:51, Igor Grinberg ??:
-> On 06/13/12 04:44, Zumeng Chen wrote:
->> From: Zumeng Chen<zumeng.chen@windriver.com>
->>
->> If we don't set proper debouce time for ads7846, then there are
->> flooded interrupt counters of ads7846 responding to one time
->> touch on screen, so the driver couldn't work well.
->>
->> And since most OMAP3 series boards pass NULL pointer of board_pdata
->> to omap_ads7846_init, so it's more proper to set it in driver level
->> after having gpio_request done.
->>
->> This patch has been validated on 3530evm.
->>
->> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->> Signed-off-by: Syed Mohammed Khasim<khasim@ti.com>
->> ---
->>   drivers/input/touchscreen/ads7846.c |    4 ++++
->>   1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->> index f02028e..459ff29 100644
->> --- a/drivers/input/touchscreen/ads7846.c
->> +++ b/drivers/input/touchscreen/ads7846.c
->> @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->>   		}
->>
->>   		ts->gpio_pendown = pdata->gpio_pendown;
->> +#ifdef CONFIG_ARCH_OMAP3
->> +		/* 310 means about 10 microsecond for omap3 */
->> +		gpio_set_debounce(pdata->gpio_pendown, 310);
->> +#endif
-> Unless this concerns many boards/archs/platforms,
-Yes, this is the case.
-> I'd suggest you to implement
-> the get_pendown_state() method in the board file.
-it seems they are different way between gpio and
-get_pendown_state, and gpio way is used for omap3
-to drive ads7846, so I guess we may have to do like this.
+Hi Wim,
 
-Regards,
-Zumeng
-> If more users will need this, it can be facilitated in the driver.
-> (and of course not with the ugly ifdefs...)
->
+On Wed, Apr 18, 2012 at 6:08 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 4/10/2012 3:05 PM, Viresh KUMAR wrote:
+>> On 3/12/2012 9:51 AM, Viresh KUMAR wrote:
+>>> Hello,
+>>>
+>>> This patchset contains fixes and updates for ARM watchdog drivers sp805 and
+>>> mpcore.
+>>>
+>>> Changes since V1:
+>>> - Included patches for sp805 driver.
+>>> - Removed: wdt->clk = NULL from mpcore driver, and use IS_ERR() to check if
+>>> ? clock is supported or not.
+>>> - Adapted to watchdog core for both the drivers.
+>>> - two patches for watchdog core added
+>>> - add patch to use __raw_readl{writel} instead of readl{writel}
+>>> - taken care of few more review comments.
+>>>
 >>
->>   	} else {
->>   		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+>> Hi Wim,
+>>
+>> Have you applied patches left in this patchset for linux-next?
+>
+> Ping!!
+
+You planned to push them in v-3.5. Isn't it?
