@@ -1,113 +1,39 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Jun 2012 13:50:18 +0200
-Subject: [PATCHv2 6/6] ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC
- attribute
-In-Reply-To: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
-References: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1339588218-24398-7-git-send-email-m.szyprowski@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Jun 2012 04:54:45 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <20120613113217.GK12766@atomide.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+ <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+ <4FD77E35.3050703@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
+ <20120613113217.GK12766@atomide.com>
+Message-ID: <20120613115445.GM12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DMA_ATTR_SKIP_CPU_SYNC attribute for
-dma_(un)map_(single,page,sg) functions family. It lets dma mapping clients
-to create a mapping for the buffer for the given device without performing
-a CPU cache synchronization. CPU cache synchronization can be skipped for
-the buffers which it is known that they are already in 'device' domain (CPU
-caches have been already synchronized or there are only coherent mappings
-for the buffer). For advanced users only, please use it with care.
+* Tony Lindgren <tony@atomide.com> [120613 04:36]:
+> * Mohammed, Afzal <afzal@ti.com> [120612 22:00]:
+> > Hi Jon,
+> > 
+> > On Tue, Jun 12, 2012 at 23:06:53, Hunter, Jon wrote:
+> > 
+> > > Should you at least warn, if you are going to over-write a value?
+> > 
+> > Yes, that would be better except for too much logging, if Tony
+> > prefers that way I will add. 
+> 
+> If there's a chance it causing file system corruption, we should
+> test it carefully on the boards before applying. If that's done,
+> then there's probably no need for warnings. It's safer to disable
+> NAND for untested boards if there's a chance of breaking the timings.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mm/dma-mapping.c |   20 +++++++++++---------
- 1 files changed, 11 insertions(+), 9 deletions(-)
+Actually this patch breaks at least DMA on tusb6010 on n8x0. That's
+a MUSB hardware in a wrapper connected to GPMC that's very picky with
+the timings.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 3840997..939cdc2 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -73,7 +73,7 @@ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
- 	     unsigned long offset, size_t size, enum dma_data_direction dir,
- 	     struct dma_attrs *attrs)
- {
--	if (!arch_is_coherent())
-+	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 		__dma_page_cpu_to_dev(page, offset, size, dir);
- 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
- }
-@@ -96,7 +96,7 @@ static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
- 		size_t size, enum dma_data_direction dir,
- 		struct dma_attrs *attrs)
- {
--	if (!arch_is_coherent())
-+	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
- 				      handle & ~PAGE_MASK, size, dir);
- }
-@@ -1206,7 +1206,7 @@ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
-  */
- static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 			  size_t size, dma_addr_t *handle,
--			  enum dma_data_direction dir)
-+			  enum dma_data_direction dir, struct dma_attrs *attrs)
- {
- 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
- 	dma_addr_t iova, iova_base;
-@@ -1225,7 +1225,8 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 		phys_addr_t phys = page_to_phys(sg_page(s));
- 		unsigned int len = PAGE_ALIGN(s->offset + s->length);
- 
--		if (!arch_is_coherent())
-+		if (!arch_is_coherent() &&
-+		    !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
- 
- 		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-@@ -1272,7 +1273,7 @@ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
- 
- 		if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
- 			if (__map_sg_chunk(dev, start, size, &dma->dma_address,
--			    dir) < 0)
-+			    dir, attrs) < 0)
- 				goto bad_mapping;
- 
- 			dma->dma_address += offset;
-@@ -1285,7 +1286,7 @@ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		}
- 		size += s->length;
- 	}
--	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir) < 0)
-+	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir, attrs) < 0)
- 		goto bad_mapping;
- 
- 	dma->dma_address += offset;
-@@ -1319,7 +1320,8 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		if (sg_dma_len(s))
- 			__iommu_remove_mapping(dev, sg_dma_address(s),
- 					       sg_dma_len(s));
--		if (!arch_is_coherent())
-+		if (!arch_is_coherent() &&
-+		    !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 			__dma_page_dev_to_cpu(sg_page(s), s->offset,
- 					      s->length, dir);
- 	}
-@@ -1381,7 +1383,7 @@ static dma_addr_t arm_iommu_map_page(struct device *dev, struct page *page,
- 	dma_addr_t dma_addr;
- 	int ret, len = PAGE_ALIGN(size + offset);
- 
--	if (!arch_is_coherent())
-+	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 		__dma_page_cpu_to_dev(page, offset, size, dir);
- 
- 	dma_addr = __alloc_iova(mapping, len);
-@@ -1420,7 +1422,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
- 	if (!iova)
- 		return;
- 
--	if (!arch_is_coherent())
-+	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 		__dma_page_dev_to_cpu(page, offset, size, dir);
- 
- 	iommu_unmap(mapping->domain, iova, len);
--- 
-1.7.1.569.g6f426
+Got any hints what should be done with the cycle2cycle stuff for
+tusb6010?
+
+Tony
