@@ -1,43 +1,33 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Jun 2012 12:05:11 -0500
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <20120613134032.GW12766@atomide.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
- <4FD6586A.9060706@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
- <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
- <20120613134032.GW12766@atomide.com>
-Message-ID: <4FD8C847.20002@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 13 Jun 2012 18:13:22 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Enable selection of SPARSE_IRQ
+In-Reply-To: <1339607602-3846-1-git-send-email-tixy@linaro.org>
+References: <1339607602-3846-1-git-send-email-tixy@linaro.org>
+Message-ID: <1339607602-3846-3-git-send-email-tixy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jon Medhurst <tixy@linaro.org>
 
-On 06/13/2012 08:40 AM, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120613 06:16]:
->> Hi Tony,
->>
->> On Wed, Jun 13, 2012 at 17:37:17, Tony Lindgren wrote:
->>> * Jon Hunter <jon-hunter@ti.com> [120612 11:01]:
->>>>
->>>> On 06/12/2012 02:16 AM, Mohammed, Afzal wrote:
->>
->>>>> Does having minor revision add any value ?, at least as of now,
->>>>> I do not see any.
->>>>
->>>> May be not but it does not hurt either.
->>>
->>> Yeah might as well show the full revision.
->>
->> We are already showing full version, but only storing major, it seems you
->> want to store minor version along with major version in the same variable,
->> right ?
-> 
-> Ah OK, yeah might as well just store the minor version.
+This is required to add vexpress to multiplatform kernels containing
+other boards which require SPARSE_IRQ.
 
-Actually, you really need the major version. However, IMO if you are
-going to store it, then store the whole thing, you have allocated
-32-bits and the major and minor combined are 8-bits.
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Jon
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84449dd..bdede09 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -311,6 +311,7 @@ config ARCH_VEXPRESS
+ 	select HAVE_CLK
+ 	select HAVE_PATA_PLATFORM
+ 	select ICST
++	select MAY_HAVE_SPARSE_IRQ
+ 	select NO_IOPORT
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_CLCD
+-- 
+1.7.10
