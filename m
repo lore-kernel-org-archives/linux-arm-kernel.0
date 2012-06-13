@@ -1,30 +1,85 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 13 Jun 2012 06:15:38 +0000
-Subject: [PATCH v5 07/14] ARM: OMAP2+: gpmc: time setting (register#)
- helper
-In-Reply-To: <4FD7909B.4040304@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <aafc6bc498e303be0bc86ce1ae395148fdca5c3d.1339419492.git.afzal@ti.com>
- <4FD7909B.4040304@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998872@DBDE01.ent.ti.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 13 Jun 2012 08:16:12 +0200
+Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
+ pr_warn()
+In-Reply-To: <1339442328.6001.2602.camel@edumazet-glaptop>
+References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
+ <1339403108.6001.1697.camel@edumazet-glaptop> <4FD5AE1D.9030807@antcom.de>
+ <20120611.020352.1962768244524496467.davem@davemloft.net>
+ <4FD5B9C8.4020800@antcom.de>  <1339442328.6001.2602.camel@edumazet-glaptop>
+Message-ID: <1339568172.22704.312.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, Jun 13, 2012 at 00:25:23, Hunter, Jon wrote:
-
-> When are the timings calculated? Why not just use the existing
-> gpmc_cs_set_timings()?
+On Mon, 2012-06-11 at 21:18 +0200, Eric Dumazet wrote:
+> On Mon, 2012-06-11 at 11:26 +0200, Roland Stigge wrote:
 > 
-> I guess I am not convinced that we need to have multiple formats to pass
-> timings such as clock, period, etc.
+> > Is it sensible at this point to increase the TX buffers anyway? For
+> > different reasons of course: We have enough SRAM available and TX
+> > buffers (16->32) are still more than RX buffers (48).
 > 
-> I think that it is sufficient to pass the timings as time (period) as is
-> currently done and have the driver convert to clocks based upon the gpmc
-> fclk rate.
+> I doubt it has any impact on performance for a 100Mbit link ?
+> 
+> One thing that could be done would be to free skbs in
+> lpc_eth_hard_start_xmit() instead of __lpc_handle_xmit()
+> 
 
-Please see http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69041.html
+Here is the patch I was thinking about
 
-Regards
-Afzal
+(on top of latest net-next)
+
+Could you please test it ?
+
+ drivers/net/ethernet/nxp/lpc_eth.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
+index 083d671..426f14c 100644
+--- a/drivers/net/ethernet/nxp/lpc_eth.c
++++ b/drivers/net/ethernet/nxp/lpc_eth.c
+@@ -440,7 +440,7 @@ struct netdata_local {
+ 	spinlock_t		lock;
+ 	void __iomem		*net_base;
+ 	u32			msg_enable;
+-	struct sk_buff		*skb[ENET_TX_DESC];
++	unsigned int		skblen[ENET_TX_DESC];
+ 	unsigned int		last_tx_idx;
+ 	unsigned int		num_used_tx_buffs;
+ 	struct mii_bus		*mii_bus;
+@@ -908,7 +908,7 @@ static void __lpc_handle_xmit(struct net_device *ndev)
+ 
+ 	txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+ 	while (pldat->last_tx_idx != txcidx) {
+-		skb = pldat->skb[pldat->last_tx_idx];
++		unsigned int skblen = pldat->skblen[pldat->last_tx_idx];
+ 
+ 		/* A buffer is available, get buffer status */
+ 		ptxstat = &pldat->tx_stat_v[pldat->last_tx_idx];
+@@ -945,9 +945,8 @@ static void __lpc_handle_xmit(struct net_device *ndev)
+ 		} else {
+ 			/* Update stats */
+ 			ndev->stats.tx_packets++;
+-			ndev->stats.tx_bytes += skb->len;
++			ndev->stats.tx_bytes += skblen;
+ 		}
+-		dev_kfree_skb_irq(skb);
+ 
+ 		txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+ 	}
+@@ -1132,7 +1131,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	memcpy(pldat->tx_buff_v + txidx * ENET_MAXF_SIZE, skb->data, len);
+ 
+ 	/* Save the buffer and increment the buffer counter */
+-	pldat->skb[txidx] = skb;
++	pldat->skblen[txidx] = len;
+ 	pldat->num_used_tx_buffs++;
+ 
+ 	/* Start transmit */
+@@ -1147,6 +1146,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 
+ 	spin_unlock_irq(&pldat->lock);
+ 
++	dev_kfree_skb(skb);
+ 	return NETDEV_TX_OK;
+ }
+ 
