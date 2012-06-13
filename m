@@ -1,43 +1,36 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Wed, 13 Jun 2012 19:58:34 +0530
-Subject: [RFC PATCH 0/3] usb: musb: add new phy driver
-In-Reply-To: <20120612104803.GD10901@arwen.pp.htv.fi>
-References: <1338388466-3565-1-git-send-email-kishon@ti.com>
- <20120612104803.GD10901@arwen.pp.htv.fi>
-Message-ID: <CAAe_U6JQ5rVoQWwyJLQBNR8uOp2zE0bmqFXH6HkBWYKPuqng+Q@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 13 Jun 2012 16:31:19 +0200
+Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <1339594368.8980.41.camel@twins>
+References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
+ <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
+ <CAORVsuWqWt0pJfewymh_ydAH61-uPsO0M7m7Gs4N3zJY=Vo9ZA@mail.gmail.com>
+ <CAKfTPtBc-KuDg_1qe04TfYS4+66qQoiHCJQbCF9gnhga5ociow@mail.gmail.com>
+ <CAP245DXEOGLe1jq2Wj0rNW5qea63UyJu2jOvwV65Y4B9LLoQtg@mail.gmail.com>
+ <1339591666.8980.26.camel@twins>
+ <CAKfTPtCyV389OTrun5Oyn8RCsDagza95wdmWr=r9poMiYrU0Mg@mail.gmail.com>
+ <1339594368.8980.41.camel@twins>
+Message-ID: <CAKfTPtAhWrH8M3z-+13iKz4FjNd8LQDJOfOGKcKUx7jLXvtz+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 12, 2012 at 4:18 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, May 30, 2012 at 08:04:23PM +0530, Kishon Vijay Abraham I wrote:
->> This series adds a new usb2 phy driver. The device for which is created
->> by the ocp2scp driver. This also uses control module driver.
->>
->> This series converts twl6030 as a comparator driver (previously it was
->> also the phy driver) and makes use of omap-usb2 as the phy driver.
->>
->> Instead of notification mechanism by power chip to omap glue to pass detection
->> of any events, an export API has been added in omap glue. Both twl4030 and
->> twl6030 will call to this API to pass any event. (twl6030 is used in omap4 and
->> twl4030 is used in omap3).
->>
->> This series depends on:
->> *[RFC PATCH 00/11] OMAP System Control Module* patch series
->> However System Control Module driver has only dt support, so wouldn't
->> be able to test this patch series. However I'll adapt omap usb2 phy
->> driver and musb driver for dt and send it asap to the list.
->>
->> This series also depends on:
->> *[PATCH v3 0/3] usb: multi-phy support* patch series
->> *[RFC PATCH 0/5] omap: add ocp2scp as a misc driver* patch series
->>
->> Compile tested only.
+On 13 June 2012 15:32, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, 2012-06-13 at 15:29 +0200, Vincent Guittot wrote:
+>> In fact, there is 2 tracks, one for a power aware scheduler and one
+>> for setting the capacity of each core of a big.LITTLE system. This
+>> patch is for the latter and is not directly link to the power because
+>> the default/performance mode of the scheduler should also take
+>> advantage of this information
 >
-> are we getting new version of this series ?
+> Fair enough.. can you include a little blurp in the changelog on how
+> this affects the capacity stuff for big.little and if that works as
+> desired due to these patches?
 
-Yes. I'm planning to send a new version with only dt support by next week.
+OK, I will add explanations about how this affect the cpu_power field
+and the load balance of a big.LITTLE system, what is enhanced with
+this modification and what is not.
 
-Thanks
-Kishon
+
+>
+>
