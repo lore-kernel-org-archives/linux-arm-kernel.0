@@ -1,39 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jun 2012 15:24:26 +0000
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-In-Reply-To: <4FD8AC5E.1060804@redhat.com>
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <4FD8AC5E.1060804@redhat.com>
-Message-ID: <201206131524.26653.arnd@arndb.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 13 Jun 2012 18:26:58 +0300
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20120613152658.GE32111@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 June 2012, Jon Masters wrote:
-> On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
+On Tue, Jun 12, 2012 at 04:41:47PM +0200, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> > You'll find in this patch set the new version of the initial support for a
-> > new family of ARMv7-compatible Marvell SoCs initially submitted by my
-> > colleague Thomas Petazzoni. Following the conclusion of the discussion when
-> > we submitted our first version we have chosen to add this support for this
-> > SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+> This series defines clock bindings for Device-Tree and adds kernel
+> support using the common clock infrastructure. The last patch enables
+> DT clock support for the Calxeda Highbank platform.
 > 
-> Pardon my silly question. I know that there's an effort to reconcile the
-> two different SoCs so you're picking a neutral name, but what does
-> "mvebu" mean, and will you be persistently keeping this name? Our guys
-> want to know what this new platform will entail for Fedora support in
-> terms of the platform name being used in various non-kernel places.
+> I'm posting this again to solicit further review. There has been some
+> discussion[1], but no definite path forward. This series is not changed
+> from the last post other than rebasing to v3.5-rc2.
+> 
+> Rob
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100932.html
+> 
 
-We've had an extended discussion about the name when the patches
-were posted for the first time. It was just the best thing that anyone
-suggested so far given the alternatives.
+How would this binding work for clocks which can take a spinlock pointer as a
+init parameter (eg. clk-gate).
 
-"EBU" is the business unit that makes all the SoCs in this family
-(orion, kirkwood, armadaxp, dove, ...) and no other name that was
-suggested covers all of these but not also at least some of the other
-Marvell SoCs (pxa, mmp, armada1000, ...).
+Cheers,
 
-Just "ebu" would not be very clear, and other variations (mv-ebu,
-mrvl-ebu) were considered to be too long.
-
-	Arnd
+Peter.
