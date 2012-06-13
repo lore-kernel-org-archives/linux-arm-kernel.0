@@ -1,43 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 04:33:59 -0700
-Subject: [PATCH 0/3] Prepare for GPMC driver conversion
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99803F@DBDE01.ent.ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99803F@DBDE01.ent.ti.com>
-Message-ID: <20120613113358.GL12766@atomide.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Wed, 13 Jun 2012 07:35:20 -0400
+Subject: [RFC/PATCH v5 7/7] ARM: ARM11 MPCore: Make cpu_v6_set_pte_ext
+ preempt safe
+In-Reply-To: <20120613093433.GD29492@arm.com>
+References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-8-git-send-email-gdavis@mvista.com>
+ <20120613093433.GD29492@arm.com>
+Message-ID: <CDF627A3-E3A9-4A2E-A2F0-48CB7B2CD12B@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120612 03:32]:
-> Hi Tony,
-> 
-> On Mon, Jun 11, 2012 at 19:31:01, Mohammed, Afzal wrote:
-> 
-> > Objective of this series is to make things easy for GPMC driver
-> > conversion series by separating out more things from driver
-> > conversion series.
-> > 
-> > This series,
-> > 1. Unifies NAND platform initialization functions
-> > 2. Cleans up OneNAND platform code a little
-> > 3. Handles additional timings in Kernel
-> > 
-> > This series is based on 3.5-rc1 & made on top of
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69501.html
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69881.html
-> 
-> 
-> Please let me know your comments on this series.
-> 
-> gpmc driver conversion series [1] is dependent on this.
 
-Looks good to me, made one comment regarding testing and maybe disabling
-NAND for untested boards if timings change. Are Jon's comments all handled?
+On Jun 13, 2012, at 5:34 AM, Catalin Marinas wrote:
 
-Tony
- 
-> Regards
-> Afzal
+> On Tue, Jun 12, 2012 at 09:40:18PM +0100, gdavis at mvista.com wrote:
+>> From: George G. Davis <gdavis@mvista.com>
+>> 
+>> If preemption and subsequent task migration occurs during calls to
+>> cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
+>> can become inconsistent.  To prevent inconsistent memory state on
+>> these machines, disable interrupts in cpu_v6_set_pte_ext.
+>> 
+>> Signed-off-by: George G. Davis <gdavis@mvista.com>
+>> ---
+>> arch/arm/mm/proc-macros.S |    3 +++
+>> 1 files changed, 3 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+>> index 2d8ff3a..7e32603 100644
+>> --- a/arch/arm/mm/proc-macros.S
+>> +++ b/arch/arm/mm/proc-macros.S
+>> @@ -168,8 +168,11 @@
+>> 	tstne	r1, #L_PTE_PRESENT
+>> 	moveq	r3, #0
+>> 
+>> +	mrs	r2, cpsr
+>> +	cpsid	i
+>> 	str	r3, [r0]
+>> 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+>> +	msr	cpsr_c, r2
+>> 	.endm
 > 
-> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69897.html
+> We have save_and_disable_irqs and restore_irqs (and _notrace variants)
+> macros in asm/assembler.h.
+
+I updated this patch to use save_and_disable_irqs and restore_irqs.
+
+Thanks!
+
+--
+Regards,
+George
+
 > 
+> -- 
+> Catalin
