@@ -1,48 +1,27 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Wed, 13 Jun 2012 10:56:28 +0530
-Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
-In-Reply-To: <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
-References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
- <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
- <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
-Message-ID: <CANfBPZ-Sei434hV0edEEGeViwL6TXWsvRnprv7-Kf64dJ6_auQ@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 05:29:31 +0000
+Subject: [PATCH v5 05/14] ARM: OMAP2+: gpmc: resource creation helpers
+In-Reply-To: <4FD7841D.1000202@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <3b124fd254f5700187a2ec5a423271a7296e0510.1339419492.git.afzal@ti.com>
+ <4FD65BA5.4020205@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997EE1@DBDE01.ent.ti.com>
+ <4FD7841D.1000202@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9987E3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 12:50 PM, Ming Lei <ming.lei@canonical.com> wrote:
-> On Mon, Jun 11, 2012 at 2:21 PM, T Krishnamoorthy, Balaji
-> <balajitk@ti.com> wrote:
->> Hi Ming Lei,
->> Can you let me know if you noticed any write/timeout errors ?
->
-> Nothing error logs found during writing.
->
-> Below is one of my test case.
->
-> root at beagleboard:~# upk
-> updateing kernel...
-> flush storage...
-> root at beagleboard:~# cat bin/upk
-> #!/bin/sh
->
-> echo "updateing kernel..."
-> cp -f /mnt/nfs/t/uImage /media/mmcblk0p1/
->
-> echo "flush storage..."
-> sync
-> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
-> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
-> root at beagleboard:~# umount /media/mmcblk0p1
-> root at beagleboard:~# mount -t vfat /dev/mmcblk0p1 /media/mmcblk0p1
-> root at beagleboard:~#
-> root at beagleboard:~#
-> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
-> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
->
-Ming,
-  Just to keep you posted, Balaji and myself are trying to reproduce
-the issue and haven't hit the problem yet.
-This patch was in use internaly for sometime before we sent it upstream.
-Meanwhile, is is possible for you to reproduce this problem with
-MMC_DEBUG enabled ? That would be helpful.
-~Venkat.
+Hi Jon,
+
+On Tue, Jun 12, 2012 at 23:32:05, Hunter, Jon wrote:
+
+> Well looking at the function it seems that you either return an error
+> code or 1. So if you are never going to return anything other than 1 on
+> success it may as well be 0.
+
+Irq & memory resource creation functions returns number of resources,
+if memory function only is modified, that will cause loss of uniformity
+w.r.t irq function, even though both does similar things.
+
+Regards
+Afzal
