@@ -1,36 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 06:40:32 -0700
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
- <4FD6586A.9060706@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
- <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
-Message-ID: <20120613134032.GW12766@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Jun 2012 21:38:57 +0800
+Subject: [PATCH] ARM: irq: add a mach/fiq.h inclusion for SPARSE_IRQ build
+In-Reply-To: <20120613130753.GA31565@S2101-09.ap.freescale.net>
+References: <1339592253-25142-1-git-send-email-shawn.guo@linaro.org>
+ <20120613130753.GA31565@S2101-09.ap.freescale.net>
+Message-ID: <20120613133855.GB31565@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120613 06:16]:
-> Hi Tony,
+On Wed, Jun 13, 2012 at 09:07:56PM +0800, Shawn Guo wrote:
+> Damned.  Just realized that this will break those platforms with
+> SPARSE_IRQ enabled but no mach/fiq.h provided.
 > 
-> On Wed, Jun 13, 2012 at 17:37:17, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [120612 11:01]:
-> > > 
-> > > On 06/12/2012 02:16 AM, Mohammed, Afzal wrote:
-> 
-> > > > Does having minor revision add any value ?, at least as of now,
-> > > > I do not see any.
-> > > 
-> > > May be not but it does not hurt either.
-> > 
-> > Yeah might as well show the full revision.
-> 
-> We are already showing full version, but only storing major, it seems you
-> want to store minor version along with major version in the same variable,
-> right ?
+What about adding #ifdef CONFIG_FIQ check for the inclusion?
 
-Ah OK, yeah might as well just store the minor version.
+--8<---
 
-Tony
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 35c21c3..8db119a 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -7,6 +7,9 @@
+ #include <mach/irqs.h>
+ #else
+ #define NR_IRQS NR_IRQS_LEGACY
++#ifdef CONFIG_FIQ
++#include <mach/fiq.h>
++#endif
+ #endif
+
+ #ifndef irq_canonicalize
+
+--->8--
+
+Regards,
+Shawn
