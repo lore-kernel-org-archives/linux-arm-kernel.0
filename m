@@ -1,23 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 13 Jun 2012 11:22:12 -0600 (MDT)
-Subject: [PATCHv2 04/12] ARM: OMAP4: hwmod data: fix 32k sync timer idle
- modes
-In-Reply-To: <4FD5BAE7.7080805@ti.com>
-References: <20120611004502.20034.8840.stgit@dusk>
- <20120611004602.20034.73590.stgit@dusk> <4FD5BAE7.7080805@ti.com>
-Message-ID: <alpine.DEB.2.00.1206131121580.30212@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jun 2012 18:31:26 +0100
+Subject: [alsa-devel] [PATCH v2 0/5] mmp audio support
+In-Reply-To: <CAMj5BkiOtgc1rPb1usHCahna8V_2PJceh9v9SGBduzChKjqoEQ@mail.gmail.com>
+References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
+ <20120613121743.GN4545@opensource.wolfsonmicro.com>
+ <CAMj5BkiOtgc1rPb1usHCahna8V_2PJceh9v9SGBduzChKjqoEQ@mail.gmail.com>
+Message-ID: <20120613173125.GA7804@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012, Cousson, Benoit wrote:
+On Wed, Jun 13, 2012 at 10:01:55PM +0800, zhangfei gao wrote:
 
-> On 6/11/2012 2:46 AM, Paul Walmsley wrote:
-> > The 32k sync timer IP block target idle modes are incorrect in the
-> > hwmod data are incorrect.
-> 
-> Nit: Is there too many "incorrect" in this sentence?
+> Great, thanks Mark.
+> By the way, patch 05 "ASoC: add ttc-dkb machine support" also based on
+> these patches.
+> ttc-dkb (pxa910) and brownstone (pxa688) are sharing mmp-pcm.c and mmp-tdma.c.
 
-Thanks; patch updated.
-
-
-- Paul
+That was already applied, just miscounted.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120613/593cab05/attachment.sig>
