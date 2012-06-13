@@ -1,59 +1,45 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Wed, 13 Jun 2012 11:32:23 +0200
-Subject: [PATCH v2] lib/decompress_unxz.c: removing all memory helper
- functions
-In-Reply-To: <4FD6B472.7040609@zytor.com>
-References: <1339470307-28223-1-git-send-email-tmac@hp.com>
- <4FD6B472.7040609@zytor.com>
-Message-ID: <20120613113223.0fc3c490@de.ibm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Jun 2012 10:34:33 +0100
+Subject: [RFC/PATCH v5 7/7] ARM: ARM11 MPCore: Make cpu_v6_set_pte_ext
+ preempt safe
+In-Reply-To: <1339533618-15969-8-git-send-email-gdavis@mvista.com>
+References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-8-git-send-email-gdavis@mvista.com>
+Message-ID: <20120613093433.GD29492@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jun 2012 20:16:02 -0700
-"H. Peter Anvin" <hpa@zytor.com> wrote:
-
-> On 06/11/2012 08:05 PM, T Makphaibulchoke wrote:
-> > Cleaning up the file lib/decompress_unxz.c, moving all memory helper functions,
-> > e.g. memmove, to a new common source file, lib/boot/mem.c.
-> > 
-> > In additon to including the decompressor, any architecture supporting the XZ
-> > decompression needs to also include this new source file.
-> > 
-> > Also moving some other duplicated memory helper functions to this new source
-> > file from the arm, s390, sh and x86 preboot environments.  All 4 architectures
-> > build without error when using any compression.
-> > 
-> > Adding a new file lib/boot/mem.c, containing memory helper functions required
-> > by different compression types.
-> > 
-> > Adding memcmp declaration workaround and removing the memmove and memcpy
-> > defines workaround from arch/arm/boot/compressed/decompress.c
-> > 
-> > Removing the common functions, memmove, memcmp and memset, and adding the new
-> > source file include to arch/arm/boot/compressed/string.c.
-> > 
-> > Removing the memcpy and memmove functions and adding the new source file
-> > include to arch/s390/boot/compressed/misc.c.
-> > 
-> > Removing the memset function and adding the new source file include to
-> > arch/sh/boot/compressed/misc.c
-> > 
-> > Removing the memset function from arch/x86/boot/compressed/misc.c and move
-> > the memcpy function to the file arch/x86/boot/compressed/string.c
-> > 
-> > Adding the memcpy function and the new source file include to
-> > arch/x86/boot/compressed/string.c
-> > 
+On Tue, Jun 12, 2012 at 09:40:18PM +0100, gdavis at mvista.com wrote:
+> From: George G. Davis <gdavis@mvista.com>
 > 
-> I can take this if Russell, Martin or Heiko, and Paul are willing to ack it.
+> If preemption and subsequent task migration occurs during calls to
+> cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
+> can become inconsistent.  To prevent inconsistent memory state on
+> these machines, disable interrupts in cpu_v6_set_pte_ext.
+> 
+> Signed-off-by: George G. Davis <gdavis@mvista.com>
+> ---
+>  arch/arm/mm/proc-macros.S |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 2d8ff3a..7e32603 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -168,8 +168,11 @@
+>  	tstne	r1, #L_PTE_PRESENT
+>  	moveq	r3, #0
+>  
+> +	mrs	r2, cpsr
+> +	cpsid	i
+>  	str	r3, [r0]
+>  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +	msr	cpsr_c, r2
+>  	.endm
 
-Just tested kernel compression with all five compression algorithms,
-works fine for s390.
-
-Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
+We have save_and_disable_irqs and restore_irqs (and _notrace variants)
+macros in asm/assembler.h.
 
 -- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+Catalin
