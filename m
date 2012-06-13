@@ -1,57 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 Jun 2012 13:28:17 +0100
-Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD6F0E8.5040606@linaro.org>
- <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
- <4FD83AAD.2010701@linaro.org>
- <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
-Message-ID: <4FD88761.9050703@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Jun 2012 05:29:50 -0700
+Subject: [PATCH 5/9] ARM: OMAP2+: gpmc-smc91x: Adapt to use gpmc driver
+In-Reply-To: <0bdbc293fc98613011d37ec59559ba6d475eadf2.1339419379.git.afzal@ti.com>
+References: <cover.1339419379.git.afzal@ti.com>
+ <0bdbc293fc98613011d37ec59559ba6d475eadf2.1339419379.git.afzal@ti.com>
+Message-ID: <20120613122950.GR12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/12 09:12, Linus Walleij wrote:
-> On Wed, Jun 13, 2012 at 9:01 AM, Lee Jones<lee.jones@linaro.org>  wrote:
->
->> Board specific is fine, as the data is protected by a board specific
->> property. Do you mean that the properties are *bus specific*? In which case
->> I see your point and will apply the correct bindings.
->
-> I cannot parse this, the board for me is a SoC, busses and a
-> number of components connected via e.g. I2C.
->
-> Can you define what you mean with a "board specific property"?
-> It seems you are talking about what I would call an
-> "SoC-specific property", i.e. something out of a .dtsi file for
-> a certain SoC, whereas the .dts for an entire board is,
-> well, for a board, a set of components on a PCB.
->
-> The arrangement of accelerometers and battery monitors on a
-> certain board is board-specific, and it is also by definition
-> bus-specific.
+* Afzal Mohammed <afzal@ti.com> [120611 08:19]:
+> --- a/arch/arm/mach-omap2/gpmc-smc91x.c
+> +++ b/arch/arm/mach-omap2/gpmc-smc91x.c
+> @@ -114,7 +136,13 @@ static int smc91c96_gpmc_retime(void)
+>  	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
+>  		return 0;
+>  
+> -	return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
+> +	/* gpmc driver interface */
+> +	if (gpmc_smc91x_cs_data.mem_size == 0x10) {
+> +		gpmc_smc91x_cs_data.time_ctrl.type = has_period;
+> +		gpmc_smc91x_cs_data.time_ctrl.timings = t;
+> +		return 0;
+> +	} else
+> +		return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
+>  }
+>  
+>  /*
 
-Okay, let's put it another way. We can individualise any board, bus, 
-platform, machine or system by placing all of the information in a DT 
-node so long as we plonk it in the correct place within the Device Tree. 
-However, we have just as much control by keeping them in separate 
-structs in the C file and selecting the right one using the compatible 
-sting.
+Here too we just need to care about the mainline kernel users
+and convert them to use the new interface. No need to keep
+gpmc_cs_set_timings around. The same applies for other similar
+patches.
 
-The real item for discussion is; if we have varying configurations for 
-each of the i2c buses residing on the same SoC, do we really want to use 
-different compatible strings to identify each one. If the answer is no, 
-which I think it is, then I need to write the bindings and have 
-everything individually configurable from Device Tree.
+Regards,
 
-While you're mulling this over, I'm just going to write the bindings anyway.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tony
