@@ -1,33 +1,37 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 13 Jun 2012 13:52:03 +0000
-Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
-References: <cover.1339419492.git.afzal@ti.com>
- <54e643eb1b4dbefcbb52580fa582043bf4f0da3d.1339419492.git.afzal@ti.com>
- <4FD6586A.9060706@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
- <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
- <20120613134032.GW12766@atomide.com> <20120613134408.GY12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998F2F@DBDE01.ent.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 13 Jun 2012 15:55:47 +0200
+Subject: [PATCH] arm: tegra: build powergate unconditionally
+Message-ID: <1339595767-9140-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+powergate functions are needed for tegra30 as well (see common.c), so
+build it always. Fixes:
 
-On Wed, Jun 13, 2012 at 19:20:35, Mohammed, Afzal wrote:
-> Hi Tony,
-> 
-> On Wed, Jun 13, 2012 at 19:14:08, Tony Lindgren wrote:
-> 
-> > Actually why do you even need to store the revision? You can
-> > just read it from the hardware as needed.
-> 
-> Earlier for wr_access & wr_data_mux_bus, we were checking,
-> cpu_is_34xx, but I feel it should instead be based on
-> IP revision as it is the IP revision that decides the
-> availability of those register bits.
+arch/arm/mach-tegra/built-in.o: In function `tegra30_init_early':
+apbio.c:(.init.text+0x78): undefined reference to `tegra_powergate_init'
 
-Or you meant, even there read revision register ?
+(using "allnoconfig" with tegra30 enabled)
 
-Regards
-Afzal
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ arch/arm/mach-tegra/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 2eb4445..35253fd 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -8,9 +8,9 @@ obj-y                                   += timer.o
+ obj-y					+= fuse.o
+ obj-y					+= pmc.o
+ obj-y					+= flowctrl.o
++obj-y					+= powergate.o
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+-- 
+1.7.10
