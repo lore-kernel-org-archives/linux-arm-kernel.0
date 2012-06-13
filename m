@@ -1,148 +1,88 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 13 Jun 2012 08:34:22 +0200
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4FD7A36B.9090409@wwwdotorg.org>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
- <4FD66410.7090001@wwwdotorg.org>
- <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
- <4FD763C5.3090500@wwwdotorg.org>
- <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
- <4FD7A36B.9090409@wwwdotorg.org>
-Message-ID: <20120613063422.GC31001@avionic-0098.mockup.avionic-design.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 Jun 2012 08:36:50 +0200
+Subject: [PATCH] ARM: mxc-rnga: fix data_present API
+In-Reply-To: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
+References: <1795608889.2533817.1339535267600.JavaMail.root@advansee.com>
+Message-ID: <20120613063650.GB32436@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 06/12/2012 11:20 AM, Thierry Reding wrote:
-> ...
-> > I came up with the following alternative:
-> > 
-> > 	pci {
-> > 		compatible = "nvidia,tegra20-pcie";
-> > 		reg = <0x80003000 0x00000800   /* PADS registers */
-> > 		       0x80003800 0x00000200   /* AFI registers */
-> > 		       0x80004000 0x00100000   /* configuration space */
-> > 		       0x80104000 0x00100000   /* extended configuration space */
-> > 		       0x80400000 0x00010000   /* downstream I/O */
-> > 		       0x90000000 0x10000000   /* non-prefetchable memory */
-> > 		       0xa0000000 0x10000000>; /* prefetchable memory */
-> > 		interrupts = <0 98 0x04   /* controller interrupt */
-> > 		              0 99 0x04>; /* MSI interrupt */
-> > 		status = "disabled";
-> > 
-> > 		ranges = <0x80000000 0x80000000 0x00002000   /* 2 root ports */
-> > 			  0x80004000 0x80004000 0x00100000   /* configuration space */
-> > 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
-> > 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
-> > 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
-> > 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
-> > 
-> > 		#address-cells = <1>;
-> > 		#size-cells = <1>;
-> > 
-> > 		port at 80000000 {
-> > 			reg = <0x80000000 0x00001000>;
-> > 			status = "disabled";
-> > 		};
-> > 
-> > 		port at 80001000 {
-> > 			reg = <0x80001000 0x00001000>;
-> > 			status = "disabled";
-> > 		};
-> > 	};
-> > 
-> > The "ranges" property can probably be cleaned up a bit, but the most
-> > interesting part is the port@ children, which can simply be enabled in board
-> > DTS files by setting the status property to "okay". I find that somewhat more
-> > intuitive to the variant with an "enable-ports" property.
-> > 
-> > What do you think of this?
-> 
-> As a general concept, this kind of design seems OK to me.
-> 
-> The "port" child nodes I think should be named "pci at ..." given Mitch's
-> comments, I think.
-> 
-> The port nodes probably need two entries in reg, given the following in
-> our downstream driver:
-> 
-> >         int rp_offset = 0;
-> >         int ctrl_offset = AFI_PEX0_CTRL;
-> ...
-> >         for (port = 0; port < MAX_PCIE_SUPPORTED_PORTS; port++) {
-> >                 ctrl_offset += (port * 8);
-> >                 rp_offset = (rp_offset + 0x1000) * port;
-> >                 if (tegra_pcie.plat_data->port_status[port])
-> >                         tegra_pcie_add_port(port, rp_offset, ctrl_offset);
-> >         }
-> 
-> (which actually looks likely to be horribly buggy for port>1 and only
-> accidentally correct for port==1, but anyway...)
+Hello,
 
-Yeah, I currently have code that gets the port index and the reset register
-offset (ctrl_offset above) from the port address. It feels rather hackish,
-though.
+your changelog is very sparse. Maybe point out the commit that changed
+the API without fixing its users?
 
-> But instead, I'd be tempted to make the top-level node say:
+On Tue, Jun 12, 2012 at 11:07:47PM +0200, Beno?t Th?baudeau wrote:
+> Cc: Matt Mackall <mpm@selenic.com>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Alan Carvalho de Assis <acassis@gmail.com>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+> ---
+>  .../drivers/char/hw_random/mxc-rnga.c              |   22 +++++++++++++-------
+>  1 file changed, 14 insertions(+), 8 deletions(-)
 > 
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 
-> ... so that the child nodes' reg is just the port ID. The parent node
-> can calculate the addresses/offsets of the per-port registers within the
-> PCIe controller's register space based on the ID using code roughly like
-> what I quoted above:
-> 
-> 	pci at 0 {
-> 		reg = <0>;
-> 		status = "disabled";
-> 	};
-> 
-> 	pci at 1 {
-> 		reg = <0>;
-> 		status = "disabled";
-> 	};
-> 
-> That would save having to put 2 entries in the reg, and perhaps remove
-> the need for any ranges property.
-> 
-> I think you also need a property to specify the exact port layout; the
-> Tegra20 controller supports:
-> 
-> 1 x4 port
-> 2 x2 ports (you can choose to use only 1 of these I assume)
-> 
-> So just because only 1 of the ports is enabled, doesn't imply it's x4;
-> it could still be x2.
-> 
-> Tegra30 has more options.
+> diff --git linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
+> index 187c6be..2924253 100644
+> --- linux-next-HEAD-c90e5d2.orig/drivers/char/hw_random/mxc-rnga.c
+> +++ linux-next-HEAD-c90e5d2/drivers/char/hw_random/mxc-rnga.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/hw_random.h>
+> +#include <linux/delay.h>
+>  #include <linux/io.h>
+>  
+>  /* RNGA Registers */
+> @@ -60,16 +61,21 @@
+>  
+>  static struct platform_device *rng_dev;
+>  
+> -static int mxc_rnga_data_present(struct hwrng *rng)
+> +static int mxc_rnga_data_present(struct hwrng *rng, int wait)
+>  {
+> -	int level;
+>  	void __iomem *rng_base = (void __iomem *)rng->priv;
+> -
+> -	/* how many random numbers is in FIFO? [0-16] */
+> -	level = ((__raw_readl(rng_base + RNGA_STATUS) &
+> -			RNGA_STATUS_LEVEL_MASK) >> 8);
+> -
+> -	return level > 0 ? 1 : 0;
+> +	int level, data, i;
+level is only used in the for loop, so it should be declared there, too.
 
-Both the upstream and downstream drivers currently hard-code this to dual and
-411 (I assume that means 1x4, 2x1?) configurations for Tegra20 and Tegra30
-respectively. Unfortunately the register AFI_PCIE_CONFIG isn't documented on
-Tegra20 at all and for Tegra30 lists only the valid configurations (see
-28.4.1.5 PCIe CONFIG) but not the corresponding encodings.
+> +
+> +	for (i = 0; i < 20; i++) {
+> +		/* how many random numbers is in FIFO? [0-16] */
+As you touch this comment can you fix the grammar, too? (i.e. s/is/are/)
 
-Maybe a good name for the new property would be "num-lanes". I also wonder if
-this property would be better off in the parent node, which would make it
-easier to check for valid configurations. Otherwise the code would have to
-collect the settings of all the ports and check if the combination is valid.
-Then again, having num-lanes in the parent with one cell for each controller
-isn't very nice if each controller can be individually disabled.
+> +		level = ((__raw_readl(rng_base + RNGA_STATUS) &
+> +				RNGA_STATUS_LEVEL_MASK) >> 8);
+> +		data = level > 0 ? 1 : 0;
+This statement is equivalent to:
 
-One other thing: in addition to the device tree binding, this will all have to
-be represented in the platform data as well to support the legacy board
-definitions currently in the tree. But instead of adding all of these changes
-to the patch that converts the code to a driver, I'm thinking it might be
-better to split these additions off into one or more separate patches. Do you
-have any objections?
+	data = level > 0;
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120613/aee9fdd4/attachment-0001.sig>
+so IMHO there is no need for the data variable.
+
+> +		if (data || !wait)
+> +			break;
+> +		udelay(10);
+Apart from the magic 20 that Fabio already pointed out, these 10 us are
+magic, too. What is the requirement when wait evaluates to true? Are you
+allowed to sleep? If so, maybe better do that?
+
+> +	}
+> +	return data;
+>  }
+>  
+>  static int mxc_rnga_data_read(struct hwrng *rng, u32 * data)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
