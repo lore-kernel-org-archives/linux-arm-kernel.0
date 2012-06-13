@@ -1,170 +1,104 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 Jun 2012 23:33:12 +0200
-Subject: [Patch v5 05/13] usb: otg: add basic mxs phy driver support
-In-Reply-To: <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120613213312.GD30400@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jun 2012 21:33:28 +0000
+Subject: [PATCH v8 01/13] ARM: Add per-platform SMP/CPU-hotplug operations
+In-Reply-To: <1339504256-11266-2-git-send-email-marc.zyngier@arm.com>
+References: <1339504256-11266-1-git-send-email-marc.zyngier@arm.com>
+ <1339504256-11266-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <201206132133.28758.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 08:34:15PM +0800, Richard Zhao wrote:
-> mxs phy is used in Freescale i.MX SoCs, for example
-> imx23, imx28, imx6Q. This patch adds the basic host
-> support.
-> 
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Peter Chen <peter.chen@freescale.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |   13 ++
->  drivers/usb/otg/Kconfig                           |    8 +
->  drivers/usb/otg/Makefile                          |    1 +
->  drivers/usb/otg/mxs-phy.c                         |  204 +++++++++++++++++++++
->  4 files changed, 226 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
->  create mode 100644 drivers/usb/otg/mxs-phy.c
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> new file mode 100644
-> index 0000000..5835b27
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -0,0 +1,13 @@
-> +* Freescale MXS USB Phy Device
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx23-usbphy"
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain phy interrupt
-> +
-> +Example:
-> +usbphy1: usbphy at 020c9000 {
-> +	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
-> +	reg = <0x020c9000 0x1000>;
-> +	interrupts = <0 44 0x04>;
-> +};
-> diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
-> index 5c87db0..3a9bc44 100644
-> --- a/drivers/usb/otg/Kconfig
-> +++ b/drivers/usb/otg/Kconfig
-> @@ -116,6 +116,14 @@ config FSL_USB2_OTG
->  	help
->  	  Enable this to support Freescale USB OTG transceiver.
+On Tuesday 12 June 2012, Marc Zyngier wrote:
+> @@ -35,6 +36,9 @@ struct machine_desc {
+>  	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+> +#ifdef CONFIG_SMP
+> +	struct smp_ops		*smp_ops;	/* SMP operations	*/
+> +#endif
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> @@ -50,6 +54,12 @@ struct machine_desc {
+>  	void			(*restart)(char, const char *);
+>  };
 >  
-> +config USB_MXS_PHY
-> +	tristate "Freescale MXS USB PHY support"
-> +	select USB_OTG_UTILS
-> +	help
-> +	  Enable this to support the Freescale MXS USB PHY.
+> +#ifdef CONFIG_SMP
+> +#define smp_ops(s)		.smp_ops = (&s),
+> +#else
+> +#define smp_ops(s)		/* empty */
+> +#endif
 > +
-> +	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
-> +
->  config USB_MV_OTG
->  	tristate "Marvell USB OTG support"
->  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
-> diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
-> index 41aa509..a844b8d 100644
-> --- a/drivers/usb/otg/Makefile
-> +++ b/drivers/usb/otg/Makefile
-> @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
->  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
->  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
->  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
-> +obj-$(CONFIG_USB_MXS_PHY)	+= mxs-phy.o
->  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
-> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
-> new file mode 100644
-> index 0000000..a55aaed
-> --- /dev/null
-> +++ b/drivers/usb/otg/mxs-phy.c
-> @@ -0,0 +1,204 @@
-> +/*
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-> + * on behalf of DENX Software Engineering GmbH
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/clk.h>
-> +#include <linux/usb/otg.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +
-> +#define DRIVER_NAME "mxs_phy"
-> +
-> +#define HW_USBPHY_PWD				0x00
-> +#define HW_USBPHY_CTRL				0x30
-> +#define HW_USBPHY_CTRL_SET			0x34
-> +#define HW_USBPHY_CTRL_CLR			0x38
-> +
-> +#define BM_USBPHY_CTRL_SFTRST			BIT(31)
-> +#define BM_USBPHY_CTRL_CLKGATE			BIT(30)
-> +#define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
-> +#define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
-> +#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
-> +
-> +struct mxs_phy {
-> +	struct usb_phy phy;
-> +	struct clk *clk;
-> +	int connected:1;
+
+I think we should just leave these in unconditionally as before. The price
+is one pointer per machine_desc, but the advantage is that we don't have
+to use an ugly macro.
+
+If people think the savings are worth doing the macro for, can we
+at least kill the "," and the "&" in it, to make it more regular syntax?
+
+> +struct smp_ops {
+> +	struct smp_init_ops		init_ops;
+> +	struct smp_secondary_ops	secondary_ops;
+> +	struct smp_hotplug_ops		hotplug_ops;
 > +};
-> +
-> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> +
-> +static void mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-> +{
-> +	void __iomem *base = mxs_phy->phy.io_priv;
-> +
-> +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE, base + HW_USBPHY_CTRL_CLR);
-> +
-> +	/* Reset USBPHY module */
-> +	writel_relaxed(BM_USBPHY_CTRL_SFTRST, base + HW_USBPHY_CTRL_SET);
-> +	udelay(10);
-> +
-> +	/* Remove CLKGATE and SFTRST */
-> +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE | BM_USBPHY_CTRL_SFTRST,
-> +			base + HW_USBPHY_CTRL_CLR);
-> +	udelay(10);
 
-Is stmp_reset_block() suitable for what you want to do here?
+Ok, I don't really mind this split so much, although it still feels
+like it's making the structure more complicated than it should.
 
-> +	base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!base)
-> +		return -EBUSY;
+> +#ifdef CONFIG_SMP
+> +#define smp_init_ops(prefix)		.init_ops = {			\
+> +		.smp_init_cpus		= prefix##_smp_init_cpus,	\
+> +		.smp_prepare_cpus	= prefix##_smp_prepare_cpus,	\
+> +	},
 > +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk)) {
-> +		dev_err(&pdev->dev, "can't get the clock!");
-
-Please add the return value to these kind of messages.
-
-> +		return PTR_ERR(clk);
-> +	}
+> +#define smp_secondary_ops(prefix)	.secondary_ops = {		\
+> +		.smp_secondary_init	= prefix##_secondary_init,	\
+> +		.smp_boot_secondary	= prefix##_boot_secondary,	\
+> +	},
 > +
-> +	mxs_phy = devm_kzalloc(&pdev->dev, sizeof(*mxs_phy), GFP_KERNEL);
-> +	if (!mxs_phy) {
-> +		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
+> +extern void smp_ops_register(struct smp_ops *);
+> +
+> +#else
+> +#define smp_init_ops(prefix)		.init_ops = {},
+> +#define smp_secondary_ops(prefix)	.secondary_ops = {},
+> +#define smp_ops_register(a)		do {} while(0)
+> +#endif
+> +
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +#define smp_hotplug_ops(prefix)		.hotplug_ops = {	\
+> +		.cpu_kill	= prefix##_cpu_kill,		\
+> +		.cpu_die	= prefix##_cpu_die,		\
+> +		.cpu_disable	= prefix##_cpu_disable,		\
+> +	},
+> +#else
+> +#define smp_hotplug_ops(prefix)		.hotplug_ops = {},
+> +#endif
 
-This message is rather useless. It is really not expected for kzalloc
-to fail. If it fails here you really have problems elsewhere and this
-message won't help you debugging it.
+But these macros are just horrible. The string concatenation makes it impossible
+to grep for where the function pointers are actually used. Just open-code
+the initialization, it's really not too much to ask to write something like
 
-Sascha
+struct smp_ops vexpress_smp_ops = {
+	.init_ops = {
+		.smp_init_cpus		= vexpress_smp_init_cpus,
+		.smp_prepare_cpus	= vexpress_smp_prepare_cpus,
+	},
+	.secondary_ops = {
+		.smp_secondary_init	= vexpress_secondary_init,
+		.smp_boot_secondary	= vexpress_boot_secondary,
+	},
+#ifdef CONFIG_HOTPLUG_CPU
+	.hotplug_ops = {
+		.cpu_kill		= vexpress_cpu_kill,
+		.cpu_die		= vexpress_cpu_die,
+		.cpu_disable		= vexpress_cpu_disable,
+	},
+#endif
+};
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Anyone can read this, and it's not all that much to write either. Whereas the macro
+version requires everybody who wants to modify that code to understand all the
+macros you introduced.
+
+	Arnd
