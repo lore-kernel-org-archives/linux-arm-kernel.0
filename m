@@ -1,33 +1,68 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Wed, 13 Jun 2012 18:40:52 +0800
-Subject: Where to power on the wifi device before loading the driver.
-Message-ID: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 13 Jun 2012 13:01:43 +0200
+Subject: [PATCHv3 0/3] ARM: replace custom consistent dma region with vmalloc
+Message-ID: <1339585306-7147-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
-I'm working on the tegra30 wifi upstream issue.
+Hello!
 
-The tegra30 board (Cardhu) use Broadcom 4329 as wifi device, and use brcmfmac as the wifi driver.
+This patchset replaces custom consistent dma regions usage in
+dma-mapping framework in favour of generic vmalloc areas created on
+demand for each allocation. The main purpose for this patchset is to
+remove 2MiB limit of dma coherent/writecombine allocations.
 
-In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
+Atomic allocations are served from special pool preallocated on boot,
+becasue vmalloc areas cannot be reliably created in atomic context.
 
-On the Cardhu, the wifi's power is controlled by two gpios (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
-This power on sequence is: 
-set power-gpio to 1 ;
-mdelay(100) ;
-set reset-gpio to 1 ;
-mdelay(200);
+Linux v3.5-rc1 introduced a lot of changes to ARM dma-mapping subsystem
+(CMA and dmamap_ops based implementation has been finally merged), so
+the previous version of these patches is not applicable anymore. This
+version provides an update required for applying them on v3.5-rc2 kernel
+as well as some changes requested by Minchan Kim in his review.
 
-My question is where to power on the wifi. We may have three places to power on it:
-1. power on it in the brcmfmac driver before calling sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
-2. power on it in the mmc driver. In our tegra SD driver, it has power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
-3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
+This patch is based on vanilla v3.5-rc2 release.
 
-I have no good idea for it, does anyone has suggestion?
+Atomic allocations have been tested with s3c-sdhci driver on Samsung
+UniversalC210 board with dmabounce code enabled to force
+dma_alloc_coherent() use on each dma_map_* call (some of them are made
+from interrupts).
 
-Thanks.
-Wei.
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
----
-nvpublic
+Changelog:
+
+v3:
+- rebased onto v3.4-rc2: added support for IOMMU-aware implementation 
+  of dma-mapping calls, unified with CMA coherent dma pool
+- implemented changes requested by Minchan Kim: added more checks for
+  vmarea->flags & VM_DMA, renamed some variables, removed obsole locks,
+  squashed find_vm_area() exporting patch into the main redesign patch 
+
+v2: http://thread.gmane.org/gmane.linux.kernel.mm/78563
+- added support for atomic allocations (served from preallocated pool)
+- minor cleanup here and there
+- rebased onto v3.4-rc7
+
+v1: http://thread.gmane.org/gmane.linux.kernel.mm/76703
+- initial version
+
+Patch summary:
+
+Marek Szyprowski (3):
+  mm: vmalloc: use const void * for caller argument
+  mm: vmalloc: add VM_DMA flag to indicate areas used by dma-mapping
+    framework
+  ARM: dma-mapping: remove custom consistent dma region
+
+ Documentation/kernel-parameters.txt |    2 +-
+ arch/arm/include/asm/dma-mapping.h  |    2 +-
+ arch/arm/mm/dma-mapping.c           |  503 ++++++++++++-----------------------
+ include/linux/vmalloc.h             |   10 +-
+ mm/vmalloc.c                        |   31 ++-
+ 5 files changed, 206 insertions(+), 342 deletions(-)
+
+-- 
+1.7.1.569.g6f426
