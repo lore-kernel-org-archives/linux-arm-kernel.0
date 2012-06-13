@@ -1,25 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jun 2012 19:58:48 +0000
-Subject: [PATCH v2 0/5] mmp audio support
-In-Reply-To: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <201206131958.49446.arnd@arndb.de>
+Date: Wed, 13 Jun 2012 20:21:08 +0000
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <4FD84133.4060401@firmworks.com>
+ <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201206132021.09774.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 June 2012, Zhangfei Gao wrote:
+On Wednesday 13 June 2012, Thierry Reding wrote:
+>                 pci at 80000000 {
+>                         reg = <0x80000000 0x00001000>;
+>                         status = "disabled";
 > 
-> v1->v2:
-> modify accroingly with suggestion from Vinod and Mark
-> remove deprecated chan->private and dma.h
-> remove prep_slave_sg
-> remove module_init and move operation to probe
-> misc change
+>                         #address-cells = <3>;
+>                         #size-cells = <2>;
+> 
+>                         ranges = <0x80400000 0x80400000 0x00008000   /* I/O */
+>                                   0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
+>                                   0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
+> 
+>                         nvidia,ctrl-offset = <0x0>;
+>                         nvidia,num-lanes = <2>;
+>                 };
+> 
 
-It seems that this driver is missing DT bindings, which really need to get
-added. The brownstone platform is currently supported using both DT and
-ATAG probing, but we want to remove the ATAG variant eventually, so adding
-a new driver for that platform without support for DT booting is a step in
-the wrong direction.
+I believe you will need an "interrupt-map" property here, to map the host
+interrupts to the INTA-INTD lines of the attached devices.
+
+I'm not sure whether we want to have a device_type="pciex" property here.
+powerpc and sparc seem to use that information, to distinguish a pcie
+bus from pci or cardbus.
 
 	Arnd
