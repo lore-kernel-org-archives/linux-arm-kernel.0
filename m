@@ -1,18 +1,44 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 13 Jun 2012 15:19:40 +0200
-Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 13 Jun 2012 15:20:53 +0200
+Subject: [RFC 4/4] sched: cpu_power: enable ARCH_POWER
+In-Reply-To: <1339591819.8980.28.camel@twins>
 References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
- <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1339593580.8980.35.camel@twins>
+ <1339502524-10265-5-git-send-email-vincent.guittot@linaro.org>
+ <1339591819.8980.28.camel@twins>
+Message-ID: <CAKfTPtCERCDdCSLyPAYAhxAB4wkDMVfMbfecv+vOMbgUXvYwYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-06-12 at 14:02 +0200, Vincent Guittot wrote:
-> Use cpu compatibility field and clock-frequency field of DT to
-> estimate the capacity of each core of the system
-> 
-Can you provide a little description in the form of a code comment near
-update_cpu_power() as to wtf all that does? This OF nonsense is
-unreadable.
+On 13 June 2012 14:50, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, 2012-06-12 at 14:02 +0200, Vincent Guittot wrote:
+>> Heteregeneous ARM platform uses arch_scale_freq_power function
+>> to reflect the relative capacity of each core
+>
+> I think I've pointed out before that this breaks x86.. you need a patch
+> killing at that stuff before this.
+
+In v3.4, x86 hasn't got any specific declaration for
+arch_scale_freq_power so it would now use the weak
+arch_scale_freq_power which calls default_scale_freq_power. Isn't it
+enough ?
+
+>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>> ?kernel/sched/features.h | ? ?2 +-
+>> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+>> index de00a48..d98ae90 100644
+>> --- a/kernel/sched/features.h
+>> +++ b/kernel/sched/features.h
+>> @@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
+>> ?/*
+>> ? * Use arch dependent cpu power functions
+>> ? */
+>> -SCHED_FEAT(ARCH_POWER, false)
+>> +SCHED_FEAT(ARCH_POWER, true)
+>>
+>> ?SCHED_FEAT(HRTICK, false)
+>> ?SCHED_FEAT(DOUBLE_TICK, false)
+>
