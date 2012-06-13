@@ -1,58 +1,23 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Jun 2012 09:51:50 -0500
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
-Message-ID: <4FD8A906.8080202@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 13 Jun 2012 16:54:20 +0200
+Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <1339592856.8980.33.camel@twins>
+References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
+ <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
+ <1339592856.8980.33.camel@twins>
+Message-ID: <CAKfTPtDkRZJmfwmOeR6TPc5etbWRRneWAmN13X2_ace4wFwf7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+On 13 June 2012 15:07, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, 2012-06-12 at 14:02 +0200, Vincent Guittot wrote:
+>> +struct cpu_capacity cpu_capacity[NR_CPUS];
+>
+> I know ARM isn't likely to suffer from the 4k cpu issue, but is there a
+> reason to use a NR_CPUS array over a per-cpu variable?
 
-On 06/13/2012 12:20 AM, Mohammed, Afzal wrote:
-> Hi Jon,
-> 
-> On Tue, Jun 12, 2012 at 23:10:01, Hunter, Jon wrote:
->> On 06/12/2012 01:53 AM, Mohammed, Afzal wrote:
->>> On Tue, Jun 12, 2012 at 01:26:29, Hunter, Jon wrote:
-> 
->>>> My preference would be to store gpmc_l3_clk in the pdata and pass to
->>>> probe via the pdata. The aim would be to remove the global gpmc_l3_clk
->>>> altogether.
->>>
->>> For timing calculation by platform outside of driver, we need clk rate
->>
->> Right but potentially, this could be done by the driver.
-> 
-> I do not think it is practically possible. Please see timing calculations
-> in arch/arm/mach-omap2/gpmc-*, the way it is done for different
-> peripherals are different, and we cannot expect gpmc driver to do those as
-> that would require gpmc driver being aware of type of peripheral connected.
-> 
-> And all those gpmc-* timing calculation needs to be done before driver
-> is ready, they rely on functions like gpmc_get_fclk_rate(), which in turn
-> requires the clk rate to be available before driver is probed.
-
-So I see that the various gpmc-*.c files have some form of _retime()
-function. However, at the end of the day they all call
-gpmc_cs_set_timings() to convert time into gpmc clocks. Converting time
-to gpmc clocks is completely independent of the actual device and so
-this can be performed by the driver. We just need to populate the
-gpmc_timings struct and pass to the driver to convert to clocks and
-program into the registers.
-
-If the clk handle for the gpmc is passed to the gpmc driver, then there
-is no reason why the driver cannot do this.
-
-Obviously, I could be missing something fundamental here, but my
-assumption is that if the driver has the handle the fclk (and hence can
-query the clock rate) and has then gpmc_timings struct (with timings in
-time), then that is all it needs.
-
-Cheers
-Jon
+At this stage, we don't know which logical CPU will match which hwid.
+During the boot of each CPU, we parse the table to found an efficiency
+value for the booting CPU. The whole table is used by one CPU at a
+time.
