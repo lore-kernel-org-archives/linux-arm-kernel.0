@@ -1,77 +1,91 @@
 From: zumeng.chen@gmail.com (Zumeng Chen)
-Date: Wed, 13 Jun 2012 09:44:07 +0800
-Subject: [PATCH V2 2/5] ARM: OMAP3EVM: Adding USB internal LDOs board file
+Date: Wed, 13 Jun 2012 09:44:06 +0800
+Subject: [PATCH V2 1/5] ARM: OMAP3EVM: Add NAND flash definition
 In-Reply-To: <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
 References: <zumeng.chen@gmail.com>
  <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
-Message-ID: <1339551850-20827-3-git-send-email-zumeng.chen@gmail.com>
+Message-ID: <1339551850-20827-2-git-send-email-zumeng.chen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zumeng Chen <zumeng.chen@windriver.com>
 
-EHCI PHY requires these regulators:
-        EVM Rev >=E  --> VAUX2
-        EVM Rev < E  --> VUSB1V5, VUSB1V8
-
-Adding USB internal LDOs (vusb1v5 & vusb1v8) and VAUX2 to omap3evm
-board file. Also removing vaux2_{1/2/3} supplies as they are not
-used on omap3 evm.
-
-But we need not to add vaux2 in twl4030_platform_data since it will
-be added conditionally.
-
-Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Zumeng Chen <zumeng.chen@windriver.com>
+Tested-by: Zumeng Chen <zumeng.chen@windriver.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap3evm.c |   39 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 39 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 0b83d0e..3c91534 100644
+index 639bd07..0b83d0e 100644
 --- a/arch/arm/mach-omap2/board-omap3evm.c
 +++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -466,6 +466,30 @@ struct wl12xx_platform_data omap3evm_wlan_data __initdata = {
+@@ -24,6 +24,10 @@
+ #include <linux/leds.h>
+ #include <linux/interrupt.h>
+ 
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/nand.h>
++
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+ #include <linux/i2c/twl.h>
+@@ -43,6 +47,7 @@
+ 
+ #include <plat/board.h>
+ #include <plat/usb.h>
++#include <plat/nand.h>
+ #include "common.h"
+ #include <plat/mcspi.h>
+ #include <video/omapdss.h>
+@@ -607,6 +612,37 @@ static struct regulator_consumer_supply dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
  };
- #endif
  
-+/* VAUX2 for USB */
-+static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
-+	REGULATOR_SUPPLY("VDD_CSIPHY1", "omap3isp"),	/* OMAP ISP */
-+	REGULATOR_SUPPLY("VDD_CSIPHY2", "omap3isp"),	/* OMAP ISP */
-+	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
++static struct mtd_partition omap3evm_nand_partitions[] = {
++	/* All the partition sizes are listed in terms of NAND block size */
 +	{
-+		.supply		= "vaux2",
-+	}
-+};
-+
-+static struct regulator_init_data omap3evm_vaux2 = {
-+	.constraints = {
-+		.min_uV		= 2800000,
-+		.max_uV		= 2800000,
-+		.apply_uV	= true,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
++		.name           = "X-Loader",
++		.offset         = 0,
++		.size           = 4*(SZ_128K),
++		.mask_flags     = MTD_WRITEABLE
 +	},
-+	.num_consumer_supplies		= ARRAY_SIZE(omap3evm_vaux2_supplies),
-+	.consumer_supplies		= omap3evm_vaux2_supplies,
++	{
++		.name           = "U-Boot",
++		.offset         = MTDPART_OFS_APPEND,
++		.size           = 14*(SZ_128K),
++		.mask_flags     = MTD_WRITEABLE
++	},
++	{
++		.name           = "U-Boot Env",
++		.offset         = MTDPART_OFS_APPEND,
++		.size           = 2*(SZ_128K)
++	},
++	{
++		.name           = "Kernel",
++		.offset         = MTDPART_OFS_APPEND,
++		.size           = 40*(SZ_128K)
++	},
++	{
++		.name           = "File system",
++		.size           = MTDPART_SIZ_FULL,
++		.offset         = MTDPART_OFS_APPEND,
++	},
 +};
 +
- static struct twl4030_platform_data omap3evm_twldata = {
- 	/* platform_data for children goes here */
- 	.keypad		= &omap3evm_kp_data,
-@@ -659,6 +683,9 @@ static void __init omap3_evm_init(void)
- 	omap_mux_init_gpio(63, OMAP_PIN_INPUT);
- 	omap_hsmmc_init(mmc);
- 
-+	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
-+		omap3evm_twldata.vaux2 = &omap3evm_vaux2;
+ static void __init omap3_evm_init(void)
+ {
+ 	struct omap_board_mux *obm;
+@@ -656,6 +692,9 @@ static void __init omap3_evm_init(void)
+ 	}
+ 	usb_musb_init(&musb_board_data);
+ 	usbhs_init(&usbhs_bdata);
++	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
++			     ARRAY_SIZE(omap3evm_nand_partitions));
 +
- 	omap3_evm_i2c_init();
- 
- 	omap_display_init(&omap3_evm_dss_data);
+ 	omap_ads7846_init(1, OMAP3_EVM_TS_GPIO, 310, NULL);
+ 	omap3evm_init_smsc911x();
+ 	omap3_evm_display_init();
 -- 
 1.7.5.4
