@@ -1,26 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jun 2012 22:31:26 -0300
-Subject: mx51evk kernel dump on next-20120612
-In-Reply-To: <CAOMZO5ARiGCVWgVeY-xzKcxPkXJjL-fYZEAmq=k=3gaT=_HDoA@mail.gmail.com>
-References: <CAOMZO5ARiGCVWgVeY-xzKcxPkXJjL-fYZEAmq=k=3gaT=_HDoA@mail.gmail.com>
-Message-ID: <CAOMZO5CV3PNWcsg9QCeYB+rFFasfsiF9XY=BmGhp7cFKWVNM8w@mail.gmail.com>
+From: snijsure@grid-net.com (Subodh Nijsure)
+Date: Tue, 12 Jun 2012 18:42:20 -0700
+Subject: MXS getting AUART to work with DT.
+Message-ID: <4FD7EFFC.8010204@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 9:41 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi,
->
-> On a mx51evk running 3.5.0-rc2-next-20120612 I am getting:
->
-> pinctrl core: initialized pinctrl subsystem
-> ------------[ cut here ]------------
-> WARNING: at include/linux/regmap.h:391 regulator_register+0xf8c/0x1128()
-> regmap API is disabled
+Hi,
 
-Ok, selecting the mx13892 mfd and regulator driver "fixes" it.
+I am testing my mx28 hardware with arm-soc/for-next branch. I have made  
+additions shown below to my dt file.
 
-I will send a patch for imx_v6_v7_defconfig soon.
+What I see is only ttyAPP0 device gets created but not the ttyAPP1, do 
+folks who know DT much better than I, see any issues with this DT 
+definition below?
 
-Regards,
+auart0_pins_a: auart0 at 0 {
+         reg = <0>;
+         fsl,pinmux-ids = <0x3000 0x3010 0x3020 0x3030>;
+         fsl,drive-strength = <0>;
+         fsl,voltage = <1>;
+         fsl,pull-up = <0>;
+};
+auart1_pins_a: auart1 at 0 {
+         reg = <0>;
+         fsl,pinmux-ids = <0x3040 0x3050>;
+         fsl,drive-strength = <0>;
+         fsl,voltage = <1>;
+         fsl,pull-up = <0>;
+};
+auart0: serial at 8006a000 {
+          pinctrl-names = "default";
+          pinctrl-0 = <&auart0_pins_a>;
+          status = "okay";
+};
+auart1: serial at 8006c000 {
+           pinctrl-names = "default";
+           pinctrl-0 = <&auart1_pins_a>;
+           status = "okay";
+  };
 
-Fabio Estevam
+-Subodh
