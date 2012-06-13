@@ -1,66 +1,343 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 Jun 2012 08:01:01 +0100
-Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
- <4FD6F0E8.5040606@linaro.org>
- <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
-Message-ID: <4FD83AAD.2010701@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 13 Jun 2012 09:03:54 +0200
+Subject: [PATCH] ARM: imx: cleanup otg_mode
+In-Reply-To: <1417597871.2526557.1339523203564.JavaMail.root@advansee.com>
+References: <1417597871.2526557.1339523203564.JavaMail.root@advansee.com>
+Message-ID: <20120613070354.GV30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/12 06:40, Linus Walleij wrote:
-> On Tue, Jun 12, 2012 at 9:34 AM, Lee Jones<lee.jones@linaro.org>  wrote:
->> On 11/06/12 21:37, Linus Walleij wrote:
->>>
->>> So why don't we create proper device tree bindings for the above platform
->>> data?
->>> (...)
->>> This looks to me like a way to push the burden of doing the real
->>> device tree binding for the above to the next user.
->>> (Which will likely be me, so therefore I care a bit ...)
->>
->>
->> On the contrary. This will avoid any added Device Tree complexity and ensure
->> that no extra vendor specific bindings are required. When a new user wishes
->> to use the driver, all they (you) have to do is create a new struct with the
->> platform specific information and add the entry to nmk_gpio_match[],
->> simples.
->>
->> I've even added the logic to extract any information you provide via
->> nmk_gpio_match[] for use as platform data. This keeps it both out of
->> platform code and the Device Tree binary. Everyone's a winner. :)
->
-> No. You assume that the platform data is a chip-specific property,
-> and that it will be the same for all busses on the chip. But it
-> isn't.
->
-> The above platform data is *board specific*, it depends on
-> what devices have been connected to each bus.
->
-> For example the max frequency: this depends on the maximum
-> frequency any of the devices connected to one very bus
-> can support.
->
-> The other platforms have put this frequency into their device
-> trees for a reason, and this is it.
->
-> So for the four different i2c busses there may need to be
-> four different platform data sets. How are you going to
-> distinguish between the four buses?
->
-> This is thus broken and needs to have proper bindings.
+On Tue, Jun 12, 2012 at 07:46:43PM +0200, Beno?t Th?baudeau wrote:
+> Cleanup the code for the otg_mode command line param:
+> * Use the bool type as it applies here.
+> * Qualify otg_mode_host with __initdata since this variable is only used in this
+>   context.
+> * The __setup functions are not supposed to return a status code, but a boolean
+>   indicating whether the param has been handled. See obsolete_checksetup() in
+>   init/main.c.
+> 
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
 
-Board specific is fine, as the data is protected by a board specific 
-property. Do you mean that the properties are *bus specific*? In which 
-case I see your point and will apply the correct bindings.
+Applied as cleanup.
+
+Thanks
+ Sascha
+
+> ---
+>  .../arch/arm/mach-imx/mach-cpuimx27.c              |    8 ++++----
+>  .../arch/arm/mach-imx/mach-cpuimx35.c              |    8 ++++----
+>  .../arch/arm/mach-imx/mach-cpuimx51sd.c            |    8 ++++----
+>  .../arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    8 ++++----
+>  .../arch/arm/mach-imx/mach-mx27_3ds.c              |    8 ++++----
+>  .../arch/arm/mach-imx/mach-mx31_3ds.c              |    8 ++++----
+>  .../arch/arm/mach-imx/mach-mx35_3ds.c              |    8 ++++----
+>  .../arch/arm/mach-imx/mach-mx51_babbage.c          |    8 ++++----
+>  .../arch/arm/mach-imx/mach-pca100.c                |    8 ++++----
+>  .../arch/arm/mach-imx/mach-pcm037.c                |    8 ++++----
+>  .../arch/arm/mach-imx/mach-pcm043.c                |    8 ++++----
+>  11 files changed, 44 insertions(+), 44 deletions(-)
+> 
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx27.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx27.c
+> index d085aea..dbbb970 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx27.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx27.c
+> @@ -233,18 +233,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.phy_mode       = FSL_USB2_PHY_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init eukrea_cpuimx27_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", eukrea_cpuimx27_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx35.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx35.c
+> index 6450303..7d4dc14 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx35.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx35.c
+> @@ -141,18 +141,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init eukrea_cpuimx35_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", eukrea_cpuimx35_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx51sd.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx51sd.c
+> index 1e09de5..cd40bab 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-cpuimx51sd.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-cpuimx51sd.c
+> @@ -217,18 +217,18 @@ static const struct mxc_usbh_platform_data usbh1_config __initconst = {
+>  	.portsc	= MXC_EHCI_MODE_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init eukrea_cpuimx51sd_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", eukrea_cpuimx51sd_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-eukrea_cpuimx25.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+> index d1e04e6..77a9edd 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+> @@ -109,18 +109,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.workaround     = FLS_USB2_WORKAROUND_ENGCM09152,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init eukrea_cpuimx25_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", eukrea_cpuimx25_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx27_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx27_3ds.c
+> index c6d385c..cc4f83c 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -241,18 +241,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.phy_mode       = FSL_USB2_PHY_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init mx27_3ds_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", mx27_3ds_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx31_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx31_3ds.c
+> index 4eafdf2..ebcadd2 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -671,18 +671,18 @@ static const struct fsl_usb2_platform_data usbotg_pdata __initconst = {
+>  	.phy_mode	= FSL_USB2_PHY_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init mx31_3ds_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", mx31_3ds_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx35_3ds.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx35_3ds.c
+> index 28aa194..af92e5e 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx35_3ds.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx35_3ds.c
+> @@ -540,18 +540,18 @@ static const struct mxc_usbh_platform_data usb_host_pdata __initconst = {
+>  	.portsc		= MXC_EHCI_MODE_SERIAL,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init mx35_3ds_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", mx35_3ds_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx51_babbage.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx51_babbage.c
+> index dde3970..3ca6902 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-mx51_babbage.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-mx51_babbage.c
+> @@ -307,18 +307,18 @@ static const struct mxc_usbh_platform_data usbh1_config __initconst = {
+>  	.portsc	= MXC_EHCI_MODE_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init babbage_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", babbage_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pca100.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pca100.c
+> index 541152e..9fe7a1b 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pca100.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pca100.c
+> @@ -298,18 +298,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.phy_mode       = FSL_USB2_PHY_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init pca100_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", pca100_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm037.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm037.c
+> index 0a40004..debc286 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm037.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm037.c
+> @@ -557,18 +557,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.phy_mode       = FSL_USB2_PHY_ULPI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init pcm037_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", pcm037_otg_mode);
+>  
+> diff --git linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm043.c linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm043.c
+> index 73585f5..a8f4a00 100644
+> --- linux-next-HEAD-c90e5d2.orig/arch/arm/mach-imx/mach-pcm043.c
+> +++ linux-next-HEAD-c90e5d2/arch/arm/mach-imx/mach-pcm043.c
+> @@ -330,18 +330,18 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  	.phy_mode       = FSL_USB2_PHY_UTMI,
+>  };
+>  
+> -static int otg_mode_host;
+> +static bool otg_mode_host __initdata;
+>  
+>  static int __init pcm043_otg_mode(char *options)
+>  {
+>  	if (!strcmp(options, "host"))
+> -		otg_mode_host = 1;
+> +		otg_mode_host = true;
+>  	else if (!strcmp(options, "device"))
+> -		otg_mode_host = 0;
+> +		otg_mode_host = false;
+>  	else
+>  		pr_info("otg_mode neither \"host\" nor \"device\". "
+>  			"Defaulting to device\n");
+> -	return 0;
+> +	return 1;
+>  }
+>  __setup("otg_mode=", pcm043_otg_mode);
+>  
+> 
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
