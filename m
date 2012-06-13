@@ -1,23 +1,25 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 13 Jun 2012 16:54:20 +0200
-Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <1339592856.8980.33.camel@twins>
-References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
- <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
- <1339592856.8980.33.camel@twins>
-Message-ID: <CAKfTPtDkRZJmfwmOeR6TPc5etbWRRneWAmN13X2_ace4wFwf7A@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 13 Jun 2012 11:06:06 -0400
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <4FD8AC5E.1060804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2012 15:07, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, 2012-06-12 at 14:02 +0200, Vincent Guittot wrote:
->> +struct cpu_capacity cpu_capacity[NR_CPUS];
->
-> I know ARM isn't likely to suffer from the 4k cpu issue, but is there a
-> reason to use a NR_CPUS array over a per-cpu variable?
+On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
 
-At this stage, we don't know which logical CPU will match which hwid.
-During the boot of each CPU, we parse the table to found an efficiency
-value for the booting CPU. The whole table is used by one CPU at a
-time.
+> You'll find in this patch set the new version of the initial support for a
+> new family of ARMv7-compatible Marvell SoCs initially submitted by my
+> colleague Thomas Petazzoni. Following the conclusion of the discussion when
+> we submitted our first version we have chosen to add this support for this
+> SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+
+Pardon my silly question. I know that there's an effort to reconcile the
+two different SoCs so you're picking a neutral name, but what does
+"mvebu" mean, and will you be persistently keeping this name? Our guys
+want to know what this new platform will entail for Fedora support in
+terms of the platform name being used in various non-kernel places.
+
+Jon.
