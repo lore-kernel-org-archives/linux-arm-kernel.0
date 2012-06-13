@@ -1,36 +1,42 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 13 Jun 2012 16:31:19 +0200
-Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <1339594368.8980.41.camel@twins>
-References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
- <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
- <CAORVsuWqWt0pJfewymh_ydAH61-uPsO0M7m7Gs4N3zJY=Vo9ZA@mail.gmail.com>
- <CAKfTPtBc-KuDg_1qe04TfYS4+66qQoiHCJQbCF9gnhga5ociow@mail.gmail.com>
- <CAP245DXEOGLe1jq2Wj0rNW5qea63UyJu2jOvwV65Y4B9LLoQtg@mail.gmail.com>
- <1339591666.8980.26.camel@twins>
- <CAKfTPtCyV389OTrun5Oyn8RCsDagza95wdmWr=r9poMiYrU0Mg@mail.gmail.com>
- <1339594368.8980.41.camel@twins>
-Message-ID: <CAKfTPtAhWrH8M3z-+13iKz4FjNd8LQDJOfOGKcKUx7jLXvtz+g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 13 Jun 2012 10:34:01 -0400 (EDT)
+Subject: [PATCH] ARM: irq: add a mach/fiq.h inclusion for SPARSE_IRQ build
+In-Reply-To: <1339592253-25142-1-git-send-email-shawn.guo@linaro.org>
+References: <1339592253-25142-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <alpine.LFD.2.02.1206131024480.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2012 15:32, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, 2012-06-13 at 15:29 +0200, Vincent Guittot wrote:
->> In fact, there is 2 tracks, one for a power aware scheduler and one
->> for setting the capacity of each core of a big.LITTLE system. This
->> patch is for the latter and is not directly link to the power because
->> the default/performance mode of the scheduler should also take
->> advantage of this information
->
-> Fair enough.. can you include a little blurp in the changelog on how
-> this affects the capacity stuff for big.little and if that works as
-> desired due to these patches?
+On Wed, 13 Jun 2012, Shawn Guo wrote:
 
-OK, I will add explanations about how this affect the cpu_power field
-and the load balance of a big.LITTLE system, what is enhanced with
-this modification and what is not.
+> The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
+> makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
+> a nubmer of platforms have FIQ_START defined in mach/irqs.h.
+> 
+>   arch/arm/mach-at91/include/mach/irqs.h:#define FIQ_START AT91_ID_FIQ
+>   arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
+>   arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
+>   arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
+>   arch/arm/plat-omap/include/plat/irqs.h:#define FIQ_START                1024
+> 
+> If SPARSE_IRQ is enabled for any of these platforms, the following
+> compile error will be seen.
+> 
+>   arch/arm/kernel/fiq.c: In function ?enable_fiq?:
+>   arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
+>   arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
+>   arch/arm/kernel/fiq.c: In function ?disable_fiq?:
+>   arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
+> 
+> So before we can remove the reference to FIQ_START in fiq.c, we need
+> a way out.  The patch adds a mach/fiq.h inclusion for SPARSE_IRQ build
+> in asm/irq.h, so that platform can have a chance to provide FIQ_START.
+
+This is a step backward.  Please let's get rid of FIQ_START instead.
+This should be removed from enable_fiq() and disable_fiq(), and the 
+arguments to those functions should use the absolute IRQ number instead.  
+for instance, there is FIQ_FLOPPYDATA in mach-rpc/include/mach/irqs.h 
+which could be defined as 64 instead of 0, etc.
 
 
->
->
+Nicolas
