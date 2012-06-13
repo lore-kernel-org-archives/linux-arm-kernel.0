@@ -1,85 +1,65 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 13 Jun 2012 08:16:12 +0200
-Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
- pr_warn()
-In-Reply-To: <1339442328.6001.2602.camel@edumazet-glaptop>
-References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
- <1339403108.6001.1697.camel@edumazet-glaptop> <4FD5AE1D.9030807@antcom.de>
- <20120611.020352.1962768244524496467.davem@davemloft.net>
- <4FD5B9C8.4020800@antcom.de>  <1339442328.6001.2602.camel@edumazet-glaptop>
-Message-ID: <1339568172.22704.312.camel@edumazet-glaptop>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 13 Jun 2012 11:49:55 +0530
+Subject: [PATCH V2 03/10] ARM: OMAP4: Re-map the CTIs IRQs from MPU to
+ DEBUGSS
+In-Reply-To: <CAFm5wm2h9X-ELks7adT=NmRzVkvWhQEkefuBSvVHS6+AvstLwA@mail.gmail.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-4-git-send-email-jon-hunter@ti.com>
+ <CAFm5wm07QXCLA9SoFSqQP1NbdU0XynmyxKfjNJEMvziEAtphJQ@mail.gmail.com>
+ <CAFm5wm2h9X-ELks7adT=NmRzVkvWhQEkefuBSvVHS6+AvstLwA@mail.gmail.com>
+Message-ID: <CAMQu2gwLwOFaneDy07V9B=v9=8PWwgknm2+o1rTFJ4kAfEVsLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-06-11 at 21:18 +0200, Eric Dumazet wrote:
-> On Mon, 2012-06-11 at 11:26 +0200, Roland Stigge wrote:
-> 
-> > Is it sensible at this point to increase the TX buffers anyway? For
-> > different reasons of course: We have enough SRAM available and TX
-> > buffers (16->32) are still more than RX buffers (48).
-> 
-> I doubt it has any impact on performance for a 100Mbit link ?
-> 
-> One thing that could be done would be to free skbs in
-> lpc_eth_hard_start_xmit() instead of __lpc_handle_xmit()
-> 
+On Wed, Jun 13, 2012 at 11:43 AM, Pandita, Vikram <vikram.pandita@ti.com> wrote:
+> On Tue, Jun 12, 2012 at 11:07 PM, Pandita, Vikram <vikram.pandita@ti.com> wrote:
+>> On Thu, Jun 7, 2012 at 2:22 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>> In order to use the CTI interrupts inconjunction with the DEBUGSS we need to
+>>> re-map the CTI IRQs to the DEBUGSS HWMOD. The purpose for doing this is so we
+>>> can create a PMU device based upon the DEBUGSS HWMOD and use the CTI interrupts
+>>> for routing ARM PMU events for OMAP4430 devices.
+>>>
+>>> This is based upon Benoit Cousson's patch [1].
+>>>
+>>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073319.html
+>>>
+>>> Cc: Ming Lei <ming.lei@canonical.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Kevin Hilman <khilman@ti.com>
+>>>
+>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> ---
+>>> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?9 +++++++--
+>>> ?1 file changed, 7 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> index 950454a..faf5a6d 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> @@ -482,10 +482,17 @@ static struct omap_hwmod_class omap44xx_debugss_hwmod_class = {
+>>> ?};
+>>>
+>>> ?/* debugss */
+>>> +static struct omap_hwmod_irq_info omap44xx_debugss_irqs[] = {
+>>> + ? ? ? { .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
+>>> + ? ? ? { .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
+>>
+>> Data manual assigns cit0 == MA_IRQ_1 and cti1 == MA_IRQ_2
+>> Why do you add 32 base GIC_START ?
+>
+> Looks we do the same for pl310:
+> { .name = "pl310", .irq = 0 + OMAP44XX_IRQ_GIC_START },
+>
+> so u can ignore my comment .. excuse the noise...
+>
+All the SPI ( shared Peripheral IRQ's) have offset since first 32 IRQs
+are dedicated
+for SGI and PPI's.
 
-Here is the patch I was thinking about
+CTIx and PL310 interrupts are mapped on SPI and hence they need that offset.
 
-(on top of latest net-next)
-
-Could you please test it ?
-
- drivers/net/ethernet/nxp/lpc_eth.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
-index 083d671..426f14c 100644
---- a/drivers/net/ethernet/nxp/lpc_eth.c
-+++ b/drivers/net/ethernet/nxp/lpc_eth.c
-@@ -440,7 +440,7 @@ struct netdata_local {
- 	spinlock_t		lock;
- 	void __iomem		*net_base;
- 	u32			msg_enable;
--	struct sk_buff		*skb[ENET_TX_DESC];
-+	unsigned int		skblen[ENET_TX_DESC];
- 	unsigned int		last_tx_idx;
- 	unsigned int		num_used_tx_buffs;
- 	struct mii_bus		*mii_bus;
-@@ -908,7 +908,7 @@ static void __lpc_handle_xmit(struct net_device *ndev)
- 
- 	txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
- 	while (pldat->last_tx_idx != txcidx) {
--		skb = pldat->skb[pldat->last_tx_idx];
-+		unsigned int skblen = pldat->skblen[pldat->last_tx_idx];
- 
- 		/* A buffer is available, get buffer status */
- 		ptxstat = &pldat->tx_stat_v[pldat->last_tx_idx];
-@@ -945,9 +945,8 @@ static void __lpc_handle_xmit(struct net_device *ndev)
- 		} else {
- 			/* Update stats */
- 			ndev->stats.tx_packets++;
--			ndev->stats.tx_bytes += skb->len;
-+			ndev->stats.tx_bytes += skblen;
- 		}
--		dev_kfree_skb_irq(skb);
- 
- 		txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
- 	}
-@@ -1132,7 +1131,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	memcpy(pldat->tx_buff_v + txidx * ENET_MAXF_SIZE, skb->data, len);
- 
- 	/* Save the buffer and increment the buffer counter */
--	pldat->skb[txidx] = skb;
-+	pldat->skblen[txidx] = len;
- 	pldat->num_used_tx_buffs++;
- 
- 	/* Start transmit */
-@@ -1147,6 +1146,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 
- 	spin_unlock_irq(&pldat->lock);
- 
-+	dev_kfree_skb(skb);
- 	return NETDEV_TX_OK;
- }
- 
+Regards
+Santosh
