@@ -1,49 +1,34 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 19:10:46 -0500
-Subject: [PATCH V3 1/2] arm/dts: OMAP2: Add support for OMAP2420H4 Board
+Date: Tue, 12 Jun 2012 19:13:32 -0500
+Subject: [PATCH V3 0/2] arm/dts: Add OMAP2420 SDP support
 In-Reply-To: <1339546247-13865-1-git-send-email-jon-hunter@ti.com>
 References: <1339546247-13865-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1339546247-13865-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <4FD7DB2C.3090208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simple DTS file for OMAP2420H4 board adding memory information to allow
-device-tree testing on an OMAP2420. OMAP2420H4 board has 64MB of RAM.
 
-Verified that kernel boots with DT using a simple RAMDISK file-system on
-OMAP2420H4.
+On 06/12/2012 07:10 PM, Jon Hunter wrote:
+> This series fixes the OMAP2 interrupt controller binding and adds support for
+> the OMAP2420H4 board. I have verified that the kernel boots with device-tree
+> on this board.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap2420-sdp.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap2420-sdp.dts
+Oops! Forgot to change SDP to H4 in the $SUBJECT. However, should be
+correct elsewhere.
 
-diff --git a/arch/arm/boot/dts/omap2420-sdp.dts b/arch/arm/boot/dts/omap2420-sdp.dts
-new file mode 100644
-index 0000000..2c292c9
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420-sdp.dts
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap2.dtsi"
-+
-+/ {
-+	model = "TI OMAP2420 SDP board";
-+	compatible = "ti,omap2-sdp", "ti,omap2420", "ti,omap2";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x84000000>; /* 64 MB */
-+	};
-+};
--- 
-1.7.9.5
+Jon
+
+> This series is based upon the linux-omap master branch (3.5-rc1).
+> 
+> V3: Rename OMAP2420 SDP to OMAP2420H4
+> V2: Correct typo in copyright date
+> 
+> Jon Hunter (2):
+>   arm/dts: OMAP2: Add support for OMAP2420H4 Board
+>   arm/dts: OMAP2: Fix interrupt controller binding
+> 
+>  arch/arm/boot/dts/omap2.dtsi       |    2 ++
+>  arch/arm/boot/dts/omap2420-sdp.dts |   20 ++++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap2420-sdp.dts
+> 
