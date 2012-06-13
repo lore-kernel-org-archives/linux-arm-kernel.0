@@ -1,49 +1,24 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 13 Jun 2012 10:09:10 +0530
-Subject: [PATCH 1/2] clk: cache parent clocks only for muxes
-In-Reply-To: <20120612190449.GH19410@gmail.com>
-References: <1338973891-28719-1-git-send-email-rnayak@ti.com>
- <1338973891-28719-2-git-send-email-rnayak@ti.com>
- <20120606104759.GN8262@n2100.arm.linux.org.uk>
- <20120612190449.GH19410@gmail.com>
-Message-ID: <4FD8196E.7080009@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 04:56:28 +0000
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <4FD77E35.3050703@ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+ <4FD63DBF.9000200@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
+ <4FD77E35.3050703@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 June 2012 12:34 AM, Mike Turquette wrote:
-> On 20120606-11:47, Russell King - ARM Linux wrote:
->> On Wed, Jun 06, 2012 at 02:41:30PM +0530, Rajendra Nayak wrote:
->>> caching parent clocks makes sense only when a clock has more
->>> than one parent (mux clocks).
->>> Avoid doing this for every other clock.
->>>
->>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>> ---
->>>   drivers/clk/clk.c |    2 +-
->>>   1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>> index 687b00d..40568e9 100644
->>> --- a/drivers/clk/clk.c
->>> +++ b/drivers/clk/clk.c
->>> @@ -1229,7 +1229,7 @@ int __clk_init(struct device *dev, struct clk *clk)
->>>   	 * If clk->parents is not NULL we skip this entire block.  This allows
->>>   	 * for clock drivers to statically initialize clk->parents.
->>>   	 */
->>> -	if (clk->num_parents&&  !clk->parents) {
->>> +	if ((clk->num_parents>  1)&&  !clk->parents) {
->>
->> You don't need the additional parens here.  Please learn the C precedence
->> rules.  Additional unnecessary parens can make expressions much harder
->> to read.
->
-> Rajendra,
->
-> I've taken this patch into clk-next for testing.  I've fixed up the
-> extra parens locally, so no need for a resend.
+Hi Jon,
 
-Thanks Mike.
+On Tue, Jun 12, 2012 at 23:06:53, Hunter, Jon wrote:
 
->
-> Regards,
-> Mike
+> Should you at least warn, if you are going to over-write a value?
+
+Yes, that would be better except for too much logging, if Tony
+prefers that way I will add. 
+
+Regards
+Afzal
