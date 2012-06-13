@@ -1,85 +1,45 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Wed, 13 Jun 2012 16:23:19 +0800
-Subject: [PATCH V2 2/5] ARM: OMAP3EVM: Adding USB internal LDOs board file
-In-Reply-To: <4FD84C57.5000605@compulab.co.il>
-References: <zumeng.chen@gmail.com>
- <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
- <1339551850-20827-3-git-send-email-zumeng.chen@gmail.com>
- <4FD84C57.5000605@compulab.co.il>
-Message-ID: <4FD84DF7.8050400@windriver.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 13 Jun 2012 16:33:58 +0800
+Subject: [PATCH] ARM: gic: add irq_set_affinity to gic_arch_extn
+Message-ID: <1339576438-23638-1-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?06?13? 16:16, Igor Grinberg ??:
-> On 06/13/12 04:44, Zumeng Chen wrote:
->> From: Zumeng Chen<zumeng.chen@windriver.com>
->>
->> EHCI PHY requires these regulators:
->>          EVM Rev>=E  -->  VAUX2
->>          EVM Rev<  E  -->  VUSB1V5, VUSB1V8
->>
->> Adding USB internal LDOs (vusb1v5&  vusb1v8) and VAUX2 to omap3evm
->> board file. Also removing vaux2_{1/2/3} supplies as they are not
->> used on omap3 evm.
->>
->> But we need not to add vaux2 in twl4030_platform_data since it will
->> be added conditionally.
->>
->> Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
->> Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
->> Signed-off-by: Zumeng Chen<zumeng.chen@windriver.com>
->> ---
->>   arch/arm/mach-omap2/board-omap3evm.c |   27 +++++++++++++++++++++++++++
->>   1 files changed, 27 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
->> index 0b83d0e..3c91534 100644
->> --- a/arch/arm/mach-omap2/board-omap3evm.c
->> +++ b/arch/arm/mach-omap2/board-omap3evm.c
->> @@ -466,6 +466,30 @@ struct wl12xx_platform_data omap3evm_wlan_data __initdata = {
->>   };
->>   #endif
->>
->> +/* VAUX2 for USB */
->> +static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
->> +	REGULATOR_SUPPLY("VDD_CSIPHY1", "omap3isp"),	/* OMAP ISP */
->> +	REGULATOR_SUPPLY("VDD_CSIPHY2", "omap3isp"),	/* OMAP ISP */
->> +	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
->> +	{
->> +		.supply		= "vaux2",
->> +	}
-> This too can use the REGULATOR_SUPPLY() macro, why not use it?
-Yes, Of course from me, I'll try to see if there is other considerations
-from the original patch. If no I'll change it.
+From: Bin Wang <binw@marvell.com>
 
-Regards,
-Zumeng
->> +};
->> +
->> +static struct regulator_init_data omap3evm_vaux2 = {
->> +	.constraints = {
->> +		.min_uV		= 2800000,
->> +		.max_uV		= 2800000,
->> +		.apply_uV	= true,
->> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
->> +					| REGULATOR_MODE_STANDBY,
->> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE
->> +					| REGULATOR_CHANGE_STATUS,
->> +	},
->> +	.num_consumer_supplies		= ARRAY_SIZE(omap3evm_vaux2_supplies),
->> +	.consumer_supplies		= omap3evm_vaux2_supplies,
->> +};
->> +
->>   static struct twl4030_platform_data omap3evm_twldata = {
->>   	/* platform_data for children goes here */
->>   	.keypad		=&omap3evm_kp_data,
->> @@ -659,6 +683,9 @@ static void __init omap3_evm_init(void)
->>   	omap_mux_init_gpio(63, OMAP_PIN_INPUT);
->>   	omap_hsmmc_init(mmc);
->>
->> +	if (get_omap3_evm_rev()>= OMAP3EVM_BOARD_GEN_2)
->> +		omap3evm_twldata.vaux2 =&omap3evm_vaux2;
->> +
->>   	omap3_evm_i2c_init();
->>
->>   	omap_display_init(&omap3_evm_dss_data);
+Some architectures would shut done the mp logic for certain low power
+mode cases, thus it relies on an external interrupt controller to
+wake up the cores. In order to keep the same interrupt distribute
+mapping as in the gic, here export the irq_set_affinity hook in the
+gic_arch_extn.
+
+Signed-off-by: Bin Wang <binw@marvell.com>
+---
+ arch/arm/common/gic.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 5b60d5e..c3d5b31 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -54,6 +54,7 @@ struct irq_chip gic_arch_extn = {
+ 	.irq_retrigger	= NULL,
+ 	.irq_set_type	= NULL,
+ 	.irq_set_wake	= NULL,
++	.irq_set_affinity = NULL,
+ };
+ 
+ #ifndef MAX_GIC_NR
+@@ -186,6 +187,10 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 
+ 	mask = 0xff << shift;
+ 	raw_spin_lock(&irq_controller_lock);
++
++	if (gic_arch_extn.irq_set_affinity)
++		gic_arch_extn.irq_set_affinity(d, mask_val, false);
++
+ 	d->node = cpu;
+ #ifdef CONFIG_CPU_MMP3
+ 	cpu = smp_hardid[cpu];
+-- 
+1.7.0.4
