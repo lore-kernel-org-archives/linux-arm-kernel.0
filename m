@@ -1,67 +1,130 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Jun 2012 10:08:09 -0500
-Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998E2F@DBDE01.ent.ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
- <4FD64D6D.3020401@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
- <4FD77EF1.8000600@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
- <20120613120208.GN12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998E2F@DBDE01.ent.ti.com>
-Message-ID: <4FD8ACD9.1010507@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Jun 2012 10:09:54 -0500
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
+Message-ID: <4FD8AD42.6010702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
-
-On 06/13/2012 08:05 AM, Mohammed, Afzal wrote:
-> Hi Tony,
+On 06/13/2012 07:34 AM, Richard Zhao wrote:
+> Sometimes, boards have gpios that don't own by any driver or owner
+> by a generic driver that don't like hacks. Such gpios is normally
+> output and need setup once on boot. So I introduce the config-on-boot
+> gpios.
 > 
-> On Wed, Jun 13, 2012 at 17:32:09, Tony Lindgren wrote:
->> * Mohammed, Afzal <afzal@ti.com> [120612 22:24]:
->>> Hi Jon,
->>>
->>> On Tue, Jun 12, 2012 at 23:10:01, Hunter, Jon wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
+>  arch/arm/mach-imx/mach-imx6q.c                     |   35 ++++++++++++++++++++
+>  3 files changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/config-on-boot.txt
 > 
->>>> Right but potentially, this could be done by the driver.
->>>
->>> I do not think it is practically possible. Please see timing calculations
->>> in arch/arm/mach-omap2/gpmc-*, the way it is done for different
->>> peripherals are different, and we cannot expect gpmc driver to do those as
->>> that would require gpmc driver being aware of type of peripheral connected.
->>>
->>> And all those gpmc-* timing calculation needs to be done before driver
->>> is ready, they rely on functions like gpmc_get_fclk_rate(), which in turn
->>> requires the clk rate to be available before driver is probed.
->>
->> Yeah I also think the GPMC code should handle the L3 timings, and dynamically
->> calculate them for DVFS when L3 frequency changes. Does the GPMC have enough
->> information now to do that?
-> 
-> Do you mean that gpmc driver should have the capability to calculate peripheral
-> timings at runtime based on frequency ?, I am not sure how this can be handled
-> by gpmc driver as calculation for different peripherals are done in different
-> way, requiring gpmc driver to know about connected peripheral, that would imply
-> that gpmc driver would not be peripheral agnostic.
+> diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt b/Documentation/devicetree/bindings/arm/config-on-boot.txt
+> new file mode 100644
+> index 0000000..f98ed74
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
+> @@ -0,0 +1,12 @@
+> +* Configure on Boot
+> +
+> +Node name: config-on-boot
+> +  It must be in root node. config-on-boot means to describe settings that needs
+> +  to be set one time on boot but aren't owned by any driver, or the owned driver
+> +  is too generic to handle such settings. For example, usb hub uses generic
+> +  driver in usb core code, a on-board usb may need deassert reset pin.
 
-I guess I still don't agree with this. From the gpmc timing point of
-view it should not care what device is connected, it just needs to know
-the associated timings. Therefore, the gpmc driver just needs the time
-associated with the different timings fields in the various GPMC_CONFIGx
-registers and then convert to clocks based upon the gpmc fclk. The only
-item that is device specific here is the actual timing values and these
-can be passed to the driver.
+NAK. This is not a h/w description and should be solved within the
+kernel or bootloader. Either fix this in u-boot, the platform code, or
+make the generic driver support this in a generic way.
 
-Furthermore, gpmc_cs_set_timings function is completely device agnostic.
-Why can we not call this from within the driver? Why does it need to be
-called outside the driver?
+Rob
 
-I am looking for you to prove me wrong about this, but if the only
-reason is because we need to fclk rate and timings, then as I have
-mentioned before we can pass these to the driver. So I am looking for a
-stronger reason than this of why this would not work.
-
-Cheers
-Jon
+> +
+> +Optional properties:
+> +- output-gpios: Output gpio array that needs to set.
+> +- output-gpio-values: This property is required if output-gpios is set.
+> +  The value is a array of 0 or 1. Total count eaquals the number of gpios.
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index e0ec929..1dd2261 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -17,6 +17,13 @@
+>  	model = "Freescale i.MX6 Quad SABRE Lite Board";
+>  	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+>  
+> +	config-on-boot {
+> +		output-gpios = <
+> +				&gpio3 22 0>;	/* vbus reset */
+> +		output-gpio-values = <
+> +				1>;		/* vbus reset */
+> +	};
+> +
+>  	memory {
+>  		reg = <0x10000000 0x40000000>;
+>  	};
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index b47e98b..577cf19 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/pinctrl/machine.h>
+> @@ -113,6 +114,38 @@ static void __init imx6q_sabrelite_init(void)
+>  	imx6q_sabrelite_cko1_setup();
+>  }
+>  
+> +static void __init imx6q_config_on_boot(void)
+> +{
+> +	struct device_node *np;
+> +	struct property *pp;
+> +	int cnt, len, i;
+> +	int gpio;
+> +
+> +	np = of_find_node_by_path("/config-on-boot");
+> +	if (!np)
+> +		return;
+> +	cnt = of_gpio_named_count(np, "output-gpios");
+> +	pp = of_find_property(np, "output-gpio-values", &len);
+> +	if (!pp || cnt != len / sizeof(u32)) {
+> +		pr_err("Invalid config-on-boot gpios!\n");
+> +		of_node_put(np);
+> +		return;
+> +	}
+> +	for (i = 0; i < cnt; i++) {
+> +		gpio = of_get_named_gpio(np, "output-gpios", i);
+> +		if (gpio_is_valid(gpio))
+> +			gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH,
+> +					"config-on-boot");
+> +	}
+> +
+> +	of_node_put(np);
+> +}
+> +
+> +static void __init imx6q_post_populate(void)
+> +{
+> +	imx6q_config_on_boot();
+> +}
+> +
+>  static void __init imx6q_init_machine(void)
+>  {
+>  	/*
+> @@ -126,6 +159,8 @@ static void __init imx6q_init_machine(void)
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  
+> +	imx6q_post_populate();
+> +
+>  	imx6q_pm_init();
+>  }
+>  
