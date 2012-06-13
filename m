@@ -1,89 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Jun 2012 18:14:08 +0200
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
-In-Reply-To: <201206121349.27696.arnd@arndb.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 13 Jun 2012 18:12:57 +0200
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
+In-Reply-To: <20120613154829.GH14756@titan.lakedaemon.net> (Jason Cooper's
+ message of "Wed, 13 Jun 2012 11:48:29 -0400")
 References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <201206121349.27696.arnd@arndb.de>
-Message-ID: <20120613181408.7e03fcae@skate>
+ <4FD8AC5E.1060804@redhat.com>
+ <20120613154829.GH14756@titan.lakedaemon.net>
+Message-ID: <87d353xkae.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Le Tue, 12 Jun 2012 13:49:27 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+> On Wed, Jun 13, 2012 at 11:06:06AM -0400, Jon Masters wrote:
+>> On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
+>> 
+>> > You'll find in this patch set the new version of the initial support for a
+>> > new family of ARMv7-compatible Marvell SoCs initially submitted by my
+>> > colleague Thomas Petazzoni. Following the conclusion of the discussion when
+>> > we submitted our first version we have chosen to add this support for this
+>> > SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+>> 
+>> Pardon my silly question. I know that there's an effort to reconcile the
+>> two different SoCs so you're picking a neutral name, but what does
+>> "mvebu" mean, and will you be persistently keeping this name? 
+>
+> As persistent as anything else is in life ;-P  It covers all the SoCs that
+> have come out of Marvell's EBU division.  This includes orion5x,
+> kirkwood, dove, mv78xxx, the new armada xp, etc.
+>
+> We're placing all boards under that umbrella with DT support into
+> mach-mvebu/.  Eventually, once DT conversion is complete, the other
+> directories will empty out and mach-mvebu/ will hold all support for
+> those SoCs.
+>
+> Currently, the only boards with DT support are in mach-kirkwood/: the
+> dreamplug, iconnect, and a few others.  Before it gets too out of hand,
+> Arnd has a patch series which consolidates it all into mach-mvebu/.
+>
+>> Our guys want to know what this new platform will entail for Fedora
+>> support in terms of the platform name being used in various non-kernel
+>> places.
+>
+> I'm not familiar with how Fedora does it, but debian has five
+> different
 
-> > Andrew Lunn asked for refactoring the _restart() function to being used by
-> > any MVEBU SOC, but we didn't find a nice way to do it. Indeed the registers
-> > mapping differs between the SOC and the bit mask too. A solution could be to
-> > get this mapping through the device tree, but we are not sure it was a good
-> > usage of the device tree.
-> 
-> As I suggested in my reply to patch 4/8, I think this can be encapsulated
-> in one file that acts as a driver for the generic ("bridge regs") registers
-> and provides functions for that based on the "compatible" property.
+nitpick: 6 different
 
-The problem here is that those registers are part of a random set of
-registers, that do not really constitute a sort of coherent "device",
-as we have for other IP blocks (SATA controllers, SPI controllers,
-etc.). First of all, the "bridge regs" name was unfortunate and a
-left-over from early versions of the code, the datasheet does not refer
-to them as "bridge registers" in any location.
+> armel kernels, each supporting a range of boards.
+>
+> linux-image-iop32x
+> linux-image-ixp4xx
+> linux-image-kirkwood
+> linux-image-orion5x
+> linux-image-versatile
 
-On the Armada 370, the registers needed to restart the machine are part
-of a "Miscellaneous Registers" section in the list of register
-sections. This Miscellaneous Registers are 32 bits registers organized
-as follows:
+there's also linux-image-mv78xx0.
 
- * SoC Control Register
- * SoC Device Mux Register
- * Power Management Memory Power Down 2 Register
- * Power Management Memory Power Down 3 Register
- * Power Management Memory Power Down 4 Register
- * Power Management Memory Power Down 5 Register
- * Power Management Clock Gating Control Register
- * Power Management Memory Power Down 6 Register
- * Sample at Reset Register
- * Sample at Register High Register
- * Device ID Register
- * CPU SoC ID Register 
- * SYSRSTn Length Counter Register
- * RSTOUTn Mask Register -- this one needed for restart
- * System Soft Reset Register -- this one needed for restart
- * Shared SERDES 063 selectors Register
- * Boot ROM Routine and Error Code Register
- * PCI Express Boot Address Register
-
-This registers are more or less contiguous, from offset 0x18204 to
-0x182D4. As you can see, the purpose of those registers are very
-different from one register to another, so it's kind of odd to create a
-"driver" that would span those registers.
-
-On the Armada XP, we have a "System Registers" area, subdivided by the
-datasheet in "Configuration and Control", "QSGMII Control and Status",
-"SERDES", "Power Management and Memory Power Down", "Thermal Manager",
-"BootROM", "Interrupt, "Design for Testability". But from an
-offset/address perspective, some registers of the "Power Management and
-Memory Power Down" subsection are in the middle of the registers of the
-"Configuration and Control" registers.
-
-For the restart problem on Armada XP, the two registers of interest are
-within the "Configuration and Control" subsection.
-
-Our biggest problem is that all those registers do not really match
-very well with a device/driver representation, so we don't know how to
-nicely represent them in the device tree. How would you recommend to
-handle these?
-
-If further details are needed on the registers organization in order to
-find the best solution, I'll be happy to provide them.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Arnaud
