@@ -1,51 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 05:27:48 -0700
-Subject: [PATCH 4/9] ARM: OMAP2+: gpmc-tusb6010: Adapt to use gpmc driver
-In-Reply-To: <9c6c6b0298e37b1985a89e2cd99c35504521a1da.1339419379.git.afzal@ti.com>
-References: <cover.1339419379.git.afzal@ti.com>
- <9c6c6b0298e37b1985a89e2cd99c35504521a1da.1339419379.git.afzal@ti.com>
-Message-ID: <20120613122747.GQ12766@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Jun 2012 13:28:17 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD6F0E8.5040606@linaro.org>
+ <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
+ <4FD83AAD.2010701@linaro.org>
+ <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+Message-ID: <4FD88761.9050703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [120611 08:19]:
-> @@ -106,7 +123,14 @@ static int tusb_set_async_mode(unsigned sysclk_ps, unsigned fclk_ps)
->  	tmp = t.cs_wr_off * 1000 + 7000 /* t_acsn_rdy_z */;
->  	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
->  
-> -	return gpmc_cs_set_timings(async_cs, &t);
-> +	/* gpmc driver interface */
-> +	if (gpmc_tusb_data.pdata != NULL) {
-> +		gpmc_tusb_cs_data[CS_ASYNC_IDX].time_ctrl.type = has_period;
-> +		gpmc_tusb_cs_data[CS_ASYNC_IDX].time_ctrl.timings = t;
-> +		return 0;
-> +	/* old interface */
-> +	} else
-> +		return gpmc_cs_set_timings(async_cs, &t);
->  }
->  
->  static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
-> @@ -174,7 +198,16 @@ static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
->  	tmp = t.cs_wr_off * 1000 + 7000 /* t_scsn_rdy_z */;
->  	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
->  
-> -	return gpmc_cs_set_timings(sync_cs, &t);
-> +	t.clk_activation = gpmc_ticks_to_ns(1);
-> +
-> +	/* gpmc driver interface */
-> +	if (gpmc_tusb_data.pdata != NULL) {
-> +		gpmc_tusb_cs_data[CS_SYNC_IDX].time_ctrl.type = has_period;
-> +		gpmc_tusb_cs_data[CS_SYNC_IDX].time_ctrl.timings = t;
-> +		return 0;
-> +	/* old interface */
-> +	} else
-> +		return gpmc_cs_set_timings(sync_cs, &t);
->  }
+On 13/06/12 09:12, Linus Walleij wrote:
+> On Wed, Jun 13, 2012 at 9:01 AM, Lee Jones<lee.jones@linaro.org>  wrote:
+>
+>> Board specific is fine, as the data is protected by a board specific
+>> property. Do you mean that the properties are *bus specific*? In which case
+>> I see your point and will apply the correct bindings.
+>
+> I cannot parse this, the board for me is a SoC, busses and a
+> number of components connected via e.g. I2C.
+>
+> Can you define what you mean with a "board specific property"?
+> It seems you are talking about what I would call an
+> "SoC-specific property", i.e. something out of a .dtsi file for
+> a certain SoC, whereas the .dts for an entire board is,
+> well, for a board, a set of components on a PCB.
+>
+> The arrangement of accelerometers and battery monitors on a
+> certain board is board-specific, and it is also by definition
+> bus-specific.
 
-We can drop the old interface for non-mainline cases. In this case
-tusb6010 is only used by board-n8x0.c, so it's best to just convert
-it all to use the new interface.
+Okay, let's put it another way. We can individualise any board, bus, 
+platform, machine or system by placing all of the information in a DT 
+node so long as we plonk it in the correct place within the Device Tree. 
+However, we have just as much control by keeping them in separate 
+structs in the C file and selecting the right one using the compatible 
+sting.
 
-Regards,
+The real item for discussion is; if we have varying configurations for 
+each of the i2c buses residing on the same SoC, do we really want to use 
+different compatible strings to identify each one. If the answer is no, 
+which I think it is, then I need to write the bindings and have 
+everything individually configurable from Device Tree.
 
-Tony
+While you're mulling this over, I'm just going to write the bindings anyway.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
