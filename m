@@ -1,40 +1,42 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Wed, 13 Jun 2012 10:33:13 -0700
-Subject: Where to power on the wifi device before loading the
- driver.
-In-Reply-To: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
-References: <6B4D417B830BC44B8026029FD256F7F1C377BFFE88@HKMAIL01.nvidia.com>
-Message-ID: <4FD8CED9.6030901@broadcom.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Jun 2012 13:09:36 -0500
+Subject: [PATCH v3 0/4] DT clock bindings
+In-Reply-To: <20120613152658.GE32111@tbergstrom-lnx.Nvidia.com>
+References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
+ <20120613152658.GE32111@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4FD8D760.3070406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Peter,
 
-On 06/13/2012 03:40 AM, Wei Ni wrote:
-> In the brcmfmac init routine, it call sdio_register_driver() to register driver, if the wifi device is powered on, then the mmc driver will enumerate it, and call the probe callback routine.
->
-> On the Cardhu, the wifi's power is controlled by two gpios (power-gpio and reset-gpio), the default state is power-off. So we need to power on it before calling sdio_register_driver(), if not, the mmc driver can't enumerate it, and will not call the probe routine.
-> This power on sequence is:
-> set power-gpio to 1 ;
-> mdelay(100) ;
-> set reset-gpio to 1 ;
-> mdelay(200);
->
-> My question is where to power on the wifi. We may have three places to power on it:
-> 1. power on it in the brcmfmac driver before calling sdio_register_driver(). But I think this power sequence is special for tegra30 cardhu, it's not good to add it in the generic wifi driver, because different board may use the different way to power on the wifi.
-> 2. power on it in the mmc driver. In our tegra SD driver, it has power-gpios property, which allow the slot to be powered. But this power is for mmc slot, could we add this wifi power sequence in the tegra SD driver?
-> 3. hard-coded into DT. Set these gpios in the DT, something like pinmux settings, but in this way, it's not good to put the mdelay() value in the DT.
+On 06/13/2012 10:26 AM, Peter De Schrijver wrote:
+> On Tue, Jun 12, 2012 at 04:41:47PM +0200, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This series defines clock bindings for Device-Tree and adds kernel
+>> support using the common clock infrastructure. The last patch enables
+>> DT clock support for the Calxeda Highbank platform.
+>>
+>> I'm posting this again to solicit further review. There has been some
+>> discussion[1], but no definite path forward. This series is not changed
+>> from the last post other than rebasing to v3.5-rc2.
+>>
+>> Rob
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100932.html
+>>
+> 
+> How would this binding work for clocks which can take a spinlock pointer as a
+> init parameter (eg. clk-gate).
 
-We introduced oob interrupt support in 3.5 [1]. We are using a virtual 
-platform device to retrieve board specific oob interrupt GPIO setting. 
-You should be able to implement the power control in this way as well. 
-Brcmfmac gets the GPIOs through platform device interface, powers up the 
-chip and triggers a card detection. Then 4329 should be enumerated by 
-MMC stack. The reason we didn't implement this is the card detection. 
-Some design doesn't have hardware card detection since the WiFi chip is 
-already on board. And the current MMC stack doesn't have virtual card 
-detection interface.
+Other than fixed clocks, this makes no attempt at generic bindings.
+There is still per clock init required which can allocate a spinlock if
+necessary. If you look at the highbank code, it would be trivial to
+initialize spinlocks as needed.
 
-Franky
+Rob
 
-[1]: http://www.spinics.net/lists/linux-wireless/msg89335.html
+> Cheers,
+> 
+> Peter.
