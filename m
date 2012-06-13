@@ -1,37 +1,15 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Jun 2012 00:03:17 +0200
-Subject: [Patch v5 05/13] usb: otg: add basic mxs phy driver support
-In-Reply-To: <201206132356.16093.marex@denx.de>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
- <20120613213312.GD30400@pengutronix.de>
- <201206132356.16093.marex@denx.de>
-Message-ID: <20120613220317.GH30400@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Jun 2012 16:03:30 -0600
+Subject: [PATCH] i2c: let the core register devices from devicetree
+In-Reply-To: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <4FD90E32.5040309@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 11:56:15PM +0200, Marek Vasut wrote:
-> Dear Sascha Hauer,
-> 
-> > 
-> > This message is rather useless. It is really not expected for kzalloc
-> > to fail. If it fails here you really have problems elsewhere and this
-> > message won't help you debugging it.
-> 
-> It's not useless, but it'll hardly ever be displayed if you run out of memory so 
-> badly this kzalloc() will fail.
+On 06/13/2012 03:12 PM, Wolfram Sang wrote:
+> Currently, every driver has to do it on its own, but it should be done
+> in the core, like we already do with board_info structs.
 
-If you run out of memory while allocating a few bytes it's really
-not interesting where exactly this happens. The message won't give
-you any hint where you can fix this problem. Also, if you bail out
-of a drivers probe function with -ENOMEM you will have a message
-in the log anyway.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+At least on Tegra this works fine,
+Tested-by: Stephen Warren <swarren@wwwdotorg.org>
