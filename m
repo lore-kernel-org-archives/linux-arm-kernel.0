@@ -1,91 +1,56 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 12 Jun 2012 21:04:10 -1000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120613055437.GB31001@avionic-0098.mockup.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
- <4FD66410.7090001@wwwdotorg.org>
- <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
- <4FD763C5.3090500@wwwdotorg.org>
- <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
- <4FD7943E.60302@firmworks.com> <4FD79CAE.9090006@wwwdotorg.org>
- <4FD79DE8.90603@firmworks.com>
- <20120613055437.GB31001@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4FD83B6A.4020804@firmworks.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 13 Jun 2012 08:18:57 +0100
+Subject: [PATCH] kprobes: only test 'sub pc, pc, #1b-2b+8-2' on ARMv6
+In-Reply-To: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
+References: <1339502874-9104-1-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <1339571937.2759.13.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/12/2012 7:54 PM, Thierry Reding wrote:
-> * Mitch Bradley wrote:
->> On 6/12/2012 9:46 AM, Stephen Warren wrote:
->>> On 06/12/2012 01:10 PM, Mitch Bradley wrote:
->>>> On 6/12/2012 7:20 AM, Thierry Reding wrote:
->>> ...
->>>>> I came up with the following alternative:
->>>>>
->>>>> 	pci {
->>>>> 		compatible = "nvidia,tegra20-pcie";
->>>>> 		reg =<0x80003000 0x00000800   /* PADS registers */
->>>>> 		       0x80003800 0x00000200   /* AFI registers */
->>>>> 		       0x80004000 0x00100000   /* configuration space */
->>>>> 		       0x80104000 0x00100000   /* extended configuration space */
->>>>> 		       0x80400000 0x00010000   /* downstream I/O */
->>>>> 		       0x90000000 0x10000000   /* non-prefetchable memory */
->>>>> 		       0xa0000000 0x10000000>; /* prefetchable memory */
->>>>> 		interrupts =<0 98 0x04   /* controller interrupt */
->>>>> 		              0 99 0x04>; /* MSI interrupt */
->>>>> 		status = "disabled";
->>>>>
->>>>> 		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
->>>>> 			  0x80004000 0x80004000 0x00100000   /* configuration space */
->>>>> 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
->>>>> 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
->>>>> 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
->>>>> 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
->>>>>
->>>>> 		#address-cells =<1>;
->>>>> 		#size-cells =<1>;
->>>>>
->>>>> 		port at 80000000 {
->>>>> 			reg =<0x80000000 0x00001000>;
->>>>> 			status = "disabled";
->>>>> 		};
->>>>>
->>>>> 		port at 80001000 {
->>>>> 			reg =<0x80001000 0x00001000>;
->>>>> 			status = "disabled";
->>>>> 		};
->>>>> 	};
->>>>>
->>>>> The "ranges" property can probably be cleaned up a bit, but the most
->>>>> interesting part is the port@ children, which can simply be enabled in board
->>>>> DTS files by setting the status property to "okay". I find that somewhat more
->>>>> intuitive to the variant with an "enable-ports" property.
->>>>>
->>>>> What do you think of this?
->>>>
->>>> The problem is that children of a PCI-ish bus have specific expectations
->>>> about the parent address format - the standard 3-address-cell PCI
->>>> addressing.  So making a PCI bus node - even if it is PCIe - with 1
->>>> address cell is a problem.
->>>
->>> Couldn't you put the #address-cells=<3>   underneath each port node, and
->>> put any PCIe devices there rather than under the main PCIe controller
->>> node? I'm not sure how the interrupt mapping table etc. would work in
->>> that case, but that seems to solve the addressing issue.
->>
->> Yes, that would work just fine, and in fact would be preferable, if
->> a "root port" is essentially an independent PCI bus.  The parent of
->> those root ports should not be named "pci", though, as it is not in
->> itself a PCI bus.  It could be called "pcis".
->
-> Yes, on Tegra each of the ports provides a separate PCI bus. How about naming
-> the parent "pcie-controller"?
+On Tue, 2012-06-12 at 17:37 +0530, Rabin Vincent wrote:
+> 'sub pc, pc, #1b-2b+8-2' results in address<1:0> == '10'.
+> 
+> sub pc, pc, #const (== ADR pc, #const) performs an interworking branch
+> (BXWritePC()) on ARMv7+ and a simple branch (BranchWritePC()) on earlier
+> versions.
+> 
+> In ARM state, BXWritePC() is UNPREDICTABLE when address<1:0> == '10'.
+> 
+> In ARM state on ARMv6+, BranchWritePC() ignores address<1:0>.  Before
+> ARMv6, BranchWritePC() is UNPREDICTABLE if address<1:0> != '00'
+> 
+> So the instruction is UNPREDICTABLE both before and after v6.
 
-That seems like a fine name.
+I agree with this analysis. However, it is possible to have a kernel
+built to support both ARM v6 and v7 (e.g OMAP2+) in which case
+__LINUX_ARM_ARCH__ == 6 will be true but the code could be running on v7
+hardware. Therefore a compile time check for ARM architecture isn't
+sufficient to fix the problem.
 
-> IMO that reflects the nature of the device
-> better, whereas "pcis" would seem more like a "virtual" node for collecting
-> similar children.
->
-> Thierry
+I can only suggest to remove the test case. That feels a bit wrong, but
+I'm not sure it's worth the effort to get the test code infrastructure
+to support runtime checks for architecture version.
+
+-- 
+Tixy
+
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> ---
+>  arch/arm/kernel/kprobes-test-arm.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+> index ba32b39..6c926d5 100644
+> --- a/arch/arm/kernel/kprobes-test-arm.c
+> +++ b/arch/arm/kernel/kprobes-test-arm.c
+> @@ -187,8 +187,8 @@ void kprobe_arm_test_cases(void)
+>  	TEST_BF_R ("mov	pc, r",0,2f,"")
+>  	TEST_BF_RR("mov	pc, r",0,2f,", asl r",1,0,"")
+>  	TEST_BB(   "sub	pc, pc, #1b-2b+8")
+> -#if __LINUX_ARM_ARCH__ >= 6
+> -	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before ARMv6 */
+> +#if __LINUX_ARM_ARCH__ == 6
+> +	TEST_BB(   "sub	pc, pc, #1b-2b+8-2") /* UNPREDICTABLE before and after ARMv6 */
+>  #endif
+>  	TEST_BB_R( "sub	pc, pc, r",14, 1f-2f+8,"")
+>  	TEST_BB_R( "rsb	pc, r",14,1f-2f+8,", pc")
