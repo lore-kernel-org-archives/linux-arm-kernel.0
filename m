@@ -1,30 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Jun 2012 18:02:14 +0100
-Subject: Fwd: [RFC PATCH 00/15] ARM: perf: support multiple PMUs
-In-Reply-To: <20120613114326.GA14399@bnru02>
-References: <4B9A4BAF850C914D8DED94776A2C477E0B853A2F@nasanexd01b.na.qualcomm.com>
- <4E52A852.9090809@codeaurora.org>
- <20110822201546.GD22755@e102144-lin.cambridge.arm.com>
- <CAMzctLkwJCrgKoeYET=OYcfOifKuTEWoWfcRgWts4Y6aspZEUA@mail.gmail.com>
- <20120613114326.GA14399@bnru02>
-Message-ID: <20120613170214.GD11458@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Jun 2012 11:03:44 -0600
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120613063422.GC31001@avionic-0098.mockup.avionic-design.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
+ <4FD66410.7090001@wwwdotorg.org>
+ <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
+ <4FD763C5.3090500@wwwdotorg.org>
+ <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
+ <4FD7A36B.9090409@wwwdotorg.org>
+ <20120613063422.GC31001@avionic-0098.mockup.avionic-design.de>
+Message-ID: <4FD8C7F0.5050305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 12:43:27PM +0100, Srinidhi Kasagar wrote:
-> > The series is based on Will Deacon's perf-updates branch at:
-> >        git://linux-arm.org/linux-2.6-wd.git perf-updates
-> > 
-> > An example driver using the framework (supporting the PMU present in
-> > L220/PL310 level 2 cache controllers) can be found at:
-> >        git://linux-arm.org/linux-2.6-wd.git perf-l2x0-wip
-> > 
-> Do you still maintain this tree? Looks it is empty. I'm wondering if
-> we can make use of this to instrument the PMU counters of L2/pl310.
+On 06/13/2012 12:34 AM, Thierry Reding wrote:
+...
+> One other thing: in addition to the device tree binding, this will
+> all have to be represented in the platform data as well to support
+> the legacy board definitions currently in the tree. But instead of
+> adding all of these changes to the patch that converts the code to
+> a driver, I'm thinking it might be better to split these additions
+> off into one or more separate patches. Do you have any objections?
 
-There's an old branch here, but this stuff is pretty bit-rotted and needs
-reworking as part of the big.LITTLE support:
-
-http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=shortlog;h=refs/heads/perf/l2x0
-
-Will
+So long as git bisect isn't broken for build- or run-time, that's just
+fine.
