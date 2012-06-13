@@ -1,25 +1,106 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 13 Jun 2012 15:25:58 -0700
-Subject: [PATCH 01/14] rtc: ab8500-rtc: IRQF_ONESHOT when requesting a
- threaded IRQ
-In-Reply-To: <4FD70481.6020207@linaro.org>
-References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-2-git-send-email-lee.jones@linaro.org>
- <201206111531.20468.arnd@arndb.de> <4FD70481.6020207@linaro.org>
-Message-ID: <20120613152558.e6025b04.akpm@linux-foundation.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 13 Jun 2012 17:32:22 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <201206090004.10086.arnd@arndb.de>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <4FBAA64A.200@wwwdotorg.org> <4FD24CC3.50700@ti.com>
+ <201206090004.10086.arnd@arndb.de>
+Message-ID: <4FD914F6.6000402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jun 2012 09:57:37 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
+Hi Arnd,
 
-> The kernel now forces IRQs to be ONESHOT if no IRQ handler is passed.
+On 06/08/2012 07:04 PM, Arnd Bergmann wrote:
+> On Friday 08 June 2012, Jon Hunter wrote:
+>> On 05/21/2012 03:32 PM, Stephen Warren wrote:
+>>> On 05/21/2012 12:18 PM, Arnd Bergmann wrote:
+>>>> On Monday 21 May 2012, Stephen Warren wrote:
+>>>>>
+>>>>> If so, that seems a little odd; you have to request a DMA channel for
+>>>>> "TX", but then end up having the common code check all the entries in
+>>>>> the dmas property since it can't know which are TX, and then have the
+>>>>> wrong ones almost accidentally fail, since the DMAC will then determine
+>>>>> that it can't support TX on the RX DMA request IDs.
+>>>>
+>>>> I think the direction must be encoded in a way that does not depend on
+>>>> the binding for the specific controller. There are two ways I can see
+>>>> how we might do it:
+>>>>
+>>>> 1. have separate property names for tx and rx channels, and probably
+>>>>    one for combined rx/tx channels
+>>>
+>>>> 2. define the second cell in each channel specifier to be the direction
+>>>>    in a predefined format, followed by the other (controller specific)
+>>>>    attributes, if any.
+>>>
+>>> In this option, lets say bit 0 is 0==TX, 1==RX (or perhaps 2 bits if
+>>> combined TX/RX is needed)
+>>>
+>>> Then, we could reserve say bits 7:1 as client DMA request ID.
+>>>
+>>> And then have bits 31:8 as DMAC specific data.
+>>>
+>>> Wouldn't that allow us to have our cake and eat it?
+>>
+>> Sorry for not responding sooner.
+>>
+>> It seems to me we were pretty close on alignment. In fact, I was quite
+>> happy with Steven's 2nd to last proposal of  ...
+>>
+>> simple 1 req:
+>> dmas = <0 &dmac1 xxx>;
+>>
+>> simple 2 req:
+>> dmas = <0 &dmac1 xxx 1 &dmac1 yyy>;
+>>
+>> multiple dmacs:
+>> dmas = <0 &dmac1 xxx 0 &dmac2 zzz 1 &dmac1 yyy>;
+>>
+>> Arnd, I know that you had some concerns. However, in the above case I
+>> would expect that the 3rd parameter be optional and it can be some sort
+>> of match variable. In other words, we don't care how the 32-bits are
+>> encoded or what they represent but they would be used appropriately by
+>> the xlate function being used. So the xlate and this "match" variable
+>> would have to speak the same language.
+> 
+> I would at least put the &dmac part first to be consistent with other
+> bindings that refer to some node. That controller should then be
+> able to specify the number of additional cells used to describe the
+> dma request. We can define that the first cell after the controller
+> phandle is always the same thing, e.g. the direction (in/out/inout)
+> or a client-specific ID or a combination of that with other predefined
+> bits that are not dependent on dma controller specifics.
 
-What does this mean.  The kernel crashes?  The registration fails?  A
-warning is emitted?
+I agree with putting the &dmac phandle first, that makes sense.
 
-When fixing a bug, please fully describe the consequences of that bug.
+> As I said previously, I think just encoding the direction but not
+> the client specific ID (meaning we would have to disambiguate
+> the more complex cases that Stephen mentioned using a dma-names
+> property) would be the best because it keeps the common case simple,
+> but I could live with other things going in there too.
 
-> Cc: stable at vger.kernel.org
+Ok, so you are saying that there are some DMA controllers where there is
+no channel/request ID and only a direction is needed? So an even simpler
+case than what I had imagined.
 
-Especially when suggesting a -stable backport.
+So in that case, I don't see why the first cell after the phandle could
+not be an index which could be either a direction or request-id and then
+the next cell after that be a secondary match variable.
+
+So simple case with just a index (either req-id or direction) ...
+
+dmas = <&dmac0 index>
+
+More complex case ...
+
+dmas = <&dmac0 index match>
+
+For example, for OMAP index = req-id and match = direction ...
+
+dmas = <&dmac0 req-id direction>
+
+Or am I way off the page?
+
+Cheers
+Jon
