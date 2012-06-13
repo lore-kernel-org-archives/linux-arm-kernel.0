@@ -1,38 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Jun 2012 14:23:05 -0500
-Subject: [PATCH 2/2] ARM: vexpress: Enable selection of SPARSE_IRQ
-In-Reply-To: <1339607602-3846-3-git-send-email-tixy@linaro.org>
-References: <1339607602-3846-1-git-send-email-tixy@linaro.org>
- <1339607602-3846-3-git-send-email-tixy@linaro.org>
-Message-ID: <4FD8E899.8080207@gmail.com>
+From: apw@canonical.com (Andy Whitcroft)
+Date: Wed, 13 Jun 2012 20:27:40 +0100
+Subject: [RFC 1/4] ARM: topology: Add arch_scale_freq_power function
+In-Reply-To: <1339591969.8980.30.camel@twins>
+References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
+ <1339502524-10265-2-git-send-email-vincent.guittot@linaro.org>
+ <1339591969.8980.30.camel@twins>
+Message-ID: <20120613192740.GZ5878@dm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2012 12:13 PM, Jon Medhurst (Tixy) wrote:
-> From: Jon Medhurst <tixy@linaro.org>
+On Wed, Jun 13, 2012 at 02:52:49PM +0200, Peter Zijlstra wrote:
+> On Tue, 2012-06-12 at 14:02 +0200, Vincent Guittot wrote:
+> >         }
+> >         smp_wmb();
+> >  } 
 > 
-> This is required to add vexpress to multiplatform kernels containing
-> other boards which require SPARSE_IRQ.
+> You know what.. we should make checkpatch report an error for memory
+> barriers that don't have a comment. 
 > 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 84449dd..bdede09 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -311,6 +311,7 @@ config ARCH_VEXPRESS
->  	select HAVE_CLK
->  	select HAVE_PATA_PLATFORM
->  	select ICST
-> +	select MAY_HAVE_SPARSE_IRQ
+> I know this isn't added by this patch, but every time I see something
+> like it I cry a little.
 
-Why not always select SPARSE_IRQ and remove mach/irqs.h?
+Actually if it was a new line, it would have been reported, at least in
+theory:
 
-Rob
+    # check for memory barriers without a comment.
+		    if ($line =~
+    /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/)
+    {
+	if (!ctx_has_comment($first_line, $linenr)) {
+	    CHK("MEMORY_BARRIER",
+		"memory barrier without comment\n" . $herecurr);
+	}
+    }
 
->  	select NO_IOPORT
->  	select PLAT_VERSATILE
->  	select PLAT_VERSATILE_CLCD
+-apw
