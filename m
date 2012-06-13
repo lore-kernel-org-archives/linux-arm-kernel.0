@@ -1,64 +1,49 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Wed, 13 Jun 2012 15:55:10 +0300
-Subject: [PATCH 2/2] ARM: OMAP3: cm-t35: add tvp5150 decoder support
-In-Reply-To: <1339592110-14312-1-git-send-email-lifshitz@compulab.co.il>
-References: <1339592110-14312-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1339592110-14312-3-git-send-email-lifshitz@compulab.co.il>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Jun 2012 20:57:33 +0800
+Subject: [PATCH] ARM: irq: add a mach/fiq.h inclusion for SPARSE_IRQ build
+Message-ID: <1339592253-25142-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the tvp5150 video decoder in ISP subsystem.
+The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
+makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
+a nubmer of platforms have FIQ_START defined in mach/irqs.h.
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+  arch/arm/mach-at91/include/mach/irqs.h:#define FIQ_START AT91_ID_FIQ
+  arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
+  arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
+  arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
+  arch/arm/plat-omap/include/plat/irqs.h:#define FIQ_START                1024
+
+If SPARSE_IRQ is enabled for any of these platforms, the following
+compile error will be seen.
+
+  arch/arm/kernel/fiq.c: In function ?enable_fiq?:
+  arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
+  arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
+  arch/arm/kernel/fiq.c: In function ?disable_fiq?:
+  arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
+
+So before we can remove the reference to FIQ_START in fiq.c, we need
+a way out.  The patch adds a mach/fiq.h inclusion for SPARSE_IRQ build
+in asm/irq.h, so that platform can have a chance to provide FIQ_START.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-omap2/board-cm-t35.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/irq.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 05c66e8..97d7190 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -498,6 +498,9 @@ static struct i2c_board_info cm_t35_isp_i2c_boardinfo[] = {
- 	{
- 		I2C_BOARD_INFO("mt9t001", 0x5d),
- 	},
-+	{
-+		I2C_BOARD_INFO("tvp5150", 0x5c),
-+	},
- };
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 35c21c3..3fa390d 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -7,6 +7,7 @@
+ #include <mach/irqs.h>
+ #else
+ #define NR_IRQS NR_IRQS_LEGACY
++#include <mach/fiq.h>
+ #endif
  
- static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
-@@ -508,6 +511,14 @@ static struct isp_subdev_i2c_board_info cm_t35_isp_primary_subdevs[] = {
- 	{ NULL, 0, },
- };
- 
-+static struct isp_subdev_i2c_board_info cm_t35_isp_secondary_subdevs[] = {
-+	{
-+		.board_info = &cm_t35_isp_i2c_boardinfo[1],
-+		.i2c_adapter_id = 3,
-+	},
-+	{ NULL, 0, },
-+};
-+
- static struct isp_v4l2_subdevs_group cm_t35_isp_subdevs[] = {
- 	{
- 		.subdevs = cm_t35_isp_primary_subdevs,
-@@ -518,6 +529,15 @@ static struct isp_v4l2_subdevs_group cm_t35_isp_subdevs[] = {
- 			},
- 		},
- 	},
-+	{
-+		.subdevs = cm_t35_isp_secondary_subdevs,
-+		.interface = ISP_INTERFACE_PARALLEL,
-+		.bus = {
-+			.parallel = {
-+				.clk_pol = 0,
-+			},
-+		},
-+	},
- 	{ NULL, 0, },
- };
- 
+ #ifndef irq_canonicalize
 -- 
 1.7.5.4
