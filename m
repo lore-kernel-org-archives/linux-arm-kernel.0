@@ -1,31 +1,99 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 13 Jun 2012 18:26:58 +0300
-Subject: [PATCH v3 0/4] DT clock bindings
-In-Reply-To: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
-References: <1339512111-11172-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120613152658.GE32111@tbergstrom-lnx.Nvidia.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Wed, 13 Jun 2012 20:58:54 +0530
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+Message-ID: <CANrkHUaxJGcv2bdUWTCB_oKct-iFCKCdb7OQPTUjS4MuKeCS2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 04:41:47PM +0200, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This series defines clock bindings for Device-Tree and adds kernel
-> support using the common clock infrastructure. The last patch enables
-> DT clock support for the Calxeda Highbank platform.
-> 
-> I'm posting this again to solicit further review. There has been some
-> discussion[1], but no definite path forward. This series is not changed
-> from the last post other than rebasing to v3.5-rc2.
-> 
-> Rob
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100932.html
-> 
+On Mon, Jun 11, 2012 at 12:50 PM, Ming Lei <ming.lei@canonical.com> wrote:
+>
+> On Mon, Jun 11, 2012 at 2:21 PM, T Krishnamoorthy, Balaji
+> <balajitk@ti.com> wrote:
+> > Hi Ming Lei,
+> > Can you let me know if you noticed any write/timeout errors ?
+>
+> Nothing error logs found during writing.
+Hi,
 
-How would this binding work for clocks which can take a spinlock pointer as a
-init parameter (eg. clk-gate).
+Couldn't reproduce the issue with BeagleXM rev C, Might be a combination
+of rev and SD card. How often do you see mis-match in file content?
 
-Cheers,
+Can you please try the inlined patch to get more info?
 
-Peter.
+---
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 9a7a60a..77aabe6 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -60,6 +60,7 @@
+ #define OMAP_HSMMC_STAT		0x0130
+ #define OMAP_HSMMC_IE		0x0134
+ #define OMAP_HSMMC_ISE		0x0138
++#define OMAP_HSMMC_AC12		0x013C
+ #define OMAP_HSMMC_CAPA		0x0140
+
+ #define VS18			(1 << 26)
+@@ -177,6 +178,7 @@ struct omap_hsmmc_host {
+ 	int			reqs_blocked;
+ 	int			use_reg;
+ 	int			req_in_progress;
++	int			autocmd_err;
+ 	unsigned int		flags;
+ 	struct omap_hsmmc_next	next_data;
+
+@@ -983,6 +985,7 @@ static void omap_hsmmc_do_irq(struct
+omap_hsmmc_host *host, int status)
+ {
+ 	struct mmc_data *data;
+ 	int end_cmd = 0, end_trans = 0;
++	u32 autocmd12;
+
+ 	if (!host->req_in_progress) {
+ 		do {
+@@ -998,6 +1001,13 @@ static void omap_hsmmc_do_irq(struct
+omap_hsmmc_host *host, int status)
+
+ 	if (status & ERR) {
+ 		omap_hsmmc_dbg_report_irq(host, status);
++		if (status & (1 << 24)) {
++			host->autocmd_err = 1;
++			dev_err(mmc_dev(host->mmc), "AutoCMD error STAT 0x%x\n", status);
++			autocmd12 = OMAP_HSMMC_READ(host->base, AC12);
++			dev_err(mmc_dev(host->mmc), "AutoCMD error 0x%x\n", autocmd12);
++		}
++
+ 		if ((status & CMD_TIMEOUT) ||
+ 			(status & CMD_CRC)) {
+ 			if (host->cmd) {
+---
+>
+> Below is one of my test case.
+>
+> root at beagleboard:~# upk
+> updateing kernel...
+> flush storage...
+> root at beagleboard:~# cat bin/upk
+> #!/bin/sh
+>
+> echo "updateing kernel..."
+> cp -f /mnt/nfs/t/uImage /media/mmcblk0p1/
+>
+> echo "flush storage..."
+> sync
+> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+> root at beagleboard:~# umount /media/mmcblk0p1
+> root at beagleboard:~# mount -t vfat /dev/mmcblk0p1 /media/mmcblk0p1
+> root at beagleboard:~#
+> root at beagleboard:~#
+> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+>
+>
+> Thanks,
+> --
+> Ming Lei
