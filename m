@@ -1,49 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Jun 2012 20:57:33 +0800
-Subject: [PATCH] ARM: irq: add a mach/fiq.h inclusion for SPARSE_IRQ build
-Message-ID: <1339592253-25142-1-git-send-email-shawn.guo@linaro.org>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 13:05:53 +0000
+Subject: [PATCH v5 02/14] ARM: OMAP2+: gpmc: Adapt to HWMOD
+In-Reply-To: <20120613120208.GN12766@atomide.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <fb739c3c5383806f78cee3666f7c74d61bed6427.1339419492.git.afzal@ti.com>
+ <4FD64D6D.3020401@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997DD6@DBDE01.ent.ti.com>
+ <4FD77EF1.8000600@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9987B2@DBDE01.ent.ti.com>
+ <20120613120208.GN12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998E2F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
-makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
-a nubmer of platforms have FIQ_START defined in mach/irqs.h.
+Hi Tony,
 
-  arch/arm/mach-at91/include/mach/irqs.h:#define FIQ_START AT91_ID_FIQ
-  arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
-  arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
-  arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
-  arch/arm/plat-omap/include/plat/irqs.h:#define FIQ_START                1024
+On Wed, Jun 13, 2012 at 17:32:09, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120612 22:24]:
+> > Hi Jon,
+> > 
+> > On Tue, Jun 12, 2012 at 23:10:01, Hunter, Jon wrote:
 
-If SPARSE_IRQ is enabled for any of these platforms, the following
-compile error will be seen.
+> > > Right but potentially, this could be done by the driver.
+> > 
+> > I do not think it is practically possible. Please see timing calculations
+> > in arch/arm/mach-omap2/gpmc-*, the way it is done for different
+> > peripherals are different, and we cannot expect gpmc driver to do those as
+> > that would require gpmc driver being aware of type of peripheral connected.
+> > 
+> > And all those gpmc-* timing calculation needs to be done before driver
+> > is ready, they rely on functions like gpmc_get_fclk_rate(), which in turn
+> > requires the clk rate to be available before driver is probed.
+> 
+> Yeah I also think the GPMC code should handle the L3 timings, and dynamically
+> calculate them for DVFS when L3 frequency changes. Does the GPMC have enough
+> information now to do that?
 
-  arch/arm/kernel/fiq.c: In function ?enable_fiq?:
-  arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
-  arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
-  arch/arm/kernel/fiq.c: In function ?disable_fiq?:
-  arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
+Do you mean that gpmc driver should have the capability to calculate peripheral
+timings at runtime based on frequency ?, I am not sure how this can be handled
+by gpmc driver as calculation for different peripherals are done in different
+way, requiring gpmc driver to know about connected peripheral, that would imply
+that gpmc driver would not be peripheral agnostic.
 
-So before we can remove the reference to FIQ_START in fiq.c, we need
-a way out.  The patch adds a mach/fiq.h inclusion for SPARSE_IRQ build
-in asm/irq.h, so that platform can have a chance to provide FIQ_START.
+Or else some sort of a callback to be used ?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/include/asm/irq.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 35c21c3..3fa390d 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -7,6 +7,7 @@
- #include <mach/irqs.h>
- #else
- #define NR_IRQS NR_IRQS_LEGACY
-+#include <mach/fiq.h>
- #endif
+Out of the 20,14 are depending on bootloader, both omap3evm & beagle has been
+converted to utilize runtime calculation, but for other 12 boards, first
+we need to get values used by bootloader (those include peripherals that doesn't
+have gpmc-* helpers), then derive it based on expression, after that only, we
+will have information to achieve it and those are the ones that I do not
+have access to.
  
- #ifndef irq_canonicalize
--- 
-1.7.5.4
+Regards
+Afzal
+
+> 
+> Additionally GPMC should add constraints to DVFS if not enough data is know
+> to scale L3.
+> 
+> Tony
+> 
