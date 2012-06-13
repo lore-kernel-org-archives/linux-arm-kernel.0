@@ -1,51 +1,71 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Jun 2012 19:40:46 -0500
-Subject: [RESEND PATCH V3 2/2] arm/dts: OMAP2: Fix interrupt controller binding
-In-Reply-To: <1339548046-27988-1-git-send-email-jon-hunter@ti.com>
-References: <1339548046-27988-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1339548046-27988-3-git-send-email-jon-hunter@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 12 Jun 2012 21:41:13 -0300
+Subject: mx51evk kernel dump on next-20120612
+Message-ID: <CAOMZO5ARiGCVWgVeY-xzKcxPkXJjL-fYZEAmq=k=3gaT=_HDoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with device-tree on an OMAP2420H4, the kernel is hanging when
-initialising the interrupts and following kernel dumps is seen ...
+Hi,
 
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: at arch/arm/mach-omap2/irq.c:271 omap_intc_of_init+0x50/0xb4()
-[    0.000000] unable to get intc registers
-[    0.000000] Modules linked in:
-[    0.000000] [<c001befc>] (unwind_backtrace+0x0/0xf4) from [<c0040c34>] (warn_slowpath_common+0x4c/0x64)
-[    0.000000] [<c0040c34>] (warn_slowpath_common+0x4c/0x64) from [<c0040ce0>] (warn_slowpath_fmt+0x30/0x40)
-[    0.000000] [<c0040ce0>] (warn_slowpath_fmt+0x30/0x40) from [<c066b8a4>] (omap_intc_of_init+0x50/0xb4)
-[    0.000000] [<c066b8a4>] (omap_intc_of_init+0x50/0xb4) from [<c0688b70>] (of_irq_init+0x144/0x288)
-[    0.000000] [<c0688b70>] (of_irq_init+0x144/0x288) from [<c0663294>] (init_IRQ+0x14/0x1c)
-[    0.000000] [<c0663294>] (init_IRQ+0x14/0x1c) from [<c06607fc>] (start_kernel+0x198/0x304)
-[    0.000000] [<c06607fc>] (start_kernel+0x198/0x304) from [<80008044>] (0x80008044)
-[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-[    0.000000] of_irq_init: children remain, but no parents
+On a mx51evk running 3.5.0-rc2-next-20120612 I am getting:
 
-The OMAP2 interrupt controller binding is missing the number of interrupts and
-interrupt controller register address. Adding these fixes the problem.
+pinctrl core: initialized pinctrl subsystem
+------------[ cut here ]------------
+WARNING: at include/linux/regmap.h:391 regulator_register+0xf8c/0x1128()
+regmap API is disabled
+Modules linked in:
+Backtrace:
+[<80012510>] (dump_backtrace+0x0/0x10c) from [<80413ee0>] (dump_stack+0x18/0x1c)
+ r7:00000009 r6:00000187 r5:8022f7cc r4:9f84dd30
+[<80413ec8>] (dump_stack+0x0/0x1c) from [<80021ac0>]
+(warn_slowpath_common+0x54/0x6c)
+[<80021a6c>] (warn_slowpath_common+0x0/0x6c) from [<80021b7c>]
+(warn_slowpath_fmt+0x38/0x40)
+ r9:805d2c1f r8:8061f778 r7:9f84de04 r6:9f803c08 r5:805b78f8
+r4:9f803e00
+[<80021b44>] (warn_slowpath_fmt+0x0/0x40) from [<8022f7cc>]
+(regulator_register+0xf8c/0x1128)
+ r3:00000000 r2:804e7f40
+[<8022e840>] (regulator_register+0x0/0x1128) from [<804090a4>]
+(dummy_regulator_probe+0x48/0x80)
+[<8040905c>] (dummy_regulator_probe+0x0/0x80) from [<80257330>]
+(platform_drv_probe+0x20/0x24)
+ r6:9f803c08 r5:805b78bc r4:80620a5c
+[<80257310>] (platform_drv_probe+0x0/0x24) from [<80255e74>]
+(driver_probe_device+0x80/0x1f0)
+[<80255df4>] (driver_probe_device+0x0/0x1f0) from [<80256078>]
+(__driver_attach+0x94/0x98)
+ r9:8057d904 r8:0000008e r7:00000000 r6:9f803c3c r5:805b78bc
+r4:9f803c08
+[<80255fe4>] (__driver_attach+0x0/0x98) from [<80254630>]
+(bus_for_each_dev+0x68/0x94)
+ r7:00000000 r6:80255fe4 r5:9f84de90 r4:805b78bc
+[<802545c8>] (bus_for_each_dev+0x0/0x94) from [<80255cd4>]
+(driver_attach+0x20/0x28)
+ r7:00000000 r6:9f86e400 r5:805bb770 r4:805b78bc
+[<80255cb4>] (driver_attach+0x0/0x28) from [<80254f54>]
+(bus_add_driver+0x18c/0x268)
+[<80254dc8>] (bus_add_driver+0x0/0x268) from [<802566a8>]
+(driver_register+0x80/0x134)
+[<80256628>] (driver_register+0x0/0x134) from [<802576d8>]
+(platform_driver_register+0x4c/0x60)
+ r7:00000000 r6:805d2cc0 r5:8061f768 r4:8061f774
+[<8025768c>] (platform_driver_register+0x0/0x60) from [<8055b9a8>]
+(regulator_dummy_init+0x60/0x98)
+[<8055b948>] (regulator_dummy_init+0x0/0x98) from [<8055b798>]
+(regulator_init+0x68/0x8c)
+ r5:8061f768 r4:00000000
+[<8055b730>] (regulator_init+0x0/0x8c) from [<800086a4>]
+(do_one_initcall+0x40/0x194)
+ r5:00000002 r4:9f84c000
+[<80008664>] (do_one_initcall+0x0/0x194) from [<805393f4>]
+(kernel_init+0xfc/0x1cc)
+[<805392f8>] (kernel_init+0x0/0x1cc) from [<80026b40>] (do_exit+0x0/0x81c)
+---[ end trace 1b75b31a2719ed1c ]---
+dummy:
 
-This is based upon latest linux-omap master (3.5-rc1) git tree.
+Before I start to investigate this: is this a known issue?
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap2.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index f2ab4ea..581cb08 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -44,6 +44,8 @@
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
-+			ti,intc-size = <96>;
-+			reg = <0x480FE000 0x1000>;
- 		};
- 
- 		uart1: serial at 4806a000 {
--- 
-1.7.9.5
+Fabio Estevam
