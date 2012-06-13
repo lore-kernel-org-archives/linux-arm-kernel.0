@@ -1,267 +1,170 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 13 Jun 2012 23:12:10 +0200
-Subject: [PATCH] i2c: let the core register devices from devicetree
-Message-ID: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 13 Jun 2012 23:33:12 +0200
+Subject: [Patch v5 05/13] usb: otg: add basic mxs phy driver support
+In-Reply-To: <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <1339590863-10564-6-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120613213312.GD30400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, every driver has to do it on its own, but it should be done
-in the core, like we already do with board_info structs.
+On Wed, Jun 13, 2012 at 08:34:15PM +0800, Richard Zhao wrote:
+> mxs phy is used in Freescale i.MX SoCs, for example
+> imx23, imx28, imx6Q. This patch adds the basic host
+> support.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Peter Chen <peter.chen@freescale.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |   13 ++
+>  drivers/usb/otg/Kconfig                           |    8 +
+>  drivers/usb/otg/Makefile                          |    1 +
+>  drivers/usb/otg/mxs-phy.c                         |  204 +++++++++++++++++++++
+>  4 files changed, 226 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mxs-phy.txt
+>  create mode 100644 drivers/usb/otg/mxs-phy.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> new file mode 100644
+> index 0000000..5835b27
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -0,0 +1,13 @@
+> +* Freescale MXS USB Phy Device
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx23-usbphy"
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain phy interrupt
+> +
+> +Example:
+> +usbphy1: usbphy at 020c9000 {
+> +	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+> +	reg = <0x020c9000 0x1000>;
+> +	interrupts = <0 44 0x04>;
+> +};
+> diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+> index 5c87db0..3a9bc44 100644
+> --- a/drivers/usb/otg/Kconfig
+> +++ b/drivers/usb/otg/Kconfig
+> @@ -116,6 +116,14 @@ config FSL_USB2_OTG
+>  	help
+>  	  Enable this to support Freescale USB OTG transceiver.
+>  
+> +config USB_MXS_PHY
+> +	tristate "Freescale MXS USB PHY support"
+> +	select USB_OTG_UTILS
+> +	help
+> +	  Enable this to support the Freescale MXS USB PHY.
+> +
+> +	  MXS Phy is used by some of the i.MX SoCs, for example imx23/28/6x.
+> +
+>  config USB_MV_OTG
+>  	tristate "Marvell USB OTG support"
+>  	depends on USB_EHCI_MV && USB_MV_UDC && USB_SUSPEND
+> diff --git a/drivers/usb/otg/Makefile b/drivers/usb/otg/Makefile
+> index 41aa509..a844b8d 100644
+> --- a/drivers/usb/otg/Makefile
+> +++ b/drivers/usb/otg/Makefile
+> @@ -20,4 +20,5 @@ obj-$(CONFIG_USB_MSM_OTG)	+= msm_otg.o
+>  obj-$(CONFIG_AB8500_USB)	+= ab8500-usb.o
+>  fsl_usb2_otg-objs		:= fsl_otg.o otg_fsm.o
+>  obj-$(CONFIG_FSL_USB2_OTG)	+= fsl_usb2_otg.o
+> +obj-$(CONFIG_USB_MXS_PHY)	+= mxs-phy.o
+>  obj-$(CONFIG_USB_MV_OTG)	+= mv_otg.o
+> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
+> new file mode 100644
+> index 0000000..a55aaed
+> --- /dev/null
+> +++ b/drivers/usb/otg/mxs-phy.c
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> + * on behalf of DENX Software Engineering GmbH
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +
+> +#define DRIVER_NAME "mxs_phy"
+> +
+> +#define HW_USBPHY_PWD				0x00
+> +#define HW_USBPHY_CTRL				0x30
+> +#define HW_USBPHY_CTRL_SET			0x34
+> +#define HW_USBPHY_CTRL_CLR			0x38
+> +
+> +#define BM_USBPHY_CTRL_SFTRST			BIT(31)
+> +#define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+> +#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+> +
+> +struct mxs_phy {
+> +	struct usb_phy phy;
+> +	struct clk *clk;
+> +	int connected:1;
+> +};
+> +
+> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> +
+> +static void mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> +{
+> +	void __iomem *base = mxs_phy->phy.io_priv;
+> +
+> +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE, base + HW_USBPHY_CTRL_CLR);
+> +
+> +	/* Reset USBPHY module */
+> +	writel_relaxed(BM_USBPHY_CTRL_SFTRST, base + HW_USBPHY_CTRL_SET);
+> +	udelay(10);
+> +
+> +	/* Remove CLKGATE and SFTRST */
+> +	writel_relaxed(BM_USBPHY_CTRL_CLKGATE | BM_USBPHY_CTRL_SFTRST,
+> +			base + HW_USBPHY_CTRL_CLR);
+> +	udelay(10);
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
+Is stmp_reset_block() suitable for what you want to do here?
 
-Based on v3.5-rc2. Only build tested, I don't have a OF based device
-around at the moment.
+> +	base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!base)
+> +		return -EBUSY;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "can't get the clock!");
 
-@Peter: Why does ocores do the device registration manually via
-platform_data instead of using board_info?
+Please add the return value to these kind of messages.
 
- drivers/i2c/busses/i2c-cpm.c                |    5 -----
- drivers/i2c/busses/i2c-designware-platdrv.c |    1 -
- drivers/i2c/busses/i2c-gpio.c               |    2 --
- drivers/i2c/busses/i2c-ibm_iic.c            |    3 ---
- drivers/i2c/busses/i2c-imx.c                |    2 --
- drivers/i2c/busses/i2c-mpc.c                |    1 -
- drivers/i2c/busses/i2c-mxs.c                |    2 --
- drivers/i2c/busses/i2c-ocores.c             |    2 --
- drivers/i2c/busses/i2c-omap.c               |    2 --
- drivers/i2c/busses/i2c-pnx.c                |    2 --
- drivers/i2c/busses/i2c-pxa.c                |    1 -
- drivers/i2c/busses/i2c-s3c2410.c            |    1 -
- drivers/i2c/busses/i2c-sh_mobile.c          |    1 -
- drivers/i2c/busses/i2c-tegra.c              |    2 --
- drivers/i2c/busses/i2c-versatile.c          |    1 -
- drivers/i2c/busses/i2c-xiic.c               |    2 --
- drivers/i2c/i2c-core.c                      |    3 +++
- 17 files changed, 3 insertions(+), 30 deletions(-)
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	mxs_phy = devm_kzalloc(&pdev->dev, sizeof(*mxs_phy), GFP_KERNEL);
+> +	if (!mxs_phy) {
+> +		dev_err(&pdev->dev, "Failed to allocate USB PHY structure!\n");
 
-diff --git a/drivers/i2c/busses/i2c-cpm.c b/drivers/i2c/busses/i2c-cpm.c
-index c1e1096..749e63c 100644
---- a/drivers/i2c/busses/i2c-cpm.c
-+++ b/drivers/i2c/busses/i2c-cpm.c
-@@ -673,11 +673,6 @@ static int __devinit cpm_i2c_probe(struct platform_device *ofdev)
- 	dev_dbg(&ofdev->dev, "hw routines for %s registered.\n",
- 		cpm->adap.name);
- 
--	/*
--	 * register OF I2C devices
--	 */
--	of_i2c_register_devices(&cpm->adap);
--
- 	return 0;
- out_shut:
- 	cpm_i2c_shutdown(cpm);
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 0506fef..cf3b23c 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -147,7 +147,6 @@ static int __devinit dw_i2c_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failure adding adapter\n");
- 		goto err_free_irq;
- 	}
--	of_i2c_register_devices(adap);
- 
- 	return 0;
- 
-diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-index e62d2d9..75e26b9 100644
---- a/drivers/i2c/busses/i2c-gpio.c
-+++ b/drivers/i2c/busses/i2c-gpio.c
-@@ -195,8 +195,6 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_add_bus;
- 
--	of_i2c_register_devices(adap);
--
- 	platform_set_drvdata(pdev, priv);
- 
- 	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
-diff --git a/drivers/i2c/busses/i2c-ibm_iic.c b/drivers/i2c/busses/i2c-ibm_iic.c
-index 806e225..8894ab6 100644
---- a/drivers/i2c/busses/i2c-ibm_iic.c
-+++ b/drivers/i2c/busses/i2c-ibm_iic.c
-@@ -759,9 +759,6 @@ static int __devinit iic_probe(struct platform_device *ofdev)
- 	dev_info(&ofdev->dev, "using %s mode\n",
- 		 dev->fast_mode ? "fast (400 kHz)" : "standard (100 kHz)");
- 
--	/* Now register all the child nodes */
--	of_i2c_register_devices(adap);
--
- 	return 0;
- 
- error_cleanup:
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 8d6b504..16d9356 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -568,8 +568,6 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 		goto fail5;
- 	}
- 
--	of_i2c_register_devices(&i2c_imx->adapter);
--
- 	/* Set up platform driver data */
- 	platform_set_drvdata(pdev, i2c_imx);
- 
-diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
-index b76731e..a86049a 100644
---- a/drivers/i2c/busses/i2c-mpc.c
-+++ b/drivers/i2c/busses/i2c-mpc.c
-@@ -675,7 +675,6 @@ static int __devinit fsl_i2c_probe(struct platform_device *op)
- 		dev_err(i2c->dev, "failed to add adapter\n");
- 		goto fail_add;
- 	}
--	of_i2c_register_devices(&i2c->adap);
- 
- 	return result;
- 
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 04eb441..2bc0ec6 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -379,8 +379,6 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	of_i2c_register_devices(adap);
--
- 	return 0;
- }
- 
-diff --git a/drivers/i2c/busses/i2c-ocores.c b/drivers/i2c/busses/i2c-ocores.c
-index 75194c5..a6a11cb 100644
---- a/drivers/i2c/busses/i2c-ocores.c
-+++ b/drivers/i2c/busses/i2c-ocores.c
-@@ -344,8 +344,6 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
- 	if (pdata) {
- 		for (i = 0; i < pdata->num_devices; i++)
- 			i2c_new_device(&i2c->adap, pdata->devices + i);
--	} else {
--		of_i2c_register_devices(&i2c->adap);
- 	}
- 
- 	return 0;
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 801df60..c290091 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1121,8 +1121,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_free_irq;
- 	}
- 
--	of_i2c_register_devices(adap);
--
- 	return 0;
- 
- err_free_irq:
-diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
-index 99389d2..c64d960 100644
---- a/drivers/i2c/busses/i2c-pnx.c
-+++ b/drivers/i2c/busses/i2c-pnx.c
-@@ -730,8 +730,6 @@ static int __devinit i2c_pnx_probe(struct platform_device *pdev)
- 		goto out_irq;
- 	}
- 
--	of_i2c_register_devices(&alg_data->adapter);
--
- 	dev_dbg(&pdev->dev, "%s: Master at %#8x, irq %d.\n",
- 		alg_data->adapter.name, res->start, alg_data->irq);
- 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index a997c7d..9475235 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1194,7 +1194,6 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 		printk(KERN_INFO "I2C: Failed to add bus\n");
- 		goto eadapt;
- 	}
--	of_i2c_register_devices(&i2c->adap);
- 
- 	platform_set_drvdata(dev, i2c);
- 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 0195915..ad3a79b 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1058,7 +1058,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 		goto err_cpufreq;
- 	}
- 
--	of_i2c_register_devices(&i2c->adap);
- 	platform_set_drvdata(pdev, i2c);
- 
- 	pm_runtime_enable(&pdev->dev);
-diff --git a/drivers/i2c/busses/i2c-sh_mobile.c b/drivers/i2c/busses/i2c-sh_mobile.c
-index 8110ca4..9acd286 100644
---- a/drivers/i2c/busses/i2c-sh_mobile.c
-+++ b/drivers/i2c/busses/i2c-sh_mobile.c
-@@ -670,7 +670,6 @@ static int sh_mobile_i2c_probe(struct platform_device *dev)
- 	dev_info(&dev->dev, "I2C adapter %d with bus speed %lu Hz\n",
- 		 adap->nr, pd->bus_speed);
- 
--	of_i2c_register_devices(adap);
- 	return 0;
- 
-  err_all:
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 8b2e555..67388cc 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -684,8 +684,6 @@ static int __devinit tegra_i2c_probe(struct platform_device *pdev)
- 		goto err_free_irq;
- 	}
- 
--	of_i2c_register_devices(&i2c_dev->adapter);
--
- 	return 0;
- err_free_irq:
- 	free_irq(i2c_dev->irq, i2c_dev);
-diff --git a/drivers/i2c/busses/i2c-versatile.c b/drivers/i2c/busses/i2c-versatile.c
-index eec20db..14a1432 100644
---- a/drivers/i2c/busses/i2c-versatile.c
-+++ b/drivers/i2c/busses/i2c-versatile.c
-@@ -108,7 +108,6 @@ static int i2c_versatile_probe(struct platform_device *dev)
- 	ret = i2c_bit_add_numbered_bus(&i2c->adap);
- 	if (ret >= 0) {
- 		platform_set_drvdata(dev, i2c);
--		of_i2c_register_devices(&i2c->adap);
- 		return 0;
- 	}
- 
-diff --git a/drivers/i2c/busses/i2c-xiic.c b/drivers/i2c/busses/i2c-xiic.c
-index 641d0e5..d76bb71 100644
---- a/drivers/i2c/busses/i2c-xiic.c
-+++ b/drivers/i2c/busses/i2c-xiic.c
-@@ -754,8 +754,6 @@ static int __devinit xiic_i2c_probe(struct platform_device *pdev)
- 			i2c_new_device(&i2c->adap, pdata->devices + i);
- 	}
- 
--	of_i2c_register_devices(&i2c->adap);
--
- 	return 0;
- 
- add_adapter_failed:
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index a6ad32b..4791833 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -39,6 +39,7 @@
- #include <linux/irqflags.h>
- #include <linux/rwsem.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of_i2c.h>
- #include <asm/uaccess.h>
- 
- #include "i2c-core.h"
-@@ -880,6 +881,8 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
- #endif
- 
- 	/* create pre-declared device nodes */
-+	of_i2c_register_devices(adap);
-+
- 	if (adap->nr < __i2c_first_dynamic_bus_num)
- 		i2c_scan_static_board_info(adap);
- 
+This message is rather useless. It is really not expected for kzalloc
+to fail. If it fails here you really have problems elsewhere and this
+message won't help you debugging it.
+
+Sascha
+
 -- 
-1.7.10
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
