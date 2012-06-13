@@ -1,15 +1,16 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 13 Jun 2012 11:48:29 -0400
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
- and Armada XP SoC
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 13 Jun 2012 11:56:21 -0400 (EDT)
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
+ Armada XP SoC
 In-Reply-To: <4FD8AC5E.1060804@redhat.com>
 References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
  <4FD8AC5E.1060804@redhat.com>
-Message-ID: <20120613154829.GH14756@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.02.1206131128020.23555@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 11:06:06AM -0400, Jon Masters wrote:
+On Wed, 13 Jun 2012, Jon Masters wrote:
+
 > On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
 > 
 > > You'll find in this patch set the new version of the initial support for a
@@ -20,38 +21,30 @@ On Wed, Jun 13, 2012 at 11:06:06AM -0400, Jon Masters wrote:
 > 
 > Pardon my silly question. I know that there's an effort to reconcile the
 > two different SoCs so you're picking a neutral name, but what does
-> "mvebu" mean, and will you be persistently keeping this name? 
+> "mvebu" mean, and will you be persistently keeping this name? Our guys
+> want to know what this new platform will entail for Fedora support in
+> terms of the platform name being used in various non-kernel places.
 
-As persistent as anything else is in life ;-P  It covers all the SoCs that
-have come out of Marvell's EBU division.  This includes orion5x,
-kirkwood, dove, mv78xxx, the new armada xp, etc.
+Marvell like to create different names for similar things and also reuse 
+the same name for totally different things.  While this might look good 
+for marketing purposes, we kernel developers prefer to gather things 
+together according to shared support code.
 
-We're placing all boards under that umbrella with DT support into
-mach-mvebu/.  Eventually, once DT conversion is complete, the other
-directories will empty out and mach-mvebu/ will hold all support for
-those SoCs.
+Within Marvell there are actually 2 distinct SOC families: the one 
+acquired from Intel with the XScale/PXA origin, and Marvell's own design 
+that produced Orion, Kirkwood, Dove, etc.
 
-Currently, the only boards with DT support are in mach-kirkwood/: the
-dreamplug, iconnect, and a few others.  Before it gets too out of hand,
-Arnd has a patch series which consolidates it all into mach-mvebu/.
+The former is found under mach-pxa and mach-mmp. The later is getting 
+way too scattered, currently using mach-dove, mach-kirkwood, 
+mach-mv78xx0, mach-orion5x, and two more were proposed for the new SOCs.
 
-> Our guys want to know what this new platform will entail for Fedora
-> support in terms of the platform name being used in various non-kernel
-> places.
+Since all SOCs in the later family came from the EBU division within 
+Marvell, and because they share a significant amount of code despite 
+their wildly different names, we settled on "mvebu" to gather them 
+together in the future.
 
-I'm not familiar with how Fedora does it, but debian has five different
-armel kernels, each supporting a range of boards.
-
-linux-image-iop32x
-linux-image-ixp4xx
-linux-image-kirkwood
-linux-image-orion5x
-linux-image-versatile
-
-At the very least, they will be able to consolidate -kirkwood and
--orion5x into linux-image-mvebu if they choose.
+This is therefore a name for kernel engineering/maintenance purpose 
+only. I'd strongly suggest not to use this name in non-kernel places.
 
 
-hth,
-
-Jason.
+Nicolas
