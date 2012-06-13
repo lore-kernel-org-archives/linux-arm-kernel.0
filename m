@@ -1,48 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jun 2012 05:42:15 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E998D51@DBDE01.ent.ti.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
- <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998D51@DBDE01.ent.ti.com>
-Message-ID: <20120613124215.GT12766@atomide.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 13 Jun 2012 18:14:32 +0530
+Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
+ information
+In-Reply-To: <CAKfTPtBc-KuDg_1qe04TfYS4+66qQoiHCJQbCF9gnhga5ociow@mail.gmail.com>
+References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
+ <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
+ <CAORVsuWqWt0pJfewymh_ydAH61-uPsO0M7m7Gs4N3zJY=Vo9ZA@mail.gmail.com>
+ <CAKfTPtBc-KuDg_1qe04TfYS4+66qQoiHCJQbCF9gnhga5ociow@mail.gmail.com>
+Message-ID: <CAP245DXEOGLe1jq2Wj0rNW5qea63UyJu2jOvwV65Y4B9LLoQtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120613 05:43]:
-> Hi Tony,
-> 
-> On Wed, Jun 13, 2012 at 17:02:17, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [120612 22:00]:
-> > > Yes, that would be better except for too much logging, if Tony
-> > > prefers that way I will add. 
-> > 
-> > If there's a chance it causing file system corruption, we should
-> > test it carefully on the boards before applying. If that's done,
-> > then there's probably no need for warnings. It's safer to disable
-> > NAND for untested boards if there's a chance of breaking the timings.
-> 
-> By disabling NAND, I understand that you are suggesting to remove
-> nand initialization done in board file, right ?
+On Wed, Jun 13, 2012 at 3:14 PM, Vincent Guittot
+<vincent.guittot@linaro.org> wrote:
+> On 13 June 2012 10:59, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+>> Vincent,
+>>
+>> On Tue, Jun 12, 2012 at 2:02 PM, Vincent Guittot
+>> <vincent.guittot@linaro.org> wrote:
+>>> Use cpu compatibility field and clock-frequency field of DT to
+>>> estimate the capacity of each core of the system
+>>>
+>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>> ---
+>>> ?arch/arm/kernel/topology.c | ?122 ++++++++++++++++++++++++++++++++++++++++++++
+>>> ?1 file changed, 122 insertions(+)
+>>>
+>>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+>>> index 2f85a64..0c2aee4 100644
+>>> --- a/arch/arm/kernel/topology.c
+>>> +++ b/arch/arm/kernel/topology.c
+>>> @@ -17,6 +17,7 @@
+>>> ?#include <linux/percpu.h>
+>>> ?#include <linux/node.h>
+>>> ?#include <linux/nodemask.h>
+>>> +#include <linux/of.h>
+>>> ?#include <linux/sched.h>
+>>>
+>>> ?#include <asm/cputype.h>
+>>> @@ -47,6 +48,122 @@ void set_power_scale(unsigned int cpu, unsigned long power)
+>>> ? ? ? ?per_cpu(cpu_scale, cpu) = power;
+>>> ?}
+>>>
+>>> +#ifdef CONFIG_OF
+>>> +struct cpu_efficiency {
+>>> + ? ? ? const char *compatible;
+>>> + ? ? ? unsigned long efficiency;
+>>> +};
+>>> +
+>>> +/*
+>>> + * Table of relative efficiency of each processors
+>>> + * The efficiency value must fit in 20bit. The final
+>>> + * cpu_scale value must be in the range [1:2048[.
+>> Typo here.
+>
+> I realize that I have use absolute value instead of SCHED_POWER_SCALE.
+> The cpu_scale value must be in the range 0 < cpu_scale < 2*SCHED_POWER_SCALE
+>
+>>
+>>> + * Processors that are not defined in the table,
+>>> + * use the default SCHED_POWER_SCALE value for cpu_scale.
+>>> + */
+>>> +struct cpu_efficiency table_efficiency[] = {
+>>> + ? ? ? {"arm,cortex-a15", 3891},
+>>> + ? ? ? {"arm,cortex-a7", ?2048},
+>> How are those results measured or computed? Is this purely related to
+>> the number crunching performance?
+>
+> These values are based on ARM's figures which say that Cortex-A15 is
+> 1,9 faster than Cortex-A7 at same frequency. So the inputs are ARM's
+> figures. Then, the absolute values are arbitrary with the constraint
+> of being large enough for precision and small enough to make the
+> computation in an unsigned long
+>
+>>
+>> Also more generally what if the cores frequencies are changing?
+>
+> Up to now, the scheduler takes into account the maximum capacity of a
+> core when it checks the load balance of the system.
 
-Yes, but before we do that, let's fix things first for cases that we
-can test, like tusb6010 DMA.
- 
-> And boards that can be tested here are omap3evm & beagleboard,
-> both of which can't be tested for this change.
-> 
-> Or should additional timings be achieved without affecting old
-> interface, but that it seems would necessitate more code
-> duplication.
+Jean,
 
-We should just keep the same timings as before, with values
-added for the newly added registers.
+Various discussions around power-aware scheduling have amplified the
+need for the scheduler to have some knowledge of DVFS. This would then
+require the scheduler to track 'cpu_power' ( = max power) and perhaps
+a new variable 'current_power' that is changed by the DVFS framework.
 
-Regards,
+The first goal, though, is to make sure that the scheduler can handle
+different cpu_power values due to asymmetric cores.
 
-Tony
+/Amit
