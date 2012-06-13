@@ -1,31 +1,22 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 13 Jun 2012 20:34:22 +0800
-Subject: [Patch v5 12/13] ARM: mxs: clk_register_clkdev mx28 usb clocks
-In-Reply-To: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1339590863-10564-13-git-send-email-richard.zhao@freescale.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 12:40:21 +0000
+Subject: [PATCH 0/3] Prepare for GPMC driver conversion
+In-Reply-To: <20120613113358.GL12766@atomide.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99803F@DBDE01.ent.ti.com>
+ <20120613113358.GL12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998D74@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- drivers/clk/mxs/clk-imx28.c |    4 ++++
- 1 file changed, 4 insertions(+)
+Hi Tony,
 
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index 2826a26..0201a0f 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -328,6 +328,10 @@ int __init mx28_clocks_init(void)
- 	clk_register_clkdevs(clks[fec], fec_lookups, ARRAY_SIZE(fec_lookups));
- 	clk_register_clkdevs(clks[can0], can0_lookups, ARRAY_SIZE(can0_lookups));
- 	clk_register_clkdevs(clks[can1], can1_lookups, ARRAY_SIZE(can1_lookups));
-+	clk_register_clkdev(clks[usb0_pwr], NULL, "8007c000.usbphy");
-+	clk_register_clkdev(clks[usb1_pwr], NULL, "8007e000.usbphy");
-+	clk_register_clkdev(clks[usb0], NULL, "80080000.usb");
-+	clk_register_clkdev(clks[usb1], NULL, "80090000.usb");
- 
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
--- 
-1.7.9.5
+On Wed, Jun 13, 2012 at 17:03:59, Tony Lindgren wrote:
+
+> NAND for untested boards if timings change. Are Jon's comments all handled?
+
+I have explained the justification, why those changes were done so,
+waiting for his comments.
+
+Regards
+Afzal
