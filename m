@@ -1,95 +1,71 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 13 Jun 2012 11:28:07 +0200
-Subject: [PATCH 1/3] net: lpc_eth: Replace WARN() trace with simple
- pr_warn()
-In-Reply-To: <1339568172.22704.312.camel@edumazet-glaptop>
-References: <1339401793-12258-1-git-send-email-stigge@antcom.de>
- <1339403108.6001.1697.camel@edumazet-glaptop> <4FD5AE1D.9030807@antcom.de>
- <20120611.020352.1962768244524496467.davem@davemloft.net>
- <4FD5B9C8.4020800@antcom.de> <1339442328.6001.2602.camel@edumazet-glaptop>
- <1339568172.22704.312.camel@edumazet-glaptop>
-Message-ID: <4FD85D27.5090509@antcom.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Jun 2012 10:32:18 +0100
+Subject: [RFC/PATCH v5 5/7] ARM: ARM11 MPCore: cpu_v6_dcache_clean_area
+ needs RFO
+In-Reply-To: <1339533618-15969-6-git-send-email-gdavis@mvista.com>
+References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-1-git-send-email-gdavis@mvista.com>
+ <1339533618-15969-6-git-send-email-gdavis@mvista.com>
+Message-ID: <20120613093218.GC29492@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2012 08:16 AM, Eric Dumazet wrote:
-> On Mon, 2012-06-11 at 21:18 +0200, Eric Dumazet wrote:
->> On Mon, 2012-06-11 at 11:26 +0200, Roland Stigge wrote:
->>
->>> Is it sensible at this point to increase the TX buffers anyway? For
->>> different reasons of course: We have enough SRAM available and TX
->>> buffers (16->32) are still more than RX buffers (48).
->>
->> I doubt it has any impact on performance for a 100Mbit link ?
->>
->> One thing that could be done would be to free skbs in
->> lpc_eth_hard_start_xmit() instead of __lpc_handle_xmit()
->>
+On Tue, Jun 12, 2012 at 09:40:16PM +0100, gdavis at mvista.com wrote:
+> From: George G. Davis <gdavis@mvista.com>
 > 
-> Here is the patch I was thinking about
+> Implement Request-For-Ownership in cpu_v6_dcache_clean_area and
+> disable preemption in same to insure that memory is consistent
+> in cases of preemption and subsequent task migration just before
+> and during calls to this function.  This is an alternative
+> implementation to other workarounds which disable preemption
+> in callers of this function while updating PTEs.
 > 
-> (on top of latest net-next)
+> This change depends on "ARM: Move get_thread_info macro definition
+> to <asm/assembler.h>".
 > 
-> Could you please test it ?
->
->  drivers/net/ethernet/nxp/lpc_eth.c |   10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> Signed-off-by: George G. Davis <gdavis@mvista.com>
+> ---
+>  arch/arm/mm/proc-v6.S |   22 +++++++++++++++++++++-
+>  1 files changed, 21 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
-> index 083d671..426f14c 100644
-> --- a/drivers/net/ethernet/nxp/lpc_eth.c
-> +++ b/drivers/net/ethernet/nxp/lpc_eth.c
-> @@ -440,7 +440,7 @@ struct netdata_local {
->  	spinlock_t		lock;
->  	void __iomem		*net_base;
->  	u32			msg_enable;
-> -	struct sk_buff		*skb[ENET_TX_DESC];
-> +	unsigned int		skblen[ENET_TX_DESC];
->  	unsigned int		last_tx_idx;
->  	unsigned int		num_used_tx_buffs;
->  	struct mii_bus		*mii_bus;
-> @@ -908,7 +908,7 @@ static void __lpc_handle_xmit(struct net_device *ndev)
+> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+> index 5900cd5..de8b3a6 100644
+> --- a/arch/arm/mm/proc-v6.S
+> +++ b/arch/arm/mm/proc-v6.S
+> @@ -81,10 +81,30 @@ ENTRY(cpu_v6_do_idle)
 >  
->  	txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
->  	while (pldat->last_tx_idx != txcidx) {
-> -		skb = pldat->skb[pldat->last_tx_idx];
-> +		unsigned int skblen = pldat->skblen[pldat->last_tx_idx];
->  
->  		/* A buffer is available, get buffer status */
->  		ptxstat = &pldat->tx_stat_v[pldat->last_tx_idx];
-> @@ -945,9 +945,8 @@ static void __lpc_handle_xmit(struct net_device *ndev)
->  		} else {
->  			/* Update stats */
->  			ndev->stats.tx_packets++;
-> -			ndev->stats.tx_bytes += skb->len;
-> +			ndev->stats.tx_bytes += skblen;
->  		}
-> -		dev_kfree_skb_irq(skb);
->  
->  		txcidx = readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
->  	}
-> @@ -1132,7 +1131,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  	memcpy(pldat->tx_buff_v + txidx * ENET_MAXF_SIZE, skb->data, len);
->  
->  	/* Save the buffer and increment the buffer counter */
-> -	pldat->skb[txidx] = skb;
-> +	pldat->skblen[txidx] = len;
->  	pldat->num_used_tx_buffs++;
->  
->  	/* Start transmit */
-> @@ -1147,6 +1146,7 @@ static int lpc_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  
->  	spin_unlock_irq(&pldat->lock);
->  
-> +	dev_kfree_skb(skb);
->  	return NETDEV_TX_OK;
->  }
+>  ENTRY(cpu_v6_dcache_clean_area)
+>  #ifndef TLB_CAN_READ_FROM_L1_CACHE
+> -1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+> +#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+> +	get_thread_info ip
+> +	ldr	r3, [ip, #TI_PREEMPT]		@ get preempt count
+> +	add	r2, r3, #1			@ increment it
+> +	str	r2, [ip, #TI_PREEMPT]		@ disable preemption
+> +#endif
+> +1:
+> +#ifdef CONFIG_SMP
+> +	/* no cache maintenance broadcasting on ARM11MPCore */
+> +	ldr	r2, [r0]			@ read for ownership
+> +#endif
+> +	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+>  	add	r0, r0, #D_CACHE_LINE_SIZE
+>  	subs	r1, r1, #D_CACHE_LINE_SIZE
+>  	bhi	1b
+> +#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+> +	teq	r3, #0				@ preempt count == 0?
+> +	str	r3, [ip, #TI_PREEMPT]		@ restore preempt count
+> +	bne	99f				@ done if non-zero
+> +	ldr	r3, [ip, #TI_FLAGS]		@ else check flags
+> +	tst	r3, #_TIF_NEED_RESCHED		@ need resched?
+> +	bne	preempt_schedule		@ yes, do preempt_schedule
 
-Works fine for a while now.
+Maybe we should get some asm macros for preempt disable/enable as they
+are used in more than one place.
 
-We can remove the unused variable skb from __lpc_handle_xmit() now,
-maybe just do in your patch?
+Alternatively, we could disable the interrupts around RFO and D-cache
+cleaning (inside the loop), though I think the preempt disabling is
+faster.
 
-Thanks!
-
-Tested-by: Roland Stigge <stigge@antcom.de>
+-- 
+Catalin
