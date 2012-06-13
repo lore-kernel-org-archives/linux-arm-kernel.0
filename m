@@ -1,72 +1,28 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Jun 2012 14:14:09 +0200
-Subject: [PATCH] ARM: dma-mapping: fix debug messages in dmabounce code
-Message-ID: <1339589649-31970-1-git-send-email-m.szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jun 2012 13:17:43 +0100
+Subject: [PATCH v2 0/5] mmp audio support
+In-Reply-To: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
+References: <1339409081-10097-1-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <20120613121743.GN4545@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the usage of uninitialized variables in dmabounce code
-intoduced by commit a227fb92 ('ARM: dma-mapping: remove offset parameter
-to prepare for generic dma_ops'):
-arch/arm/common/dmabounce.c: In function ?dmabounce_sync_for_device?:
-arch/arm/common/dmabounce.c:409: warning: ?off? may be used uninitialized in this function
-arch/arm/common/dmabounce.c:407: note: ?off? was declared here
-arch/arm/common/dmabounce.c: In function ?dmabounce_sync_for_cpu?:
-arch/arm/common/dmabounce.c:369: warning: ?off? may be used uninitialized in this function
-arch/arm/common/dmabounce.c:367: note: ?off? was declared here
+On Mon, Jun 11, 2012 at 06:04:36PM +0800, Zhangfei Gao wrote:
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/common/dmabounce.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+> These patches provide mmp audio support under alsa via dmaengine
+> Support platfrom pxa688 and pxa910
+> mmp_tdma.c and mmp-pcm.c is shared for pxa688 and pxa910
+> pxa688 (mmp2) use mmp2-sspa.c
+> pxa910 directly use pxa-ssp.c
+> mmp_tdma.c is under dmaengine framework
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index 9d7eb53..aa07f59 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -366,8 +366,8 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 	struct safe_buffer *buf;
- 	unsigned long off;
- 
--	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
--		__func__, addr, off, sz, dir);
-+	dev_dbg(dev, "%s(dma=%#x,sz=%zx,dir=%x)\n",
-+		__func__, addr, sz, dir);
- 
- 	buf = find_safe_buffer_dev(dev, addr, __func__);
- 	if (!buf)
-@@ -377,8 +377,8 @@ static int __dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
- 
- 	BUG_ON(buf->direction != dir);
- 
--	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
--		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
-+	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
-+		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
- 		buf->safe, buf->safe_dma_addr);
- 
- 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
-@@ -406,8 +406,8 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 	struct safe_buffer *buf;
- 	unsigned long off;
- 
--	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
--		__func__, addr, off, sz, dir);
-+	dev_dbg(dev, "%s(dma=%#x,sz=%zx,dir=%x)\n",
-+		__func__, addr, sz, dir);
- 
- 	buf = find_safe_buffer_dev(dev, addr, __func__);
- 	if (!buf)
-@@ -417,8 +417,8 @@ static int __dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
- 
- 	BUG_ON(buf->direction != dir);
- 
--	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
--		__func__, buf->ptr, virt_to_dma(dev, buf->ptr),
-+	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x off=%#lx) mapped to %p (dma=%#x)\n",
-+		__func__, buf->ptr, virt_to_dma(dev, buf->ptr), off,
- 		buf->safe, buf->safe_dma_addr);
- 
- 	DO_STATS(dev->archdata.dmabounce->bounce_count++);
--- 
-1.7.1.569.g6f426
+Applied 2-4.  I'm not seeing a direct code dependency between this and
+the dmaengine driver in patch 1 (or review of it from Vinod yet) so I'm
+expecting that to go via the dmaengine tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120613/17cbd502/attachment.sig>
