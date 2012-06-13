@@ -1,36 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jun 2012 20:21:08 +0000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <4FD84133.4060401@firmworks.com>
- <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201206132021.09774.arnd@arndb.de>
+Date: Wed, 13 Jun 2012 21:10:30 +0000
+Subject: [PATCH 5/9] ARM: kirkwood: use devicetree for orion-spi
+In-Reply-To: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+References: <1339324322-29388-6-git-send-email-andrew@lunn.ch>
+Message-ID: <201206132110.31011.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 June 2012, Thierry Reding wrote:
->                 pci at 80000000 {
->                         reg = <0x80000000 0x00001000>;
->                         status = "disabled";
-> 
->                         #address-cells = <3>;
->                         #size-cells = <2>;
-> 
->                         ranges = <0x80400000 0x80400000 0x00008000   /* I/O */
->                                   0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
->                                   0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
-> 
->                         nvidia,ctrl-offset = <0x0>;
->                         nvidia,num-lanes = <2>;
->                 };
-> 
+On Sunday 10 June 2012, Andrew Lunn wrote:
+> @@ -26,6 +26,11 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+>         { }
+>  };
+>  
+> +struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> +       OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+> +       {},
+> +};
+> +
+>  static void __init kirkwood_dt_init(void)
+>  {
 
-I believe you will need an "interrupt-map" property here, to map the host
-interrupts to the INTA-INTD lines of the attached devices.
-
-I'm not sure whether we want to have a device_type="pciex" property here.
-powerpc and sparc seem to use that information, to distinguish a pcie
-bus from pci or cardbus.
+How about instead adding the clkdev for "f1010600.spi" so you don't need the auxdata?
 
 	Arnd
