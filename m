@@ -1,26 +1,41 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 13 Jun 2012 15:32:48 +0200
-Subject: [RFC 3/4] ARM: topology: Update cpu_power according to DT
- information
-In-Reply-To: <CAKfTPtCyV389OTrun5Oyn8RCsDagza95wdmWr=r9poMiYrU0Mg@mail.gmail.com>
-References: <1339502524-10265-1-git-send-email-vincent.guittot@linaro.org>
- <1339502524-10265-4-git-send-email-vincent.guittot@linaro.org>
- <CAORVsuWqWt0pJfewymh_ydAH61-uPsO0M7m7Gs4N3zJY=Vo9ZA@mail.gmail.com>
- <CAKfTPtBc-KuDg_1qe04TfYS4+66qQoiHCJQbCF9gnhga5ociow@mail.gmail.com>
- <CAP245DXEOGLe1jq2Wj0rNW5qea63UyJu2jOvwV65Y4B9LLoQtg@mail.gmail.com>
- <1339591666.8980.26.camel@twins>
- <CAKfTPtCyV389OTrun5Oyn8RCsDagza95wdmWr=r9poMiYrU0Mg@mail.gmail.com>
-Message-ID: <1339594368.8980.41.camel@twins>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 13:39:25 +0000
+Subject: [PATCH 5/9] ARM: OMAP2+: gpmc-smc91x: Adapt to use gpmc driver
+In-Reply-To: <20120613122950.GR12766@atomide.com>
+References: <cover.1339419379.git.afzal@ti.com>
+ <0bdbc293fc98613011d37ec59559ba6d475eadf2.1339419379.git.afzal@ti.com>
+ <20120613122950.GR12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998EC1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-06-13 at 15:29 +0200, Vincent Guittot wrote:
-> In fact, there is 2 tracks, one for a power aware scheduler and one
-> for setting the capacity of each core of a big.LITTLE system. This
-> patch is for the latter and is not directly link to the power because
-> the default/performance mode of the scheduler should also take
-> advantage of this information 
+Hi Tony,
 
-Fair enough.. can you include a little blurp in the changelog on how
-this affects the capacity stuff for big.little and if that works as
-desired due to these patches?
+On Wed, Jun 13, 2012 at 17:59:50, Tony Lindgren wrote:
+
+> Here too we just need to care about the mainline kernel users
+> and convert them to use the new interface. No need to keep
+> gpmc_cs_set_timings around. The same applies for other similar
+> patches.
+
+Not sure whether I follow you here.
+
+Do you mean for all the gpmc-* helpers existing initialization
+needs to be modified to use the new interface, the previous version
+was doing so. But then that will cause all boards using the same
+gpmc-* helper to be converted at once (tusb6010 is not an issue as
+only one board uses it), then the problem will be that there would
+be a few commits where gpmc may not work properly.
+
+And for a particular board, either it has to use old interface
+or either the new interface, it cannot use both.
+
+Consider the case of this one, smc91x, all sdp boards use it,
+that requires nand, onenand, nor gpmc-* helpers to be converted
+before board migration for say 3430sdp board, that would mean
+that 2430sdp board would be broken w.r.t gpmc at that commit as
+board modifications are not yet done for 2430. That in turn means
+all the boards using nand, onenand would be broken at that point.
+
+Regards
+Afzal
