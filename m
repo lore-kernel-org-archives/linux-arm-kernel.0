@@ -1,33 +1,119 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 13 Jun 2012 14:04:42 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <20120613124215.GT12766@atomide.com>
-References: <cover.1339419244.git.afzal@ti.com>
- <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
- <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998D51@DBDE01.ent.ti.com>
- <20120613124215.GT12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E998F70@DBDE01.ent.ti.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 13 Jun 2012 10:12:12 -0400
+Subject: [PATCHv2 0/6] ARM: DMA-mapping: new extensions for buffer sharing
+In-Reply-To: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
+References: <1339588218-24398-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120613141211.GJ5979@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Wed, Jun 13, 2012 at 18:12:15, Tony Lindgren wrote:
-
-> > Or should additional timings be achieved without affecting old
-> > interface, but that it seems would necessitate more code
-> > duplication.
+On Wed, Jun 13, 2012 at 01:50:12PM +0200, Marek Szyprowski wrote:
+> Hello,
 > 
-> We should just keep the same timings as before, with values
-> added for the newly added registers.
+> This is an updated version of the patch series introducing a new
+> features to DMA mapping subsystem to let drivers share the allocated
+> buffers (preferably using recently introduced dma_buf framework) easy
+> and efficient.
+> 
+> The first extension is DMA_ATTR_NO_KERNEL_MAPPING attribute. It is
+> intended for use with dma_{alloc, mmap, free}_attrs functions. It can be
+> used to notify dma-mapping core that the driver will not use kernel
+> mapping for the allocated buffer at all, so the core can skip creating
+> it. This saves precious kernel virtual address space. Such buffer can be
+> accessed from userspace, after calling dma_mmap_attrs() for it (a
+> typical use case for multimedia buffers). The value returned by
+> dma_alloc_attrs() with this attribute should be considered as a DMA
+> cookie, which needs to be passed to dma_mmap_attrs() and
+> dma_free_attrs() funtions.
+> 
+> The second extension is required to let drivers to share the buffers
+> allocated by DMA-mapping subsystem. Right now the driver gets a dma
+> address of the allocated buffer and the kernel virtual mapping for it.
+> If it wants to share it with other device (= map into its dma address
+> space) it usually hacks around kernel virtual addresses to get pointers
+> to pages or assumes that both devices share the DMA address space. Both
+> solutions are just hacks for the special cases, which should be avoided
+> in the final version of buffer sharing. To solve this issue in a generic
+> way, a new call to DMA mapping has been introduced - dma_get_sgtable().
+> It allocates a scatter-list which describes the allocated buffer and
+> lets the driver(s) to use it with other device(s) by calling
+> dma_map_sg() on it.
 
-What I understood from above is to get values bootloader used to
-set for those new timings & put in Kernel, right ?
+What about the cases where the driver wants to share the buffer but there
+are multiple IOMMUs? So the DMA address returned initially would be
+different on the other IOMMUs? Would the driver have to figure this out
+or would the DMA/IOMMU implementation be in charge of that?
 
-Regards
-Afzal
+And what about IOMMU's that don't do DMA_ATTR_NO_KERNEL_MAPPING?
+Can they just ignore it and do what they did before ? (I presume yes).
+
+> 
+> The third extension solves the performance issues which we observed with
+> some advanced buffer sharing use cases, which require creating a dma
+> mapping for the same memory buffer for more than one device. From the
+> DMA-mapping perspective this requires to call one of the
+> dma_map_{page,single,sg} function for the given memory buffer a few
+> times, for each of the devices. Each dma_map_* call performs CPU cache
+> synchronization, what might be a time consuming operation, especially
+> when the buffers are large. We would like to avoid any useless and time
+> consuming operations, so that was the main reason for introducing
+> another attribute for DMA-mapping subsystem: DMA_ATTR_SKIP_CPU_SYNC,
+> which lets dma-mapping core to skip CPU cache synchronization in certain
+> cases.
+> 
+> The proposed patches have been rebased on the latest Linux kernel
+> v3.5-rc2 with 'ARM: replace custom consistent dma region with vmalloc'
+> patches applied (for more information, please refer to the 
+> http://www.spinics.net/lists/arm-kernel/msg179202.html thread).
+> 
+> The patches together with all dependences are also available on the
+> following GIT branch:
+> 
+> git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git 3.5-rc2-dma-ext-v2
+> 
+> Best regards
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> Changelog:
+> 
+> v2:
+> - rebased onto v3.5-rc2 and adapted for CMA and dma-mapping changes
+> - renamed dma_get_sgtable() to dma_get_sgtable_attrs() to match the convention
+>   of the other dma-mapping calls with attributes
+> - added generic fallback function for dma_get_sgtable() for architectures with
+>   simple dma-mapping implementations
+> 
+> v1: http://thread.gmane.org/gmane.linux.kernel.mm/78644
+>     http://thread.gmane.org/gmane.linux.kernel.cross-arch/14435 (part 2)
+> - initial version
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (6):
+>   common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING attribute
+>   ARM: dma-mapping: add support for DMA_ATTR_NO_KERNEL_MAPPING
+>     attribute
+>   common: dma-mapping: introduce dma_get_sgtable() function
+>   ARM: dma-mapping: add support for dma_get_sgtable()
+>   common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
+>   ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
+> 
+>  Documentation/DMA-attributes.txt         |   42 ++++++++++++++++++
+>  arch/arm/common/dmabounce.c              |    1 +
+>  arch/arm/include/asm/dma-mapping.h       |    3 +
+>  arch/arm/mm/dma-mapping.c                |   69 ++++++++++++++++++++++++------
+>  drivers/base/dma-mapping.c               |   18 ++++++++
+>  include/asm-generic/dma-mapping-common.h |   18 ++++++++
+>  include/linux/dma-attrs.h                |    2 +
+>  include/linux/dma-mapping.h              |    3 +
+>  8 files changed, 142 insertions(+), 14 deletions(-)
+> 
+> -- 
+> 1.7.1.569.g6f426
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
