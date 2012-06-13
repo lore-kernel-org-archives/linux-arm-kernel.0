@@ -1,31 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jun 2012 10:45:28 +0100
-Subject: [RFC/PATCH v5 5/7] ARM: ARM11 MPCore: cpu_v6_dcache_clean_area
- needs RFO
-In-Reply-To: <20120613094127.GE29492@arm.com>
-References: <1318945654-548-1-git-send-email-gdavis@mvista.com>
- <1339533618-15969-1-git-send-email-gdavis@mvista.com>
- <1339533618-15969-6-git-send-email-gdavis@mvista.com>
- <20120613093218.GC29492@arm.com>
- <20120613093634.GA31722@n2100.arm.linux.org.uk>
- <20120613094127.GE29492@arm.com>
-Message-ID: <20120613094528.GB31722@n2100.arm.linux.org.uk>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 13 Jun 2012 11:50:04 +0200
+Subject: [PATCH v5 1/7] ARM: davinci, cp_intc: Add irq domain support
+In-Reply-To: <4FD77E0F.8050907@ti.com>
+References: <1338373143-7467-1-git-send-email-hs@denx.de>
+ <1338373143-7467-2-git-send-email-hs@denx.de> <4FC919C9.6070107@ti.com>
+ <4FD77E0F.8050907@ti.com>
+Message-ID: <4FD8624C.8010605@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2012 at 10:41:27AM +0100, Catalin Marinas wrote:
-> On Wed, Jun 13, 2012 at 10:36:34AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jun 13, 2012 at 10:32:18AM +0100, Catalin Marinas wrote:
-> > > Alternatively, we could disable the interrupts around RFO and D-cache
-> > > cleaning (inside the loop), though I think the preempt disabling is
-> > > faster.
-> > 
-> > It also has the *important* effect that it doesn't cause problems with
-> > interrupt latency, which is a real concern if you have peripherals
-> > requiring quick servicing.
-> 
-> I was suggesting just disabling the interrupts inside the loop around
-> RFO and D-cache cleaning, so only for a single cache line (and not the
-> whole range) which would not introduce noticeable interrupt latency.
+Hello Nori,
 
-But would slow down the loop, probably significantly.
+On 12.06.2012 19:36, Sekhar Nori wrote:
+> Hi Heiko,
+>
+> On 6/2/2012 1:06 AM, Sekhar Nori wrote:
+>> Hi Heiko,
+>>
+>> On 5/30/2012 3:48 PM, Heiko Schocher wrote:
+>>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>>> Cc: Sekhar Nori<nsekhar@ti.com>
+>>> Cc: Wolfgang Denk<wd@denx.de>
+>>> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
+>>>
+>>> ---
+>>
+>> On AM18x EVM, with this patch applied and CONFIG_KEYBOARD_GPIO_POLLED=y,
+>> I get warnings of type:
+>>
+>> irq 0, desc: c0372950, depth: 1, count: 0, unhandled: 0
+>>
+>> ->handle_irq():  c00552f8, handle_bad_irq+0x0/0x23c
+>>
+>> ->irq_data.chip(): c03794e8, 0xc03794e8
+>>
+>> ->action():   (null)
+>>
+>>     IRQ_NOPROBE set
+>>
+>>   IRQ_NOREQUEST set
+>>
+>>
+>> They do not come when CONFIG_KEYBOARD_GPIO_POLLED=n. I am yet to debug
+>> this, but wanted to point out now in case there is anything obvious.
+
+Hups, seems I missed your EMail :-(
+
+> I debugged this a bit more and the good news for you is that spurious
+> IRQ messages have got nothing to do with your patch. Looks like the
+
+Good :-)
+
+> spurious interrupts on interrupt line 0 were always there - just that
+> they were getting silently ignored earlier. I am still debugging what is
+> causing these spurious interrupts.
+
+Hmm.. I did not see this on the enbw_cmc board. Maybe I can try it
+on the TMDXEXP1808L board, but I must admit, that I am currently lacking
+time, because of an accident ...
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
