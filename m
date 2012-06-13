@@ -1,168 +1,216 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 13 Jun 2012 17:19:29 +0200
-Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
-In-Reply-To: <4FD8AD42.6010702@gmail.com>
-References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
- <1339590863-10564-9-git-send-email-richard.zhao@freescale.com>
- <4FD8AD42.6010702@gmail.com>
-Message-ID: <201206131719.29671.marex@denx.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 13 Jun 2012 17:21:45 +0200
+Subject: [PATCHv3 03/20] ARM: OMAP4: PM: add support for device off
+In-Reply-To: <1339515095-9908-4-git-send-email-t-kristo@ti.com>
+References: <1339515095-9908-1-git-send-email-t-kristo@ti.com>
+ <1339515095-9908-4-git-send-email-t-kristo@ti.com>
+Message-ID: <CAORVsuUJOpQu1qE7qmK9PS79JZJ065egqcpfgmsWNHwnhLUdvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob Herring,
+Hi Tero,
 
-> On 06/13/2012 07:34 AM, Richard Zhao wrote:
-> > Sometimes, boards have gpios that don't own by any driver or owner
-> > by a generic driver that don't like hacks. Such gpios is normally
-> > output and need setup once on boot. So I introduce the config-on-boot
-> > gpios.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> > 
-> >  .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
-> >  arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
-> >  arch/arm/mach-imx/mach-imx6q.c                     |   35
-> >  ++++++++++++++++++++ 3 files changed, 54 insertions(+)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > b/Documentation/devicetree/bindings/arm/config-on-boot.txt new file mode
-> > 100644
-> > index 0000000..f98ed74
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
-> > @@ -0,0 +1,12 @@
-> > +* Configure on Boot
-> > +
-> > +Node name: config-on-boot
-> > +  It must be in root node. config-on-boot means to describe settings
-> > that needs +  to be set one time on boot but aren't owned by any driver,
-> > or the owned driver +  is too generic to handle such settings. For
-> > example, usb hub uses generic +  driver in usb core code, a on-board usb
-> > may need deassert reset pin.
-> 
-> NAK. This is not a h/w description and should be solved within the
-> kernel or bootloader. Either fix this in u-boot
+I have a few remarks regarding the genericity of this code. I think it
+is better if the code in powerdomain.c stays generic and that the
+platform specific checks and operations be moved in the specific
+functions (via the pwrdm_ops struct).
 
-I don't want to be the bastard here, but this shouldn't go into uboot.
+On Tue, Jun 12, 2012 at 5:31 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> On OMAP4+, device wide off-mode has its own enable mechanism in addition
+> to powerdomain target states. This patch adds support for this on top
+> of functional power states by overloading the OFF state for core pwrdm.
+> On pwrdm level, the deepest power state supported by core pwrdm is OSWR.
+> When user (e.g. suspend) programs core pwrdm target as OFF, the functional
+> power state for the domain will be OSWR with the additional device off
+> enabled. Previous power state information will reflect this also.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+> ?arch/arm/mach-omap2/powerdomain.c ? ? ? ? ? | ? 17 +++++++++
+> ?arch/arm/mach-omap2/powerdomain.h ? ? ? ? ? | ? 13 +++++++-
+> ?arch/arm/mach-omap2/powerdomain44xx.c ? ? ? | ? 48 +++++++++++++++++++++++++++
+> ?arch/arm/mach-omap2/powerdomains44xx_data.c | ? ?3 +-
+> ?4 files changed, 79 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index ac63f86..78a9308 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -677,6 +677,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
+> ? ? ? ?int sleep_switch = -1, ret = 0, hwsup = 0;
+> ? ? ? ?int new_func_pwrst, next_func_pwrst, pwrst, logic;
+> ? ? ? ?u8 curr_pwrst;
+> + ? ? ? bool extra_off_enable = false;
+> + ? ? ? bool has_extra_off = false;
+>
+> ? ? ? ?if (!pwrdm || IS_ERR(pwrdm)) {
+> ? ? ? ? ? ? ? ?pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
+> @@ -687,6 +689,13 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
+>
+> ? ? ? ?mutex_lock(&pwrdm->lock);
+>
+> + ? ? ? /* Check if powerdomain has extra off mode handling */
+> + ? ? ? if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
+> + ? ? ? ? ? ? ? has_extra_off = true;
+> + ? ? ? ? ? ? ? if (func_pwrst == PWRDM_FUNC_PWRST_OFF)
+> + ? ? ? ? ? ? ? ? ? ? ? extra_off_enable = true;
+> + ? ? ? }
+Could those checks be moved in the OMAP4 specific functions, so that
+the power domain code stays generic?
 
-> the platform code
+> +
+> ? ? ? ?new_func_pwrst = pwrdm_get_achievable_func_pwrst(pwrdm, func_pwrst);
+> ? ? ? ?pwrst = pwrdm_func_to_pwrst(pwrdm, new_func_pwrst);
+> ? ? ? ?logic = pwrdm_func_to_logic_pwrst(pwrdm, new_func_pwrst);
+> @@ -741,6 +750,9 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 func_pwrst)
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?}
+>
+> + ? ? ? if (has_extra_off && arch_pwrdm->pwrdm_enable_off)
+> + ? ? ? ? ? ? ? arch_pwrdm->pwrdm_enable_off(pwrdm, extra_off_enable);
+> +
+> ?out:
+> ? ? ? ?mutex_unlock(&pwrdm->lock);
+> ? ? ? ?return ret;
+> @@ -810,6 +822,11 @@ int pwrdm_read_next_func_pwrst(struct powerdomain *pwrdm)
+> ? ? ? ?int next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+> ? ? ? ?int next_logic = pwrdm_read_logic_retst(pwrdm);
+>
+> + ? ? ? if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE &&
+> + ? ? ? ? ? arch_pwrdm->pwrdm_read_next_off &&
+> + ? ? ? ? ? arch_pwrdm->pwrdm_read_next_off(pwrdm))
+> + ? ? ? ? ? ? ? return PWRDM_FUNC_PWRST_OFF;
+> +
+Same comment here. The OMAP4 specific function for
+pwrdm_read_next_pwrst could return PWRDM_FUNC_PWRST_OFF.
 
-Yes, it should be here. But then, it's some usb reset, so maybe the PHY should 
-somehow handle it?
+> ? ? ? ?return pwrdm_pwrst_to_func(pwrdm, next_pwrst, next_logic);
+> ?}
+>
+> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+> index 0729d91..cc30b94 100644
+> --- a/arch/arm/mach-omap2/powerdomain.h
+> +++ b/arch/arm/mach-omap2/powerdomain.h
+> @@ -75,6 +75,13 @@
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* state without waking up the
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* powerdomain
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
+> +/*
+> + * OMAP4+ has device off feature, which must be enabled separately in
+> + * addition to power domain next state setup. This feature is overloaded
+> + * as EXTRA_OFF_ENABLE for core_pwrdm, and is implemented on top of
+> + * functional power state
+> + */
+> +#define PWRDM_HAS_EXTRA_OFF_ENABLE ? ? (1 << 3)
+>
+> ?/*
+> ?* Number of memory banks that are power-controllable. On OMAP4430, the
+> @@ -173,7 +180,9 @@ struct powerdomain {
+> ?* @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
+> ?* @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
+> ?* @pwrdm_wait_transition: Wait for a pd state transition to complete
+> - * @pwrdm_lost_context_rff: Check if pd has lost RFF context (entered off)
+> + * @pwrdm_lost_context_rff: Check if pd has lost RFF context (omap4+ device off)
+> + * @pwrdm_enable_off: Extra off mode enable for pd (omap4+ device off)
+> + * @pwrdm_read_next_off: Check if pd next state is off (omap4+ device off)
+> ?*/
+> ?struct pwrdm_ops {
+> ? ? ? ?int ? ? (*pwrdm_func_to_pwrst)(struct powerdomain *pwrdm, u8 func_pwrst);
+> @@ -199,6 +208,8 @@ struct pwrdm_ops {
+> ? ? ? ?int ? ? (*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
+> ? ? ? ?int ? ? (*pwrdm_wait_transition)(struct powerdomain *pwrdm);
+> ? ? ? ?bool ? ?(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
+> + ? ? ? void ? ?(*pwrdm_enable_off)(struct powerdomain *pwrdm, bool enable);
+> + ? ? ? bool ? ?(*pwrdm_read_next_off)(struct powerdomain *pwrdm);
+> ?};
+>
+> ?int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
+> diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+> index 562f78a..b2bdc0f 100644
+> --- a/arch/arm/mach-omap2/powerdomain44xx.c
+> +++ b/arch/arm/mach-omap2/powerdomain44xx.c
+> @@ -358,6 +358,52 @@ bool omap4_pwrdm_lost_context_rff(struct powerdomain *pwrdm)
+> ? ? ? ?return false;
+> ?}
+>
+> +/**
+> + * omap4_device_set_next_state_off - setup device off state
+> + * @pwrdm: struct powerdomain * to target powerdomain
+> + * @enable: true if off-mode should be enabled
+> + *
+> + * When Device OFF is enabled, Device is allowed to perform
+> + * transition to off mode as soon as all power domains in MPU, IVA
+> + * and CORE voltage are in OFF or OSWR state (open switch retention)
+> + */
+> +void omap4_device_set_next_state_off(struct powerdomain *pwrdm, bool enable)
+> +{
+> + ? ? ? u8 val = enable ? 0x1 : 0x0;
+> +
+> + ? ? ? if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? omap4_prminst_write_inst_reg(val << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4430_PRM_PARTITION,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4430_PRM_DEVICE_INST,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
+> +}
+> +
+> +
+> +/**
+> + * omap4_device_read_next_state_off - read device off state
+> + * @pwrdm: struct powerdomain * to target powerdomain
+> + *
+> + * Checks if device off is enabled or not.
+> + * Returns true if enabled, false otherwise.
+> + */
+> +bool omap4_device_read_next_state_off(struct powerdomain *pwrdm)
+> +{
+> + ? ? ? u32 val;
+> +
+> + ? ? ? if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
+> + ? ? ? ? ? ? ? return false;
+> +
+> + ? ? ? val = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4430_PRM_DEVICE_INST,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
+> +
+> + ? ? ? val &= OMAP4430_DEVICE_OFF_ENABLE_MASK;
+> +
+> + ? ? ? return val ? true : false;
+> +}
+> +
+> ?struct pwrdm_ops omap4_pwrdm_operations = {
+> ? ? ? ?.pwrdm_func_to_pwrst ? ?= omap2_pwrdm_func_to_pwrst,
+> ? ? ? ?.pwrdm_func_to_logic_pwrst ? ? ?= omap2_pwrdm_func_to_logic_pwrst,
+> @@ -381,4 +427,6 @@ struct pwrdm_ops omap4_pwrdm_operations = {
+> ? ? ? ?.pwrdm_enable_hdwr_sar ?= omap4_pwrdm_enable_hdwr_sar,
+> ? ? ? ?.pwrdm_disable_hdwr_sar = omap4_pwrdm_disable_hdwr_sar,
+> ? ? ? ?.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
+> + ? ? ? .pwrdm_enable_off ? ? ? = omap4_device_set_next_state_off,
+> + ? ? ? .pwrdm_read_next_off ? ?= omap4_device_read_next_state_off,
+> ?};
+> diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> index c4de02f..13db876 100644
+> --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
+> +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+> @@ -54,7 +54,8 @@ static struct powerdomain core_44xx_pwrdm = {
+> ? ? ? ? ? ? ? ?[3] = PWRSTS_ON, ? ? ? ?/* ducati_l2ram */
+> ? ? ? ? ? ? ? ?[4] = PWRSTS_ON, ? ? ? ?/* ducati_unicache */
+> ? ? ? ?},
+> - ? ? ? .flags ? ? ? ? ? ?= PWRDM_HAS_LOWPOWERSTATECHANGE,
+> + ? ? ? .flags ? ? ? ? ? ?= PWRDM_HAS_LOWPOWERSTATECHANGE |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? PWRDM_HAS_EXTRA_OFF_ENABLE,
+> ?};
+>
+> ?/* gfx_44xx_pwrdm: 3D accelerator power domain */
 
-> , or
-> make the generic driver support this in a generic way.
+Regards,
+Jean
 
-Well, this is platform specific stuff, so it shouldn't be in any way part of the 
-driver.
-
-> 
-> Rob
-> 
-> > +
-> > +Optional properties:
-> > +- output-gpios: Output gpio array that needs to set.
-> > +- output-gpio-values: This property is required if output-gpios is set.
-> > +  The value is a array of 0 or 1. Total count eaquals the number of
-> > gpios. diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > b/arch/arm/boot/dts/imx6q-sabrelite.dts index e0ec929..1dd2261 100644
-> > --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> > @@ -17,6 +17,13 @@
-> > 
-> >  	model = "Freescale i.MX6 Quad SABRE Lite Board";
-> >  	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
-> > 
-> > +	config-on-boot {
-> > +		output-gpios = <
-> > +				&gpio3 22 0>;	/* vbus reset */
-> > +		output-gpio-values = <
-> > +				1>;		/* vbus reset */
-> > +	};
-> > +
-> > 
-> >  	memory {
-> >  	
-> >  		reg = <0x10000000 0x40000000>;
-> >  	
-> >  	};
-> > 
-> > diff --git a/arch/arm/mach-imx/mach-imx6q.c
-> > b/arch/arm/mach-imx/mach-imx6q.c index b47e98b..577cf19 100644
-> > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > @@ -19,6 +19,7 @@
-> > 
-> >  #include <linux/irqdomain.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_address.h>
-> > 
-> > +#include <linux/of_gpio.h>
-> > 
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/pinctrl/machine.h>
-> > 
-> > @@ -113,6 +114,38 @@ static void __init imx6q_sabrelite_init(void)
-> > 
-> >  	imx6q_sabrelite_cko1_setup();
-> >  
-> >  }
-> > 
-> > +static void __init imx6q_config_on_boot(void)
-> > +{
-> > +	struct device_node *np;
-> > +	struct property *pp;
-> > +	int cnt, len, i;
-> > +	int gpio;
-> > +
-> > +	np = of_find_node_by_path("/config-on-boot");
-> > +	if (!np)
-> > +		return;
-> > +	cnt = of_gpio_named_count(np, "output-gpios");
-> > +	pp = of_find_property(np, "output-gpio-values", &len);
-> > +	if (!pp || cnt != len / sizeof(u32)) {
-> > +		pr_err("Invalid config-on-boot gpios!\n");
-> > +		of_node_put(np);
-> > +		return;
-> > +	}
-> > +	for (i = 0; i < cnt; i++) {
-> > +		gpio = of_get_named_gpio(np, "output-gpios", i);
-> > +		if (gpio_is_valid(gpio))
-> > +			gpio_request_one(gpio, GPIOF_OUT_INIT_HIGH,
-> > +					"config-on-boot");
-> > +	}
-> > +
-> > +	of_node_put(np);
-> > +}
-> > +
-> > +static void __init imx6q_post_populate(void)
-> > +{
-> > +	imx6q_config_on_boot();
-> > +}
-> > +
-> > 
-> >  static void __init imx6q_init_machine(void)
-> >  {
-> >  
-> >  	/*
-> > 
-> > @@ -126,6 +159,8 @@ static void __init imx6q_init_machine(void)
-> > 
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > 
-> > +	imx6q_post_populate();
-> > +
-> > 
-> >  	imx6q_pm_init();
-> >  
-> >  }
-
-Best regards,
-Marek Vasut
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
