@@ -1,131 +1,89 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Wed, 13 Jun 2012 18:15:34 +0200 (CEST)
-Subject: [PATCH] ARM: mxc-rnga: fix data_present API
-In-Reply-To: <20120613063650.GB32436@pengutronix.de>
-Message-ID: <449445897.2590473.1339604134205.JavaMail.root@advansee.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 13 Jun 2012 18:14:08 +0200
+Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370
+ and Armada XP SoC
+In-Reply-To: <201206121349.27696.arnd@arndb.de>
+References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
+ <201206121349.27696.arnd@arndb.de>
+Message-ID: <20120613181408.7e03fcae@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Arnd,
 
-On Wed, Jun 13, 2012 at 8:36:50AM +0200, Uwe Kleine-K?nig wrote:
-> your changelog is very sparse. Maybe point out the commit that
-> changed
-> the API without fixing its users?
+Le Tue, 12 Jun 2012 13:49:27 +0000,
+Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-Done below.
-
-> On Tue, Jun 12, 2012 at 11:07:47PM +0200, Beno?t Th?baudeau wrote:
-> > +	int level, data, i;
-> level is only used in the for loop, so it should be declared there,
-> too.
-
-Done below.
-
-> > +
-> > +	for (i = 0; i < 20; i++) {
-> > +		/* how many random numbers is in FIFO? [0-16] */
-> As you touch this comment can you fix the grammar, too? (i.e.
-> s/is/are/)
-
-Done below.
-
-> > +		level = ((__raw_readl(rng_base + RNGA_STATUS) &
-> > +				RNGA_STATUS_LEVEL_MASK) >> 8);
-> > +		data = level > 0 ? 1 : 0;
-> This statement is equivalent to:
+> > Andrew Lunn asked for refactoring the _restart() function to being used by
+> > any MVEBU SOC, but we didn't find a nice way to do it. Indeed the registers
+> > mapping differs between the SOC and the bit mask too. A solution could be to
+> > get this mapping through the device tree, but we are not sure it was a good
+> > usage of the device tree.
 > 
-> 	data = level > 0;
-> 
-> so IMHO there is no need for the data variable.
+> As I suggested in my reply to patch 4/8, I think this can be encapsulated
+> in one file that acts as a driver for the generic ("bridge regs") registers
+> and provides functions for that based on the "compatible" property.
 
-Done below. I had kept that only to stick more closely to the original code, but
-I did not like this either.
+The problem here is that those registers are part of a random set of
+registers, that do not really constitute a sort of coherent "device",
+as we have for other IP blocks (SATA controllers, SPI controllers,
+etc.). First of all, the "bridge regs" name was unfortunate and a
+left-over from early versions of the code, the datasheet does not refer
+to them as "bridge registers" in any location.
 
-> > +		if (data || !wait)
-> > +			break;
-> > +		udelay(10);
-> Apart from the magic 20 that Fabio already pointed out, these 10 us
-> are
-> magic, too. What is the requirement when wait evaluates to true? Are
-> you
-> allowed to sleep? If so, maybe better do that?
+On the Armada 370, the registers needed to restart the machine are part
+of a "Miscellaneous Registers" section in the list of register
+sections. This Miscellaneous Registers are 32 bits registers organized
+as follows:
 
-Both the magic 20 and the magic 10 ?s are simply the missing extension for RNGA
-of commit 984e976. They first appear in commit 844dd05, which only says this is
-polling time used to let RNG HW gather new entropy while rng_dev_read() is
-waiting for it. Hence, at least the 10 ?s should be hardware-specific.
+ * SoC Control Register
+ * SoC Device Mux Register
+ * Power Management Memory Power Down 2 Register
+ * Power Management Memory Power Down 3 Register
+ * Power Management Memory Power Down 4 Register
+ * Power Management Memory Power Down 5 Register
+ * Power Management Clock Gating Control Register
+ * Power Management Memory Power Down 6 Register
+ * Sample at Reset Register
+ * Sample at Register High Register
+ * Device ID Register
+ * CPU SoC ID Register 
+ * SYSRSTn Length Counter Register
+ * RSTOUTn Mask Register -- this one needed for restart
+ * System Soft Reset Register -- this one needed for restart
+ * Shared SERDES 063 selectors Register
+ * Boot ROM Routine and Error Code Register
+ * PCI Express Boot Address Register
 
-The requirement when wait evaluates to true should be to wait for entropy data
-with a time-out. rng_dev_read() seems to run in a "sleep-able" context. The
-issue is that there does not seem to be any source of information regarding the
-time required by RNGA to gather entropy data, or the time after which it is
-useless to expect entropy data. The RNGA chapter of the i.MX31 RM is very light.
+This registers are more or less contiguous, from offset 0x18204 to
+0x182D4. As you can see, the purpose of those registers are very
+different from one register to another, so it's kind of odd to create a
+"driver" that would span those registers.
 
-IMHO, considering the information we have, it's better to keep this 20 * 10 ?s
-behavior copied from the other RNG drivers since it works, it gives some time to
-RNGA to gather new entropy, and at worst it wastes 0.2 ms each time. Should it
-sleep for 10 ?s?
+On the Armada XP, we have a "System Registers" area, subdivided by the
+datasheet in "Configuration and Control", "QSGMII Control and Status",
+"SERDES", "Power Management and Memory Power Down", "Thermal Manager",
+"BootROM", "Interrupt, "Design for Testability". But from an
+offset/address perspective, some registers of the "Power Management and
+Memory Power Down" subsection are in the middle of the registers of the
+"Configuration and Control" registers.
 
-See my reworked patch below.
+For the restart problem on Armada XP, the two registers of interest are
+within the "Configuration and Control" subsection.
 
-Regards,
-Beno?t
+Our biggest problem is that all those registers do not really match
+very well with a device/driver representation, so we don't know how to
+nicely represent them in the device tree. How would you recommend to
+handle these?
 
+If further details are needed on the registers organization in order to
+find the best solution, I'll be happy to provide them.
 
-[PATCH] ARM: mxc-rnga: fix data_present API
+Thanks!
 
-Commit 45001e9, which added support for RNGA, ignored the previous commit
-984e976, which changed the data_present API.
-
-Cc: Matt Mackall <mpm@selenic.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Alan Carvalho de Assis <acassis@gmail.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../drivers/char/hw_random/mxc-rnga.c              |   21 ++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
-
-diff --git linux-next-HEAD-aab6028.orig/drivers/char/hw_random/mxc-rnga.c linux-next-HEAD-aab6028/drivers/char/hw_random/mxc-rnga.c
-index 187c6be..85074de 100644
---- linux-next-HEAD-aab6028.orig/drivers/char/hw_random/mxc-rnga.c
-+++ linux-next-HEAD-aab6028/drivers/char/hw_random/mxc-rnga.c
-@@ -24,6 +24,7 @@
- #include <linux/ioport.h>
- #include <linux/platform_device.h>
- #include <linux/hw_random.h>
-+#include <linux/delay.h>
- #include <linux/io.h>
- 
- /* RNGA Registers */
-@@ -60,16 +61,20 @@
- 
- static struct platform_device *rng_dev;
- 
--static int mxc_rnga_data_present(struct hwrng *rng)
-+static int mxc_rnga_data_present(struct hwrng *rng, int wait)
- {
--	int level;
- 	void __iomem *rng_base = (void __iomem *)rng->priv;
--
--	/* how many random numbers is in FIFO? [0-16] */
--	level = ((__raw_readl(rng_base + RNGA_STATUS) &
--			RNGA_STATUS_LEVEL_MASK) >> 8);
--
--	return level > 0 ? 1 : 0;
-+	int i;
-+
-+	for (i = 0; i < 20; i++) {
-+		/* how many random numbers are in FIFO? [0-16] */
-+		int level = (__raw_readl(rng_base + RNGA_STATUS) &
-+				RNGA_STATUS_LEVEL_MASK) >> 8;
-+		if (level || !wait)
-+			return !!level;
-+		udelay(10);
-+	}
-+	return 0;
- }
- 
- static int mxc_rnga_data_read(struct hwrng *rng, u32 * data)
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
