@@ -1,50 +1,77 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 13 Jun 2012 11:56:21 -0400 (EDT)
-Subject: [PATCH v2] arm: Add basic support for new Marvell Armada 370 and
- Armada XP SoC
-In-Reply-To: <4FD8AC5E.1060804@redhat.com>
-References: <1339433585-28087-1-git-send-email-gregory.clement@free-electrons.com>
- <4FD8AC5E.1060804@redhat.com>
-Message-ID: <alpine.LFD.2.02.1206131128020.23555@xanadu.home>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 13 Jun 2012 18:00:38 +0200
+Subject: [Patch v5 08/13] ARM: imx6q: add config-on-boot gpios
+In-Reply-To: <20120613152841.GA23590@richard-laptop>
+References: <1339590863-10564-1-git-send-email-richard.zhao@freescale.com>
+ <4FD8AD42.6010702@gmail.com> <20120613152841.GA23590@richard-laptop>
+Message-ID: <201206131800.38622.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jun 2012, Jon Masters wrote:
+Dear Richard Zhao,
 
-> On 06/11/2012 12:52 PM, Gregory CLEMENT wrote:
+> On Wed, Jun 13, 2012 at 10:09:54AM -0500, Rob Herring wrote:
+> > On 06/13/2012 07:34 AM, Richard Zhao wrote:
+> > > Sometimes, boards have gpios that don't own by any driver or owner
+> > > by a generic driver that don't like hacks. Such gpios is normally
+> > > output and need setup once on boot. So I introduce the config-on-boot
+> > > gpios.
+> > > 
+> > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/arm/config-on-boot.txt     |   12 +++++++
+> > >  arch/arm/boot/dts/imx6q-sabrelite.dts              |    7 ++++
+> > >  arch/arm/mach-imx/mach-imx6q.c                     |   35
+> > >  ++++++++++++++++++++ 3 files changed, 54 insertions(+)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/arm/config-on-boot.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/config-on-boot.txt
+> > > b/Documentation/devicetree/bindings/arm/config-on-boot.txt new file
+> > > mode 100644
+> > > index 0000000..f98ed74
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/config-on-boot.txt
+> > > @@ -0,0 +1,12 @@
+> > > +* Configure on Boot
+> > > +
+> > > +Node name: config-on-boot
+> > > +  It must be in root node. config-on-boot means to describe settings
+> > > that needs +  to be set one time on boot but aren't owned by any
+> > > driver, or the owned driver +  is too generic to handle such settings.
+> > > For example, usb hub uses generic +  driver in usb core code, a
+> > > on-board usb may need deassert reset pin.
+> > 
+> > NAK. This is not a h/w description
 > 
-> > You'll find in this patch set the new version of the initial support for a
-> > new family of ARMv7-compatible Marvell SoCs initially submitted by my
-> > colleague Thomas Petazzoni. Following the conclusion of the discussion when
-> > we submitted our first version we have chosen to add this support for this
-> > SoC family in the to support in the arch/arm/mach-mvebu/ directory.
+> It's misc things, but is hw description.
 > 
-> Pardon my silly question. I know that there's an effort to reconcile the
-> two different SoCs so you're picking a neutral name, but what does
-> "mvebu" mean, and will you be persistently keeping this name? Our guys
-> want to know what this new platform will entail for Fedora support in
-> terms of the platform name being used in various non-kernel places.
+> > and should be solved within the
+> > kernel or bootloader. Either fix this in u-boot,
+> 
+> Kernel might be better not to depend on uboot.
 
-Marvell like to create different names for similar things and also reuse 
-the same name for totally different things.  While this might look good 
-for marketing purposes, we kernel developers prefer to gather things 
-together according to shared support code.
+And we don't want to polute uboot either, so this is a good move.
 
-Within Marvell there are actually 2 distinct SOC families: the one 
-acquired from Intel with the XScale/PXA origin, and Marvell's own design 
-that produced Orion, Kirkwood, Dove, etc.
+> > the platform code, or
+> 
+> How do I get gpio in platfrom code without dts description?
 
-The former is found under mach-pxa and mach-mmp. The later is getting 
-way too scattered, currently using mach-dove, mach-kirkwood, 
-mach-mv78xx0, mach-orion5x, and two more were proposed for the new SOCs.
+Write a driver that does the GPIO setup in some generic way? Wasn't there 
+something about this stuff going on? Shawn, you had some comments /wrt the M28 
+DTS. This might be what you meant?
 
-Since all SOCs in the later family came from the EBU division within 
-Marvell, and because they share a significant amount of code despite 
-their wildly different names, we settled on "mvebu" to gather them 
-together in the future.
+> > make the generic driver support this in a generic way.
+> 
+> It's called just after populate devices. It's hard for generic driver to
+> decide when it's called.
+> 
+> Thanks
+> Richard
 
-This is therefore a name for kernel engineering/maintenance purpose 
-only. I'd strongly suggest not to use this name in non-kernel places.
-
-
-Nicolas
+Best regards,
+Marek Vasut
