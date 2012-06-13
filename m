@@ -1,24 +1,48 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 13 Jun 2012 05:25:00 +0000
-Subject: [PATCH v5 03/14] ARM: OMAP2+: gpmc: driver migration helper
-In-Reply-To: <4FD7808A.1040806@ti.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <a121156faf6c758d4e37447ab832f6f825cc5bc8.1339419492.git.afzal@ti.com>
- <4FD6555D.4000508@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997E0F@DBDE01.ent.ti.com>
- <4FD7808A.1040806@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9987CB@DBDE01.ent.ti.com>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Wed, 13 Jun 2012 10:56:28 +0530
+Subject: MMC: commit dba3c29 ruins mmc card data on beagle-xm revB
+In-Reply-To: <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+References: <CACVXFVO-Wm1Qwporby1M=+yPz81AWHpZRBZSbr5tgT32b6sSEA@mail.gmail.com>
+ <CANrkHUYd8Ww6De4MiZ8_oPfcnhvtsZXOySLRiWSBU4QUQ6beHw@mail.gmail.com>
+ <CACVXFVP16UmHe-GGydrSMgGHwnkSvYhnY339=zr=BfCehvS8Kw@mail.gmail.com>
+Message-ID: <CANfBPZ-Sei434hV0edEEGeViwL6TXWsvRnprv7-Kf64dJ6_auQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Tue, Jun 12, 2012 at 23:16:50, Hunter, Jon wrote:
-
-> Ok, I see that this is necessary until all boards are migrated. However,
-> please label with a FIXME to make it clear that this is to be removed.
-
-Ok, I will update this.
-
-Regards
-Afzal
+On Mon, Jun 11, 2012 at 12:50 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> On Mon, Jun 11, 2012 at 2:21 PM, T Krishnamoorthy, Balaji
+> <balajitk@ti.com> wrote:
+>> Hi Ming Lei,
+>> Can you let me know if you noticed any write/timeout errors ?
+>
+> Nothing error logs found during writing.
+>
+> Below is one of my test case.
+>
+> root at beagleboard:~# upk
+> updateing kernel...
+> flush storage...
+> root at beagleboard:~# cat bin/upk
+> #!/bin/sh
+>
+> echo "updateing kernel..."
+> cp -f /mnt/nfs/t/uImage /media/mmcblk0p1/
+>
+> echo "flush storage..."
+> sync
+> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+> root at beagleboard:~# umount /media/mmcblk0p1
+> root at beagleboard:~# mount -t vfat /dev/mmcblk0p1 /media/mmcblk0p1
+> root at beagleboard:~#
+> root at beagleboard:~#
+> root at beagleboard:~# diff /mnt/nfs/t/uImage /media/mmcblk0p1/uImage
+> Binary files /mnt/nfs/t/uImage and /media/mmcblk0p1/uImage differ
+>
+Ming,
+  Just to keep you posted, Balaji and myself are trying to reproduce
+the issue and haven't hit the problem yet.
+This patch was in use internaly for sometime before we sent it upstream.
+Meanwhile, is is possible for you to reproduce this problem with
+MMC_DEBUG enabled ? That would be helpful.
+~Venkat.
