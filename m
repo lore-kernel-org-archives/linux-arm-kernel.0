@@ -1,40 +1,42 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 13 Jun 2012 14:23:04 +0800
-Subject: [PATCH v4] usb: chipidea: permit driver bindings pass phy pointer
-In-Reply-To: <20120612231438.GA6177@kroah.com>
-References: <1337912665-16615-3-git-send-email-richard.zhao@freescale.com>
- <1339159026-15837-1-git-send-email-richard.zhao@freescale.com>
- <20120612231438.GA6177@kroah.com>
-Message-ID: <20120613062031.GB22680@b20223-02.ap.freescale.net>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 13 Jun 2012 06:25:00 +0000
+Subject: [PATCH v5 01/14] ARM: OMAP2+: gpmc: platform definitions
+In-Reply-To: <4FD79147.9060501@ti.com>
+References: <cover.1339419492.git.afzal@ti.com>
+ <139eb951817b4bee8ea91083b0d572c7421078f0.1339419492.git.afzal@ti.com>
+ <4FD79147.9060501@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99889E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 04:14:38PM -0700, Greg KH wrote:
-> On Fri, Jun 08, 2012 at 08:37:06PM +0800, Richard Zhao wrote:
-> > Sometimes, the driver bindings may know what phy they use.
-> > For example, when using device tree, the usb controller may have a
-> > phandler pointing to usb phy.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > Reviewed-by: Marek Vasut <marex@denx.de>
-> > Acked-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > Changes since laster version:
-> > - hcd transceiver renamed to phy
-> 
-> Ick, I see patches all over this thread, and other threads, and I have
-> no idea what to apply anywhere...
-I thought it only need small fix, but the fix became bigger and bigger.
-> 
-> So, consider all chipidea patches dropped from my queue now, can you
-> please resend them to me, with the accumulated acks and reviewed-by
-> line, so that I can queue them up?
-I'll send out a new version series.
+Hi Jon,
 
-Thanks for review.
-Richard
+On Wed, Jun 13, 2012 at 00:28:15, Hunter, Jon wrote:
+> On 06/11/2012 09:26 AM, Afzal Mohammed wrote:
+
+> > +enum {
+> > +	has_none,
+> > +	has_period,
+> > +	has_clock
+> > +};
+> > +
+> > +struct gpmc_time_ctrl {
+> > +	int type;
+> > +	struct gpmc_timings timings;
+> > +	struct gpmc_misc_timings bool_timings;
+> > +};
 > 
-> thanks,
-> 
-> greg k-h
-> 
+> Why not combine misc_timings and the original timings? I don't see why
+> these need to be kept separate. Even if combined it can still be
+
+To keep similar things together, as misc_timings are all bool type, while
+existing are not so. This could have been put inside gpmc_timings, but
+wanted to reduce chance of issues for users of old interface.
+
+> backward compatible for legacy boards as they will not specify the misc
+> timing fields. I am also not convinced we need this type member.
+
+Reason: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg69041.html
+
+Regards
+Afzal
