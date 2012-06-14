@@ -1,109 +1,122 @@
-From: neilb@suse.de (NeilBrown)
-Date: Fri, 15 Jun 2012 07:06:11 +1000
-Subject: [GIT PULL] gpio/omap: cleanups for v3.5
-In-Reply-To: <CAC83ZvKT+EDRzBWrMbiyqOYqLW7WudOQeAq5Y5ZgXEs2txEPrA@mail.gmail.com>
-References: <874nrmtf47.fsf@ti.com> <20120614101541.39f50aee@notabene.brown>
- <CAC83ZvKT+EDRzBWrMbiyqOYqLW7WudOQeAq5Y5ZgXEs2txEPrA@mail.gmail.com>
-Message-ID: <20120615070611.0fa559ed@notabene.brown>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 14 Jun 2012 23:07:09 +0200
+Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
+In-Reply-To: <alpine.DEB.2.00.1206141052240.30212@utopia.booyaka.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004614.20034.50895.stgit@dusk> <4FD9DF2A.3010000@ti.com>
+ <alpine.DEB.2.00.1206141052240.30212@utopia.booyaka.com>
+Message-ID: <4FDA527D.9080401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jun 2012 23:24:10 +0530 "DebBarma, Tarun Kanti"
-<tarun.kanti@ti.com> wrote:
+On 6/14/2012 7:09 PM, Paul Walmsley wrote:
+> Hi
+>
+> On Thu, 14 Jun 2012, Cousson, Benoit wrote:
+>
+>> I don't think we should allow that at hwmod level. This line is already
+>> handled by the IVAHD hwmod. We will then have some potential issue since
+>> nothing will prevent the concurrent access.
+>> Moreover that IP is only used by the IVAHD and thus should be handled by the
+>> same driver. The SL2 being inside the IVA subsystem, it should be reset when
+>> the IVA will be reset and thus does not require an individual control.
+>
+> If a hardreset line will affect an IP block, then the line should be
+> listed as one of the IP block's hardreset lines.
 
-> On Thu, Jun 14, 2012 at 5:45 AM, NeilBrown <neilb@suse.de> wrote:
-> > On Fri, 11 May 2012 17:30:48 -0700 Kevin Hilman <khilman@ti.com> wrote:
-> >
-> >> Hi Grant,
-> >>
-> >> Here's the final round of GPIO cleanups for v3.5. ?This branch is based
-> >> on my for_3.5/fixes/gpio branch you just pulled.
-> >>
-> >> Kevin
-> >
-> > Hi.
-> >
-> > ?I'm not sure if it was this series or the following cleanups which broke
-> > ?things for me, but I've been trying 3.5-rc2 on my GTA04 and the serial
-> > ?console (ttyO2) dies as soon as the omap-gpio driver initialises.
-> >
-> > ?After some digging I came up with this patch to gpio-omap.c
-> >
-> > @@ -1124,6 +1124,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> >
-> > ? ? ? ?platform_set_drvdata(pdev, bank);
-> >
-> > + ? ? ? if (bank->get_context_loss_count)
-> > + ? ? ? ? ? ? ? bank->context_loss_count =
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
-> > ? ? ? ?pm_runtime_enable(bank->dev);
-> > ? ? ? ?pm_runtime_irq_safe(bank->dev);
-> > ? ? ? ?pm_runtime_get_sync(bank->dev);
-> >
-> > which fixes it.
-> >
-> > What was happening ?was that when omap_gpio_probe calls pm_runtime_get_sync,
-> > it calls
-> > ?_od_runtime_resume -> pm_generic_runtime_resume -> omap_gpio_runtime_resume
-> > ?-> omap_gpio_restore_context
-> >
-> > and then the serial port stops.
-> > I reasoned that the context probably hadn't been set up yet, so restoring
-> > from it broke things.
-> > Initialising bank->context_loss_count seems sensible and would ensure that
-> > we didn't try to restore the context until it has actually been lost.
-> 
-> I thought the following code exactly does that. That is context_lost_cnt_after
-> would be zero until there is context loss. The bank->context_loss_count is zero
-> at the beginning. So, (context_lost_cnt_after != bank->context_loss_count) would
-> be false and hence context restore should NOT happen? Not sure if I am
-> over looking
-> anything here....
+No, not necessarily. That signal is already added in the IVA hwmod that 
+is the subsystem that does contain the SL2. The fact that the HW signal 
+is propagated inside the SS is an implementation detail. In fact the 
+hardreset of every SS is always propagated inside the SS IPs.
 
-Ahhh... I think I know what might be happening.
+What is adding some confusion here is just because the SL2 does have a 
+modulemode for some weird legacy reason and thus a hwmod.
 
-I found a while ago that if I actually enable off_mode some things
-didn't work properly, but if I just set mpu_deepest_state to PWRDM_POWER_OFF
-in next_valid_state, it all does work and I use less power.  So I did that.
-It has now come back to bite me I expect.
+>  Otherwise, the hwmod
+> data will not accurately reflect the hardware -- the ultimate goal.
 
-I'll revert that, enable off mode properly, and see what happens.
+Not really, describing the relevant HW for the SW usage is the goal. 
+Otherwise we will end up with the full RTL inside the kernel.
 
-Thanks,
+So, here the point is just that SL2 is inside the IVAHD and thus will be 
+reset when the IVAHD will be reset.
 
-NeilBrown
+That does not mean the reset line should be controlled by the SL2 hwmod 
+as well. This is in that case a duplication of a already existing line 
+that is already controlled by the parent subsystem.
+
+It seems obvious to me that in that case, only the parent should have 
+the control. Otherwise, you will end up in a situation where a 
+(potential) SL2 driver will reset the whole subsystem and all its 
+siblings if it does try to reset the SL2.
+
+>> I guess, we should just mark the dependency with some external power resource
+>> to avoid the fmwk to try to enable that automatically.
+>
+> Right now, the presence of a hardreset line will effectively cause the
+> hwmod code to ignore the IP block from a reset and enable point of view.
+> So the IP block won't be enabled automatically right now anyway, since we
+> still don't have a clear sense of how to handle those.
+
+Yep, but for that I'd rather add a flag than a information that is a 
+duplication of the parent data.
+
+>> It is similar to DSS sub IPs and to some extend McPDM for my point of view.
+>
+> These seem like different cases to me.
+>
+> The DSS has no hardreset and the sub-IPs have their own softreset bits.
+> As far as I know, the main reason why we can't have individual reset
+> functions for the DSS sub-IPs is because we don't have hierarchical IP
+> block enable/disable implemented in the hwmod code, not any real hardware
+> constraint.
+
+The point with DSS is that you cannot enable the DISPC hwmod if the DSS 
+(parent) is not enable.
+-> Clock/Power dependency
+
+> McPDM has a functional clock dependency on an external (non-SoC) device
+> that's only controllable via I2C.  And, the McPDM can block the ABE
+> clockdomain from going idle.  That's just wacky.
+
+The point with McPDM is that you cannot enable the McPDM if the external 
+clock is not enabled.
+-> Clock dependency
+
+> So those cases seem quite different to me.  One is a software issue.  And
+> the other is an off-chip (non-OMAP) dependency, unlike the SL2IF/IVAHD
+> issue in which all the needed resources are still on-chip.
+
+The IVAHD reset must be de-asserted to enable the SL2.
+-> Parent reset dependency
 
 
-> 
-> omap_gpio_runtime_resume(...)
-> {
-> ...
->         if (bank->get_context_loss_count) {
->                 context_lost_cnt_after =
->                         bank->get_context_loss_count(bank->dev);
->                 if (context_lost_cnt_after != bank->context_loss_count) {
->                         omap_gpio_restore_context(bank);
->                 } else {
->                         spin_unlock_irqrestore(&bank->lock, flags);
->                         return 0;
->                 }
->         }
-> ...
-> }
-> --
-> Tarun
-> >
-> > Thanks,
-> > NeilBrown
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The point I'm trying to make is that some IPs do have dependency with 
+other IPs / devices in the system. It can be clock/reset or power.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120615/50978419/attachment.sig>
+Some of them could be indeed handled by hwmod fmwk, but since some other 
+will require a management at Linux device level, and because LDM does 
+already have a proper way to handle parent/child relationship, there is 
+no point adding extra complexity in hwmod fmwk.
+
+By using a single flag we can just prevent the hwmod fmwk to try to 
+enable these IPs at boot time, because we already know it will fail due 
+to missing dependencies.
+
+>> Maybe we should rename HWMOD_EXT_OPT_MAIN_CLK with something more
+>> generic like HWMOD_EXT_POWER_DEP to highlight the dependency with an
+>> external resource. It can be a external clock or another module.
+>
+> Yes, I agree that it would be convenient to have some flag, either on the
+> hwmod or the hardreset line, to indicate that some of the reset lines are
+> shared.
+
+I guess such flag will be mostly irrelevant. What will we do with that?
+
+We just want to avoid enabling an IP that cannot be enabled without 
+enabling some other IPs before.
+We do not want the hwmod fmwk to do that, we want to defer that do the 
+Linux device level.
+
+Regards,
+Benoit
