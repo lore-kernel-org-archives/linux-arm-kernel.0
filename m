@@ -1,91 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jun 2012 12:20:17 +0100
-Subject: [PATCH 09/17] i2c: omap: ack IRQ in parts
-In-Reply-To: <1339669250-9183-10-git-send-email-balbi@ti.com>
-References: <1339669250-9183-1-git-send-email-balbi@ti.com>
- <1339669250-9183-10-git-send-email-balbi@ti.com>
-Message-ID: <20120614112017.GC31187@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jun 2012 04:23:22 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9997F4@DBDE01.ent.ti.com>
+References: <cover.1339419244.git.afzal@ti.com>
+ <c4bd7d71e9950c09f9712077160b6231f566d8f3.1339419244.git.afzal@ti.com>
+ <20120614092957.GE12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9997F4@DBDE01.ent.ti.com>
+Message-ID: <20120614112322.GJ12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 01:20:42PM +0300, Felipe Balbi wrote:
-> According to flow diagrams on OMAP TRMs,
-> we should ACK the IRQ as they happen.
+* Mohammed, Afzal <afzal@ti.com> [120614 02:46]:
+> Hi Tony,
+> 
+> On Thu, Jun 14, 2012 at 14:59:57, Tony Lindgren wrote:
+> > * Afzal Mohammed <afzal@ti.com> [120611 07:21]:
+> 
+> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 0, 3, bus_turnaround);
+> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG6, 8, 11, cycle2cycle_delay);
+> > > +
+> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
+> > > +	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
+> > > +
+> > 
+> > Thinking about this, the CONFIG1 bits have been set with
+> > gpmc_cs_write_reg because these are part of the static configuration
+> > and do not need to be dynamically calculated as they are tick based.
+> > For example, tusb6010 sets GPMC_CONFIG1_CLKACTIVATIONTIME(1) during init.
+> 
+> But aren't we deciding number of ticks based on clock period ?
+> If we take case of onenand, based on the knowledge of clock period,
+> number of ticks are calculated.
+> 
+> And similarly to decide cycle2cycledelay, busturnaround, we decide number
+> of ticks based on peripheral datasheet timings & gpmc clock, hence
+> shouldn't it also be dynamically calculated similar to timings that were
+> existing earlier.
 
-You don't explain that you're adding a new dev_err() statement into the
-driver for a missing acknowledge.
+Hmm indeed onenand is setting that dynamically. OK, let's try your
+approach and make sure we patch in the missing values so we don't
+overwrite the values set with gpmc_cs_write_reg.
 
-What if you're probing for a device - can this cause spam to the kernel
-console?  What if you have protocol mangling enabled with the "ignore
-lack of ack bit set" ?
+Regards,
 
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   29 +++++++++++++++++------------
->  1 file changed, 17 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index f978b14..c00ba7d 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -894,21 +894,20 @@ omap_i2c_isr(int this_irq, void *dev_id)
->  		}
->  
->  complete:
-> -		/*
-> -		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
-> -		 * acked after the data operation is complete.
-> -		 * Ref: TRM SWPU114Q Figure 18-31
-> -		 */
-> -		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
-> -				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
-> -				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
-> -
-> -		if (stat & OMAP_I2C_STAT_NACK)
-> +		if (stat & OMAP_I2C_STAT_NACK) {
-> +			dev_err(dev->dev, "No Acknowledge\n");
->  			err |= OMAP_I2C_STAT_NACK;
-> +			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-> +			omap_i2c_complete_cmd(dev, err);
-> +			return IRQ_HANDLED;
-> +		}
->  
->  		if (stat & OMAP_I2C_STAT_AL) {
->  			dev_err(dev->dev, "Arbitration lost\n");
->  			err |= OMAP_I2C_STAT_AL;
-> +			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-> +			omap_i2c_complete_cmd(dev, err);
-> +			return IRQ_HANDLED;
->  		}
->  
->  		/*
-> @@ -989,12 +988,18 @@ complete:
->  
->  		if (stat & OMAP_I2C_STAT_ROVR) {
->  			dev_err(dev->dev, "Receive overrun\n");
-> -			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
-> +			err |= OMAP_I2C_STAT_ROVR;
-> +			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
-> +			omap_i2c_complete_cmd(dev, err);
-> +			return IRQ_HANDLED;
->  		}
->  
->  		if (stat & OMAP_I2C_STAT_XUDF) {
->  			dev_err(dev->dev, "Transmit underflow\n");
-> -			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
-> +			err |= OMAP_I2C_STAT_XUDF;
-> +			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
-> +			omap_i2c_complete_cmd(dev, err);
-> +			return IRQ_HANDLED;
->  		}
->  	} while (stat);
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tony
