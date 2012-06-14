@@ -1,66 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jun 2012 04:49:06 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
-References: <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com>
- <20120613115445.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
- <20120614101901.GI12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
-Message-ID: <20120614114905.GK12766@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Jun 2012 14:47:14 +0300
+Subject: [PATCH 09/17] i2c: omap: ack IRQ in parts
+In-Reply-To: <20120614112017.GC31187@n2100.arm.linux.org.uk>
+References: <1339669250-9183-1-git-send-email-balbi@ti.com>
+ <1339669250-9183-10-git-send-email-balbi@ti.com>
+ <20120614112017.GC31187@n2100.arm.linux.org.uk>
+Message-ID: <20120614114712.GR13602@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [120614 03:43]:
-> Hi Tony,
+On Thu, Jun 14, 2012 at 12:20:17PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 14, 2012 at 01:20:42PM +0300, Felipe Balbi wrote:
+> > According to flow diagrams on OMAP TRMs,
+> > we should ACK the IRQ as they happen.
 > 
-> On Thu, Jun 14, 2012 at 15:49:02, Tony Lindgren wrote:
+> You don't explain that you're adding a new dev_err() statement into the
+> driver for a missing acknowledge.
 > 
-> > Well I took a look at the values, and it seems the only difference is the
-> > static GPMC_CONFIG1_CLKACTIVATIONTIME(1) that your patch now overwrites 0.
-> 
-> It seems change below should be part of $subject.
-> 
-> Please let me know your comments
+> What if you're probing for a device - can this cause spam to the kernel
+> console?  What if you have protocol mangling enabled with the "ignore
+> lack of ack bit set" ?
 
-Well I could not get this to apply either on top of the $subject nor all your
-patches for some reason, but I manually applied the tusb6010 part with the
-following change..
+indeed... maybe dev_vdbg() would fit better, or just don't add anything.
 
-> --- a/arch/arm/mach-omap2/usb-tusb6010.c
-> +++ b/arch/arm/mach-omap2/usb-tusb6010.c
-> @@ -174,6 +174,8 @@ static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
->         tmp = t.cs_wr_off * 1000 + 7000 /* t_scsn_rdy_z */;
->         t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
-> 
-> +       t.clk_activation = gpmc_ticks_to_ns(1);
-> +
-
-..this should be just 1 as it's one tick, not ns.
-
->         return gpmc_cs_set_timings(sync_cs, &t);
->  }
-> 
-> @@ -283,7 +285,6 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
->                         | GPMC_CONFIG1_READTYPE_SYNC
->                         | GPMC_CONFIG1_WRITEMULTIPLE_SUPP
->                         | GPMC_CONFIG1_WRITETYPE_SYNC
-> -                       | GPMC_CONFIG1_CLKACTIVATIONTIME(1)
->                         | GPMC_CONFIG1_PAGE_LEN(2)
->                         | GPMC_CONFIG1_WAIT_READ_MON
->                         | GPMC_CONFIG1_WAIT_WRITE_MON
-
-And that makes tusb6010 work as earlier with your patches.
-
-For onenand I'm getting the following error:
-
-omap2-onenand omap2-onenand: Cannot request GPMC CS 
-
-Regards,
-
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/bc5c15c6/attachment.sig>
