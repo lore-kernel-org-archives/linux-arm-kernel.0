@@ -1,55 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Jun 2012 09:39:04 +0100
-Subject: [PATCH V3 2/3] i2c-nomadik: turn the platform driver to an amba
- driver
-In-Reply-To: <20120614081758.GA19648@mail.gnudd.com>
-References: <201206140804.39083.arnd@arndb.de>
- <cover.1339447570.git.rubini@gnudd.com>
- <4a198618063924b68182279ffd56c335d621f542.1339447570.git.rubini@gnudd.com>
- <20120614081758.GA19648@mail.gnudd.com>
-Message-ID: <4FD9A328.9080000@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jun 2012 01:39:58 -0700
+Subject: [PATCH v5 04/14] ARM: OMAP2+: gpmc: minimal driver support
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E99952D@DBDE01.ent.ti.com>
+References: <4FD6586A.9060706@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E997E2A@DBDE01.ent.ti.com>
+ <4FD782F7.9010003@ti.com> <20120613120717.GP12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998E43@DBDE01.ent.ti.com>
+ <20120613134032.GW12766@atomide.com>
+ <20120613134408.GY12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998F2F@DBDE01.ent.ti.com>
+ <20120614063524.GB12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E99952D@DBDE01.ent.ti.com>
+Message-ID: <20120614083957.GC12766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/12 09:17, Alessandro Rubini wrote:
->> You change only one half of ux500 here: the part where the device
->> gets defined statically, but not not the definition in the
->> device-tree.
->
-> Yes, I'm aware. That's why I added Lee Jones as Cc:, on Linusw's
-> suggestion.  Lee told me to go ahead and he'll fix the DT stuff.
+* Mohammed, Afzal <afzal@ti.com> [120613 23:44]:
+> Hi Tony,
+> 
+> On Thu, Jun 14, 2012 at 12:05:25, Tony Lindgren wrote:
+> > * Mohammed, Afzal <afzal@ti.com> [120613 06:56]:
+> 
+> 
+> > > Or you meant, even there read revision register ?
+> > 
+> > Yeah that should be fine as this really should only happen
+> > during init and whatever revision specific features can
+> > be initialized for GPMC.
+> 
+> Sorry, I got confused, we need revision to be available while setting
+> time also, so you meant to store it as a variable or read revision
+> at probe as well as during setting time ?
 
-I did?
+You can set up GPMC specific flags during init, something like
+OMAP_GPMC_HAS_XYZ, or you can set up function pointers if only
+some features are available on some revisions.
 
-I have already DT:ed this driver. There are 3 patches on the MLs currently.
+Regards,
 
-> [PATCH 1/3] i2c: Add Device Tree support to the Nomadik I2C driver
-> [PATCH 2/3] ARM: ux500: Add i2c configurations to the Device Tree for DB8500 based devices
-> [PATCH 3/3] Documentation: Device Tree binding information for i2c-nomadik driver
-
-I'm more than happy for you to base your patches on these and make the 
-necessary changes. Off hand, I think the only changes you'll need to 
-make is the probing from DT itself.
-
-So something like:
-
-> --- a/arch/arm/boot/dts/db8500.dtsi
-> +++ b/arch/arm/boot/dts/db8500.dtsi
-> @@ -449,7 +449,7 @@
->                 };
->
->                 i2c at 80004000 {
-> -                       compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
-> +                       compatible = "st,nomadik-i2c", "arm,primecell";
->                         reg = <0x80004000 0x1000>;
->                         interrupts = <0 21 0x4>;
->                         #address-cells = <1>;
-
-... for each of the controllers.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tony
