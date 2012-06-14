@@ -1,40 +1,42 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Jun 2012 13:20:33 +0300
-Subject: [PATCH 00/17] Big OMAP I2C Cleanup
-Message-ID: <1339669250-9183-1-git-send-email-balbi@ti.com>
+Date: Thu, 14 Jun 2012 13:20:34 +0300
+Subject: [PATCH 01/17] i2c: omap: simplify num_bytes handling
+In-Reply-To: <1339669250-9183-1-git-send-email-balbi@ti.com>
+References: <1339669250-9183-1-git-send-email-balbi@ti.com>
+Message-ID: <1339669250-9183-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+trivial patch, no functional changes
 
-I have dropped a few patches from the series and also
-tested every single patch on my pandaboard. I2C messages
-are still working fine with panda after each patch.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-There's still lots of work to be done on the i2c-omap.c
-driver but it's now easier to read, IMO.
-
-Felipe Balbi (17):
-  i2c: omap: simplify num_bytes handling
-  i2c: omap: decrease indentation level on data handling
-  i2c: omap: add blank lines
-  i2c: omap: simplify omap_i2c_ack_stat()
-  i2c: omap: split out [XR]DR and [XR]RDY
-  i2c: omap: improve 1p153 errata handling
-  i2c: omap: re-factor receive/transmit data loop
-  i2c: omap: switch over to do {} while loop
-  i2c: omap: ack IRQ in parts
-  i2c: omap: get rid of the "complete" label
-  i2c: omap: switch to devm_* API
-  i2c: omap: switch to platform_get_irq()
-  i2c: omap: bus: add a receiver flag
-  i2c: omap: simplify errata check
-  i2c: omap: always return IRQ_HANDLED
-  i2c: omap: simplify IRQ exit path
-  i2c: omap: resize fifos before each message
-
- drivers/i2c/busses/i2c-omap.c |  388 +++++++++++++++++++++++------------------
- 1 file changed, 222 insertions(+), 166 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 801df60..9b532cd 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -855,8 +855,7 @@ complete:
+ 							OMAP_I2C_BUFSTAT_REG)
+ 							>> 8) & 0x3F;
+ 			}
+-			while (num_bytes) {
+-				num_bytes--;
++			while (num_bytes--) {
+ 				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+ 				if (dev->buf_len) {
+ 					*dev->buf++ = w;
+@@ -898,8 +897,7 @@ complete:
+ 							OMAP_I2C_BUFSTAT_REG)
+ 							& 0x3F;
+ 			}
+-			while (num_bytes) {
+-				num_bytes--;
++			while (num_bytes--) {
+ 				w = 0;
+ 				if (dev->buf_len) {
+ 					w = *dev->buf++;
 -- 
 1.7.10.4
