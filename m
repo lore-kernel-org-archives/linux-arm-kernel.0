@@ -1,56 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jun 2012 11:55:56 +0000
-Subject: [PATCH 1/9] ARM: Kirkwood: Add interrupt controller support for
- DT boards
-In-Reply-To: <20120614091858.GD4799@lunn.ch>
-References: <1339324322-29388-2-git-send-email-andrew@lunn.ch>
- <201206140812.34399.arnd@arndb.de> <20120614091858.GD4799@lunn.ch>
-Message-ID: <201206141155.56289.arnd@arndb.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 14 Jun 2012 13:58:02 +0200
+Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <201206141106.49142.arnd@arndb.de>
+References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
+ <201206141025.09325.arnd@arndb.de>
+ <20120614103127.GA15904@avionic-0098.mockup.avionic-design.de>
+ <201206141106.49142.arnd@arndb.de>
+Message-ID: <20120614115802.GA22211@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 June 2012, Andrew Lunn wrote:
-> > I think if you compute the number of interrupts in the domain from the number of
-> > registers that are described in the device tree, call orion_irq_init()
-> > based on those registers, and use irq domains for the gpio stuff as Rob suggested,
-> > this init_irq function can become completely generic to all orion platforms.
+On Thu, Jun 14, 2012 at 11:06:48AM +0000, Arnd Bergmann wrote:
+> On Thursday 14 June 2012, Thierry Reding wrote:
+> > On Thu, Jun 14, 2012 at 10:25:09AM +0000, Arnd Bergmann wrote:
+> > > On Thursday 14 June 2012, Thierry Reding wrote:
+> > > > > 
+> > > > > I believe you will need an "interrupt-map" property here, to map the host
+> > > > > interrupts to the INTA-INTD lines of the attached devices.
+> > > >
+> > > > Legacy interrupts are something I cannot test at all because I have no
+> > > > hardware that supports them.
+> > > 
+> > > Hmm, I thought all PCIe hardware has to support them when you do not
+> > > enable MSI. What hardware do you have then?
+> > 
+> > The TEC (Tamonten Evaluation Carrier) has an FPGA which is connected to one
+> > of the Tegra PCIe ports and it only supports MSIs.
 > 
-> I'm reworking the GPIO stuff at the moment, moving it to use IRQ
-> domains for its interrupts. That code will be generic to all Orion
-> platforms. I'm modeling the code on the AT91 GPIO handler, since that
-> has a similar structure, one hardware interrupt for a number of GPIO
-> lines, which is in software demultiplexed and triggers secondary level
-> interrupts. The major difference is that AT91 has one hardware
-> interrupt for a GPIO chip with 32 lines, where as Orion has 4 hardware
-> interrupt lines, so maybe four interrupt domains, for one GPIO chip
-> with 32 lines.
+> Ah, I see. FPGA based devices often have incomplete PCI support so that
+> explains why you can't test it. The board also appears to have a
+> PCIe mini port though, so anything that you could plug in there should
+> also support LSI interrupts.
 
-My guess is that you're still better off with a single interrupt domain
-for 32 lines, or even for all the gpio lines, but I'm sure you can
-find a solution that works best for you.
+Yes, I haven't gotten my hands on a suitable module yet, but I'll try. I'm
+not very familiar with legacy interrupts, though, and I'll have to read up
+on the interrupt map bindings.
 
-> Non-GPIO interrupts are more of a problem. Underneath it uses the
-> generic-chip interrupt code. The patchset to add _domain versions of
-> these calls is stalled. So i think for the moment, we need to stay
-> with the domain bolted on top, until generic-chip gets domain
-> support. I would also expect that generic-chip also gets a common DT
-> binding which any SoC can use.
+> > > > > I'm not sure whether we want to have a device_type="pciex" property here.
+> > > > > powerpc and sparc seem to use that information, to distinguish a pcie
+> > > > > bus from pci or cardbus.
+> > > > 
+> > > > That'd be rather useless information given that the Tegra is unlikely to
+> > > > support either PCI or CardBus at some point.
+> > > 
+> > > But the generic code does not know that.
+> > 
+> > True. Still there's not much generic code on ARM, so maybe it'd be better to
+> > add it along with the corresponding code?
+> 
+> I hope we can make the PCI host probing architecture independent one day,
+> instead of each architecture implementing their own. I'd say better put
+> that property in there so we don't have to change it in case the future
+> generic code will need it. It is part of the binding at
+> http://www.openfirmware.org/1275/bindings/pci/pci-express.txt after all.
 
-I suggested that before, and the comments I got back then were that
-we should treat the generic irq chip more like a library and keep
-the device tree binding at a higher level. If I understood things right,
-that means we would just have one plat-orion (or mach-mvebu later)
-irq chip abstraction that handles the DT binding and the irq domains
-itself but uses the generic irq chip code to implement the actual
-irq handling.
+There seems to be quite a lot in the PCI core already. Unfortunately every
+architecture seems to do things differently, so unification is probably going
+to be quite difficult.
 
-> My aim at the moment is to get something which works well enough that
-> we can add DT support to other drivers. Without interrupts, we are not
-> going to get very far. We can later rip it out what i create now and
-> replace it once generic-chip becomes domain and DT aware, and there
-> should be no effect on other drivers.
+> Note that we should generally not make /code/ be written with the
+> anticipation of a future extension, but anything that concerns interfaces
+> to code outside of the kernel (firmware or user space) is best written
+> in a conservative way to allow later changes.
 
-Right. I just want to ensure that we don't need to change the bindings
-in incompatible ways.
+Okay, I'll add the property.
 
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/3c9c8a18/attachment.sig>
