@@ -1,44 +1,27 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 14 Jun 2012 19:43:56 +0100
-Subject: [PATCH 1/3] mfd: support 88pm80x in 80x driver
-In-Reply-To: <201206141227.48867.arnd@arndb.de>
-References: <1339578251-15009-1-git-send-email-zhouqiao@marvell.com>
- <1339578251-15009-2-git-send-email-zhouqiao@marvell.com>
- <201206141227.48867.arnd@arndb.de>
-Message-ID: <20120614184356.GC30185@sirena.org.uk>
+Date: Thu, 14 Jun 2012 19:46:58 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <20120614183636.GB30185@sirena.org.uk>
+References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD6F0E8.5040606@linaro.org>
+ <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
+ <4FD83AAD.2010701@linaro.org>
+ <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+ <4FD88761.9050703@linaro.org>
+ <20120614183636.GB30185@sirena.org.uk>
+Message-ID: <20120614184656.GD30185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2012 at 12:27:48PM +0000, Arnd Bergmann wrote:
-> On Wednesday 13 June 2012, Qiao Zhou wrote:
+On Thu, Jun 14, 2012 at 07:36:36PM +0100, Mark Brown wrote:
 
-> > +static struct mfd_cell onkey_devs[] = {
-> > +	{
-> > +	 .name = "88pm80x-onkey",
-> > +	 .num_resources = 1,
-> > +	 .resources = &onkey_resources[0],
-> > +	 .id = -1,
-> > +	 },
-> > +};
+> You're not understanding Linus' point.  The compatible string isn't
+> useful here because properties like the maximum clock rate of the bus
+> depend on the board design, not the silicon.  The controller may be
+> perfectly happy to run at a given rate but other devices on the bus or
+> the electrical engineering of the PCB itself may restrict this further.
 
-> I wonder if it really makes sense to use the mfd_cell abstraction here, when each
-> array only contains a single device. Why not just use
-> platform_device_register_simple()? 
-
-mfd_cell does some other stuff like let you pass in bases for the various
-resource ranges when you register which looks to be being used here.
-
-> > +static irqreturn_t pm805_irq(int irq, void *data)
-> > +{
-> > +	struct pm80x_chip *chip = data;
-> > +	struct pm80x_subchip *pm805_chip = chip->pm805_chip;
-> > +	struct pm80x_irq_data *irq_data;
-> > +	struct i2c_client *i2c;
-> > +	int i, read_reg = -1, value = 0;
-
-> The functions for pm800 and pm805 look almost identical. Have you tried
-> consolidating them so you can use the same irqchip and code with different
-> init data structures?
-
-Since you use regmap perhaps you can use regmap_irq and just convert
-them into data?
+Sorry, I read the next revision and see this was actually resolved OK.
