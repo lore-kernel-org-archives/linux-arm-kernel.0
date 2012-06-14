@@ -1,35 +1,47 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 12:09:41 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: gpmc: handle additional timings
-In-Reply-To: <20120614114905.GK12766@atomide.com>
-References: <4FD63DBF.9000200@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E997D9E@DBDE01.ent.ti.com>
- <4FD77E35.3050703@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998767@DBDE01.ent.ti.com>
- <20120613113217.GK12766@atomide.com> <20120613115445.GM12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E998C80@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999849@DBDE01.ent.ti.com>
- <20120614101901.GI12766@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99994C@DBDE01.ent.ti.com>
- <20120614114905.GK12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E999B05@DBDE01.ent.ti.com>
+From: linux-arm@overkiz.com (Boris BREZILLON)
+Date: Thu, 14 Jun 2012 13:48:48 +0200
+Subject: [PATCH 2/5] ARM: at91: Implementation of PMC clks using the common
+ clk framework.
+In-Reply-To: <20120612170306.GD19410@gmail.com>
+References: <1336812838-3649-1-git-send-email-linux-arm@overkiz.com>
+ <1336812838-3649-3-git-send-email-linux-arm@overkiz.com>
+ <20120612170306.GD19410@gmail.com>
+Message-ID: <4FD9CFA0.30800@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Thu, Jun 14, 2012 at 17:19:06, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120614 03:43]:
-
-> For onenand I'm getting the following error:
+On 12/06/2012 19:03, Mike Turquette wrote:
+> On 20120512-10:53, Boris BREZILLON wrote:
+>> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+>> index 79d0f60..29f8812 100644
+>> --- a/arch/arm/mach-at91/Makefile
+>> +++ b/arch/arm/mach-at91/Makefile
+>> @@ -6,8 +6,11 @@ obj-y		:= irq.o gpio.o setup.o
+>>  obj-m		:=
+>>  obj-n		:=
+>>  obj-		:=
+>> -
+>> +ifeq ($(CONFIG_COMMON_CLK),y)
+>> +obj-$(CONFIG_AT91_PMC_UNIT)	+= pmc-osc.o pmc-pll.o pmc-master.o pmc-sys.o pmc-periph.o pmc-prog.o pmc.o
+>> +else
+>>  obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
+>> +endif
 > 
-> omap2-onenand omap2-onenand: Cannot request GPMC CS 
+> Hi Boris,
+> 
+> Looks like the old platform clock code is not removed in this series.
+> Is this just a work in progress or do you want to merge in AT91 support
+> for common clk while leaving the old clock code merged in?
+> 
+This is a work in progress.
+I'd like to have more reviews from at91 maitainers before removing the old at91 clock implementation.
 
-I am a bit confused with this message, for onenand, we only have,
+Do you have some comments on other parts of this patch serie (it's been a month and nobody reviewed it yet)?
 
-pr_err("%s: Cannot request GPMC CS\n", __func__);
-
-dev_err is used only for nand
-
-Regards
-Afzal
+> Regards,
+> Mike
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
