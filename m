@@ -1,46 +1,21 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Thu, 14 Jun 2012 18:16:14 -0400
-Subject: Converting kirkwood-goflexnet to DTS
-In-Reply-To: <20120614141706.GA6676@lunn.ch>
-References: <20120614141706.GA6676@lunn.ch>
-Message-ID: <CAMW5UfaPLUt3mub-rpZGKYG5GzjMntvrCOwu-q3r-twm-AgD=g@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 14 Jun 2012 17:02:28 -0600 (MDT)
+Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
+In-Reply-To: <4FDA527D.9080401@ti.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004614.20034.50895.stgit@dusk> <4FD9DF2A.3010000@ti.com>
+ <alpine.DEB.2.00.1206141052240.30212@utopia.booyaka.com>
+ <4FDA527D.9080401@ti.com>
+Message-ID: <alpine.DEB.2.00.1206141702120.25628@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally some progress.  Using the printk patch along with earlyprintk
-and the config tweaks as suggested, my kernel at least now shows why
-it's dying:
+On Thu, 14 Jun 2012, Cousson, Benoit wrote:
 
---------------------------
-## Booting kernel from Legacy Image at 00800000 ...
-   Image Name:   Linux-3.5.0-rc2-ARCH
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    3015272 Bytes = 2.9 MiB
-   Load Address: 00008000
-   Entry Point:  00008000
-   Verifying Checksum ... OK
-   Loading Kernel Image ... OK
-OK
+> Yep, but for that I'd rather add a flag than a information that is a
+> duplication of the parent data.
 
-Starting kernel ...
+Great, send a patch.
 
-Uncompressing Linux... done, booting the kernel.
 
-Error: unrecognized/unsupported machine ID (r1 = 0x00000c11).
-
-Available machine support:
-
-ID (hex)        NAME
-ffffffff        Marvell Kirkwood (Flattened Device Tree)
-
-Please check your kernel config and/or bootloader.
---------------------------
-
-Obviously, I've missed something with my work as my machine is not
-showing up as a supported unit in that list.  At least the machine ID
-being detected is correct, so that's a plus.
-
-I should be able to crack this and have another test kernel in 4
-hours, I'm hoping with good results.
-
-Josh C
+- Paul
