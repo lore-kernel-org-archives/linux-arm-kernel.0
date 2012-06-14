@@ -1,29 +1,37 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 14 Jun 2012 12:33:01 +0100
-Subject: [PATCH 0/2] ARM: vexpress: Enable SPARSE_IRQ selection
-In-Reply-To: <20120614085553.GB28714@n2100.arm.linux.org.uk>
-References: <1339607602-3846-1-git-send-email-tixy@linaro.org>
- <20120614085553.GB28714@n2100.arm.linux.org.uk>
-Message-ID: <1339673581.3044.10.camel@linaro1.home>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 14 Jun 2012 21:35:24 +1000
+Subject: [PATCH] i2c: let the core register devices from devicetree
+In-Reply-To: <20120614091434.GB14419@pengutronix.de>
+References: <1339622215-4733-1-git-send-email-w.sang@pengutronix.de>
+ <1339623217.9220.119.camel@pasglop> <20120614091434.GB14419@pengutronix.de>
+Message-ID: <1339673724.9220.164.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-06-14 at 09:55 +0100, Russell King - ARM Linux wrote:
-> So you're relying on the GIC IRQs starting at 0, and so that the local
-> timer interrupt stays at 29 ?
+On Thu, 2012-06-14 at 11:14 +0200, Wolfram Sang wrote:
+> On Thu, Jun 14, 2012 at 07:33:37AM +1000, Benjamin Herrenschmidt wrote:
+> > On Wed, 2012-06-13 at 23:12 +0200, Wolfram Sang wrote:
+> > > Currently, every driver has to do it on its own, but it should be done
+> > > in the core, like we already do with board_info structs.
+> > > 
+> > > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > > ---
+> > > 
+> > > Based on v3.5-rc2. Only build tested, I don't have a OF based device
+> > > around at the moment.
+> > 
+> > Won't that conflict with i2c-powermac doing it its own way ?
+> 
+> Yup :(
+> 
+> I assume there is no chance that the powermac devicetree can be
+> pre-processed to be compatible with of_i2c_register_devices?
 
-Well, the existing code already did that ;-)
+That would be nasty and need a lot of testing on all sort of machines I
+don't have direct access to.
 
->   And the local timer interrupt is now
-> just some random number buried in some C file.
+Maybe we can set a flag somewhere to indicate to the core not to run the
+default probing on that controller ?
 
-Yes, that did leave a bit of a bad taste, I guess in the back of my mind
-I had the (erroneous?) thought that this non-device-tree code would be
-going away soon.
-
-However, for the purpose of enabling sparse irqs, we don't actually need
-to mess with the IRQ defines so I'll follow up with an alternative patch
-which leaves them alone...
-
--- 
-Tixy
+Cheers,
+Ben.
