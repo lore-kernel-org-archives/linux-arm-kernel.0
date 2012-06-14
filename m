@@ -1,54 +1,62 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 14 Jun 2012 18:50:52 +0200
-Subject: [PATCH v2 02/23] ARM: LPC32xx: Clock initialization for NAND
- controllers
+Date: Thu, 14 Jun 2012 18:50:54 +0200
+Subject: [PATCH v2 04/23] ARM: LPC32xx: Add DMA configuration to platform data
 In-Reply-To: <1339692673-7848-1-git-send-email-stigge@antcom.de>
 References: <1339692673-7848-1-git-send-email-stigge@antcom.de>
-Message-ID: <1339692673-7848-3-git-send-email-stigge@antcom.de>
+Message-ID: <1339692673-7848-5-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock initialization for the MLC NAND controller of the LPC32xx
-SoC and adjusts it for the SLC controller.
+This patch adds DMA channel configuration to the LPC32xx platform file.  The
+configured DMA signalling is generic for LPC32xx SoC and is not board specific.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+
 ---
+Changes since v1:
+* Don't use pointers to functions in struct init
 
- arch/arm/mach-lpc32xx/clock.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/mach-lpc32xx/phy3250.c |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -691,10 +691,21 @@ static struct clk clk_nand = {
- 	.parent		= &clk_hclk,
- 	.enable		= local_onoff_enable,
- 	.enable_reg	= LPC32XX_CLKPWR_NAND_CLK_CTRL,
--	.enable_mask	= LPC32XX_CLKPWR_NANDCLK_SLCCLK_EN,
-+	.enable_mask	= LPC32XX_CLKPWR_NANDCLK_SLCCLK_EN |
-+			  LPC32XX_CLKPWR_NANDCLK_SEL_SLC,
- 	.get_rate	= local_return_parent_rate,
- };
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -226,7 +226,38 @@ static int __init phy3250_spi_board_regi
+ }
+ arch_initcall(phy3250_spi_board_register);
  
-+static struct clk clk_nand_mlc = {
-+	.parent         = &clk_hclk,
-+	.enable         = local_onoff_enable,
-+	.enable_reg     = LPC32XX_CLKPWR_NAND_CLK_CTRL,
-+	.enable_mask    = LPC32XX_CLKPWR_NANDCLK_MLCCLK_EN |
-+			  LPC32XX_CLKPWR_NANDCLK_DMA_INT |
-+			  LPC32XX_CLKPWR_NANDCLK_INTSEL_MLC,
-+	.get_rate       = local_return_parent_rate,
++static struct pl08x_channel_data pl08x_slave_channels[] = {
++	{
++		.bus_id = "nand-slc",
++		.min_signal = 1, /* SLC NAND Flash */
++		.max_signal = 1,
++		.periph_buses = PL08X_AHB1,
++	},
++	{
++		.bus_id = "nand-mlc",
++		.min_signal = 12, /* MLC NAND Flash */
++		.max_signal = 12,
++		.periph_buses = PL08X_AHB1,
++	},
 +};
 +
- static struct clk clk_i2s0 = {
- 	.parent		= &clk_hclk,
- 	.enable		= local_onoff_enable,
-@@ -1121,7 +1132,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
- 	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
- 	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
--	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
-+	CLKDEV_INIT("20020000.flash", NULL, &clk_nand),
-+	CLKDEV_INIT("200a8000.flash", NULL, &clk_nand_mlc),
- 	CLKDEV_INIT("40048000.adc", NULL, &clk_adc),
- 	CLKDEV_INIT(NULL, "i2s0_ck", &clk_i2s0),
- 	CLKDEV_INIT(NULL, "i2s1_ck", &clk_i2s1),
++/* NOTE: These will change, according to RMK */
++static int pl08x_get_signal(struct pl08x_dma_chan *ch)
++{
++	return ch->cd->min_signal;
++}
++
++static void pl08x_put_signal(struct pl08x_dma_chan *ch)
++{
++}
++
+ static struct pl08x_platform_data pl08x_pd = {
++	.slave_channels = &pl08x_slave_channels[0],
++	.num_slave_channels = ARRAY_SIZE(pl08x_slave_channels),
++	.get_signal = pl08x_get_signal,
++	.put_signal = pl08x_put_signal,
++	.lli_buses = PL08X_AHB1,
++	.mem_buses = PL08X_AHB1,
+ };
+ 
+ static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
