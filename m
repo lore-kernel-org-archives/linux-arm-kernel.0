@@ -1,34 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Jun 2012 13:20:47 +0300
-Subject: [PATCH 14/17] i2c: omap: simplify errata check
+Date: Thu, 14 Jun 2012 13:20:48 +0300
+Subject: [PATCH 15/17] i2c: omap: always return IRQ_HANDLED
 In-Reply-To: <1339669250-9183-1-git-send-email-balbi@ti.com>
 References: <1339669250-9183-1-git-send-email-balbi@ti.com>
-Message-ID: <1339669250-9183-15-git-send-email-balbi@ti.com>
+Message-ID: <1339669250-9183-16-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_i2c_dev is allocated with kzalloc(),
-so we need not initialize b_hw to zero.
+otherwise we could get our IRQ line disabled due
+to many spurious IRQs.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index fad5f6f..fc5b8bc 100644
+index fc5b8bc..5b78a73 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1139,9 +1139,7 @@ omap_i2c_probe(struct platform_device *pdev)
+@@ -1015,7 +1015,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 		}
+ 	} while (stat);
  
- 		dev->fifo_size = (dev->fifo_size / 2);
+-	return count ? IRQ_HANDLED : IRQ_NONE;
++	return IRQ_HANDLED;
+ }
  
--		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
--			dev->b_hw = 0; /* Disable hardware fixes */
--		else
-+		if (dev->rev < OMAP_I2C_REV_ON_3530_4430)
- 			dev->b_hw = 1; /* Enable hardware fixes */
- 
- 		/* calculate wakeup latency constraint for MPU */
+ static const struct i2c_algorithm omap_i2c_algo = {
 -- 
 1.7.10.4
