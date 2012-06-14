@@ -1,47 +1,61 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 14 Jun 2012 19:07:32 +0200
-Subject: [PATCH 4/14] ARM: LPC32xx: Add DMA configuration to platform data
-In-Reply-To: <20120611111029.GF11168@n2100.arm.linux.org.uk>
-References: <1339412537-24485-1-git-send-email-stigge@antcom.de>
- <1339412537-24485-5-git-send-email-stigge@antcom.de>
- <20120611111029.GF11168@n2100.arm.linux.org.uk>
-Message-ID: <4FDA1A54.3020206@antcom.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 14 Jun 2012 11:09:58 -0600 (MDT)
+Subject: [PATCHv2 08/12] ARM: OMAP4: hwmod data: add SL2IF hardreset line
+In-Reply-To: <4FD9DF2A.3010000@ti.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004614.20034.50895.stgit@dusk> <4FD9DF2A.3010000@ti.com>
+Message-ID: <alpine.DEB.2.00.1206141052240.30212@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi
 
-thanks for your note!
+On Thu, 14 Jun 2012, Cousson, Benoit wrote:
 
-On 11/06/12 13:10, Russell King - ARM Linux wrote:
-> On Mon, Jun 11, 2012 at 01:02:07PM +0200, Roland Stigge wrote:
->> +static int pl08x_get_signal(struct pl08x_dma_chan *ch)
->> +{
->> +	return ch->cd->min_signal;
->> +}
->> +
->> +static void pl08x_put_signal(struct pl08x_dma_chan *ch)
->> +{
->> +}
-> 
-> These change in my unstable/dma-pl08x branch, patches have been posted
-> already, but I don't deem them to be totally stable yet.  Waiting on
-> OMAP people to get their mainline kernel restored to a buildable state
-> so I can continue my DMA engine work.
+> I don't think we should allow that at hwmod level. This line is already
+> handled by the IVAHD hwmod. We will then have some potential issue since
+> nothing will prevent the concurrent access.
+> Moreover that IP is only used by the IVAHD and thus should be handled by the
+> same driver. The SL2 being inside the IVA subsystem, it should be reset when
+> the IVA will be reset and thus does not require an individual control.
 
-We have a few options here:
+If a hardreset line will affect an IP block, then the line should be 
+listed as one of the IP block's hardreset lines.  Otherwise, the hwmod 
+data will not accurately reflect the hardware -- the ultimate goal.
 
-1) Take the patch as I posted it (needs adjustments as soon as the API
-changed and becomes stable)
+> I guess, we should just mark the dependency with some external power resource
+> to avoid the fmwk to try to enable that automatically.
 
-2) Remove the DMA related patches from the LPC32xx series for now (which
-would be unfortunate)
+Right now, the presence of a hardreset line will effectively cause the 
+hwmod code to ignore the IP block from a reset and enable point of view.  
+So the IP block won't be enabled automatically right now anyway, since we 
+still don't have a clear sense of how to handle those.
 
-3) Let me build upon some tree that already looks worthwhile to play
-with already (which one?)
+> It is similar to DSS sub IPs and to some extend McPDM for my point of view.
 
-What would you suggest?
+These seem like different cases to me.
 
-Thanks in advance,
+The DSS has no hardreset and the sub-IPs have their own softreset bits.  
+As far as I know, the main reason why we can't have individual reset 
+functions for the DSS sub-IPs is because we don't have hierarchical IP 
+block enable/disable implemented in the hwmod code, not any real hardware 
+constraint.
 
-Roland
+McPDM has a functional clock dependency on an external (non-SoC) device 
+that's only controllable via I2C.  And, the McPDM can block the ABE 
+clockdomain from going idle.  That's just wacky.
+
+So those cases seem quite different to me.  One is a software issue.  And 
+the other is an off-chip (non-OMAP) dependency, unlike the SL2IF/IVAHD 
+issue in which all the needed resources are still on-chip.
+
+> Maybe we should rename HWMOD_EXT_OPT_MAIN_CLK with something more 
+> generic like HWMOD_EXT_POWER_DEP to highlight the dependency with an 
+> external resource. It can be a external clock or another module.
+
+Yes, I agree that it would be convenient to have some flag, either on the 
+hwmod or the hardreset line, to indicate that some of the reset lines are 
+shared.
+
+
+- Paul
