@@ -1,172 +1,90 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 12 Jun 2012 09:10:54 -1000
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
-References: <1339427118-32263-1-git-send-email-thierry.reding@avionic-design.de>
- <1339427118-32263-8-git-send-email-thierry.reding@avionic-design.de>
- <4FD66410.7090001@wwwdotorg.org>
- <20120612062124.GE4040@avionic-0098.adnet.avionic-design.de>
- <4FD763C5.3090500@wwwdotorg.org>
- <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
-Message-ID: <4FD7943E.60302@firmworks.com>
+From: zumeng.chen@gmail.com (Zumeng Chen)
+Date: Thu, 14 Jun 2012 11:29:11 +0800
+Subject: [PATCH V2 5/5] Input: ads7846: set proper debounce time in driver
+ level
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
+References: <zumeng.chen@gmail.com>
+ <1339551850-20827-1-git-send-email-zumeng.chen@gmail.com>
+ <1339551850-20827-6-git-send-email-zumeng.chen@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA4F07F@DBDE01.ent.ti.com>
+Message-ID: <CA+Y31wd10rbSVyM5tEDkSNtBuoLn-19vo5hLwcTYiZh-mGq-4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/12/2012 7:20 AM, Thierry Reding wrote:
-> * Stephen Warren wrote:
->> On 06/12/2012 12:21 AM, Thierry Reding wrote:
->>> * Stephen Warren wrote:
->>>> On 06/11/2012 09:05 AM, Thierry Reding wrote:
->>>>> This commit adds support for instantiating the Tegra PCIe
->>>>> controller from a device tree.
->>>>
->>>>> +++ b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
->>>>
->>>> Can we please name this nvidia,tegra20-pcie.txt to match the
->>>> naming of all the other Tegra bindings.
->>>
->>> Yes, will do.
->>>
->>>>> +Required properties: +- compatible: "nvidia,tegra20-pcie" +-
->>>>> reg: physical base address and length of the controller's
->>>>> registers
->>>>
->>>> Since there's more than one range now, that should specify how
->>>> many entries are required and what they represent.
->>>
->>> Okay.
->>>
->>>>> +Optional properties: +- pex-clk-supply: supply voltage for
->>>>> internal reference clock +- vdd-supply: power supply for
->>>>> controller (1.05V)
->>>>
->>>> Those shouldn't be optional. If the board has no regulator, the
->>>> board's .dts should provide a fixed always-on regulator that
->>>> those properties can refer to, so that the driver can always
->>>> get() those regulators.
->>>
->>> That'll add more dummy regulators and I don't think sprinkling them
->>> across the DTS is going to work very well. Maybe collecting them
->>> under a top-level "regulators" node is a good option. If you have a
->>> better alternative, I'm all open for it.
->>>
->>>>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
->>>>> b/arch/arm/boot/dts/tegra20.dtsi
->>>>
->>>>> +	pci {
->>>> ...
->>>>> +		status = "disable";
->>>>
->>>> That should be "disabled"; sorry for providing a bad example.
->>>
->>> Yes.
->>>
->>>>> diff --git a/arch/arm/mach-tegra/pcie.c
->>>>> b/arch/arm/mach-tegra/pcie.c
->>>>
->>>>> +static struct tegra_pcie_pdata *tegra_pcie_parse_dt(struct
->>>>> platform_device *pdev)
->>>>
->>>>> +	if (of_find_property(node, "vdd-supply", NULL)) {
->>>>
->>>> As mentioned above, that if statement should be removed, since
->>>> the regulators shouldn't be optional.
->>>
->>> Okay.
->>>
->>>>> +		pcie->vdd_supply = regulator_get(&pdev->dev, "vdd");
->>>>
->>>> Those could be devm_regulator_get(). Then tegra_pcie_remove()
->>>> wouldn't have to put() them.
->>>
->>> Okay.
->>>
->>>>> +	for (i = 0; i<  TEGRA_PCIE_MAX_PORTS; i++) +
->>>>> pdata->enable_ports[i] = true;
->>>>
->>>> Shouldn't the DT indicate which ports are used? I assume there's
->>>> some reason that the existing driver allows that to be
->>>> configured, rather than always enabling all ports. At least,
->>>> enumeration time wasted on non-existent ports springs to mind,
->>>> and perhaps attempting to enable port 1 when port 0 is x4 and
->>>> using all the lanes would cause errors in port 0?
->>>
->>> Yes, that's been on my mind as well. I'm not sure about the best
->>> binding for this. Perhaps something like:
->>>
->>> pci { enable-ports =<0 1 2>; };
->>>
->>> Would do?
->>
->> That seems reasonable, although since the property is presumably
->> something specific to the Tegra PCIe binding, not generic, I think it
->> should be nvidia,enable-ports.
->
-> I came up with the following alternative:
->
-> 	pci {
-> 		compatible = "nvidia,tegra20-pcie";
-> 		reg =<0x80003000 0x00000800   /* PADS registers */
-> 		       0x80003800 0x00000200   /* AFI registers */
-> 		       0x80004000 0x00100000   /* configuration space */
-> 		       0x80104000 0x00100000   /* extended configuration space */
-> 		       0x80400000 0x00010000   /* downstream I/O */
-> 		       0x90000000 0x10000000   /* non-prefetchable memory */
-> 		       0xa0000000 0x10000000>; /* prefetchable memory */
-> 		interrupts =<0 98 0x04   /* controller interrupt */
-> 		              0 99 0x04>; /* MSI interrupt */
-> 		status = "disabled";
->
-> 		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
-> 			  0x80004000 0x80004000 0x00100000   /* configuration space */
-> 			  0x80104000 0x80104000 0x00100000   /* extended configuration space */
-> 			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
-> 			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
-> 			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
->
-> 		#address-cells =<1>;
-> 		#size-cells =<1>;
->
-> 		port at 80000000 {
-> 			reg =<0x80000000 0x00001000>;
-> 			status = "disabled";
-> 		};
->
-> 		port at 80001000 {
-> 			reg =<0x80001000 0x00001000>;
-> 			status = "disabled";
-> 		};
-> 	};
->
-> The "ranges" property can probably be cleaned up a bit, but the most
-> interesting part is the port@ children, which can simply be enabled in board
-> DTS files by setting the status property to "okay". I find that somewhat more
-> intuitive to the variant with an "enable-ports" property.
->
-> What do you think of this?
+2012/6/13 Hiremath, Vaibhav <hvaibhav@ti.com>
 
-The problem is that children of a PCI-ish bus have specific expectations 
-about the parent address format - the standard 3-address-cell PCI 
-addressing.  So making a PCI bus node - even if it is PCIe - with 1 
-address cell is a problem.
-
-Also, if a given address range is listed in "reg", it should not also be 
-listed in "ranges".  A block of addresses is either "claimed" by the 
-parent node (reg property) or passed through to its children (ranges 
-property), but not both.  "reg" entries are appropriate for entities 
-that pertain to the overall control of the bus interface itself, while 
-"ranges" entries are for chunks of address space that are overlaid onto 
-child devices.
+> On Wed, Jun 13, 2012 at 07:14:10, Zumeng Chen wrote:
+> > From: Zumeng Chen <zumeng.chen@windriver.com>
+> >
+> > If we don't set proper debouce time for ads7846, then there are
+> > flooded interrupt counters of ads7846 responding to one time
+> > touch on screen, so the driver couldn't work well.
+> >
+> > And since most OMAP3 series boards pass NULL pointer of board_pdata
+> > to omap_ads7846_init, so it's more proper to set it in driver level
+> > after having gpio_request done.
+> >
+> > This patch has been validated on 3530evm.
+> >
+> > Signed-off-by: Zumeng Chen <zumeng.chen@windriver.com>
+> > Signed-off-by: Syed Mohammed Khasim <khasim@ti.com>
+> > ---
+> >  drivers/input/touchscreen/ads7846.c |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/input/touchscreen/ads7846.c
+> b/drivers/input/touchscreen/ads7846.c
+> > index f02028e..459ff29 100644
+> > --- a/drivers/input/touchscreen/ads7846.c
+> > +++ b/drivers/input/touchscreen/ads7846.c
+> > @@ -980,6 +980,10 @@ static int __devinit ads7846_setup_pendown(struct
+> spi_device *spi, struct ads784
+> >               }
+> >
+> >               ts->gpio_pendown = pdata->gpio_pendown;
+> > +#ifdef CONFIG_ARCH_OMAP3
+> > +             /* 310 means about 10 microsecond for omap3 */
+> > +             gpio_set_debounce(pdata->gpio_pendown, 310);
+> > +#endif
+> >
+>
+> Zumeng,
+>
+> With my sign-off you are changing the original code, that too
+> without my sign-off and ack.
+> I wouldn't mind you to submit patches from my tree, but the expectation is
+> if you are changing the original code, it should be under your sign-off.
+>
+Many thanks for your information, good to learn. I'll remove too. Sorry for
+inconvenience.
 
 >
+> Coming to the patch, #ifdef in driver is not recommended, and this 10msec
+> delay is specific to OMAP GPIO and driver should not be aware of this,
+> that's where you will find the original patch handling it in board file.
 >
-> Thierry
+Yes, I just went through again the board related codes, there is a commit
+from
+Mike, I think that's the basic thoughts for me to do this patch for all
+omap3 about
+ads7846 :-)
+
+Regards,
+Zumeng
+
+
+>
+> Thanks,
+> Vaibhav
+> >       } else {
+> >               dev_err(&spi->dev, "no get_pendown_state nor
+> gpio_pendown?\n");
+> > --
+> > 1.7.5.4
+> >
+> >
 >
 >
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120612/f97d2ef4/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/326deab1/attachment-0001.html>
