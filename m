@@ -1,44 +1,40 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 14 Jun 2012 10:21:33 +0000
-Subject: [PATCH v5 14/14] ARM: OMAP2+: gpmc: writeprotect helper
-In-Reply-To: <20120614093625.GF12766@atomide.com>
-References: <cover.1339419492.git.afzal@ti.com>
- <85c5dc5fa3203cc60a12d4b2350e45da07d7f5fd.1339419492.git.afzal@ti.com>
- <4FD78D93.9080906@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E99884F@DBDE01.ent.ti.com>
- <4FD8BFC5.2050007@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E999720@DBDE01.ent.ti.com>
- <20120614093625.GF12766@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E99988D@DBDE01.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Jun 2012 13:20:33 +0300
+Subject: [PATCH 00/17] Big OMAP I2C Cleanup
+Message-ID: <1339669250-9183-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi guys,
 
-On Thu, Jun 14, 2012 at 15:06:25, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [120614 01:59]:
-> > On Wed, Jun 13, 2012 at 21:58:53, Hunter, Jon wrote:
+I have dropped a few patches from the series and also
+tested every single patch on my pandaboard. I2C messages
+are still working fine with panda after each patch.
 
-> > > devices should indicate if they use the write-protect pin and we should
-> > > either have this "enable on boot" as a global setting not specific to a
-> > > child device or ensure that multiple devices using the wp have the same
-> > > configuration of the wp on boot. In other words, if one device says
-> > > enable on boot and the other does not, then warn.
-> > 
-> > Which one of Jon's above suggestions would you prefer,
-> > 
-> > i.e.
-> > writeprotect as a global setting for all devices
-> > Or
-> > Ensure that multiple devices using wp have same configuration
-> > 
-> > Or anything else you have in mind ?
-> 
-> If it's shared it can cause undesired effects on the mounted rootfs
-> if one device changes it. So some kind of checking for a shared case
-> should be available before a device is allowed to change it.
+There's still lots of work to be done on the i2c-omap.c
+driver but it's now easier to read, IMO.
 
-Ok, I will add a check for shared case.
+Felipe Balbi (17):
+  i2c: omap: simplify num_bytes handling
+  i2c: omap: decrease indentation level on data handling
+  i2c: omap: add blank lines
+  i2c: omap: simplify omap_i2c_ack_stat()
+  i2c: omap: split out [XR]DR and [XR]RDY
+  i2c: omap: improve 1p153 errata handling
+  i2c: omap: re-factor receive/transmit data loop
+  i2c: omap: switch over to do {} while loop
+  i2c: omap: ack IRQ in parts
+  i2c: omap: get rid of the "complete" label
+  i2c: omap: switch to devm_* API
+  i2c: omap: switch to platform_get_irq()
+  i2c: omap: bus: add a receiver flag
+  i2c: omap: simplify errata check
+  i2c: omap: always return IRQ_HANDLED
+  i2c: omap: simplify IRQ exit path
+  i2c: omap: resize fifos before each message
 
-Regards
-Afzal
+ drivers/i2c/busses/i2c-omap.c |  388 +++++++++++++++++++++++------------------
+ 1 file changed, 222 insertions(+), 166 deletions(-)
+
+-- 
+1.7.10.4
