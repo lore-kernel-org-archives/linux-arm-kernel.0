@@ -1,150 +1,103 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jun 2012 13:59:40 +0800
-Subject: [PATCH 09/16] ARM: imx: pass gpio than irq number into mxc_expio_init
+Date: Thu, 14 Jun 2012 13:59:46 +0800
+Subject: [PATCH 15/16] ARM: fiq: save FIQ_START by passing absolute fiq number
 In-Reply-To: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
 References: <1339653587-4832-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1339653587-4832-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1339653587-4832-16-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change mxc_expio_init interface a little bit to have gpio than irq
-number passed in.  With the change, gpio_to_irq can be called inside
-mxc_expio_init to get irq number, so that MXC_IRQ_TO_GPIO can be
-removed.
+The commit a2be01b (ARM: only include mach/irqs.h for !SPARSE_IRQ)
+makes mach/irqs.h only be included for !SPARSE_IRQ build.  There are
+a nubmer of platforms have FIQ_START defined in mach/irqs.h.
+
+  arch/arm/mach-at91/include/mach/irqs.h:#define FIQ_START AT91_ID_FIQ
+  arch/arm/mach-rpc/include/mach/irqs.h:#define FIQ_START         64
+  arch/arm/mach-s3c24xx/include/mach/irqs.h:#define FIQ_START             IRQ_EINT0
+  arch/arm/plat-mxc/include/mach/irqs.h:#define FIQ_START 0
+  arch/arm/plat-omap/include/plat/irqs.h:#define FIQ_START                1024
+
+If SPARSE_IRQ is enabled for any of these platforms, the following
+compile error will be seen.
+
+  arch/arm/kernel/fiq.c: In function ?enable_fiq?:
+  arch/arm/kernel/fiq.c:127:19: error: ?FIQ_START? undeclared (first use in this function)
+  arch/arm/kernel/fiq.c:127:19: note: each undeclared identifier is reported only once for each function it appears in
+  arch/arm/kernel/fiq.c: In function ?disable_fiq?:
+  arch/arm/kernel/fiq.c:132:20: error: ?FIQ_START? undeclared (first use in this function)
+
+Though FIQ_START is defined in above 5 platforms, a grep on the whole
+tree only reports the following users of enable_fiq/disable_fiq.
+
+  arch/arm/mach-rpc/dma.c
+  drivers/media/video/mx1_camera.c
+  sound/soc/fsl/imx-pcm-fiq.c
+
+That said, only rpc and imx are actually using enable_fiq/disable_fiq.
+
+The patch changes enable_fiq/disable_fiq a little bit to have the
+absolute fiq number than offset passed into by parameter "fiq".  While
+fiq on imx starts from 0, only rpc needs a fix-up to adapt the change.
+
+With this change, all those FIQ_START definitions in platform irqs.h
+can be removed now, but we chose to leave the decision to platform
+maintainers, it should be removed or just left there as a document
+on where fiq starts on the platform.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-imx/mach-mx27_3ds.c               |    3 +--
- arch/arm/mach-imx/mach-mx31_3ds.c               |    3 +--
- arch/arm/mach-imx/mach-mx35_3ds.c               |    4 +---
- arch/arm/mach-imx/mach-mx51_3ds.c               |    3 +--
- arch/arm/plat-mxc/3ds_debugboard.c              |    8 ++++----
- arch/arm/plat-mxc/include/mach/3ds_debugboard.h |    2 +-
- 6 files changed, 9 insertions(+), 14 deletions(-)
+ arch/arm/kernel/fiq.c                 |    4 ++--
+ arch/arm/mach-rpc/include/mach/irqs.h |   12 ++++++------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 18b9bca..eeff0b6 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -48,7 +48,6 @@
- #define SD1_EN_GPIO		IMX_GPIO_NR(2, 25)
- #define OTG_PHY_RESET_GPIO	IMX_GPIO_NR(2, 23)
- #define SPI2_SS0		IMX_GPIO_NR(4, 21)
--#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(3, 28))
- #define PMIC_INT		IMX_GPIO_NR(3, 14)
- #define SPI1_SS0		IMX_GPIO_NR(4, 28)
- #define SD1_CD			IMX_GPIO_NR(2, 26)
-@@ -500,7 +499,7 @@ static void __init mx27pdk_init(void)
- 	spi_register_board_info(mx27_3ds_spi_devs,
- 						ARRAY_SIZE(mx27_3ds_spi_devs));
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index c32f845..5953bea 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -124,12 +124,12 @@ void release_fiq(struct fiq_handler *f)
  
--	if (mxc_expio_init(MX27_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+	if (mxc_expio_init(MX27_CS5_BASE_ADDR, IMX_GPIO_NR(3, 28)))
- 		pr_warn("Init of the debugboard failed, all devices on the debugboard are unusable.\n");
- 	imx27_add_imx_i2c(0, &mx27_3ds_i2c0_data);
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 618935e..f37d9b5 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -730,8 +730,7 @@ static void __init mx31_3ds_init(void)
- 	if (!otg_mode_host)
- 		imx31_add_fsl_usb2_udc(&usbotg_pdata);
- 
--	if (mxc_expio_init(MX31_CS5_BASE_ADDR,
--			   gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1))))
-+	if (mxc_expio_init(MX31_CS5_BASE_ADDR, IOMUX_TO_GPIO(MX31_PIN_GPIO1_1)))
- 		printk(KERN_WARNING "Init of the debug board failed, all "
- 				    "devices on the debug board are unusable.\n");
- 	imx31_add_imx2_wdt(NULL);
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index ad63e6e..596f237 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -132,8 +132,6 @@ static struct platform_device mx35_3ds_lcd = {
- 	.dev.platform_data = &mx35_3ds_lcd_data,
- };
- 
--#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
--
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -580,7 +578,7 @@ static void __init mx35_3ds_init(void)
- 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
- 	imx35_add_sdhci_esdhc_imx(0, NULL);
- 
--	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+	if (mxc_expio_init(MX35_CS5_BASE_ADDR, IMX_GPIO_NR(1, 1)))
- 		pr_warn("Init of the debugboard failed, all "
- 				"devices on the debugboard are unusable.\n");
- 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
-diff --git a/arch/arm/mach-imx/mach-mx51_3ds.c b/arch/arm/mach-imx/mach-mx51_3ds.c
-index 3c5b163..ebb9188 100644
---- a/arch/arm/mach-imx/mach-mx51_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx51_3ds.c
-@@ -26,7 +26,6 @@
- 
- #include "devices-imx51.h"
- 
--#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 6))
- #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
- 
- static iomux_v3_cfg_t mx51_3ds_pads[] = {
-@@ -148,7 +147,7 @@ static void __init mx51_3ds_init(void)
- 	spi_register_board_info(mx51_3ds_spi_nor_device,
- 				ARRAY_SIZE(mx51_3ds_spi_nor_device));
- 
--	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+	if (mxc_expio_init(MX51_CS5_BASE_ADDR, IMX_GPIO_NR(1, 6)))
- 		printk(KERN_WARNING "Init of the debugboard failed, all "
- 				    "devices on the board are unusable.\n");
- 
-diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
-index 5cac2c5..3b48a08 100644
---- a/arch/arm/plat-mxc/3ds_debugboard.c
-+++ b/arch/arm/plat-mxc/3ds_debugboard.c
-@@ -49,7 +49,6 @@
- #define MCU_BOARD_ID_REG	0x68
- 
- #define MXC_IRQ_TO_EXPIO(irq)   ((irq) - MXC_BOARD_IRQ_START)
--#define MXC_IRQ_TO_GPIO(irq)	((irq) - MXC_INTERNAL_IRQS)
- 
- #define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
- #define MXC_MAX_EXP_IO_LINES	16
-@@ -155,8 +154,9 @@ static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
- };
- 
--int __init mxc_expio_init(u32 base, u32 p_irq)
-+int __init mxc_expio_init(u32 base, u32 intr_gpio)
+ void enable_fiq(int fiq)
  {
-+	u32 p_irq = gpio_to_irq(intr_gpio);
- 	int i;
+-	enable_irq(fiq + FIQ_START);
++	enable_irq(fiq);
+ }
  
- 	brd_io = ioremap(BOARD_IO_ADDR(base), SZ_4K);
-@@ -178,8 +178,8 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
- 	/*
- 	 * Configure INT line as GPIO input
- 	 */
--	gpio_request(MXC_IRQ_TO_GPIO(p_irq), "expio_pirq");
--	gpio_direction_input(MXC_IRQ_TO_GPIO(p_irq));
-+	gpio_request(intr_gpio, "expio_pirq");
-+	gpio_direction_input(intr_gpio);
+ void disable_fiq(int fiq)
+ {
+-	disable_irq(fiq + FIQ_START);
++	disable_irq(fiq);
+ }
  
- 	/* disable the interrupt and clear the status */
- 	__raw_writew(0, brd_io + INTR_MASK_REG);
-diff --git a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-index a384fdd..9fd6cb3 100644
---- a/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-+++ b/arch/arm/plat-mxc/include/mach/3ds_debugboard.h
-@@ -13,6 +13,6 @@
- #ifndef __ASM_ARCH_MXC_3DS_DB_H__
- #define __ASM_ARCH_MXC_3DS_DB_H__
+ EXPORT_SYMBOL(set_fiq_handler);
+diff --git a/arch/arm/mach-rpc/include/mach/irqs.h b/arch/arm/mach-rpc/include/mach/irqs.h
+index 6868e17..4962bdd 100644
+--- a/arch/arm/mach-rpc/include/mach/irqs.h
++++ b/arch/arm/mach-rpc/include/mach/irqs.h
+@@ -31,15 +31,15 @@
+ #define IRQ_DMAS0		20
+ #define IRQ_DMAS1		21
  
--extern int __init mxc_expio_init(u32 base, u32 p_irq);
-+extern int __init mxc_expio_init(u32 base, u32 intr_gpio);
+-#define FIQ_FLOPPYDATA		0
+-#define FIQ_ECONET		2
+-#define FIQ_SERIALPORT		4
+-#define FIQ_EXPANSIONCARD	6
+-#define FIQ_FORCE		7
+-
+ /*
+  * This is the offset of the FIQ "IRQ" numbers
+  */
+ #define FIQ_START		64
  
- #endif /* __ASM_ARCH_MXC_3DS_DB_H__ */
++#define FIQ_FLOPPYDATA		(FIQ_START + 0)
++#define FIQ_ECONET		(FIQ_START + 2)
++#define FIQ_SERIALPORT		(FIQ_START + 4)
++#define FIQ_EXPANSIONCARD	(FIQ_START + 6)
++#define FIQ_FORCE		(FIQ_START + 7)
++
+ #define NR_IRQS			128
 -- 
 1.7.5.4
