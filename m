@@ -1,57 +1,57 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Jun 2012 15:43:25 +0200
-Subject: [PATCH 3/5] DRM i.MX: Add LCDC support
+Date: Thu, 14 Jun 2012 15:43:27 +0200
+Subject: [PATCH 5/5] DRM: Add i.MX IPUv3 crtc support
 In-Reply-To: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
 References: <1339681407-28721-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1339681407-28721-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1339681407-28721-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds a i.MX51/53 IPU (Image Processing Unit) KMS driver. The
+driver has been tested on the i.MX51 babbage board and the i.MX53
+LOCO board in different clone mode and dual head setups.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/gpu/drm/imx/Kconfig         |    6 +
- drivers/gpu/drm/imx/Makefile        |    1 +
- drivers/gpu/drm/imx/imx-lcdc-crtc.c |  523 +++++++++++++++++++++++++++++++++++
- 3 files changed, 530 insertions(+)
- create mode 100644 drivers/gpu/drm/imx/imx-lcdc-crtc.c
+ drivers/gpu/drm/imx/Kconfig          |    6 +
+ drivers/gpu/drm/imx/Makefile         |    1 +
+ drivers/gpu/drm/imx/imx-ipuv3-crtc.c |  579 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 586 insertions(+)
+ create mode 100644 drivers/gpu/drm/imx/imx-ipuv3-crtc.c
 
 diff --git a/drivers/gpu/drm/imx/Kconfig b/drivers/gpu/drm/imx/Kconfig
-index fdd0f5d..b554ecf 100644
+index e735643..cd89c23 100644
 --- a/drivers/gpu/drm/imx/Kconfig
 +++ b/drivers/gpu/drm/imx/Kconfig
-@@ -15,6 +15,12 @@ config DRM_IMX_FB_HELPER
- 	  for your device. This is necessary to get a framebuffer console
- 	  and also for appplications using the legacy framebuffer API
- 
-+config DRM_IMX_LCDC
-+	tristate "DRM Support for Freescale i.MX1 and i.MX2"
+@@ -32,3 +32,9 @@ config DRM_IMX_IPUV3_CORE
+ 	  Choose this if you have a i.MX5/6 system and want
+ 	  to use the IPU. This option only enables IPU base
+ 	  support.
++
++config DRM_IMX_IPUV3
++	tristate "DRM Support for i.MX IPUv3"
 +	depends on DRM_IMX
 +	help
-+	  Choose this if you have a i.MX1, i.MX21, i.MX25 or i.MX27 processor.
-+
- config DRM_IMX_PARALLEL_DISPLAY
- 	tristate "Support for parallel displays"
- 	depends on DRM_IMX
++	  Choose this if you have a i.MX5 or i.MX6 processor.
 diff --git a/drivers/gpu/drm/imx/Makefile b/drivers/gpu/drm/imx/Makefile
-index f5a793f..6c7dd2d 100644
+index 72a7e26..8006081 100644
 --- a/drivers/gpu/drm/imx/Makefile
 +++ b/drivers/gpu/drm/imx/Makefile
-@@ -4,4 +4,5 @@ imxdrm-objs := imx-drm-core.o imx-fb.o
- obj-$(CONFIG_DRM_IMX) += imxdrm.o
- 
- obj-$(CONFIG_DRM_IMX_PARALLEL_DISPLAY) += imx-parallel-display.o
-+obj-$(CONFIG_DRM_IMX_LCDC) += imx-lcdc-crtc.o
+@@ -7,3 +7,4 @@ obj-$(CONFIG_DRM_IMX_PARALLEL_DISPLAY) += imx-parallel-display.o
+ obj-$(CONFIG_DRM_IMX_LCDC) += imx-lcdc-crtc.o
  obj-$(CONFIG_DRM_IMX_FB_HELPER) += imx-fbdev.o
-diff --git a/drivers/gpu/drm/imx/imx-lcdc-crtc.c b/drivers/gpu/drm/imx/imx-lcdc-crtc.c
+ obj-$(CONFIG_DRM_IMX_IPUV3_CORE) += ipu-v3/
++obj-$(CONFIG_DRM_IMX_IPUV3)	+= imx-ipuv3-crtc.o
+diff --git a/drivers/gpu/drm/imx/imx-ipuv3-crtc.c b/drivers/gpu/drm/imx/imx-ipuv3-crtc.c
 new file mode 100644
-index 0000000..5c72c47
+index 0000000..5d7730d
 --- /dev/null
-+++ b/drivers/gpu/drm/imx/imx-lcdc-crtc.c
-@@ -0,0 +1,523 @@
++++ b/drivers/gpu/drm/imx/imx-ipuv3-crtc.c
+@@ -0,0 +1,579 @@
 +/*
-+ * i.MX LCDC crtc driver
++ * i.MX IPUv3 Graphics driver
 + *
-+ * Copyright (C) 2012 Sascha Hauer, Pengutronix
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License
@@ -62,295 +62,313 @@ index 0000000..5c72c47
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
 + */
++#include <linux/module.h>
++#include <linux/export.h>
 +#include <linux/device.h>
 +#include <linux/platform_device.h>
 +#include <drm/drmP.h>
 +#include <drm/drm_fb_helper.h>
 +#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_gem_cma_helper.h>
-+#include <drm/drm_fb_cma_helper.h>
 +#include <linux/fb.h>
 +#include <linux/clk.h>
-+#include <linux/module.h>
-+#include <mach/hardware.h>
-+#include <mach/imxfb.h>
-+#include <generated/mach-types.h>
++#include <drm/imx-ipu-v3.h>
 +#include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_fb_cma_helper.h>
 +
 +#include "imx-drm.h"
 +
-+#define LCDC_SSA		0x00
-+#define LCDC_SIZE		0x04
-+#define LCDC_VPW		0x08
-+#define LCDC_CPOS		0x0C
-+#define LCDC_LCWHB		0x10
-+#define LCDC_LCHCC		0x14
-+#define LCDC_PCR		0x18
-+#define LCDC_HCR		0x1C
-+#define LCDC_VCR		0x20
-+#define LCDC_POS		0x24
-+#define LCDC_LSCR1		0x28
-+#define LCDC_PWMR		0x2C
-+#define LCDC_DMACR		0x30
-+#define LCDC_RMCR		0x34
-+#define LCDC_LCDICR		0x38
-+#define LCDC_LIER		0x3c
-+#define LCDC_LISR		0x40
++#define DRIVER_DESC		"i.MX IPUv3 Graphics"
 +
-+#define SIZE_XMAX(x)		((((x) >> 4) & 0x3f) << 20)
-+
-+#define YMAX_MASK		(cpu_is_mx1() ? 0x1ff : 0x3ff)
-+#define SIZE_YMAX(y)		((y) & YMAX_MASK)
-+
-+#define VPW_VPW(x)		((x) & 0x3ff)
-+
-+#define HCR_H_WIDTH(x)		(((x) & 0x3f) << 26)
-+#define HCR_H_WAIT_1(x)		(((x) & 0xff) << 8)
-+#define HCR_H_WAIT_2(x)		((x) & 0xff)
-+
-+#define VCR_V_WIDTH(x)		(((x) & 0x3f) << 26)
-+#define VCR_V_WAIT_1(x)		(((x) & 0xff) << 8)
-+#define VCR_V_WAIT_2(x)		((x) & 0xff)
-+
-+#define RMCR_LCDC_EN_MX1	(1 << 1)
-+
-+#define RMCR_SELF_REF		(1 << 0)
-+
-+#define LIER_EOF		(1 << 1)
-+
-+struct imx_crtc {
-+	struct drm_crtc		base;
-+	struct imx_drm_crtc	*imx_drm_crtc;
-+	int			di_no;
-+	int			enabled;
-+	void __iomem		*regs;
-+	u32			pwmr;
-+	u32			lscr1;
-+	u32			dmacr;
-+	u32			pcr;
-+	struct clk		*clk;
-+	struct device		*dev;
-+	int			vblank_enable;
-+
-+	struct drm_pending_vblank_event *page_flip_event;
-+	struct drm_framebuffer	*newfb;
++struct ipu_framebuffer {
++	struct drm_framebuffer	base;
++	void			*virt;
++	dma_addr_t		phys;
++	size_t			len;
 +};
 +
-+#define to_imx_crtc(x) container_of(x, struct imx_crtc, base)
++struct ipu_crtc {
++	struct drm_fb_helper	fb_helper;
++	struct ipu_framebuffer	ifb;
++	int			num_crtcs;
++	struct device		*dev;
++	struct drm_crtc		base;
++	struct imx_drm_crtc	*imx_crtc;
++	struct ipuv3_channel	*ipu_ch;
++	struct ipu_dc		*dc;
++	struct ipu_dp		*dp;
++	struct dmfc_channel	*dmfc;
++	struct ipu_di		*di;
++	int			enabled;
++	struct ipu_priv		*ipu_priv;
++	struct drm_pending_vblank_event *page_flip_event;
++	struct drm_framebuffer	*newfb;
++	int			irq;
++	u32			interface_pix_fmt;
++	unsigned long		di_clkflags;
++};
 +
-+static void imx_crtc_load_lut(struct drm_crtc *crtc)
++#define to_ipu_crtc(x) container_of(x, struct ipu_crtc, base)
++
++static int calc_vref(struct drm_display_mode *mode)
 +{
++	unsigned long htotal, vtotal;
++
++	htotal = mode->htotal;
++	vtotal = mode->vtotal;
++
++	if (!htotal || !vtotal)
++		return 60;
++
++	return mode->clock * 1000 / vtotal / htotal;
 +}
 +
-+#define PCR_BPIX_8		(3 << 25)
-+#define PCR_BPIX_12		(4 << 25)
-+#define PCR_BPIX_16		(5 << 25)
-+#define PCR_BPIX_18		(6 << 25)
-+#define PCR_END_SEL		(1 << 18)
-+#define PCR_END_BYTE_SWAP	(1 << 17)
-+
-+static const char *fourcc_to_str(u32 fourcc)
++static int calc_bandwidth(struct drm_display_mode *mode, unsigned int vref)
 +{
-+	static char buf[5];
-+
-+	*(u32 *)buf = fourcc;
-+	buf[4] = 0;
-+
-+	return buf;
++	return mode->hdisplay * mode->vdisplay * vref;
 +}
 +
-+static int imx_drm_crtc_set(struct drm_crtc *crtc,
-+		struct drm_display_mode *mode)
++static void ipu_fb_enable(struct ipu_crtc *ipu_crtc)
 +{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
-+	struct drm_framebuffer *fb = crtc->fb;
-+	int lower_margin = mode->vsync_start - mode->vdisplay;
-+	int upper_margin = mode->vtotal - mode->vsync_end;
-+	int vsync_len = mode->vsync_end - mode->vsync_start;
-+	int hsync_len = mode->hsync_end - mode->hsync_start;
-+	int right_margin = mode->hsync_start - mode->hdisplay;
-+	int left_margin = mode->htotal - mode->hsync_end;
-+	unsigned long lcd_clk;
-+	u32 pcr;
++	if (ipu_crtc->enabled)
++		return;
 +
-+	lcd_clk = clk_get_rate(imx_crtc->clk) / 1000;
++	ipu_di_enable(ipu_crtc->di);
++	ipu_dmfc_enable_channel(ipu_crtc->dmfc);
++	ipu_idmac_enable_channel(ipu_crtc->ipu_ch);
++	ipu_dc_enable_channel(ipu_crtc->dc);
++	if (ipu_crtc->dp)
++		ipu_dp_enable_channel(ipu_crtc->dp);
 +
-+	if (!mode->clock)
-+		return -EINVAL;
++	ipu_crtc->enabled = 1;
++}
 +
-+	pcr = DIV_ROUND_CLOSEST(lcd_clk, mode->clock);
-+	if (--pcr > 0x3f)
-+		pcr = 0x3f;
++static void ipu_fb_disable(struct ipu_crtc *ipu_crtc)
++{
++	if (!ipu_crtc->enabled)
++		return;
 +
-+	switch (fb->pixel_format) {
-+	case DRM_FORMAT_XRGB8888:
-+	case DRM_FORMAT_ARGB8888:
-+		pcr |= PCR_BPIX_18;
-+		pcr |= PCR_END_SEL | PCR_END_BYTE_SWAP;
++	if (ipu_crtc->dp)
++		ipu_dp_disable_channel(ipu_crtc->dp);
++	ipu_dc_disable_channel(ipu_crtc->dc);
++	ipu_idmac_disable_channel(ipu_crtc->ipu_ch);
++	ipu_dmfc_disable_channel(ipu_crtc->dmfc);
++	ipu_di_disable(ipu_crtc->di);
++
++	ipu_crtc->enabled = 0;
++}
++
++static void ipu_crtc_dpms(struct drm_crtc *crtc, int mode)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
++
++	dev_info(ipu_crtc->dev, "%s mode: %d\n", __func__, mode);
++
++	switch (mode) {
++	case DRM_MODE_DPMS_ON:
++		ipu_fb_enable(ipu_crtc);
 +		break;
-+	case DRM_FORMAT_RGB565:
-+		if (cpu_is_mx1())
-+			pcr |= PCR_BPIX_12;
-+		else
-+			pcr |= PCR_BPIX_16;
++	case DRM_MODE_DPMS_STANDBY:
++	case DRM_MODE_DPMS_SUSPEND:
++	case DRM_MODE_DPMS_OFF:
++		ipu_fb_disable(ipu_crtc);
 +		break;
-+	case DRM_FORMAT_RGB332:
-+		pcr |= PCR_BPIX_8;
-+		break;
-+	default:
-+		dev_err(imx_crtc->dev, "unsupported pixel format %s\n",
-+				fourcc_to_str(fb->pixel_format));
-+		return -EINVAL;
++	}
++}
++
++static int ipu_page_flip(struct drm_crtc *crtc,
++		struct drm_framebuffer *fb,
++		struct drm_pending_vblank_event *event)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
++	int ret;
++
++	if (ipu_crtc->newfb)
++		return -EBUSY;
++
++	ret = imx_drm_crtc_vblank_get(ipu_crtc->imx_crtc);
++	if (ret) {
++		dev_dbg(ipu_crtc->dev, "failed to acquire vblank counter\n");
++		list_del(&event->base.link);
++
++		return ret;
 +	}
 +
-+	/* add sync polarities */
-+	pcr |= imx_crtc->pcr & ~(0x3f | (7 << 25));
-+
-+	dev_dbg(imx_crtc->dev,
-+			"xres=%d hsync_len=%d left_margin=%d right_margin=%d\n",
-+			mode->hdisplay, hsync_len,
-+			left_margin, right_margin);
-+	dev_dbg(imx_crtc->dev,
-+			"yres=%d vsync_len=%d upper_margin=%d lower_margin=%d\n",
-+			mode->vdisplay, vsync_len,
-+			upper_margin, lower_margin);
-+
-+	writel(VPW_VPW(mode->hdisplay * fb->bits_per_pixel / 8 / 4),
-+		imx_crtc->regs + LCDC_VPW);
-+
-+	writel(HCR_H_WIDTH(hsync_len - 1) |
-+		HCR_H_WAIT_1(right_margin - 1) |
-+		HCR_H_WAIT_2(left_margin - 3),
-+		imx_crtc->regs + LCDC_HCR);
-+
-+	writel(VCR_V_WIDTH(vsync_len) |
-+		VCR_V_WAIT_1(lower_margin) |
-+		VCR_V_WAIT_2(upper_margin),
-+		imx_crtc->regs + LCDC_VCR);
-+
-+	writel(SIZE_XMAX(mode->hdisplay) | SIZE_YMAX(mode->vdisplay),
-+			imx_crtc->regs + LCDC_SIZE);
-+
-+	writel(pcr, imx_crtc->regs + LCDC_PCR);
-+	writel(imx_crtc->pwmr, imx_crtc->regs + LCDC_PWMR);
-+	writel(imx_crtc->lscr1, imx_crtc->regs + LCDC_LSCR1);
-+	/* reset default */
-+	writel(0x00040060, imx_crtc->regs + LCDC_DMACR);
++	ipu_crtc->newfb = fb;
++	ipu_crtc->page_flip_event = event;
 +
 +	return 0;
 +}
 +
-+static int imx_drm_set_base(struct drm_crtc *crtc, int x, int y)
++static const struct drm_crtc_funcs ipu_crtc_funcs = {
++	.set_config = drm_crtc_helper_set_config,
++	.destroy = drm_crtc_cleanup,
++	.page_flip = ipu_page_flip,
++};
++
++static int ipu_drm_set_base(struct drm_crtc *crtc, int x, int y)
 +{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
 +	struct drm_gem_cma_object *cma_obj;
 +	struct drm_framebuffer *fb = crtc->fb;
 +	unsigned long phys;
 +
 +	cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
-+	if (!cma_obj)
++	if (!cma_obj) {
++		DRM_LOG_KMS("entry is null.\n");
 +		return -EFAULT;
++	}
 +
 +	phys = cma_obj->paddr;
 +	phys += x * (fb->bits_per_pixel >> 3);
 +	phys += y * fb->pitches[0];
 +
-+	dev_dbg(imx_crtc->dev, "%s: phys: 0x%lx\n", __func__, phys);
-+	dev_dbg(imx_crtc->dev, "%s: xy: %dx%d\n", __func__, x, y);
++	dev_dbg(ipu_crtc->dev, "%s: phys: 0x%lx\n", __func__, phys);
++	dev_dbg(ipu_crtc->dev, "%s: xy: %dx%d\n", __func__, x, y);
 +
-+	writel(phys, imx_crtc->regs + LCDC_SSA);
++	ipu_cpmem_set_stride(ipu_get_cpmem(ipu_crtc->ipu_ch), fb->pitches[0]);
++	ipu_cpmem_set_buffer(ipu_get_cpmem(ipu_crtc->ipu_ch),
++			  0, phys);
 +
 +	return 0;
 +}
 +
-+static int imx_crtc_mode_set(struct drm_crtc *crtc,
++static int ipu_crtc_mode_set(struct drm_crtc *crtc,
++			       struct drm_display_mode *orig_mode,
 +			       struct drm_display_mode *mode,
-+			       struct drm_display_mode *adjusted_mode,
 +			       int x, int y,
 +			       struct drm_framebuffer *old_fb)
 +{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
++	struct drm_framebuffer *fb = ipu_crtc->base.fb;
++	int ret;
++	struct ipu_di_signal_cfg sig_cfg = {};
++	u32 out_pixel_fmt;
++	struct ipu_ch_param __iomem *cpmem = ipu_get_cpmem(ipu_crtc->ipu_ch);
++	int bpp;
++	u32 v4l2_fmt;
 +
-+	imx_drm_set_base(crtc, x, y);
++	dev_dbg(ipu_crtc->dev, "%s: mode->hdisplay: %d\n", __func__,
++			mode->hdisplay);
++	dev_dbg(ipu_crtc->dev, "%s: mode->vdisplay: %d\n", __func__,
++			mode->vdisplay);
 +
-+	dev_dbg(imx_crtc->dev, "mode->hdisplay: %d\n", mode->hdisplay);
-+	dev_dbg(imx_crtc->dev, "mode->vdisplay: %d\n", mode->vdisplay);
++	ipu_ch_param_zero(cpmem);
 +
-+	return imx_drm_crtc_set(crtc, mode);
-+}
-+
-+static void imx_crtc_enable(struct imx_crtc *imx_crtc)
-+{
-+	if (!imx_crtc->enabled)
-+		clk_prepare_enable(imx_crtc->clk);
-+	imx_crtc->enabled = 1;
-+}
-+
-+static void imx_crtc_disable(struct imx_crtc *imx_crtc)
-+{
-+	if (imx_crtc->enabled)
-+		clk_disable_unprepare(imx_crtc->clk);
-+	imx_crtc->enabled = 0;
-+}
-+
-+static void imx_crtc_dpms(struct drm_crtc *crtc, int mode)
-+{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
-+
-+	dev_dbg(imx_crtc->dev, "%s mode: %d\n", __func__, mode);
-+
-+	switch (mode) {
-+	case DRM_MODE_DPMS_ON:
-+		imx_crtc_enable(imx_crtc);
++	switch (fb->pixel_format) {
++	case DRM_FORMAT_XRGB8888:
++	case DRM_FORMAT_ARGB8888:
++		v4l2_fmt = V4L2_PIX_FMT_RGB32;
++		bpp = 32;
++		break;
++	case DRM_FORMAT_RGB565:
++		v4l2_fmt = V4L2_PIX_FMT_RGB565;
++		bpp = 16;
++		break;
++	case DRM_FORMAT_RGB888:
++		v4l2_fmt = V4L2_PIX_FMT_RGB24;
++		bpp = 24;
 +		break;
 +	default:
-+		imx_crtc_disable(imx_crtc);
-+		break;
++		dev_err(ipu_crtc->dev, "unsupported pixel format 0x%08x\n",
++				fb->pixel_format);
++		return -EINVAL;
 +	}
++
++	out_pixel_fmt = ipu_crtc->interface_pix_fmt;
++
++	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
++		sig_cfg.interlaced = 1;
++	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
++		sig_cfg.Hsync_pol = 1;
++	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
++		sig_cfg.Vsync_pol = 1;
++
++	sig_cfg.enable_pol = 1;
++	sig_cfg.clk_pol = 0;
++	sig_cfg.width = mode->hdisplay;
++	sig_cfg.height = mode->vdisplay;
++	sig_cfg.pixel_fmt = out_pixel_fmt;
++	sig_cfg.h_start_width = mode->htotal - mode->hsync_end;
++	sig_cfg.h_sync_width = mode->hsync_end - mode->hsync_start;
++	sig_cfg.h_end_width = mode->hsync_start - mode->hdisplay;
++
++	sig_cfg.v_start_width = mode->vtotal - mode->vsync_end;
++	sig_cfg.v_sync_width = mode->vsync_end - mode->vsync_start;
++	sig_cfg.v_end_width = mode->vsync_start - mode->vdisplay;
++	sig_cfg.pixelclock = mode->clock * 1000;
++	sig_cfg.clkflags = ipu_crtc->di_clkflags;
++
++	sig_cfg.v_to_h_sync = 0;
++
++	if (ipu_crtc->dp) {
++		ret = ipu_dp_setup_channel(ipu_crtc->dp, IPUV3_COLORSPACE_RGB,
++				IPUV3_COLORSPACE_RGB);
++		if (ret) {
++			dev_err(ipu_crtc->dev,
++				"initializing display processor failed with %d\n",
++				ret);
++			return ret;
++		}
++		ipu_dp_set_global_alpha(ipu_crtc->dp, 1, 0, 1);
++	}
++
++	ret = ipu_dc_init_sync(ipu_crtc->dc, ipu_crtc->di, sig_cfg.interlaced,
++			out_pixel_fmt, mode->hdisplay);
++	if (ret) {
++		dev_err(ipu_crtc->dev,
++				"initializing display controller failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ret = ipu_di_init_sync_panel(ipu_crtc->di, &sig_cfg);
++	if (ret) {
++		dev_err(ipu_crtc->dev,
++				"initializing panel failed with %d\n", ret);
++		return ret;
++	}
++
++	ipu_cpmem_set_resolution(cpmem, mode->hdisplay, mode->vdisplay);
++	ipu_cpmem_set_fmt(cpmem, v4l2_fmt);
++	ipu_cpmem_set_high_priority(ipu_crtc->ipu_ch);
++
++	ret = ipu_dmfc_init_channel(ipu_crtc->dmfc, mode->hdisplay);
++	if (ret) {
++		dev_err(ipu_crtc->dev,
++				"initializing dmfc channel failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ret = ipu_dmfc_alloc_bandwidth(ipu_crtc->dmfc,
++			calc_bandwidth(mode, calc_vref(mode)), 64);
++	if (ret) {
++		dev_err(ipu_crtc->dev,
++				"allocating dmfc bandwidth failed with %d\n",
++				ret);
++		return ret;
++	}
++
++	ipu_drm_set_base(crtc, x, y);
++
++	return 0;
 +}
 +
-+static bool imx_crtc_mode_fixup(struct drm_crtc *crtc,
-+				  struct drm_display_mode *mode,
-+				  struct drm_display_mode *adjusted_mode)
-+{
-+	return true;
-+}
-+
-+static void imx_crtc_prepare(struct drm_crtc *crtc)
-+{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
-+
-+	imx_crtc_disable(imx_crtc);
-+}
-+
-+static void imx_crtc_commit(struct drm_crtc *crtc)
-+{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
-+
-+	imx_crtc_enable(imx_crtc);
-+}
-+
-+static struct drm_crtc_helper_funcs imx_helper_funcs = {
-+	.dpms = imx_crtc_dpms,
-+	.mode_fixup = imx_crtc_mode_fixup,
-+	.mode_set = imx_crtc_mode_set,
-+	.prepare = imx_crtc_prepare,
-+	.commit = imx_crtc_commit,
-+	.load_lut = imx_crtc_load_lut,
-+};
-+
-+static void imx_drm_handle_pageflip(struct imx_crtc *imx_crtc)
++static void ipu_crtc_handle_pageflip(struct ipu_crtc *ipu_crtc)
 +{
 +	struct drm_pending_vblank_event *e;
 +	struct timeval now;
 +	unsigned long flags;
-+	struct drm_device *drm = imx_crtc->base.dev;
++	struct drm_device *drm = ipu_crtc->base.dev;
 +
 +	spin_lock_irqsave(&drm->event_lock, flags);
 +
-+	e = imx_crtc->page_flip_event;
-+
++	e = ipu_crtc->page_flip_event;
 +	if (!e) {
 +		spin_unlock_irqrestore(&drm->event_lock, flags);
 +		return;
@@ -360,7 +378,9 @@ index 0000000..5c72c47
 +	e->event.sequence = 0;
 +	e->event.tv_sec = now.tv_sec;
 +	e->event.tv_usec = now.tv_usec;
-+	imx_crtc->page_flip_event = NULL;
++	ipu_crtc->page_flip_event = NULL;
++
++	imx_drm_crtc_vblank_put(ipu_crtc->imx_crtc);
 +
 +	list_add_tail(&e->base.link, &e->base.file_priv->event_list);
 +
@@ -369,207 +389,243 @@ index 0000000..5c72c47
 +	spin_unlock_irqrestore(&drm->event_lock, flags);
 +}
 +
-+static int imx_crtc_enable_vblank(struct drm_crtc *crtc)
++static irqreturn_t ipu_irq_handler(int irq, void *dev_id)
 +{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
++	struct ipu_crtc *ipu_crtc = dev_id;
 +
-+	writel(LIER_EOF, imx_crtc->regs + LCDC_LIER);
++	imx_drm_handle_vblank(ipu_crtc->imx_crtc);
 +
-+	return 0;
-+}
-+
-+static void imx_crtc_disable_vblank(struct drm_crtc *crtc)
-+{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
-+
-+	writel(0, imx_crtc->regs + LCDC_LIER);
-+}
-+
-+static irqreturn_t imx_irq_handler(int irq, void *dev_id)
-+{
-+	struct imx_crtc *imx_crtc = dev_id;
-+	struct drm_device *drm = imx_crtc->base.dev;
-+
-+	/* Acknowledge interrupt */
-+	readl(imx_crtc->regs + LCDC_LISR);
-+
-+	drm_handle_vblank(drm, 0);
-+
-+	if (imx_crtc->newfb) {
-+		imx_crtc->base.fb = imx_crtc->newfb;
-+		imx_crtc->newfb = NULL;
-+		imx_drm_set_base(&imx_crtc->base, 0, 0);
-+		imx_drm_handle_pageflip(imx_crtc);
-+		imx_drm_crtc_vblank_put(imx_crtc->imx_drm_crtc);
++	if (ipu_crtc->newfb) {
++		ipu_crtc->base.fb = ipu_crtc->newfb;
++		ipu_crtc->newfb = NULL;
++		ipu_drm_set_base(&ipu_crtc->base, 0, 0);
++		ipu_crtc_handle_pageflip(ipu_crtc);
 +	}
 +
 +	return IRQ_HANDLED;
 +}
 +
-+static int imx_page_flip(struct drm_crtc *crtc,
-+		struct drm_framebuffer *fb,
-+		struct drm_pending_vblank_event *event)
++static bool ipu_crtc_mode_fixup(struct drm_crtc *crtc,
++				  struct drm_display_mode *mode,
++				  struct drm_display_mode *adjusted_mode)
 +{
-+	struct imx_crtc *imx_crtc = to_imx_crtc(crtc);
++	return true;
++}
 +
-+	if (imx_crtc->newfb)
-+		return -EBUSY;
++static void ipu_crtc_prepare(struct drm_crtc *crtc)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
 +
-+	imx_crtc->newfb = fb;
-+	imx_crtc->page_flip_event = event;
-+	imx_drm_crtc_vblank_get(imx_crtc->imx_drm_crtc);
++	ipu_fb_disable(ipu_crtc);
++}
++
++static void ipu_crtc_commit(struct drm_crtc *crtc)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
++
++	ipu_fb_enable(ipu_crtc);
++}
++
++static void ipu_crtc_load_lut(struct drm_crtc *crtc)
++{
++}
++
++static struct drm_crtc_helper_funcs ipu_helper_funcs = {
++	.dpms = ipu_crtc_dpms,
++	.mode_fixup = ipu_crtc_mode_fixup,
++	.mode_set = ipu_crtc_mode_set,
++	.prepare = ipu_crtc_prepare,
++	.commit = ipu_crtc_commit,
++	.load_lut = ipu_crtc_load_lut,
++};
++
++static int ipu_enable_vblank(struct drm_crtc *crtc)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
++
++	enable_irq(ipu_crtc->irq);
 +
 +	return 0;
 +}
 +
-+static const struct drm_crtc_funcs imx_crtc_funcs = {
-+	.set_config = drm_crtc_helper_set_config,
-+	.destroy = drm_crtc_cleanup,
-+	.page_flip = imx_page_flip,
-+};
-+
-+static const struct imx_drm_crtc_helper_funcs imx_imx_drm_helper = {
-+	.enable_vblank = imx_crtc_enable_vblank,
-+	.disable_vblank = imx_crtc_disable_vblank,
-+	.crtc_funcs = &imx_crtc_funcs,
-+	.crtc_helper_funcs = &imx_helper_funcs,
-+};
-+
-+#define DRIVER_NAME "imx-lcdc-crtc"
-+
-+/*
-+ * the pcr bits to be allowed to set in platform data
-+ */
-+#define PDATA_PCR	(PCR_PIXPOL | PCR_FLMPOL | PCR_LPPOL | \
-+			PCR_CLKPOL | PCR_OEPOL | PCR_TFT | PCR_COLOR | \
-+			PCR_PBSIZ_8 | PCR_ACD(0x7f) | PCR_ACD_SEL | \
-+			PCR_SCLK_SEL | PCR_SHARP)
-+
-+static int __devinit imx_crtc_probe(struct platform_device *pdev)
++static void ipu_disable_vblank(struct drm_crtc *crtc)
 +{
-+	struct imx_crtc *imx_crtc;
-+	struct resource *res;
-+	int ret, irq;
-+	u32 pcr_value = 0xf00080c0;
-+	u32 lscr1_value = 0x00120300;
-+	u32 pwmr_value = 0x00a903ff;
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
 +
-+	imx_crtc = devm_kzalloc(&pdev->dev, sizeof(*imx_crtc), GFP_KERNEL);
-+	if (!imx_crtc)
-+		return -ENOMEM;
++	disable_irq(ipu_crtc->irq);
++}
 +
-+	imx_crtc->dev = &pdev->dev;
++static int ipu_set_interface_pix_fmt(struct drm_crtc *crtc, u32 encoder_type,
++		u32 pixfmt)
++{
++	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
++	ipu_crtc->interface_pix_fmt = pixfmt;
 +
-+	res = devm_request_mem_region(&pdev->dev, res->start,
-+			resource_size(res), DRIVER_NAME);
-+	if (!res)
-+		return -EBUSY;
-+
-+	imx_crtc->regs = devm_ioremap(&pdev->dev, res->start,
-+			resource_size(res));
-+	if (!imx_crtc->regs) {
-+		dev_err(&pdev->dev, "Cannot map frame buffer registers\n");
-+		return -EBUSY;
++	switch (encoder_type) {
++	case DRM_MODE_ENCODER_LVDS:
++		ipu_crtc->di_clkflags = IPU_DI_CLKMODE_SYNC |
++			IPU_DI_CLKMODE_EXT;
++		break;
++	case DRM_MODE_ENCODER_NONE:
++		ipu_crtc->di_clkflags = 0;
++		break;
 +	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(&pdev->dev, irq, imx_irq_handler, 0, "imx_drm",
-+			imx_crtc);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "irq request failed with %d\n", ret);
-+		return ret;
-+	}
-+
-+	imx_crtc->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(imx_crtc->clk)) {
-+		ret = PTR_ERR(imx_crtc->clk);
-+		dev_err(&pdev->dev, "unable to get clock: %d\n", ret);
-+		return ret;
-+	}
-+
-+	clk_prepare_enable(imx_crtc->clk);
-+	imx_crtc->enabled = 1;
-+
-+	platform_set_drvdata(pdev, imx_crtc);
-+
-+	imx_crtc->pcr = pcr_value & PDATA_PCR;
-+
-+	if (imx_crtc->pcr != pcr_value)
-+		dev_err(&pdev->dev, "invalid bits set in pcr: 0x%08x\n",
-+				pcr_value & ~PDATA_PCR);
-+
-+	imx_crtc->lscr1 = lscr1_value;
-+	imx_crtc->pwmr = pwmr_value;
-+
-+	ret = imx_drm_add_crtc(&imx_crtc->base,
-+			&imx_crtc->imx_drm_crtc,
-+			&imx_imx_drm_helper, THIS_MODULE,
-+			pdev->dev.of_node, 0);
-+	if (ret)
-+		goto err_init;
-+
-+	dev_info(&pdev->dev, "probed\n");
 +
 +	return 0;
++}
 +
-+err_init:
-+	clk_disable_unprepare(imx_crtc->clk);
-+	clk_put(imx_crtc->clk);
++static const struct imx_drm_crtc_helper_funcs ipu_crtc_helper_funcs = {
++	.enable_vblank = ipu_enable_vblank,
++	.disable_vblank = ipu_disable_vblank,
++	.set_interface_pix_fmt = ipu_set_interface_pix_fmt,
++	.crtc_funcs = &ipu_crtc_funcs,
++	.crtc_helper_funcs = &ipu_helper_funcs,
++};
++
++static void ipu_put_resources(struct ipu_crtc *ipu_crtc)
++{
++	if (!IS_ERR_OR_NULL(ipu_crtc->ipu_ch))
++		ipu_idmac_put(ipu_crtc->ipu_ch);
++	if (!IS_ERR_OR_NULL(ipu_crtc->dmfc))
++		ipu_dmfc_put(ipu_crtc->dmfc);
++	if (!IS_ERR_OR_NULL(ipu_crtc->dp))
++		ipu_dp_put(ipu_crtc->dp);
++	if (!IS_ERR_OR_NULL(ipu_crtc->di))
++		ipu_di_put(ipu_crtc->di);
++}
++
++static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
++		struct ipu_client_platformdata *pdata)
++{
++	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
++	int ret;
++
++	ipu_crtc->ipu_ch = ipu_idmac_get(ipu, pdata->dma[0]);
++	if (IS_ERR_OR_NULL(ipu_crtc->ipu_ch)) {
++		ret = PTR_ERR(ipu_crtc->ipu_ch);
++		goto err_out;
++	}
++
++	ipu_crtc->dc = ipu_dc_get(ipu, pdata->dc);
++	if (IS_ERR(ipu_crtc->dc)) {
++		ret = PTR_ERR(ipu_crtc->dc);
++		goto err_out;
++	}
++
++	ipu_crtc->dmfc = ipu_dmfc_get(ipu, pdata->dma[0]);
++	if (IS_ERR(ipu_crtc->dmfc)) {
++		ret = PTR_ERR(ipu_crtc->dmfc);
++		goto err_out;
++	}
++
++	if (pdata->dp >= 0) {
++		ipu_crtc->dp = ipu_dp_get(ipu, pdata->dp);
++		if (IS_ERR(ipu_crtc->dp)) {
++			ret = PTR_ERR(ipu_crtc->ipu_ch);
++			goto err_out;
++		}
++	}
++
++	ipu_crtc->di = ipu_di_get(ipu, pdata->di);
++	if (IS_ERR(ipu_crtc->di)) {
++		ret = PTR_ERR(ipu_crtc->di);
++		goto err_out;
++	}
++
++	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
++			IPU_IRQ_EOF);
++	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
++			"imx_drm", ipu_crtc);
++	if (ret < 0) {
++		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
++		goto err_out;
++	}
++
++	disable_irq(ipu_crtc->irq);
++
++	return 0;
++err_out:
++	ipu_put_resources(ipu_crtc);
 +
 +	return ret;
 +}
 +
-+static int __devexit imx_crtc_remove(struct platform_device *pdev)
++static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
++		struct ipu_client_platformdata *pdata)
 +{
-+	struct imx_crtc *imx_crtc = platform_get_drvdata(pdev);
++	int ret;
 +
-+	imx_drm_remove_crtc(imx_crtc->imx_drm_crtc);
++	ret = ipu_get_resources(ipu_crtc, pdata);
++	if (ret) {
++		dev_err(ipu_crtc->dev, "getting resources failed with %d.\n",
++				ret);
++		return ret;
++	}
 +
-+	writel(0, imx_crtc->regs + LCDC_LIER);
++	ret = imx_drm_add_crtc(&ipu_crtc->base,
++			&ipu_crtc->imx_crtc,
++			&ipu_crtc_helper_funcs, THIS_MODULE,
++			ipu_crtc->dev->parent->of_node, pdata->di);
++	if (ret) {
++		dev_err(ipu_crtc->dev, "adding crtc failed with %d.\n", ret);
++		goto err_put_resources;
++	}
 +
-+	clk_disable_unprepare(imx_crtc->clk);
-+	clk_put(imx_crtc->clk);
++	return 0;
 +
-+	platform_set_drvdata(pdev, NULL);
++err_put_resources:
++	ipu_put_resources(ipu_crtc);
++
++	return ret;
++}
++
++static int __devinit ipu_drm_probe(struct platform_device *pdev)
++{
++	struct ipu_client_platformdata *pdata = pdev->dev.platform_data;
++	struct ipu_crtc *ipu_crtc;
++	int ret;
++
++	if (!pdata)
++		return -EINVAL;
++
++	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++
++	ipu_crtc = devm_kzalloc(&pdev->dev, sizeof(*ipu_crtc), GFP_KERNEL);
++	if (!ipu_crtc)
++		return -ENOMEM;
++
++	ipu_crtc->dev = &pdev->dev;
++
++	ret = ipu_crtc_init(ipu_crtc, pdata);
++
++	platform_set_drvdata(pdev, ipu_crtc);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id imx_lcdc_dt_ids[] = {
-+	{ .compatible = "fsl,imx1-lcdc", .data = NULL, },
-+	{ .compatible = "fsl,imx21-lcdc", .data = NULL, },
-+	{ /* sentinel */ }
-+};
++static int __devexit ipu_drm_remove(struct platform_device *pdev)
++{
++	struct ipu_crtc *ipu_crtc = platform_get_drvdata(pdev);
 +
-+static struct platform_driver imx_crtc_driver = {
-+	.remove		= __devexit_p(imx_crtc_remove),
-+	.probe		= imx_crtc_probe,
-+	.driver		= {
-+		.name	= DRIVER_NAME,
-+		.owner	= THIS_MODULE,
-+		.of_match_table = imx_lcdc_dt_ids,
++	imx_drm_remove_crtc(ipu_crtc->imx_crtc);
++
++	ipu_put_resources(ipu_crtc);
++
++	return 0;
++}
++
++static struct platform_driver ipu_drm_driver = {
++	.driver = {
++		.name = "imx-ipuv3-crtc",
 +	},
++	.probe = ipu_drm_probe,
++	.remove = __devexit_p(ipu_drm_remove),
 +};
++module_platform_driver(ipu_drm_driver);
 +
-+static int __init imx_lcdc_init(void)
-+{
-+	return platform_driver_register(&imx_crtc_driver);
-+}
-+
-+static void __exit imx_lcdc_exit(void)
-+{
-+	platform_driver_unregister(&imx_crtc_driver);
-+}
-+
-+module_init(imx_lcdc_init);
-+module_exit(imx_lcdc_exit)
-+
-+MODULE_DESCRIPTION("Freescale i.MX framebuffer driver");
-+MODULE_AUTHOR("Sascha Hauer, Pengutronix");
++MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
++MODULE_DESCRIPTION(DRIVER_DESC);
 +MODULE_LICENSE("GPL");
 -- 
 1.7.10
