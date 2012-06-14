@@ -1,180 +1,63 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 14 Jun 2012 11:19:06 +0200
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4FD85127.8050301@firmworks.com>
-References: <4FD763C5.3090500@wwwdotorg.org>
- <20120612172041.GA28010@avionic-0098.adnet.avionic-design.de>
- <4FD7A36B.9090409@wwwdotorg.org> <4FD7B085.1020006@firmworks.com>
- <20120613064519.GD31001@avionic-0098.mockup.avionic-design.de>
- <4FD84133.4060401@firmworks.com>
- <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
- <4FD849CF.4030009@firmworks.com>
- <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
- <4FD85127.8050301@firmworks.com>
-Message-ID: <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Thu, 14 Jun 2012 09:26:24 +0000
+Subject: [PATCH 5/9] ARM: OMAP2+: gpmc-smc91x: Adapt to use gpmc driver
+In-Reply-To: <20120613134323.GX12766@atomide.com>
+References: <cover.1339419379.git.afzal@ti.com>
+ <0bdbc293fc98613011d37ec59559ba6d475eadf2.1339419379.git.afzal@ti.com>
+ <20120613122950.GR12766@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E998EC1@DBDE01.ent.ti.com>
+ <20120613134323.GX12766@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9997BD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2012 at 10:36:55PM -1000, Mitch Bradley wrote:
-> On 6/12/2012 10:19 PM, Thierry Reding wrote:
-> >On Tue, Jun 12, 2012 at 10:05:35PM -1000, Mitch Bradley wrote:
-> >>On 6/12/2012 9:52 PM, Thierry Reding wrote:
-> >>>I think the configuration spaces and downstream I/O ranges need to be in the
-> >>>pcie-controller's reg property because they are remapped and used by the
-> >>>controller driver, not by the individual ports.
-> >>>
-> >>>That's probably not really necessary but rather a result of how the driver
-> >>>was written. Perhaps the driver should handle them differently instead,
-> >>>listing the regions in the ranges property of the parent and listing the
-> >>>corresponding partitions in the ranges properties of the pci child nodes.
-> >>>
-> >>>Like in the following, where the ranges property of the ports partition the
-> >>>ranges passed from the parent evenly:
-> >>>
-> >>>	pcie-controller {
-> >>>		compatible = "nvidia,tegra20-pcie";
-> >>>		reg =<0x80003000 0x00000800   /* PADS registers */
-> >>>		       0x80003800 0x00000200>; /* AFI registers */
-> >>>		interrupts =<0 98 0x04   /* controller interrupt */
-> >>>			      0 99 0x04>; /* MSI interrupt */
-> >>>		status = "disabled";
-> >>>
-> >>>		ranges =<0x80000000 0x80000000 0x00002000   /* 2 root ports */
-> >>>			  0x80004000 0x80004000 0x00100000   /* configuration space */
-> >>>			  0x80104000 0x80100000 0x00100000   /* extended configuration space */
-> >>>			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
-> >>>			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
-> >>>			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
-> >>>
-> >>>		#address-cells =<1>;
-> >>>		#size-cells =<1>;
-> >>>
-> >>>		pci at 80000000 {
-> >>>			reg =<0x80000000 0x00001000>;
-> >>>			status = "disabled";
-> >>>
-> >>>			#address-cells =<3>;
-> >>>			#size-cells =<2>;
-> >>>
-> >>>			ranges =<0x80400000 0x80400000 0x00008000   /* I/O */
-> >>>				  0x90000000 0x90000000 0x08000000   /* non-prefetchable memory */
-> >>>				  0xa0000000 0xa0000000 0x08000000>; /* prefetchable memory */
-> >>
-> >>You are on the right track here, but the format of the child-address
-> >>portion of the above ranges property is incorrect.  Since the child
-> >>address space is the PCI address space, the child-address portion
-> >>needs to be 3 cells.  It's not a linear address but rather a triple.
-> >>The first cell identifies the address type (config, I/O, memory..)
-> >>and the second and third cells are offsets within that subspace.
-> >>The second and third cells will typically be 0.  The PCI binding has
-> >>details.
+Hi Tony,
+
+On Wed, Jun 13, 2012 at 19:13:24, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120613 06:43]:
+
+> > Do you mean for all the gpmc-* helpers existing initialization
+> > needs to be modified to use the new interface, the previous version
+> > was doing so. But then that will cause all boards using the same
+> > gpmc-* helper to be converted at once (tusb6010 is not an issue as
+> > only one board uses it), then the problem will be that there would
+> > be a few commits where gpmc may not work properly.
+> > 
+> > And for a particular board, either it has to use old interface
+> > or either the new interface, it cannot use both.
+> > 
+> > Consider the case of this one, smc91x, all sdp boards use it,
+> > that requires nand, onenand, nor gpmc-* helpers to be converted
+> > before board migration for say 3430sdp board, that would mean
+> > that 2430sdp board would be broken w.r.t gpmc at that commit as
+> > board modifications are not yet done for 2430. That in turn means
+> > all the boards using nand, onenand would be broken at that point.
 > 
-> Also, the size field in ranges is specified according to the child
-> address space, so there must be 2 size cells in the ranges at this
-> level.  Each ranges entry at this level is:
-> 
-> <child_address_space, child_address_high, child_address_low,
-> parent_address, child_size_high, child_size_low>
-> 
-> The above should be:
-> 
-> 			ranges =<0x81000000 0 0  0x80400000  0 0x00008000   /* I/O */
-> 				 0x82000000 0 0  0x90000000  0 0x08000000   /* non-prefetchable memory */
-> 				 0xc2000000 0 0  0xa0000000  0 0x08000000>; /* prefetchable memory */
-> 
-> 
+> What I mean is keep the old interface in gpmc.c, then convert
+> users one at a time to the new interface, and remove the old
+> interface code from the users. But yeah you're right, it may
+> not be immediately doable for the smc91x case before we dump
+> out the register values. But at least tusb6010 should be able
+> to just convert to use the new interface and drop the old code.
 
-Okay, so the new pcie-controller node looks like this:
+Yesterday, I overlooked the fact that n8x0 have onenand in addition
+to tusb6010. As that is the case, to have boards work properly,
+we may need to keep old interface along with new interface for at
+least a few commits even for tusb6010.
 
-	pcie-controller {
-		compatible = "nvidia,tegra20-pcie", "simple-bus";
-		reg = <0x80003000 0x00000800   /* PADS registers */
-		       0x80003800 0x00000200   /* AFI registers */
-		       0x80004000 0x00100000   /* configuration space */
-		       0x80104000 0x00100000>; /* extended configuration space */
-		interrupts = <0 98 0x04   /* controller interrupt */
-		              0 99 0x04>; /* MSI interrupt */
-		status = "disabled";
+Straightaway if existing tusb6010 interface is modified (without
+having new interface alongside), it will create problem for n8x0
+as it has onenand still using old interface. And a board at a time
+cannot use both.
 
-		ranges = <0x80000000 0x80000000 0x00002000   /* 2 root ports */
-			  0x80400000 0x80400000 0x00010000   /* downstream I/O */
-			  0x90000000 0x90000000 0x10000000   /* non-prefetchable memory */
-			  0xa0000000 0xa0000000 0x10000000>; /* prefetchable memory */
+And if we proceed in the reverse, i.e. convert onenand to use
+new interface first (w/o having new interface alongside),
+still n8x0 would have problems as tusb6010 would be using the old
+interface then
 
-		#address-cells = <1>;
-		#size-cells = <1>;
+So it seems, both interface has to live side-by-side till all
+boards are converted (or at least till all boards using the
+peripheral in question has to get converted to use new interface)
 
-		pci at 80000000 {
-			compatible = "nvidia,tegra20-pcie-port";
-			reg = <0x80000000 0x00001000>;
-			status = "disabled";
-
-			#address-cells = <3>;
-			#size-cells = <2>;
-
-			ranges = <0x81000000 0 0 0x80400000 0 0x00008000   /* I/O */
-				  0x82000000 0 0 0x90000000 0 0x08000000   /* non-prefetchable memory */
-				  0xc2000000 0 0 0xa0000000 0 0x08000000>; /* prefetchable memory */
-
-			nvidia,ctrl-offset = <0x110>;
-			nvidia,num-lanes = <2>;
-		};
-
-		pci at 80001000 {
-			compatible = "nvidia,tegra20-pcie-port";
-			reg = <0x80001000 0x00001000>;
-			status = "disabled";
-
-			#address-cells = <3>;
-			#size-cells = <2>;
-
-			ranges = <0x81000000 0 0 0x80408000 0 0x00008000   /* I/O */
-				  0x82000000 0 0 0x98000000 0 0x08000000   /* non-prefetchable memory */
-				  0xc2000000 0 0 0xa8000000 0 0x08000000>; /* prefetchable memory */
-
-			nvidia,ctrl-offset = <0x118>;
-			nvidia,num-lanes = <2>;
-		};
-	};
-
-While looking into some more code, trying to figure out how to hook this all
-up with the device tree I ran into a problem. I need to actually create a
-'struct device' for each of the ports, so I added the "simple-bus" to the
-pcie-controller's "compatible" property. Furthermore, each PCI root port now
-becomes a platform_device, which are supported by a new tegra-pcie-port
-driver. I'm not sure if "port" is very common in PCI speek, so something like
-tegra-pcie-bridge (compatible = "nvidia,tegra20-pcie-bridge") may be more
-appropriate?
-
-Using real platform devices is not only more straightforward (each bridge is
-after all a separate parent for the PCI endpoints) but it also has the
-advantage that the bridges are properly hooked up with the device tree. If I
-read the code correctly, passing the 'struct device' to pci_scan_root_bus()
-will allow the PCI core code to set up the proper pointers that allow busses
-and endpoints below each bridge to be matched to the corresponding DT nodes.
-
-However this causes other problems with the initialization of the PCIe
-controller. The translations cannot be setup and the controller shouldn't be
-enabled until after all the ports have been probed because it isn't clear
-which of them are really active and which are not. For the DT case this can
-probably be done by parsing the device tree and collecting the information,
-but for the non-DT case this will probably be more difficult.
-
-To solve this for both cases I could probably use device_for_each_child() and
-check that all children have been properly probed before setting up the
-translations and enabling the controller. That leaves the question of how to
-verify that a device has been correctly probed. The easiest would probably be
-to check if dev_get_drvdata() != NULL, but I'm still trying to decide whether
-that's too ugly or not. I don't know of any other way to determine that
-probing was successful. In addition it may still be useful to continue if one
-of the devices failed to initialize (the link on only one of two enabled
-ports is up).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120614/69eb44a0/attachment-0001.sig>
+Regards
+Afzal
