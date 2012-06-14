@@ -1,31 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 14 Jun 2012 19:32:32 +0100
-Subject: [PATCH 08/14] mfd: Add IRQ domain support for the AB8500
-In-Reply-To: <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
+Date: Thu, 14 Jun 2012 19:36:36 +0100
+Subject: [PATCH 09/14] i2c: Add Device Tree support to the Nomadik I2C
+ driver
+In-Reply-To: <4FD88761.9050703@linaro.org>
 References: <1339428307-3850-1-git-send-email-lee.jones@linaro.org>
- <1339428307-3850-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120614183231.GA30185@sirena.org.uk>
+ <1339428307-3850-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaMDbH4NkiHRLAfbJZ_j4QXbwg94bvaWsdYRPH+dSfc8Q@mail.gmail.com>
+ <4FD6F0E8.5040606@linaro.org>
+ <CACRpkdYxiT-0x4aetMxB2x8SkB+Mmy8rk8uSzgU_anemSayhMw@mail.gmail.com>
+ <4FD83AAD.2010701@linaro.org>
+ <CACRpkdZC8E6izDpdnWy6DMjOdA6KsqTaPoaq9pErWoNW0Ewytw@mail.gmail.com>
+ <4FD88761.9050703@linaro.org>
+Message-ID: <20120614183636.GB30185@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 11, 2012 at 04:25:01PM +0100, Lee Jones wrote:
+On Wed, Jun 13, 2012 at 01:28:17PM +0100, Lee Jones wrote:
 
-> +	if (np) {
-> +		ab8500->domain = irq_domain_add_linear(
-> +			np, num_irqs, &ab8500_irq_ops, ab8500);
-> +	}
-> +	else {
-> +		ab8500->domain = irq_domain_add_legacy(
-> +			NULL, num_irqs, ab8500->irq_base,
-> +			0, &ab8500_irq_ops, ab8500);
-> +	}
+> Device Tree. However, we have just as much control by keeping them
+> in separate structs in the C file and selecting the right one using
+> the compatible sting.
 
-This is odd, why are you forcing non-DT systems to use a legacy mapping?
-The more usual approach is to use a legacy mapping if and only if a base
-for the legacy range has been provided, otherwise the system will
-needlessly fail to initialise the device...
-
-> +	if (!(ab8500->irq_base || np)) {
-> +		dev_info(&pdev->dev, "couldn't find irq-base and not doing DT boot\n");
-
-...like this.  See regmap_irq for an example.
+You're not understanding Linus' point.  The compatible string isn't
+useful here because properties like the maximum clock rate of the bus
+depend on the board design, not the silicon.  The controller may be
+perfectly happy to run at a given rate but other devices on the bus or
+the electrical engineering of the PCB itself may restrict this further.
