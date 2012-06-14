@@ -1,104 +1,235 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 14 Jun 2012 13:50:56 -0600
-Subject: [PATCH v2 07/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
-References: <4FD7A36B.9090409@wwwdotorg.org> <4FD7B085.1020006@firmworks.com>
- <20120613064519.GD31001@avionic-0098.mockup.avionic-design.de>
- <4FD84133.4060401@firmworks.com>
- <20120613075232.GA6139@avionic-0098.mockup.avionic-design.de>
- <4FD849CF.4030009@firmworks.com>
- <20120613081910.GB6528@avionic-0098.mockup.avionic-design.de>
- <4FD85127.8050301@firmworks.com>
- <20120614091905.GA9081@avionic-0098.mockup.avionic-design.de>
- <4FDA2DDA.1030704@wwwdotorg.org>
- <20120614192903.GA2212@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4FDA40A0.4030206@wwwdotorg.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 14 Jun 2012 22:13:41 +0200
+Subject: [PATCHv2 02/12] ARM: OMAP2+: hwmod code/data: fix 32K sync timer
+In-Reply-To: <alpine.DEB.2.00.1206141136080.30212@utopia.booyaka.com>
+References: <20120611004502.20034.8840.stgit@dusk>
+ <20120611004555.20034.87035.stgit@dusk> <4FDA15AA.6090704@ti.com>
+ <alpine.DEB.2.00.1206141136080.30212@utopia.booyaka.com>
+Message-ID: <4FDA45F5.9090300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2012 01:29 PM, Thierry Reding wrote:
-> On Thu, Jun 14, 2012 at 12:30:50PM -0600, Stephen Warren wrote:
->> On 06/14/2012 03:19 AM, Thierry Reding wrote:
-...
->>> #address-cells = <1>; #size-cells = <1>;
->>> 
->>> pci at 80000000 {
->> 
->> I'm still not convinced that using the address of the port's
->> registers is the correct way to represent each port. The port
->> index seems much more useful.
->> 
->> The main reason here is that there are a lot of registers that
->> contain fields for each port - far more than the combination of
->> this node's reg and ctrl-offset (which I assume is an address
->> offset for just one example of this issue) properties can
->> describe. The bit position and bit stride of these fields isn't
->> necessarily the same in each register. Do we want a property like
->> ctrl-offset for every single type of field in every single shared
->> register that describes the location of the relevant data, or
->> just a single "port ID" bit that can be applied to anything?
->> 
->> (Perhaps this isn't so obvious looking at the TRM since it
->> doesn't document all registers, and I'm also looking at the
->> Tegra30 documentation too, which might be more exposed to this -
->> I haven't correlated all the documentation sources to be sure
->> though)
-> 
-> I agree that maybe adding properties for each bit position or
-> register offset may not work out too well. But I think it still
-> makes sense to use the base address of the port's registers (see
-> below). We could of course add some code to determine the index
-> from the base address at initialization time and reuse the index
-> where appropriate.
+On 6/14/2012 8:04 PM, Paul Walmsley wrote:
+> Hi
+>
+> On Thu, 14 Jun 2012, Cousson, Benoit wrote:
+>
+>> On 6/11/2012 2:45 AM, Paul Walmsley wrote:
+>>> Kuvin discovered that commit c8d82ff68fb6873691536cf33021977efbf5593c
+>>
+>> I guess you meant Kevin?
+>
+> ...
+>
+>>> The IP block itself pbobably does not have any native idle
+>>
+>> typo
+>
+> Thanks for noticing these, but they are not in what was sent out by the
+> list server:
+>
+> http://www.spinics.net/lists/linux-omap/msg71503.html
+>
+> Some software/hardware issue on your end, maybe?
 
-To me, working back from address to ID then using the ID to calculate
-some other addresses seems far more icky than just calculating all the
-addresses based off of one ID. But, I suppose this doesn't make a huge
-practical difference.
+Hehe, funny, first time outlook server is editing email automatically... 
+That's probably a new feature.
 
->>> compatible = "nvidia,tegra20-pcie-port"; reg = <0x80000000 
->>> 0x00001000>; status = "disabled";
->>> 
->>> #address-cells = <3>; #size-cells = <2>;
->>> 
->>> ranges = <0x81000000 0 0 0x80400000 0 0x00008000   /* I/O */ 
->>> 0x82000000 0 0 0x90000000 0 0x08000000   /* non-prefetchable
->>> memory */ 0xc2000000 0 0 0xa0000000 0 0x08000000>; /*
->>> prefetchable memory */
->> 
->> The values here appear identical for both ports. Surely they
->> should describe just the parts of the overall address space that
->> have been assigned/delegated to the individual port/bridge?
-> 
-> They're not identical. Port 0 gets the first half and port 1 gets
-> the second half of the ranges specified in the parent.
+>
+>>> handling at all, due to its simplicity.
+>>
+>> I don't think this description is really accurate, due to the usual confusing
+>> definition of IDLE for the PRCM standpoint :-)
+>> The counter_32k will follow PRCM requirement toward SIdleReq/SIdleAck.
+>> It has to be "idle" for PRCM standpoint to allow the transition of the L4_WKUP
+>> to inactive (SIdleAck=IDLE). And it will be functional as soon as the L4_WKUP
+>> domain is active.
+>>
+>> The fact that the smartidle mode is missing does not change anything in the
+>> way the PRCM handle the protocol. It is just an issue at IP level.
+>>
+>> In that case force-idle = smart-idle, just because this module does not have
+>> anything to do to delay the SIdleAck upon SIdleReq request. The IP is probably
+>> connecting the SIdleAck to the SIdleReq signal.
+>> Please note that there are a bunch of IPs that are doing that even if they do
+>> support the smartidle mode.
+>
+> Right, that's exactly my point -- perhaps made in an unclear way.
+>
+> My point was that the 32k counter IP block doesn't do anything with the
+> incoming IdleReq signal to determine whether or not to assert IdleAck back
+> to the PRCM.  But rather than implementing smart-idle mode to handle this,
+> like the other IP blocks do, the only two modes implemented were the
+> debugging modes, force-idle and no-idle.
+>
+> So depending on one's point of view, this patch is either:
+>
+> 1. a hardware bug workaround, because the hardware should have a
+> smart-idle mode that acts the same way as the force-idle mode, just like
+> the other IP blocks do; or
 
-Oh right, I missed some 8s and 0s that looked the same!
+Well it is not even a real HW bug. That's more a recommendation that was 
+not followed than a real HW bug. It is not the only one BTW, hence the 
+number of flags we have in hwmod already :-)
 
->>> While looking into some more code, trying to figure out how to
->>> hook this all up with the device tree I ran into a problem. I
->>> need to actually create a 'struct device' for each of the
->>> ports, so I added the "simple-bus" to the pcie-controller's
->>> "compatible" property. Furthermore, each PCI root port now
->>> becomes a platform_device, which are supported by a new
->>> tegra-pcie-port driver. I'm not sure if "port" is very common
->>> in PCI speek, so something like tegra-pcie-bridge (compatible =
->>> "nvidia,tegra20-pcie-bridge") may be more appropriate?
->> 
->> What is it that drives the need for each port to be a 'struct
->> device'? The current driver supports 2 host ports, yet there's
->> only a single struct device for it. Does the DT code assume a 1:1
->> mapping between struct device and DT node that represents the
->> child bus? If so, perhaps it'd be better to rework that code to
->> accept a DT node as a parameter and call it multiple times,
->> rather than accept a struct device as a parameter and hence need
->> multiple devices?
-> 
-> It's not so much the DT code, but rather the PCI core and
-> ultimately the device model that requires it. Each port is
-> basically a PCI host bridge that provides a root PCI bus and the
-> device model is used to represent the hierachy of the busses.
-> Providing just the DT node isn't going to be enough.
+A HW bug will be more for an IP that is supposed to have smart-idle but 
+it does work properly and thus has to be disabled. In that case the mode 
+is clearly not documented, so I'm not calling that an HW bug.
 
-But the existing driver works without /any/ devices, let alone one per
-port.
+> 2. a software workaround, because we don't have a 32k counter device
+> driver that implements runtime PM around counter reads.
+>
+> Of course #2 would be rather pointless and the patch description tries to
+> convey this too.
+>
+>>> Furthermore, the PRCM will never request target idle for this IP block
+>>> while the kernel is running, due to the sleep dependency that prevents
+>>> the WKUP clockdomain from idling while the CORE_L3 clockdomain is
+>>> active.  So we can safely leave the 32k sync timer in target-no-idle
+>>> mode, even while we continue to access it.
+>>
+>> Do you mean force-idle? Because accessing a module in no-idle is always
+>> possible.
+>
+> Thanks, that's indeed a description bug.
+
+I'm not sure to follow you? My point was it should be: "So we can safely 
+leave the 32k sync timer in force-idle mode, even while we continue to 
+access it."
+This is what the WA is doing.
+
+>>> This workaround is implemented by defining a new hwmod flag,
+>>> HWMOD_ALWAYS_FORCE_SIDLE, that places the IP block into target
+>>> force-idle mode even when enabled.  The 32k sync timer hwmods are
+>>> marked with this flag for OMAP3 and OMAP4 SoCs.  (On OMAP2xxx, no OCP
+>>> header existed on the 32k sync timer.)
+>>
+>> I still don't see the need for this flag. It looks to me that we are adding a
+>> redundant information and thus make things more complex than it should.
+>>
+>> 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
+>>
+>> It the real root cause of the problem. There is no need to re-encode that
+>> using an extra flag. Especially at hwmod level where the issue is at sysconfig
+>> level.
+>>
+>> I did not really get the reason why you changed your mind on that point.
+>>
+>> As soon as there is no SIDLE_SMART mode, what choice do we have but using the
+>> SIDLE_FORCE?
+>
+> SIDLE_NO is the option that makes more sense to me.
+>
+> Consider an IP block with SIDLE_NO and SIDLE_FORCE but without
+> SIDLE_SMART.  When an initiator will access it, the default setting should
+> be SIDLE_NO, for the reason that you identified above: "because accessing
+> a module in no-idle is always possible."  On the other hand, we don't know
+> when it's safe to access a module in SIDLE_FORCE unless we have additional
+> information as to how the IP block handles the SIdleReq signal internally,
+> and the characteristics of the clock domain in which it's integrated.
+
+Nope, that's not really accurate. The SIDLE mode is just the local 
+configuration for the IP behavior during clock domain transition to 
+idle. It does not have any influence on the re-activation of the clock.
+In that case, both force-idle and smart-idle will behave the same. Only 
+the transition to *idle* is supposed to be different between these two 
+modes, hence the name.
+What is missing here is the modulemode and the clock domain control:
+
+counter_32k modulemode description:
+"Module is managed automatically by HW according to clock domain 
+transition. A clock domain sleep transition put module into idle. A 
+wakeup domain transition put it back into function.
+If CLKTRCTRL=3, any OCP access to module is always granted. Module 
+clocks may be gated according to the clock domain state."
+
+This is the modulemode and clkdm static dependency / dynamic on OMAP3/4 
+that will guaranty that the OCP clock will be enabled upon any access to 
+this L4_WKUP clock domain IPs. This has nothing to do with the SIDLE mode.
+
+So SIDLE_FORCE is the right solution to still allow the proper 
+clockdomain transition. It will behave exactly like a SIDLE_SMART.
+And that's probably why they did not implement the smart-idle for that IP.
+
+> For
+> example, as mentioned earlier in the discussion on this patch, the AM335x
+> documentation states "By definition, initiator may generate read/write
+> transaction as long as it is out of IDLE state."
+
+I saw that sentence, but what is this supposed to mean?
+
+
+Moreover if AM335X require some specific trick, we should add some flags 
+for that, and not force the usage of a flag that is mostly irrelevant 
+for OMAP3 and 4 just because AM might need it.
+
+>> BTW, I even think the HWMOD_SWSUP_SIDLE hwmod flag is useless now. It
+>> was needed before probably because the idlemodes were wrongly populated.
+>>
+>> In fact the hwmod flags is really there to *flag* some real HW bug we cannot
+>> figure out otherwise, but in that case, the sysc.idlemodes already contains
+>> all the information we need to set the proper mode during enable/disable.
+>>
+>> Duplicating the information is always a source of confusion and might lead to
+>> nasty bugs due to the increase of complexity.
+>
+> You may be misunderstanding the meaning of the HWMOD_SWSUP_SIDLE flag.  It
+> was added to work around IP blocks that had broken smart-idle.  These
+> modules definitely do exist; see for example the OMAP3 wdt2, usbhsotg, and
+> usb_host_hs hwmods as some examples.
+
+I know, I was mostly referring to the HWMOD_ALWAYS_FORCE_SIDLE. My point 
+about HWMOD_SWSUP_SIDLE is: it is useless for that IP, not in general.
+
+> It might be reasonable to remove the HWMOD_SWSUP_SIDLE flag from the 32k
+> counter and just test again for HWMOD_ALWAYS_FORCE_SIDLE in the module
+> disable.  I'll take a look at this.
+
+Both should be removed as explained before. There is clearly no need for 
+HWMOD_ALWAYS_FORCE_SIDLE.
+
+We are already explicitly listing the limitation through the idlemodes 
+attribute. Only SIDLE_FORCE and SIDLE_NO are supported, so we already 
+know that SIDLE_FORCE is the proper way to fix that limitation for the 
+current OMAPs.
+Since there is no other IP with such limitation, we know as well that 
+there will be no side effect.
+If, in the future, some more IPs will have that limitation and will not 
+work as expected, it will mean that some other HW bugs will be there, 
+and only these ones will have to be flagged.
+
+But my point is let's keep it simple and not try to anticipate future 
+bugs. This flag is not require today, let's not add it.
+
+>>> Another theoretically clean fix for this problem would be to implement
+>>> PM runtime-based control for 32k sync timer accesses.  These PM
+>>> runtime calls would need to located in a custom clocksource, since the
+>>> 32k sync timer is currently used as an MMIO clocksource.  But in
+>>> practice, there would be little benefit to doing so; and there would
+>>> be some cost, due to the addition of unnecessary lines of code and the
+>>> additional CPU overhead of the PM runtime and hwmod code - unnecessary
+>>> in this case.
+>>
+>> I don't think that part is really relevant anymore.
+>
+> Why?
+
+I'm not sure anymore now :-)
+I guess it was because I thought this is mostly a HW issue, and it was 
+detected because HWMOD_SWSUP_SIDLE was set previously. Without that, 
+this IP will behave like a GPTIMER.
+
+>>> Another possible fix would have been to modify the pm34xx.c code to
+>>> force the IP block idle before entering WFI.  But this would not have
+>>> been an acceptable approach: we are trying to remove this type of
+>>> centralized IP block idle control from the PM code.
+>>
+>> Neither that one I guess. As soon as we consider force-idle to be equivalent
+>> to smart-idle, nothing more is needed.
+>
+> But they are definitely not equivalent.
+
+Indeed, but in that case, yes, and this is what really matter.
+
+Regards,
+Benoit
